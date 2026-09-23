@@ -1238,9 +1238,81 @@ export const MH_DRIVE_HEADING = Object.freeze({
     abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
     sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
     droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
-    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: false }),
-    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: false }),
+    // wired at v4662 -- see MH_ADVECT_SIGN. These two do not point a path at V, they carry the whole cloud
+    // along it, and the displacement is k * driveInt rather than murmur's k * drive * t.
+    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: true }),
+    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: true }),
 });
+
+/**
+ * *** THE LAST TWO BARE `rate * t` SITES IN THE ROSTER, AND BOTH ARE ABSENCES RATHER THAN TELEPORTS --
+ * v4662. ***
+ *
+ * v4654 chose to integrate rather than transcribe, and v4655-v4657 took the four mechanisms that were
+ * already MOVING in this port: the rates handed to mh_drift, the rates that multiply mh_drift's whole
+ * result, the flourish slot divisors, and the two rates that are products. What was left were two sites
+ * where murmur's rate moves and THIS PORT'S DOES NOT -- so there was no teleport here to repair, only a
+ * signal that never arrived. An absence is not findable by any census that hunts for signals: these two
+ * came out of reading opal.ts and geode.ts against this file, which is the same instrument that found
+ * helix's climb at v4655.
+ *
+ * ADDING THEM AS murmur SPELLS THEM WOULD HAVE SHIPPED TWO NEW TELEPORTS, at the end of an arc whose whole
+ * subject was removing them. Adding them in the integrated form costs nothing new: both rates are SUMS of
+ * the conditioned signals, the three integrals are already sent to the shader, and the reduction at a held
+ * signal is exact -- so neither moves a recorded frame.
+ */
+export const MH_OPAL_DRIFT = Object.freeze({ base: 0.055, knob: 0.075, pace: 0.75, drive: 0.95 });
+
+/**
+ * *** geode's IS A MIX AND NOT A PRODUCT, WHICH IS WHY ITS COEFFICIENT IS DERIVED HERE RATHER THAN WRITTEN
+ * DOWN. ***
+ *
+ * geode.ts spells the spin as mix(mh_drift(t, 0.088*sp, ...), t * 0.30 * sp, st.drive * 0.70): under drive
+ * the stone stops wobbling around its own slow turn and takes a faster, steadier one. The secular half
+ * expands to
+ *
+ *     0.088*sp*t*(1 - 0.70*d) + 0.30*sp*t*0.70*d  =  0.088*sp*t * (1 + ((0.30*0.70)/0.088 - 0.70) * d)
+ *
+ * -- sp cancels, and the drive coefficient is 1.686364, which is 0.1484 of absolute rate. THAT NUMBER IS
+ * NOT ONE murmur WROTE. Writing 1.686364 into a table would present a derived quantity as a transcription,
+ * and the next reader could not check it against geode.ts without re-deriving it; worse, a later edit to
+ * `to` or `w` would leave it silently stale. So the two numbers murmur DID write are the table, the
+ * coefficient is a function of them and of the species' own rate, and
+ * tools/ship/murmurClock3-selfcheck.mjs grades the identity against murmur's mix at held drive rather than
+ * against this arithmetic restated.
+ *
+ * THE WOBBLE IS MIXED TOO AND IT STAYS INSTANTANEOUS, which is v4655's rule and not a new decision: the mix
+ * scales mh_drift's whole result by (1 - w*d), so the wobble amplitude is (1 - w*d) * k*rate/w2 -- bounded
+ * by construction, it cannot accumulate, and only the secular half needed the integral.
+ */
+export const MH_GEODE_SPIN = Object.freeze({ to: 0.30, w: 0.70 });
+
+/** geode's drive coefficient as a multiple of its own base rate -- see MH_GEODE_SPIN. */
+export function mhGeodeSpinDrive(spinRate, to, w) {
+    return (to * w) / spinRate - w;
+}
+
+/**
+ * *** AND THE ADVECTION: THE LAST TWO `wired: false` ENTRIES IN MH_DRIVE_HEADING -- v4662. ***
+ *
+ * nebula and tempest do not point a path at the heading the way still and abyss do; they carry the whole
+ * CLOUD along it. nebula.ts spells adv = V * (st.drive * k * t) and displaces the medium's sample point by
+ * it, so under drive the field streams past in one direction instead of turning over in place.
+ *
+ * *** IT WAS HELD BACK FOR ONE REASON AND THAT REASON IS GONE. *** v4653 recorded it as "the same hazard
+ * wearing the heading family's clothes" -- a displacement proportional to elapsed time, which jumps by
+ * t * dDrive the instant drive moves, exactly like every rate this arc has repaired. The integral of
+ * drive * k dt IS k * driveInt, the host has been accumulating it since v4654, and the substitution is one
+ * argument. A census row in tools/ship/murmurDrive-selfcheck.mjs was set to go RED the day anyone wired
+ * these two, so that the note would be read before the jump shipped; it fires on this round by design, and
+ * the answer it gets is that the jump is not being shipped.
+ *
+ * THE SIGN IS A DECISION AND IT IS STATED: the sample point is displaced by MINUS the advection, so the
+ * pattern APPEARS to move along +V. Sampling at p + adv would move the cloud the other way for the same
+ * arithmetic, and V is the same vector the heading family leans toward -- a cloud leaning one way while
+ * still and abyss lean the other would be a different design, not a sign convention.
+ */
+export const MH_ADVECT_SIGN = -1;
 
 /**
  * *** AND THE OTHER HALF OF THE LEAN: IT STOPS SCATTERING. ***

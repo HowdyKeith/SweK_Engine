@@ -366,20 +366,45 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         const tP = diff(run.frames[0], run.frames[5]), tD = diff(run.frames[0], run.frames[6]);
         const hV = diff(run.frames[2], run.frames[7]);
         const fV = diff(run.frames[8], run.frames[10]), fD = diff(run.frames[8], run.frames[11]);
-        say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest driveInt 0 -> 14: ${tD.pct.toFixed(1)}%   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
+        // *** tempest's DRIVE PAIR LEFT THIS ROW AT v4662 AND IT LEFT AS A POSITIVE, NOT AS AN EXCUSE. ***
+        // It read 0.0% from v4655 to v4661 because tempest's DRIFT is scaled by voice alone -- which is still
+        // true, and is still what this gate's subject is. What changed is the SPECIES: v4662 wired nebula's
+        // and tempest's advection, nebula.ts's adv = V * (st.drive * k * t), and the frame cannot tell a
+        // cloud whose drift ignores drive from a cloud that is being carried along a heading by it. An
+        // instrument that cannot separate its subject from something else in the same picture is not
+        // measuring its subject, so the pair moves to the row below rather than having its bound widened.
+        say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest driveInt 0 -> 14: ${tD.pct.toFixed(1)}% (the v4662 ADVECTION, not the drift)   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
         say(`flux    voiceInt 0 -> 14: ${fV.pct.toFixed(1)}%   flux driveInt 0 -> 14: ${fD.pct.toFixed(1)}%`);
-        ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: five sweeps, zero bytes ***",
-            tP.pct === 0 && tD.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0,
+        ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: four sweeps, zero bytes ***",
+            tP.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0,
             `the SAME fourteen radian-seconds that move ${tV.pct.toFixed(1)}% of tempest on voiceInt move ` +
-            `${tP.pct.toFixed(0)} bytes on paceInt and ${tD.pct.toFixed(0)} on driveInt, and the same sweep ` +
+            `${tP.pct.toFixed(0)} bytes on paceInt, and the same sweep ` +
             `that moves ${hD.pct.toFixed(1)}% of helix on driveInt moves ${hV.pct.toFixed(0)} bytes on ` +
             `voiceInt, and flux moves ${fV.pct.toFixed(0)} and ${fD.pct.toFixed(0)} bytes on the two it does ` +
             `not read. nebula.ts and tempest.ts scale their drift by voice alone; flux.ts scales its stream ` +
-            `by pace alone; helix.ts scales its climb by pace and drive alone. THE POSITIVE ROWS ABOVE ` +
+            `by pace alone; helix.ts scales its climb by pace and drive alone. *** IT WAS FIVE SWEEPS UNTIL ` +
+            `v4662 AND THE FIFTH IS NOW A POSITIVE ROW INSTEAD: *** tempest's drift is still deaf to drive, ` +
+            `but tempest the SPECIES is not, because that round wired the advection nebula.ts and tempest.ts ` +
+            `spell as adv = V * (st.drive * k * t). The frame cannot separate a drift that ignores drive from ` +
+            `a cloud being carried along a heading by it, so the pair was moved rather than kept on a ` +
+            `widened bound -- and the round that moved it added the reading it now makes. FOUR NEGATIVES ` +
+            `STILL SEPARATE THREE WIRES FROM ONE BUS, which is what this row exists for. THE POSITIVE ROWS ABOVE ` +
             `CANNOT TELL THE DIFFERENCE between three wires ` +
             `and one bus -- this one can, and it is the reason the three integrals were kept as three ` +
             `uniforms instead of being summed into the single "how busy has it been" number that would have ` +
             `been cheaper and would have been a different function.`);
+
+        // *** AND THE PAIR THAT MOVED HERE, AS A POSITIVE: the advection v4662 wired. ***
+        ok("!! ...and tempest's cloud IS carried by the drive integral, which is the pair that left the row above",
+            tD.pct > 5 && tD.mx > 50,
+            `fourteen radian-seconds of accumulated drive move ${tD.pct.toFixed(1)}% of tempest's bytes, ` +
+            `worst channel ${tD.mx} of 255 -- on a species whose DRIFT reads no drive at all. That is the ` +
+            `advection: nebula.ts's adv = V * (st.drive * k * t), which this port did not carry until v4662 ` +
+            `and which is spelled k * driveInt here rather than k * drive * t, because the transcription ` +
+            `jumps by t * dDrive and the integral does not. The reading is in THIS gate rather than only in ` +
+            `the round's own because the pair used to be one of this row's negatives: a measurement that ` +
+            `stops being available should leave behind the measurement that replaced it, in the same file, ` +
+            `or the next reader finds a gate that quietly counts one fewer than its own prose.`);
     }
 }
 

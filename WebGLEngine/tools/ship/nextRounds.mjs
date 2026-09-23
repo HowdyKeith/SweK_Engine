@@ -1098,6 +1098,38 @@ export const NEXT_ROUNDS = [
             "found that exact pairing wrong twice (aura's ribbons, helix's strands). v4661 put its own " +
             "constant on brightP, which both channels already read, and left the other two where it found " +
             "them. Somebody with murmur's prism.ts in front of them should settle it in one line.",
+        note11: "*** THE CLOCK ARC IS CLOSED AT v4662, AND ITS LAST THREE SITES WERE ABSENCES. *** opal's " +
+            "flash drift took murmur's (1 + 0.75*live.pace + 0.95*st.drive); geode's spin took the " +
+            "mix(mh_drift, t*0.30*sp, 0.70*st.drive) it had carried one arm of; and nebula's and tempest's " +
+            "ADVECTION was wired -- the last two `wired: false` entries in MH_DRIVE_HEADING, nine rounds " +
+            "after v4653 set a census row to go red the day anybody did. All three are integrated, not " +
+            "transcribed, so none of them shipped the jump.\n\n" +
+            "*** THE ROUND'S NEW RULE FOUND A FOURTH SITE THAT WAS LIVE, AND THE LESSON IS ABOUT CENSUSES. " +
+            "*** Every rate census from v4654 to v4657 inspected mh_drift CALL SITES and each printed a " +
+            "clean result. sol's granulation is uniforms.time * (0.35 + 0.75*live.pace) -- a bare product " +
+            "inside a noise lookup, no mh_drift anywhere near it -- so none of them could see it. Section 5 " +
+            "of tools/ship/murmurClock3-selfcheck.mjs asks the question at the level of the DEFECT (a " +
+            "signal multiplied by uniforms.time, anywhere) rather than at the level of the mechanism the " +
+            "defect usually arrives through, and it found it on the first run. 270.0 units of noise space " +
+            "in one 1/60 s frame after half an hour, which is thirty-two body radii at granScale 8.5.\n\n" +
+            "*** AND A NEAR MISS WORTH MORE THAN THE FIX. *** The round measured sol's granulation with a " +
+            "byte count, got 0.0% and worst 1 of 255 at 48 px and at 128 px, ruled out the moire gate, and " +
+            "was one edit from recording \"it cannot be seen at all\" as a named absence with three " +
+            "measurements behind it. tools/ship/murmurSpecies9-selfcheck.mjs had been grading it all along " +
+            "with a neighbour-to-neighbour TEXTURE statistic at a dimmed operating point: x1.488 on the " +
+            "simmer knob. A zero-mean noise on a bright disc moves almost no bytes and a great deal of " +
+            "texture. WHAT TO DO ABOUT IT NEXT TIME is in the shape of the mistake: before recording that a " +
+            "term cannot be seen, grep for a gate that already renders it.\n\n" +
+            "*** WHAT IS LEFT OF THE murmur PORT, MEASURED AT v4662: *** mh_out's triangular-PDF dither is " +
+            "the one kit function of 41 still unported. st.complete is done (v4661), st.settled is 19 sites " +
+            "on 3 shapes, st.sweep is 8 readers, st.drive is 24 and its rate family is closed. THE LARGEST " +
+            "REMAINING ITEM IS THE CADENCE: five builders covering six species still have no live.pace at " +
+            "all -- droplet, opal, mist (nebula and tempest), fathom, geode -- against murmur giving all " +
+            "eighteen one, and that count has moved in six of the last eight rounds. Then tempest's bolt " +
+            "slots missing murmur's `small` mix (mix(2.9, 5.2, small) and mix(4.3, 7.4, small)), and " +
+            "prism's open question from v4661: whether its gesture pulse and its v4659 travelling figure " +
+            "belong on the hue numerator as well as on the energy, which needs prism.ts in front of " +
+            "somebody rather than an inference.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

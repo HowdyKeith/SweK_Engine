@@ -263,11 +263,21 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     say(`species whose clocks use the integrated phase: ${repaired.join(", ")}`);
     say(`modulated rates still on murmur's rate * t: ${plainDrift.length ? plainDrift.join(", ") : "(none)"}`);
 
-    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet"].sort();
-    ok("!! *** ALL SEVEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
+    // *** EIGHT AT v4662, AND THE EIGHTH WAS AN ABSENCE RATHER THAN A TELEPORT. *** geode's spin is
+    // mix(mh_drift(...), t * 0.30 * sp, st.drive * 0.70) in geode.ts and this port carried the mh_drift arm
+    // alone -- so there was no modulated rate here for this census to find, and there never would have been.
+    // Every species this row has ever added for that reason (helix at v4655, geode here) came out of reading
+    // the source file against this one, which is the only instrument that finds a signal that is missing.
+    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "geode"].sort();
+    ok("!! *** ALL EIGHT MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
         repaired.slice().sort().join(",") === WANT.join(",") && plainDrift.length === 0,
         `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase, and ` +
-        `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. THE CENSUS ` +
+        `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. *** AND ONE ` +
+        `SITE USES mhRatePhase WITHOUT mhDriftPhase, WHICH IS WHY THIS ROW COUNTS EIGHT AND NOT NINE: *** ` +
+        `opal's flash drift is spent inside three plain sines rather than through mh_drift, so it has a ` +
+        `secular phase to integrate and no wobble to leave alone. It took murmur's live terms at v4662 -- ` +
+        `(1 + 0.75*live.pace + 0.95*st.drive), absent from this port until then -- and it is graded in ` +
+        `tools/ship/murmurClock3-selfcheck.mjs, not here, because this row's subject is mh_drift. THE CENSUS ` +
         `SAID "(none)" AT v4654 WHILE mist AND flux WERE STILL TELEPORTING -- it inspected only the rate ` +
         `argument, and only when that argument was a bare identifier, so a drift whose OUTPUT is scaled ` +
         `afterwards was invisible to it. *** AND THE LAST ONE, duet's, WAS RECORDED HERE FOR THREE ROUNDS AS ` +

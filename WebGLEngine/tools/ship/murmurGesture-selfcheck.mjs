@@ -403,12 +403,24 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
             `the shader conditions from a uniform differs between the two halves -- under the expression ` +
             `this round replaced these would be five identical pictures.`);
 
-        say(`still +voiceInt 12 (glint ON): ${sV.pct.toFixed(1)}%   |   tempest +driveInt 9: ${tD.pct.toFixed(1)}%   +paceInt 9: ${tP.pct.toFixed(1)}%`);
+        // *** tempest's DRIVE PAIR LEFT THIS ROW AT v4662, FOR A REASON THAT IS NOT ABOUT SLOTS. *** It read
+        // 0.0% from v4656 to v4661 because tempest.ts divides its bolt slots by energy alone -- still true,
+        // and still this row's subject. What changed is the species: v4662 wired nebula's and tempest's
+        // advection, adv = V * (st.drive * k * t), and a frame of tempest cannot separate a SLOT that
+        // ignores drive from a cloud being carried along a heading by it. The same pair left the equivalent
+        // row in tools/ship/murmurClock2-selfcheck.mjs in the same round and for the same reason, and that
+        // gate carries the positive reading it became.
+        say(`still +voiceInt 12 (glint ON): ${sV.pct.toFixed(1)}%   |   tempest +driveInt 9: ${tD.pct.toFixed(1)}% (the v4662 ADVECTION, not the slot)   +paceInt 9: ${tP.pct.toFixed(1)}%`);
         ok("!! *** ...AND EACH SLOT IS DEAF TO THE SIGNALS murmur DOES NOT GIVE IT -- measured with the gesture ON SCREEN ***",
-            sV.pct === 0 && tD.pct === 0 && tP.pct === 0,
+            sV.pct === 0 && tP.pct === 0,
             `still.ts divides by pace and drive and NOT voice; tempest.ts by energy alone. Twelve ` +
-            `radian-seconds of the signal each one does not read moves ${sV.pct.toFixed(0)}, ` +
-            `${tD.pct.toFixed(0)} and ${tP.pct.toFixed(0)} bytes. THE FRAMES THESE ARE MEASURED AGAINST HAVE ` +
+            `radian-seconds of the signal each one does not read moves ${sV.pct.toFixed(0)} and ` +
+            `${tP.pct.toFixed(0)} bytes. *** IT WAS THREE PAIRS UNTIL v4662 AND THE THIRD IS NOT AVAILABLE ` +
+            `ANY MORE: *** tempest's SLOT is still deaf to drive, but that round wired the species' ` +
+            `advection and a frame of tempest now moves ${tD.pct.toFixed(1)}% on driveInt for a reason that ` +
+            `has nothing to do with a slot. The pair was dropped rather than kept on a widened bound, and ` +
+            `tools/ship/murmurClock2-selfcheck.mjs carries the positive reading it turned into. THE FRAMES ` +
+            `THESE ARE MEASURED AGAINST HAVE ` +
             `THE GESTURE UP -- still at 0.993 and tempest's first bolt at 0.981 -- which is the whole ` +
             `difference between this row and a vacuous one: a deaf reading taken on a NIGHT frame says ` +
             `nothing, because nothing was on screen to move. The first cut of this section measured exactly ` +

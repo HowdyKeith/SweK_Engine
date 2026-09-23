@@ -207,15 +207,21 @@ sec("2. *** THE SIX HEADINGS ARE NOT ONE VECTOR, NONE OF THEM IS A UNIT VECTOR, 
 
     // The z sign is the finding, and it is the reason the two unwired entries are carried here at all.
     const fwd = names.filter((n) => H[n].v[2] > 0), back = names.filter((n) => H[n].v[2] < 0);
-    ok("!! *** THE FOUR WIRED HEADINGS POINT ONE WAY IN DEPTH AND THE TWO CLOUDS STREAM THE OTHER ***",
+    // *** THE ROW USED TO TIE THE DEPTH SPLIT TO THE WIRED SPLIT AND SAY IT WAS A COINCIDENCE OF SUBJECT. ***
+    // It was: the two that stream away are murmur's two volumetric heroes, and their heading is an
+    // ADVECTION rather than a direction. v4662 wired both, so the coincidence is gone and the SUBJECT claim
+    // is what is left -- which is the half that was ever worth asserting. A row whose condition happened to
+    // encode a scheduling fact alongside a design fact goes red when the schedule moves, and reads as though
+    // the design had changed.
+    ok("!! *** THE FOUR HEADINGS POINT ONE WAY IN DEPTH AND THE TWO CLOUDS STREAM THE OTHER ***",
         fwd.join(",") === "still,abyss,sol,droplet" && back.join(",") === "nebula,tempest" &&
-        fwd.every((n) => H[n].wired) && back.every((n) => !H[n].wired),
-        `+z: ${fwd.join(", ")}; -z: ${back.join(", ")}. The split is exactly the wired/unwired split and that ` +
-        `is a coincidence of subject, not of scheduling: the two that stream AWAY are murmur's two volumetric ` +
-        `heroes, and their headings are spelled as an ADVECTION -- adv = V * (drive * k * t) -- a displacement ` +
-        `proportional to elapsed time. A drive ramping while t is large advects the domain by t * k * dDrive ` +
-        `in one frame, which is the shape v4650 repaired on this orb's host clock (2.902 s in one frame after ` +
-        `a minute; 86.191 s after half an hour). This round wires only terms that are a DIRECTION or a SIZE.`);
+        names.every((n) => H[n].wired),
+        `+z: ${fwd.join(", ")}; -z: ${back.join(", ")}. THE SPLIT IS BY WHAT THE HEADING IS FOR: the four ` +
+        `that point INTO the frame aim a path or a body at the viewer under drive, and the two that stream ` +
+        `AWAY are murmur's two volumetric heroes, whose heading is an ADVECTION -- the whole cloud carried ` +
+        `along V -- so leaning toward the viewer would push the field out of its own silhouette. Until v4662 ` +
+        `this split was also exactly the wired/unwired split and the row said so; all six are wired now, and ` +
+        `what is asserted is the geometry rather than the coincidence.`);
 }
 
 // =============================================================================================================
@@ -312,16 +318,36 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     // string key from the file as written.
     const rawSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
     const dropletFlow = /DROPLET_FLOW/.test(src) && /species === "droplet" && HEAD/.test(rawSrc);
-    const reached = callers.concat(dropletFlow ? ["droplet"] : []).sort();
-    say(`heading callers: ${callers.join(", ")}${dropletFlow ? " (+ droplet, via the body's flow deformation)" : ""}`);
-    ok("!! *** EXACTLY THE `wired` ENTRIES REACH THE SHADER, AND THE TWO ADVECTIONS REACH NOTHING ***",
-        reached.join(",") === wired.join(",") && !/MH_DRIVE_HEADING\.(nebula|tempest)/.test(src),
+    // *** THE ADVECTION IS A THIRD SPELLING AND THIS CENSUS HAD TO LEARN IT -- v4662. *** nebula and tempest
+    // do not call mhDriveHeading and never will: they do not point a path at V, they displace the medium's
+    // sample point by it, and both are built by the ONE shared buildMist closure. So the census asks the
+    // builder they actually dispatch to, and credits both species when it reads the table by species key.
+    // The two halves of the wired set are now reached by three different mechanisms -- a direction (still,
+    // abyss, sol), a flow deformation (droplet) and an advection (nebula, tempest) -- which is why this row
+    // reads THREE patterns rather than counting one.
+    const mistBlk = (() => { for (let k = 0; k < marks.length - 1; k++)
+        if (marks[k][1] === "mist") return lines.slice(marks[k][0], marks[k + 1][0]).join("\n");
+        return ""; })();
+    const advects = /MH_DRIVE_HEADING\[species\]/.test(mistBlk) && /uniforms\.driveInt/.test(mistBlk);
+    const reached = callers.concat(dropletFlow ? ["droplet"] : [], advects ? ["nebula", "tempest"] : []).sort();
+    say(`heading callers: ${callers.join(", ")}${dropletFlow ? " (+ droplet, via the body's flow deformation)" : ""}` +
+        `${advects ? " (+ nebula, tempest, via the cloud's advection)" : ""}`);
+    ok("!! *** EXACTLY THE `wired` ENTRIES REACH THE SHADER, AND THE ADVECTION REACHES IT AS AN INTEGRAL ***",
+        reached.join(",") === wired.join(",") && advects &&
+        !/MH_DRIVE_HEADING\[species\][\s\S]{0,400}?\.mul\(uniforms\.time\)/.test(rawSrc),
         `the builder reads ${reached.join(", ")}; MH_DRIVE_HEADING's wired set is ${wired.join(", ")}. ` +
         `EQUALITY IN BOTH DIRECTIONS, and each direction has a failure behind it: a table entry no closure ` +
         `reads draws nothing at all (v4644's dead MH_IGNITE entry walked through every pixel gate in that ` +
-        `round), and a closure reading an entry that is not there would fault on its k. nebula's and ` +
-        `tempest's names appear nowhere in the shader, so the day somebody wires them THIS ROW GOES RED and ` +
-        `the note explaining why they were left out gets read before the jump ships.`);
+        `round), and a closure reading an entry that is not there would fault on its k. ` +
+        `*** THIS ROW WAS SET AT v4653 TO GO RED THE DAY ANYBODY WIRED THE TWO ADVECTIONS, so that the note ` +
+        `explaining why they were left out would be read before the jump shipped. IT FIRED ON v4662, AND THE ` +
+        `ANSWER IS THAT THE JUMP IS NOT BEING SHIPPED. *** nebula.ts spells adv = V * (st.drive * k * t), ` +
+        `which advects the domain by t * k * dDrive in a single frame when drive moves -- 34.36 units after ` +
+        `half an hour, measured. The wiring spends k * driveInt instead, the same integral v4654 built for ` +
+        `every other rate in this port, and the last conjunct above is what holds it: the table's entry may ` +
+        `not be multiplied by uniforms.time anywhere within 400 characters of being read. So the row still ` +
+        `goes red for the thing it was built to catch, and it now passes for the repair rather than for the ` +
+        `absence.`);
 
     // *** THE RULE THIS ROUND SET ITSELF -- AND WHAT IT BECAME TWO ROUNDS LATER, WHICH IS WHY IT IS REWRITTEN
     // RATHER THAN LEFT PASSING. *** At v4653 this row read "NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK" and
@@ -396,9 +422,11 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "made the secular phase an integral and v4655 finished the sites whose whole output is multiplied. The " +
     "rule above was rewritten to say what is true now rather than left passing on a condition its own " +
     "sentence had outgrown; tools/ship/murmurClock-selfcheck.mjs and murmurClock2-selfcheck.mjs are the " +
-    "gates for it, and limn's drive FACTOR is the one piece still outstanding because its rate is a " +
-    "product. nebula's and tempest's advections remain unwired -- that same " +
-    "hazard in the heading family and are carried unwired with a census row that goes red if anyone wires " +
-    "them. The scatter collapsing around the heading is the sibling gate, " +
+    "gates for it; limn's drive FACTOR arrived at v4657 through the two cross-term integrals, and the last " +
+    "two bare sites -- opal's flash drift and geode's spin mix -- at v4662, which also WIRED nebula's and " +
+    "tempest's advections. Those were carried here unwired for nine rounds with a census row set to go red " +
+    "the day anybody wired them, and it did: the row now reads that they reach the shader as k * driveInt " +
+    "and asserts that the table's entry is never multiplied by uniforms.time. The clock arc is closed. " +
+    "The scatter collapsing around the heading is the sibling gate, " +
     "tools/ship/murmurDrive2-selfcheck.mjs.");
 process.exit(fails ? 1 : 0);

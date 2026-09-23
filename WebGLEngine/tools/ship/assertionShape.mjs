@@ -691,8 +691,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // holds the four that are not the family's (1 + k * complete) shape plus still's, the second the four
     // plain multiplies -- but the reason there are two files is the clock, and saying otherwise would make
     // the next round look for a distinction that is not there.
-    gates: 1770, usesOk: 1749, definesOk: 1741, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1642, condFirst: 96, unknownSignature: 11,
+    // v4662 -- RE-TAKEN 1770 -> 1772 for tools/ship/murmurClock3-selfcheck.mjs and murmurClock4. The split
+    // is BY INSTRUMENT and the clock is why, which is worth recording because it is the first time this
+    // tree has split a gate that way: one file held the arithmetic and the pixels and measured 3,605 ms
+    // against a 3,000 ms ceiling once sol's frames joined it. Every claim in Clock3 is arithmetic or source
+    // and it runs in 147 ms; Clock4 renders five species in 2,837. Splitting by SUBJECT would have put a
+    // 147 ms file and a 2,837 ms file at the same total and made neither one's subject whole.
+    gates: 1772, usesOk: 1751, definesOk: 1743, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1644, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

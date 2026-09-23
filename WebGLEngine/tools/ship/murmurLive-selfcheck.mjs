@@ -232,11 +232,16 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 15 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 15,
+    ok("!! the conditioned pair is declared once each and read 42 and 14 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 14,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
         `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
-        `-- and every step was an ABSENCE being filled rather than a number being invented: helix's climb ` +
+        `-- and then DOWN by one at v4662, which is the first time this count has fallen and is a REPAIR ` +
+        `rather than a regression: sol's granulation read the instantaneous cadence and multiplied it by ` +
+        `elapsed time, which jumps by t*dPace whenever the cadence moves -- 270.0 units of noise space in ` +
+        `one frame after half an hour, measured. A SECULAR PHASE MUST READ THE INTEGRAL AND NOT THE SIGNAL, ` +
+        `so that site is a paceInt reader now and the cadence still reaches it. Every OTHER step was an ` +
+        `ABSENCE being filled rather than a number being invented: helix's climb ` +
         `took murmur's 0.75*live.pace at v4655, still's and abyss's gesture slots took 0.30 and 0.35 of it ` +
         `at v4656, and duet's orbital rate took 0.55 at v4657. The 43 before all that was a REPAIR of a ` +
         `recorded 44, not a regression: v4641 moved 44 raw-knob sites and 8 glintRate sites, and one of the ` +

@@ -26,6 +26,75 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4662 -- the last three places a signal multiplies elapsed time, and a fourth nobody had looked for
+
+v4654 chose to integrate rather than transcribe murmur's `rate * t`. v4655 took the clocks whose whole
+*output* is scaled, v4656 the flourish slot divisors, v4657 the two rates that are products. Each of those
+repaired a teleport that was **live** in this port. What was left were three sites where murmur's rate moves
+and this port's did not move at all:
+
+| | murmur spells it | this port carried |
+|---|---|---|
+| opal's flash drift | `(0.055 + 0.075·driftK) · (1 + 0.75·live.pace + 0.95·st.drive)`, spent as `drift · t` | the style half and neither signal |
+| geode's spin | `mix(mh_drift(t, 0.088·sp, …), t · 0.30 · sp, st.drive · 0.70)` | the `mh_drift` arm alone |
+| nebula + tempest's advection | `adv = V · (st.drive · k · t)` on the medium's sample point | nothing — `wired: false` since v4653 |
+
+**An absence is not findable by any census that hunts for moving rates**, and this tree has now proved that
+three times — helix's climb at v4655, these two here. Each came out of reading the species' own source
+against this file. And transcribing them would have shipped three new teleports at the end of the arc that
+removed them; all three are integrated instead.
+
+The advection was the last `wired: false` entry in `MH_DRIVE_HEADING`, carried for nine rounds with a census
+row set to go red **the day anybody wired it**, so the note explaining why would be read before the jump
+shipped. It fired on this round by design. The answer it got is that the jump is not being shipped:
+`k · driveInt`, not `k · drive · t`.
+
+**And the round's own new rule found a fourth site that was live.** Section 5 of `murmurClock3` asks for a
+signal multiplied by `uniforms.time` *anywhere*, rather than inside a particular function's arguments — and
+on its first run it flagged **sol's granulation**: `uniforms.time · (0.35 + 0.75·live.pace)`, a bare product
+inside a noise lookup. Every rate census from v4654 to v4657 inspected `mh_drift` call sites, and this is not
+one, so four rounds printed clean results — correctly.
+
+    entering RESPONDING after half an hour:
+      murmur     270.0 units of noise space in ONE 1/60 s frame
+      integrated   0.0121
+      ratio       22,346x   — granScale is 8.5, so thirty-two body radii between two frames
+
+The granulation was not drifting there. It was being replaced. That is the largest single jump this arc has
+found, and it was in the shipped port.
+
+**In pixels**, all four species moved **0 of 9,216 bytes** between drive 0 and drive 1 — the whole of
+murmur's RESPONDING lean — before this round:
+
+| | at v4661 | after |
+|---|---|---|
+| opal | 0.0% | **22.0%** |
+| geode | 0.0% | **10.6%** |
+| nebula | 0.0% | **20.4%** |
+| tempest | 0.0% | **21.7%** |
+
+Fourteen sabotages, all caught — **one only after a row was added for it.** Putting the advection on
+`mhInside` as well as on the noise lookups — moving the *body* instead of the field — went through the whole
+battery green, on a claim the kit note made in words and nothing measured. `murmurClock4` now reads nebula's
+lit set at driveInt 0 and 14: 740 pixels, same centroid to nine decimals, same outer radius, while 20.9% of
+the interior moves.
+
+**And the round nearly shipped a gap that was not there.** It measured sol's granulation with a byte count,
+read 0.0% and worst 1 of 255 at 48 px *and* at 128 px, ruled out the kit's moire gate, and was one edit from
+recording "it cannot be seen at all" as a named absence with three measurements behind it.
+`murmurSpecies9-selfcheck.mjs` had been grading it all along, with a neighbour-to-neighbour **texture**
+statistic at a dimmed operating point: ×1.488 on the simmer knob. A zero-mean noise on a bright disc moves
+almost no bytes and a great deal of texture. The absence was the instrument's, not the species'. The
+pace-integral row went into that gate, where the instrument that can see it already was.
+
+`tools/ship/murmurClock3-selfcheck.mjs` and `murmurClock4-selfcheck.mjs` arrive green at 147 ms and
+2,837 ms, so the tree holds 1772 gates. The split between them is by **instrument** rather than by subject,
+and the clock is why: one file held both halves at 3,605 ms against a 3,000 ms ceiling.
+
+**What is left:** the cadence — five builders covering six species still have no `live.pace` at all
+(droplet, opal, mist, fathom, geode) against murmur giving all eighteen one; tempest's bolt slots missing
+murmur's `small` mix; and prism's open question from v4661.
+
 ## v4661 -- the last nine complete sites, and there is no tenth rule
 
 v4658 took the four that sit on the shared interior line, the three saturations and sol's core gain. v4659

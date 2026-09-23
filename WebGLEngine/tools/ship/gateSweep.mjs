@@ -8070,6 +8070,50 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4662 -- THE 345th CLOSING: the last three places a moving signal multiplies elapsed time -- and a
+    // FOURTH that four rounds of censuses had missed, found by this round's own new rule on its first run.
+    since344: Object.freeze({
+        at: "v4662", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock3-selfcheck.mjs", "tools/ship/murmurClock4-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 147 ms and 2,837 ms on this box, 13 rows over two files. THE SPLIT IS BY " +
+                 "INSTRUMENT AND THE CLOCK IS WHY: one file held the arithmetic and the pixels and measured " +
+                 "3,605 ms against a 3,000 ms ceiling once sol's frames joined it. " +
+                 "*** THE CLOCK ARC THAT BEGAN AT v4654 IS CLOSED. *** Its last three sites were ABSENCES " +
+                 "rather than teleports -- murmur's rate moves at each and this port's did not move at all " +
+                 "-- so no census of moving rates could ever have found them, and all three came out of " +
+                 "reading the species' own source against this file. opal's flash drift took murmur's " +
+                 "(1 + 0.75*live.pace + 0.95*st.drive); geode's spin took the mix(mh_drift, t*0.30*sp, " +
+                 "0.70*st.drive) it had carried only one arm of; and nebula's and tempest's ADVECTION was " +
+                 "wired, the last two `wired: false` entries in MH_DRIVE_HEADING, nine rounds after v4653 " +
+                 "set a census row to go red the day anybody did. It fired, and the answer is that the jump " +
+                 "is not being shipped: k * driveInt, not k * drive * t. " +
+                 "*** AND THE ROUND'S OWN NEW RULE FOUND A FOURTH SITE THAT WAS LIVE. *** Section 5 of " +
+                 "Clock3 asks for a signal multiplied by uniforms.time ANYWHERE, rather than inside a " +
+                 "particular function's arguments, and on its first run it flagged sol's granulation: " +
+                 "uniforms.time * (0.35 + 0.75*live.pace), a bare product inside a noise lookup. Every " +
+                 "census from v4654 to v4657 inspected mh_drift call sites and this is not one, so four " +
+                 "rounds printed clean results, correctly. MEASURED, entering RESPONDING after half an " +
+                 "hour: 270.0 units of noise space in ONE 1/60 s frame against 0.0121 integrated -- " +
+                 "22,346x, and granScale is 8.5, so thirty-two body radii crossed between two frames. The " +
+                 "largest single jump this arc has found. " +
+                 "IN PIXELS: opal, geode, nebula and tempest each moved 0 of 9,216 bytes between drive 0 " +
+                 "and drive 1 -- the whole of murmur's RESPONDING lean -- and now move 22.0%, 10.6%, 20.4% " +
+                 "and 21.7%. " +
+                 "FOURTEEN SABOTAGES, ALL CAUGHT, ONE ONLY AFTER A ROW WAS ADDED FOR IT: putting the " +
+                 "advection on mhInside as well as on the noise lookups -- moving the BODY instead of the " +
+                 "field -- went through the whole battery green, on a claim the kit note made in words and " +
+                 "nothing measured. Clock4 now reads nebula's lit set at driveInt 0 and 14: 740 pixels, " +
+                 "same centroid to nine decimals, same outer radius, while 20.9% of the interior moves. " +
+                 "*** AND THE ROUND NEARLY SHIPPED A GAP THAT WAS NOT THERE. *** It measured sol's " +
+                 "granulation with a byte count, read 0.0% and worst 1 of 255 at 48 px and at 128 px, ruled " +
+                 "out the moire gate, and was one edit from recording \"it cannot be seen at all\". " +
+                 "tools/ship/murmurSpecies9-selfcheck.mjs had been measuring it all along with a TEXTURE " +
+                 "statistic -- x1.488 on the simmer knob -- because a zero-mean noise on a bright disc " +
+                 "moves almost no bytes and a great deal of texture. The absence was the instrument's. The " +
+                 "pace-integral row went into that gate, where the instrument that can see it already was.",
+    }),
     // v4661 -- THE 344th CLOSING: the last nine st.complete sites, which finishes that signal's port -- and
     // the second consecutive round in which finishing something broke a gate that rested on it being unfinished.
     since343: Object.freeze({

@@ -133,7 +133,8 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE,
+         MH_OPAL_DRIFT, MH_GEODE_SPIN, mhGeodeSpinDrive, MH_ADVECT_SIGN, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -860,7 +861,18 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // directly: the four flashes sit at four points across the spread, two either side of the anchor, and
         // the multiplier "takes the extremes to about thirty-seven degrees of OKLAB hue at spread 1: still
         // one hue family by the rail's own definition, and the widest this collection ever goes".
-        const opalDrift = float(0.055).add(uniforms.drift.mul(0.075)).toVar();
+        // *** opal's FLASH DRIFT TOOK ITS LIVE TERMS AT v4662, AND IT TOOK THEM INTEGRATED. *** opal.ts:
+        // drift = (0.055 + 0.075*driftK) * (1 + 0.75*live.pace + 0.95*st.drive), spent as drift * t inside
+        // the three sines below. This port carried the STYLE half and neither signal, so opal's flashes
+        // drifted at one fixed speed whatever the orb was doing -- an absence, not a teleport, which is why
+        // no census of moving rates could see it and why reading opal.ts line by line is what found it.
+        // Transcribing murmur's spelling would have introduced the teleport this whole arc removed: the
+        // phase is base*(t + 0.75*P + 0.95*D) instead, which is the same number at a held signal.
+        const OD = MH_OPAL_DRIFT;
+        const opalDrift = float(OD.base).add(uniforms.drift.mul(OD.knob)).toVar();
+        const opalPhase = KIT.mhRatePhase(opalDrift, uniforms.time,
+            float(OD.pace), uniforms.paceInt, float(0.0), uniforms.voiceInt,
+            float(OD.drive), uniforms.driveInt).toVar();
         const opalRad = float(0.135).add(uniforms.softness.mul(0.095))
             .mul(mix(float(1.0), float(1.70), smallK)).mul(float(1.0).add(VOICE.mul(0.30))).toVar();
         const opalBright = float(0.82).add(uniforms.flashes.mul(0.55)).mul(float(1.0).add(VOICE.mul(0.85))).toVar();
@@ -881,9 +893,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const life = KIT.mhCompleteLift(KIT.mhOpalLife(float(fk), uniforms.time), COMPLETE,
                 float(MH_COMPLETE_LIFT.opal.k), float(MH_COMPLETE_LIFT.opal.over)).toVar();
             // THE WANDER: three incommensurate rates per flash, so each traces its own slow closed-ish path.
-            const c = vec3(sin(opalDrift.mul(uniforms.time).mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
-                           sin(opalDrift.mul(uniforms.time).mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
-                           sin(opalDrift.mul(uniforms.time).mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
+            // THE THREE SINES SHARE ONE PHASE AND SCALE IT, which is what makes one integral enough: the
+            // integral of drift(t)*m is m times the integral of drift(t) for a constant m, so three axes on
+            // three multipliers need three multiplications and not three accumulators.
+            const c = vec3(sin(opalPhase.mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
+                           sin(opalPhase.mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
+                           sin(opalPhase.mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
             const rk = opalRad.mul(0.80 + 0.30 * ((fk * 0.37 + 0.21) % 1))
                 .mul(k === 0 ? float(1.0).add(flO.x.mul(0.35)) : float(1.0)).toVar();
             const to = c.sub(P).toVar();
@@ -1062,6 +1077,19 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             KIT.mhRatePhase(mistBase, uniforms.time, float(0.0), uniforms.paceInt,
                 float(mistKV), uniforms.voiceInt, float(0.0), uniforms.driveInt),
             mistBase.mul(mDrFactor), float(0.45), float(MIST.drLane), uniforms.time).toVar();
+        // *** THE ADVECTION, AND IT IS THE LAST `wired: false` IN MH_DRIVE_HEADING -- v4662. *** nebula and
+        // tempest do not point a path at the heading the way still and abyss do: they carry the whole CLOUD
+        // along it. nebula.ts spells adv = V * (st.drive * k * t) and displaces the medium's sample point by
+        // it. That is a displacement proportional to elapsed time -- the heading family's clothes on this
+        // arc's hazard -- and it jumps by t * dDrive the instant drive moves, which is why v4653 left it out
+        // and set a census row to go red the day anybody wired it. The integral of drive * k dt is
+        // k * driveInt, which the host has sent since v4654, so the substitution is one argument.
+        //
+        // IT DISPLACES THE NOISE LOOKUPS AND NOT THE RAY. mhInside(pM) is the silhouette and the glow's
+        // radius is length(pM); advecting those would move the BODY rather than the field inside it, which
+        // is a different species. Only the two noise coordinates move.
+        const ADV = MH_DRIVE_HEADING[species];
+        const adv = vec3(...ADV.v).mul(ADV.k * MH_ADVECT_SIGN).mul(uniforms.driveInt).toVar();
         const mAbsorb = float(MIST.absorb).mul(float(0.55).add(densityK.mul(0.85))).toVar();
         const mEmit = float(MIST.emitB).add(densityK.mul(MIST.emitK)).toVar();
 
@@ -1118,8 +1146,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const pM = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
             const fade = KIT.mhInside(pM).toVar();
             // THE FOLD: one noise displaces the coordinates the next is read at.
-            const w = KIT.mhNoise3(pM.mul(mWarp).add(vec3(0.0, mDr.mul(0.70), mDr))).toVar();
-            const q = pM.mul(mScale)
+            const w = KIT.mhNoise3(pM.add(adv).mul(mWarp).add(vec3(0.0, mDr.mul(0.70), mDr))).toVar();
+            const q = pM.add(adv).mul(mScale)
                 .add(w.mul(mFold).mul(species === "tempest" ? vec3(0.90, -0.62, 0.68) : vec3(0.92, -0.58, 0.71)))
                 .add(vec3(0.0, 0.0, mDr)).toVar();
             const nz = KIT.mhNoise3(q).toVar();
@@ -1324,7 +1352,19 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const glimK = clamp(uniforms.glim, 0.0, 1.0).toVar();
             const stoneK = clamp(uniforms.stone, 0.0, 1.0).toVar();
             const flG = KIT.mhFlourish(uniforms.time, float(19.0), float(10.2)).toVar();
-            const ayG = KIT.mhDrift(uniforms.time, float(GE.spinRate), float(GE.spinWob), float(GE.spinLane)).toVar();
+            // *** geode's SPIN IS A MIX AND THIS PORT HAD ONLY ONE SIDE OF IT -- v4662. *** geode.ts:
+            // mix(mh_drift(t, 0.088*sp, ...), t * 0.30 * sp, st.drive * 0.70) -- under drive the stone stops
+            // wobbling around its slow turn and takes a faster, steadier one. The port carried the mh_drift
+            // arm alone, so geode's spin was the same at every drive. See MH_GEODE_SPIN: the secular half is
+            // the integral and the WOBBLE keeps the instantaneous (1 - w*drive) as its amplitude, which is
+            // v4655's rule rather than a new decision -- the wobble is bounded by k*rate/w2 and cannot
+            // accumulate, so only the half that grows without limit needed repairing.
+            const spinMix = float(1.0).sub(DRIVE.mul(MH_GEODE_SPIN.w)).toVar();
+            const ayG = KIT.mhDriftPhase(
+                KIT.mhRatePhase(float(GE.spinRate), uniforms.time, float(0.0), uniforms.paceInt,
+                    float(0.0), uniforms.voiceInt,
+                    float(mhGeodeSpinDrive(GE.spinRate, MH_GEODE_SPIN.to, MH_GEODE_SPIN.w)), uniforms.driveInt),
+                float(GE.spinRate).mul(spinMix), float(GE.spinWob), float(GE.spinLane), uniforms.time).toVar();
             const axG = float(0.34).add(sin(uniforms.time.mul(0.041)).mul(0.22)).toVar();
             // THE RAY, IN THE STONE'S FRAME. Rotating the ray IN is one transform; rotating the eight planes
             // OUT would be eight.
@@ -1635,10 +1675,24 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 .mul(float(SO.simB).add(simmerK.mul(SO.simK)))
                 .mul(float(SO.simPaceB).add(PACE.mul(SO.simPaceK))).toVar();
             const sp3 = P.add(rd.mul(max(sFront, float(0.0)))).toVar();
+            // *** sol's GRANULATION WAS STILL TELEPORTING AT v4661, AND v4662's OWN CENSUS IS WHAT FOUND IT.
+            // *** The rate is (0.35 + 0.75*live.pace) and it was spent as rate * uniforms.time -- a
+            // pace-modulated rate times elapsed time, which is this whole arc's defect exactly. FOUR ROUNDS
+            // OF CENSUSES MISSED IT because every one of them hunted mh_drift sites, and sol's granulation
+            // does not go through mh_drift: it is a bare product inside a noise lookup, the same shape opal's
+            // flash drift turned out to be. The row that caught it is section 5 of
+            // tools/ship/murmurClock3-selfcheck.mjs, which asks for a signal multiplied by uniforms.time
+            // ANYWHERE rather than in a particular function's argument.
+            //
+            // MEASURED: entering RESPONDING after half an hour, the sample point jumped 270.0 units of noise
+            // space in one 1/60 s frame, against 0.0121 integrated -- 22,345x, and granScale is 8.5, so 270
+            // units is thirty-one body radii. The granulation was not drifting there; it was replaced.
+            const granPhase = KIT.mhRatePhase(float(SO.granRateB), uniforms.time,
+                float(SO.granRateK / SO.granRateB), uniforms.paceInt,
+                float(0.0), uniforms.voiceInt, float(0.0), uniforms.driveInt).toVar();
             const gran = float(1.0).add(simAmt.mul(SO.granK)
                 .mul(smoothstep(float(SO.granIn), float(SO.granOut), disc))
-                .mul(KIT.mhNoise3(sp3.mul(SO.granScale).add(vec3(float(0.0), float(0.0),
-                    uniforms.time.mul(float(SO.granRateB).add(PACE.mul(SO.granRateK))))))))
+                .mul(KIT.mhNoise3(sp3.mul(SO.granScale).add(vec3(float(0.0), float(0.0), granPhase)))))
                 .toVar();
             // sol.ts line 91 gives the core a SECOND complete, beside its voice: a gain on the brightness
             // itself, where the lift above is a saturation on each prominence.
