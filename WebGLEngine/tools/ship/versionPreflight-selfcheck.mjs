@@ -32,7 +32,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { preflight, versionNumber, engineVersionOf, mainVersion, ENG } from "./versionPreflight.mjs";
+import { preflight, versionNumber, engineVersionOf, mainVersion, ordinalsOf, mainOrdinals, ENG } from "./versionPreflight.mjs";
 
 let pass = 0, fail = 0;
 const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m + (d ? "   " + d : "")); } };
@@ -40,8 +40,16 @@ const ok = (c, m, d) => { if (c) pass++; else { fail++; console.error("  FAIL  "
 // fall through to the real files would compare this tree with itself, find them identical, and turn every
 // historical collision below into a pass -- the check would then be measuring the working tree rather than the
 // rule. (That is exactly what happened when the byte comparison was added: five of these went green at once.)
+// *** v4665 -- AND THE ORDINALS MUST BE INJECTED FOR THE REASON THE PARAGRAPH ABOVE ALREADY GIVES. *** The
+// ordinal check added this round reads origin/main's CHANGELOG, and these fixtures did not override it -- so
+// three of them were graded against the live repo the moment it existed, and "the headroom jump this round
+// actually took is permitted" went red because the real main had spent v4660. A fixture that reaches the
+// tree it is replaying history against is not a fixture; it is the working tree wearing one. Every helper
+// here now supplies a changelog whose newest heading is the main it is replaying.
+const chlogSpending = (main) => `# changelog\n\n## ${main} -- the other line's newest round\n\nbody\n`;
 const against = (main) => (v) => preflight(v, {
     mainVersionOverride: main, skipFreshness: true,
+    mainOrdinalsOverride: ordinalsOf(chlogSpending(main)),
     mainSourceOverride: `const ENGINE_VERSION = "${main}";   // the other line's build\n`,
     localSourceOverride: `const ENGINE_VERSION = "${v}";   // this branch's build\n`,
 });
@@ -83,6 +91,7 @@ const against = (main) => (v) => preflight(v, {
 {
     const src = "const ENGINE_VERSION = \"v4350\";   // v4350 -- a round\n";
     const shipped = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: src,
+                                         mainOrdinalsOverride: ordinalsOf(chlogSpending("v4350")),
                                          localSourceOverride: src, skipFreshness: true });
     ok(shipped.ok === true && shipped.refusal === null,
        "*** shipping v4350 when main's v4350 IS this build, byte for byte, is permitted ***");
@@ -90,12 +99,14 @@ const against = (main) => (v) => preflight(v, {
        (shipped.note || "").slice(0, 60));
 
     const drifted = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: src + "// and one more line\n",
+                                         mainOrdinalsOverride: ordinalsOf(chlogSpending("v4350")),
                                          localSourceOverride: src, skipFreshness: true });
     ok(drifted.ok === false && /THE SAME NUMBER/.test(drifted.refusal),
        "*** but ONE CHANGED BYTE under the same number is still refused -- the rule is bytes, not numbers ***");
 
     // and an unreadable pair falls back to refusing, because "cannot compare" is not "they match"
     const unknown = preflight("v4350", { mainVersionOverride: "v4350", mainSourceOverride: null,
+                                         mainOrdinalsOverride: ordinalsOf(chlogSpending("v4350")),
                                          localSourceOverride: null, skipFreshness: true });
     ok(unknown.ok === false, "if neither build can be read, the same number is refused rather than assumed equal");
 }
@@ -143,6 +154,88 @@ const against = (main) => (v) => preflight(v, {
         ok(!/ENOBUFS|maxBuffer/i.test(r.reason), "*** a buffer failure is never reported as a missing ref ***", r.reason);
         ok(/not readable here|no ENGINE_VERSION/.test(r.reason), "and the reason given is one that is true of this tree", r.reason);
     }
+}
+
+// 5b) *** v4665 -- THE SECOND NUMBER A ROUND WEARS, replayed on the collision this guard actually missed. ***
+//     Everything above compares ENGINE_VERSION. On 2026-09-23 this branch ran the ritual to ship v4654 and
+//     this file printed "OK: shipping v4654, origin/main carries v4649" -- while origin/main's CHANGELOG had
+//     already given v4654 to a different round ("the species' clocks are integrals now"), along with v4650
+//     and v4653. Main's marker had not moved since v4649 because that line ships rounds without bumping it,
+//     so the two lines were never comparable by the number a BUILD wears. The guard was watching a number
+//     that had stopped moving, which is the same defect as a count standing in for a property.
+{
+    // The real changelog head from origin/main at that merge, trimmed to the headings that decide it.
+    const MAIN_AT_MERGE = [
+        "# SweK_Engine -- changelog", "",
+        "## v4660 -- the other four ignition figures, which really were four shapes", "",
+        "## v4654 -- the species' clocks are integrals now: this port is correct where murmur is not", "",
+        "## v4653 -- the RESPONDING lean: the wander acquires a heading, and stops scattering", "",
+        "## v4650 -- the orb's clock was an integral that reached no shader", "",
+        "## v4649 -- Three instruments were lying", "",
+    ].join("\n");
+    const ords = ordinalsOf(MAIN_AT_MERGE);
+    const asShipped = (v) => preflight(v, {
+        mainVersionOverride: "v4649", skipFreshness: true, mainOrdinalsOverride: ords,
+        mainSourceOverride: `const ENGINE_VERSION = "v4649";   // the other line's build\n`,
+        localSourceOverride: `const ENGINE_VERSION = "${v}";   // this branch's build\n`,
+    });
+
+    ok(ords.ordinals[0] === 4660 && ords.ordinals.includes(4654),
+       "the fixture is the real thing: main's changelog spends v4660 while its marker reads v4649",
+       JSON.stringify(ords.ordinals));
+
+    // *** THE CONTROL THAT MATTERS: the marker check ALONE passes this, and it is wrong. ***
+    const markerOnly = preflight("v4654", {
+        mainVersionOverride: "v4649", skipFreshness: true, mainOrdinalsOverride: { ordinals: null, titles: null },
+        mainSourceOverride: `const ENGINE_VERSION = "v4649";   // the other line's build\n`,
+        localSourceOverride: `const ENGINE_VERSION = "v4654";   // this branch's build\n`,
+    });
+    ok(markerOnly.ok === true,
+       "*** with the ordinals unread, v4654 against a main marked v4649 PASSES -- which is exactly what shipped ***",
+       "this row is the bug, preserved. If it ever goes red the marker path has changed and the row below is no longer the fix");
+
+    const r = asShipped("v4654");
+    ok(r.ok === false && /already gave to a DIFFERENT round/.test(r.refusal || ""),
+       "*** ...and with the ordinals read, the same call is REFUSED ***", (r.refusal || "").slice(0, 90));
+    ok(/the species' clocks are integrals/.test(r.refusal || ""),
+       "...and the refusal NAMES the round main already gave the number to, not merely that it is taken",
+       "a refusal that says 'taken' sends the writer to git log; one that says WHAT took it does not");
+    ok(/main's MARKER reads v4649/.test(r.refusal || "") && /11 ahead/.test(r.refusal || ""),
+       "...and it says WHY the marker check could not see this: main's rounds run 11 ahead of its own marker");
+
+    for (const v of ["v4650", "v4653"]) {
+        ok(asShipped(v).ok === false, `the other genuine collision ${v} is refused too`);
+    }
+
+    // *** A GAP IS REFUSED AS WELL, AND THAT IS A DELIBERATE CHOICE RATHER THAN AN OVERSHOOT. *** v4651 and
+    // v4652 were free on main -- nothing was wearing them. Shipping into them would leave this branch's
+    // rounds interleaved below main's highest, and a peer comparing two round numbers could not tell which
+    // came first. Monotonic ordering is the property; an empty seat below the top does not provide it.
+    ok(asShipped("v4651").ok === false && /non-monotonic/.test(asShipped("v4651").refusal || ""),
+       "*** an UNTAKEN number below main's highest is refused too, and the refusal says it is about ordering ***");
+    ok(/Supersede FORWARD: v4661/.test(asShipped("v4651").refusal || ""),
+       "...naming v4661, which is the number this branch actually renumbered to");
+
+    // and the far side: the renumber itself passes, which is what makes this a rule rather than a wall
+    ok(asShipped("v4661").ok === true && asShipped("v4665").ok === true,
+       "*** and v4661/v4665 -- past everything main has spent -- are permitted ***");
+
+    // SABOTAGE: a prose mention of a version is not a heading, and must not be read as one.
+    const proseOnly = ordinalsOf("# changelog\n\n## v4400 -- a round\n\nbody naming v4999 and ## v4998 mid-line\n");
+    ok(proseOnly.ordinals.length === 1 && proseOnly.ordinals[0] === 4400,
+       "!! SABOTAGE: a version NAMED IN PROSE is not a number the changelog has spent",
+       "these notes quote version numbers constantly -- this file's own prose names v4350, v4649 and v4654 -- " +
+       "so a loose scan would read every citation as a claim on a seat and refuse every round. Only ^## spends one");
+
+    // and an unreadable changelog stands aside rather than refusing, the same way an unreadable main does
+    const noChlog = preflight("v4654", {
+        mainVersionOverride: "v4649", skipFreshness: true,
+        mainOrdinalsOverride: { ordinals: null, titles: null, reason: "not readable" },
+        mainSourceOverride: `const ENGINE_VERSION = "v4649";\n`, localSourceOverride: `const ENGINE_VERSION = "v4654";\n`,
+    });
+    ok(noChlog.ok === true,
+       "an unreadable changelog stands aside rather than refusing -- a tree with no main is a normal one to work in",
+       "the failure this exists for is a changelog that IS readable and HAS spent the number");
 }
 
 // 6) IT IS WIRED INTO THE RITUAL, as a call rather than a mention.

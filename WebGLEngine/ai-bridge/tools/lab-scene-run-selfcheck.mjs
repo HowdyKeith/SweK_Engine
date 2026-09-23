@@ -197,6 +197,6 @@ section("5. THE DEVICE COUNT IN server.html's TOOLTIP, DERIVED");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exitCode = fail ? 1 : 0;

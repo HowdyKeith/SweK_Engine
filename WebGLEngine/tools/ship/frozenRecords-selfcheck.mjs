@@ -604,7 +604,7 @@ console.log("\n4. what was closed, checked against the files rather than claimed
         "check that pretended to be a re-derivation would be the worse of the two failures");
 }
 
-// ---- THE CHEAP CENSUS, v4651 --------------------------------------------------------------------------------
+// ---- THE CHEAP CENSUS, v4662 --------------------------------------------------------------------------------
 {
     // *** census({ guardians: false }) SKIPS THE GATE SCAN, AND THE MEMO MUST NOT SERVE IT TO A CALLER THAT
     // ASKED FOR GUARDIANS. *** That is the shape v4647r found one level down in this same file: a cache key

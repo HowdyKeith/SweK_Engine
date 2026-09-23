@@ -533,6 +533,6 @@ console.log("unchecked here: FRICTION AND RESTITUTION. The coupled contact is fr
     "of the seam. The scenes below start the body in contact for that reason, and it is a limit rather than a " +
     "tuning. And EDGES AND CORNERS are approximated by their dominant face, which is what makes a box the only " +
     "shape here; swk_body_sphere is in the shim and not in the built wasm.");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

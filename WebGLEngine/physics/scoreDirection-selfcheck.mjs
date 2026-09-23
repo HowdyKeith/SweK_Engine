@@ -205,7 +205,7 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
 {
     resetRegistry();
     registerAll();
-    // *** THE PROPOSERS THAT DECLARE A ready() ARE READIED FIRST, AND UNTIL v4651 THEY WERE NOT. ***
+    // *** THE PROPOSERS THAT DECLARE A ready() ARE READIED FIRST, AND UNTIL v4662 THEY WERE NOT. ***
     // proposers.mjs:71 says it in as many words -- "an adjudicator that needs a wasm loaded (the race's
     // box3d) exposes an async ready() the route awaits before runProposer" -- and this file is that route
     // and never awaited one. It could not even discover there was one to await: listProposers() projected
@@ -272,7 +272,7 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
                          "would call that an exhausted search. It is not one"
                        : rows.filter((x) => x.needsReady).length + " declare one (" +
                          rows.filter((x) => x.needsReady).map((x) => x.id).join(", ") + "), all ready. " +
-                         "Until v4651 this route awaited none of them and could not see that it should");
+                         "Until v4662 this route awaited none of them and could not see that it should");
     ok("where the greedy pick is refused, the loop still names a survivor -- or says it looked and found none",
        greedyRefused.every((x) => x.r.accepted !== null || EXHAUSTED.includes(x.id)) &&
        exhausted.every((x) => EXHAUSTED.includes(x.id) && x.r.acceptedRank === -1 && x.r.adjudicated > 1),
@@ -284,6 +284,6 @@ section("5. THE CENSUS -- REPORTED, NOT FROZEN");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exitCode = fail ? 1 : 0;

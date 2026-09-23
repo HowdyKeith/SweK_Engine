@@ -106,7 +106,7 @@ registerProposer({
     ok("!! an instrument with NO independent adjudicator cannot be registered at all",
        threw, "an untunable-because-ungradeable device is a programming error, not a warning");
 
-    // *** v4651 -- THE VIEW MUST SAY WHICH PROPOSERS NEED READYING, AND FOR 124 ROUNDS IT DID NOT. ***
+    // *** v4662 -- THE VIEW MUST SAY WHICH PROPOSERS NEED READYING, AND FOR 124 ROUNDS IT DID NOT. ***
     // registerProposer's own note says a route awaits ready() before runProposer. This projection carries no
     // callables on purpose, and `ready` went out with them -- so a caller ITERATING THE LIST could not learn
     // that a member needed starting. physics/scoreDirection-selfcheck.mjs is that caller: unready,

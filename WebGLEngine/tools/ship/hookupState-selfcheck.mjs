@@ -132,6 +132,6 @@ ok("the survey costs nothing but reading what exists",
     "no new state was introduced to answer a question about state");
 
 console.log(fails ? `\nhookupState-selfcheck: ${fails} FAILED` : "\nhookupState-selfcheck: all checks pass");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

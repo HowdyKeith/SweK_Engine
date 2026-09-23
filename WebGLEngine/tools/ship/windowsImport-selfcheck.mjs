@@ -23,7 +23,7 @@
 // rather than a file:// URL. That question has the same answer on every platform, which is exactly the property
 // a cross-platform bug needs its guard to have.
 //
-// ---- v4650 -- AND IT WATCHED A THIRD SPELLING SHIP, WHICH IS THE LESSON THIS FILE ALREADY WROTE DOWN -------
+// ---- v4661 -- AND IT WATCHED A THIRD SPELLING SHIP, WHICH IS THE LESSON THIS FILE ALREADY WROTE DOWN -------
 //
 // Keith's rig at v4649: tools/ship/fsrPage-selfcheck.mjs died with ERR_UNSUPPORTED_ESM_URL_SCHEME. The scan
 // below was green for it, twice over, because the detector was NAME-BASED:
@@ -58,7 +58,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
 const SKIP = /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/;
 
-// *** WHAT MAKES A SPECIFIER RIGHT, WHICH IS THE QUESTION WITH ONE ANSWER. *** The v4650 note in the header
+// *** WHAT MAKES A SPECIFIER RIGHT, WHICH IS THE QUESTION WITH ONE ANSWER. *** The v4661 note in the header
 // says why these replaced a list of ways to be wrong.
 /** One whole string literal with no interpolation: "three", "node:fs", "./x.mjs" -- already a specifier. */
 const WHOLE_LITERAL = /^(["'`])(?:(?!\1)[^\\]|\\.)*\1$/;
@@ -237,7 +237,7 @@ function walk(dir, out = []) {
     ok("...and the scan covered the whole tree", files.length > 500, files.length + " source files");
     // *** THE UNDECIDABLE SET, REPORTED WITH ITS NAMES RATHER THAN EXEMPTED QUIETLY. *** `import(u)` is a URL
     // or a path depending on a value this file does not have, and most of these are FUNCTION PARAMETERS whose
-    // callers are in other files. Four were read by hand at v4650 and all four are correct -- server.js's `u`
+    // callers are in other files. Four were read by hand at v4661 and all four are correct -- server.js's `u`
     // is pathToFileURL(...).href, gunnerPolicy's `nodeOnly` is a relative literal split in two to dodge a
     // static-import guard, physicsAi's `bare` is a package name, recordDrift's `p` is always "./x.mjs" from
     // its own call sites. They are counted so that the count going UP is visible; a reader who wants one of
@@ -271,7 +271,7 @@ function walk(dir, out = []) {
     const J = "path." + "join(ENG, \"world\", \"treeSpawner.js\")";
     ok("!! SABOTAGE: the exact line that crashed IS an offender", classifySpecifier(J) === "offender",
        "biomeSpawnWiring line 40, verbatim -- it passed nine checks and then the process died");
-    // v4650 -- the two shapes the NAME-BASED detector walked past, both real, both from Keith's rig.
+    // v4661 -- the two shapes the NAME-BASED detector walked past, both real, both from Keith's rig.
     ok("!! SABOTAGE: fsrPage's form -- a temp path concatenated with a cache-buster -- IS an offender",
        classifySpecifier('tmp + "?" + Math.random()', 'const tmp = path.join(fs.mkdtempSync(os.tmpdir()), "page.mjs");') === "offender",
        "the old pattern needed the WHOLE argument to be one expression AND the variable to be named " +

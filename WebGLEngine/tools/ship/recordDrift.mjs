@@ -178,8 +178,8 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
         });
     }
 
-    // *** v4651 -- THE PRE-FLIGHT DID NOT ASK ABOUT THE TWO CENSUSES THAT COUNT RECORDS, AND THAT COST TWO
-    // ROUNDS IN A ROW. *** v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651; this tool reported
+    // *** v4662 -- THE PRE-FLIGHT DID NOT ASK ABOUT THE TWO CENSUSES THAT COUNT RECORDS, AND THAT COST TWO
+    // ROUNDS IN A ROW. *** v4661 added WASM_AT_V4661 and v4662 added EXILED_PASS_V4662; this tool reported
     // "nothing stale" both times and both verifies then came back with frozenRecords-selfcheck and
     // recordReach-selfcheck red. The closing line of the record in frozenRecords.mjs has said it since
     // v4647f -- "a round that adds a record re-takes this, and that is the point" -- and the instrument that
@@ -433,18 +433,18 @@ export const DRIFT_AT_V4482 = Object.freeze({
     // notChecked -- so the ratio did not improve by adding a check, it improved by adding a check AND
     // admitting a duty that was not written down. See the note under reportLines for why that one is a gap
     // rather than an omission: its only cheap input is a record stale in the same direction as its subject.
-    // v4651: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
-    // rounds: v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651, this tool said "nothing stale"
+    // v4662: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
+    // rounds: v4661 added WASM_AT_V4661 and v4662 added EXILED_PASS_V4662, this tool said "nothing stale"
     // both times, and both verifies then returned frozenRecords-selfcheck and recordReach-selfcheck red.
     // A pre-flight silent about the commonest kind of arrival is not cheap, it is misleading.
-    // v4651: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
-    // rounds: v4650 added WASM_AT_V4650 and v4651 added EXILED_PASS_V4651, this tool said "nothing stale"
+    // v4662: 6 -> 7. `record censuses` joined, and it is the check that SHOULD have been here for two
+    // rounds: v4661 added WASM_AT_V4661 and v4662 added EXILED_PASS_V4662, this tool said "nothing stale"
     // both times, and both verifies then returned frozenRecords-selfcheck and recordReach-selfcheck red.
     // A pre-flight silent about the commonest kind of arrival is not cheap, it is misleading.
     //
-    // *** v4652: notChecked 1 -> 2, AND THE SECOND ONE IS ADMITTED RATHER THAN ADDED. *** orrery-fleet.json
-    // records the BYTE SIZE of every file in this tree that imports a vendored library, so v4650's edit of
-    // 48 gates moved eleven of its entries by exactly 217 bytes each and v4651 moved main.js by 14,321 --
+    // *** v4663: notChecked 1 -> 2, AND THE SECOND ONE IS ADMITTED RATHER THAN ADDED. *** orrery-fleet.json
+    // records the BYTE SIZE of every file in this tree that imports a vendored library, so v4661's edit of
+    // 48 gates moved eleven of its entries by exactly 217 bytes each and v4662 moved main.js by 14,321 --
     // and this pre-flight was silent, exactly as it had been about the record censuses. MEASURED before
     // deciding: orreryBake.drift() costs 2,580 ms, because it runs `git log --diff-filter=A` once per
     // vendored body and that query walks the whole history per path. Against a pre-flight whose SEVEN
@@ -459,7 +459,7 @@ export const DRIFT_AT_V4482 = Object.freeze({
     // that row pass on a total nobody pays. 291 -> 845 ms, so the margin under the second is now 155 ms and
     // real rather than comfortable: the NEXT check added here has to justify itself against that, or the
     // budget has to move on an argument instead of by drift.
-    // v4651 -- the seventh check's cost is IN this table, and the note above is what shaped it. That note
+    // v4662 -- the seventh check's cost is IN this table, and the note above is what shaped it. That note
     // says the next check added "has to justify itself against [a 155 ms margin], or the budget has to move
     // on an argument instead of by drift". At the full census's 740 ms it did not fit, and BOTH things were
     // done rather than one: the check was made cheap, and the bound was changed on an argument.

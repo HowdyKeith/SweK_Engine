@@ -197,6 +197,6 @@ sec("7. IN THE BROWSER: the lab's race scene steps the car, the stored record re
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the Initiate button pressed in a browser against a live bridge (the harness has no sidecar; the route is driven through handle() and the page's handler is lab-scene-run-selfcheck's); the trained brain as a candidate (the knob is the hand policy's gain, a trained policy has no single knob); a lab bound other than 80 s and 1% (the lab's, said so in the triage row's caution).");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

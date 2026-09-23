@@ -8071,7 +8071,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
     since336: Object.freeze({
-        at: "v4653", swept: 1, green: 1, red: 0,
+        at: "v4664", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/declaredCost-selfcheck.mjs",
         ]),
@@ -8093,7 +8093,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "matters most, since ~0.2s and ~200ms are both in the tree and differ by a thousand.",
     }),
     since335: Object.freeze({
-        at: "v4651", swept: 1, green: 1, red: 0,
+        at: "v4662", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/thrownRow-selfcheck.mjs",
         ]),
@@ -8115,7 +8115,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "opposite, because that is what the measurement said.",
     }),
     since334: Object.freeze({
-        at: "v4650", swept: 1, green: 1, red: 0,
+        at: "v4661", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/wasmTeardown-selfcheck.mjs",
         ]),

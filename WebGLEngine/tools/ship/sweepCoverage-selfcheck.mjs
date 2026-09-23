@@ -1071,9 +1071,9 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
 console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
 {
 {
-    // ---- EXILED_PASS_V4651: the whole pool, and the number nobody had ------------------------------------
-    const R = SC.EXILED_PASS_V4651;
-    say(`EXILED_PASS_V4651: ${R.pool} gates outside the sweep, ${R.green} green, ${R.redCount} red ` +
+    // ---- EXILED_PASS_V4662: the whole pool, and the number nobody had ------------------------------------
+    const R = SC.EXILED_PASS_V4662;
+    say(`EXILED_PASS_V4662: ${R.pool} gates outside the sweep, ${R.green} green, ${R.redCount} red ` +
         `(${R.failRows} FAIL rows), ${R.stillKilledCount} still killed at ${R.capMs} ms`);
     // *** THE ARITHMETIC FIRST, because a census whose own parts do not add up is not evidence of anything.
     ok("!! *** the pool's three outcomes add up to the pool, and each list is the length its count claims ***",
@@ -1084,7 +1084,7 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
        `against a pool of ${R.pool}; ${R.red.length} red rows, ${R.stillKilled.length} killed names, ` +
        `${R.red.reduce((a, x) => a + x.failRows, 0)} FAIL rows summed from the rows themselves`);
     // *** AND EVERY NAME IS A FILE, because a rename strands a record silently and a count cannot see it.
-    const gone = [...R.red.map((x) => x.gate), ...R.stillKilled, ...R.repairedAtV4651]
+    const gone = [...R.red.map((x) => x.gate), ...R.stillKilled, ...R.repairedAtV4662]
         .filter((g2) => !fs.existsSync(path.join(ENG, g2)));
     ok("  ...and every gate it names still exists on disk",
        gone.length === 0,
@@ -1109,7 +1109,7 @@ console.log("\n*** THE BUCKET NOTHING COULD RUN, RUN (v4568) ***");
     // *** AND THE REPAIRS ARE A TERM. *** v4571 found the shape on the record below: a floor demanding the
     // reds STAY red goes off when somebody fixes them. What must hold is that a gate recorded as red is
     // ACCOUNTED FOR -- still red, or named among the round's repairs and green when run.
-    const claimed = R.repairedAtV4651;
+    const claimed = R.repairedAtV4662;
     const notInRed = claimed.filter((g2) => !R.red.some((x) => x.gate === g2));
     ok("!! CONTROL: every gate claimed as repaired was actually IN the red list, so the claim is about this pass",
        notInRed.length === 0 && claimed.length > 0,

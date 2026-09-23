@@ -198,6 +198,6 @@ sec("E. *** THE SURFACES READ THE LEDGER: THE GAUGE CARD, THE GRID ROWS, THE POO
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 for (const l of F.reportLines()) console.log("  " + l);
 REPORT.write();
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

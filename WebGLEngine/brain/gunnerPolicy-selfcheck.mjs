@@ -169,6 +169,6 @@ console.log("\n7. THE FRONT DOOR");
     ok("reportLines names the shape, the reward (the burn), the knob and the wasm state", L.length === 4 && /11 -> 8 -> 5/.test(L[0]) && /141 weights/.test(L[1]) && /drop, ignite/.test(L[1]) && /on my fire/.test(L[2]) && /1 \/ speed/.test(L[2]) && /ready/.test(L[3]));
 }
 console.log(fails ? `\ngunnerPolicy-selfcheck: ${fails} FAILED` : "\ngunnerPolicy-selfcheck: all checks pass");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

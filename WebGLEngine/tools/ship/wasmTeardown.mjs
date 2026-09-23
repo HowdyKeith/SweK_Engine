@@ -1,7 +1,7 @@
 // tools/ship/wasmTeardown.mjs -- A GATE THAT COMPILES WASM AND THEN CALLS process.exit() IS RACING V8's
 // BACKGROUND COMPILER, AND ON WINDOWS THE RACE IS FATAL.
 //
-// v4650 -- Keith's rig, three gates in one clone-verify at v4649:
+// v4661 -- Keith's rig, three gates in one clone-verify at v4649:
 //
 //     physics/box3d/box3dConformance-selfcheck.mjs   all checks pass
 //     tools/ship/contactOverlay-selfcheck.mjs        all checks pass
@@ -160,8 +160,8 @@ export function exitCallCount(strippedSrc) {
  * say the property holds while the calls are still there. The number is recorded so that a member growing a new
  * one is visible, and the honest response to that is to re-run the census rather than to read the diff.
  */
-export const WASM_AT_V4650 = Object.freeze({
-    at: "v4650",
+export const WASM_AT_V4661 = Object.freeze({
+    at: "v4661",
     screened: 246,
     candidates: 61,
     capMs: 90000,

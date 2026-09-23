@@ -228,6 +228,6 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-312 snapshot, nine shards mid-burs
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: a pooled shard body keeps its first shape, so a reused shard's box may be a little off its cell (the picture is the quad's, not the box's); shards colliding with other glyphs (they do, in the solver, unheld); the burst's look on a rig.");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

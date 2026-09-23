@@ -1102,7 +1102,7 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
  *
  * v4565 re-timed a BAND of the over-budget gates and v4568 opened the killed bucket to 90 s. Neither ran the
  * whole thing, and the question every round since has asked in passing -- how many of the gates outside the
- * ship-time sweep are RED -- had no measurement behind it at all. v4650 found four by hand and said in its own
+ * ship-time sweep are RED -- had no measurement behind it at all. v4661 found four by hand and said in its own
  * note that four was not the number that mattered. This is the number.
  *
  *     361 gates outside the sweep (224 over budget + 137 killed, union), run at a 120 s cap, 6 workers
@@ -1116,7 +1116,7 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
  *
  * WHAT THE READING IS NOT. It is not 17 defects: `simulation/carrySpawn-selfcheck.mjs` is in the red list with
  * ZERO FAIL rows because it DIED -- a fixed 6,000 ms sleep used as a readiness test, then a dereference of the
- * dock tab that had not appeared under six-way load -- and it is GREEN alone on this box. Repaired at v4651 to
+ * dock tab that had not appeared under six-way load -- and it is GREEN alone on this box. Repaired at v4662 to
  * wait for the thing rather than for a duration, and netted, so the next absence reports instead of crashing.
  * The other sixteen print real FAIL rows. And the 48 are not 48 slow gates either: a cap is a lower bound, and
  * v4568's finding stands -- 35 of the 140 it opened came in UNDER the 20,000 ms cap that had exiled them.
@@ -1124,8 +1124,8 @@ export const OVER_BUDGET_PASS_V4565 = Object.freeze({
  * THE LIST IS BY NAME because a count cannot say which one left, which is the lesson v4568's own record
  * carries three lines into its comment.
  */
-export const EXILED_PASS_V4651 = Object.freeze({
-    at: "v4651", capMs: 120000, workers: 6, pool: 361, over: 224, killed: 137,
+export const EXILED_PASS_V4662 = Object.freeze({
+    at: "v4662", capMs: 120000, workers: 6, pool: 361, over: 224, killed: 137,
     commit: "fda780d8", worktree: true,
     green: 296, redCount: 17, failRows: 28, stillKilledCount: 48,
     // *** REPAIRED IN THE SAME ROUND THAT MEASURED THEM, so the row grading this record does not punish the
@@ -1134,7 +1134,7 @@ export const EXILED_PASS_V4651 = Object.freeze({
     // SEARCH for two proposers that had simply never been started (listProposers() dropped `ready` from its
     // view, so the route could not discover there was anything to await), and carrySpawn DIED rather than
     // reporting, on a fixed sleep used as a readiness test.
-    repairedAtV4651: Object.freeze([
+    repairedAtV4662: Object.freeze([
         "physics/scoreDirection-selfcheck.mjs",
         "simulation/carrySpawn-selfcheck.mjs",
     ]),

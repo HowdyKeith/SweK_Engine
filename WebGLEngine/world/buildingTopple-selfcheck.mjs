@@ -232,6 +232,6 @@ sec("6. THE PAGE: race-crash.html in its own browser, ramming on load with the d
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the block's bounding box stands in for its exact centre of mass; a block leaning on the road or on a neighbour is left leaning; cascade damage to neighbours from the fall; the page on WebGPU (the presented device is lost on this harness, v4589).");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

@@ -91,6 +91,53 @@ export function refFreshness({ run = null } = {}) {
     } catch { return { known: false, stale: null, note: "could not compare against the remote (offline, or no origin)" }; }
 }
 
+// ====================================================================================================
+// *** v4665 -- THE MARKER IS NOT THE ONLY NUMBER A ROUND WEARS, AND THIS GUARD WAS WATCHING THE OTHER ONE. ***
+// Everything above compares ENGINE_VERSION: the number a BUILD wears. A round also wears an ORDINAL -- the
+// `## vNNNN` heading in docs/CHANGELOG.md -- and the two are not the same number, because not every line
+// bumps the marker. Measured, not supposed: at this merge main's marker read v4649 while its changelog had
+// spent v4650 and v4653..v4660, ELEVEN ROUNDS AHEAD OF ITS OWN MARKER. Run against that exact collision
+// this file printed "OK: shipping v4654, origin/main carries v4649" -- and v4654 was a heading already taken
+// on main by a different round. The refusal this file exists for did not fire, in the case it was written
+// for, because it was reading a number that had stopped moving.
+//
+// The fix is not a wider marker check; it is the second number, read from the same place a reader would.
+// The rule is the one the changelog's own v4333 note states: supersede FORWARD, past everything main has
+// spent -- not merely past main's marker, and not merely into a gap. A gap is worse than a collision: it
+// makes the ordering non-monotonic, and the peer comparing two rounds cannot tell which came first.
+// ====================================================================================================
+
+/** Every round ordinal a changelog text spends, newest first, with the heading each one names. */
+export function ordinalsOf(text) {
+    const titles = new Map();
+    // Anchored at line start with ^##, because the round notes QUOTE version numbers constantly -- this very
+    // file's prose names v4350, v4649 and v4654 -- and a loose /v(\d+)/ would read prose as a claim on a
+    // number. The heading is the only place a changelog SPENDS one.
+    for (const m of String(text || "").matchAll(/^##\s+v(\d{3,5})\b[^\n]*/gm)) {
+        const n = Number(m[1]);
+        if (!titles.has(n)) titles.set(n, m[0].replace(/^##\s+/, "").trim());
+    }
+    return { ordinals: [...titles.keys()].sort((a, b) => b - a), titles };
+}
+
+/** The ordinals origin/main's changelog has spent, or null with a reason. */
+export function mainOrdinals({ run = null } = {}) {
+    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    let text;
+    try { text = exec(["show", "origin/main:docs/CHANGELOG.md"]); }
+    catch (e) {
+        const msg = String((e && e.message) || e);
+        // Same shape as mainVersion's: an unreadable main is a normal tree to work in and is NOT a refusal,
+        // but the reason is reported rather than folded into silence.
+        return { ordinals: null, titles: null, reason: /unknown revision|does not exist|ambiguous argument/i.test(msg)
+            ? "origin/main is not readable here (no such ref, or not a clone with a remote)"
+            : "reading origin/main's changelog FAILED: " + msg.split("\n")[0].slice(0, 120) };
+    }
+    const { ordinals, titles } = ordinalsOf(text);
+    return ordinals.length ? { ordinals, titles, reason: null }
+                           : { ordinals: null, titles: null, reason: "origin/main's changelog has no `## vNNNN` heading this could parse" };
+}
+
 /**
  * The whole check. Returns { ok, refusal, mainVersion, shipping, freshness }.
  * `shipping` is the number this round intends to ship, e.g. "v4338".
@@ -122,16 +169,20 @@ export function preflight(shipping, opts = {}) {
     // number teaches people to skip it, and then the rule is unenforced again with extra steps" -- committed
     // in the guard that says it. Found by using it, one commit after it shipped. So the same-number case now
     // compares the builds, and only a DIFFERENT build wearing main's number is refused.
-    if (have != null && want === have) {
-        const localPath = path.join(ENG, "main.js");
+    // v4665 -- hoisted, because the ordinal check below needs the SAME exemption for the SAME reason. v4350's
+    // false fault was refusing a follow-up commit to a round already shipped; an ordinal check that did not
+    // carry that exemption would reintroduce it one number over.
+    const sameBuild = (() => {
         const mine = opts.localSourceOverride !== undefined ? opts.localSourceOverride
-                   : (() => { try { return fs.readFileSync(localPath, "utf8"); } catch { return null; } })();
+                   : (() => { try { return fs.readFileSync(path.join(ENG, "main.js"), "utf8"); } catch { return null; } })();
         const theirs = opts.mainSourceOverride !== undefined ? opts.mainSourceOverride : mainSource(opts);
-        if (mine != null && theirs != null && mine === theirs) {
-            return { ok: true, shipping, mainVersion: mv, freshness, refusal: null,
-                     note: `origin/main carries ${mv} and it is THIS build, byte for byte -- the same build under ` +
-                           `one number is what shipping means, not a collision` };
-        }
+        return mine != null && theirs != null && mine === theirs;
+    })();
+
+    if (have != null && want === have && sameBuild) {
+        return { ok: true, shipping, mainVersion: mv, freshness, refusal: null,
+                 note: `origin/main carries ${mv} and it is THIS build, byte for byte -- the same build under ` +
+                       `one number is what shipping means, not a collision` };
     }
 
     if (have != null && want <= have) {
@@ -143,7 +194,28 @@ export function preflight(shipping, opts = {}) {
                           `. Supersede FORWARD: v${have + 1} or later.` +
                           (freshness && freshness.stale ? " (and origin/main is itself behind the remote -- fetch first, the real number may be higher)" : "") };
     }
-    return { ok: true, shipping, mainVersion: mv, freshness, refusal: null };
+    // *** THE SECOND NUMBER. *** Past the marker check, and only for a build that is not main's own.
+    const ord = opts.mainOrdinalsOverride !== undefined ? opts.mainOrdinalsOverride : mainOrdinals(opts);
+    const spent = ord && ord.ordinals;
+    if (!sameBuild && spent && spent.length) {
+        const top = spent[0], taken = ord.titles && ord.titles.get(want);
+        if (want <= top) {
+            return { ok: false, shipping, mainVersion: mv, freshness, ordinalTop: top,
+                     refusal: `origin/main's changelog has already spent v${top}` +
+                              (taken ? `, and ${shipping} is a heading it already gave to a DIFFERENT round: "${taken}"`
+                                     : `, and ${shipping} is at or below it -- shipping into a gap below main's ` +
+                                       `highest makes the ordering non-monotonic, which is a worse record than a collision`) +
+                              `. Supersede FORWARD: v${top + 1} or later.` +
+                              (have != null && top > have
+                                 ? ` (main's MARKER reads v${have}: its rounds run ${top - have} ahead of it, which is why ` +
+                                   `comparing markers alone said this was fine)` : "") };
+        }
+    }
+    const note = (!sameBuild && spent && spent.length && have != null && spent[0] > have)
+        ? `main's changelog has spent v${spent[0]} while its marker reads v${have} -- ${spent[0] - have} rounds ahead, ` +
+          `so the ordinal is the binding number here` : undefined;
+    return { ok: true, shipping, mainVersion: mv, freshness, refusal: null, ordinalTop: spent ? spent[0] : null,
+             ...(note ? { note } : {}) };
 }
 
 // Run directly: node tools/ship/versionPreflight.mjs vNNNN

@@ -201,6 +201,6 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-300 snapshot drawn one body at a t
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: a depth test between overlapping glyph bodies (drawn in body order, no depth); the box3d browser loader's module against node's (the page uses the same adapter over it); the ticker's cost on a rig.");
-// v4650 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

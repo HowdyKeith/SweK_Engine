@@ -77,7 +77,7 @@ const ok = (name, cond, detail) => {
     // tells you nothing about the physics, and a page that cannot tell them apart would report a broken import
     // as a broken world.
     //
-    // *** v4650 -- AND IT MUST NOT BE A GATE THE SWEEP IS RUNNING. ***
+    // *** v4661 -- AND IT MUST NOT BE A GATE THE SWEEP IS RUNNING. ***
     // v4649 ledgered the mutation so a killed run could be undone, and that was the wrong half. The sweep is
     // EIGHT WAY PARALLEL: this gate edited physics/upAxis-selfcheck.mjs on disk while another worker was
     // running that same file, so upAxis went red in every sweep and green every time anybody ran it alone.

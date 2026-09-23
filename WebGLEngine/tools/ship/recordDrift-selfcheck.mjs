@@ -302,8 +302,8 @@ console.log("\n2. handed a stale record, each check names it");
         `the live drift() at the top of this file has already memoised the real census under the real ` +
         `function; a coarser key would hand this fixture that answer and pass. Got: ${rA.detail}`);
 
-    // *** v4651 -- THE CHECK THAT SHOULD HAVE EXISTED FOR TWO ROUNDS, DRIVEN BOTH WAYS. ***
-    // v4650 added a frozen record and v4651 added another; this pre-flight reported "nothing stale" on both
+    // *** v4662 -- THE CHECK THAT SHOULD HAVE EXISTED FOR TWO ROUNDS, DRIVEN BOTH WAYS. ***
+    // v4661 added a frozen record and v4662 added another; this pre-flight reported "nothing stale" on both
     // and BOTH verifies then came back with frozenRecords-selfcheck and recordReach-selfcheck red. The
     // instrument whose whole job is to ask "what did a new module invalidate" was not asking about the two
     // censuses that COUNT records, while the record in frozenRecords.mjs has carried the line "a round that
@@ -389,7 +389,7 @@ console.log("\n4. the frozen record");
 ok("the rounds and their record counts are what the commits show",
     REC.rounds.length === 4 && REC.rounds.map((r) => r.records).join(",") === "3,2,4,4",
     "two to four, varying by what the round added -- which is why the list cannot be memorised");
-// *** v4651 -- THE BOUND WAS A ROUND NUMBER AND IS NOW A RATIO, AND THE SWAP IS THE ARGUMENT THE RECORD
+// *** v4662 -- THE BOUND WAS A ROUND NUMBER AND IS NOW A RATIO, AND THE SWAP IS THE ARGUMENT THE RECORD
 // DEMANDED RATHER THAN A WIDENING. *** It read `sum < 1000`, and the record's own note beside the cost table
 // said the next check added "has to justify itself against that, or the budget has to move on an argument
 // instead of by drift". The seventh check costs 740 ms, the sum is 1,585, and the argument is that two
@@ -404,7 +404,7 @@ ok("!! re-deriving every checked record costs a small fraction of the verify it 
     `bound 1%. The old form was a flat 1,000 ms and the seventh check at a FULL census would not have fit ` +
     `under it; the check was made cheap (740 -> 285 ms, guardians off) AND the bound was given a shape, ` +
     `because a round number says nothing about what it is guarding`);
-// v4652 -- TWO now, and both are ADMITTED rather than added. The second is orrery-fleet.json's byte counts,
+// v4663 -- TWO now, and both are ADMITTED rather than added. The second is orrery-fleet.json's byte counts,
 // whose only re-derivation costs 2,580 ms against a pre-flight totalling 1,130 -- see the note on the
 // register. What this row asserts is that the number and the CLAUSES agree: an OWES entry for every duty
 // this tool names but does not discharge, so "not checked" cannot quietly become "not mentioned".

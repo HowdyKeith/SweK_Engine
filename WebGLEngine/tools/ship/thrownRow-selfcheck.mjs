@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/thrownRow-selfcheck.mjs -- v4651
+// WebGLEngine/tools/ship/thrownRow-selfcheck.mjs -- v4662
 //
 // Run: node tools/ship/thrownRow-selfcheck.mjs
 //
@@ -164,12 +164,12 @@ console.log("\n2. *** BOTH SHAPES NODE HAS -- AND MEASURED, EITHER HANDLER ALONE
 }
 
 // -----------------------------------------------------------------------------------------------------------
-console.log("\n3. *** IT SETS THE CODE RATHER THAN CALLING process.exit, FOR v4650's REASON ***");
+console.log("\n3. *** IT SETS THE CODE RATHER THAN CALLING process.exit, FOR v4661's REASON ***");
 {
     const src = codeOnly(fs.readFileSync(MOD, "utf8"));
     ok("*** reportThrows sets process.exitCode and never calls process.exit ***",
         /process\.exitCode = 1/.test(src) && !/process\.exit\s*\(/.test(src),
-        "this handler runs in a process that may have a wasm module behind it, and v4650 measured what " +
+        "this handler runs in a process that may have a wasm module behind it, and v4661 measured what " +
         "exiting there does: V8's compiler pool is still working, and disposing the platform underneath it " +
         "trips win/async.c's UV_HANDLE_CLOSING assertion. A net that aborts the process is not a net");
     // Driven rather than read: a source scan cannot tell a call that is there from one that runs.
@@ -250,26 +250,26 @@ console.log("\n5. *** WHO CARRIES THE NET, AND THE HONEST SIZE OF WHO DOES NOT *
     // hundred and ten gates on that evidence would be a hundred and ten untested edits to close a defect
     // nobody here can see, which is how a repair becomes the next round's finding. What ships is the four
     // the rig actually filed, and a floor that cannot fall.
-    const NETTED_AT_V4651 = Object.freeze([
+    const NETTED_AT_V4662 = Object.freeze([
         "ai-bridge/tools/boot-trace-selfcheck.mjs",
         // *** THE ONE CAUGHT ON THIS BOX RATHER THAN ON THE RIG, which is why it is the one with a diagnosis:
         // a fixed 6,000 ms sleep used as a readiness test, then a dereference of the dock tab that had not
         // appeared under six-way load. Green alone, dead in company, and dead WITHOUT A FAIL ROW. Found by
-        // v4651's run of the 361 gates outside the sweep, repaired to wait for the thing, and netted.
+        // v4662's run of the 361 gates outside the sweep, repaired to wait for the thing, and netted.
         "simulation/carrySpawn-selfcheck.mjs",
         "tools/roundhouse/magmapDefault-selfcheck.mjs",
         "tools/ship/atmosphere-selfcheck.mjs",
         "tools/ship/perspectiveWarp-selfcheck.mjs",
     ]);
-    const missing = NETTED_AT_V4651.filter((r) => !/reportThrows\s*\(/.test(fs.readFileSync(path.join(ENG, r), "utf8")));
+    const missing = NETTED_AT_V4662.filter((r) => !/reportThrows\s*\(/.test(fs.readFileSync(path.join(ENG, r), "utf8")));
     ok("*** every gate MEASURED to have died without a FAIL row carries the net ***",
-        missing.length === 0 && NETTED_AT_V4651.length === 5,
+        missing.length === 0 && NETTED_AT_V4662.length === 5,
         missing.length ? "lost it: " + missing.join(", ")
-                       : NETTED_AT_V4651.length + " named by a real crash -- four from the rig's capture and " +
+                       : NETTED_AT_V4662.length + " named by a real crash -- four from the rig's capture and " +
                          "one from this box's own exiled-gate pass -- all netted");
     ok("  ...and the netted count is a FLOOR that cannot fall",
-        netted.length >= NETTED_AT_V4651.length,
-        `${netted.length} gates carry it against a floor of ${NETTED_AT_V4651.length}`);
+        netted.length >= NETTED_AT_V4662.length,
+        `${netted.length} gates carry it against a floor of ${NETTED_AT_V4662.length}`);
     report(`NOT NETTED: ${launchers.length - nettedLaunchers.length} gates launch a browser without it. That is the ` +
         "exposed population and it is REPORTED rather than ratcheted to zero: every one of them is green on " +
         "this box, so there is no evidence here to edit them against, and a hundred blind edits is how a " +

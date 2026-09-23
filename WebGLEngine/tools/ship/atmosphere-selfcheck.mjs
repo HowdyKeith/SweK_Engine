@@ -27,7 +27,7 @@ import { reportThrows } from "./thrownRow.mjs";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
-// *** v4651 -- ANY THROW BECOMES A FAIL ROW. *** This gate has come back from the rig as
+// *** v4662 -- ANY THROW BECOMES A FAIL ROW. *** This gate has come back from the rig as
 // "CRASHED, exit 1, 0 FAIL rows" -- it printed its passing rows, threw somewhere in the browser half,
 // and died, so the ship's `grep -c '^  FAIL'` read ZERO on a gate that had failed. Worse, what a
 // page.evaluate rejects with is usually a plain object, and node prints a thrown object with NO STACK
