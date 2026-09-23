@@ -40,7 +40,17 @@ console.log("murmurDrive-selfcheck -- RESPONDING: the wander acquires a heading\
 // RESPONDING is state index 3 and drive is smoothstep(0, 0.55, tau), so tau 0 is drive EXACTLY 0 and any
 // tau past 0.55 is drive EXACTLY 1. Both ends are exact, which is what lets the rows below be equalities.
 const RESP = 3, IDLE = 0;
-const D0 = { stateIndex: RESP, stateTau: 0.0 }, D1 = { stateIndex: RESP, stateTau: 1.0 };
+// *** THE CADENCE IS HELD AT ZERO IN EVERY FRAME HERE, AND THAT IS AN ISOLATION AND NOT A TIDY DEFAULT. ***
+// mh_live weights the cadence by 0.60 in IDLE and 1.00 in THINKING and RESPONDING, so two frames that differ
+// only in their state index ALSO differ in their conditioned cadence -- and the row below compares exactly
+// such a pair to show that entering RESPONDING before the lean has begun moves nothing. It held while no
+// species this gate renders read the cadence. v4656 gave still's gesture slot murmur's
+// (1 + 0.30*live.pace + 1.70*st.drive) and the row went red on 673 bytes of cadence: a control confounded by
+// something other than its subject, which is this tree's oldest instrument fault and the one v4644 found in
+// the same place. activity 0 makes pow(0, 0.85) zero in every state, so the window cannot open and drive is
+// the only thing left that differs.
+const QUIET = { activity: 0 };
+const D0 = { ...QUIET, stateIndex: RESP, stateTau: 0.0 }, D1 = { ...QUIET, stateIndex: RESP, stateTau: 1.0 };
 
 // still's twelve gesture hashes, taken from the kit's own flourish at the species' own slot -- NOT invented
 // times. Each is the `rand` at a gesture's peak, which is what sets that gesture's wander angle.
@@ -225,7 +235,7 @@ sec("3. *** IT REACHES PIXELS, AND drive = 0 INSIDE RESPONDING IS BYTE-IDENTICAL
     const SPECIES = ["still", "droplet"];
     const T = 3.85;   // a gesture PEAK for still's slot, and a time abyss has a creature passing
     const FRAMES = [];
-    for (const s of SPECIES) for (const kn of [{ stateIndex: IDLE, stateTau: 0.0 }, D0, D1]) FRAMES.push(sp(s, T, undefined, kn));
+    for (const s of SPECIES) for (const kn of [{ ...QUIET, stateIndex: IDLE, stateTau: 0.0 }, D0, D1]) FRAMES.push(sp(s, T, undefined, kn));
     const run = await renderSpecies(FRAMES);
     if (!run.ok || !run.frames || run.frames.length !== FRAMES.length) {
         ok("!! the lean renders at all", false,
@@ -247,7 +257,10 @@ sec("3. *** IT REACHES PIXELS, AND drive = 0 INSIDE RESPONDING IS BYTE-IDENTICAL
             `over -- and both move at least ${Math.min(...rows.map((r) => r.lean.pct)).toFixed(1)}% ` +
             `of its bytes as drive goes to 1, worst channel ${rows.map((r) => r.lean.mx).join("/")} of 255. ` +
             `BOTH HALVES ARE THE CLAIM AND THE FIRST IS THE ONE THAT PROTECTS EVERYTHING ELSE: eighteen ` +
-            `species' byte baselines are captured outside RESPONDING, and drive is exactly 0 there.`);
+            `species' byte baselines are captured outside RESPONDING, and drive is exactly 0 there. EVERY ` +
+            `FRAME HOLDS activity AT 0 so that mh_live's cadence WINDOW -- 0.60 in IDLE against 1.00 in ` +
+            `RESPONDING -- cannot open between the two states and be read as a lean. It did not matter until ` +
+            `v4656 gave still's gesture slot a cadence term, and then it moved 673 bytes.`);
 
         // *** TWO KINDS OF LEAN, AND ONE INSTRUMENT TELLS THEM APART. *** ringChange reads the light on a
         // fixed circle: a body whose OUTLINE moves sweeps its own rim past it, and a body whose interior

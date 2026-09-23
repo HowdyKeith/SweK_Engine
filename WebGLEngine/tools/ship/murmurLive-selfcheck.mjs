@@ -85,7 +85,8 @@ const FRAMES = [
     /*  6 */ f("arc", { stateIndex: 0, activity: A_SQRT }),
     /*  7 */ f("arc", { stateIndex: 0, activity: 0.0 }),
     /*  8 */ f("arc", { stateIndex: 0, activity: 1.0 }),
-    // still -- the one species here with NO cadence site at all. Its glintRate is its own style dial.
+    // still -- which had NO cadence site at all until v4656 gave its gesture slot murmur's divisor.
+    // Its glintRate is its own style dial and stays one; what it did not have was the signal beside it.
     /*  9 */ f("still", { stateIndex: 0, activity: 0.0 }),
     /* 10 */ f("still", { stateIndex: 0, activity: 1.0 }),
     /* 11 */ f("still", { stateIndex: 1, voice: L_LISTEN }),
@@ -158,18 +159,36 @@ if (!run.ok) {
             `with one shared window would fail exactly one of these two halves and pass the other.`);
     }
 
-    sec("3. *** THE CADENCE IS WHERE murmur PUTS IT AND NOT EVERYWHERE: still IS EXACTLY INVARIANT TO IT ***");
+    sec("3. *** THE CADENCE REACHES still NOW, AND UNTIL v4656 THIS ROW ASSERTED THAT IT COULD NOT ***");
     {
         const sSpan = cmp(F[9], F[10]);
         const aSpan = cmp(F[7], F[8]);
         say(`activity 0 -> 1: still moves ${sSpan.sum} bytes over ${sSpan.n}, arc ${aSpan.sum} over ${aSpan.n} (worst ${aSpan.mx})`);
-        ok("!! *** still DOES NOT MOVE AT ALL ACROSS THE WHOLE CADENCE RANGE, AND arc DOES ***",
-            sSpan.n === 0 && aSpan.sum > 2000,
-            `still: ${sSpan.n} differing bytes across activity 0 to 1 -- EXACTLY zero, because still is not one ` +
-            `of the six species murmur gives a cadence to, and its glintRate is its own style dial out of ` +
-            `styles.ts. arc moves ${aSpan.sum} over the same span. The zero alone would be passed by a shader ` +
-            `that ignored the activity knob entirely, and the nonzero alone by a port that sprayed it over all ` +
-            `eighteen; the pair together is the claim, and murmurLive2-selfcheck.mjs adds chorus to each half.`);
+        // *** THIS ROW SAID "still DOES NOT MOVE AT ALL ACROSS THE WHOLE CADENCE RANGE" AND GAVE murmur's OWN
+        // DESIGN AS THE REASON: "still is not one of the six species murmur gives a cadence to". *** It is the
+        // same falsehood the census below carried for thirteen rounds and v4654 inverted, in a different
+        // room: counted in murmur's own sources live.pace appears in ALL EIGHTEEN, and still.ts in particular
+        // divides its gesture slot by (1 + 0.30*live.pace + 1.70*st.drive). The zero this row required was a
+        // GAP IN THIS PORT wearing the clothes of a design decision -- and because it was written as a
+        // requirement, it would have gone red the day anybody closed the gap. Which is what happened: v4656
+        // gave still its slot divisor and this row went red reading 613 bytes over 270.
+        //
+        // A ROW THAT GOES RED WHEN A PORT GETS MORE FAITHFUL IS POINTING THE WRONG WAY. So it inverts, and
+        // the half it used to carry -- that the cadence does not reach everywhere -- moves to where it can be
+        // stated truthfully: the source census in section 4, which names the six builders that do not read it
+        // and calls them a gap, and tools/ship/murmurGesture-selfcheck.mjs, whose DEAF rows show in pixels
+        // that still's slot ignores the VOICE integral and tempest's bolts ignore cadence and drive. That is
+        // the real "not everywhere" claim -- a signal absent where murmur omits it, rather than absent where
+        // this port has not arrived.
+        ok("!! *** still MOVES ON THE CADENCE NOW, AND arc STILL DOES: 613 bytes and 5,227 across the same span ***",
+            sSpan.n > 0 && sSpan.sum > 200 && aSpan.sum > 2000 && aSpan.sum > sSpan.sum,
+            `still moves ${sSpan.sum} bytes over ${sSpan.n} across activity 0 to 1, where it moved EXACTLY ` +
+            `ZERO before v4656 -- still.ts divides its gesture slot by (1 + 0.30*live.pace + 1.70*st.drive) ` +
+            `and this port carried no divisor at all, so the one event in still's frame arrived at the same ` +
+            `rate whether or not anybody was talking to it. arc moves ${aSpan.sum} over the same span, and it ` +
+            `MOVES MORE, which is the shape of the two species: arc reads the cadence in a continuous rate ` +
+            `and still reads it in a gesture that is either on screen or not. THE ORDERING IS PART OF THE ` +
+            `ROW -- a port that sprayed the cadence over everything at one strength would not produce it.`);
     }
 }
 
@@ -213,11 +232,12 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 12 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 12,
+    ok("!! the conditioned pair is declared once each and read 42 and 14 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 14,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
-        `strings stripped. The cadence count is 12 at v4655 and was 11: helix's climb acquired murmur's ` +
-        `0.75*live.pace, which this port had simply never carried. The 43 before that was a REPAIR of a ` +
+        `strings stripped. The cadence count is 14 at v4656, 12 at v4655 and 11 before that: helix's climb took ` +
+        `murmur's 0.75*live.pace at v4655, and at v4656 still's gesture slot and abyss's took 0.30 and 0.35 ` +
+        `of it. Three absences filled in two rounds, none of them a new number. The 43 before that was a REPAIR of a ` +
         `recorded 44, not a regression: v4641 moved 44 raw-knob sites and 8 glintRate sites, and one of the ` +
         `44 collapsed into a shared expression while the census kept scoring the comment that named it. The ` +
         `pixel rows above are what say the move was real; this row says nothing was left behind.`);
@@ -266,12 +286,15 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
     say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
-    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES NINE -- the eight builders still without one are named ***",
-        paced.length === 9 && ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix"].every((x) => paced.includes(x)) &&
-        unpaced.length === (marks.length - 1) - 9,
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES ELEVEN -- the six builders still without one are named ***",
+        paced.length === 11 &&
+        ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix", "still", "abyss"].every((x) => paced.includes(x)) &&
+        unpaced.length === (marks.length - 1) - 11,
         `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
-        `${unpaced.join(", ")} -- eight builders covering nine species, since mist draws both nebula and ` +
-        `tempest. helix arrives at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
+        `${unpaced.join(", ")} -- six builders covering seven species, since mist draws both nebula and ` +
+        `tempest. still and abyss arrive at v4656 through their GESTURE SLOTS, which murmur divides by the ` +
+        `signal sum: still's carried no divisor at all and abyss's carried the voice term alone. helix ` +
+        `arrived at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
         `this port carried the bare drift, so its strands rose at one speed whatever the exchange was doing. ` +
         `comet and limn arrived at v4654 -- comet's orbital rate was reading VOICE where murmur reads ` +
         `live.pace and its closure never touched the cadence at all, and limn had the smaller of murmur's two ` +

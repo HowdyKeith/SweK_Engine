@@ -935,6 +935,32 @@ export const NEXT_ROUNDS = [
             "flourish slot divisors, duet's shader-side flourish rate, limn's drive FACTOR, and the nine " +
             "species still without murmur's cadence -- helix acquired it here, which moved the count from " +
             "eight to nine.",
+        note5: "MECHANISM (c), THE FLOURISH SLOT DIVISORS, IS DONE AT v4656 -- AND IT WAS THREE SPECIES AND " +
+            "NOT TWO. The note above said still and abyss; tempest's two lightning lanes divide their slots " +
+            "by (1 + 1.30*energy) as well, and tempest's was the one already WIRED, so it was re-rolling its " +
+            "bolts on every change of voice in the shipped port.\n\n" +
+            "*** IT DID NOT NEED ITS OWN IDEA AFTER ALL; IT NEEDED v4654's, APPLIED TO THE INDEX. *** The " +
+            "note above was right that integration does not apply to a slot PHASE -- there isn't one -- but " +
+            "the slot COUNT is an integral: a boundary falls where the accumulated count crosses an integer, " +
+            "and that count is the integral of dt/SLOT = (t + a*P + b*V + c*D)/B. Same three uniforms, no " +
+            "new ones, and floor of it can only step by ONE. Measured at zero jumps, zero reversals and " +
+            "zero mid-gesture re-seeds over 5,019 frames, against murmur's 21-slot jumps and an envelope " +
+            "stepping 0.9996 in a frame.\n\n" +
+            "*** WHAT IS STILL NOT RIGHT, AND IT IS murmur's RULE RATHER THAN THE REPAIR'S: *** the 0.9 s " +
+            "LEAD-IN is an absolute duration, so a fixed 0.9 s is a larger share of a slot that has got " +
+            "shorter and a gesture's start SLIDES while a signal moves. It is continuous, and it lets the " +
+            "repaired envelope step up to 9.0x the rate of its own progress during a transition. Expressing " +
+            "it against the BASE slot would make it perfectly continuous and would break the reduction that " +
+            "protects every recorded frame -- measured and rejected, not overlooked.\n\n" +
+            "*** AND A STYLE ABSENCE FOUND ON THE SAME LINE AND DELIBERATELY NOT FIXED HERE: *** tempest's " +
+            "bolt slots are mix(2.9, 5.2, small) and mix(4.3, 7.4, small) in tempest.ts, and this port " +
+            "carries the bare 2.9 and 4.3. It is a style transcription rather than a clock, so folding it " +
+            "into a round whose whole measurement is about the clock would have made both harder to read. " +
+            "One line per lane, and it will move whatever tempest frames are recorded at small > 0.\n\n" +
+            "STILL OPEN FROM (a)-(c): the two bare rate * t sites (opal's flash drift, geode's mix target), " +
+            "duet's shader-side flourish rate, limn's drive FACTOR, and the nine species still without " +
+            "murmur's cadence -- helix took it at v4655 and still took it at v4656, so the count has moved " +
+            "twice in two rounds.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

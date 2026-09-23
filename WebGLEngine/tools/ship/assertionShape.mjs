@@ -660,8 +660,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 2,772 at which this tree splits. Putting them in murmurClock instead would have added those three
     // compiles to its existing one and gone over the 3,000 ms ceiling, which does not make a gate slow, it
     // makes it not run.
-    gates: 1764, usesOk: 1743, definesOk: 1735, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1636, condFirst: 96, unknownSignature: 11,
+    // v4656 -- RE-TAKEN 1764 -> 1765 for tools/ship/murmurGesture-selfcheck.mjs. ONE gate again, and the
+    // clock allowed it: three species RENDERED is the same three compiles murmurClock2 pays, and the CPU
+    // half was brought under the line by MEMOISING the state walks two sections both wanted -- 3,519 ms to
+    // 3,135 on this box, which against a murmurKit measuring 2,861 here and RECORDED at 2,035 (drift 1.41)
+    // is about 2,230 recorded. Computing the same 21 walks twice was a tenth of the budget spent on
+    // arithmetic already done, which is a cheaper thing to find than a second gate file.
+    gates: 1765, usesOk: 1744, definesOk: 1736, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1637, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

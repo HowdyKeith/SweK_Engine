@@ -8070,6 +8070,66 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4656 -- THE 339th CLOSING: the gesture clock, where a slot that changes length does not advance the
+    // gesture, it replaces it.
+    since338: Object.freeze({
+        at: "v4656", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurGesture-selfcheck.mjs"]),
+        // EMPTY because the new gate arrived GREEN. murmurSpecies3 went red on this round's CHANGE, which is
+        // a recorded bound moving under a repaired mechanism and not a gate arriving broken -- this field is
+        // for the second. What happened to it is in the verdict, where it can be read rather than counted.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,135 ms on this box against a murmurKit measuring 2,861 here and RECORDED at " +
+                 "2,035 -- a drift of 1.41, so about 2,230 recorded. 12 rows in five sections over three " +
+                 "species. *** mh_flourish's SLOT INDEX IS NOT A PHASE: every number in the gesture is a " +
+                 "hash of floor(t / SLOT) -- where it starts, how long it lasts, and the per-gesture random " +
+                 "its species spends as a DIRECTION. *** Three of murmur's species make the slot length a " +
+                 "function of the live signals, and a divisor that moves makes that index JUMP, which " +
+                 "re-rolls every hash at once. The bolt in the air becomes a different bolt between one " +
+                 "frame and the next. " +
+                 "MEASURED across three species and seven session lengths: the index moves up to 21 SLOTS " +
+                 "in a single 16.7 ms frame and the envelope steps 0.9996 of its 0..1 range -- and sin^2 " +
+                 "has ZERO SLOPE at both ends by design, so it cannot legitimately arrive there from 0 in " +
+                 "one frame. The per-gesture random changed MID-GESTURE on 14 frames, envelope up on both " +
+                 "sides: the same creature's direction redrawn while it is on screen. " +
+                 "*** AND IT IS NOT THE PHASE TELEPORT'S SHAPE, which is a distinction worth having. *** " +
+                 "The envelope step is already 0.9950 after thirty seconds; one re-index ruins one gesture " +
+                 "completely at any t. What grows with the session is the FREQUENCY -- 0 re-rolls at 30 s " +
+                 "and 7 at half an hour -- because d(floor(t/SLOT))/dSLOT is -t/SLOT^2, so at large t an " +
+                 "arbitrarily small change of slot length flips the index and the gesture flickers. " +
+                 "*** tempest's TWO LIGHTNING LANES WERE DOING THIS TODAY. *** It is the one of the three " +
+                 "whose divisor was already wired; still's was absent entirely and abyss's carried one of " +
+                 "murmur's three terms, so those two are an ABSENCE filled and tempest's is a defect fixed. " +
+                 "THE REPAIR IS v4654's FACTORING ON A DIFFERENT STRUCTURE AND COSTS NO NEW UNIFORM: a " +
+                 "boundary falls where the accumulated slot COUNT crosses an integer, and that count is " +
+                 "(t + a*P + b*V + c*D)/B -- mhRatePhase with a base of 1/B. S is continuous and strictly " +
+                 "increasing, so floor(S) steps by one: ZERO jumps, ZERO reversals and ZERO mid-gesture " +
+                 "re-seeds over 5,019 frames, against a held-signal reduction of 1.5e-12 across all four " +
+                 "outputs and 62,400 points. " +
+                 "*** A SHADER TWIN HAD BEEN MISSING TWO OF ITS FOUR SIGNAL TERMS AND THE PROBE COULD NOT " +
+                 "SEE IT: *** mhAbyssSlot divided by (1 + 0.55*voice) where abyss.ts and this tree's own " +
+                 "CPU abyssSlot divide by all four, and the kit probe swept rarity and voice ONLY -- the " +
+                 "pair that was missing sat at zero in every pixel. Repaired, the probe now sweeps pace " +
+                 "against drive in a second channel and catches the old twin at 101/255. Two arguments " +
+                 "pinned at zero grade nothing, for the third round running. " +
+                 "*** murmurSpecies3 WENT RED ON ARRIVAL AND ITS CONSTANTS WERE DROPPED RATHER THAN " +
+                 "RE-FITTED. *** Its four frame times were hand-written [2.0, 9.0, 16.0, 22.5], fitted to " +
+                 "a slot of 16.48 s -- which was abyss's slot only while the cadence term was missing. With " +
+                 "it the slot is 15.12 s, the lanes moved, and the row about two lanes turning opposite " +
+                 "ways read 15.25 degrees against 0.00 because the first lane was no longer passing at all. " +
+                 "The times are SEARCHED FOR now, at the gate's own operating point against its own clock, " +
+                 "and the numbers got stronger: +17.80 and -11.93 degrees, genuinely opposite, and the " +
+                 "interior swing went from 4.7x to 10.9x. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, TWO ONLY AFTER REPAIR: handing abyss its BASE slot length " +
+                 "where the instantaneous one belongs walked through both pixel rows and every species gate " +
+                 "(it is worth 1.3% of a slot), and dropping the 1.30 from tempest's folded coefficient " +
+                 "walked through everything because every pixel row asked only whether the frame MOVED. " +
+                 "Closed by a structural census -- the count must integrate against a base with no live " +
+                 "signal and the length must carry one -- and by reading tempest's 1.30 and 0.85 out of the " +
+                 "shader and multiplying them. The census's own first cut took a 240-character declaration " +
+                 "window that spilled into the next statement and scored every correct site as wrong.",
+    }),
     // v4655 -- THE 338th CLOSING: the clocks whose OUTPUT is multiplied, which last round's census could
     // not see, and a row that had outlived its own repair two gates away.
     since337: Object.freeze({

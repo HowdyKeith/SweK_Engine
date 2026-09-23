@@ -26,6 +26,100 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4656 -- the gesture clock: a slot that changes length does not advance the gesture, it replaces it
+
+`mh_flourish` is the pack's play mechanism — "every hero performs **one** gesture, a thing the presence does
+now and then and then lets go of". Time is cut into slots, the slot **index** is `floor(t / SLOT)`, and every
+other number in the gesture is a hash of that index: where in its slot it falls, how long it lasts, and the
+per-gesture random its species spends as a **direction**.
+
+The index is not a phase. Three of murmur's species make the slot length a function of the live signals — and
+a divisor that moves makes `floor(t / SLOT)` **jump**, which re-rolls every hash at once. The bolt in the air
+becomes a different bolt, with a different start, a different duration and a different direction, between one
+frame and the next.
+
+Measured across three species and seven session lengths, at a 1/60 s frame:
+
+| | worst index jump | worst envelope step | random re-rolled mid-gesture |
+|---|---|---|---|
+| murmur's `floor(t / SLOT)` | **21 slots in one frame** | **0.9996** of a 0..1 range | 14 frames |
+| the integrated slot count | 1 | 0.0929 | 0 |
+
+`sin²(πu)` has **zero slope at both ends by design**, so an envelope cannot legitimately arrive at 0.9996 from
+zero in 16.7 ms. And the middle column is the mild reading: the right-hand one is a creature's direction being
+redrawn while it is on screen.
+
+**This is not the phase teleport's shape, and the difference is worth having.** The envelope step is already
+0.9950 after thirty seconds — one re-index ruins one gesture completely at any `t`. What grows with the
+session is the *frequency*: 0 re-rolls at 30 s and 7 at half an hour, because `d(floor(t/SLOT))/dSLOT` is
+`−t/SLOT²`, so at large `t` an arbitrarily small change of slot length flips the index and the gesture
+flickers rather than jumping once.
+
+**tempest's two lightning lanes were doing this today.** It is the one of the three whose divisor was already
+wired; still's was absent entirely and abyss's carried one of murmur's three terms — so those two are an
+absence filled and tempest's is a defect fixed, which is the distinction v4655 had to draw about helix.
+
+**The repair is v4654's factoring on a different structure, and it costs no new uniform.** The honest reading
+of "time cut into slots" when the slot moves is that a boundary falls where the accumulated slot **count**
+crosses an integer:
+
+    S(t) = ∫ dt / SLOT(t) = ∫ F(t) dt / B = (t + a·P + b·V + c·D) / B
+
+which is `mhRatePhase` with a base of `1/B` and the three integrals the host has sent since v4654. `S` is
+continuous and strictly increasing, so `floor(S)` steps by one — **zero jumps, zero reversals and zero
+mid-gesture re-seeds over 5,019 frames** — and a held signal makes the two functions identical across all four
+outputs to 1.5e-12 over 62,400 points. That reduction was verified the hard way too: with the new coefficients
+zeroed and only the migration in place, every one of the fifteen species gates stayed green.
+
+**A shader twin had been missing two of its four signal terms, and the probe could not see it.** `mhAbyssSlot`
+divided by `(1 + 0.55·voice)` where `abyss.ts` — and this tree's own CPU `abyssSlot` — divide by all four. The
+CPU reference was *ahead of* the shader, and the kit probe swept rarity and voice only, leaving the pair that
+was missing at the one value where its absence is invisible. Repaired, the probe sweeps pace against drive in
+a second channel and catches the old twin at 101/255. **Two arguments pinned at zero grade nothing**, for the
+third round running.
+
+**Three recorded claims were repaired rather than re-fitted.** First, `murmurSpecies3` went red. Its four frame times were
+hand-written `[2.0, 9.0, 16.0, 22.5]`, fitted to a slot of 16.48 s — which was abyss's slot only while the
+cadence term was missing. With it the slot is 15.12 s, the lanes moved, and the row about two lanes turning
+the body opposite ways read 15.25° against 0.00° because the first lane was no longer passing at all. A
+constant fitted to where a mechanism happened to be is not a measurement of the mechanism, so the four times
+are **searched for** now, at the gate's own operating point against its own clock. The numbers got stronger:
+**+17.80° and −11.93°**, genuinely opposite signs, and the interior swing went from 4.7× to 10.9×.
+
+**And `murmurDrive`'s control was confounded.** It compares RESPONDING at drive 0 against IDLE, to show that
+entering the state before the lean has begun moves nothing — but `mh_live` weights the *cadence* by 0.60 in
+IDLE and 1.00 in RESPONDING, so that pair also differs in cadence. It held while nothing the gate rendered
+read the cadence; still's new gesture slot reads it, and the row went red on 673 bytes that were not a lean at
+all. Every frame there now holds `activity` at 0, so the window cannot open and drive is the only thing left
+that differs — the same instrument fault v4644 found in the same place, two rounds apart.
+
+Thirteen sabotages, all caught, two only after repair. Handing abyss its **base** slot length where the
+instantaneous one belongs walked through both pixel rows and every species gate — it is worth about 1.3% of a
+slot. Dropping the 1.30 from tempest's folded coefficient walked through everything, because every pixel row
+asked only whether the frame *moved*. Closed by a structural census — the count must integrate against a base
+with no live signal in it and the length must carry one — and by reading tempest's 1.30 and 0.85 out of the
+shader and multiplying them. That census's own first cut took a 240-character declaration window which spilled
+into the next statement and scored every correct site as wrong.
+
+The pixel rows hold `stateIndex`, `stateTau` and the level fixed and sweep only the history, so nothing the
+shader conditions from a uniform differs across a pair: still's single glint is at **0.000 with no history and
+0.993 with twelve radian-seconds of cadence behind it**, at the same instant. The deaf rows — still is deaf to
+voice, tempest's bolts to cadence and drive — are measured with the gesture **on screen**, because a deaf
+reading taken on a night frame says nothing. The first cut of that section measured exactly that and read 0.0%
+on all three of still's integrals, including the two it does read.
+
+`tools/ship/murmurGesture-selfcheck.mjs` arrives green at 3,135 ms on this box (~2,230 recorded), so the tree
+holds 1765 gates. It was 3,519 until the state walks that two sections both wanted were memoised.
+
+**Not claimed:** the 0.9 s **lead-in** still reads the instantaneous slot length, because it is an absolute
+duration in murmur and a fixed 0.9 s *is* a larger share of a slot that has got shorter — so a gesture's start
+slides, continuously, while a signal moves, and the repaired envelope can step up to 9.0× the rate of its own
+progress during a transition. Expressing it against the base slot instead would make it perfectly continuous
+at the price of the reduction that protects every recorded frame: measured, and rejected for that reason. Also
+not claimed: tempest's bolt slots are missing murmur's `small` mix (`mix(2.9, 5.2, small)` and
+`mix(4.3, 7.4, small)`) — a style transcription rather than a clock, kept out so neither measurement would
+muddy the other, and recorded.
+
 ## v4655 -- the clocks my own census could not see, and a row that outlived its own repair
 
 v4654 shipped a census that printed **`modulated rates still on murmur's rate * t: (none)`**. Two clocks were

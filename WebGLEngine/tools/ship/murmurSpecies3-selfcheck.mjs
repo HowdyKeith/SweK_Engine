@@ -14,7 +14,7 @@
 // periods of 14.3 to 22.4. Sampling those in a gate built for a 2.2-second window would measure nothing.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, VOICE_LIVE, sp, renderSpecies, lin, light, bil, edgeQuartile, interiorMeanLight, hueShift,
+import { N3, VOICE, VOICE_LIVE, PACE_LIVE, sp, renderSpecies, lin, light, bil, edgeQuartile, interiorMeanLight, hueShift,
          hueTurn, hotspotMove, interiorPeak } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
@@ -24,25 +24,65 @@ const sec = (t) => console.log("\n" + t);
 
 console.log("murmurSpecies3-selfcheck -- opal's play of colour and abyss's long dark\n");
 
-// FOUR TIMES ACROSS 20.5 SECONDS, which is chosen from the species rather than round: abyss's default slot
-// is 16.48 s at these knobs and opal's four lives run at 14.3, 17.1, 19.6 and 22.4, so a span shorter than
-// this can miss an abyss event entirely and would sample opal at what is effectively one phase.
+// FOUR TIMES CHOSEN FROM abyss's OWN CLOCKS RATHER THAN SPACED EVENLY, which is what lets the rows below
+// name a LANE instead of a moment. render/murmurKit.mjs's gesture clock is the same envelope the shader
+// runs, so the CPU half says exactly which of the three lanes is passing at any time. What the four are is:
+// two NIGHTS with every lane at zero, and two SINGLE-LANE passes BY DIFFERENT LANES. An evenly spaced set
+// would give two nights and two passes as well, but with no way to say which lane made either -- and the hue
+// row below turns entirely on that, because the two lanes are meant to turn the body in OPPOSITE directions.
 //
-// *** AND THE FOUR ARE CHOSEN FROM abyss's OWN CLOCKS RATHER THAN SPACED EVENLY, which is what lets the rows
-// below name a LANE instead of a moment. *** render/murmurKit.mjs's mhFlourish is the same envelope the
-// shader runs, so the CPU half says exactly which of the three lanes is passing at any time. At the default
-// rarity (0.6) and this voice the slot is 16.48 s, and over the first half-minute:
+// *** THEY WERE FOUR HAND-WRITTEN NUMBERS UNTIL v4656 AND THAT IS WHY THEY ARE DERIVED NOW. *** They read
+// [2.0, 9.0, 16.0, 22.5], fitted to a slot of 16.48 s -- which was abyss's slot only while this port was
+// missing murmur's CADENCE term. v4656 added it (abyss.ts divides by 1 + 0.55*voice + 0.35*pace +
+// 1.60*drive; the shader twin carried the voice term alone), the slot became 15.12 s at these knobs, the
+// lanes moved, and the row about two lanes turning opposite ways went red reading 15.25 degrees against
+// 0.00 -- because at t = 22.5 the first lane was no longer passing at all.
 //
-//     t = 2.0    all three lanes at 0.000          -- night
-//     t = 9.0    lane 2 at 0.909, lanes 0,1 at 0.000/0.005  -- ONE creature, the third lane, hue step +1
-//     t = 16.0   all three lanes at 0.000          -- night
-//     t = 22.5   lane 0 at 0.333, lanes 1,2 at 0.000        -- ONE creature, the first lane, hue step -1
-//
-// Two nights and two single-lane passes BY DIFFERENT LANES. An evenly spaced set would have been two nights
-// and two passes as well, but with no way to say which lane made either -- and the hue row below turns
-// entirely on that, because the two lanes are meant to turn the body in OPPOSITE directions.
-const TIMES = [2.0, 9.0, 16.0, 22.5];
-// The two single-lane passes, by index into TIMES.
+// A CONSTANT FITTED TO WHERE A MECHANISM HAPPENED TO BE IS NOT A MEASUREMENT OF THE MECHANISM, and re-fitting
+// it to 19.25 would leave the next reader the same trap. So the four are SEARCHED FOR, at this gate's own
+// operating point, against this gate's own clock: whatever the slot is, the picker finds the first run in
+// which each lane passes alone and the longest night either side of it. It is the same move v4654 made when
+// limn's hue centre was dropped rather than re-fitted.
+const ABY = { rarity: 0.6, small: 0, drive: 0 };
+const SLOT_SIG = K.MH_SLOT_SIGNAL.abyss;
+const ABY_BASE = K.abyssSlot(ABY.rarity, 0, 0, 0, ABY.small);
+const ABY_NOW = K.abyssSlot(ABY.rarity, VOICE_LIVE, PACE_LIVE, ABY.drive, ABY.small);
+/** The three lanes' envelopes at shader time t, on the integrated slot count the shader itself runs. */
+const abyssLanes = (t) => K.ABYSS_LANES.map((L) => K.mhFlourishPhase(
+    K.mhRatePhase(1 / (ABY_BASE * L.slot), t, SLOT_SIG.pace, PACE_LIVE * t,
+                  SLOT_SIG.voice, VOICE_LIVE * t, SLOT_SIG.drive, ABY.drive * t),
+    ABY_NOW * L.slot, L.seed).env);
+const TIMES = (() => {
+    const grid = [];
+    for (let t = 1.0; t <= 60; t += 0.25) grid.push([t, abyssLanes(t)]);
+    // the PEAK of the FIRST run in which lane k passes alone: earliest, so the frames stay inside the first
+    // half-minute the species' own file talks about, and the peak of it, so a row measures a creature rather
+    // than its tail.
+    const firstSoloPeak = (k) => {
+        const run = [];
+        for (const g of grid) {
+            const solo = g[1][k] > 0.20 && g[1].every((x, j) => j === k || x < 0.02);
+            if (solo) run.push(g); else if (run.length) break;
+        }
+        if (!run.length) throw new Error(`murmurSpecies3: no solo pass found for abyss lane ${k}`);
+        return run.reduce((a, b) => (b[1][k] > a[1][k] ? b : a))[0];
+    };
+    const P2 = firstSoloPeak(2), P0 = firstSoloPeak(0);
+    const nightMid = (lo, hi) => {
+        let best = null, run = null;
+        for (const [t, e] of grid) {
+            if (t <= lo || t >= hi) { run = null; continue; }
+            if (Math.max(...e) < 0.005) {
+                run = run || [t, t]; run[1] = t;
+                if (!best || run[1] - run[0] > best[1] - best[0]) best = [run[0], run[1]];
+            } else run = null;
+        }
+        if (!best) throw new Error(`murmurSpecies3: no night found between ${lo} and ${hi}`);
+        return Math.round(((best[0] + best[1]) / 2) * 4) / 4;
+    };
+    return [nightMid(0, Math.min(P0, P2)), P2, nightMid(Math.min(P0, P2), Math.max(P0, P2)), P0];
+})();
+// The two single-lane passes, by index into TIMES. The picker builds the array in this order.
 const PASS_THIRD = 1, PASS_FIRST = 3, NIGHT = 2;
 // THIRTEEN FRAMES AND TWO SHADERS, and every one of those three numbers is a budget decision. The ceiling is
 // 3,000 ms and a gate over it does not run at ship time AT ALL, so the arithmetic is part of the gate:
@@ -108,9 +148,11 @@ sec("1. *** ABYSS: THE PATIENCE PIECE -- rare glows passing through, mostly nigh
             mx / mn > 4 && ab.filter((v) => v < mn * 2).length >= TIMES.length / 2,
             `its interior runs ${mn.toFixed(3)} to ${mx.toFixed(3)}, a ${(mx / mn).toFixed(1)}x swing, with ` +
             `${ab.filter((v) => v < mn * 2).length} of ${TIMES.length} samples still on the floor. A species ` +
-            `whose events were continuous would show a small swing and a high floor; this one waits. The span ` +
-            `is 20.5 s because abyss's slot at these knobs is 16.48 -- a shorter window can miss every pass ` +
-            `and would measure the gate rather than the hero. *** THE LIMIT IS 4x AND THE MEASUREMENT IS ` +
+            `whose events were continuous would show a small swing and a high floor; this one waits. THE SPAN ` +
+            `IS ${(Math.max(...TIMES) - Math.min(...TIMES)).toFixed(2)} s AND IT IS NOT A CHOSEN NUMBER: it ` +
+            `is whatever the picker's two nights and two solo passes span at abyss's own slot of ` +
+            `${ABY_NOW.toFixed(2)} s, which is the base ${ABY_BASE.toFixed(2)} divided by the signal sum. A ` +
+            `window shorter than one slot can miss every pass and would measure the gate rather than the hero. *** THE LIMIT IS 4x AND THE MEASUREMENT IS ` +
             `${(mx / mn).toFixed(1)}x, WHICH IS NOT SLACK BUT A STATEMENT ABOUT WHICH HALF IS STABLE: *** the ` +
             `FLOOR is in every sample and barely moves, while the PEAK depends on whether one of four times ` +
             `happens to land on a pass -- six times read 31.8x and four read ${(mx / mn).toFixed(1)}x on the ` +

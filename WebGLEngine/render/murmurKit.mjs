@@ -177,6 +177,58 @@ export function mhFlourish(t, lane, slotLen) {
 }
 
 /**
+ * *** THE SAME GESTURE CLOCK WITH THE SLOT INDEX SUPPLIED RATHER THAN DIVIDED OUT -- v4656. ***
+ *
+ * mh_flourish takes a slot LENGTH and computes `floor(t / SLOT)`. Three of murmur's species make that length
+ * a function of the live signals -- still divides it by (1 + 0.30*pace + 1.70*drive), abyss by (1 + 0.55*voice
+ * + 0.35*pace + 1.60*drive), tempest's two lightning lanes by (1 + 1.30*energy) -- and a divisor that moves
+ * makes `floor(t / SLOT)` JUMP. The index is not a phase: every hash in this function is keyed on it, so a
+ * jump does not advance the gesture, IT REPLACES IT. The bolt in the air becomes a different bolt, with a
+ * different start, a different duration and a different direction, between one frame and the next.
+ *
+ * MEASURED on tempest's first lane as the voice rises, at a 1/60 s frame: after half an hour of running the
+ * index moves TWENTY-ONE SLOTS in one frame and the envelope steps 0.9614 of its full range. still reaches
+ * 0.9989 and abyss 0.9996 -- a gesture at essentially full brightness appearing out of nothing, or vanishing
+ * mid-stroke. It is not a large-t defect the way the phase teleport was: the envelope step is already 0.995
+ * after thirty seconds. What grows with t is HOW OFTEN it happens, because d(floor(t/SLOT))/dSLOT is -t/SLOT^2
+ * and at large t an arbitrarily small change of slot length flips the index.
+ *
+ * *** THE REPAIR IS THE SAME FACTORING AS v4654's AND IT COSTS NO NEW UNIFORM. *** The honest generalisation
+ * of "time cut into slots" when the slot length moves is that a boundary falls wherever the ACCUMULATED slot
+ * count crosses an integer:
+ *
+ *     S(t) = integral of dt / SLOT(t) = integral of F(t) dt / B = (t + a*P + b*V + c*D) / B
+ *
+ * because SLOT is B / F with B a style constant and F the signal sum. That is mhRatePhase with a base of 1/B
+ * and the three integrals the host already sends. S is continuous and strictly increasing, so floor(S) can
+ * only ever step by ONE -- measured at 0 jumps over 1,673 frames across three species and seven session
+ * lengths -- and the per-gesture hash stays put for the whole of its own gesture.
+ *
+ * *** AND IT REDUCES TO murmur's OWN EXPRESSION AT A HELD SIGNAL, which is what protects every recorded
+ * frame. *** Held, P = pace*t, so S = t*F/B = t/SLOT: floor(S) IS floor(t/SLOT) and S - floor(S) IS
+ * local/SLOT. The one term that has to be read in seconds is murmur's 0.9 s LEAD-IN, which is an absolute
+ * duration and not a fraction of the slot, so it enters as 0.9/SLOT at the instantaneous length. That is
+ * murmur's rule faithfully read rather than an artefact of the repair: a fixed 0.9 s IS a larger share of a
+ * slot that has got shorter, so the start of a gesture genuinely slides while a signal moves. It is
+ * CONTINUOUS, and it is why the repaired envelope can step up to 9.0x the rate of its own progress during a
+ * transition -- against murmur's 0.9996, which is not a rate at all but a discontinuity.
+ *
+ * `slotLen` is still taken, for that lead-in and for the `dur` this returns in seconds.
+ */
+export function mhFlourishPhase(slotPhase, slotLen, lane) {
+    const SLOT = Math.max(slotLen, 1.0);
+    const slot = Math.floor(slotPhase);
+    const localPhase = slotPhase - slot;
+    const startPhase = 0.9 / SLOT + 0.28 * mhHash1(slot, lane);
+    const durPhase = 0.24 + 0.16 * mhHash1(slot + 811.0, lane);
+    const u = (localPhase - startPhase) / durPhase;
+    const uc = Math.min(1, Math.max(0, u));
+    const sn = Math.sin(Math.PI * uc);
+    const env = (u <= 0.0 || u >= 1.0) ? 0.0 : sn * sn;
+    return { env, u: uc, rand: mhHash1(slot + 1607.0, lane), dur: SLOT * durPhase };
+}
+
+/**
  * kit.ts's mh_drift: an EASED angular travel. rate*t plus a sine whose amplitude is tied to the rate, so the
  * thing "hurries through part of its lap and dawdles through the rest -- a light going somewhere, not a light
  * going round. At a constant rate this species was a spinner."
@@ -606,6 +658,34 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
     const base = (9.0 + (26.0 - 9.0) * r) / (1 + 0.55 * voice + 0.35 * pace + 1.60 * drive);
     return base * (1 + (0.66 - 1) * small);
 }
+
+/**
+ * *** THE THREE SPECIES WHOSE GESTURE SLOT READS THE LIVE SIGNALS, AND THE COEFFICIENTS THEY READ IT WITH. ***
+ *
+ * A slot length is B / F, where B is a style constant and F is this sum. Every other species hands
+ * mh_flourish a fixed number of seconds, so its slot is not here -- a table naming eighteen species where
+ * three have an entry is a table nobody can read.
+ *
+ *   still    still.ts:   mix(11.5, 7.0, glintK) / (1 + 0.30*live.pace + 1.70*st.drive)
+ *   abyss    abyss.ts:   mix(9, 26, rarityK) / (1 + 0.55*live.voice + 0.35*live.pace + 1.60*st.drive)
+ *   tempest  tempest.ts: mix(2.9, 5.2, small) * 1/(1 + 1.30*energy), energy = clamp(0.85*live.voice, 0, 1.6)
+ *
+ * *** tempest's VOICE COEFFICIENT IS A PRODUCT AND IT IS ONLY A CONSTANT BECAUSE THE CLAMP IS INERT. ***
+ * 1.30 * 0.85 is 1.105, and folding the two is the same function as murmur's only while `energy` is a LINEAR
+ * function of voice. mh_live's voice output is bounded to [0,1] in both halves of the kit, so energy tops out
+ * at 0.85 against a ceiling of 1.6 -- a margin of 1.88x, measured at v4655 for the drift that reads the same
+ * clamp and re-checked here for the slot.
+ *
+ * These are the ORB's coefficients. abyssSlot above carries its own three because it is a transcription of
+ * abyss.ts in its own right and the two are meant to be able to disagree -- the v4579 distinction. The gate
+ * RECOVERS this table's abyss row from that function by inversion rather than comparing the literals, so a
+ * drift between them is caught without either being a restatement of the other.
+ */
+export const MH_SLOT_SIGNAL = Object.freeze({
+    still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
+    abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
+    tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+});
 
 /** abyss's three lanes: their seeds and the multipliers on the slot, so the gaps are never equal. */
 export const ABYSS_LANES = Object.freeze([

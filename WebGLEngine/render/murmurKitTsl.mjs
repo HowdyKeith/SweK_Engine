@@ -92,6 +92,29 @@ export function makeMurmurKitTsl(TSL) {
         return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), dur);
     });
 
+    /**
+     * *** THE GESTURE CLOCK WITH THE SLOT INDEX SUPPLIED -- v4656. *** See render/murmurKit.mjs's
+     * mhFlourishPhase for the whole argument and the measurements. In one line: mh_flourish keys every hash
+     * on floor(t / SLOT), three species make SLOT a function of the live signals, and a divisor that moves
+     * makes that index JUMP -- which does not advance the gesture, it replaces it. The repair takes the
+     * integrated slot count instead, which is continuous and strictly increasing, so the index steps by one.
+     *
+     * slotLen is still taken: murmur's 0.9 s lead-in is an absolute duration rather than a fraction of the
+     * slot, and `dur` is returned in seconds because that is what its readers spend it as.
+     */
+    const mhFlourishPhase = Fn(([slotPhase, slotLen, lane]) => {
+        const SLOT = max(slotLen, float(1.0)).toVar();
+        const slot = floor(slotPhase).toVar();
+        const localPhase = slotPhase.sub(slot).toVar();
+        const startPhase = float(0.9).div(SLOT).add(float(0.28).mul(mhHash1(slot, lane))).toVar();
+        const durPhase = float(0.24).add(float(0.16).mul(mhHash1(slot.add(811.0), lane))).toVar();
+        const u = localPhase.sub(startPhase).div(durPhase).toVar();
+        const uc = clamp(u, 0.0, 1.0).toVar();
+        const sn = sin(float(Math.PI).mul(uc)).toVar();
+        const env = select(u.lessThanEqual(0.0).or(u.greaterThanEqual(1.0)), float(0.0), sn.mul(sn));
+        return TSL.vec4(env, uc, mhHash1(slot.add(1607.0), lane), SLOT.mul(durPhase));
+    });
+
     /** kit.ts's mh_spin: yaw about y then tilt about x. A rotation -- the CPU twin's gate asserts it preserves length. */
     const mhSpin = Fn(([p, ay, ax]) => {
         const ca = cos(ay).toVar(), sa = sin(ay).toVar();
@@ -530,10 +553,20 @@ export function makeMurmurKitTsl(TSL) {
         return float(0.16).add(sn.mul(sn).mul(0.84));
     });
 
-    /** abyss's SLOT LENGTH in seconds. High rarity is rarer; voice and the small mounts both shorten it. */
-    const mhAbyssSlot = Fn(([rarity, voice, small]) =>
+    /**
+     * abyss's SLOT LENGTH in seconds. High rarity is rarer; voice, cadence, drive and the small mounts all
+     * shorten it.
+     *
+     * *** THIS TWIN CARRIED TWO OF murmur's FOUR SIGNAL TERMS UNTIL v4656, AND THE PROBE COULD NOT SEE IT. ***
+     * abyss.ts divides by (1 + 0.55*live.voice + 0.35*live.pace + 1.60*st.drive); this function took a single
+     * `voice` argument and divided by (1 + 0.55*voice). render/murmurKit.mjs's abyssSlot had all four from
+     * the start, so the CPU reference was AHEAD of the shader -- and the kit probe swept rarity and voice
+     * only, leaving the pair that was missing at the one value where its absence is invisible. Two arguments
+     * pinned at zero grade nothing, which is the third round running that this exact shape has been found.
+     */
+    const mhAbyssSlot = Fn(([rarity, voice, pace, drive, small]) =>
         mix(float(9.0), float(26.0), clamp(rarity, 0.0, 1.0))
-            .div(float(1.0).add(voice.mul(0.55)))
+            .div(float(1.0).add(voice.mul(0.55)).add(pace.mul(0.35)).add(drive.mul(1.60)))
             .mul(mix(float(1.0), float(0.66), small)));
 
     // ---- the surface: mh_key / mh_small / mh_surface -----------------------------------------------------
@@ -616,7 +649,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhDriftPhase,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
@@ -690,8 +723,16 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const k = TSL.floor(px.div(n).mul(4.0)).toVar();
             const tt = py.div(n).mul(24.0).toVar();
             const life = K.mhOpalLife(k, tt).toVar();
-            const slot = K.mhAbyssSlot(px.div(n), TSL.floor(py.div(n).mul(3.0)).mul(0.5), float(0.0)).toVar();
-            return vec4(clamp(life, 0.0, 1.0), clamp(slot.div(32.0), 0.0, 1.0), 0.0, 1.0);
+            // G sweeps rarity against VOICE, B sweeps PACE against DRIVE at a held rarity, so all four of
+            // abyss's signal inputs move somewhere in this one frame. Two channels rather than one because
+            // the frame is two-dimensional and the function takes four signals: before v4656 the probe swept
+            // rarity and voice alone, and the two terms the shader was MISSING sat at zero in every pixel.
+            const slot = K.mhAbyssSlot(px.div(n), TSL.floor(py.div(n).mul(3.0)).mul(0.5),
+                                       float(0.0), float(0.0), float(0.0)).toVar();
+            const slotPD = K.mhAbyssSlot(float(0.6), float(0.0), px.div(n),
+                                         TSL.floor(py.div(n).mul(3.0)).mul(0.5), float(0.0)).toVar();
+            return vec4(clamp(life, 0.0, 1.0), clamp(slot.div(32.0), 0.0, 1.0),
+                        clamp(slotPD.div(32.0), 0.0, 1.0), 1.0);
         }
         if (mode === "surface") {
             // *** mh_surface OVER A WHOLE SPHERE, AGAINST THE CPU REFERENCE. *** The frame spans -1.2..1.2 in

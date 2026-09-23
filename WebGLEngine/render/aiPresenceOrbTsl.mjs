@@ -126,7 +126,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -428,8 +428,24 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the other along a line hashed per gesture, and it is SOLVED at the ray's closest approach rather
         // than marched -- still.ts's own reason: "On the only event in the frame, sampling artefacts are the
         // entire picture, so this one is never marched."
-        const slot = float(11.5).sub(uniforms.glintRate.mul(4.5));
-        const fl = KIT.mhFlourish(uniforms.time, float(5.0), slot).toVar();
+        // *** still's SLOT READS THE CADENCE AND THE LEAN -- v4656, and this port carried neither. ***
+        // still.ts: slot = mix(11.5, 7.0, glintK) / (1 + 0.30*live.pace + 1.70*st.drive), with its own note
+        // "about eleven and a half seconds at glintRate 0, seven at 1". The divisor was simply absent here,
+        // so the one event in still's frame arrived at the same rate whether or not anybody was talking to
+        // it -- on the species whose whole brief is that the single glint IS the content.
+        //
+        // IT GOES IN AS AN INTEGRATED SLOT COUNT AND NOT AS A DIVISOR, because mh_flourish keys every hash
+        // on floor(t / SLOT) and a divisor that moves makes that index JUMP -- which replaces the gesture
+        // rather than advancing it. See render/murmurKit.mjs's mhFlourishPhase. The base is a style knob and
+        // does not move, so the integral is (t + a*P + c*D) / B and costs no new uniform.
+        const SLS = MH_SLOT_SIGNAL.still;
+        const stillBase = float(11.5).sub(uniforms.glintRate.mul(4.5)).toVar();
+        const stillSlotNow = stillBase.div(float(1.0).add(PACE.mul(SLS.pace)).add(DRIVE.mul(SLS.drive))).toVar();
+        const fl = KIT.mhFlourishPhase(
+            KIT.mhRatePhase(float(1.0).div(stillBase), uniforms.time,
+                float(SLS.pace), uniforms.paceInt, float(SLS.voice), uniforms.voiceInt,
+                float(SLS.drive), uniforms.driveInt),
+            stillSlotNow, float(5.0)).toVar();
         const ga = fl.z.mul(6.2831853).toVar();
         // *** THE PATH TAKES A HEADING UNDER DRIVE -- v4653. *** still.ts: "Under drive the lines converge on
         // one axis, so an occasional wander becomes a traverse." THE RAW WANDER GOES INTO THE MIX AND THE
@@ -853,7 +869,16 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // as an empty cell rather than as a dark one". Its catchlight comes DOWN to 0.38 for the mirror
         // reason: at 0.62 "there was a bright point sitting on the shell in every single frame, including the
         // long dark stretches this species exists for".
-        const abyssBase = KIT.mhAbyssSlot(uniforms.rarity, VOICE, smallK).toVar();
+        // *** abyss's SLOT GAINS murmur's CADENCE AND LEAN, AND ITS DIVISOR MOVES INTO THE PHASE -- v4656. ***
+        // abyss.ts divides by (1 + 0.55*voice + 0.35*pace + 1.60*drive); the shader twin of mhAbyssSlot
+        // carried the voice term alone until this round, while render/murmurKit.mjs's abyssSlot had all
+        // three from the start. TWO CALLS OF ONE FUNCTION: the BASE, with every signal at zero, is what the
+        // slot count integrates against, and the instantaneous length is what murmur's 0.9 s lead-in and the
+        // returned duration are measured in. Their ratio IS the signal sum, which is what makes the pair
+        // checkable rather than two numbers that have to agree by inspection.
+        const SLA = MH_SLOT_SIGNAL.abyss;
+        const abyssBase = KIT.mhAbyssSlot(uniforms.rarity, float(0.0), float(0.0), float(0.0), smallK).toVar();
+        const abyssSlotNow = KIT.mhAbyssSlot(uniforms.rarity, VOICE, PACE, DRIVE, smallK).toVar();
         const thirdC = float(1.0).sub(smoothstep(float(0.30), float(0.72), smallK)).toVar();
         const abyssRad = float(0.155).add(uniforms.creatures.mul(0.075)).mul(mix(float(1.0), float(1.80), smallK)).toVar();
         const abyssBright = float(0.85).add(uniforms.creatures.mul(0.75))
@@ -863,7 +888,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const glowH = float(0.0).toVar();
         for (let k = 0; k < 3; k++) {
             const seed = [31.0, 37.0, 41.0][k], slot = [1.0, 1.37, 1.81][k];
-            const f = KIT.mhFlourish(uniforms.time, float(seed), abyssBase.mul(slot)).toVar();
+            const f = KIT.mhFlourishPhase(
+                KIT.mhRatePhase(float(1.0).div(abyssBase.mul(slot)), uniforms.time,
+                    float(SLA.pace), uniforms.paceInt, float(SLA.voice), uniforms.voiceInt,
+                    float(SLA.drive), uniforms.driveInt),
+                abyssSlotNow.mul(slot), float(seed)).toVar();
             const wk = k < 2 ? float(1.0) : thirdC;
             const fk = k;
             const ga = f.z.mul(6.2831853).add(fk * 1.7).toVar();
@@ -972,13 +1001,35 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // THE BURIED GESTURE. nebula gets ONE glint on a 7.2 s slot and no depth mask; tempest gets TWO
         // lightning lanes on 2.9 and 4.3 s slots that "interleave without ever landing together", each
         // depth-MASKED to the inner two thirds. That mask is the species' one inviolable rule.
+        // *** tempest's TWO LIGHTNING LANES WERE RE-INDEXING ON EVERY CHANGE OF VOICE -- v4656. *** This is
+        // the one of the three that was LIVE: the divisor was already wired, so `floor(t / SLOT)` already
+        // jumped, and MEASURED after half an hour of running it moved TWENTY-ONE SLOTS in a single frame
+        // while the envelope stepped 0.9614 of its range. A bolt does not brighten into that: it is a
+        // different bolt, with a different direction, appearing where the last one was.
+        //
+        // The coefficient is folded at build time for the reason mist's drift one is: `energy` is
+        // clamp(0.85*VOICE, 0, 1.6) and the clamp is inert by 1.88x, so 1.30 * 0.85 is a constant and the
+        // slot count is an exact integral. nebula keeps its fixed 7.2 s slot and the PLAIN clock, because a
+        // slot that does not move has no index to re-roll and migrating it would move a frame for nothing.
+        const SLT = MH_SLOT_SIGNAL.tempest;
         const mistRate = float(1.0).div(float(1.0).add(energy.mul(1.30))).toVar();
+        // The two lanes are spelled out rather than built by a helper: tools/ship/murmurGesture-selfcheck.mjs
+        // reads these call sites to check that the slot COUNT integrates against a style base while the
+        // LENGTH carries the live signal, and a census cannot see through a closure.
         const flA = species === "tempest"
-            ? KIT.mhFlourish(uniforms.time, float(MH_TEMPEST_BOLT.lanes[0].seed),
-                             float(MH_TEMPEST_BOLT.lanes[0].slot).mul(mistRate)).toVar()
+            ? KIT.mhFlourishPhase(
+                KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[0].slot)), uniforms.time,
+                    float(SLT.pace), uniforms.paceInt, float(SLT.voice), uniforms.voiceInt,
+                    float(SLT.drive), uniforms.driveInt),
+                float(MH_TEMPEST_BOLT.lanes[0].slot).mul(mistRate),
+                float(MH_TEMPEST_BOLT.lanes[0].seed)).toVar()
             : KIT.mhFlourish(uniforms.time, float(3.0), float(7.2)).toVar();
-        const flB = KIT.mhFlourish(uniforms.time, float(MH_TEMPEST_BOLT.lanes[1].seed),
-                                   float(MH_TEMPEST_BOLT.lanes[1].slot).mul(mistRate)).toVar();
+        const flB = KIT.mhFlourishPhase(
+            KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[1].slot)), uniforms.time,
+                float(SLT.pace), uniforms.paceInt, float(SLT.voice), uniforms.voiceInt,
+                float(SLT.drive), uniforms.driveInt),
+            float(MH_TEMPEST_BOLT.lanes[1].slot).mul(mistRate),
+            float(MH_TEMPEST_BOLT.lanes[1].seed)).toVar();
         const gAng = flA.z.mul(6.2831853).toVar();
         const gPosA = species === "tempest"
             ? vec3(cos(flA.z.mul(6.283)), sin(flA.z.mul(9.1).add(1.1)).mul(0.75), sin(flA.z.mul(5.3).add(2.7))).mul(0.40).toVar()

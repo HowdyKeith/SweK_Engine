@@ -1232,15 +1232,21 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
             const kk = Math.floor((x / N) * 4), tt = (y / N) * 24;
             const wantLife = Math.round(Math.min(1, Math.max(0, K.opalLife(kk, tt))) * 255);
             const wantSlot = Math.round(Math.min(1, Math.max(0, K.abyssSlot(x / N, Math.floor((y / N) * 3) * 0.5) / 32)) * 255);
+            // ...and the SAME function with its other two signals moving. See the note on mhAbyssSlot: the
+            // shader twin was missing both of them and this frame graded them at zero in every pixel.
+            const wantPD = Math.round(Math.min(1, Math.max(0,
+                K.abyssSlot(0.6, 0, x / N, Math.floor((y / N) * 3) * 0.5, 0) / 32)) * 255);
             const dL = Math.abs(oa[i] - wantLife), dS = Math.abs(oa[i + 1] - wantSlot);
             if (dL > wLife) { wLife = dL; atL = `k=${kk} t=${tt.toFixed(1)}: gpu ${oa[i]} cpu ${wantLife}`; }
-            wSlot = Math.max(wSlot, dS);
+            wSlot = Math.max(wSlot, Math.max(dS, Math.abs(oa[i + 2] - wantPD)));
         }
         say(`opal life and abyss slot over ${N * N} points: worst |gpu - cpu| = ${wLife}/255 on the life, ${wSlot}/255 on the slot`);
         ok("!! *** opal's LIFE AND abyss's SLOT RENDER ON A REAL GPU AND MATCH THE CPU REFERENCE ***",
             wLife <= 2 && wSlot <= 2,
             `worst channel error ${wLife} of 255 on the life across four flashes and 24 seconds, and ${wSlot} ` +
-            `on the slot across the whole rarity range at three voices. Worst life at ${atL}. This is the row ` +
+            `on the slot across the whole rarity range at three voices AND across the whole cadence range at `+
+            `three drives -- all four of its signal inputs, after v4656 found the shader twin carrying two `+
+            `of them and this frame sweeping neither. Worst life at ${atL}. This is the row ` +
             `that makes the four CPU rows above mean anything about the PICTURE: without it they describe a ` +
             `reference implementation nothing draws, which is the shape v4632's sabotage sweep caught when ` +
             `these formulas lived inline in the species file and three corruptions of them passed everything.`);
