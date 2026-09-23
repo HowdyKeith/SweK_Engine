@@ -482,9 +482,15 @@ console.log("\n11. *** WHAT THE PASS IS WORTH (v4665), AND WHAT IT COSTS THE FEA
        "its benefit falls from +0.400 to +0.082 on THIS content because dilation rewrites the same one " +
        "percent of the picture first. FSR2 ships it for shader-animated and transparent content this page " +
        "does not have and dilation cannot help with. A null on one scene is not a verdict on a feature.");
-    ok("  ...and the default is still OFF, so the figures above are still the control arm's",
-       /still ships dilation OFF/.test(pre) && /<select id="dilate">\s*<option value="off"/.test(raw),
-       "moving the default is a separate round with its own re-measurement, not a consequence of this one");
+    ok("  ...and the record says the default MOVED at v4667, with the figures re-measured rather than swapped",
+       // the SECTION and its figures, not the string "v4667": that also appears in the bullet above the
+       // section, so deleting the section scored zero until this named what the section has to contain.
+       /# v4667 -- ENABLED, AND WHAT MOVED/.test(pre)
+       && /106\s+->\s+108/.test(pre) && /404 \(1\.03%\)\s+->\s+363/.test(pre)
+       && /<select id="dilate">\s*<option value="on"/.test(raw),
+       "v4665 said moving the default was a separate round with its own re-measurement. v4667 is that " +
+       "round, and the record says so where it used to say the opposite -- a record that quietly stops " +
+       "being true is worse than one that is openly superseded.");
 }
 
 console.log("\n10. *** FSR2'S EARLIEST PASS (v4664): DILATED DEPTH AND MOTION ***");
@@ -523,15 +529,25 @@ console.log("\n10. *** FSR2'S EARLIEST PASS (v4664): DILATED DEPTH AND MOTION **
         "motionUsed carries the FOREGROUND's zPrev at every silhouette. Compared against an undilated " +
         "record that reads as a disocclusion at every edge, every frame -- the artefact the pass exists to " +
         "remove, reintroduced by wiring one side of it. Off, depthRecord IS depth.");
-    ok("!! ...and the pass defaults to OFF, so every figure this file pins was measured on the control arm",
-        // ANCHORED TO THE FIRST OPTION. The lazy [\s\S]{0,120}? this replaced found `value="off"` in the
-        // SECOND option too, so reordering them -- which is exactly how a default flips -- scored zero.
-        /<select id="dilate">\s*<option value="off"/.test(raw) &&
+    ok("!! ...and the pass now defaults to ON, with the OFF arm kept as the control it was measured against",
+        // ANCHORED TO THE FIRST OPTION. The lazy [\s\S]{0,120}? this replaced found the other option too,
+        // so reordering them -- which is exactly how a default flips -- scored zero. v4667 DID flip it,
+        // and this row flipped with it rather than being deleted: the direction of the default is a claim
+        // the page makes, and a row that stops holding it when it changes was only ever holding a habit.
+        // *** BOTH OPTIONS CHECKED INSIDE THE dilate SELECT, NOT ANYWHERE ON THE PAGE. *** The first draft
+        // tested a bare /<option value="off"/ to hold that the control arm survives, and DELETING THE ARM
+        // SCORED ZERO: `value="off"` is also in the shading, reactive and dilscope selects. That is the
+        // fourth time this session a bare substring has been satisfied by a different part of the file --
+        // after /counted: true/ twice and the wrapped-prose matches. Scope the search, always.
+        (() => { const m = /<select id="dilate">([\s\S]*?)<\/select>/.exec(raw); if (!m) return false;
+                 const opts = [...m[1].matchAll(/<option value="(\w+)"/g)].map((o) => o[1]);
+                 return opts[0] === "on" && opts.includes("off"); })() &&
         /const dilateOn = \$\("dilate"\)\.value === "on"/.test(src),
-        "this page's 106 genuine disocclusions, its 212/106 alternation and the reactive mask's 404 fired " +
-        "pixels are quoted in its prose and pinned by five gates, and dilation moves all of them. v4649's " +
-        "`sx` discipline: a round that moved the figures while adding a feature could not be told from a " +
-        "round that broke them.");
+        "v4664 shipped it OFF so a round adding the feature could not be confused with a round that broke " +
+        "the page's figures -- v4649's `sx` discipline. v4665 measured +1.80 dB and v4667 flipped it, " +
+        "re-measuring every one of those figures rather than swapping them: 106 genuine became 108, the " +
+        "212/106 alternation became 216/108, the mask's 404 fired pixels became 363. The OFF arm remains, " +
+        "because the control an effect was measured against is not scaffolding to remove afterwards.");
     ok("  ...and it is counted, because on flat geometry a dilation that did nothing looks identical",
         // *** ANCHORED TO THE dilate() CALL, AND THIS FILE ALREADY LEARNED THIS ONCE. *** v4659 wrote the
         // identical row for the reactive mask, found that a bare /counted: true/ was satisfied by
@@ -703,6 +719,18 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4667  the dilate default flipped back to OFF                        2 RED here, 1 in fsrPageDevice.
+//   v4667  the OFF control arm DELETED from the dilate select             *** 0 RED AT FIRST ***. The row
+//          held it with a bare /<option value="off"/, which the shading, reactive and dilscope selects all
+//          satisfy. Scoped to the dilate select's own options now, and it checks their ORDER too.
+//   v4667  the record's v4667 re-measurement section deleted              *** 0 RED AT FIRST ***. The row
+//          tested for the string "v4667", which also appears in the bullet ABOVE that section. It now
+//          names the heading and two of the re-measured figures.
+//
+// *** THOSE TWO ARE THE SAME DEFECT, AND IT IS THIS SESSION'S MOST FREQUENT ONE. *** A bare substring
+// satisfied by a different part of the file: /counted: true/ at v4659 and again at v4664, wrapped prose at
+// v4663, v4665 and v4666, and both of these. Four rounds of it. The fix is always the same -- scope the
+// search to the construct being held -- and writing it down has not once stopped the next row repeating it.
 //   v4666  the reactive mask stops being scoped (always dilated)          1 RED.
 //   v4666  a clip-only figure edited so the three arms stop adding up      1 RED -- the figures are parsed
 //          out of the record and re-added, never typed into this gate.

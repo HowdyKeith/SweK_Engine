@@ -8032,6 +8032,46 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4667 -- THE 277th CLOSING: enabled, and every pinned figure re-measured rather than swapped.
+    since352: Object.freeze({
+        at: "v4667", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A PASS WORTH +1.80 dB THAT SHIPS OFF IS A PASS NOBODY GETS. *** v4664 shipped FSR2's " +
+                 "dilation behind a switch defaulting to OFF, deliberately, so a round adding the feature " +
+                 "could not be confused with a round that broke this page's figures -- v4649's `sx` " +
+                 "discipline. v4665 measured it and v4666 located it; v4667 flips the default. " +
+                 "EVERY FIGURE THE PROSE AND THE GATES PIN WAS RE-MEASURED, WITH THE OLD VALUE KEPT BESIDE " +
+                 "THE NEW: the dolly's genuine disocclusions 106 -> 108, the objects camera's alternation " +
+                 "212/106 -> 216/108 (same 27/24 frame split), the reactive mask's mean fired set 404 " +
+                 "(1.03%) -> 363 (0.98%), frame 6 on that camera 39.68 -> 41.34 dB. The counts GROW by the " +
+                 "two to four pixels the neighbourhood search hands the foreground at each silhouette: the " +
+                 "same edges, correctly attributed, not larger errors. The OFF arm stays, because the " +
+                 "control an effect was measured against is not scaffolding to remove once the measurement " +
+                 "is quoted. " +
+                 "*** AND v4663's FINDING SURVIVES FOR THE HARM AND NOT FOR THE HELP. *** Re-derived on the " +
+                 "shipped path: the HARMED frames still put their extra error inside the fired region " +
+                 "(+0.6996 against +0.0831, 13 of 18 per frame) -- the harm is still a localised silhouette " +
+                 "event. The HELP is not: -0.4083 inside against -0.2343 outside, only 18 of 33 mostly " +
+                 "inside, and five times smaller than it was. That follows from v4666 rather than " +
+                 "contradicting it -- dilation has already fixed the pixels the mask was earning its keep " +
+                 "on, so the residue is small and diffuse while the wrong-signed part stays put. " +
+                 "*** ONE GATE'S CONTROL HAD SILENTLY STARTED HOLDING A DIFFERENT VARIABLE. *** " +
+                 "fsrPageClocks compares today's page at startFrame 0 against the page as it shipped at " +
+                 "v4659, to hold that v4661's clock split changed nothing. With dilation defaulting on, " +
+                 "that comparison began measuring DILATION -- a pass v4659 did not have -- and went red on " +
+                 "a change it was never about. Both arms are pinned to dilate OFF now. A control that " +
+                 "quietly changes what it controls reports a real difference as a regression in the thing " +
+                 "it names. " +
+                 "Three sabotages, three caught, TWO 0-REDs first, and they are the same defect: a bare " +
+                 "substring satisfied by a different part of the file. /<option value=\"off\"/ is in the " +
+                 "shading, reactive and dilscope selects too, so deleting the dilate control's own OFF arm " +
+                 "scored zero; and \"v4667\" appears in the bullet above the section whose deletion was " +
+                 "meant to red. That is the SAME defect as /counted: true/ at v4659 and again at v4664, and " +
+                 "as the wrapped-prose matches at v4663, v4665 and v4666 -- four rounds of one mistake, " +
+                 "with the fix written down each time and inherited by nothing. No gate added.",
+    }),
     // v4666 -- THE 276th CLOSING: the clip chain carried 96% of it, and the mask's share is not separable from nothing.
     since351: Object.freeze({
         at: "v4666", swept: 0, green: 0, red: 0,

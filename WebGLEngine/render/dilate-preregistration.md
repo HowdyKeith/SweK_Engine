@@ -123,9 +123,12 @@ at all. A null on one scene is not a verdict on the feature.
   and nothing here separates them. **— ANSWERED AT v4666, see below.**
 * **Why eight frames lose.** The same shape of question three refuted hypotheses have already
   been spent on for the reactive mask, and it is not answered here for this one either.
-* **That the default should change.** The page still ships dilation OFF, because every figure in
-  its prose and in five gates was measured on that arm. Moving the default is a separate round
-  with its own re-measurement, not a consequence of this one.
+* **That the default should change.** At the time of writing the page still shipped dilation OFF,
+  because every figure in its prose and in five gates was measured on that arm. Moving the default
+  is a separate round with its own re-measurement, not a consequence of this one.
+  **— DONE AT v4667**, and every one of those figures was re-measured rather than swapped:
+  106 genuine disocclusions became 108, the 212/106 alternation became 216/108, the reactive
+  mask's 404 fired pixels became 363. The OFF arm remains as the control.
 
 
 ---
@@ -184,3 +187,48 @@ cannot help with at all.
   particles and no transparency; the measurement above says what the mask is worth *here*, on a
   scene built to exercise object motion, and nothing more.
 * **Whether the default should move.** Still a separate round with its own re-measurement.
+
+
+---
+
+# v4667 -- ENABLED, AND WHAT MOVED
+
+Dilation is worth +1.80 dB and shipped OFF, so nobody got it. v4667 makes it the default. Every
+figure this page's prose and its gates pin was measured on the OFF arm and has been **re-measured,
+with the old value kept beside the new one** — a number that changes silently is indistinguishable
+from a number that broke.
+
+    dolly, genuine disocclusions        106  ->  108
+    objects camera, the alternation     212/106  ->  216/108   (same 27/24 frame split)
+    reactive mask, mean fired pixels    404 (1.03%)  ->  363 (0.98%)
+    objects camera, PSNR at frame 6     39.68 dB  ->  41.34 dB
+
+The counts grow by the two-to-four pixels the neighbourhood search hands the foreground at each
+silhouette. They are not larger errors; they are the same edges, correctly attributed.
+
+## v4663's FINDING SURVIVES FOR THE HARM AND NOT FOR THE HELP
+
+v4663 split the reconstruction error by where the reactive mask fires and found the mask's whole
+effect — help and harm alike — inside about one percent of the picture. Re-derived under the new
+default:
+
+                        d(SSE) inside    outside     per frame, mostly inside
+    HARMED  before        +0.628         +0.085         11 of 14
+    HARMED  now           +0.6996        +0.0831        13 of 18
+    HELPED  before        -2.308         +0.062         32 of 37
+    HELPED  now           -0.4083        -0.2343        18 of 33
+
+**The harm is still a localised silhouette event.** The *help* no longer is: it has shrunk by
+more than five times and is now split roughly evenly between the fired region and everything
+else. That follows from v4666 rather than contradicting it — dilation has already fixed the
+silhouette pixels the mask was earning its keep on, so what benefit remains is small and diffuse,
+while the part that goes the wrong way stays exactly where it always was.
+
+## WHAT THIS ROUND DOES NOT CLAIM
+
+* **That the page's other cameras improved.** The static and pan cameras have no depth parallax
+  and dilation is a no-op on them by construction; the dolly and objects cameras are what moved.
+* **That 108 is better than 106.** It is the count of the same silhouette under a correct
+  attribution. Whether the *picture* is better is v4665's +1.80 dB, measured separately.
+* **Anything about the eight frames dilation loses.** Still unexplained, and enabling the pass
+  ships those frames along with the gain.

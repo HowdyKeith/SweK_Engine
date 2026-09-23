@@ -97,7 +97,14 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000,
         // and startframe when it runs, and shading/reactive are read per tick, so ONE reset after all of
         // them are set is the same state by construction. The control is still read BACK off the element
         // afterwards; that row is about whether the page honoured the value, not about how it was delivered.
-        const want = [["scene","smooth"], ["shading","off"], ["reactive","off"], ["camera","objects"]];
+        // *** DILATION OFF IN EVERY ARM, AND v4667 IS WHY THIS LINE HAD TO SAY SO. *** This gate's
+        // control compares today's page at startFrame 0 against the page as it shipped at v4659, to hold
+        // that v4661's clock split changed nothing. When v4667 made dilation the DEFAULT, that comparison
+        // started measuring DILATION -- a pass v4659 did not have -- and the row went red on a change it
+        // was never about. A control that silently starts holding a different variable is worse than no
+        // control: it reports a real difference as a regression in the thing it names. The pre-change
+        // page has no dilate control at all, so setting it here is a no-op there and pins the arm here.
+        const want = [["scene","smooth"], ["shading","off"], ["reactive","off"], ["dilate","off"], ["camera","objects"]];
         if (startFrame !== null) want.push(["startframe", String(startFrame)]);
         let last = null;
         for (const [id, v] of want) { const e = $(id); if (!e) continue; e.value = v; last = e; }

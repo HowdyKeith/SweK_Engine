@@ -59,8 +59,8 @@
       <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
     </select>
     <select id="dilate">
-      <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
       <option value="on">dilate depth+motion: ON (FSR2's early pass)</option>
+      <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
     </select>
     <label>scene starts at frame
       <input id="startframe" type="number" min="0" max="4096" step="1" value="0" style="width:5em">
@@ -156,7 +156,8 @@
   together. Depth alone is not the condition and perspective alone is not the condition.
   <br><br>
   So the dolly puts the pattern on two planes, four and eight units out, and walks the camera sideways. The
-  <i>disocclusion</i> line reads <b>106 genuine</b> &mdash; a one-pixel sliver down the slab&rsquo;s trailing
+  <i>disocclusion</i> line reads <b>108 genuine</b> &mdash; <b>106</b> before v4667 made FSR2&rsquo;s dilation
+  pass the shipped path, and still 106 on the page&rsquo;s control arm &mdash; a one-pixel sliver down the slab&rsquo;s trailing
   edge, 106 pixels tall &mdash; and <b>0 on every eighth frame</b>, which is not flakiness: the edge advances
   0.879 display pixels per frame, so in eight frames it crosses seven pixel boundaries and the depth buffer is
   nearest-sampled. The threshold is <i>derived</i> from the camera, a quarter of the near/far clip-z gap
@@ -706,8 +707,15 @@ async function tick() {
     // 106 genuine disocclusions on the dolly, the 212/106 alternation on this camera, the reactive mask's
     // 404 fired pixels. Dilation moves all of them. A round that changed them while adding a feature could
     // not be told from a round that broke them -- v4649's `sx` discipline, and the reason the control is a
-    // switch rather than a rewrite. Whether it IMPROVES the picture is a paired measurement and is the next
-    // round's; render/dilateGPU-selfcheck.mjs grades that the pass is the pass and claims nothing else.
+    // switch rather than a rewrite.
+    //
+    // *** v4667 FLIPPED IT, AFTER v4665 MEASURED +1.80 dB. *** A pass worth that much, shipping off, is a
+    // pass nobody gets. Every figure above was RE-MEASURED rather than swapped, with the old value kept
+    // beside the new one: 106 genuine -> 108, the 212/106 alternation -> 216/108 (same 27/24 frame split),
+    // the mask's 404 fired pixels -> 363. The counts grow by the two to four pixels the neighbourhood
+    // search hands the foreground at each silhouette -- the same edges, correctly attributed, not larger
+    // errors. The OFF arm stays, because the control an effect was measured against is not scaffolding to
+    // be removed once the measurement is quoted.
     //
     // *** BOTH SIDES OF THE CLIP TEST MOVE TOGETHER OR NEITHER DOES. *** The dilated depth becomes next
     // frame's prevDepth, so the test compares dilated zPrev against a dilated record. Feeding it dilated
@@ -883,6 +891,8 @@ async function tick() {
     // can be run on an accumulator that is EMPTY when it starts:
     //
     //     scene  3-53, history grown with it   14 of 51 harmed (27.5%)   mean +0.4004 dB
+    //     (all three rows were taken with dilation OFF, which was the default until v4667; on the shipped
+    //      path the mask's figure over this window is 18 of 51 and +0.0820 dB -- see v4666 below)
     //     scene 54-98, history grown with it    3 of 45 harmed ( 6.7%)   mean +0.5862 dB
     //     scene 54-98, history EMPTY at 54      0 of 45 harmed ( 0.0%)   mean +0.6371 dB
     //
@@ -904,6 +914,15 @@ async function tick() {
     //
     //     on the 14 HARMED frames   d(SSE) fired +0.628   rest +0.085   -- 88% of the extra error in 1% of the picture
     //     on the 37 HELPED frames   d(SSE) fired -2.308   rest +0.062   -- and essentially all of the saving
+    //
+    // *** RE-DERIVED AT v4667 ON THE SHIPPED PATH, AND HALF OF IT SURVIVED. *** With dilation on:
+    //     HARMED (18 frames)   fired +0.6996   rest +0.0831   -- 13 of 18 mostly inside; the harm is STILL
+    //                                                            a localised silhouette event
+    //     HELPED (33 frames)   fired -0.4083   rest -0.2343   -- only 18 of 33 mostly inside, and the whole
+    //                                                            effect is five times smaller
+    // The HELP is no longer localised. That follows from v4666 rather than contradicting it: dilation has
+    // already fixed the silhouette pixels the mask was earning its keep on, so what benefit remains is
+    // small and diffuse, while the part going the wrong way stays exactly where it always was.
     //
     // Per frame, not as a ratio of means: 11 of the 14 harmed frames put most of the extra error inside the
     // fired region, and 32 of the 37 helped frames put most of the saving there. So the mask is NOT doing
