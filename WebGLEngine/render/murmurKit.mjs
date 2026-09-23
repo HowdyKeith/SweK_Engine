@@ -1031,6 +1031,66 @@ export function mhIgniteAxis(coord, complete, sweep, lo, hi, width, gain, flat) 
 }
 
 /**
+ * *** THE LAST FOUR IGNITION FIGURES, WHICH REALLY ARE FOUR SHAPES -- v4660. ***
+ *
+ * v4659 found that four of the eight remaining figures were one shape on four different axes. These four are
+ * not: each does something the others do not, and reading them together is what says so.
+ *
+ *   aura   A VON MISES IN THE ANGLE, not a gaussian, and aura.ts gives the reason in one line: "it wraps
+ *          with no seam: a seam here would be a dark notch running across all three ribbons at once". It is
+ *          the only figure in the roster that spends `sweep` as a position going ROUND something. exp(k*(cos
+ *          x - 1)) is a function of cos alone and is therefore periodic by construction -- the same argument
+ *          limn's arc profile makes, and the same one that got a gaussian thrown out there.
+ *   fathom THE SHELLS LIGHT IN SEQUENCE, outermost first. Each shell has a `turn` -- (2-k)*0.33 -- and a
+ *          triangular window in the sweep around it, so the flash passes through the nest from outside in.
+ *          The only figure keyed on WHICH PART of the species it is, rather than on where the part is.
+ *   geode  A FLAT LIFT, complete * 0.70, with no sweep at all. geode's light is a facet term on a normal;
+ *          there is no path for a front to travel along, so the stone simply brightens. It is in the table
+ *          because a reader who found three travelling figures and one absence would assume the fourth was
+ *          missing.
+ *   comet  THE ONLY ONE THAT ADDS NO LIGHT. It lengthens the trail instead: decay = mix(decay, 9.0, sweep),
+ *          and decay sits in the DENOMINATOR of exp(-age/decay), so a larger one fades slower and the orbit
+ *          fills in behind the head out to wherever the sweep has reached. The flash is the path becoming
+ *          visible, which is the one thing comet has that nothing else does.
+ *
+ * *** comet's DECAY LINE CARRIES TWO MORE TERMS THIS PORT NEVER HAD, on the same line. *** comet.ts spells
+ * it (1.30 + 2.60*trailK) * (1 + 1.25*st.drive) * mix(1.0, 0.40, small) -- so the lean LENGTHENS the trail
+ * and the small mounts shorten it to two fifths. Both are bounded multipliers on a decay rather than on a
+ * clock, so neither can teleport anything and both go in as murmur spells them.
+ */
+export const MH_IGNITE_LAP = Object.freeze({ flat: 0.18, gain: 0.80, k: 2.40 });
+export const MH_IGNITE_TURN = Object.freeze({ step: 0.33, lead: 0.16, edge: 0.42, flat: 0.50, gain: 2.40 });
+export const MH_IGNITE_FLAT_GEODE = 0.70;
+export const MH_COMET_TRAIL = Object.freeze({ to: 9.00, driveK: 1.25, small: 0.40 });
+
+/**
+ * aura's ignition: a von Mises bump at the sweep's angle. Returns what the flash ADDS, which is 0 at
+ * complete 0 for every angle. The bump is widest at the back -- exp(2.4*(cos-1)) is 1 at the centre and
+ * 8.3e-3 at the far side -- so the ribbons are never fully dark behind it.
+ */
+export function mhIgniteLap(ang, complete, sweep, flat, gain, k) {
+    return complete * (flat + gain * Math.exp(k * (Math.cos(ang - sweep * 6.2831853) - 1.0)));
+}
+
+/**
+ * fathom's ignition: a triangular window in the sweep around this shell's own turn.
+ *
+ * *** THE PARAMETER IS turnIndex AND NOT k, AND THE FIRST DRAFT OF THIS NOTE HAD IT BACKWARDS. *** fathom.ts
+ * writes turn = float(2 - k) * 0.33, so the shell with k = 2 has turn 0 and its window is centred at sweep
+ * 0.16 -- it lights FIRST. k = 2 is the INNERMOST shell: MH_FATHOM's weights fall away inward (1.00, 0.74,
+ * 0.52) with k = 0 the outer. So the flash starts at the middle of the nest and travels OUTWARD, which is
+ * the same direction mh_ignite's shell runs and the same thing fathom.ts's own comment says. Passing k here
+ * instead of 2 - k reverses the species, and it reverses it into something that still looks like an
+ * ignition -- which is why the gate measures the ORDER the three peak in rather than that they peak.
+ */
+export function mhIgniteTurn(turnIndex, complete, sweep, step, lead, edge, flat, gain) {
+    const x = Math.abs(sweep - turnIndex * step - lead) / edge;
+    const t = Math.min(1, Math.max(0, x));
+    const w = 1.0 - t * t * (3.0 - 2.0 * t);
+    return complete * (flat + gain * w);
+}
+
+/**
  * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
  *
  * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs

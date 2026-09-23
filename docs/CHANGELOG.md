@@ -26,6 +26,75 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4660 -- the other four ignition figures, which really were four shapes -- and a control that had stopped being one
+
+v4659 found that four of the eight remaining `st.complete` figures were one shape on four axes and gave them
+one table. **These four are the answer to why there is not a fifth entry in it.** Each does something none of
+the others does, and a port that reached for one spelling would have been wrong about three species:
+
+| | the figure | what is unusual about it |
+|---|---|---|
+| aura | `lap += complete · (0.18 + 0.80 · exp(2.4·(cos(ang − sweep·2π) − 1)))` | a **von Mises on the angle** — the only figure in the roster that spends `sweep` going *round* something rather than along it |
+| fathom | `w = 1 − smoothstep(0, 0.42, \|sweep − turn·0.33 − 0.16\|)`, `e ·= 1 + complete·(0.50 + 2.40·w)` | keyed on **which shell** rather than on where a shell is: the three light in sequence, innermost first |
+| geode | `lit += complete · 0.70` | **no sweep at all** — geode's light is a facet term on a *normal*, so there is no path for a front to run down |
+| comet | `decay = mix(decay, 9.0, sweep)` | **adds no light whatever**: decay sits in the denominator of `exp(−age/decay)`, so the orbit fills in behind the head out to wherever the sweep has reached |
+
+**fathom and geode were still not flashing at all** — both moved 0.0% of their bytes and ×1.000 of interior
+light between the start of their own SUCCESS state and its brightest instant.
+
+| | at v4659 | after |
+|---|---|---|
+| fathom | ×1.00 | **×4.03** |
+| geode | ×1.00 | **×4.90** |
+| aura | ×2.45 | ×3.59 |
+| comet | ×1.00 | ×1.14 |
+
+comet's is the smallest by far **and that is its shape**: its flash adds no light, so what moves is the trail
+filling in. Its decay line also took murmur's two other factors in the same round — `(1 + 1.25·st.drive)` and
+`mix(1.0, 0.40, small)` — which this port never had, so the lean did not lengthen the trail and the small
+mounts did not shorten it to two fifths.
+
+**Wiring geode's figure turned a gate this round never touched red, and that is the round's real finding.**
+`tools/ship/murmurIgnite-selfcheck.mjs` is built around a pair: one species whose SUCCESS is a travelling
+shell, and one whose SUCCESS is a settle and *nothing else*. geode had been the second since v4644 on the
+strength of a sentence — "it is one of the eleven whose `complete` goes to its own figure" — that was true
+when it was written and that nothing ever checked. Giving geode that figure made its SUCCESS rise and fall
+like a flash, and three settle rows went red *about a settle* when the defect was in the control.
+
+The control is comet now, which after this round is the **last species in the roster with no `complete` term
+anywhere**, and that gate's new section 4 measures the property rather than asserting it — over the whole
+roster, reading the builder *dispatch* rather than matching names, because nebula and tempest share
+`buildMist` and a name match reports both unflashed. The first cut of that census read 16 entries for 18
+species and its own size assertion is what said so.
+
+**A gain came out of the repair.** comet's `sweep` saturates at tau 0.95 and it has no `complete`, so frames
+at tau 0.95 and tau 1.40 differ in `settled` and in nothing else — 0.7258 → 0.9873. That is the first
+**isolated settle in pixels** this tree has had: the added light grows ×1.278 and its centroid moves 0.0011.
+
+Both new kit functions have a compiled twin now, in the kit probe's `igniteRound` mode: 0/255 on the lap and
+1/255 on the window across 256 points, and the lap's lattice spans −π to +π **inclusive**, so the seam is two
+pixels the GPU itself wrote.
+
+Sixteen sabotages across three gates, all caught. Four of them named the wrong row at first — the geode census
+carried its own control as a conjunct, so unwiring fathom or comet reddened a row titled for geode; the
+control is its own row now. Two are aimed at the repair rather than at the round: **giving comet a `complete`
+term** reddens the control census by name, which is precisely what geode's silence cost fifteen rounds, and
+**stretching `mh_state`'s sweep so it no longer saturates before tau 1.40** reddens the isolated-settle row,
+because that row's whole claim is that those two frames differ in one signal.
+
+**And two of this round's own rows were wrong before they shipped.** One asserted aura's lap is *exactly*
+equal at −π and +π and measured 4.44e-16 — two ulp of the 2π binary cannot hold, not a seam. The other mapped
+five sweeps through an arrow that never read its argument and asserted the five results were equal: a row that
+could not fail, under a title claiming a sweep had been tried. Both are measurements now — the gaussian in the
+lap's place tears by 0.80 at the same join, and geode's *whole builder* is counted for the word `SWEEP` with
+the other three species as the control.
+
+`tools/ship/murmurIgniteFour-selfcheck.mjs` arrives green at 2,690 ms, so the tree holds 1768 gates.
+
+**What is left of `st.complete` is the singles:** still's glint 0.85, comet's head 2.2, droplet's 0.26, limn's
+ring and its second interior, duet's flare and its one *shrink* (`1 − 0.62·complete`), chorus's sync, prism's
+1.10. Nine numbers across eight species, none sharing a shape with another.
+
 ## v4659 -- four figures that turned out to be one shape, and two species that still were not flashing
 
 `MH_IGNITE`'s own note said the eight remaining `st.complete` figures were "per-species transcriptions rather

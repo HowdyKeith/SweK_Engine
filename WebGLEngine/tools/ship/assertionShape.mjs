@@ -677,8 +677,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // four species at 2,969 ms and these are four more, which is four more WGSL compiles and would have put
     // one file over the 3,000 ms ceiling. The split is also the subject's: one gate holds the flash's effect
     // on light that is ALREADY THERE and the other holds the figure it sends TRAVELLING.
-    gates: 1767, usesOk: 1746, definesOk: 1738, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1639, condFirst: 96, unknownSignature: 11,
+    // v4660 -- RE-TAKEN 1767 -> 1768 for tools/ship/murmurIgniteFour-selfcheck.mjs. A THIRD ignition gate,
+    // and the reason is the subject rather than the clock this time: v4659's four figures are ONE shape on
+    // four axes and share a table, while these four are four different shapes -- a von Mises going round
+    // aura, a sequence of windows down fathom's shells, a flat lift on geode with no sweep in it, and a
+    // trail decay on comet that adds no light at all. Four shapes in one gate is four sets of rows that
+    // share nothing; putting them in the axis gate would also have been four more WGSL compiles on a file
+    // already measuring 2,736 ms. This one measures 2,690 with its four species.
+    gates: 1768, usesOk: 1747, definesOk: 1739, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1640, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -115,7 +115,7 @@ export const ORB_KNOBS = Object.freeze([
     "beams", "split", "swing", "turns", "rise", "strand",
 ]);
 
-/** The species this file can build. murmur ships eighteen; these are the six that are ported. */
+/** The species this file can build: murmur's eighteen, all of them, since v4651. The line here said "the six that are ported" until v4660 -- a record that outlived its own repair by nine rounds, in the declaration of the array that disproves it. */
 export const ORB_SPECIES = Object.freeze(["still", "limn", "comet", "droplet", "opal", "abyss",
                                           "nebula", "tempest", "fathom", "geode", "arc", "sol",
                                           "aura", "flux", "duet", "chorus", "prism", "helix"]);
@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -663,7 +663,21 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // necessary because a tube thinner than the march step aliases the way the head did.
         const hw = float(0.028).add(uniforms.pointSize.mul(0.030)).mul(float(1.0).add(VOICE.mul(0.45))).toVar();
         const tubeW = hw.mul(1.45).toVar();
-        const decay = float(1.30).add(uniforms.trail.mul(2.60)).toVar();
+        // *** comet's IGNITION ADDS NO LIGHT: IT LENGTHENS THE TRAIL -- v4660. *** comet.ts:
+        // decay = mix(decay, 9.0, st.sweep) inside the complete guard, and `decay` sits in the DENOMINATOR
+        // of exp(-age / decay), so a larger one fades SLOWER and "the orbit fills in behind the head, out to
+        // wherever the sweep has reached". The flash is the path becoming visible, which is the one thing
+        // comet has that nothing else does. No guard is needed: mh_state's sweep is identically 0 outside
+        // SUCCESS, and mix(decay, 9.0, 0) IS decay, so the branchless form is the same number everywhere.
+        //
+        // *** AND TWO MORE TERMS ON THE SAME LINE THAT THIS PORT NEVER CARRIED. *** comet.ts spells the base
+        // as (1.30 + 2.60*trailK) * (1 + 1.25*st.drive) * mix(1.0, 0.40, small): the lean LENGTHENS the
+        // trail and the small mounts shorten it to two fifths -- "a full lap of smear on a 44 px badge".
+        // Both are bounded multipliers on a decay rather than on a clock, so neither can teleport anything.
+        const CT = MH_COMET_TRAIL;
+        const decay = mix(float(1.30).add(uniforms.trail.mul(2.60))
+            .mul(float(1.0).add(DRIVE.mul(CT.driveK)))
+            .mul(mix(float(1.0), float(CT.small), smallK)), float(CT.to), SWEEP).toVar();
 
         const accC = float(0.0).toVar();
         // comet weights its hue by the trail's AGE rather than by depth: clamp(age/pi, 0, 1) is 0 at the head
@@ -1213,8 +1227,18 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                     // amplification cannot diverge.
                     const graze = thick.div(max(abs(g), float(FA.grazeFloor))).toVar();
                     const lit = float(FA.litB).add(clamp(dot(dir, keyF), 0.0, 1.0).mul(FA.litK)).toVar();
+                    // *** fathom's SHELLS LIGHT IN SEQUENCE -- v4660. *** fathom.ts: "SUCCESS travels outward
+                    // one layer at a time: shell 2 lights first, then 1, then 0, as the sweep passes each
+                    // one's turn." turn = (2 - k) * 0.33, so k = 2 -- the INNERMOST, since MH_FATHOM's
+                    // weights fall away inward -- has turn 0 and its window is centred at sweep 0.16. The
+                    // flash starts in the middle of the nest and travels out, the same direction the shell
+                    // runs for the seven species that have one.
+                    const TRN = MH_IGNITE_TURN;
                     const en = graze.mul(float(FA.eB).add(foldOf(dir, k).mul(0.5).add(0.5).mul(FA.eK)))
-                        .mul(lit).mul(WGT[k]).toVar();
+                        .mul(lit).mul(WGT[k])
+                        .mul(float(1.0).add(KIT.mhIgniteTurn(float(2 - k), COMPLETE, SWEEP,
+                            float(TRN.step), float(TRN.lead), float(TRN.edge),
+                            float(TRN.flat), float(TRN.gain)))).toVar();
                     sHit.push(sc); eHit.push(select(live, en, float(0.0)).toVar()); zHit.push(dir.z);
                 }
             }
@@ -1326,8 +1350,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const keyG = KIT.mhSpin(KIT.mhKey(uniforms.time), ayG, axG).toVar();
             const sharp = max(float(GE.sharpB).add(facetK.mul(GE.sharpK)).sub(VOICE.mul(GE.sharpV)), float(0.7)).toVar();
             const face = pow(clamp(dot(nrm, keyG), 0.0, 1.0), sharp).toVar();
+            // *** geode's IGNITION IS FLAT, AND THAT IS THE SPECIES RATHER THAN AN OMISSION -- v4660. ***
+            // geode.ts: `if (st.complete > 0.001) lit += st.complete * 0.70;` -- no sweep anywhere in it.
+            // geode's light is a facet term on a NORMAL; there is no path for a front to travel along, so
+            // the stone simply brightens. It is in MH_IGNITE_FLAT_GEODE rather than left inline because a
+            // reader who found three travelling figures and one absence would assume the fourth was missing.
             const litG = float(GE.litB).add(face.mul(GE.litK))
-                .add(flG.x.mul(1.70).mul(pow(clamp(dot(nrm, normalize(vec3(...GE.axes[0]).add(vec3(...GE.axes[2])))), 0.0, 1.0), float(3.0)))).toVar();
+                .add(flG.x.mul(1.70).mul(pow(clamp(dot(nrm, normalize(vec3(...GE.axes[0]).add(vec3(...GE.axes[2])))), 0.0, 1.0), float(3.0))))
+                .add(COMPLETE.mul(MH_IGNITE_FLAT_GEODE)).toVar();
             const bodyG = smoothstep(float(0.0), gScale.mul(GE.bodyEdge), chord).toVar();
             const visG = KIT.mhInside(P.add(rd.mul(sEnter.add(chord.mul(0.4))))).mul(exp(sEnter.mul(-MH_EXT))).toVar();
             // A bright line where two faces meet.
@@ -1790,13 +1820,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                         float(0.5).add(sin(q.x.mul(AU.gFreq[k]).sub(uniforms.time.mul(AU.gRate[k])).add(AU.gPhase[k])).mul(0.5)))).toVar();
                     E.push(exp(aK.negate()).add(KIT.mhScatter(aK, float(AU.scatterAmp))).mul(g).mul(WT[k]).toVar());
                 }
-                const ribbons = E[0].add(E[1]).add(E[2]).mul(w3)
+                // *** aura's IGNITION TRAVELS ROUND THE RIBBONS, AND IT IS A VON MISES -- v4660. *** aura.ts:
+                // "A von Mises bump in the angle rather than a gaussian, because it wraps with no seam: a
+                // seam here would be a dark notch running across all three ribbons at once." It is the only
+                // figure in the roster that spends `sweep` as a position going ROUND something rather than
+                // along it, which is why it is not in MH_IGNITE_AXIS with the four that travel.
+                const LAP = MH_IGNITE_LAP;
+                const angA = TSL.atan(pA.z, pA.x).toVar();
+                const lap = float(1.0).add(KIT.mhIgniteLap(angA, COMPLETE, SWEEP,
+                    float(LAP.flat), float(LAP.gain), float(LAP.k))).toVar();
+                const ribbons = E[0].add(E[1]).add(E[2]).mul(w3).mul(lap)
                     .mul(float(1.0).add(shimAmt.mul(KIT.mhNoise3(pA.mul(AU.shimScale)
                         .add(vec3(float(0.0), float(0.0), uniforms.time.mul(AU.shimRate))))))).toVar();
                 // THE HUE CONVERSATION, weighted by which ribbon is actually at this tap, "so a pixel where
                 // two ribbons cross gets the average and the crossing reads as a blend rather than as a hard
                 // seam between two colours".
-                const hueW = E[0].mul(AU.hueW[0]).add(E[1].mul(AU.hueW[1])).add(E[2].mul(AU.hueW[2])).mul(w3).toVar();
+                // ...and the hue takes the lap too. aura.ts: ribbons = (e0+e1+e2) * w3 * lap and
+                // hueW = (e0*-0.70 + e1*0.55 + e2*1.0) * w3 * lap -- the same factor on both, for the reason
+                // helix's has it on both: the hue this species reports is acc.y / acc.x, so lifting one
+                // without the other drifts the colour through the flash.
+                const hueW = E[0].mul(AU.hueW[0]).add(E[1].mul(AU.hueW[1])).add(E[2].mul(AU.hueW[2])).mul(w3).mul(lap).toVar();
                 const med = KIT.mhMedium(pA, uniforms.time, float(AU.medLane)).mul(AU.medAmt).toVar();
                 const eA = ribbons.mul(AU.ribbonGain).add(med).mul(fade).toVar();
                 accA.addAssign(eA.mul(transA).mul(ds));

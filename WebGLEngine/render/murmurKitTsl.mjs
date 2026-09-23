@@ -567,6 +567,20 @@ export function makeMurmurKitTsl(TSL) {
     });
 
     /**
+     * aura's ignition -- a von MISES in the angle, which wraps with no seam. See render/murmurKit.mjs's
+     * MH_IGNITE_LAP: aura.ts's own reason is that a seam "would be a dark notch running across all three
+     * ribbons at once", and exp(k*(cos x - 1)) is a function of cos alone and periodic by construction.
+     */
+    const mhIgniteLap = Fn(([ang, complete, sweep, flat, gain, k]) =>
+        complete.mul(flat.add(gain.mul(exp(k.mul(cos(ang.sub(sweep.mul(6.2831853))).sub(1.0)))))));
+
+    /** fathom's ignition -- a triangular window in the sweep around this shell's own turn, innermost first, so the flash travels OUTWARD -- see the CPU twin's note. */
+    const mhIgniteTurn = Fn(([turnIndex, complete, sweep, step, lead, edge, flat, gain]) => {
+        const w = float(1.0).sub(smoothstep(float(0.0), edge, abs(sweep.sub(turnIndex.mul(step)).sub(lead)))).toVar();
+        return complete.mul(flat.add(gain.mul(w)));
+    });
+
+    /**
      * *** THE SUCCESS FLASH's SATURATION -- v4658. *** See render/murmurKit.mjs's MH_COMPLETE_LIFT: three
      * species pull a per-figure LIFE toward full rather than scaling it, mix(life, target, complete * k),
      * and chorus's target overshoots past 1 while opal's and sol's do not. A saturation closes the
@@ -681,7 +695,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis,
+        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
@@ -935,6 +949,46 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const a = K.mhIgniteAxis(coord, py.div(n), float(0.5), float(-1.0), float(1.0), float(0.26), float(2.10), float(0.35));
             return vec4(clamp(r.div(2.5), 0.0, 1.0), clamp(g.div(2.5), 0.0, 1.0),
                         clamp(b.div(2.5), 0.0, 1.0), clamp(a.div(2.5), 0.0, 1.0));
+        }
+        if (mode === "igniteRound") {
+            // *** THE TWO IGNITION FIGURES THAT ARE NOT A GAUSSIAN ON AN AXIS -- v4660. *** The v4659 probe
+            // above grades four species that turned out to be one shape; these are two of the four that are
+            // not, and without a channel of their own their TSL halves were the only kit functions in the
+            // file with no compiled-shader twin behind them.
+            //
+            // R  aura's von Mises over the WHOLE circle: x is the angle -pi .. pi and y is the sweep. THE
+            //    LATTICE REACHES BOTH ENDS OF THE CIRCLE, so the seam the species is chosen for is INSIDE
+            //    the probe rather than beside it -- a gaussian substituted here tears at the first column.
+            // G  fathom's triangular window: x is floor(3 * x/n), which is the three turn indices and
+            //    nothing else, and y is the sweep. A window keyed on WHICH shell cannot be sampled on a
+            //    continuous axis, so this channel deliberately spends 16 columns on 3 values.
+            // B  the lap again with COMPLETE on y and the sweep PINNED at 0.5 -- v4644's lesson, the same
+            //    one alpha carries above: with complete held at 1 everywhere, deleting the complete multiply
+            //    changes no pixel and the sabotage walks. The lap has a FLAT term (0.18), so a twin that
+            //    lifted the flat outside the multiply is exactly what this channel is here to catch.
+            // A  fathom's turn with COMPLETE on y and the sweep pinned at 0.16, which is the window's own
+            //    lead -- so turn index 0 sits on its PEAK and the complete axis grades the figure where it
+            //    is largest rather than on its floor.
+            //
+            // THE CONSTANTS ARE WRITTEN OUT rather than imported from the kit's tables, so this probe is a
+            // second spelling and not a second reference to the first: a table edited on one side alone
+            // turns section 17 red instead of moving both halves together in silence.
+            // *** THE ANGLE SPANS -pi TO +pi INCLUSIVE -- div(n - 1), not div(n). *** Over n it stops one
+            // lattice step short of +pi, and the first and last columns then differ by the figure's own
+            // SLOPE across that step: 69 of 255 here, measured, which is not a seam and cannot be told
+            // from one. Inclusive, column 0 IS -pi and column n-1 IS +pi, so the join is two pixels the
+            // GPU itself produced and the periodicity is a reading rather than an argument.
+            const ang = px.div(n - 1).mul(6.2831853).sub(3.1415927).toVar();
+            const turnIx = TSL.floor(px.div(n).mul(3.0)).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgniteLap(ang, one, sweep, float(0.18), float(0.80), float(2.40));
+            const g = K.mhIgniteTurn(turnIx, one, sweep, float(0.33), float(0.16), float(0.42), float(0.50), float(2.40));
+            const b = K.mhIgniteLap(ang, py.div(n), float(0.5), float(0.18), float(0.80), float(2.40));
+            const a = K.mhIgniteTurn(turnIx, py.div(n), float(0.16), float(0.33), float(0.16), float(0.42), float(0.50), float(2.40));
+            // the lap peaks at flat + gain = 0.98 and needs no scale; the turn peaks at 2.90 and takes /3.
+            return vec4(clamp(r, 0.0, 1.0), clamp(g.div(3.0), 0.0, 1.0),
+                        clamp(b, 0.0, 1.0), clamp(a.div(3.0), 0.0, 1.0));
         }
         if (mode === "live") {
             // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and

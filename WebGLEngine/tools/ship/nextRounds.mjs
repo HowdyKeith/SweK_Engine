@@ -1038,6 +1038,31 @@ export const NEXT_ROUNDS = [
             "cannot isolate sweep from complete or from settled. Anything about WHERE the front is belongs " +
             "in the kit probe, where the three can be driven independently; anything about whether a species " +
             "flashes at all belongs in a species gate.",
+        note9: "*** AND v4660 TOOK THE OTHER FOUR, WHICH REALLY WERE FOUR SHAPES. *** aura's von Mises on " +
+            "the angle (mhIgniteLap), fathom's per-shell triangular window (mhIgniteTurn), geode's flat " +
+            "lift with no sweep in it, and comet's trail decay that adds no light at all. Both new kit " +
+            "functions have a compiled twin now, in the kit probe's `igniteRound` mode, graded at section " +
+            "17 of tools/ship/murmurKit-selfcheck.mjs -- the lap's lattice spans -pi to +pi INCLUSIVE so " +
+            "the seam is two pixels the GPU itself wrote.\n\n" +
+            "MEASURED, at the peak of complete against the start of the same SUCCESS state: fathom went " +
+            "from x1.000 of interior light to x4.03 and geode from x1.000 to x4.90 -- neither was flashing " +
+            "AT ALL before this round -- aura x2.45 -> x3.59, comet x1.00 -> x1.14 (its flash adds no " +
+            "light, so that is the trail filling in and not a brightening).\n\n" +
+            "*** TWO THINGS THE ROUND FOUND THAT ARE NOT ABOUT THE FIGURES. *** First: comet is now the " +
+            "ONLY species in the roster with no `complete` term anywhere, and " +
+            "tools/ship/murmurIgnite-selfcheck.mjs's control species depended on geode NOT having one -- " +
+            "so wiring geode's flat lift turned three settle rows red in a gate this round never touched. " +
+            "The control moved to comet and section 4 of that gate now MEASURES the property the control " +
+            "rests on, over the whole roster, reading the builder DISPATCH rather than matching names. " +
+            "Second, and it is a gain: between tau 0.95 and tau 1.40 comet's sweep is saturated and it has " +
+            "no complete, so those two frames differ in `settled` and in NOTHING else -- the first " +
+            "isolated settle in pixels this tree has had.\n\n" +
+            "WHAT IS LEFT OF st.complete IS THE SINGLES, unchanged from note8: still's glint 0.85, comet's " +
+            "head 2.2, droplet's 0.26, limn's ring (complete * band * 1.20) and its second interior 0.9, " +
+            "duet's flare 1.15 and its one SHRINK (1 - 0.62*complete), chorus's sync 0.55, prism's 1.10. " +
+            "Nine numbers across eight species, each one a line of its own species' file, and none of them " +
+            "shares a shape with another -- so the round that takes them is a round of transcriptions and " +
+            "should not look for a table to put them in.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

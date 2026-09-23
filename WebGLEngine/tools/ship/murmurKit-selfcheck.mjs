@@ -325,7 +325,8 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "ignite", n: N } },
                { factoryArgs: { mode: "heading", n: N } },
                { factoryArgs: { mode: "drift", n: N } },
-               { factoryArgs: { mode: "igniteAxis", n: N } }],
+               { factoryArgs: { mode: "igniteAxis", n: N } },
+               { factoryArgs: { mode: "igniteRound", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1931,6 +1932,61 @@ sec("16. *** THE IGNITION's TRAVELLING GAUSSIAN, ON A REAL GPU -- v4659 ***");
             `mix(lo, hi, sweep) to within ${worstPeak.toFixed(4)} across three species and five sweeps. THAT ` +
             `IS THE CLAIM THE WORD "TRAVELLING" MAKES and it is measured rather than read off the formula: ` +
             `the front's position is the sweep's position, so the flash crosses the whole figure once.`);
+    }
+}
+
+// =============================================================================================================
+sec("17. *** THE TWO IGNITION FIGURES THAT ARE NOT AN AXIS: aura's CIRCLE AND fathom's WINDOW -- v4660 ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the lap and the window match a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const fr = r.frames[15];
+        const L = K.MH_IGNITE_LAP, T = K.MH_IGNITE_TURN;
+        let wLap = 0, wTurn = 0, wLapC = 0, wTurnC = 0, at = "";
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const i = ((N - 1 - y) * N + x) * 4;
+            const ang = (x / (N - 1)) * 6.2831853 - 3.1415927, turnIx = Math.floor((x / N) * 3), sweep = y / N;
+            const q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255);
+            const dR = Math.abs(fr[i] - q(K.mhIgniteLap(ang, 1, sweep, L.flat, L.gain, L.k)));
+            const dG = Math.abs(fr[i + 1] - q(K.mhIgniteTurn(turnIx, 1, sweep, T.step, T.lead, T.edge, T.flat, T.gain) / 3));
+            const dB = Math.abs(fr[i + 2] - q(K.mhIgniteLap(ang, y / N, 0.5, L.flat, L.gain, L.k)));
+            const dA = Math.abs(fr[i + 3] - q(K.mhIgniteTurn(turnIx, y / N, 0.16, T.step, T.lead, T.edge, T.flat, T.gain) / 3));
+            if (dR >= wLap) { wLap = dR; at = wLap ? `angle ${ang.toFixed(2)} sweep ${sweep.toFixed(2)}` : "nowhere -- no pixel of the lap differs at all"; }
+            wTurn = Math.max(wTurn, dG); wLapC = Math.max(wLapC, dB); wTurnC = Math.max(wTurnC, dA);
+        }
+        say(`over ${N * N} points: lap ${wLap}/255, window ${wTurn}/255, and on the COMPLETE axis lap ${wLapC}/255, window ${wTurnC}/255`);
+        ok("!! *** aura's VON MISES AND fathom's WINDOW ARE THE SAME NUMBERS ON A REAL GPU, INCLUDING AT THE SEAM ***",
+            wLap <= 1 && wTurn <= 1 && wLapC <= 1 && wTurnC <= 1,
+            `worst |gpu - cpu| is ${wLap} of 255 on the lap (worst at ${at}), ${wTurn} on the window, and ` +
+            `${wLapC} / ${wTurnC} on the two channels that sweep COMPLETE with the sweep PINNED. UNTIL THIS ` +
+            `ROW THE TWO NEWEST KIT FUNCTIONS HAD NO COMPILED TWIN AT ALL: v4660 wired both into four ` +
+            `species and graded them entirely against their own f64 halves, which is the arrangement that ` +
+            `let mh_abyss_slot carry two of four signal terms for a full round. The lap's lattice spans the ` +
+            `WHOLE circle, -pi to +pi, so the seam is inside the probe; the window's x axis spends sixteen ` +
+            `columns on three turn indices, because a figure keyed on WHICH shell has nothing continuous to ` +
+            `sample; and the two complete channels exist because holding complete at 1 lets the multiplier ` +
+            `be deleted with nothing red -- both figures have a FLAT term, which is precisely what a ` +
+            `complete axis grades and what an axis held at 1 cannot see.`);
+
+        // ...and the two figures are DIFFERENT SHAPES, measured on the probe's own pixels rather than argued.
+        const col = (x, y, c) => fr[((N - 1 - y) * N + x) * 4 + c];
+        let lapEnds = 0, turnEnds = 0;
+        for (let y = 0; y < N; y++) {
+            lapEnds = Math.max(lapEnds, Math.abs(col(0, y, 0) - col(N - 1, y, 0)));
+            turnEnds = Math.max(turnEnds, Math.abs(col(0, y, 1) - col(N - 1, y, 1)));
+        }
+        ok("!! ...and the CIRCLE closes on the GPU's own pixels while the WINDOW does not, which is the difference",
+            lapEnds === 0 && turnEnds > 40,
+            `the lap's first and last columns ARE -pi and +pi -- the probe's angle runs over n - 1 for exactly ` +
+            `this row -- and the GPU writes the same byte in both at every one of the ${N} sweeps: ${lapEnds} ` +
+            `of 255, on hardware, not in the reference. THE FIRST CUT OF THIS ROW RAN THE ANGLE OVER n AND ` +
+            `READ 69 of 255, which is the figure's slope across one lattice step and not a seam at all -- a ` +
+            `periodicity row whose two samples are not the same point is measuring something else and would ` +
+            `have been "repaired" by widening its bound. fathom's window across the same two columns differs ` +
+            `by up to ${turnEnds}, because its axis is an INDEX and has no business closing: a row asserting ` +
+            `both were periodic would be green on a port that had swapped them.`);
     }
 }
 

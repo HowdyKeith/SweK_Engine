@@ -8070,6 +8070,60 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4660 -- THE 343rd CLOSING: the other four ignition figures, which really were four shapes -- and the
+    // control species another gate had been resting on for fifteen rounds without ever checking it.
+    since342: Object.freeze({
+        at: "v4660", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteFour-selfcheck.mjs"]),
+        // EMPTY, AND THE FIRST DRAFT PUT tools/ship/murmurIgnite-selfcheck.mjs HERE. It is not an arrival:
+        // it shipped at v4644 and this round turned it red by taking its control species away. Naming it
+        // here put a gate in the ledger twice -- closingCoverage-selfcheck read 388 names over 387 distinct
+        // and went red on the duplicate, because one duplicate buys one credit and one credit hides one
+        // future unswept gate. The repair belongs in the verdict, which is where it is.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,690 ms on this box, 9 rows in five sections over four rendered species, plus a " +
+                 "new section 17 and a new probe mode (igniteRound) in tools/ship/murmurKit-selfcheck.mjs, " +
+                 "which goes 2,260 -> 2,285 ms for it. " +
+                 "*** THE OTHER FOUR FIGURES ARE FOUR SHAPES AND NOT A FIFTH TABLE ENTRY. *** aura's is a " +
+                 "von MISES on the angle -- the only figure in the roster that spends sweep going ROUND " +
+                 "something -- fathom's is a triangular window per shell so the nest lights innermost " +
+                 "first, geode's is a flat lift with no sweep in it at all, and comet's adds NO LIGHT: it " +
+                 "lengthens the trail, decay = mix(decay, 9.0, sweep), and decay is in the denominator. " +
+                 "*** fathom AND geode WERE STILL NOT FLASHING AT ALL: *** both moved 0.0% of their bytes " +
+                 "and x1.000 of interior light at the peak of their own SUCCESS state. They now read x4.03 " +
+                 "and x4.90; aura goes x2.45 -> x3.59 and comet x1.00 -> x1.14, which is small BECAUSE its " +
+                 "flash adds no light. comet's decay also took murmur's drive and small factors, which this " +
+                 "port never had. " +
+                 "*** AND WIRING geode's FIGURE TURNED ANOTHER GATE RED, WHICH IS THE ROUND'S REAL FINDING. " +
+                 "*** tools/ship/murmurIgnite-selfcheck.mjs is built around a PAIR -- one species that " +
+                 "flashes and one whose SUCCESS is a settle and NOTHING else -- and geode had been the " +
+                 "second since v4644 on the strength of a sentence nothing ever checked. Giving geode an " +
+                 "ignition made its SUCCESS rise and fall, and three settle rows went red about a settle " +
+                 "when the defect was in the control. The control is comet now, which after this round is " +
+                 "the LAST species with no complete term anywhere, and that gate's new section 4 measures " +
+                 "that property over the whole roster -- reading the builder DISPATCH, because nebula and " +
+                 "tempest share buildMist and a name match reports both unflashed. The first cut of that " +
+                 "census read 16 entries for 18 species and its own size assertion said so. " +
+                 "*** A GAIN CAME OUT OF THE REPAIR: *** comet's sweep saturates at tau 0.95 and it has no " +
+                 "complete, so frames at tau 0.95 and 1.40 differ in `settled` and in nothing else -- the " +
+                 "first isolated settle in pixels this tree has had. It reads x1.278 with its centroid " +
+                 "moving 0.0011. " +
+                 "SIXTEEN SABOTAGES ACROSS THREE GATES, ALL CAUGHT -- including two aimed at the repair " +
+                 "itself: giving comet a complete term reddens the control census BY NAME, and stretching " +
+                 "mh_state's sweep so it no longer saturates before tau 1.40 reddens the isolated-settle " +
+                 "row, whose whole claim is that those two frames differ in one signal. FOUR OF THEM NAMED " +
+                 "THE WRONG ROW at first: the geode " +
+                 "census carried its own control as a conjunct, so unwiring fathom or comet reddened a row " +
+                 "titled for geode. The control is its own row now. " +
+                 "AND TWO OF THIS ROUND'S OWN ROWS WERE WRONG BEFORE THEY SHIPPED: one asserted aura's lap " +
+                 "is EXACTLY equal at -pi and +pi and measured 4.44e-16, which is two ulp of the 2*pi that " +
+                 "binary cannot hold, not a seam; and one mapped five sweeps through an arrow that never " +
+                 "read its argument, then asserted the five results were equal -- a row that could not " +
+                 "fail, under a title claiming a sweep had been tried. Both replaced by measurements: the " +
+                 "gaussian in the lap's place tears by 0.80 at the same join, and geode's WHOLE builder is " +
+                 "counted for the word SWEEP with the other three as the control.",
+    }),
     // v4659 -- THE 342nd CLOSING: four figures that turned out to be one shape, and the two species that
     // were STILL not flashing after the round before.
     since341: Object.freeze({
