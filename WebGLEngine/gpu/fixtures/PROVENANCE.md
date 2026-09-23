@@ -243,3 +243,63 @@ for exactly this kind of self-authored fixture). Deliberately carries **no** `JO
 animations — that is the entire point: it is shaped exactly like a Trellis-generated GLB
 (`ai/ComfyUIClient.js`'s image-to-3D pipeline), which lands with geometry but no skeleton. No third-party
 bytes anywhere, same "no license to verify" reasoning as the fixtures above.
+
+## `fbxMultiMaterial.ascii.fbx`, `fbxEmbeddedTexture.ascii.fbx`, `fbxMorphTarget.ascii.fbx`, `fbxRotation180.ascii.fbx` — the round that closed `fbxAnimAdvanced.ascii.fbx`'s own remaining gap list
+
+Four more files, added when the four gaps `fbxAnimAdvanced.ascii.fbx`'s entry above named as still open —
+multi-mesh/multi-material concat, embedded-texture extraction, morph-target (`DeformPercent`) animation
+tracks, and a rotation curve spanning >=180 degrees between keyframes — were closed. Same discipline as all
+five fixtures above: hand-authored, plain-ASCII FBX 7.4, written directly against
+`vendor/three/jsm/loaders/FBXLoader.js`'s own source (this round read `GeometryParser`'s
+`parseMaterialIndices`/`genGeometry` for the `LayerElementMaterial` → `geo.groups` pipeline,
+`DeformerParser`/`AnimationParser` for the `Shape`/`BlendShapeChannel`/`BlendShape` connection chain and the
+`DeformPercent` curve's own connection path, and `interpolateRotations` for the >=180-degree slerp-subdivision
+loop) — each confirmed against the real headless-Chromium harness before any gate assertion was written, not
+trusted from the reading alone. No third-party bytes anywhere, same reasoning as every fixture above.
+
+- **`fbxMultiMaterial.ascii.fbx`** — the same two-triangle quad as `fbxIngest.ascii.fbx`, split into two
+  materials via `LayerElementMaterial` (`MappingInformationType: "ByPolygon"`,
+  `ReferenceInformationType: "IndexToDirect"`, `Materials: *2 { a: 0,1 }`): triangle 0 → `Material::matA`,
+  triangle 1 → `Material::matB`. `tools/ship/fbxIngest-selfcheck.mjs` section 8 proves `normalizeFbxGroup()`'s
+  `primitiveRanges` comes back as exactly the two triangle-sized ranges FBXLoader's own `genGeometry()` derives
+  from that layer, with `materialIdx` 0 then 1 in the order the fixture's `Connections` block lists the two
+  materials — not assumed, traced against this exact fixture (see that section's own comments).
+- **`fbxEmbeddedTexture.ascii.fbx`** — the same quad, one material, one embedded base64 PNG (a hand-built,
+  original 2x2 RGB image — red/green/blue/white corners, encoded with `tools/ship/pngWrite.mjs`'s
+  `encodePNG`, the same helper `autoRigUnrigged.glb` above uses) in a `Video` node's `Content`, bound to the
+  material's `DiffuseColor` slot via a `Texture` node. Section 9 proves the full path — `parseFbx()`'s
+  `LoadingManager` wait, `createImageBitmap()`, and the real `gl.texImage2D` upload — by reading the actual GL
+  texture back with `gl.readPixels()` and asserting it matches the fixture's authored pixels exactly, plus a
+  second check (9b) that omitting the `LoadingManager` (any caller written before this round) still works
+  safely: no throw, `texture` stays `null`, reproducing v1-v3's behavior rather than breaking it.
+- **`fbxMorphTarget.ascii.fbx`** — the same quad, one `Shape` blend target (`"bulge"`, a uniform `(0,0,1)`
+  delta at all 4 control points) wired through a `BlendShape`/`BlendShapeChannel` deformer chain, animated by
+  a `DeformPercent` curve sweeping 0 → 100 over one second. Section 10 proves both halves together: the static
+  delta extraction (`readFbxMorphTargets()`, matching `GLBParser.js`'s own `_readMorphTargets` shape) and the
+  animation-curve routing (`mapFbxAnimations()`'s `MORPH_TRACK_RE` branch, producing a `morphChannels` entry
+  rather than a regular TRS channel) — against exact measured values, including the `/100` scaling FBXLoader's
+  own `generateMorphTrack` performs before this file ever sees the sampler values.
+- **`fbxRotation180.ascii.fbx`** — the same quad plus a separate, unskinned `LimbNode` (`"spinner"`) rotating
+  0 → 270 degrees about X over one second — a span FBXLoader's own `interpolateRotations()` subdivides via
+  slerp before the track ever reaches this repo's code. This fixture needed **no code change** in
+  `gpu/fbxLoad.js` (see that file's header and `tools/ship/fbxIngest-selfcheck.mjs` section 11 for why); it
+  exists purely to prove faithful pass-through, and its own construction surfaced a genuine, if surprising,
+  quirk of the currently-vendored loader: `interpolateRotations()`'s subdivision loop
+  (`for (let t = 0; t < 1; t += 1 / numSubIntervals)`) never emits a sample at `t = 1`, so with a 270-degree
+  span (`numSubIntervals = 1.5`) the fixture's own authored final keyframe value never appears in the output
+  track at all — the last sample is a partial (t≈0.667) interpolation, not the full 270-degree end state.
+  Section 11 measures this directly (comparing `normalizeFbxGroup()`'s sampler against FBXLoader's own raw
+  `group.animations` track from the same parse) rather than hand-deriving what a "clean" subdivision should
+  produce, because what the vendored loader actually produces is the only thing worth proving pass-through
+  against.
+
+**What is still not proven after this round**, named plainly rather than silently: narrower
+`LayerElementMaterial` mapping types (`ByPolygonVertex`/`ByVertice`/`AllSame`) and more than one separate Mesh
+Model in a file; non-`DiffuseColor` texture slots (bump/normal/emissive/specular/alpha) and external (non-
+embedded) texture references; more than one morph target on a mesh, or morph targets combined with skin; and
+the "mixed skin scope" simplification — only the first `SkinnedMesh`'s skeleton is treated as real skin, and
+this is a REAL, UNGATED RISK, not merely a narrower behavior: any other mesh in the same file inherits joint
+0's entire ANIMATED motion at render time (not "stays static"), so a static prop or a mesh meant to follow a
+different bone visibly drags or detaches whenever joint 0 animates — an adversarial review of this round found
+an earlier, softer wording of this note understated that severity; see `gpu/fbxLoad.js`'s own header for the
+corrected wording and `tools/ship/fbxIngest-selfcheck.mjs`'s own header for why no fixture exercises it.

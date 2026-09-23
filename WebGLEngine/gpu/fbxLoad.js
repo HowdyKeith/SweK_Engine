@@ -1,10 +1,8 @@
 // FILE: gpu/fbxLoad.js
-// VERSION: v3 -- task #59, closing the gaps its own v2 round (commit 5fc21a72) named but did not close:
-// preRotation/postRotation composition, a non-default Euler rotation order, position/scale
-// (VectorKeyframeTrack) channels, and multiple AnimationStacks/clips in one file. Round 1 (v1) shipped
-// skin/joint extraction but left `animations: null` unconditionally (see git history for that header
-// text); v2 mapped the common case (one rotation-only clip); this round proves the rest of the shape
-// mapFbxAnimations() already handled in code but no fixture had ever exercised.
+// VERSION: v4 -- closes four gaps v3's own header named as open: multi-mesh/multi-material concat,
+// embedded-texture extraction, morph-target (DeformPercent) animation tracks, and rotation curves spanning
+// >=180 degrees between keyframes. Three of these are real new code (below); the fourth is NOT -- see its own
+// note further down, it needed a fixture, not a line changed here.
 //
 // *** THE LOADER IS INJECTED, EXACTLY LIKE gpu/gltfDraco.js AND gpu/glbLoad.js. *** `FBXLoaderCtor` is passed
 // in by the caller rather than imported here, so this module stays testable with no browser and no three.js
@@ -22,57 +20,87 @@
 //
 // normalizeFbxGroup() converts a THREE.Group (FBXLoader's parse() return value) into a GLBParser.parse()-
 // shaped object -- same field names, same types -- so gpu/gpuAssetLoader.js's _uploadParsedMesh() can upload
-// either one with no branch on which parser produced it. What it does NOT do, on purpose, this round:
+// either one with no branch on which parser produced it. *** IT IS NOW async *** (v3 was sync) -- texture
+// extraction needs createImageBitmap(), which is inherently async, and there is no honest way to make one
+// part of this function's output async and the rest not. The one real caller (gpu/gpuAssetLoader.js's
+// _loadFBX) already awaited parseFbx(); it now also awaits this.
 //
-//   * SINGLE MESH ONLY. Finds the FIRST object in the tree with .isMesh or .isSkinnedMesh true and reads only
-//     that one. This matches GLBParser's own original v1 scope (single primitive) before multi-primitive
-//     concat was added over many later rounds -- multi-mesh FBX concat is a real follow-up, not attempted here.
-//   * ANIMATION MAPPING (task #59) -- mapFbxAnimations() below reads `group.animations` (THREE.AnimationClip[],
-//     attached by FBXLoader's own AnimationParser when the source file has curves, ALL of them -- clips.map()
-//     below runs over every entry in that array, not just the first) and maps each clip's `.tracks`
-//     (VectorKeyframeTrack | QuaternionKeyframeTrack, each exposing `.name`, `.times`, `.values` as plain own
-//     properties -- duck-typed, no `instanceof`) into GLBParser's documented `animations: [{name, duration,
-//     samplers: [{times, values, interpolation}], channels: [{samplerIdx, targetNode, path}]}]` shape
-//     (gpu/GLBParser.js's `_parseAnimationClip`, ~line 976). Verified against two fixtures now:
-//     gpu/fixtures/fbxAnim.ascii.fbx (single rotation-only clip, together with skin extraction on the same
-//     rig -- tools/ship/fbxIngest-selfcheck.mjs section 6) and gpu/fixtures/fbxAnimAdvanced.ascii.fbx (added
-//     this round, no skin -- section 7), which between them prove, against exact measured numbers:
-//       - preRotation/postRotation composition and a non-default RotationOrder (enum 5, "XYZ" -- the implicit
-//         default when the property is absent is enum 0, "ZYX", NOT "XYZ"; see getEulerOrder() in
-//         vendor/three/jsm/loaders/FBXLoader.js ~line 4243). FBXLoader's own generateRotationTrack composes
-//         these BEFORE any track value reaches this file (Euler->quaternion per keyframe, premultiply(pre),
-//         multiply(post.invert()), ~line 2809-2880 of that vendored file) -- this file still does not
-//         re-derive that math, it only trusts the already-composed quaternion values. Section 7's expected
-//         values for that composition come from an independent three.js Quaternion/Euler script mirroring
-//         generateRotationTrack's own steps, not hand trigonometry -- see that section's own comments.
-//       - VectorKeyframeTrack position AND scale channels (generateVectorTrack, a different FBXLoader code
-//         path from generateRotationTrack -- plain per-axis curve values, no Euler/quaternion math at all).
-//       - multiple AnimationStacks/clips in one file, each resolving to its own distinct entry in
-//         mapFbxAnimations()'s returned array with correct, non-overlapping channels.
-//     Still not covered by either fixture, stated plainly rather than silently: CUBICSPLINE interpolation --
-//     this is not merely untested, it is UNREACHABLE from the currently-vendored FBXLoader. Confirmed by
-//     reading vendor/three/jsm/loaders/FBXLoader.js's AnimationParser in full: it never calls
-//     `.setInterpolation()` on any track it builds, so every track it can ever produce carries KeyframeTrack's
-//     own class default, InterpolateLinear -- there is no FBX file, hand-authored or otherwise, that could
-//     make this specific vendored loader emit anything but "LINEAR" through samplerInterpolation() below. Do
-//     not read a future missing CUBICSPLINE fixture as an open gap; it would need a patched or newer
-//     FBXLoader to ever be reachable, which is out of this file's scope. Also still open: morph-target
-//     (`DeformPercent`) tracks, which FBXLoader maps to a `NumberKeyframeTrack` named
-//     `<model>.morphTargetInfluences[n]` -- a distinct shape from GLBParser's node-TRS channels that
-//     `mapFbxAnimations()` below deliberately skips (see its own comment) rather than mis-mapping.
+//   * MULTI-MESH CONCAT (v4). Walks the WHOLE tree collecting every .isMesh/.isSkinnedMesh object, pre-order
+//     -- not just the first, matching GLBParser's own multi-primitive concat (gpu/GLBParser.js, "second pass:
+//     concat with vertex-base offsets on indices"). Each mesh becomes its own vertex range in the
+//     concatenated buffers, same primData/vOff pattern GLBParser uses.
+//   * MULTI-MATERIAL CONCAT (v4), WITHIN one mesh, via `geometry.groups` (three.js's own convention for FBX's
+//     LayerElementMaterial -- FBXLoader's GeometryParser calls `geometry.addGroup(...)` per contiguous run of
+//     same-material-index polygons; a mesh with no groups gets one synthetic group covering everything, same
+//     as GLBParser treats a primitive with no material as one implicit range). A synthetic, deduplicated-by-
+//     object-identity materials list is built once across ALL meshes in the group (FBX has no `json.materials`
+//     array the way glTF does), and `primitiveRanges`/`texturesByMaterial` key off that list's index --
+//     shaped exactly like GLBParser's own `primitiveRanges: [{indexStart, indexCount, materialIdx, vertexStart,
+//     vertexCount}]` / `texturesByMaterial: {idx: ImageBitmap}`, so gpu/gpuAssetLoader.js's _uploadParsedMesh
+//     (shared with GLBParser's output, "nothing below this point knows or cares which source format produced
+//     it") needs no changes.
+//   * MIXED SKIN SCOPE -- NAMED PLAINLY, AND ITS PRACTICAL SEVERITY NAMED PLAINLY TOO (an adversarial review
+//     of this round found the risk here was real but understated by an earlier, softer wording of this same
+//     paragraph -- corrected below rather than left reading gentler than it is). Skin data is taken from the
+//     FIRST SkinnedMesh found and its skeleton ONLY. Any other mesh in the same group -- plain Mesh, or a
+//     SkinnedMesh with a DIFFERENT skeleton object -- contributes synthetic joints=[0,0,0,0]/weights=
+//     [1,0,0,0] rows. *** THIS IS NOT "STAYS STATIC AT BIND POSE" -- IT IS "INHERITS JOINT 0'S ENTIRE
+//     ANIMATED MOTION." *** The mesh's own vertices are baked to their correct WORLD-SPACE bind pose first,
+//     then the render-time skinning shader multiplies that by joint 0's CURRENT (animated) world matrix times
+//     its inverse bind matrix -- identity only at rest pose. The moment joint 0 (typically a character's
+//     root/hip bone) animates at all, any secondary mesh sharing that FBX gets rigidly dragged/orbited around
+//     joint 0's bind-pose origin: an unrelated static prop bundled in the same file visibly swings with the
+//     character's root motion, and a mesh actually meant to follow a DIFFERENT bone (e.g. a held weapon meant
+//     to track a wrist) instead follows the root and visibly detaches whenever wrist and root diverge. This is
+//     a real, deliberate simplification -- not glTF's own considerably more involved "walk the node parent
+//     chain to the nearest joint ancestor, bake the bind-pose local transform" logic (GLBParser.js's own
+//     `unskinnedPrims` handling), not attempted here -- but it is NOT gated end to end with an animating joint
+//     0 plus a second mesh together; no fixture in this tree exercises that combination (see
+//     tools/ship/fbxIngest-selfcheck.mjs's own header). A single skinned mesh (this file's v1-v3 scope) is
+//     unaffected: it IS the reference skeleton, with no secondary mesh to drag.
+//   * EMBEDDED-TEXTURE EXTRACTION (v4). `parseFbx`'s new `opts.manager` (an injected THREE.LoadingManager
+//     instance -- injected for the same reason FBXLoaderCtor is, see this file's own header) is awaited via
+//     its `onLoad` callback before returning, but ONLY if the parsed group actually references any texture at
+//     all (`_groupHasAnyTextureMap`) -- an FBX with no textures needs no wait, and manager.onLoad would in
+//     fact never fire for it (LoadingManager's own itemEnd only calls onLoad once itemsLoaded===itemsTotal,
+//     and itemsTotal never leaves 0 if nothing was ever itemStart()-ed -- confirmed by reading
+//     vendor/three/three.core.js's LoadingManager directly, not assumed). Once that resolves,
+//     `mesh.material.map.image` (an HTMLImageElement TextureLoader/ImageLoader populated ASYNCHRONOUSLY --
+//     confirmed directly: `TextureLoader.load()` assigns `texture.image = image` INSIDE the image's own load
+//     callback, not synchronously when the Texture object is constructed and returned, so reading `.image`
+//     before the manager settles would see `undefined`) is guaranteed populated, and
+//     `createImageBitmap(mat.map.image)` produces the same ImageBitmap shape GLBParser's own
+//     `_extractBaseColorImage` returns -- no re-fetch of the underlying data: URI/blob: URL needed, since the
+//     already-decoded `<img>` element itself is a valid createImageBitmap() source.
+//   * MORPH-TARGET (DeformPercent) TRACKS (v4). See mapFbxAnimations()'s own updated comment and the new
+//     `FBX_TRACK_PROPERTY_TO_GLTF_PATH`-adjacent morph handling below for the animation-CURVE half; static
+//     morph target DELTA extraction (geometry.morphAttributes.position -> GLBParser's own
+//     `morphTargets: [{positions, normals}]` shape) is built per-mesh, matching GLBParser's `_readMorphTargets`
+//     field names exactly, including that it is DELTAS (relative), not absolute positions -- confirmed against
+//     FBXLoader's own GeometryParser: `geometry.morphTargetsRelative = true` is set unconditionally wherever it
+//     builds morphAttributes, so this file makes no relative/absolute decision of its own, it inherits
+//     FBXLoader's.
+//   * ROTATION CURVES SPANNING >=180 DEGREES -- *** NOT A CODE CHANGE. VERIFICATION ONLY. *** FBXLoader's own
+//     interpolateRotations() (vendor/three/jsm/loaders/FBXLoader.js) already subdivides a >=180-degree
+//     interval into multiple slerp-interpolated intermediate keyframes BEFORE the resulting
+//     QuaternionKeyframeTrack ever reaches this file -- exactly the same shape as task #59's own
+//     preRotation/postRotation finding ("FBXLoader's own generateRotationTrack composes these before any
+//     track value reaches this file"). mapFbxAnimations() below reads `track.times`/`track.values` as opaque
+//     arrays with no assumption about how many samples exist -- there was nothing in this file's own code that
+//     COULD have been wrong here. What was actually unverified is whether that pass-through is faithful (does
+//     not truncate or misalign the extra subdivided samples) -- tools/ship/fbxIngest-selfcheck.mjs's new
+//     section proves it by comparing this file's own sampler output against FBXLoader's raw track directly,
+//     read in the same browser script, for exact agreement.
 //   * NORMALS ARE AN APPROXIMATION. The mesh's matrixWorld is baked into normals via its upper-3x3 submatrix,
 //     inverse-transposed and renormalized (see _inverseTranspose3x3 below, duplicated in miniature from
 //     GLBParser.js's own static method of the same name rather than importing GLBParser -- the two copies are
 //     intentionally small enough that duplication costs less than the coupling would). This is the CORRECT
 //     transform, not merely "upper-3x3" -- it handles non-uniform scale properly, the same reason GLBParser
 //     carries it.
-//   * NO TEXTURES, NO VERTEX COLORS, NO MORPH TARGETS, NO MULTI-MATERIAL. FBXLoader does extract embedded or
-//     referenced textures onto `mesh.material.map` when present; converting `.map.image` into something
-//     `_uploadParsedMesh` can `gl.texImage2D` from was left undone because it could not be verified against a
-//     real textured FBX (the same licensing-clean-fixture constraint task #59's own header, above, worked
-//     around for animation) -- guessing at texture-extraction code that has never been run is worse than the
-//     gap being visible. `texture`, `colors`, `morphTargets`, `morphTargetNames`, `morphWeights`,
-//     `primitiveRanges`, and `texturesByMaterial` are all null/0 here.
+//   * STILL NOT COVERED: vertex colors (`colors` stays null -- FBXLoader does read LayerElementColor into
+//     `geometry.attributes.color`, this file just does not extract it yet); CUBICSPLINE interpolation
+//     (unreachable from the currently-vendored FBXLoader -- see mapFbxAnimations()'s own comment, unchanged
+//     from v3).
 //
 // All of these are reasonable to add in future rounds without breaking this file's API, exactly as GLBParser's
 // own header says of its list.
@@ -83,16 +111,40 @@
  * *** UNLIKE GLTFLoader.parse (callback-based), FBXLoader.parse(FBXBuffer, path) IS SYNCHRONOUS *** and returns
  * the Group directly -- confirmed by reading vendor/three/jsm/loaders/FBXLoader.js's own FBXLoader.parse()
  * (it throws synchronously on a bad file, and load() wraps the sync call in a try/catch to funnel errors to
- * onError -- there is no promise or callback anywhere in parse() itself). Wrapped in an async function here
- * purely so callers get the same `await parseFbx(...)` shape as gpu/gltfDraco.js's `parseGlb`, not because
- * anything here actually awaits.
+ * onError -- there is no promise or callback anywhere in parse() itself).
  *
- * `FBXLoaderCtor` is injected -- see this file's header for why.
+ * `FBXLoaderCtor` is injected -- see this file's header for why. `opts.manager`, if given, is a
+ * THREE.LoadingManager instance (also injected, same reason) passed to `new FBXLoaderCtor(manager)`; if the
+ * parsed group references any texture at all, this function awaits that manager's `onLoad` before returning,
+ * so `normalizeFbxGroup()` can safely read `mesh.material.map.image` afterward -- see this file's header for
+ * why that read is unsafe before the manager settles. Omitting `opts.manager` reproduces v1-v3's behavior
+ * exactly: textures, if any, are left for the caller with no wait and no guarantee `.image` is populated.
  */
 export async function parseFbx(buffer, FBXLoaderCtor, opts = {}) {
-    const loader = new FBXLoaderCtor();
+    const manager = opts.manager || null;
+    const loader = manager ? new FBXLoaderCtor(manager) : new FBXLoaderCtor();
     const group = loader.parse(buffer, opts?.path || "");
+    if (manager && _groupHasAnyTextureMap(group)) {
+        await new Promise((resolve) => { manager.onLoad = resolve; });
+    }
     return group;
+}
+
+// Duck-typed walk: does ANY mesh in this group reference a texture at all (`material.map` truthy -- the
+// Texture OBJECT itself is constructed and assigned synchronously by TextureLoader.load(), see this file's
+// header; only its `.image` is the part that arrives late). Guards parseFbx()'s manager-wait: awaiting
+// manager.onLoad when nothing was ever itemStart()-ed would hang forever (see this file's header).
+function _groupHasAnyTextureMap(root) {
+    let found = false;
+    (function walk(obj) {
+        if (found) return;
+        if (obj.isMesh || obj.isSkinnedMesh) {
+            const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+            for (const m of mats) if (m && m.map) { found = true; return; }
+        }
+        for (const child of obj.children) { walk(child); if (found) return; }
+    })(root);
+    return found;
 }
 
 // Duplicated in miniature from gpu/GLBParser.js's `_inverseTranspose3x3` static method (same math, same
@@ -170,15 +222,15 @@ const THREE_INTERPOLATE_SMOOTH   = 2302;
 
 // Map a duck-typed KeyframeTrack's interpolation to GLBParser's "LINEAR"|"STEP"|"CUBICSPLINE" sampler
 // vocabulary. `track.getInterpolation()` is a real KeyframeTrack.prototype method (not something FBXLoader
-// adds) -- present on every VectorKeyframeTrack/QuaternionKeyframeTrack FBXLoader's AnimationParser builds,
-// duck-typed here (no `instanceof`) the same way the rest of this file checks shape rather than class.
-// FBXLoader's own AnimationParser (vendor/three/jsm/loaders/FBXLoader.js) never calls `.setInterpolation()`
-// on a track it builds -- confirmed by reading that class in full -- so every track it produces carries
-// KeyframeTrack's own class default, InterpolateLinear. LINEAR here is therefore not a guessed fallback for
-// the common case; for FBX input specifically it is currently the ONLY case. The DISCRETE/SMOOTH branches
-// are kept anyway (duck-typing has no way to promise FBXLoader never changes) rather than hard-coding "always
-// LINEAR", so a future FBXLoader that does call setInterpolation still maps correctly instead of silently
-// mislabeling STEP/CUBICSPLINE data as LINEAR.
+// adds) -- present on every VectorKeyframeTrack/QuaternionKeyframeTrack/NumberKeyframeTrack FBXLoader's
+// AnimationParser builds, duck-typed here (no `instanceof`) the same way the rest of this file checks shape
+// rather than class. FBXLoader's own AnimationParser (vendor/three/jsm/loaders/FBXLoader.js) never calls
+// `.setInterpolation()` on a track it builds -- confirmed by reading that class in full -- so every track it
+// produces carries KeyframeTrack's own class default, InterpolateLinear. LINEAR here is therefore not a
+// guessed fallback for the common case; for FBX input specifically it is currently the ONLY case. The
+// DISCRETE/SMOOTH branches are kept anyway (duck-typing has no way to promise FBXLoader never changes) rather
+// than hard-coding "always LINEAR", so a future FBXLoader that does call setInterpolation still maps
+// correctly instead of silently mislabeling STEP/CUBICSPLINE data as LINEAR.
 function samplerInterpolation(track) {
     if (typeof track.getInterpolation === "function") {
         const v = track.getInterpolation();
@@ -194,12 +246,21 @@ function samplerInterpolation(track) {
 // "<model>.rotation" (glTF's channel-path name GLBParser's consumers expect) -- confirmed by reading
 // generateRotationTrack (~line 2809) and generateVectorTrack (~line 2800) in vendor/three/jsm/loaders/
 // FBXLoader.js. This map is the one place that translation happens; everywhere else in this file "rotation"
-// means the glTF/GLBParser word.
+// means the glTF/GLBParser word. Morph tracks ("<geometryOrMeshName>.morphTargetInfluences[n]") are handled
+// separately in mapFbxAnimations() below -- their target isn't a node/TRS channel at all, so they cannot go
+// through this same {targetNode, path} shape; see that function's own comment.
 const FBX_TRACK_PROPERTY_TO_GLTF_PATH = {
     position:   "translation",
     quaternion: "rotation",
     scale:      "scale",
 };
+
+// Matches FBXLoader's own morph-influence track name, e.g. "someMesh.morphTargetInfluences[2]" -- confirmed
+// against AnimationParser's morph-track construction (search "morphTargetInfluences" in
+// vendor/three/jsm/loaders/FBXLoader.js): the track name is built as
+// `${object.name}.morphTargetInfluences[${morphNum}]` where `object` is the MESH (not a node in the
+// position/quaternion/scale sense), and `morphNum` is that mesh's own morph target index.
+const MORPH_TRACK_RE = /^(.*)\.morphTargetInfluences\[(\d+)\]$/;
 
 /**
  * Map FBXLoader's `group.animations` (THREE.AnimationClip[]) into GLBParser's documented
@@ -210,12 +271,21 @@ const FBX_TRACK_PROPERTY_TO_GLTF_PATH = {
  * this function tolerates either).
  *
  * `nodes` is the flat array `snapshotNodes()` already built for skin/node output -- reused, not rebuilt, per
- * this file's header. A track resolves to a node by matching everything before the LAST "." in its `.name`
- * (FBXLoader's own `<sanitizedModelName>.<property>` convention) against `nodes[i].name` -- the same name
- * `Object3D.name` was given when FBXLoader built that node (`PropertyBinding.sanitizeNodeName(attrName)`,
- * vendor/three/jsm/loaders/FBXLoader.js ~line 981/1018). A track whose target name isn't found, or whose
- * property isn't one of position/quaternion/scale (e.g. a `DeformPercent` morph-target track -- see this
- * file's header), is skipped rather than crashing or emitting a bogus channel.
+ * this file's header. A position/quaternion/scale track resolves to a node by matching everything before the
+ * LAST "." in its `.name` (FBXLoader's own `<sanitizedModelName>.<property>` convention) against
+ * `nodes[i].name` -- the same name `Object3D.name` was given when FBXLoader built that node
+ * (`PropertyBinding.sanitizeNodeName(attrName)`, vendor/three/jsm/loaders/FBXLoader.js ~line 981/1018).
+ *
+ * v4 -- MORPH TRACKS. A track matching MORPH_TRACK_RE (`<mesh>.morphTargetInfluences[n]`) is a DIFFERENT
+ * channel shape from position/quaternion/scale: its target is a MORPH TARGET INDEX on a given mesh, not a
+ * node's TRS. GLBParser's own animation-channel vocabulary has no "weights" path for this (glTF's
+ * `channel.target.path` CAN be "weights" for morph animation, but GLBParser's `_parseAnimationClip` was never
+ * extended to read it -- confirmed by grepping that function, it only ever emits translation/rotation/scale).
+ * Rather than invent a channel shape nothing downstream reads, this function emits a `morphChannels` array
+ * SEPARATE from `channels` -- `{samplerIdx, targetMeshName, morphIndex}` -- additive to the existing shape
+ * (present only when at least one morph track exists; absent/undefined otherwise, so every EXISTING caller
+ * that only reads `channels` is unaffected). `_uploadParsedMesh` does not currently consume it -- see
+ * gpu/fbxLoad.js's own header on what is and is not wired end to end.
  */
 function mapFbxAnimations(clips, nodes) {
     if (!Array.isArray(clips) || clips.length === 0) return null;
@@ -223,17 +293,30 @@ function mapFbxAnimations(clips, nodes) {
     return clips.map((clip, clipIdx) => {
         const samplers = [];
         const channels = [];
+        const morphChannels = [];
 
         for (const track of (clip.tracks || [])) {
             const name = track && track.name;
             if (typeof name !== "string") continue;
+
+            const morphMatch = MORPH_TRACK_RE.exec(name);
+            if (morphMatch) {
+                const times  = track.times  instanceof Float32Array ? track.times  : Float32Array.from(track.times || []);
+                const values = track.values instanceof Float32Array ? track.values : Float32Array.from(track.values || []);
+                if (times.length === 0) continue;
+                const samplerIdx = samplers.length;
+                samplers.push({ times, values, interpolation: samplerInterpolation(track) });
+                morphChannels.push({ samplerIdx, targetMeshName: morphMatch[1], morphIndex: parseInt(morphMatch[2], 10) });
+                continue;
+            }
+
             const lastDot = name.lastIndexOf(".");
             if (lastDot < 0) continue;
 
             const targetName = name.slice(0, lastDot);
             const fbxProperty = name.slice(lastDot + 1);
             const path = FBX_TRACK_PROPERTY_TO_GLTF_PATH[fbxProperty];
-            if (!path) continue;   // morph-target ("morphTargetInfluences[n]") or unknown -- see header
+            if (!path) continue;   // unknown property -- skip rather than emit a bogus channel
 
             let targetNode = -1;
             for (let i = 0; i < nodes.length; i++) {
@@ -268,25 +351,62 @@ function mapFbxAnimations(clips, nodes) {
             }
         }
 
-        return {
+        const out = {
             name: clip.name || `clip_${clipIdx}`,
             duration,
             samplers,
             channels,
         };
+        if (morphChannels.length > 0) out.morphChannels = morphChannels;
+        return out;
     });
+}
+
+/**
+ * Per-mesh static morph-target extraction -- geometry.morphAttributes.position (an array of BufferAttribute,
+ * FBXLoader's own GeometryParser builds these from Geometry::Shape nodes) into GLBParser's `_readMorphTargets`
+ * return shape: `{targets: [{positions, normals}], names, weights, count, vertexCount}`. `positions` are
+ * DELTAS relative to the base mesh, matching GLBParser's own convention -- confirmed, not assumed: FBXLoader
+ * sets `geometry.morphTargetsRelative = true` unconditionally wherever it builds morph attributes (searched
+ * the whole file for that property name), so this function never has to choose between relative/absolute, it
+ * inherits FBXLoader's own choice, which already matches GLBParser's.
+ *
+ * `names` comes from `geometry.morphAttributes.position[i].name` when FBXLoader set one (it names each
+ * BufferAttribute after the Shape's own FBX name); falls back to `morph_i` otherwise, matching
+ * GLBParser._readMorphTargets's own fallback exactly. `weights` comes from `meshObj.morphTargetInfluences`
+ * (three.js's own per-mesh initial-weight array, populated by FBXLoader alongside the attributes) if present
+ * and the right length, else a zero array -- same shape as GLBParser's own `meshDef.weights` fallback.
+ */
+function readFbxMorphTargets(meshObj) {
+    const geo = meshObj.geometry;
+    const posAttrs = geo && geo.morphAttributes && geo.morphAttributes.position;
+    if (!Array.isArray(posAttrs) || posAttrs.length === 0) return null;
+
+    const targets = posAttrs.map((attr) => {
+        if (!attr || !attr.array || attr.array.length === 0) return null;
+        const positions = attr.array instanceof Float32Array ? attr.array : Float32Array.from(attr.array);
+        return { positions, normals: null };
+    });
+    const names = posAttrs.map((attr, i) => (attr && typeof attr.name === "string" && attr.name) ? attr.name : `morph_${i}`);
+    const weights = (Array.isArray(meshObj.morphTargetInfluences) && meshObj.morphTargetInfluences.length === targets.length)
+        ? Float32Array.from(meshObj.morphTargetInfluences)
+        : new Float32Array(targets.length);
+    const vertexCount = (() => { for (const t of targets) if (t && t.positions) return t.positions.length / 3; return 0; })();
+
+    return { targets, names, weights, count: targets.length, vertexCount };
 }
 
 /**
  * Convert a THREE.Group (FBXLoader's parse() return value) into a GLBParser.parse()-shaped object -- same
  * field names, same types, documented at the top of gpu/GLBParser.js. See this file's header for exactly what
- * v1 does and does not cover.
+ * this version does and does not cover.
  *
  * Pure duck-typing throughout (`.isMesh`, `.isSkinnedMesh`, `.isBone`, `.geometry`, `.material`, `.skeleton`)
  * -- no `instanceof`, no import of 'three'. `group` is assumed to already be a real (or shaped-like-real)
- * THREE.Group/Object3D; nothing here constructs three.js objects.
+ * THREE.Group/Object3D; nothing here constructs three.js objects, EXCEPT createImageBitmap() for texture
+ * extraction, a browser global rather than a three.js class, needing no import either way.
  */
-export function normalizeFbxGroup(group) {
+export async function normalizeFbxGroup(group) {
     // World matrices must be current before anything below reads matrixWorld.
     group.updateMatrixWorld(true);
 
@@ -297,14 +417,6 @@ export function normalizeFbxGroup(group) {
     // on the mesh, so this does not belong inside the mesh-found branch below.
     const animations = mapFbxAnimations(group.animations, nodes);
 
-    // Single-mesh v1 scope (see header) -- first isMesh/isSkinnedMesh found, pre-order.
-    let meshObj = null;
-    (function find(obj) {
-        if (meshObj) return;
-        if (obj.isMesh || obj.isSkinnedMesh) { meshObj = obj; return; }
-        for (const child of obj.children) { find(child); if (meshObj) return; }
-    })(group);
-
     const empty = () => ({
         positions: new Float32Array(0),
         normals: null,
@@ -314,7 +426,7 @@ export function normalizeFbxGroup(group) {
         joints: null,
         weights: null,
         skin: null,
-        animations,   // task #59 -- mapped from group.animations even when no mesh was found (see above)
+        animations,
         nodes,
         colors: null,
         morphTargets: null,
@@ -325,66 +437,56 @@ export function normalizeFbxGroup(group) {
         texturesByMaterial: null,
     });
 
-    if (!meshObj || !meshObj.geometry) return empty();
+    // v4 -- MULTI-MESH: walk the whole tree, pre-order, collecting every .isMesh/.isSkinnedMesh (was: first
+    // only). See this file's header for why.
+    const meshList = [];
+    (function find(obj) {
+        if (obj.isMesh || obj.isSkinnedMesh) meshList.push(obj);
+        for (const child of obj.children) find(child);
+    })(group);
 
-    const geo = meshObj.geometry;
-    const posAttr = geo.attributes && geo.attributes.position;
-    if (!posAttr || !posAttr.array || posAttr.array.length === 0) return empty();
+    if (meshList.length === 0) return empty();
 
-    const srcPositions = posAttr.array;                 // Float32Array, vec3 per vertex, tightly packed
-    const vertexCount  = srcPositions.length / 3;
-
-    // Bake the mesh's matrixWorld (full 4x4, column-major -- three.js's own Matrix4.elements convention)
-    // into positions.
-    const m = meshObj.matrixWorld.elements;
-    const positions = new Float32Array(vertexCount * 3);
-    for (let v = 0; v < vertexCount; v++) {
-        const x = srcPositions[v * 3], y = srcPositions[v * 3 + 1], z = srcPositions[v * 3 + 2];
-        positions[v * 3]     = m[0] * x + m[4] * y + m[8]  * z + m[12];
-        positions[v * 3 + 1] = m[1] * x + m[5] * y + m[9]  * z + m[13];
-        positions[v * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-    }
-
-    // Normals: upper-3x3 inverse-transpose + renormalize (see inverseTranspose3x3 above).
-    let normals = null;
-    const nrmAttr = geo.attributes && geo.attributes.normal;
-    if (nrmAttr && nrmAttr.array && nrmAttr.array.length === vertexCount * 3) {
-        const it = inverseTranspose3x3(m);
-        const src = nrmAttr.array;
-        normals = new Float32Array(vertexCount * 3);
-        for (let v = 0; v < vertexCount; v++) {
-            const x = src[v * 3], y = src[v * 3 + 1], z = src[v * 3 + 2];
-            let nx = it[0] * x + it[1] * y + it[2] * z;
-            let ny = it[3] * x + it[4] * y + it[5] * z;
-            let nz = it[6] * x + it[7] * y + it[8] * z;
-            const len = Math.hypot(nx, ny, nz);
-            if (len > 1e-12) { nx /= len; ny /= len; nz /= len; }
-            normals[v * 3] = nx; normals[v * 3 + 1] = ny; normals[v * 3 + 2] = nz;
+    // v4 -- synthetic materials list, deduplicated by object identity, first-encounter order across ALL
+    // meshes. FBX has no `json.materials` array the way glTF does, so this file builds the equivalent.
+    const materialsList = [];
+    const materialIndexOf = new Map();
+    for (const meshObj of meshList) {
+        const mats = Array.isArray(meshObj.material) ? meshObj.material : (meshObj.material ? [meshObj.material] : []);
+        for (const m of mats) {
+            if (m && !materialIndexOf.has(m)) {
+                materialIndexOf.set(m, materialsList.length);
+                materialsList.push(m);
+            }
         }
     }
 
-    // texCoords
-    let texCoords = null;
-    const uvAttr = geo.attributes && geo.attributes.uv;
-    if (uvAttr && uvAttr.array && uvAttr.array.length === vertexCount * 2) {
-        texCoords = uvAttr.array instanceof Float32Array ? uvAttr.array : new Float32Array(uvAttr.array);
+    // v4 -- embedded-texture extraction. Only reachable with a populated `.map.image` -- see parseFbx()'s own
+    // manager-wait, which this function does not itself perform (normalizeFbxGroup has no browser-load
+    // concept, only parseFbx does). A caller that never passed opts.manager to parseFbx() gets `texture: null`
+    // / `texturesByMaterial: {}` here exactly as v1-v3 always did, not a crash or a hang.
+    let texture = null;
+    const texturesByMaterial = {};
+    for (let i = 0; i < materialsList.length; i++) {
+        const mat = materialsList[i];
+        if (!mat || !mat.map || !mat.map.image) continue;
+        try {
+            const bmp = await createImageBitmap(mat.map.image);
+            texturesByMaterial[i] = bmp;
+            if (!texture) texture = bmp;
+        } catch { /* unreadable image -- leave this material's texture absent rather than throw */ }
     }
 
-    // indices -- real index buffer if present, else synthesize identity the same way GLBParser.js does
-    // when a primitive carries no indices.
-    let indices;
-    if (geo.index && geo.index.array && geo.index.array.length > 0) {
-        indices = geo.index.array instanceof Uint32Array ? geo.index.array : Uint32Array.from(geo.index.array);
-    } else {
-        indices = new Uint32Array(vertexCount);
-        for (let i = 0; i < vertexCount; i++) indices[i] = i;
+    // v4 -- reference skin: the FIRST SkinnedMesh's skeleton. See this file's header on the deliberate
+    // "mixed skin scope" this simplification accepts.
+    let refSkeleton = null;
+    for (const meshObj of meshList) {
+        if (meshObj.isSkinnedMesh && meshObj.skeleton && Array.isArray(meshObj.skeleton.bones)) { refSkeleton = meshObj.skeleton; break; }
     }
-
-    // skin -- only for a SkinnedMesh with a real skeleton.
-    let skin = null, joints = null, weights = null;
-    if (meshObj.isSkinnedMesh && meshObj.skeleton && Array.isArray(meshObj.skeleton.bones)) {
-        const bones = meshObj.skeleton.bones;
-        const boneInverses = meshObj.skeleton.boneInverses || [];
+    let skin = null;
+    if (refSkeleton) {
+        const bones = refSkeleton.bones;
+        const boneInverses = refSkeleton.boneInverses || [];
         const jointIndices = bones.map((b) => {
             const idx = indexOf.get(b);
             return idx === undefined ? -1 : idx;
@@ -396,18 +498,145 @@ export function normalizeFbxGroup(group) {
             ]);
         });
         skin = { joints: jointIndices, inverseBindMatrices, skeleton: null };
+    }
 
-        const skinIndexAttr  = geo.attributes.skinIndex;
-        const skinWeightAttr = geo.attributes.skinWeight;
-        if (skinIndexAttr && skinWeightAttr) {
-            // Already indexes into skeleton.bones order, which is exactly skin.joints' order -- no remap.
-            joints  = skinIndexAttr.array instanceof Uint16Array || skinIndexAttr.array instanceof Uint8Array
-                ? skinIndexAttr.array
-                : Uint16Array.from(skinIndexAttr.array);
-            weights = skinWeightAttr.array instanceof Float32Array
-                ? skinWeightAttr.array
-                : Float32Array.from(skinWeightAttr.array);
+    // v4 -- first pass: per-mesh vertex data (positions/normals/uv/indices/skin/groups/morph), unconcatenated.
+    const primData = [];
+    let allHaveNormals = true, allHaveUVs = true;
+    let morphResult = null;   // v4 -- first mesh that carries morph targets, matching GLBParser's own
+                               // "first primitive that carries them" v1391 convention (see that file's header).
+    let morphOwnerVertexStart = 0;
+
+    for (const meshObj of meshList) {
+        const geo = meshObj.geometry;
+        const posAttr = geo && geo.attributes && geo.attributes.position;
+        if (!posAttr || !posAttr.array || posAttr.array.length === 0) continue;   // skip an empty/malformed mesh
+
+        const srcPositions = posAttr.array;
+        const vertexCount = srcPositions.length / 3;
+
+        const m = meshObj.matrixWorld.elements;
+        const positions = new Float32Array(vertexCount * 3);
+        for (let v = 0; v < vertexCount; v++) {
+            const x = srcPositions[v * 3], y = srcPositions[v * 3 + 1], z = srcPositions[v * 3 + 2];
+            positions[v * 3]     = m[0] * x + m[4] * y + m[8]  * z + m[12];
+            positions[v * 3 + 1] = m[1] * x + m[5] * y + m[9]  * z + m[13];
+            positions[v * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
         }
+
+        let normals = null;
+        const nrmAttr = geo.attributes && geo.attributes.normal;
+        if (nrmAttr && nrmAttr.array && nrmAttr.array.length === vertexCount * 3) {
+            const it = inverseTranspose3x3(m);
+            const src = nrmAttr.array;
+            normals = new Float32Array(vertexCount * 3);
+            for (let v = 0; v < vertexCount; v++) {
+                const x = src[v * 3], y = src[v * 3 + 1], z = src[v * 3 + 2];
+                let nx = it[0] * x + it[1] * y + it[2] * z;
+                let ny = it[3] * x + it[4] * y + it[5] * z;
+                let nz = it[6] * x + it[7] * y + it[8] * z;
+                const len = Math.hypot(nx, ny, nz);
+                if (len > 1e-12) { nx /= len; ny /= len; nz /= len; }
+                normals[v * 3] = nx; normals[v * 3 + 1] = ny; normals[v * 3 + 2] = nz;
+            }
+        }
+        if (!normals) allHaveNormals = false;
+
+        let texCoords = null;
+        const uvAttr = geo.attributes && geo.attributes.uv;
+        if (uvAttr && uvAttr.array && uvAttr.array.length === vertexCount * 2) {
+            texCoords = uvAttr.array instanceof Float32Array ? uvAttr.array : new Float32Array(uvAttr.array);
+        }
+        if (!texCoords) allHaveUVs = false;
+
+        let indices;
+        if (geo.index && geo.index.array && geo.index.array.length > 0) {
+            indices = geo.index.array instanceof Uint32Array ? geo.index.array : Uint32Array.from(geo.index.array);
+        } else {
+            indices = new Uint32Array(vertexCount);
+            for (let i = 0; i < vertexCount; i++) indices[i] = i;
+        }
+
+        // v4 -- per-mesh skin: only meshes sharing the REFERENCE skeleton contribute real joints/weights;
+        // every other mesh in a skinned group gets synthetic joint-0/full-weight rows -- which DRAGS with
+        // joint 0's full animated motion at render time, not "stays static" (see this file's header's own
+        // corrected wording on the practical severity here).
+        let joints = null, weights = null;
+        if (skin) {
+            if (meshObj.isSkinnedMesh && meshObj.skeleton === refSkeleton && geo.attributes.skinIndex && geo.attributes.skinWeight) {
+                const skinIndexAttr = geo.attributes.skinIndex, skinWeightAttr = geo.attributes.skinWeight;
+                joints  = skinIndexAttr.array instanceof Uint16Array || skinIndexAttr.array instanceof Uint8Array
+                    ? skinIndexAttr.array
+                    : Uint16Array.from(skinIndexAttr.array);
+                weights = skinWeightAttr.array instanceof Float32Array
+                    ? skinWeightAttr.array
+                    : Float32Array.from(skinWeightAttr.array);
+            } else {
+                joints = new Uint16Array(vertexCount * 4);          // all-zero -> follows joint 0's full motion
+                weights = new Float32Array(vertexCount * 4);
+                for (let v = 0; v < vertexCount; v++) weights[v * 4] = 1;   // full weight on joint 0
+            }
+        }
+
+        // v4 -- multi-material groups within this mesh. geometry.groups is three.js's own convention for
+        // FBX's LayerElementMaterial (FBXLoader's GeometryParser calls geometry.addGroup() per contiguous
+        // same-material-index polygon run). No groups -> one synthetic group covering the whole mesh.
+        const mats = Array.isArray(meshObj.material) ? meshObj.material : (meshObj.material ? [meshObj.material] : []);
+        const groups = (geo.groups && geo.groups.length > 0)
+            ? geo.groups
+            : [{ start: 0, count: indices.length, materialIndex: 0 }];
+
+        // v4 -- morph targets: first mesh that carries them, matching GLBParser's own "first primitive" rule.
+        if (!morphResult) {
+            const mr = readFbxMorphTargets(meshObj);
+            if (mr) { morphResult = mr; morphOwnerVertexStart = -1; /* resolved below once vOff is known */ }
+        }
+
+        primData.push({ pos: positions, norm: normals, uv: texCoords, idx: indices, vc: vertexCount, joints, weights, groups, mats, meshObj });
+    }
+
+    if (primData.length === 0) return empty();
+
+    const totalVerts = primData.reduce((s, pd) => s + pd.vc, 0);
+    const totalIndices = primData.reduce((s, pd) => s + pd.idx.length, 0);
+
+    const positions = new Float32Array(totalVerts * 3);
+    const normals   = allHaveNormals ? new Float32Array(totalVerts * 3) : null;
+    const texCoords = allHaveUVs     ? new Float32Array(totalVerts * 2) : null;
+    const indices   = new Uint32Array(totalIndices);
+    const jointsOut  = skin ? new Uint16Array(totalVerts * 4) : null;
+    const weightsOut = skin ? new Float32Array(totalVerts * 4) : null;
+
+    const primitiveRanges = [];
+    let vOff = 0, iOff = 0;
+    for (const pd of primData) {
+        positions.set(pd.pos, vOff * 3);
+        if (normals && pd.norm) normals.set(pd.norm, vOff * 3);
+        if (texCoords && pd.uv) texCoords.set(pd.uv, vOff * 2);
+        if (jointsOut && pd.joints) jointsOut.set(pd.joints, vOff * 4);
+        if (weightsOut && pd.weights) weightsOut.set(pd.weights, vOff * 4);
+        for (let i = 0; i < pd.idx.length; i++) indices[iOff + i] = pd.idx[i] + vOff;
+
+        if (morphResult && morphOwnerVertexStart === -1 && pd.meshObj && readFbxMorphTargets(pd.meshObj)) {
+            // The mesh that owns morphResult is being visited now -- resolved here (not at collection time,
+            // where vOff was not yet known) the same way GLBParser's v4112 resolves morphVertexOffset.
+            morphOwnerVertexStart = vOff;
+        }
+
+        for (const g of pd.groups) {
+            const localMat = pd.mats[g.materialIndex] ?? pd.mats[0] ?? null;
+            const globalMatIdx = localMat ? materialIndexOf.get(localMat) : null;
+            primitiveRanges.push({
+                indexStart: iOff + g.start,
+                indexCount: g.count,
+                materialIdx: (globalMatIdx != null) ? globalMatIdx : null,
+                vertexStart: vOff,
+                vertexCount: pd.vc,
+            });
+        }
+
+        vOff += pd.vc;
+        iOff += pd.idx.length;
     }
 
     return {
@@ -415,18 +644,20 @@ export function normalizeFbxGroup(group) {
         normals,
         texCoords,
         indices,
-        texture: null,              // v1 gap -- see this file's header
-        joints,
-        weights,
+        texture,
+        joints: jointsOut,
+        weights: weightsOut,
         skin,
-        animations,                 // task #59 -- see mapFbxAnimations() and this file's header
+        animations,
         nodes,
-        colors: null,               // v1 gap -- see this file's header
-        morphTargets: null,
-        morphTargetNames: null,
-        morphWeights: null,
-        morphVertexCount: 0,
-        primitiveRanges: null,
-        texturesByMaterial: null,
+        colors: null,
+        morphTargets: morphResult ? morphResult.targets : null,
+        morphTargetNames: morphResult ? morphResult.names : null,
+        morphWeights: morphResult ? morphResult.weights : null,
+        morphVertexCount: morphResult ? morphResult.vertexCount : 0,
+        morphVertexOffset: morphResult ? Math.max(0, morphOwnerVertexStart) : 0,
+        morphPlaced: morphResult ? (morphOwnerVertexStart >= 0) : false,
+        primitiveRanges,
+        texturesByMaterial,
     };
 }
