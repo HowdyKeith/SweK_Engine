@@ -218,6 +218,108 @@ console.log("\n1b. RTX ROUND 10 -- makeRtSession's material OPTION, AGAINST pipe
     }
 }
 
+// ---- 1c. RTX ROUND 12 -- makeRtSession's `direct` OPTION, AGAINST pipelineWgsl() DIRECTLY (NO GPU NEEDED) ----
+console.log("\n1c. RTX ROUND 12 -- makeRtSession's `direct` OPTION, AGAINST pipelineWgsl() DIRECTLY (NO GPU NEEDED)");
+{
+    const fakeMesh = {
+        bvh: { nodeCount: 1, triCount: 1, bounds: new Float32Array(6), meta: new Float32Array(4),
+                order: new Uint32Array(1), tris: new Float32Array(9) },
+        bounds: { center: [0, 0, 0], radius: 1 }, vertexCount: 3, triangleCount: 1,
+    };
+    const stubDevice = () => {
+        const wgsls = [];
+        return { wgsls, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind() {}, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture() { return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+
+    const d1 = stubDevice();
+    V.makeRtSession(d1.device, { mesh: fakeMesh, w: 4, h: 4, material: "microfacet", direct: "nee" });
+    ok("!! material:\"microfacet\" + direct:\"nee\" generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,gradient:true,microfacet:\"nee\",msComp:true})",
+        d1.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "nee", msComp: true }),
+        "proves `direct` actually reaches pipelineWgsl's own `microfacet` option (round 8's three-way NEE/MIS technique), not merely accepted with no effect");
+
+    const d2 = stubDevice();
+    V.makeRtSession(d2.device, { mesh: fakeMesh, w: 4, h: 4, material: "microfacet", direct: "mis" });
+    ok("!! material:\"microfacet\" + direct:\"mis\" generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,gradient:true,microfacet:\"mis\",msComp:true})",
+        d2.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "mis", msComp: true }),
+        "the same proof for the MIS technique specifically, not just NEE");
+
+    const d3 = stubDevice();
+    V.makeRtSession(d3.device, { mesh: fakeMesh, w: 4, h: 4, material: "microfacet" });
+    ok("!! direct OMITTED (default \"bsdf\") under material:\"microfacet\" is BYTE-IDENTICAL to round 10's own shipped default",
+        d3.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "bsdf", msComp: true }),
+        "round 10's own already-shipped default behaviour must not change just because this round added a new, " +
+        "unrelated-when-omitted option -- verified by direct string equality, not assumed");
+
+    for (const dv of ["nee", "mis"]) {
+        const d4 = stubDevice();
+        V.makeRtSession(d4.device, { mesh: fakeMesh, w: 4, h: 4, material: "lambertian", direct: dv });
+        ok(`!! direct:"${dv}" is a harmless NO-OP under material:"lambertian" -- same WGSL as if direct had been omitted entirely`,
+            d4.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true }),
+            "plain Lambertian's own `nee` option (physics/render/rtPipeline.mjs) is a boolean with no MIS mode at all -- " +
+            "a genuinely different, larger design fork this round does not take (see render/rtViewer.mjs's own doc) -- " +
+            `so direct:"${dv}" is accepted-but-inert here, the same shape roughness/ior already have under material:"lambertian", ` +
+            "confirmed by direct string equality rather than merely asserted to be harmless -- checked for BOTH non-default " +
+            "values, not just \"nee\", since an adversarial review found the first draft only ever checked one");
+    }
+
+    ok("an unrecognized `direct` value throws rather than silently falling back to bsdf",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, direct: "path" }); return false; }
+                 catch (e) { return /direct must be/.test(e.message); } })(),
+        "a typo in a future caller's `direct` string should fail loud, not silently render bsdf-only");
+
+    // *** THE LIGHT ITSELF: sbt gains exactly one record, and ONLY when direct!=="bsdf" AND material is
+    // "microfacet" -- checked directly against makeRtSession's own real pipelineUniforms() call, not just
+    // inferred from the WGSL text (which says nothing about the SCENE's own contents). ***
+    const capturedUniforms = [];
+    const uniformsProbe = () => {
+        const dev = stubDevice().device;
+        dev.buffer = (d) => ({ write: (data) => { if (d && d.usage === "uniform" && data && data.length === 96) capturedUniforms.push(data); }, destroy() {} });
+        // uBuf.write() (the call this probe cares about) runs synchronously BEFORE renderFrame() ever reaches
+        // device.frame() -- this stub only needs to exist and not throw, never actually dispatch anything.
+        dev.frame = () => null;
+        return dev;
+    };
+    ok("direct:\"bsdf\" (the default) adds NO light -- sbt stays empty even under material:\"microfacet\"",
+        (() => { const s = V.makeRtSession(uniformsProbe(), { mesh: fakeMesh, w: 4, h: 4, material: "microfacet" });
+                 s.renderFrame({ w: 4, h: 4, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 30 }, { offscreen: true });
+                 return capturedUniforms.length === 1 && capturedUniforms[0][4 + 3] === 0; })(),
+        "U[1].w carries sbt.length (rtPipeline.mjs's own packing) -- must read 0 when direct is left at its default, " +
+        "the scene-level half of the byte-identity claim above (WGSL text alone says nothing about what is IN the scene)");
+    capturedUniforms.length = 0;
+    ok("!! direct:\"nee\" adds EXACTLY ONE light record -- sbt.length reads 1, not silently 0 or more than 1",
+        (() => { const s = V.makeRtSession(uniformsProbe(), { mesh: fakeMesh, w: 4, h: 4, material: "microfacet", direct: "nee" });
+                 s.renderFrame({ w: 4, h: 4, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 30 }, { offscreen: true });
+                 return capturedUniforms.length === 1 && capturedUniforms[0][4 + 3] === 1; })(),
+        "proves the light this round adds is actually reaching pipelineUniforms's own sbt array, not just built and discarded");
+
+    // *** THE LIGHT RECORD'S OWN CONTENTS -- an adversarial review found sbt.length alone proves a record was
+    // added, not that it is the RIGHT record: a wrong position, radius or emit would sail through every check
+    // above unnoticed. rtPipeline.mjs's own pipelineUniforms() packs sbt[0]'s centre/radius at flat index
+    // (8+0)*4=32..35 and sbtRecordFloats(r,{rgb:false}) -- [hitType,albedo,emit,ior] for a non-microfacet
+    // record -- at (16+0)*4=64..67 (both read directly off rtPipeline.mjs's source, not guessed), so this
+    // reads the SAME uniform buffer the sbt.length checks above already capture, no new probe machinery needed.
+    capturedUniforms.length = 0;
+    {
+        const s = V.makeRtSession(uniformsProbe(), { mesh: fakeMesh, w: 4, h: 4, material: "microfacet", direct: "nee" });
+        s.renderFrame({ w: 4, h: 4, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 30 }, { offscreen: true });
+        const u = capturedUniforms[0];
+        const expectCentre = [fakeMesh.bounds.center[0], fakeMesh.bounds.center[1] + fakeMesh.bounds.radius * V.DEFAULT_LIGHT_OFFSET_SCALE, fakeMesh.bounds.center[2]];
+        const expectRadius = fakeMesh.bounds.radius * V.DEFAULT_LIGHT_RADIUS_SCALE;
+        const close = (a, b) => Math.abs(a - b) < 1e-5;
+        ok("!! the packed LIGHT RECORD ITSELF -- not just sbt.length -- carries the right position, radius, hit-type and emit",
+            !!u && close(u[32], expectCentre[0]) && close(u[33], expectCentre[1]) && close(u[34], expectCentre[2]) &&
+            close(u[35], expectRadius) && u[64] === 0 && close(u[66], V.DEFAULT_LIGHT_EMIT),
+            `expected centre ${JSON.stringify(expectCentre)} radius ${expectRadius} hitType 0 (lambertian) emit ${V.DEFAULT_LIGHT_EMIT} -- ` +
+            `got centre [${u ? [u[32], u[33], u[34]] : "?"}] radius ${u ? u[35] : "?"} hitType ${u ? u[64] : "?"} emit ${u ? u[66] : "?"} -- ` +
+            "a wrong scale constant, a swapped axis, or a wrong emit value would diverge here even though sbt.length alone would still read 1");
+    }
+}
+
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
 console.log("\n2. accumulateWgsl -- A RUNNING MEAN, HELD TO HAND-COMPUTED EXPECTED VALUES");
 {
@@ -356,6 +458,51 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 session.destroy();
             }
 
+            // ---- 4d. RTX ROUND 12 -- the SAME fabricated cube, through direct:"nee" and direct:"mis" (the
+            // FIRST production caller of either, and the first time this session's own scene contains a real
+            // light) -- proves the real device path (a light sbtRecord built and packed through
+            // pipelineUniforms, the microfacet direct-lighting technique switched in the generated WGSL)
+            // actually executes end to end, not just that the right JS options are chosen (section 1c's own
+            // GPU-free claim). ----
+            {
+                const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+                const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(positions, indices);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 32, h = 24;
+                const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
+                const renderDirect = async (direct) => {
+                    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                    const device = await requestDevice(canvas, { backend: "webgpu" });
+                    const session = makeRtSession(device, { mesh, w, h, spp: 2, material: "microfacet", direct });
+                    for (let i = 0; i < 6; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                    const accum = new Float32Array(await device.read(session.accumBuf));
+                    // checksum is a POSITION-WEIGHTED sum (not just a total), so two buffers with the same total
+                    // but different per-pixel values -- e.g. a direct:"mis" that accidentally degenerated into
+                    // reusing direct:"nee"'s own code path pixel-for-pixel, which the mean-gap check below could
+                    // not tell apart from a real, independent MIS render -- read as DIFFERENT here even though
+                    // their means would agree almost exactly (an adversarial review's own finding).
+                    let nan = 0, min = Infinity, max = -Infinity, sum = 0, checksum = 0;
+                    for (let i = 0; i < accum.length; i++) {
+                        const v = accum[i];
+                        if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v;
+                        checksum += v * (i % 97 + 1);
+                    }
+                    session.destroy();
+                    return { nan, min, max, mean: sum / accum.length, checksum };
+                };
+                // A FRESH, WITHIN-SECTION bsdf-only/no-light baseline, not section 4b's own cubeMicrofacet --
+                // min/max alone turned out to be the WRONG metric here (both stay pinned to the SAME extreme
+                // pixels -- the sky and a Fresnel highlight -- whether or not the light is on), confirmed by a
+                // real headless-Chromium run BEFORE settling on mean as the actual sensitive signal: bsdf
+                // mean 0.123277, nee mean 0.124229, mis mean 0.124225 -- nee and mis independently agree with
+                // EACH OTHER (both unbiased estimators of the identical lit scene) far more closely than either
+                // agrees with the unlit bsdf-only baseline, exactly the signature a real, working light gives.
+                out.cubeDirectBsdf = await renderDirect("bsdf");
+                out.cubeDirectNee = await renderDirect("nee");
+                out.cubeDirectMis = await renderDirect("mis");
+            }
+
             // ---- 5. the real GLB -- fetch, parse, BVH, render; informal sanity only (no radiance oracle for a mesh) ----
             {
                 const res = await fetch("/vendor/kenney-city/models/pavement.glb");
@@ -399,7 +546,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -447,6 +594,50 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         Math.abs(cubeEnvMap.max - cube.max) > 1e-4 || Math.abs(cubeEnvMap.min - cube.min) > 1e-4,
         `envMap range [${cubeEnvMap.min.toFixed(4)}, ${cubeEnvMap.max.toFixed(4)}] vs gradient range ` +
         `[${cube.min.toFixed(4)}, ${cube.max.toFixed(4)}]`);
+
+    console.log("\n4d. RTX ROUND 12 -- THE SAME FABRICATED CUBE, THROUGH direct:\"nee\" AND direct:\"mis\" -- THE FIRST PRODUCTION CALLER OF EITHER, THE FIRST REAL LIGHT");
+    say(`bsdf (fresh, no light): mean=${cubeDirectBsdf.mean.toFixed(6)} range [${cubeDirectBsdf.min.toFixed(4)}, ${cubeDirectBsdf.max.toFixed(4)}]`);
+    say(`nee:  accumBuf ${cubeDirectNee.nan} NaN/Inf, mean=${cubeDirectNee.mean.toFixed(6)} range [${cubeDirectNee.min.toFixed(4)}, ${cubeDirectNee.max.toFixed(4)}]`);
+    say(`mis:  accumBuf ${cubeDirectMis.nan} NaN/Inf, mean=${cubeDirectMis.mean.toFixed(6)} range [${cubeDirectMis.min.toFixed(4)}, ${cubeDirectMis.max.toFixed(4)}]`);
+    REPORT_ROWS.push(["cube, direct:nee", "unit cube + light", "6 frames", `mean ${cubeDirectNee.mean.toFixed(6)} vs bsdf ${cubeDirectBsdf.mean.toFixed(6)}`]);
+    REPORT_ROWS.push(["cube, direct:mis", "unit cube + light", "6 frames", `mean ${cubeDirectMis.mean.toFixed(6)} vs bsdf ${cubeDirectBsdf.mean.toFixed(6)}`]);
+    ok("!! direct:\"nee\" -- the light this round bakes into sbt, packed through pipelineUniforms and sampled via rtPipeline.mjs's own NEE loop, through a REAL WebGPU device -- no NaN, real range",
+        cubeDirectNee.nan === 0 && cubeDirectNee.max > cubeDirectNee.min && cubeDirectNee.min >= 0.0,
+        "proves the WIRING this round adds -- not just the math physics/render/rtPipeline-selfcheck.mjs's own section 13 " +
+        "already proved in isolation -- actually executes end to end: a real sbtRecord light, scaled against this " +
+        "cube's own mesh.bounds, built and bound the first time any production caller has ever passed one");
+    ok("!! direct:\"mis\" -- the same light, sampled via rtPipeline.mjs's own MIS weighting instead -- no NaN, real range",
+        cubeDirectMis.nan === 0 && cubeDirectMis.max > cubeDirectMis.min && cubeDirectMis.min >= 0.0,
+        "the same proof as direct:\"nee\" just above, for the MIS-weighted technique specifically, through the SAME real light");
+    // *** min/max ALONE IS THE WRONG METRIC HERE -- FOUND BY ACTUALLY RUNNING IT, NOT ASSUMED FROM ROUND 10/11's
+    // OWN "genuinely different" PRECEDENT. *** Every one of bsdf/nee/mis pins the SAME two extreme pixels (a
+    // sky ray and a Fresnel highlight), so min/max alone reads byte-for-byte IDENTICAL across all three despite
+    // the light genuinely lighting the cube -- a real, once-red finding during this round's own gate-writing,
+    // not a hypothetical. `mean` is the sensitive signal: nee and mis (both unbiased estimators of the SAME lit
+    // scene) must agree with EACH OTHER far more closely than either agrees with the unlit bsdf-only baseline --
+    // the actual signature a real, working light gives, not just "some number changed by some amount".
+    const meanGap = (a, b) => Math.abs(a - b) / ((a + b) / 2);
+    const neeVsBsdf = meanGap(cubeDirectNee.mean, cubeDirectBsdf.mean), neeVsMis = meanGap(cubeDirectNee.mean, cubeDirectMis.mean);
+    say(`mean gaps: nee-vs-bsdf ${(neeVsBsdf * 100).toFixed(3)}%, nee-vs-mis ${(neeVsMis * 100).toFixed(3)}% (expect nee-vs-mis << nee-vs-bsdf)`);
+    // *** THIS BAND IS A MEASURED VALUE, NOT A LOOSE SANITY FLOOR -- an adversarial review found the first draft's
+    // `neeVsBsdf > 1e-4` floor would still pass a light wired 10-50x too dim or too bright (the real gap is 0.77%,
+    // 77x that floor), and its `< 0.25` ratio had real margin against the measured ~0.0036 but was not itself tight
+    // enough to positively rule out a partially-contaminated MIS implementation. Both are narrowed here to bands
+    // that still comfortably contain the real, reproducible (fully deterministic -- no true randomness, seeded by
+    // frame count alone) measured values with headroom, not to the measured values exactly. ***
+    ok("!! direct:\"nee\" and direct:\"mis\" agree with EACH OTHER (both lit by the SAME light) far more closely than either agrees with the fresh bsdf-only, NO-LIGHT baseline",
+        neeVsMis < neeVsBsdf * 0.1 && neeVsBsdf > 0.002 && neeVsBsdf < 0.05,
+        `nee mean ${cubeDirectNee.mean.toFixed(6)}, mis mean ${cubeDirectMis.mean.toFixed(6)}, bsdf-only mean ${cubeDirectBsdf.mean.toFixed(6)} -- ` +
+        "the light this round adds is actually visible and actually lighting the cube (within a band around the real, " +
+        "measured ~0.77% shift -- not merely 'some number changed'), not built and silently discarded, and not off by " +
+        "an order of magnitude in either direction");
+    ok("!! direct:\"mis\" is a GENUINELY DISTINCT per-pixel render from direct:\"nee\", not merely a close MEAN -- " +
+        "a position-weighted checksum over the whole accumulation buffer, not just its average",
+        cubeDirectNee.checksum !== cubeDirectMis.checksum,
+        `nee checksum ${cubeDirectNee.checksum}, mis checksum ${cubeDirectMis.checksum} -- identical checksums here ` +
+        "would mean direct:\"mis\" produced byte-identical output to direct:\"nee\", the exact signature of a copy-paste " +
+        "bug where MIS silently reuses NEE's own code path rather than its own weighting, which the mean-gap check " +
+        "above cannot tell apart from a real, independently-computed MIS render (found by an adversarial review)");
 
     console.log("\n5. A REAL GLB, THROUGH THE FULL loadMeshBvh -> makeRtSession -> device.frame PATH");
     say(`vendor/kenney-city/models/pavement.glb: ${mesh.byteLength} bytes -> ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices`);
@@ -496,6 +687,11 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "a page that never read the param would still call makeRtSession successfully (sky defaults to " +
         "\"gradient\") and every check above this one would still pass -- the same shape of gap round 10's own " +
         "material check exists to catch, extended to the third toggle");
+    ok("!! RTX round 12 -- the page reads a `direct` URL param and passes it into makeRtSession, not just the hardcoded bsdf default",
+        /DIRECT_VALUES/.test(page) && /direct\s*:\s*DIRECT/.test(page),
+        "a page that never read the param would still call makeRtSession successfully (direct defaults to " +
+        "\"bsdf\") and every check above this one would still pass -- the same shape of gap round 10/11's own " +
+        "checks exist to catch, extended to the fourth toggle");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));

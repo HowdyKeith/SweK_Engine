@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="RTX viewer">
-<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Two skies: a gradient (the default), or a captured environment-map atlas -- an analytic sky baked into a real texture once at load (RTX round 11) -- toggle with the third link. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
+<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Two skies: a gradient (the default), or a captured environment-map atlas -- an analytic sky baked into a real texture once at load (RTX round 11) -- toggle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
 <meta name="demo:category" content="physics">
 <meta name="demo:swatch" content="&#9651;">
 <title>RTX viewer</title>
@@ -25,7 +25,7 @@
 <div id="hud">
   <div id="cap">RTX viewer</div>
   <div id="be">requesting a WebGPU device&hellip;</div>
-  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a href="/server.html">&larr; back</a></div>
+  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a id="directToggle" href="#">direct</a> &middot; <a href="/server.html">&larr; back</a></div>
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
@@ -36,6 +36,7 @@ const cvs = document.getElementById("c"), beEl = document.getElementById("be"), 
 const toggleEl = document.getElementById("sceneToggle");
 const materialToggleEl = document.getElementById("materialToggle");
 const skyToggleEl = document.getElementById("skyToggle");
+const directToggleEl = document.getElementById("directToggle");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 
 // RTX round 5 -- which scene to load, read once at page load (not hot-swapped mid-session: a running WebGPU
@@ -52,13 +53,22 @@ const MATERIAL = new URLSearchParams(location.search).get("material") === "micro
 // builds its one fixed compute pipeline at session creation, so this is a third page-reload toggle, not a live
 // sky swap.
 const SKY = new URLSearchParams(location.search).get("sky") === "envMap" ? "envMap" : "gradient";
-const qs = (scene, material, sky) => "?scene=" + scene + "&material=" + material + "&sky=" + sky;
-toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY);
+// RTX round 12 -- a FOURTH toggle, same reload shape, but three-valued rather than binary (bsdf/nee/mis), so
+// its own link CYCLES rather than flips -- meaningful only under material:"microfacet" (see render/rtViewer.mjs's
+// own doc on why), but harmless and simply inert under Lambertian, so it is not hidden behind that combination.
+const DIRECT_VALUES = ["bsdf", "nee", "mis"];
+const rawDirect = new URLSearchParams(location.search).get("direct");
+const DIRECT = DIRECT_VALUES.includes(rawDirect) ? rawDirect : "bsdf";
+const qs = (scene, material, sky, direct) => "?scene=" + scene + "&material=" + material + "&sky=" + sky + "&direct=" + direct;
+toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY, DIRECT);
 toggleEl.textContent = SCENE === "city" ? "try the pavement tile" : "try the procedural city";
-materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY);
+materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY, DIRECT);
 materialToggleEl.textContent = MATERIAL === "microfacet" ? "try lambertian" : "try microfacet + energy compensation";
-skyToggleEl.href = qs(SCENE, MATERIAL, SKY === "envMap" ? "gradient" : "envMap");
+skyToggleEl.href = qs(SCENE, MATERIAL, SKY === "envMap" ? "gradient" : "envMap", DIRECT);
 skyToggleEl.textContent = SKY === "envMap" ? "try the gradient sky" : "try the captured environment map";
+const nextDirect = DIRECT_VALUES[(DIRECT_VALUES.indexOf(DIRECT) + 1) % DIRECT_VALUES.length];
+directToggleEl.href = qs(SCENE, MATERIAL, SKY, nextDirect);
+directToggleEl.textContent = "try " + nextDirect.toUpperCase() + " direct lighting (microfacet only)";
 
 let session = null, mesh = null, device = null;
 let yaw = 0.7, pitch = 0.45, dist = 3, dragging = null, dirty = true;
@@ -96,8 +106,9 @@ async function main() {
     } catch (e) { return fail("loading the mesh threw: " + e.message); }
 
     dist = mesh.bounds.radius * 3.2 + 0.5;
-    session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY });
-    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky`;
+    session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY, direct: DIRECT });
+    const directNote = MATERIAL === "microfacet" ? `${DIRECT} direct` : `${DIRECT} direct (inert -- lambertian ignores it)`;
+    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky, ${directNote}`;
 
     cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; cvs.setPointerCapture(e.pointerId); });
     addEventListener("pointerup", () => { dragging = null; });

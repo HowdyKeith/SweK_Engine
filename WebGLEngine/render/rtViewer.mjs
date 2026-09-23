@@ -30,7 +30,7 @@
 // bit-for-bit parity is task #99, not this round.
 "use strict";
 
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
@@ -48,6 +48,19 @@ export const DEFAULT_IOR = 1.5;
 // sample (alpha=0, per its own "collapses to a point sample" doc) -- trivial at any reasonable size, so 32 is
 // picked for a texture that reads as an actual atlas rather than a blocky 8x8, not for speed.
 export const DEFAULT_ENV_FACE_SIZE = 32;
+// RTX round 12 -- the demo light's own geometry, SCALED against a scene's own `mesh.bounds` rather than an
+// absolute size (the two live scenes differ by 17x in bounds.radius: the pavement tile ~0.7, the city ~12).
+// Scratch-verified before touching any gated file: r/d = radius/(offset-radius) -- distance to the light's own
+// NEAR edge, the same conservative convention rtPipeline-selfcheck.mjs's own r/d comments use, NOT radius/offset
+// -- is 0.6/(2.2-0.6) = 0.375 for BOTH scenes. That falls inside the range physics/render/rtPipeline-selfcheck.mjs's
+// own NEE gates have actually measured as tractable: r/d~0.16 (section 11b, real clearance, no widening needed)
+// up through r/d~0.33 and r/d~0.55 (sections 13/14, each widened there from a smaller, measurably "too noisy"
+// value) -- not a value picked by eye.
+// Placed ABOVE the scene (+Y) rather than to one side so it reads sensibly from the orbit camera's default
+// framing regardless of which of the two scenes or which yaw/pitch a viewer orbits to.
+export const DEFAULT_LIGHT_RADIUS_SCALE = 0.6;
+export const DEFAULT_LIGHT_OFFSET_SCALE = 2.2;
+export const DEFAULT_LIGHT_EMIT = 8;
 
 /**
  * RTX round 11 -- the ANALYTIC sky baked into a texture when `sky:"envMap"` is chosen. The gradient TERM is the
@@ -224,14 +237,23 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * fixed-direction sun highlight so the baked result reads as visibly distinct from the gradient it replaces)
  * into a real texture, ONCE at session creation -- see envRadianceOf's own doc above for why this is analytic
  * rather than a real scene capture or HDRI import, matching the one existing envMap gate's own precedent.
+ *
+ * `direct` (RTX round 12, default "bsdf") is the FIRST production caller of `microfacet`'s own "nee"/"mis"
+ * modes (round 8's own three-way option) -- and the first time this session's scene ever contains a real
+ * light. Meaningful ONLY when `material` is "microfacet" (plain Lambertian's own `nee` is a boolean with no
+ * MIS mode, a genuinely different, larger design fork this round does not take -- see the option's own inline
+ * comment below). Left at its default, BYTE- AND SCENE-IDENTICAL to every round before this one: no light is
+ * added to `sbt` unless `direct` is explicitly "nee" or "mis".
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
                                           material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
-                                          sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE }) {
+                                          sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf" }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     if (sky !== "gradient" && sky !== "envMap") throw new Error(
         "rtViewer: sky must be \"gradient\" or \"envMap\", got " + sky);
+    if (direct !== "bsdf" && direct !== "nee" && direct !== "mis") throw new Error(
+        "rtViewer: direct must be \"bsdf\", \"nee\" or \"mis\", got " + direct);
     const { bvh } = mesh;
     const floats = w * h * 3;
     const isMicrofacet = material === "microfacet";
@@ -256,9 +278,29 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // "two different sky sources" refusal), so the two cannot both reach the generated WGSL at once.
     const envAtlas = isEnvMap ? packCapturedAtlas(captureBaseCubemap(envRadianceOf, [0, 0, 0], envFaceSize)) : null;
     const useGradient = isEnvMap ? false : gradient;
+    // RTX round 12 -- `direct` is meaningful ONLY for the microfacet material (round 8's own three-way
+    // `microfacet:"bsdf"|"nee"|"mis"` option; plain Lambertian's own `nee` is a boolean with no MIS mode at
+    // all, confirmed by reading physics/render/rtPipeline.mjs directly -- see this function's own doc above
+    // for why that made Lambertian NEE a separate, larger design fork this round does not take). `direct`
+    // omitted (its own default "bsdf") is byte- AND scene-identical to every round before this one: no light
+    // is added unless `direct` is EXPLICITLY set to "nee" or "mis". This is NOT because an unsampled light
+    // would be invisible under "bsdf" -- it would not: rtPipeline.mjs's own `needsDirectState` gate
+    // (`nee || microfacetOn`) is already true for "bsdf" too, and its emitter-hit branch adds radiance on ANY
+    // ray, camera or ordinary BSDF-sampled bounce, that happens to land directly on an emitter, regardless of
+    // `direct`; only NEE/MIS *sampling* the light on purpose (rather than merely stumbling into it) needs
+    // `direct !== "bsdf"`. So a light added unconditionally whenever material is "microfacet" would render as
+    // a plain bright sphere even under "bsdf" -- changing round 10's own already-shipped default bsdf-mode
+    // picture, which this function's own opt-in discipline forbids. Gating on `direct !== "bsdf"` is what
+    // avoids that picture-change, not a dodge around an invisible-light bug that was never actually at risk.
+    const hasLight = isMicrofacet && direct !== "bsdf";
+    const lightRecord = hasLight ? sbtRecord({
+        centre: [mesh.bounds.center[0], mesh.bounds.center[1] + mesh.bounds.radius * DEFAULT_LIGHT_OFFSET_SCALE, mesh.bounds.center[2]],
+        radius: mesh.bounds.radius * DEFAULT_LIGHT_RADIUS_SCALE, hit: "lambertian", albedo: 0, emit: DEFAULT_LIGHT_EMIT,
+    }) : null;
+    const sbt = hasLight ? [lightRecord] : [];
 
     const rtPipe = device.compute({ wgsl: isMicrofacet
-        ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: "bsdf", msComp: true, envMap: isEnvMap })
+        ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap })
         : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
@@ -309,11 +351,11 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             // pipeline's own WGSL text with above -- rtPipeline.mjs's own doc on pipelineUniforms names this a
             // silent-misrender trap with no runtime cross-check across two independent calls; `isMicrofacet` is
             // the ONE flag both sides are computed from, on purpose, so the two calls cannot drift apart.
-            uBuf.write(pipelineUniforms([], { spp, seed: frame, view, eps, rgb: !isMicrofacet,
+            uBuf.write(pipelineUniforms(sbt, { spp, seed: frame, view, eps, rgb: !isMicrofacet,
                 bvh: isMicrofacet
                     ? { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "microfacet", roughness, ior, msTable }
                     : { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo },
-                ...(isMicrofacet ? { microfacet: "bsdf", msComp: true } : {}),
+                ...(isMicrofacet ? { microfacet: direct, msComp: true } : {}),
                 // pipelineUniforms's own `envMap` option takes the ATLAS OBJECT itself (matching `bvh`'s own
                 // "take the descriptor" convention), not a boolean -- `isEnvMap` decides whether it is passed
                 // at all, the SAME single flag pipelineWgsl's own envMap option above was built from.
