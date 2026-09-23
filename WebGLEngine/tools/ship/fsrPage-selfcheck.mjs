@@ -50,6 +50,22 @@ const PAGE = path.join(ENG, "fsr.html");
 const raw = fs.readFileSync(PAGE, "utf8");
 const src = noComments(raw);
 
+/**
+ * *** DOES THIS TEXT SAY THIS, ACROSS WHATEVER LINE BREAKS IT FELL ON? ***
+ *
+ * Five rows and one sabotage in this session have failed on the same thing: a multi-word phrase matched
+ * literally against WRAPPED prose, where it straddles a newline. v4663, v4665 (where it turned a mutation
+ * into a silent no-op), v4666, and twice here. Each time the fix was to write \s+ between the words, each
+ * time that was recorded, and each time the next row was written with a literal space again.
+ *
+ * So it stops being a thing to remember. `says` takes a phrase, escapes it, and joins the words with \s+.
+ * Prose rows call this; rows matching CODE keep using a literal regex, because whitespace in code is not
+ * incidental the way a paragraph's wrapping is.
+ */
+const says = (text, phrase) =>
+    new RegExp(phrase.trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "i")
+        .test(text);
+
 console.log("fsrPage-selfcheck -- the temporal arc's only caller, and whether the chain actually fires\n");
 
 // -----------------------------------------------------------------------------------------------------------
@@ -377,7 +393,13 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
     ok("!! the reactive mask has a control arm as well, and it is the one whose result NEEDED it",
         /<select id="reactive">/.test(raw) && /reactive:\s*reactiveOn \? reactiveMask : null/.test(src)
         && /const reactiveOn = \$\("reactive"\)\.value !== "off"/.test(src)
-        && /const rx = await xgpu\.reactive\(\{/.test(src) && /reactiveMask = rx\.data/.test(src),
+        // *** v4670 SPLIT THE SOURCE AND THIS ROW HELD THE OLD ASSIGNMENT. *** Its point since v4658 is that
+        // the mask must be COMPUTED and not merely switched -- a null mask and a computed-but-ignored one
+        // produce identical frames at the frames any gate runs, so only the assignment can be held. That
+        // still applies; what changed is that the assignment now chooses between two masks. BOTH are
+        // computed every frame regardless of which is used, so the derived one's counters keep reporting.
+        && /const rx = await xgpu\.reactive\(\{/.test(src)
+        && /reactiveMask = rxSource === "app" \? \(appMask \|\| rx\.data\) : rx\.data;/.test(src),
         "at TWENTY-ONE frames this mask's t-test cleared 0.05 and its sign test did not -- two tests, two " +
         "verdicts, and a round could have quoted whichever it preferred. Fifty-one settled it. A switch is " +
         "what makes taking more samples possible at all.");
@@ -414,6 +436,42 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n14. *** FSR2's PRIMARY PATH (v4670): A MASK THE APPLICATION DECLARES ***");
+{
+    const REC = path.resolve(path.dirname(PAGE), "render", "transparency-measurement.md");
+    const rec = fs.existsSync(REC) ? fs.readFileSync(REC, "utf8") : "";
+    // *** A DECLARATION, NOT A SECOND DERIVATION -- which is the whole distinction and the easy thing to
+    // lose. A mask that inferred transparency from the picture would be the derived mask wearing the word
+    // "application", and would measure as one.
+    ok("!! *** the app mask reads the GEOMETRY and never a colour, a history or a depth ***",
+       (() => { const m = /function renderReactiveApp\([\s\S]*?\n\}/.exec(src); if (!m) return false;
+                const body = m[0];
+                return /hitBoth\(/.test(body) && /1 - alpha/.test(body)
+                       && !/(scene\(|hist|prevDepth|luma)/.test(body); })(),
+       "the slab's coverage is the predicate hitBoth already computes for the geometry and the value is " +
+       "the alpha the page was asked to draw at. Nothing is inferred from the picture, which is what makes " +
+       "this FSR2's primary path rather than its fallback under another name.");
+    ok("  ...and an opaque scene declares nothing rather than declaring zero by accident",
+       // the CODE in src and the REASON in raw: noComments() strips the comment out of src, so testing a
+       // comment against it can only ever fail -- which is how this row arrived red.
+       /if \(alpha >= 1\) return out;/.test(src) && says(raw, "an opaque scene declares nothing"),
+       "the early return is the statement; it also keeps the three older cameras out of this entirely");
+    ok("!! *** the record reports FSR2's primary path as the LESS RELIABLE of the two here ***",
+       /\+0\.9024 dB/.test(rec) && /48 up \/\s+3 down/.test(rec)
+       && says(rec, "28 up / 23 down") && says(rec, "less reliable"),
+       "+0.9024 dB against the derived mask's +0.6673, and head to head 28 to 23 -- near a coin flip. The " +
+       "larger mean is not the whole claim and reporting it alone would be the mistake v4658 recorded.");
+    ok("!! ...and it carries the one figure that explains both halves",
+       /11,130/.test(rec) && /590/.test(rec) && says(rec, "blind to whether it matters"),
+       "590 pixels against 11,130 -- nineteen times as many. The app mask is exact about COVERAGE and " +
+       "blind to whether the history was actually wrong there; the derived one is the reverse. The larger " +
+       "mean and the lost frames are the same fact.");
+    ok("  ...and it does not read as a verdict on FSR2's API",
+       says(rec, "not a flat coverage stencil") && says(rec, "crudest possible honest declaration"),
+       "a real application's mask is authored and can distinguish a reactive particle from a static " +
+       "decal. The crudest version losing a third of its frames is an argument about THIS mask.");
+}
+
 console.log("\n13. *** THE CONTENT THE REACTIVE MASK EXISTS FOR (v4669) ***");
 // Four rounds said the mask was being judged on a case it was not designed for and could not act on it.
 // A translucent surface contributes COLOUR AND NOT DEPTH, so the motion vector describes the background
@@ -443,8 +501,8 @@ console.log("\n13. *** THE CONTENT THE REACTIVE MASK EXISTS FOR (v4669) ***");
        /if \(alpha >= 1\) return s;/.test(src) && /const alphaCur = objects \? slabAlpha\(\) : 1;/.test(src),
        "the three older cameras pass 1 and cannot see this control at all, exactly as they pass sx = 0");
     ok("!! *** the record reports 51 of 51 frames up, and does not dress a first look as a confirmation ***",
-       /\+0\.6673 dB/.test(rec) && /51 up \/\s+0 down/.test(rec)
-       && /not a pre-registered confirmation/i.test(rec) && /v4671/.test(rec),
+       /\+0\.6673 dB/.test(rec) && says(rec, "51 up / 0 down")
+       && says(rec, "not a pre-registered confirmation") && /v4671/.test(rec),
        "+0.6673 dB against +0.0820 on the opaque slab, and never once negative. 51 of 51 is not a number " +
        "that needs a test to be believed -- and that is not the point: the procedure is what stops a round " +
        "choosing its verdict, this round did not follow it, and the record says so rather than borrowing " +
@@ -479,22 +537,25 @@ console.log("\n12. *** WHICH CONSUMER CARRIED IT (v4666) ***");
        // happens to straddle a line break fails a literal match while the sentence is plainly there. That
        // has now bitten three rows and one sabotage in this session -- including a mutation that silently
        // did nothing and was logged as a no-op at v4665 for exactly this reason.
-       /clears \*\*neither\*\* test/i.test(pre) && /close\s+to\s+a\s+coin\s+flip/.test(pre)
-       && /clears NEITHER test/.test(raw),
+       says(pre, "clears **neither** test") && says(pre, "close to a coin flip")
+       && says(raw, "clears NEITHER test"),
        "+0.076 dB with 29 frames up against 21 down. v4664 routed all three consumers together and for the " +
        "mask that was not justified by measurement; a round reporting only the 96% would leave that " +
        "unsaid.");
     ok("!! ...and it still says this is NOT a case for deleting the reactive mask",
-       /not a case for deleting the mask/i.test(pre) && /not a case for deleting it/.test(raw),
+       says(pre, "not a case for deleting the mask") && says(raw, "not a case for deleting it"),
        "FSR2 ships it for shader-animated and transparent content this page does not contain and dilation " +
        "cannot help with. A measurement on one scene is not a verdict on a feature.");
     ok("  ...and the lock ring's absence from the switch is stated as a measurement, not left unsaid",
-       /shadingShift/.test(pre) && /never fills inside scene 3.53/.test(pre) && /shadingShift/.test(raw),
+       // the record writes an EN DASH in "3–53". The regex this replaced used `3.53`, whose dot matched it
+       // by luck; converting the row to a literal phrase exposed that. A range is matched as a range now
+       // rather than relying on a wildcard nobody meant to rely on.
+       says(pre, "shadingShift") && /never fills inside scene 3[-\u2013]53/.test(pre) && says(raw, "shadingShift"),
        "it feeds the shading mask, which is OFF in every arm these figures were taken on and whose ring " +
        "never fills inside this window anyway -- so a third option would be a control that cannot move " +
        "its own number");
     ok("  ...and the decomposition is labelled EXPLORATORY rather than dressed as a second pre-registration",
-       /Exploratory, and labelled so/i.test(pre) && /post-hoc/i.test(pre),
+       says(pre, "Exploratory, and labelled so") && says(pre, "post-hoc"),
        "it decomposes an effect already confirmed under pre-registration; the contrast between the two " +
        "dilated arms did no searching but was not declared in advance either, and says so");
 }
@@ -522,7 +583,8 @@ console.log("\n11. *** WHAT THE PASS IS WORTH (v4665), AND WHAT IT COSTS THE FEA
        `mask's +0.0820 once dilation is on. Missing from the record: ${missPre.join(" ") || "none"}; from ` +
        `the page: ${missPage.join(" ") || "none"}.`);
     ok("!! ...and both still say the pass COSTS eight frames, the worst by more than the reactive mask's worst",
-       /eight frames are worse/i.test(pre) && /2\.43/.test(pre) && /eight frames are worse/i.test(raw) && /2\.43/.test(raw),
+       says(pre, "eight frames are worse") && /2\.43/.test(pre)
+       && says(raw, "eight frames are worse") && /2\.43/.test(raw),
        "a mean of +1.80 dB with a 2.43 dB single-frame loss inside it is not the same claim as +1.80 dB, " +
        "and the larger number is the one a reader remembers");
     ok("!! ...and both still say the reactive mask is NOT therefore pointless",
@@ -640,8 +702,8 @@ console.log("\n9. *** THE REFUTED HYPOTHESIS (v4662), AND THE CELL THAT DOES NOT
                           : "cells unparsed" ,
        );
     ok("!! ...and both the record and the page still say the harm is UNEXPLAINED, not solved",
-       /REFUTED/.test(harm) && /What is left is the scene window itself/.test(harm)
-       && /THREE explanations for the harm are now spent/.test(raw),
+       says(harm, "REFUTED") && says(harm, "What is left is the scene window itself")
+       && says(raw, "THREE explanations for the harm are now spent"),
        "three explanations are spent -- jitter refuted, the wide/narrow split confirmed and beside the " +
        "point, the history's age refuted -- and naming the scene window is an association, not a mechanism. " +
        "A round that printed 'refuted' and moved on would read as having closed the question.");
@@ -757,7 +819,8 @@ console.log("\n7. *** THE PRE-REGISTERED TEST (v4660): TWO DOCUMENTS, ONE SET OF
              "third is the one a later edit gets wrong.");
     // *** AND THE THING THE CONFIRMATION DID NOT DO, WHICH A READER WILL OTHERWISE ASSUME IT DID. ***
     ok("!! ...and both documents still say the confirmed effect does NOT explain the harm it was found chasing",
-       /does not explain|not an explanation/i.test(pre) && /NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES/.test(raw),
+       (says(pre, "does not explain") || says(pre, "not an explanation"))
+       && says(raw, "NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES"),
        "3 of 45 frames are harmed over 54-98 against 14 of 51 over 3-53, while the wide/narrow difference " +
        "holds its size. The split predicts how much the mask HELPS, not whether it HURTS, and v4658's " +
        "defect is open. A round that printed 'confirmed, p = 0.019' and stopped would read as closing it.");
@@ -774,6 +837,22 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4670  the app mask DERIVES from the picture instead of declaring    1 RED -- and that mutation is the
+//          one that matters: a mask inferring transparency from the frame is the derived mask wearing the
+//          word "application", and would measure as one.
+//   v4670  the opaque early return removed                                1 RED.
+//   v4670  the record reports only the app mask's larger mean              1 RED.
+//   v4670  the record drops the 11,130-vs-590 mechanism                    1 RED.
+//   v4670  the record turns the null into a verdict on FSR2's API          1 RED -- on the SECOND attempt;
+//          the first sabotage string spanned a line wrap and never applied. A no-op, not a 0-RED.
+//
+// *** AND TWO OF THIS ROUND'S OWN ROWS ARRIVED RED FOR REASONS THIS FILE HAS NOW SEEN SIX TIMES. *** One
+// tested a COMMENT against `src`, which is noComments(raw) and has no comments in it. The other matched a
+// wrapped phrase literally -- the fifth time. So `says()` exists now: it escapes a phrase and joins its
+// words with \s+, and every prose row in this file was converted to it, not merely the new ones. That
+// conversion immediately found a row passing on a `.` wildcard that happened to match an EN DASH in a
+// record's "3–53". The sabotage scripts are not covered by the helper and the fifth instance above is one
+// of them, which is worth knowing: the fix reaches the rows and not the mutations that test them.
 //   v4669  the DEPTH buffer keeps the translucent slab                    1 RED -- the asymmetry gone, and
 //          with it the whole experiment: a transparency that writes depth is an opaque slab in a different
 //          colour and would measure as one.

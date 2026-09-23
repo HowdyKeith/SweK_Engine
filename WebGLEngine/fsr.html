@@ -54,6 +54,10 @@
       <option value="on">reactive mask: ON</option>
       <option value="off">reactive mask: OFF (the control)</option>
     </select>
+    <select id="rxsource">
+      <option value="derived">reactive mask from: the DERIVED heuristic (colour vs history)</option>
+      <option value="app">reactive mask from: the APPLICATION's declaration (FSR2's primary path)</option>
+    </select>
     <select id="slabalpha">
       <option value="1">slab: OPAQUE (every figure on this page is this arm)</option>
       <option value="0.5">slab: TRANSLUCENT 0.5 -- colour but no depth, the reactive mask's case</option>
@@ -343,6 +347,37 @@ function shadeRay(inv, u, v, kind, sx = 0, alpha = 1) {
     const b = scene(bu, bv, kind);
     const out = [0, 0, 0, 0];
     for (let c = 0; c < 4; c++) out[c] = alpha * s[c] + (1 - alpha) * b[c];
+    return out;
+}
+
+/**
+ * *** v4670 -- THE APPLICATION-SUPPLIED REACTIVE MASK, WHICH IS FSR2's ACTUAL DESIGN. ***
+ *
+ * render/reactive.mjs DERIVES reactivity: it compares the current frame against its reprojected history and
+ * reports where they disagree past a depth gate. That is FSR2's ffx_fsr2_autogen_reactive, the FALLBACK for
+ * content that will not tell the upscaler anything. The primary path in the API is a mask the APPLICATION
+ * hands over, because the application knows -- it drew the particles, it knows which pixels are a
+ * transparency and how much of one.
+ *
+ * render/reactiveGPU-selfcheck.mjs has asked for this since v4657: "whether an APPLICATION-supplied mask
+ * would beat this derived one, which is FSR2's actual design and needs content that knows which of its own
+ * pixels are particles". v4669 gave this page such content. This is the declaration.
+ *
+ * *** IT IS A DECLARATION AND NOT A SECOND DERIVATION, WHICH IS THE ENTIRE DISTINCTION. *** Nothing here
+ * looks at a colour, a history, or a depth. The slab's coverage is the same predicate hitBoth already
+ * computes for the geometry, and the value is the alpha the page was asked to draw it at. A mask that
+ * inferred transparency from the picture would be the derived mask again, wearing the word "application".
+ */
+function renderReactiveApp(vp, sx = 0, alpha = 1) {
+    const inv = mat4Invert(vp);
+    const out = new Float32Array(D * D);
+    if (alpha >= 1) return out;                 // an opaque scene declares nothing, and 0 is that statement
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        // 1 - alpha: how much of this pixel is NOT the surface the motion vector describes. At alpha 0.5 a
+        // slab pixel is half background -- which the vector is right about -- and half slab, which it is
+        // not. The mask's job is to say how much of the history to distrust, and that is the share.
+        if (hitBoth(inv, (x + 0.5) / D, (y + 0.5) / D, sx).near) out[y * D + x] = 1 - alpha;
+    }
     return out;
 }
 
@@ -1055,7 +1090,13 @@ async function tick() {
         const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion: rxMotion, prevDepth,
                                          w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1,
                                          counted: true });
-        reactiveMask = rx.data;
+        // *** WHICH MASK REACHES THE CHAIN, AND BOTH ARE COMPUTED EITHER WAY. *** The derived one is
+        // computed regardless so its counters keep reporting -- the readout below is the instrument v4659
+        // built and it should not go dark because a different mask is in use -- and because the two being
+        // side by side every frame is what makes them comparable at all.
+        const rxSource = $("rxsource").value;
+        const appMask = alphaCur < 1 ? renderReactiveApp(vpCur, sxCur, alphaCur) : null;
+        reactiveMask = rxSource === "app" ? (appMask || rx.data) : rx.data;
         // The same quantile treatment the shading mask takes, and for the same reason v4655 had to learn:
         // this is a CONTINUOUS detector, so a count of pixels above ZERO counts the arithmetic.
         const rsorted = Float32Array.from(reactiveMask).sort();

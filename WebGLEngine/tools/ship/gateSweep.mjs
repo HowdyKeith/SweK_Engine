@@ -8032,6 +8032,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4670 -- THE 280th CLOSING: FSR2's primary path, larger on average and less reliable.
+    since355: Object.freeze({
+        at: "v4670", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** render/reactive.mjs IS FSR2's FALLBACK, NOT ITS PRIMARY PATH. *** It DERIVES " +
+                 "reactivity from colour against reprojected history -- ffx_fsr2_autogen_reactive, for " +
+                 "content that will not tell the upscaler anything. The API's primary path is a mask the " +
+                 "APPLICATION hands over, because the application drew the transparency and knows its " +
+                 "alpha. reactiveGPU-selfcheck has asked for the comparison since v4657 and v4669 supplied " +
+                 "the content; this is the declaration, and it is a DECLARATION and not a second " +
+                 "derivation -- it reads the geometry predicate hitBoth already computes and the alpha the " +
+                 "page was asked to draw at, and never a colour, a history or a depth. A sabotage making it " +
+                 "infer from the picture reds, because that mask would be the derived one wearing the word " +
+                 "'application'. " +
+                 "*** HEAD TO HEAD ON THE TRANSLUCENT SLAB, AND THE PRIMARY PATH IS THE LESS RELIABLE " +
+                 "ONE. *** Derived vs no mask: +0.6673 dB, 51 up and 0 down. App vs no mask: +0.9024 dB, 48 " +
+                 "up and 3 DOWN, worst -0.90. App against derived directly: +0.2351 dB but 28 up and 23 " +
+                 "down -- near a coin flip, with the mean advantage coming from a few large wins against a " +
+                 "few large losses. The same shape v4658 found between the shading and reactive masks: " +
+                 "helps more on average, far less reliably. That the shape RECURS is worth noticing. " +
+                 "*** AND THE MECHANISM IS ONE NUMBER. *** The derived mask marks 590 pixels of 36,864 at " +
+                 "or above 0.05; the app mask marks 11,130 -- NINETEEN TIMES as many, a third of the " +
+                 "picture. It is exact about COVERAGE and blind to whether the history was actually wrong " +
+                 "there, marking every pixel the slab covers including the many where the background behind " +
+                 "it is uniform and the reprojection was perfectly good. The derived one is the reverse. " +
+                 "Both halves of the result follow from that figure: the larger mean is what the derived " +
+                 "mask misses, the lost frames are good history discarded across a third of the frame. This " +
+                 "is an argument about THIS mask and not about the API -- a real application's is authored " +
+                 "and can tell a reactive particle from a static decal -- and the record says so. " +
+                 "*** AND THE ROUND BUILT A HELPER FOR A DEFECT IT HAS NOW COMMITTED SIX TIMES. *** Two of " +
+                 "its own rows arrived red: one testing a COMMENT against noComments(raw), and one matching " +
+                 "a wrapped phrase literally, which is the fifth instance of that after v4663, v4665 (where " +
+                 "it silently voided a mutation), v4666 and v4667. Writing the fix down five times changed " +
+                 "nothing, so `says()` now escapes a phrase and joins its words with \\s+, and EVERY prose " +
+                 "row in fsrPage-selfcheck was converted rather than only the new ones -- which immediately " +
+                 "caught a row passing on a `.` wildcard that happened to match an EN DASH. The helper does " +
+                 "not reach the sabotage scripts, and the fifth instance was one of them. Five sabotages, " +
+                 "five caught, one recorded no-op. No gate added.",
+    }),
     // v4669 -- THE 279th CLOSING: the content the reactive mask exists for, and 51 frames of 51.
     since354: Object.freeze({
         at: "v4669", swept: 0, green: 0, red: 0,
