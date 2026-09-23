@@ -267,28 +267,41 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
     const raw = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
 
-    // *** AND tempest's FOLDED COEFFICIENT COMES OUT OF THE SHADER'S OWN TWO NUMBERS. *** The table says
-    // 1.30 * 0.85 and the shader spells those two separately -- 1.30 inside the bolt's own rate and 0.85
-    // inside the energy clamp. Restating 1.105 here would make this row a comment, so both are READ and
-    // multiplied: change either in the shader and this recomputes instead of agreeing with itself. A
-    // sabotage that dropped the 1.30 walked through every row in this gate, because a wrong coefficient
-    // still moves a pixel and every pixel row here asks only whether it moved.
+    // *** AND tempest's SLOT COEFFICIENTS COME OUT OF THE SHADER'S OWN NUMBERS, WHICH ARE THREE NOW AND
+    // NOT TWO. *** The divisor is (1 + 1.30 * energy) and energy is 0.85*pace + 0.65*think + 0.55*drive, so
+    // the slot COUNT integrates against 1.30 times each of those. Restating 1.105 here would make this row
+    // a comment, so the shader's own numbers are READ and multiplied: change any of them and this
+    // recomputes instead of agreeing with itself. A sabotage that dropped the 1.30 walked through every row
+    // in this gate, because a wrong coefficient still moves a pixel and every pixel row here asks only
+    // whether it moved.
+    //
+    // *** UNTIL v4663 THE WHOLE WEIGHT SAT ON VOICE, AND IT WAS THE WRONG SIGNAL. *** tempest.ts reads pace,
+    // a THINKING indicator and drive; this port read voice, so the bolts re-timed when somebody SPOKE and
+    // kept a fixed rhythm while the assistant thought -- in the state tempest.ts calls the species' home.
     {
         const raw0 = raw;
-        const mR = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(([\d.]+)\)\)\)/.exec(raw0);
-        const mE = /clamp\(VOICE\.mul\(([\d.]+)\), 0\.0, ([\d.]+)\)/.exec(raw0);
-        const T2 = K.MH_SLOT_SIGNAL.tempest;
-        ok("!! *** tempest's SLOT COEFFICIENT IS THE SHADER'S OWN 1.30 TIMES ITS OWN 0.85, read and multiplied ***",
-            !!mR && !!mE && Math.abs(T2.voice - Number(mR[1]) * Number(mE[1])) < 1e-12 &&
-            T2.pace === 0 && T2.drive === 0 && Number(mE[1]) * 1.0 < Number(mE[2]),
-            mR && mE ? `the bolt's rate divides by (1 + ${mR[1]} * energy) and energy is ` +
-                `clamp(${mE[1]} * VOICE, 0, ${mE[2]}), so the folded voice coefficient is ${mR[1]} x ` +
-                `${mE[1]} = ${(Number(mR[1]) * Number(mE[1])).toFixed(4)} against the table's ${T2.voice}. ` +
-                `THE FOLD IS ONLY VALID WHILE THE CLAMP IS INERT, and mh_live bounds voice to 1 in both ` +
-                `halves of the kit, so energy tops at ${mE[1]} against a ceiling of ${mE[2]} -- a margin of ` +
-                `${(Number(mE[2]) / Number(mE[1])).toFixed(2)}x, the same clamp v4655 measured for the drift ` +
-                `that reads it. tempest.ts gives its bolts NO cadence and NO drive, and the table's other ` +
-                `two entries are exactly 0.`
+        const mR = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(SLT\.k\)\)\)/.test(raw0);
+        const mE = /clamp\(PACE\.mul\(TE\.pace\)\.add\(think\.mul\(TE\.think\)\)\.add\(DRIVE\.mul\(TE\.drive\)\), 0\.0, TE\.cap\)/.test(raw0);
+        const T2 = K.MH_SLOT_SIGNAL.tempest, TE2 = K.MH_TEMPEST_ENERGY;
+        const derived = (k) => T2.k * TE2[k];
+        ok("!! *** tempest's SLOT WEIGHTS ARE ITS DIVISOR'S 1.30 TIMES ENERGY'S OWN THREE, and VOICE carries none ***",
+            mR && mE &&
+            Math.abs(T2.pace - derived("pace")) < 1e-12 &&
+            Math.abs(T2.think - derived("think")) < 1e-12 &&
+            Math.abs(T2.drive - derived("drive")) < 1e-12 &&
+            T2.voice === 0 && TE2.pace + TE2.think + TE2.drive > TE2.cap,
+            mR && mE
+                ? `the bolt's rate divides by (1 + ${T2.k} * energy) and energy is clamp(${TE2.pace}*pace + ` +
+                  `${TE2.think}*think + ${TE2.drive}*drive, 0, ${TE2.cap}), so the slot count integrates ` +
+                  `against ${derived("pace").toFixed(4)} on the cadence, ${derived("think").toFixed(4)} on ` +
+                  `the THINK integral and ${derived("drive").toFixed(4)} on the lean -- and ${T2.voice} on ` +
+                  `voice, which carried the entire weight until v4663. THE FOLD IS ONLY VALID WHILE THE ` +
+                  `CLAMP IS INERT, and the three coefficients SUM TO ` +
+                  `${(TE2.pace + TE2.think + TE2.drive).toFixed(2)}, which is ABOVE the ${TE2.cap} ceiling -- ` +
+                  `so the old margin argument does not carry over and section 1 of ` +
+                  `tools/ship/murmurCadence-selfcheck.mjs re-derives it: the maximum is 1.500, because ` +
+                  `THINKING and RESPONDING are different states and two of energy's terms can never be live ` +
+                  `together.`
                 : `could not find the bolt rate or the energy clamp in the shader source -- if either moved, ` +
                   `this row has to move with it rather than pass on a stale reading.`);
     }
@@ -393,13 +406,18 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         say(`abyss   voiceInt +9: ${aV.pct.toFixed(1)}% worst ${aV.mx}   driveInt +6: ${aD.pct.toFixed(1)}% worst ${aD.mx}   |   tempest voiceInt 3->8: ${tV.pct.toFixed(1)}% worst ${tV.mx}`);
         ok("!! *** THE ACCUMULATED HISTORY DECIDES WHETHER THE GESTURE IS ON SCREEN AT ALL, on all three species ***",
             sP.pct > 5 && sP.mx > 100 && sD.pct > 5 && sD.mx > 100 &&
-            aV.pct > 5 && aV.mx > 100 && aD.pct > 5 && aD.mx > 100 && tV.pct > 5 && tV.mx > 100,
+            aV.pct > 5 && aV.mx > 100 && aD.pct > 5 && aD.mx > 100 && tP.pct > 5 && tP.mx > 100,
             `still's single glint is at 0.000 with no history and 0.993 with twelve radian-seconds of ` +
             `cadence behind it, at the SAME instant and the same instantaneous cadence: ${sP.pct.toFixed(1)}% ` +
             `of bytes move, worst channel ${sP.mx} of 255. Drive does the same through its own coefficient ` +
             `(${sD.pct.toFixed(1)}%, ${sD.mx}), abyss's third lane moves on voice and drive ` +
-            `(${aV.pct.toFixed(1)}%, ${aD.pct.toFixed(1)}%) and tempest's first bolt on voice ` +
-            `(${tV.pct.toFixed(1)}%). EVERY PAIR HOLDS stateIndex 0, stateTau 0 AND voice 0.6, so nothing ` +
+            `(${aV.pct.toFixed(1)}%, ${aD.pct.toFixed(1)}%) and tempest's first bolt on the CADENCE ` +
+            `(${tP.pct.toFixed(1)}%). *** tempest's HALF OF THIS ROW READ VOICE UNTIL v4663 AND IT WAS THE ` +
+            `WRONG SIGNAL: *** tempest.ts divides its bolt slots by (1 + 1.30 * energy) and energy is ` +
+            `0.85*live.pace + 0.65*think + 0.55*st.drive, not voice -- so this gate's POSITIVE and its ` +
+            `NEGATIVE for tempest have swapped places, which is what happens when the input was wrong ` +
+            `rather than the wiring. It now moves ${tP.pct.toFixed(1)}% on the cadence and ` +
+            `${tV.pct.toFixed(1)}% on voice. EVERY PAIR HOLDS stateIndex 0, stateTau 0 AND voice 0.6, so nothing ` +
             `the shader conditions from a uniform differs between the two halves -- under the expression ` +
             `this round replaced these would be five identical pictures.`);
 
@@ -412,10 +430,13 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         // gate carries the positive reading it became.
         say(`still +voiceInt 12 (glint ON): ${sV.pct.toFixed(1)}%   |   tempest +driveInt 9: ${tD.pct.toFixed(1)}% (the v4662 ADVECTION, not the slot)   +paceInt 9: ${tP.pct.toFixed(1)}%`);
         ok("!! *** ...AND EACH SLOT IS DEAF TO THE SIGNALS murmur DOES NOT GIVE IT -- measured with the gesture ON SCREEN ***",
-            sV.pct === 0 && tP.pct === 0,
-            `still.ts divides by pace and drive and NOT voice; tempest.ts by energy alone. Twelve ` +
-            `radian-seconds of the signal each one does not read moves ${sV.pct.toFixed(0)} and ` +
-            `${tP.pct.toFixed(0)} bytes. *** IT WAS THREE PAIRS UNTIL v4662 AND THE THIRD IS NOT AVAILABLE ` +
+            sV.pct === 0 && tV.pct === 0,
+            `still.ts divides by pace and drive and NOT voice; tempest.ts by an ENERGY built from pace, a ` +
+            `THINKING indicator and drive -- and NOT voice. Twelve radian-seconds of the signal each one ` +
+            `does not read moves ${sV.pct.toFixed(0)} and ${tV.pct.toFixed(0)} bytes. *** tempest's PAIR ` +
+            `HERE WAS paceInt UNTIL v4663 AND IS voiceInt NOW, which is the same swap the positive row ` +
+            `above records: the port had tempest's energy reading the microphone, so the signal it was deaf ` +
+            `to and the signal it answered were exactly the wrong way round. *** IT WAS THREE PAIRS UNTIL v4662 AND THE THIRD IS NOT AVAILABLE ` +
             `ANY MORE: *** tempest's SLOT is still deaf to drive, but that round wired the species' ` +
             `advection and a frame of tempest now moves ${tD.pct.toFixed(1)}% on driveInt for a reason that ` +
             `has nothing to do with a slot. The pair was dropped rather than kept on a widened bound, and ` +

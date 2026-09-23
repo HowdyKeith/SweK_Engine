@@ -190,44 +190,34 @@ sec("3. *** THE FACTORING NEEDS tempest's CLAMP TO BE INERT, AND THE MARGIN IS R
     // not need to: it is after the three numbers, and the empty pair of quotes is what the ternary looks like
     // once the scanner has been through it.
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
-    const m = /const energy = species === "" \? clamp\(VOICE\.mul\(([\d.]+)\), ([\d.-]+), ([\d.]+)\)/.exec(src);
-    ok("!! the clamp's own three numbers are still where this row thinks they are", !!m,
-        m ? `read gain ${m[1]}, floor ${m[2]}, ceiling ${m[3]} straight out of the shader source.` :
-            `could not find tempest's energy clamp in render/aiPresenceOrbTsl.mjs -- if the expression moved, ` +
-            `this row has to move with it rather than pass on a stale reading.`);
-    if (m) {
-        const gain = Number(m[1]), lo = Number(m[2]), hi = Number(m[3]);
-        // The sup of mh_live's voice over its ENTIRE domain, including levels outside [0,1] -- the function
-        // clamps its own input in both halves, so a caller cannot push it past 1 either.
-        let supV = 0, infV = 1;
-        for (const lvl of [-5, -1, -1e-9, 0, 0.001, 0.25, 0.5, 0.75, 0.999, 1, 1 + 1e-9, 2, 100]) {
-            for (const si of [0, 1, 2, 3, 4, 5]) {
-                const v = K.mhLive(lvl, 0.5, si).voice;
-                supV = Math.max(supV, v); infV = Math.min(infV, v);
-            }
-        }
-        ok("!! *** THE CLAMP CANNOT BITE AT EITHER END: 0.85 x sup(voice) = 0.85 against a ceiling of 1.6 ***",
-            gain * supV < hi && infV >= lo && supV <= 1 + 1e-12 && hi / (gain * supV) > 1.5,
-            `mh_live's voice output over 78 points of its full domain -- levels from -5 to 100, every state ` +
-            `index -- runs [${infV.toFixed(4)}, ${supV.toFixed(4)}], because the function clamps its own ` +
-            `level to [0,1] in BOTH halves of the kit and its heaviest state weight is 1.00. So energy tops ` +
-            `out at ${gain} x ${supV.toFixed(4)} = ${(gain * supV).toFixed(4)} against a ceiling of ${hi}, a ` +
-            `margin of ${(hi / (gain * supV)).toFixed(2)}x, and bottoms at ${(gain * infV).toFixed(4)} ` +
-            `against a floor of ${lo}. THIS IS WHY THE TWO COEFFICIENTS COULD BE FOLDED INTO ONE: 0.95*${gain} ` +
-            `+ 0.35 = ${(0.95 * gain + 0.35).toFixed(4)} is the voice coefficient of the WHOLE factor only ` +
-            `while energy is a linear function of voice, and the clamp is the one thing that could make it ` +
-            `not be. Measured, because "it probably never gets that loud" is not an argument about a bound.`);
-
-        // ...and the folded coefficient in the shader IS that number, for tempest and for nebula alike.
-        const folded = /const mistKV = \(species === "" \? 0\.85 \* 0\.95 : 0\) \+ 0\.35;/.test(src);
-        ok("!! ...and nebula gets 0.35 while tempest gets 1.1575, because nebula's energy is the constant zero",
-            folded && Math.abs((0.95 * gain + 0.35) - 1.1575) < 1e-12,
-            `the shader folds the coefficient at BUILD time with the same ternary that decides whether energy ` +
-            `exists at all, so the two species get ${(0.95 * gain + 0.35).toFixed(4)} and 0.3500. Folding it ` +
-            `unconditionally would have given nebula a voice term murmur does not give it -- nebula.ts has no ` +
-            `energy at all, and 0.95 times a constant zero is a term that should not appear rather than a ` +
-            `term that evaluates to nothing.`);
-    }
+    // *** THIS BLOCK'S SUBJECT MOVED AT v4663, AND SO DID THE CLAMP IT WAS ABOUT. *** Until that round
+    // tempest's energy was clamp(0.85 * VOICE, 0, 1.6) and the two clouds' drift factors were FOLDED into
+    // one voice coefficient -- 0.95*0.85 + 0.35 for tempest, 0.35 for nebula -- which is only the same
+    // function while the clamp never bites, so this gate proved it never did over mh_live's whole domain.
+    //
+    // tempest.ts's energy is 0.85*live.pace + 0.65*think + 0.55*st.drive. The coefficient was right and the
+    // INPUT was not, so there is no voice fold left to prove anything about, and the clamp question has to
+    // be asked again of three terms that SUM TO 2.05 against a 1.6 ceiling -- an argument that does not
+    // survive its own repair. tools/ship/murmurCadence-selfcheck.mjs section 1 re-derives it: the maximum
+    // is 1.500, and the reason is structural rather than arithmetic.
+    //
+    // WHAT IS LEFT HERE IS WHAT THIS GATE UNIQUELY OWNS: that the old spelling is gone, and that the two
+    // clouds' factors are per-species rather than one expression with a build-time constant in it.
+    const N2 = K.MH_MIST.nebula, T2 = K.MH_MIST.tempest;
+    ok("!! *** THE VOICE FOLD IS GONE, and with it the coefficient this gate spent two rounds proving inert ***",
+        !/clamp\(VOICE\.mul\(0\.85\), 0\.0, 1\.6\)/.test(src) && !/const mistKV = /.test(src) &&
+        /clamp\(PACE\.mul\(TE\.pace\)\.add\(think\.mul\(TE\.think\)\)\.add\(DRIVE\.mul\(TE\.drive\)\)/.test(src) &&
+        T2.drEnergy > 0 && N2.drVoice > 0 && N2.drEnergy === 0 && T2.drVoice === 0,
+        `the shader no longer spells clamp(0.85 * VOICE, 0, 1.6) and no longer folds a mistKV, because ` +
+        `tempest's energy was never voice: tempest.ts reads ${K.MH_TEMPEST_ENERGY.pace}*live.pace + ` +
+        `${K.MH_TEMPEST_ENERGY.think}*think + ${K.MH_TEMPEST_ENERGY.drive}*st.drive. nebula's drift factor ` +
+        `carries ${N2.drPace}*pace + ${N2.drVoice}*voice + ${N2.drDrive}*drive and tempest's carries ` +
+        `${T2.drEnergy}*energy, each coefficient non-zero for exactly one of the two. *** THIS GATE PROVED ` +
+        `THE OLD CLAMP INERT OVER 78 POINTS OF mh_live's DOMAIN AND THE PROOF WAS ABOUT THE WRONG SIGNAL. *** ` +
+        `It was a correct proof of a true statement about an expression that should not have existed, which ` +
+        `is the most expensive kind of green row there is: it made the wrong input look deliberate. The ` +
+        `clamp question is re-asked of the right three terms in murmurCadence section 1, where the answer ` +
+        `is 1.500 against 1.6 because THINKING and RESPONDING are different states.`);
 }
 
 // =============================================================================================================
@@ -274,10 +264,24 @@ sec("4. *** helix's CLIMB: TWO OF murmur's NUMBERS THAT WERE NOT ABSENT BY DESIG
         //                            the finished phase rather than living in a coefficient.
         // The first draft of this row knew only the first shape and went red on aura -- a correct subject,
         // which is the tell. Both spellings are here because both are in the file and both are right.
+        // *** A SECULAR ARGUMENT MAY BE A BINDING, AND v4663 MADE ONE. *** The two clouds need DIFFERENT
+        // integral pairs -- nebula's middle slot carries voice and tempest's carries the THINK integral --
+        // so the call is chosen by a build-time conditional and handed to mhDriftPhase as a local const.
+        // This census demanded the call INLINE and reported the site as "NEITHER" on a correct file. It
+        // resolves a bare identifier to its own definition now and requires EVERY mhRatePhase inside it to
+        // carry the base, so a conditional that got one branch right and one wrong is still red.
+        const resolve = (arg) => {
+            if (!/^[A-Za-z_]\w*$/.test(arg || "")) return arg || "";
+            const m = new RegExp("const\\s+" + arg + "\\s*=\\s*([\\s\\S]*?);\\n").exec(src);
+            return m ? m[1] : arg;
+        };
         const mm = /^([A-Za-z_]\w*)\.mul\(([\s\S]*)\)$/.exec(args[1] || "");
         if (mm) {
-            const viaCoeff = new RegExp("^KIT\\.mhRatePhase\\(\\s*" + mm[1] + "\\s*,").test(args[0] || "");
-            const viaPhase = new RegExp("\\.mul\\(\\s*" + mm[2].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\)$").test(args[0] || "");
+            const sec0 = resolve(args[0]);
+            const calls = sec0.match(/KIT\.mhRatePhase\(\s*[A-Za-z_]\w*/g) || [];
+            const viaCoeff = calls.length > 0 &&
+                calls.every((c) => new RegExp("KIT\\.mhRatePhase\\(\\s*" + mm[1] + "$").test(c));
+            const viaPhase = new RegExp("\\.mul\\(\\s*" + mm[2].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\)$").test(sec0);
             pairs.push({ base: mm[1], how: viaCoeff ? "coefficients" : viaPhase ? "whole phase" : "NEITHER", ok: viaCoeff || viaPhase });
         }
     }
@@ -338,17 +342,22 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
             for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d) n++; if (d > mx) mx = d; }
             return { pct: 100 * n / a.length, mx }; };
         const tV = diff(run.frames[0], run.frames[1]);
+        const tP = diff(run.frames[0], run.frames[5]), tD = diff(run.frames[0], run.frames[6]);
         const hD = diff(run.frames[2], run.frames[3]);
         const hP = diff(run.frames[2], run.frames[4]);
         say(`tempest voiceInt 0 -> 14: ${tV.pct.toFixed(1)}% of bytes move, worst channel ${tV.mx}`);
         const fP = diff(run.frames[8], run.frames[9]);
         say(`helix   driveInt 0 -> 14: ${hD.pct.toFixed(1)}%, worst ${hD.mx}   |   helix paceInt 0 -> 9: ${hP.pct.toFixed(1)}%, worst ${hP.mx}`);
         say(`flux    paceInt  0 -> 14: ${fP.pct.toFixed(1)}% of bytes move, worst channel ${fP.mx}`);
-        ok("!! *** THE CLOUD MOVES ON voiceInt, THE STREAM ON paceInt AND THE STRANDS ON BOTH OF helix's -- WITH EVERY INSTANTANEOUS SIGNAL FIXED ***",
-            tV.pct > 5 && tV.mx > 50 && hD.pct > 5 && hD.mx > 50 && hP.pct > 5 && hP.mx > 50 &&
+        ok("!! *** THE CLOUD MOVES ON paceInt, THE STREAM ON paceInt AND THE STRANDS ON BOTH OF helix's -- WITH EVERY INSTANTANEOUS SIGNAL FIXED ***",
+            tP.pct > 5 && tP.mx > 50 && hD.pct > 5 && hD.mx > 50 && hP.pct > 5 && hP.mx > 50 &&
             fP.pct > 5 && fP.mx > 50,
-            `fourteen radian-seconds of accumulated voice -- what about a half-minute of somebody talking ` +
-            `produces -- moves ${tV.pct.toFixed(1)}% of tempest's bytes, worst channel ${tV.mx} of 255. ` +
+            `*** tempest's HALF OF THIS ROW SWEPT voiceInt UNTIL v4663 AND NOW SWEEPS paceInt, because the ` +
+            `port had its energy reading the microphone where tempest.ts reads the cadence, a THINKING ` +
+            `indicator and the lean. *** Fourteen radian-seconds of accumulated CADENCE move ` +
+            `${tP.pct.toFixed(1)}% of tempest's bytes, worst channel ${tP.mx} of 255, and the same sweep of ` +
+            `accumulated VOICE now moves ${tV.pct.toFixed(1)}% -- this gate's positive and its negative for ` +
+            `tempest have exchanged places, which is what happens when the input was wrong and not the wiring. ` +
             `helix's strands move ${hD.pct.toFixed(1)}% on the drive integral and ${hP.pct.toFixed(1)}% on ` +
             `the pace integral, and BOTH HAD TO BE MEASURED SEPARATELY: a climb wired to one of murmur's two ` +
             `coefficients and not the other passes a row that sweeps them together. flux's stream moves ` +
@@ -363,7 +372,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         // a drive term and no voice -- so each species has to be DEAF to the integrals murmur does not give
         // it, and that is a thing a frame can show. It is also the row that catches the easiest wrong repair
         // there is: folding all three integrals into one accumulated "activity" and sending it everywhere.
-        const tP = diff(run.frames[0], run.frames[5]), tD = diff(run.frames[0], run.frames[6]);
+
         const hV = diff(run.frames[2], run.frames[7]);
         const fV = diff(run.frames[8], run.frames[10]), fD = diff(run.frames[8], run.frames[11]);
         // *** tempest's DRIVE PAIR LEFT THIS ROW AT v4662 AND IT LEFT AS A POSITIVE, NOT AS AN EXCUSE. ***
@@ -376,12 +385,14 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest driveInt 0 -> 14: ${tD.pct.toFixed(1)}% (the v4662 ADVECTION, not the drift)   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
         say(`flux    voiceInt 0 -> 14: ${fV.pct.toFixed(1)}%   flux driveInt 0 -> 14: ${fD.pct.toFixed(1)}%`);
         ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: four sweeps, zero bytes ***",
-            tP.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0,
-            `the SAME fourteen radian-seconds that move ${tV.pct.toFixed(1)}% of tempest on voiceInt move ` +
-            `${tP.pct.toFixed(0)} bytes on paceInt, and the same sweep ` +
+            tV.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0,
+            `the SAME fourteen radian-seconds that move ${tP.pct.toFixed(1)}% of tempest on paceInt move ` +
+            `${tV.pct.toFixed(0)} bytes on VOICEint -- the signal this port wrongly had it reading until ` +
+            `v4663 -- and the same sweep ` +
             `that moves ${hD.pct.toFixed(1)}% of helix on driveInt moves ${hV.pct.toFixed(0)} bytes on ` +
             `voiceInt, and flux moves ${fV.pct.toFixed(0)} and ${fD.pct.toFixed(0)} bytes on the two it does ` +
-            `not read. nebula.ts and tempest.ts scale their drift by voice alone; flux.ts scales its stream ` +
+            `not read. nebula.ts scales its drift by pace, voice and drive; tempest.ts by an ENERGY that ` +
+            `holds no voice at all; flux.ts scales its stream ` +
             `by pace alone; helix.ts scales its climb by pace and drive alone. *** IT WAS FIVE SWEEPS UNTIL ` +
             `v4662 AND THE FIFTH IS NOW A POSITIVE ROW INSTEAD: *** tempest's drift is still deaf to drive, ` +
             `but tempest the SPECIES is not, because that round wired the advection nebula.ts and tempest.ts ` +

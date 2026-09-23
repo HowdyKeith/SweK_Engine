@@ -61,7 +61,7 @@ export const ORB_KNOBS = Object.freeze([
     // because its lane and slot are style constants and the envelope is therefore a function of the clock
     // this host already keeps. See render/aiPresenceOrbState.mjs, which explains why the record that called
     // that impossible was wrong.
-    "paceDriveInt", "voiceDriveInt", "duetFlourishInt",
+    "paceDriveInt", "voiceDriveInt", "duetFlourishInt", "thinkInt",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
@@ -134,7 +134,8 @@ export const ORB_COLORS = Object.freeze({
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE,
-         MH_OPAL_DRIFT, MH_GEODE_SPIN, mhGeodeSpinDrive, MH_ADVECT_SIGN, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_OPAL_DRIFT, MH_GEODE_SPIN, mhGeodeSpinDrive, MH_ADVECT_SIGN, MH_ADVECT_WARP,
+         MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -194,7 +195,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
     const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, paceDriveInt: 0, voiceDriveInt: 0, duetFlourishInt: 0,
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, paceDriveInt: 0, voiceDriveInt: 0, duetFlourishInt: 0, thinkInt: 0,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
@@ -391,7 +392,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                      amp: DRIVE.mul(HEAD.k),
                      phase: KIT.mhDrift(uniforms.time, float(2.05), float(0.30), float(7.0)).negate() };
         })() : null;
-        const bodyV = KIT.mhBody(uvM, uniforms.time, float(0.004), shapeAmp, float(0.0), shapeGain,
+        // *** droplet's TREMOR IS THE CADENCE, AND THIS IS THE THIRD MECHANISM THE KIT CARRIED WITH NOTHING
+        // SETTING IT -- v4663. *** droplet.ts: mh_shape(wob, 0.012 * live.pace * tremGate, 3.30). Both halves
+        // of this port's kit have taken mh_shape's tremor argument since the port began and EVERY call site
+        // passed 0.0, exactly as mhDeform's flow did before v4653 and mh_live's conditioning before v4641.
+        // The gate for it is a source census, because a mechanism nothing invokes is invisible to every
+        // pixel row ever written about the species.
+        //
+        // tremGate is murmur's own anti-alias guard, mh_aa(2*pi*6.9 / MH_R, size, pixelScale) * (1 - small):
+        // a 6.9-cycle ripple is under a pixel on a small badge, so it eases to nothing rather than aliasing.
+        // AN AMPLITUDE AND NOT A CLOCK, so the instantaneous cadence is exactly right here and there is
+        // nothing to integrate -- which is worth saying in a round that spent four predecessors integrating.
+        //
+        // THE GATE IS FOLDED AT BUILD TIME, like KIT_AA beside it: mh_small is a function of the frame
+        // size and the pixel scale, both of which this file compiles for rather than varies, so
+        // (1 - small) is a constant here and not a node. It is spelled through the kit's own mhSmall so
+        // that the one place the badge size is decided stays the one place.
+        const dropletTrem = species === "droplet"
+            ? PACE.mul(MH_DROPLET_TREM * KIT_AA(6.9) * (1 - mhSmall(120, 120))).toVar()
+            : float(0.0).toVar();
+        const bodyV = KIT.mhBody(uvM, uniforms.time, float(0.004), shapeAmp, dropletTrem, shapeGain,
                                  DROPLET_FLOW ? DROPLET_FLOW.dir : vec3(0.0, 0.0, 1.0),
                                  DROPLET_FLOW ? DROPLET_FLOW.amp : float(0.0),
                                  DROPLET_FLOW ? DROPLET_FLOW.phase : float(0.0), dP, dN).toVar();
@@ -1053,11 +1073,44 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // collection": it raises the churn, quickens the weather AND shortens both flicker slots at once.
         // This port has no state machine (mh_state/mh_live are not ported and the port runs as idle), so the
         // only live input it can honour is voice -- which is named here rather than quietly dropped.
-        const energy = species === "tempest" ? clamp(VOICE.mul(0.85), 0.0, 1.6).toVar() : float(0.0).toVar();
+        // *** tempest's ENERGY WAS READING THE WRONG SIGNAL ALTOGETHER -- v4663. *** tempest.ts:
+        // energy = clamp(0.85*live.pace + 0.65*think + 0.55*st.drive, 0, 1.6), with `think` read DIRECTLY
+        // off the state index because "THINKING IS THIS SPECIES' HOME STATE ... a storm that rises while the
+        // assistant thinks is the whole concept". This port spelled clamp(0.85*VOICE, 0, 1.6): the
+        // coefficient was right and the input was not, so the storm rose when somebody SPOKE and did nothing
+        // at all while the assistant thought. It reaches the fold, the drift, both bolt slots and the
+        // flicker, so all four have been driven by the wrong number since tempest was ported.
+        const TE = MH_TEMPEST_ENERGY;
+        const think = species === "tempest"
+            ? select(uniforms.stateIndex.greaterThan(1.5).and(uniforms.stateIndex.lessThan(2.5)),
+                     float(1.0), float(0.0)).toVar()
+            : float(0.0).toVar();
+        const energy = species === "tempest"
+            ? clamp(PACE.mul(TE.pace).add(think.mul(TE.think)).add(DRIVE.mul(TE.drive)), 0.0, TE.cap).toVar()
+            : float(0.0).toVar();
+        // *** energy's INTEGRAL IS NOT BUILT HERE, AND THE FIRST DRAFT OF THIS ROUND BUILT IT AND LEFT IT
+        // UNUSED. *** The two secular sites -- the drift and the two bolt slots -- each spell their own
+        // mhRatePhase call with energy's three coefficients folded into the three pairs, because each has a
+        // different BASE and mhRatePhase multiplies the base through. A shared `energyInt` node would have
+        // had to be divided back out at both, so it was written, needed nowhere, and sat as dead code until
+        // tools/ship/murmurClock3-selfcheck.mjs counted three integral reads outside a phase call instead of
+        // one. THAT IS THE DEFECT THIS WHOLE ROUND IS ABOUT -- a mechanism nobody invokes -- committed by
+        // the round itself, and caught by a row the round before it wrote.
+        //
+        // The clamp is inert for the new terms and it is re-checked rather than inherited: 0.85 + 0.65 +
+        // 0.55 is 2.05, ABOVE the 1.6 cap, so the old margin does not carry over. See section 1 of
+        // tools/ship/murmurCadence-selfcheck.mjs, which finds the maximum is 1.500 and says why.
         const mScale = float(MIST.scale).mul(mix(float(1.0), float(MIST.small), smallK)).toVar();
         const mWarp = float(MIST.warp).mul(mix(float(1.0), float(0.60), smallK)).toVar();
-        const mFold = float(MIST.foldB).add(foldK.mul(MIST.foldK)).mul(float(1.0).add(energy.mul(0.85)))
-            .mul(mix(float(1.0), float(0.55), smallK)).toVar();
+        // *** THE FOLD TAKES ITS OWN SPECIES' SIGNAL, AND THE TWO ARE NOT THE SAME SIGNAL -- v4663. ***
+        // nebula.ts: (0.30 + 0.70*foldK) * (1 + 0.75*live.pace) * mix(1, 0.55, small)
+        // tempest.ts: (0.42 + 0.80*churnK) * (1 + 0.85*energy) * mix(1, 0.50, small)
+        // The bases were already per-species in MH_MIST; the live coefficient and the small mix were not,
+        // and the port carried one literal 0.55 for both. An AMPLITUDE at both sites, so both read the
+        // instantaneous signal and neither has anything to integrate.
+        const mFold = float(MIST.foldB).add(foldK.mul(MIST.foldK))
+            .mul(float(1.0).add(PACE.mul(MIST.foldPace)).add(energy.mul(MIST.foldEnergy)))
+            .mul(mix(float(1.0), float(MIST.foldSmall), smallK)).toVar();
         // *** THE OUTPUT-MULTIPLIED CLOCK, INTEGRATED -- v4655. *** murmur scales the WHOLE drift result by
         // (1 + ...), which scales the secular term and the wobble alike. Only the secular one grows without
         // limit, so the repair puts the signal integrals there and leaves the wobble's amplitude reading the
@@ -1070,12 +1123,30 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // level, so energy reaches 0.849 and the clamp NEVER bites -- measured, not assumed, because a live
         // clamp would make the integral of energy something other than 0.85 times the integral of VOICE and
         // this whole factoring would stop being exact.
+        // *** AND THE DRIFT'S FACTOR IS THE OTHER PLACE THE TWO SPECIES DIVERGE -- v4663. ***
+        // nebula.ts: mh_drift(t, 0.052 + 0.055*foldK, 0.45, 2.0) * (1 + 0.65*pace + 0.35*voice + 0.90*drive)
+        // tempest.ts: mh_drift(t, 0.070 + 0.075*churnK, 0.42, 3.0) * (1 + 0.95*energy)
+        // This port had the VOICE term alone for nebula and an energy term built on voice for tempest, so
+        // nebula's weather ignored the cadence and the lean entirely.
+        //
+        // *** THE MIDDLE PAIR CARRIES A DIFFERENT SIGNAL FOR EACH SPECIES, which is what mhRatePhase's
+        // A/B/C parameter names are for. *** v4657 renamed them off pace/voice/drive precisely so a caller
+        // could spend a slot on something else -- duet spends the middle one on its own gesture envelope --
+        // and here nebula spends it on VOICE while tempest spends it on the THINK integral. Folding both
+        // into one four-pair signature would make every other caller pass a zero, and a coefficient of zero
+        // grades nothing.
+        const isTmp = species === "tempest";
         const mistBase = float(MIST.drB).add(foldK.mul(MIST.drK)).toVar();
-        const mistKV = (species === "tempest" ? 0.85 * 0.95 : 0) + 0.35;
-        const mDrFactor = float(1.0).add(energy.mul(0.95)).add(VOICE.mul(0.35)).toVar();
-        const mDr = KIT.mhDriftPhase(
-            KIT.mhRatePhase(mistBase, uniforms.time, float(0.0), uniforms.paceInt,
-                float(mistKV), uniforms.voiceInt, float(0.0), uniforms.driveInt),
+        const mDrFactor = float(1.0).add(PACE.mul(MIST.drPace)).add(VOICE.mul(MIST.drVoice))
+            .add(DRIVE.mul(MIST.drDrive)).add(energy.mul(MIST.drEnergy)).toVar();
+        const mDrSecular = isTmp
+            ? KIT.mhRatePhase(mistBase, uniforms.time,
+                float(MIST.drEnergy * MH_TEMPEST_ENERGY.pace), uniforms.paceInt,
+                float(MIST.drEnergy * MH_TEMPEST_ENERGY.think), uniforms.thinkInt,
+                float(MIST.drEnergy * MH_TEMPEST_ENERGY.drive), uniforms.driveInt)
+            : KIT.mhRatePhase(mistBase, uniforms.time, float(MIST.drPace), uniforms.paceInt,
+                float(MIST.drVoice), uniforms.voiceInt, float(MIST.drDrive), uniforms.driveInt);
+        const mDr = KIT.mhDriftPhase(mDrSecular,
             mistBase.mul(mDrFactor), float(0.45), float(MIST.drLane), uniforms.time).toVar();
         // *** THE ADVECTION, AND IT IS THE LAST `wired: false` IN MH_DRIVE_HEADING -- v4662. *** nebula and
         // tempest do not point a path at the heading the way still and abyss do: they carry the whole CLOUD
@@ -1106,22 +1177,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // clamp(0.85*VOICE, 0, 1.6) and the clamp is inert by 1.88x, so 1.30 * 0.85 is a constant and the
         // slot count is an exact integral. nebula keeps its fixed 7.2 s slot and the PLAIN clock, because a
         // slot that does not move has no index to re-roll and migrating it would move a frame for nothing.
+        // *** AND THE SLOT DIVISOR'S COEFFICIENTS FOLLOW THE SAME REPAIR. *** v4656 folded them at build
+        // time on the strength of energy = 0.85*VOICE, so MH_SLOT_SIGNAL.tempest carried its whole weight on
+        // voice. energy is 0.85*pace + 0.65*think + 0.55*drive, so the slot COUNT integrates against those
+        // three: count = (1/SLOT) * (t + 1.30 * integral of energy).
         const SLT = MH_SLOT_SIGNAL.tempest;
-        const mistRate = float(1.0).div(float(1.0).add(energy.mul(1.30))).toVar();
+        const mistRate = float(1.0).div(float(1.0).add(energy.mul(SLT.k))).toVar();
         // The two lanes are spelled out rather than built by a helper: tools/ship/murmurGesture-selfcheck.mjs
         // reads these call sites to check that the slot COUNT integrates against a style base while the
         // LENGTH carries the live signal, and a census cannot see through a closure.
         const flA = species === "tempest"
             ? KIT.mhFlourishPhase(
                 KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[0].slot)), uniforms.time,
-                    float(SLT.pace), uniforms.paceInt, float(SLT.voice), uniforms.voiceInt,
+                    float(SLT.pace), uniforms.paceInt, float(SLT.think), uniforms.thinkInt,
                     float(SLT.drive), uniforms.driveInt),
                 float(MH_TEMPEST_BOLT.lanes[0].slot).mul(mistRate),
                 float(MH_TEMPEST_BOLT.lanes[0].seed)).toVar()
             : KIT.mhFlourish(uniforms.time, float(3.0), float(7.2)).toVar();
         const flB = KIT.mhFlourishPhase(
             KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[1].slot)), uniforms.time,
-                float(SLT.pace), uniforms.paceInt, float(SLT.voice), uniforms.voiceInt,
+                float(SLT.pace), uniforms.paceInt, float(SLT.think), uniforms.thinkInt,
                 float(SLT.drive), uniforms.driveInt),
             float(MH_TEMPEST_BOLT.lanes[1].slot).mul(mistRate),
             float(MH_TEMPEST_BOLT.lanes[1].seed)).toVar();
@@ -1146,7 +1221,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const pM = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
             const fade = KIT.mhInside(pM).toVar();
             // THE FOLD: one noise displaces the coordinates the next is read at.
-            const w = KIT.mhNoise3(pM.add(adv).mul(mWarp).add(vec3(0.0, mDr.mul(0.70), mDr))).toVar();
+            // *** THE WARP TAKES HALF THE ADVECTION AND v4662 GAVE IT ALL OF IT. *** Both cloud sources
+            // spell the two lookups differently -- `- adv * 0.5` for the warp, `- adv` for the density --
+            // and the warp is the noise that DISPLACES the coordinates the density is read at, so carrying
+            // the two at one speed would stream the fold without deforming it. See MH_ADVECT_WARP.
+            const w = KIT.mhNoise3(pM.add(adv.mul(MH_ADVECT_WARP)).mul(mWarp).add(vec3(0.0, mDr.mul(0.70), mDr))).toVar();
             const q = pM.add(adv).mul(mScale)
                 .add(w.mul(mFold).mul(species === "tempest" ? vec3(0.90, -0.62, 0.68) : vec3(0.92, -0.58, 0.71)))
                 .add(vec3(0.0, 0.0, mDr)).toVar();
@@ -1253,8 +1332,25 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // IN-PLANE direction, which is exactly the direction of the shell's limb there: an approximation
             // away from the limb and exact AT it, which is the right place for the error to be.
             const limbDir = normalize(vec3(P.x, P.y, 0.02).add(1e-5)).toVar();
-            const ANG = FA.shells.map((sh) =>
-                KIT.mhDrift(uniforms.time, float(sh.rate), float(sh.wob), float(sh.lane)).toVar());
+            // *** fathom's THREE SHELLS SHARE ONE SPEED FACTOR AND THIS PORT HAD NONE OF IT -- v4663. ***
+            // fathom.ts: sp = (1 + 0.85*live.pace + 1.10*st.drive), then a0 = mh_drift(t, 0.085*sp, ...),
+            // a1 = mix(mh_drift(t, -0.062*sp, ...), a0, st.drive*0.7) and a2 likewise. The nest turned at one
+            // fixed speed here whatever the orb was doing.
+            //
+            // *** ONLY a0 IS WIRED IN THIS ROUND, AND THE REASON IS ARITHMETIC RATHER THAN APPETITE. ***
+            // a0's rate is a clean SUM, which mhRatePhase integrates exactly. a1 and a2 are MIXES by
+            // st.drive*0.7, so with sp moving their secular term carries integrals of pace*drive -- which
+            // the host sends -- AND of drive SQUARED, which it does not. Folding sp into those two without
+            // the cross terms would be murmur's number at drive 0 and drive 1 and nobody's in between,
+            // which is every frame of the ramp. See MH_FATHOM_SP and tools/ship/nextRounds.mjs.
+            const spF = float(1.0).add(PACE.mul(MH_FATHOM_SP.pace)).add(DRIVE.mul(MH_FATHOM_SP.drive)).toVar();
+            const ANG = FA.shells.map((sh, k) => k === 0
+                ? KIT.mhDriftPhase(
+                    KIT.mhRatePhase(float(sh.rate), uniforms.time,
+                        float(MH_FATHOM_SP.pace), uniforms.paceInt, float(0.0), uniforms.voiceInt,
+                        float(MH_FATHOM_SP.drive), uniforms.driveInt),
+                    float(sh.rate).mul(spF), float(sh.wob), float(sh.lane), uniforms.time).toVar()
+                : KIT.mhDrift(uniforms.time, float(sh.rate), float(sh.wob), float(sh.lane)).toVar());
             const AX = ANG.map((a) => normalize(vec3(cos(a), 0.42, sin(a))).toVar());
             const R0 = min(float(FA.shells[0].base).add(layersK.mul(FA.shells[0].rk)).mul(spanK), float(FA.rCap)).toVar();
             const RAD = FA.shells.map((sh, k) => k === 0 ? R0

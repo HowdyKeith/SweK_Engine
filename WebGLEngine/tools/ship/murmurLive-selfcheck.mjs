@@ -213,13 +213,20 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // turns it plus the elapsed tau into four windows. The row names BOTH call sites in full rather than
     // loosening the count to "at most a few", which is how a census stops being one.
     ok("!! *** THE FOUR RAW LIVE UNIFORMS REACH NO SPECIES: TWO CONDITIONING CALLS ARE THEIR ONLY READERS ***",
-        rawV === 1 && rawA === 1 && rawS === 2 && rawT === 1 &&
+        rawV === 1 && rawA === 1 && rawS === 4 && rawT === 1 &&
         /KIT\.mhLive\(uniforms\.voice,\s*uniforms\.activity,\s*uniforms\.stateIndex\)/.test(src) &&
-        /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src),
+        /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
+        /uniforms\.stateIndex\.greaterThan\(1\.5\)\.and\(uniforms\.stateIndex\.lessThan\(2\.5\)\)/.test(src),
         `uniforms.voice ${rawV}, uniforms.activity ${rawA}, uniforms.stateIndex ${rawS}, uniforms.stateTau ` +
-        `${rawT}; the readers are ${callLine} and ${stLine} -- so there is no second path by which a raw level ` +
-        `could reach a species. Before v4641 the voice count was 44 and there was no activity knob at all; ` +
-        `before v4644 there was no stateTau and stateIndex was read once.`);
+        `${rawT}; the readers are ${callLine} and ${stLine} -- so there is no second path by which a raw ` +
+        `LEVEL could reach a species. *** stateIndex IS FOUR NOW AND THE OTHER TWO ARE ONE SPECIES READING ` +
+        `THE STATE DIRECTLY, WHICH murmur DOES ON PURPOSE. *** tempest.ts: "THINKING IS THIS SPECIES' HOME ` +
+        `STATE, so it is read directly rather than through mh_state, which only designs success and ` +
+        `responding", and the two reads are the two halves of its (stateIndex > 1.5 && stateIndex < 2.5) ` +
+        `window. The row asserts that exact expression rather than widening the count, because a census ` +
+        `that answers a surprise by loosening its bound has stopped being one -- the state INDEX is not a ` +
+        `level and no species reads voice or activity raw. Before v4641 the voice count was 44 and there ` +
+        `was no activity knob at all; before v4644 there was no stateTau and stateIndex was read once.`);
 
     // *** THIS CENSUS COUNTED ITS OWN PROSE UNTIL v4644, AND ITS RECORDED NUMBER WAS ONE TOO HIGH BECAUSE OF
     // IT. *** The counts ran over the raw file, so a COMMENT naming VOICE scored as a reader -- and one did,
@@ -232,11 +239,16 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 14 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 14,
+    ok("!! the conditioned pair is declared once each and read 41 and 19 times, counting CODE and not comments",
+        decl === 2 && readV === 41 && readP === 19,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
         `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
-        `-- and then DOWN by one at v4662, which is the first time this count has fallen and is a REPAIR ` +
+        `-- and then DOWN by one at v4662 and UP BY FIVE at v4663, which took four of the five builders ` +
+        `that had no cadence at all: droplet's tremor amplitude, nebula's fold and drift, tempest's energy ` +
+        `and fathom's speed factor. THE VOICE COUNT FELL BY ONE IN THE SAME ROUND AND THAT IS THE ROUND'S ` +
+        `HEADLINE: tempest's energy read VOICE where tempest.ts reads pace, a THINKING indicator and drive, ` +
+        `so a voice reader was removed because it should never have been one. The v4662 fall was a REPAIR ` +
+        `too and is the first time this count had fallen: ` +
         `rather than a regression: sol's granulation read the instantaneous cadence and multiplied it by ` +
         `elapsed time, which jumps by t*dPace whenever the cadence moves -- 270.0 units of noise space in ` +
         `one frame after half an hour, measured. A SECULAR PHASE MUST READ THE INTEGRAL AND NOT THE SIGNAL, ` +
@@ -309,22 +321,32 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
     say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
-    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES TWELVE -- the five builders still without one are named ***",
-        paced.length === 12 &&
-        ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix", "still", "abyss", "duet"].every((x) => paced.includes(x)) &&
-        unpaced.length === (marks.length - 1) - 12,
-        `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
-        `${unpaced.join(", ")} -- five builders covering six species, since mist draws both nebula and ` +
-        `tempest. duet arrives at v4657: its orbital rate reads 0.55*live.pace beside the gesture term this ` +
-        `port already had, so the pair sped up for its own flourish and ignored the exchange. still and ` +
-        `abyss arrived at v4656 through their GESTURE SLOTS, which murmur divides by the ` +
-        `signal sum: still's carried no divisor at all and abyss's carried the voice term alone. helix ` +
-        `arrived at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
-        `this port carried the bare drift, so its strands rose at one speed whatever the exchange was doing. ` +
-        `comet and limn arrived at v4654 -- comet's orbital rate was reading VOICE where murmur reads ` +
-        `live.pace and its closure never touched the cadence at all, and limn had the smaller of murmur's two ` +
-        `terms and not the larger. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN. It is a count of what this ` +
-        `port has reached and it goes red when that count moves, in either direction.`);
+    // *** THIS ROW'S SUBJECT NARROWED AT v4663, AND NARROWING IT IS THE REPAIR. *** It counted builders
+    // matching \bPACE\b and called that "has murmur's cadence", which was the same question until v4662
+    // moved opal's cadence onto the pace INTEGRAL -- a secular site cannot read the instantaneous signal and
+    // be correct, so the count reported opal cadence-less on the round after opal got one. Widening the
+    // match here would put a second copy of that census in a second file, and two gates with their own copy
+    // of one definition is the failure this tree has repaired in its own records three times over.
+    //
+    // So this row asks the question it can answer exactly -- which builders read the CONDITIONED SIGNAL
+    // ITSELF -- and tools/ship/murmurCadence-selfcheck.mjs owns the whole-cadence question, coefficients
+    // and integrals included. The two are different facts and the split is by subject, not by convenience:
+    // an instantaneous reader is an AMPLITUDE site and an integral reader is a CLOCK, which is the
+    // distinction the entire v4654-v4663 arc turns on.
+    const INSTANT = ["still", "limn", "comet", "abyss", "mist", "fathom", "arc", "sol",
+                     "aura", "flux", "duet", "chorus", "prism", "helix"];
+    ok("!! *** FOURTEEN BUILDERS READ THE CONDITIONED CADENCE ITSELF -- the amplitude sites, named exactly ***",
+        paced.length === INSTANT.length && INSTANT.every((x) => paced.includes(x)) &&
+        paced.every((x) => INSTANT.includes(x)),
+        `${paced.length}: ${paced.join(", ")}. NOT IN THIS LIST AND NOT WITHOUT A CADENCE: opal, whose ` +
+        `flash drift reads the pace INTEGRAL since v4662 because it is a clock, and geode, which has no ` +
+        `cadence at all -- its spin is a mix and folding murmur's sp in without an integral of drive ` +
+        `SQUARED would be wrong at every partial drive. tools/ship/murmurCadence-selfcheck.mjs holds that ` +
+        `census, reads the coefficient beside each integral, and is where the count of the eighteen lives. ` +
+        `mist, fathom AND sol MOVED IN THIS ROUND: mist and fathom arrived with the cadence and sol LEFT ` +
+        `this list in v4662 and came back -- its granulation reads the integral now and its simmer still ` +
+        `reads the signal. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN; counted in murmur's own eighteen ` +
+        `sources, live.pace appears in all of them.`);
 
     const stillGlint = count(/uniforms\.glintRate\b/g);
     const stillBlk = (() => { const k = marks.findIndex((m) => m[1] === "still");

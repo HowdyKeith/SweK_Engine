@@ -26,6 +26,75 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4663 -- the cadence in four builders that had none, and one signal that was simply the wrong signal
+
+**This round went and read murmur.** Every previous round of this arc transcribed from *this tree's own*
+recorded notes, which carry the coefficients for the sites earlier rounds had read. For the five
+cadence-less builders the record held the per-species **counts** and no coefficients at all — so the choice
+was to invent seven numbers or fetch the source. `krispuckett/murmur-web` is public, MIT, and this port's
+upstream; it clones in one command. It also **confirmed v4662's opal coefficients exactly**, which is the
+first independent check this arc's recorded numbers have ever had.
+
+**And it showed the port had tempest's core signal wrong.**
+
+    tempest.ts:  float think  = (stateIndex > 1.5 && stateIndex < 2.5) ? 1.0 : 0.0;
+                 float energy = clamp(0.85 * live.pace + 0.65 * think + 0.55 * st.drive, 0.0, 1.6);
+    this port:   clamp(0.85 * voice, 0.0, 1.6)
+
+The coefficient was right and the **input** was not. tempest.ts puts the reason on the line above: "THINKING
+IS THIS SPECIES' HOME STATE, so it is read directly rather than through `mh_state`, which only designs
+success and responding. A storm that rises while the assistant thinks is the whole concept." So the storm
+rose when somebody *spoke* and did nothing at all while the assistant thought.
+
+Measured on a worktree of v4662, between IDLE and THINKING: **tempest moved 0 of 9,216 bytes.** Its home
+state reached no pixel of it. It now moves 21.5%, worst channel 221 of 255.
+
+`energy` reaches four sites — the fold, the drift, both bolt slot divisors and the flicker — so all four had
+been driven by the microphone. The repair needs a **fourth host accumulator**, `thinkInt`: the drift and the
+slots are secular and read the integral, the fold and the flicker are amplitudes and read the signal itself.
+That is v4654's split applied to a new signal rather than a new idea.
+
+The other four sites, with every reading zero before this round:
+
+| | murmur | at v4662 | after |
+|---|---|---|---|
+| nebula's fold + drift | `(1 + 0.75·pace)`, `(1 + 0.65·pace + 0.35·voice + 0.90·drive)` | 0.0% | **19.7%** |
+| tempest's energy | above | 0.0% | **21.4%** |
+| fathom's `sp` | `(1 + 0.85·pace + 1.10·drive)` | 0.0% | **17.2%** |
+| droplet's tremor | `0.012 · live.pace · tremGate` | 0.0% | **7.0%** |
+
+droplet's is **the third mechanism this kit has carried with every call site passing zero** — after mhDeform's
+flow at v4653 and mh_live's conditioning at v4641. `mh_shape`'s tremor argument has existed in both halves of
+the kit since the port began and was a literal `0.0` everywhere.
+
+**And the source contradicted one v4662 decision.** Both clouds spell their warp lookup with *half* the
+advection and their density lookup with all of it; v4662 wired both at full, and the advection's own gate
+could not tell — it measures that the field moves and the body does not, which is true either way. (The
+*sign* v4662 chose was right: murmur subtracts `adv` from the sample point.)
+
+Fifteen sabotages, **eleven caught on the first pass and four only after rows were added for them**: widening
+the THINK window to catch RESPONDING as well (every row asks whether the term moves; none asked *when*);
+putting fathom's `sp` on its two mix-shaped shells, which is one character and makes fathom answer the cadence
+*more* and wrongly at every partial drive; zeroing the host's `thinkInt` accumulation, which left the gate
+green because its frames set the uniform directly; and the warp's half.
+
+**And the round committed this arc's own defect on its way through** — it built an `energyInt` node, needed it
+nowhere, and left it as dead code. A mechanism nobody invokes, in the round whose subject is mechanisms nobody
+invokes. v4662's integral census counted three reads outside a phase call instead of one and named it.
+
+Six rows in three other gates went red and each was restated rather than budgeted. `murmurClock2`'s and
+`murmurGesture`'s tempest **positive and negative swapped places** — the signal the species answered and the
+signal it was deaf to were exactly the wrong way round. `murmurClock2`'s clamp proof was a correct proof about
+an expression that should not have existed, which is the most expensive kind of green row there is: it made
+the wrong input look deliberate. And `murmurLive`'s cadence census **narrowed** to the instantaneous readers
+it can answer exactly, because widening it would have put a second copy of the new census in a second file.
+
+`tools/ship/murmurCadence-selfcheck.mjs` arrives green at 2,714 ms, so the tree holds 1773 gates.
+
+**What is left of the cadence is one builder, and it needs an accumulator:** geode's spin and fathom's second
+and third shells are mixes by `st.drive · 0.7` with `sp` on both arms, so the secular term carries an integral
+of **drive squared** that the host has never sent. One more accumulator closes all three.
+
 ## v4662 -- the last three places a signal multiplies elapsed time, and a fourth nobody had looked for
 
 v4654 chose to integrate rather than transcribe murmur's `rate * t`. v4655 took the clocks whose whole

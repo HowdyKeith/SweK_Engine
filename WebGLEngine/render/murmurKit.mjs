@@ -718,7 +718,18 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
 export const MH_SLOT_SIGNAL = Object.freeze({
     still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
     abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
-    tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+    // *** tempest's ENTRY WAS BUILT ON THE WRONG SIGNAL AND v4663 REBUILT IT. *** The divisor is
+    // (1 + 1.30 * energy) and v4656 folded it as 1.30 * 0.85 on VOICE, because this port's energy was
+    // 0.85*voice. tempest.ts's energy is 0.85*live.pace + 0.65*think + 0.55*st.drive, so the weight that sat
+    // entirely on voice is distributed across three signals and voice carries NONE of it. `k` is the 1.30
+    // itself, named rather than folded, so the three coefficients below are readable as what they are --
+    // the divisor's weight times each of energy's own terms -- and so the shader's instantaneous divisor
+    // and this table cannot drift apart.
+    //
+    // THE `think` SLOT IS NOT A CONDITIONED SIGNAL and the field is named for it rather than for `voice`,
+    // which is the field mhRatePhase's middle pair will carry for this species. A slot called voice holding
+    // a think coefficient is how a census reads the wrong number and reports it confidently.
+    tempest: Object.freeze({ k: 1.30, pace: 1.30 * 0.85, think: 1.30 * 0.65, voice: 0.00, drive: 1.30 * 0.55 }),
 });
 
 /**
@@ -1312,6 +1323,71 @@ export function mhGeodeSpinDrive(spinRate, to, w) {
  * arithmetic, and V is the same vector the heading family leans toward -- a cloud leaning one way while
  * still and abyss lean the other would be a different design, not a sign convention.
  */
+/**
+ * *** tempest's ENERGY WAS THE WRONG SIGNAL ENTIRELY, FOR AS LONG AS THIS PORT HAS HAD A tempest. ***
+ *
+ * tempest.ts: `energy = clamp(0.85 * live.pace + 0.65 * think + 0.55 * st.drive, 0.0, 1.6)`, and the file
+ * says what it is for in the line above it: "THINKING IS THIS SPECIES' HOME STATE, so it is read directly
+ * rather than through mh_state, which only designs success and responding. A storm that rises while the
+ * assistant thinks is the whole concept."
+ *
+ * THIS PORT SPELLED IT `clamp(0.85 * voice, 0, 1.6)`. The coefficient is right and the SIGNAL is not: the
+ * storm rose when somebody spoke and did nothing at all while the assistant thought, which is the one thing
+ * tempest is about. It reached four sites -- the fold, the drift's whole output, both bolt slot divisors and
+ * the flicker amplitude -- so every one of them has been reading the wrong input.
+ *
+ * *** `think` IS A STATE INDICATOR AND NOT A CONDITIONED SIGNAL, AND IT NEEDS ITS OWN INTEGRAL. *** It is
+ * 1 in THINKING and 0 everywhere else, so it is a square wave the host can accumulate exactly like the
+ * other three -- `thinkInt` is the time spent in THINKING, in shader time. The drift and the slot divisors
+ * are SECULAR and read the integral; the fold and the flicker are instantaneous and read `energy` itself.
+ * That is v4654's split applied to a fourth signal rather than a new idea.
+ */
+export const MH_TEMPEST_ENERGY = Object.freeze({ pace: 0.85, think: 0.65, drive: 0.55, cap: 1.6 });
+
+/** THINKING is murmur's state index 2, read directly -- see MH_TEMPEST_ENERGY. */
+export const MH_THINKING_INDEX = 2;
+
+/**
+ * *** droplet's TREMOR AMPLITUDE IS THE CADENCE, and this port passed a constant. *** droplet.ts:
+ * `mh_shape(wob, 0.012 * live.pace * tremGate, 3.30)` -- the ripple on the drop's surface is proportional
+ * to the cadence and is gated to nothing when it would alias. An AMPLITUDE and not a clock, so there is no
+ * integral here and nothing can teleport: this is a transcription in the plainest sense.
+ */
+export const MH_DROPLET_TREM = 0.012;
+
+/**
+ * *** fathom's AND geode's SHARED `sp`: ONE FACTOR ON EVERY ONE OF THE SPECIES' OWN CLOCKS. ***
+ *
+ * fathom.ts: `sp = (1.0 + 0.85 * live.pace + 1.10 * st.drive)`, then `a0 = mh_drift(t, 0.085 * sp, ...)`.
+ * geode.ts:  `sp = (1.0 + 0.80 * live.pace + 1.00 * st.drive)`, then the spin mix MH_GEODE_SPIN describes.
+ * Neither signal was in this port at all: both species turned at one fixed speed whatever the orb did.
+ *
+ * *** ONLY fathom's FIRST SHELL IS WIRED AT v4663 AND THE REASON IS ARITHMETIC, NOT SCHEDULING. *** a0's
+ * rate is `0.085 * sp` -- a clean SUM of the conditioned signals, which mhRatePhase integrates exactly.
+ * fathom's a1 and a2, and geode's spin, are MIXES of two drifts by `st.drive * 0.7`, and with `sp` moving
+ * the secular term expands to
+ *
+ *     0.085 * sp * (1 + k*d)  =  0.085 * (1 + 0.85p + 1.10d) * (1 + k*d)
+ *
+ * whose last terms are integrals of p*d -- which the host already sends -- and of d SQUARED, which it does
+ * not. That is limn's situation at v4657 exactly, and it costs one more accumulator. It is recorded in
+ * tools/ship/nextRounds.mjs with this expansion rather than approximated here, because an `sp` folded into
+ * the mix without its cross terms is not murmur's number at any partial drive, and partial drive is every
+ * frame of the ramp that RESPONDING is made of.
+ */
+export const MH_FATHOM_SP = Object.freeze({ pace: 0.85, drive: 1.10 });
+export const MH_GEODE_SP = Object.freeze({ pace: 0.80, drive: 1.00 });
+
+/**
+ * *** THE WARP LOOKUP TAKES HALF THE ADVECTION, AND v4662 GAVE IT ALL OF IT. *** nebula.ts and tempest.ts
+ * both spell the two noise reads differently: `mh_noise3(p * warpScale + ... - adv * 0.5)` for the warp and
+ * `p * scale + ... - adv` for the density. The warp is the noise that DISPLACES the coordinates the density
+ * is read at, so carrying it at the same speed as the field it warps would move the two together and the
+ * fold would stream without deforming. v4662 wired both at full and no row could tell -- the advection's
+ * own gate measures that the FIELD moves and the BODY does not, which is true either way.
+ */
+export const MH_ADVECT_WARP = 0.5;
+
 export const MH_ADVECT_SIGN = -1;
 
 /**
@@ -1437,11 +1513,21 @@ export const MH_SHAPE = Object.freeze({
  *   gain          the interior multiplier
  */
 export const MH_MIST = Object.freeze({
+    // *** THE TWO CLOUDS' LIVE COEFFICIENTS ARRIVE AT v4663, AND THEY ARE NOT THE SAME SHAPE. *** nebula's
+    // fold and drift read the three conditioned signals directly; tempest's read its own ENERGY, which is a
+    // signal it builds out of them (see MH_TEMPEST_ENERGY). So the pair share a builder and a table and do
+    // NOT share this: `foldPace` is nebula's and `foldEnergy` is tempest's, and each is 0 in the other.
+    // A shared coefficient with two meanings is how the port ended up reading tempest's energy off voice.
+    // foldSmall differs too -- 0.55 against 0.50 -- and the port carried one literal for both until v4663.
     nebula: Object.freeze({ scale: 2.20, warp: 1.30, small: 0.58, foldB: 0.30, foldK: 0.70,
+                            foldPace: 0.75, foldEnergy: 0.00, foldSmall: 0.55,
+                            drPace: 0.65, drVoice: 0.35, drDrive: 0.90, drEnergy: 0.00,
                             drB: 0.052, drK: 0.055, drLane: 2.0, dLo: -0.20, dHi: 0.30,
                             gLo: 0.30, gK: 0.95, gFar: 0.88, absorb: 3.10, emitB: 0.62, emitK: 0.85,
                             gain: 3.30, voiceE: 0.75 }),
     tempest: Object.freeze({ scale: 2.55, warp: 1.45, small: 0.55, foldB: 0.42, foldK: 0.80,
+                             foldPace: 0.00, foldEnergy: 0.85, foldSmall: 0.50,
+                             drPace: 0.00, drVoice: 0.00, drDrive: 0.00, drEnergy: 0.95,
                              drB: 0.070, drK: 0.075, drLane: 3.0, dLo: -0.12, dHi: 0.46,
                              gLo: 0.26, gK: 0.72, gFar: 0.90, absorb: 3.60, emitB: 0.58, emitK: 0.72,
                              gain: 6.20, voiceE: 0.85 }),

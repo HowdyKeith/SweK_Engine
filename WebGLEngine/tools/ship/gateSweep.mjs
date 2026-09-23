@@ -8070,6 +8070,59 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4663 -- THE 346th CLOSING: the cadence, in four of the five builders that had none -- and tempest's
+    // core signal, which was the wrong signal entirely for as long as this port has had a tempest.
+    since345: Object.freeze({
+        at: "v4663", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurCadence-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,714 ms on this box, 12 rows in six sections over four rendered species. " +
+                 "*** THE ROUND WENT AND READ murmur. *** Every previous round of this arc transcribed from " +
+                 "this tree's own recorded notes, which carry the coefficients for the sites earlier rounds " +
+                 "had read. For these five builders the record held the per-species COUNTS and no " +
+                 "coefficients at all, so the choice was to invent seven numbers or fetch the source. " +
+                 "krispuckett/murmur-web is public and MIT and it is this port's upstream; it was cloned " +
+                 "and the seven sites read off it. IT ALSO CONFIRMED v4662's opal COEFFICIENTS EXACTLY, " +
+                 "which is the first independent check this arc's recorded numbers have had. " +
+                 "*** AND IT SHOWED THE PORT HAD tempest's CORE SIGNAL WRONG. *** tempest.ts: energy = " +
+                 "clamp(0.85*live.pace + 0.65*think + 0.55*st.drive, 0, 1.6), with `think` read DIRECTLY " +
+                 "off the state index because \"THINKING IS THIS SPECIES' HOME STATE ... a storm that rises " +
+                 "while the assistant thinks is the whole concept\". This port spelled clamp(0.85*voice, 0, " +
+                 "1.6): the coefficient right, the INPUT wrong. MEASURED, between IDLE and THINKING on a " +
+                 "worktree of v4662: tempest moved 0 of 9,216 bytes. Its home state reached no pixel of it. " +
+                 "It now moves 21.5%, worst channel 221. " +
+                 "energy is four sites -- fold, drift, both bolt slot divisors, flicker -- so all four had " +
+                 "been driven by the microphone. The repair needs a FOURTH host accumulator, thinkInt, " +
+                 "because the drift and the slots are secular; the fold and the flicker are amplitudes and " +
+                 "read the signal itself, which is v4654's split applied to a new signal. " +
+                 "THE OTHER FOUR SITES: droplet's tremor (0.012 * live.pace * tremGate -- THE THIRD " +
+                 "MECHANISM THIS KIT HAS CARRIED WITH EVERY CALL SITE PASSING ZERO, after mhDeform's flow " +
+                 "at v4653 and mh_live's conditioning at v4641), nebula's fold and drift, and fathom's " +
+                 "speed factor. In pixels, on identical frames: nebula 0.0% -> 19.7%, tempest 0.0% -> " +
+                 "21.4%, fathom 0.0% -> 17.2%, droplet 0.0% -> 7.0%. " +
+                 "*** AND ONE v4662 DEFECT THE SOURCE CONTRADICTED: *** both clouds spell their warp lookup " +
+                 "with HALF the advection and their density lookup with all of it; v4662 wired both at " +
+                 "full, and the advection's own gate could not tell because it measures that the field " +
+                 "moves and the body does not, which is true either way. " +
+                 "FIFTEEN SABOTAGES, ELEVEN CAUGHT ON THE FIRST PASS AND FOUR ONLY AFTER ROWS WERE ADDED " +
+                 "FOR THEM: widening the THINK window to catch RESPONDING as well (every row asks whether " +
+                 "the term moves, none asked WHEN); putting fathom's sp on its two MIX shells, which is one " +
+                 "character and makes fathom answer the cadence MORE and wrongly at every partial drive; " +
+                 "zeroing the host's thinkInt accumulation, which left the gate green because its frames " +
+                 "set the uniform directly; and the warp's half. " +
+                 "*** AND THE ROUND COMMITTED THIS ARC'S OWN DEFECT ON ITS WAY THROUGH: *** it built an " +
+                 "`energyInt` node, needed it nowhere, and left it as dead code -- a mechanism nobody " +
+                 "invokes, in the round whose subject is mechanisms nobody invokes. v4662's integral census " +
+                 "counted three reads outside a phase call instead of one and named it. " +
+                 "SIX ROWS IN THREE OTHER GATES WENT RED AND EACH WAS RESTATED RATHER THAN BUDGETED: " +
+                 "murmurClock2's and murmurGesture's tempest POSITIVE and NEGATIVE swapped places, because " +
+                 "the signal the species answered and the signal it was deaf to were exactly the wrong way " +
+                 "round; murmurClock2's clamp proof was a correct proof about an expression that should not " +
+                 "have existed, which is the most expensive kind of green row there is; and murmurLive's " +
+                 "cadence census NARROWED to the instantaneous readers it can answer exactly, because " +
+                 "widening it would have put a second copy of murmurCadence's census in a second file.",
+    }),
     // v4662 -- THE 345th CLOSING: the last three places a moving signal multiplies elapsed time -- and a
     // FOURTH that four rounds of censuses had missed, found by this round's own new rule on its first run.
     since344: Object.freeze({

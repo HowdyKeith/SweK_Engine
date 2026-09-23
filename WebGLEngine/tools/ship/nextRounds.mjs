@@ -1130,6 +1130,37 @@ export const NEXT_ROUNDS = [
             "prism's open question from v4661: whether its gesture pulse and its v4659 travelling figure " +
             "belong on the hue numerator as well as on the energy, which needs prism.ts in front of " +
             "somebody rather than an inference.",
+        note12: "*** v4663 WENT AND READ murmur, AND THAT IS THE FIRST THING THE NEXT ROUND SHOULD KNOW. *** " +
+            "Every round of this arc transcribed from THIS TREE'S recorded notes, which carry coefficients " +
+            "for the sites earlier rounds read. For the five cadence-less builders the record held only " +
+            "per-species COUNTS, so the choice was to invent seven numbers or fetch the source. " +
+            "krispuckett/murmur-web is public, MIT, and this port's upstream; it clones in one command and " +
+            "the sites are in src/shaders/<species>.ts. IT ALSO CONFIRMED v4662's opal COEFFICIENTS " +
+            "EXACTLY -- the first independent check this arc's recorded numbers have ever had. DO THIS " +
+            "FIRST from now on rather than last.\n\n" +
+            "*** IT FOUND tempest's CORE SIGNAL WAS WRONG. *** tempest.ts: energy = clamp(0.85*live.pace + " +
+            "0.65*think + 0.55*st.drive, 0, 1.6), think read DIRECTLY off the state index. This port had " +
+            "clamp(0.85*voice, 0, 1.6) -- right coefficient, wrong input -- so the storm rose when somebody " +
+            "SPOKE and stood still while the assistant thought. Measured on a v4662 worktree: 0 of 9,216 " +
+            "bytes between IDLE and THINKING, the state tempest.ts calls the species' home. A FOURTH HOST " +
+            "ACCUMULATOR, thinkInt, carries its integral for the drift and the two bolt slots.\n\n" +
+            "*** WHAT IS LEFT OF THE CADENCE IS ONE BUILDER AND IT NEEDS AN ACCUMULATOR: *** geode's spin " +
+            "and fathom's second and third shells are MIXES by st.drive*0.7, and murmur scales both arms by " +
+            "sp = (1 + k_p*live.pace + k_d*st.drive) -- fathom 0.85/1.10, geode 0.80/1.00. The secular term " +
+            "is then 0.085*sp*(1 + gK*d), which expands to integrals of pace, drive, PACE*DRIVE (the host " +
+            "sends it since v4657) and DRIVE SQUARED (it does not). One more accumulator, driveSqInt, " +
+            "closes all three sites. Folding sp in without it is murmur's number at drive 0 and drive 1 and " +
+            "nobody's in between -- which is every frame of the ramp.\n\n" +
+            "*** AND THE SOURCE CONTRADICTED ONE v4662 DECISION: *** both clouds spell the warp lookup with " +
+            "HALF the advection and the density lookup with all of it. v4662 wired both at full and the " +
+            "advection's own gate could not tell, because it measures that the field moves and the body " +
+            "does not, which is true either way. Fixed here. THE SIGN v4662 CHOSE WAS RIGHT -- murmur " +
+            "subtracts adv from the sample point, so the field appears to move along +V.\n\n" +
+            "*** STILL OPEN AFTER THIS ROUND: *** geode's cadence and the two fathom shells (above); " +
+            "tempest's bolt slots missing murmur's `small` mix, mix(2.9, 5.2, small) and mix(4.3, 7.4, " +
+            "small), which is a style transcription and now checkable against the source; prism's hue " +
+            "question from v4661, which the upstream file can settle in one read; and mh_out's " +
+            "triangular-PDF dither, the one kit function of 41 still unported.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

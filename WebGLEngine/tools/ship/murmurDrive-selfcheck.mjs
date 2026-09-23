@@ -397,11 +397,13 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     const driveIntReads = (src.match(/uniforms\.driveInt/g) || []).length;
     const driveIntInRate = (src.match(/uniforms\.driveInt\)/g) || []).length;
     ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
-        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 2 && driveIntReads === driveIntInRate,
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 3 && driveIntReads === driveIntInRate,
         `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
         `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
-        `helix's climb, whose whole rate murmur scales by st.drive, and limn's flattening ease, ` +
-        `mix(0.62, 0.14, st.drive), which arrived at v4657. Both are amplitudes. The ` +
+        `helix's climb, whose whole rate murmur scales by st.drive, limn's flattening ease, ` +
+        `mix(0.62, 0.14, st.drive), which arrived at v4657, and fathom's speed factor sp at v4663, whose ` +
+        `1.10*st.drive scales the shell's rate and therefore its wobble's amplitude with it. All three are ` +
+        `amplitudes. The 
         `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
         `and it reads uniforms.driveInt, which appears ${driveIntReads} times and every one of them is the ` +
         `last argument of a mhRatePhase call. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +

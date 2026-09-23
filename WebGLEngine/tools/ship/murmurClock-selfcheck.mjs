@@ -268,8 +268,13 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     // alone -- so there was no modulated rate here for this census to find, and there never would have been.
     // Every species this row has ever added for that reason (helix at v4655, geode here) came out of reading
     // the source file against this one, which is the only instrument that finds a signal that is missing.
-    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "geode"].sort();
-    ok("!! *** ALL EIGHT MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
+    // NINE at v4663: fathom's first shell joins, and it is the same kind of arrival geode and helix were --
+    // an ABSENCE rather than a teleport. fathom.ts scales all three shell rates by
+    // sp = (1 + 0.85*live.pace + 1.10*st.drive) and this port carried the bare drift, so the nest turned at
+    // one speed whatever the orb did. Only the shell whose rate is a clean SUM is here; the other two are
+    // mixes and need an integral of drive squared -- see tools/ship/murmurCadence-selfcheck.mjs section 4.
+    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "geode", "fathom"].sort();
+    ok("!! *** ALL NINE MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
         repaired.slice().sort().join(",") === WANT.join(",") && plainDrift.length === 0,
         `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase, and ` +
         `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. *** AND ONE ` +

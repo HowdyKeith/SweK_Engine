@@ -697,8 +697,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // against a 3,000 ms ceiling once sol's frames joined it. Every claim in Clock3 is arithmetic or source
     // and it runs in 147 ms; Clock4 renders five species in 2,837. Splitting by SUBJECT would have put a
     // 147 ms file and a 2,837 ms file at the same total and made neither one's subject whole.
-    gates: 1772, usesOk: 1751, definesOk: 1743, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1644, condFirst: 96, unknownSignature: 11,
+    // v4663 -- RE-TAKEN 1772 -> 1773 for tools/ship/murmurCadence-selfcheck.mjs. ONE gate for four builders
+    // and a wrong signal, at 2,714 ms with four species rendered -- the fifth reading it needs, tempest
+    // across IDLE and THINKING, shares tempest's compile with the cadence sweep, so the round's headline
+    // costs no shader of its own.
+    gates: 1773, usesOk: 1752, definesOk: 1744, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1645, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

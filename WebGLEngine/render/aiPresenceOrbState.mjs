@@ -20,7 +20,7 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
-import { mhLive, mhState, mhFlourish, MH_DUET } from "./murmurKit.mjs";
+import { mhLive, mhState, mhFlourish, MH_DUET, MH_THINKING_INDEX } from "./murmurKit.mjs";
 
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
@@ -235,6 +235,13 @@ export function createPresenceState(initial = "idle") {
     // from the same inputs at the same instant, and the two are graded bit-exact against each other in
     // tools/ship/murmurKit-selfcheck.mjs section 11.
     let paceInt = 0, voiceInt = 0, driveInt = 0;
+    // *** THE FOURTH SIGNAL, AND IT IS NOT A CONDITIONED ONE -- v4663. *** tempest.ts reads THINKING
+    // DIRECTLY rather than through mh_state, because "a storm that rises while the assistant thinks is the
+    // whole concept" and mh_state only designs success and responding. `think` is 1 in that state and 0
+    // everywhere else, so its integral is simply the time spent thinking, in SHADER time like the other
+    // three. It is accumulated here rather than derived in the shader for the same reason the other three
+    // are: a secular phase needs the history and the shader only ever sees the instant.
+    let thinkInt = 0;
 
     // *** AND THREE MORE, FOR THE TWO RATES v4654 RECORDED AS OUT OF REACH -- v4657. ***
     //
@@ -300,6 +307,7 @@ export function createPresenceState(initial = "idle") {
             paceInt += lv.pace * dPhase;
             voiceInt += lv.voice * dPhase;
             driveInt += stn.drive * dPhase;
+            thinkInt += (si === MH_THINKING_INDEX ? 1 : 0) * dPhase;
             // The two cross products, accumulated from the SAME conditioned pair at the SAME instant -- not
             // from the running integrals, which would be the product of two averages rather than the
             // average of a product.
@@ -324,7 +332,7 @@ export function createPresenceState(initial = "idle") {
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
+                     paceInt, voiceInt, driveInt, thinkInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
         },
         get state() { return cur; },
     };
