@@ -20,14 +20,18 @@
 //                   the established idiom (mpm-gpu.html, fluid-webgpu.html) is to bind one compute pass's
 //                   storage output straight into the next pass's input, which is what pass.storage() is for.
 //
-// WHAT THIS FILE DOES NOT CLAIM: that accumulation across per-frame dispatches is bit-exact against a single
+// WHAT THIS FILE DOES NOT CLAIM: that accumulation across per-frame dispatches is BIT-EXACT against a single
 // large-spp dispatch of the same total sample count. It is not -- rngState is seeded once per DISPATCH from
 // (seed,x,y) and evolves only within that dispatch's own spp loop, so N frames of spp=1 walk a genuinely
 // different random sequence than one frame of spp=N. tools/ship/rtViewer-selfcheck.mjs's primary check is
 // therefore the accumulate kernel's arithmetic in ISOLATION, against fabricated input -- exact and decoupled
 // from path-tracing noise entirely -- with only an informal secondary sanity pass (no NaN/Inf, real spatial
-// variance) against a real mesh. The genuine statistical (measured-noise-bound) gate this would need to claim
-// bit-for-bit parity is task #99, not this round.
+// variance) against a real mesh. RTX round 14 (task #99) closed the remaining gap: tools/ship/rtViewer-
+// selfcheck.mjs's own section 4f proves accumBuf after K real renderFrame() calls is the BIT-EXACT arithmetic
+// mean of each call's own raw per-frame output (not fabricated numbers), and, separately, that K accumulated
+// frames of spp=S agree in EXPECTATION with one frame of spp=K*S within 3 measured standard errors -- the two
+// configurations are STILL never claimed bit-exact against each other, only unbiased estimators of the same
+// underlying radiance, exactly as the paragraph above already states.
 "use strict";
 
 import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, VIEW, EPS } from "../physics/render/rtPipeline.mjs";

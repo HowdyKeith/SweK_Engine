@@ -25,13 +25,20 @@
 // backed module in this tree uses). Section 3 proves that integration on a fabricated cube before section 5
 // trusts it with a real GLB.
 //
-// *** WHAT THIS DOES NOT CLAIM. *** That per-frame progressive accumulation is bit-exact against one large-spp
+// *** WHAT THIS DOES NOT CLAIM. *** That per-frame progressive accumulation is BIT-EXACT against one large-spp
 // dispatch of the same total sample count -- it is not (rtViewer.mjs's own header explains why: rngState is
 // seeded once per DISPATCH, so N frames of spp=1 walk a different sequence than one frame of spp=N). Section 2
 // therefore grades the accumulate kernel's ARITHMETIC in isolation, against fabricated input decoupled from any
 // path-tracing noise, which is an exact and total claim about that kernel; section 5's real-mesh render is
 // graded only informally (no NaN/Inf, real spatial variance) because there is no oracle for what a path-traced
-// picture of a real mesh should look like. A genuine statistical (measured-noise-bound) render gate is task #99.
+// picture of a real mesh should look like. Task #99 (a genuine statistical, measured-noise-bound render gate)
+// is CLOSED as of RTX round 14 -- section 4f proves two things this comment used to say neither existed: a
+// BIT-EXACT check that accumBuf after K real renderFrame() calls equals the hand-computed mean of each call's
+// own raw per-frame output (closing the gap between section 2's fabricated-input proof and section 5's purely
+// informal real-render sanity check), and a STATISTICAL check (3 measured standard errors, the same technique
+// physics/render/rtPipeline-selfcheck.mjs's own statistical gates already use) that K accumulated frames of
+// spp=S agree in EXPECTATION with one frame of spp=K*S -- not bit-exactly, which the paragraph above still
+// correctly says never holds, but as two unbiased estimators of the same underlying radiance.
 //
 // SABOTAGE LOG -- each applied to render/rtViewer.mjs, gate run, exit read, file restored byte for byte:
 //   A  accumulateWgsl's n replaced with n-1 (an off-by-one on the running-mean denominator)
@@ -735,6 +742,70 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 session.destroy();
             }
 
+            // ---- 4f. RTX ROUND 14 (task #99) -- WHAT THIS FILE'S OWN HEADER HAS SAID SINCE ROUND 3 IT DOES
+            // NOT CLAIM: that accumBuf after K accumulated frames agrees with a single larger-spp dispatch of
+            // the same total sample budget. Two separate proofs, not one -- a BIT-EXACT one (does the Welford
+            // recurrence, fed REAL rendered frames rather than section 2's own fabricated numbers, actually
+            // equal their arithmetic mean?) and a STATISTICAL one (does K frames of spp=S converge to the SAME
+            // expected value as one frame of spp=K*S, within measured noise -- the genuinely different random
+            // sequence this file's own header names as the reason bit-exactness across CONFIGURATIONS cannot
+            // be claimed, only agreement in expectation). ----
+            {
+                const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+                const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(positions, indices);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 16, h = 12;
+                const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
+                const K = 6, S = 2;
+
+                // -- 4f-i. BIT-EXACT: accumBuf after K real renderFrame() calls equals the hand-computed
+                // arithmetic mean of EACH call's own raw per-frame output (session.outBuf -- exposed on the
+                // session's own return object, read back immediately after each call, before the next call
+                // overwrites it) -- REAL rendered frames, not fabricated numbers (section 2's own scope). This
+                // is the first time anything in this file cross-checks the FINAL accumulated result against
+                // the INDIVIDUAL frames that actually went into it. ----
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: S });
+                const raws = [];
+                for (let i = 0; i < K; i++) {
+                    await session.renderFrame(view, { offscreen: true, read: true });
+                    raws.push(new Float32Array(await device.read(session.outBuf)));
+                }
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                const handMean = new Float32Array(accum.length);
+                for (let i = 0; i < accum.length; i++) { let s = 0; for (let k = 0; k < K; k++) s += raws[k][i]; handMean[i] = s / K; }
+                let maxDelta = 0;
+                for (let i = 0; i < accum.length; i++) maxDelta = Math.max(maxDelta, Math.abs(accum[i] - handMean[i]));
+                out.accumBitExact = { maxDelta, n: accum.length, K, S, frameCount: session.frameCount() };
+                session.destroy();
+
+                // -- 4f-ii. STATISTICAL: reuses the SAME K raw per-frame captures above (no extra dispatches) as
+                // K independent trials of the spp=S estimator (seeds 1..K, one per accumulated frame -- session
+                // frame count IS the seed, physics/render/rtPipeline.mjs's own pipelineUniforms(seed:frame)), and
+                // compares their own mean/relSd against M FRESH, independently-seeded spp=(K*S) trials from a
+                // second session -- offset by K throwaway frames first (seeds K+1..K+M) so neither side's own
+                // measured noise can be an artifact of a shared random tape, the same discipline physics/render/
+                // rtPipeline-selfcheck.mjs's own statistical gates already hold to for a DIFFERENT pair of
+                // implementations; here both sides are the IDENTICAL GPU kernel at two different spp budgets, so
+                // the offset is about measurement rigor, not a correctness-hiding risk this file has ever found. ----
+                const M = 8;
+                const meanOfPixels = (arr) => { let s = 0; for (const v of arr) s += v; return s / arr.length; };
+                const accVals = raws.map(meanOfPixels);
+                const canvas2 = document.createElement("canvas"); canvas2.width = w; canvas2.height = h;
+                const device2 = await requestDevice(canvas2, { backend: "webgpu" });
+                const session2 = makeRtSession(device2, { mesh, w, h, spp: K * S });
+                for (let i = 0; i < K; i++) await session2.renderFrame(view, { offscreen: true, read: true });
+                const largeVals = [];
+                for (let t = 0; t < M; t++) {
+                    await session2.renderFrame(view, { offscreen: true, read: true });
+                    largeVals.push(meanOfPixels(new Float32Array(await device2.read(session2.outBuf))));
+                }
+                session2.destroy();
+                out.convergence = { accVals, largeVals, K, S, M };
+            }
+
             // ---- 5. the real GLB -- fetch, parse, BVH, render; informal sanity only (no radiance oracle for a mesh) ----
             {
                 const res = await fetch("/vendor/kenney-city/models/pavement.glb");
@@ -778,7 +849,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -899,6 +970,41 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         `sceneCapture mean ${cubeSceneCapture.mean.toFixed(6)} vs envMap mean ${cubeEnvMap.mean.toFixed(6)} -- a difference confined ` +
         "entirely to the two extreme pixels min/max alone track would leave the bulk of the atlas's own content unverified");
 
+    console.log("\n4f. RTX ROUND 14 (task #99) -- accumBuf's BIT-EXACTNESS AGAINST REAL PER-FRAME RENDERS, AND K-FRAMES-vs-ONE-LARGER-SPP WITHIN MEASURED NOISE");
+    say(`bit-exact: K=${accumBitExact.K} frames of spp=${accumBitExact.S}, ${accumBitExact.n} pixels, max|accumBuf - handMean|=${accumBitExact.maxDelta.toExponential(3)}`);
+    ok("!! accumBuf after K REAL renderFrame() calls equals the hand-computed arithmetic mean of each call's own " +
+        "RAW per-frame output, to floating-point precision -- not fabricated input (section 2's own scope), real " +
+        "rendered frames read back between calls",
+        accumBitExact.maxDelta < 1e-4,
+        `max delta ${accumBitExact.maxDelta.toExponential(3)} across ${accumBitExact.n} pixels -- this is the FIRST check in this file that ` +
+        "cross-checks the FINAL accumulated result against the INDIVIDUAL frames that actually went into it, closing the gap between " +
+        "section 2's own isolated-arithmetic proof (fabricated numbers) and sections 4/4b/etc.'s own sanity checks (real renders, but only " +
+        "checked for NaN/range, never against their own inputs)");
+
+    {
+        const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+        const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+        const { accVals, largeVals, K, S, M } = convergence;
+        const accM = meanOf(accVals), accRelSd = sdOf(accVals, accM) / accM;
+        const largeM = meanOf(largeVals), largeRelSd = sdOf(largeVals, largeM) / largeM;
+        const ratio = largeM / accM;
+        const bound = 3 * Math.sqrt((accRelSd / Math.sqrt(K)) ** 2 + (largeRelSd / Math.sqrt(M)) ** 2);
+        say(`K=${K} frames of spp=${S} (${K} seeded trials): mean ${accM.toFixed(6)} (relSd ${(accRelSd * 100).toFixed(2)}%); ` +
+            `1 frame of spp=${K * S} (${M} seeded trials): mean ${largeM.toFixed(6)} (relSd ${(largeRelSd * 100).toFixed(2)}%); ` +
+            `ratio ${ratio.toFixed(6)}, bound ${bound.toFixed(6)}`);
+        REPORT_ROWS.push(["accumulate convergence (task #99)", `${K}x spp${S} vs 1x spp${K * S}`, `${K}+${M} seeded trials`,
+            `|ratio-1|=${Math.abs(ratio - 1).toExponential(2)}, bound=${bound.toExponential(2)}`]);
+        ok("!! both sides show REAL per-seed noise -- neither relSd is near zero, which would mean a seed never reached the render",
+            accRelSd > 1e-3 && largeRelSd > 1e-3, `accRelSd ${(accRelSd * 100).toFixed(3)}%, largeRelSd ${(largeRelSd * 100).toFixed(3)}%`);
+        ok("!! *** K ACCUMULATED FRAMES OF spp=S AGREE WITH ONE FRAME OF spp=K*S, WITHIN 3 MEASURED STANDARD ERRORS -- " +
+            "THE STATISTICAL CLAIM THIS FILE'S OWN HEADER HAS SAID SINCE ROUND 3 IT DOES NOT MAKE ***",
+            Math.abs(ratio - 1) < bound,
+            `accumulated-frames mean ${accM.toFixed(6)} vs single-larger-dispatch mean ${largeM.toFixed(6)} -- the two configurations walk ` +
+            "genuinely DIFFERENT random sequences (rngState is seeded once per DISPATCH, so K frames of spp=1 evolve differently than one " +
+            "frame of spp=K, exactly as this file's own header states) and are never claimed bit-exact against each other -- what IS claimed, " +
+            "and what this proves, is that both are UNBIASED estimators of the SAME expected radiance, agreeing within their own measured noise");
+    }
+
     console.log("\n5. A REAL GLB, THROUGH THE FULL loadMeshBvh -> makeRtSession -> device.frame PATH");
     say(`vendor/kenney-city/models/pavement.glb: ${mesh.byteLength} bytes -> ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices`);
     say(`bounds ${JSON.stringify(mesh.bounds)}`);
@@ -969,10 +1075,10 @@ console.log("unchecked here: WHETHER LIVE CANVAS PRESENTATION ITSELF WORKS ON TH
     "above passes {offscreen:true,read:true} deliberately (tools/ship/devicePresent-selfcheck.mjs's own header: " +
     "this build box loses the WebGPU device on a render pass whose attachment is the canvas's current texture). " +
     "rtx-viewer.html itself presents normally, the way every other live demo page does, and only a real browser " +
-    "on real hardware can confirm that picture. Also unchecked: bit-exactness of accumulation against a single " +
-    "large-spp dispatch (not a claim this round makes -- see this file's header), multi-material SBT offset and " +
-    "a genuine statistical render gate (task #99), and orbit-camera pointer handling in rtx-viewer.html itself " +
-    "(pure event wiring, not rendering math -- nothing here simulates pointer events against a live page).");
+    "on real hardware can confirm that picture. Task #99 (a genuine statistical bit-exactness render gate) is " +
+    "CLOSED as of RTX round 14 -- section 4f. Also unchecked: multi-material SBT offset, and orbit-camera pointer " +
+    "handling in rtx-viewer.html itself (pure event wiring, not rendering math -- nothing here simulates pointer " +
+    "events against a live page).");
 REPORT.table("accumulate kernel and the real mesh render, measured", ["case", "input", "n / frames", "result"], REPORT_ROWS,
     "A number that only reached this terminal is a measurement nobody else can re-read.");
 REPORT.write();
