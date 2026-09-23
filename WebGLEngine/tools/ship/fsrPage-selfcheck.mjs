@@ -267,9 +267,16 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
     // over five frames -- but that control needed a copy of the old page on disk and cannot ship. What can
     // ship is the reason it held: every sampler takes the slab offset with a default of 0, and the three
     // older cameras pass none.
-    const samplers = ["function hit\\(inv, u, v, sx = 0\\)", "function renderPersp\\(R, vp, kind, sx = 0\\)",
-                      "function renderDepth\\(vp, sx = 0\\)", "function truthPersp\\(vp, kind, sx = 0\\)",
-                      "function renderIds\\(vp, sx = 0\\)"];
+    // *** v4669 ADDED A SECOND DEFAULTED PARAMETER AND THIS ROW HAD TO GROW WITH IT. *** Every sampler now
+    // also takes the slab's ALPHA, defaulted to 1 for exactly the reason sx is defaulted to 0: the three
+    // older cameras pass neither, so neither can reach them. The row holds BOTH defaults rather than being
+    // loosened to stop noticing the signature -- the defaults ARE the property that keeps those cameras
+    // untouched, and a row that matched any signature would hold nothing.
+    const samplers = ["function hit\\(inv, u, v, sx = 0, alpha = 1\\)",
+                      "function renderPersp\\(R, vp, kind, sx = 0, alpha = 1\\)",
+                      "function renderDepth\\(vp, sx = 0, alpha = 1\\)",
+                      "function truthPersp\\(vp, kind, sx = 0, alpha = 1\\)",
+                      "function renderIds\\(vp, sx = 0, alpha = 1\\)"];
     const missing = samplers.filter((r) => !new RegExp(r).test(src));
     ok("!! ...and EVERY sampler defaults its slab offset to zero, which is what keeps the three older cameras untouched",
         missing.length === 0,
@@ -407,6 +414,48 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n13. *** THE CONTENT THE REACTIVE MASK EXISTS FOR (v4669) ***");
+// Four rounds said the mask was being judged on a case it was not designed for and could not act on it.
+// A translucent surface contributes COLOUR AND NOT DEPTH, so the motion vector describes the background
+// while the colour is a blend of two surfaces moving differently -- wrong by construction, and the reason
+// the feature exists. What the source has to show is that asymmetry, because a "transparency" that also
+// wrote depth would be a differently-coloured opaque slab and would measure as one.
+{
+    const REC = path.resolve(path.dirname(PAGE), "render", "transparency-measurement.md");
+    const rec = fs.existsSync(REC) ? fs.readFileSync(REC, "utf8") : "";
+    ok("the alpha control exists and defaults to OPAQUE, so every earlier figure is still the shipped arm",
+       (() => { const m = /<select id="slabalpha">([\s\S]*?)<\/select>/.exec(raw); if (!m) return false;
+                const opts = [...m[1].matchAll(/<option value="([\d.]+)"/g)].map((o) => o[1]);
+                return opts[0] === "1" && opts.length >= 2; })(),
+       "v4649's `sx` discipline for the fourth time in this arc: a round that moved the page's figures " +
+       "while adding content could not be told from a round that broke them");
+    // *** THE ASYMMETRY, WHICH IS THE WHOLE POINT. ***
+    ok("!! *** the geometry samplers take the alpha and the COLOUR sampler does not, which is the defect ***",
+       /function renderDepth\(vp, sx = 0, alpha = 1\)/.test(src)
+       && /function renderIds\(vp, sx = 0, alpha = 1\)/.test(src)
+       && /return \(near && alpha >= 1\) \? near : far;/.test(src)
+       && /function shadeRay\(inv, u, v, kind, sx = 0, alpha = 1\)/.test(src)
+       && /alpha \* s\[c\] \+ \(1 - alpha\) \* b\[c\]/.test(src),
+       "depth and ids drop the slab below alpha 1; the colour blends it. A transparency that also wrote " +
+       "depth would be a differently-coloured OPAQUE slab and would measure as one -- the experiment would " +
+       "run, produce numbers, and be about nothing.");
+    ok("!! ...and at alpha 1 every one of those paths is the expression it replaced",
+       /if \(alpha >= 1\) return s;/.test(src) && /const alphaCur = objects \? slabAlpha\(\) : 1;/.test(src),
+       "the three older cameras pass 1 and cannot see this control at all, exactly as they pass sx = 0");
+    ok("!! *** the record reports 51 of 51 frames up, and does not dress a first look as a confirmation ***",
+       /\+0\.6673 dB/.test(rec) && /51 up \/\s+0 down/.test(rec)
+       && /not a pre-registered confirmation/i.test(rec) && /v4671/.test(rec),
+       "+0.6673 dB against +0.0820 on the opaque slab, and never once negative. 51 of 51 is not a number " +
+       "that needs a test to be believed -- and that is not the point: the procedure is what stops a round " +
+       "choosing its verdict, this round did not follow it, and the record says so rather than borrowing " +
+       "the credibility of the rounds that did.");
+    ok("!! ...and it reports the MECHANISM in the mask's own counters, not just the dB",
+       /depth-gated declines, translucent slab\s+ZERO/.test(rec),
+       "with no depth written for the slab there is no silhouette in the depth buffer, so the depth gate " +
+       "never fires and every pixel is examined. The mask has nothing to hand off to the disocclusion " +
+       "test. That is the same fact as the dB, stated twice.");
+}
+
 console.log("\n12. *** WHICH CONSUMER CARRIED IT (v4666) ***");
 {
     const PRE = path.resolve(path.dirname(PAGE), "render", "dilate-preregistration.md");
@@ -644,13 +693,19 @@ console.log("\n8. *** TWO CLOCKS (v4661): THE SCENE'S TIME AND THE HISTORY'S AGE
         "22. A different sub-pixel offset is a different rendered frame, and every comparison between the two " +
         "runs would carry it.");
     ok("  ...and reset()'s own still panes follow the scene clock, so they are not a different scene",
-        /const t0 = startFrame/.test(src) && /truthPersp\(dollyVP\(t0\), kind, sx0\)/.test(src)
-        && /renderPersp\(R, dollyVP\(t0\), kind, sx0\)/.test(src),
+        /const t0 = startFrame/.test(src) && /truthPersp\(dollyVP\(t0\), kind, sx0, slabAlpha\(\)\)/.test(src)
+        && /renderPersp\(R, dollyVP\(t0\), kind, sx0, slabAlpha\(\)\)/.test(src),
         "reset() draws the reference and the one unjittered frame. Left at dollyVP(0) they would show time " +
         "zero while the temporal pane ran at 54, and dBil/dFsr would be scored against a truth the temporal " +
         "pane never sees.");
     ok("  ...and the control is a SELECT on the page, so the experiment is re-runnable rather than a build that once existed",
-        /<input id="startframe" type="number"/.test(raw) && /\["scene", "camera", "ratio", "startframe"\]/.test(src),
+        // the RESET LIST as a set, not as a literal: v4669 added slabalpha to it and the literal broke on a
+        // change that was the list working correctly. What matters is that every control which changes the
+        // SCENE rebuilds the history, not the order they happen to be written in.
+        /<input id="startframe" type="number"/.test(raw) &&
+        (() => { const m = /for \(const id of \[([^\]]*)\]\) \$\(id\)\.onchange/.exec(src); if (!m) return false;
+                 const ids = [...m[1].matchAll(/"(\w+)"/g)].map((x) => x[1]);
+                 return ["scene", "camera", "ratio", "startframe", "slabalpha"].every((k) => ids.includes(k)); })(),
         "and it is in the reset list, because a scene clock changed without rebuilding the history is two " +
         "scenes in one accumulator");
 }
@@ -719,6 +774,13 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4669  the DEPTH buffer keeps the translucent slab                    1 RED -- the asymmetry gone, and
+//          with it the whole experiment: a transparency that writes depth is an opaque slab in a different
+//          colour and would measure as one.
+//   v4669  the colour stops blending                                       1 RED.
+//   v4669  the alpha control defaults to translucent                       1 RED.
+//   v4669  the record drops "not a pre-registered confirmation"            1 RED.
+//   v4669  the record drops the mechanism and keeps only the dB            1 RED.
 //   v4667  the dilate default flipped back to OFF                        2 RED here, 1 in fsrPageDevice.
 //   v4667  the OFF control arm DELETED from the dilate select             *** 0 RED AT FIRST ***. The row
 //          held it with a bare /<option value="off"/, which the shading, reactive and dilscope selects all

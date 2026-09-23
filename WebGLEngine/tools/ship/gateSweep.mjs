@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4669 -- THE 279th CLOSING: the content the reactive mask exists for, and 51 frames of 51.
+    since354: Object.freeze({
+        at: "v4669", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FOUR ROUNDS SAID THE REACTIVE MASK WAS BEING JUDGED ON A CASE IT WAS NOT DESIGNED FOR " +
+                 "AND NONE COULD ACT ON IT. *** reactiveGPU-selfcheck has carried the sentence since v4657; " +
+                 "v4665 and v4666 each repeated it while reporting the mask at +0.0820 dB and then +0.0059, " +
+                 "measured on a fully opaque scene built to exercise OBJECT MOTION. v4669 adds the missing " +
+                 "content: the slab can be translucent. " +
+                 "*** THE ASYMMETRY IS THE WHOLE DEFECT, AND IT IS WHAT THE SOURCE ROWS HOLD. *** " +
+                 "Alpha-blended geometry is drawn after the depth pass and writes NO DEPTH, so at a " +
+                 "translucent pixel the depth buffer, the id buffer and the MOTION VECTOR describe the " +
+                 "background while the colour is a blend of two surfaces moving differently. Reprojecting " +
+                 "that along the background's vector is wrong by construction -- nothing can fix it -- and " +
+                 "a reactive mask can only tell the accumulator to trust less of it. A 'transparency' that " +
+                 "also wrote depth would be an opaque slab in a different colour and would measure as one: " +
+                 "the experiment would run, produce numbers, and be about nothing. A sabotage on exactly " +
+                 "that reds. " +
+                 "*** MEASURED: +0.6673 dB, 51 FRAMES OF 51 UP, NOT ONE DOWN. *** Against +0.0820 dB and " +
+                 "18 losses on the opaque slab -- eight times the effect and a perfect sign record. For " +
+                 "scale, this page's other features are the shading mask at +0.117 (21/21) and dilation at " +
+                 "+1.799 (43/51, one frame losing 2.43 dB). The reactive mask on transparent content is the " +
+                 "only thing this arc has measured that is both large and never negative. " +
+                 "*** AND THE MECHANISM IS IN THE MASK'S OWN COUNTERS. *** Depth-gated declines go from 106 " +
+                 "or 216 every frame to ZERO: with no depth written for the slab there is no silhouette in " +
+                 "the depth buffer, the gate never fires, every pixel is examined, and the mask has nothing " +
+                 "to hand off to the disocclusion test. The same fact as the dB, stated twice. " +
+                 "*** IT IS NOT A PRE-REGISTERED RESULT AND THE RECORD SAYS SO. *** No statistic or " +
+                 "threshold was fixed before the data existed, which is the standard this arc has held " +
+                 "since v4660. 51 of 51 needs no test to be believed and that is not the point: the " +
+                 "procedure is what stops a round choosing its verdict. v4671 is the confirming round, and " +
+                 "a gate row fails if the record ever stops saying this. " +
+                 "Five sabotages, five caught, no 0-RED. Three rows in fsrPage-selfcheck had to GROW rather " +
+                 "than loosen: every sampler now carries a second defaulted parameter, and the defaults are " +
+                 "the property that keeps the three older cameras untouched. No gate added.",
+    }),
     // v4668 -- THE 278th CLOSING: FSR2's first dispatch, and an exposure with nothing to do.
     since353: Object.freeze({
         at: "v4668", swept: 1, green: 1, red: 0,

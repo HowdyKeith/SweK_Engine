@@ -54,6 +54,11 @@
       <option value="on">reactive mask: ON</option>
       <option value="off">reactive mask: OFF (the control)</option>
     </select>
+    <select id="slabalpha">
+      <option value="1">slab: OPAQUE (every figure on this page is this arm)</option>
+      <option value="0.5">slab: TRANSLUCENT 0.5 -- colour but no depth, the reactive mask's case</option>
+      <option value="0.25">slab: TRANSLUCENT 0.25</option>
+    </select>
     <select id="dilscope">
       <option value="all">dilation feeds: the clip chain AND the reactive mask</option>
       <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
@@ -273,7 +278,31 @@ const IDENT4 = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
 const translate4 = (tx) => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, 0, 1]);
 
 /** Where this pixel's ray meets the scene: the slab if it covers it, the background otherwise. */
-function hit(inv, u, v, sx = 0) {
+/**
+ * *** v4669 -- THE SLAB CAN BE TRANSPARENT NOW, AND THAT IS THE CONTENT FSR2's REACTIVE MASK EXISTS FOR. ***
+ *
+ * Four rounds in a row said the same thing and could not act on it. v4665: "FSR2 ships the reactive mask for
+ * shader-animated and transparent content -- particles, foliage -- which this page does not have." v4666:
+ * "this page has no particles and no transparency; the measurement says what the mask is worth HERE."
+ * render/reactiveGPU-selfcheck.mjs has carried it since v4657. The mask was measured on content built to
+ * exercise OBJECT MOTION, and found to be worth +0.0059 dB once dilation fixed the silhouettes -- a null
+ * that says nothing about the case the feature was designed for, because the case was absent.
+ *
+ * *** A TRANSPARENT SURFACE CONTRIBUTES COLOUR AND NOT DEPTH, AND THAT ASYMMETRY IS THE WHOLE DEFECT. ***
+ * Alpha-blended geometry is drawn after the depth pass and does not write depth. So at a translucent slab
+ * pixel the depth buffer, the id buffer and therefore the MOTION VECTOR all describe the BACKGROUND, while
+ * the colour is a blend of two surfaces moving differently. Reprojecting that colour along the background's
+ * vector is wrong by construction -- no motion field can be right about it -- and a history that keeps it
+ * smears the slab. That is precisely what a reactive mask is for: it cannot fix the reprojection, it can
+ * only tell the accumulator to trust less of it.
+ *
+ * alpha 1 is the default and every expression below reduces to the one it replaced there, so this page's
+ * figures and its gates are untouched -- v4649's `sx` discipline, for the fourth time in this arc.
+ */
+const slabAlpha = () => { const a = parseFloat(($("slabalpha") || {}).value); return Number.isFinite(a) ? Math.min(1, Math.max(0, a)) : 1; };
+
+/** Where the ray meets each surface: the slab point when it covers this ray, and the background point always. */
+function hitBoth(inv, u, v, sx = 0) {
     const nx = 2 * u - 1, ny = 1 - 2 * v;
     const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
     const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
@@ -281,7 +310,40 @@ function hit(inv, u, v, sx = 0) {
     const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
     const n = at(Y_NEAR);
     const onSlab = n[0] >= SLAB_X[0] + sx && n[0] <= SLAB_X[1] + sx && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
-    return onSlab ? n : at(Y_FAR);
+    return { near: onSlab ? n : null, far: at(Y_FAR) };
+}
+
+/**
+ * The GEOMETRY hit: what the depth and id buffers see. A translucent slab is not in it.
+ *
+ * `opaqueOnly` is the caller's and defaults to true, so every existing caller gets exactly the point it got
+ * before. renderDepth and renderIds pass the slab's alpha; the COLOUR samplers do not, because colour is the
+ * one thing a transparent surface does contribute.
+ */
+function hit(inv, u, v, sx = 0, alpha = 1) {
+    const nx = 2 * u - 1, ny = 1 - 2 * v;
+    const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
+    const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
+    const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
+    const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
+    const { near, far } = hitBoth(inv, u, v, sx);
+    // alpha 1 -- the default -- returns the slab exactly as this function always did. Below 1 the slab is
+    // not in the depth buffer at all, so the geometry here is the background's and so is its motion.
+    return (near && alpha >= 1) ? near : far;
+}
+
+/** The blended colour along a ray: the slab over the background, or just the background. */
+function shadeRay(inv, u, v, kind, sx = 0, alpha = 1) {
+    const { near, far } = hitBoth(inv, u, v, sx);
+    if (!near) { const [bu, bv] = patternUV(far, sx); return scene(bu, bv, kind); }
+    const [nu, nv] = patternUV(near, sx);
+    const s = scene(nu, nv, kind);
+    if (alpha >= 1) return s;                       // the expression every caller had before v4669
+    const [bu, bv] = patternUV(far, sx);
+    const b = scene(bu, bv, kind);
+    const out = [0, 0, 0, 0];
+    for (let c = 0; c < 4; c++) out[c] = alpha * s[c] + (1 - alpha) * b[c];
+    return out;
 }
 
 /**
@@ -295,11 +357,11 @@ function hit(inv, u, v, sx = 0) {
  *
  * 0 is the background and 1 is the slab, matching the order of the model tables in tick().
  */
-function renderIds(vp, sx = 0) {
+function renderIds(vp, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     const ids = new Uint32Array(D * D);
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
-        ids[y * D + x] = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx)[1] === Y_NEAR ? 1 : 0;
+        ids[y * D + x] = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx, alpha)[1] === Y_NEAR ? 1 : 0;
     }
     return ids;
 }
@@ -313,24 +375,23 @@ const patternUV = (p, sx = 0) => p[1] === Y_NEAR
     : [(p[0] + 6) / 12, (p[2] + 6) / 12];
 
 /** Colour at R x R through a (jittered) view-projection. */
-function renderPersp(R, vp, kind, sx = 0) {
+function renderPersp(R, vp, kind, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     if (!inv) throw new Error("fsr.html: the dolly camera is singular -- mat4Invert returns null, not a matrix");
     const out = new Float32Array(R * R * 4);
     for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-        const [pu, pv] = patternUV(hit(inv, (x + 0.5) / R, (y + 0.5) / R, sx), sx);
-        const px = scene(pu, pv, kind);
+        const px = shadeRay(inv, (x + 0.5) / R, (y + 0.5) / R, kind, sx, alpha);
         for (let c = 0; c < 4; c++) out[(y * R + x) * 4 + c] = px[c];
     }
     return out;
 }
 
 /** Clip-space z at D x D through the UNJITTERED camera -- what motionVectorsCPU and disocclusionCPU read. */
-function renderDepth(vp, sx = 0) {
+function renderDepth(vp, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     const d = new Float32Array(D * D);
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
-        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx);
+        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx, alpha);
         const q = transform4(vp, p[0], p[1], p[2], 1);
         d[y * D + x] = q[2] / q[3];
     }
@@ -338,14 +399,13 @@ function renderDepth(vp, sx = 0) {
 }
 
 /** The 8x8 supersampled truth through the same camera, so the reference moves with it. */
-function truthPersp(vp, kind, sx = 0) {
+function truthPersp(vp, kind, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     const out = new Float32Array(D * D * 4), N = 8;
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
         const acc = [0, 0, 0, 0];
         for (let sy = 0; sy < N; sy++) for (let ssx = 0; ssx < N; ssx++) {
-            const [pu, pv] = patternUV(hit(inv, (x + (ssx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D, sx), sx);
-            const px = scene(pu, pv, kind);
+            const px = shadeRay(inv, (x + (ssx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D, kind, sx, alpha);
             for (let c = 0; c < 4; c++) acc[c] += px[c];
         }
         for (let c = 0; c < 4; c++) out[(y * D + x) * 4 + c] = acc[c] / (N * N);
@@ -580,9 +640,9 @@ async function reset() {
     // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
     const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX : 0;
     const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
-    ref = dolly ? truthPersp(dollyVP(t0), kind, sx0) : truth(kind, dx0);
+    ref = dolly ? truthPersp(dollyVP(t0), kind, sx0, slabAlpha()) : truth(kind, dx0);
     draw(cRef, ref);
-    const one = dolly ? renderPersp(R, dollyVP(t0), kind, sx0) : render(R, 0, 0, kind, dx0);
+    const one = dolly ? renderPersp(R, dollyVP(t0), kind, sx0, slabAlpha()) : render(R, 0, 0, kind, dx0);
     const bil = bilinearCPU(one, R, R, D, D).data;
     const F = await fsr1(one, R, R, D, D, parseFloat($("sharp").value));
     const fsr = F.data;
@@ -612,6 +672,9 @@ async function tick() {
     const panning = cam === "pan", dolly = cam === "dolly" || objects;
     // the slab's world x this frame and last -- zero on every camera but "objects", so the three older
     // cameras take the same code path with the same numbers they always did
+    // the slab's alpha this frame. 1 on every camera but "objects", so the three older cameras cannot
+    // see this control at all -- the same guard sxCur carries, for the same reason.
+    const alphaCur = objects ? slabAlpha() : 1;
     const sxCur = objects ? sceneT() * SLAB_DX : 0;
     const sxPrev = objects ? sceneTPrev() * SLAB_DX : 0;
     const dx = panning ? sceneT() * PAN : 0;
@@ -641,7 +704,7 @@ async function tick() {
     const vpCur = dolly ? dollyVP(sceneT()) : null;
     const vpPrev = dolly ? dollyVP(sceneTPrev()) : null;
     const frameSrc = dolly
-        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind, sxCur)
+        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind, sxCur, alphaCur)
         : render(R, jx, jy, kind, dx);
 
     // *** THE MOTION FIELD IS DERIVED NOW, AND THIS IS THE LINE THAT COST A ROUND. ***
@@ -668,7 +731,7 @@ async function tick() {
     // fourth channel it writes -- the depth this surface would have had last frame -- is the whole disocclusion
     // test. The two matrices are (current INVERSE, previous FORWARD) and swapping them gives motion of exactly
     // the right magnitude and the wrong sign, which an orthographic pan could not have shown.
-    const depth = dolly ? renderDepth(vpCur, sxCur) : null;
+    const depth = dolly ? renderDepth(vpCur, sxCur, alphaCur) : null;
     // *** AND THE DOLLY'S MOTION COMES OFF THE DEVICE TOO, AS OF v4641. *** motion() is the general form and
     // pan() is the special case; the dolly needs the general one because its matrices are perspective.
     //
@@ -680,7 +743,7 @@ async function tick() {
     //
     // The id buffer costs a function call: renderIds() is hit() again with its y compared to Y_NEAR, which is
     // the comparison patternUV has made on every dolly frame since that camera existed.
-    const ids = objects ? renderIds(vpCur, sxCur) : null;
+    const ids = objects ? renderIds(vpCur, sxCur, alphaCur) : null;
     const objMats = objects ? buildObjectMatrices({
         vpCur, vpPrev,
         models:     [IDENT4, translate4(sxCur)],     // 0 = background (never moves), 1 = the slab
@@ -1059,7 +1122,7 @@ async function tick() {
     // how far the slab has walked, so it DECAYS MONOTONICALLY whatever the motion vectors do: 30.94 dB at
     // frame 2 falling to 19.56 by frame 10, while the plain dolly sat at a stable 38-41 through the same
     // frames. Every comparison taken against that reference was measuring the mistake and not the method.
-    if (dolly) ref = truthPersp(vpCur, kind, sxCur);
+    if (dolly) ref = truthPersp(vpCur, kind, sxCur, alphaCur);
     const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
@@ -1165,7 +1228,7 @@ async function tick() {
 
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "Pause" : "Run"; if (running) tick(); };
 $("reset").onclick = () => { running = false; $("run").textContent = "Run"; reset(); };
-for (const id of ["scene", "camera", "ratio", "startframe"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();
