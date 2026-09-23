@@ -177,6 +177,59 @@ both immediately before the refactor (`git stash` on `gpu/gpuAssetLoader.js` alo
 after. `tools/ship/fbxIngest-selfcheck.mjs` re-runs the "after" half of that as a standing regression check,
 pinned to the values that comparison measured.
 
+## `SimpleSparseAccessor.glb` — task #7, glTF conformance fixtures (sparse accessors)
+
+A sixth file, added when `gpu/GLBParser.js`'s own `_readAccessor()` was found to silently ignore
+`accessor.sparse` entirely (zero occurrences of `sparse` anywhere in that file before this round) —
+returning the UNPATCHED base array for any accessor that combines a real `bufferView` with `sparse`
+overrides, no throw and no warning, just the wrong numbers. Unlike the other fixtures in this file, this one
+is **not self-authored and not a header-only strip** — it is the FULL, complete, working Khronos
+glTF-Sample-Assets model **"Simple Sparse Accessor"**, converted from its original `.gltf` + `.bin` pair into
+a single `.glb` container via this tree's own `tools/export/voxelGlb.mjs`'s `packGlb()` (the same packer
+`sceneGlb.mjs`/`voxelGlb.mjs` already use, so no second, independently-spelled GLB-assembly routine exists) —
+the JSON's `buffers[0].uri` was dropped and the original `.bin` bytes embedded as the GLB's own BIN chunk,
+byte-for-byte, at the SAME internal byte offsets the source model's own `bufferViews` already declare, so
+nothing about the accessor data itself was touched.
+
+**Why full, not header-only.** `ABeautifulGame-*.header.glb`, above, proves ROUTING against a real file's
+real declarations, and is deliberately unloadable — the BIN chunk is removed, so the model's `buffers`
+declare bytes that are not present. Sparse-accessor DECODING is exactly the thing a header-only fixture
+cannot prove: there is nothing to decode without the real BIN chunk, sparse index/value sub-buffers
+included. At 284 bytes of BIN data (1,056 bytes total, GLB-packed) there was no size reason to strip it
+either — the whole reason `ABeautifulGame` needed stripping (55 MB raw) does not apply to a fixture this
+small.
+
+**What it is**, read directly off the model's own JSON: a flat 2×7 vertex grid (`POSITION`, accessor 1, 14
+vertices, `VEC3`/`FLOAT`, `bufferView` 1) forming two rows along X (`y=0` and `y=1`, `z=0` throughout) before
+any sparse patch, indexed into 12 triangles (accessor 0, `bufferView` 0). The `POSITION` accessor's own
+`sparse` object overrides 3 of the 14 vertices — indices `[8, 10, 12]` (all in the `y=1` row) — with new
+values `[[1,2,0], [3,3,0], [5,4,0]]` (`bufferView` 2 for the `UNSIGNED_SHORT` indices, `bufferView` 3 for the
+`FLOAT` values, both hand-decoded directly from the raw BIN bytes before writing the gate, not assumed from
+the JSON's own `max`/`min`). The accessor's own declared `max: [6,4,0]` only becomes true once the sparse
+patch is correctly applied — the unpatched base data's own real max is `[6,1,0]` — which is itself a live,
+spec-provided regression check: a reader that ignores `sparse` produces geometry the file's own JSON says is
+wrong.
+
+**Licence.** CC-BY-4.0, per `Models/SimpleSparseAccessor/LICENSE.md` and `metadata.json` in the
+glTF-Sample-Assets repository (read directly, not assumed from Khronos publishing it — the SAME discipline
+`ABeautifulGame`'s own entry above already applies, and the same repository `BrainStem`/`Duck` are NOT
+CC-BY-4.0 in, which is exactly why this check is never skipped):
+
+> Simple Sparse Accessor — by **Marco Hutter** (https://github.com/javagl/), 2017. Licensed CC-BY-4.0:
+> https://creativecommons.org/licenses/by/4.0/legalcode
+> Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SimpleSparseAccessor
+
+**What it proves, and the limit.** `tools/ship/gltfConformance-selfcheck.mjs` parses this fixture through the
+real, shipped `GLBParser.parse()` and asserts the exact patched position array — all 14 vertices, not just
+the 3 sparse-overridden ones — against the hand-decoded indices/values above. It proves the
+`bufferView`-present-AND-`sparse` shape specifically; the OTHER spec-valid shape (`bufferView` entirely
+omitted, base implicitly all-zero) has no small Khronos sample fixture and is instead exercised with a
+synthetic, inline-constructed accessor built directly in the gate itself (no file, no license question — the
+same "no bytes to license" reasoning `fbxIngest.ascii.fbx` and `regressionTri.glb` already state). It does
+not prove sparse accessors combined with `byteStride` (interleaved) bufferViews, or sparse on a non-`FLOAT`
+componentType — named as the honest remaining scope for whichever round widens this file's own feature
+matrix next, not silently assumed covered.
+
 ## `autoRigUnrigged.glb` — task #38/#39, the auto-rig-wiring fixture
 
 Self-authored, hand-built directly against the glTF 2.0 container spec (not through `writeGlb()`, which does
