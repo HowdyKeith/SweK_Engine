@@ -1,0 +1,41 @@
+mikktspace.h, mikktspace.c -- vendored
+https://github.com/mmikk/MikkTSpace
+author: Morten S. Mikkelsen -- see the license header inside each file (zlib, Copyright (C) 2011)
+
+Pinned at 3e895b49d05ea07e4c2133156cfa94369e19e409, cloned and read in this tree rather than
+remembered. There is no separate LICENSE file in this repository; the zlib text lives only in
+the header comment at the top of mikktspace.c and mikktspace.h, verbatim, and that is the whole
+of it -- confirmed by fetching both files directly and reading the header rather than assuming
+the license from the fact that Khronos's own glTF 2.0 spec names this algorithm as the
+recommended one (Specification.adoc line ~339: "_MikkTSpace_ <https://github.com/mmikk/MikkTSpace>",
+and line ~1757: "client implementations SHOULD calculate tangents using default MikkTSpace
+algorithms"). Restriction 1 of the license explicitly says an acknowledgment "would be
+appreciated but is not required"; restriction 3 only requires the notice not be stripped from
+source distributions, which it is not here.
+
+Recorded at v4611 (task #41, backlog id "mikktspace-wasm").
+
+*** THIS IS A REFERENCE, NOT A DEPENDENCY. NOTHING IN THE ENGINE LOADS IT. ***
+Same shape as vendor/xatlas: mikktspace.c is C and there is no emscripten in this sandbox, so it
+cannot ship to the browser -- clang++/g++ ARE here, so it can be BUILT AND RUN natively, and
+that is what it is for. physics/mesh/mikktSpace.mjs is this engine's own from-scratch JS port
+of the algorithm (chosen over the npm package "mikktspace" / donmccurdy/mikktspace-wasm -- see
+that decision recorded in tools/ship/nextRounds.mjs's mikktspace-wasm entry). tools/mesh/mikktRef.mjs
+builds and runs the two files below, unmodified, as the REFERENCE IMPLEMENTATION to grade the
+JS port's numeric output against, exactly the same role xatlas plays for physics/mesh/uvLscm.mjs.
+
+WHAT IS VENDORED: the two files of the core library and no other file -- not the repository's
+README (it is 156 bytes and points only at mikktspace.com, itself unreachable through this
+sandbox's egress proxy -- flagged, not assumed empty of content). The two files are
+self-contained ANSI C (assert.h float.h math.h stdio.h stdlib.h string.h and the header only --
+confirmed by grep) and compile with `g++ -O2 -std=c++11` (or gcc) with no other dependency,
+which is checked rather than claimed (tools/mesh/mikktRef.mjs builds them on demand and SKIPS
+when no compiler is present, the same binaryIfCurrent()-guarded pattern tools/mesh/xatlasRef.mjs
+already established).
+
+EVIDENCE:
+  git ls-remote https://github.com/mmikk/MikkTSpace HEAD  ->  3e895b49d05ea07e4c2133156cfa94369e19e409
+  head -20 mikktspace.c  ->  the zlib header quoted above, verbatim
+  sha256sum mikktspace.c  ->  de87e74107df766ce68108801262bd8d53899414236b59810509a8fc2a51e288
+  sha256sum mikktspace.h  ->  17fc433894f24c73753d548086cc4d8c5c0379f4a6edfb98b5da243e4f0bc3d0
+  wc -l mikktspace.c mikktspace.h  ->  1899 + 145 = 2044 lines total
