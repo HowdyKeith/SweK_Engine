@@ -471,6 +471,7 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4657 -- 1758 -> 1759 for render/reactiveGPU-selfcheck.mjs, the factor pass's third input.
     // v4661 -- 1759 -> 1760 for tools/ship/fsrPageClocks-selfcheck.mjs, the scene clock and the history's age.
     // v4664 -- 1760 -> 1761 for render/dilateGPU-selfcheck.mjs, FSR2's dilated depth and motion.
+    // v4672 -- 1762 -> 1763 for tools/ship/fsr2Coverage-selfcheck.mjs, the FSR2 pass census.
     // v4668 -- 1761 -> 1762 for render/luminancePyramid-selfcheck.mjs, FSR2's luminance pyramid. nameFirst
     // bumped in the SAME edit this time, which it was not at v4661 or v4664.
     // Seventh round running with the same four rows by one and the other four held -- and this round bumped
@@ -481,8 +482,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // this row caught it, which is the division of labour working and is also the reason the sentence is
     // not enough on its own. The pre-flight cannot see it either -- recordDrift compares four
     // fields and this row compares all nine, which is exactly why that row says so in its own text.
-    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1634, condFirst: 91, unknownSignature: 16,
+    gates: 1763, usesOk: 1742, definesOk: 1734, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1635, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

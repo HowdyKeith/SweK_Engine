@@ -8032,6 +8032,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4672 -- THE 282nd CLOSING: "FSR2 is complete" becomes a number a reader can recompute.
+    since357: Object.freeze({
+        at: "v4672", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsr2Coverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FIFTEEN ROUNDS ADDED FSR2 PASSES AND THE ONLY ACCOUNT OF WHAT REMAINED WAS PROSE IN A " +
+                 "CLOSING LINE. *** tools/ship/fsr2Coverage.mjs maps FSR2's dispatches onto this tree's " +
+                 "modules and the gate grades it. MEASURED: 10 WIRED, 1 GATE-ONLY, 3 MISSING, OF 14. " +
+                 "*** THE MAPPING IS A DECLARATION AND THE MODULE SAYS SO IN ITS OWN HEADER. *** That " +
+                 "temporalReject 'is' ffx_fsr2_depth_clip is a judgement about two pieces of software, and a " +
+                 "tool inferring it from file names would invent a correspondence and report it as a " +
+                 "measurement. What is DERIVED is everything a gate can hold: that the named files exist " +
+                 "(20 across 14 passes), that every pass called WIRED is really imported by fsr.html, and " +
+                 "that the summary counts are the rows counted. So the table can be wrong about what a pass " +
+                 "MEANS and cannot be wrong about what this tree HAS. " +
+                 "*** AND TWO CENSUSES WRITTEN IN DIFFERENT ROUNDS FOR DIFFERENT QUESTIONS AGREE. *** The " +
+                 "one gate-only pass is compute_luminance_pyramid, and runnerCallers -- which walks compute " +
+                 "runners and their importers, knowing nothing about FSR2's pipeline -- independently names " +
+                 "render/luminancePyramidGPU.mjs. Neither is derived from the other, which is the only " +
+                 "reason the agreement is worth anything, and v4668 widened that ratchet for exactly this " +
+                 "file with the reason recorded there. " +
+                 "*** WHAT IS ACTUALLY LEFT, AND ONE OF THE THREE IS NOT A FEATURE. *** Auto-exposure " +
+                 "APPLIED to the chain (the pyramid and exposureFrom exist; nothing multiplies by the " +
+                 "result, and on [0,1] content the scale is 1 -- v4668 measured that rather than assuming " +
+                 "it). TCR, the opaque-vs-composed second mask, for which this tree now has the transparent " +
+                 "CONTENT since v4669 and an application-supplied mask since v4670 but no comparison. And " +
+                 "single-pass SPD, which is an OPTIMISATION and is labelled as one: it computes the numbers " +
+                 "luminancePyramidGPU already computes. Counting that as a missing feature would report " +
+                 "this tree as further from FSR2 than it is, and omitting it would claim a like-for-like " +
+                 "port. Every MISSING row carries a note and a gate row fails if one stops. " +
+                 "Five sabotages, five caught, no 0-RED. V2 is the one worth reading: removing the page's " +
+                 "import moves a pass from wired to gate-only WITHOUT touching the table, which is the exact " +
+                 "failure this file exists for -- a coverage document still claiming a pass runs after the " +
+                 "only thing running it stopped. RUNTIME 2,009 ms, inside the sweep.",
+    }),
     // v4671 -- THE 281st CLOSING: the primary replicates, and the secondary inverts.
     since356: Object.freeze({
         at: "v4671", swept: 0, green: 0, red: 0,

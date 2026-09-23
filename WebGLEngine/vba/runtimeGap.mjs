@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4305,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4307,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -735,6 +735,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // file that drives a GPU, which is exactly what a text census can see and the only thing it can.
     //
     // *** v4657 -- SIX ROWS, FOUR NEW FILES, and the WebGL row moves again for v4648's reason. *** files
+    // v4672 -- 4305 -> 4307, ES modules 4005 -> 4007, closures 3865 -> 3867, for
+    // tools/ship/fsr2Coverage.mjs and its gate. async/await does NOT move: both are synchronous, which is
+    // unusual in this arc and is why the gate runs in 2 s rather than needing an adapter.
     // v4668 -- 4301 -> 4305, ES modules 4001 -> 4005, closures 3863 -> 3865, async/await 1532 -> 1534,
     // typed arrays 1137 -> 1140, WebGL 161 -> 162, for render/luminancePyramid.mjs, its kernel, its runner
     // and its gate. Promises do NOT move, for the same reason as v4664: the four files await and none
@@ -756,7 +759,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4005, closures: 3865, asyncAwait: 1534, typedArrays: 1140, promises: 370,
+    esModules: 4007, closures: 3867, asyncAwait: 1534, typedArrays: 1140, promises: 370,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 162, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
