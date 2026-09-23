@@ -231,6 +231,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             // running integrals instead, in shader time, so the shader can build a secular phase that is
             // exact. render/aiPresenceOrbState.mjs's own note has the factoring and the measurement.
             paceInt: p.paceInt, voiceInt: p.voiceInt, driveInt: p.driveInt,
+            paceDriveInt: p.paceDriveInt, voiceDriveInt: p.voiceDriveInt, duetFlourishInt: p.duetFlourishInt,
             aspect: 1,   // the widget's own canvas is always square, unlike the standalone demo's full window
         });
         pipeline.render(renderer);

@@ -232,12 +232,13 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 14 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 14,
+    ok("!! the conditioned pair is declared once each and read 42 and 15 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 15,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
-        `strings stripped. The cadence count is 14 at v4656, 12 at v4655 and 11 before that: helix's climb took ` +
-        `murmur's 0.75*live.pace at v4655, and at v4656 still's gesture slot and abyss's took 0.30 and 0.35 ` +
-        `of it. Three absences filled in two rounds, none of them a new number. The 43 before that was a REPAIR of a ` +
+        `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
+        `-- and every step was an ABSENCE being filled rather than a number being invented: helix's climb ` +
+        `took murmur's 0.75*live.pace at v4655, still's and abyss's gesture slots took 0.30 and 0.35 of it ` +
+        `at v4656, and duet's orbital rate took 0.55 at v4657. The 43 before all that was a REPAIR of a ` +
         `recorded 44, not a regression: v4641 moved 44 raw-knob sites and 8 glintRate sites, and one of the ` +
         `44 collapsed into a shared expression while the census kept scoring the comment that named it. The ` +
         `pixel rows above are what say the move was real; this row says nothing was left behind.`);
@@ -286,13 +287,15 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
     say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
-    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES ELEVEN -- the six builders still without one are named ***",
-        paced.length === 11 &&
-        ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix", "still", "abyss"].every((x) => paced.includes(x)) &&
-        unpaced.length === (marks.length - 1) - 11,
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES TWELVE -- the five builders still without one are named ***",
+        paced.length === 12 &&
+        ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix", "still", "abyss", "duet"].every((x) => paced.includes(x)) &&
+        unpaced.length === (marks.length - 1) - 12,
         `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
-        `${unpaced.join(", ")} -- six builders covering seven species, since mist draws both nebula and ` +
-        `tempest. still and abyss arrive at v4656 through their GESTURE SLOTS, which murmur divides by the ` +
+        `${unpaced.join(", ")} -- five builders covering six species, since mist draws both nebula and ` +
+        `tempest. duet arrives at v4657: its orbital rate reads 0.55*live.pace beside the gesture term this ` +
+        `port already had, so the pair sped up for its own flourish and ignored the exchange. still and ` +
+        `abyss arrived at v4656 through their GESTURE SLOTS, which murmur divides by the ` +
         `signal sum: still's carried no divisor at all and abyss's carried the voice term alone. helix ` +
         `arrived at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
         `this port carried the bare drift, so its strands rose at one speed whatever the exchange was doing. ` +

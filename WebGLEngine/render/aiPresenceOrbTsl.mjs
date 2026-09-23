@@ -55,6 +55,13 @@ export const ORB_KNOBS = Object.freeze([
     // A shader has no memory, so the host supplies the running integrals instead and the secular phase
     // becomes base * (t + a*P + b*V + c*D), which is the exact integral and costs three numbers.
     "paceInt", "voiceInt", "driveInt",
+    // ...and three more at v4657, for the two rates v4654 recorded as out of reach. paceDriveInt and
+    // voiceDriveInt are limn's, whose rate is a PRODUCT so its expansion needs the integral of each product
+    // rather than of each signal; duetFlourishInt is duet's own gesture envelope, integrated host-side
+    // because its lane and slot are style constants and the envelope is therefore a function of the clock
+    // this host already keeps. See render/aiPresenceOrbState.mjs, which explains why the record that called
+    // that impossible was wrong.
+    "paceDriveInt", "voiceDriveInt", "duetFlourishInt",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
@@ -126,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -186,7 +193,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
     const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0,
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, paceDriveInt: 0, voiceDriveInt: 0, duetFlourishInt: 0,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
@@ -536,16 +543,30 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the dominant half of limn's cadence response was missing. The sum factor is repaired and
         // integrated here.
         //
-        // *** THE DRIVE FACTOR IS STILL DEFERRED AND THE REASON IS SPECIFIC: limn's rate is a PRODUCT of two
-        // modulated factors, not a sum. *** Expanding it gives cross terms in pace*drive and voice*drive, and
-        // the factoring this round rests on needs the integral of each PRODUCT, not of each signal -- two
-        // more accumulators for one species. It is the only rate in the roster shaped this way.
-        const limnBase = float(0.34).add(uniforms.travel.mul(0.40)).toVar();
-        const limnRate = limnBase.mul(float(1.0).add(PACE.mul(0.95)).add(VOICE.mul(0.30))).toVar();
+        // *** THE DRIVE FACTOR ARRIVES AT v4657, AND IT COST EXACTLY WHAT v4654 SAID IT WOULD. *** limn's
+        // rate is a PRODUCT of two modulated factors, so expanding it gives cross terms in pace*drive and
+        // voice*drive and the integral needs each PRODUCT rather than each signal -- two more accumulators
+        // for one species. v4654 named that price and passed 0.0 rather than fold a product in as if it
+        // were a sum; this round pays it. It is the only rate in the roster shaped this way.
+        //
+        // THE CROSS COEFFICIENTS ARE FORMED HERE AS PRODUCTS OF THE TWO FACTORS and not read from a third
+        // pair of numbers, because 0.95 * 1.05 IS the expansion and a table carrying 0.9975 beside them
+        // would be two spellings of one fact. Held signals make the whole thing murmur's own product again
+        // to 3.6e-12; moving ones are where murmur's spelling advances this travel 68.3121 rad in a single
+        // 1/60 s frame after half an hour, which is nearly eleven whole turns.
+        const LR = MH_LIMN_RATE;
+        const limnBase = float(LR.base).add(uniforms.travel.mul(LR.travelK)).toVar();
+        const limnRate = limnBase.mul(float(1.0).add(PACE.mul(LR.pace)).add(VOICE.mul(LR.voice)))
+            .mul(float(1.0).add(DRIVE.mul(LR.drive))).toVar();
         const phi0 = KIT.mhDriftPhase(
-            KIT.mhRatePhase(limnBase, uniforms.time, float(0.95), uniforms.paceInt,
-                float(0.30), uniforms.voiceInt, float(0.0), uniforms.driveInt),
-            limnRate, float(0.62), float(1.0), uniforms.time).toVar();
+            KIT.mhRatePhase(limnBase, uniforms.time, float(LR.pace), uniforms.paceInt,
+                float(LR.voice), uniforms.voiceInt, float(LR.drive), uniforms.driveInt)
+                .add(KIT.mhCrossPhase(limnBase, float(LR.pace * LR.drive), uniforms.paceDriveInt,
+                                      float(LR.voice * LR.drive), uniforms.voiceDriveInt)),
+            // ...and the EASE flattens as the sweep decides: limn.ts's wobble is mix(0.62, 0.14, st.drive)
+            // and this port carried the resting 0.62 alone. A bounded amplitude, so it reads the
+            // instantaneous drive exactly as murmur does -- no integral, nothing to teleport.
+            limnRate, mix(float(LR.wobLo), float(LR.wobHi), DRIVE), float(LR.lane), uniforms.time).toVar();
         const phi = TSL.atan(pc.y, pc.x).toVar();
         // limn.ts wraps by subtracting a ROUNDED turn, which is exact at the seam; an atan round-trip is not.
         const aw = phi.sub(phi0).toVar();
@@ -1922,9 +1943,25 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 .mul(mix(float(1.0), float(DU.rSmall), smallK))
                 .mul(float(1.0).sub(DRIVE.mul(FORM.sep)))
                 .mul(float(1.0).sub(flD.x.mul(0.30))).toVar();
-            const rate = float(DU.rateB).add(orbitK.mul(DU.rateK))
-                .mul(float(1.0).add(flD.x.mul(0.85))).toVar();
-            const psi = KIT.mhDrift(uniforms.time, rate, float(DU.orbitWob), float(DU.orbitLane)).toVar();
+            // *** duet's RATE WAS TELEPORTING ON ITS OWN GESTURE, AND v4654 RECORDED THAT AS UNREACHABLE. ***
+            // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x). This
+            // port carried the FLOURISH term and neither of the other two -- so the pair sped up for its own
+            // gesture and ignored the exchange -- and mh_drift's phase is rate * t, so every time a gesture
+            // fired the orbit jumped by t * dRate. MEASURED at 1.8152 rad in one 1/60 s frame after half an
+            // hour, which is 29% of a whole turn of the shared orbit, against a flat 0.006244 integrated.
+            //
+            // *** THE RECORD SAID THE HOST COULD NOT SEE fl.x. IT CAN. *** mh_flourish is a pure function of
+            // shader time, a lane and a slot LENGTH, and duet's two are style constants out of MH_DUET. So
+            // the envelope is a deterministic function of the clock the host already integrates, and
+            // render/aiPresenceOrbState.mjs accumulates it like any other signal. A signal the host does not
+            // know has no integral to send -- but this was never one of those.
+            const rateBase = float(DU.rateB).add(orbitK.mul(DU.rateK)).toVar();
+            const rate = rateBase.mul(float(1.0).add(PACE.mul(DU.ratePace)).add(DRIVE.mul(DU.rateDrive))
+                .add(flD.x.mul(DU.rateFlourish))).toVar();
+            const psi = KIT.mhDriftPhase(
+                KIT.mhRatePhase(rateBase, uniforms.time, float(DU.ratePace), uniforms.paceInt,
+                    float(DU.rateFlourish), uniforms.duetFlourishInt, float(DU.rateDrive), uniforms.driveInt),
+                rate, float(DU.orbitWob), float(DU.orbitLane), uniforms.time).toVar();
             // THE BRAID: "two things becoming one line without merging." Off at rest; the gesture alone
             // reaches it here, because this port has no drive signal wired.
             const braid = flD.x.mul(DU.braidFlourish).mul(sin(psi.mul(DU.braidRate))).toVar();

@@ -337,7 +337,14 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     //   INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE. It reaches a clock at exactly one place, as
     //   mh_drift's WOBBLE AMPLITUDE, which is bounded by k*rate/w2 and cannot accumulate. Every SECULAR term
     //   that reads drive reads the running integral instead, through mhRatePhase's last two arguments.
-    const bad = lines.filter((l) => /\bDRIVE\b/.test(l) && /uniforms\.time/.test(l));
+    // *** THE LINE TEST WAS A PROXY AND IT FIRED ON A CORRECT SITE. *** "No line reads both DRIVE and
+    // uniforms.time" was standing in for "no expression multiplies the instantaneous drive by elapsed time".
+    // Those are not the same claim: v4657 gave limn murmur's flattening wobble, mix(0.62, 0.14, DRIVE), and
+    // it sits on the same source line as the uniforms.time that mhDriftPhase takes as its own argument --
+    // a bounded amplitude and a clock argument side by side, which is exactly the arrangement this row
+    // exists to bless. So the test is the actual shape now: a product of DRIVE and time, either way round.
+    const bad = lines.filter((l) => /\bDRIVE\b[^;]*\.mul\(\s*uniforms\.time/.test(l) ||
+                                    /uniforms\.time[^;]*\.mul\(\s*DRIVE\b/.test(l));
     // Every DRIVE inside a mhDriftPhase call must be in the SECOND argument (the amplitude), never the first.
     const chainArgs = (txt, at) => {
         let open = txt.indexOf("(", at), j = open, d = 0;
@@ -354,16 +361,21 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     for (let i = 0; (i = src.indexOf("KIT.mhDriftPhase(", i)) !== -1; i += 8) {
         const a = chainArgs(src, i);
         if (/\bDRIVE\b/.test(a[0] || "")) secularDrive++;
-        if (/\bDRIVE\b/.test(a[1] || "")) amplitudeDrive++;
+        // mh_drift's wobble term is k * rate / w2 times a sine, so BOTH the rate argument and the wobble
+        // coefficient set an amplitude and neither can accumulate. helix's drive is in the rate (its whole
+        // climb is scaled); limn's is in the wobble (its ease flattens as the sweep decides). Counting only
+        // the rate missed limn and read 1 where the file has 2.
+        if (/\bDRIVE\b/.test(a[1] || "") || /\bDRIVE\b/.test(a[2] || "")) amplitudeDrive++;
     }
     // ...and the integral itself is only ever handed to mhRatePhase, so it cannot be spent as a plain factor.
     const driveIntReads = (src.match(/uniforms\.driveInt/g) || []).length;
     const driveIntInRate = (src.match(/uniforms\.driveInt\)/g) || []).length;
     ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
-        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 1 && driveIntReads === driveIntInRate,
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 2 && driveIntReads === driveIntInRate,
         `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
         `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
-        `helix's climb, the one site where murmur scales a clock by st.drive and this port reaches it. The ` +
+        `helix's climb, whose whole rate murmur scales by st.drive, and limn's flattening ease, ` +
+        `mix(0.62, 0.14, st.drive), which arrived at v4657. Both are amplitudes. The ` +
         `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
         `and it reads uniforms.driveInt, which appears ${driveIntReads} times and every one of them is the ` +
         `last argument of a mhRatePhase call. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +

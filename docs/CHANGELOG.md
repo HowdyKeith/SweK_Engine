@@ -26,6 +26,75 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4657 -- the two rates the records gave up on, one of which was never out of reach
+
+`murmurClock-selfcheck.mjs` had carried this sentence for three rounds:
+
+> its rate reads the species' OWN FLOURISH envelope, which is computed inside the shader from a hash and
+> cannot be integrated by a host that has never seen it. A signal the host does not know has no integral to
+> send, and that is a property of the mechanism rather than a gap in this round.
+
+**The host does know it.** `mh_flourish` is a pure function of shader time, a lane and a slot *length*, and
+duet's lane and slot are style constants out of `MH_DUET` — so the envelope is a deterministic function of
+the very clock `aiPresenceOrbState.mjs` already integrates. The sentence is true of a signal the host does not
+know, and duet's was never one of those. It read as a property of the mechanism, and it was believed.
+
+Measured meanwhile, at a 1/60 s frame:
+
+| running first | duet, integrated | duet, murmur's `rate·t` | limn, integrated | limn, murmur's |
+|---|---|---|---|---|
+| 5 s | 0.006244 rad | 0.0151 rad | 0.056582 rad | 0.1948 rad |
+| 300 s | 0.006244 rad | 0.3010 rad | 0.056582 rad | 11.3896 rad |
+| 1800 s | 0.006244 rad | **1.8152 rad** | 0.056582 rad | **68.3121 rad** |
+
+duet's 1.8152 is 29% of a whole turn of the pair's shared orbit, in one frame — and the trigger is the
+species' *own gesture*, not anything the user does. limn's is nearly eleven whole turns.
+
+**limn's was priced correctly and this round paid it.** Its rate is the only one in murmur's roster that is a
+product of two modulated factors:
+
+    base · (1 + 0.95·pace + 0.30·voice) · (1 + 1.05·drive)
+      = base · (1 + 0.95p + 0.30v + 1.05d + 0.9975·p·d + 0.3150·v·d)
+
+so the exact integral needs the integral of each **product**, which is two more accumulators. The expansion
+reproduces murmur's product to 3.6e-12 over 180 held operating points out to an hour — and a product folded in
+as a sum would pass at `d = 0` and at `p = v = 0`, which is most of an idle session.
+
+**The cross integral is not the product of the two integrals** — 8.20 against 68.35 after twenty seconds idle
+and six busy. A product of integrals carries `t²`. That is also the trap the frame helper fell into, and the
+sabotage that walked through every gate in the tree.
+
+**Three instruments had quietly stopped meaning what they said.** `murmurSpecies12` divided its fourteen orbit
+samples out of duet's *base* rate; with murmur's three modulated terms wired, that covers 86% of a turn and
+every row kept passing, saying "across one full orbit" about something that was not one. The times are solved
+from the phase now, and the gate asserts its own coverage at 1.0004 turns — **a gate that silently measures
+less than it claims is worse than a red one.** `murmurDrive` tested "no line reads both `DRIVE` and
+`uniforms.time`" as a proxy for "no expression multiplies drive by elapsed time", and fired on limn's
+flattening wobble — a *bounded amplitude*, which is precisely the arrangement that row exists to bless.
+`murmurDrive2` bounded helix's contraction as `pct < 10 * limn.pct` with both numbers negative, so limn moving
+*more* made helix's claim *harder*; it is a ratio of magnitudes now.
+
+Fifteen sabotages, all caught, four only after repair. The gesture-integral row graded a running sum the
+*gate* kept beside the module's rather than the module's own — so accumulating against wall `dt` and reading
+the wrong flourish lane both walked straight through. **A reference is only evidence about the thing it is
+actually applied to.**
+
+`mhRatePhase`'s three pairs are named `kA/intA` now rather than `kPace/paceInt`: the function is a sum of
+three coefficient-and-integral pairs, nine call sites spend them on pace, voice and drive, and duet spends its
+middle one on its own gesture. Under the old names that call site read `float(DU.rateFlourish),
+uniforms.duetFlourishInt` in slots labelled for voice — a small lie in the one place a reader looks to find
+out what a rate is made of.
+
+No gate file was added: the subject is two more clocks of a kind `murmurClock-selfcheck.mjs` already owns, so
+it took a section and six rows instead, and paid for them by replacing a 438,000-tick settle with the closed
+form the state module computes (3,345 ms → 3,042 on this box, ~2,160 recorded). A gate file per round is a
+habit, not a rule.
+
+**What is left of the whole clock arc is two sites, and both are absences rather than teleports:** opal's
+flash drift and geode's spin. In this port neither rate moves — opal's live terms and geode's drive mix are
+simply missing — so adding them as murmur spells them would ship two new teleports, and adding them in the
+integrated form costs nothing new, because both are sums.
+
 ## v4656 -- the gesture clock: a slot that changes length does not advance the gesture, it replaces it
 
 `mh_flourish` is the pack's play mechanism — "every hero performs **one** gesture, a thing the presence does

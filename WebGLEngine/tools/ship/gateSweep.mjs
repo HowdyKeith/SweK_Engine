@@ -8070,6 +8070,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4657 -- THE 340th CLOSING: the two rates this tree recorded as out of reach, one of them because a
+    // record said the host could not see a signal it had been keeping all along.
+    since339: Object.freeze({
+        at: "v4657", swept: 0, green: 0, red: 0,
+        // NO NEW GATE FILE. The subject is two more clocks of a kind tools/ship/murmurClock-selfcheck.mjs
+        // already owns, so the round added a section and four rows to it rather than a seventh murmur gate,
+        // and paid for them by replacing a 438,000-tick settle with the closed form it computes (3,345 ms
+        // to 3,042 on this box). A gate file per round is a habit, not a rule.
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate added; murmurClock-selfcheck.mjs green at 3,042 ms on this box against a " +
+                 "murmurKit measuring 2,861 here and RECORDED at 2,035 -- a drift of 1.41, so about 2,160 " +
+                 "recorded, up from 1,611 for six new rows and two more rendered species. " +
+                 "*** THE RATE FAMILY IS FINISHED, AND THE LAST TWO WERE THE ONES THIS TREE HAD WRITTEN " +
+                 "OFF. *** duet's rate was recorded in murmurClock-selfcheck.mjs for three rounds as " +
+                 "structurally unreachable: \"its rate reads the species' OWN FLOURISH envelope, which is " +
+                 "computed inside the shader from a hash and cannot be integrated by a host that has never " +
+                 "seen it. A signal the host does not know has no integral to send.\" THE HOST DOES KNOW " +
+                 "IT. mh_flourish is a pure function of shader time, a lane and a slot LENGTH, and duet's " +
+                 "lane and slot are style constants out of MH_DUET -- so the envelope is a deterministic " +
+                 "function of the very clock render/aiPresenceOrbState.mjs already integrates. The sentence " +
+                 "was true of a signal the host does not know; duet's was never one of those, and it read " +
+                 "as a property of the mechanism. " +
+                 "MEASURED: duet's orbital phase advanced 1.8152 rad in ONE 1/60 s frame after half an hour " +
+                 "-- 29% of a whole turn of the pair's shared orbit -- against a flat 0.006244, and the " +
+                 "trigger was the species' own gesture rather than anything the user did. limn's, which " +
+                 "v4654 priced correctly at two more accumulators, reached 68.3121 rad in a frame: nearly " +
+                 "eleven whole turns. Both reduce to murmur's own expression at a held signal, limn's " +
+                 "product to 3.6e-12 over 180 operating points. " +
+                 "THREE NEW HOST INTEGRALS, and the cross ones are the interesting pair: the integral of " +
+                 "pace*drive is NOT the product of the two integrals -- 8.20 against 68.35 after twenty " +
+                 "seconds idle and six busy -- because a product of integrals carries t SQUARED. " +
+                 "*** AND THREE INSTRUMENTS WERE REPAIRED, EACH OF WHICH HAD STOPPED MEANING WHAT IT " +
+                 "SAID. *** murmurSpecies12 divided its fourteen orbit samples out of duet's BASE rate; " +
+                 "with murmur's three modulated terms in, that covers 86% of a turn and every row still " +
+                 "passed, saying \"across one full orbit\" about something that was not one -- the times " +
+                 "are SOLVED from the phase now and the gate asserts its own coverage at 1.0004 turns. " +
+                 "murmurDrive tested \"no line reads both DRIVE and uniforms.time\" as a proxy for \"no " +
+                 "expression multiplies drive by elapsed time\", and fired on limn's flattening wobble -- a " +
+                 "bounded amplitude, which is the arrangement the row exists to bless. murmurDrive2 bounded " +
+                 "helix's contraction as `pct < 10 * limn.pct` with both numbers NEGATIVE, so limn moving " +
+                 "more made helix's claim HARDER: a ratio of magnitudes now. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, FOUR ONLY AFTER REPAIR: the gesture-integral row graded a " +
+                 "sum this GATE kept beside the module's rather than the module's own, so accumulating " +
+                 "against wall dt and reading the wrong lane both walked through; the frame helper deriving " +
+                 "the cross terms as a product of integrals walked through everything; and nothing noticed " +
+                 "duet's orbit samples silently covering less than they claimed.",
+    }),
     // v4656 -- THE 339th CLOSING: the gesture clock, where a slot that changes length does not advance the
     // gesture, it replaces it.
     since338: Object.freeze({

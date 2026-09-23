@@ -961,6 +961,32 @@ export const NEXT_ROUNDS = [
             "duet's shader-side flourish rate, limn's drive FACTOR, and the nine species still without " +
             "murmur's cadence -- helix took it at v4655 and still took it at v4656, so the count has moved " +
             "twice in two rounds.",
+        note6: "*** THE RATE FAMILY IS FINISHED AT v4657, AND ONE OF THE LAST TWO WAS NEVER BLOCKED. *** " +
+            "note3 above recorded duet's rate as structurally unreachable -- \"duet's rate reads the " +
+            "species' OWN flourish envelope, computed in the shader from a hash, so there is no host-side " +
+            "integral to send\". That is true of a signal the host does not know, and duet's was not one: " +
+            "mh_flourish is a pure function of shader time, a LANE and a SLOT LENGTH, and duet's two are " +
+            "style constants. The envelope is therefore a deterministic function of the clock the host " +
+            "already keeps. THE RECORD CLOSED A DOOR THAT WAS NEVER LOCKED, and it was believed for three " +
+            "rounds while duet's orbit jumped 1.8152 rad in a frame -- 29% of a whole turn -- every time " +
+            "one of its own gestures fired.\n\n" +
+            "limn's was priced correctly and this round paid it: two accumulators for the two cross " +
+            "products its PRODUCT rate expands to. What is worth carrying forward is that the cross " +
+            "integral is NOT the product of the two integrals (8.20 against 68.35 in the measurement), " +
+            "because the latter carries t squared -- which is also the trap the frame helper fell into and " +
+            "the sabotage that walked through every gate.\n\n" +
+            "*** WHAT IS LEFT OF THE WHOLE CLOCK ARC IS TWO SITES, AND BOTH ARE ABSENCES RATHER THAN " +
+            "TELEPORTS: *** opal's flash drift (opal.ts: drift = (0.055 + 0.075*driftK) * (1 + 0.75*pace + " +
+            "0.95*drive), spent as drift * t inside three sines) and geode's spin (geode.ts: " +
+            "mix(mh_drift(...), t * 0.30 * sp, st.drive * 0.7), whose secular term expands to " +
+            "sp*(0.088 + 0.1484*drive)*t). In THIS port neither rate moves: opal's live terms and geode's " +
+            "drive mix are both simply missing. Adding them as murmur spells them would ship two new " +
+            "teleports; adding them in the integrated form costs nothing new, because both are SUMS and " +
+            "the three conditioned integrals are already sent.\n\n" +
+            "ALSO STILL OPEN: tempest's bolt slots are missing murmur's `small` mix (mix(2.9, 5.2, small) " +
+            "and mix(4.3, 7.4, small)), and five builders covering six species still have no cadence at " +
+            "all -- droplet, opal, mist, fathom, geode. That count has moved in each of the last four " +
+            "rounds, from eight species to twelve, and every step was an absence being filled.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

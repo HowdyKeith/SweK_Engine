@@ -101,10 +101,19 @@ sec("1. *** FOUR OF THE FIVE DRAW IN, AND THE FIFTH IS THE ONE WHOSE TABLE SAYS 
     for (const r of R) say(`${r.s.padEnd(6)} RMS radius ${r.r0.toFixed(4)} -> ${r.r1.toFixed(4)}  ${r.pct.toFixed(2)}%   (bytes moved ${r.moved.pct.toFixed(1)}%, worst channel ${r.moved.mx})`);
 
     const narrowers = R.filter((r) => r.s !== "limn"), limn = R.find((r) => r.s === "limn");
+    // *** THE SECOND CLAUSE WAS `r.pct < 10 * limn.pct` AND THAT RAN THE WRONG WAY. *** Both numbers are
+    // negative, so the bound got STRICTER as limn moved -- limn contracting a little more made helix's claim
+    // harder to satisfy, which is backwards for a row whose point is that helix draws in and limn does not.
+    // It held while limn's radius barely moved at all, and went red at v4657 when limn gained murmur's drive
+    // FACTOR and its flattening wobble and drew in 0.60% instead of 0.12%. A RATIO OF MAGNITUDES says what
+    // was meant: helix's contraction is many times limn's, whatever limn's happens to be.
     ok("!! *** THE LIGHT DRAWS IN: helix's whole field moves inward as the strands close on the axis ***",
-        narrowers.every((r) => r.pct < -2.5) && narrowers.every((r) => r.pct < 10 * limn.pct),
+        narrowers.every((r) => r.pct < -2.5) &&
+        narrowers.every((r) => Math.abs(r.pct) > 5 * Math.abs(limn.pct)),
         `${narrowers.map((r) => r.s + " " + r.pct.toFixed(2) + "%").join(", ")}, against limn's ` +
-        `${R.find((r) => r.s === "limn").pct.toFixed(2)}% in the row below. THE SIZE OF A CONTRACTION DOES ` +
+        `${R.find((r) => r.s === "limn").pct.toFixed(2)}% in the row below -- a factor of ` +
+        `${Math.min(...narrowers.map((r) => Math.abs(r.pct) / Math.abs(limn.pct))).toFixed(1)}x at the ` +
+        `narrowest. THE SIZE OF A CONTRACTION DOES ` +
         `NOT TRACK THE SIZE OF ITS COEFFICIENT AND THIS ROW DOES NOT CLAIM IT DOES: measured this round, ` +
         `prism carries the table's LARGEST coefficient (0.62 against duet's 0.34) and moved LESS than duet ` +
         `(-4.05% against -7.21%), because a fan closing rotates three beams about a shared origin while a ` +

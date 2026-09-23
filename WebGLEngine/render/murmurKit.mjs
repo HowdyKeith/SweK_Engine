@@ -272,8 +272,42 @@ export function mhDrift(t, rate, wobble, lane) {
  * this divergence moves no recorded frame: the two differ only while a signal is in motion, which is
  * precisely where murmur's is wrong.
  */
-export function mhRatePhase(base, t, kPace, paceInt, kVoice, voiceInt, kDrive, driveInt) {
-    return base * (t + kPace * paceInt + kVoice * voiceInt + kDrive * driveInt);
+/*
+ * *** THE THREE PAIRS ARE NAMED kA/intA RATHER THAN kPace/paceInt, AND THAT IS A CORRECTION MADE AT v4657. ***
+ * The function is a sum of three coefficient-and-integral pairs; nine of its ten call sites spend them on
+ * pace, voice and drive, and duet spends its middle one on its OWN GESTURE ENVELOPE, which the host
+ * integrates because duet's flourish lane and slot are style constants. Under the old names that call site
+ * read `float(DU.rateFlourish), uniforms.duetFlourishInt` in the slots labelled kVoice and voiceInt -- an
+ * argument named for one signal carrying another, which is a small lie in the one place a reader looks to
+ * find out what a rate is made of. The generality was always there; the names hid it.
+ */
+export function mhRatePhase(base, t, kA, intA, kB, intB, kC, intC) {
+    return base * (t + kA * intA + kB * intB + kC * intC);
+}
+
+/**
+ * *** THE TERMS A RATE NEEDS WHEN IT IS NOT A SUM OF THE THREE CONDITIONED SIGNALS -- v4657. ***
+ *
+ * mhRatePhase covers base * (1 + a*pace + b*voice + c*drive), which is every rate in murmur's roster but
+ * one. limn's is a PRODUCT of two modulated factors:
+ *
+ *     rate = base * (1 + 0.95*pace + 0.30*voice) * (1 + 1.05*drive)
+ *          = base * (1 + 0.95p + 0.30v + 1.05d + 0.9975*p*d + 0.3150*v*d)
+ *
+ * and the last two terms are integrals of a PRODUCT, which is not the product of two integrals. The host
+ * accumulates them from the conditioned pair at each instant -- see render/aiPresenceOrbState.mjs -- and
+ * this adds them to what mhRatePhase already returned. Together the two reproduce murmur's product EXACTLY
+ * at a held signal (3.6e-12 over 144 operating points out to an hour), which is what protects every
+ * recorded frame, and diverge only while a signal is moving, which is where murmur's is wrong: 68.3121 rad
+ * of limn's travel in one 1/60 s frame after half an hour, against a flat 0.056582.
+ *
+ * *** IT IS SPLIT FROM mhRatePhase RATHER THAN FOLDED INTO IT because ONE species has cross terms. *** A
+ * five-pair mhRatePhase would make nine call sites pass 0.0 twice, and a coefficient of zero grades nothing
+ * -- this tree has found that exact shape in three consecutive rounds. A separate function is a separate
+ * claim, and limn is the only caller that has one to make.
+ */
+export function mhCrossPhase(base, kPaceDrive, paceDriveInt, kVoiceDrive, voiceDriveInt) {
+    return base * (kPaceDrive * paceDriveInt + kVoiceDrive * voiceDriveInt);
 }
 
 /**
@@ -685,6 +719,24 @@ export const MH_SLOT_SIGNAL = Object.freeze({
     still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
     abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
     tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+});
+
+/**
+ * *** limn's TRAVEL RATE -- THE ONE RATE IN murmur's ROSTER THAT IS A PRODUCT. ***
+ *
+ * limn.ts: rate = (0.34 + 0.40*travelK) * (1 + 0.95*live.pace + 0.30*live.voice) * (1 + 1.05*st.drive),
+ * and wobble = mix(0.62, 0.14, st.drive) -- "roughly doubles the rate: a decisive sweep", with the ease
+ * flattening as it goes so the sweep reads as decision rather than as hurry.
+ *
+ * THE CROSS COEFFICIENTS ARE NOT IN THIS TABLE ON PURPOSE. The expansion's pace*drive term is 0.95 * 1.05
+ * and its voice*drive term is 0.30 * 1.05, and the shader forms those PRODUCTS from the two factors rather
+ * than reading a third pair of numbers. A table carrying 0.9975 beside 0.95 and 1.05 is two spellings of
+ * one fact, and the day somebody edits one of the three the other two stop describing murmur.
+ */
+export const MH_LIMN_RATE = Object.freeze({
+    base: 0.34, travelK: 0.40,
+    pace: 0.95, voice: 0.30, drive: 1.05,
+    wobLo: 0.62, wobHi: 0.14, lane: 1.0,
 });
 
 /** abyss's three lanes: their seeds and the multipliers on the slot, so the gaps are never equal. */
@@ -1429,6 +1481,13 @@ export const MH_DUET = Object.freeze({
     // pair's colour conversation leans the way its own file says it does.
     hueA: 0.85, hueB: -1.00,
     flourishSlot: 6.0, flourishDur: 8.3,
+    // *** duet.ts's THREE RATE TERMS, of which this port carried ONE until v4657. ***
+    //     rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x)
+    // The flourish term was wired and the other two were not, so the pair sped up for its own gesture and
+    // ignored the exchange entirely. It is also the term that made the rate MOVE, which is why duet's
+    // orbital phase was jumping 1.8152 rad in a single frame after half an hour -- 29% of a whole turn of
+    // the shared orbit -- every time a gesture fired.
+    ratePace: 0.55, rateDrive: 0.90, rateFlourish: 0.85,
 });
 
 /**

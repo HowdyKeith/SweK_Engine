@@ -20,7 +20,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderThreeTslToPixels } from "./webgpuHarness.mjs";
-import { srgbToLinear, linearToOklab, mhLive, mhState } from "../../render/murmurKit.mjs";
+import { srgbToLinear, linearToOklab, mhLive, mhState, mhFlourish, MH_DUET } from "../../render/murmurKit.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -105,6 +105,19 @@ export const INK = [0x0A / 255, 0x0A / 255, 0x0B / 255];
  * precisely the case where the integrated form reduces to murmur's own base * (1 + a*signal) * t, which is
  * why supplying it leaves every recorded frame exactly where it was rather than merely close to it.
  */
+/**
+ * duet's gesture envelope integrated from 0 to t, at 4,096 steps -- the frame-helper twin of what
+ * render/aiPresenceOrbState.mjs accumulates a tick at a time. A frame is a steady state in the SIGNALS, but
+ * the flourish is not a signal: it is a function of the clock, so its integral is a definite one and there
+ * is no shortcut of the env*time kind the other five use.
+ */
+export const flourishQuadrature = (t) => {
+    const N = 4096, h = t / N;
+    let acc = 0;
+    for (let i = 0; i < N; i++) acc += mhFlourish((i + 0.5) * h, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * h;
+    return acc;
+};
+
 export const sp = (species, time, voice = VOICE, extra = {}) => {
     // The CONDITIONED pair, because that is what multiplies a rate -- see the operating-point note above.
     const si = extra.stateIndex != null ? extra.stateIndex : 0;
@@ -117,6 +130,16 @@ export const sp = (species, time, voice = VOICE, extra = {}) => {
        // grades a SPECIES, and tools/ship/murmurLive-selfcheck.mjs is where the live signals are the subject.
        knobs: { time, voice, activity: ACTIVITY, stateIndex: 0,
                 paceInt: lv.pace * time, voiceInt: lv.voice * time, driveInt: st.drive * time,
+                // ...and the three v4657 added, derived on the same principle. THE CROSS TERMS ARE THE
+                // PRODUCT TIMES TIME AND NOT THE PRODUCT OF THE TWO INTEGRALS: at a steady state the
+                // integral of pace*drive is (pace*drive)*t, while paceInt*driveInt would be
+                // pace*drive*t^2 -- a different number, and one that grows with the square of the frame's
+                // own timestamp. The flourish integral is the trickier one and it is NOT env*time: the
+                // envelope is zero for most of its slot, so a steady state at time t has accumulated the
+                // envelope's integral from 0 to t, which is what this quadrature computes.
+                paceDriveInt: lv.pace * st.drive * time,
+                voiceDriveInt: lv.voice * st.drive * time,
+                duetFlourishInt: flourishQuadrature(time),
                 colors: { ink: INK }, ...extra } };
 };
 

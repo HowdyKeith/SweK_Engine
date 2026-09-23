@@ -20,7 +20,7 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
-import { mhLive, mhState } from "./murmurKit.mjs";
+import { mhLive, mhState, mhFlourish, MH_DUET } from "./murmurKit.mjs";
 
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
@@ -236,6 +236,36 @@ export function createPresenceState(initial = "idle") {
     // tools/ship/murmurKit-selfcheck.mjs section 11.
     let paceInt = 0, voiceInt = 0, driveInt = 0;
 
+    // *** AND THREE MORE, FOR THE TWO RATES v4654 RECORDED AS OUT OF REACH -- v4657. ***
+    //
+    // THE CROSS PRODUCTS, for limn. limn.ts spells its rate as two modulated FACTORS:
+    //     (0.34 + 0.40*travelK) * (1 + 0.95*pace + 0.30*voice) * (1 + 1.05*drive)
+    // Expanding gives 1 + 0.95p + 0.30v + 1.05d + 0.9975*p*d + 0.3150*v*d, so the exact integral needs the
+    // integral of each PRODUCT and not of each signal. v4654 recorded that as "two more accumulators for one
+    // species" and passed limn's drive factor 0.0 rather than fold it in as if it were a sum. It costs
+    // exactly what that note said it would; what the note did not say is that it was worth it. MEASURED:
+    // murmur's spelling advances limn's travel 68.3121 rad in ONE 1/60 s frame after half an hour of running
+    // -- nearly eleven whole turns -- against a flat 0.056582.
+    let paceDriveInt = 0, voiceDriveInt = 0;
+
+    // *** THE GESTURE INTEGRAL, for duet -- AND THE RECORD THAT SAID IT COULD NOT EXIST WAS WRONG. ***
+    // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x), where fl is
+    // the species' OWN gesture envelope. v4654 called that structurally unreachable -- "its rate reads the
+    // species' OWN FLOURISH envelope, which is computed inside the shader from a hash and cannot be
+    // integrated by a host that has never seen it. A signal the host does not know has no integral to send."
+    //
+    // The host DOES know it. mh_flourish is a pure function of shader time, a lane and a slot LENGTH, and
+    // duet's lane and slot are STYLE CONSTANTS -- 6.0 and 8.3, out of MH_DUET, not signals. So the envelope
+    // is a deterministic function of the very clock this module already integrates, and the integral is an
+    // ordinary accumulation. The door was never locked; the record said it was, and the record was believed
+    // for three rounds. MEASURED: duet's orbital phase jumps 1.8152 rad in one frame after 1800 s -- 29% of
+    // a full turn of the pair's shared orbit, every time a gesture fires -- against a flat 0.006244.
+    //
+    // IT IS duet's AND IT IS NAMED FOR THAT. A second species whose rate read its own gesture would need its
+    // own accumulator, because the envelope depends on the lane and the slot; this is not a general "gesture
+    // integral" and calling it one would invite exactly that mistake.
+    let duetFlourishInt = 0;
+
     function paramsAt(name) { return STATES[name]; }
     function blendedParams() {
         if (transitionT >= TRANSITION_DURATION || !prev) return paramsAt(cur);
@@ -270,6 +300,13 @@ export function createPresenceState(initial = "idle") {
             paceInt += lv.pace * dPhase;
             voiceInt += lv.voice * dPhase;
             driveInt += stn.drive * dPhase;
+            // The two cross products, accumulated from the SAME conditioned pair at the SAME instant -- not
+            // from the running integrals, which would be the product of two averages rather than the
+            // average of a product.
+            paceDriveInt += lv.pace * stn.drive * dPhase;
+            voiceDriveInt += lv.voice * stn.drive * dPhase;
+            // duet's gesture envelope, at the phase the shader will be handed this frame.
+            duetFlourishInt += mhFlourish(phase, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * dPhase;
         },
         getParams() {
             const p = blendedParams();
@@ -287,7 +324,7 @@ export function createPresenceState(initial = "idle") {
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt };
+                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
         },
         get state() { return cur; },
     };

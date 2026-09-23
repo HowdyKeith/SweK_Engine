@@ -12,7 +12,7 @@
 // chorus does with its seven, and why the two ship together (…murmurSpecies13-selfcheck.mjs).
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, sp, renderSpecies, light, interiorPeak } from "./murmurSpeciesFrames.mjs";
+import { N3, VOICE, ACTIVITY, flourishQuadrature, sp, renderSpecies, light, interiorPeak } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -29,12 +29,39 @@ const BASE = { glint: 0, density: 0.5, fold: 0.5, spread: 0, glow: DIM,
                sep: 0.5, orbit: 0.5, ratio: 0.5, voices: 0.5, sync: 0.5, breath: 0.5 };
 const DU = (t, voice, extra = {}) => sp("duet", t, voice, { ...BASE, ...extra });
 
-// ONE FULL ORBIT, read off the species' own rate rather than spaced by hope. The orbital rate is
-// MH_DUET.rateB + orbit * rateK = 0.675 rad/s at the default, so a half turn -- which is one full exchange of
-// which body is nearer the eye -- takes about 4.65 s. Fourteen samples across 9.3 s cover both halves.
+// ONE FULL ORBIT, AND IT IS SOLVED FROM THE PHASE RATHER THAN DIVIDED OUT OF A RATE.
+//
+// *** THIS WAS `2*pi / (rateB + 0.5*rateK)` UNTIL v4657, AND THAT STOPPED BEING AN ORBIT. *** The base rate
+// is 0.675 rad/s, so fourteen samples across 9.3 s covered exactly one turn -- while duet's rate WAS the
+// base rate. v4657 gave it murmur's three modulated terms (0.55*live.pace + 0.90*st.drive + 0.85*fl.x), so
+// at this gate's own operating point the rate is about 16% higher and rises again whenever a gesture fires.
+// The old span covered 86% of a turn and the row still passed, saying "across one full orbit" about
+// something that was not one. A GATE THAT SILENTLY MEASURES LESS THAN IT CLAIMS IS WORSE THAN A RED ONE.
+//
+// So the times are SOLVED: psi is the phase the shader actually computes, and these are the fourteen times
+// at which it has advanced by equal fractions of 2*pi. That is exact whatever the rate does, and it stays
+// exact the next time somebody adds a term.
 const RATE = K.MH_DUET.rateB + 0.5 * K.MH_DUET.rateK;
-const ORBIT_S = Math.PI / RATE;
-const DT = Array.from({ length: 14 }, (_, i) => i * 2 * ORBIT_S / 14);
+const DUET_PSI = (t) => {
+    const lv = K.mhLive(VOICE, ACTIVITY, 0);   // this gate's operating point; stateIndex 0, so drive is 0
+    const rateNow = RATE * (1 + K.MH_DUET.ratePace * lv.pace +
+                            K.MH_DUET.rateFlourish * K.mhFlourish(t, K.MH_DUET.flourishSlot, K.MH_DUET.flourishDur).env);
+    return K.mhDriftPhase(
+        K.mhRatePhase(RATE, t, K.MH_DUET.ratePace, lv.pace * t,
+                      K.MH_DUET.rateFlourish, flourishQuadrature(t), K.MH_DUET.rateDrive, 0),
+        rateNow, K.MH_DUET.orbitWob, K.MH_DUET.orbitLane, t);
+};
+const DT = (() => {
+    const psi0 = DUET_PSI(0), want = Array.from({ length: 14 }, (_, i) => psi0 + i * 2 * Math.PI / 14);
+    const out = [];
+    let t = 0;
+    for (const target of want) {
+        while (DUET_PSI(t) < target && t < 120) t += 1 / 240;
+        out.push(Math.round(t * 240) / 240);
+    }
+    return out;
+})();
+const ORBIT_S = DT[DT.length - 1] * 14 / 13 / 2;   // the half-turn these samples actually span
 
 const FRAMES = [
     DU(3.0, 0.0), DU(3.0, 1.0),                      // 0,1  the balance
@@ -103,10 +130,27 @@ sec("2. *** THE PAIR PASSES IN FRONT OF AND BEHIND ITSELF, AND THE LIGHT SAYS SO
 {
     if (!okRun) { ok("!! the orbit frames rendered", false, "no frames"); }
     else {
+        // *** THE INSTRUMENT ASSERTS ITS OWN COVERAGE BEFORE IT SAYS ANYTHING ABOUT THE SPECIES. ***
+        // Every row below is "across one full orbit", and that is a claim about these fourteen times and not
+        // about duet. It went quietly untrue at v4657 when duet's rate gained murmur's three modulated terms
+        // -- the old span covered 86% of a turn and nothing noticed, because the rows are about ranges and a
+        // range measured over six sevenths of an orbit is still a range. A sabotage that puts the old
+        // base-rate division back walks through every one of them unless something checks the span itself.
+        const turns = (DUET_PSI(DT[13]) - DUET_PSI(DT[0])) / (2 * Math.PI) * 14 / 13;
+        ok("!! *** THE FOURTEEN SAMPLES COVER EXACTLY ONE TURN OF THE PHASE THE SHADER COMPUTES ***",
+            Math.abs(turns - 1) < 0.02,
+            `psi advances ${turns.toFixed(4)} turns across the fourteen, solved from duet's own phase rather ` +
+            `than divided out of a rate. THE BASE RATE IS ${RATE.toFixed(3)} rad/s AND THAT IS NO LONGER ` +
+            `duet's RATE: murmur multiplies it by (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x), so a span ` +
+            `computed as 2*pi / base covers ${(RATE / (RATE * (1 + K.MH_DUET.ratePace * K.mhLive(VOICE, ACTIVITY, 0).pace))).toFixed(2)} ` +
+            `of a turn at this gate's operating point and less whenever a gesture is up. A GATE THAT ` +
+            `SILENTLY MEASURES LESS THAN IT CLAIMS IS WORSE THAN A RED ONE, because the rows keep passing.`);
         const D = DT.map((_, i) => twoPeaks(fr(F.orbit + i)));
         const R = D.map((d) => d.ratio).filter((v) => v !== null);
         const lo = Math.min(...R), hi = Math.max(...R);
-        say(`across one full orbit (${(2 * ORBIT_S).toFixed(1)} s at ${RATE.toFixed(3)} rad/s): ratio runs ` +
+        say(`across one full orbit -- ${(DT[13] - DT[0]).toFixed(2)} s of shader time, solved so psi advances ` +
+            `${((DUET_PSI(DT[13]) - DUET_PSI(DT[0])) / (2 * Math.PI) * 14 / 13).toFixed(3)} turns over the ` +
+            `fourteen, against a BASE rate of ${RATE.toFixed(3)} rad/s that is no longer duet's rate: ratio runs ` +
             `${lo.toFixed(2)}x to ${hi.toFixed(2)}x; separations [${D.map((d) => d.dist === null ? "-" : d.dist.toFixed(0)).join(", ")}] px`);
 
         // *** THE ORBIT IS TILTED AND PRECESSES, AND BOTH BOUNDS ARE WHY. *** duet.ts bounds the tilt away
