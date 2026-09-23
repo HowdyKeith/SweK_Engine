@@ -213,13 +213,14 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 11 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 11,
+    ok("!! the conditioned pair is declared once each and read 42 and 12 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 12,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
-        `strings stripped. The 43 is a REPAIR of a recorded 44, not a regression: v4641 moved 44 raw-knob ` +
-        `sites and 8 glintRate sites, and one of the 44 collapsed into a shared expression while the census ` +
-        `kept scoring the comment that named it. The pixel rows above are what say the move was real; this ` +
-        `row says nothing was left behind.`);
+        `strings stripped. The cadence count is 12 at v4655 and was 11: helix's climb acquired murmur's ` +
+        `0.75*live.pace, which this port had simply never carried. The 43 before that was a REPAIR of a ` +
+        `recorded 44, not a regression: v4641 moved 44 raw-knob sites and 8 glintRate sites, and one of the ` +
+        `44 collapsed into a shared expression while the census kept scoring the comment that named it. The ` +
+        `pixel rows above are what say the move was real; this row says nothing was left behind.`);
 
     // mh_state's other three outputs, on the same terms. `drive` arrived at v4653 and has its own row below.
     const declS = cc(/const SETTLED = /g) + cc(/const COMPLETE = /g) + cc(/const SWEEP = /g);
@@ -265,14 +266,17 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
     say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
-    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES EIGHT -- the ten missing are named ***",
-        paced.length === 8 && ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn"].every((x) => paced.includes(x)) &&
-        unpaced.length === (marks.length - 1) - 8,
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES NINE -- the eight builders still without one are named ***",
+        paced.length === 9 && ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix"].every((x) => paced.includes(x)) &&
+        unpaced.length === (marks.length - 1) - 9,
         `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
-        `${unpaced.join(", ")}. comet and limn arrive at v4654 -- comet's orbital rate was reading VOICE where ` +
-        `murmur reads live.pace and its closure never touched the cadence at all, and limn had the smaller of ` +
-        `murmur's two terms and not the larger. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN. It is a count of ` +
-        `what this port has reached and it goes red when that count moves, in either direction.`);
+        `${unpaced.join(", ")} -- eight builders covering nine species, since mist draws both nebula and ` +
+        `tempest. helix arrives at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
+        `this port carried the bare drift, so its strands rose at one speed whatever the exchange was doing. ` +
+        `comet and limn arrived at v4654 -- comet's orbital rate was reading VOICE where murmur reads ` +
+        `live.pace and its closure never touched the cadence at all, and limn had the smaller of murmur's two ` +
+        `terms and not the larger. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN. It is a count of what this ` +
+        `port has reached and it goes red when that count moves, in either direction.`);
 
     const stillGlint = count(/uniforms\.glintRate\b/g);
     const stillBlk = (() => { const k = marks.findIndex((m) => m[1] === "still");
@@ -406,10 +410,12 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_live is the one function every species in murmur's family reads and this port " +
     "did not have. The kit's own gate proves the FUNCTION is right on a real GPU; this one proves the ORB " +
     "CALLS IT, which is the half a correct-and-unwired port would pass in silence." +
-    "\nWHAT IS NOT CLAIMED: st.drive's RATE family -- sixteen of its 45 sites, deferred at v4653 because " +
+    "\nWHAT IS NOT CLAIMED: st.drive's RATE family was sixteen of its 45 sites, deferred at v4653 because " +
     "each multiplies a local clock and mh_drift's phase is rate * t, so a drive ramping at large t " +
-    "teleports it. The deferral is CHECKED in tools/ship/murmurDrive-selfcheck.mjs (no line reads both " +
-    "DRIVE and uniforms.time) rather than stated here. All four of mh_state's outputs are otherwise wired " +
+    "teleports it. IT IS NO LONGER DEFERRED: v4654 made the secular phase an integral and v4655 took the " +
+    "sites whose whole output is multiplied, helix's climb among them, which is why this file's cadence " +
+    "count moved from eight species to nine. What st.drive still does NOT have is limn's drive factor, " +
+    "whose rate is a product rather than a sum. All four of mh_state's outputs are otherwise wired " +
     "and the source census below counts where they land; whether they reach PIXELS is graded next door, in " +
     "tools/ship/murmurIgnite-selfcheck.mjs and tools/ship/murmurDrive-selfcheck.mjs, on renders rather than " +
     "on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +

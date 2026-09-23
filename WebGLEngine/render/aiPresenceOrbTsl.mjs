@@ -947,8 +947,25 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const mWarp = float(MIST.warp).mul(mix(float(1.0), float(0.60), smallK)).toVar();
         const mFold = float(MIST.foldB).add(foldK.mul(MIST.foldK)).mul(float(1.0).add(energy.mul(0.85)))
             .mul(mix(float(1.0), float(0.55), smallK)).toVar();
-        const mDr = KIT.mhDrift(uniforms.time, float(MIST.drB).add(foldK.mul(MIST.drK)), float(0.45), float(MIST.drLane))
-            .mul(float(1.0).add(energy.mul(0.95)).add(VOICE.mul(0.35))).toVar();
+        // *** THE OUTPUT-MULTIPLIED CLOCK, INTEGRATED -- v4655. *** murmur scales the WHOLE drift result by
+        // (1 + ...), which scales the secular term and the wobble alike. Only the secular one grows without
+        // limit, so the repair puts the signal integrals there and leaves the wobble's amplitude reading the
+        // instantaneous factor, exactly as the rate-into-drift family does. Held signals make the two
+        // spellings identical: base*(t + k*s*t) + (k*base*(1+k*s)/w2)*sin IS (base*t + (k*base/w2)*sin) *
+        // (1 + k*s), which is why this migration moves no recorded frame.
+        //
+        // THE COEFFICIENT IS FOLDED AT BUILD TIME AND THE CLAMP IS PROVEN INERT. `energy` is
+        // clamp(0.85 * VOICE, 0, 1.6) and the conditioned voice tops out at 0.999350 across every state and
+        // level, so energy reaches 0.849 and the clamp NEVER bites -- measured, not assumed, because a live
+        // clamp would make the integral of energy something other than 0.85 times the integral of VOICE and
+        // this whole factoring would stop being exact.
+        const mistBase = float(MIST.drB).add(foldK.mul(MIST.drK)).toVar();
+        const mistKV = (species === "tempest" ? 0.85 * 0.95 : 0) + 0.35;
+        const mDrFactor = float(1.0).add(energy.mul(0.95)).add(VOICE.mul(0.35)).toVar();
+        const mDr = KIT.mhDriftPhase(
+            KIT.mhRatePhase(mistBase, uniforms.time, float(0.0), uniforms.paceInt,
+                float(mistKV), uniforms.voiceInt, float(0.0), uniforms.driveInt),
+            mistBase.mul(mDrFactor), float(0.45), float(MIST.drLane), uniforms.time).toVar();
         const mAbsorb = float(MIST.absorb).mul(float(0.55).add(densityK.mul(0.85))).toVar();
         const mEmit = float(MIST.emitB).add(densityK.mul(MIST.emitK)).toVar();
 
@@ -1734,9 +1751,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
             const ayF = KIT.mhDrift(uniforms.time, float(FX.yawRate), float(FX.yawWob), float(FX.yawLane)).toVar();
             const axF = float(FX.tiltB).add(sin(uniforms.time.mul(FX.tiltRate)).mul(FX.tiltAmp)).toVar();
-            const flow = KIT.mhDrift(uniforms.time, float(FX.flowB).add(streamK.mul(FX.flowK)),
-                float(FX.flowWob), float(FX.flowLane))
-                .mul(float(1.0).add(PACE.mul(FX.flowPace))).toVar();
+            // flux's stream clock, on the same treatment as mist's -- its output multiplier reads the
+            // cadence, so it teleported by t * dPace every time the exchange got busier.
+            const fluxBase = float(FX.flowB).add(streamK.mul(FX.flowK)).toVar();
+            const flow = KIT.mhDriftPhase(
+                KIT.mhRatePhase(fluxBase, uniforms.time, float(FX.flowPace), uniforms.paceInt,
+                    float(0.0), uniforms.voiceInt, float(0.0), uniforms.driveInt),
+                fluxBase.mul(float(1.0).add(PACE.mul(FX.flowPace))),
+                float(FX.flowWob), float(FX.flowLane), uniforms.time).toVar();
             const bend = float(FX.bendB).add(bendK.mul(FX.bendK))
                 .mul(float(1.0).add(PACE.mul(FX.bendPace)))
                 .mul(mix(float(1.0), float(FX.bendSmall), smallK)).toVar();
@@ -2128,9 +2150,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // operation beside each coefficient instead of a magnitude.
             const turns = float(HX.turnsB).add(turnsK.mul(HX.turnsK)).mul(mix(float(1.0), float(HX.turnsSmall), smallK))
                 .mul(float(1.0).add(DRIVE.mul(FORM.turns)).add(flH.x.mul(0.20))).toVar();
-            const climb = KIT.mhDrift(uniforms.time,
-                float(HX.climbB).add(riseK.mul(HX.climbK)).mul(mix(float(1.0), float(HX.climbSmall), smallK)),
-                float(HX.climbWob), float(HX.climbLane)).toVar();
+            // *** helix's CLIMB HAD NO SIGNAL ON IT AT ALL, AND helix.ts SCALES IT BY BOTH. *** murmur:
+            // climb = mh_drift(t, ..., 0.44, 5.0) * (1.0 + 0.75*live.pace + 0.85*st.drive). This file
+            // carried the bare drift, so the strands rose at one speed whatever the exchange was doing --
+            // on the one species whose own brief is that somebody says "DNA" within three seconds. Added in
+            // the integrated form, because adding it as murmur spells it would have shipped a new teleport.
+            const climbBase = float(HX.climbB).add(riseK.mul(HX.climbK)).mul(mix(float(1.0), float(HX.climbSmall), smallK)).toVar();
+            const climb = KIT.mhDriftPhase(
+                KIT.mhRatePhase(climbBase, uniforms.time, float(HX.climbPace), uniforms.paceInt,
+                    float(0.0), uniforms.voiceInt, float(HX.climbDrive), uniforms.driveInt),
+                climbBase.mul(float(1.0).add(PACE.mul(HX.climbPace)).add(DRIVE.mul(HX.climbDrive))),
+                float(HX.climbWob), float(HX.climbLane), uniforms.time).toVar();
             const r0 = float(HX.r0B).add(turnsK.mul(HX.r0K))
                 .mul(float(1.0).sub(DRIVE.mul(FORM.r0)).sub(flH.x.mul(0.10))).toVar();
             const wH = float(HX.wB).add(glowK.mul(HX.wK)).mul(mix(float(1.0), float(HX.wSmall), smallK))

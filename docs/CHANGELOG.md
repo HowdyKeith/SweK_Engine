@@ -26,6 +26,83 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4655 -- the clocks my own census could not see, and a row that outlived its own repair
+
+v4654 shipped a census that printed **`modulated rates still on murmur's rate * t: (none)`**. Two clocks were
+teleporting while it said so.
+
+It inspected `mh_drift`'s **rate argument**, and only when that argument was a bare identifier it could chase
+back to a `const`. The shape it could not see is the other way round: a drift with a *constant* rate whose
+whole **result** is multiplied by a live signal afterwards. nebula's and tempest's cloud drift and flux's
+stream both carried exactly that. A census that reports a clean result about a subset it never names is this
+tree's oldest defect, and this one shipped it one round ago.
+
+Measured at a 1/60 s frame, with the signal driven to full:
+
+| running first | tempest's cloud drift | | helix's strand climb | |
+|---|---|---|---|---|
+| | integrated | murmur's `drift · F` | integrated | murmur's `drift · F` |
+| 5 s | 0.000880 rad | 0.0199 rad | 0.021992 rad | 0.0849 rad |
+| 60 s | 0.000880 rad | 0.2292 rad | 0.021992 rad | 0.9882 rad |
+| 1800 s | 0.000880 rad | **6.8535 rad** | 0.021992 rad | **29.5654 rad** |
+
+Both grow within 4.1% of linear for 360× the wait, because the error *is* `t · ΔF` and it has no ceiling. The
+integrated form reaches **exactly 100.0%** of its derived bound `base · (1 + k·sup) · speed · dt` at every
+session length, and varies by 7e-14 across five sessions spanning five seconds to half an hour — the bound is
+the real one and not slack, and the sup is read out of `mh_live` itself rather than assumed to be 1.
+
+**The wobble question, which v4654 recorded as the reason this family needed its own round, turned out to have
+one right answer.** murmur multiplies the whole drift by `F`, scaling the secular travel and the bounded
+wobble alike. Expand it:
+
+    (base·t + (k·base/w₂)·sin) · F   =   base·F·t + (k·base·F/w₂)·sin
+
+Only the first summand has a `t` in it. So the integrals go in the **secular** term and the wobble amplitude
+keeps reading the instantaneous factor — not a compromise, the exact continuation of what murmur wrote. The
+two agree to 4.6e-13 across 480 held-signal operating points out to an hour, and part by **405 radians** where
+the signal has just moved. The second number is what stops the first being two spellings of one thing.
+
+**helix turned out to be a fourth kind: its climb had no signal at all.** `helix.ts` scales it by
+`0.75·live.pace` and `0.85·st.drive`; this port carried the bare drift, so the strands rose at one speed
+whatever the exchange was doing — on the one species whose own brief is whether somebody says "DNA" inside
+three seconds. **No signal-hunting census could ever have found that**, because there was no signal in it to
+find. It came out of reading `helix.ts` against the file line for line, which is the only instrument that
+finds an absence. It moves this tree's cadence count from eight species to nine.
+
+**And a row two gates away had outlived its own repair.** `murmurDrive`'s *"NOTHING THIS ROUND WIRED
+MULTIPLIES A CLOCK"* tested that no line reads both `DRIVE` and `uniforms.time`. v4654 and v4655 undeferred
+the rate family; helix's climb now reads both — and **the test kept passing**, because the two reads sit on
+two source lines. A condition that outlives its sentence is worse than a red one: it reads like a live
+guarantee. Rewritten to what is true now — instantaneous drive reaches a clock at exactly one place, as the
+*bounded* wobble amplitude, while every secular term reads the integral.
+
+Fifteen sabotages, all caught, and one of them found a real gap first. Deleting the drive term from the CPU
+`mhRatePhase` left `murmurKit` green — correctly, its section 15 grades the **shader** twin against a
+hand-written reference and never calls the CPU one — and left `murmurClock` green too, because every row
+there passed 0 for three of the four coefficients. **A coefficient of zero grades nothing**, for the second
+round running. Closed by grading `mhRatePhase` against a 4,096-step quadrature of the moving rate it claims to
+integrate, over three signals at unrelated frequencies: 1.0e-12 rad over 46.8 rad of accumulated phase, and
+the reference is the *definition* rather than a second spelling of the implementation.
+
+The pixel rows hold every instantaneous signal fixed and sweep only the history, so under the expression this
+round replaced all four comparisons would be a picture against itself: tempest's cloud moves 21.6% of its
+bytes on `voiceInt`, flux's stream 22.7% on `paceInt`, helix's strands 21.7% and 20.4% on its two. And each
+species is **deaf** to the integrals murmur does not give it — five sweeps, zero bytes — which is the row that
+says these are three wires and not one bus.
+
+The census is a chain walker now: balanced parentheses plus every chained `.method(...)`, so a trailing
+`.mul(VOICE)` is part of the expression being examined instead of the text after it. It checks itself on a
+three-site fixture before it is believed about the orb.
+
+`tools/ship/murmurClock2-selfcheck.mjs` arrives green at 3,005 ms on this box — against a `murmurKit` that
+measures 2,705 here and is recorded at 2,035, a box drift of 1.33, so about 2,260 recorded — so the tree holds
+1764 gates.
+
+**Still on murmur's spelling:** the two bare `rate * t` sites (opal's flash drift, geode's mix target) and the
+two flourish *slot divisors* (still, abyss), where a changing slot re-indexes which gesture is playing rather
+than advancing a phase. Two more cannot be repaired by this mechanism at all: duet's rate reads the shader's
+own flourish, and limn's is a *product* of two modulated factors. Nine species still lack murmur's cadence.
+
 ## v4654 -- the species' clocks are integrals now: this port is correct where murmur is not
 
 v4653 deferred the rate family and named the decision it carried. **The owner chose to diverge.** murmur's

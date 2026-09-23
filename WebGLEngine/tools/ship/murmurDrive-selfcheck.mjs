@@ -310,18 +310,53 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
         `tempest's names appear nowhere in the shader, so the day somebody wires them THIS ROW GOES RED and ` +
         `the note explaining why they were left out gets read before the jump ships.`);
 
-    // *** THE RULE THIS ROUND SET ITSELF, CHECKED RATHER THAN PROMISED. *** Every term wired here is a
-    // direction or a size; the rate family is deferred because it multiplies a clock. A line that reads
-    // DRIVE and `uniforms.time` together is the shape that would break it.
+    // *** THE RULE THIS ROUND SET ITSELF -- AND WHAT IT BECAME TWO ROUNDS LATER, WHICH IS WHY IT IS REWRITTEN
+    // RATHER THAN LEFT PASSING. *** At v4653 this row read "NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK" and
+    // tested that no line reads DRIVE and `uniforms.time` together: the rate family was deferred, and a drive
+    // ramping at large t would have teleported a phase of rate * t. v4654 and v4655 UNDEFERRED IT -- the
+    // secular phase is an integral now, and helix's climb reads st.drive and advances a clock on purpose.
+    //
+    // The old test still passed, because helix's two reads land on two source lines. A row whose literal
+    // condition survives while the sentence above it has stopped being true is the defect this tree keeps
+    // finding -- a record that outlived its own repair -- and it is worse than a red one, because it reads
+    // like a live guarantee. So the rule is restated as what is actually true at v4655:
+    //
+    //   INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE. It reaches a clock at exactly one place, as
+    //   mh_drift's WOBBLE AMPLITUDE, which is bounded by k*rate/w2 and cannot accumulate. Every SECULAR term
+    //   that reads drive reads the running integral instead, through mhRatePhase's last two arguments.
     const bad = lines.filter((l) => /\bDRIVE\b/.test(l) && /uniforms\.time/.test(l));
-    ok("!! *** NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK -- the deferral is a checked rule, not a promise ***",
-        bad.length === 0,
-        `no line in the shader reads both DRIVE and uniforms.time (${bad.length} found). That is the whole ` +
-        `difference between this round and the one that follows it: murmur hands rate * (1 + k * st.drive) to ` +
-        `mh_drift at sixteen sites, and mh_drift's phase is rate * t, so a drive ramping at large t teleports ` +
-        `the phase. droplet's flow is the closest this round comes and it stays on the right side: its ` +
-        `flowPhase is a FIXED-rate drift and only its AMPLITUDE reads drive. The rate family needs a decision ` +
-        `about faithfulness rather than a transcription and it is recorded in tools/ship/nextRounds.mjs.`);
+    // Every DRIVE inside a mhDriftPhase call must be in the SECOND argument (the amplitude), never the first.
+    const chainArgs = (txt, at) => {
+        let open = txt.indexOf("(", at), j = open, d = 0;
+        for (; j < txt.length; j++) { if (txt[j] === "(") d++; else if (txt[j] === ")") { d--; if (!d) break; } }
+        const inner = txt.slice(open + 1, j), out = []; let depth = 0, last = 0;
+        for (let q = 0; q < inner.length; q++) {
+            if (inner[q] === "(") depth++; else if (inner[q] === ")") depth--;
+            else if (inner[q] === "," && depth === 0) { out.push(inner.slice(last, q)); last = q + 1; }
+        }
+        out.push(inner.slice(last));
+        return out;
+    };
+    let secularDrive = 0, amplitudeDrive = 0;
+    for (let i = 0; (i = src.indexOf("KIT.mhDriftPhase(", i)) !== -1; i += 8) {
+        const a = chainArgs(src, i);
+        if (/\bDRIVE\b/.test(a[0] || "")) secularDrive++;
+        if (/\bDRIVE\b/.test(a[1] || "")) amplitudeDrive++;
+    }
+    // ...and the integral itself is only ever handed to mhRatePhase, so it cannot be spent as a plain factor.
+    const driveIntReads = (src.match(/uniforms\.driveInt/g) || []).length;
+    const driveIntInRate = (src.match(/uniforms\.driveInt\)/g) || []).length;
+    ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 1 && driveIntReads === driveIntInRate,
+        `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
+        `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
+        `helix's climb, the one site where murmur scales a clock by st.drive and this port reaches it. The ` +
+        `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
+        `and it reads uniforms.driveInt, which appears ${driveIntReads} times and every one of them is the ` +
+        `last argument of a mhRatePhase call. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +
+        `that no line read DRIVE and uniforms.time together. v4654 and v4655 undeferred it, and the old test ` +
+        `KEPT PASSING because helix's two reads sit on two lines -- a condition outliving its own sentence, ` +
+        `which is the failure this tree finds most often and the one a green row hides best.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
@@ -331,8 +366,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "frames cannot show it cleanly because a glint carries its along-path position and a residual lateral " +
     "offset as well (a frame-convergence instrument reads 1.34x -- measured, and rejected rather than " +
     "reported). render/murmurKitTsl.mjs's twin of the same function is what carries it to the GPU." +
-    "\nWHAT IS NOT CLAIMED: the RATE family, sixteen sites where drive multiplies a local clock, deferred " +
-    "with a checked rule rather than an intention; nebula's and tempest's advections, which are that same " +
+    "\nWHAT IS NOT CLAIMED: the RATE family was sixteen sites where drive multiplies a local clock, deferred " +
+    "here at v4653 with a checked rule rather than an intention, and it is NOT deferred any more -- v4654 " +
+    "made the secular phase an integral and v4655 finished the sites whose whole output is multiplied. The " +
+    "rule above was rewritten to say what is true now rather than left passing on a condition its own " +
+    "sentence had outgrown; tools/ship/murmurClock-selfcheck.mjs and murmurClock2-selfcheck.mjs are the " +
+    "gates for it, and limn's drive FACTOR is the one piece still outstanding because its rate is a " +
+    "product. nebula's and tempest's advections remain unwired -- that same " +
     "hazard in the heading family and are carried unwired with a census row that goes red if anyone wires " +
     "them. The scatter collapsing around the heading is the sibling gate, " +
     "tools/ship/murmurDrive2-selfcheck.mjs.");

@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/murmurClock-selfcheck.mjs -- v4654
+// WebGLEngine/tools/ship/murmurClock-selfcheck.mjs -- v4655
 //
 // *** THE SPECIES' OWN CLOCKS, AND THIS PORT'S ONE DELIBERATE DIVERGENCE FROM murmur. ***
 //
@@ -117,6 +117,51 @@ sec("2. *** AND IT IS murmur's OWN EXPRESSION WHEREVER NOTHING MOVES, which is w
         `TWO DIFFER ONLY WHILE A SIGNAL IS IN MOTION, which is exactly where murmur's is wrong, so every ` +
         `frame this tree has recorded at a fixed operating point is where it was.`);
 
+    // *** AND mhRatePhase IS GRADED AGAINST THE THING IT IS SUPPOSED TO BE, not against a second spelling of
+    // itself. *** A row that writes base * (t + a*P + b*V + c*D) next to a function whose body is
+    // base * (t + a*P + b*V + c*D) grades nothing -- the v4579 scar, and this tree has worn it. The claim
+    // mhRatePhase actually makes is that it is THE INTEGRAL OF THE MOVING RATE, so the reference here is a
+    // fine-step numerical integration of base * (1 + a*pace(t) + b*voice(t) + c*drive(t)) over three signals
+    // that are all in motion and none of which is a multiple of another. A dropped or swapped coefficient
+    // cannot survive it, and neither can the function being right about one signal and wrong about a second.
+    //
+    // THIS EXISTS BECAUSE A SABOTAGE WALKED THROUGH TWO GATES. Deleting the drive term from the CPU
+    // mhRatePhase left murmurKit-selfcheck.mjs green -- correctly, since its section 15 grades the SHADER
+    // twin against a hand-written reference and never calls the CPU one -- and left this gate green too,
+    // because every row here passed 0 for three of the four coefficients. A coefficient of zero grades
+    // nothing. Only murmurClock2's derived bound caught it, and by an inequality.
+    {
+        const pace = (t) => 0.5 + 0.5 * Math.sin(0.37 * t), voice = (t) => 0.5 - 0.5 * Math.cos(0.211 * t),
+              drive = (t) => Math.min(1, t / 23);
+        const base = 0.34, a = 0.95, b = 0.31, c = 0.77;
+        const H = 1 / 4096;
+        let P = 0, V = 0, D = 0, ref = 0, worstR = 0, atR = "";
+        for (let i = 0; i < Math.round(60 / H); i++) {
+            const t = i * H, mid = t + H / 2;
+            // the reference: the rate itself, integrated. The trapezoid on a midpoint sample is exact enough
+            // at this step that the residual measures 1.0e-12, which is float accumulation over a quarter of
+            // a million steps rather than quadrature error -- so the bound is 1e-6, six orders of magnitude
+            // clear of the reading and still far smaller than any dropped term could hide in.
+            ref += base * (1 + a * pace(mid) + b * voice(mid) + c * drive(mid)) * H;
+            P += pace(mid) * H; V += voice(mid) * H; D += drive(mid) * H;
+            if (i % 4096 === 0) {
+                const got = K.mhRatePhase(base, t + H, a, P, b, V, c, D);
+                const d = Math.abs(got - ref);
+                if (d > worstR) { worstR = d; atR = `t = ${(t + H).toFixed(1)} s, integral ${ref.toFixed(4)}, mhRatePhase ${got.toFixed(4)}`; }
+            }
+        }
+        ok("!! *** mhRatePhase IS THE INTEGRAL OF THE MOVING RATE -- checked against a 4096-step quadrature, not against itself ***",
+            worstR < 1e-6 && ref > 20,
+            `worst |mhRatePhase - the numerically integrated rate| = ${worstR.toExponential(2)} rad over a ` +
+            `minute of three signals in continuous motion -- a sine, a shifted cosine at an unrelated ` +
+            `frequency and a ramp -- reaching ${ref.toFixed(3)} rad in total (worst at ${atR}). THE ` +
+            `REFERENCE IS THE DEFINITION AND NOT THE IMPLEMENTATION: nothing here restates base * (t + a*P + ` +
+            `b*V + c*D), so dropping a term, swapping two coefficients or reading one integral twice all ` +
+            `fail. THE THREE SIGNALS ARE DELIBERATELY UNRELATED -- pace at 0.37 rad/s, voice at 0.211 and ` +
+            `drive a ramp -- because three signals that moved together would let one coefficient stand in ` +
+            `for another.`);
+    }
+
     // ...and mhDriftPhase with an unmodulated secular is mhDrift, bit for bit, so the migration itself is free.
     let worstD = 0;
     for (const t of [1, 17, 123, 999]) for (const lane of [1, 2, 3, 5, 7]) for (const rate of [0.047, 0.34, 2.05]) {
@@ -141,25 +186,91 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     const marks = [];
     lines.forEach((l, i) => { const m = /^\s*const build([A-Z]\w*) = \(\) => \{/.exec(l); if (m) marks.push([i, m[1].toLowerCase()]); });
     marks.push([lines.length, "(end)"]);
+    // *** THIS CENSUS REPORTED "(none)" WHILE TWO CLOCKS WERE TELEPORTING, AND v4655 IS THE REPAIR. ***
+    // The first cut looked only at mh_drift's RATE ARGUMENT, and only when that argument was a bare
+    // identifier it could chase back to a `const`. It could not see the shape that was actually left in the
+    // file: a drift with a CONSTANT rate whose whole RESULT is multiplied by a live signal afterwards. mist
+    // and flux both carried it, and this row printed "(none)" over the top of them for a round.
+    //
+    // A census that reports a clean result about a subset it never names is this tree's oldest defect shape,
+    // and this one shipped it one round ago. It is a CHAIN WALKER now rather than a regex: from `KIT.` it
+    // takes the balanced parentheses of the call and then every chained .method(...) that follows, so the
+    // trailing .mul(VOICE) is part of the expression being examined instead of the text after it. That is
+    // the difference between "what is passed in" and "what the site does", and the whole defect lived in
+    // the gap.
+    const chainAt = (src2, i) => {
+        let j = src2.indexOf("(", i), d = 0;
+        for (; j < src2.length; j++) {
+            if (src2[j] === "(") d++;
+            else if (src2[j] === ")") { d--; if (d === 0) { j++; break; } }
+        }
+        for (;;) {
+            const mm = /^(?:\s*\.\s*[A-Za-z_]\w*\s*\()/.exec(src2.slice(j));
+            if (!mm) break;
+            let pp = j + mm[0].length - 1, dd = 0;
+            for (; pp < src2.length; pp++) {
+                if (src2[pp] === "(") dd++;
+                else if (src2[pp] === ")") { dd--; if (dd === 0) { pp++; break; } }
+            }
+            j = pp;
+        }
+        return src2.slice(i, j);
+    };
+    const SIGNAL = /\b(VOICE|PACE|DRIVE|energy)\b/;
+    /** Every plain mh_drift site in `blk` whose CALL OR TRAILING CHAIN reads a live signal. */
+    const modulatedDrifts = (blk) => {
+        const out = [];
+        for (let i = 0; (i = blk.indexOf("KIT.mhDrift(", i)) !== -1; i += 5) {
+            const call = chainAt(blk, i);
+            let modulated = SIGNAL.test(call);
+            if (!modulated) {   // the rate may be a bare identifier declared nearby; resolve one level
+                const idm = /KIT\.mhDrift\(\w+\.\w+,\s*([A-Za-z_]\w*)\s*[,.]/.exec(call);
+                if (idm) modulated = SIGNAL.test((new RegExp("const " + idm[1] + " = [\\s\\S]{0,200}").exec(blk) || [""])[0]);
+            }
+            if (modulated) out.push(call.replace(/\s+/g, " "));
+        }
+        return out;
+    };
+
+    // *** AND THE CENSUS CARRIES ITS OWN NEGATIVE CONTROL, because the version it replaces was GREEN. ***
+    // Three synthetic sites: one plain, one modulated through its rate argument, one modulated through a
+    // trailing multiply. The third is the one the old form could not see, so a regression to the old form
+    // does not quietly go back to reporting "(none)" -- it goes red here first, on a fixture that is four
+    // lines long and does not depend on what the orb happens to contain this round.
+    const FIXTURE = [
+        'const a = KIT.mhDrift(uniforms.time, float(0.5), float(0.4), float(2.0)).toVar();',
+        'const rB = float(0.3).add(PACE.mul(0.7)).toVar();',
+        'const b = KIT.mhDrift(uniforms.time, rB, float(0.4), float(2.0)).toVar();',
+        'const c = KIT.mhDrift(uniforms.time, float(0.5), float(0.4), float(2.0))\n    .mul(float(1.0).add(VOICE.mul(0.35))).toVar();',
+    ].join("\n");
+    const found = modulatedDrifts(FIXTURE);
+    ok("!! *** THE CENSUS CAN SEE BOTH SHAPES -- it is checked on a fixture before it is believed about the orb ***",
+        found.length === 2 && found.some((x) => /rB/.test(x)) && found.some((x) => /VOICE/.test(x)),
+        `three synthetic drift sites -- a plain one, one modulated through its RATE, and one modulated by a ` +
+        `TRAILING MULTIPLY -- and the census flags exactly the second and third: ` +
+        `${JSON.stringify(found.map((x) => x.slice(0, 52)))}. ` +
+        `THE THIRD IS THE ONE THIS ROW EXISTS FOR. The form shipped at v4654 matched to the first .toVar() ` +
+        `after the rate argument and only resolved bare identifiers, so it found one of these three and ` +
+        `reported the file clean. An instrument that has not been shown a positive is not evidence about a ` +
+        `negative, and "(none)" is a negative.`);
+
     const repaired = [], plainDrift = [];
     for (let k = 0; k < marks.length - 1; k++) {
         const blk = lines.slice(marks[k][0], marks[k + 1][0]).join("\n");
         if (/KIT\.mhDriftPhase\(/.test(blk)) repaired.push(marks[k][1]);
-        // a plain mhDrift whose rate reads a live signal is an UNREPAIRED modulated clock
-        for (const m of blk.matchAll(/KIT\.mhDrift\(uniforms\.time,\s*([A-Za-z_]\w*)\s*[,.]/g)) {
-            const re = new RegExp("const " + m[1] + " = [\\s\\S]{0,200}");
-            const decl = (re.exec(blk) || [""])[0];
-            if (/\b(VOICE|PACE|DRIVE)\b/.test(decl)) plainDrift.push(`${marks[k][1]}:${m[1]}`);
-        }
+        for (const call of modulatedDrifts(blk)) plainDrift.push(`${marks[k][1]}:${call.slice(0, 44)}`);
     }
     say(`species whose clocks use the integrated phase: ${repaired.join(", ")}`);
     say(`modulated rates still on murmur's rate * t: ${plainDrift.length ? plainDrift.join(", ") : "(none)"}`);
 
-    const WANT = ["aura", "comet", "limn"];
-    ok("!! *** THE THREE MODULATED CLOCKS THIS PORT HAD ARE ALL REPAIRED, and the census names what is left ***",
+    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist"].sort();
+    ok("!! *** ALL SIX MODULATED CLOCKS IN THIS FILE ARE REPAIRED, and the census names what is left ***",
         repaired.slice().sort().join(",") === WANT.join(",") && plainDrift.length === 0,
-        `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase. Those ` +
-        `are the three clocks in this file whose rate read a live signal at all. THE ONE REMAINING MODULATED ` +
+        `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase, and ` +
+        `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. THE CENSUS ` +
+        `SAID "(none)" AT v4654 WHILE mist AND flux WERE STILL TELEPORTING -- it inspected only the rate ` +
+        `argument, and only when that argument was a bare identifier, so a drift whose OUTPUT is scaled ` +
+        `afterwards was invisible to it. THE ONE REMAINING MODULATED ` +
         `RATE IS duet's, and it is not an oversight: its rate reads the species' OWN FLOURISH envelope, which ` +
         `is computed inside the shader from a hash and cannot be integrated by a host that has never seen it. ` +
         `A signal the host does not know has no integral to send, and that is a property of the mechanism ` +
@@ -249,9 +360,13 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "what murmur does. murmur hands a moving rate to mh_drift, whose phase is rate * t; this port hands it " +
     "an integrated secular phase instead, which is the exact integral and reduces to murmur's expression " +
     "wherever nothing is moving. The divergence was put to the owner as a choice and taken knowingly." +
-    "\nWHAT IS NOT CLAIMED: the other three mechanisms that carry the same shape and are NOT repaired -- the " +
-    "four sites that multiply mh_drift's OUTPUT by a moving factor (flux, helix, nebula, tempest), the two " +
-    "that spell a bare rate * t (opal's flash drift, geode's mix target), and the two flourish SLOT divisors " +
-    "(still, abyss), where a changing slot re-indexes the gesture rather than advancing a phase. Each needs " +
-    "its own treatment and each is recorded against the st.drive entry in tools/ship/nextRounds.mjs.");
+    "\nWHAT IS NOT CLAIMED: the mechanisms that carry the same shape and are NOT repaired -- the two sites that " +
+    "spell a bare rate * t (opal's flash drift, geode's mix target), the two flourish SLOT divisors (still, " +
+    "abyss), where a changing slot re-indexes which gesture plays rather than advancing a phase, duet's rate " +
+    "and limn's drive factor as the rows above set out. The four sites that multiply mh_drift's OUTPUT by a " +
+    "moving factor WERE on this list at v4654 and are off it at v4655: they are nebula's and tempest's cloud " +
+    "drift, flux's stream and helix's climb, and tools/ship/murmurClock2-selfcheck.mjs is the gate for them. " +
+    "Two of the four were teleporting while section 3 of THIS file printed \"(none)\", which is why section 3 " +
+    "now checks its own census on a fixture before believing it. Each remaining item is recorded against the " +
+    "st.drive entry in tools/ship/nextRounds.mjs.");
 process.exit(fails ? 1 : 0);

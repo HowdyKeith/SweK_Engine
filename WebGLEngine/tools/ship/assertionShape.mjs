@@ -652,8 +652,16 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // last three orb rounds needed, and the reason is the same one murmurTempo had: the subject is a NUMBER
     // the host computes, so three of its four sections are pure CPU and the fourth renders a single species.
     // A round whose claim is arithmetic does not pay a WGSL compile per species to make it.
-    gates: 1763, usesOk: 1742, definesOk: 1734, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1635, condFirst: 96, unknownSignature: 11,
+    // v4655 -- RE-TAKEN 1763 -> 1764 for tools/ship/murmurClock2-selfcheck.mjs. A PAIR after all, and the
+    // clock forced it exactly as it forced the last three: the subject needs THREE species rendered (nebula
+    // and tempest share a builder, flux, helix) because the three clocks this round repaired do not live on
+    // one body, and three WGSL compiles measure 3,056-3,242 ms on this box against a murmurKit that measures
+    // 2,705 here and is RECORDED at 2,035 -- a box drift of 1.33, so about 2,300-2,440 recorded, under the
+    // 2,772 at which this tree splits. Putting them in murmurClock instead would have added those three
+    // compiles to its existing one and gone over the 3,000 ms ceiling, which does not make a gate slow, it
+    // makes it not run.
+    gates: 1764, usesOk: 1743, definesOk: 1735, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1636, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

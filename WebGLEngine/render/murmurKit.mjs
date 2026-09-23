@@ -1495,6 +1495,9 @@ export const MH_HELIX = Object.freeze({
     tiltB: 0.06, tiltAmp: 0.05, tiltRate: 0.031,
     turnsB: 1.75, turnsK: 1.10, turnsSmall: 0.50,
     climbB: 0.20, climbK: 0.30, climbSmall: 0.70, climbWob: 0.44, climbLane: 5.0,
+    // v4655 -- helix.ts scales its climb by (1 + 0.75*live.pace + 0.85*st.drive) and this port carried
+    // the bare drift. Two of murmur's numbers that were simply absent, not two new ones.
+    climbPace: 0.75, climbDrive: 0.85,
     r0B: 0.42, r0K: 0.10,
     wB: 0.062, wK: 0.022, wSmall: 1.90, wVoice: 0.25,
     brightB: 0.80, brightK: 0.65, brightVoice: 0.80,

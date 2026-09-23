@@ -914,6 +914,27 @@ export const NEXT_ROUNDS = [
             "sources, live.pace appears in all EIGHTEEN. comet and limn were repaired here because their " +
             "rates were the round's subject. The other ten are a separate, larger job and the census in " +
             "tools/ship/murmurLive-selfcheck.mjs now names them.",
+        note4: "MECHANISM (a) IS DONE AT v4655, AND THE ROUND STARTED BY FINDING THAT v4654's OWN CENSUS " +
+            "COULD NOT SEE IT. That census printed \"modulated rates still on murmur's rate * t: (none)\" " +
+            "while nebula's and tempest's cloud drift and flux's stream were still teleporting: it looked at " +
+            "mh_drift's RATE ARGUMENT, and only when that argument was a bare identifier it could chase back " +
+            "to a const, so a drift whose whole RESULT is multiplied afterwards was invisible to it. It is a " +
+            "chain walker now -- balanced parens plus every chained .method(...) -- and it checks itself on " +
+            "a three-site fixture before it is believed about the orb.\n\n" +
+            "*** WHAT THE WOBBLE QUESTION TURNED OUT TO BE: *** murmur's drift*F expands to base*F*t + " +
+            "(k*base*F/w2)*sin, and only the first summand has a t in it. So the integrals go in the " +
+            "SECULAR term and the wobble amplitude keeps reading the instantaneous factor -- not a " +
+            "compromise, the exact continuation of what murmur wrote. It agrees with murmur to 4.6e-13 " +
+            "across 480 held-signal operating points out to an hour and parts by 405 rad where the signal " +
+            "has just moved.\n\n" +
+            "helix turned out to be a FOURTH kind: its climb had no signal at all. helix.ts scales it by " +
+            "0.75*live.pace and 0.85*st.drive and this port carried the bare drift. An absence is not " +
+            "findable by any census that hunts signals -- it came out of reading helix.ts against the file " +
+            "line for line, which is the only instrument that finds one.\n\n" +
+            "*** STILL OPEN, AND UNCHANGED BY THIS ROUND: *** (b) the two bare rate * t sites, (c) the two " +
+            "flourish slot divisors, duet's shader-side flourish rate, limn's drive FACTOR, and the nine " +
+            "species still without murmur's cadence -- helix acquired it here, which moved the count from " +
+            "eight to nine.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

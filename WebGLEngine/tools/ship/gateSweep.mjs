@@ -8070,6 +8070,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4655 -- THE 338th CLOSING: the clocks whose OUTPUT is multiplied, which last round's census could
+    // not see, and a row that had outlived its own repair two gates away.
+    since337: Object.freeze({
+        at: "v4655", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock2-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,005 ms on this box against a murmurKit that measures 2,705 here and is " +
+                 "RECORDED at 2,035 -- a box drift of 1.33, so about 2,260 recorded, under the 2,772 at " +
+                 "which this tree splits. 12 rows in five sections over three species. " +
+                 "*** LAST ROUND'S CENSUS PRINTED \"modulated rates still on murmur's rate * t: (none)\" " +
+                 "WHILE TWO CLOCKS WERE TELEPORTING. *** It inspected mh_drift's RATE ARGUMENT, and only " +
+                 "when that argument was a bare identifier it could chase back to a const. The shape it " +
+                 "could not see is a drift with a CONSTANT rate whose whole RESULT is multiplied by a live " +
+                 "signal afterwards -- nebula's and tempest's cloud drift and flux's stream both carried " +
+                 "it. A census that reports a clean result about a subset it never names is this tree's " +
+                 "oldest defect and this one shipped it ONE ROUND AGO. " +
+                 "MEASURED, at a 1/60 s frame: tempest's cloud drift advances 0.0199 rad after 5 s of " +
+                 "running and 6.8535 after 1800 -- 7,791x the integrated frame's 0.000880 -- and helix's " +
+                 "strand climb 0.0849 against 29.5654, which is 1,344x. Both grow within 4.1% of linear " +
+                 "for 360x the wait, because the error IS t * dF and it has no ceiling. The integrated " +
+                 "form reaches EXACTLY 100.0% of its derived bound base * (1 + k*sup) * speed * dt at " +
+                 "every session length and varies by 7e-14 across five spanning 5 s to half an hour. " +
+                 "*** THE REPAIR PUTS THE INTEGRALS IN THE SECULAR TERM AND LEAVES THE WOBBLE READING THE " +
+                 "INSTANTANEOUS FACTOR, *** because murmur's product expands to base*F*t + " +
+                 "(k*base*F/w2)*sin and only the first summand has a t in it. The two agree to 4.6e-13 " +
+                 "across 480 operating points out to an hour and part by 405 rad where the signal has just " +
+                 "moved -- the second number is what stops the first being two spellings of one thing. " +
+                 "*** helix's CLIMB WAS AN ABSENCE, NOT A TELEPORT: *** helix.ts scales it by 0.75*live.pace " +
+                 "and 0.85*st.drive and this port carried the bare drift, so the strands rose at one speed " +
+                 "whatever the exchange was doing. No signal-hunting census could ever have found it; it " +
+                 "came out of reading helix.ts against the file line for line, and it moves this tree's " +
+                 "cadence count from eight species to nine. " +
+                 "*** AND A ROW TWO GATES AWAY HAD OUTLIVED ITS OWN REPAIR. *** murmurDrive's " +
+                 "\"NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK\" tested that no line reads both DRIVE and " +
+                 "uniforms.time. v4654 and v4655 UNDEFERRED the rate family, helix's climb now reads both " +
+                 "-- and the test KEPT PASSING because the two reads sit on two source lines. A condition " +
+                 "outliving its sentence is worse than a red one: it reads like a live guarantee. Rewritten " +
+                 "to what is true now, that instantaneous drive reaches a clock at exactly one place, as " +
+                 "the BOUNDED wobble amplitude, while every secular term reads the integral. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, and one of them found a real gap first: deleting the drive " +
+                 "term from the CPU mhRatePhase left murmurKit green -- correctly, its section 15 grades " +
+                 "the SHADER twin against a hand-written reference -- and left murmurClock green too, " +
+                 "because every row there passed 0 for three of the four coefficients. A COEFFICIENT OF " +
+                 "ZERO GRADES NOTHING, for the second round running. Closed by grading mhRatePhase against " +
+                 "a 4,096-step quadrature of the moving rate it claims to integrate, over three signals at " +
+                 "unrelated frequencies: 1.0e-12 rad over 46.8 rad of accumulated phase, and the reference " +
+                 "is the DEFINITION rather than a second spelling of the implementation.",
+    }),
     // v4654 -- THE 337th CLOSING: the species' own clocks, and this port's one deliberate divergence.
     since336: Object.freeze({
         at: "v4654", swept: 1, green: 1, red: 0,
