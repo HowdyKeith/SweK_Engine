@@ -187,11 +187,21 @@ export function meshBounds(bvh) {
  * GLBParser.parse -> splatMesh.mjs's meshTriples (flat -> nested triples) -> rtPipeline.mjs's bvhBuffersFromMesh.
  * Skinned GLBs are out of scope here for the same reason colliderFromGLB.mjs names: the scene-graph walk this
  * depends on only fully bakes an UNSKINNED file to world space.
+ *
+ * RTX round 15 -- `parsed.colors` (GLBParser.parse's own per-vertex COLOR_0/baseColorFactor bake, `vc*3` floats,
+ * indexed the SAME as `parsed.positions`) is reshaped into the `[[r,g,b],...]` triples bvhBuffersFromMesh's own
+ * `opts.colors` expects and attached automatically -- costs nothing when `vertexColors` is never requested at
+ * the session level (see makeRtSession's own doc), the same "safe to always compute, only activated on request"
+ * shape round 13's own envAtlas bake already established. Scratch-verified before touching this file: the
+ * live demo's own pavement.glb has NO COLOR_0 accessor and no per-vertex-meaningful baseColorFactor variance --
+ * `parsed.colors` comes back `undefined` for it -- so this path is exercised (and gated) by the city scene, not
+ * the tile; kept here anyway so a FUTURE GLB with real vertex colors works with zero further plumbing.
  */
 export async function loadMeshBvh(arrayBuffer, opts = {}) {
     const parsed = await GLBParser.parse(arrayBuffer, opts.parse || {});
     const { positions, indices } = meshTriples({ positions: parsed.positions, indices: parsed.indices });
-    const bvh = bvhBuffersFromMesh(positions, indices, opts.bvh || {});
+    const colors = parsed.colors ? Array.from({ length: parsed.colors.length / 3 }, (_, i) => [parsed.colors[i * 3], parsed.colors[i * 3 + 1], parsed.colors[i * 3 + 2]]) : undefined;
+    const bvh = bvhBuffersFromMesh(positions, indices, { ...(colors ? { colors } : {}), ...(opts.bvh || {}) });
     return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: positions.length, triangleCount: indices.length });
 }
 
@@ -202,10 +212,17 @@ export async function loadMeshBvh(arrayBuffer, opts = {}) {
  * greedy mesher every kaiju world's on-screen terrain already uses) via bvhBuffersFromTriSoup() rather than
  * loadMeshBvh()'s GLB-and-indices path -- there is no GLB here, and no indices, only chunkMesherCore.js's own
  * already-flat, world-space triangle soup.
+ *
+ * RTX round 15 -- `scene.cols` is citySceneMesh()'s OWN already-computed per-vertex colour (by height/material,
+ * per that function's own header), already in the exact 9-floats-per-triangle, position-aligned layout
+ * bvhBuffersFromTriSoup's own `opts.colors` expects -- "ready to hand straight to... bvhBuffersFromTriSoup(verts,
+ * {colors: cols}), no further conversion" is citySceneMesh()'s own doc comment, proven by tools/ship/
+ * cityChunkScene-selfcheck.mjs's own section 5 well before this round existed to use it. Attached the same
+ * always-safe way loadMeshBvh's own colors are above.
  */
 export function loadCityBvh(opts = {}) {
     const scene = citySceneMesh(opts.scene || {});
-    const bvh = bvhBuffersFromTriSoup(scene.verts, opts.bvh || {});
+    const bvh = bvhBuffersFromTriSoup(scene.verts, { colors: scene.cols, ...(opts.bvh || {}) });
     return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: scene.vertexCount, triangleCount: scene.triangleCount });
 }
 
@@ -317,10 +334,24 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * MIS mode, a genuinely different, larger design fork this round does not take -- see the option's own inline
  * comment below). Left at its default, BYTE- AND SCENE-IDENTICAL to every round before this one: no light is
  * added to `sbt` unless `direct` is explicitly "nee" or "mis".
+ *
+ * `vertexColors` (RTX round 15, default false) is rtPipeline.mjs's own `vertexColors` WGSL option (bound at
+ * BVH_BINDINGS.vertColors, name "bvhVertColors"), which had NO production caller until now -- every mesh this
+ * function has ever rendered used ONE flat `albedo` regardless of what per-vertex colour data (if any) the
+ * mesh itself carried. Meaningful ONLY under material:"lambertian" -- rtPipeline.mjs's own pipelineWgsl()
+ * throws on `vertexColors && !rgb`, and `rgb` is forced false under microfacet (see `material`'s own doc
+ * above), so `vertexColors:true` under material:"microfacet" is accepted-but-inert, the same shape `direct`
+ * has under material:"lambertian". Left at its default, BYTE-IDENTICAL WGSL to before this round. When
+ * requested and actually meaningful (lambertian), throws if the mesh's own `bvh.vertColors` is null -- a
+ * caller asking for vertex colours on a mesh with none is a real mistake, not a silent flat-render fallback.
+ * loadMeshBvh()/loadCityBvh() now attach `bvh.vertColors` automatically whenever real per-vertex colour data
+ * is available (see their own docs) -- scratch-verified before touching this file: the live demo's own
+ * pavement.glb has none (no COLOR_0 accessor), so this option's real, gated demonstration is the city scene.
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
                                           material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
-                                          sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf" }) {
+                                          sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf",
+                                          vertexColors = false }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     if (sky !== "gradient" && sky !== "envMap" && sky !== "sceneCapture") throw new Error(
@@ -330,6 +361,16 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     const { bvh } = mesh;
     const floats = w * h * 3;
     const isMicrofacet = material === "microfacet";
+    // Meaningful only under lambertian (rtPipeline.mjs's own vertexColors requires rgb, which microfacet
+    // forces off) -- accepted-but-inert under microfacet, the mirror image of `direct`'s own shape. The
+    // missing-data guard only fires when the option would ACTUALLY be used, the same "envFaceSize is not
+    // checked when sky is gradient" reasoning round 11 already established: a caller who sets
+    // vertexColors:true under material:"microfacet" is not penalized for an option that will never be read.
+    const wantsVertexColors = vertexColors && !isMicrofacet;
+    if (wantsVertexColors && !bvh.vertColors) throw new Error(
+        "rtViewer: vertexColors:true was requested but this mesh has no per-vertex colour data (bvh.vertColors " +
+        "is null) -- loadMeshBvh()/loadCityBvh() only attach it when the underlying source (a GLB's own COLOR_0 " +
+        "accessor, or citySceneMesh()'s own baked cols) actually has some, and this mesh's does not.");
     const isSceneCapture = sky === "sceneCapture";
     const isEnvMap = sky === "envMap" || isSceneCapture;
     // A background adversarial review found this specific numeric option needed a guard `roughness`/`ior`
@@ -386,7 +427,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
 
     const rtPipe = device.compute({ wgsl: isMicrofacet
         ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap })
-        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap }) });
+        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
     const boundsBuf = device.buffer({ usage: "storage", data: bvh.bounds });
@@ -399,6 +440,11 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     rtPipe.bind("bvhMeta", metaBuf);
     rtPipe.bind("bvhOrder", orderBuf);
     rtPipe.bind("bvhTris", trisBuf);
+    // RTX round 15 -- rtPipeline.mjs's own vertColors binding (BVH_BINDINGS.vertColors, WGSL name
+    // "bvhVertColors"), bound only when actually meaningful (wantsVertexColors already folds in the
+    // material:"microfacet" inertness above) -- a scene that never asks for it allocates no extra buffer.
+    const vertColorsBuf = wantsVertexColors ? device.buffer({ usage: "storage", data: bvh.vertColors }) : null;
+    if (vertColorsBuf) rtPipe.bind("bvhVertColors", vertColorsBuf);
     // The shared multi-scatter E(mu) table (physics/render/rtPipeline.mjs's own `msE` binding, msComp:true's
     // one pipeline-level storage buffer -- see sbtRecord's own doc on why this is shared rather than per-record).
     const msBuf = isMicrofacet ? device.buffer({ usage: "storage", data: Float32Array.from(msTable.E) }) : null;
@@ -459,6 +505,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             const buffers = [outBuf, uBuf, boundsBuf, metaBuf, orderBuf, trisBuf, accumBuf, fBuf];
             if (msBuf) buffers.push(msBuf);
             if (envTex) buffers.push(envTex);
+            if (vertColorsBuf) buffers.push(vertColorsBuf);
             for (const b of buffers) { try { b.destroy(); } catch (e) {} }
         },
     });

@@ -121,12 +121,14 @@ export function stampScene(world, opts = {}) {
  * voxelrenderer.js dispatches for on-screen terrain), and return `{verts, cols, buildings, triangleCount,
  * vertexCount}` -- `verts`/`cols` ready to hand straight to physics/render/rtPipeline.mjs's own
  * bvhBuffersFromTriSoup(verts, {colors: cols}), no further conversion (tools/ship/cityChunkScene-selfcheck.mjs
- * section 5 proves that exact hand-off). NOT YET DONE, by either scene: render/rtViewer.mjs's loadCityBvh()
- * currently drops `cols` on the floor rather than passing it as `opts.bvh.colors`, and even if it did,
- * makeRtSession() doesn't request `vertexColors: true` from pipelineWgsl() for either this scene or the
- * existing pavement-tile one -- an aspiration-vs-wiring gap an adversarial review found, not a regression
- * (the tile has the identical limitation today), left for whichever round actually wires per-vertex colour
- * into the live viewer rather than silently claimed solved here.
+ * section 5 proves that exact hand-off). RTX round 15 wired exactly this: render/rtViewer.mjs's loadCityBvh()
+ * now passes `cols` straight through as `opts.bvh.colors`, and makeRtSession() accepts a `vertexColors: true`
+ * option that requests `pipelineWgsl()`'s own vertexColors WGSL path and binds the resulting buffer. This
+ * scene is round 15's real, live-gated target (tools/ship/rtViewer-selfcheck.mjs section 5c renders it through
+ * the full path on a real device) -- the pavement-tile scene did NOT turn out to have "the identical
+ * limitation" as this comment used to claim: round 15 found, by parsing the real vendor/kenney-city/models/
+ * pavement.glb directly, that it has no COLOR_0 accessor at all, so its own vertex-colors wiring in
+ * loadMeshBvh() is defensive/future-proofing only, currently unexercised by any live asset.
  */
 export function citySceneMesh(opts = {}) {
     const world = makeSceneWorld(opts.gridRadius ?? 1);

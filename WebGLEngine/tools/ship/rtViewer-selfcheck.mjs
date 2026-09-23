@@ -75,6 +75,26 @@
 //   H  RTX round 11 -- makeRtSession's `envFaceSize` validation guard removed entirely (added after a
 //      background adversarial review found this option, unlike `sky`/`material`, had none)
 //        -> exit=1, 3 red: section 1b's own three envFaceSize:{0,-4,3.5} tests, each by name.
+//   I  RTX round 15 -- makeRtSession's missing-data throw guard (`if (wantsVertexColors && !bvh.vertColors)
+//      throw`) removed entirely
+//        -> exit=1, 1 red: section 1f's own "vertexColors:true on a mesh with NO per-vertex colour data
+//           throws..." test, by name.
+//   J  RTX round 15 -- `wantsVertexColors = vertexColors && !isMicrofacet` changed to `wantsVertexColors =
+//      vertexColors` (dropping the microfacet-inertness fold-in)
+//        -> exit=1, 1 red: section 1f's own "vertexColors:true is a harmless NO-OP under material:
+//           \"microfacet\"..." test, by name.
+//   K  RTX round 15 -- `vertColorsBuf` still created but the `rtPipe.bind("bvhVertColors", vertColorsBuf)`
+//      call removed
+//        -> exit=1, 1 red: section 1f's own "and BINDS the real vertColors buffer by NAME..." test, by name --
+//           the bind-capture proof this section exists to add over a WGSL-text-only check.
+//   L  RTX round 15 -- loadCityBvh's `colors: scene.cols` pass-through reverted to `bvhBuffersFromTriSoup(
+//      scene.verts, opts.bvh || {})` (dropping the colors attachment)
+//        -> exit=1, but NOT a single targeted red: the whole gate crashes with an uncaught Error, because
+//           section 5c calls makeRtSession({vertexColors:true}) against the now-colorless city mesh and the
+//           SAME missing-data guard sabotage I above exists to test fires for real (bvh.vertColors is
+//           genuinely null). Confirmed non-redundant with section 1f: 1f's own checks build fabricated bvh
+//           fixtures directly and never call loadCityBvh() at all, so they cannot see this regression --
+//           only section 5c, which drives the real loadCityBvh -> makeRtSession chain, does.
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
@@ -535,6 +555,60 @@ console.log("\n1e. RTX ROUND 13 -- THE REAL PAVEMENT-TILE GLB'S OWN sky:\"sceneC
         "makeRtSession, cannot see");
 }
 
+// ---- 1f. RTX ROUND 15 -- makeRtSession's `vertexColors` OPTION, AGAINST pipelineWgsl() AND A REAL BOUND BUFFER (NO GPU) ----
+console.log("\n1f. RTX ROUND 15 -- makeRtSession's `vertexColors` OPTION, AGAINST pipelineWgsl() AND A REAL BOUND BUFFER (NO GPU NEEDED)");
+{
+    // A real, traceable cube WITH real per-vertex colour data this time -- fakeMesh's own stub bvh has no
+    // vertColors for makeRtSession to bind, the same reason section 1d needed a real BVH for sceneCapture.
+    const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+    const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+    const colors = positions.map((_, i) => [i / 8, (7 - i) / 8, 0.5]);
+    const cubeBvh = bvhBuffersFromMesh(positions, indices, { colors });
+    const cubeMesh = { bvh: cubeBvh, bounds: V.meshBounds(cubeBvh) };
+    const noColorBvh = bvhBuffersFromMesh(positions, indices, {});
+    const noColorMesh = { bvh: noColorBvh, bounds: V.meshBounds(noColorBvh) };
+
+    const stubDevice = () => {
+        const wgsls = [], binds = [];
+        return { wgsls, binds, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind(name) { binds.push(name); }, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture() { return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+
+    const d1 = stubDevice();
+    V.makeRtSession(d1.device, { mesh: cubeMesh, w: 4, h: 4, vertexColors: true });
+    ok("!! vertexColors:true (material omitted) generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,rgb:true,gradient:true,vertexColors:true})",
+        d1.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, vertexColors: true }),
+        "proves vertexColors actually reaches pipelineWgsl's own vertexColors option, not merely accepted with no effect");
+    ok("!! and BINDS the real vertColors buffer by NAME (\"bvhVertColors\") -- not just generates the right WGSL text",
+        d1.binds.includes("bvhVertColors"),
+        `binds captured: ${JSON.stringify(d1.binds)} -- WGSL text alone says nothing about whether the buffer the shader reads from was ever actually bound`);
+
+    const d2 = stubDevice();
+    V.makeRtSession(d2.device, { mesh: cubeMesh, w: 4, h: 4 });
+    ok("!! vertexColors OMITTED (default false) is BYTE-IDENTICAL to round 10's own shipped default, and does NOT bind bvhVertColors",
+        d2.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true }) && !d2.binds.includes("bvhVertColors"),
+        "a caller that never asks for vertexColors must render exactly as every round before this one did -- verified by " +
+        "direct string equality AND by confirming the buffer this round adds is never bound, not just that the WGSL text matches");
+
+    const d3 = stubDevice();
+    V.makeRtSession(d3.device, { mesh: cubeMesh, w: 4, h: 4, material: "microfacet", vertexColors: true });
+    ok("!! vertexColors:true is a harmless NO-OP under material:\"microfacet\" -- same WGSL as material:\"microfacet\" alone, and no bind",
+        d3.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "bsdf", msComp: true }) && !d3.binds.includes("bvhVertColors"),
+        "rtPipeline.mjs's own pipelineWgsl() throws on vertexColors+!rgb, and rgb is forced false under microfacet (see " +
+        "render/rtViewer.mjs's own doc) -- so vertexColors is accepted-but-inert here, the mirror image of the shape " +
+        "`direct` already has under material:\"lambertian\", confirmed by direct string equality and an empty bind list");
+
+    ok("!! vertexColors:true on a mesh with NO per-vertex colour data throws, rather than silently rendering flat",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: noColorMesh, w: 4, h: 4, vertexColors: true }); return false; }
+                 catch (e) { return /no per-vertex colour data/.test(e.message); } })(),
+        "a caller asking for vertex colours on a mesh that has none (bvh.vertColors is null -- e.g. the live demo's own " +
+        "pavement.glb, which has no COLOR_0 accessor) should fail loud, not silently fall back to the flat albedo");
+}
+
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
 console.log("\n2. accumulateWgsl -- A RUNNING MEAN, HELD TO HAND-COMPUTED EXPECTED VALUES");
 {
@@ -838,18 +912,40 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 const view = { w, h, ...view0, fovDeg: 45 };
                 for (let i = 0; i < 8; i++) await session.renderFrame(view, { offscreen: true, read: true });
                 const accum = new Float32Array(await device.read(session.accumBuf));
-                let nan = 0, min = Infinity, max = -Infinity;
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0;
                 const uniq = new Set();
-                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; uniq.add(Math.round(v * 1000)); }
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; uniq.add(Math.round(v * 1000)); }
                 out.city = { triangleCount: mesh.triangleCount, vertexCount: mesh.vertexCount, bounds: mesh.bounds,
-                             nan, min, max, distinct: uniq.size, frameCount: session.frameCount() };
+                             nan, min, max, mean: sum / accum.length, distinct: uniq.size, frameCount: session.frameCount() };
+                session.destroy();
+            }
+
+            // ---- 5c. RTX ROUND 15 -- THE SAME REAL CITY SCENE, THROUGH vertexColors:true -- THE FIRST PRODUCTION
+            // CALLER of rtPipeline.mjs's own vertexColors option, proving the FULL real path (loadCityBvh's own
+            // cols->colors hand-off, bvhBuffersFromTriSoup's own vertColors packing, makeRtSession's own WGSL
+            // switch and real buffer bind) actually executes end to end against the REAL production data, not a
+            // fabricated fixture -- section 1f's own GPU-free claim (the right JS options, the right bind call)
+            // is correct in isolation, this proves it reaches a real device and changes the real picture. ----
+            {
+                const mesh = loadCityBvh();
+                const w = 48, h = 32;
+                const view0 = orbitEye({ yaw: 0.7, pitch: 0.5, dist: mesh.bounds.radius * 3.2 + 0.5, center: mesh.bounds.center });
+                const view = { w, h, ...view0, fovDeg: 45 };
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2, vertexColors: true });
+                for (let i = 0; i < 8; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0;
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; }
+                out.cityVertexColors = { nan, min, max, mean: sum / accum.length, frameCount: session.frameCount() };
                 session.destroy();
             }
             return out;
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -1030,6 +1126,27 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         city.nan === 0 && city.distinct > 20 && city.max > city.min,
         "same informal-by-design reasoning as section 5's real GLB -- no CPU radiance oracle for a triangle mesh, so what's checked is a real, varied picture rather than sky, black, or NaN");
 
+    console.log("\n5c. RTX ROUND 15 -- THE SAME CITY SCENE, THROUGH vertexColors:true -- THE FIRST PRODUCTION CALLER OF rtPipeline.mjs's OWN vertexColors OPTION");
+    say(`accumBuf after ${cityVertexColors.frameCount} frames: ${cityVertexColors.nan} NaN/Inf, range [${cityVertexColors.min.toFixed(4)}, ${cityVertexColors.max.toFixed(4)}], mean ${cityVertexColors.mean.toFixed(6)}`);
+    REPORT_ROWS.push(["city scene, vertexColors", `${city.triangleCount} tris`, `${cityVertexColors.frameCount} frames`,
+        `mean ${cityVertexColors.mean.toFixed(6)} vs flat-albedo ${city.mean.toFixed(6)}`]);
+    ok("!! the SAME real city scene, world/cityChunkScene.mjs's own citySceneMesh() cols hand-off through loadCityBvh's " +
+        "new colors wiring, bvhBuffersFromTriSoup's own vertColors packing, and makeRtSession's new vertexColors switch, " +
+        "through a REAL WebGPU device -- no NaN, real range",
+        cityVertexColors.nan === 0 && cityVertexColors.max > cityVertexColors.min && cityVertexColors.min >= 0.0,
+        "proves the WIRING this round adds -- not just section 1f's own GPU-free claim that the right WGSL is generated " +
+        "and the right buffer bound by name -- actually executes end to end: real per-vertex color data, computed by " +
+        "citySceneMesh() itself, reaching a real bound storage buffer and changing what a real device renders");
+    // *** MEAN, NOT JUST MIN/MAX -- the same lesson section 4d/4e's own history in this file already paid for: min/max
+    // alone can pin on unrelated pixels while a real, working change moves the bulk of the picture. out.city was
+    // extended with its own `mean` field specifically so this comparison has a metric that isn't extreme-pixel-only. ***
+    ok("!! and reads genuinely DIFFERENT from the flat-albedo render of the IDENTICAL scene and camera (section 5b) -- " +
+        "vertex colors actually changes the picture, not just \"doesn't crash\", via BOTH range and mean",
+        (Math.abs(cityVertexColors.max - city.max) > 1e-4 || Math.abs(cityVertexColors.min - city.min) > 1e-4) &&
+        Math.abs(cityVertexColors.mean - city.mean) > 1e-4,
+        `vertexColors range [${cityVertexColors.min.toFixed(4)}, ${cityVertexColors.max.toFixed(4)}] mean ${cityVertexColors.mean.toFixed(6)} ` +
+        `vs flat-albedo range [${city.min.toFixed(4)}, ${city.max.toFixed(4)}] mean ${city.mean.toFixed(6)}`);
+
     console.log("\n6. THE LIVE PAGE ITSELF");
     const page = read("rtx-viewer.html");
     ok("carries demo:title/demo:desc/demo:category and imports render/rtViewer.mjs",
@@ -1068,6 +1185,11 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "never actually wired into the live page's own toggle cycle. Anchored to the ACTUAL SKY_VALUES array literal " +
         "(not \"the two substrings appear somewhere in the page\", which an adversarial review found would pass even if " +
         "\"sceneCapture\" only ever appeared in an unused label string, never in the array the toggle logic actually reads)");
+    ok("!! RTX round 15 -- the page reads a `vertexColors` URL param and passes it into makeRtSession, not just the hardcoded false default",
+        /VERTEX_COLORS/.test(page) && /vertexColors\s*:\s*VERTEX_COLORS/.test(page),
+        "a page that never read the param would still call makeRtSession successfully (vertexColors defaults to " +
+        "false) and every check above this one would still pass -- the same shape of gap round 10/11/12's own " +
+        "checks exist to catch, extended to the fifth toggle");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
