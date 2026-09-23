@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -1489,7 +1489,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
                 const run = float(1.0).add(shimAmt.mul(sin(th.mul(AR.runFreq).sub(uniforms.time.mul(AR.runRate))))).toVar();
                 const pr = th.sub(mix(span.negate(), span, flA.y)).div(0.34).toVar();
-                const pulse = flA.x.mul(0.95).mul(exp(pr.mul(pr).negate())).toVar();
+                // *** AND THE IGNITION RUNS THE SAME FIGURE ALONG THE SAME AXIS -- v4659. *** arc.ts runs
+                // its flash as this species' own gesture pulse driven by st.sweep instead of the gesture's
+                // own position, and drawn tighter: 0.34 for the gesture against 0.30 for the ignition. The
+                // success is the thing the species already does, once, travelling the whole length.
+                const IA_A = MH_IGNITE_AXIS.arc;
+                const pulse = flA.x.mul(0.95).mul(exp(pr.mul(pr).negate()))
+                    .add(KIT.mhIgniteAxis(th, COMPLETE, SWEEP, span.mul(IA_A.lo), span.mul(IA_A.hi),
+                        float(IA_A.width), float(IA_A.gain), float(IA_A.flat))).toVar();
 
                 // THE CLOSED FORM, TWICE: once for the thread and once for its halo. The halo's coefficient is
                 // 0.09 where every marched hero gives its scatter 0.24, and the arithmetic is in the kit's
@@ -1904,7 +1911,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 // THE SURGE: "a brightening surge travels across the curtains from one side to the other.
                 // Auroral substorm, in miniature."
                 const sr = q.x.sub(mix(float(-0.9), float(0.9), flX.y)).div(0.42).toVar();
-                const surge = flX.x.mul(0.85).mul(exp(sr.mul(sr).negate())).toVar();
+                // *** AND THE IGNITION RUNS THE SAME FIGURE ALONG THE SAME AXIS -- v4659. *** flux.ts runs
+                // its flash as this species' own gesture pulse driven by st.sweep instead of the gesture's
+                // own position, and drawn tighter: 0.42 for the gesture against 0.38 for the ignition. The
+                // success is the thing the species already does, once, travelling the whole length.
+                const IA_F = MH_IGNITE_AXIS.flux;
+                const surge = flX.x.mul(0.85).mul(exp(sr.mul(sr).negate()))
+                    .add(KIT.mhIgniteAxis(q.x, COMPLETE, SWEEP, float(IA_F.lo), float(IA_F.hi),
+                        float(IA_F.width), float(IA_F.gain), float(IA_F.flat))).toVar();
 
                 const curtains = EF[0].add(EF[1]).add(EF[2]).mul(vert).mul(brightF).mul(stri)
                     .mul(float(1.0).add(surge)).toVar();
@@ -2202,7 +2216,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 }
                 const run = float(1.0).add(shimAmt.mul(sin(S1[1].mul(PR.runFreq).sub(uniforms.time.mul(PR.runRate))))).toVar();
                 const pr = S1[1].sub(flP.y.mul(PR.pulseFrom)).div(PR.pulseW).toVar();
-                const pulse = flP.x.mul(PR.pulseAmp).mul(exp(pr.mul(pr).negate())).toVar();
+                // *** AND THE IGNITION RUNS THE SAME FIGURE ALONG THE SAME AXIS -- v4659. *** prism.ts runs
+                // its flash as this species' own gesture pulse driven by st.sweep instead of the gesture's
+                // own position, and drawn tighter: 0.28 for the gesture against 0.26 for the ignition. The
+                // success is the thing the species already does, once, travelling the whole length.
+                const IA_P = MH_IGNITE_AXIS.prism;
+                const pulse = flP.x.mul(PR.pulseAmp).mul(exp(pr.mul(pr).negate()))
+                    .add(KIT.mhIgniteAxis(S1[1], COMPLETE, SWEEP, float(IA_P.lo), float(IA_P.hi),
+                        float(IA_P.width), float(IA_P.gain), float(IA_P.flat))).toVar();
                 const beams = E[0].add(E[1]).add(E[2]).mul(brightP).mul(run).mul(float(1.0).add(pulse)).toVar();
                 // THE SPLIT IS THE HUE: outer beams either side of the anchor, the middle one on it.
                 const hueWP = E[0].mul(PR.hueW[0]).add(E[2].mul(PR.hueW[2])).mul(brightP).mul(run).toVar();
@@ -2295,9 +2316,21 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 const a1 = dot(d1v, d1v).div(wl.mul(wl)).toVar();
                 const e0 = exp(a0.negate()).add(KIT.mhScatter(a0, float(HX.scatterAmp))).mul(prof).toVar();
                 const e1 = exp(a1.negate()).add(KIT.mhScatter(a1, float(HX.scatterAmp))).mul(prof).toVar();
-                const eH = e0.add(e1).mul(brightH).mul(HX.strandGain).mul(fadeH).toVar();
+                // *** helix's IGNITION IS THE ONLY ONE WITH A FLAT TERM, AND IT MULTIPLIES. *** helix.ts:
+                // lift = 1 + st.complete * (0.35 + 2.10 * exp(-sr*sr)), with sr along q.y -- the height of
+                // the strands. So 0.35 of the flash reaches the WHOLE helix whether the front is there or
+                // not, and the front brightens hardest: the pair reads as the whole figure lighting up with
+                // a wave running its length, rather than only a band moving over a dark strand.
+                const IA_H = MH_IGNITE_AXIS.helix;
+                const liftH = float(1.0).add(KIT.mhIgniteAxis(q.y, COMPLETE, SWEEP,
+                    float(IA_H.lo), float(IA_H.hi), float(IA_H.width), float(IA_H.gain), float(IA_H.flat))).toVar();
+                const eH = e0.add(e1).mul(brightH).mul(HX.strandGain).mul(fadeH).mul(liftH).toVar();
                 accH.addAssign(eH.mul(transH).mul(dsH));
-                accHH.addAssign(e1.sub(e0).mul(brightH).mul(HX.strandGain).mul(fadeH).mul(transH).mul(dsH));
+                // ...and the HUE channel takes the same lift. helix.ts: strands = (e0+e1)*bright*lift and
+                // hueW = (e1-e0)*bright*lift -- both factors, one number. Lifting the energy and not the hue
+                // would make the pair's colour drift toward the anchor through the flash, because the hue
+                // this species reports is acc.y / acc.x and only the denominator would have grown.
+                accHH.addAssign(e1.sub(e0).mul(brightH).mul(HX.strandGain).mul(fadeH).mul(liftH).mul(transH).mul(dsH));
                 transH.assign(transH.mul(exp(eH.mul(HX.absorb).add(MH_EXT).mul(dsH).negate())));
             });
 

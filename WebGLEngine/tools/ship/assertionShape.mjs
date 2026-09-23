@@ -672,8 +672,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // by the source census in section 3, and opal was already moving before this round because it has an
     // ignition shell. What the four are chosen FOR is stated where they are listed: the two largest gains,
     // the one overshoot, and the species carrying both shapes at once.
-    gates: 1766, usesOk: 1745, definesOk: 1737, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1638, condFirst: 96, unknownSignature: 11,
+    // v4659 -- RE-TAKEN 1766 -> 1767 for tools/ship/murmurIgniteAxis-selfcheck.mjs. A SECOND gate for the
+    // same signal rather than more rows in murmurComplete's, and the clock decided it: that gate renders
+    // four species at 2,969 ms and these are four more, which is four more WGSL compiles and would have put
+    // one file over the 3,000 ms ceiling. The split is also the subject's: one gate holds the flash's effect
+    // on light that is ALREADY THERE and the other holds the figure it sends TRAVELLING.
+    gates: 1767, usesOk: 1746, definesOk: 1738, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1639, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

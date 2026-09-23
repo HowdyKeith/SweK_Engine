@@ -26,6 +26,56 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4659 -- four figures that turned out to be one shape, and two species that still were not flashing
+
+`MH_IGNITE`'s own note said the eight remaining `st.complete` figures were "per-species transcriptions rather
+than this one shape". **Four of them are one shape.** Read side by side, arc, flux, prism and helix run the
+shell's own arithmetic along a coordinate of their own instead of along `|p|`:
+
+    r = (coord - mix(lo, hi, st.sweep)) / width;   figure += st.complete * (flat + gain * exp(-r·r))
+
+arc along the angle round its arc, flux along the length of its stream, prism along the distance out its
+beams, helix along the height of its strands. The shell's coordinate is `|p|` for all seven species that run
+it; these four are four *different* quantities, which is why it is a second table rather than four more rows
+in the first.
+
+**And each one is that species' own gesture figure, run on `sweep` and drawn tighter** — arc 0.34 against
+0.30, flux 0.42 against 0.38, prism 0.28 against 0.26. The success is the thing the species already does,
+once, travelling the whole length and a little sharper. Both halves are in this port now, so that is a
+statement it can make rather than a reading of somebody else's file.
+
+**prism and helix were still not flashing at all after v4658** — both moved 0.0% of their bytes and ×1.000 of
+interior light at the peak of their own SUCCESS state, because neither has an interior factor and this
+travelling figure *is* their whole flash.
+
+| | at v4658 | after |
+|---|---|---|
+| prism | ×1.00 | **×2.08** |
+| helix | ×1.00 | **×2.93** |
+| arc | ×1.81 | ×2.18 |
+| flux | ×4.33 | ×5.92 |
+
+**Where the front travels is graded in the kit, and the reason is measured rather than assumed.** Isolating
+`sweep` in a rendered frame needs two taus with equal `complete` and different `sweep` — and `mh_state`'s
+`settled` turns on at *exactly* the complete peak (tau 0.3600), so no such pair exists, searched at 0.0002
+resolution. A new probe mode grades the front against the CPU twin on a real GPU at **0/255** over three
+different axes at once, and its peak sits at `mix(lo, hi, sweep)` to within 0.0010 of the axis at every sweep.
+
+Thirteen sabotages, one caught only after repair: moving helix's **flat** term outside the complete multiply —
+which would lift every strand in every state — read identically on the probe's alpha channel, because that
+channel ran *flux's* constants and flux has no flat term. It runs helix's now.
+
+**And the round's own baseline lied once.** The neutralisation that measures what the port did *before* a
+change is a regex over the table, and prism's entry has two spaces after `lo:` where the others have one — so
+prism was never neutralised, and its "before" reading was the wired version, which read as though the change
+did nothing. The script asserts how many entries it neutralised now.
+
+`tools/ship/murmurIgniteAxis-selfcheck.mjs` arrives green at 2,621 ms, so the tree holds 1767 gates.
+
+**Four ignition figures left, and they really are four different shapes:** aura's von Mises on the *angle* —
+the only figure that spends `sweep` going round something rather than along it — fathom's per-shell turn,
+geode's flat lift, and comet's, which changes the trail's *decay* instead of adding light.
+
 ## v4658 -- the flash brightens what is already there, and six species were not flashing at all
 
 `kit.ts`, on the whole family's arrival:

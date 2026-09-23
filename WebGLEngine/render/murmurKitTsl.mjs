@@ -557,6 +557,16 @@ export function makeMurmurKitTsl(TSL) {
     // passed every row in the tree.
 
     /**
+     * *** THE IGNITION's TRAVELLING GAUSSIAN -- v4659. *** See render/murmurKit.mjs's MH_IGNITE_AXIS: four
+     * species run the shell's arithmetic along a coordinate of their OWN rather than along |p|, and each
+     * one is that species' own gesture figure run on `sweep` and drawn a little tighter.
+     */
+    const mhIgniteAxis = Fn(([coord, complete, sweep, lo, hi, width, gain, flat]) => {
+        const r = coord.sub(mix(lo, hi, sweep)).div(width).toVar();
+        return complete.mul(flat.add(gain.mul(exp(r.mul(r).negate()))));
+    });
+
+    /**
      * *** THE SUCCESS FLASH's SATURATION -- v4658. *** See render/murmurKit.mjs's MH_COMPLETE_LIFT: three
      * species pull a per-figure LIFE toward full rather than scaling it, mix(life, target, complete * k),
      * and chorus's target overshoots past 1 while opal's and sol's do not. A saturation closes the
@@ -671,7 +681,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift,
+        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
@@ -894,6 +904,37 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             const b = K.mhIgnite(pLen, one, sweep, float(0.02), float(1.05), float(0.24));   // tempest
             const a = K.mhIgnite(pLen, py.div(n), float(0.5), float(0.02), float(0.95), float(0.26));  // still, complete on y
             return vec4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), clamp(a, 0.0, 1.0));
+        }
+        if (mode === "igniteAxis") {
+            // *** THE TRAVELLING GAUSSIAN OVER ITS WHOLE AXIS BY ITS WHOLE SWEEP -- v4659. *** x carries the
+            // species' own coordinate over -1.2 .. 2.4, which is the UNION of the four axes so no species'
+            // front is cropped, and y carries the sweep 0..1 -- so one frame is the front's entire journey
+            // along each of three axes at once, and the front's POSITION is what the CPU twin is graded on.
+            //
+            // THREE SPECIES IN THREE CHANNELS AND THEY BRACKET THE TABLE: flux is the widest front (0.38)
+            // travelling -1 to 1, prism the narrowest (0.26) travelling 0 to 2.1 -- a different range
+            // entirely, so a probe on one range could not tell a correct `hi` from a constant -- and helix
+            // is the only one with a FLAT term, which lifts its whole channel off the floor everywhere the
+            // gaussian does not reach.
+            //
+            // *** AND ALPHA READS THE LATTICE A SECOND WAY, FOR `complete`, WHICH IS v4644's LESSON. *** The
+            // three channels above hold complete at 1, so deleting the complete multiplier from this
+            // function would leave them IDENTICAL -- exactly the sabotage that walked through the shell's
+            // probe until it got an axis of its own. Alpha re-reads y as COMPLETE with the sweep PINNED at
+            // 0.5: pinned rather than shared, so a port spending sweep where complete belongs fails it.
+            const coord = px.div(n).mul(3.6).sub(1.2).toVar();
+            const sweep = py.div(n).toVar();
+            const one = float(1.0);
+            const r = K.mhIgniteAxis(coord, one, sweep, float(-1.0), float(1.0), float(0.38), float(1.70), float(0.00));
+            const g = K.mhIgniteAxis(coord, one, sweep, float(0.0), float(2.10), float(0.26), float(1.60), float(0.00));
+            const b = K.mhIgniteAxis(coord, one, sweep, float(-1.0), float(1.0), float(0.26), float(2.10), float(0.35));
+            // ...and alpha uses HELIX's constants, not flux's, BECAUSE HELIX IS THE ONE WITH A FLAT TERM.
+            // With flux's (flat 0) a twin that moved the flat term outside the complete multiply read the
+            // same as a correct one at every complete, and walked through. The flat term is exactly what a
+            // complete axis exists to grade: outside the multiply it lifts the figure in EVERY state.
+            const a = K.mhIgniteAxis(coord, py.div(n), float(0.5), float(-1.0), float(1.0), float(0.26), float(2.10), float(0.35));
+            return vec4(clamp(r.div(2.5), 0.0, 1.0), clamp(g.div(2.5), 0.0, 1.0),
+                        clamp(b.div(2.5), 0.0, 1.0), clamp(a.div(2.5), 0.0, 1.0));
         }
         if (mode === "live") {
             // *** mh_live OVER THE WHOLE INPUT SQUARE, AGAINST THE f64 TWIN. *** x is the raw signal 0..1 and

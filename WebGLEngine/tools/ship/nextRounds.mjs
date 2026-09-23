@@ -1015,6 +1015,29 @@ export const NEXT_ROUNDS = [
             "rather than two. Named absences outside that: opal's flash-drift live terms, geode's drive " +
             "mix, tempest's bolt `small` mix, and five builders (droplet, opal, mist, fathom, geode) with " +
             "no cadence at all.",
+        note8: "*** FOUR OF THE EIGHT IGNITION FIGURES WERE ONE SHAPE, AND v4659 TOOK THEM. *** note7 above " +
+            "listed them as eight separate transcriptions, which is what MH_IGNITE's own note said too. Read " +
+            "side by side, arc, flux, prism and helix run the SAME arithmetic the shell runs, on a " +
+            "coordinate of their own instead of |p|: r = (coord - mix(lo, hi, sweep)) / width, " +
+            "figure += complete * (flat + gain * exp(-r*r)). MH_IGNITE_AXIS holds the five constants; each " +
+            "is that species' own gesture pulse driven by sweep and drawn tighter (0.34 -> 0.30, " +
+            "0.42 -> 0.38, 0.28 -> 0.26).\n\n" +
+            "*** FOUR LEFT, AND THEY REALLY ARE FOUR DIFFERENT SHAPES: *** aura's is a von MISES on the " +
+            "ANGLE -- lap += complete * (0.18 + 0.80 * exp(2.4 * (cos(ang - sweep*2pi) - 1))) -- the only " +
+            "figure in the roster that spends sweep as a position going ROUND something rather than along " +
+            "it; fathom's is a per-shell TURN, w = 1 - smoothstep(0, 0.42, |sweep - turn - 0.16|) then " +
+            "e *= 1 + complete*(0.5 + 2.4*w), so the three shells ignite in sequence; geode's is a flat " +
+            "lit += complete * 0.70 with no sweep at all; and comet's changes the trail's DECAY instead of " +
+            "adding light, decay = mix(decay, 9.0, st.sweep), so the ignition runs the length of the path.\n\n" +
+            "THEN THE SINGLES: still's glint 0.85, comet's head 2.2, droplet's 0.26, limn's ring " +
+            "(complete * band * 1.20) and its second interior 0.9, duet's flare 1.15 and its one SHRINK " +
+            "(1 - 0.62*complete), chorus's sync 0.55, prism's 1.10.\n\n" +
+            "*** AND A NOTE ABOUT MEASURING THIS SIGNAL AT ALL, because it cost a detour: *** mh_state's " +
+            "`settled` turns on at EXACTLY the tau where `complete` peaks (0.3600), so there is NO pair of " +
+            "taus with equal complete and different sweep -- searched at 0.0002 resolution. A rendered frame " +
+            "cannot isolate sweep from complete or from settled. Anything about WHERE the front is belongs " +
+            "in the kit probe, where the three can be driven independently; anything about whether a species " +
+            "flashes at all belongs in a species gate.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

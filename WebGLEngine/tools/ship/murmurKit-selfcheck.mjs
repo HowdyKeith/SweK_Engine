@@ -324,7 +324,8 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "finishGrey", n: N } },
                { factoryArgs: { mode: "ignite", n: N } },
                { factoryArgs: { mode: "heading", n: N } },
-               { factoryArgs: { mode: "drift", n: N } }],
+               { factoryArgs: { mode: "drift", n: N } },
+               { factoryArgs: { mode: "igniteAxis", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1872,6 +1873,64 @@ sec("15. *** THE MODULATED CLOCK: this port's ONE DELIBERATE DIVERGENCE FROM mur
             `* t. THAT IS THE ROW THAT MAKES THE DIVERGENCE SAFE: the two formulas differ only while a signal ` +
             `is in motion, which is exactly where murmur's is wrong, so every frame this tree has recorded at ` +
             `a fixed operating point is where it was.`);
+    }
+}
+
+// =============================================================================================================
+sec("16. *** THE IGNITION's TRAVELLING GAUSSIAN, ON A REAL GPU -- v4659 ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the travelling gaussian matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const fr = r.frames[14];
+        const A = K.MH_IGNITE_AXIS;
+        const chan = [["flux", A.flux], ["prism", A.prism], ["helix", A.helix]];
+        let worst = 0, at = "", worstA = 0;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const i = ((N - 1 - y) * N + x) * 4;
+            const coord = (x / N) * 3.6 - 1.2, sweep = y / N;
+            chan.forEach(([nm, c], k) => {
+                const want = Math.round(Math.min(1, Math.max(0,
+                    K.mhIgniteAxis(coord, 1, sweep, c.lo, c.hi, c.width, c.gain, c.flat) / 2.5)) * 255);
+                const d = Math.abs(fr[i + k] - want);
+                if (d > worst) { worst = d; at = `${nm} coord ${coord.toFixed(2)} sweep ${sweep.toFixed(2)}: gpu ${fr[i + k]} cpu ${want}`; }
+            });
+            const wantA = Math.round(Math.min(1, Math.max(0,
+                K.mhIgniteAxis(coord, y / N, 0.5, A.helix.lo, A.helix.hi, A.helix.width, A.helix.gain, A.helix.flat) / 2.5)) * 255);
+            worstA = Math.max(worstA, Math.abs(fr[i + 3] - wantA));
+        }
+        say(`the travelling front over ${N * N} points x three axes: worst |gpu - cpu| = ${worst}/255; the complete axis in alpha ${worstA}/255`);
+        ok("!! *** THE FRONT IS WHERE sweep PUTS IT, ON A REAL GPU, ACROSS THREE DIFFERENT AXES ***",
+            worst <= 1 && worstA <= 1,
+            `worst channel error ${worst} of 255 across flux's -1..1, prism's 0..2.1 and helix's -1..1 with ` +
+            `its flat term (worst at ${at}), and ${worstA} on the alpha channel that sweeps COMPLETE with the ` +
+            `sweep PINNED -- and that channel runs HELIX's constants, because helix is the one with a FLAT term ` +
+            `and a twin that moved the flat outside the complete multiply read identically on flux's and ` +
+            `walked through. THE THREE RANGES ARE DIFFERENT ON PURPOSE: a probe that ran every channel over ` +
+            `-1..1 could not tell prism's hi of 2.10 from a constant, and the alpha channel exists because ` +
+            `holding complete at 1 in all three would let the multiplier be deleted with nothing red -- ` +
+            `which is precisely what happened to the SHELL's probe before v4644 gave it the same axis.`);
+
+        // ...and the front's PEAK is at mix(lo, hi, sweep), which is the whole claim about travelling.
+        let worstPeak = 0;
+        for (const [nm, c] of chan) {
+            for (const sw of [0, 0.25, 0.5, 0.75, 1]) {
+                let bestC = 0, bestV = -1;
+                for (let q = -1.2; q <= 2.4; q += 0.002) {
+                    const v = K.mhIgniteAxis(q, 1, sw, c.lo, c.hi, c.width, c.gain, c.flat);
+                    if (v > bestV) { bestV = v; bestC = q; }
+                }
+                worstPeak = Math.max(worstPeak, Math.abs(bestC - (c.lo + (c.hi - c.lo) * sw)));
+                void nm;
+            }
+        }
+        ok("!! ...and the brightest point IS mix(lo, hi, sweep), to 0.002 of the axis, at every sweep",
+            worstPeak < 0.003,
+            `the gaussian's peak, found by scanning the whole axis at 0.002 resolution, sits at ` +
+            `mix(lo, hi, sweep) to within ${worstPeak.toFixed(4)} across three species and five sweeps. THAT ` +
+            `IS THE CLAIM THE WORD "TRAVELLING" MAKES and it is measured rather than read off the formula: ` +
+            `the front's position is the sweep's position, so the flash crosses the whole figure once.`);
     }
 }
 

@@ -990,6 +990,47 @@ export function mhCompleteLift(x, complete, k, over) {
 }
 
 /**
+ * *** THE IGNITION's OTHER SHAPE: A GAUSSIAN THAT TRAVELS ALONG THE SPECIES' OWN AXIS -- v4659. ***
+ *
+ * MH_IGNITE's shell is a ring in |p|: it leaves the heart and reaches the surface, and seven species run it.
+ * Four more run the SAME arithmetic on a coordinate of their own instead, and it took reading all eight of
+ * the remaining figures side by side to see that they are one shape and not four:
+ *
+ *     r = (coord - mix(lo, hi, st.sweep)) / width;   figure += st.complete * (flat + gain * exp(-r*r))
+ *
+ * arc runs it along `th`, the angle round its own arc; flux along q.x, the length of its stream; prism along
+ * s1, the distance out its beams; helix along q.y, the height of its strands. The axis is whatever that
+ * species is built along, which is why this is a different table from the shell rather than four more rows
+ * in it -- the shell's coordinate is |p| for everybody.
+ *
+ * *** EACH ONE IS THE SPECIES' OWN GESTURE FIGURE, RUN ON `sweep` AND DRAWN TIGHTER. *** arc's flourish
+ * pulse is the same expression at width 0.34 and the ignition is 0.30; flux 0.42 against 0.38; prism 0.28
+ * against 0.26. The success is the gesture the species already performs, once, travelling the whole length
+ * and a little sharper -- which is a design statement the port can now make because both are here.
+ *
+ * `lo` and `hi` are in the species' own units, and arc's are a FRACTION of its own span: its ends are
+ * -span and +span, where span is a runtime value from the arc's extent, so its entry carries -1 and 1 and
+ * its call site multiplies. helix is the only one with a `flat` term: 0.35 of the flash reaches the whole
+ * strand whether or not the gaussian does, so the ignition lifts the figure everywhere and brightens hardest
+ * where the front is.
+ */
+export const MH_IGNITE_AXIS = Object.freeze({
+    arc:   Object.freeze({ lo: -1.00, hi: 1.00, width: 0.30, gain: 1.80, flat: 0.00, spanScaled: true,  gestureW: 0.34 }),
+    flux:  Object.freeze({ lo: -1.00, hi: 1.00, width: 0.38, gain: 1.70, flat: 0.00, spanScaled: false, gestureW: 0.42 }),
+    prism: Object.freeze({ lo:  0.00, hi: 2.10, width: 0.26, gain: 1.60, flat: 0.00, spanScaled: false, gestureW: 0.28 }),
+    helix: Object.freeze({ lo: -1.00, hi: 1.00, width: 0.26, gain: 2.10, flat: 0.35, spanScaled: false, gestureW: 0.00 }),
+});
+
+/**
+ * The travelling gaussian itself. Returns what the flash ADDS to the species' figure, which is 0 at
+ * complete 0 for every coordinate -- the property that keeps every non-SUCCESS frame where it was.
+ */
+export function mhIgniteAxis(coord, complete, sweep, lo, hi, width, gain, flat) {
+    const r = (coord - (lo + (hi - lo) * sweep)) / width;
+    return complete * (flat + gain * Math.exp(-r * r));
+}
+
+/**
  * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
  *
  * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs

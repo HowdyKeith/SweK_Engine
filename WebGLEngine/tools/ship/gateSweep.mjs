@@ -8070,6 +8070,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4659 -- THE 342nd CLOSING: four figures that turned out to be one shape, and the two species that
+    // were STILL not flashing after the round before.
+    since341: Object.freeze({
+        at: "v4659", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteAxis-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,621 ms on this box, 8 rows in four sections over four rendered species, plus a " +
+                 "new section 16 and a new probe mode in tools/ship/murmurKit-selfcheck.mjs. " +
+                 "*** MH_IGNITE's OWN NOTE CALLED THE REMAINING EIGHT FIGURES \"per-species transcriptions " +
+                 "rather than this one shape\". FOUR OF THEM ARE ONE SHAPE. *** r = (coord - mix(lo, hi, " +
+                 "st.sweep)) / width, figure += st.complete * (flat + gain * exp(-r*r)) -- arc along the " +
+                 "angle round its arc, flux along the length of its stream, prism along the distance out its " +
+                 "beams, helix along the height of its strands. The SHELL's coordinate is |p| for all seven " +
+                 "species that run it; these four are four different quantities, which is why it is a second " +
+                 "table and not four more rows in the first. " +
+                 "*** AND EACH IS THAT SPECIES' OWN GESTURE FIGURE, RUN ON sweep AND DRAWN TIGHTER: *** arc " +
+                 "0.34 against 0.30, flux 0.42 against 0.38, prism 0.28 against 0.26. The success is the " +
+                 "thing the species already does, once, travelling the whole length. " +
+                 "*** prism AND helix WERE STILL NOT FLASHING AT ALL AFTER v4658: *** both moved 0.0% of " +
+                 "their bytes and x1.000 of interior light at the peak of their own SUCCESS state, because " +
+                 "neither has an interior factor and this figure IS their whole flash. They now read x2.08 " +
+                 "and x2.93; arc goes x1.81 -> x2.18 and flux x4.33 -> x5.92 on top of what v4658 gave them. " +
+                 "*** WHERE THE FRONT TRAVELS IS GRADED IN THE KIT AND THE REASON IS MEASURED: *** isolating " +
+                 "sweep in a rendered frame needs two taus with equal complete and different sweep, and " +
+                 "mh_state's settled turns on at EXACTLY the complete peak (tau 0.3600) -- searched, and " +
+                 "there is no such pair. So a new probe mode grades the front against the CPU twin on a real " +
+                 "GPU at 0/255 over three different axes, and its peak sits at mix(lo, hi, sweep) to 0.0010 " +
+                 "of the axis at every sweep. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, ONE ONLY AFTER REPAIR: moving helix's FLAT term outside " +
+                 "the complete multiply -- which would lift every strand in every state -- read identically " +
+                 "on the probe's alpha channel, because that channel ran FLUX's constants and flux has no " +
+                 "flat term. It runs helix's now. " +
+                 "AND THE ROUND's OWN BASELINE LIED ONCE: the neutralisation that measures what the port did " +
+                 "BEFORE a change is a regex over the table, and prism's entry has two spaces after `lo:` " +
+                 "where the others have one -- so prism was never neutralised and its \"before\" reading was " +
+                 "the wired version, which read as though the change did nothing. The script asserts the " +
+                 "count of entries it neutralised now.",
+    }),
     // v4658 -- THE 341st CLOSING: the half of the SUCCESS flash that is not the shell, and the six species
     // that reached the peak of their own success state without moving a byte.
     since340: Object.freeze({
