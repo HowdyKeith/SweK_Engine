@@ -286,11 +286,11 @@ export const REACH_AT_V4548 = Object.freeze({
     // and runs at 574 ms, under the budget -- so `unguarded` is unmoved at 17 and `unchecked` does not rise.
     // That is what adding a record properly looks like, and it is re-taken in the round that added it
     // rather than four rounds later, which is how the previous two came to be found by a red gate.
-    // v4661 -- 147 -> 148: WASM_AT_V4661 in tools/ship/wasmTeardown.mjs, the runtime census of which gates
+    // v4663 -- 147 -> 148: WASM_AT_V4663 in tools/ship/wasmTeardown.mjs, the runtime census of which gates
     // compile a wasm module and how they leave. It arrives GUARDED -- tools/ship/wasmTeardown-selfcheck.mjs
     // names it and runs at 1,248 ms, under the budget -- so `unguarded` is unmoved at 17 and `unchecked`
     // does not rise. Re-taken in the round that added it.
-    // v4662 -- 148 -> 149: EXILED_PASS_V4662 in tools/ship/sweepCoverage.mjs. It arrives GUARDED --
+    // v4664 -- 148 -> 149: EXILED_PASS_V4664 in tools/ship/sweepCoverage.mjs. It arrives GUARDED --
     // tools/ship/sweepCoverage-selfcheck.mjs names it and grades its arithmetic, its names against the tree,
     // and whether the reds it lists are still outside the sweep -- so `unguarded` is unmoved at 17.
     total: 149,
@@ -499,9 +499,9 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // looks like. The other three fields are structural and unchanged.
     // v4647g -- 146 -> 147, the one arrival re-taken above. `unguarded` does not move: the new record is
     // named by the gate in its own defining file's sibling.
-    // v4661 -- 147 -> 148, the one arrival re-taken above. `unguarded` does not move: the new record is
+    // v4663 -- 147 -> 148, the one arrival re-taken above. `unguarded` does not move: the new record is
     // named by the gate beside it.
-    // v4662 -- 148 -> 149, the one arrival re-taken above; `unguarded` does not move.
+    // v4664 -- 148 -> 149, the one arrival re-taken above; `unguarded` does not move.
     structural: Object.freeze({ total: 149, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),

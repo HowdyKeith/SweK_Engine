@@ -1,7 +1,7 @@
 // tools/ship/declaredCost.mjs -- EVERY GATE THAT COSTS ANYTHING WRITES ITS COST AT THE TOP OF ITSELF, AND
 // NOTHING IN THE SHIP HAS EVER READ ONE.
 //
-// v4664. 271 gates in this tree open with a line of this shape, and many carry the round that measured it:
+// v4666. 271 gates in this tree open with a line of this shape, and many carry the round that measured it:
 //
 //     // Run: node tools/roundhouse/khConvergence-selfcheck.mjs   (~616s)
 //     // Run: node tools/roundhouse/assumptionMap-selfcheck.mjs   (~238s - MEASURED v3941, was ~40s)

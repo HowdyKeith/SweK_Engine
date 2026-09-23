@@ -42,7 +42,7 @@ const RADIUS = (() => {
 // ---------------------------------------------------------------------------
 let wasm;
 try {
-    // v4661 -- pathToFileURL, because an absolute path is not a specifier. On Linux `join(...)` starts with
+    // v4663 -- pathToFileURL, because an absolute path is not a specifier. On Linux `join(...)` starts with
     // "/" and node's loader tolerates it; on Windows it starts with "C:" and the loader reads "c:" as a URL
     // scheme -- ERR_UNSUPPORTED_ESM_URL_SCHEME, and the catch below would report it as "build it first".
     wasm = await import(pathToFileURL(join(here, "..", "world", "wasm", "terrain_wasm.js")).href);

@@ -390,6 +390,6 @@ console.log("unchecked here: box3d WITH CCD OFF is not re-measured, because swk_
     "surface; whether the caps or the CCD hole move with substeps is a whole grid nobody has run. And the " +
     "sensor comparison is about DELIVERY, not about agreement: no check here asks whether the two engines " +
     "report the same overlap at the same step, which is what a lockstep peer swapping backends would need.");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

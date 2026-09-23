@@ -289,7 +289,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const arrived = F.COMMIT_BELT_DRIFT_V4621.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
-    // *** v4663 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
+    // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
     // found it reading COUNTS ("a count reverted to a wrong value still looks like a count"). v4534 found it
     // reading %h ("fourteen of fifteen bodies drifted without changing"). This is a SHALLOW CLONE: git lists
     // the commits it HAS, and for anything vendored before the graft boundary the list simply stops there --
@@ -369,7 +369,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
     const D = F.COMMIT_BELT_DRIFT_V4621;
-    // *** v4663 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
+    // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still
     // "differs" by whatever the boundary swallowed: this read 0 unchanged of 15 and the true figure is 11.
     // But swapping the comparator alone was WRONG IN THE OTHER DIRECTION and the gate's own partition row
@@ -403,7 +403,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const unaccounted = names.filter((n) => !(R.perBody[n] || []).length && !moved[n] && !arrived[n]);
     ok("!! *** UNCHANGED + MOVED + ARRIVED + REMOVED IS THE WHOLE FLEET -- a new body cannot arrive unrecorded ***",
        unaccounted.length === 0 && names.length === D.bodiesNow &&
-       // v4663 -- `unobservable` is a FIFTH class and it is IN the sum, not excluded from it. The row's own
+       // v4665 -- `unobservable` is a FIFTH class and it is IN the sum, not excluded from it. The row's own
        // name is the argument: a partition that quietly drops a class is how a body arrives unrecorded, and
        // six of this clone's bodies are checked-where-visible-and-uncheckable-below rather than unchanged.
        stillMatchesV4475.length + unobservable.length + Object.keys(moved).length +

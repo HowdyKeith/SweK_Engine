@@ -32,9 +32,9 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
             if (e.name === "node_modules" || e.name === ".git" || (dir === ROOT && e.name === "vendor")) continue;
             const p = path.join(dir, e.name);
             if (e.isDirectory()) walk(p, out);
-            // v4665 -- .cjs ADDED. The walk had three extensions and CommonJS was not one of them, so an
+            // v4667 -- .cjs ADDED. The walk had three extensions and CommonJS was not one of them, so an
             // entire module system was invisible to a census that claims to count "files that touch wasm".
-            // It cost nothing until v4661 wrote tools/ship/wasmExitHook.cjs -- which wraps ALL FIVE
+            // It cost nothing until v4663 wrote tools/ship/wasmExitHook.cjs -- which wraps ALL FIVE
             // WebAssembly doors and is the most aggressive caller in the tree -- and the census scored it
             // zero. A filter narrower than the claim is the same defect as a count standing in for a
             // property: the number stayed plausible precisely because the omission was invisible.
@@ -67,7 +67,7 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
         // codeOnly() blanks strings AND comments, which is right for asking "is this a code shape at all".
         const code = codeOnly(raw).replace(/<!--[\s\S]*?-->/g, " ");
         if (/\.wasm|WebAssembly\./.test(raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ").replace(/<!--[\s\S]*?-->/g, " "))) inCode++;
-        // v4665 -- *** AND THE CALLER COUNT WAS MATCHING A SPELLING, NOT A CALL. *** wasmExitHook.cjs does
+        // v4667 -- *** AND THE CALLER COUNT WAS MATCHING A SPELLING, NOT A CALL. *** wasmExitHook.cjs does
         // `const W = WebAssembly;` once and then wraps W.instantiate, W.compile, W.instantiateStreaming,
         // W.compileStreaming and new W.Module -- five doors, and `WebAssembly.` followed by a method name
         // appears nowhere in its code. Adding .cjs to the walk above would have made it VISIBLE and still
@@ -101,7 +101,7 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // measures both -- the loose number is prose-sensitive by construction, and a round that writes a sentence
     // containing ".wasm" moves it without touching a byte of wasm handling. The two numbers the round's claims
     // rest on, inCode (94) and callsApi (12), are frozen where they were.
-    // v4665 -- RE-TAKEN 119 -> 121, AND THIS ONE IS NOT PROSE DRIFT. Two files arrived, both of them this
+    // v4667 -- RE-TAKEN 119 -> 121, AND THIS ONE IS NOT PROSE DRIFT. Two files arrived, both of them this
     // session's own wasm/libuv teardown machinery: tools/ship/wasmTeardown.mjs (+1 mention, +1 inCode) and
     // tools/ship/wasmExitHook.cjs, which was not counted at all until .cjs joined the walk above (+1
     // mention, +1 inCode, +1 callsApi via the alias rule). comment-only did NOT move, staying at 25, which
@@ -288,7 +288,7 @@ console.log("      real fallback, and it had one before this round.");
 console.log("      AND ONLY TWO LOADERS WERE WIRED. The other nine API callers are Node-side gates and tools,");
 console.log("      where WebAssembly is always present and a probe would be ceremony. That is a judgement, not");
 console.log("      a measurement: if one of them is ever run somewhere hostile it will need the same treatment.");
-console.log("      AND THE CALLER COUNT STILL MATCHES SPELLINGS, JUST TWO MORE OF THEM. v4665 added .cjs to the");
+console.log("      AND THE CALLER COUNT STILL MATCHES SPELLINGS, JUST TWO MORE OF THEM. v4667 added .cjs to the");
 console.log("      walk and one alias shape -- `const W = WebAssembly` in the same file -- because that is what");
 console.log("      wasmExitHook.cjs does. A caller that takes the global as a PARAMETER, reads it off a");
 console.log("      property, or looks it up by name at runtime is still counted as touching wasm nowhere. The");

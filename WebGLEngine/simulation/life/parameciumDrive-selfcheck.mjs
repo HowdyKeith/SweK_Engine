@@ -129,6 +129,6 @@ const run = async (drive, g) => {
 }
 
 console.log(fails ? "\nparameciumDrive-selfcheck: " + fails + " FAILED" : "\nparameciumDrive-selfcheck: all checks pass");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

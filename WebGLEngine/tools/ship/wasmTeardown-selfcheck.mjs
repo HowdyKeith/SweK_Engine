@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/wasmTeardown-selfcheck.mjs -- v4661
+// WebGLEngine/tools/ship/wasmTeardown-selfcheck.mjs -- v4663
 //
 // Run: node tools/ship/wasmTeardown-selfcheck.mjs
 //
@@ -38,7 +38,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { liveHandles } from "./serverShutdown.mjs";
 import { noComments } from "./sourceScan.mjs";
-import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4661, exitCallCount } from "./wasmTeardown.mjs";
+import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4663, exitCallCount } from "./wasmTeardown.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -187,24 +187,24 @@ console.log("\n4. *** THE PROPERTY, ON A REAL MEMBER, MEASURED RATHER THAN READ 
 // -----------------------------------------------------------------------------------------------------------
 console.log("\n5. *** HOW BIG THE POPULATION IS, MEASURED ONCE, WITH ITS GAP NAMED ***");
 {
-    report(`${WASM_AT_V4661.candidates} candidate gates run under the hook at ${WASM_AT_V4661.at}; ` +
-           `${WASM_AT_V4661.compilers.length} COMPILED a wasm module. A further ${WASM_AT_V4661.noMarker} of ` +
-           `the ${WASM_AT_V4661.screened} screened were killed at the first pass's cap and wrote no marker: UNKNOWN`);
+    report(`${WASM_AT_V4663.candidates} candidate gates run under the hook at ${WASM_AT_V4663.at}; ` +
+           `${WASM_AT_V4663.compilers.length} COMPILED a wasm module. A further ${WASM_AT_V4663.noMarker} of ` +
+           `the ${WASM_AT_V4663.screened} screened were killed at the first pass's cap and wrote no marker: UNKNOWN`);
     // The frozen set is a MEASUREMENT and re-deriving it costs a full pass, so what runs here is a ratchet on
     // its inputs: if a member's exit shape changes, this says so and the census is re-run. A count standing in
     // for a property is the defect this tree names most often, and this is deliberately not one -- the property
     // itself is measured in section 4, on a live member, with the instrument that took the census.
-    const drifted = WASM_AT_V4661.compilers.filter((c) => {
+    const drifted = WASM_AT_V4663.compilers.filter((c) => {
         const src = noComments(fs.readFileSync(path.join(ENG, c.gate), "utf8"));
         return exitCallCount(src) !== c.exitCalls;
     });
     ok("*** every measured wasm compiler still has the exit shape the census recorded for it ***",
-        WASM_AT_V4661.compilers.length > 0 && drifted.length === 0,
+        WASM_AT_V4663.compilers.length > 0 && drifted.length === 0,
         drifted.length ? "changed since the census, re-run it: " +
                          drifted.map((d) => d.gate + " (recorded " + d.exitCalls + ")").join(", ")
-                       : `${WASM_AT_V4661.compilers.length} members, none moved`);
+                       : `${WASM_AT_V4663.compilers.length} members, none moved`);
     ok("  ...and the set is not empty, which would make the row above vacuous",
-        WASM_AT_V4661.compilers.length > 0,
+        WASM_AT_V4663.compilers.length > 0,
         "a population of zero passes any property asked of its members");
     // *** AND THE TRAP IN THE SWAP, WHICH HAS ALREADY BITTEN ONCE. *** process.exit() stopped execution and
     // process.exitCode does not, so a member whose verdict sat in an `if` needs an `else` or a failing run
@@ -216,7 +216,7 @@ console.log("\n5. *** HOW BIG THE POPULATION IS, MEASURED ONCE, WITH ITS GAP NAM
         "it prints `gateReport-selfcheck: 4 FAILURES` and nothing else today. Left sequential, the line after " +
         "it would run as well -- which is exactly what the same repair did to statedRuntime at v4640");
     report(`NOT MEASURED: a gate that spawns a node CHILD which compiles wasm. The child is the process that ` +
-        `exits and the hook is not in it. ${WASM_AT_V4661.noMarker} further gates were killed at the first ` +
+        `exits and the hook is not in it. ${WASM_AT_V4663.noMarker} further gates were killed at the first ` +
         "pass's cap and wrote nothing, so the compiler count is a FLOOR and not a census of the tree.");
 }
 

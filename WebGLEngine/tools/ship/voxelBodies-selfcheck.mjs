@@ -196,6 +196,6 @@ sec("5. ON BOTH BACKENDS: a red crate at rest on the slab, then turned 45 degree
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: non-cubic bodies (one scale per record: the sandbox's crates are cubes this round); friction and restitution knobs; body-vs-body stacking under the window (the pool handles it, the gate drops one crate at a time); the page's crate button (eyeballed).");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

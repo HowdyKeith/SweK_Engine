@@ -276,6 +276,6 @@ let browser = null;
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the brain (drivePolicy) on the draped track (the pursuit driver laps it; the trained policy's features are the flat track's); buildings on the terrain (CityGen stamps a flat floor; the terrain page has none); a box3d heightfield collider (the surface is analytic, as the flat one was); the terrain's other looks (biome, language) under the road.");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

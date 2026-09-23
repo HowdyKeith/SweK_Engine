@@ -235,6 +235,6 @@ sec("6. IN THE BROWSER ON BOTH BACKENDS: the same wasm, the same 30 s, the same 
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the wheel joints as a SECOND car (built in the wasm since v01fe7f4e, but nothing puts them on a chassis; physics/wheelJoint.mjs holds their standalone measurement); wheel spin and tyre slip curves (the tyre model is vehicle.mjs's linear-to-saturation one); the car against another car (round 3 races them); the page's live drive (eyeballed).");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

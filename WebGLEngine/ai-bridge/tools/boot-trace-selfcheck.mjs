@@ -30,7 +30,7 @@ const ok = (label, cond, note = "") => {
 };
 const report = (label, note) => console.log(`  ----  ${label}${note ? "   " + note : ""}`);
 
-// *** v4662 -- ANY THROW BECOMES A FAIL ROW. *** This gate spawns real node children and binds a real port,
+// *** v4664 -- ANY THROW BECOMES A FAIL ROW. *** This gate spawns real node children and binds a real port,
 // and both are things that fail differently on another box. Before this, a throw anywhere in it printed its
 // passing rows and died: exit 1, ZERO FAIL rows, which failLines reports as CRASHED because there is no
 // finding to read. The CHILD is registered so the net can reap it -- a gate that reports its own death and

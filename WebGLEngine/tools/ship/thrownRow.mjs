@@ -1,7 +1,7 @@
 // tools/ship/thrownRow.mjs -- A GATE THAT THROWS REPORTS NOTHING, AND A GATE THAT THROWS AN OBJECT REPORTS
 // NOTHING TWICE OVER.
 //
-// v4662 -- the rig's clone-verify has filed gates in this shape for three generations:
+// v4664 -- the rig's clone-verify has filed gates in this shape for three generations:
 //
 //     CRASHED   exit 1   3516 ms   0F   tools/roundhouse/magmapDefault-selfcheck.mjs   lines: []
 //     CRASHED   exit 1   3684 ms   0F   tools/ship/atmosphere-selfcheck.mjs            lines: []
@@ -27,7 +27,7 @@
 //
 // WHAT THIS DOES NOT DO: diagnose the rig's throw. This box cannot reproduce it -- every one of these gates
 // is green here -- so what ships is the instrument that will name it on the next clone-verify, which is the
-// same split v4661's wasm teardown was recorded under. A crash that becomes a finding is not a fix; it is
+// same split v4663's wasm teardown was recorded under. A crash that becomes a finding is not a fix; it is
 // the thing that makes a fix possible.
 "use strict";
 
@@ -68,7 +68,7 @@ export function describeThrow(e) {
  * and emits the SAME two lines either way: a FAIL row, and a verdict line, so a gate that dies still looks
  * like a gate that reported.
  *
- * It sets process.exitCode and RETURNS rather than calling process.exit(), for v4661's reason: this process
+ * It sets process.exitCode and RETURNS rather than calling process.exit(), for v4663's reason: this process
  * may have a wasm module behind it, and exiting while V8's compiler pool is still working is what aborts on
  * Windows. Returning from an uncaughtException handler lets the loop drain and the code stand.
  *

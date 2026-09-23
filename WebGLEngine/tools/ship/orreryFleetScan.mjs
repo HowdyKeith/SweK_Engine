@@ -51,7 +51,7 @@ export const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[
 // and joined box3d's fleet, taking it 26 -> 27. A file whose subject is the scanner is not a dependant of what
 // it scans, and the exclusion is BY PATH rather than by hope.
 export const NOT_IMPORTERS = Object.freeze([
-    // v4665: SIXTH instance, and the first that is not a gate. gfx/frontDoor.mjs's REACH_ARRIVALS_SINCE_V4407
+    // v4667: SIXTH instance, and the first that is not a gate. gfx/frontDoor.mjs's REACH_ARRIVALS_SINCE_V4407
     // is an ACCOUNT OF WHAT main.js's WALK REACHES, so the modules it names are written as the walk spells
     // them -- and five of the eight arrivals recorded this round are vendor/three/ paths. The classifier read
     // them as `path`, which is the right reading of a bare quoted vendor path almost everywhere and the wrong

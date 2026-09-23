@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d9f2c14cafc11c817365e915965bba8b96dae580",
+ "head": "e90cd8481d83234cb3733871a41081402625c2c0",
  "bodies": {
   "box3d": [
    {
@@ -17,12 +17,12 @@
    {
     "path": "physics/backendRouting-selfcheck.mjs",
     "bytes": 25295,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
     "bytes": 12269,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
@@ -37,7 +37,7 @@
    {
     "path": "physics/box3d/sensorsCcd-selfcheck.mjs",
     "bytes": 27409,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "physics/box3d/wasmBuild-selfcheck.mjs",
@@ -62,17 +62,17 @@
    {
     "path": "simulation/life/paramecium3d-selfcheck.mjs",
     "bytes": 8984,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "simulation/life/parameciumBox3d-selfcheck.mjs",
     "bytes": 9063,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "simulation/life/parameciumDrive-selfcheck.mjs",
     "bytes": 8620,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/crossarch-box3d.mjs",
@@ -82,7 +82,7 @@
    {
     "path": "tools/crossarchBox3d-selfcheck.mjs",
     "bytes": 7467,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/macSession.mjs",
@@ -132,7 +132,7 @@
    {
     "path": "tools/ship/ragdollSelfCollide-selfcheck.mjs",
     "bytes": 18114,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    }
   ],
   "draco": [
@@ -258,7 +258,7 @@
    {
     "path": "tools/ship/slugNapalm-selfcheck.mjs",
     "bytes": 29298,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/ship/slugProjective-selfcheck.mjs",
@@ -273,12 +273,12 @@
    {
     "path": "tools/ship/slugShatter-selfcheck.mjs",
     "bytes": 26232,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/ship/slugTicker-selfcheck.mjs",
     "bytes": 21169,
-    "sha": "fda780d8236149d71dcf768194b917360ee76f0d"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3401761,
-    "sha": "d9f2c14cafc11c817365e915965bba8b96dae580"
+    "bytes": 3407000,
+    "sha": "e90cd8481d83234cb3733871a41081402625c2c0"
    },
    {
     "path": "mpm3d.html",
@@ -753,7 +753,7 @@
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
     "bytes": 18813,
-    "sha": "629ce9da643276ab70d464eb1a9c9f12bd33c4f0"
+    "sha": "0066bdf7a4f45b7eee6a75f2a4efb8b6ef1e4953"
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
@@ -854,8 +854,8 @@
   "three-webgpu": [
    {
     "path": "ai-presence-orb.html",
-    "bytes": 8257,
-    "sha": "94ecfafa001dfb52bba8f732bf2d7d5fba29fa20"
+    "bytes": 9528,
+    "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
    },
    {
     "path": "orrery-gpu.html",
@@ -959,8 +959,8 @@
    },
    {
     "path": "ui/aiPresenceOrbWidget.js",
-    "bytes": 15207,
-    "sha": "e78aec8dfd2d2005cfcf52920606ac43d4f955db"
+    "bytes": 17735,
+    "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
    }
   ],
   "wasm": [

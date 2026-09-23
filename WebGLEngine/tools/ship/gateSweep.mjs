@@ -8070,13 +8070,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
-    // *** v4665 -- THESE THREE SLOTS WERE WRITTEN AS since334-since336 AND ARE RENUMBERED FORWARD TO
-    // since343-since345, for the same reason and at the same merge as v4650-v4654 -> v4661-v4665. main's
+    // *** v4667 -- THESE THREE SLOTS WERE WRITTEN AS since334-since336 AND ARE RENUMBERED FORWARD TO
+    // since345-since347, for the same reason and at the same merge as v4650-v4654 -> v4663-v4667. main's
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
-    since345: Object.freeze({
-        at: "v4664", swept: 1, green: 1, red: 0,
+    since347: Object.freeze({
+        at: "v4666", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/declaredCost-selfcheck.mjs",
         ]),
@@ -8097,8 +8097,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a death that mode's own note already predicted. Six sabotages, all red; the unit one " +
                  "matters most, since ~0.2s and ~200ms are both in the tree and differ by a thousand.",
     }),
-    since344: Object.freeze({
-        at: "v4662", swept: 1, green: 1, red: 0,
+    since346: Object.freeze({
+        at: "v4664", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/thrownRow-selfcheck.mjs",
         ]),
@@ -8119,8 +8119,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "all. Both are re-pointed and the section headed 'one handler is half a net' now says the " +
                  "opposite, because that is what the measurement said.",
     }),
-    since343: Object.freeze({
-        at: "v4661", swept: 1, green: 1, red: 0,
+    since345: Object.freeze({
+        at: "v4663", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/wasmTeardown-selfcheck.mjs",
         ]),

@@ -259,6 +259,6 @@ const W = 256, H = 256;
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the collider shrinking with the crater (the static box stands until the topple; the blast deepens along the heading instead); debris that collides (the sandbox's does not either); the brain driving into buildings (the ram is a launch); CityGen's crumble side-bite direction, which is Math.random and not the seed's (the first impact's voxels are deterministic; a second bite's are not).");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

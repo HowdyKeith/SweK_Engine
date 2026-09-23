@@ -636,18 +636,18 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4647p -- RE-TAKEN: tools/ship/sweepRotation-selfcheck.mjs joined. gates/usesOk/definesOk by one and
     // nameFirst by one -- the ordinary shape, and the counter-example to v4647g's condFirst arrival two
     // rounds ago. The other five rows did not move.
-    // *** v4665 -- RE-TAKEN AT THE MERGE, AND NEITHER SIDE'S NUMBER WAS RIGHT. *** Both lines re-took this
+    // *** v4667 -- RE-TAKEN AT THE MERGE, AND NEITHER SIDE'S NUMBER WAS RIGHT. *** Both lines re-took this
     // census over their own tree while the other was adding gates, so HEAD carried 1762 and origin/main
     // carried its own figure, and the merged tree is neither -- it is the union. A merge that picked a side
     // here would ship a census of half a tree under a whole tree's name. Re-derived below over the merged
     // tree; both re-take histories are kept because each one records which gates moved which rows.
     // ---- this branch's line ----
-    // v4661 -- RE-TAKEN: tools/ship/wasmTeardown-selfcheck.mjs joined. gates/usesOk/definesOk by one and
+    // v4663 -- RE-TAKEN: tools/ship/wasmTeardown-selfcheck.mjs joined. gates/usesOk/definesOk by one and
     // nameFirst by one -- the ordinary shape again, and the round that added it converted 48 OTHER gates'
     // last line from process.exit() to process.exitCode without moving a single row here, which is the
     // reassuring half: this census is about how a gate ASSERTS, and how it leaves is not that.
-    // v4662 -- RE-TAKEN: tools/ship/thrownRow-selfcheck.mjs joined. The ordinary four by one again.
-    // v4664 -- RE-TAKEN: tools/ship/declaredCost-selfcheck.mjs joined. The ordinary four by one, again.
+    // v4664 -- RE-TAKEN: tools/ship/thrownRow-selfcheck.mjs joined. The ordinary four by one again.
+    // v4666 -- RE-TAKEN: tools/ship/declaredCost-selfcheck.mjs joined. The ordinary four by one, again.
     // ---- the murmuration line ----
     // v4650 -- RE-TAKEN 1759 -> 1760 for tools/ship/murmurTempo-selfcheck.mjs. ONE gate, not the pairs the
     // last three orb rounds added, and the reason is the shape of what it grades: mh_live, mh_state and the
@@ -697,7 +697,7 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // trail decay on comet that adds no light at all. Four shapes in one gate is four sets of rows that
     // share nothing; putting them in the axis gate would also have been four more WGSL compiles on a file
     // already measuring 2,736 ms. This one measures 2,690 with its four species.
-    // v4665 -- RE-TAKEN OVER THE MERGED TREE: gates 1768 -> 1771, usesOk 1747 -> 1750, definesOk 1739 ->
+    // v4667 -- RE-TAKEN OVER THE MERGED TREE: gates 1768 -> 1771, usesOk 1747 -> 1750, definesOk 1739 ->
     // 1742, nameFirst 1640 -> 1643. The union of two lines that had each re-taken over their own tree --
     // +3 gates from this branch (wasmTeardown, thrownRow, declaredCost) on top of the murmuration line's
     // count, and the ordinary four-by-one shape three times over. condFirst and unknownSignature held.

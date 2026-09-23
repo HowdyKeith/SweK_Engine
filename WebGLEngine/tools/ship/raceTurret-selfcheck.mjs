@@ -161,6 +161,6 @@ sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON B
 }
 
 console.log(fails ? `\nraceTurret-selfcheck: ${fails} FAILED` : "\nraceTurret-selfcheck: all checks pass");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

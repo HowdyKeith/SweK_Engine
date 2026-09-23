@@ -354,7 +354,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         return ms != null && ms > lo && ms <= hi;
     };
     const pickOpts = { slots, budgetMs, filter: inBand, includeKilled: killedMode };
-    // *** v4664 -- --killed PICKS BY WHAT A GATE IS EXPECTED TO COST, AND REFUSES THE ONES THIS CAP CANNOT
+    // *** v4666 -- --killed PICKS BY WHAT A GATE IS EXPECTED TO COST, AND REFUSES THE ONES THIS CAP CANNOT
     // REACH. *** It took c.killed.slice(0, slots) -- the census's own order, which is alphabetical and knows
     // nothing about cost -- so a run at a 90 s cap would spend 90 s on tools/roundhouse/khConvergence and
     // kill it again while a gate declaring 62 s sat further down the list unattempted. This mode's own note

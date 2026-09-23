@@ -375,6 +375,6 @@ console.log("unchecked here: TRIGGER SEMANTICS ABOVE THE EVENT. box3d reports be
     "b3World_GetSensorEvents's ordering across peers is not something this file establishes. And CCD is " +
     "measured against a BOX; box3d's continuous sweep is shape-dependent and a thin plate or a hull with a " +
     "long axis is not covered by any row above.");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

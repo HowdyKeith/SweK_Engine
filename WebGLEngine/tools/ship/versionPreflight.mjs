@@ -92,7 +92,7 @@ export function refFreshness({ run = null } = {}) {
 }
 
 // ====================================================================================================
-// *** v4665 -- THE MARKER IS NOT THE ONLY NUMBER A ROUND WEARS, AND THIS GUARD WAS WATCHING THE OTHER ONE. ***
+// *** v4667 -- THE MARKER IS NOT THE ONLY NUMBER A ROUND WEARS, AND THIS GUARD WAS WATCHING THE OTHER ONE. ***
 // Everything above compares ENGINE_VERSION: the number a BUILD wears. A round also wears an ORDINAL -- the
 // `## vNNNN` heading in docs/CHANGELOG.md -- and the two are not the same number, because not every line
 // bumps the marker. Measured, not supposed: at this merge main's marker read v4649 while its changelog had
@@ -118,6 +118,65 @@ export function ordinalsOf(text) {
         if (!titles.has(n)) titles.set(n, m[0].replace(/^##\s+/, "").trim());
     }
     return { ordinals: [...titles.keys()].sort((a, b) => b - a), titles };
+}
+
+// *** v4667 -- AND ASKING MAIN ALONE WAS STILL THE WRONG QUESTION. *** The ordinal check above shipped
+// reading origin/main's changelog, and within the hour it passed v4661 for this branch while
+// origin/claude/v4661-complete-singles already carried a round of that number. The murmuration line STAGES
+// EACH ROUND ON ITS OWN BRANCH before main sees it, so main's highest ordinal is a lower bound on what has
+// been spent, not the high-water mark -- and a renumber that clears only main clears nothing. Measured at
+// that moment: main 4660, two branches 4661 and 4662, this branch 4665. A guard that asks only the trunk
+// reads a number that is TRUE AND INSUFFICIENT, which is the same shape as reading a marker that has
+// stopped moving -- twice in one round, two different wrong numbers, both of them real.
+//
+// Every remote ref is asked now. That is more git than the marker path does, so it is bounded: refs are
+// listed once and each changelog is read once, and a ref whose changelog cannot be read is SKIPPED WITH ITS
+// NAME KEPT rather than silently dropped, because "I could not look" and "nothing there" are the distinction
+// this tree keeps insisting on.
+
+/** Every remote ref's highest spent ordinal, as { ref, top } rows, plus the refs that could not be read. */
+export function refOrdinals({ run = null, refsOverride = null, readOverride = null } = {}) {
+    const exec = run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    let refs = refsOverride;
+    if (!refs) {
+        try {
+            refs = exec(["for-each-ref", "--format=%(refname)", "refs/remotes"]).split("\n")
+                     .map((r) => r.trim()).filter((r) => r && !/\/HEAD$/.test(r));
+        } catch { return { rows: [], unreadable: [], reason: "no remote refs could be listed" }; }
+    }
+    const rows = [], unreadable = [];
+    for (const ref of refs) {
+        let text;
+        try { text = readOverride ? readOverride(ref) : exec(["show", ref + ":docs/CHANGELOG.md"]); }
+        catch { unreadable.push(ref); continue; }
+        const { ordinals, titles } = ordinalsOf(text);
+        if (ordinals.length) rows.push({ ref, top: ordinals[0], ordinals, titles });
+        else unreadable.push(ref);
+    }
+    return { rows, unreadable, reason: null };
+}
+
+/** The highest ordinal any ref has spent, ignoring the one this branch is shipping from. */
+export function highWater(opts = {}) {
+    // v4667 -- *** A BRANCH DOES NOT COLLIDE WITH ITSELF, AND THAT HAD TO BE SAID RATHER THAN RELIED ON. ***
+    // The first version took no selfRef and passed only because this branch's PUSHED state was one round
+    // behind its working tree. Push the round and the next run refuses it, naming this very branch -- a guard
+    // that goes red the moment you do the thing it just approved, which is precisely the false fault v4350
+    // taught this file to refuse. The upstream of the current branch is excluded, derived rather than named.
+    const self = opts.selfRef !== undefined ? opts.selfRef : (() => {
+        const exec = opts.run || ((args) => execFileSync("git", args, { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
+        try { return "refs/remotes/" + exec(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).trim(); }
+        catch { return null; }                              // no upstream: nothing to exclude, and that is fine
+    })();
+    const { rows, unreadable } = refOrdinals(opts);
+    let top = null, where = null, titles = null;
+    for (const r of rows) {
+        if (self && r.ref === self) continue;
+        if (top == null || r.top > top) { top = r.top; where = r.ref; titles = r.titles; }
+    }
+    // `self` is returned rather than left implicit: preflight needs it to skip this branch when
+    // naming who spent a number, and re-deriving it there would be the same fact computed twice.
+    return { top, where, titles, rows, unreadable, self };
 }
 
 /** The ordinals origin/main's changelog has spent, or null with a reason. */
@@ -169,7 +228,7 @@ export function preflight(shipping, opts = {}) {
     // number teaches people to skip it, and then the rule is unenforced again with extra steps" -- committed
     // in the guard that says it. Found by using it, one commit after it shipped. So the same-number case now
     // compares the builds, and only a DIFFERENT build wearing main's number is refused.
-    // v4665 -- hoisted, because the ordinal check below needs the SAME exemption for the SAME reason. v4350's
+    // v4667 -- hoisted, because the ordinal check below needs the SAME exemption for the SAME reason. v4350's
     // false fault was refusing a follow-up commit to a round already shipped; an ordinal check that did not
     // carry that exemption would reintroduce it one number over.
     const sameBuild = (() => {
@@ -197,6 +256,27 @@ export function preflight(shipping, opts = {}) {
     // *** THE SECOND NUMBER. *** Past the marker check, and only for a build that is not main's own.
     const ord = opts.mainOrdinalsOverride !== undefined ? opts.mainOrdinalsOverride : mainOrdinals(opts);
     const spent = ord && ord.ordinals;
+
+    // v4667 -- AND THE HIGH-WATER ACROSS EVERY REF, WHICH MAIN'S CHANGELOG IS ONLY A LOWER BOUND ON.
+    // Checked BEFORE main's own, because it is the stronger claim: a number free on main and taken on a
+    // pushed branch is taken, and finding that out at the merge is what this file exists to prevent.
+    const hw = opts.highWaterOverride !== undefined ? opts.highWaterOverride : highWater(opts);
+    if (!sameBuild && hw && hw.top != null && want <= hw.top && !(spent && spent.length && want <= spent[0])) {
+        // v4667 -- THE TITLE COMES FROM WHICHEVER REF SPENT THE NUMBER, not from the highest one. The first
+        // version read hw.titles, which belongs to the ref holding the high-water mark, so asking about v4661
+        // printed the v4662 branch's entry for that number instead of the branch that actually named it. A
+        // refusal that names the WRONG round is worse than one that names none: it sends the reader to a
+        // file that does not hold what they were told is there.
+        const holder = (hw.rows || []).find((r) => r.titles && r.titles.has(want) && r.ref !== hw.self);
+        const taken = holder && holder.titles.get(want);
+        return { ok: false, shipping, mainVersion: mv, freshness, ordinalTop: spent ? spent[0] : null, highWater: hw.top,
+                 refusal: `v${hw.top} is already spent on ${hw.where}` +
+                          (taken ? `, and ${shipping} is a heading ${holder.ref} already gave to a different round: "${taken}"`
+                                 : `, and ${shipping} is at or below it`) +
+                          ` -- a round staged on a branch has spent its number even though main has not seen it yet` +
+                          (spent && spent.length ? ` (origin/main is only at v${spent[0]}, which is why asking the trunk alone said this was fine)` : "") +
+                          `. Supersede FORWARD: v${hw.top + 1} or later.` };
+    }
     if (!sameBuild && spent && spent.length) {
         const top = spent[0], taken = ord.titles && ord.titles.get(want);
         if (want <= top) {

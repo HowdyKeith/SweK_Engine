@@ -25,7 +25,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const FIXTURE_DIR = "tools/ship";
-// v4661 -- rigRunner copies a gate to sabotage it, and the copy has to sit BESIDE the original or its
+// v4663 -- rigRunner copies a gate to sabotage it, and the copy has to sit BESIDE the original or its
 // relative imports do not resolve. So the reclaim covers the directories that actually carry transient
 // fixtures rather than one of them. The `__` prefix is still what bounds it, and gateSweep refuses to
 // enumerate a `__` file as a gate wherever it lives.

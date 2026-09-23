@@ -1,6 +1,6 @@
-// WebGLEngine/tools/ship/declaredCost-selfcheck.mjs -- v4664
+// WebGLEngine/tools/ship/declaredCost-selfcheck.mjs -- v4666
 //
-// Run: node tools/ship/declaredCost-selfcheck.mjs   (~0.6s MEASURED v4664)
+// Run: node tools/ship/declaredCost-selfcheck.mjs   (~0.6s MEASURED v4666)
 //
 // *** THE GATE FOR A CENSUS WHOSE POPULATION INCLUDES THIS FILE'S OWN THIRD LINE. *** declaredCost reads the
 // `// Run: node <gate>   (~Ns)` header that 271 gates carry, and the line above is one of them -- so the
@@ -125,7 +125,7 @@ console.log("\n3. *** costOf: WHICH NUMBER A CALLER GETS, AND WHERE IT CAME FROM
         b ? `${b.ms} ms declared against a recorded ${T.timings[kill]} that is a kill` : "no such gate today");
     ok("  ...and a caller can always tell a reading from a claim, which is the whole point of the field",
         ["recorded", "declared", "cap", "none"].includes(a.from) && (!b || b.from !== a.from),
-        "v4663 found three gates reporting the shape of a checkout as fact for want of exactly this " +
+        "v4665 found three gates reporting the shape of a checkout as fact for want of exactly this " +
         "distinction. A number without its provenance is how a cap kill becomes a measurement");
 }
 
@@ -156,10 +156,10 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // *** A RATCHET AND NOT A TARGET, and the reason is that 138 headers is 138 separate re-measurements --
     // each one a gate run to completion -- which is a pass of its own and not a tail-end edit. What must not
     // happen is the number growing while nobody looks, which is how it reached 138.
-    const ROTTED_AT_V4664 = 138;
+    const ROTTED_AT_V4666 = 138;
     ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4664,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4664}. Each one is a gate whose header claims a ` +
+        c.rotted.length <= ROTTED_AT_V4666,
+        `${c.rotted.length} against a frozen ${ROTTED_AT_V4666}. Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

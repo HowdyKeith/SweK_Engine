@@ -46,7 +46,7 @@ export function bakePayload(engineRoot = ENG, repoRoot = REPO, previous = null) 
             name: b.name,
             arrived: b.arrived || (keep && keep.get(b.name) ? keep.get(b.name).arrived : null) || null,
             sha: b.sha || (keep && keep.get(b.name) ? keep.get(b.name).sha : null) || null,
-            // *** v4663 -- `truncated` IS DELIBERATELY NOT BAKED, and writing it here was this round's own
+            // *** v4665 -- `truncated` IS DELIBERATELY NOT BAKED, and writing it here was this round's own
             // first attempt. *** It is a fact about THE CLONE that ran the bake, not about the tree, so
             // serialising it would make a shallow checkout and a full one produce different bytes for an
             // unchanged vendor/ -- breaking this file's own stated contract three lines up, that two bakes
@@ -85,7 +85,7 @@ export function drift(engineRoot = ENG, repoRoot = REPO, file = BAKE_PATH) {
         const b = B.get(n);
         if (!b) continue;
         if (b.bytes !== l.bytes) out.push(`${n}: baked ${b.bytes} bytes, tree has ${l.bytes}`);
-        // *** v4663 -- A CLONE THAT CANNOT SEE FAR ENOUGH BACK HAS NO OPINION, AND NO OPINION IS NOT DRIFT. ***
+        // *** v4665 -- A CLONE THAT CANNOT SEE FAR ENOUGH BACK HAS NO OPINION, AND NO OPINION IS NOT DRIFT. ***
         // These two fields come from git's first-add query, and in a shallow clone that query answers with
         // the graft boundary for everything committed before it. orreryScan now returns null and says
         // `truncated`; comparing that null against a recorded date would report every body as moved -- which

@@ -113,7 +113,7 @@ let stillUnreached = [];
     // round adding an import anywhere in main.js's reach broke it, and the break said nothing about what
     // v4407 claimed. Growth is accounted instead: the total is the v4407 number plus the NAMED arrivals, each
     // with a reason, and anything reached at v4407 that has since fallen out is a separate, real red.
-    // *** v4665 -- THE COUNT IS OF DISTINCT MODULES, BECAUSE TWO WERE RECORDED TWICE AND THE CHECK FORGAVE
+    // *** v4667 -- THE COUNT IS OF DISTINCT MODULES, BECAUSE TWO WERE RECORDED TWICE AND THE CHECK FORGAVE
     // ITSELF BY EXACTLY THAT MUCH. *** `arrivals.length` counted the ARRAY, so skyStars and exactHash -- both
     // listed once at v4580 and again eleven entries later -- padded the expected total by two while
     // accounting for no module at all. A list that may be double-counted is not an accounting, so the

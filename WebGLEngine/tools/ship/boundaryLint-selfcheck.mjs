@@ -214,7 +214,7 @@ const { fail, report } = partition(all);
         !hit('try { p.kill(); } catch {}\n return { ok: true };').includes("KILL_DISCARDS_HANDLE"),
         "keeping the reference leaves verification possible, which is all this rule asks for");
 
-    // v4665 -- THE SELF-KILL EXCLUSION, AND THE FENCE AROUND IT. fixtureLitter's probe takes SIGKILL on
+    // v4667 -- THE SELF-KILL EXCLUSION, AND THE FENCE AROUND IT. fixtureLitter's probe takes SIGKILL on
     // itself deliberately: dying with a fixture on disk is the thing being measured. Asking it to re-check
     // the effect asks for code that runs after SIGKILL, which does not exist. The exclusion is therefore
     // about WHO IS LEFT TO LOOK, and these two rows are what stop it becoming "kills are fine": anything

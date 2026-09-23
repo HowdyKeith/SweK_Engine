@@ -48,7 +48,7 @@ export function listFileSizes(dir) {
 /**
  * *** THE COMMITS AT THE EDGE OF A TRUNCATED HISTORY, WHICH ARE NOT ANSWERS ABOUT WHEN ANYTHING ARRIVED. ***
  *
- * v4663. firstSeen's docstring below has said since it was written that null is returned "when git cannot
+ * v4665. firstSeen's docstring below has said since it was written that null is returned "when git cannot
  * say -- which is a real answer (A SHALLOW CLONE, or a path never committed)". It named the case and the
  * code could not reach it: in a shallow clone git does not return NOTHING for a path added before the
  * boundary, it returns THE BOUNDARY COMMIT, which looks exactly like a real first-add. So every vendored

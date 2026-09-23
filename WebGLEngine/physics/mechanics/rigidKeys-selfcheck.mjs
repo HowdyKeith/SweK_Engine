@@ -255,6 +255,6 @@ console.log("\n7. THE REPORT PRINTS, AND THE SPLIT HOLDS");
 
 console.log(fails ? `\nrigidKeys-selfcheck: ${fails} FAILED${skips ? `, ${skips} skipped` : ""}`
                   : `\nrigidKeys-selfcheck: all checks pass${skips ? `, ${skips} skipped` : ""}`);
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

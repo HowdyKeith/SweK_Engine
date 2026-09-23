@@ -134,7 +134,7 @@ const SHARED = "66db97c45b5286d98d1c018506effca552f05a23";
 
 // 5) THE SCANNER READS THE HASH, FROM ONE CALL.
 //
-// *** v4663 -- THE TWO ROWS BELOW ASK GIT A QUESTION A SHALLOW CLONE CANNOT ANSWER, AND USED TO BELIEVE THE
+// *** v4665 -- THE TWO ROWS BELOW ASK GIT A QUESTION A SHALLOW CLONE CANNOT ANSWER, AND USED TO BELIEVE THE
 // WRONG ANSWER. *** git's first-add query returns the GRAFT BOUNDARY for anything committed before it, which
 // looks exactly like a real first-add -- so in this session's own checkout every one of the twenty bodies came
 // back with the same date and the same sha (2026-08-31, 6ba6776c, a parentless commit touching 5,226 files)
@@ -201,7 +201,7 @@ const SHARED = "66db97c45b5286d98d1c018506effca552f05a23";
     const baked = readBaked();
     ok(baked.bodies.every((b) => b.sha === null || /^[0-9a-f]{40}$/.test(b.sha)),
         "the baked file carries full hashes, because a browser cannot run git");
-    // *** v4663 -- bakePayload TAKES THE RECORD, because on a truncated history it carries the recorded
+    // *** v4665 -- bakePayload TAKES THE RECORD, because on a truncated history it carries the recorded
     // arrivals and seeds forward rather than baking twenty nulls over them. Calling it without the record
     // here compared a payload that had thrown those fields away against the file that still holds them. ***
     ok(serialise(bakePayload(ENG, REPO, baked)) === fs.readFileSync(BAKE_PATH, "utf8"),

@@ -112,6 +112,6 @@ const all = listProposers();
 }
 
 console.log(fails ? ("[knobRegistry-selfcheck] FAILED " + fails) : "[knobRegistry-selfcheck] all passed");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

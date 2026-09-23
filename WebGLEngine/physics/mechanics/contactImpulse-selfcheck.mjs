@@ -147,6 +147,6 @@ ok("the reporting tool produces a report", (await reportLines()).length > 12,
     "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");
 
 console.log(fails ? `\ncontactImpulse-selfcheck: ${fails} FAILED` : "\ncontactImpulse-selfcheck: all checks pass");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

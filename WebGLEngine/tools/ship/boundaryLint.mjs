@@ -67,7 +67,7 @@ export const BOUNDARY_RULES = {
         severity: "report",
         why: "a kill whose effect is never re-checked. v3096 fixed the one that mattered (the port), but from " +
              "source alone a kill that needs verifying is indistinguishable from one whose caller genuinely " +
-             "does not care, so this reports rather than rules. v4665 excludes a SELF-kill -- " +
+             "does not care, so this reports rather than rules. v4667 excludes a SELF-kill -- " +
              "process.kill(process.pid, ...) leaves nobody behind to re-check anything",
     },
 };
@@ -93,7 +93,7 @@ export function scanBoundaries(src) {
         if (isLocalDecode(arg)) continue;
         out.push({ rule: kind === "json" ? "UNCHECKED_JSON_BODY" : "UNCHECKED_ERROR_BODY", arg: arg.trim().slice(0, 60), kind });
     }
-    // v4665 -- A PROCESS KILLING ITSELF HAS NO "AFTER" IN WHICH TO CHECK. The rule's own why above says the
+    // v4667 -- A PROCESS KILLING ITSELF HAS NO "AFTER" IN WHICH TO CHECK. The rule's own why above says the
     // reason it reports rather than rules is that a kill needing verification is indistinguishable, from
     // source, from one whose caller does not care. process.kill(process.pid, ...) is neither: there is no
     // surviving caller to care or to look. fixtureLitter's probe takes SIGKILL on purpose -- dying with a

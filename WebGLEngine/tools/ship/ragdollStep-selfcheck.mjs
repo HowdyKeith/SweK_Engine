@@ -298,6 +298,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "neither consumes ragdollFromSkeleton, so the duplication v4245 measured is still there; this round proves " +
     "the derivation runs, not that anything has adopted it. And CONTACTS are now available and unused -- " +
     "resting-contact counts would say whether the pile is really at rest rather than creeping.");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

@@ -631,10 +631,10 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4647g -- RE-TAKEN alongside `excluding`: 146 / 69 / 392 -> 147 / 70 / 393. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
-    // v4661 -- RE-TAKEN alongside `excluding`: 147 / 70 / 393 -> 148 / 71 / 398. The two halves are one
+    // v4663 -- RE-TAKEN alongside `excluding`: 147 / 70 / 393 -> 148 / 71 / 398. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
-    // v4662 -- RE-TAKEN alongside `excluding`: 148 / 71 / 398 -> 149 / 72 / 399. The two halves are one
+    // v4664 -- RE-TAKEN alongside `excluding`: 148 / 71 / 398 -> 149 / 72 / 399. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
     currentIncludingModule: Object.freeze({ records: 149, withFields: 72, fields: 399 }),
@@ -818,13 +818,13 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/cliArgs.mjs -- a record with fields, so all three move by one. Re-taken in the round that
     // added it: the two before it were found by a red gate four rounds late, which is the whole argument
     // for the line this row already carried -- a round that adds a record re-takes this.
-    // v4661 -- RE-TAKEN: 145 / 68 / 373 -> 146 / 69 / 378. One arrival, WASM_AT_V4661 in
+    // v4663 -- RE-TAKEN: 145 / 68 / 373 -> 146 / 69 / 378. One arrival, WASM_AT_V4663 in
     // tools/ship/wasmTeardown.mjs -- a record WITH fields, so all three move, and fields by FIVE rather than
     // by one because that record carries five (at, screened, candidates, capMs, noMarker,
     // exitAfterWasmBefore, compilers -- the per-line reader this file's note above names as a LIMIT sees the
     // ones on their own lines). Re-taken in the round that added it, which is the line this row has been
     // carrying since v4647f and which two rounds before that one ignored.
-    // v4662 -- RE-TAKEN: 146 / 69 / 378 -> 147 / 70 / 379. One arrival, EXILED_PASS_V4662 in
+    // v4664 -- RE-TAKEN: 146 / 69 / 378 -> 147 / 70 / 379. One arrival, EXILED_PASS_V4664 in
     // tools/ship/sweepCoverage.mjs -- the whole exiled pool run at last. Its `red` and `stillKilled` lists
     // are arrays of objects and of strings, so the per-line reader this file's note above names as a LIMIT
     // counts ONE field for it where a reader would say four; the reading is what the census measures, and

@@ -266,7 +266,7 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
         why: "v4544's gravity-and-landing module. main.js -> simulation/BotManager.js -> fallBody: the " +
              "round that stopped an airborne bot being assigned world._heightAt(x, z) + BOT_EYE in one " +
              "frame. Mine, and it did not record itself here" }),
-    // *** v4665 -- AND THESE TWO WERE ALREADY IN THE LIST ELEVEN ENTRIES ABOVE. *** skyStars and exactHash
+    // *** v4667 -- AND THESE TWO WERE ALREADY IN THE LIST ELEVEN ENTRIES ABOVE. *** skyStars and exactHash
     // were recorded TWICE, and the duplicate is not a tidy-up: the row that grades this asserts
     // `seen.size === 695 + arrivals.length` and `arrivals.length` COUNTS THE ARRAY, so two repeated names
     // padded the total by two without accounting for a single module. The check forgave itself by exactly

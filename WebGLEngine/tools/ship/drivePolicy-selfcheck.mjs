@@ -208,6 +208,6 @@ sec("6. IN THE BROWSER ON BOTH BACKENDS: the same three-car race to node's finge
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 console.log("unchecked here: the policy's forward pass ON THE DEVICE (brain/mlp.js's BatchedMLP; the twin it is held to here is the CPU one the kernels gate holds bit for bit); a brain that laps from ZERO (sixty candidates climb and do not lap; the idle trainer's longer run is race-brain.html's, unmeasured beyond what section 3 records); cars that see each other (the features carry no other car); the page's idle loop (eyeballed).");
-// v4661 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
+// v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;

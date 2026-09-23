@@ -83,7 +83,7 @@ console.log("\n3. *** WHAT WAS INVISIBLE: SIX MODULES THE SERVER LOADS AT STARTU
     const required = cjs.filter((f) => server.includes(path.basename(f.path, ".cjs")));
     const lines = cjs.reduce((s, f) => s + f.text.split("\n").length, 0);
     say(cjs.map((f) => path.basename(f.path)).join(", "));
-    // *** v4661 -- THE CLAIM WAS "SERVER.JS NAMES ALL SIX" AND THE CLAIM IS "NONE OF THEM IS DEAD". ***
+    // *** v4663 -- THE CLAIM WAS "SERVER.JS NAMES ALL SIX" AND THE CLAIM IS "NONE OF THEM IS DEAD". ***
     // The first is evidence for the second and is not the same sentence, and the difference arrived the
     // moment a SEVENTH .cjs did: tools/ship/wasmExitHook.cjs is a `node --require` preload that watches a
     // gate compile wasm and then watches how it leaves, and it is required by tools/ship/wasmTeardown.mjs
