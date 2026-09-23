@@ -332,7 +332,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
 export async function renderGlslToPixels({ vertex, fragment, width = 64, height = 64, srcSize = 64,
                                            uniforms = null, uniformNames = [], sourceTexel = null,
                                            uniformVecs = null, textures = null, uniformArrays = null,
-                                           uniformInts = null }) {
+                                           uniformInts = null, timeoutMs = 60000 }) {
     // v4288 -- `uniformInts` and the getError drain below exist because of a THIRD way a uniform can fail,
     // and it is the one the earlier two guards cannot see. COMPOSITE_FS declares `uniform int uHeatCount`;
     // this harness set every named scalar with uniform1f; getUniformLocation SUCCEEDS for an int uniform, so
@@ -379,11 +379,20 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         texData[nm] = Array.from(buf);
     }
 
+    // v4612 -- task #35's own gate found this the hard way: a WHILE-LOOP shader (tools/ship/precisionProbe-
+    // selfcheck.mjs's sabotage tests) mutated into an accidental fixed point (`(value<<2)|1` on a 32-bit int
+    // cycles rather than overflowing) hung the real headless_shell GPU process at ~99% CPU for minutes, past
+    // this tool's own timeout, with no way to recover short of `pkill -9`. page.evaluate() has NO timeout of
+    // its own -- page.setDefaultTimeout() (used elsewhere in this file) does not apply to it, exactly as
+    // runInEngineOrigin's own v4528 comment already found for a different hang. Same fix here: race the
+    // evaluate against a timer, so a shader that never returns is a NAMED, bounded failure rather than a
+    // process that must be killed from outside.
     let browser = null;
     try {
         browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
         const page = await browser.newPage();
-        const out = await page.evaluate(async (a) => {
+        let timer = null;
+        const out = await Promise.race([page.evaluate(async (a) => {
             const c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
             const gl = c.getContext("webgl2", { preserveDrawingBuffer: true });
             if (!gl) return { ok: false, reason: "no webgl2 context" };
@@ -488,7 +497,11 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
              uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
              uniformVecs: uniformVecs || {}, textures: texData, uniformArrays: uniformArrays || {},
-             uniformInts: uniformInts || {} });
+             uniformInts: uniformInts || {} }),
+            new Promise((r) => { timer = setTimeout(() => r({ ok: false, timedOut: true,
+                reason: `harness: the shader did not return within ${timeoutMs} ms (a while-loop that never terminates?)` }), timeoutMs); }),
+        ]);
+        clearTimeout(timer);
         if (!out.ok) return { skipped: false, ...out };
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);
