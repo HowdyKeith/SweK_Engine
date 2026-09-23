@@ -407,6 +407,55 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n10. *** FSR2'S EARLIEST PASS (v4664): DILATED DEPTH AND MOTION ***");
+// The pass this tree never had. What matters on the SOURCE is not that it is imported but that the whole
+// chain reads the dilated field and that the RECORD moves with it: dilated motion carries the foreground's
+// zPrev at every silhouette, so an undilated prevDepth would read a disocclusion at every edge on every
+// frame -- the exact artefact the pass removes, reintroduced by wiring half of it.
+{
+    ok("the page imports the runner and owns none of the pass",
+        /import \{ DilateGPU \} from "\.\/render\/dilateGPU\.mjs"/.test(src)
+        && !/nearest depth|bestD/.test(src),
+        "the neighbourhood search is render/dilate.mjs's; the page passes depth and motion in and reads a " +
+        "field out, exactly as it does for the reject chain");
+    // EVERY consumer, as a census: a list of three is a list somebody adds a fourth to.
+    const consumers = [...src.matchAll(/^\s*(?:const dis = disocclusionCPU|lgpu\.pushRing|const rx = await xgpu\.reactive)[\s\S]{0,160}?motion(?::\s*(\w+))?[,\s}]/gm)];
+    // NOT named `raw`: that is this file's whole-page source, and a local of the same name inside this
+    // block shadowed it -- the two rows below then tested a filtered array for HTML and failed while the
+    // page was right. Caught by the gate's own run, which is the cheapest place.
+    const stillRaw = consumers.filter((m) => m[1] !== "motionUsed");
+    ok("!! *** every chain consumer reads the DILATED field, and not one of them reads the raw one ***",
+        consumers.length >= 3 && stillRaw.length === 0,
+        `${consumers.length} consumers matched, ${stillRaw.length} still on the raw field. The object-gap ` +
+        "diagnostic deliberately stays on the raw one -- it measures the object-motion feature and would " +
+        "otherwise be measuring this pass instead.");
+    ok("!! *** ...and the RECORD kept for next frame is the dilated depth, or the clip test disagrees with itself ***",
+        /if \(dolly\) prevDepth = depthRecord;/.test(src)
+        && /const depthRecord = dilated \? dilated\.depth : depth;/.test(src),
+        "motionUsed carries the FOREGROUND's zPrev at every silhouette. Compared against an undilated " +
+        "record that reads as a disocclusion at every edge, every frame -- the artefact the pass exists to " +
+        "remove, reintroduced by wiring one side of it. Off, depthRecord IS depth.");
+    ok("!! ...and the pass defaults to OFF, so every figure this file pins was measured on the control arm",
+        // ANCHORED TO THE FIRST OPTION. The lazy [\s\S]{0,120}? this replaced found `value="off"` in the
+        // SECOND option too, so reordering them -- which is exactly how a default flips -- scored zero.
+        /<select id="dilate">\s*<option value="off"/.test(raw) &&
+        /const dilateOn = \$\("dilate"\)\.value === "on"/.test(src),
+        "this page's 106 genuine disocclusions, its 212/106 alternation and the reactive mask's 404 fired " +
+        "pixels are quoted in its prose and pinned by five gates, and dilation moves all of them. v4649's " +
+        "`sx` discipline: a round that moved the figures while adding a feature could not be told from a " +
+        "round that broke them.");
+    ok("  ...and it is counted, because on flat geometry a dilation that did nothing looks identical",
+        // *** ANCHORED TO THE dilate() CALL, AND THIS FILE ALREADY LEARNED THIS ONCE. *** v4659 wrote the
+        // identical row for the reactive mask, found that a bare /counted: true/ was satisfied by
+        // rejectAndAccumulate's own `counted: true` further down the page, and fixed it with a comment
+        // saying so. Four rounds later the same row was written the same way for this pass and scored the
+        // same zero. A lesson recorded in a file is not a lesson the next row inherits.
+        /dgpu\.dilate\(\{[\s\S]{0,240}?counted: true/.test(src)
+        && /dilStat = dilated\.stats/.test(src) && /id="dilstat"/.test(raw),
+        "a dilation that fired everywhere and one that fired nowhere produce the same depth and motion " +
+        "buffers on flat geometry; the choice exists only at the moment it is made");
+}
+
 console.log("\n9. *** THE REFUTED HYPOTHESIS (v4662), AND THE CELL THAT DOES NOT EXIST ***");
 // v4661's control made one experiment possible and v4662 ran it: the same scene window on an accumulator
 // that is EMPTY when it starts. H2 said the harm follows the history's AGE; the youngest history turned out
@@ -566,6 +615,20 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4664  one chain consumer left on the raw motion field                1 RED.
+//   v4664  dilated motion fed while the undilated depth is still recorded  1 RED -- half the pass wired,
+//          which reintroduces a disocclusion at every silhouette on every frame.
+//   v4664  the dilate control reordered to default ON                      *** 0 RED AT FIRST ***. The row
+//          used a lazy [\s\S]{0,120}? and found `value="off"` in the SECOND option, so a reorder -- which
+//          is exactly how a default flips -- satisfied it. Anchored to the first option now.
+//   v4664  the dilate call stops counting                                  *** 0 RED AT FIRST ***, AND
+//          THIS FILE HAD ALREADY LEARNED IT. v4659 wrote the identical row for the reactive mask, found a
+//          bare /counted: true/ satisfied by rejectAndAccumulate's own further down the page, and fixed it
+//          with a comment saying so. Four rounds later the same row was written the same way and scored
+//          the same zero. A lesson recorded in a file is not a lesson the next row inherits.
+//
+// And a local named `raw` inside the v4664 block SHADOWED this file's whole-page source of the same name,
+// so two rows tested a filtered array for HTML and failed while the page was right.
 //   v4662  the harm record's OUTCOME reverted to uncollected                1 RED.
 //   v4662  a cell's percentage edited without its count                      1 RED -- the percentages are
 //          parsed out of the record and re-divided, never typed into this file.

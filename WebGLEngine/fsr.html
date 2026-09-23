@@ -54,6 +54,10 @@
       <option value="on">reactive mask: ON</option>
       <option value="off">reactive mask: OFF (the control)</option>
     </select>
+    <select id="dilate">
+      <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
+      <option value="on">dilate depth+motion: ON (FSR2's early pass)</option>
+    </select>
     <label>scene starts at frame
       <input id="startframe" type="number" min="0" max="4096" step="1" value="0" style="width:5em">
     </label>
@@ -73,6 +77,7 @@
   <div class="stat" id="lockstat"></div>
   <div class="stat" id="reactstat"></div>
   <div class="stat" id="splitstat"></div>
+  <div class="stat" id="dilstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -194,6 +199,7 @@ import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
 import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
 import { TemporalLockGPU } from "./render/temporalLockGPU.mjs";
 import { ReactiveGPU } from "./render/reactiveGPU.mjs";
+import { DilateGPU } from "./render/dilateGPU.mjs";
 import { buildObjectMatrices, objectMotionCPU } from "./render/objectMotion.mjs";
 import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
@@ -478,7 +484,7 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
-let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null, xgpu = null;
+let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null, xgpu = null, dgpu = null;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -508,6 +514,7 @@ async function initGPU() {
         try { ogpu = new ObjectMotionGPU(dev); } catch { ogpu = null; }
         try { lgpu = new TemporalLockGPU(dev); } catch { lgpu = null; }
         try { xgpu = new ReactiveGPU(dev); } catch { xgpu = null; }
+        try { dgpu = new DilateGPU(dev); } catch { dgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -684,6 +691,34 @@ async function tick() {
             ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
             : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
 
+    // *** v4664 -- FSR2'S EARLIEST PASS, AND IT DEFAULTS TO OFF SO EVERY FIGURE ABOVE STILL MEANS WHAT IT
+    // SAID. *** FSR2 does not hand depth-clip and the locks raw per-pixel data: it DILATES first, each pixel
+    // taking the nearest depth in its 3x3 neighbourhood and the motion vector of whichever pixel that depth
+    // came from, so a silhouette edge reprojects with the FOREGROUND. This tree has never had that pass, and
+    // every consumer downstream -- disocclusionCPU, the lock ring, the reactive mask -- has read undilated
+    // data since it was written.
+    //
+    // OFF BY DEFAULT ON PURPOSE. This page's numbers are quoted in its own prose and pinned by five gates:
+    // 106 genuine disocclusions on the dolly, the 212/106 alternation on this camera, the reactive mask's
+    // 404 fired pixels. Dilation moves all of them. A round that changed them while adding a feature could
+    // not be told from a round that broke them -- v4649's `sx` discipline, and the reason the control is a
+    // switch rather than a rewrite. Whether it IMPROVES the picture is a paired measurement and is the next
+    // round's; render/dilateGPU-selfcheck.mjs grades that the pass is the pass and claims nothing else.
+    //
+    // *** BOTH SIDES OF THE CLIP TEST MOVE TOGETHER OR NEITHER DOES. *** The dilated depth becomes next
+    // frame's prevDepth, so the test compares dilated zPrev against a dilated record. Feeding it dilated
+    // motion against an undilated record would compare the foreground's expectation with the background's
+    // history at every silhouette -- a disocclusion at every edge, every frame, which is the exact artefact
+    // this pass exists to remove.
+    const dilateOn = $("dilate").value === "on";
+    let dilated = null, dilStat = null;
+    if (dolly && dilateOn && dgpu && depth) {
+        dilated = await dgpu.dilate({ depth, motion, w: D, h: D, nearerIsLess: true, counted: true });
+        dilStat = dilated.stats;
+    }
+    const motionUsed = dilated ? dilated.motion : motion;
+    const depthRecord = dilated ? dilated.depth : depth;
+
     // *** WHAT THE OBJECT-AWARE PATH BOUGHT, IN PIXELS, ON THIS FRAME. *** The camera-only field is computed
     // alongside -- it is the field this page would have used before v4649 -- and the two are differenced on
     // the slab's pixels and on the background's separately. The background number is the control: object 0's
@@ -846,7 +881,7 @@ async function tick() {
     if (objects && lgpu && dollyCurrent) {
         const period = jitterPhaseCount(parseFloat($("ratio").value));
         if (!lockRing) lockRing = lgpu.makeRing(D, D, period);
-        lgpu.pushRing(lockRing, { current: dollyCurrent, motion });
+        lgpu.pushRing(lockRing, { current: dollyCurrent, motion: motionUsed });
         // scale is the luma range this page's content actually spans; strength 1 leaves the detector's own
         // units alone. A detector normalised by something the page invented is one nobody can reason about,
         // which is render/temporalLock.mjs's own rule about `scale` being the caller's.
@@ -878,7 +913,7 @@ async function tick() {
         // never once said what the mask DID -- while the shading mask beside it got quantiles in v4655 for
         // exactly that reason. A control whose effect is measured and whose behaviour is not is half an
         // instrument.
-        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion, prevDepth,
+        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion: motionUsed, prevDepth,
                                          w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1,
                                          counted: true });
         reactiveMask = rx.data;
@@ -898,7 +933,7 @@ async function tick() {
             // this page would print "not counted" on an adapter and "106 genuine" on the CPU for the same
             // frame -- the exact regression v4591 had to undo for the accumulate pass.
             rejected = await rgpu.rejectAndAccumulate({
-                current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
+                current: dollyCurrent, history: hist, motion: motionUsed, prevDepth, w: D, h: D, alpha, threshold,
                 shading: shadingOn ? shadingMask : null,   // the switch above; null on every other camera
                 reactive: reactiveOn ? reactiveMask : null,   // the switch above; null on frame one
                 nearerIsLess: true, space: "ycocg", counted: true });
@@ -907,7 +942,7 @@ async function tick() {
             disStats = { genuine: rejected.disocStats.flagged - rejected.disocStats.noHistory,
                          noHistory: rejected.disocStats.noHistory, threshold, engine: "the device" };
         } else {
-            const dis = disocclusionCPU({ motion, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
+            const dis = disocclusionCPU({ motion: motionUsed, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
             factor = historyFactorCPU({ disocclusion: dis.data, n: D * D });
             // flagged counts three different things and only one of them is a disocclusion; noHistory is the other
             // two (motion invalid, reprojected offscreen), so the genuine count is the difference.
@@ -928,14 +963,18 @@ async function tick() {
     const acc = dolly
         ? rejected
         || rectifiedAccumulateCPU({ current: dollyCurrent,
-                                   history: hist, motion, factor, w: D, h: D, alpha, space: "ycocg" })
+                                   history: hist, motion: motionUsed, factor, w: D, h: D, alpha, space: "ycocg" })
         : tgpu
             ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
                                                 history: hist, motion, alpha, counted: true })
             : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
                                       history: hist, motion, w: D, h: D, alpha });
     hist = acc.data; frame++; advanceJitter(jit);
-    if (dolly) prevDepth = depth;                // THIS frame's depth is next frame's recorded depth
+    // *** THE RECORD IS THE DILATED DEPTH WHEN THE PASS IS ON, OR THE TWO SIDES OF THE CLIP TEST DISAGREE
+    // BY CONSTRUCTION. *** motionUsed carries the foreground's zPrev at every silhouette; comparing that
+    // against an undilated record would read a disocclusion at every edge on every frame. Off, depthRecord
+    // IS depth and this line is the line it replaced.
+    if (dolly) prevDepth = depthRecord;          // THIS frame's depth is next frame's recorded depth
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
     // *** THE REFERENCE TAKES THE SLAB'S OFFSET TOO, AND OMITTING IT COST THIS ROUND ITS HEADLINE NUMBER. ***
@@ -1022,6 +1061,22 @@ async function tick() {
               `arms differ in, so the fired set is not the same set on both sides. The pixel counts are ` +
               `printed so a reader can see whether the two partitions are comparable rather than assume it.`
             : "error by region: no reactive mask on this frame, so there is nothing to split by";
+    // *** WHAT THE DILATION MOVED, COUNTED AS THE CHOICE IS MADE. *** On flat geometry a dilation that
+    // fired everywhere and one that fired nowhere produce the IDENTICAL depth and motion buffers, so no
+    // pass over the output could recover this -- the same reason the reactive mask's three declines needed
+    // atomics. `moved` comes from mainCounted; `source` carries which pixel each output came from.
+    $("dilstat").textContent = !dolly ? ""
+        : dilStat
+            ? `dilate [ON]: ${dilStat.moved} of ${D * D} pixels took a neighbour's depth and motion ` +
+              `(${(100 * dilStat.moved / (D * D)).toFixed(2)}%) -- the ring outside every silhouette in the ` +
+              `frame. Each one now carries the FOREGROUND's vector and the foreground's zPrev, and the ` +
+              `record kept for next frame is the dilated depth, so both sides of the clip test moved together.`
+            : dilateOn
+                ? "dilate: ON but not computed on this frame (it needs the adapter and a depth buffer)"
+                : `dilate [OFF -- the control]: every figure on this page and in its five gates was measured ` +
+                  `on this arm. FSR2 runs this pass BEFORE depth clip and the locks; this tree has never had ` +
+                  `it, and turning it on moves the disocclusion counts, the 212/106 alternation and the ` +
+                  `reactive mask's fired set. Whether it moves the PICTURE is a paired measurement.`;
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +

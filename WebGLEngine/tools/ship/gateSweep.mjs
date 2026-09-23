@@ -8032,6 +8032,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4664 -- THE 274th CLOSING: FSR2's earliest pass, which this tree never had.
+    since349: Object.freeze({
+        at: "v4664", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/dilateGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2 DOES NOT HAND DEPTH-CLIP AND THE LOCKS RAW PER-PIXEL DATA, AND THIS TREE ALWAYS " +
+                 "HAD. *** It DILATES first: each pixel takes the nearest depth in its 3x3 neighbourhood and " +
+                 "the motion vector of whichever pixel that depth came from, so a silhouette edge reprojects " +
+                 "with the FOREGROUND. render/dilate.mjs, DILATE_WGSL with a counted entry point, DilateGPU, " +
+                 "and a gate. Every consumer downstream -- disocclusionCPU, the lock ring, the reactive mask " +
+                 "-- had been reading undilated data since it was written. " +
+                 "*** WHAT IT BUYS, MEASURED ON A FIXTURE WHERE THE SLAB HAS NOT MOVED: 112 SPURIOUS " +
+                 "DISOCCLUSIONS BECOME 0. *** Undilated, each silhouette-ring pixel carries the background's " +
+                 "zPrev while the depth recorded there last frame is the slab's, so the clip test reads " +
+                 "something nearer than expected and calls it a disocclusion -- though nothing was " +
+                 "uncovered. Dilated, the ring carries the slab's own zPrev and the test agrees with itself. " +
+                 "*** `source` IS THE INSTRUMENT AND D2 PROVES IT. *** The runner returns WHICH pixel each " +
+                 "output came from, because on flat geometry -- most of any frame -- a dilation that fired " +
+                 "everywhere and one that fired nowhere produce the IDENTICAL depth and motion buffers. " +
+                 "Changing the kernel's tie rule to nearer-OR-EQUAL leaves the depth buffer bit-identical " +
+                 "and is caught only through the source buffer. " +
+                 "*** OFF BY DEFAULT, WHICH IS v4649's `sx` DISCIPLINE AND NOT TIMIDITY. *** This page's " +
+                 "figures -- 106 genuine disocclusions, the 212/106 alternation, the reactive mask's 404 " +
+                 "fired pixels -- are quoted in its prose and pinned by five gates, and dilation moves all " +
+                 "of them. A round that moved them while adding a feature could not be told from a round " +
+                 "that broke them. The page calls the runner anyway, because runnerCallers' ratchet caught " +
+                 "the third gate-only runner on the round that added it, exactly as it caught reactiveGPU at " +
+                 "v4657: this session's instrument catching this session's habit for the second time. " +
+                 "Twelve sabotages, twelve caught, TWO 0-REDs on the page rows and both repairs. The second " +
+                 "is worth reading: v4659 wrote the identical `counted: true` row for the reactive mask, " +
+                 "found a bare substring test satisfied by rejectAndAccumulate's own further down the page, " +
+                 "and fixed it WITH A COMMENT SAYING SO -- and four rounds later the same row was written " +
+                 "the same way in the same file and scored the same zero. A lesson recorded in a file is not " +
+                 "a lesson the next row inherits. " +
+                 "And two of the new gate's own rows were RED ON ARRIVAL, both fixture defects: a " +
+                 "Float32Array value compared against the f64 literal 0.05 (0 of 112), and a section that " +
+                 "asserted what the pass is FOR rather than what the fixture does -- it claimed dilation " +
+                 "would ADD disocclusions by the ring, where both arms read zero because that case is an " +
+                 "occlusion. Rebuilt around what dilation actually removes.",
+    }),
     // v4663 -- THE 273rd CLOSING: the harm and the help are one mechanism, in one percent of the picture.
     since348: Object.freeze({
         at: "v4663", swept: 0, green: 0, red: 0,

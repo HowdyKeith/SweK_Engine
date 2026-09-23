@@ -470,13 +470,17 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // only a gate imports. Sixth round running with the same four rows moving by one and the other four held.
     // v4657 -- 1758 -> 1759 for render/reactiveGPU-selfcheck.mjs, the factor pass's third input.
     // v4661 -- 1759 -> 1760 for tools/ship/fsrPageClocks-selfcheck.mjs, the scene clock and the history's age.
+    // v4664 -- 1760 -> 1761 for render/dilateGPU-selfcheck.mjs, FSR2's dilated depth and motion.
     // Seventh round running with the same four rows by one and the other four held -- and this round bumped
     // THREE of the four on its first pass and shipped the fourth only because the gate went red on it.
     // nameFirst is the one a hand-edit forgets: it is the shape count, not a gate count, so nothing about
-    // "I added one gate" reminds you of it. The pre-flight cannot see it either -- recordDrift compares four
+    // "I added one gate" reminds you of it. *** AND v4664 FORGOT IT AGAIN, THREE ROUNDS AFTER THIS
+    // SENTENCE WAS WRITTEN. *** Same field, same verify, same repair. Twice now the pre-flight passed and
+    // this row caught it, which is the division of labour working and is also the reason the sentence is
+    // not enough on its own. The pre-flight cannot see it either -- recordDrift compares four
     // fields and this row compares all nine, which is exactly why that row says so in its own text.
-    gates: 1760, usesOk: 1739, definesOk: 1731, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1632, condFirst: 91, unknownSignature: 16,
+    gates: 1761, usesOk: 1740, definesOk: 1732, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1633, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

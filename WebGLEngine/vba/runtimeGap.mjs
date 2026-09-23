@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4297,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4301,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -735,6 +735,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // file that drives a GPU, which is exactly what a text census can see and the only thing it can.
     //
     // *** v4657 -- SIX ROWS, FOUR NEW FILES, and the WebGL row moves again for v4648's reason. *** files
+    // v4664 -- 4297 -> 4301, ES modules 3997 -> 4001, closures 3861 -> 3863, async/await 1530 -> 1532,
+    // typed arrays 1134 -> 1137, WebGL 160 -> 161, for render/dilate.mjs, dilateWgsl, dilateGPU and its
+    // gate. Promises do NOT move: the four new files await, and none of them constructs a Promise.
     // v4661 -- 4296 -> 4297, ES modules 3996 -> 3997, closures 3860 -> 3861, async/await 1529 -> 1530,
     // Promises 369 -> 370, for tools/ship/fsrPageClocks-selfcheck.mjs. Typed arrays do NOT move: that gate
     // reads strings off a page and counts integers, and never allocates one.
@@ -749,8 +752,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 3997, closures: 3861, asyncAwait: 1530, typedArrays: 1134, promises: 370,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 160, webgpu: 52, threads: 23, wasm: 23,
+    esModules: 4001, closures: 3863, asyncAwait: 1532, typedArrays: 1137, promises: 370,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 161, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

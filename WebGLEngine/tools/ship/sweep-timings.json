@@ -2163,7 +2163,8 @@
   "tools/ship/constantRows-selfcheck.mjs": 1960,
   "tools/ship/runnerCallers-selfcheck.mjs": 1872,
   "render/reactiveGPU-selfcheck.mjs": 1054,
-  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830,
+  "render/dilateGPU-selfcheck.mjs": 971
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3928,7 +3929,8 @@
   "tools/ship/constantRows-selfcheck.mjs": 0,
   "tools/ship/runnerCallers-selfcheck.mjs": 0,
   "render/reactiveGPU-selfcheck.mjs": 0,
-  "tools/ship/fsrPageClocks-selfcheck.mjs": 0
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 0,
+  "render/dilateGPU-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5693,7 +5695,8 @@
   "tools/ship/constantRows-selfcheck.mjs": "2026-09-22T06:00:00.000Z",
   "tools/ship/runnerCallers-selfcheck.mjs": "2026-09-22T12:00:00.000Z",
   "render/reactiveGPU-selfcheck.mjs": "2026-09-23T06:00:00.000Z",
-  "tools/ship/fsrPageClocks-selfcheck.mjs": "2026-09-21T00:00:00.000Z"
+  "tools/ship/fsrPageClocks-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
+  "render/dilateGPU-selfcheck.mjs": "2026-09-23T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10376,7 +10379,8 @@
   "tools/ship/constantRows-selfcheck.mjs": 1960,
   "tools/ship/runnerCallers-selfcheck.mjs": 1872,
   "render/reactiveGPU-selfcheck.mjs": 1054,
-  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830
+  "tools/ship/fsrPageClocks-selfcheck.mjs": 11830,
+  "render/dilateGPU-selfcheck.mjs": 971
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13451,7 +13455,8 @@
   "tools/ship/constantRows-selfcheck.mjs": false,
   "tools/ship/runnerCallers-selfcheck.mjs": false,
   "render/reactiveGPU-selfcheck.mjs": false,
-  "tools/ship/fsrPageClocks-selfcheck.mjs": false
+  "tools/ship/fsrPageClocks-selfcheck.mjs": false,
+  "render/dilateGPU-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15216,6 +15221,7 @@
   "tools/ship/constantRows-selfcheck.mjs": "alone",
   "tools/ship/runnerCallers-selfcheck.mjs": "alone",
   "render/reactiveGPU-selfcheck.mjs": "alone",
-  "tools/ship/fsrPageClocks-selfcheck.mjs": "alone"
+  "tools/ship/fsrPageClocks-selfcheck.mjs": "alone",
+  "render/dilateGPU-selfcheck.mjs": "alone"
  }
 }
