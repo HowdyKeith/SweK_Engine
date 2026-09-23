@@ -196,34 +196,47 @@ sec("3. *** THE TWO CLOUDS SHARE A BUILDER AND DO NOT SHARE A SIGNAL ***");
 }
 
 // =============================================================================================================
-sec("4. *** fathom's SPEED FACTOR, AND THE TWO SHELLS IT IS NOT SAFE TO PUT IT ON YET ***");
+sec("4. *** fathom's SPEED FACTOR IS ON ALL THREE SHELLS NOW, AND geode's ON ITS SPIN ***");
 {
-    const FS = K.MH_FATHOM_SP, GS = K.MH_GEODE_SP;
+    const FS = K.MH_FATHOM_SP, GS = K.MH_GEODE_SP, FA = K.MH_FATHOM;
     const raw = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
     const a0Wired = /KIT\.mhRatePhase\(float\(sh\.rate\), uniforms\.time,\s*\n\s*float\(MH_FATHOM_SP\.pace\), uniforms\.paceInt/.test(raw);
-    // the expansion the other two need, evaluated: (1 + p*kp + d*kd) * (1 + k*d) has a d-squared term
-    const dSq = FS.drive * 0.7;
+    // *** THE BARE-RATE SPELLING MUST BE GONE, and that is a different claim from the new one being present.
+    // *** v4663's version of this section asserted that a1 and a2 STILL passed mh_drift the bare rate, and
+    // said why. The round that wires them has to retire that row rather than leave it passing on a condition
+    // its own sentence has outgrown -- this tree's most frequent failure, found in four consecutive rounds.
+    const bareGone = !/: KIT\.mhDrift\(uniforms\.time, float\(sh\.rate\), float\(sh\.wob\), float\(sh\.lane\)\)/.test(raw);
+    const mixWired = /KIT\.mhSpMixPhase\(float\(c\.t\), uniforms\.time/.test(raw) &&
+                     /mhSpMixCoef\(sh\.rate, FA\.shells\[0\]\.rate, MH_FATHOM_SP\.mixW/.test(raw);
     say(`fathom sp = 1 + ${FS.pace}*pace + ${FS.drive}*drive; geode sp = 1 + ${GS.pace}*pace + ${GS.drive}*drive`);
-    say(`the mix-shaped shells need integrals of pace*drive (the host sends it) and of drive SQUARED (it does not)`);
-    ok("!! *** ONLY THE SHELL WHOSE RATE IS A CLEAN SUM IS WIRED, and the other two are arithmetic rather than appetite ***",
-        a0Wired && FS.pace > 0 && FS.drive > 0 && GS.pace > 0 && GS.drive > 0 && dSq > 0,
-        `fathom's a0 is mh_drift(t, 0.085 * sp, ...) -- sp is a SUM, which mhRatePhase integrates exactly, ` +
-        `so it is wired. a1 and a2 are mix(mh_drift(t, k*sp, ...), a0, st.drive * 0.7) and geode's spin is ` +
-        `the same shape, so with sp moving their secular term expands to sp*(1 + k*drive), whose last two ` +
-        `terms are integrals of pace*drive -- which the host has sent since v4657 -- and of drive SQUARED, ` +
-        `which it has never sent. FOLDING sp IN WITHOUT THEM WOULD BE murmur's NUMBER AT DRIVE 0 AND DRIVE ` +
-        `1 AND NOBODY'S IN BETWEEN, and in between is every frame of the ramp RESPONDING is made of. The ` +
-        `expansion is recorded in MH_FATHOM_SP's note and in tools/ship/nextRounds.mjs so the round that ` +
-        `adds the accumulator does not have to re-derive it.`);
+    ok("!! *** ALL THREE OF fathom's SHELLS CARRY THE SPEED FACTOR, AND THE BARE RATE IS GONE FROM THE FILE ***",
+        a0Wired && bareGone && mixWired && FS.pace > 0 && FS.drive > 0 && GS.pace > 0 && GS.drive > 0,
+        `a0's rate is a clean SUM and mhRatePhase integrates it exactly; a1 and a2 are mixes toward a0 by ` +
+        `st.drive * ${FS.mixW} with sp on both arms, so their rate carries drive SQUARED and they go through ` +
+        `mhSpMixPhase's five pairs. THE THREE CONJUNCTS ARE THREE DIFFERENT CLAIMS: that a0 is still wired, ` +
+        `that the bare-rate spelling v4663 left behind is GONE, and that what replaced it derives its ` +
+        `coefficients from murmur's four numbers rather than transcribing five. v4663's version of this row ` +
+        `asserted the bare rate was still there and said why -- a correct row about a deliberate absence, ` +
+        `which becomes a wrong row about a repair the moment the absence is filled.`);
 
-    ok("!! ...and the two MIX shells still pass the bare rate, which is the half of that claim a table cannot make",
-        /: KIT\.mhDrift\(uniforms\.time, float\(sh\.rate\), float\(sh\.wob\), float\(sh\.lane\)\)\.toVar\(\)\)/.test(raw),
-        `fathom's a1 and a2 are still mh_drift(t, sh.rate, ...) with no sp on them at all. THE ROW ABOVE ` +
-        `SAYS WHY THEY ARE LEFT AND THIS ONE SAYS THEY ARE STILL LEFT, which is not the same claim: ` +
-        `multiplying their rate by spF is one character, it moves pixels, it makes fathom respond to the ` +
-        `cadence MORE, and it is wrong at every partial drive. A sabotage that did exactly that walked ` +
-        `through this gate before this row existed -- every other row asks whether fathom answers the ` +
-        `cadence, and a wrong answer is still an answer.`);
+    // *** AND THE CROSS TERMS ARE SHOWN TO MATTER, which a source row cannot say. *** The whole reason this
+    // was held for a round is that dropping them is not a small error, so the row states how large it is
+    // rather than asserting that somebody was careful.
+    const c1 = K.mhSpMixCoef(FA.shells[1].rate, FA.shells[0].rate, FS.mixW, FS.pace, FS.drive);
+    const full = (p, d) => c1.t + c1.pace * p + c1.drive * d + c1.paceDrive * p * d + c1.driveSq * d * d;
+    const trunc = (p, d) => c1.t + c1.pace * p + c1.drive * d;
+    const PC = 0.30, DR = K.mhState(3, 0.3).drive;
+    say(`fathom a1 at pace ${PC} -- rest ${full(PC, 0).toFixed(6)}, ramp's own drive ${DR.toFixed(3)}: ` +
+        `${full(PC, DR).toFixed(6)} rad/s with the cross terms, ${trunc(PC, DR).toFixed(6)} without, ` +
+        `${full(PC, 1).toFixed(6)} at full drive`);
+    ok("!! *** AND THE SECOND SHELL REVERSES UNDER RESPONDING, which is what the mix is for ***",
+        full(PC, 0) < 0 && full(PC, 1) > 0 && Math.abs(trunc(PC, DR) / full(PC, DR)) > 5,
+        `a1's rate runs ${full(PC, 0).toFixed(6)} rad/s at rest and ${full(PC, 1).toFixed(6)} at full drive: ` +
+        `it changes SIGN, because the shell is being pulled onto a0's turn and a0 turns the other way. The ` +
+        `port ran it at a flat ${FA.shells[1].rate} -- the wrong direction at full drive. And dropping the ` +
+        `cross terms is not a rounding: at the ramp's own ${DR.toFixed(3)} the truncated rate is ` +
+        `${Math.abs(trunc(PC, DR) / full(PC, DR)).toFixed(2)}x the right one. THE TWO SPELLINGS AGREE ONLY AT ` +
+        `DRIVE 0, which is the single operating point at which the term does not exist.`);
 }
 
 // =============================================================================================================
@@ -330,21 +343,22 @@ sec("6. *** THE CENSUS: how many of the eighteen this port reaches, and which ar
     say(`builders reading the cadence, instantaneously or through a WEIGHTED integral: ${reached.join(", ")}`);
     say(`reached ONLY through the integral: ${viaInt.join(", ") || "none"}; reading paceInt with a ZERO coefficient: ${zeroCoeff.join(", ") || "none"}`);
     say(`builders still without one: ${without.join(", ") || "none"}`);
-    ok("!! *** SIXTEEN OF THE SEVENTEEN BUILDERS CARRY murmur's CADENCE NOW, AND THE ONE LEFT IS NAMED ***",
-        reached.length === all.length - 1 && without.length === 1 && without[0] === "geode" &&
-        zeroCoeff.includes("geode") && viaInt.includes("opal"),
-        `${reached.length} of ${all.length} builders, covering ${reached.length + 1} of murmur's eighteen ` +
-        `species because nebula and tempest share one. THE ONE LEFT IS geode and it is left for the reason ` +
-        `section 4 gives: its spin is a MIX and folding its sp in without the drive-squared integral would ` +
-        `be wrong at every partial drive. *** AND THE CENSUS COUNTS THE INTEGRAL AS WELL AS THE SIGNAL, ` +
-        `WHICH IT DID NOT BEFORE: *** ${viaInt.join(", ") || "no builder"} reaches it only through paceInt, ` +
-        `and murmurLive's version -- which matched PACE alone -- reported opal cadence-less on the round ` +
-        `after v4662 gave opal its cadence. A secular site MUST read the integral rather than the signal, ` +
-        `so a census looking only for the signal reports the repair as the absence. *** AND THE WIDER ` +
-        `VERSION WAS WRONG THE OTHER WAY UNTIL THE COEFFICIENT WAS READ: *** ${zeroCoeff.join(", ")} reads ` +
-        `paceInt with a coefficient of float(0.0) -- an argument slot, not a signal -- and the first cut of ` +
-        `this row counted it as a cadence and reported seventeen of seventeen. A coefficient of zero grades ` +
-        `nothing, and a census that cannot see the coefficient turns that into a green row.`);
+    ok("!! *** ALL SEVENTEEN BUILDERS CARRY murmur's CADENCE NOW, AND THE LAST ONE WAS geode ***",
+        reached.length === all.length && without.length === 0 && zeroCoeff.length === 0 &&
+        viaInt.includes("opal") && reached.includes("geode"),
+        `${reached.length} of ${all.length} builders, covering all eighteen of murmur's species because ` +
+        `nebula and tempest share one. THE LAST WAS geode, and it was last because its spin is a MIX of two ` +
+        `speed-factored arms: folding sp in without an integral of drive SQUARED would have been wrong at ` +
+        `every partial drive, so it waited for the accumulator rather than for an approximation. *** AND ` +
+        `THE CENSUS COUNTS THE INTEGRAL AS WELL AS THE SIGNAL: *** ${viaInt.join(", ") || "no builder"} ` +
+        `reaches it only through paceInt, and murmurLive's version -- which matched PACE alone -- reported ` +
+        `opal cadence-less on the round after v4662 gave opal its cadence. A secular site MUST read the ` +
+        `integral rather than the signal, so a census looking only for the signal reports the repair as the ` +
+        `absence. *** AND THE ZERO-COEFFICIENT COUNT IS ASSERTED EMPTY RATHER THAN SIMPLY NOT MENTIONED: *** ` +
+        `geode used to read paceInt with a coefficient of float(0.0) -- an argument slot, not a signal -- and ` +
+        `the first cut of this row counted that as a cadence and reported seventeen of seventeen a round ` +
+        `early. It reports seventeen of seventeen now for a different reason, and the empty list is what ` +
+        `distinguishes the two: a coefficient of zero grades nothing, and the census can still see one.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
@@ -353,10 +367,11 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "drift, tempest's energy, fathom's first shell -- and the largest finding is not a missing term but a " +
     "WRONG SIGNAL: tempest's energy read voice where murmur reads pace, a THINKING indicator and drive, so " +
     "the storm rose when somebody spoke and stood still while the assistant thought. " +
-    "\nWHAT IS NOT CLAIMED: fathom's second and third shells, and geode's spin. All three are mixes by " +
-    "st.drive * 0.7, so a moving sp puts an integral of drive SQUARED in the secular term and the host has " +
-    "never sent one. The expansion is recorded rather than approximated -- an sp folded in without its " +
-    "cross terms is murmur's number at both ends of the ramp and nobody's in between. " +
+    "\nAND v4668 TOOK THE LAST OF IT: fathom's second and third shells and geode's spin, the three mixes " +
+    "by st.drive * 0.7 whose moving sp puts an integral of drive SQUARED in the secular term. One host " +
+    "accumulator closed all three, and the expansion was recorded at v4663 rather than approximated, which " +
+    "is why the round that wired them had nothing to re-derive. THE CADENCE IS COMPLETE: seventeen of " +
+    "seventeen builders, eighteen of eighteen species. " +
     "\nAND NOT CLAIMED: that `think` belongs in mh_state. tempest.ts reads the state index directly and " +
     "says why -- mh_state \"only designs success and responding\" -- so the port reads it directly too, and " +
     "the host accumulates its integral like any other signal.");

@@ -62,6 +62,12 @@ export const ORB_KNOBS = Object.freeze([
     // this host already keeps. See render/aiPresenceOrbState.mjs, which explains why the record that called
     // that impossible was wrong.
     "paceDriveInt", "voiceDriveInt", "duetFlourishInt", "thinkInt",
+    // ...and the SQUARE of the lean, at v4668. geode's spin and fathom's second and third shells are each a
+    // mix of two arms by st.drive*0.70 with murmur's speed factor on BOTH arms, so the rate carries a term
+    // in drive*drive and the exact integral needs the integral of the square. It is not driveInt squared and
+    // it is not any product of the six above -- see render/murmurKit.mjs's mhSpMixCoef for the expansion and
+    // render/aiPresenceOrbState.mjs for what it cost and what it bought.
+    "driveSqInt",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
     // eighteen are arranged -- each reads c0..c3 out of the same argument list.
@@ -134,7 +140,7 @@ export const ORB_COLORS = Object.freeze({
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE,
-         MH_OPAL_DRIFT, MH_GEODE_SPIN, mhGeodeSpinDrive, MH_ADVECT_SIGN, MH_ADVECT_WARP,
+         MH_OPAL_DRIFT, MH_GEODE_SPIN, MH_GEODE_SP, mhSpMixCoef, MH_ADVECT_SIGN, MH_ADVECT_WARP,
          MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, MH_DRIVE_FORMATION, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
@@ -195,7 +201,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // .mjs by tools/ship/murmurKit-selfcheck.mjs on a real GPU.
     const KIT = makeMurmurKitTsl(TSL);
 
-    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, paceDriveInt: 0, voiceDriveInt: 0, duetFlourishInt: 0, thinkInt: 0,
+    const k0 = { time: 0, speed: 1, glow: 1, depth: 1, hueShift: 0, presence: 0.5, clarity: 0.6, glintRate: 0.3, voice: 0, aspect: 1, activity: 0, stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, paceDriveInt: 0, voiceDriveInt: 0, duetFlourishInt: 0, thinkInt: 0, driveSqInt: 0,
                  rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4,
                  orbitTilt: 0.5, trail: 0.5, pointSize: 0.4,
                  wobble: 0.5, tension: 0.5, sheen: 0.5,
@@ -1359,20 +1365,30 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // a1 = mix(mh_drift(t, -0.062*sp, ...), a0, st.drive*0.7) and a2 likewise. The nest turned at one
             // fixed speed here whatever the orb was doing.
             //
-            // *** ONLY a0 IS WIRED IN THIS ROUND, AND THE REASON IS ARITHMETIC RATHER THAN APPETITE. ***
-            // a0's rate is a clean SUM, which mhRatePhase integrates exactly. a1 and a2 are MIXES by
-            // st.drive*0.7, so with sp moving their secular term carries integrals of pace*drive -- which
-            // the host sends -- AND of drive SQUARED, which it does not. Folding sp into those two without
-            // the cross terms would be murmur's number at drive 0 and drive 1 and nobody's in between,
-            // which is every frame of the ramp. See MH_FATHOM_SP and tools/ship/nextRounds.mjs.
+            // *** AND THE OTHER TWO SHELLS ARE PULLED ONTO THE FIRST ONE'S TURN -- v4668. *** a1 and a2 are
+            // MIXES toward a0 by st.drive*0.70 with sp on both arms, so their rate carries drive SQUARED and
+            // needed one accumulator the host had never sent. v4663 wired a0 alone and said so; this is the
+            // rest of the sentence. See mhSpMixCoef for the expansion.
+            //
+            // THE SECULAR HALF IS INTEGRATED AND THE WOBBLE HALF IS MIXED WHERE IT STANDS, which is v4655's
+            // split and not a new decision: mh_drift's wobble is bounded by k*rate/w2 and cannot accumulate,
+            // so it keeps murmur's INSTANTANEOUS sp and the instantaneous mix weight. murmur mixes the whole
+            // drift result, so the two wobbles mix at that same weight -- the third shell's own ripple fades
+            // out as the first shell's fades in, at their own two lanes.
             const spF = float(1.0).add(PACE.mul(MH_FATHOM_SP.pace)).add(DRIVE.mul(MH_FATHOM_SP.drive)).toVar();
-            const ANG = FA.shells.map((sh, k) => k === 0
-                ? KIT.mhDriftPhase(
-                    KIT.mhRatePhase(float(sh.rate), uniforms.time,
-                        float(MH_FATHOM_SP.pace), uniforms.paceInt, float(0.0), uniforms.voiceInt,
-                        float(MH_FATHOM_SP.drive), uniforms.driveInt),
-                    float(sh.rate).mul(spF), float(sh.wob), float(sh.lane), uniforms.time).toVar()
-                : KIT.mhDrift(uniforms.time, float(sh.rate), float(sh.wob), float(sh.lane)).toVar());
+            const wF = DRIVE.mul(MH_FATHOM_SP.mixW).toVar();
+            const wobF = FA.shells.map((sh) => KIT.mhDriftPhase(float(0.0),
+                float(sh.rate).mul(spF), float(sh.wob), float(sh.lane), uniforms.time).toVar());
+            const ANG = FA.shells.map((sh, k) => {
+                if (k === 0) return KIT.mhRatePhase(float(sh.rate), uniforms.time,
+                    float(MH_FATHOM_SP.pace), uniforms.paceInt, float(0.0), uniforms.voiceInt,
+                    float(MH_FATHOM_SP.drive), uniforms.driveInt).add(wobF[0]).toVar();
+                const c = mhSpMixCoef(sh.rate, FA.shells[0].rate, MH_FATHOM_SP.mixW,
+                                      MH_FATHOM_SP.pace, MH_FATHOM_SP.drive);
+                return KIT.mhSpMixPhase(float(c.t), uniforms.time, float(c.pace), uniforms.paceInt,
+                    float(c.drive), uniforms.driveInt, float(c.paceDrive), uniforms.paceDriveInt,
+                    float(c.driveSq), uniforms.driveSqInt).add(mix(wobF[k], wobF[0], wF)).toVar();
+            });
             const AX = ANG.map((a) => normalize(vec3(cos(a), 0.42, sin(a))).toVar());
             const R0 = min(float(FA.shells[0].base).add(layersK.mul(FA.shells[0].rk)).mul(spanK), float(FA.rCap)).toVar();
             const RAD = FA.shells.map((sh, k) => k === 0 ? R0
@@ -1477,13 +1493,30 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // the integral and the WOBBLE keeps the instantaneous (1 - w*drive) as its amplitude, which is
             // v4655's rule rather than a new decision -- the wobble is bounded by k*rate/w2 and cannot
             // accumulate, so only the half that grows without limit needed repairing.
+            //
+            // *** AND BOTH ARMS CARRY A SPEED FACTOR THIS PORT DID NOT HAVE AT ALL -- v4668. *** geode.ts
+            // multiplies both by sp = (1 + 0.80*live.pace + 1.00*st.drive); v4662 wired the mix at sp = 1,
+            // which left geode the LAST builder in the roster with no cadence and its spin at 44.6% of
+            // murmur's at full drive -- 0.2364 rad/s against 0.529536. The mix of two speed-factored arms is
+            // one rate with a drive-SQUARED term in it, so it is mhSpMixCoef's five pairs rather than
+            // mhRatePhase's three, and the wobble keeps the instantaneous sp beside the instantaneous mix.
+            const spG = float(1.0).add(PACE.mul(MH_GEODE_SP.pace)).add(DRIVE.mul(MH_GEODE_SP.drive)).toVar();
             const spinMix = float(1.0).sub(DRIVE.mul(MH_GEODE_SPIN.w)).toVar();
+            const cAy = mhSpMixCoef(GE.spinRate, MH_GEODE_SPIN.to, MH_GEODE_SPIN.w,
+                                    MH_GEODE_SP.pace, MH_GEODE_SP.drive);
             const ayG = KIT.mhDriftPhase(
-                KIT.mhRatePhase(float(GE.spinRate), uniforms.time, float(0.0), uniforms.paceInt,
-                    float(0.0), uniforms.voiceInt,
-                    float(mhGeodeSpinDrive(GE.spinRate, MH_GEODE_SPIN.to, MH_GEODE_SPIN.w)), uniforms.driveInt),
-                float(GE.spinRate).mul(spinMix), float(GE.spinWob), float(GE.spinLane), uniforms.time).toVar();
-            const axG = float(0.34).add(sin(uniforms.time.mul(0.041)).mul(0.22)).toVar();
+                KIT.mhSpMixPhase(float(cAy.t), uniforms.time, float(cAy.pace), uniforms.paceInt,
+                    float(cAy.drive), uniforms.driveInt, float(cAy.paceDrive), uniforms.paceDriveInt,
+                    float(cAy.driveSq), uniforms.driveSqInt),
+                float(GE.spinRate).mul(spG).mul(spinMix), float(GE.spinWob), float(GE.spinLane),
+                uniforms.time).toVar();
+            // *** THE STONE STOPS NODDING AS WELL, AND NO ROUND HAD LOOKED FOR THIS ONE. *** geode.ts:
+            // ax = mix(0.34 + 0.22*sin(t*0.041), 0.30, st.drive*0.7). An ANGLE and not a phase, so there is
+            // nothing to integrate; it is here because v4664's coefficient census cannot see it -- 0.70 was
+            // already in the table for the spin, so the site read as present while the picture had none of
+            // it. See MH_GEODE's tilt entries.
+            const axG = mix(float(GE.tiltB).add(sin(uniforms.time.mul(GE.tiltRate)).mul(GE.tiltAmp)),
+                            float(GE.tiltTo), DRIVE.mul(MH_GEODE_SPIN.w)).toVar();
             // THE RAY, IN THE STONE'S FRAME. Rotating the ray IN is one transform; rotating the eight planes
             // OUT would be eight.
             const Pc = KIT.mhSpin(P, ayG, axG).toVar();

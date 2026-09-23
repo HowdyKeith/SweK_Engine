@@ -26,6 +26,141 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4668 -- the integral of drive squared, and a gate that had not parsed for two rounds
+
+<!-- Written as v4665 and renumbered FORWARD at the fetch, per the v4333-v4335 rule at the top of this
+     file: main shipped v4650-v4667 from the code-review line while this branch sat on v4664, and
+     e90cd84 is already called v4665. Two builds wearing one number with different bytes is what jams
+     the peer auto-update fleet-wide. main's highest is v4667, so this is v4668. No text, number or
+     measurement in the round changed -- only the label. -->
+
+Two things, and the second one is the bigger.
+
+### The clocks
+
+Three of murmur's clocks are a **mix of two arms that both carry the species' speed factor**:
+
+```
+geode.ts   ay = mix(mh_drift(t, 0.088 * sp, 0.48, 2.0), t * 0.30 * sp, st.drive * 0.70)
+fathom.ts  a1 = mix(mh_drift(t, -0.062 * sp, 0.50, 2.0), a0, st.drive * 0.70)
+           a2 = mix(mh_drift(t,  0.108 * sp, 0.40, 3.0), a0, st.drive * 0.70)
+
+           sp = (1 + q * live.pace + s * st.drive)
+```
+
+A mix of two rates is **one rate** — `A + B*drive`, with `B` the mix weight times the gap between the arms —
+and multiplying it by `sp` makes it quadratic in drive. So the exact phase is
+
+```
+A*t + A*q*P + (A*s + B)*D + B*q*PD + B*s*DD
+```
+
+and `DD`, the integral of **drive squared**, is the one integral this host had never accumulated. v4663
+recorded that expansion rather than approximating it, and one accumulator closed all three sites.
+
+**It is not reachable from the six integrals already travelling.** Measured across the RESPONDING ramp,
+`driveInt²/t` misses `DD` by up to **44.2%** — the square of a mean against the mean of a square, which agree
+only where the signal is constant — and `DD/driveInt` varies by **5.67×** over the same four points, so no
+fixed coefficient on `driveInt` reproduces it either.
+
+### And the missing cross terms were the smaller half
+
+fathom's second and third shells were plain `mh_drift` at murmur's bare rates in this port. No `sp`, no mix,
+**no drive at all**. So the nest never closed up under RESPONDING, while murmur pulls the outer shells onto
+the first one's turn as the orb responds.
+
+| | at rest | full drive | this port, at every drive |
+|---|---|---|---|
+| fathom a1 | −0.077810 rad/s | **+0.096320** | −0.062 |
+| fathom a2 | 0.135540 | 0.216425 | 0.108 |
+| geode ay | 0.109120 | 0.529536 | 0.088 → 0.2364 |
+
+**a1 changes sign.** The second shell reverses under RESPONDING, because it is being pulled onto a0's turn
+and a0 turns the other way — and this port ran it at a flat −0.062, the wrong direction at full drive at 64%
+of the right speed. geode had the mix from v4662 and no `sp`, which left it the **last builder in the roster
+without a cadence** and its stone spinning at 44.6% of murmur's under drive.
+
+Dropping the cross terms is not a rounding either: at the ramp's own drive of 0.568, a1 turns at 0.006679
+rad/s with them and 0.058100 without — **8.70× too fast**, for as long as the orb responds.
+
+### A second geode site nobody had looked for
+
+```
+ax = mix(0.34 + 0.22 * sin(t * 0.041), 0.30, st.drive * 0.7)
+```
+
+The stone stops **nodding** as well as wobbling: its swing falls from ±0.220 rad to ±0.066 and its centre
+rises from 0.34 to 0.312. v4664's `st.drive` audit passed this site because it counts **coefficients** and
+0.70 was already in the table for the spin — which is exactly the weakness that audit states about itself. A
+number being present does not prove it is on the right expression.
+
+Measuring it took one piece of arithmetic. `buildGeode` reads the instantaneous drive in two places, the tilt
+and the spin's wobble amplitude; `mh_drift`'s wobble is `(k*rate/w2) * sin(w2*t + lane*1.71)`, so at a time
+where that **sine is zero** the wobble contributes nothing at any amplitude. With the integrals held at 0 the
+secular spin is `0.088*t` in both frames, and the two pictures differ by the tilt alone: 814 of 6,912 bytes,
+worst channel 187.
+
+### The gate that had not parsed since v4663
+
+`tools/ship/murmurDrive-selfcheck.mjs` **has not parsed since v4663**. That round dropped a `` ` + ` ``
+between two adjacent template literals inside a 900-character prose string, and raised a count in the same
+row from 2 to 3 for the site it had just wired. Neither change was ever evaluated. **v4663 and v4664 both
+shipped over it.**
+
+Repaired and re-run, the instrument it had read **2** — the same 2 it read before v4663 touched it — because
+a token match cannot see a drive that arrives through a local, and fathom's `sp` is one. A number raised to
+match an intention, in a file nobody could execute, is the most expensive shape a green row has: it reads
+like a measurement of the thing it was written for.
+
+The census resolves one level now, through the **nearest preceding** declaration, names the local and the
+builder each of its **eight** sites resolves through, and tests containment of the drive integral with a
+balanced-paren walk rather than a closing bracket. Scoping and tokenising are both load-bearing: a file-wide
+name set credited aura's rate to limn's, and treating `sh.rate` as an identifier credited *fathom's* site to
+whichever `const rate` came last.
+
+`tools/ship/gateParses-selfcheck.mjs` exists so the class cannot repeat — it compiles every
+`*selfcheck*.mjs` in the tree without evaluating it in 792 ms, plus the 380 helpers the gates import. The
+tree holds 1776 gates. Two arrived this round. The suite is the guarantee and it is 26 minutes; a parse is a second, and it catches the
+failure that makes a gate silent rather than red.
+
+### Sabotage
+
+Twenty-seven, twenty-one caught on the first pass. The six that walked:
+
+- **Deleting the mix of the two wobble halves.** Every pixel row here holds drive fixed or holds the
+  integrals fixed, and the wobble moves with neither. It has a row now, and the row says plainly that its
+  catching conjunct is a spelling test and why no operating point isolates the term.
+- **Deleting `driveSqInt` from the host's returned params.** Caught, but as a *crash* on `.toFixed` rather
+  than a red row — a worse diagnosis. The field is read defensively now.
+- **Making the shared frame helper send `drive*time` for the square.** No row pinned the helper's own value;
+  that is v4654's impossible-history trap one signal further on.
+- **Removing the property-strip from murmurDrive's resolver**, and separately **making it resolve
+  file-wide instead of nearest-preceding**. The count stayed 8 under both, so only naming the local *and the
+  builder* each of the eight sites resolves through catches them.
+- **Deleting `driveSqInt` from murmurClock3's integral pattern** — the sharpest of the six. A census that
+  narrows its own pattern narrows *both sides* of its equality and stays green: 54 of 55 becomes 52 of 53.
+  That list is read from `aiPresenceOrbState.mjs`'s own `getParams()` return now, so the **host** decides
+  which integrals exist, and an eighth accumulator reddens the row on the day it is added.
+
+### And one correct change exposed a confounded instrument
+
+`murmurSpecies6`'s layers row predicts fathom's ridge ratio as `(base + rk)/base` and read it 1.0% off at
+v4664 and **3.8% off at v4668** — because the ridge sits at `R * (1 + (foldAmp/R0) * foldOf(dir))` and `R0`
+is shell 0's radius, which `layers` moves the *other* way, so the fold does not cancel between the pair. Its
+2% tolerance was a property of where the fold phase happened to be at t = 11 s with the wrong shell rates.
+
+It reads the mean of three times spread across the fold's own period now, and asserts the spread — 0.0475 —
+under the 0.10 margin it identifies the shells by. **The bound was not widened.**
+
+### Where the port stands
+
+The cadence is **complete**: seventeen of seventeen builders, eighteen of eighteen species. Three items
+remain and none of them needs a new mechanism — tempest's bolt slots want murmur's `small` mix, prism's hue
+question from v4661, and `mh_out`'s triangular-PDF dither.
+
+`tools/ship/murmurSpMix-selfcheck.mjs` arrives green at 2,183 ms; `tools/ship/gateParses-selfcheck.mjs` at
+1,101 ms.
+
 ## v4664 -- RESPONDING has a third thing, and this port had two of them
 
 This round began as an audit. *Is the port complete?* With the upstream cloned at v4663 that is answerable by

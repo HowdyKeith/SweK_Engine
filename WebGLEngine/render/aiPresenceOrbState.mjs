@@ -255,6 +255,23 @@ export function createPresenceState(initial = "idle") {
     // -- nearly eleven whole turns -- against a flat 0.056582.
     let paceDriveInt = 0, voiceDriveInt = 0;
 
+    // *** AND THE SQUARE OF THE LEAN -- v4668. *** Two species spell a clock as a MIX of two arms whose rates
+    // BOTH carry murmur's own speed factor sp = (1 + q*live.pace + s*st.drive), mixed by st.drive * 0.70:
+    // geode's spin, and fathom's second and third shells. Multiplying sp by the mix weight puts a term in
+    // s * 0.70 * (to - base) * drive * drive into the rate, and the integral of drive SQUARED is not the
+    // square of driveInt and is not any product of the six integrals above it. It is one more accumulation
+    // of a quantity this loop already has in hand, and it is the LAST one murmur's roster asks for: no rate
+    // in the eighteen is cubic in a signal, and no other pair of signals multiplies that paceDriveInt and
+    // voiceDriveInt do not already carry.
+    //
+    // MEASURED, and the reason the cross terms are not dropped: fathom's second shell at a held drive of
+    // 0.568 -- the RESPONDING ramp's own value 0.3 s in -- turns at 0.006679 rad/s with them and 0.058100
+    // without, which is 8.70x too fast, and it stays wrong for as long as the orb responds. The two
+    // spellings agree ONLY where drive is 0, which is the one operating point at which this term does not
+    // exist; at full drive they are 0.096320 and -0.043110, which is not a discrepancy of degree -- the
+    // shell turns the other way.
+    let driveSqInt = 0;
+
     // *** THE GESTURE INTEGRAL, for duet -- AND THE RECORD THAT SAID IT COULD NOT EXIST WAS WRONG. ***
     // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x), where fl is
     // the species' OWN gesture envelope. v4654 called that structurally unreachable -- "its rate reads the
@@ -307,6 +324,7 @@ export function createPresenceState(initial = "idle") {
             paceInt += lv.pace * dPhase;
             voiceInt += lv.voice * dPhase;
             driveInt += stn.drive * dPhase;
+            driveSqInt += stn.drive * stn.drive * dPhase;
             thinkInt += (si === MH_THINKING_INDEX ? 1 : 0) * dPhase;
             // The two cross products, accumulated from the SAME conditioned pair at the SAME instant -- not
             // from the running integrals, which would be the product of two averages rather than the
@@ -332,7 +350,7 @@ export function createPresenceState(initial = "idle") {
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt, thinkInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
+                     paceInt, voiceInt, driveInt, thinkInt, driveSqInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
         },
         get state() { return cur; },
     };

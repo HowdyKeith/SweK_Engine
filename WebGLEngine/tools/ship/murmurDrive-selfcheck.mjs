@@ -383,33 +383,149 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
         out.push(inner.slice(last));
         return out;
     };
+    // *** AND THE TOKEN TEST WAS A SECOND PROXY, WHICH THIS ROW ASSERTED A NUMBER AGAINST WITHOUT EVER
+    // RUNNING -- v4668. *** Matching /\bDRIVE\b/ inside the argument sees drive only where it is spelled on
+    // the spot. fathom's sp and geode's are LOCAL VARIABLES -- `const spF = float(1.0).add(PACE...).add(
+    // DRIVE...)` -- so a wobble argument of `float(sh.rate).mul(spF)` carries the instantaneous drive and
+    // matches nothing. v4663 wired fathom's sp, wrote 3 into this row for it, AND BROKE THIS FILE'S SYNTAX
+    // IN THE SAME EDIT, so the number was never once evaluated: the gate has not parsed since. Repaired, the
+    // old instrument reads 2, which is what it read before v4663 -- it never saw fathom at all.
+    //
+    // So the argument is resolved one level through the builder's own consts. That is the depth the shader
+    // actually uses and the depth is STATED rather than left to be discovered: a factor assembled across two
+    // locals would still be missed, and this row would still say so.
+    // *** AND THE RESOLUTION IS SCOPED TO THE NEAREST PRECEDING DECLARATION, WHICH A NAME SET IS NOT. ***
+    // A first cut collected every `const NAME =` whose definition mentioned DRIVE into one set and matched
+    // identifiers against it. It read EIGHT amplitude sites, because seventeen builders declare a local
+    // called `rate` and one of them is limn's -- so aura's rate and arc's rate inherited limn's drive. A
+    // census keyed on a bare name across a file with seventeen scopes in it reports about the wrong scope,
+    // and it reports MORE than the truth, which is the direction that looks like diligence.
+    const buildMarks = [];
+    for (const m of src.matchAll(/const build([A-Z]\w*) = \(\) => \{/g)) buildMarks.push([m.index, m[1].toLowerCase()]);
+    const ownerOf = (i) => { let n = "(shared)"; for (const [x, nm] of buildMarks) if (x < i) n = nm; return n; };
+    const defBefore = (name, at) => {
+        const re = new RegExp("\\bconst\\s+" + name + "\\s*=", "g");
+        let found = -1, m;
+        while ((m = re.exec(src)) && m.index < at) found = m.index;
+        if (found < 0) return "";
+        let j = found, d = 0, b = 0;
+        for (; j < src.length; j++) {
+            if (src[j] === "(") d++; else if (src[j] === ")") d--;
+            else if (src[j] === "{") b++; else if (src[j] === "}") b--;
+            else if (src[j] === ";" && d <= 0 && b <= 0) break;
+        }
+        return src.slice(found, j);
+    };
+    // *** AND A PROPERTY IS NOT AN IDENTIFIER, WHICH COST THIS INSTRUMENT ITS ANSWER ON fathom. *** Tokenising
+    // `float(sh.rate).mul(spF)` naively yields `rate`, and seventeen builders declare a local by that name --
+    // so fathom's site was being credited to whichever `const rate` came last, and would have gone on being
+    // credited to it after spF was deleted. The dotted part is stripped before tokenising, so the site is
+    // counted for the local it actually reads.
+    // *** AND THE CENSUS NAMES WHICH LOCAL EACH SITE RESOLVES THROUGH, because the COUNT alone cannot catch a
+    // resolver that is right by accident. *** Dropping the property-strip above credits fathom's
+    // `float(sh.rate).mul(spF)` to whichever `const rate` came last instead of to spF; the total stays 8 and
+    // the row stays green while the instrument has stopped tracking the thing it names. A count is a scalar
+    // and a scalar cannot distinguish two populations of the same size -- this tree has shipped that shape
+    // before under the name "a row that cannot fail".
+    // *** ONE RESOLVER AND NOT TWO. *** The first cut had a boolean carriesDrive beside a naming viaOf, each
+    // with its own copy of the strip and the loop. Two walkers over the same question eventually disagree --
+    // this tree has repaired that in its own records three times -- and here it did so immediately: a
+    // sabotage that removed the strip from one of them changed nothing, because the other still had it. The
+    // boolean IS "the name is not null".
+    //
+    // It returns the DECLARING BUILDER as well as the name, and that is what grades the scoping: seventeen
+    // builders declare a local called `rate`, three of them carry drive, and a resolver that took the last
+    // one in the FILE rather than the nearest one BEFORE the call site would produce the same three names
+    // attached to the wrong three owners. A sabotage doing exactly that walked through the name-only form.
+    const viaOf = (a, at) => {
+        const txt = (a || "").replace(/\.\s*[A-Za-z_$][\w$]*/g, "");
+        if (/\bDRIVE\b/.test(txt)) return "DRIVE";
+        for (const id of new Set(txt.match(/\b[A-Za-z_$][\w$]*\b/g) || [])) {
+            const d = defBefore(id, at);
+            if (/\bDRIVE\b/.test(d)) return id + "@" + ownerOf(src.indexOf(d));
+        }
+        return null;
+    };
+    const carriesDrive = (a, at) => viaOf(a, at) !== null;
+    const resolved = [];
     let secularDrive = 0, amplitudeDrive = 0;
     for (let i = 0; (i = src.indexOf("KIT.mhDriftPhase(", i)) !== -1; i += 8) {
         const a = chainArgs(src, i);
-        if (/\bDRIVE\b/.test(a[0] || "")) secularDrive++;
+        if (carriesDrive(a[0] || "", i)) secularDrive++;
         // mh_drift's wobble term is k * rate / w2 times a sine, so BOTH the rate argument and the wobble
         // coefficient set an amplitude and neither can accumulate. helix's drive is in the rate (its whole
         // climb is scaled); limn's is in the wobble (its ease flattens as the sweep decides). Counting only
         // the rate missed limn and read 1 where the file has 2.
-        if (/\bDRIVE\b/.test(a[1] || "") || /\bDRIVE\b/.test(a[2] || "")) amplitudeDrive++;
+        else if (carriesDrive(a[1] || "", i) || carriesDrive(a[2] || "", i)) {
+            amplitudeDrive++;
+            resolved.push(ownerOf(i) + ":" + (viaOf(a[1] || "", i) || viaOf(a[2] || "", i)));
+        }
     }
-    // ...and the integral itself is only ever handed to mhRatePhase, so it cannot be spent as a plain factor.
+    // murmur's own four numbers reach each of these through a differently named local, and the pairing is
+    // what says the resolver is tracking the expression rather than the neighbourhood.
+    const EXPECT = ["limn:limnRate@limn", "comet:rate@comet", "mist:mDrFactor@mist", "fathom:spF@fathom",
+                    "geode:spG@geode", "aura:rate@aura", "duet:rate@duet", "helix:DRIVE"];
+    const pairsMatch = resolved.length === EXPECT.length && EXPECT.every((e, k) => resolved[k] === e);
+    // ...and the integral itself is only ever handed to a PHASE function, so it cannot be spent as a plain
+    // factor. *** THE TEST IS CONTAINMENT NOW AND NOT A CLOSING BRACKET -- v4668. *** It used to count
+    // `uniforms.driveInt)` -- the integral as the LAST argument -- which was true of mhRatePhase and
+    // mhCrossPhase and is false of mhSpMixPhase, where the drive integral is the sixth of ten and four more
+    // pairs follow it. Spelling is not the property; being inside a phase call is. Every read must sit within
+    // the balanced parentheses of one of the three, and there is nowhere else a secular term can be built.
+    const PHASE_FNS = ["KIT.mhRatePhase(", "KIT.mhCrossPhase(", "KIT.mhSpMixPhase("];
+    const spans = [];
+    for (const fn of PHASE_FNS)
+        for (let i = 0; (i = src.indexOf(fn, i)) !== -1; i += fn.length) {
+            let j = src.indexOf("(", i), d = 0;
+            for (; j < src.length; j++) { if (src[j] === "(") d++; else if (src[j] === ")") { d--; if (!d) break; } }
+            spans.push([i, j]);
+        }
     const driveIntReads = (src.match(/uniforms\.driveInt/g) || []).length;
-    const driveIntInRate = (src.match(/uniforms\.driveInt\)/g) || []).length;
+    let driveIntInRate = 0;
+    const spentDirect = [];
+    for (let i = 0; (i = src.indexOf("uniforms.driveInt", i)) !== -1; i += 17)
+        if (spans.some(([a, b]) => i > a && i < b)) driveIntInRate++;
+        else spentDirect.push(src.slice(Math.max(0, i - 160), i + 24).replace(/\s+/g, " "));
+    // *** AND ONE READ IS SPENT DIRECTLY, WHICH IS CORRECT AND IS NAMED RATHER THAN COUNTED. *** nebula's and
+    // tempest's advection is a DISPLACEMENT and not a phase: murmur spells V * (st.drive * k * t) and this
+    // port spends V * k * driveInt, which is that integral exactly, with no phase function in sight. The old
+    // spelling test passed it BY ACCIDENT -- it matched `uniforms.driveInt)` and `.mul(uniforms.driveInt)`
+    // ends in a bracket -- so the one site in the file that genuinely spends the integral as a factor was
+    // blessed for the same reason a misplaced one would have been. It is asserted by its own shape now.
+    const advSpend = spentDirect.length === 1 &&
+        /ADV\.k \* MH_ADVECT_SIGN\)\.mul\(uniforms\.driveInt\)/.test(spentDirect[0]);
     ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
-        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 3 && driveIntReads === driveIntInRate,
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 8 && pairsMatch && driveIntInRate > 0 &&
+        advSpend && driveIntReads === driveIntInRate + 1,
         `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
-        `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
-        `helix's climb, whose whole rate murmur scales by st.drive, limn's flattening ease, ` +
-        `mix(0.62, 0.14, st.drive), which arrived at v4657, and fathom's speed factor sp at v4663, whose ` +
-        `1.10*st.drive scales the shell's rate and therefore its wobble's amplitude with it. All three are ` +
-        `amplitudes. The 
-        `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
-        `and it reads uniforms.driveInt, which appears ${driveIntReads} times and every one of them is the ` +
-        `last argument of a mhRatePhase call. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +
-        `that no line read DRIVE and uniforms.time together. v4654 and v4655 undeferred it, and the old test ` +
-        `KEPT PASSING because helix's two reads sit on two lines -- a condition outliving its own sentence, ` +
-        `which is the failure this tree finds most often and the one a green row hides best.`);
+        `${secularDrive} pass the instantaneous drive as the SECULAR phase and ${amplitudeDrive} as the ` +
+        `wobble AMPLITUDE -- limn's, comet's, mist's, aura's, duet's and helix's whole rates, and at v4668 ` +
+        `fathom's speed factor and geode's, resolved as ${resolved.join(", ")}. The amplitude is bounded ` +
+        `by k*rate/w2 whatever ` +
+        `drive does; the secular half is where the teleport lives and it reads uniforms.driveInt, which ` +
+        `appears ${driveIntReads} times: ${driveIntInRate} INSIDE a phase call -- mhRatePhase, mhCrossPhase ` +
+        `or mhSpMixPhase -- and exactly one spent as a plain factor, which is the advection, asserted by its ` +
+        `own shape because it is the one site that SHOULD spend the integral directly: a cloud's ` +
+        `displacement is not a phase.\n` +
+        `        *** THIS ROW HAS NOT BEEN EVALUATED SINCE v4663 AND THE NUMBER IN IT WAS NEVER TRUE. *** ` +
+        `That round wired fathom's sp, wrote 3 here for it, and in the same edit dropped a ' + ' between two ` +
+        `template literals, so this FILE STOPPED PARSING: v4663 and v4664 both shipped over a gate that ` +
+        `could not run. Repaired, the instrument it had was still a token match, which cannot see a drive ` +
+        `that arrives through a local -- fathom's sp is one -- so it read 2, the same 2 it read before v4663 ` +
+        `touched it. A number raised to match an intention, in a file nobody could execute, is the most ` +
+        `expensive shape a green row has: it reads as a measurement of the thing it was written for.\n` +
+        `        THE INSTRUMENT RESOLVES ONE LEVEL NOW, through the NEAREST PRECEDING declaration, and the ` +
+        `depth is stated rather than implied: a factor assembled across two locals would still be missed. ` +
+        `Scoping is not decoration here, and neither is tokenising: a file-wide name set credited aura's ` +
+        `rate to limn's, and treating \`sh.rate\` as an identifier credited FATHOM's site -- the one this ` +
+        `round is about -- to whichever \`const rate\` came last, which would have kept counting it after ` +
+        `spF was deleted. Both read 8 by luck rather than by measurement.\n` +
+        `        THE OLD SPELLING TEST WENT WITH IT: it counted \`uniforms.driveInt)\` -- the integral as the ` +
+        `LAST argument -- which is true of mhRatePhase and false of mhSpMixPhase, where four more pairs ` +
+        `follow it. Being inside a phase call is the property; a closing bracket was the proxy.\n` +
+        `        THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested that no line read DRIVE and ` +
+        `uniforms.time together. v4654 and v4655 undeferred it, and the old test KEPT PASSING because ` +
+        `helix's two reads sit on two lines -- a condition outliving its own sentence.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

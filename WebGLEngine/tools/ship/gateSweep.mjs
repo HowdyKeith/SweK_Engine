@@ -8070,6 +8070,76 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4668 -- THE 348th CLOSING: the drive-squared integral, and a gate that had not parsed for two rounds.
+    //
+    // *** THIS ROUND WAS WRITTEN AS v4665 AND RENUMBERED FORWARD AT THE FETCH, which is the rule this tree
+    // already has rather than a new one. *** main shipped v4650-v4667 from the code-review line while this
+    // branch was on v4664, and e90cd84 is already called v4665. The changelog's own note on v4333-v4335 says
+    // why reuse is not an option: two builds wearing one number with different bytes is what jams the peer
+    // auto-update fleet-wide. main's highest is v4667, so this is v4668. NOTHING ELSE ABOUT THE ROUND MOVED.
+    since347: Object.freeze({
+        at: "v4668", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["tools/ship/murmurSpMix-selfcheck.mjs", "tools/ship/gateParses-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "both green on this box -- murmurSpMix in 2,183 ms with 9 rows over seven sections and two " +
+                 "render launches, gateParses in 1,101 ms compiling 1,776 gate files and 380 helpers. " +
+                 "*** THE ROUND'S SUBJECT: *** three of murmur's clocks are a MIX of two arms that both " +
+                 "carry the species' speed factor sp = (1 + q*pace + s*drive), mixed by st.drive*0.70 -- " +
+                 "geode's spin and fathom's second and third shells. A mix of two rates is ONE rate, " +
+                 "A + B*drive, and sp makes it quadratic, so the exact phase needs the integral of drive " +
+                 "SQUARED. v4663 recorded that expansion rather than approximating it; one host accumulator " +
+                 "closed all three. MEASURED: DD is off (driveInt^2)/t by up to 44.2% across the ramp and " +
+                 "DD/driveInt varies 5.67x, so it is neither the square of an integral this host had nor a " +
+                 "multiple of one. " +
+                 "*** AND THE MISSING CROSS TERMS WERE THE SMALLER HALF. *** fathom's a1 and a2 were plain " +
+                 "mh_drift at murmur's bare rates -- no sp, no mix, no drive at all -- so the nest never " +
+                 "closed up under RESPONDING. At a held pace of 0.30 murmur runs a1 at -0.077810 rad/s at " +
+                 "rest and +0.096320 at full drive: THE SHELL REVERSES, because it is being pulled onto the " +
+                 "first shell's turn and the first shell turns the other way. This port ran it at a flat " +
+                 "-0.062 -- the wrong direction at full drive, at 64% of the right speed. geode had the mix " +
+                 "since v4662 and no sp, which left it the LAST builder in the roster with no cadence and " +
+                 "its stone spinning at 44.6% of murmur's under drive (0.2364 against 0.529536 rad/s). " +
+                 "*** AND A SECOND geode SITE NOBODY HAD LOOKED FOR: *** ax = mix(0.34 + 0.22*sin(t*0.041), " +
+                 "0.30, st.drive*0.7) -- the stone stops NODDING as well as wobbling, its swing falling " +
+                 "0.220 -> 0.066 rad. v4664's st.drive audit passed that site because it counts " +
+                 "COEFFICIENTS and 0.70 was already in the table for the spin, which is exactly the " +
+                 "weakness that audit states about itself. " +
+                 "*** THE ROUND'S LARGEST FINDING IS NOT ABOUT murmur AT ALL: *** " +
+                 "tools/ship/murmurDrive-selfcheck.mjs HAS NOT PARSED SINCE v4663. That round dropped a " +
+                 "' + ' between two template literals inside a 900-character prose string and raised a " +
+                 "count in the same row from 2 to 3 for the site it had just wired. Neither change was ever " +
+                 "evaluated. v4663 and v4664 both shipped over it. Repaired and re-run, the instrument it " +
+                 "had read 2 -- the same 2 it read before v4663 touched it -- because a token match cannot " +
+                 "see a drive that arrives through a local, and fathom's sp is one. It resolves one level " +
+                 "through the nearest preceding declaration now, names the local and the builder each of " +
+                 "its EIGHT sites resolves through, and its containment test for the drive integral is a " +
+                 "balanced-paren walk rather than a closing bracket. tools/ship/gateParses-selfcheck.mjs " +
+                 "exists so the class cannot repeat: a parse is the cheapest possible proof that a check is " +
+                 "still a check, and 1,776 files cost 792 ms. " +
+                 "TWENTY-SEVEN SABOTAGES, TWENTY-ONE CAUGHT ON THE FIRST PASS. The six that walked: " +
+                 "deleting the mix of the two WOBBLE halves (every pixel row holds drive fixed or holds the " +
+                 "integrals fixed, and the wobble moves with neither); deleting driveSqInt from the host's " +
+                 "returned params (caught, but as a CRASH on .toFixed rather than a red row -- a worse " +
+                 "diagnosis, and the row reads the field defensively now); making the shared frame helper " +
+                 "send drive*time for the square (no row pinned the helper's own value, which is v4654's " +
+                 "impossible-history trap one signal further on); removing the property-strip from " +
+                 "murmurDrive's resolver AND making it resolve file-wide instead of nearest-preceding (the " +
+                 "COUNT stayed 8 under both, so only naming the local and the BUILDER each site resolves " +
+                 "through catches them); and deleting driveSqInt from murmurClock3's integral pattern, which " +
+                 "is the sharpest of the six -- a census that narrows its own pattern narrows BOTH sides of " +
+                 "its equality and stays green, 54 of 55 becoming 52 of 53. That list is read from " +
+                 "render/aiPresenceOrbState.mjs's own getParams() return now, so the HOST decides which " +
+                 "integrals exist and an eighth accumulator reddens the row on the day it is added. " +
+                 "*** AND ONE CORRECT CHANGE EXPOSED A CONFOUNDED INSTRUMENT. *** murmurSpecies6's layers " +
+                 "row predicts the ridge ratio as (base+rk)/base and read it 1.0% off at v4664 and 3.8% off " +
+                 "at v4668 -- because the ridge sits at R*(1 + (foldAmp/R0)*foldOf(dir)) and R0 is shell " +
+                 "0's radius, which layers moves the OTHER way, so the fold does not cancel between the " +
+                 "pair. Its 2% tolerance was a property of where the fold phase happened to be at t = 11 s " +
+                 "with the wrong shell rates. It reads the mean of three times spread across the fold's own " +
+                 "period now, and asserts the spread (0.0475) under the 0.10 margin it identifies the " +
+                 "shells by. The bound was NOT widened.",
+    }),
     // v4664 -- THE 347th CLOSING: RESPONDING's THIRD thing. v4653 ported the heading and the narrowing;
     // read against murmur's own sources, st.drive does one more thing at eight sites and it is FORMATION.
     since346: Object.freeze({

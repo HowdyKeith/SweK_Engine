@@ -707,8 +707,16 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // four flashes, and arc's shimmer is a texture under a geometry that moves at the same instant. None of
     // the three is a thing 48 px can answer, and the gate says so per section rather than rendering them
     // and reporting whatever came back.
-    gates: 1774, usesOk: 1753, definesOk: 1745, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1646, condFirst: 96, unknownSignature: 11,
+    // v4668 -- RE-TAKEN 1774 -> 1776 for TWO gates. tools/ship/murmurSpMix-selfcheck.mjs is the round's own,
+    // at 2,184 ms across two launches -- one per species, because a launch is nearly the whole cost of a
+    // frame and three of them measured 2,711 ms against the 3,000 ms ceiling. The second is
+    // tools/ship/gateParses-selfcheck.mjs, which is not about murmur at all: v4663 broke
+    // tools/ship/murmurDrive-selfcheck.mjs with a dropped ` + ` inside a prose string and TWO ROUNDS SHIPPED
+    // OVER A GATE THAT COULD NOT PARSE, with a count in it that had been raised for a site nobody had
+    // measured. Compiling every *selfcheck*.mjs in the tree without evaluating it answers that in 792 ms for
+    // 1,776 files, which is cheap enough to run in the round that edits a gate rather than at the end of it.
+    gates: 1776, usesOk: 1755, definesOk: 1747, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1648, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

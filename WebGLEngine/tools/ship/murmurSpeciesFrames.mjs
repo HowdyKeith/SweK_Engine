@@ -139,6 +139,11 @@ export const sp = (species, time, voice = VOICE, extra = {}) => {
                 // envelope's integral from 0 to t, which is what this quadrature computes.
                 paceDriveInt: lv.pace * st.drive * time,
                 voiceDriveInt: lv.voice * st.drive * time,
+                // ...and the SQUARE, at v4668, on the same principle and for the same reason: at a steady
+                // state the integral of drive*drive is (drive*drive)*t. driveInt*driveInt would be
+                // drive*drive*t*t, which is a different number that grows with the square of the frame's own
+                // timestamp -- the same trap the cross terms above name, one signal further along.
+                driveSqInt: st.drive * st.drive * time,
                 duetFlourishInt: flourishQuadrature(time),
                 colors: { ink: INK }, ...extra } };
 };

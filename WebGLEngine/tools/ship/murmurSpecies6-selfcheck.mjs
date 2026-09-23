@@ -48,7 +48,7 @@
 // the claim that it is doing visible work is retracted here rather than graded.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
-import { N3, VOICE, sp, renderSpecies, light, bil, ringProfile, interiorPeak } from "./murmurSpeciesFrames.mjs";
+import { N3, VOICE, sp, renderSpecies, light, bil, ringProfile, interiorPeak, PACE_LIVE } from "./murmurSpeciesFrames.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -94,16 +94,42 @@ const FA = (t, voice, extra = {}) => sp("fathom", t, voice, { ...BASE, ...extra 
 // all six at or under 46% -- plus one development-time measurement, LABELLED AS ONE because it is not what
 // runs below: when this gate rendered all ten ported species, every one of the nine returned no outer ridge
 // at all. It is reproducible by rendering the ten and running outerRidge over them.
+// *** THE THREE TIMES ARE A THIRD OF fathom's SLOWEST SHELL APART, and they are derived rather than
+// picked. *** The shell whose limb the outer ridge is -- shell 1 -- turns at rate * sp, and the fold it
+// carries repeats once per turn of that axis. Sampling at t, t + P/3 and t + 2P/3 of THAT period puts
+// the three readings at 120 degrees of the fold's own cycle, which is the smallest set whose mean does
+// not depend on where the first one landed. P is computed from murmur's own constants below.
 const SPECIES = ["limn", "droplet", "abyss", "fathom"];
 const FATHOM = 3;
+
+// *** THE FOLD'S PERIOD IS NOT THE SHELL'S. *** fathom.ts builds each shell's fold from
+// sin(2.30 * dot(dir, ax) + a * 1.7) and sin(3.70 * dot(dir, ax.zxy) - a * 1.1 + 2.1), so as the shell's
+// angle `a` advances the two halves turn at 1.7 and 1.1 times it. The faster half is the one that decides
+// where the ridge lands, so the period sampled is a's own period divided by 1.7, and five readings spread
+// evenly across it put the slower half at 1.1/1.7 of a cycle as well -- not commensurate, which is the
+// point: five samples of two incommensurate phases is a mean, and one sample of them is a coincidence.
+const FOLD_A = 2 * Math.PI / 1.7;
+const SHELL_RATE = Math.abs(K.MH_FATHOM.shells[1].rate * (1 + K.MH_FATHOM_SP.pace * PACE_LIVE));
+const FOLD_P = FOLD_A / SHELL_RATE;
+const T2 = T + FOLD_P / 3, T3 = T + 2 * FOLD_P / 3;
 
 const FRAMES = [
     ...SPECIES.map((s) => sp(s, T, VOICE, BASE)),                     // 0..3  the ridge control
     FA(T, 0.0), FA(T, 1.0),                                           // 4,5   voice moves the radii
     FA(T, 0.0, { layers: 0.0 }), FA(T, 0.0, { layers: 1.0 }),         // 6,7   layers moves the skin
     FA(T, VOICE, { parallax: 0.0 }), FA(T, VOICE, { parallax: 1.0 }), // 8,9   the fold
+    // *** AND THE LAYERS PAIR AGAIN AT FOUR MORE TIMES, BECAUSE ONE TIME MEASURES THE FOLD AS WELL AS THE
+    // SHELL. *** See section 2's layers row for the arithmetic. THE NEW FRAMES GO AT THE END AND NOT BESIDE
+    // THE PAIR THEY BELONG TO: F's indices are positional, and the first cut of this edit inserted them in
+    // the middle, which silently repointed pLo and pHi at two layers frames. Section 3 went red measuring
+    // the fold's effect on the outline between two frames that differ in LAYERS -- a correct instrument
+    // reporting about the wrong two pictures, which is the failure this file's own section 2 note describes.
+    FA(T2, 0.0, { layers: 0.0 }), FA(T2, 0.0, { layers: 1.0 }),       // 10,11
+    FA(T3, 0.0, { layers: 0.0 }), FA(T3, 0.0, { layers: 1.0 }),       // 12,13
 ];
 const F = { all: 0, vLo: 4, vHi: 5, lLo: 6, lHi: 7, pLo: 8, pHi: 9 };
+// The three (lLo, lHi) pairs, in render order.
+const L_PAIRS = [[6, 7], [10, 11], [12, 13]];
 const run = await renderSpecies(FRAMES);
 const okRun = run.ok && run.frames && run.frames.length === FRAMES.length;
 if (!okRun) ok("!! the species render ran", false, `could not render: ${run.reason || "frames " + (run.frames ? run.frames.length : "none")}`);
@@ -190,14 +216,35 @@ sec("2. *** TWO KNOBS, TWO EFFECTS, AND THEY DO NOT OVERLAP: one moves the shell
     else {
         const vO = [outerRidge(fr(F.vLo)), outerRidge(fr(F.vHi))];
         const vI = [innerRidge(fr(F.vLo)), innerRidge(fr(F.vHi))];
+        // *** THE LAYERS PAIR IS READ AT THREE TIMES AND AVERAGED, and the reason is a defect this row had
+        // from the day it was written. *** The ridge a ray finds sits at R * (1 + (foldAmp/R0) * foldOf(dir)),
+        // and R0 is shell 0's radius, which layers ALSO moves -- by 1.0857, the other way. So the fold's
+        // contribution does not cancel between the two frames, and what is left is proportional to foldOf at
+        // the direction measured, which turns with the shell's own axis. ONE TIME MEASURES THE FOLD PHASE AS
+        // WELL AS THE rk CONSTANTS, and the 2% tolerance was a property of where that phase happened to be.
+        //
+        // IT WAS EXPOSED BY A CORRECT CHANGE, WHICH IS THE ONLY REASON IT WAS FOUND: v4668 gave fathom's
+        // second and third shells murmur's speed factor, so at the same t = 11 s their axes sit where murmur
+        // puts them rather than where a bare rate did. The outer reading moved from x0.9500 to x0.9231 -- 1.0%
+        // off the prediction to 3.8% off -- and the row went red for a repair. Widening the bound to 4% would
+        // have been budgeting a red down to green and would have left the next round's shells free to move it
+        // back out. Averaging over a third of the shell's own turn removes the term instead.
+        const ridgeMean = (pairs, f) => {
+            const outs = pairs.map(([lo, hi]) => [f(fr(lo)), f(fr(hi))]);
+            if (outs.some(([a, b]) => !a || !b)) return null;
+            const r = outs.map(([a, b]) => b.r / a.r), v = outs.map(([a, b]) => b.v / a.v);
+            const mean = (x) => x.reduce((p, q) => p + q, 0) / x.length;
+            return { r: mean(r), v: mean(v), spread: Math.max(...r) - Math.min(...r), each: r };
+        };
+        const lOm = ridgeMean(L_PAIRS, outerRidge), lIm = ridgeMean(L_PAIRS, innerRidge);
         const lO = [outerRidge(fr(F.lLo)), outerRidge(fr(F.lHi))];
         const lI = [innerRidge(fr(F.lLo)), innerRidge(fr(F.lHi))];
         const have = vO[0] && vO[1] && vI[0] && vI[1] && lO[0] && lO[1] && lI[0] && lI[1];
         if (!have) { ok("!! both ridges were found in all four frames", false, "a ridge went missing"); }
         else {
             const vRo = vO[1].r / vO[0].r, vRi = vI[1].r / vI[0].r;
-            const lRo = lO[1].r / lO[0].r, lRi = lI[1].r / lI[0].r;
-            const lVo = lO[1].v / lO[0].v, lVi = lI[1].v / lI[0].v;
+            const lRo = lOm ? lOm.r : lO[1].r / lO[0].r, lRi = lIm ? lIm.r : lI[1].r / lI[0].r;
+            const lVo = lOm ? lOm.v : lO[1].v / lO[0].v, lVi = lIm ? lIm.v : lI[1].v / lI[0].v;
             say(`voice 0->1: outer ridge x${vRo.toFixed(4)} inner x${vRi.toFixed(4)}   ` +
                 `layers 0->1: outer x${lRo.toFixed(4)} inner x${lRi.toFixed(4)}, heights x${lVo.toFixed(3)} / x${lVi.toFixed(3)}`);
             say(`peaks: voice ${interiorPeak(fr(F.vLo))} -> ${interiorPeak(fr(F.vHi))}, ` +
@@ -250,8 +297,11 @@ sec("2. *** TWO KNOBS, TWO EFFECTS, AND THEY DO NOT OVERLAP: one moves the shell
                 Math.abs((sh[1].base + sh[1].rk) / sh[1].base - P1) < 1e-4 &&
                 Math.abs((sh[2].base + sh[2].rk) / sh[2].base - P2) < 1e-4 &&
                 Math.abs((sh[0].base + sh[0].rk) / sh[0].base - P0) < 1e-4;
+            say(`the three layers readings, evenly across the fold's own period: outer ` +
+                `${lOm ? lOm.each.map((x) => x.toFixed(4)).join(", ") : "(one time only)"}` +
+                `${lOm ? ` -- spread ${lOm.spread.toFixed(4)}` : ""}`);
             ok("!! ...and LAYERS moves them INWARD by the amounts its rk constants predict, to 2%",
-                lVo > 1.15 && lVi > 1.15 && tableMatches &&
+                lOm && lIm && lOm.spread < 0.10 && lIm.spread < 0.10 && lVo > 1.15 && lVi > 1.15 && tableMatches &&
                 Math.abs(lRo / P1 - 1) < 0.03 && Math.abs(lRi / P2 - 1) < 0.04 &&
                 Math.abs(lRo / P0 - 1) > 0.10,
                 `layers 0->1 multiplies the ridge HEIGHTS by ${lVo.toFixed(3)} and ${lVi.toFixed(3)} -- the ` +
@@ -265,7 +315,16 @@ sec("2. *** TWO KNOBS, TWO EFFECTS, AND THEY DO NOT OVERLAP: one moves the shell
                 `two ridges are the MIDDLE and the SMALLEST shells. *** Shell 0 predicts x${P0.toFixed(4)} ` +
                 `and is ${(Math.abs(lRo / P0 - 1) * 100).toFixed(0)}% away from the outer measurement -- ` +
                 `its limb falls outside the band, which is why the profile shows two ridges and not three. ` +
-                `That negative is carried IN THE CONDITION, so the row cannot pass by matching everything.`);
+                `That negative is carried IN THE CONDITION, so the row cannot pass by matching everything. ` +
+                `*** AND THE RATIOS ARE MEANS OVER THREE TIMES SPREAD ACROSS THE FOLD'S OWN PERIOD, *** because ` +
+                `the fold displaces the ridge by (foldAmp/R0) * foldOf(dir) and R0 -- shell 0's radius -- is ` +
+                `moved by layers too, so the displacement does not cancel between the pair. The spread across ` +
+                `the three is ${lOm ? lOm.spread.toFixed(4) : "n/a"} on the outer ridge, which is the size of ` +
+                `the term that was being read as part of the answer at one time. *** AND THE SPREAD IS ` +
+                `ASSERTED UNDER 0.10 RATHER THAN MERELY PRINTED: *** 0.10 is the margin this row identifies ` +
+                `the shells by -- shell 0 is 15% away -- so a fold swing larger than that would make the ` +
+                `mean of three phases an average of readings that no longer agree about which shell they ` +
+                `are looking at, and the row would be reporting a number it could not stand behind.`);
         }
     }
 }

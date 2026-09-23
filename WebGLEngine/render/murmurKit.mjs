@@ -311,6 +311,59 @@ export function mhCrossPhase(base, kPaceDrive, paceDriveInt, kVoiceDrive, voiceD
 }
 
 /**
+ * *** THE THIRD RATE SHAPE IN murmur's ROSTER: A MIX OF TWO ARMS THAT BOTH CARRY THE SPEED FACTOR -- v4668. ***
+ *
+ * mhRatePhase covers a rate that is a SUM of conditioned signals; mhCrossPhase adds the terms a PRODUCT of
+ * two modulated factors needs. Two species spell a clock a third way, as a MIX whose weight is itself a
+ * signal and whose two arms are both scaled by murmur's own speed factor:
+ *
+ *   geode.ts   ay = mix(mh_drift(t, 0.088 * sp, 0.48, 2.0), t * 0.30 * sp, st.drive * 0.70)
+ *   fathom.ts  a1 = mix(mh_drift(t, -0.062 * sp, 0.50, 2.0), a0, st.drive * 0.70)
+ *              a2 = mix(mh_drift(t,  0.108 * sp, 0.40, 3.0), a0, st.drive * 0.70)
+ *
+ * with sp = (1 + q * live.pace + s * st.drive) -- q,s = 0.80,1.00 for geode and 0.85,1.10 for fathom.
+ *
+ * *** THE MIX OF TWO RATES IS ONE RATE, AND THAT IS THE WHOLE STEP. *** Writing w = m * drive and reading
+ * `base` for the drifting arm's rate and `toward` for the arm it is pulled onto,
+ *
+ *     mixed = sp * (base * (1 - w) + toward * w)
+ *           = sp * (base + m * (toward - base) * drive)
+ *           = (1 + q*pace + s*drive) * (A + B*drive),    A = base,  B = m * (toward - base)
+ *           = A + A*q*pace + (A*s + B)*drive + B*q*pace*drive + B*s*drive*drive
+ *
+ * so the exact integral is A*t + A*q*P + (A*s + B)*D + B*q*PD + B*s*DD, and the only integral in it this
+ * host was not already sending is DD -- the integral of drive SQUARED. ONE accumulator closes all three
+ * sites, which is why they were held together for one round rather than wired one at a time.
+ *
+ * *** IT IS A FUNCTION OF murmur's FOUR NUMBERS AND NOT A TABLE OF FIVE DERIVED ONES. *** `base`, `toward`,
+ * `mixW`, `kPace` and `kDrive` are what geode.ts and fathom.ts literally contain; every coefficient above is
+ * computed from them here, so an edit to either source moves all five together. Writing 0.113190 down would
+ * present a derived quantity as a transcription and leave it free to go stale -- the defect this tree has
+ * repaired in its own records more often than in its code.
+ *
+ * *** AND B IS SIGNED, WHICH IS NOT A DETAIL. *** fathom's second shell has base -0.062 and toward +0.085,
+ * so B is positive and large enough to carry the shell THROUGH zero: at a held pace of 0.30 its rate runs
+ * -0.077810 rad/s at rest and +0.096320 at full drive. The shell REVERSES under RESPONDING, because it is
+ * being pulled onto the first shell's turn and the first shell turns the other way. A port that dropped the
+ * mix ran it at a flat -0.062 -- the wrong direction at full drive, at 64% of the right speed.
+ */
+export function mhSpMixCoef(base, toward, mixW, kPace, kDrive) {
+    const A = base, B = mixW * (toward - base);
+    return { t: A, pace: A * kPace, drive: A * kDrive + B, paceDrive: B * kPace, driveSq: B * kDrive };
+}
+
+/** The secular phase mhSpMixCoef's coefficients describe. Its shader twin is murmurKitTsl's mhSpMixPhase. */
+export function mhSpMixPhase(c, t, paceInt, driveInt, paceDriveInt, driveSqInt) {
+    return c.t * t + c.pace * paceInt + c.drive * driveInt + c.paceDrive * paceDriveInt + c.driveSq * driveSqInt;
+}
+
+/**
+ * The INSTANTANEOUS mix weight and speed factor the wobble halves keep -- see mhDriftPhase for why the
+ * bounded term is transcribed rather than integrated. Both are plain reads of the signals at this instant.
+ */
+export function mhSpFactor(kPace, kDrive, pace, drive) { return 1 + kPace * pace + kDrive * drive; }
+
+/**
  * mh_drift with the secular term supplied rather than computed, so a modulated rate cannot teleport it.
  *
  * *** THE WOBBLE TERM KEEPS murmur's INSTANTANEOUS RATE AS ITS AMPLITUDE, AND THAT IS A DELIBERATE LIMIT ON
@@ -1297,11 +1350,27 @@ export const MH_OPAL_DRIFT = Object.freeze({ base: 0.055, knob: 0.075, pace: 0.7
  * by construction, it cannot accumulate, and only the secular half needed the integral.
  */
 export const MH_GEODE_SPIN = Object.freeze({ to: 0.30, w: 0.70 });
+//
+// *** THE FUNCTION THAT USED TO LIVE HERE IS GONE, AND ITS REMOVAL IS THE POINT -- v4668. *** v4662 shipped
+// mhGeodeSpinDrive(rate, to, w) = (to*w)/rate - w, which is the drive coefficient of this same mix WHEN THE
+// SPEED FACTOR IS 1. That was true of this port because the port had no speed factor; it was never true of
+// geode.ts, which multiplies both arms by sp. Leaving it exported once the shader stopped calling it would
+// have left a gate grading a helper no picture depends on -- a reference is only evidence about the thing it
+// is actually applied to, and this tree has repaired that exact shape four times. mhSpMixCoef is the general
+// form and the sp = 1 case falls out of it: B / base is (to - base) * w / base = (to*w)/base - w.
 
-/** geode's drive coefficient as a multiple of its own base rate -- see MH_GEODE_SPIN. */
-export function mhGeodeSpinDrive(spinRate, to, w) {
-    return (to * w) / spinRate - w;
-}
+/**
+ * *** geode's SECOND DRIVE SITE, WHICH NO ROUND HAD LOOKED FOR -- v4668. *** geode.ts line 64:
+ * `ax = mix(0.34 + 0.22 * sin(t * 0.041), 0.30, st.drive * 0.7)` -- the stone stops NODDING under drive at
+ * the same moment it stops wobbling. v4664's st.drive audit passed this site because it counts COEFFICIENTS
+ * and 0.70 was already present in MH_GEODE_SPIN, which is exactly the weakness that audit states about
+ * itself: a number being present does not prove it is on the right expression. Measured at full drive the
+ * tilt's swing falls from +/-0.22 rad to +/-0.066 and its centre rises from 0.34 to 0.312.
+ *
+ * NO CLOCK AND NO INTEGRAL: the rate 0.041 is a style constant, nothing conditioned multiplies t, and the
+ * mix moves an ANGLE rather than a phase. It is in this round because it is geode's, not because it shares
+ * the arithmetic.
+ */
 
 /**
  * *** AND THE ADVECTION: THE LAST TWO `wired: false` ENTRIES IN MH_DRIVE_HEADING -- v4662. ***
@@ -1362,21 +1431,23 @@ export const MH_DROPLET_TREM = 0.012;
  * geode.ts:  `sp = (1.0 + 0.80 * live.pace + 1.00 * st.drive)`, then the spin mix MH_GEODE_SPIN describes.
  * Neither signal was in this port at all: both species turned at one fixed speed whatever the orb did.
  *
- * *** ONLY fathom's FIRST SHELL IS WIRED AT v4663 AND THE REASON IS ARITHMETIC, NOT SCHEDULING. *** a0's
- * rate is `0.085 * sp` -- a clean SUM of the conditioned signals, which mhRatePhase integrates exactly.
- * fathom's a1 and a2, and geode's spin, are MIXES of two drifts by `st.drive * 0.7`, and with `sp` moving
- * the secular term expands to
+ * *** v4663 WIRED ONLY fathom's FIRST SHELL, AND v4668 WIRED THE REST. *** a0's rate is `0.085 * sp` -- a
+ * clean SUM of the conditioned signals, which mhRatePhase integrates exactly. fathom's a1 and a2, and
+ * geode's spin, are MIXES of two speed-factored arms by `st.drive * 0.7`, whose rate carries a term in drive
+ * SQUARED; that integral is not driveInt squared and was not among the six the host sent. The expansion is
+ * mhSpMixCoef's and the accumulator is driveSqInt. It was held for a round rather than approximated because
+ * an `sp` folded into the mix without its cross terms is not murmur's number at any partial drive, and
+ * partial drive is every frame of the ramp that RESPONDING is made of -- measured, fathom's second shell at
+ * the ramp's own 0.568 turns at 0.006679 rad/s with the cross terms and 0.058100 without.
  *
- *     0.085 * sp * (1 + k*d)  =  0.085 * (1 + 0.85p + 1.10d) * (1 + k*d)
- *
- * whose last terms are integrals of p*d -- which the host already sends -- and of d SQUARED, which it does
- * not. That is limn's situation at v4657 exactly, and it costs one more accumulator. It is recorded in
- * tools/ship/nextRounds.mjs with this expansion rather than approximated here, because an `sp` folded into
- * the mix without its cross terms is not murmur's number at any partial drive, and partial drive is every
- * frame of the ramp that RESPONDING is made of.
+ * *** AND THE MIX ITSELF WAS ABSENT, WHICH IS THE LARGER HALF OF THE MISS. *** Before v4668 this port's a1
+ * and a2 were plain `mh_drift(t, rate, wob, lane)` at murmur's rates -- no sp, no mix, no drive. So the
+ * second and third shells turned at one fixed speed in one fixed direction whatever the orb did, while
+ * murmur pulls them onto the FIRST shell's turn as the orb responds. At full drive a1's rate is +0.096320
+ * against this port's -0.062: the shell reverses, and the nest closes up into one turning thing.
  */
-export const MH_FATHOM_SP = Object.freeze({ pace: 0.85, drive: 1.10 });
-export const MH_GEODE_SP = Object.freeze({ pace: 0.80, drive: 1.00 });
+export const MH_FATHOM_SP = Object.freeze({ pace: 0.85, drive: 1.10, mixW: 0.70 });
+export const MH_GEODE_SP = Object.freeze({ pace: 0.80, drive: 1.00, mixW: 0.70 });
 
 /**
  * *** THE WARP LOOKUP TAKES HALF THE ADVECTION, AND v4662 GAVE IT ALL OF IT. *** nebula.ts and tempest.ts
@@ -1627,6 +1698,7 @@ export const MH_GEODE = Object.freeze({
     sharpB: 1.4, sharpK: 2.6, sharpV: 1.0, litB: 0.10, litK: 1.25,
     bodyEdge: 0.34, crystalGain: 0.92, medB: 0.048, medS: 0.028, medAbsorb: 2.00, murkGain: 3.20,
     spinRate: 0.088, spinWob: 0.48, spinLane: 2.0,
+    tiltB: 0.34, tiltAmp: 0.22, tiltRate: 0.041, tiltTo: 0.30,
 });
 
 /**

@@ -45,52 +45,66 @@ const sec = (t) => console.log("\n" + t);
 console.log("murmurClock3-selfcheck -- the last three bare rate*t sites, and all three were absences\n");
 
 const RESPONDING = 3, DT = 1 / 60;
-const OD = K.MH_OPAL_DRIFT, GS = K.MH_GEODE_SPIN, GE = K.MH_GEODE;
-const gK = K.mhGeodeSpinDrive(GE.spinRate, GS.to, GS.w);
+const OD = K.MH_OPAL_DRIFT, GS = K.MH_GEODE_SPIN, GE = K.MH_GEODE, GP = K.MH_GEODE_SP;
+const gC = K.mhSpMixCoef(GE.spinRate, GS.to, GS.w, GP.pace, GP.drive);
+const PACE_C = K.mhLive(VOICE_LIVE, Math.pow(PACE_LIVE / 0.60, 1 / 0.85), 0).pace;
 
 // =============================================================================================================
-sec("1. *** geode's COEFFICIENT IS DERIVED FROM murmur's MIX AND GRADED AGAINST THE MIX ITSELF ***");
+sec("1. *** geode's SPIN IS A MIX OF TWO SPEED-FACTORED ARMS, GRADED AGAINST THAT MIX AND NOT AGAINST ITSELF ***");
 {
-    // *** THE NUMBER 1.686364 IS NOT ONE murmur WROTE, so it is not written down. *** geode.ts spells a MIX,
-    // and the drive coefficient is what that mix expands to. Grading the expansion against a restatement of
-    // the expansion would be grading a copy of itself; this evaluates murmur's mix DIRECTLY -- the drift arm
-    // and the t*0.30*sp arm, mixed by 0.70*drive -- and compares it with what the shader computes.
-    const murmurMix = (t, d, sp2 = 1) => (GE.spinRate * sp2 * t) * (1 - GS.w * d) + (t * GS.to * sp2) * (GS.w * d);
-    const ours = (t, d) => K.mhRatePhase(GE.spinRate, t, 0, 0, 0, 0, gK, d * t);   // held drive: D = d*t
-    let worst = 0, at = "";
+    // *** THE FIVE COEFFICIENTS ARE NOT NUMBERS murmur WROTE, so they are not written down and not restated
+    // here. *** geode.ts spells mix(mh_drift(t, 0.088*sp, ...), t*0.30*sp, 0.70*st.drive) with
+    // sp = (1 + 0.80*live.pace + 1.00*st.drive). This evaluates THAT, arm by arm, at a held signal -- where
+    // murmur's own rate*t is the correct integral -- and compares it with what mhSpMixCoef's expansion and
+    // the host's five integrals produce.
+    //
+    // *** AND THE PACE ARM IS SWEPT, WHICH IS THE WHOLE REASON THIS ROW WAS REWRITTEN AT v4668. *** Its
+    // first form carried `sp2 = 1` as a default parameter and never passed anything else, so it graded the
+    // sp = 1 special case -- true of the port until v4668 and never true of geode.ts. A parameter that only
+    // ever takes its default is a row that cannot fail in the dimension it appears to cover.
+    const murmurMix = (t, p, d) => {
+        const sp2 = 1 + GP.pace * p + GP.drive * d;
+        return (GE.spinRate * sp2 * t) * (1 - GS.w * d) + (t * GS.to * sp2) * (GS.w * d);
+    };
+    // The host's integrals at a signal held since zero: P = p*t, D = d*t, PD = p*d*t, DD = d*d*t.
+    const ours = (t, p, d) => K.mhSpMixPhase(gC, t, p * t, d * t, p * d * t, d * d * t);
+    let worst = 0, at = "", worstRel = 0;
     for (const t of [0.5, 7, 60, 600, 1800, 3600])
-        for (let d = 0; d <= 1.0001; d += 0.05) {
-            const e = Math.abs(murmurMix(t, d) - ours(t, d));
-            if (e > worst) { worst = e; at = `t=${t}s d=${d.toFixed(2)}`; }
-        }
+        for (let p = 0; p <= 1.0001; p += 0.1)
+            for (let d = 0; d <= 1.0001; d += 0.05) {
+                const e = Math.abs(murmurMix(t, p, d) - ours(t, p, d));
+                const rel = e / Math.max(1e-9, Math.abs(murmurMix(t, p, d)));
+                if (rel > worstRel) worstRel = rel;
+                if (e > worst) { worst = e; at = `t=${t}s p=${p.toFixed(1)} d=${d.toFixed(2)}`; }
+            }
     // *** THE BOUND IS RELATIVE AND ulp-SCALE, AND THE ROW MUST NOT SAY "ZERO". *** The two sides group the
-    // same three numbers differently -- base*(t + k*d*t) against base*t*(1 + k*d) -- so they agree to the
-    // rounding of that regrouping and not to the bit. At t = 3600 s the phase is about 852 rad and the worst
-    // gap is 1.1e-13, which is one ulp of it. A first cut asserted `worst === 0`, passed at t = 17 s where
-    // the phase is small, and went red the moment the sweep reached an hour: an exactness claim that is
-    // really a magnitude claim about whichever operating points happened to be in the loop.
-    const phaseAt = GE.spinRate * 3600 * (1 + gK);
-    say(`geode's drive coefficient derives to ${gK.toFixed(6)} of its base rate, which is ${(gK * GE.spinRate).toFixed(6)} absolute`);
-    ok("!! *** THE INTEGRATED SPIN IS murmur's MIX TO ONE ULP AT EVERY HELD DRIVE, OVER 126 OPERATING POINTS ***",
-        worst / phaseAt < 1e-15 && gK > 0 && Math.abs(gK * GE.spinRate - 0.1484) < 1e-12,
+    // same numbers differently -- a sum of five products against a product of two sums -- so they agree to
+    // the rounding of that regrouping and not to the bit. A first cut of this row's ancestor asserted
+    // `worst === 0`, passed at t = 17 s where the phase is small, and went red the moment the sweep reached
+    // an hour: an exactness claim that is really a magnitude claim about whichever points were in the loop.
+    say(`geode's spin expands to ${gC.t.toFixed(6)}*t + ${gC.pace.toFixed(6)}*P + ${gC.drive.toFixed(6)}*D ` +
+        `+ ${gC.paceDrive.toFixed(6)}*PD + ${gC.driveSq.toFixed(6)}*DD`);
+    say(`at the ramp's own drive 0.568 and this tree's pace ${PACE_C.toFixed(4)}, that is ` +
+        `${(gC.t + gC.pace * PACE_C + gC.drive * 0.568 + gC.paceDrive * PACE_C * 0.568 + gC.driveSq * 0.568 * 0.568).toFixed(6)} rad/s ` +
+        `against ${(GE.spinRate * (1 + (GS.to * GS.w / GE.spinRate - GS.w) * 0.568)).toFixed(6)} for the sp = 1 spelling v4662 shipped`);
+    ok("!! *** THE INTEGRATED SPIN IS murmur's MIX TO ONE ULP OVER 1,386 HELD OPERATING POINTS ***",
+        worstRel < 1e-13 && gC.driveSq > 0 && Math.abs(gC.driveSq - GS.w * (GS.to - GE.spinRate) * GP.drive) < 1e-15,
         `worst |murmur's mix - integrated| = ${worst.toExponential(2)} across six session lengths out to an ` +
-        `hour and 21 drive levels (worst at ${at || "nowhere"}), against a phase of ${phaseAt.toFixed(1)} rad ` +
-        `at that corner -- a relative ${(worst / phaseAt).toExponential(1)}, which is the regrouping's own ` +
-        `rounding and not a modelling difference -- at a held signal the ` +
-        `integral D is d*t and base*(t + k*d*t) IS base*t*(1 + k*d). THE COEFFICIENT IS A FUNCTION AND NOT A ` +
-        `TABLE ENTRY: mhGeodeSpinDrive(rate, to, w) = (to*w)/rate - w, so the two numbers geode.ts actually ` +
-        `contains are what this tree stores, and an edit to either moves the coefficient with it. Writing ` +
-        `1.686364 down would have presented a derived quantity as a transcription and left it free to go ` +
-        `stale -- the defect this tree has repaired in its own records more often than in its code.`);
+        `hour, eleven pace levels and 21 drive levels (worst at ${at || "nowhere"}); worst RELATIVE gap ` +
+        `${worstRel.toExponential(1)}, which is the regrouping's own rounding and not a modelling ` +
+        `difference. THE COEFFICIENTS ARE A FUNCTION AND NOT A TABLE: mhSpMixCoef(base, toward, mixW, q, s) ` +
+        `derives all five from the four numbers geode.ts actually contains, so an edit to any of them moves ` +
+        `the expansion with it. Writing ${gC.driveSq.toFixed(6)} down would present a derived quantity as a ` +
+        `transcription and leave it free to go stale -- the defect this tree has repaired in its own records ` +
+        `more often than in its code.`);
 
-    ok("!! ...and the wobble keeps the INSTANTANEOUS mix factor, which is v4655's rule rather than a new decision",
-        /float\(GE\.spinRate\)\.mul\(spinMix\), float\(GE\.spinWob\)/.test(
+    ok("!! ...and the wobble keeps the INSTANTANEOUS sp AND mix factor, which is v4655's rule rather than a new decision",
+        /float\(GE\.spinRate\)\.mul\(spG\)\.mul\(spinMix\), float\(GE\.spinWob\)/.test(
             fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")),
         `mh_drift's wobble is (k * rate / w2) * sin(...), bounded by k*rate/w2 whatever the rate does, so it ` +
-        `cannot accumulate and never needed an integral. murmur mixes the WHOLE drift result, so the wobble's ` +
-        `amplitude carries (1 - ${GS.w}*drive) instantaneously and the secular half carries the integral. ` +
-        `That split is exactly what v4655 established for the four output-multiplied clocks and it is ` +
-        `applied here without being re-argued -- the same shape, the same reason, one more caller.`);
+        `cannot accumulate and never needed an integral. murmur mixes the WHOLE drift result, so the ` +
+        `wobble's amplitude carries sp and (1 - ${GS.w}*drive) instantaneously while the secular half ` +
+        `carries the integral. v4662 had the mix factor and NOT sp, because this port had no sp anywhere.`);
 }
 
 // =============================================================================================================
@@ -150,7 +164,7 @@ sec("3. *** THE TELEPORT NONE OF THE THREE SHIPPED: what murmur's spelling would
     const IDLE_S = 1800;
     const lv0 = K.mhLive(VOICE_LIVE, Math.pow(PACE_LIVE / 0.60, 1 / 0.85), 0);
     const lvR = K.mhLive(VOICE_LIVE, Math.pow(PACE_LIVE / 0.60, 1 / 0.85), RESPONDING);
-    let t = 0, P = 0, D = 0;
+    let t = 0, P = 0, D = 0, PD = 0, DD = 0;
     for (let i = 0; i < IDLE_S / DT; i++) { P += lv0.pace * DT; t += DT; }
     const oBase = OD.base + 0.4 * OD.knob;
     const ADV = K.MH_DRIVE_HEADING.nebula;
@@ -160,14 +174,18 @@ sec("3. *** THE TELEPORT NONE OF THE THREE SHIPPED: what murmur's spelling would
         const cur = {
             oM: oBase * (1 + OD.pace * lvR.pace + OD.drive * d) * t,
             oO: K.mhRatePhase(oBase, t, OD.pace, P, 0, 0, OD.drive, D),
-            gM: GE.spinRate * (1 + gK * d) * t,
-            gO: K.mhRatePhase(GE.spinRate, t, 0, 0, 0, 0, gK, D),
+            // geode's is murmur's WHOLE mix now, both arms carrying sp -- see section 1. The jump it would
+            // have made is correspondingly larger than v4662 measured, because the factor it was missing
+            // multiplies the very product of signal and elapsed time that jumps.
+            gM: (1 + GP.pace * lvR.pace + GP.drive * d)
+                * (GE.spinRate * (1 - GS.w * d) + GS.to * GS.w * d) * t,
+            gO: K.mhSpMixPhase(gC, t, P, D, PD, DD),
             aM: ADV.k * d * t,
             aO: ADV.k * D,
         };
         if (prev) for (const k of Object.keys(worst)) worst[k] = Math.max(worst[k], Math.abs(cur[k] - prev[k]));
         prev = cur;
-        P += lvR.pace * DT; D += d * DT; t += DT;
+        P += lvR.pace * DT; D += d * DT; PD += lvR.pace * d * DT; DD += d * d * DT; t += DT;
     }
     const TURN = 2 * Math.PI;
     say(`opal   murmur ${worst.oM.toFixed(4)} rad in one frame, integrated ${worst.oO.toFixed(6)} -- ${(worst.oM / worst.oO).toFixed(0)}x, and ${(worst.oM / TURN).toFixed(2)} of a turn`);
@@ -320,11 +338,31 @@ sec("5. *** THE CENSUS: the clock arc is closed, and the closing is checkable ra
         for (; j < txt.length; j++) { if (txt[j] === "(") d++; else if (txt[j] === ")") { d--; if (!d) break; } }
         return txt.slice(open + 1, j);
     };
+    // *** THE PATTERN NAMES THE INTEGRALS RATHER THAN DESCRIBING THEM, AND v4668 IS WHY. *** It used to
+    // match /uniforms\.(pace|voice|drive)Int/, which reads as "any of the signal integrals" and is in fact
+    // "the three whose names are a signal followed by Int". thinkInt arrived at v4663 and paceDriveInt and
+    // voiceDriveInt at v4657 and none of them matched; driveSqInt at v4668 does not either. So the census
+    // was quietly reporting about a SUBSET it never named -- this tree's own recurring finding, in the row
+    // whose whole job is to say that every integral is spent as a phase argument. The list is explicit now,
+    // and adding an eighth accumulator without adding it here leaves the total short and the row red.
+    // *** AND THE LIST IS CHECKED AGAINST THE HOST RATHER THAN MAINTAINED BY HAND, because a census that
+    // narrows its own pattern narrows BOTH sides of its equality and stays green. *** A sabotage that deleted
+    // driveSqInt from the list below walked straight through: the read vanished from `total` and from
+    // `inside` together, and 54 of 55 became 52 of 53. THE HOST IS THE SOURCE OF TRUTH FOR WHICH INTEGRALS
+    // EXIST -- render/aiPresenceOrbState.mjs accumulates them and returns them by name -- so the names are
+    // read from its getParams() return and the pattern is required to cover every one. An eighth accumulator
+    // reddens this row on the day it is added, which is the day the shader needs to be looked at.
+    const hostReturn = /paceInt, voiceInt, driveInt[^;]*duetFlourishInt \};/.exec(
+        fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8"));
+    const hostNames = hostReturn ? hostReturn[0].replace(/[};]/g, "").split(",").map((x) => x.trim()).filter(Boolean) : [];
+    const INTEGRAL_NAMES = ["paceInt", "voiceInt", "driveInt", "thinkInt", "paceDriveInt", "voiceDriveInt", "driveSqInt"];
+    const uncovered = hostNames.filter((n) => n !== "duetFlourishInt" && !INTEGRAL_NAMES.includes(n));
+    const INTEGRALS = new RegExp("uniforms\\.(" + INTEGRAL_NAMES.join("|") + ")\\b", "g");
     let inside = 0;
-    for (const fn of ["KIT.mhRatePhase(", "KIT.mhCrossPhase("])
+    for (const fn of ["KIT.mhRatePhase(", "KIT.mhCrossPhase(", "KIT.mhSpMixPhase("])
         for (let i = 0; (i = src.indexOf(fn, i)) !== -1; i += fn.length)
-            inside += (callArgs(src, i + fn.length - 1).match(/uniforms\.(pace|voice|drive)Int/g) || []).length;
-    const total = (src.match(/uniforms\.(pace|voice|drive)Int/g) || []).length;
+            inside += (callArgs(src, i + fn.length - 1).match(INTEGRALS) || []).length;
+    const total = (src.match(INTEGRALS) || []).length;
     const flourish = (src.match(/uniforms\.duetFlourishInt/g) || []).length;
     // *** AND THE ADVECTION IS A THIRD LEGITIMATE USE, WHICH THIS ROW HAD TO LEARN IN THE SAME ROUND THAT
     // CREATED IT. *** A phase is an angle and belongs inside mhRatePhase; a DISPLACEMENT is not, and
@@ -332,9 +370,12 @@ sec("5. *** THE CENSUS: the clock arc is closed, and the closing is checkable ra
     // than allowing "anything outside the phase functions", so a fourth use goes red and gets read.
     const advReads = (src.match(/MH_ADVECT_SIGN\)\.mul\(uniforms\.driveInt\)/g) || []).length;
     say(`integral reads in the shader: ${total}; inside a phase function ${inside}, in the advection ${advReads}`);
-    ok("!! *** EVERY INTEGRAL READ IS AN ARGUMENT OF THE TWO PHASE FUNCTIONS OR THE ONE ADVECTION, AND NOTHING ELSE ***",
-        inside + advReads === total && total >= 20 && advReads === 1,
-        `${inside} of ${total} inside a phase call, found by walking each call's balanced parentheses rather ` +
+    ok("!! *** EVERY INTEGRAL READ IS AN ARGUMENT OF THE THREE PHASE FUNCTIONS OR THE ONE ADVECTION, AND NOTHING ELSE ***",
+        inside + advReads === total && total >= 20 && advReads === 1 &&
+        hostNames.length >= 8 && uncovered.length === 0,
+        `${inside} of ${total} inside a phase call, over the ${INTEGRAL_NAMES.length} integrals the host ` +
+        `returns (${hostNames.length} names read from getParams(), ${uncovered.length} not covered by ` +
+        `this row's pattern), found by walking each call's balanced parentheses rather ` +
         `than by matching the character after the name -- the first cut compared "uniforms.paceInt)" against ` +
         `"uniforms.paceInt" and read 39 against 38, because that only holds when the integral is the LAST ` +
         `argument and v4662's opal site is the first to pass paceInt in the middle. The remaining ` +

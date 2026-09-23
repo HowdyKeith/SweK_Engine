@@ -1161,6 +1161,31 @@ export const NEXT_ROUNDS = [
             "small), which is a style transcription and now checkable against the source; prism's hue " +
             "question from v4661, which the upstream file can settle in one read; and mh_out's " +
             "triangular-PDF dither, the one kit function of 41 still unported.",
+        note14: "*** v4668 TOOK THE LARGEST ITEM ON note13's LIST, AND FOUND A GATE THAT HAD NOT RUN FOR TWO " +
+            "ROUNDS DOING IT. *** Item (1) is closed: geode's spin and tilt and fathom's second and third " +
+            "shells. ONE host accumulator -- driveSqInt, the integral of drive squared -- closed all three " +
+            "clocks, and the expansion note13 pointed at was correct and cost nothing to re-derive.\n\n" +
+            "*** THE CADENCE IS NOW COMPLETE: seventeen of seventeen builders, eighteen of eighteen " +
+            "species. *** geode was the last and it was last for a reason rather than by oversight.\n\n" +
+            "*** AND THE ROUND'S LARGEST FINDING WAS NOT ABOUT murmur. *** " +
+            "tools/ship/murmurDrive-selfcheck.mjs stopped parsing at v4663 -- a dropped ` + ` between two " +
+            "template literals inside a prose string -- and v4663 and v4664 BOTH SHIPPED OVER IT, with a " +
+            "count in it that had been raised in the same edit for a site nobody had measured. " +
+            "tools/ship/gateParses-selfcheck.mjs now compiles every *selfcheck*.mjs in the tree in about a " +
+            "second. *** IF A ROUND EDITS A GATE, RUN THAT GATE. *** The suite is the guarantee and it is " +
+            "26 minutes; a parse is a second and it catches the failure that makes a gate silent rather " +
+            "than red.\n\n" +
+            "*** WHAT IS LEFT, AND IT IS THREE ITEMS: *** (1) tempest's bolt slots are missing murmur's " +
+            "`small` mix, mix(2.9, 5.2, small) and mix(4.3, 7.4, small) -- a style transcription, checkable " +
+            "against the source. (2) prism's hue question from v4661, which one read of prism.ts settles. " +
+            "(3) mh_out's triangular-PDF dither, the one kit function of 41 still unported. NONE OF THE " +
+            "THREE NEEDS A NEW MECHANISM, which is the first time that has been true of this backlog.\n\n" +
+            "*** AND ONE INSTRUMENT TO WATCH RATHER THAN A PORT ITEM: *** murmurSpecies6's layers row " +
+            "predicts a ridge ratio from (base+rk)/base while measuring a LIGHT ridge that the fold " +
+            "displaces by (foldAmp/R0)*foldOf(dir), and R0 moves with layers so the term does not cancel. " +
+            "v4668 made it the mean of three fold phases; the spread across those three is 0.0475 against a " +
+            "3% tolerance, so the row is living inside its own uncertainty. If a later round moves fathom's " +
+            "shells again it will go red again, and the answer is a better estimator and not a wider bound.",
         note13: "*** THE ANSWER TO \"IS THE PORT COMPLETE\" IS NO, AND v4664 IS WHAT THE AUDIT FOUND. *** " +
             "With krispuckett/murmur-web cloned, the question is answerable by counting rather than by " +
             "reading this tree's own notes. Counted against murmur's eighteen sources, st.drive had SEVEN " +

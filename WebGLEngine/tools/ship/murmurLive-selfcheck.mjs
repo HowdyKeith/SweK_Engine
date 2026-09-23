@@ -239,11 +239,12 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 41 and 19 times, counting CODE and not comments",
-        decl === 2 && readV === 41 && readP === 19,
+    ok("!! the conditioned pair is declared once each and read 41 and 20 times, counting CODE and not comments",
+        decl === 2 && readV === 41 && readP === 20,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
-        `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
-        `-- and then DOWN by one at v4662 and UP BY FIVE at v4663, which took four of the five builders ` +
+        `strings stripped. The cadence count has moved in each of the last five rounds -- 11, then 14, then 15 ` +
+        `-- and then DOWN by one at v4662, UP BY FIVE at v4663, and by one more at v4668, which is geode's ` +
+        `speed factor: THE LAST BUILDER IN THE ROSTER WITHOUT A CADENCE. v4663 took four of the five that ` +
         `that had no cadence at all: droplet's tremor amplitude, nebula's fold and drift, tempest's energy ` +
         `and fathom's speed factor. THE VOICE COUNT FELL BY ONE IN THE SAME ROUND AND THAT IS THE ROUND'S ` +
         `HEADLINE: tempest's energy read VOICE where tempest.ts reads pace, a THINKING indicator and drive, ` +
@@ -333,15 +334,18 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // and integrals included. The two are different facts and the split is by subject, not by convenience:
     // an instantaneous reader is an AMPLITUDE site and an integral reader is a CLOCK, which is the
     // distinction the entire v4654-v4663 arc turns on.
-    const INSTANT = ["still", "limn", "comet", "abyss", "mist", "fathom", "arc", "sol",
+    const INSTANT = ["still", "limn", "comet", "abyss", "mist", "fathom", "geode", "arc", "sol",
                      "aura", "flux", "duet", "chorus", "prism", "helix"];
-    ok("!! *** FOURTEEN BUILDERS READ THE CONDITIONED CADENCE ITSELF -- the amplitude sites, named exactly ***",
+    ok("!! *** FIFTEEN BUILDERS READ THE CONDITIONED CADENCE ITSELF -- the amplitude sites, named exactly ***",
         paced.length === INSTANT.length && INSTANT.every((x) => paced.includes(x)) &&
         paced.every((x) => INSTANT.includes(x)),
         `${paced.length}: ${paced.join(", ")}. NOT IN THIS LIST AND NOT WITHOUT A CADENCE: opal, whose ` +
-        `flash drift reads the pace INTEGRAL since v4662 because it is a clock, and geode, which has no ` +
-        `cadence at all -- its spin is a mix and folding murmur's sp in without an integral of drive ` +
-        `SQUARED would be wrong at every partial drive. tools/ship/murmurCadence-selfcheck.mjs holds that ` +
+        `flash drift reads the pace INTEGRAL since v4662 because it is a clock. *** geode JOINED THIS LIST ` +
+        `AT v4668 AND IT IS IN BOTH HALVES: *** its speed factor sp multiplies the spin's WOBBLE, which is ` +
+        `instantaneous and lands here, and the same sp's secular half goes through mhSpMixPhase's paceInt, ` +
+        `which lands in the other census. A species can be an amplitude site and a clock at once, and geode ` +
+        `is the first in the roster to be both from one expression. tools/ship/murmurCadence-selfcheck.mjs ` +
+        `holds that ` +
         `census, reads the coefficient beside each integral, and is where the count of the eighteen lives. ` +
         `mist, fathom AND sol MOVED IN THIS ROUND: mist and fathom arrived with the cadence and sol LEFT ` +
         `this list in v4662 and came back -- its granulation reads the integral now and its simmer still ` +

@@ -251,6 +251,20 @@ export function makeMurmurKitTsl(TSL) {
         base.mul(kPaceDrive.mul(paceDriveInt).add(kVoiceDrive.mul(voiceDriveInt))));
 
     /**
+     * *** THE SECULAR PHASE OF A MIX OF TWO SPEED-FACTORED ARMS. *** See render/murmurKit.mjs's mhSpMixCoef
+     * for the expansion: geode's spin and fathom's second and third shells are mix(armA, armB, m*drive) with
+     * murmur's sp = (1 + q*pace + s*drive) on BOTH arms, which is one rate A + A*q*p + (A*s+B)*d + B*q*p*d +
+     * B*s*d*d and therefore five coefficient-and-integral pairs rather than three.
+     *
+     * THE FIVE COEFFICIENTS ARE COMPUTED ON THE HOST BY mhSpMixCoef AND PASSED IN, because they are build-time
+     * constants out of murmur's four numbers -- there is nothing here for the GPU to derive per pixel, and
+     * deriving it here would put a second copy of the algebra where the CPU gate cannot reach it.
+     */
+    const mhSpMixPhase = Fn(([cT, t, cP, paceInt, cD, driveInt, cPD, paceDriveInt, cDD, driveSqInt]) =>
+        cT.mul(t).add(cP.mul(paceInt)).add(cD.mul(driveInt))
+          .add(cPD.mul(paceDriveInt)).add(cDD.mul(driveSqInt)));
+
+    /**
      * mh_drift with the secular term supplied rather than computed. The wobble keeps murmur's instantaneous
      * rate as its amplitude on purpose -- that term is bounded by k*rate/w2 and does not accumulate, so the
      * repair is confined to the half that grows without limit. Its CPU twin is mhDriftPhase.
@@ -692,7 +706,7 @@ export function makeMurmurKitTsl(TSL) {
         // the literal token `null` -- which the GPU rejected at pipeline creation rather than silently. Both
         // times the value is one number that half the family's colour depends on and nothing owned it.
         MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP,
-        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhDriftPhase,
+        mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhSpMixPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
         mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
