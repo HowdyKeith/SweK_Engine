@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="RTX viewer">
-<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Three skies: a gradient (the default), an analytic captured environment-map atlas baked into a real texture once at load (RTX round 11), or a REAL scene capture -- the same atlas format, baked instead by tracing real rays against the loaded scene's own BVH from its bounds center, the way a reflection probe would (RTX round 13) -- cycle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Real per-vertex colour on the procedural city (the pavement tile's own GLB has none) -- off by default (a flat albedo, as every prior round shipped), toggle on with the fifth link to see the city's own baked colour instead (RTX round 15). Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two; the drag/dolly math itself is render/rtViewer.mjs's own dragOrbit/dollyOrbit (RTX round 16), not inline page arithmetic, so a gate can hold it without a pointer. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
+<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Three skies: a gradient (the default), an analytic captured environment-map atlas baked into a real texture once at load (RTX round 11), or a REAL scene capture -- the same atlas format, baked instead by tracing real rays against the loaded scene's own BVH from its bounds center, the way a reflection probe would (RTX round 13) -- cycle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Real per-vertex colour on the procedural city (the pavement tile's own GLB has none) -- off by default (a flat albedo, as every prior round shipped), toggle on with the fifth link to see the city's own baked colour instead (RTX round 15). Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two; the drag/dolly math itself is render/rtViewer.mjs's own dragOrbit/dollyOrbit (RTX round 16), not inline page arithmetic, so a gate can hold it without a pointer. Real PER-TRIANGLE materials on the procedural city -- one real SBT record per distinct voxel type actually used (stone/dirt/sand/snow/etc., world/chunkMesherCore.js's own PALETTE), selected per-triangle via physics/render/rtPipeline.mjs's own meshMaterials/bvhMatIdx offset (proven correct in isolation since RTX round 4, no production caller until now) -- off by default (one flat mesh-wide material, as every prior round shipped), toggle on with the sixth link (RTX round 17). WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
 <meta name="demo:category" content="physics">
 <meta name="demo:swatch" content="&#9651;">
 <title>RTX viewer</title>
@@ -25,7 +25,7 @@
 <div id="hud">
   <div id="cap">RTX viewer</div>
   <div id="be">requesting a WebGPU device&hellip;</div>
-  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a id="directToggle" href="#">direct</a> &middot; <a id="vertexColorsToggle" href="#">vertex colors</a> &middot; <a href="/server.html">&larr; back</a></div>
+  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a id="directToggle" href="#">direct</a> &middot; <a id="vertexColorsToggle" href="#">vertex colors</a> &middot; <a id="meshMaterialsToggle" href="#">mesh materials</a> &middot; <a href="/server.html">&larr; back</a></div>
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
@@ -38,6 +38,7 @@ const materialToggleEl = document.getElementById("materialToggle");
 const skyToggleEl = document.getElementById("skyToggle");
 const directToggleEl = document.getElementById("directToggle");
 const vertexColorsToggleEl = document.getElementById("vertexColorsToggle");
+const meshMaterialsToggleEl = document.getElementById("meshMaterialsToggle");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 
 // RTX round 5 -- which scene to load, read once at page load (not hot-swapped mid-session: a running WebGPU
@@ -71,20 +72,28 @@ const DIRECT = DIRECT_VALUES.includes(rawDirect) ? rawDirect : "bsdf";
 // than silently rendering flat, because that scene's own GLB has no per-vertex colour data at all -- a real
 // caller mistake this toggle can produce on purpose (city+vertexColors=true is the combination that works).
 const VERTEX_COLORS = new URLSearchParams(location.search).get("vertexColors") === "true";
-const qs = (scene, material, sky, direct, vertexColors) => "?scene=" + scene + "&material=" + material + "&sky=" + sky + "&direct=" + direct + "&vertexColors=" + vertexColors;
-toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY, DIRECT, VERTEX_COLORS);
+// RTX round 17 -- a SIXTH toggle, the same boolean shape round 15's own vertexColors already established --
+// meaningful only under material:"lambertian" (see render/rtViewer.mjs's own doc: materialTableFromCodes()'s
+// own records are Lambertian, built from real PALETTE colour with no roughness/ior to give a microfacet
+// record), and, like vertexColors, THROWS on the pavement-tile scene rather than silently rendering flat,
+// because that scene has no per-triangle material table at all (loadMeshBvh() does not attach one).
+const MESH_MATERIALS = new URLSearchParams(location.search).get("meshMaterials") === "true";
+const qs = (scene, material, sky, direct, vertexColors, meshMaterials) => "?scene=" + scene + "&material=" + material + "&sky=" + sky + "&direct=" + direct + "&vertexColors=" + vertexColors + "&meshMaterials=" + meshMaterials;
+toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS);
 toggleEl.textContent = SCENE === "city" ? "try the pavement tile" : "try the procedural city";
-materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY, DIRECT, VERTEX_COLORS);
+materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS);
 materialToggleEl.textContent = MATERIAL === "microfacet" ? "try lambertian" : "try microfacet + energy compensation";
 const nextSky = SKY_VALUES[(SKY_VALUES.indexOf(SKY) + 1) % SKY_VALUES.length];
-skyToggleEl.href = qs(SCENE, MATERIAL, nextSky, DIRECT, VERTEX_COLORS);
+skyToggleEl.href = qs(SCENE, MATERIAL, nextSky, DIRECT, VERTEX_COLORS, MESH_MATERIALS);
 const SKY_LABEL = { gradient: "the gradient sky", envMap: "the analytic captured environment map", sceneCapture: "a REAL scene-captured environment map" };
 skyToggleEl.textContent = "try " + SKY_LABEL[nextSky];
 const nextDirect = DIRECT_VALUES[(DIRECT_VALUES.indexOf(DIRECT) + 1) % DIRECT_VALUES.length];
-directToggleEl.href = qs(SCENE, MATERIAL, SKY, nextDirect, VERTEX_COLORS);
+directToggleEl.href = qs(SCENE, MATERIAL, SKY, nextDirect, VERTEX_COLORS, MESH_MATERIALS);
 directToggleEl.textContent = "try " + nextDirect.toUpperCase() + " direct lighting (microfacet only)";
-vertexColorsToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, !VERTEX_COLORS);
+vertexColorsToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, !VERTEX_COLORS, MESH_MATERIALS);
 vertexColorsToggleEl.textContent = VERTEX_COLORS ? "try the flat albedo (no vertex colors)" : "try REAL vertex colors (procedural city only)";
+meshMaterialsToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, !MESH_MATERIALS);
+meshMaterialsToggleEl.textContent = MESH_MATERIALS ? "try one flat material (no mesh materials)" : "try REAL per-voxel materials (procedural city only)";
 
 let session = null, mesh = null, device = null;
 let yaw = 0.7, pitch = 0.45, dist = 3, dragging = null, dirty = true;
@@ -123,11 +132,12 @@ async function main() {
 
     dist = mesh.bounds.radius * 3.2 + 0.5;
     try {
-        session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY, direct: DIRECT, vertexColors: VERTEX_COLORS });
+        session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY, direct: DIRECT, vertexColors: VERTEX_COLORS, meshMaterials: MESH_MATERIALS });
     } catch (e) { return fail("makeRtSession threw: " + e.message); }
     const directNote = MATERIAL === "microfacet" ? `${DIRECT} direct` : `${DIRECT} direct (inert -- lambertian ignores it)`;
     const vcNote = !VERTEX_COLORS ? "flat albedo" : MATERIAL === "microfacet" ? "vertex colors (inert -- microfacet ignores it)" : "REAL vertex colors";
-    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky, ${directNote}, ${vcNote}`;
+    const mmNote = !MESH_MATERIALS ? "one flat material" : MATERIAL === "microfacet" ? "mesh materials (inert -- microfacet ignores it)" : "REAL per-voxel materials";
+    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky, ${directNote}, ${vcNote}, ${mmNote}`;
 
     cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; cvs.setPointerCapture(e.pointerId); });
     addEventListener("pointerup", () => { dragging = null; });

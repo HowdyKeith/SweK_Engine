@@ -34,10 +34,11 @@
 // underlying radiance, exactly as the paragraph above already states.
 "use strict";
 
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, meshSbtBuffer, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
+import { PALETTE } from "../world/chunkMesherCore.js";
 import { buildTable } from "../physics/render/energyCompensation.mjs";
 import { captureBaseCubemap, packCapturedAtlas } from "../physics/render/specularProbeCapture.mjs";
 import { toHalf } from "../text/slugAtlas.js";
@@ -219,11 +220,36 @@ export async function loadMeshBvh(arrayBuffer, opts = {}) {
  * {colors: cols}), no further conversion" is citySceneMesh()'s own doc comment, proven by tools/ship/
  * cityChunkScene-selfcheck.mjs's own section 5 well before this round existed to use it. Attached the same
  * always-safe way loadMeshBvh's own colors are above.
+ *
+ * RTX round 17 -- `scene.matCodes` (chunkMesherCore.js's own new per-triangle voxel id, threaded through
+ * citySceneMesh() unmodified) is turned into a compact `materialIndex` plus a real, PALETTE-derived SBT record
+ * table by materialTableFromCodes() below, attached the same always-safe way -- `mesh.meshRecords` costs
+ * nothing when `meshMaterials` is never requested at the session level (see makeRtSession's own doc).
  */
 export function loadCityBvh(opts = {}) {
     const scene = citySceneMesh(opts.scene || {});
-    const bvh = bvhBuffersFromTriSoup(scene.verts, { colors: scene.cols, ...(opts.bvh || {}) });
-    return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: scene.vertexCount, triangleCount: scene.triangleCount });
+    const { records, materialIndex } = materialTableFromCodes(scene.matCodes);
+    const bvh = bvhBuffersFromTriSoup(scene.verts, { colors: scene.cols, materialIndex, ...(opts.bvh || {}) });
+    return Object.freeze({ bvh, bounds: meshBounds(bvh), vertexCount: scene.vertexCount, triangleCount: scene.triangleCount, meshRecords: records });
+}
+
+/**
+ * RTX round 17 -- turns a per-triangle array of ABSOLUTE voxel ids (world/chunkMesherCore.js's own `matIds`,
+ * threaded through citySceneMesh() as `matCodes`) into the two things physics/render/rtPipeline.mjs's own
+ * `meshMaterials` option needs: a compact, 0-based `materialIndex` (one per triangle, as `bvhBuffersFromMesh`/
+ * `bvhBuffersFromTriSoup`'s own `opts.materialIndex` contract requires -- a raw voxel id like 5 is NOT a valid
+ * SBT record index and would read past the end of a small `records` array) and the `records` array itself, one
+ * per DISTINCT code actually used, built straight from world/chunkMesherCore.js's own PALETTE -- the SAME
+ * lookup table `cols` already used for the identical triangle, not a second, independently-chosen colour. Pure
+ * and GPU-free: testable directly against fabricated or real `matCodes` with no device at all. Exported (not
+ * inlined into loadCityBvh) so tools/ship/rtViewer-selfcheck.mjs can hold it to exact values.
+ */
+export function materialTableFromCodes(matCodes) {
+    const distinct = [...new Set(matCodes)].sort((a, b) => a - b);
+    const codeToIndex = new Map(distinct.map((code, i) => [code, i]));
+    const records = distinct.map((code) => sbtRecord({ hit: "lambertian", albedo: PALETTE[code] || [1, 1, 1] }));
+    const materialIndex = Int32Array.from(matCodes, (code) => codeToIndex.get(code));
+    return Object.freeze({ records: Object.freeze(records), materialIndex });
 }
 
 /**
@@ -373,11 +399,28 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * loadMeshBvh()/loadCityBvh() now attach `bvh.vertColors` automatically whenever real per-vertex colour data
  * is available (see their own docs) -- scratch-verified before touching this file: the live demo's own
  * pavement.glb has none (no COLOR_0 accessor), so this option's real, gated demonstration is the city scene.
+ *
+ * `meshMaterials` (RTX round 17, default false) is rtPipeline.mjs's own `meshMaterials` WGSL option (bound at
+ * BVH_BINDINGS.matIndex/meshSbt, names "bvhMatIdx"/"bvhSbt") -- a PER-TRIANGLE material selection, which had
+ * NO production caller until now: physics/render/rtPipeline.mjs proved meshMaterials/meshSbtBuffer()/bvhMatIdx
+ * correct in isolation since RTX round 4, but no mesh this function has ever rendered was ever anything but
+ * ONE mesh-wide record (or one flat vertexColors tint on top of it). Unlike vertexColors, meshMaterials does
+ * NOT need `rgb` (rtPipeline.mjs's own doc: "HIT_SHADERS' scalar path reads rec.y exactly as the single-record
+ * MESH_SBT path always has; only the SOURCE of rec changes"), but IS meaningful only under material:"lambertian"
+ * here for a different reason: materialTableFromCodes()'s own records are built `hit:"lambertian"` from real
+ * PALETTE colour data, which has no roughness/ior to give a "microfacet" record -- fabricating those values
+ * would be exactly the kind of invented data this arc's own taste already refuses (see loadCityBvh's own doc),
+ * so meshMaterials:true under material:"microfacet" is accepted-but-inert, the same shape vertexColors has.
+ * Left at its default, BYTE-IDENTICAL WGSL to before this round. When requested and actually meaningful
+ * (lambertian), throws if the mesh has no per-triangle material table -- loadCityBvh() attaches both
+ * `mesh.meshRecords` and `bvh.matIndex` automatically (see its own doc); loadMeshBvh() does not yet, since the
+ * live pavement-tile GLB is a single primitive with exactly one material slot (a degenerate case not worth the
+ * wiring for a demo whose whole point is showing MULTIPLE materials).
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
                                           material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
                                           sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf",
-                                          vertexColors = false }) {
+                                          vertexColors = false, meshMaterials = false }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     if (sky !== "gradient" && sky !== "envMap" && sky !== "sceneCapture") throw new Error(
@@ -397,6 +440,15 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
         "rtViewer: vertexColors:true was requested but this mesh has no per-vertex colour data (bvh.vertColors " +
         "is null) -- loadMeshBvh()/loadCityBvh() only attach it when the underlying source (a GLB's own COLOR_0 " +
         "accessor, or citySceneMesh()'s own baked cols) actually has some, and this mesh's does not.");
+    // Meaningful only under lambertian for a DIFFERENT reason than vertexColors -- materialTableFromCodes()'s
+    // own records are built `hit:"lambertian"` from real PALETTE colour, with no roughness/ior to offer a
+    // microfacet record (see this function's own doc above) -- accepted-but-inert under microfacet either way.
+    const wantsMeshMaterials = meshMaterials && !isMicrofacet;
+    if (wantsMeshMaterials && (!mesh.meshRecords || !bvh.matIndex)) throw new Error(
+        "rtViewer: meshMaterials:true was requested but this mesh has no per-triangle material table " +
+        "(mesh.meshRecords and/or bvh.matIndex is missing) -- loadCityBvh() attaches both automatically from " +
+        "world/chunkMesherCore.js's own PALETTE; loadMeshBvh() does not, and a mesh built another way must " +
+        "supply both itself.");
     const isSceneCapture = sky === "sceneCapture";
     const isEnvMap = sky === "envMap" || isSceneCapture;
     // A background adversarial review found this specific numeric option needed a guard `roughness`/`ior`
@@ -453,7 +505,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
 
     const rtPipe = device.compute({ wgsl: isMicrofacet
         ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap })
-        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors }) });
+        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors, meshMaterials: wantsMeshMaterials }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
     const boundsBuf = device.buffer({ usage: "storage", data: bvh.bounds });
@@ -471,6 +523,13 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // material:"microfacet" inertness above) -- a scene that never asks for it allocates no extra buffer.
     const vertColorsBuf = wantsVertexColors ? device.buffer({ usage: "storage", data: bvh.vertColors }) : null;
     if (vertColorsBuf) rtPipe.bind("bvhVertColors", vertColorsBuf);
+    // RTX round 17 -- rtPipeline.mjs's own matIndex/meshSbt bindings (BVH_BINDINGS.matIndex/meshSbt, WGSL names
+    // "bvhMatIdx"/"bvhSbt"), bound only when actually meaningful (wantsMeshMaterials already folds in the
+    // material:"microfacet" inertness above) -- a scene that never asks for it allocates neither buffer.
+    const matIdxBuf = wantsMeshMaterials ? device.buffer({ usage: "storage", data: bvh.matIndex }) : null;
+    const meshSbtBuf = wantsMeshMaterials ? device.buffer({ usage: "storage", data: meshSbtBuffer(mesh.meshRecords, { rgb: true }) }) : null;
+    if (matIdxBuf) rtPipe.bind("bvhMatIdx", matIdxBuf);
+    if (meshSbtBuf) rtPipe.bind("bvhSbt", meshSbtBuf);
     // The shared multi-scatter E(mu) table (physics/render/rtPipeline.mjs's own `msE` binding, msComp:true's
     // one pipeline-level storage buffer -- see sbtRecord's own doc on why this is shared rather than per-record).
     const msBuf = isMicrofacet ? device.buffer({ usage: "storage", data: Float32Array.from(msTable.E) }) : null;
@@ -516,7 +575,12 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
                 // pipelineUniforms's own `envMap` option takes the ATLAS OBJECT itself (matching `bvh`'s own
                 // "take the descriptor" convention), not a boolean -- `isEnvMap` decides whether it is passed
                 // at all, the SAME single flag pipelineWgsl's own envMap option above was built from.
-                ...(isEnvMap ? { envMap: envAtlas } : {}) }));
+                ...(isEnvMap ? { envMap: envAtlas } : {}),
+                // pipelineUniforms() REQUIRES `meshRecords` whenever `meshMaterials` is true (rtPipeline.mjs's
+                // own doc: it is the ONLY way sharedMsTable() can see the per-triangle table at all) -- the SAME
+                // `mesh.meshRecords` array meshSbtBuffer() above was built from, per that file's own "pass the
+                // identical value to both calls" discipline.
+                ...(wantsMeshMaterials ? { meshMaterials: true, meshRecords: mesh.meshRecords } : {}) }));
             fBuf.write(new Float32Array([frame, 0, 0, 0]));
             return device.frame(({ pass }) => {
                 pass.dispatch(rtPipe, rayWg);
@@ -532,6 +596,8 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             if (msBuf) buffers.push(msBuf);
             if (envTex) buffers.push(envTex);
             if (vertColorsBuf) buffers.push(vertColorsBuf);
+            if (matIdxBuf) buffers.push(matIdxBuf);
+            if (meshSbtBuf) buffers.push(meshSbtBuf);
             for (const b of buffers) { try { b.destroy(); } catch (e) {} }
         },
     });

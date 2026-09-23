@@ -129,6 +129,12 @@ export function stampScene(world, opts = {}) {
  * limitation" as this comment used to claim: round 15 found, by parsing the real vendor/kenney-city/models/
  * pavement.glb directly, that it has no COLOR_0 accessor at all, so its own vertex-colors wiring in
  * loadMeshBvh() is defensive/future-proofing only, currently unexercised by any live asset.
+ *
+ * RTX round 17 -- `matCodes` is chunkMesherCore.js's own new `matIds` output, passed straight through: one
+ * ABSOLUTE VOXEL ID per triangle (not per vertex, unlike `cols`), the exact real per-quad id emitQuad() already
+ * looks PALETTE up by for `cols` itself -- not a second, independently-derived material signal. render/
+ * rtViewer.mjs's own materialTableFromCodes() turns this into a compact per-triangle materialIndex plus a real,
+ * PALETTE-derived SBT record table for physics/render/rtPipeline.mjs's own `meshMaterials` option.
  */
 export function citySceneMesh(opts = {}) {
     const world = makeSceneWorld(opts.gridRadius ?? 1);
@@ -139,7 +145,7 @@ export function citySceneMesh(opts = {}) {
         size: CHUNK_SIZE, height: CHUNK_HEIGHT, cx: 0, cz: 0, skipWater: opts.skipWater !== false,
     });
     return Object.freeze({
-        verts: r.verts, cols: r.cols, buildings,
+        verts: r.verts, cols: r.cols, matCodes: r.matIds, buildings,
         triangleCount: r.verts.length / 9, vertexCount: r.verts.length / 3,
     });
 }

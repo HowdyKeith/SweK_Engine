@@ -108,16 +108,44 @@
 //   P  RTX round 16 -- rtx-viewer.html's own wheel handler reverted the same way (no longer calling dollyOrbit)
 //        -> exit=1, 1 red: the SAME section 6 test as sabotage O, by name -- one combined check covers both
 //           halves of the page's own wiring, not two separate ones.
+//   Q  RTX round 17 -- materialTableFromCodes()'s own ascending-code sort removed (`.sort((a,b)=>a-b)` dropped,
+//      leaving first-seen order)
+//        -> exit=1, 2 red: section 1h's own "materialIndex compacts... in ASCENDING CODE order" test (by name)
+//           AND its own "every record is hit:lambertian with the SAME albedo..." test -- a real, traceable
+//           cascading effect (first-seen compaction reorders `records` itself, not just `materialIndex`).
+//   R  RTX round 17 -- makeRtSession's meshMaterials missing-data throw guard removed entirely
+//        -> exit=1, 1 red: section 1i's own "meshMaterials:true on a mesh with NO per-triangle material table
+//           throws..." test, by name.
+//   S  RTX round 17 -- `wantsMeshMaterials = meshMaterials && !isMicrofacet` changed to `wantsMeshMaterials =
+//      meshMaterials` (dropping the microfacet fold-in)
+//        -> exit=1, 1 red: section 1i's own "meshMaterials:true is a harmless NO-OP under material:
+//           \"microfacet\"..." test, by name.
+//   T  RTX round 17 -- the `rtPipe.bind("bvhSbt", meshSbtBuf)` call removed (matIdxBuf still bound)
+//        -> exit=1, 1 red: section 1i's own "and BINDS the real matIndex/meshSbt buffers by NAME..." test, by
+//           name -- the one check that exists specifically to prove BOTH buffers were actually bound, not
+//           merely that the right WGSL text was generated.
+//   U  RTX round 17 -- loadCityBvh's own `materialIndex` pass-through removed (reverted to `{colors: scene.cols,
+//      ...(opts.bvh || {})}` alone)
+//        -> exit=1, but NOT a single targeted red: the whole gate crashes with an uncaught Error, because
+//           section 5d calls makeRtSession({meshMaterials:true}) against the now-matIndex-less city mesh and
+//           the SAME missing-data guard sabotage R above exists to test fires for real (bvh.matIndex is
+//           genuinely null). Confirmed non-redundant with section 1i: 1i's own checks build fabricated bvh
+//           fixtures directly and never call loadCityBvh() at all, so they cannot see this regression -- only
+//           section 5d, which drives the real loadCityBvh -> makeRtSession chain, does. The SAME non-redundancy
+//           shape round 15's own sabotage L already found for vertexColors, confirmed again for meshMaterials.
+//   V  RTX round 17 -- rtx-viewer.html's own makeRtSession() call reverted to omit `meshMaterials: MESH_MATERIALS`
+//        -> exit=1, 1 red: section 6's own "the page reads a `meshMaterials` URL param..." test, by name.
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
-import { pipelineWgsl, bvhBuffersFromMesh } from "../../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, bvhBuffersFromMesh, sbtRecord } from "../../physics/render/rtPipeline.mjs";
 import { captureAtlasHalves, captureBaseCubemap, packCapturedAtlas } from "../../physics/render/specularProbeCapture.mjs";
 import { fromHalf } from "../../text/slugAtlas.js";
 import { GLBParser } from "../../gpu/GLBParser.js";
+import { PALETTE } from "../../world/chunkMesherCore.js";
 import { meshTriples } from "../../physics/splat/splatMesh.mjs";
 import { faceTexelDir } from "../../render/cubeBake.js";
 import fs from "node:fs";
@@ -668,6 +696,84 @@ console.log("\n1g. RTX ROUND 16 -- dragOrbit/dollyOrbit, rtx-viewer.html's OWN P
         V.dollyOrbit(8, 77, bounds) === distOld, `dollyOrbit ${V.dollyOrbit(8, 77, bounds)} vs inline ${distOld}`);
 }
 
+console.log("\n1h. RTX ROUND 17 -- materialTableFromCodes(), HELD TO EXACT VALUES AGAINST world/chunkMesherCore.js's OWN PALETTE (NO GPU NEEDED)");
+{
+    // 5 fabricated triangles, codes [3,1,3,5,1] -- distinct codes sorted ASCENDING (not first-seen order) are
+    // [1,3,5], so the expected compact index is [1,0,1,2,0], independently re-derived here rather than by
+    // calling materialTableFromCodes() a second time.
+    const { records, materialIndex } = V.materialTableFromCodes([3, 1, 3, 5, 1]);
+    ok("!! materialIndex compacts to 0-based indices in ASCENDING CODE order, one per input triangle",
+        materialIndex.length === 5 && Array.from(materialIndex).every((v, i) => v === [1, 0, 1, 2, 0][i]),
+        `got ${JSON.stringify(Array.from(materialIndex))}, expected [1,0,1,2,0] -- a first-seen-order compaction ` +
+        "would instead give [0,1,0,2,1], a real, distinguishable-by-this-test difference");
+    ok("!! exactly one record per DISTINCT code, not one per input triangle",
+        records.length === 3, `got ${records.length} records for 5 triangles using 3 distinct codes`);
+    ok("!! every record is `hit:\"lambertian\"` with the SAME albedo world/chunkMesherCore.js's own PALETTE " +
+        "already gives that code -- not a fabricated or re-derived colour",
+        records[0].hit === "lambertian" && records[1].hit === "lambertian" && records[2].hit === "lambertian" &&
+        records[0].albedo === PALETTE[1] && records[1].albedo === PALETTE[3] && records[2].albedo === PALETTE[5],
+        `record albedos: ${JSON.stringify(records.map((r) => r.albedo))} vs PALETTE[1,3,5]: ${JSON.stringify([PALETTE[1], PALETTE[3], PALETTE[5]])}`);
+    ok("!! an UNKNOWN code (no PALETTE entry) falls back to [1,1,1] rather than throwing or reading undefined",
+        V.materialTableFromCodes([999]).records[0].albedo.every((c) => c === 1),
+        `got ${JSON.stringify(V.materialTableFromCodes([999]).records[0].albedo)} -- matches emitQuad's own ` +
+        "PALETTE[absCode] || [1, 1, 1] fallback exactly, the SAME fallback cols already relies on");
+}
+
+console.log("\n1i. RTX ROUND 17 -- makeRtSession's `meshMaterials` OPTION, AGAINST pipelineWgsl() AND REAL BOUND BUFFERS (NO GPU NEEDED)");
+{
+    const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+    const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+    const records = [sbtRecord({ hit: "lambertian", albedo: [1, 0, 0] }), sbtRecord({ hit: "lambertian", albedo: [0, 1, 0] })];
+    const materialIndex = indices.map((_, i) => i % 2);
+    const matBvh = bvhBuffersFromMesh(positions, indices, { materialIndex });
+    const matMesh = { bvh: matBvh, bounds: V.meshBounds(matBvh), meshRecords: records };
+    // fakeMesh's own stub bvh has no matIndex for makeRtSession to bind -- the same reason section 1f needed a
+    // real BVH with colors for vertexColors's own missing-data test.
+    const noMatBvh = bvhBuffersFromMesh(positions, indices, {});
+    const noMatMesh = { bvh: noMatBvh, bounds: V.meshBounds(noMatBvh) };
+
+    const stubDevice = () => {
+        const wgsls = [], binds = [];
+        return { wgsls, binds, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind(name) { binds.push(name); }, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture() { return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+
+    const d1 = stubDevice();
+    V.makeRtSession(d1.device, { mesh: matMesh, w: 4, h: 4, meshMaterials: true });
+    ok("!! meshMaterials:true (material omitted) generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,rgb:true,gradient:true,meshMaterials:true})",
+        d1.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, meshMaterials: true }),
+        "proves meshMaterials actually reaches pipelineWgsl's own meshMaterials option, not merely accepted with no effect");
+    ok("!! and BINDS the real matIndex/meshSbt buffers by NAME (\"bvhMatIdx\"/\"bvhSbt\") -- not just generates the right WGSL text",
+        d1.binds.includes("bvhMatIdx") && d1.binds.includes("bvhSbt"),
+        `binds captured: ${JSON.stringify(d1.binds)} -- WGSL text alone says nothing about whether the buffers the shader reads from were ever actually bound`);
+
+    const d2 = stubDevice();
+    V.makeRtSession(d2.device, { mesh: matMesh, w: 4, h: 4 });
+    ok("!! meshMaterials OMITTED (default false) is BYTE-IDENTICAL to round 16's own shipped default, and does NOT bind bvhMatIdx/bvhSbt",
+        d2.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true }) && !d2.binds.includes("bvhMatIdx") && !d2.binds.includes("bvhSbt"),
+        "a caller that never asks for meshMaterials must render exactly as every round before this one did -- verified by " +
+        "direct string equality AND by confirming the buffers this round adds are never bound, not just that the WGSL text matches");
+
+    const d3 = stubDevice();
+    V.makeRtSession(d3.device, { mesh: matMesh, w: 4, h: 4, material: "microfacet", meshMaterials: true });
+    ok("!! meshMaterials:true is a harmless NO-OP under material:\"microfacet\" -- same WGSL as material:\"microfacet\" alone, and no bind",
+        d3.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "bsdf", msComp: true }) && !d3.binds.includes("bvhMatIdx") && !d3.binds.includes("bvhSbt"),
+        "materialTableFromCodes() only ever builds `hit:\"lambertian\"` records from real PALETTE colour, with no " +
+        "roughness/ior to offer a microfacet record (see render/rtViewer.mjs's own doc) -- so meshMaterials is " +
+        "accepted-but-inert here, the same shape vertexColors already has, confirmed by direct string equality and an empty bind list");
+
+    ok("!! meshMaterials:true on a mesh with NO per-triangle material table throws, rather than silently rendering one flat material",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: noMatMesh, w: 4, h: 4, meshMaterials: true }); return false; }
+                 catch (e) { return /no per-triangle material table/.test(e.message); } })(),
+        "a caller asking for per-triangle materials on a mesh that has none (mesh.meshRecords/bvh.matIndex both null " +
+        "-- e.g. the live demo's own pavement tile, which loadMeshBvh() never attaches either for) should fail loud, " +
+        "not silently fall back to one flat material");
+}
+
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
 console.log("\n2. accumulateWgsl -- A RUNNING MEAN, HELD TO HAND-COMPUTED EXPECTED VALUES");
 {
@@ -971,11 +1077,19 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 const view = { w, h, ...view0, fovDeg: 45 };
                 for (let i = 0; i < 8; i++) await session.renderFrame(view, { offscreen: true, read: true });
                 const accum = new Float32Array(await device.read(session.accumBuf));
-                let nan = 0, min = Infinity, max = -Infinity, sum = 0;
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0, checksum = 0;
                 const uniq = new Set();
-                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; uniq.add(Math.round(v * 1000)); }
+                for (let i = 0; i < accum.length; i++) {
+                    const v = accum[i];
+                    if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; uniq.add(Math.round(v * 1000));
+                    // Position-weighted, the same shape round 12's own direct:nee/direct:mis distinctness check
+                    // uses -- an adversarial review of round 17 found the mean/range comparison below (section
+                    // 5d) could in principle miss a bug that PERMUTES which triangle gets which material while
+                    // preserving the scene's own aggregate mean; this catches that class too.
+                    checksum += v * (i % 97 + 1);
+                }
                 out.city = { triangleCount: mesh.triangleCount, vertexCount: mesh.vertexCount, bounds: mesh.bounds,
-                             nan, min, max, mean: sum / accum.length, distinct: uniq.size, frameCount: session.frameCount() };
+                             nan, min, max, mean: sum / accum.length, checksum, distinct: uniq.size, frameCount: session.frameCount() };
                 session.destroy();
             }
 
@@ -1000,11 +1114,39 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 out.cityVertexColors = { nan, min, max, mean: sum / accum.length, frameCount: session.frameCount() };
                 session.destroy();
             }
+
+            // ---- 5d. RTX ROUND 17 -- THE SAME REAL CITY SCENE, THROUGH meshMaterials:true -- THE FIRST PRODUCTION
+            // CALLER of rtPipeline.mjs's own meshMaterials/bvhMatIdx/meshSbtBuffer capability, proving the FULL
+            // real path (chunkMesherCore.js's own matIds -> citySceneMesh's matCodes -> materialTableFromCodes'
+            // own compact index+PALETTE records -> bvhBuffersFromTriSoup's own matIndex packing -> makeRtSession's
+            // own WGSL switch and real buffer binds) actually executes end to end against REAL production data --
+            // section 1h's own GPU-free claim is correct in isolation, this proves it reaches a real device and
+            // changes the real picture. ----
+            {
+                const mesh = loadCityBvh();
+                const w = 48, h = 32;
+                const view0 = orbitEye({ yaw: 0.7, pitch: 0.5, dist: mesh.bounds.radius * 3.2 + 0.5, center: mesh.bounds.center });
+                const view = { w, h, ...view0, fovDeg: 45 };
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2, meshMaterials: true });
+                for (let i = 0; i < 8; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0, checksum = 0;
+                for (let i = 0; i < accum.length; i++) {
+                    const v = accum[i];
+                    if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v;
+                    checksum += v * (i % 97 + 1);
+                }
+                out.cityMeshMaterials = { nan, min, max, mean: sum / accum.length, checksum, frameCount: session.frameCount(),
+                                           recordCount: mesh.meshRecords.length };
+                session.destroy();
+            }
             return out;
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors, cityMeshMaterials } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -1206,6 +1348,44 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         `vertexColors range [${cityVertexColors.min.toFixed(4)}, ${cityVertexColors.max.toFixed(4)}] mean ${cityVertexColors.mean.toFixed(6)} ` +
         `vs flat-albedo range [${city.min.toFixed(4)}, ${city.max.toFixed(4)}] mean ${city.mean.toFixed(6)}`);
 
+    console.log("\n5d. RTX ROUND 17 -- THE SAME CITY SCENE, THROUGH meshMaterials:true -- THE FIRST PRODUCTION CALLER OF rtPipeline.mjs's OWN meshMaterials/bvhMatIdx/meshSbtBuffer CAPABILITY");
+    say(`accumBuf after ${cityMeshMaterials.frameCount} frames: ${cityMeshMaterials.nan} NaN/Inf, range [${cityMeshMaterials.min.toFixed(4)}, ${cityMeshMaterials.max.toFixed(4)}], mean ${cityMeshMaterials.mean.toFixed(6)}`);
+    REPORT_ROWS.push(["city scene, meshMaterials", `${city.triangleCount} tris, ${cityMeshMaterials.recordCount} records`, `${cityMeshMaterials.frameCount} frames`,
+        `mean ${cityMeshMaterials.mean.toFixed(6)} vs flat-albedo ${city.mean.toFixed(6)}`]);
+    ok("the real city scene actually uses MORE THAN ONE material -- world/chunkMesherCore.js's own DEFAULT_BUILDING " +
+        "stamped onto its own ground plane touches at least stone, dirt, sand and snow (see its own PALETTE)",
+        cityMeshMaterials.recordCount > 1,
+        "a wrong count here (1) would mean materialTableFromCodes() collapsed every distinct voxel to one record, " +
+        "silently defeating this round's own \"multi\" claim for the default fixture this gate actually asked for");
+    ok("!! the SAME real city scene, chunkMesherCore.js's own matIds -> citySceneMesh's matCodes -> " +
+        "materialTableFromCodes' own compact index+PALETTE records -> bvhBuffersFromTriSoup's own matIndex " +
+        "packing -> makeRtSession's own WGSL switch, through a REAL WebGPU device -- no NaN, real range",
+        cityMeshMaterials.nan === 0 && cityMeshMaterials.max > cityMeshMaterials.min && cityMeshMaterials.min >= 0.0,
+        "proves the WIRING this round adds -- not just section 1h's own GPU-free claim that the right WGSL is " +
+        "generated and the right buffers bound by name -- actually executes end to end: real per-triangle voxel " +
+        "material data, derived from world/chunkMesherCore.js's own PALETTE, reaching real bound storage buffers " +
+        "and changing what a real device renders");
+    // *** MEAN, NOT JUST MIN/MAX -- the same lesson section 4d/4e/5c's own history in this file already paid
+    // for: min/max alone can pin on unrelated pixels while a real, working change moves the bulk of the picture. ***
+    ok("!! and reads genuinely DIFFERENT from the flat-albedo render of the IDENTICAL scene and camera (section 5b) -- " +
+        "per-triangle materials actually change the picture, not just \"doesn't crash\", via BOTH range and mean",
+        (Math.abs(cityMeshMaterials.max - city.max) > 1e-4 || Math.abs(cityMeshMaterials.min - city.min) > 1e-4) &&
+        Math.abs(cityMeshMaterials.mean - city.mean) > 1e-4,
+        `meshMaterials range [${cityMeshMaterials.min.toFixed(4)}, ${cityMeshMaterials.max.toFixed(4)}] mean ${cityMeshMaterials.mean.toFixed(6)} ` +
+        `vs flat-albedo range [${city.min.toFixed(4)}, ${city.max.toFixed(4)}] mean ${city.mean.toFixed(6)}`);
+    // *** A POSITION-WEIGHTED CHECKSUM, NOT JUST MEAN/RANGE -- AN ADVERSARIAL REVIEW'S OWN FINDING. *** Mean and
+    // range are both aggregate stats: a bug that PERMUTES which triangle gets which material while preserving
+    // the scene's own overall colour balance could in principle still pass the check just above. The same
+    // position-weighted checksum round 12's own direct:"nee"-vs-"mis" distinctness check already established
+    // (section 4d, above) closes that gap here too -- two renders with the SAME mean but a DIFFERENT per-pixel
+    // arrangement read as different under this metric even when they would not under mean/range alone.
+    ok("!! and the two renders' own POSITION-WEIGHTED CHECKSUMS differ too, not just their aggregate mean/range -- " +
+        "closes the gap a permuted-but-mean-preserving material assignment could otherwise slip through",
+        cityMeshMaterials.checksum !== city.checksum,
+        `meshMaterials checksum ${cityMeshMaterials.checksum} vs flat-albedo checksum ${city.checksum} -- identical ` +
+        "checksums here would mean the two renders are pixel-for-pixel the same despite meshMaterials:true, the " +
+        "exact signature a mean/range comparison alone cannot rule out");
+
     console.log("\n6. THE LIVE PAGE ITSELF");
     const page = read("rtx-viewer.html");
     ok("carries demo:title/demo:desc/demo:category and imports render/rtViewer.mjs",
@@ -1263,6 +1443,11 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "matches render/orbitCamera-selfcheck.mjs's own established section-3 precedent for orrery-gpu.html -- a page " +
         "that kept the old inline formula (or imported dragOrbit/dollyOrbit but never called them) would still pass " +
         "every check above this one, since section 1g only tests the FUNCTIONS in isolation, never the page");
+    ok("!! RTX round 17 -- the page reads a `meshMaterials` URL param and passes it into makeRtSession, not just the hardcoded false default",
+        /MESH_MATERIALS/.test(page) && /meshMaterials\s*:\s*MESH_MATERIALS/.test(page),
+        "a page that never read the param would still call makeRtSession successfully (meshMaterials defaults to " +
+        "false) and every check above this one would still pass -- the same shape of gap round 10/11/12/15's own " +
+        "checks exist to catch, extended to the sixth toggle");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
@@ -1276,9 +1461,11 @@ console.log("unchecked here: WHETHER LIVE CANVAS PRESENTATION ITSELF WORKS ON TH
     "still unchecked: what a real pointer actually does to the on-screen picture, since no gate anywhere in this " +
     "tree simulates a genuine PointerEvent against a live page (the same limit render/orbitCamera-selfcheck.mjs's " +
     "own footer already names for orrery-gpu.html: 'what a drag LOOKS like on a real pointer is the rig's to see'). " +
-    "Also unchecked: multi-material SBT offset -- physics/render/rtPipeline.mjs already proves it correct in " +
-    "isolation, but neither live scene exposes real per-triangle material data through render/rtViewer.mjs's own " +
-    "current dependencies (world/chunkMesherCore.js computes one at mesh time but never returns it).");
+    "Multi-material SBT offset is CLOSED as of RTX round 17 -- section 5d, real per-triangle materials on the " +
+    "city scene, derived from world/chunkMesherCore.js's own PALETTE (extended this round to expose a per-" +
+    "triangle voxel id it always computed but never returned). Unchecked for the pavement-tile scene, which " +
+    "loadMeshBvh() does not wire this to -- its own GLB is a single primitive with exactly one material slot, a " +
+    "degenerate case not worth the wiring for a demo whose whole point is showing MULTIPLE materials.");
 REPORT.table("accumulate kernel and the real mesh render, measured", ["case", "input", "n / frames", "result"], REPORT_ROWS,
     "A number that only reached this terminal is a measurement nobody else can re-read.");
 REPORT.write();
