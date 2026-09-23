@@ -63,6 +63,635 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
 *** THREE GATES PRINTED "all checks pass" AND THEN ABORTED THE PROCESS, AND NOTHING THIS TREE OWNS WAS OPEN WHEN THEY DID. *** box3dConformance, contactOverlay and ragdollSelfCollide came back from Keith's v4649 clone-verify with a perfect scoreline and exit 3221226505 -- `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94`. tools/ship/serverShutdown.mjs was written for that exact assertion at v4000 and is NOT the fix for this one: its instrument, liveHandles(), reads EMPTY at the instant these three exit. Nothing is open. The handle that trips the assert is NodePlatform's own flush_tasks_ async -- the one a V8 BACKGROUND THREAD uses to post a finished compilation job back to the foreground -- and no drain written in JavaScript can reach it. The window is measurable here even though the crash is not: with the main thread asleep on a timer, a process that has loaded box3d and stepped a world burns 23 to 38 ms of CPU on other threads against a SAME-PROCESS control of 0.8, and it decays to nothing a few hundred ms later, which is what makes it compilation rather than a standing cost. process.exit() at that instant disposes the platform underneath a job that is still running. THE POPULATION WAS MEASURED BY RUNNING IT, because a static walk was a count standing in for a property twice over: 206 gates can REACH a file that calls WebAssembly.instantiate and 18 of them compile anything, and the same walk MISSED every box3d gate because box3dNode.mjs loads its glue through a dynamic import with a computed path. Under a runtime hook, 61 candidates, 56 compile wasm, 48 called process.exit() with a module behind them; all 48 now set process.exitCode, and a re-run of the census reads 0 with not one exit code changed. THE REPAIR IS THE LINE pipeTruncation-selfcheck ALREADY ARGUES FOR, from the opposite platform -- on POSIX process.exit() strands piped output, on Windows it can abort the process -- and it costs nothing: 227/316/233 ms against 241/315/195 for the same wasm work, same status. *** SECOND: windowsImport-selfcheck WATCHED A THIRD SPELLING SHIP, WHICH IS THE LESSON ITS OWN HEADER ALREADY CONTAINS. *** fsrPage-selfcheck died on the rig with ERR_UNSUPPORTED_ESM_URL_SCHEME while that guard reported the tree clean, twice over: `import(tmp + "?" + Math.random())` slipped a detector that demanded the whole argument be one expression AND the variable be named something ending in Path/File/Dir/Full/Abs, and the gate's OTHER half is not import() syntax at all -- it rewrites the page's `from "./x.mjs"` into `from "<engine root>/x.mjs"` and imports the result, a specifier manufactured by a string replace that no scan over call sites can see. It had also missed tools/terrain-parity.mjs's `import(join(here, ...))`, invisible because `join` was destructured from node:path. The file's v3900 note says it outright -- A GUARD THAT KNOWS ONE SPELLING OF A DEFECT WILL WATCH THE OTHER SPELLING SHIP -- and v3900's answer was a second regex, which is the same shape of fix one round later. The rule is INVERTED now: a specifier is safe when it is a whole literal, when it BEGINS with a scheme or relative literal, when pathToFileURL is anywhere in the expression, or when the first identifier of a concatenation is assigned through pathToFileURL in the same file; everything else is an offender by default, so a new way of building a path is one without being added to a list. Arguments are read by balancing parentheses, because the old non-greedy regex truncated `import(require("url").pathToFileURL(p).href)` to `require("url"` and reported a CORRECT line as broken, and because `\bimport\(` matches after a dot and read `window.asset.import(vox.voxUrl, x, y, z)` as a dynamic import of three arguments. The one shape it cannot decide -- a bare identifier, 18 live, most of them function parameters whose callers are in other files -- is COUNTED and reported, never asserted on; four were read by hand and all four are correct. Section 3 drives the rule itself rather than its own copy of it, which is a check grading its own copy, fixed. *** AND FOUR RED GATES LIVE OUTSIDE THE SWEEP, FOUND BY RUNNING THEM BY HAND AND NOT BY ANY SHIP. *** gateReach (11.2 s, pin 529 against a live 542), gateReport (9.6 s, 4 reds), commentFalsePass (10.2 s, 2), scoreDirection (4.7 s, 1, and it was REPAIRED at v4565) are all over the 3,000 ms membership threshold, so the verify is green with four reds standing -- confirmed pre-existing by stashing this round's work and re-running. gateReach's pin is counted and updated here the way its own comment demands (GREW, 13 ADDED, 0 REMOVED, reconciles, physics +7 / physics/character +5 / simulation +1, every one named, compare() read BEFORE writing); the other three are named rather than registered, following v4645's precedent for this same gate. THE NUMBER THAT MATTERS IS NOT FOUR: nobody has measured how many of the 219 still-exiled gates are red, and that is the next round. Four derived records this round's own work moved were re-taken rather than widened -- assertionShape's census, gateSweep's closing ledger, sweep-timings through sweepRotation --write, and runtimeGap's twelve rows, where WebAssembly 23 -> 24 is the only movement that means anything beyond arithmetic. SABOTAGES: seven on the new gate, six red, and the seventh is recorded as ZERO -- replacing an assertion with a tautology cannot be caught by running the gate, and a sabotage log that lists only the ones that worked is an advertisement. AN EIGHTH WAS RUN BY THE BOX: section 1's first version took one fixed 200 ms idle window, read 38.0 against 0.4 on an idle machine and 0.7 against 0.4 under a load average of 7, and WENT RED FOR CONTENTION -- a fixed window measures WHEN the compiler ran and the claim is about WHETHER it had anything left to run, so it accumulates until the pool is quiet instead. WHAT IS NOT CLAIMED: that the Windows crash is fixed -- unix/async.c has no UV_HANDLE_CLOSING assertion, so no row here can go red for the reason the round exists, and the rig's next clone-verify is the instrument for the fact, the same split winPathGuard's repair was recorded under; that the 0xC0000005 access violation is covered, since it is a different code and nothing here touches it; that the wasm census is complete, since 29 further candidates were killed at the first pass's cap and wrote no marker, and a gate that spawns a node CHILD which compiles wasm is invisible to the hook entirely; or that process.exit() is gone from the tree -- 1,717 gates still call it, pipeTruncation owns that population for its own reason, and this round repaired only the 48 where the window was measured to be wide. The tree stands at 1760 gates.
 
+## v4660 -- the other four ignition figures, which really were four shapes -- and a control that had stopped being one
+
+v4659 found that four of the eight remaining `st.complete` figures were one shape on four axes and gave them
+one table. **These four are the answer to why there is not a fifth entry in it.** Each does something none of
+the others does, and a port that reached for one spelling would have been wrong about three species:
+
+| | the figure | what is unusual about it |
+|---|---|---|
+| aura | `lap += complete · (0.18 + 0.80 · exp(2.4·(cos(ang − sweep·2π) − 1)))` | a **von Mises on the angle** — the only figure in the roster that spends `sweep` going *round* something rather than along it |
+| fathom | `w = 1 − smoothstep(0, 0.42, \|sweep − turn·0.33 − 0.16\|)`, `e ·= 1 + complete·(0.50 + 2.40·w)` | keyed on **which shell** rather than on where a shell is: the three light in sequence, innermost first |
+| geode | `lit += complete · 0.70` | **no sweep at all** — geode's light is a facet term on a *normal*, so there is no path for a front to run down |
+| comet | `decay = mix(decay, 9.0, sweep)` | **adds no light whatever**: decay sits in the denominator of `exp(−age/decay)`, so the orbit fills in behind the head out to wherever the sweep has reached |
+
+**fathom and geode were still not flashing at all** — both moved 0.0% of their bytes and ×1.000 of interior
+light between the start of their own SUCCESS state and its brightest instant.
+
+| | at v4659 | after |
+|---|---|---|
+| fathom | ×1.00 | **×4.03** |
+| geode | ×1.00 | **×4.90** |
+| aura | ×2.45 | ×3.59 |
+| comet | ×1.00 | ×1.14 |
+
+comet's is the smallest by far **and that is its shape**: its flash adds no light, so what moves is the trail
+filling in. Its decay line also took murmur's two other factors in the same round — `(1 + 1.25·st.drive)` and
+`mix(1.0, 0.40, small)` — which this port never had, so the lean did not lengthen the trail and the small
+mounts did not shorten it to two fifths.
+
+**Wiring geode's figure turned a gate this round never touched red, and that is the round's real finding.**
+`tools/ship/murmurIgnite-selfcheck.mjs` is built around a pair: one species whose SUCCESS is a travelling
+shell, and one whose SUCCESS is a settle and *nothing else*. geode had been the second since v4644 on the
+strength of a sentence — "it is one of the eleven whose `complete` goes to its own figure" — that was true
+when it was written and that nothing ever checked. Giving geode that figure made its SUCCESS rise and fall
+like a flash, and three settle rows went red *about a settle* when the defect was in the control.
+
+The control is comet now, which after this round is the **last species in the roster with no `complete` term
+anywhere**, and that gate's new section 4 measures the property rather than asserting it — over the whole
+roster, reading the builder *dispatch* rather than matching names, because nebula and tempest share
+`buildMist` and a name match reports both unflashed. The first cut of that census read 16 entries for 18
+species and its own size assertion is what said so.
+
+**A gain came out of the repair.** comet's `sweep` saturates at tau 0.95 and it has no `complete`, so frames
+at tau 0.95 and tau 1.40 differ in `settled` and in nothing else — 0.7258 → 0.9873. That is the first
+**isolated settle in pixels** this tree has had: the added light grows ×1.278 and its centroid moves 0.0011.
+
+Both new kit functions have a compiled twin now, in the kit probe's `igniteRound` mode: 0/255 on the lap and
+1/255 on the window across 256 points, and the lap's lattice spans −π to +π **inclusive**, so the seam is two
+pixels the GPU itself wrote.
+
+Sixteen sabotages across three gates, all caught. Four of them named the wrong row at first — the geode census
+carried its own control as a conjunct, so unwiring fathom or comet reddened a row titled for geode; the
+control is its own row now. Two are aimed at the repair rather than at the round: **giving comet a `complete`
+term** reddens the control census by name, which is precisely what geode's silence cost fifteen rounds, and
+**stretching `mh_state`'s sweep so it no longer saturates before tau 1.40** reddens the isolated-settle row,
+because that row's whole claim is that those two frames differ in one signal.
+
+**And two of this round's own rows were wrong before they shipped.** One asserted aura's lap is *exactly*
+equal at −π and +π and measured 4.44e-16 — two ulp of the 2π binary cannot hold, not a seam. The other mapped
+five sweeps through an arrow that never read its argument and asserted the five results were equal: a row that
+could not fail, under a title claiming a sweep had been tried. Both are measurements now — the gaussian in the
+lap's place tears by 0.80 at the same join, and geode's *whole builder* is counted for the word `SWEEP` with
+the other three species as the control.
+
+`tools/ship/murmurIgniteFour-selfcheck.mjs` arrives green at 2,690 ms, so the tree holds 1768 gates.
+
+**What is left of `st.complete` is the singles:** still's glint 0.85, comet's head 2.2, droplet's 0.26, limn's
+ring and its second interior, duet's flare and its one *shrink* (`1 − 0.62·complete`), chorus's sync, prism's
+1.10. Nine numbers across eight species, none sharing a shape with another.
+
+## v4659 -- four figures that turned out to be one shape, and two species that still were not flashing
+
+`MH_IGNITE`'s own note said the eight remaining `st.complete` figures were "per-species transcriptions rather
+than this one shape". **Four of them are one shape.** Read side by side, arc, flux, prism and helix run the
+shell's own arithmetic along a coordinate of their own instead of along `|p|`:
+
+    r = (coord - mix(lo, hi, st.sweep)) / width;   figure += st.complete * (flat + gain * exp(-r·r))
+
+arc along the angle round its arc, flux along the length of its stream, prism along the distance out its
+beams, helix along the height of its strands. The shell's coordinate is `|p|` for all seven species that run
+it; these four are four *different* quantities, which is why it is a second table rather than four more rows
+in the first.
+
+**And each one is that species' own gesture figure, run on `sweep` and drawn tighter** — arc 0.34 against
+0.30, flux 0.42 against 0.38, prism 0.28 against 0.26. The success is the thing the species already does,
+once, travelling the whole length and a little sharper. Both halves are in this port now, so that is a
+statement it can make rather than a reading of somebody else's file.
+
+**prism and helix were still not flashing at all after v4658** — both moved 0.0% of their bytes and ×1.000 of
+interior light at the peak of their own SUCCESS state, because neither has an interior factor and this
+travelling figure *is* their whole flash.
+
+| | at v4658 | after |
+|---|---|---|
+| prism | ×1.00 | **×2.08** |
+| helix | ×1.00 | **×2.93** |
+| arc | ×1.81 | ×2.18 |
+| flux | ×4.33 | ×5.92 |
+
+**Where the front travels is graded in the kit, and the reason is measured rather than assumed.** Isolating
+`sweep` in a rendered frame needs two taus with equal `complete` and different `sweep` — and `mh_state`'s
+`settled` turns on at *exactly* the complete peak (tau 0.3600), so no such pair exists, searched at 0.0002
+resolution. A new probe mode grades the front against the CPU twin on a real GPU at **0/255** over three
+different axes at once, and its peak sits at `mix(lo, hi, sweep)` to within 0.0010 of the axis at every sweep.
+
+Thirteen sabotages, one caught only after repair: moving helix's **flat** term outside the complete multiply —
+which would lift every strand in every state — read identically on the probe's alpha channel, because that
+channel ran *flux's* constants and flux has no flat term. It runs helix's now.
+
+**And the round's own baseline lied once.** The neutralisation that measures what the port did *before* a
+change is a regex over the table, and prism's entry has two spaces after `lo:` where the others have one — so
+prism was never neutralised, and its "before" reading was the wired version, which read as though the change
+did nothing. The script asserts how many entries it neutralised now.
+
+`tools/ship/murmurIgniteAxis-selfcheck.mjs` arrives green at 2,621 ms, so the tree holds 1767 gates.
+
+**Four ignition figures left, and they really are four different shapes:** aura's von Mises on the *angle* —
+the only figure that spends `sweep` going round something rather than along it — fathom's per-shell turn,
+geode's flat lift, and comet's, which changes the trail's *decay* instead of adding light.
+
+## v4658 -- the flash brightens what is already there, and six species were not flashing at all
+
+`kit.ts`, on the whole family's arrival:
+
+> The light in a success is NOT an overlay: every species multiplies its own interior energy by
+> (1 + complete), which brightens exactly what is already there and leaves the dark dark.
+
+v4644 ported the **shell** — `mh_ignite`'s gaussian ring travelling out along `sweep` — and gave seven species
+an `MH_IGNITE` entry. It did not port that sentence.
+
+So at `stateTau` 0.360, where `mh_state`'s `complete` is exactly 1.0 and `settled` exactly 0, **six species
+moved 0 of 9,216 bytes** between the start of their own SUCCESS state and its brightest instant: limn, arc,
+aura, flux, sol and chorus. The flash was computed, handed to the shader as a uniform, and spent by nobody.
+
+| | at HEAD | after |
+|---|---|---|
+| limn | ×1.000 | **×3.74** |
+| flux | ×1.000 | **×4.33** |
+| chorus | ×1.000 | **×3.88** |
+| sol | ×1.000 | **×2.22** |
+
+**The four on the shared interior line are found by a rule, not a list.** Every one of murmur's eighteen
+species ends its interior with `(1 + S · st.settled)` — the factor this port has carried since v4644 — and
+exactly four of those eighteen lines *also* carry a complete factor: limn 1.60, arc 0.90, aura 0.45, flux
+0.75. A site belongs in `MH_COMPLETE_INTERIOR` if and only if its complete factor sits on the same source
+line as its settled factor, which makes the table a strict subset of `MH_SETTLED_INTERIOR` — and the gate
+asserts that rather than the list.
+
+**Three species saturate where four scale, and that is the opposite operation.** opal's flashes, sol's
+prominences and chorus's voices are each pulled *toward* a target — `mix(life, target, complete · k)` — so the
+differences between them **close**: two figures 4.00× apart come out 1.09× apart, where a gain leaves the
+ratio at exactly 4.00. chorus alone overshoots, toward `1 + 0.45·complete`, because its subject is an ensemble
+arriving together and going past full is how that reads as louder than its parts. One spelling for all seven
+would have been wrong about six species in two different directions.
+
+Thirteen sabotages, all caught, three only after repair — and all three were the instrument, not the code.
+
+**A pixel row about the dark staying dark was written here and deleted.** It read a worst rise of 0.0 counts on
+all four species, and the population it read that from was **zero**: every pixel at or below 6 of 255 was
+*outside* the silhouette. It would have passed forever while measuring the paper behind the orb. The claim is
+arithmetic — a multiply cannot create light where there was none — and is graded as arithmetic.
+
+**sol's 0.55 core gain was invisible because its disc is saturated.** At the roster's default glow the core
+reads 2.0937 before the flash and 2.0916 after, a ratio of 0.999: the pixels are already at the top of the
+range. A sabotage deleting that gain walked through, because the lift on the prominences carried the row on
+its own. sol renders at glow 0.25 now, where the same core reads ×2.56, and it has a row of its own. A frame
+where the subject is clipped is not a measurement of the subject.
+
+**And the shader twin of the saturation, rewritten as a gain, walked through every pixel row in the round** —
+because a gain brightens too. `mh_complete_lift` is in the kit probe's alpha channel now, on chorus's
+overshooting pair, which is exactly where a saturation and a gain part company.
+
+`tools/ship/murmurComplete-selfcheck.mjs` arrives green at 2,969 ms, so the tree holds 1766 gates.
+
+**Where the port stands, measured rather than recalled** — because that question was asked and the last three
+rounds each found a record that was wrong. murmur's kit has 41 functions and 40 are ported; the one missing is
+`mh_out`'s triangular-PDF dither. `live.pace`, `live.voice` and `st.drive` are essentially complete after the
+clock arc. `st.settled`'s 19 sites are collapsed onto the 3 shapes they take. **`st.complete` is the large
+one**: 47 sites in murmur, of which this round takes 8 — what remains is eight per-species ignition *figures*
+(arc on its filament, aura on a von Mises following the sweep round its ribbons, geode a flat `lit += 0.70`)
+plus about a dozen singles. `st.sweep` is 15 sites and the port has 1, and those same eight figures are where
+the other fourteen live — so sweep and complete are one job rather than two.
+
+## v4657 -- the two rates the records gave up on, one of which was never out of reach
+
+`murmurClock-selfcheck.mjs` had carried this sentence for three rounds:
+
+> its rate reads the species' OWN FLOURISH envelope, which is computed inside the shader from a hash and
+> cannot be integrated by a host that has never seen it. A signal the host does not know has no integral to
+> send, and that is a property of the mechanism rather than a gap in this round.
+
+**The host does know it.** `mh_flourish` is a pure function of shader time, a lane and a slot *length*, and
+duet's lane and slot are style constants out of `MH_DUET` — so the envelope is a deterministic function of
+the very clock `aiPresenceOrbState.mjs` already integrates. The sentence is true of a signal the host does not
+know, and duet's was never one of those. It read as a property of the mechanism, and it was believed.
+
+Measured meanwhile, at a 1/60 s frame:
+
+| running first | duet, integrated | duet, murmur's `rate·t` | limn, integrated | limn, murmur's |
+|---|---|---|---|---|
+| 5 s | 0.006244 rad | 0.0151 rad | 0.056582 rad | 0.1948 rad |
+| 300 s | 0.006244 rad | 0.3010 rad | 0.056582 rad | 11.3896 rad |
+| 1800 s | 0.006244 rad | **1.8152 rad** | 0.056582 rad | **68.3121 rad** |
+
+duet's 1.8152 is 29% of a whole turn of the pair's shared orbit, in one frame — and the trigger is the
+species' *own gesture*, not anything the user does. limn's is nearly eleven whole turns.
+
+**limn's was priced correctly and this round paid it.** Its rate is the only one in murmur's roster that is a
+product of two modulated factors:
+
+    base · (1 + 0.95·pace + 0.30·voice) · (1 + 1.05·drive)
+      = base · (1 + 0.95p + 0.30v + 1.05d + 0.9975·p·d + 0.3150·v·d)
+
+so the exact integral needs the integral of each **product**, which is two more accumulators. The expansion
+reproduces murmur's product to 3.6e-12 over 180 held operating points out to an hour — and a product folded in
+as a sum would pass at `d = 0` and at `p = v = 0`, which is most of an idle session.
+
+**The cross integral is not the product of the two integrals** — 8.20 against 68.35 after twenty seconds idle
+and six busy. A product of integrals carries `t²`. That is also the trap the frame helper fell into, and the
+sabotage that walked through every gate in the tree.
+
+**Three instruments had quietly stopped meaning what they said.** `murmurSpecies12` divided its fourteen orbit
+samples out of duet's *base* rate; with murmur's three modulated terms wired, that covers 86% of a turn and
+every row kept passing, saying "across one full orbit" about something that was not one. The times are solved
+from the phase now, and the gate asserts its own coverage at 1.0004 turns — **a gate that silently measures
+less than it claims is worse than a red one.** `murmurDrive` tested "no line reads both `DRIVE` and
+`uniforms.time`" as a proxy for "no expression multiplies drive by elapsed time", and fired on limn's
+flattening wobble — a *bounded amplitude*, which is precisely the arrangement that row exists to bless.
+`murmurDrive2` bounded helix's contraction as `pct < 10 * limn.pct` with both numbers negative, so limn moving
+*more* made helix's claim *harder*; it is a ratio of magnitudes now.
+
+Fifteen sabotages, all caught, four only after repair. The gesture-integral row graded a running sum the
+*gate* kept beside the module's rather than the module's own — so accumulating against wall `dt` and reading
+the wrong flourish lane both walked straight through. **A reference is only evidence about the thing it is
+actually applied to.**
+
+`mhRatePhase`'s three pairs are named `kA/intA` now rather than `kPace/paceInt`: the function is a sum of
+three coefficient-and-integral pairs, nine call sites spend them on pace, voice and drive, and duet spends its
+middle one on its own gesture. Under the old names that call site read `float(DU.rateFlourish),
+uniforms.duetFlourishInt` in slots labelled for voice — a small lie in the one place a reader looks to find
+out what a rate is made of.
+
+No gate file was added: the subject is two more clocks of a kind `murmurClock-selfcheck.mjs` already owns, so
+it took a section and six rows instead, and paid for them by replacing a 438,000-tick settle with the closed
+form the state module computes (3,345 ms → 3,042 on this box, ~2,160 recorded). A gate file per round is a
+habit, not a rule.
+
+**What is left of the whole clock arc is two sites, and both are absences rather than teleports:** opal's
+flash drift and geode's spin. In this port neither rate moves — opal's live terms and geode's drive mix are
+simply missing — so adding them as murmur spells them would ship two new teleports, and adding them in the
+integrated form costs nothing new, because both are sums.
+
+## v4656 -- the gesture clock: a slot that changes length does not advance the gesture, it replaces it
+
+`mh_flourish` is the pack's play mechanism — "every hero performs **one** gesture, a thing the presence does
+now and then and then lets go of". Time is cut into slots, the slot **index** is `floor(t / SLOT)`, and every
+other number in the gesture is a hash of that index: where in its slot it falls, how long it lasts, and the
+per-gesture random its species spends as a **direction**.
+
+The index is not a phase. Three of murmur's species make the slot length a function of the live signals — and
+a divisor that moves makes `floor(t / SLOT)` **jump**, which re-rolls every hash at once. The bolt in the air
+becomes a different bolt, with a different start, a different duration and a different direction, between one
+frame and the next.
+
+Measured across three species and seven session lengths, at a 1/60 s frame:
+
+| | worst index jump | worst envelope step | random re-rolled mid-gesture |
+|---|---|---|---|
+| murmur's `floor(t / SLOT)` | **21 slots in one frame** | **0.9996** of a 0..1 range | 14 frames |
+| the integrated slot count | 1 | 0.0929 | 0 |
+
+`sin²(πu)` has **zero slope at both ends by design**, so an envelope cannot legitimately arrive at 0.9996 from
+zero in 16.7 ms. And the middle column is the mild reading: the right-hand one is a creature's direction being
+redrawn while it is on screen.
+
+**This is not the phase teleport's shape, and the difference is worth having.** The envelope step is already
+0.9950 after thirty seconds — one re-index ruins one gesture completely at any `t`. What grows with the
+session is the *frequency*: 0 re-rolls at 30 s and 7 at half an hour, because `d(floor(t/SLOT))/dSLOT` is
+`−t/SLOT²`, so at large `t` an arbitrarily small change of slot length flips the index and the gesture
+flickers rather than jumping once.
+
+**tempest's two lightning lanes were doing this today.** It is the one of the three whose divisor was already
+wired; still's was absent entirely and abyss's carried one of murmur's three terms — so those two are an
+absence filled and tempest's is a defect fixed, which is the distinction v4655 had to draw about helix.
+
+**The repair is v4654's factoring on a different structure, and it costs no new uniform.** The honest reading
+of "time cut into slots" when the slot moves is that a boundary falls where the accumulated slot **count**
+crosses an integer:
+
+    S(t) = ∫ dt / SLOT(t) = ∫ F(t) dt / B = (t + a·P + b·V + c·D) / B
+
+which is `mhRatePhase` with a base of `1/B` and the three integrals the host has sent since v4654. `S` is
+continuous and strictly increasing, so `floor(S)` steps by one — **zero jumps, zero reversals and zero
+mid-gesture re-seeds over 5,019 frames** — and a held signal makes the two functions identical across all four
+outputs to 1.5e-12 over 62,400 points. That reduction was verified the hard way too: with the new coefficients
+zeroed and only the migration in place, every one of the fifteen species gates stayed green.
+
+**A shader twin had been missing two of its four signal terms, and the probe could not see it.** `mhAbyssSlot`
+divided by `(1 + 0.55·voice)` where `abyss.ts` — and this tree's own CPU `abyssSlot` — divide by all four. The
+CPU reference was *ahead of* the shader, and the kit probe swept rarity and voice only, leaving the pair that
+was missing at the one value where its absence is invisible. Repaired, the probe sweeps pace against drive in
+a second channel and catches the old twin at 101/255. **Two arguments pinned at zero grade nothing**, for the
+third round running.
+
+**Three recorded claims were repaired rather than re-fitted.** First, `murmurSpecies3` went red. Its four frame times were
+hand-written `[2.0, 9.0, 16.0, 22.5]`, fitted to a slot of 16.48 s — which was abyss's slot only while the
+cadence term was missing. With it the slot is 15.12 s, the lanes moved, and the row about two lanes turning
+the body opposite ways read 15.25° against 0.00° because the first lane was no longer passing at all. A
+constant fitted to where a mechanism happened to be is not a measurement of the mechanism, so the four times
+are **searched for** now, at the gate's own operating point against its own clock. The numbers got stronger:
+**+17.80° and −11.93°**, genuinely opposite signs, and the interior swing went from 4.7× to 10.9×.
+
+**And `murmurDrive`'s control was confounded.** It compares RESPONDING at drive 0 against IDLE, to show that
+entering the state before the lean has begun moves nothing — but `mh_live` weights the *cadence* by 0.60 in
+IDLE and 1.00 in RESPONDING, so that pair also differs in cadence. It held while nothing the gate rendered
+read the cadence; still's new gesture slot reads it, and the row went red on 673 bytes that were not a lean at
+all. Every frame there now holds `activity` at 0, so the window cannot open and drive is the only thing left
+that differs — the same instrument fault v4644 found in the same place, two rounds apart.
+
+Thirteen sabotages, all caught, two only after repair. Handing abyss its **base** slot length where the
+instantaneous one belongs walked through both pixel rows and every species gate — it is worth about 1.3% of a
+slot. Dropping the 1.30 from tempest's folded coefficient walked through everything, because every pixel row
+asked only whether the frame *moved*. Closed by a structural census — the count must integrate against a base
+with no live signal in it and the length must carry one — and by reading tempest's 1.30 and 0.85 out of the
+shader and multiplying them. That census's own first cut took a 240-character declaration window which spilled
+into the next statement and scored every correct site as wrong.
+
+The pixel rows hold `stateIndex`, `stateTau` and the level fixed and sweep only the history, so nothing the
+shader conditions from a uniform differs across a pair: still's single glint is at **0.000 with no history and
+0.993 with twelve radian-seconds of cadence behind it**, at the same instant. The deaf rows — still is deaf to
+voice, tempest's bolts to cadence and drive — are measured with the gesture **on screen**, because a deaf
+reading taken on a night frame says nothing. The first cut of that section measured exactly that and read 0.0%
+on all three of still's integrals, including the two it does read.
+
+`tools/ship/murmurGesture-selfcheck.mjs` arrives green at 3,135 ms on this box (~2,230 recorded), so the tree
+holds 1765 gates. It was 3,519 until the state walks that two sections both wanted were memoised.
+
+**Not claimed:** the 0.9 s **lead-in** still reads the instantaneous slot length, because it is an absolute
+duration in murmur and a fixed 0.9 s *is* a larger share of a slot that has got shorter — so a gesture's start
+slides, continuously, while a signal moves, and the repaired envelope can step up to 9.0× the rate of its own
+progress during a transition. Expressing it against the base slot instead would make it perfectly continuous
+at the price of the reduction that protects every recorded frame: measured, and rejected for that reason. Also
+not claimed: tempest's bolt slots are missing murmur's `small` mix (`mix(2.9, 5.2, small)` and
+`mix(4.3, 7.4, small)`) — a style transcription rather than a clock, kept out so neither measurement would
+muddy the other, and recorded.
+
+## v4655 -- the clocks my own census could not see, and a row that outlived its own repair
+
+v4654 shipped a census that printed **`modulated rates still on murmur's rate * t: (none)`**. Two clocks were
+teleporting while it said so.
+
+It inspected `mh_drift`'s **rate argument**, and only when that argument was a bare identifier it could chase
+back to a `const`. The shape it could not see is the other way round: a drift with a *constant* rate whose
+whole **result** is multiplied by a live signal afterwards. nebula's and tempest's cloud drift and flux's
+stream both carried exactly that. A census that reports a clean result about a subset it never names is this
+tree's oldest defect, and this one shipped it one round ago.
+
+Measured at a 1/60 s frame, with the signal driven to full:
+
+| running first | tempest's cloud drift | | helix's strand climb | |
+|---|---|---|---|---|
+| | integrated | murmur's `drift · F` | integrated | murmur's `drift · F` |
+| 5 s | 0.000880 rad | 0.0199 rad | 0.021992 rad | 0.0849 rad |
+| 60 s | 0.000880 rad | 0.2292 rad | 0.021992 rad | 0.9882 rad |
+| 1800 s | 0.000880 rad | **6.8535 rad** | 0.021992 rad | **29.5654 rad** |
+
+Both grow within 4.1% of linear for 360× the wait, because the error *is* `t · ΔF` and it has no ceiling. The
+integrated form reaches **exactly 100.0%** of its derived bound `base · (1 + k·sup) · speed · dt` at every
+session length, and varies by 7e-14 across five sessions spanning five seconds to half an hour — the bound is
+the real one and not slack, and the sup is read out of `mh_live` itself rather than assumed to be 1.
+
+**The wobble question, which v4654 recorded as the reason this family needed its own round, turned out to have
+one right answer.** murmur multiplies the whole drift by `F`, scaling the secular travel and the bounded
+wobble alike. Expand it:
+
+    (base·t + (k·base/w₂)·sin) · F   =   base·F·t + (k·base·F/w₂)·sin
+
+Only the first summand has a `t` in it. So the integrals go in the **secular** term and the wobble amplitude
+keeps reading the instantaneous factor — not a compromise, the exact continuation of what murmur wrote. The
+two agree to 4.6e-13 across 480 held-signal operating points out to an hour, and part by **405 radians** where
+the signal has just moved. The second number is what stops the first being two spellings of one thing.
+
+**helix turned out to be a fourth kind: its climb had no signal at all.** `helix.ts` scales it by
+`0.75·live.pace` and `0.85·st.drive`; this port carried the bare drift, so the strands rose at one speed
+whatever the exchange was doing — on the one species whose own brief is whether somebody says "DNA" inside
+three seconds. **No signal-hunting census could ever have found that**, because there was no signal in it to
+find. It came out of reading `helix.ts` against the file line for line, which is the only instrument that
+finds an absence. It moves this tree's cadence count from eight species to nine.
+
+**And a row two gates away had outlived its own repair.** `murmurDrive`'s *"NOTHING THIS ROUND WIRED
+MULTIPLIES A CLOCK"* tested that no line reads both `DRIVE` and `uniforms.time`. v4654 and v4655 undeferred
+the rate family; helix's climb now reads both — and **the test kept passing**, because the two reads sit on
+two source lines. A condition that outlives its sentence is worse than a red one: it reads like a live
+guarantee. Rewritten to what is true now — instantaneous drive reaches a clock at exactly one place, as the
+*bounded* wobble amplitude, while every secular term reads the integral.
+
+Fifteen sabotages, all caught, and one of them found a real gap first. Deleting the drive term from the CPU
+`mhRatePhase` left `murmurKit` green — correctly, its section 15 grades the **shader** twin against a
+hand-written reference and never calls the CPU one — and left `murmurClock` green too, because every row
+there passed 0 for three of the four coefficients. **A coefficient of zero grades nothing**, for the second
+round running. Closed by grading `mhRatePhase` against a 4,096-step quadrature of the moving rate it claims to
+integrate, over three signals at unrelated frequencies: 1.0e-12 rad over 46.8 rad of accumulated phase, and
+the reference is the *definition* rather than a second spelling of the implementation.
+
+The pixel rows hold every instantaneous signal fixed and sweep only the history, so under the expression this
+round replaced all four comparisons would be a picture against itself: tempest's cloud moves 21.6% of its
+bytes on `voiceInt`, flux's stream 22.7% on `paceInt`, helix's strands 21.7% and 20.4% on its two. And each
+species is **deaf** to the integrals murmur does not give it — five sweeps, zero bytes — which is the row that
+says these are three wires and not one bus.
+
+The census is a chain walker now: balanced parentheses plus every chained `.method(...)`, so a trailing
+`.mul(VOICE)` is part of the expression being examined instead of the text after it. It checks itself on a
+three-site fixture before it is believed about the orb.
+
+`tools/ship/murmurClock2-selfcheck.mjs` arrives green at 3,005 ms on this box — against a `murmurKit` that
+measures 2,705 here and is recorded at 2,035, a box drift of 1.33, so about 2,260 recorded — so the tree holds
+1764 gates.
+
+**Still on murmur's spelling:** the two bare `rate * t` sites (opal's flash drift, geode's mix target) and the
+two flourish *slot divisors* (still, abyss), where a changing slot re-indexes which gesture is playing rather
+than advancing a phase. Two more cannot be repaired by this mechanism at all: duet's rate reads the shader's
+own flourish, and limn's is a *product* of two modulated factors. Nine species still lack murmur's cadence.
+
+## v4654 -- the species' clocks are integrals now: this port is correct where murmur is not
+
+v4653 deferred the rate family and named the decision it carried. **The owner chose to diverge.** murmur's
+species build a rate out of the live signals and hand it to `mh_drift`, whose phase is `rate * t`; a moving
+rate makes that jump by `t · Δrate`, an error with no ceiling. This port integrates instead.
+
+Measured on comet's orbit as the cadence rises:
+
+| running first | integrated | murmur's `rate * t` | |
+|---|---|---|---|
+| 5 s | 0.00793 rad | 0.1676 rad | 21× |
+| 60 s | 0.00793 rad | 1.9315 rad | 244× |
+| 1800 s | 0.00793 rad | **57.7341 rad** | 7283× |
+
+Fifty-seven radians in one 16.7 ms frame is **nine full turns of the orbit** — the point of light is simply
+somewhere else. The integrated form varies by 4e-16 across those five sessions: it does not depend on the
+session at all.
+
+**The repair is exact and costs three numbers, because the integral factors.** `base` and the coefficients
+come from style knobs and do not move, so
+
+    ∫ base · (1 + a·pace + b·voice + c·drive) dt  =  base · (t + a·P + b·V + c·D)
+
+and the shader needs three running integrals, not a history. The host accumulates them in **shader** time —
+against the tempo integral v4650 connected, not wall seconds — because a species' rate is per second of the
+clock it is handed.
+
+**And it reduces to murmur's own expression wherever a signal is held**, to 9.1e-13 out to an hour. That is
+the row that made the divergence safe to make, and it isn't theory: HEAD read limn's hue turn at 26.84
+degrees, and the integrated clock with no other change read **26.84**, identical.
+
+**The round found three signal-routing defects it had to fix first.** comet's orbital rate read `VOICE` where
+`comet.ts` reads `live.pace` — its closure never touched the cadence at all, so the one hero whose subject is
+a point *travelling* sped up when the user spoke and ignored how busy the exchange was. limn carried the
+*smaller* of murmur's two rate terms and not the larger. aura carried the voice term alone where `aura.ts`
+has voice, pace **and** drive. Adding a cadence term to `rate * t` would have shipped three new teleports, so
+the mechanism wasn't a refinement on top of the fix — it is what made the fix safe to make.
+
+**A gate row had been asserting something false about murmur for thirteen rounds:** *"THE SIX SPECIES WITH A
+CADENCE ARE murmur's SIX … a port that routed the cadence to every species would draw a shimmer on eleven
+bodies murmur leaves still."* Counted in murmur's own sources, `live.pace` appears in **all eighteen**. The
+six were never murmur's — they were the six this port happened to reach at v4641, written down as if they
+were the design. The row now counts how many of the eighteen are reached (eight) and **names the ten that are
+not**.
+
+Twelve sabotages, all caught, three only after repair: the kit probe passed 0 for two of `mhRatePhase`'s four
+coefficients, so deleting a term from the TSL twin moved no pixel (**a coefficient of zero grades nothing**);
+aura's per-lane scale on the secular phase was ungraded because no section renders aura; and nothing checked
+that the shared frame helper *derives* the three integrals rather than defaulting them — which went red on
+limn at 26.45 the moment the clock landed, because a frame that sets `voice` and leaves `voiceInt` at zero
+describes a signal that is loud now and has been silent for all of time.
+
+Two recorded bounds were **dropped rather than re-fitted**. limn's hue centre moved 26.84 → 25.12 because
+murmur's restored pace term runs its arc 28.5% faster, so the row now asserts the *physics* — a saturating
+share approaches `MH_SPREAD` from below — instead of a centre fitted to wherever the arc happened to be. And
+`murmurTempo`'s "an honest frame moves ≤ 20 counts" became a ratio, because that number was about limn's old
+rate and nothing to do with tempo.
+
+Also brought level: `ai-presence-orb.html` had never been given `activity`, `stateIndex` or `stateTau`, so
+the demo's own state buttons changed the speed and the glow and left the shader pinned in IDLE — the SUCCESS
+flash and the RESPONDING lean could not be seen on that page at all.
+
+`tools/ship/murmurClock-selfcheck.mjs` arrives green at 1,611 ms, so the tree holds 1763 gates.
+
+**Still on murmur's spelling, and they are different jobs rather than more of the same one:** the four
+output-multiplied sites (flux, helix, nebula, tempest), the two bare `rate * t` sites (opal, geode), and the
+two flourish *slot divisors* (still, abyss) — where a changing slot re-indexes which gesture is playing
+rather than advancing a phase, so integration does not apply and it needs its own idea. Two more cannot be
+repaired by this mechanism at all: duet's rate reads the shader's own flourish (no host-side integral
+exists), and limn's is a *product* of two modulated factors, whose expansion needs the integral of
+`pace·drive` and `voice·drive`.
+
+## v4653 -- the RESPONDING lean: the wander acquires a heading, and stops scattering
+
+`st.drive` is the last of `mh_state`'s four outputs and the only one whose subject is a **direction**. Its 45
+references across murmur's eighteen sources do three different things — they point a wander at a heading,
+they collapse the scatter around it, and they run sixteen local clocks faster. This round wired the first
+two and left the third, and the line is not where the work got tiring: **every term wired here is a
+direction or a size, and the deferral is a checked rule rather than an intention** — no line in the shader
+reads both `DRIVE` and `uniforms.time`, and a gate row says so.
+
+**The heading's claim is geometry, so the gate grades it as geometry.** still's twelve gesture directions sit
+**86.82°** apart at rest — worst pair 177.3°, very nearly opposite — and collapse to exactly one axis at full
+drive. abyss makes the same call at `k = 0.80` instead of `1.00` and keeps a **12.02°** residual: it becomes a
+current, not a ray, and a table sharing one `k` could not say that.
+
+And it does not converge in a straight line. At the quarter point still reads **87.34°** — *higher* than the
+86.82 it started at — because `normalize(mix(a, b, t))` is not a rotation: mixing two nearly-opposite vectors
+partway toward a common target can leave them further apart in angle. A port that slerped would read 65.11
+there and pass every other row.
+
+A frame-convergence instrument was built for this and **rejected**: it reads 1.34×, because a glint also
+carries its along-path position and a residual lateral offset. That number is in the gate's header rather
+than in its rows.
+
+**The narrowing is the half a frame can show.** helix's light draws in 3.51% (duet 7.21%, prism 4.05%, arc
+2.98% — measured this round, not rendered by the shipped gate, for budget) while **limn moves 0.21% and still
+shifts 8.1% of its bytes**: it is the one species in `MH_DRIVE_FORM` whose lean is not a contraction. Its
+`kTail` is a *concentration* that drive divides, so the tail broadens; its `offT` is an *angle* that drive
+subtracts from, so the tail swings round. A stroke finishing a word spreads and turns.
+
+**droplet's lean is in the silhouette and still's is not** — 539.7% against 1.2% on the same 0.62 ring. Its
+route is the kit's flow deformation, `d += flowAmp * sin(3.20 * dot(n, flowDir) + flowPhase)`, which **both
+halves of the kit have carried since the port and no call site had ever set**: every one passed `(0,0,1), 0,
+0`. The third "built, graded, unreachable" of this arc, after mh_live at v4641 and mh_state at v4644.
+
+Also transcribed rather than tidied: **not one of murmur's six heading vectors is a unit vector** (sol's is
+0.997046 long), and murmur normalizes them *inconsistently* — still and abyss mix toward the raw vector, sol
+and droplet toward its normalized version. That flag changes the direction at every point of the ramp
+strictly between the ends, by 6.6e-4 at sol's half drive.
+
+**Fourteen sabotages, all caught — and six walked through first.** The largest was structural:
+`mhDriveHeading`'s CPU/GPU pair was graded **nowhere**, so deleting the mix — or the normalize — from the TSL
+twin left every pixel gate green, because the species carrying a heading also carry a narrowing and their
+frames still moved. Closed by a new section 14 in `murmurKit-selfcheck`, which also reads the vector's
+**length** back out of the frame: without the normalize it reads 0.30 at mid-ramp, pointing correctly and
+moving at seven tenths speed, which no brightness bound in this tree would catch.
+
+Two more were v4650's lesson repeated: a bound loosened on a correct subject is invisible. The angular
+epsilon is now **derived** from `Number.EPSILON` through acos's square-root amplification (two hand-written
+cuts, at 1e-9 and 1e-6, had both gone red on their own subject), and the unit-vector bound **carries its own
+negative control** — the row builds a tidied-to-five-decimals vector and requires it to fail.
+
+One row was **deleted rather than repaired**: a helix inference that "it moves more of its frame than its
+radius change explains" survived its own negation — a frame with *fewer* turns also moves a fifth of its
+bytes. Replaced by a source census that states the altitude it answers at.
+
+And one sabotage was wrong rather than the gate: a needle matched `MH_IGNITE` before `MH_DRIVE_HEADING` and
+tested the wrong table.
+
+`tools/ship/murmurDrive-selfcheck.mjs` (2,225 ms) and `…Drive2-selfcheck.mjs` (2,260 ms) arrive green, so the
+tree holds 1762 gates. Eighteen species' byte baselines are unmoved, and the gate proves why rather than
+only that: at drive 0 the new heading mix reduces to the normalize that stood there before, bit for bit, so
+there is no operating point where the old expression and the new one differ.
+
+**Still open, with the decision named:** the rate family. Transcribe murmur faithfully and inherit a phase
+teleport that grows without bound with session length, or integrate per-species rates inside the shader and
+diverge from the source on purpose. There is no third option — the defect is in murmur's own design, and
+`live.pace` already carries the identical shape at the sites that read it.
+
+## v4650 -- the orb's clock was an integral that reached no shader, and the wrong one shipped in its place
+
+`render/aiPresenceOrbState.mjs` has integrated speed every tick since the port's first round — composite
+Simpson's rule, accumulated into `phase`, returned by `getParams()` — under a header that names the defect
+it exists to prevent in as many words: *"A state change can jump `speed` instantly; multiplying elapsed time
+by the CURRENT speed would then jump the animation's PHASE too (a visible pop)."*
+
+Both of the two call sites that feed a shader wrote `time: (now - t0) / 1000 * p.speed`. The expression that
+sentence forbids. `ui/aiPresenceOrbWidget.js` and `ai-presence-orb.html`, identically. The mechanism was
+built, graded by its own gate, computed every frame — and thrown away at the one call that mattered. Same
+shape as mh_live before v4641 and mh_state before v4644, except here something wrong was shipping in the
+gap.
+
+**"A visible pop" undersells it.** The error is `t * (speedNew - speedOld)`, set by how long the orb has been
+on screen, so it has no ceiling:
+
+| idle before the change | jump in one 16.7 ms frame | `phase` in the same frame |
+|---|---|---|
+| 5 s | 0.269 s | 0.0242 s |
+| 60 s | **2.902 s** | 0.0242 s |
+| 300 s | 14.390 s | 0.0242 s |
+| 1800 s | **86.191 s** | 0.0242 s |
+
+360× the wait gives 320× the jump — the two track to within 11%, which is what says the error *is*
+`t * Δspeed` and not a rounding artefact. `phase`'s worst frame varies by 3.6e-14 s across all five: it does
+not depend on the session at all, and it lands on `maxSpeed * dt` to 100.00%, because that is what a clock
+running at that speed can cover in one frame.
+
+**And it is not a transient.** Once the 0.6 s crossfade settles, the old clock is permanently **69.355 s**
+displaced, and every later state change displaces it again — a long conversation's clock wanders further
+from its own elapsed time with every turn. Two of the six state changes also *lower* the speed, and under
+`t * speed` a drop runs the shader's clock **backwards**: every species' gesture clock, drift and flourish
+rewinding together.
+
+**The row that makes the repair safe is the one saying the two are the same expression.** The integral of a
+constant from zero *is* elapsed-time-times-that-constant, so wherever speed has never changed they agree to
+1.6e-12 over 3,600 ticks — float accumulation and nothing else. That is why all eighteen species' byte
+baselines are unmoved, and why "just use phase" is a measurement here rather than an assertion.
+
+**Seconds are not a picture, so the gate renders them.** At the clock value the frame after a state change
+*should* have, against the one it *had*: the jumped frame moves **73×** (limn) and **99×** (still) the light
+of one honest frame, worst channel 239 and 30 of 255 against 18 and 1. The two fail differently on purpose —
+limn's arc is a *position*, so a jumped clock simply puts the sweep somewhere else; still is the quietest
+species in the roster (0.2% of bytes per honest frame) and has nothing for a jump to hide behind.
+
+Twelve sabotages, all caught, and **two of them changed the gate rather than passing it**. The ceiling row
+asked only that `phase` stay *under* `maxSpeed * dt`; replacing that derived ceiling with a flat one second
+walked straight through, because every reading is under a second — a bound nothing approaches is a comment,
+not a ceiling, so the row now brackets it from both sides. And a row demanding *zero* readers of `speed`
+went red on the demo's own speed readout: a bound set where it was easy to state rather than where the
+invariant actually is, which would have been "repaired" by deleting a feature. It now names where each
+reader is instead of counting to zero.
+
+One process note worth keeping: the sabotage battery was piped through `head`, took SIGPIPE mid-run, and
+left the state module carrying sabotage T5. The new gate caught it on the very next run, which is the only
+reason this paragraph is about a near miss. The battery now restores through `atexit`.
+
+`tools/ship/murmurTempo-selfcheck.mjs` arrives green at 2,213 ms, so the tree holds 1760 gates.
+
+**Not claimed, and recorded against the `st.drive` backlog entry rather than quietly corrected:** the
+shader's *own* rate multipliers have the same shape one level down. murmur's species multiply local clocks
+by `(1 + k * live.pace)` and `(1 + k * st.drive)` and hand the product to `mh_drift`, whose phase is
+`rate * t`. `live.pace` is already wired and already carries it, so drive does not introduce the hazard — it
+multiplies it by sixteen. The round that wires drive has a decision to make out loud: transcribe murmur
+faithfully and inherit the jump, or integrate per-species rates in the shader and diverge from the source on
+purpose.
+
 ## v4649 -- Three instruments were lying, and most of what they printed was not the tree's
 
 *** THREE INSTRUMENTS WERE LYING, AND MOST OF WHAT THEY PRINTED WAS NOT THE TREE'S. *** I read physics/upAxis's failing row as a Windows physics finding twice and as my own stale sabotage once, and it was neither: rigRunner-selfcheck proves the rig page can report a failure by EDITING upAxis in the tree, restored it in a `finally`, and a finally does not survive the SIGKILL this sweep's cap deals out 241 times a run on that box -- so one killed run welded the sabotage in, every sweep after read it red, and each later rigRunner run snapshotted the sabotage as its own original and wrote it straight back, which is why a hand restore did not hold. The tell was in the row for three rounds: the detail it printed, `y = 5.000 after 1s at 5 m/s`, PASSES the assertion it was printed under. Mutations are ledgered in captures/ outside the engine tree before they are made and reclaimed on the way in, driven on a real SIGKILL with both polarities. *** SECOND: verify had carried every red gate's FAIL lines since v4648 and printed NONE of them *** -- every round since has cost a separate failLines pass on the other box to learn what a red said, with the answer sitting unused in the result object, and carried-but-not-shown is the same as not carried one layer in. It prints them now, and for the seven gates that die having printed no row at all it prints the last line they DID print, which names the last row that ran; on a Windows fail-fast, which writes nothing to stderr, that line is the only diagnosis that exists. *** THIRD: ntfsMounter's headline row, the one wearing the words SABOTAGE and PWNED, drove a payload that cannot fire in the position it is driven in *** -- `'; touch ... #` is inert inside double quotes on any platform, measured with the quoting removed entirely -- and underneath it a volume named $(...) EXECUTED when the generated .command was double-clicked, because shellQuote's single quotes are ordinary characters there too. Found by sabotaging the row and getting zero red. The name now goes into a variable as a single-quoted literal and is printed with printf %s, the gate drives the bridge's own text through bash, and a positive control rebuilds the old shape and proves it fires. Also repaired: a gate that wrote five fixtures into the tree and unlinked them only if it lived, leaving one behind that stamped a whole capture WORKING TREE DIRTY; two separator-blind comparisons that made the licence register and its own gate report themselves as unlicensed copies on Windows while the walk descended into node_modules; three claims that were POSIX properties asserted as universal, one of which measured ZERO on Windows by construction because Node's pipes are synchronous there; and six WGSL gates whose frozen numbers were one adapter's reading, moved onto the per-adapter record that has existed since v4646 and had exactly ONE user of 161. The clearest of those: microfacetVndf demanded a NON-ZERO count of backfacing facets, so an adapter whose f32 rounds the other way and is EXACT went red for being better than the claim. NOT RECORDED, AND DELIBERATELY: noisePrecision, solidTexture and the three slug gates get a byte-exact readback probe and a worst-pixel diagnosis instead of a per-adapter number, because 0 of 9216 points agreeing with EITHER mirror is a readback and not a rounding, and recording 16 of 255 as what that adapter does would have closed a red by agreeing with it. Four derived records this round's own work drifted were re-taken rather than widened, including a separator census that moved eight callers and REPAIRED three. WHAT IS NOT CLAIMED: that any of it is verified on Windows -- this box is green at 1397 of 1397 gates and every finding here came from the rig, which is the instrument for the rest; that the six fail-fast crashes are six defects rather than one 7908 MB box, since the set differs every run and STATUS_STACK_BUFFER_OVERRUN is what V8 raises for an OOM abort as well as for a smashed stack; or that sweepCoverage is closed -- it went red inside the sweep and green three times alone, and it still grades a timing record the same run rewrites. The tree stands at 1759 gates.

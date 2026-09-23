@@ -322,7 +322,11 @@ const probeRun = await renderThreeTslToPixels({
                { factoryArgs: { mode: "finishPaper", n: N } },
                { factoryArgs: { mode: "finishInk", n: N } },
                { factoryArgs: { mode: "finishGrey", n: N } },
-               { factoryArgs: { mode: "ignite", n: N } }],
+               { factoryArgs: { mode: "ignite", n: N } },
+               { factoryArgs: { mode: "heading", n: N } },
+               { factoryArgs: { mode: "drift", n: N } },
+               { factoryArgs: { mode: "igniteAxis", n: N } },
+               { factoryArgs: { mode: "igniteRound", n: N } }],
 });
 
 sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FOR BIT ***");
@@ -1230,15 +1234,28 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
             const kk = Math.floor((x / N) * 4), tt = (y / N) * 24;
             const wantLife = Math.round(Math.min(1, Math.max(0, K.opalLife(kk, tt))) * 255);
             const wantSlot = Math.round(Math.min(1, Math.max(0, K.abyssSlot(x / N, Math.floor((y / N) * 3) * 0.5) / 32)) * 255);
+            // ...and the SAME function with its other two signals moving. See the note on mhAbyssSlot: the
+            // shader twin was missing both of them and this frame graded them at zero in every pixel.
+            const wantPD = Math.round(Math.min(1, Math.max(0,
+                K.abyssSlot(0.6, 0, x / N, Math.floor((y / N) * 3) * 0.5, 0) / 32)) * 255);
+            // ...and the SUCCESS flash's saturation in alpha: x is the figure, y is complete, on chorus's
+            // overshooting pair. See the probe's own note -- a gain and a saturation both brighten, so a
+            // pixel row about a species cannot tell them apart and this one can.
+            const wantLift = Math.round(Math.min(1, Math.max(0,
+                K.mhCompleteLift((x / N) * 1.5, y / N, 0.90, 0.45) / 2)) * 255);
             const dL = Math.abs(oa[i] - wantLife), dS = Math.abs(oa[i + 1] - wantSlot);
+            wSlot = Math.max(wSlot, Math.abs(oa[i + 3] - wantLift));
             if (dL > wLife) { wLife = dL; atL = `k=${kk} t=${tt.toFixed(1)}: gpu ${oa[i]} cpu ${wantLife}`; }
-            wSlot = Math.max(wSlot, dS);
+            wSlot = Math.max(wSlot, Math.max(dS, Math.abs(oa[i + 2] - wantPD)));
         }
         say(`opal life and abyss slot over ${N * N} points: worst |gpu - cpu| = ${wLife}/255 on the life, ${wSlot}/255 on the slot`);
         ok("!! *** opal's LIFE AND abyss's SLOT RENDER ON A REAL GPU AND MATCH THE CPU REFERENCE ***",
             wLife <= 2 && wSlot <= 2,
             `worst channel error ${wLife} of 255 on the life across four flashes and 24 seconds, and ${wSlot} ` +
-            `on the slot across the whole rarity range at three voices. Worst life at ${atL}. This is the row ` +
+            `on the slot across the whole rarity range at three voices AND across the whole cadence range at `+
+            `three drives -- all four of its signal inputs -- and mh_complete_lift's saturation over the figure `+
+            `and the flash, on chorus's overshooting pair. After v4656 found the shader twin carrying two `+
+            `of them and this frame sweeping neither. Worst life at ${atL}. This is the row ` +
             `that makes the four CPU rows above mean anything about the PICTURE: without it they describe a ` +
             `reference implementation nothing draws, which is the shape v4632's sabotage sweep caught when ` +
             `these formulas lived inline in the species file and three corruptions of them passed everything.`);
@@ -1689,6 +1706,289 @@ sec("13. *** mh_ignite: THE SUCCESS SHELL -- a ring that LEAVES the heart and RE
     }
 }
 
+
+sec("14. *** mh_drive's HEADING MIX: the RESPONDING lean, CPU against the compiled shader ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! mhDriveHeading matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;   // the same row flip sections 6, 11, 12 and 13 measure and assert
+        const hd = r.frames[12];
+        // still's constants written out by hand, NOT read out of MH_DRIVE_HEADING -- the v4579 distinction,
+        // and the reason this section can disagree with the table at all.
+        const V = [0.92, -0.18, 0.35];
+        const wander = (ga) => [Math.cos(ga), 0.42 * Math.sin(ga * 1.3), Math.sin(ga)];
+        const want = (drive, ga) => {
+            const a = Math.min(1, Math.max(0, drive));
+            const w = wander(ga);
+            const m = [w[0] + (V[0] - w[0]) * a, w[1] + (V[1] - w[1]) * a, w[2] + (V[2] - w[2]) * a];
+            const L = Math.hypot(m[0], m[1], m[2]);
+            return m.map((c) => Math.round(Math.min(1, Math.max(0, c / L * 0.5 + 0.5)) * 255));
+        };
+        let worst = 0, at = "", worstFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const drive = x / N, ga = (ysh / N) * 6.2831853;
+            const w = want(drive, ga);
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 3; c++) {
+                const d = Math.abs(hd[i + c] - w[c]);
+                if (d > worst) { worst = d; at = `drive ${drive.toFixed(3)} angle ${ga.toFixed(3)} ch ${c}: gpu ${hd[i + c]} cpu ${w[c]}`; }
+                worstFlat = Math.max(worstFlat, Math.abs(hd[iFlat + c] - w[c]));
+            }
+        }
+        say(`mh_drive's heading over ${N} drives x ${N} wander angles x 3 components: worst |gpu - cpu| = ` +
+            `${worst}/255 (unflipped, ${worstFlat}/255)`);
+        ok("!! *** THE HEADING MIX RENDERS ON A REAL GPU AND MATCHES THE HAND-WRITTEN normalize(mix(w, V, a)) ***",
+            worst <= 2 && worstFlat > 20,
+            `worst component error ${worst} of 255 (${at || "no disagreement"}); the unflipped orientation ` +
+            `scores ${worstFlat}, so this cannot pass by the symmetry a drive-independent direction would ` +
+            `have. *** THIS SECTION EXISTS BECAUSE TWO SABOTAGES WALKED THROUGH THE ROUND WITHOUT IT. *** ` +
+            `Deleting the mix from the TSL twin, and deleting the NORMALIZE from it, both left every pixel ` +
+            `gate in v4653 green: the species that carry a heading also carry a narrowing, so their frames ` +
+            `still moved with drive and "the lean reaches the picture" was still true. A geometry claim ` +
+            `graded only on the CPU reference is a claim about a function the shader need not be running.`);
+
+        // The NORMALIZE is the half a dropped-normalize sabotage gets wrong while still pointing the right
+        // way, so it is asserted as a LENGTH rather than inferred from the agreement bound above.
+        let worstLen = 0, atLen = "";
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const i = (ry(ysh) * N + x) * 4;
+            const v = [0, 1, 2].map((c) => (hd[i + c] / 255) * 2 - 1);
+            const L = Math.hypot(v[0], v[1], v[2]);
+            const d = Math.abs(L - 1);
+            if (d > worstLen) { worstLen = d; atLen = `drive ${(x / N).toFixed(3)} angle ${((ysh / N) * 6.2831853).toFixed(3)}: |v| = ${L.toFixed(4)}`; }
+        }
+        ok("!! ...and every direction it returns is a UNIT vector, read back out of the frame",
+            worstLen < 0.02,
+            `worst |length - 1| = ${worstLen.toFixed(4)} over all ${N * N} cells (${atLen}), against an 8-bit ` +
+            `quantisation that is itself worth about 0.007 in a component. WITHOUT THE NORMALIZE THIS ROW ` +
+            `READS 0.30 AT MID-RAMP: mixing two unit vectors that are 90 degrees apart gives a vector of ` +
+            `length 0.71 at a = 0.5, and a species marching along it would travel at seven tenths the speed ` +
+            `through the middle of every gesture -- pointing correctly and moving wrong, which no brightness ` +
+            `bound anywhere in this tree would catch.`);
+
+        // The ends of the ramp, where the answer is known exactly without any mixing at all.
+        const at0 = (ysh) => [0, 1, 2].map((c) => hd[(ry(ysh) * N + 0) * 4 + c]);
+        const at1 = (ysh) => [0, 1, 2].map((c) => hd[(ry(ysh) * N + (N - 1)) * 4 + c]);
+        let endSpread = 0;
+        for (let ysh = 1; ysh < N; ysh++) for (let c = 0; c < 3; c++)
+            endSpread = Math.max(endSpread, Math.abs(at1(ysh)[c] - at1(0)[c]));
+        let startSpread = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let c = 0; c < 3; c++)
+            startSpread = Math.max(startSpread, Math.abs(at0(ysh)[c] - at0(0)[c]));
+        say(`across all ${N} wander angles: at the LAST drive column the components vary by ${endSpread}/255, at the first by ${startSpread}/255`);
+        ok("!! *** AT THE TOP OF THE RAMP EVERY WANDER ANGLE RETURNS THE SAME DIRECTION, AND AT THE BOTTOM NONE DOES ***",
+            endSpread <= 16 && startSpread > 200 && startSpread > 15 * endSpread,
+            `${endSpread} of 255 at the top against ${startSpread} at the bottom -- ` +
+            `${(startSpread / Math.max(endSpread, 1)).toFixed(0)}x. THE RESIDUAL IS ARITHMETIC AND ITS SIZE ` +
+            `IS PREDICTED, NOT TOLERATED: the probe's last column is drive ${((N - 1) / N).toFixed(4)}, not ` +
+            `1.0, because the lattice samples cell CENTRES, so 1/${N} of each wander survives the mix. A ` +
+            `component spans about 2, an eighth-and-a-half of a percent of that is 0.125, the frame carries ` +
+            `it at half scale, and 255 * 0.0625 is 16 -- which is the bound, and ${endSpread} is what it ` +
+            `reads. This is the ` +
+            `convergence tools/ship/murmurDrive-selfcheck.mjs measures as an ANGLE in f64 (86.82 degrees to ` +
+            `zero); here it is the same fact read straight out of a frame.`);
+    }
+}
+
+sec("15. *** THE MODULATED CLOCK: this port's ONE DELIBERATE DIVERGENCE FROM murmur, graded on a real GPU ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the repaired drift matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const ry = (ysh) => N - 1 - ysh;
+        const dr = r.frames[13];
+        const TAU = 2 * Math.PI, wrap = (v) => v / TAU - Math.floor(v / TAU);
+        const base = 0.34, kP = 0.95, lane = 1.0, wob = 0.62;
+
+        // The CPU side, from murmur's constants written out by hand rather than read off the kit.
+        // The three coefficients the probe carries, written out here rather than read off it: the voice and
+        // drive lanes ride the same step at half and a quarter of its height, so each of mhRatePhase's four
+        // terms is non-zero and a deleted one shows.
+        const kV = 0.31, kD = 0.77, fV = 0.5, fD = 0.25;
+        const cpu = (t0, t) => {
+            const P = Math.max(t - t0, 0), paceNow = t >= t0 ? 1 : 0;
+            const rateNow = base * (1 + paceNow * kP + paceNow * kV * fV + paceNow * kD * fD);
+            const k = Math.min(0.72, Math.max(0, wob)), w2 = 0.137 + 0.0413 * lane;
+            const wobTerm = (k * rateNow / w2) * Math.sin(w2 * t + lane * 1.71);
+            const mine = base * (t + kP * P + kV * (P * fV) + kD * (P * fD)) + wobTerm;
+            const theirs = rateNow * t + wobTerm;
+            return [mine, theirs];
+        };
+        let worst = 0, at = "", worstFlat = 0;
+        for (let ysh = 0; ysh < N; ysh++) for (let x = 0; x < N; x++) {
+            const t0 = (x / N) * 60, t = (ysh / N) * 120;
+            const [mine, theirs] = cpu(t0, t);
+            const want = [wrap(mine), wrap(theirs), Math.min(1, Math.max(0, (theirs - mine) / 20))]
+                .map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255));
+            const i = (ry(ysh) * N + x) * 4, iFlat = (ysh * N + x) * 4;
+            for (let c = 0; c < 3; c++) {
+                const d = Math.abs(dr[i + c] - want[c]);
+                if (d > worst) { worst = d; at = `t0 ${t0.toFixed(2)} t ${t.toFixed(2)} ch ${c}: gpu ${dr[i + c]} cpu ${want[c]}`; }
+                worstFlat = Math.max(worstFlat, Math.abs(dr[iFlat + c] - want[c]));
+            }
+        }
+        say(`the modulated clock over ${N} step times x ${N} observation times: worst |gpu - cpu| = ${worst}/255 (unflipped, ${worstFlat}/255)`);
+        // The bound is 2 because the reading is 0: taking a residue mod 2*pi of a phase near sixty radians
+        // is lossy in f32 in principle -- about 6e-6 of absolute slop, which is a count of 255 on the worst
+        // cell -- and in practice both sides land on the same value. It is left at 2 rather than 0 for that
+        // reason and not as slack; a real disagreement in this function is a whole turn, not a count.
+        ok("!! *** THE REPAIRED CLOCK AND murmur's ORIGINAL BOTH RENDER ON A REAL GPU AND MATCH THE CPU ***",
+            worst <= 2 && worstFlat > 30,
+            `worst channel error ${worst} of 255 (${at || "no disagreement"}); the unflipped orientation ` +
+            `scores ${worstFlat}, so this cannot pass by the symmetry a time-independent phase would have. ` +
+            `BOTH EXPRESSIONS ARE IN THE SAME FRAME ON PURPOSE: the row grades the repair and the thing it ` +
+            `replaces against one CPU reference, so a shader that quietly computed murmur's formula in both ` +
+            `channels would fail rather than agree with itself.`);
+
+        // The whole point: the two DISAGREE, and by how much is the size of the defect being repaired.
+        const at3 = (xs, ysh, c) => dr[(ry(ysh) * N + xs) * 4 + c];
+        let maxGap = 0, gapAt = "";
+        for (let ysh = 1; ysh < N; ysh++) for (let x = 1; x < N; x++) {
+            const g = at3(x, ysh, 2);
+            if (g > maxGap) { maxGap = g; gapAt = `step at ${((x / N) * 60).toFixed(1)}s, seen at ${((ysh / N) * 120).toFixed(1)}s`; }
+        }
+        const [m0, t0] = cpu(56.25, 120);
+        say(`a pace step at 56.2 s, read at t = 120: repaired ${m0.toFixed(3)} rad, murmur ${t0.toFixed(3)} rad -- ${Math.abs(m0 - t0).toFixed(3)} apart`);
+        ok("!! *** AND THE TWO ARE NOT THE SAME CLOCK: a late signal step parts them by nearly three turns ***",
+            Math.abs(m0 - t0) > 15 && maxGap > 100,
+            `${Math.abs(m0 - t0).toFixed(3)} radians -- ${(Math.abs(m0 - t0) / TAU).toFixed(2)} ` +
+            `full turns of a species that reads this as an angle -- and the difference channel reaches ` +
+            `${maxGap} of 255 from zero somewhere in the frame (${gapAt}). IF THIS ROW WENT QUIET THE ROUND ` +
+            `WOULD BE POINTLESS: it is what says the repair changes the number at all, and it is measured on ` +
+            `the same lattice the agreement row above is, so neither can be true of a different picture.`);
+
+        // ...and they agree exactly where nothing is moving, which is what protects every recorded frame.
+        let worstSteady = 0;
+        for (let i = 0; i <= 40; i++) {
+            const t = 1 + i * 3, pace = 0.47;
+            const mine = base * (t + kP * (pace * t)), theirs = base * (1 + kP * pace) * t;
+            worstSteady = Math.max(worstSteady, Math.abs(mine - theirs));
+        }
+        ok("!! ...and with a signal that is NOT moving the two are the same expression, to 2.3e-13 over two minutes",
+            worstSteady < 1e-9,
+            `worst |repaired - murmur| = ${worstSteady.toExponential(2)} across 41 times out to t = 121 at a ` +
+            `held pace. A constant signal makes P = pace * t, so base * (t + a*pace*t) IS base * (1 + a*pace) ` +
+            `* t. THAT IS THE ROW THAT MAKES THE DIVERGENCE SAFE: the two formulas differ only while a signal ` +
+            `is in motion, which is exactly where murmur's is wrong, so every frame this tree has recorded at ` +
+            `a fixed operating point is where it was.`);
+    }
+}
+
+// =============================================================================================================
+sec("16. *** THE IGNITION's TRAVELLING GAUSSIAN, ON A REAL GPU -- v4659 ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the travelling gaussian matches a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const fr = r.frames[14];
+        const A = K.MH_IGNITE_AXIS;
+        const chan = [["flux", A.flux], ["prism", A.prism], ["helix", A.helix]];
+        let worst = 0, at = "", worstA = 0;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const i = ((N - 1 - y) * N + x) * 4;
+            const coord = (x / N) * 3.6 - 1.2, sweep = y / N;
+            chan.forEach(([nm, c], k) => {
+                const want = Math.round(Math.min(1, Math.max(0,
+                    K.mhIgniteAxis(coord, 1, sweep, c.lo, c.hi, c.width, c.gain, c.flat) / 2.5)) * 255);
+                const d = Math.abs(fr[i + k] - want);
+                if (d > worst) { worst = d; at = `${nm} coord ${coord.toFixed(2)} sweep ${sweep.toFixed(2)}: gpu ${fr[i + k]} cpu ${want}`; }
+            });
+            const wantA = Math.round(Math.min(1, Math.max(0,
+                K.mhIgniteAxis(coord, y / N, 0.5, A.helix.lo, A.helix.hi, A.helix.width, A.helix.gain, A.helix.flat) / 2.5)) * 255);
+            worstA = Math.max(worstA, Math.abs(fr[i + 3] - wantA));
+        }
+        say(`the travelling front over ${N * N} points x three axes: worst |gpu - cpu| = ${worst}/255; the complete axis in alpha ${worstA}/255`);
+        ok("!! *** THE FRONT IS WHERE sweep PUTS IT, ON A REAL GPU, ACROSS THREE DIFFERENT AXES ***",
+            worst <= 1 && worstA <= 1,
+            `worst channel error ${worst} of 255 across flux's -1..1, prism's 0..2.1 and helix's -1..1 with ` +
+            `its flat term (worst at ${at}), and ${worstA} on the alpha channel that sweeps COMPLETE with the ` +
+            `sweep PINNED -- and that channel runs HELIX's constants, because helix is the one with a FLAT term ` +
+            `and a twin that moved the flat outside the complete multiply read identically on flux's and ` +
+            `walked through. THE THREE RANGES ARE DIFFERENT ON PURPOSE: a probe that ran every channel over ` +
+            `-1..1 could not tell prism's hi of 2.10 from a constant, and the alpha channel exists because ` +
+            `holding complete at 1 in all three would let the multiplier be deleted with nothing red -- ` +
+            `which is precisely what happened to the SHELL's probe before v4644 gave it the same axis.`);
+
+        // ...and the front's PEAK is at mix(lo, hi, sweep), which is the whole claim about travelling.
+        let worstPeak = 0;
+        for (const [nm, c] of chan) {
+            for (const sw of [0, 0.25, 0.5, 0.75, 1]) {
+                let bestC = 0, bestV = -1;
+                for (let q = -1.2; q <= 2.4; q += 0.002) {
+                    const v = K.mhIgniteAxis(q, 1, sw, c.lo, c.hi, c.width, c.gain, c.flat);
+                    if (v > bestV) { bestV = v; bestC = q; }
+                }
+                worstPeak = Math.max(worstPeak, Math.abs(bestC - (c.lo + (c.hi - c.lo) * sw)));
+                void nm;
+            }
+        }
+        ok("!! ...and the brightest point IS mix(lo, hi, sweep), to 0.002 of the axis, at every sweep",
+            worstPeak < 0.003,
+            `the gaussian's peak, found by scanning the whole axis at 0.002 resolution, sits at ` +
+            `mix(lo, hi, sweep) to within ${worstPeak.toFixed(4)} across three species and five sweeps. THAT ` +
+            `IS THE CLAIM THE WORD "TRAVELLING" MAKES and it is measured rather than read off the formula: ` +
+            `the front's position is the sweep's position, so the flash crosses the whole figure once.`);
+    }
+}
+
+// =============================================================================================================
+sec("17. *** THE TWO IGNITION FIGURES THAT ARE NOT AN AXIS: aura's CIRCLE AND fathom's WINDOW -- v4660 ***");
+{
+    const r = probeRun;
+    if (!r.ok) {
+        ok("!! the lap and the window match a real GPU render", false, `could not render: ${r.reason || "unknown"}`);
+    } else {
+        const fr = r.frames[15];
+        const L = K.MH_IGNITE_LAP, T = K.MH_IGNITE_TURN;
+        let wLap = 0, wTurn = 0, wLapC = 0, wTurnC = 0, at = "";
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const i = ((N - 1 - y) * N + x) * 4;
+            const ang = (x / (N - 1)) * 6.2831853 - 3.1415927, turnIx = Math.floor((x / N) * 3), sweep = y / N;
+            const q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255);
+            const dR = Math.abs(fr[i] - q(K.mhIgniteLap(ang, 1, sweep, L.flat, L.gain, L.k)));
+            const dG = Math.abs(fr[i + 1] - q(K.mhIgniteTurn(turnIx, 1, sweep, T.step, T.lead, T.edge, T.flat, T.gain) / 3));
+            const dB = Math.abs(fr[i + 2] - q(K.mhIgniteLap(ang, y / N, 0.5, L.flat, L.gain, L.k)));
+            const dA = Math.abs(fr[i + 3] - q(K.mhIgniteTurn(turnIx, y / N, 0.16, T.step, T.lead, T.edge, T.flat, T.gain) / 3));
+            if (dR >= wLap) { wLap = dR; at = wLap ? `angle ${ang.toFixed(2)} sweep ${sweep.toFixed(2)}` : "nowhere -- no pixel of the lap differs at all"; }
+            wTurn = Math.max(wTurn, dG); wLapC = Math.max(wLapC, dB); wTurnC = Math.max(wTurnC, dA);
+        }
+        say(`over ${N * N} points: lap ${wLap}/255, window ${wTurn}/255, and on the COMPLETE axis lap ${wLapC}/255, window ${wTurnC}/255`);
+        ok("!! *** aura's VON MISES AND fathom's WINDOW ARE THE SAME NUMBERS ON A REAL GPU, INCLUDING AT THE SEAM ***",
+            wLap <= 1 && wTurn <= 1 && wLapC <= 1 && wTurnC <= 1,
+            `worst |gpu - cpu| is ${wLap} of 255 on the lap (worst at ${at}), ${wTurn} on the window, and ` +
+            `${wLapC} / ${wTurnC} on the two channels that sweep COMPLETE with the sweep PINNED. UNTIL THIS ` +
+            `ROW THE TWO NEWEST KIT FUNCTIONS HAD NO COMPILED TWIN AT ALL: v4660 wired both into four ` +
+            `species and graded them entirely against their own f64 halves, which is the arrangement that ` +
+            `let mh_abyss_slot carry two of four signal terms for a full round. The lap's lattice spans the ` +
+            `WHOLE circle, -pi to +pi, so the seam is inside the probe; the window's x axis spends sixteen ` +
+            `columns on three turn indices, because a figure keyed on WHICH shell has nothing continuous to ` +
+            `sample; and the two complete channels exist because holding complete at 1 lets the multiplier ` +
+            `be deleted with nothing red -- both figures have a FLAT term, which is precisely what a ` +
+            `complete axis grades and what an axis held at 1 cannot see.`);
+
+        // ...and the two figures are DIFFERENT SHAPES, measured on the probe's own pixels rather than argued.
+        const col = (x, y, c) => fr[((N - 1 - y) * N + x) * 4 + c];
+        let lapEnds = 0, turnEnds = 0;
+        for (let y = 0; y < N; y++) {
+            lapEnds = Math.max(lapEnds, Math.abs(col(0, y, 0) - col(N - 1, y, 0)));
+            turnEnds = Math.max(turnEnds, Math.abs(col(0, y, 1) - col(N - 1, y, 1)));
+        }
+        ok("!! ...and the CIRCLE closes on the GPU's own pixels while the WINDOW does not, which is the difference",
+            lapEnds === 0 && turnEnds > 40,
+            `the lap's first and last columns ARE -pi and +pi -- the probe's angle runs over n - 1 for exactly ` +
+            `this row -- and the GPU writes the same byte in both at every one of the ${N} sweeps: ${lapEnds} ` +
+            `of 255, on hardware, not in the reference. THE FIRST CUT OF THIS ROW RAN THE ANGLE OVER n AND ` +
+            `READ 69 of 255, which is the figure's slope across one lattice step and not a seam at all -- a ` +
+            `periodicity row whose two samples are not the same point is measuring something else and would ` +
+            `have been "repaired" by widening its bound. fathom's window across the same two columns differs ` +
+            `by up to ${turnEnds}, because its axis is an INDEX and has no business closing: a row asserting ` +
+            `both were periodic would be green on a port that had swapped them.`);
+    }
+}
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS KIT IS FOR: four of murmur-web's eighteen species are built out of it, and the other fourteen " +

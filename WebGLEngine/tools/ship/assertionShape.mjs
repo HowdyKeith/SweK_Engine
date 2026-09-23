@@ -636,14 +636,73 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4647p -- RE-TAKEN: tools/ship/sweepRotation-selfcheck.mjs joined. gates/usesOk/definesOk by one and
     // nameFirst by one -- the ordinary shape, and the counter-example to v4647g's condFirst arrival two
     // rounds ago. The other five rows did not move.
+    // *** v4665 -- RE-TAKEN AT THE MERGE, AND NEITHER SIDE'S NUMBER WAS RIGHT. *** Both lines re-took this
+    // census over their own tree while the other was adding gates, so HEAD carried 1762 and origin/main
+    // carried its own figure, and the merged tree is neither -- it is the union. A merge that picked a side
+    // here would ship a census of half a tree under a whole tree's name. Re-derived below over the merged
+    // tree; both re-take histories are kept because each one records which gates moved which rows.
+    // ---- this branch's line ----
     // v4661 -- RE-TAKEN: tools/ship/wasmTeardown-selfcheck.mjs joined. gates/usesOk/definesOk by one and
     // nameFirst by one -- the ordinary shape again, and the round that added it converted 48 OTHER gates'
     // last line from process.exit() to process.exitCode without moving a single row here, which is the
     // reassuring half: this census is about how a gate ASSERTS, and how it leaves is not that.
     // v4662 -- RE-TAKEN: tools/ship/thrownRow-selfcheck.mjs joined. The ordinary four by one again.
     // v4664 -- RE-TAKEN: tools/ship/declaredCost-selfcheck.mjs joined. The ordinary four by one, again.
-    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1634, condFirst: 96, unknownSignature: 11,
+    // ---- the murmuration line ----
+    // v4650 -- RE-TAKEN 1759 -> 1760 for tools/ship/murmurTempo-selfcheck.mjs. ONE gate, not the pairs the
+    // last three orb rounds added, and the reason is the shape of what it grades: mh_live, mh_state and the
+    // SUCCESS shell each needed species RENDERED to be graded, and a species is one WGSL compile, which is
+    // what forced those rounds into two files apiece. This one's subject is a NUMBER the host computes, so
+    // three of its four sections are pure CPU and the fourth renders two species to turn seconds into light.
+    // v4653 -- RE-TAKEN 1760 -> 1762 for tools/ship/murmurDrive-selfcheck.mjs and …Drive2-selfcheck.mjs.
+    // A PAIR AGAIN, and for the third time in the orb arc the split was forced by the clock rather than by
+    // the subject: five species measured 4,307 ms against a 3,000 ms ceiling, three measured 2,772 -- the
+    // exact figure at which tools/ship/murmurLive-selfcheck.mjs was split, for the recorded reason that 8%
+    // of margin is over once a contended sweep's 10% is allowed for -- and two measure about 2,300. What is
+    // different this time is that the pair carries a real division of subject as well: one gate holds a
+    // GEOMETRY claim graded in f64 and the other holds the half a frame can actually show.
+    // v4654 -- RE-TAKEN 1762 -> 1763 for tools/ship/murmurClock-selfcheck.mjs. ONE gate, not the pairs the
+    // last three orb rounds needed, and the reason is the same one murmurTempo had: the subject is a NUMBER
+    // the host computes, so three of its four sections are pure CPU and the fourth renders a single species.
+    // A round whose claim is arithmetic does not pay a WGSL compile per species to make it.
+    // v4655 -- RE-TAKEN 1763 -> 1764 for tools/ship/murmurClock2-selfcheck.mjs. A PAIR after all, and the
+    // clock forced it exactly as it forced the last three: the subject needs THREE species rendered (nebula
+    // and tempest share a builder, flux, helix) because the three clocks this round repaired do not live on
+    // one body, and three WGSL compiles measure 3,056-3,242 ms on this box against a murmurKit that measures
+    // 2,705 here and is RECORDED at 2,035 -- a box drift of 1.33, so about 2,300-2,440 recorded, under the
+    // 2,772 at which this tree splits. Putting them in murmurClock instead would have added those three
+    // compiles to its existing one and gone over the 3,000 ms ceiling, which does not make a gate slow, it
+    // makes it not run.
+    // v4656 -- RE-TAKEN 1764 -> 1765 for tools/ship/murmurGesture-selfcheck.mjs. ONE gate again, and the
+    // clock allowed it: three species RENDERED is the same three compiles murmurClock2 pays, and the CPU
+    // half was brought under the line by MEMOISING the state walks two sections both wanted -- 3,519 ms to
+    // 3,135 on this box, which against a murmurKit measuring 2,861 here and RECORDED at 2,035 (drift 1.41)
+    // is about 2,230 recorded. Computing the same 21 walks twice was a tenth of the budget spent on
+    // arithmetic already done, which is a cheaper thing to find than a second gate file.
+    // v4658 -- RE-TAKEN 1765 -> 1766 for tools/ship/murmurComplete-selfcheck.mjs. ONE gate, and it renders
+    // FOUR species of the seven the round touched: each is a WGSL compile, seven measured 4,373 ms against a
+    // 3,000 ms ceiling and four measure 2,969. The three left out are not dropped -- arc and aura are carried
+    // by the source census in section 3, and opal was already moving before this round because it has an
+    // ignition shell. What the four are chosen FOR is stated where they are listed: the two largest gains,
+    // the one overshoot, and the species carrying both shapes at once.
+    // v4659 -- RE-TAKEN 1766 -> 1767 for tools/ship/murmurIgniteAxis-selfcheck.mjs. A SECOND gate for the
+    // same signal rather than more rows in murmurComplete's, and the clock decided it: that gate renders
+    // four species at 2,969 ms and these are four more, which is four more WGSL compiles and would have put
+    // one file over the 3,000 ms ceiling. The split is also the subject's: one gate holds the flash's effect
+    // on light that is ALREADY THERE and the other holds the figure it sends TRAVELLING.
+    // v4660 -- RE-TAKEN 1767 -> 1768 for tools/ship/murmurIgniteFour-selfcheck.mjs. A THIRD ignition gate,
+    // and the reason is the subject rather than the clock this time: v4659's four figures are ONE shape on
+    // four axes and share a table, while these four are four different shapes -- a von Mises going round
+    // aura, a sequence of windows down fathom's shells, a flat lift on geode with no sweep in it, and a
+    // trail decay on comet that adds no light at all. Four shapes in one gate is four sets of rows that
+    // share nothing; putting them in the axis gate would also have been four more WGSL compiles on a file
+    // already measuring 2,736 ms. This one measures 2,690 with its four species.
+    // v4665 -- RE-TAKEN OVER THE MERGED TREE: gates 1768 -> 1771, usesOk 1747 -> 1750, definesOk 1739 ->
+    // 1742, nameFirst 1640 -> 1643. The union of two lines that had each re-taken over their own tree --
+    // +3 gates from this branch (wasmTeardown, thrownRow, declaredCost) on top of the murmuration line's
+    // count, and the ordinary four-by-one shape three times over. condFirst and unknownSignature held.
+    gates: 1771, usesOk: 1750, definesOk: 1742, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1643, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

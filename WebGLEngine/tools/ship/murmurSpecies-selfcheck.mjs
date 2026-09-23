@@ -317,9 +317,26 @@ sec("3. *** THE SPREAD AXIS, END TO END: the knob that reached no pixel until v4
         // Its hue is -tailShare * spread * MH_SPREAD, and tailShare -- the tail lobe's share of the light --
         // reaches essentially 1 out along the tail. So at spread 1 limn's tail turns by MH_SPREAD itself,
         // which is 0.50 rad = 28.65 degrees, and the measured mean over the body lands just under it.
+        //
+        // *** THE BOUND IS THE PHYSICS NOW AND NOT A PINNED CENTRE, AND v4654 IS WHY. *** It read
+        // |x - 28.65| < 2.0, which this gate met at 26.84 for as long as the port was MISSING murmur's pace
+        // term on limn's rate. Restoring it (limn.ts: rate = base * (1 + 0.95*live.pace + 0.30*live.voice) *
+        // ..., and this file carried the voice half alone) runs the arc 28.5% faster at this gate's
+        // operating point, so a different part of the sweep lies over the body and the mean reads 25.12.
+        // MEASURED, AND THE CAUSE ISOLATED RATHER THAN ASSUMED: at HEAD 26.84; with v4654's integrated clock
+        // and no pace term 26.84 -- IDENTICAL, because the integrated form reduces to murmur's own wherever
+        // a signal is held; with the pace term restored 25.12. One term moved it and the mechanism moved
+        // nothing.
+        //
+        // So the centre is dropped rather than re-fitted. A share that saturates to at most 1 gives a turn of
+        // at most MH_SPREAD, approached from BELOW -- that is the claim, it does not depend on where the arc
+        // happens to be this frame, and it is what a wrong port fails. A re-centred window would have been
+        // this round fitting a bound to its own output.
         ok("!! ...and limn, whose tail share saturates, turns by very nearly MH_SPREAD itself",
-            Math.abs(hs.limn.dHueDeg - 28.65) < 2.0 && hs.limn.dHueDeg > hs.still.dHueDeg * 10,
+            hs.limn.dHueDeg < 28.65 && hs.limn.dHueDeg > 0.80 * 28.65 && hs.limn.dHueDeg > hs.still.dHueDeg * 10,
             `limn ${hs.limn.dHueDeg.toFixed(2)} degrees against MH_SPREAD's ${(K.MH_SPREAD * 180 / Math.PI).toFixed(2)} ` +
+            `-- ${(100 * hs.limn.dHueDeg / 28.65).toFixed(0)}% of it, approached from below as a saturating ` +
+            `share must be ` +
             `-- and ${(hs.limn.dHueDeg / hs.still.dHueDeg).toFixed(0)}x still's ${hs.still.dHueDeg.toFixed(2)}, ` +
             `which is the difference between a hero whose hue term is a SHARE that saturates and one whose is ` +
             `a depth-weighted average over a ray that mostly cancels. The four heroes do not share one ` +

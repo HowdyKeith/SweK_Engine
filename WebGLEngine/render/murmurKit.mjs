@@ -177,6 +177,58 @@ export function mhFlourish(t, lane, slotLen) {
 }
 
 /**
+ * *** THE SAME GESTURE CLOCK WITH THE SLOT INDEX SUPPLIED RATHER THAN DIVIDED OUT -- v4656. ***
+ *
+ * mh_flourish takes a slot LENGTH and computes `floor(t / SLOT)`. Three of murmur's species make that length
+ * a function of the live signals -- still divides it by (1 + 0.30*pace + 1.70*drive), abyss by (1 + 0.55*voice
+ * + 0.35*pace + 1.60*drive), tempest's two lightning lanes by (1 + 1.30*energy) -- and a divisor that moves
+ * makes `floor(t / SLOT)` JUMP. The index is not a phase: every hash in this function is keyed on it, so a
+ * jump does not advance the gesture, IT REPLACES IT. The bolt in the air becomes a different bolt, with a
+ * different start, a different duration and a different direction, between one frame and the next.
+ *
+ * MEASURED on tempest's first lane as the voice rises, at a 1/60 s frame: after half an hour of running the
+ * index moves TWENTY-ONE SLOTS in one frame and the envelope steps 0.9614 of its full range. still reaches
+ * 0.9989 and abyss 0.9996 -- a gesture at essentially full brightness appearing out of nothing, or vanishing
+ * mid-stroke. It is not a large-t defect the way the phase teleport was: the envelope step is already 0.995
+ * after thirty seconds. What grows with t is HOW OFTEN it happens, because d(floor(t/SLOT))/dSLOT is -t/SLOT^2
+ * and at large t an arbitrarily small change of slot length flips the index.
+ *
+ * *** THE REPAIR IS THE SAME FACTORING AS v4654's AND IT COSTS NO NEW UNIFORM. *** The honest generalisation
+ * of "time cut into slots" when the slot length moves is that a boundary falls wherever the ACCUMULATED slot
+ * count crosses an integer:
+ *
+ *     S(t) = integral of dt / SLOT(t) = integral of F(t) dt / B = (t + a*P + b*V + c*D) / B
+ *
+ * because SLOT is B / F with B a style constant and F the signal sum. That is mhRatePhase with a base of 1/B
+ * and the three integrals the host already sends. S is continuous and strictly increasing, so floor(S) can
+ * only ever step by ONE -- measured at 0 jumps over 1,673 frames across three species and seven session
+ * lengths -- and the per-gesture hash stays put for the whole of its own gesture.
+ *
+ * *** AND IT REDUCES TO murmur's OWN EXPRESSION AT A HELD SIGNAL, which is what protects every recorded
+ * frame. *** Held, P = pace*t, so S = t*F/B = t/SLOT: floor(S) IS floor(t/SLOT) and S - floor(S) IS
+ * local/SLOT. The one term that has to be read in seconds is murmur's 0.9 s LEAD-IN, which is an absolute
+ * duration and not a fraction of the slot, so it enters as 0.9/SLOT at the instantaneous length. That is
+ * murmur's rule faithfully read rather than an artefact of the repair: a fixed 0.9 s IS a larger share of a
+ * slot that has got shorter, so the start of a gesture genuinely slides while a signal moves. It is
+ * CONTINUOUS, and it is why the repaired envelope can step up to 9.0x the rate of its own progress during a
+ * transition -- against murmur's 0.9996, which is not a rate at all but a discontinuity.
+ *
+ * `slotLen` is still taken, for that lead-in and for the `dur` this returns in seconds.
+ */
+export function mhFlourishPhase(slotPhase, slotLen, lane) {
+    const SLOT = Math.max(slotLen, 1.0);
+    const slot = Math.floor(slotPhase);
+    const localPhase = slotPhase - slot;
+    const startPhase = 0.9 / SLOT + 0.28 * mhHash1(slot, lane);
+    const durPhase = 0.24 + 0.16 * mhHash1(slot + 811.0, lane);
+    const u = (localPhase - startPhase) / durPhase;
+    const uc = Math.min(1, Math.max(0, u));
+    const sn = Math.sin(Math.PI * uc);
+    const env = (u <= 0.0 || u >= 1.0) ? 0.0 : sn * sn;
+    return { env, u: uc, rand: mhHash1(slot + 1607.0, lane), dur: SLOT * durPhase };
+}
+
+/**
  * kit.ts's mh_drift: an EASED angular travel. rate*t plus a sine whose amplitude is tied to the rate, so the
  * thing "hurries through part of its lap and dawdles through the rest -- a light going somewhere, not a light
  * going round. At a constant rate this species was a spinner."
@@ -193,6 +245,85 @@ export function mhDrift(t, rate, wobble, lane) {
     const k = Math.min(0.72, Math.max(0, wobble));
     const w2 = 0.137 + 0.0413 * lane;
     return rate * t + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
+}
+
+/**
+ * *** THE SECULAR PHASE OF A SIGNAL-MODULATED RATE, WHICH IS WHERE THIS PORT DIVERGES FROM murmur ON
+ * PURPOSE. ***
+ *
+ * murmur's species build a rate out of the live signals and hand it to mh_drift, whose phase is rate * t.
+ * When the rate moves -- and pace, voice and drive all move constantly -- that expression JUMPS by t * dRate,
+ * an error with no ceiling that grows with how long the orb has been on screen. It is the same defect v4650
+ * repaired on the HOST clock (2.902 s of shader time in one frame after a minute of idle; 86.191 s after
+ * half an hour), one level down, where no host-side integrator can reach it.
+ *
+ * *** THE REPAIR IS EXACT, NOT AN APPROXIMATION, BECAUSE THE INTEGRAL FACTORS. *** base and the coefficients
+ * are constant per species -- they come from style knobs, which do not move -- so
+ *
+ *     integral of base * (1 + a*pace + b*voice + c*drive) dt  =  base * (t + a*P + b*V + c*D)
+ *
+ * with P, V, D the running integrals of the three conditioned signals. The shader needs three numbers, not a
+ * history. Measured against a numerically integrated reference across a pace ramp and a RESPONDING ramp, the
+ * factored form tracks it to the integrator's own step error while rate(t) * t finishes 28.14 radians ahead
+ * and stays there.
+ *
+ * *** AND IT REDUCES TO murmur's OWN EXPRESSION WHEREVER NOTHING IS CHANGING. *** With a constant signal,
+ * P = pace * t, so base * (t + a*pace*t) is base * (1 + a*pace) * t -- the line it replaces. That is why
+ * this divergence moves no recorded frame: the two differ only while a signal is in motion, which is
+ * precisely where murmur's is wrong.
+ */
+/*
+ * *** THE THREE PAIRS ARE NAMED kA/intA RATHER THAN kPace/paceInt, AND THAT IS A CORRECTION MADE AT v4657. ***
+ * The function is a sum of three coefficient-and-integral pairs; nine of its ten call sites spend them on
+ * pace, voice and drive, and duet spends its middle one on its OWN GESTURE ENVELOPE, which the host
+ * integrates because duet's flourish lane and slot are style constants. Under the old names that call site
+ * read `float(DU.rateFlourish), uniforms.duetFlourishInt` in the slots labelled kVoice and voiceInt -- an
+ * argument named for one signal carrying another, which is a small lie in the one place a reader looks to
+ * find out what a rate is made of. The generality was always there; the names hid it.
+ */
+export function mhRatePhase(base, t, kA, intA, kB, intB, kC, intC) {
+    return base * (t + kA * intA + kB * intB + kC * intC);
+}
+
+/**
+ * *** THE TERMS A RATE NEEDS WHEN IT IS NOT A SUM OF THE THREE CONDITIONED SIGNALS -- v4657. ***
+ *
+ * mhRatePhase covers base * (1 + a*pace + b*voice + c*drive), which is every rate in murmur's roster but
+ * one. limn's is a PRODUCT of two modulated factors:
+ *
+ *     rate = base * (1 + 0.95*pace + 0.30*voice) * (1 + 1.05*drive)
+ *          = base * (1 + 0.95p + 0.30v + 1.05d + 0.9975*p*d + 0.3150*v*d)
+ *
+ * and the last two terms are integrals of a PRODUCT, which is not the product of two integrals. The host
+ * accumulates them from the conditioned pair at each instant -- see render/aiPresenceOrbState.mjs -- and
+ * this adds them to what mhRatePhase already returned. Together the two reproduce murmur's product EXACTLY
+ * at a held signal (3.6e-12 over 144 operating points out to an hour), which is what protects every
+ * recorded frame, and diverge only while a signal is moving, which is where murmur's is wrong: 68.3121 rad
+ * of limn's travel in one 1/60 s frame after half an hour, against a flat 0.056582.
+ *
+ * *** IT IS SPLIT FROM mhRatePhase RATHER THAN FOLDED INTO IT because ONE species has cross terms. *** A
+ * five-pair mhRatePhase would make nine call sites pass 0.0 twice, and a coefficient of zero grades nothing
+ * -- this tree has found that exact shape in three consecutive rounds. A separate function is a separate
+ * claim, and limn is the only caller that has one to make.
+ */
+export function mhCrossPhase(base, kPaceDrive, paceDriveInt, kVoiceDrive, voiceDriveInt) {
+    return base * (kPaceDrive * paceDriveInt + kVoiceDrive * voiceDriveInt);
+}
+
+/**
+ * mh_drift with the secular term supplied rather than computed, so a modulated rate cannot teleport it.
+ *
+ * *** THE WOBBLE TERM KEEPS murmur's INSTANTANEOUS RATE AS ITS AMPLITUDE, AND THAT IS A DELIBERATE LIMIT ON
+ * THE DIVERGENCE. *** kit.ts's closed form is the exact integral of rate * (1 + k*cos(w2*t + phi)) for a
+ * CONSTANT rate; with a moving rate neither half is exactly right, but only the secular half is unbounded.
+ * The wobble contributes at most k*rate/w2 -- for the largest rate and lane in the roster that is under two
+ * radians, and it does not accumulate. So this repairs the term that grows without limit and transcribes the
+ * one that does not, rather than inventing a second-order correction murmur never had and nothing can check.
+ */
+export function mhDriftPhase(secular, rate, wobble, lane, t) {
+    const k = Math.min(MH_DRIFT_WOBBLE_CAP, Math.max(0, wobble));
+    const w2 = 0.137 + 0.0413 * lane;
+    return secular + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
 }
 
 /** The maximum wobble kit.ts allows. Its reason is NOT stated upstream and is not guessed here -- see mhDrift. */
@@ -562,6 +693,52 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
     return base * (1 + (0.66 - 1) * small);
 }
 
+/**
+ * *** THE THREE SPECIES WHOSE GESTURE SLOT READS THE LIVE SIGNALS, AND THE COEFFICIENTS THEY READ IT WITH. ***
+ *
+ * A slot length is B / F, where B is a style constant and F is this sum. Every other species hands
+ * mh_flourish a fixed number of seconds, so its slot is not here -- a table naming eighteen species where
+ * three have an entry is a table nobody can read.
+ *
+ *   still    still.ts:   mix(11.5, 7.0, glintK) / (1 + 0.30*live.pace + 1.70*st.drive)
+ *   abyss    abyss.ts:   mix(9, 26, rarityK) / (1 + 0.55*live.voice + 0.35*live.pace + 1.60*st.drive)
+ *   tempest  tempest.ts: mix(2.9, 5.2, small) * 1/(1 + 1.30*energy), energy = clamp(0.85*live.voice, 0, 1.6)
+ *
+ * *** tempest's VOICE COEFFICIENT IS A PRODUCT AND IT IS ONLY A CONSTANT BECAUSE THE CLAMP IS INERT. ***
+ * 1.30 * 0.85 is 1.105, and folding the two is the same function as murmur's only while `energy` is a LINEAR
+ * function of voice. mh_live's voice output is bounded to [0,1] in both halves of the kit, so energy tops out
+ * at 0.85 against a ceiling of 1.6 -- a margin of 1.88x, measured at v4655 for the drift that reads the same
+ * clamp and re-checked here for the slot.
+ *
+ * These are the ORB's coefficients. abyssSlot above carries its own three because it is a transcription of
+ * abyss.ts in its own right and the two are meant to be able to disagree -- the v4579 distinction. The gate
+ * RECOVERS this table's abyss row from that function by inversion rather than comparing the literals, so a
+ * drift between them is caught without either being a restatement of the other.
+ */
+export const MH_SLOT_SIGNAL = Object.freeze({
+    still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
+    abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
+    tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+});
+
+/**
+ * *** limn's TRAVEL RATE -- THE ONE RATE IN murmur's ROSTER THAT IS A PRODUCT. ***
+ *
+ * limn.ts: rate = (0.34 + 0.40*travelK) * (1 + 0.95*live.pace + 0.30*live.voice) * (1 + 1.05*st.drive),
+ * and wobble = mix(0.62, 0.14, st.drive) -- "roughly doubles the rate: a decisive sweep", with the ease
+ * flattening as it goes so the sweep reads as decision rather than as hurry.
+ *
+ * THE CROSS COEFFICIENTS ARE NOT IN THIS TABLE ON PURPOSE. The expansion's pace*drive term is 0.95 * 1.05
+ * and its voice*drive term is 0.30 * 1.05, and the shader forms those PRODUCTS from the two factors rather
+ * than reading a third pair of numbers. A table carrying 0.9975 beside 0.95 and 1.05 is two spellings of
+ * one fact, and the day somebody edits one of the three the other two stop describing murmur.
+ */
+export const MH_LIMN_RATE = Object.freeze({
+    base: 0.34, travelK: 0.40,
+    pace: 0.95, voice: 0.30, drive: 1.05,
+    wobLo: 0.62, wobHi: 0.14, lane: 1.0,
+});
+
 /** abyss's three lanes: their seeds and the multipliers on the slot, so the gaps are never equal. */
 export const ABYSS_LANES = Object.freeze([
     Object.freeze({ seed: 31.0, slot: 1.00 }),
@@ -754,6 +931,166 @@ export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
     Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
 
 /**
+ * *** THE OTHER HALF OF THE SUCCESS FLASH: IT BRIGHTENS WHAT IS ALREADY THERE -- v4658. ***
+ *
+ * kit.ts: "The light in a success is NOT an overlay: every species multiplies its own interior energy by
+ * (1 + complete), which brightens exactly what is already there and leaves the dark dark." v4644 ported the
+ * SHELL -- the gaussian ring that travels out along `sweep` -- and MH_IGNITE's own note says the rest spend
+ * `complete` on their own figures. What neither said is that FOUR of them spend it at the ONE SITE ALL
+ * EIGHTEEN INTERIORS PASS THROUGH, right beside the settle:
+ *
+ *     interior = acc.x * GAIN * b.m * mh_transmit(b.fres) * (1.0 + K * st.complete) * (1.0 + S * st.settled)
+ *
+ * and this port had the second factor and not the first. Counted in murmur's own eighteen files, exactly the
+ * four below carry a complete factor on that line, and every other `st.complete` in the roster is somewhere
+ * else -- a shell, a per-figure saturation, or a brightness of its own. THE RULE IS CHECKABLE RATHER THAN
+ * REMEMBERED: the shared interior line is the one carrying `(1 + S * st.settled)`, so a site belongs here if
+ * and only if its complete factor sits on that same line. tools/ship/murmurComplete-selfcheck.mjs holds it.
+ *
+ * A MISSING KEY AND NOT A ZERO, for MH_SETTLED_INTERIOR's reason: a table with fourteen zeroes in it reads
+ * as "these species were considered and given nothing", which is false -- they spend their flash elsewhere.
+ */
+export const MH_COMPLETE_INTERIOR = Object.freeze({
+    limn: 1.60, arc: 0.90, aura: 0.45, flux: 0.75,
+});
+
+/**
+ * *** THE SATURATION: A FIGURE THAT IS PULLED TOWARD FULL RATHER THAN SCALED. ***
+ *
+ * Three species spend `complete` on a per-figure LIFE rather than on the interior, and all three spell it as
+ * the same mix:
+ *
+ *     life = mix(life, target, st.complete * k)
+ *
+ * which is a saturation and not a gain: at complete = 1 the figure IS the target whatever it was before, so
+ * a flash makes every flash/prominence/voice arrive together and the differences between them close. That is
+ * the opposite of the interior factor above, which preserves every difference and scales them all.
+ *
+ * *** chorus's TARGET OVERSHOOTS AND THE OTHER TWO DO NOT, which is the one number here worth reading twice.
+ * *** opal and sol mix toward 1.0; chorus mixes toward 1.0 + 0.45 * st.complete, so its seven voices go PAST
+ * full at the peak of the flash. chorus.ts is the one species licensed a rhythm and the one whose subject is
+ * an ensemble arriving together -- overshooting is how the arrival reads as louder than the parts.
+ */
+export const MH_COMPLETE_LIFT = Object.freeze({
+    opal:   Object.freeze({ k: 0.85, over: 0.00 }),
+    sol:    Object.freeze({ k: 0.85, over: 0.00 }),
+    chorus: Object.freeze({ k: 0.90, over: 0.45 }),
+});
+
+/** sol's SECOND complete, on the core's brightness rather than a figure -- sol.ts line 91. */
+export const MH_COMPLETE_SOL_CORE = 0.55;
+
+/**
+ * The saturation itself, so the three callers share one spelling and there is a pair to grade. `over` is
+ * chorus's overshoot and is 0 for the other two, which makes the target 1.0 exactly.
+ */
+export function mhCompleteLift(x, complete, k, over) {
+    const t = 1.0 + over * complete;
+    return x + (t - x) * (complete * k);
+}
+
+/**
+ * *** THE IGNITION's OTHER SHAPE: A GAUSSIAN THAT TRAVELS ALONG THE SPECIES' OWN AXIS -- v4659. ***
+ *
+ * MH_IGNITE's shell is a ring in |p|: it leaves the heart and reaches the surface, and seven species run it.
+ * Four more run the SAME arithmetic on a coordinate of their own instead, and it took reading all eight of
+ * the remaining figures side by side to see that they are one shape and not four:
+ *
+ *     r = (coord - mix(lo, hi, st.sweep)) / width;   figure += st.complete * (flat + gain * exp(-r*r))
+ *
+ * arc runs it along `th`, the angle round its own arc; flux along q.x, the length of its stream; prism along
+ * s1, the distance out its beams; helix along q.y, the height of its strands. The axis is whatever that
+ * species is built along, which is why this is a different table from the shell rather than four more rows
+ * in it -- the shell's coordinate is |p| for everybody.
+ *
+ * *** EACH ONE IS THE SPECIES' OWN GESTURE FIGURE, RUN ON `sweep` AND DRAWN TIGHTER. *** arc's flourish
+ * pulse is the same expression at width 0.34 and the ignition is 0.30; flux 0.42 against 0.38; prism 0.28
+ * against 0.26. The success is the gesture the species already performs, once, travelling the whole length
+ * and a little sharper -- which is a design statement the port can now make because both are here.
+ *
+ * `lo` and `hi` are in the species' own units, and arc's are a FRACTION of its own span: its ends are
+ * -span and +span, where span is a runtime value from the arc's extent, so its entry carries -1 and 1 and
+ * its call site multiplies. helix is the only one with a `flat` term: 0.35 of the flash reaches the whole
+ * strand whether or not the gaussian does, so the ignition lifts the figure everywhere and brightens hardest
+ * where the front is.
+ */
+export const MH_IGNITE_AXIS = Object.freeze({
+    arc:   Object.freeze({ lo: -1.00, hi: 1.00, width: 0.30, gain: 1.80, flat: 0.00, spanScaled: true,  gestureW: 0.34 }),
+    flux:  Object.freeze({ lo: -1.00, hi: 1.00, width: 0.38, gain: 1.70, flat: 0.00, spanScaled: false, gestureW: 0.42 }),
+    prism: Object.freeze({ lo:  0.00, hi: 2.10, width: 0.26, gain: 1.60, flat: 0.00, spanScaled: false, gestureW: 0.28 }),
+    helix: Object.freeze({ lo: -1.00, hi: 1.00, width: 0.26, gain: 2.10, flat: 0.35, spanScaled: false, gestureW: 0.00 }),
+});
+
+/**
+ * The travelling gaussian itself. Returns what the flash ADDS to the species' figure, which is 0 at
+ * complete 0 for every coordinate -- the property that keeps every non-SUCCESS frame where it was.
+ */
+export function mhIgniteAxis(coord, complete, sweep, lo, hi, width, gain, flat) {
+    const r = (coord - (lo + (hi - lo) * sweep)) / width;
+    return complete * (flat + gain * Math.exp(-r * r));
+}
+
+/**
+ * *** THE LAST FOUR IGNITION FIGURES, WHICH REALLY ARE FOUR SHAPES -- v4660. ***
+ *
+ * v4659 found that four of the eight remaining figures were one shape on four different axes. These four are
+ * not: each does something the others do not, and reading them together is what says so.
+ *
+ *   aura   A VON MISES IN THE ANGLE, not a gaussian, and aura.ts gives the reason in one line: "it wraps
+ *          with no seam: a seam here would be a dark notch running across all three ribbons at once". It is
+ *          the only figure in the roster that spends `sweep` as a position going ROUND something. exp(k*(cos
+ *          x - 1)) is a function of cos alone and is therefore periodic by construction -- the same argument
+ *          limn's arc profile makes, and the same one that got a gaussian thrown out there.
+ *   fathom THE SHELLS LIGHT IN SEQUENCE, outermost first. Each shell has a `turn` -- (2-k)*0.33 -- and a
+ *          triangular window in the sweep around it, so the flash passes through the nest from outside in.
+ *          The only figure keyed on WHICH PART of the species it is, rather than on where the part is.
+ *   geode  A FLAT LIFT, complete * 0.70, with no sweep at all. geode's light is a facet term on a normal;
+ *          there is no path for a front to travel along, so the stone simply brightens. It is in the table
+ *          because a reader who found three travelling figures and one absence would assume the fourth was
+ *          missing.
+ *   comet  THE ONLY ONE THAT ADDS NO LIGHT. It lengthens the trail instead: decay = mix(decay, 9.0, sweep),
+ *          and decay sits in the DENOMINATOR of exp(-age/decay), so a larger one fades slower and the orbit
+ *          fills in behind the head out to wherever the sweep has reached. The flash is the path becoming
+ *          visible, which is the one thing comet has that nothing else does.
+ *
+ * *** comet's DECAY LINE CARRIES TWO MORE TERMS THIS PORT NEVER HAD, on the same line. *** comet.ts spells
+ * it (1.30 + 2.60*trailK) * (1 + 1.25*st.drive) * mix(1.0, 0.40, small) -- so the lean LENGTHENS the trail
+ * and the small mounts shorten it to two fifths. Both are bounded multipliers on a decay rather than on a
+ * clock, so neither can teleport anything and both go in as murmur spells them.
+ */
+export const MH_IGNITE_LAP = Object.freeze({ flat: 0.18, gain: 0.80, k: 2.40 });
+export const MH_IGNITE_TURN = Object.freeze({ step: 0.33, lead: 0.16, edge: 0.42, flat: 0.50, gain: 2.40 });
+export const MH_IGNITE_FLAT_GEODE = 0.70;
+export const MH_COMET_TRAIL = Object.freeze({ to: 9.00, driveK: 1.25, small: 0.40 });
+
+/**
+ * aura's ignition: a von Mises bump at the sweep's angle. Returns what the flash ADDS, which is 0 at
+ * complete 0 for every angle. The bump is widest at the back -- exp(2.4*(cos-1)) is 1 at the centre and
+ * 8.3e-3 at the far side -- so the ribbons are never fully dark behind it.
+ */
+export function mhIgniteLap(ang, complete, sweep, flat, gain, k) {
+    return complete * (flat + gain * Math.exp(k * (Math.cos(ang - sweep * 6.2831853) - 1.0)));
+}
+
+/**
+ * fathom's ignition: a triangular window in the sweep around this shell's own turn.
+ *
+ * *** THE PARAMETER IS turnIndex AND NOT k, AND THE FIRST DRAFT OF THIS NOTE HAD IT BACKWARDS. *** fathom.ts
+ * writes turn = float(2 - k) * 0.33, so the shell with k = 2 has turn 0 and its window is centred at sweep
+ * 0.16 -- it lights FIRST. k = 2 is the INNERMOST shell: MH_FATHOM's weights fall away inward (1.00, 0.74,
+ * 0.52) with k = 0 the outer. So the flash starts at the middle of the nest and travels OUTWARD, which is
+ * the same direction mh_ignite's shell runs and the same thing fathom.ts's own comment says. Passing k here
+ * instead of 2 - k reverses the species, and it reverses it into something that still looks like an
+ * ignition -- which is why the gate measures the ORDER the three peak in rather than that they peak.
+ */
+export function mhIgniteTurn(turnIndex, complete, sweep, step, lead, edge, flat, gain) {
+    const x = Math.abs(sweep - turnIndex * step - lead) / edge;
+    const t = Math.min(1, Math.max(0, x));
+    const w = 1.0 - t * t * (3.0 - 2.0 * t);
+    return complete * (flat + gain * w);
+}
+
+/**
  * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
  *
  * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs
@@ -796,6 +1133,123 @@ export const MH_IGNITE = Object.freeze({
 export function mhIgnite(pLen, complete, sweep, lo, hi, width) {
     const sr = (pLen - (lo + (hi - lo) * sweep)) / width;
     return complete * Math.exp(-sr * sr);
+}
+
+/**
+ * *** THE RESPONDING LEAN: THE WANDER ACQUIRES A HEADING. ***
+ *
+ * st.drive is mh_state's fourth output, ramping in over half a second "so entering the state is a lean and
+ * not a jolt", and its 45 references across murmur's eighteen sources do three different things. This table
+ * holds the first: SIX species take a direction that is otherwise hashed, random or slowly tumbling, and mix
+ * it toward a FIXED unit vector. still.ts: "Under drive the lines converge on one axis, so an occasional
+ * wander becomes a traverse." abyss.ts: "under drive they all take one heading and the abyss becomes a
+ * current." opal.ts, of its own lean: "a procession, not a swarm."
+ *
+ * *** THE SIX ARE TWO FAMILIES AND THE SIGN OF z IS WHAT SEPARATES THEM. ***
+ *
+ *     still    (0.92, -0.18,  0.35)   mix into a hashed glint path      k 1.00
+ *     abyss    (0.90, -0.22,  0.37)   mix into three hashed lanes       k 0.80
+ *     sol      (0.86, -0.32,  0.39)   mix into a tumbling prominence    k 0.70
+ *     droplet  (0.92,  0.20,  0.34)   a FLOW through the silhouette     k 0.30
+ *     ---------------------------------------------------------------------------
+ *     nebula   (0.86,  0.24, -0.45)   ADVECTION of the whole domain     k 0.42
+ *     tempest  (0.88,  0.20, -0.43)   the same, on the second cloud     k 0.50
+ *
+ * The four above the line all point INTO the screen's near half (+z, toward the viewer in this port's frame)
+ * and three of the four lean DOWN. The two below point the other way in depth: the volumetric pair stream
+ * AWAY. That is not a stylistic accident -- a cloud advecting toward the viewer would grow across the frame
+ * and read as an approach, where a point of light travelling toward it reads as attention.
+ *
+ * *** AND `wired` IS A RECORD OF WHAT THIS ROUND DID NOT DO, GUARDED RATHER THAN WRITTEN IN PROSE. ***
+ * nebula's and tempest's headings are spelled `adv = V * (st.drive * k * t)` -- a displacement PROPORTIONAL
+ * TO ELAPSED TIME -- so a drive that ramps while t is large advects the domain by t * k * dDrive in one
+ * frame. That is exactly the shape v4650 repaired on the host side of this same orb, where entering
+ * RESPONDING after a minute of idle moved the clock 2.902 s in one frame and after half an hour 86.191 s.
+ * This round wires only terms that are a DIRECTION or a SIZE and touches nothing that multiplies a clock, so
+ * those two are carried here with their numbers and marked unwired; tools/ship/murmurDrive-selfcheck.mjs
+ * asserts that exactly the `wired` entries are read by the shader builder, so the day somebody wires them the
+ * census goes red and this note gets read.
+ */
+/**
+ * *** AND `pre` IS NOT A TIDYING FLAG: NOT ONE OF THESE SIX VECTORS IS A UNIT VECTOR. ***
+ *
+ * Measured: still 1.000650, abyss 0.997647, sol 0.997046, droplet 1.001000, nebula 0.999850, tempest
+ * 0.999650 -- hand-picked numbers, off unit by as much as 0.295%. That would be a curiosity except that
+ * murmur normalizes them INCONSISTENTLY, and the inconsistency changes the answer at partial drive:
+ *
+ *   still, abyss   normalize(mix(wander, V, a))              -- V goes in RAW
+ *   sol            normalize(mix(dir, normalize(V), a))      -- V is normalized FIRST
+ *   droplet        flowDir = normalize(V)                    -- not a mix at all, a direct assignment
+ *
+ * Mixing toward a 0.997-long vector is not the same direction as mixing toward its unit version anywhere
+ * except a = 0 and a = 1, which is every frame of the ramp that RESPONDING is made of. Transcribed per
+ * species rather than normalised into one spelling, the same call this port made for opal's two prose
+ * periods, MH_SCATTER_K's 3.2 against 0.098 and droplet's 0.339 against 0.34177.
+ */
+export const MH_DRIVE_HEADING = Object.freeze({
+    still:   Object.freeze({ v: Object.freeze([0.92, -0.18, 0.35]), k: 1.00, pre: false, wired: true }),
+    abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
+    sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
+    droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
+    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: false }),
+    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: false }),
+});
+
+/**
+ * *** AND THE OTHER HALF OF THE LEAN: IT STOPS SCATTERING. ***
+ *
+ * A heading alone would be a swarm that happens to face one way. What makes murmur's RESPONDING read as
+ * intent is that the spread collapses at the same time -- still and abyss narrow the LATERAL offset of their
+ * hashed paths by the identical 0.70, so the lines converge on the axis they just acquired rather than
+ * running parallel to it. Seven species carry a term of this kind and every one of them is a DISTANCE, an
+ * ANGLE or a SHAPE PARAMETER; not one is a rate, which is why they are all in this round.
+ *
+ * Each field is murmur's literal coefficient and the operation is named, because they are not all the same
+ * operation and folding them into one sign would lose that:
+ *
+ *   still.lateral   0.70  * (1 - k*drive)   on the glint path's sideways offset
+ *   abyss.lateral   0.70  * (1 - k*drive)   the same, on all three lanes
+ *   limn.tailK      0.30  / (1 + k*drive)   a DIVISOR on the tail lobe's concentration: the tail broadens
+ *   limn.tailOff    0.30  - k*drive         SUBTRACTED from the tail's angular offset: it swings round
+ *   arc.sway        0.55  * (1 - k*drive)   "Responding stills the wander and takes the bow out"
+ *   arc.pin         0.40  * (1 - k*drive)   ...and the bow itself flattens
+ *   duet.sep        0.34  * (1 - k*drive)   "Cadence closes it a little, responding a lot"
+ *   prism.fan       0.62  * (1 - k*drive)   "THE FAN. Responding closes it"
+ *   helix.r0        0.14  * (1 - k*drive)   the strands draw in toward the axis
+ *   helix.turns     0.35  * (1 + k*drive)   ...and there are MORE of them: the one term here that GROWS
+ *
+ * helix is the reason the table carries signs rather than magnitudes: it narrows and winds at once, which is
+ * a spring compressing rather than a thing shrinking, and a table of "how much smaller" could not say so.
+ */
+export const MH_DRIVE_FORM = Object.freeze({
+    still:   Object.freeze({ lateral: 0.70 }),
+    abyss:   Object.freeze({ lateral: 0.70 }),
+    limn:    Object.freeze({ tailK: 0.30, tailOff: 0.30 }),
+    arc:     Object.freeze({ sway: 0.55, pin: 0.40 }),
+    duet:    Object.freeze({ sep: 0.34 }),
+    prism:   Object.freeze({ fan: 0.62 }),
+    helix:   Object.freeze({ r0: 0.14, turns: 0.35 }),
+});
+
+/**
+ * The heading mix itself: normalize(mix(wander, V, drive * k)).
+ *
+ * It is a function rather than three transcriptions because three species spell it identically and the
+ * NORMALIZE is the part worth owning -- mixing two unit vectors does not give a unit vector, and a port that
+ * dropped the normalize would still point the right way while changing the SPEED along the path, which is a
+ * different species. `pre` carries murmur's per-species choice of whether V is normalized BEFORE the mix;
+ * see MH_DRIVE_HEADING's note, and note that it is not cosmetic. droplet is not a caller at all: its heading
+ * goes into the body's flow deformation rather than into a direction it marches along.
+ */
+export function mhDriveHeading(wander, V, drive, k, pre = false) {
+    let T = V;
+    if (pre) { const n = Math.hypot(V[0], V[1], V[2]) || 1; T = [V[0] / n, V[1] / n, V[2] / n]; }
+    const a = Math.min(1, Math.max(0, drive * k));
+    const m = [wander[0] + (T[0] - wander[0]) * a,
+               wander[1] + (T[1] - wander[1]) * a,
+               wander[2] + (T[2] - wander[2]) * a];
+    const len = Math.hypot(m[0], m[1], m[2]) || 1;
+    return [m[0] / len, m[1] / len, m[2] / len];
 }
 
 export const MH_SHAPE = Object.freeze({
@@ -1061,7 +1515,13 @@ export const MH_AURA = Object.freeze({
     thirdIn: 0.55, thirdOut: 0.95, thirdSmallIn: 0.22, thirdSmallOut: 0.62,
     secondSmallIn: 0.52, secondSmallOut: 0.94, secondSmall: 0.34,
     w3B: 0.55, w3K: 0.45,
-    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, rateLane: Object.freeze([1.00, 0.83, 1.17]),
+    // *** ratePace AND rateDrive ARRIVE AT v4654 AND THEY ARE NOT NEW NUMBERS -- they are two of murmur's
+    // three that this port never carried. *** aura.ts: rate = (0.17 + 0.24*swirlK) * (1 + 0.85*live.voice +
+    // 0.45*live.pace + 1.05*st.drive). This table held the voice term alone, so the ribbons answered a
+    // raised voice and were deaf to how busy the exchange was -- on the one species whose brief is depth
+    // through motion.
+    rateB: 0.17, rateK: 0.24, rateVoice: 0.85, ratePace: 0.45, rateDrive: 1.05,
+    rateLane: Object.freeze([1.00, 0.83, 1.17]),
     driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
     ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
     // The three sheets' ripple: [along-x frequency, cross-z frequency, cross weight, phase, amp multiplier].
@@ -1181,6 +1641,13 @@ export const MH_DUET = Object.freeze({
     // pair's colour conversation leans the way its own file says it does.
     hueA: 0.85, hueB: -1.00,
     flourishSlot: 6.0, flourishDur: 8.3,
+    // *** duet.ts's THREE RATE TERMS, of which this port carried ONE until v4657. ***
+    //     rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x)
+    // The flourish term was wired and the other two were not, so the pair sped up for its own gesture and
+    // ignored the exchange entirely. It is also the term that made the rate MOVE, which is why duet's
+    // orbital phase was jumping 1.8152 rad in a single frame after half an hour -- 29% of a whole turn of
+    // the shared orbit -- every time a gesture fired.
+    ratePace: 0.55, rateDrive: 0.90, rateFlourish: 0.85,
 });
 
 /**
@@ -1327,6 +1794,9 @@ export const MH_HELIX = Object.freeze({
     tiltB: 0.06, tiltAmp: 0.05, tiltRate: 0.031,
     turnsB: 1.75, turnsK: 1.10, turnsSmall: 0.50,
     climbB: 0.20, climbK: 0.30, climbSmall: 0.70, climbWob: 0.44, climbLane: 5.0,
+    // v4655 -- helix.ts scales its climb by (1 + 0.75*live.pace + 0.85*st.drive) and this port carried
+    // the bare drift. Two of murmur's numbers that were simply absent, not two new ones.
+    climbPace: 0.75, climbDrive: 0.85,
     r0B: 0.42, r0K: 0.10,
     wB: 0.062, wK: 0.022, wSmall: 1.90, wVoice: 0.25,
     brightB: 0.80, brightK: 0.65, brightVoice: 0.80,

@@ -870,6 +870,215 @@ export const NEXT_ROUNDS = [
             "v4641's species frames did not move at all once the operating point was held, but a state term " +
             "arriving is new light in the frame and there is no operating point that hides it.",
         upstream: "None. The kit half is done, graded and green; this is transcription and gating.",
+        note2: "PART DONE at v4653, and the part left is the part with the decision in it. st.drive's 45 " +
+            "sites do three things and this round wired two: the HEADING (still, abyss and sol mix a hashed " +
+            "or tumbling direction toward a fixed axis; droplet sets the kit's flow deformation, which both " +
+            "halves have carried since the port and no call site had ever set) and the NARROWING (ten " +
+            "coefficients across seven species, in MH_DRIVE_FORM).\n\n" +
+            "*** WHAT IS LEFT IS THE RATE FAMILY: sixteen sites, and the reason it is left is below. *** " +
+            "Also left: nebula's and tempest's advections, which are the same hazard wearing the heading " +
+            "family's clothes -- they are spelled adv = V * (st.drive * k * t), a displacement proportional " +
+            "to elapsed time. They are carried in MH_DRIVE_HEADING with wired: false and a census row in " +
+            "tools/ship/murmurDrive-selfcheck.mjs goes RED the day anyone wires them, so this note gets " +
+            "read before the jump ships.\n\n" +
+            "*** THE DECISION THE NEXT ROUND HAS TO MAKE OUT LOUD. *** Transcribe murmur faithfully and " +
+            "inherit a phase teleport that grows without bound with session length, or integrate " +
+            "per-species rates inside the shader -- a second phase uniform per lane, or mh_drift taking an " +
+            "already-integrated argument -- and diverge from the source on purpose. There is no third " +
+            "option where it is both faithful and correct, because the defect is in murmur's own design. " +
+            "live.pace already carries the identical shape at the sites that read it, so the honest scope " +
+            "may be wider than drive: whatever is decided applies to both.",
+        note3: "THE DECISION WAS TAKEN AT v4654 AND IT WAS TO DIVERGE. The owner chose to integrate in the " +
+            "shader rather than transcribe murmur's rate * t, so this port is now correct where its source " +
+            "is not. The mechanism is render/murmurKit.mjs's mhRatePhase and mhDriftPhase, the host supplies " +
+            "paceInt / voiceInt / driveInt in SHADER time, and tools/ship/murmurClock-selfcheck.mjs holds " +
+            "the property.\n\n" +
+            "*** THREE OF THE FOUR MECHANISMS ARE STILL ON murmur's SPELLING, and they are different jobs " +
+            "rather than more of the same one:\n" +
+            "  (a) OUTPUT-MULTIPLIED -- flux, helix, nebula, tempest scale mh_drift's RESULT by a moving " +
+            "factor. The secular half needs the same treatment, but murmur also scales the WOBBLE by it, so " +
+            "a faithful repair has to decide what happens to that term. Four sites.\n" +
+            "  (b) BARE rate * t -- opal's flash drift (drift * t inside a sin) and geode's mix TARGET " +
+            "(t * 0.30 * sp). No mh_drift involved; the same factoring applies directly. Two sites.\n" +
+            "  (c) FLOURISH SLOT DIVISORS -- still and abyss divide a gesture SLOT by (1 + ... + k*drive), " +
+            "and mh_flourish indexes gestures by floor(t / slot). A changing slot RE-INDEXES which gesture " +
+            "is playing rather than advancing a phase, so integration does not apply and this one needs its " +
+            "own idea. Two sites.\n\n" +
+            "TWO SITES CANNOT BE REPAIRED BY THIS MECHANISM AT ALL AND THE REASONS ARE STRUCTURAL: duet's " +
+            "rate reads the species' OWN flourish envelope, computed in the shader from a hash, so there is " +
+            "no host-side integral to send; and limn's rate is a PRODUCT of two modulated factors, whose " +
+            "expansion needs the integral of pace*drive and voice*drive -- two more accumulators for one " +
+            "species. limn's SUM factor is repaired; its drive factor is passed 0.0 rather than folded in.\n\n" +
+            "*** AND THE ROUND FOUND THAT THIS PORT IS MISSING murmur's CADENCE ON TEN SPECIES. *** A gate " +
+            "row had asserted for thirteen rounds that murmur gives a cadence to six; counted in its own " +
+            "sources, live.pace appears in all EIGHTEEN. comet and limn were repaired here because their " +
+            "rates were the round's subject. The other ten are a separate, larger job and the census in " +
+            "tools/ship/murmurLive-selfcheck.mjs now names them.",
+        note4: "MECHANISM (a) IS DONE AT v4655, AND THE ROUND STARTED BY FINDING THAT v4654's OWN CENSUS " +
+            "COULD NOT SEE IT. That census printed \"modulated rates still on murmur's rate * t: (none)\" " +
+            "while nebula's and tempest's cloud drift and flux's stream were still teleporting: it looked at " +
+            "mh_drift's RATE ARGUMENT, and only when that argument was a bare identifier it could chase back " +
+            "to a const, so a drift whose whole RESULT is multiplied afterwards was invisible to it. It is a " +
+            "chain walker now -- balanced parens plus every chained .method(...) -- and it checks itself on " +
+            "a three-site fixture before it is believed about the orb.\n\n" +
+            "*** WHAT THE WOBBLE QUESTION TURNED OUT TO BE: *** murmur's drift*F expands to base*F*t + " +
+            "(k*base*F/w2)*sin, and only the first summand has a t in it. So the integrals go in the " +
+            "SECULAR term and the wobble amplitude keeps reading the instantaneous factor -- not a " +
+            "compromise, the exact continuation of what murmur wrote. It agrees with murmur to 4.6e-13 " +
+            "across 480 held-signal operating points out to an hour and parts by 405 rad where the signal " +
+            "has just moved.\n\n" +
+            "helix turned out to be a FOURTH kind: its climb had no signal at all. helix.ts scales it by " +
+            "0.75*live.pace and 0.85*st.drive and this port carried the bare drift. An absence is not " +
+            "findable by any census that hunts signals -- it came out of reading helix.ts against the file " +
+            "line for line, which is the only instrument that finds one.\n\n" +
+            "*** STILL OPEN, AND UNCHANGED BY THIS ROUND: *** (b) the two bare rate * t sites, (c) the two " +
+            "flourish slot divisors, duet's shader-side flourish rate, limn's drive FACTOR, and the nine " +
+            "species still without murmur's cadence -- helix acquired it here, which moved the count from " +
+            "eight to nine.",
+        note5: "MECHANISM (c), THE FLOURISH SLOT DIVISORS, IS DONE AT v4656 -- AND IT WAS THREE SPECIES AND " +
+            "NOT TWO. The note above said still and abyss; tempest's two lightning lanes divide their slots " +
+            "by (1 + 1.30*energy) as well, and tempest's was the one already WIRED, so it was re-rolling its " +
+            "bolts on every change of voice in the shipped port.\n\n" +
+            "*** IT DID NOT NEED ITS OWN IDEA AFTER ALL; IT NEEDED v4654's, APPLIED TO THE INDEX. *** The " +
+            "note above was right that integration does not apply to a slot PHASE -- there isn't one -- but " +
+            "the slot COUNT is an integral: a boundary falls where the accumulated count crosses an integer, " +
+            "and that count is the integral of dt/SLOT = (t + a*P + b*V + c*D)/B. Same three uniforms, no " +
+            "new ones, and floor of it can only step by ONE. Measured at zero jumps, zero reversals and " +
+            "zero mid-gesture re-seeds over 5,019 frames, against murmur's 21-slot jumps and an envelope " +
+            "stepping 0.9996 in a frame.\n\n" +
+            "*** WHAT IS STILL NOT RIGHT, AND IT IS murmur's RULE RATHER THAN THE REPAIR'S: *** the 0.9 s " +
+            "LEAD-IN is an absolute duration, so a fixed 0.9 s is a larger share of a slot that has got " +
+            "shorter and a gesture's start SLIDES while a signal moves. It is continuous, and it lets the " +
+            "repaired envelope step up to 9.0x the rate of its own progress during a transition. Expressing " +
+            "it against the BASE slot would make it perfectly continuous and would break the reduction that " +
+            "protects every recorded frame -- measured and rejected, not overlooked.\n\n" +
+            "*** AND A STYLE ABSENCE FOUND ON THE SAME LINE AND DELIBERATELY NOT FIXED HERE: *** tempest's " +
+            "bolt slots are mix(2.9, 5.2, small) and mix(4.3, 7.4, small) in tempest.ts, and this port " +
+            "carries the bare 2.9 and 4.3. It is a style transcription rather than a clock, so folding it " +
+            "into a round whose whole measurement is about the clock would have made both harder to read. " +
+            "One line per lane, and it will move whatever tempest frames are recorded at small > 0.\n\n" +
+            "STILL OPEN FROM (a)-(c): the two bare rate * t sites (opal's flash drift, geode's mix target), " +
+            "duet's shader-side flourish rate, limn's drive FACTOR, and the nine species still without " +
+            "murmur's cadence -- helix took it at v4655 and still took it at v4656, so the count has moved " +
+            "twice in two rounds.",
+        note6: "*** THE RATE FAMILY IS FINISHED AT v4657, AND ONE OF THE LAST TWO WAS NEVER BLOCKED. *** " +
+            "note3 above recorded duet's rate as structurally unreachable -- \"duet's rate reads the " +
+            "species' OWN flourish envelope, computed in the shader from a hash, so there is no host-side " +
+            "integral to send\". That is true of a signal the host does not know, and duet's was not one: " +
+            "mh_flourish is a pure function of shader time, a LANE and a SLOT LENGTH, and duet's two are " +
+            "style constants. The envelope is therefore a deterministic function of the clock the host " +
+            "already keeps. THE RECORD CLOSED A DOOR THAT WAS NEVER LOCKED, and it was believed for three " +
+            "rounds while duet's orbit jumped 1.8152 rad in a frame -- 29% of a whole turn -- every time " +
+            "one of its own gestures fired.\n\n" +
+            "limn's was priced correctly and this round paid it: two accumulators for the two cross " +
+            "products its PRODUCT rate expands to. What is worth carrying forward is that the cross " +
+            "integral is NOT the product of the two integrals (8.20 against 68.35 in the measurement), " +
+            "because the latter carries t squared -- which is also the trap the frame helper fell into and " +
+            "the sabotage that walked through every gate.\n\n" +
+            "*** WHAT IS LEFT OF THE WHOLE CLOCK ARC IS TWO SITES, AND BOTH ARE ABSENCES RATHER THAN " +
+            "TELEPORTS: *** opal's flash drift (opal.ts: drift = (0.055 + 0.075*driftK) * (1 + 0.75*pace + " +
+            "0.95*drive), spent as drift * t inside three sines) and geode's spin (geode.ts: " +
+            "mix(mh_drift(...), t * 0.30 * sp, st.drive * 0.7), whose secular term expands to " +
+            "sp*(0.088 + 0.1484*drive)*t). In THIS port neither rate moves: opal's live terms and geode's " +
+            "drive mix are both simply missing. Adding them as murmur spells them would ship two new " +
+            "teleports; adding them in the integrated form costs nothing new, because both are SUMS and " +
+            "the three conditioned integrals are already sent.\n\n" +
+            "ALSO STILL OPEN: tempest's bolt slots are missing murmur's `small` mix (mix(2.9, 5.2, small) " +
+            "and mix(4.3, 7.4, small)), and five builders covering six species still have no cadence at " +
+            "all -- droplet, opal, mist, fathom, geode. That count has moved in each of the last four " +
+            "rounds, from eight species to twelve, and every step was an absence being filled.",
+        note7: "*** st.complete IS THE LARGEST REMAINING GAP AND v4658 TOOK 8 OF ITS 47 SITES. *** The " +
+            "measurement that found it: at stateTau 0.360, where mh_state's complete is exactly 1.0 and " +
+            "settled exactly 0, SIX SPECIES MOVED ZERO OF 9,216 BYTES between the start of their own SUCCESS " +
+            "state and its brightest instant -- limn, arc, aura, flux, sol and chorus. v4644 ported the " +
+            "ignition SHELL and MH_IGNITE's note said the rest \"spend complete on their own figures\", " +
+            "which is true and was read as though it meant there was nothing shared left.\n\n" +
+            "WHAT v4658 TOOK: the four species whose complete factor sits on the SHARED INTERIOR LINE beside " +
+            "the settle (limn 1.60, arc 0.90, aura 0.45, flux 0.75 -- a rule, not a list: it is the line " +
+            "carrying (1 + S * st.settled), so the table is a strict subset of MH_SETTLED_INTERIOR), the " +
+            "three SATURATIONS (opal's lives, sol's prominences, chorus's voices, mix(x, target, complete*k), " +
+            "chorus's target alone overshooting past full), and sol's 0.55 core gain.\n\n" +
+            "*** WHAT IS LEFT OF st.complete, WHICH IS THE NEXT ROUND OR TWO: *** EIGHT per-species ignition " +
+            "FIGURES, none of them MH_IGNITE's one shape -- comet, fathom, geode, arc, aura, flux, prism and " +
+            "helix. arc puts a gaussian on its FILAMENT, aura a von Mises on the ANGLE that follows st.sweep " +
+            "round its ribbons, geode a flat lit += complete * 0.70 with no gaussian at all, helix " +
+            "complete * (0.35 + 2.10 * exp(-sr*sr)), fathom a per-shell weight (0.5 + 2.4*w). Then the " +
+            "singles: still's glint brightness 0.85, comet's head 2.2, droplet's 0.26, limn's ring " +
+            "(complete * band * 1.20) and its SECOND interior 0.9, duet's flare 1.15 and its one SHRINK " +
+            "(1 - 0.62*complete), chorus's sync 0.55, prism's 1.10.\n\n" +
+            "*** AND THE MEASURED STATE OF THE WHOLE PORT, so the next reader does not have to re-derive it: " +
+            "*** murmur's kit has 41 functions and 40 are ported -- the one missing is mh_out's " +
+            "triangular-PDF dither, recorded elsewhere. live.pace, live.voice and st.drive are essentially " +
+            "complete after the clock arc v4653-v4657. st.settled is 19 sites collapsed onto the 3 shapes " +
+            "they take. st.sweep is 15 sites and the port has 1, which is the shell -- and the eight " +
+            "ignition figures above are where the other fourteen live, so sweep and complete are ONE job " +
+            "rather than two. Named absences outside that: opal's flash-drift live terms, geode's drive " +
+            "mix, tempest's bolt `small` mix, and five builders (droplet, opal, mist, fathom, geode) with " +
+            "no cadence at all.",
+        note8: "*** FOUR OF THE EIGHT IGNITION FIGURES WERE ONE SHAPE, AND v4659 TOOK THEM. *** note7 above " +
+            "listed them as eight separate transcriptions, which is what MH_IGNITE's own note said too. Read " +
+            "side by side, arc, flux, prism and helix run the SAME arithmetic the shell runs, on a " +
+            "coordinate of their own instead of |p|: r = (coord - mix(lo, hi, sweep)) / width, " +
+            "figure += complete * (flat + gain * exp(-r*r)). MH_IGNITE_AXIS holds the five constants; each " +
+            "is that species' own gesture pulse driven by sweep and drawn tighter (0.34 -> 0.30, " +
+            "0.42 -> 0.38, 0.28 -> 0.26).\n\n" +
+            "*** FOUR LEFT, AND THEY REALLY ARE FOUR DIFFERENT SHAPES: *** aura's is a von MISES on the " +
+            "ANGLE -- lap += complete * (0.18 + 0.80 * exp(2.4 * (cos(ang - sweep*2pi) - 1))) -- the only " +
+            "figure in the roster that spends sweep as a position going ROUND something rather than along " +
+            "it; fathom's is a per-shell TURN, w = 1 - smoothstep(0, 0.42, |sweep - turn - 0.16|) then " +
+            "e *= 1 + complete*(0.5 + 2.4*w), so the three shells ignite in sequence; geode's is a flat " +
+            "lit += complete * 0.70 with no sweep at all; and comet's changes the trail's DECAY instead of " +
+            "adding light, decay = mix(decay, 9.0, st.sweep), so the ignition runs the length of the path.\n\n" +
+            "THEN THE SINGLES: still's glint 0.85, comet's head 2.2, droplet's 0.26, limn's ring " +
+            "(complete * band * 1.20) and its second interior 0.9, duet's flare 1.15 and its one SHRINK " +
+            "(1 - 0.62*complete), chorus's sync 0.55, prism's 1.10.\n\n" +
+            "*** AND A NOTE ABOUT MEASURING THIS SIGNAL AT ALL, because it cost a detour: *** mh_state's " +
+            "`settled` turns on at EXACTLY the tau where `complete` peaks (0.3600), so there is NO pair of " +
+            "taus with equal complete and different sweep -- searched at 0.0002 resolution. A rendered frame " +
+            "cannot isolate sweep from complete or from settled. Anything about WHERE the front is belongs " +
+            "in the kit probe, where the three can be driven independently; anything about whether a species " +
+            "flashes at all belongs in a species gate.",
+        note9: "*** AND v4660 TOOK THE OTHER FOUR, WHICH REALLY WERE FOUR SHAPES. *** aura's von Mises on " +
+            "the angle (mhIgniteLap), fathom's per-shell triangular window (mhIgniteTurn), geode's flat " +
+            "lift with no sweep in it, and comet's trail decay that adds no light at all. Both new kit " +
+            "functions have a compiled twin now, in the kit probe's `igniteRound` mode, graded at section " +
+            "17 of tools/ship/murmurKit-selfcheck.mjs -- the lap's lattice spans -pi to +pi INCLUSIVE so " +
+            "the seam is two pixels the GPU itself wrote.\n\n" +
+            "MEASURED, at the peak of complete against the start of the same SUCCESS state: fathom went " +
+            "from x1.000 of interior light to x4.03 and geode from x1.000 to x4.90 -- neither was flashing " +
+            "AT ALL before this round -- aura x2.45 -> x3.59, comet x1.00 -> x1.14 (its flash adds no " +
+            "light, so that is the trail filling in and not a brightening).\n\n" +
+            "*** TWO THINGS THE ROUND FOUND THAT ARE NOT ABOUT THE FIGURES. *** First: comet is now the " +
+            "ONLY species in the roster with no `complete` term anywhere, and " +
+            "tools/ship/murmurIgnite-selfcheck.mjs's control species depended on geode NOT having one -- " +
+            "so wiring geode's flat lift turned three settle rows red in a gate this round never touched. " +
+            "The control moved to comet and section 4 of that gate now MEASURES the property the control " +
+            "rests on, over the whole roster, reading the builder DISPATCH rather than matching names. " +
+            "Second, and it is a gain: between tau 0.95 and tau 1.40 comet's sweep is saturated and it has " +
+            "no complete, so those two frames differ in `settled` and in NOTHING else -- the first " +
+            "isolated settle in pixels this tree has had.\n\n" +
+            "WHAT IS LEFT OF st.complete IS THE SINGLES, unchanged from note8: still's glint 0.85, comet's " +
+            "head 2.2, droplet's 0.26, limn's ring (complete * band * 1.20) and its second interior 0.9, " +
+            "duet's flare 1.15 and its one SHRINK (1 - 0.62*complete), chorus's sync 0.55, prism's 1.10. " +
+            "Nine numbers across eight species, each one a line of its own species' file, and none of them " +
+            "shares a shape with another -- so the round that takes them is a round of transcriptions and " +
+            "should not look for a table to put them in.",
+        blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
+            "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
+            "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +
+            "whose phase is `rate * t + (k*rate/w2) * sin(...)`, i.e. RATE TIMES ELAPSED TIME. A rate that " +
+            "changes while t is large therefore teleports the phase by t * dRate, which is exactly the " +
+            "defect v4650 repaired on the HOST side of the same orb: there, entering RESPONDING after a " +
+            "minute of idle moved the clock 2.902 s in one frame and after half an hour 86.191 s.\n\n" +
+            "*** THIS ONE IS INSIDE THE SHADER, WHERE NO HOST INTEGRATOR CAN REACH IT, AND IT IS murmur's " +
+            "OWN DESIGN AS SHIPPED. *** live.pace has the same shape and is already wired -- limn's rate " +
+            "carries (1 + 0.95 * live.pace) today -- so this is not a new hazard drive introduces, it is an " +
+            "existing one drive multiplies by sixteen. THE ROUND HAS A DECISION TO MAKE AND SHOULD MAKE IT " +
+            "OUT LOUD rather than discover it halfway: transcribe murmur faithfully and inherit the jump, " +
+            "or integrate per-species rates in the shader (which means a second phase uniform per lane, or " +
+            "mh_drift taking an already-integrated argument) and diverge from the source on purpose. " +
+            "Whichever is chosen, tools/ship/murmurTempo-selfcheck.mjs already has the instrument: the " +
+            "worst one-frame advance under a swept signal, bounded against what the clock CAN cover.",
         note: "PART DONE at v4644, and the part that is done is the SHARED physics rather than a slice of " +
             "the eighteen. `settled` is wired at all eighteen interiors and the ignition SHELL at the seven " +
             "marched heroes, on the kit's own mhIgnite and MH_IGNITE table -- murmur writes those four lines " +

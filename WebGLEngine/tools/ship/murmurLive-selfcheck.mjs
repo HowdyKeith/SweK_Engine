@@ -36,8 +36,10 @@
 // and NOT called by the orb, so v4641 added `activity` and `stateIndex` and deliberately not `stateTau`.
 // v4644 wired three of its four outputs -- `settled` on all eighteen interiors, and the pair (complete,
 // sweep) the SUCCESS shell travels on, in the seven marched heroes -- so `stateTau` is a uniform now and the
-// row that said it was absent has inverted into one that says what reads it. The FOURTH, st.drive (the
-// RESPONDING lean, 45 references across murmur's eighteen sources), is still absent and still named.
+// row that said it was absent has inverted into one that says what reads it. v4653 wired the FOURTH, and
+// only partly: st.drive has 45 references across murmur's eighteen sources doing THREE different things,
+// and that round took the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local
+// clock. So the row inverts a second time and the deferral is checked next door rather than promised here.
 "use strict";
 
 import fs from "node:fs";
@@ -83,7 +85,8 @@ const FRAMES = [
     /*  6 */ f("arc", { stateIndex: 0, activity: A_SQRT }),
     /*  7 */ f("arc", { stateIndex: 0, activity: 0.0 }),
     /*  8 */ f("arc", { stateIndex: 0, activity: 1.0 }),
-    // still -- the one species here with NO cadence site at all. Its glintRate is its own style dial.
+    // still -- which had NO cadence site at all until v4656 gave its gesture slot murmur's divisor.
+    // Its glintRate is its own style dial and stays one; what it did not have was the signal beside it.
     /*  9 */ f("still", { stateIndex: 0, activity: 0.0 }),
     /* 10 */ f("still", { stateIndex: 0, activity: 1.0 }),
     /* 11 */ f("still", { stateIndex: 1, voice: L_LISTEN }),
@@ -156,18 +159,36 @@ if (!run.ok) {
             `with one shared window would fail exactly one of these two halves and pass the other.`);
     }
 
-    sec("3. *** THE CADENCE IS WHERE murmur PUTS IT AND NOT EVERYWHERE: still IS EXACTLY INVARIANT TO IT ***");
+    sec("3. *** THE CADENCE REACHES still NOW, AND UNTIL v4656 THIS ROW ASSERTED THAT IT COULD NOT ***");
     {
         const sSpan = cmp(F[9], F[10]);
         const aSpan = cmp(F[7], F[8]);
         say(`activity 0 -> 1: still moves ${sSpan.sum} bytes over ${sSpan.n}, arc ${aSpan.sum} over ${aSpan.n} (worst ${aSpan.mx})`);
-        ok("!! *** still DOES NOT MOVE AT ALL ACROSS THE WHOLE CADENCE RANGE, AND arc DOES ***",
-            sSpan.n === 0 && aSpan.sum > 2000,
-            `still: ${sSpan.n} differing bytes across activity 0 to 1 -- EXACTLY zero, because still is not one ` +
-            `of the six species murmur gives a cadence to, and its glintRate is its own style dial out of ` +
-            `styles.ts. arc moves ${aSpan.sum} over the same span. The zero alone would be passed by a shader ` +
-            `that ignored the activity knob entirely, and the nonzero alone by a port that sprayed it over all ` +
-            `eighteen; the pair together is the claim, and murmurLive2-selfcheck.mjs adds chorus to each half.`);
+        // *** THIS ROW SAID "still DOES NOT MOVE AT ALL ACROSS THE WHOLE CADENCE RANGE" AND GAVE murmur's OWN
+        // DESIGN AS THE REASON: "still is not one of the six species murmur gives a cadence to". *** It is the
+        // same falsehood the census below carried for thirteen rounds and v4654 inverted, in a different
+        // room: counted in murmur's own sources live.pace appears in ALL EIGHTEEN, and still.ts in particular
+        // divides its gesture slot by (1 + 0.30*live.pace + 1.70*st.drive). The zero this row required was a
+        // GAP IN THIS PORT wearing the clothes of a design decision -- and because it was written as a
+        // requirement, it would have gone red the day anybody closed the gap. Which is what happened: v4656
+        // gave still its slot divisor and this row went red reading 613 bytes over 270.
+        //
+        // A ROW THAT GOES RED WHEN A PORT GETS MORE FAITHFUL IS POINTING THE WRONG WAY. So it inverts, and
+        // the half it used to carry -- that the cadence does not reach everywhere -- moves to where it can be
+        // stated truthfully: the source census in section 4, which names the six builders that do not read it
+        // and calls them a gap, and tools/ship/murmurGesture-selfcheck.mjs, whose DEAF rows show in pixels
+        // that still's slot ignores the VOICE integral and tempest's bolts ignore cadence and drive. That is
+        // the real "not everywhere" claim -- a signal absent where murmur omits it, rather than absent where
+        // this port has not arrived.
+        ok("!! *** still MOVES ON THE CADENCE NOW, AND arc STILL DOES: 613 bytes and 5,227 across the same span ***",
+            sSpan.n > 0 && sSpan.sum > 200 && aSpan.sum > 2000 && aSpan.sum > sSpan.sum,
+            `still moves ${sSpan.sum} bytes over ${sSpan.n} across activity 0 to 1, where it moved EXACTLY ` +
+            `ZERO before v4656 -- still.ts divides its gesture slot by (1 + 0.30*live.pace + 1.70*st.drive) ` +
+            `and this port carried no divisor at all, so the one event in still's frame arrived at the same ` +
+            `rate whether or not anybody was talking to it. arc moves ${aSpan.sum} over the same span, and it ` +
+            `MOVES MORE, which is the shape of the two species: arc reads the cadence in a continuous rate ` +
+            `and still reads it in a gesture that is either on screen or not. THE ORDERING IS PART OF THE ` +
+            `ROW -- a port that sprayed the cadence over everything at one strength would not produce it.`);
     }
 }
 
@@ -211,23 +232,39 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 43 and 8 times, counting CODE and not comments",
-        decl === 2 && readV === 43 && readP === 8,
+    ok("!! the conditioned pair is declared once each and read 42 and 15 times, counting CODE and not comments",
+        decl === 2 && readV === 42 && readP === 15,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
-        `strings stripped. The 43 is a REPAIR of a recorded 44, not a regression: v4641 moved 44 raw-knob ` +
-        `sites and 8 glintRate sites, and one of the 44 collapsed into a shared expression while the census ` +
-        `kept scoring the comment that named it. The pixel rows above are what say the move was real; this ` +
-        `row says nothing was left behind.`);
+        `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
+        `-- and every step was an ABSENCE being filled rather than a number being invented: helix's climb ` +
+        `took murmur's 0.75*live.pace at v4655, still's and abyss's gesture slots took 0.30 and 0.35 of it ` +
+        `at v4656, and duet's orbital rate took 0.55 at v4657. The 43 before all that was a REPAIR of a ` +
+        `recorded 44, not a regression: v4641 moved 44 raw-knob sites and 8 glintRate sites, and one of the ` +
+        `44 collapsed into a shared expression while the census kept scoring the comment that named it. The ` +
+        `pixel rows above are what say the move was real; this row says nothing was left behind.`);
 
-    // mh_state's three wired outputs, on the same terms. `drive` is deliberately absent and has its own row.
+    // mh_state's other three outputs, on the same terms. `drive` arrived at v4653 and has its own row below.
     const declS = cc(/const SETTLED = /g) + cc(/const COMPLETE = /g) + cc(/const SWEEP = /g);
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
-        declS === 3 && readSe === 3 && readC === 2 && readSw === 1 && igAt === 6 && igMist === 2,
+        declS === 3 && readSe === 3 && readC === 14 && readSw === 8 && igAt === 6 && igMist === 2,
         `settled ${readSe} readers -- the shared interior factor, comet's headBright and droplet's coreBright, ` +
-        `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} -- the ` +
-        `shell and the mist pair's pre-multiply; sweep ${readSw} -- the shell alone. The shell itself is ` +
+        `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
+        `v4658 and 2 before it -- the shell, the mist pair's pre-multiply, and the five v4658 added: the ` +
+        `shared interior BRIGHTENING beside the settle, opal's and sol's and chorus's saturations, and sol's ` +
+        `core gain, and the four v4659 added on top -- arc's, flux's, prism's and helix's TRAVELLING fronts, ` +
+        `which is why sweep went from 1 reader to 5 in the same round -- AND THE THREE v4660 ADDED, which ` +
+        `are the ignition figures that are NOT a gaussian on an axis: aura's von Mises going round its ` +
+        `ribbons, fathom's triangular window on each shell's own turn, and geode's flat lift with no sweep ` +
+        `in it at all. SIX SPECIES MOVED ZERO BYTES ` +
+        `AT THE PEAK OF THEIR OWN SUCCESS STATE until v4658, because kit.ts's "every species multiplies its ` +
+        `own interior energy by (1 + complete)" had no reader here at all; prism and helix STILL moved ` +
+        `nothing until v4659 gave them the figure that is their whole flash, and fathom and geode still ` +
+        `moved nothing until v4660 gave them theirs. sweep ${readSw} -- the shell, the four axis fronts, and ` +
+        `v4660's three: aura's angle, fathom's turn and comet's trail length, which is the one figure in the ` +
+        `roster that reads the sweep and NOT the complete, because comet's flash adds no light at all. The ` +
+        `shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
         `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
         `times with four numbers changed; this file writes them once and reads the numbers from MH_IGNITE.`);
@@ -244,13 +281,41 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         if ((blk.match(/\bVOICE\b/g) || []).length) voiced.push(marks[k][1]);
     }
     // `mist` is the shared builder nebula and tempest are both drawn by, which is why 17 builders cover 18 species.
-    const WANT_PACED = ["arc", "sol", "aura", "flux", "chorus", "prism"];
+    // *** THIS ROW ASSERTED SOMETHING FALSE ABOUT murmur FOR THIRTEEN ROUNDS, AND v4654 MEASURED IT. ***
+    // It read "THE SIX SPECIES WITH A CADENCE ARE murmur's SIX ... A port that routed the cadence to every
+    // species would draw a shimmer on eleven bodies murmur leaves still." Counted in murmur's own eighteen
+    // sources, live.pace appears in ALL EIGHTEEN -- still 1, limn 1, comet 2, droplet 1, opal 1, abyss 1,
+    // nebula 2, tempest 1, fathom 1, geode 1, arc 1, sol 2, aura 2, flux 2, duet 2, chorus 1, prism 1,
+    // helix 1. There is no species murmur leaves still.
+    //
+    // The six were never murmur's six. They were the six this PORT happened to reach when v4641 moved eight
+    // borrowed glintRate sites onto the cadence, and the row wrote that subset down as if it were the
+    // design. A record that over-claims sends the next reader to build what is already there; this one did
+    // the opposite and told them there was nothing left to build.
+    //
+    // So the row inverts: it names how many of the eighteen this port has reached and REQUIRES THE NUMBER TO
+    // BE SHORT, with the missing ones listed, until it is not.
+    const MURMUR_PACED = 18;   // counted in murmur's sources; see the note above
+    const ALL = marks.slice(0, -1).map((m) => m[1]);
+    const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
-    ok("!! *** THE SIX SPECIES WITH A CADENCE ARE murmur's SIX, NAMED, AND THE OTHER ELEVEN BUILDERS HAVE NONE ***",
-        paced.length === WANT_PACED.length && WANT_PACED.every((s) => paced.includes(s)),
-        `exactly ${paced.join(", ")} -- and no other builder reads it. These are the eight glintRate sites the ` +
-        `defect had, gathered by species: sol and flux carry two each, the other four one. A port that routed ` +
-        `the cadence to every species would draw a shimmer on eleven bodies murmur leaves still.`);
+    say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
+    ok("!! *** murmur GIVES A CADENCE TO ALL EIGHTEEN AND THIS PORT REACHES TWELVE -- the five builders still without one are named ***",
+        paced.length === 12 &&
+        ["arc", "sol", "aura", "flux", "chorus", "prism", "comet", "limn", "helix", "still", "abyss", "duet"].every((x) => paced.includes(x)) &&
+        unpaced.length === (marks.length - 1) - 12,
+        `${paced.length} of murmur's ${MURMUR_PACED}: ${paced.join(", ")}. STILL WITHOUT ONE: ` +
+        `${unpaced.join(", ")} -- five builders covering six species, since mist draws both nebula and ` +
+        `tempest. duet arrives at v4657: its orbital rate reads 0.55*live.pace beside the gesture term this ` +
+        `port already had, so the pair sped up for its own flourish and ignored the exchange. still and ` +
+        `abyss arrived at v4656 through their GESTURE SLOTS, which murmur divides by the ` +
+        `signal sum: still's carried no divisor at all and abyss's carried the voice term alone. helix ` +
+        `arrived at v4655: helix.ts scales its climb by 0.75*live.pace and 0.85*st.drive and ` +
+        `this port carried the bare drift, so its strands rose at one speed whatever the exchange was doing. ` +
+        `comet and limn arrived at v4654 -- comet's orbital rate was reading VOICE where murmur reads ` +
+        `live.pace and its closure never touched the cadence at all, and limn had the smaller of murmur's two ` +
+        `terms and not the larger. THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN. It is a count of what this ` +
+        `port has reached and it goes red when that count moves, in either direction.`);
 
     const stillGlint = count(/uniforms\.glintRate\b/g);
     const stillBlk = (() => { const k = marks.findIndex((m) => m[1] === "still");
@@ -306,15 +371,22 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // A knob nothing reads is a row that cannot fail, so v4641 did not add one. v4644 wires the flash, so the
     // knob arrives with the pixels it moves and the row inverts: it now has to say the uniform is READ, and
     // by what, or a future edit could delete the wiring and leave a dead knob behind the same green.
-    const drive = (code.match(/\bDRIVE\b|STATE\.drive/g) || []).length;
-    ok("!! *** stateTau IS A UNIFORM NOW BECAUSE SOMETHING READS IT -- and `drive` still is not, by design ***",
+    // *** AND AT v4653 THE LAST OF THE FOUR ARRIVES, so this row inverts a second time. *** It said at
+    // v4641 that mh_state was absent, at v4644 that three of its four outputs were wired and `drive` was
+    // not, and now that all four are read. Each inversion is the same discipline: the row states what is
+    // MISSING as a checked fact, so the missing half cannot quietly become a half-finished one.
+    const drive = (code.match(/\bDRIVE\b/g) || []).length;
+    const driveDecl = (code.match(/const DRIVE = /g) || []).length;
+    ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 3 && readC === 2 && readSw === 1 && drive === 0,
-        `stateTau is read ${rawT} time, by mh_state, and three of mh_state's four outputs reach ${readSe + readC + readSw} ` +
-        `sites between them. The FOURTH -- st.drive, the RESPONDING lean, 45 references across murmur's ` +
-        `eighteen sources -- is read ${drive} times here and is the next round. That half is still an ABSENT ` +
-        `FEATURE and is named as one rather than left for a reader to discover, which is the shape this row ` +
-        `had when the whole of mh_state was absent.`);
+        readSe === 3 && readC === 14 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
+        `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
+        `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
+        `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +
+        `PART OF IT IS HERE: murmur spends st.drive at 45 sites doing three different things, and v4653 ` +
+        `wired the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local clock. ` +
+        `That deferral is not stated here and hoped for -- tools/ship/murmurDrive-selfcheck.mjs checks that ` +
+        `no line in the shader reads both DRIVE and uniforms.time.`);
 
     // The per-species tables have to be READ and not merely imported, or MH_IGNITE is a table the shader
     // agrees with by coincidence. Seven entries, eleven species without one, and the eleven build no nodes.
@@ -377,10 +449,15 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_live is the one function every species in murmur's family reads and this port " +
     "did not have. The kit's own gate proves the FUNCTION is right on a real GPU; this one proves the ORB " +
     "CALLS IT, which is the half a correct-and-unwired port would pass in silence." +
-    "\nWHAT IS NOT CLAIMED: st.drive, the fourth of mh_state's outputs -- ported and graded in the kit, not " +
-    "wired, by design and named in its own row. Its three siblings ARE wired at v4644 and the source census " +
-    "below counts where they land; whether the flash reaches PIXELS is graded next door, in " +
-    "tools/ship/murmurIgnite-selfcheck.mjs, on renders rather than on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
+    "\nWHAT IS NOT CLAIMED: st.drive's RATE family was sixteen of its 45 sites, deferred at v4653 because " +
+    "each multiplies a local clock and mh_drift's phase is rate * t, so a drive ramping at large t " +
+    "teleports it. IT IS NO LONGER DEFERRED: v4654 made the secular phase an integral and v4655 took the " +
+    "sites whose whole output is multiplied, helix's climb among them, which is why this file's cadence " +
+    "count moved from eight species to nine. What st.drive still does NOT have is limn's drive factor, " +
+    "whose rate is a product rather than a sum. All four of mh_state's outputs are otherwise wired " +
+    "and the source census below counts where they land; whether they reach PIXELS is graded next door, in " +
+    "tools/ship/murmurIgnite-selfcheck.mjs and tools/ship/murmurDrive-selfcheck.mjs, on renders rather than " +
+    "on a reader count. The pixel rows here cover TWO of the eighteen species, arc and still, chosen as the largest " +
     "cadence response in the family and the one that has none at all; chorus and droplet are the other two " +
     "and they are in tools/ship/murmurLive2-selfcheck.mjs. The remaining fourteen are covered by the source " +
     "census at section 5 -- which grades the FILE and not the picture, and says so in its own title -- and by " +

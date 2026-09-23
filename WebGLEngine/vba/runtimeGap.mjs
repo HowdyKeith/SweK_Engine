@@ -344,7 +344,19 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // are not alike, which is the distinction the twelve rows beside the count exist to make.
     // v4647p -- 4288 -> 4289: tools/ship/sweepRotation-selfcheck.mjs. ES modules and closures by one
     // each; async/await unmoved, because the gate awaits nothing.
-    files: 4298,               // v4664 -- RE-DERIVED: two files (tools/ship/declaredCost.mjs, its gate); three rows moved, nine held. v4662 -- RE-DERIVED: two files (tools/ship/thrownRow.mjs, its gate); five rows moved, seven held. v4661 -- RE-DERIVED: three files (tools/ship/wasmTeardown.mjs, its gate, tools/ship/wasmExitHook.cjs); seven rows moved, five held. v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // *** v4665 -- RE-DERIVED AT THE MERGE: both lines re-took this over their own tree, so
+    // neither figure describes the union. Both histories kept; the numbers are re-derived below.
+    // ---- this branch's line ----
+    // (this branch's figure and its history, superseded by the merge re-derive below)
+    // files: 4298,               // v4664 -- RE-DERIVED: two files (tools/ship/declaredCost.mjs, its gate); three rows moved, nine held. v4662 -- RE-DERIVED: two files (tools/ship/thrownRow.mjs, its gate); five rows moved, seven held. v4661 -- RE-DERIVED: three files (tools/ship/wasmTeardown.mjs, its gate, tools/ship/wasmExitHook.cjs); seven rows moved, five held. v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // ---- the murmuration line ----
+    // *** v4665 -- RE-DERIVED OVER THE MERGED TREE, and it is LESS than the sum of the two lines'
+    // figures for the reason the v4645 note beside this already records: the two branches share files.
+    // 4298 here, 4300 on main, 4307 merged. SEVEN rows moved and five held -- ES modules +6, closures
+    // +7, async/await +3, typed arrays +1, Promises +2, WebAssembly 23 -> 24. That last one is this
+    // branch's tools/ship/wasmExitHook.cjs, the file the wasm census could not see either, arriving in
+    // a row that counts it correctly because this census reads every extension rather than three.
+    files: 4307,                              // v4660 -- RE-DERIVED: tools/ship/murmurIgniteFour-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3866 / 23 still rounds to 168).  // v4659 -- RE-DERIVED: tools/ship/murmurIgniteAxis-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3865 / 23 still rounds to 168).  // v4658 -- RE-DERIVED: tools/ship/murmurComplete-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3864 / 23 still rounds to 168).  // v4656 -- RE-DERIVED: tools/ship/murmurGesture-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3863 / 23 still rounds to 168).  // v4655 -- RE-DERIVED: tools/ship/murmurClock2-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3862 / 23 still rounds to 168).  // v4654 -- RE-DERIVED: tools/ship/murmurClock-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3861 / 23 still rounds to 167).  // v4653 -- RE-DERIVED: the two st.drive gates arrived, both ES modules using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3860 / 23 still rounds to 167).  // v4650 -- RE-DERIVED: tools/ship/murmurTempo-selfcheck.mjs arrived, one ES module using closures and one await (its render section) -- four rows moved, eight held, and closuresOverThreads did NOT move (3858 / 23 still rounds to 167).  // v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -664,6 +676,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // that adds a module must re-take, which is the cost of pinning it". Six rounds added modules and none
     // re-took it. It went red on BOTH boxes, and Keith's verify named it in the drift pre-flight -- which is
     // precisely the instrument for this and only helps somebody who runs it.
+    // *** v4665 -- RE-DERIVED AT THE MERGE: both lines re-took this over their own tree, so
+    // neither figure describes the union. Both histories kept; the numbers are re-derived below.
+    // ---- this branch's line ----
     // v4661 -- RE-DERIVED: three files arrived (tools/ship/wasmTeardown.mjs, its gate, and the CJS hook
     // tools/ship/wasmExitHook.cjs). SEVEN rows moved and five held -- files +3, ES modules +2 (the .cjs is
     // not one), closures +3, async/await +1, typed arrays +1, Promises +1, and WebAssembly 23 -> 24, which
@@ -677,7 +692,16 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4664 -- RE-DERIVED: two files arrived (tools/ship/declaredCost.mjs and its gate). THREE rows
     // moved and nine held -- files +2, ES modules +2, closures +2. Neither async/await nor Promises
     // moved, which is right for a pair that reads headers off disk and does no I/O it can await.
-    esModules: 3997, closures: 3864, asyncAwait: 1526, typedArrays: 1126, promises: 370,
+    // (this branch's figure and its history, superseded by the merge re-derive below)
+    // esModules: 3997, closures: 3864, asyncAwait: 1526, typedArrays: 1126, promises: 370,
+    // (this branch's capability row, superseded by the merge re-derive below)
+    // fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 24,
+    // ---- the murmuration line, RE-DERIVED at v4665 over the merged tree ----
+    esModules: 4006, closures: 3873, asyncAwait: 1535, typedArrays: 1126, promises: 370,
+    // wasm 23 -> 24: this branch's tools/ship/wasmExitHook.cjs. A DUPLICATE KEY nearly hid it -- both
+    // lines' capability rows survived the merge and the LATER one silently won, so the merged tree
+    // would have carried main's 23 under a record claiming to describe the union. JS does not warn
+    // on a repeated object key; the gate caught it because it re-derives every row rather than trusting.
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 24,
     // v4649r -- webgpu 53 -> 54: render/temporalResolve-selfcheck gained a navigator.gpu call when its
     // confidence bound was moved onto the per-adapter record. ONE row moved and eleven did not, which is

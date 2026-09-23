@@ -8070,7 +8070,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
-    since336: Object.freeze({
+    // *** v4665 -- THESE THREE SLOTS WERE WRITTEN AS since334-since336 AND ARE RENUMBERED FORWARD TO
+    // since343-since345, for the same reason and at the same merge as v4650-v4654 -> v4661-v4665. main's
+    // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
+    // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
+    // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    since345: Object.freeze({
         at: "v4664", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/declaredCost-selfcheck.mjs",
@@ -8092,7 +8097,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "a death that mode's own note already predicted. Six sabotages, all red; the unit one " +
                  "matters most, since ~0.2s and ~200ms are both in the tree and differ by a thousand.",
     }),
-    since335: Object.freeze({
+    since344: Object.freeze({
         at: "v4662", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/thrownRow-selfcheck.mjs",
@@ -8114,7 +8119,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "all. Both are re-pointed and the section headed 'one handler is half a net' now says the " +
                  "opposite, because that is what the measurement said.",
     }),
-    since334: Object.freeze({
+    since343: Object.freeze({
         at: "v4661", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/wasmTeardown-selfcheck.mjs",
@@ -8131,6 +8136,433 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "control of 0.8), that liveHandles() is EMPTY there so serverShutdown's drain cannot reach " +
                  "it, and that process.exitCode costs nothing. It arrives with 48 gates converted -- the " +
                  "measured population of wasm compilers that called process.exit() with a module behind them.",
+    }),
+    // v4660 -- THE 343rd CLOSING: the other four ignition figures, which really were four shapes -- and the
+    // control species another gate had been resting on for fifteen rounds without ever checking it.
+    since342: Object.freeze({
+        at: "v4660", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteFour-selfcheck.mjs"]),
+        // EMPTY, AND THE FIRST DRAFT PUT tools/ship/murmurIgnite-selfcheck.mjs HERE. It is not an arrival:
+        // it shipped at v4644 and this round turned it red by taking its control species away. Naming it
+        // here put a gate in the ledger twice -- closingCoverage-selfcheck read 388 names over 387 distinct
+        // and went red on the duplicate, because one duplicate buys one credit and one credit hides one
+        // future unswept gate. The repair belongs in the verdict, which is where it is.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,690 ms on this box, 9 rows in five sections over four rendered species, plus a " +
+                 "new section 17 and a new probe mode (igniteRound) in tools/ship/murmurKit-selfcheck.mjs, " +
+                 "which goes 2,260 -> 2,285 ms for it. " +
+                 "*** THE OTHER FOUR FIGURES ARE FOUR SHAPES AND NOT A FIFTH TABLE ENTRY. *** aura's is a " +
+                 "von MISES on the angle -- the only figure in the roster that spends sweep going ROUND " +
+                 "something -- fathom's is a triangular window per shell so the nest lights innermost " +
+                 "first, geode's is a flat lift with no sweep in it at all, and comet's adds NO LIGHT: it " +
+                 "lengthens the trail, decay = mix(decay, 9.0, sweep), and decay is in the denominator. " +
+                 "*** fathom AND geode WERE STILL NOT FLASHING AT ALL: *** both moved 0.0% of their bytes " +
+                 "and x1.000 of interior light at the peak of their own SUCCESS state. They now read x4.03 " +
+                 "and x4.90; aura goes x2.45 -> x3.59 and comet x1.00 -> x1.14, which is small BECAUSE its " +
+                 "flash adds no light. comet's decay also took murmur's drive and small factors, which this " +
+                 "port never had. " +
+                 "*** AND WIRING geode's FIGURE TURNED ANOTHER GATE RED, WHICH IS THE ROUND'S REAL FINDING. " +
+                 "*** tools/ship/murmurIgnite-selfcheck.mjs is built around a PAIR -- one species that " +
+                 "flashes and one whose SUCCESS is a settle and NOTHING else -- and geode had been the " +
+                 "second since v4644 on the strength of a sentence nothing ever checked. Giving geode an " +
+                 "ignition made its SUCCESS rise and fall, and three settle rows went red about a settle " +
+                 "when the defect was in the control. The control is comet now, which after this round is " +
+                 "the LAST species with no complete term anywhere, and that gate's new section 4 measures " +
+                 "that property over the whole roster -- reading the builder DISPATCH, because nebula and " +
+                 "tempest share buildMist and a name match reports both unflashed. The first cut of that " +
+                 "census read 16 entries for 18 species and its own size assertion said so. " +
+                 "*** A GAIN CAME OUT OF THE REPAIR: *** comet's sweep saturates at tau 0.95 and it has no " +
+                 "complete, so frames at tau 0.95 and 1.40 differ in `settled` and in nothing else -- the " +
+                 "first isolated settle in pixels this tree has had. It reads x1.278 with its centroid " +
+                 "moving 0.0011. " +
+                 "SIXTEEN SABOTAGES ACROSS THREE GATES, ALL CAUGHT -- including two aimed at the repair " +
+                 "itself: giving comet a complete term reddens the control census BY NAME, and stretching " +
+                 "mh_state's sweep so it no longer saturates before tau 1.40 reddens the isolated-settle " +
+                 "row, whose whole claim is that those two frames differ in one signal. FOUR OF THEM NAMED " +
+                 "THE WRONG ROW at first: the geode " +
+                 "census carried its own control as a conjunct, so unwiring fathom or comet reddened a row " +
+                 "titled for geode. The control is its own row now. " +
+                 "AND TWO OF THIS ROUND'S OWN ROWS WERE WRONG BEFORE THEY SHIPPED: one asserted aura's lap " +
+                 "is EXACTLY equal at -pi and +pi and measured 4.44e-16, which is two ulp of the 2*pi that " +
+                 "binary cannot hold, not a seam; and one mapped five sweeps through an arrow that never " +
+                 "read its argument, then asserted the five results were equal -- a row that could not " +
+                 "fail, under a title claiming a sweep had been tried. Both replaced by measurements: the " +
+                 "gaussian in the lap's place tears by 0.80 at the same join, and geode's WHOLE builder is " +
+                 "counted for the word SWEEP with the other three as the control.",
+    }),
+    // v4659 -- THE 342nd CLOSING: four figures that turned out to be one shape, and the two species that
+    // were STILL not flashing after the round before.
+    since341: Object.freeze({
+        at: "v4659", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurIgniteAxis-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,621 ms on this box, 8 rows in four sections over four rendered species, plus a " +
+                 "new section 16 and a new probe mode in tools/ship/murmurKit-selfcheck.mjs. " +
+                 "*** MH_IGNITE's OWN NOTE CALLED THE REMAINING EIGHT FIGURES \"per-species transcriptions " +
+                 "rather than this one shape\". FOUR OF THEM ARE ONE SHAPE. *** r = (coord - mix(lo, hi, " +
+                 "st.sweep)) / width, figure += st.complete * (flat + gain * exp(-r*r)) -- arc along the " +
+                 "angle round its arc, flux along the length of its stream, prism along the distance out its " +
+                 "beams, helix along the height of its strands. The SHELL's coordinate is |p| for all seven " +
+                 "species that run it; these four are four different quantities, which is why it is a second " +
+                 "table and not four more rows in the first. " +
+                 "*** AND EACH IS THAT SPECIES' OWN GESTURE FIGURE, RUN ON sweep AND DRAWN TIGHTER: *** arc " +
+                 "0.34 against 0.30, flux 0.42 against 0.38, prism 0.28 against 0.26. The success is the " +
+                 "thing the species already does, once, travelling the whole length. " +
+                 "*** prism AND helix WERE STILL NOT FLASHING AT ALL AFTER v4658: *** both moved 0.0% of " +
+                 "their bytes and x1.000 of interior light at the peak of their own SUCCESS state, because " +
+                 "neither has an interior factor and this figure IS their whole flash. They now read x2.08 " +
+                 "and x2.93; arc goes x1.81 -> x2.18 and flux x4.33 -> x5.92 on top of what v4658 gave them. " +
+                 "*** WHERE THE FRONT TRAVELS IS GRADED IN THE KIT AND THE REASON IS MEASURED: *** isolating " +
+                 "sweep in a rendered frame needs two taus with equal complete and different sweep, and " +
+                 "mh_state's settled turns on at EXACTLY the complete peak (tau 0.3600) -- searched, and " +
+                 "there is no such pair. So a new probe mode grades the front against the CPU twin on a real " +
+                 "GPU at 0/255 over three different axes, and its peak sits at mix(lo, hi, sweep) to 0.0010 " +
+                 "of the axis at every sweep. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, ONE ONLY AFTER REPAIR: moving helix's FLAT term outside " +
+                 "the complete multiply -- which would lift every strand in every state -- read identically " +
+                 "on the probe's alpha channel, because that channel ran FLUX's constants and flux has no " +
+                 "flat term. It runs helix's now. " +
+                 "AND THE ROUND's OWN BASELINE LIED ONCE: the neutralisation that measures what the port did " +
+                 "BEFORE a change is a regex over the table, and prism's entry has two spaces after `lo:` " +
+                 "where the others have one -- so prism was never neutralised and its \"before\" reading was " +
+                 "the wired version, which read as though the change did nothing. The script asserts the " +
+                 "count of entries it neutralised now.",
+    }),
+    // v4658 -- THE 341st CLOSING: the half of the SUCCESS flash that is not the shell, and the six species
+    // that reached the peak of their own success state without moving a byte.
+    since340: Object.freeze({
+        at: "v4658", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurComplete-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,969 ms on this box, 11 rows in four sections over four rendered species. " +
+                 "*** kit.ts: \"The light in a success is NOT an overlay: every species multiplies its own " +
+                 "interior energy by (1 + complete), which brightens exactly what is already there and " +
+                 "leaves the dark dark.\" v4644 PORTED THE SHELL AND NOT THAT SENTENCE. *** Measured on real " +
+                 "pixels at stateTau 0.360, where mh_state's complete is exactly 1.0 and settled exactly 0: " +
+                 "limn, arc, aura, flux, sol and chorus each moved 0 of 9,216 bytes between the start of " +
+                 "their own SUCCESS state and its brightest instant. The flash was computed, sent to the " +
+                 "shader as a uniform, and spent by nobody. " +
+                 "AFTER: limn x3.74 of interior light, flux x4.33, chorus x3.88, sol x2.22 -- all four read " +
+                 "x1.000 at HEAD on the same frames. " +
+                 "*** THE FOUR ON THE SHARED INTERIOR LINE ARE FOUND BY A RULE AND NOT BY A LIST: *** every " +
+                 "one of murmur's eighteen species ends its interior with (1 + S * st.settled), and exactly " +
+                 "four of those eighteen lines also carry a complete factor -- limn 1.60, arc 0.90, aura " +
+                 "0.45, flux 0.75. A site belongs in MH_COMPLETE_INTERIOR if and only if its complete factor " +
+                 "sits on the same source line as its settled factor, which a census can check. The table is " +
+                 "a strict SUBSET of MH_SETTLED_INTERIOR and the gate asserts that. " +
+                 "*** AND THREE SPECIES SATURATE WHERE FOUR SCALE, WHICH IS THE OPPOSITE OPERATION. *** " +
+                 "opal's flashes, sol's prominences and chorus's voices are pulled toward a target -- " +
+                 "mix(life, target, complete * k) -- so the differences between them CLOSE: two figures " +
+                 "4.00x apart come out 1.09x apart, where a gain leaves the ratio at exactly 4.00. chorus " +
+                 "alone overshoots, toward 1 + 0.45*complete, because its subject is an ensemble arriving " +
+                 "together and going past full is how that reads as louder than its parts. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, THREE ONLY AFTER REPAIR. *** A PIXEL ROW ABOUT THE DARK " +
+                 "STAYING DARK WAS WRITTEN AND DELETED: *** it read a worst rise of 0.0 counts on all four " +
+                 "species and the population it read that from was ZERO -- every pixel at or below 6 of 255 " +
+                 "was OUTSIDE the silhouette, and it would have passed forever while measuring the paper " +
+                 "behind the orb. The claim is arithmetic and is graded as arithmetic. sol's 0.55 core gain " +
+                 "was invisible because at the roster's default glow its disc is SATURATED (2.0937 against " +
+                 "2.0916 across the flash, a ratio of 0.999); sol is rendered at glow 0.25 now, where the " +
+                 "same core reads x2.56, and has its own row. And the shader twin of the saturation, " +
+                 "rewritten as a GAIN, walked through every pixel row in the round -- because a gain " +
+                 "brightens too -- until mh_complete_lift went into the kit probe's alpha channel on " +
+                 "chorus's overshooting pair, which is where a saturation and a gain part company.",
+    }),
+    // v4657 -- THE 340th CLOSING: the two rates this tree recorded as out of reach, one of them because a
+    // record said the host could not see a signal it had been keeping all along.
+    since339: Object.freeze({
+        at: "v4657", swept: 0, green: 0, red: 0,
+        // NO NEW GATE FILE. The subject is two more clocks of a kind tools/ship/murmurClock-selfcheck.mjs
+        // already owns, so the round added a section and four rows to it rather than a seventh murmur gate,
+        // and paid for them by replacing a 438,000-tick settle with the closed form it computes (3,345 ms
+        // to 3,042 on this box). A gate file per round is a habit, not a rule.
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate added; murmurClock-selfcheck.mjs green at 3,042 ms on this box against a " +
+                 "murmurKit measuring 2,861 here and RECORDED at 2,035 -- a drift of 1.41, so about 2,160 " +
+                 "recorded, up from 1,611 for six new rows and two more rendered species. " +
+                 "*** THE RATE FAMILY IS FINISHED, AND THE LAST TWO WERE THE ONES THIS TREE HAD WRITTEN " +
+                 "OFF. *** duet's rate was recorded in murmurClock-selfcheck.mjs for three rounds as " +
+                 "structurally unreachable: \"its rate reads the species' OWN FLOURISH envelope, which is " +
+                 "computed inside the shader from a hash and cannot be integrated by a host that has never " +
+                 "seen it. A signal the host does not know has no integral to send.\" THE HOST DOES KNOW " +
+                 "IT. mh_flourish is a pure function of shader time, a lane and a slot LENGTH, and duet's " +
+                 "lane and slot are style constants out of MH_DUET -- so the envelope is a deterministic " +
+                 "function of the very clock render/aiPresenceOrbState.mjs already integrates. The sentence " +
+                 "was true of a signal the host does not know; duet's was never one of those, and it read " +
+                 "as a property of the mechanism. " +
+                 "MEASURED: duet's orbital phase advanced 1.8152 rad in ONE 1/60 s frame after half an hour " +
+                 "-- 29% of a whole turn of the pair's shared orbit -- against a flat 0.006244, and the " +
+                 "trigger was the species' own gesture rather than anything the user did. limn's, which " +
+                 "v4654 priced correctly at two more accumulators, reached 68.3121 rad in a frame: nearly " +
+                 "eleven whole turns. Both reduce to murmur's own expression at a held signal, limn's " +
+                 "product to 3.6e-12 over 180 operating points. " +
+                 "THREE NEW HOST INTEGRALS, and the cross ones are the interesting pair: the integral of " +
+                 "pace*drive is NOT the product of the two integrals -- 8.20 against 68.35 after twenty " +
+                 "seconds idle and six busy -- because a product of integrals carries t SQUARED. " +
+                 "*** AND THREE INSTRUMENTS WERE REPAIRED, EACH OF WHICH HAD STOPPED MEANING WHAT IT " +
+                 "SAID. *** murmurSpecies12 divided its fourteen orbit samples out of duet's BASE rate; " +
+                 "with murmur's three modulated terms in, that covers 86% of a turn and every row still " +
+                 "passed, saying \"across one full orbit\" about something that was not one -- the times " +
+                 "are SOLVED from the phase now and the gate asserts its own coverage at 1.0004 turns. " +
+                 "murmurDrive tested \"no line reads both DRIVE and uniforms.time\" as a proxy for \"no " +
+                 "expression multiplies drive by elapsed time\", and fired on limn's flattening wobble -- a " +
+                 "bounded amplitude, which is the arrangement the row exists to bless. murmurDrive2 bounded " +
+                 "helix's contraction as `pct < 10 * limn.pct` with both numbers NEGATIVE, so limn moving " +
+                 "more made helix's claim HARDER: a ratio of magnitudes now. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, FOUR ONLY AFTER REPAIR: the gesture-integral row graded a " +
+                 "sum this GATE kept beside the module's rather than the module's own, so accumulating " +
+                 "against wall dt and reading the wrong lane both walked through; the frame helper deriving " +
+                 "the cross terms as a product of integrals walked through everything; and nothing noticed " +
+                 "duet's orbit samples silently covering less than they claimed.",
+    }),
+    // v4656 -- THE 339th CLOSING: the gesture clock, where a slot that changes length does not advance the
+    // gesture, it replaces it.
+    since338: Object.freeze({
+        at: "v4656", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurGesture-selfcheck.mjs"]),
+        // EMPTY because the new gate arrived GREEN. murmurSpecies3 went red on this round's CHANGE, which is
+        // a recorded bound moving under a repaired mechanism and not a gate arriving broken -- this field is
+        // for the second. What happened to it is in the verdict, where it can be read rather than counted.
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,135 ms on this box against a murmurKit measuring 2,861 here and RECORDED at " +
+                 "2,035 -- a drift of 1.41, so about 2,230 recorded. 12 rows in five sections over three " +
+                 "species. *** mh_flourish's SLOT INDEX IS NOT A PHASE: every number in the gesture is a " +
+                 "hash of floor(t / SLOT) -- where it starts, how long it lasts, and the per-gesture random " +
+                 "its species spends as a DIRECTION. *** Three of murmur's species make the slot length a " +
+                 "function of the live signals, and a divisor that moves makes that index JUMP, which " +
+                 "re-rolls every hash at once. The bolt in the air becomes a different bolt between one " +
+                 "frame and the next. " +
+                 "MEASURED across three species and seven session lengths: the index moves up to 21 SLOTS " +
+                 "in a single 16.7 ms frame and the envelope steps 0.9996 of its 0..1 range -- and sin^2 " +
+                 "has ZERO SLOPE at both ends by design, so it cannot legitimately arrive there from 0 in " +
+                 "one frame. The per-gesture random changed MID-GESTURE on 14 frames, envelope up on both " +
+                 "sides: the same creature's direction redrawn while it is on screen. " +
+                 "*** AND IT IS NOT THE PHASE TELEPORT'S SHAPE, which is a distinction worth having. *** " +
+                 "The envelope step is already 0.9950 after thirty seconds; one re-index ruins one gesture " +
+                 "completely at any t. What grows with the session is the FREQUENCY -- 0 re-rolls at 30 s " +
+                 "and 7 at half an hour -- because d(floor(t/SLOT))/dSLOT is -t/SLOT^2, so at large t an " +
+                 "arbitrarily small change of slot length flips the index and the gesture flickers. " +
+                 "*** tempest's TWO LIGHTNING LANES WERE DOING THIS TODAY. *** It is the one of the three " +
+                 "whose divisor was already wired; still's was absent entirely and abyss's carried one of " +
+                 "murmur's three terms, so those two are an ABSENCE filled and tempest's is a defect fixed. " +
+                 "THE REPAIR IS v4654's FACTORING ON A DIFFERENT STRUCTURE AND COSTS NO NEW UNIFORM: a " +
+                 "boundary falls where the accumulated slot COUNT crosses an integer, and that count is " +
+                 "(t + a*P + b*V + c*D)/B -- mhRatePhase with a base of 1/B. S is continuous and strictly " +
+                 "increasing, so floor(S) steps by one: ZERO jumps, ZERO reversals and ZERO mid-gesture " +
+                 "re-seeds over 5,019 frames, against a held-signal reduction of 1.5e-12 across all four " +
+                 "outputs and 62,400 points. " +
+                 "*** A SHADER TWIN HAD BEEN MISSING TWO OF ITS FOUR SIGNAL TERMS AND THE PROBE COULD NOT " +
+                 "SEE IT: *** mhAbyssSlot divided by (1 + 0.55*voice) where abyss.ts and this tree's own " +
+                 "CPU abyssSlot divide by all four, and the kit probe swept rarity and voice ONLY -- the " +
+                 "pair that was missing sat at zero in every pixel. Repaired, the probe now sweeps pace " +
+                 "against drive in a second channel and catches the old twin at 101/255. Two arguments " +
+                 "pinned at zero grade nothing, for the third round running. " +
+                 "*** murmurSpecies3 WENT RED ON ARRIVAL AND ITS CONSTANTS WERE DROPPED RATHER THAN " +
+                 "RE-FITTED. *** Its four frame times were hand-written [2.0, 9.0, 16.0, 22.5], fitted to " +
+                 "a slot of 16.48 s -- which was abyss's slot only while the cadence term was missing. With " +
+                 "it the slot is 15.12 s, the lanes moved, and the row about two lanes turning opposite " +
+                 "ways read 15.25 degrees against 0.00 because the first lane was no longer passing at all. " +
+                 "The times are SEARCHED FOR now, at the gate's own operating point against its own clock, " +
+                 "and the numbers got stronger: +17.80 and -11.93 degrees, genuinely opposite, and the " +
+                 "interior swing went from 4.7x to 10.9x. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, TWO ONLY AFTER REPAIR: handing abyss its BASE slot length " +
+                 "where the instantaneous one belongs walked through both pixel rows and every species gate " +
+                 "(it is worth 1.3% of a slot), and dropping the 1.30 from tempest's folded coefficient " +
+                 "walked through everything because every pixel row asked only whether the frame MOVED. " +
+                 "Closed by a structural census -- the count must integrate against a base with no live " +
+                 "signal and the length must carry one -- and by reading tempest's 1.30 and 0.85 out of the " +
+                 "shader and multiplying them. The census's own first cut took a 240-character declaration " +
+                 "window that spilled into the next statement and scored every correct site as wrong.",
+    }),
+    // v4655 -- THE 338th CLOSING: the clocks whose OUTPUT is multiplied, which last round's census could
+    // not see, and a row that had outlived its own repair two gates away.
+    since337: Object.freeze({
+        at: "v4655", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock2-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 3,005 ms on this box against a murmurKit that measures 2,705 here and is " +
+                 "RECORDED at 2,035 -- a box drift of 1.33, so about 2,260 recorded, under the 2,772 at " +
+                 "which this tree splits. 12 rows in five sections over three species. " +
+                 "*** LAST ROUND'S CENSUS PRINTED \"modulated rates still on murmur's rate * t: (none)\" " +
+                 "WHILE TWO CLOCKS WERE TELEPORTING. *** It inspected mh_drift's RATE ARGUMENT, and only " +
+                 "when that argument was a bare identifier it could chase back to a const. The shape it " +
+                 "could not see is a drift with a CONSTANT rate whose whole RESULT is multiplied by a live " +
+                 "signal afterwards -- nebula's and tempest's cloud drift and flux's stream both carried " +
+                 "it. A census that reports a clean result about a subset it never names is this tree's " +
+                 "oldest defect and this one shipped it ONE ROUND AGO. " +
+                 "MEASURED, at a 1/60 s frame: tempest's cloud drift advances 0.0199 rad after 5 s of " +
+                 "running and 6.8535 after 1800 -- 7,791x the integrated frame's 0.000880 -- and helix's " +
+                 "strand climb 0.0849 against 29.5654, which is 1,344x. Both grow within 4.1% of linear " +
+                 "for 360x the wait, because the error IS t * dF and it has no ceiling. The integrated " +
+                 "form reaches EXACTLY 100.0% of its derived bound base * (1 + k*sup) * speed * dt at " +
+                 "every session length and varies by 7e-14 across five spanning 5 s to half an hour. " +
+                 "*** THE REPAIR PUTS THE INTEGRALS IN THE SECULAR TERM AND LEAVES THE WOBBLE READING THE " +
+                 "INSTANTANEOUS FACTOR, *** because murmur's product expands to base*F*t + " +
+                 "(k*base*F/w2)*sin and only the first summand has a t in it. The two agree to 4.6e-13 " +
+                 "across 480 operating points out to an hour and part by 405 rad where the signal has just " +
+                 "moved -- the second number is what stops the first being two spellings of one thing. " +
+                 "*** helix's CLIMB WAS AN ABSENCE, NOT A TELEPORT: *** helix.ts scales it by 0.75*live.pace " +
+                 "and 0.85*st.drive and this port carried the bare drift, so the strands rose at one speed " +
+                 "whatever the exchange was doing. No signal-hunting census could ever have found it; it " +
+                 "came out of reading helix.ts against the file line for line, and it moves this tree's " +
+                 "cadence count from eight species to nine. " +
+                 "*** AND A ROW TWO GATES AWAY HAD OUTLIVED ITS OWN REPAIR. *** murmurDrive's " +
+                 "\"NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK\" tested that no line reads both DRIVE and " +
+                 "uniforms.time. v4654 and v4655 UNDEFERRED the rate family, helix's climb now reads both " +
+                 "-- and the test KEPT PASSING because the two reads sit on two source lines. A condition " +
+                 "outliving its sentence is worse than a red one: it reads like a live guarantee. Rewritten " +
+                 "to what is true now, that instantaneous drive reaches a clock at exactly one place, as " +
+                 "the BOUNDED wobble amplitude, while every secular term reads the integral. " +
+                 "FIFTEEN SABOTAGES, ALL CAUGHT, and one of them found a real gap first: deleting the drive " +
+                 "term from the CPU mhRatePhase left murmurKit green -- correctly, its section 15 grades " +
+                 "the SHADER twin against a hand-written reference -- and left murmurClock green too, " +
+                 "because every row there passed 0 for three of the four coefficients. A COEFFICIENT OF " +
+                 "ZERO GRADES NOTHING, for the second round running. Closed by grading mhRatePhase against " +
+                 "a 4,096-step quadrature of the moving rate it claims to integrate, over three signals at " +
+                 "unrelated frequencies: 1.0e-12 rad over 46.8 rad of accumulated phase, and the reference " +
+                 "is the DEFINITION rather than a second spelling of the implementation.",
+    }),
+    // v4654 -- THE 337th CLOSING: the species' own clocks, and this port's one deliberate divergence.
+    since336: Object.freeze({
+        at: "v4654", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurClock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,611 ms on real WebGPU, 10 rows in four sections, plus a new section 15 in " +
+                 "tools/ship/murmurKit-selfcheck.mjs. *** v4653 DEFERRED THE RATE FAMILY AND NAMED THE " +
+                 "DECISION; THE OWNER CHOSE TO DIVERGE FROM murmur RATHER THAN INHERIT ITS JUMP. *** A " +
+                 "species builds a rate from the live signals and hands it to mh_drift, whose phase is " +
+                 "rate * t; a moving rate makes that jump by t * dRate, with no ceiling. MEASURED on comet's " +
+                 "orbit as the cadence rises: 0.1676 rad in one frame after 5 s of running and 57.7341 " +
+                 "after 1800 -- NINE FULL TURNS OF THE ORBIT IN 16.7 ms -- growing 344x for 360x the wait. " +
+                 "The integrated form advances 0.00793 rad and varies by 4e-16 across the same five " +
+                 "sessions: it does not depend on the session at all. " +
+                 "*** THE REPAIR IS EXACT AND COSTS THREE NUMBERS, BECAUSE THE INTEGRAL FACTORS: *** base " +
+                 "and the coefficients come from style knobs and do not move, so integral(base * (1 + " +
+                 "a*pace + b*voice + c*drive)) is base * (t + a*P + b*V + c*D). The host accumulates the " +
+                 "three in SHADER time -- against the tempo integral, not wall seconds -- and it reduces to " +
+                 "murmur's own expression wherever a signal is held, to 9.1e-13 out to an hour. THAT ROW IS " +
+                 "WHAT MADE THE DIVERGENCE SAFE and it is not theory: HEAD read limn's hue turn at 26.84 " +
+                 "degrees and the integrated clock with no other change read 26.84, identical. " +
+                 "*** AND THE ROUND FOUND THREE SIGNAL-ROUTING DEFECTS IT HAD TO FIX FIRST. *** comet's " +
+                 "orbital rate read VOICE where comet.ts reads live.pace, and its whole closure never " +
+                 "touched the cadence; limn carried the SMALLER of murmur's two rate terms and not the " +
+                 "larger; aura carried the voice term alone where aura.ts has voice, pace and drive. Adding " +
+                 "a cadence term to rate * t would have shipped three NEW teleports, so the mechanism was " +
+                 "not a refinement on top of the fix -- it is what made the fix safe to make. " +
+                 "*** A GATE ROW WAS ASSERTING SOMETHING FALSE ABOUT murmur FOR THIRTEEN ROUNDS: *** " +
+                 "\"THE SIX SPECIES WITH A CADENCE ARE murmur's SIX ... a port that routed the cadence to " +
+                 "every species would draw a shimmer on eleven bodies murmur leaves still.\" Counted in " +
+                 "murmur's own sources, live.pace appears in ALL EIGHTEEN. The six were never murmur's -- " +
+                 "they were the six this port happened to reach at v4641 -- and the row now counts how many " +
+                 "of the eighteen are reached (eight) and NAMES THE TEN THAT ARE NOT. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, THREE AFTER REPAIR: the kit probe passed 0 for two of " +
+                 "mhRatePhase's four coefficients, so deleting a term from the TSL twin moved no pixel (a " +
+                 "coefficient of zero grades nothing); aura's per-lane scale on the secular phase was " +
+                 "ungraded because no section renders aura; and nothing checked that the shared frame " +
+                 "helper DERIVES the three integrals rather than defaulting them -- which is not " +
+                 "hypothetical, it went red on limn at 26.45 the moment the clock landed. " +
+                 "ONE RECORDED BOUND WAS DROPPED RATHER THAN RE-FITTED: limn's hue centre moved 26.84 -> " +
+                 "25.12 because murmur's missing pace term runs its arc 28.5% faster, so the row now asserts " +
+                 "the PHYSICS -- a saturating share approaches MH_SPREAD from below -- instead of a centre " +
+                 "fitted to wherever the arc happened to be.",
+    }),
+    // v4653 -- THE 336th CLOSING: st.drive, the last of mh_state's four, and the half of it that is safe.
+    since335: Object.freeze({
+        at: "v4653", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurDrive-selfcheck.mjs",
+            "tools/ship/murmurDrive2-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,225 and 2,260 ms on real WebGPU, 11 rows between them, plus a new section 14 " +
+                 "in tools/ship/murmurKit-selfcheck.mjs. *** st.drive IS THE LAST OF mh_state's FOUR AND " +
+                 "THE ONLY ONE WHOSE SUBJECT IS A DIRECTION. *** Its 45 references across murmur's eighteen " +
+                 "sources do THREE things -- they point a wander at a heading, they collapse the scatter " +
+                 "around it, and they run sixteen local clocks faster -- and this round took the first two " +
+                 "and left the third. THE LINE IS NOT WHERE THE WORK GOT TIRING: every term wired here is a " +
+                 "DIRECTION or a SIZE, and the deferral is a CHECKED RULE (no line in the shader reads both " +
+                 "DRIVE and uniforms.time) rather than an intention. The rate family hands rate * (1 + k * " +
+                 "st.drive) to mh_drift, whose phase is rate * t, so a drive ramping at large t teleports " +
+                 "it -- the same shape v4650 repaired on this orb's HOST clock, and it needs a decision " +
+                 "about faithfulness rather than a transcription. " +
+                 "*** THE HEADING'S CLAIM IS GEOMETRY AND THE GATE SAYS SO INSTEAD OF DRESSING IT UP: *** " +
+                 "still's twelve gesture directions sit 86.82 degrees apart at rest (worst pair 177.3, very " +
+                 "nearly opposite) and collapse to EXACTLY one axis at full drive, while abyss -- same call, " +
+                 "k 0.80 instead of 1.00 -- keeps a 12.02 degree residual and stays a current rather than a " +
+                 "ray. AND IT DOES NOT CONVERGE IN A STRAIGHT LINE: the quarter point reads 87.34, HIGHER " +
+                 "than the 86.82 it started at, because normalize(mix(a, b, t)) is not a rotation. A port " +
+                 "that slerped would read 65.11 there. " +
+                 "*** THE NARROWING IS WHAT A FRAME CAN SHOW: *** helix's light draws in 3.51% (duet 7.21%, " +
+                 "prism 4.05%, arc 2.98%, measured this round and not rendered by the shipped gate for " +
+                 "budget) while limn -- the one species in MH_DRIVE_FORM whose lean is NOT a contraction -- " +
+                 "moves 0.21% and still shifts 8.1% of its bytes. droplet's lean goes into the SILHOUETTE " +
+                 "and still's does not: 539.7% against 1.2% on the same 0.62 ring, and droplet's route is " +
+                 "the kit's flow deformation, a term BOTH HALVES HAVE CARRIED SINCE THE PORT AND NO CALL " +
+                 "SITE HAD EVER SET -- every one passed (0,0,1), 0, 0. " +
+                 "FOURTEEN SABOTAGES, ALL CAUGHT, AND SIX OF THEM WALKED THROUGH FIRST. The largest hole: " +
+                 "mhDriveHeading's CPU/GPU pair was graded NOWHERE, so deleting the mix -- or the normalize " +
+                 "-- from the TSL twin left every pixel gate green, because the species carrying a heading " +
+                 "also carry a narrowing and their frames still moved. Closed by kit section 14, which also " +
+                 "reads the LENGTH back out of the frame: without the normalize it reads 0.30 at mid-ramp. " +
+                 "Two more were bounds loosened on a correct subject (v4650's lesson, twice): the angular " +
+                 "epsilon is now DERIVED from Number.EPSILON through acos's square-root amplification, and " +
+                 "the unit-vector bound carries its own negative control -- the row builds a tidied vector " +
+                 "and requires it to FAIL. One row was DELETED rather than repaired: a helix inference that " +
+                 "survived its own negation, replaced by a source census that says what altitude it answers " +
+                 "at. AND ONE SABOTAGE WAS WRONG, NOT THE GATE: a needle matched MH_IGNITE before " +
+                 "MH_DRIVE_HEADING and tested the wrong table.",
+    }),
+    // v4650 -- THE 335th CLOSING: the orb's clock was an integral that reached no shader.
+    since334: Object.freeze({
+        at: "v4650", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurTempo-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,213 ms on real WebGPU, 10 rows in four sections. *** render/aiPresenceOrbState" +
+                 ".mjs HAS INTEGRATED SPEED EVERY TICK SINCE THE PORT'S FIRST ROUND AND BOTH CALL SITES THAT " +
+                 "FEED A SHADER MULTIPLIED INSTEAD. *** That module's own header names the defect in as many " +
+                 "words -- \"multiplying elapsed time by the CURRENT speed would then jump the animation's " +
+                 "PHASE too (a visible pop)\" -- and ui/aiPresenceOrbWidget.js and ai-presence-orb.html both " +
+                 "wrote time: (now - t0) / 1000 * p.speed, the expression that sentence forbids. The " +
+                 "integral was computed, accumulated, returned by getParams() as `phase`, and dropped. " +
+                 "*** \"A VISIBLE POP\" UNDERSELLS IT AND THE ROUND'S WORK IS SAYING BY HOW MUCH. *** The " +
+                 "error is t * (speedNew - speedOld), so it is set by how long the orb has been on screen " +
+                 "and has no ceiling: entering RESPONDING after 60 s of idle advanced the shader's clock " +
+                 "2.902 SECONDS IN ONE 16.7 ms FRAME; after 1800 s, 86.191 s. Measured across five session " +
+                 "lengths the old jump tracks the wait to within 11% (360x the wait, 320x the jump) while " +
+                 "phase's worst frame varies by 3.6e-14 s -- it does not depend on the session at all. AND " +
+                 "IT IS NOT A TRANSIENT: once the crossfade settles the old clock is permanently 69.355 s " +
+                 "displaced, and every later state change displaces it again. " +
+                 "*** THE ROW THAT MAKES THE REPAIR SAFE IS THE ONE SAYING THE TWO ARE THE SAME EXPRESSION: " +
+                 "*** the integral of a constant from zero IS elapsed-time-times-that-constant, so in a " +
+                 "steady state they agree to 1.6e-12 over 3,600 ticks. That is why eighteen species' byte " +
+                 "baselines did not move and why \"just use phase\" is measured here rather than asserted. " +
+                 "*** AND SECONDS ARE NOT A PICTURE, SO SECTION 4 RENDERS THEM: *** the jumped frame moves " +
+                 "73x (limn) and 99x (still) the light of one honest frame, worst channel 239 and 30 of 255 " +
+                 "against 18 and 1. The two fail differently on purpose -- limn's arc is a POSITION, still " +
+                 "is the quietest species in the roster and has nothing for a jump to hide behind. " +
+                 "TWELVE SABOTAGES, ALL CAUGHT, AND TWO OF THEM CHANGED THE GATE: the ceiling row asked " +
+                 "only that phase stay UNDER maxSpeed * dt, and widening that ceiling to a flat second " +
+                 "walked through -- a bound nothing approaches is a comment, so the row now brackets it " +
+                 "from both sides and reports 100.00% of it. A row demanding ZERO readers of `speed` also " +
+                 "went red on the demo's own speed READOUT, a bound set where it was easy to state rather " +
+                 "than where the invariant is; it now names where each reader is instead of counting to " +
+                 "zero. WHAT IS NOT CLAIMED: the SHADER's own rate multipliers. murmur's species multiply " +
+                 "local rates by (1 + k * live.pace) and (1 + k * st.drive) and hand the product to " +
+                 "mh_drift, whose phase is rate * t -- the same shape one level down, where no host-side " +
+                 "integrator can reach it. That is murmur's design as shipped and it is recorded against " +
+                 "the st.drive entry in tools/ship/nextRounds.mjs rather than quietly corrected here.",
     }),
     since333: Object.freeze({
         at: "v4647p", swept: 1, green: 1, red: 0,
