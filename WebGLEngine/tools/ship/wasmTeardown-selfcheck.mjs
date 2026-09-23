@@ -37,7 +37,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { liveHandles } from "./serverShutdown.mjs";
-import { noComments } from "./sourceScan.mjs";
+import { noComments, codeOnly } from "./sourceScan.mjs";
 import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4663, exitCallCount } from "./wasmTeardown.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -218,6 +218,63 @@ console.log("\n5. *** HOW BIG THE POPULATION IS, MEASURED ONCE, WITH ITS GAP NAM
     report(`NOT MEASURED: a gate that spawns a node CHILD which compiles wasm. The child is the process that ` +
         `exits and the hook is not in it. ${WASM_AT_V4663.noMarker} further gates were killed at the first ` +
         "pass's cap and wrote nothing, so the compiler count is a FLOOR and not a census of the tree.");
+}
+
+// -----------------------------------------------------------------------------------------------------------
+console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY THE WRONG QUESTION ***");
+{
+    // The round above screened 246 gates by asking DOES THIS COMPILE A WASM MODULE and converted the 48 that
+    // did. The rig's v4667 clone-verify then produced ai-bridge/tools/localModelResolve-selfcheck.mjs dying
+    // with the identical assertion -- win/async.c line 94, exit 0xC0000409 -- AFTER printing ALL PASS. It
+    // compiles no wasm, holds no dynamic import, and was never a candidate.
+    //
+    // *** THE DEFECT IS A SYMPTOM AND THE SCREEN ASKED ABOUT A CAUSE. *** What tears the process down badly
+    // is the PLATFORM STILL HAVING QUEUED WORK when process.exit() runs. Compiling wasm is one way to be in
+    // that state; loading node:http and a createRequire graph is another, and there is no reason to think
+    // those are the only two.
+    const LMR = "ai-bridge/tools/localModelResolve-selfcheck.mjs";
+    const lmrSrc = fs.readFileSync(path.join(ENG, LMR), "utf8");
+    ok("!! *** the gate the rig found is converted, and it was never in the 48 ***",
+        exitCallCount(codeOnly(lmrSrc)) === 0 && !WASM_AT_V4663.compilers.some((c) => String(c.gate || c) === LMR),
+        `${LMR}: ${exitCallCount(codeOnly(lmrSrc))} process.exit() call(s) left, and it is absent from the ` +
+        `${WASM_AT_V4663.compilers.length} compilers this round screened for`);
+
+    // *** THE NUMBER, WITH ITS PROVENANCE, BECAUSE A FIGURE WITHOUT ONE IS THE THING THIS SESSION KEEPS
+    // FINDING. *** Measured by patching a COPY of that gate to replace its last line with an awaited 300 ms
+    // timer across process.cpuUsage(), which is idleBackgroundCpuMs' method applied to one file:
+    //     94.6 ms of background CPU over a 300 ms idle window, at the instant the last line runs.
+    // Against this round's own figures -- a same-process control of 0.8 ms, and 23 ms for the wasm gates
+    // that motivated the conversion -- the gate EXCLUDED from the population is four times busier at exit
+    // than the ones included. It is not frozen as an assertion because it is one reading on one box of a
+    // quantity that moves with load; it is recorded so the next reader has the evidence rather than the
+    // conclusion.
+    report("MEASURED at v4668: localModelResolve idles 94.6 ms of background CPU per 300 ms at exit, against " +
+        "0.8 ms for the control and 23 ms for the wasm population. ONE READING, ONE BOX, and the method is " +
+        "idleBackgroundCpuMs' -- an awaited timer across cpuUsage -- applied to a patched copy of the gate.");
+
+    // *** AND THE TRUE CANDIDATE SET, STATED AS A CEILING RATHER THAN A TO-DO LIST. ***
+    // The walk is local and cheap: names only, no lexing, and the -selfcheck suffix is the tree's own
+    // definition of a gate (the same one buildKnowledgeIndex uses).
+    const allGates = (dir = ENG, out = []) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor" || e.name === "GPU_Assets") continue;
+            const q = path.join(dir, e.name);
+            if (e.isDirectory()) allGates(q, out);
+            else if (/-selfcheck\.mjs$/.test(e.name)) out.push(q);
+        }
+        return out;
+    };
+    const gates = allGates();
+    const stillExit = gates.filter((g) => { try { return exitCallCount(codeOnly(fs.readFileSync(g, "utf8"))) > 0; }
+                                           catch { return false; } });
+    ok("the size of the question is reported rather than implied",
+        stillExit.length > 0 && stillExit.length <= gates.length,
+        `${stillExit.length} of ${gates.length} gates still call process.exit(). THAT IS A CEILING AND NOT A ` +
+        "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
+        "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
+        "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
+        "is a round of its own. Until then the population is known to be larger than 48 and smaller than " +
+        `${stillExit.length}, and that is the honest width of it.`);
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");

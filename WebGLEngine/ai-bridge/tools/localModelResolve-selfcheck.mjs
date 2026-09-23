@@ -226,4 +226,14 @@ console.log("\n6. *** THE CATALOG ADMITS SOMETHING IT CANNOT INSTALL ***");
 }
 
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASS");
-process.exit(fails ? 1 : 0);
+// *** v4668 -- process.exitCode, NOT process.exit(), AND THIS GATE WAS NOT IN v4663'S POPULATION. ***
+// It died on the rig at v4667 with exactly the crash that round was about:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94   (exit 0xC0000409)
+// after printing ALL PASS. v4663 converted 48 gates and screened 246, and it chose them by asking "does this
+// gate COMPILE A WASM MODULE" -- a CAUSE. The defect is a SYMPTOM: the platform still has queued work when
+// process.exit() tears it down, and wasm compilation is one way to get there, not the only one. This file
+// compiles no wasm and holds no dynamic import; it loads node:http and a createRequire graph.
+// MEASURED HERE, with that round's own instrument: 94.6 ms of background CPU over a 300 ms idle window at
+// the instant this line runs -- against a same-process control of 0.8 ms and 23 ms for the wasm gates that
+// motivated the conversion. It is FOUR TIMES BUSIER AT EXIT than the population it was excluded from.
+process.exitCode = fails ? 1 : 0;
