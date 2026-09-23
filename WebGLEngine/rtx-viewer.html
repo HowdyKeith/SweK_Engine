@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="RTX viewer">
-<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Three skies: a gradient (the default), an analytic captured environment-map atlas baked into a real texture once at load (RTX round 11), or a REAL scene capture -- the same atlas format, baked instead by tracing real rays against the loaded scene's own BVH from its bounds center, the way a reflection probe would (RTX round 13) -- cycle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Real per-vertex colour on the procedural city (the pavement tile's own GLB has none) -- off by default (a flat albedo, as every prior round shipped), toggle on with the fifth link to see the city's own baked colour instead (RTX round 15). Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
+<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Three skies: a gradient (the default), an analytic captured environment-map atlas baked into a real texture once at load (RTX round 11), or a REAL scene capture -- the same atlas format, baked instead by tracing real rays against the loaded scene's own BVH from its bounds center, the way a reflection probe would (RTX round 13) -- cycle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Real per-vertex colour on the procedural city (the pavement tile's own GLB has none) -- off by default (a flat albedo, as every prior round shipped), toggle on with the fifth link to see the city's own baked colour instead (RTX round 15). Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two; the drag/dolly math itself is render/rtViewer.mjs's own dragOrbit/dollyOrbit (RTX round 16), not inline page arithmetic, so a gate can hold it without a pointer. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
 <meta name="demo:category" content="physics">
 <meta name="demo:swatch" content="&#9651;">
 <title>RTX viewer</title>
@@ -30,7 +30,7 @@
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
 import { requestDevice } from "/gfx/device.js";
-import { loadMeshBvh, loadCityBvh, makeRtSession, orbitEye } from "/render/rtViewer.mjs";
+import { loadMeshBvh, loadCityBvh, makeRtSession, orbitEye, dragOrbit, dollyOrbit } from "/render/rtViewer.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
 const toggleEl = document.getElementById("sceneToggle");
@@ -133,14 +133,13 @@ async function main() {
     addEventListener("pointerup", () => { dragging = null; });
     addEventListener("pointermove", (e) => {
         if (!dragging) return;
-        yaw += (e.clientX - dragging[0]) * 0.006;
-        pitch = Math.max(0.05, Math.min(1.5, pitch + (e.clientY - dragging[1]) * 0.006));
+        ({ yaw, pitch } = dragOrbit(yaw, pitch, e.clientX - dragging[0], e.clientY - dragging[1]));
         dragging = [e.clientX, e.clientY];
         dirty = true;
     });
     cvs.addEventListener("wheel", (e) => {
         e.preventDefault();
-        dist = Math.max(mesh.bounds.radius * 1.2, Math.min(mesh.bounds.radius * 20, dist * Math.exp(e.deltaY * 0.001)));
+        dist = dollyOrbit(dist, e.deltaY, mesh.bounds);
         dirty = true;
     }, { passive: false });
 

@@ -95,6 +95,19 @@
 //           genuinely null). Confirmed non-redundant with section 1f: 1f's own checks build fabricated bvh
 //           fixtures directly and never call loadCityBvh() at all, so they cannot see this regression --
 //           only section 5c, which drives the real loadCityBvh -> makeRtSession chain, does.
+//   M  RTX round 16 -- dragOrbit's own pitchMax default changed from 1.5 to 2.0
+//        -> exit=1, 1 red: section 1g's own "dragOrbit clamps pitch at the HIGH boundary (1.5)..." test, by name.
+//   N  RTX round 16 -- dollyOrbit's own minScale default changed from 1.2 to 0.8
+//        -> exit=1, 1 red: section 1g's own "dollyOrbit clamps at the NEAR boundary (bounds.radius * 1.2)..." test, by name.
+//   O  RTX round 16 -- rtx-viewer.html's own pointermove handler reverted to its pre-round-16 inline formula
+//      (no longer calling dragOrbit)
+//        -> exit=1, 1 red: section 6's own "the page imports dragOrbit/dollyOrbit and its own pointermove/wheel
+//           handlers actually CALL them..." test, by name -- confirmed non-redundant with section 1g: 1g only
+//           calls dragOrbit/dollyOrbit directly, never reads rtx-viewer.html at all, so it cannot see the page
+//           itself silently keeping a second, un-gated copy of the same arithmetic.
+//   P  RTX round 16 -- rtx-viewer.html's own wheel handler reverted the same way (no longer calling dollyOrbit)
+//        -> exit=1, 1 red: the SAME section 6 test as sabotage O, by name -- one combined check covers both
+//           halves of the page's own wiring, not two separate ones.
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
@@ -607,6 +620,52 @@ console.log("\n1f. RTX ROUND 15 -- makeRtSession's `vertexColors` OPTION, AGAINS
                  catch (e) { return /no per-vertex colour data/.test(e.message); } })(),
         "a caller asking for vertex colours on a mesh that has none (bvh.vertColors is null -- e.g. the live demo's own " +
         "pavement.glb, which has no COLOR_0 accessor) should fail loud, not silently fall back to the flat albedo");
+}
+
+console.log("\n1g. RTX ROUND 16 -- dragOrbit/dollyOrbit, rtx-viewer.html's OWN POINTER MATH, HELD TO EXACT ARITHMETIC (NO GPU, NO POINTER NEEDED)");
+{
+    // The exact inline formula this round replaced (rtx-viewer.html, pre-round-16): yaw += dx*0.006;
+    // pitch = clamp(pitch + dy*0.006, 0.05, 1.5); dist = clamp(dist*exp(deltaY*0.001), radius*1.2, radius*20).
+    // Pinned here as literal numbers, not by re-deriving them from V.dragOrbit/V.dollyOrbit's own defaults --
+    // a sabotage that changes a default AND this test's own expectation together would go undetected otherwise.
+    const d1 = V.dragOrbit(0.7, 0.45, 10, -20);
+    ok("!! dragOrbit, well inside both clamps: yaw += dx*0.006 exactly, pitch += dy*0.006 exactly",
+        d1.yaw === 0.7 + 10 * 0.006 && d1.pitch === 0.45 + -20 * 0.006,
+        `got yaw=${d1.yaw}, pitch=${d1.pitch}`);
+    const d2 = V.dragOrbit(0, 1.49, 0, 100);
+    ok("!! dragOrbit clamps pitch at the HIGH boundary (1.5) rather than overshooting",
+        d2.pitch === 1.5, `got pitch=${d2.pitch} for an input that would overshoot to ${1.49 + 100 * 0.006} unclamped`);
+    const d3 = V.dragOrbit(0, 0.06, 0, -100);
+    ok("!! dragOrbit clamps pitch at the LOW boundary (0.05) rather than undershooting",
+        d3.pitch === 0.05, `got pitch=${d3.pitch} for an input that would undershoot to ${0.06 - 100 * 0.006} unclamped`);
+    ok("!! dragOrbit's own yaw is NEVER clamped (only sin/cos of it are ever read by orbitEye, so wrapping/clamping " +
+        "would be pure overhead, not a correctness requirement)",
+        V.dragOrbit(0, 0.4, 1e6, 0).yaw === 1e6 * 0.006, "a huge dx must still move yaw by exactly dx*0.006, unclamped");
+
+    const bounds = { radius: 3.5 };
+    const w1 = V.dollyOrbit(5, -50, bounds);
+    ok("!! dollyOrbit, well inside both clamps: dist * exp(deltaY*0.001) exactly",
+        w1 === 5 * Math.exp(-50 * 0.001), `got ${w1}, expected ${5 * Math.exp(-50 * 0.001)}`);
+    ok("!! dollyOrbit clamps at the NEAR boundary (bounds.radius * 1.2) rather than overshooting inward",
+        V.dollyOrbit(bounds.radius * 1.2, -1e6, bounds) === bounds.radius * 1.2,
+        "a huge negative deltaY (zooming in hard) must stop exactly at radius*1.2, not pass through it");
+    ok("!! dollyOrbit clamps at the FAR boundary (bounds.radius * 20) rather than overshooting outward",
+        V.dollyOrbit(bounds.radius * 20, 1e6, bounds) === bounds.radius * 20,
+        "a huge positive deltaY (zooming out hard) must stop exactly at radius*20, not pass through it");
+    ok("!! dollyOrbit's own clamp SCALES with whichever scene is loaded -- a smaller mesh dollies to a smaller range",
+        V.dollyOrbit(1000, 1e6, { radius: 0.5 }) === 0.5 * 20 && V.dollyOrbit(1000, 1e6, { radius: 12 }) === 12 * 20,
+        "the pavement tile (radius ~0.7) and the city scene (radius ~12) must each clamp against their OWN bounds, " +
+        "not a shared constant -- a caller passing the wrong mesh's bounds would silently dolly to the wrong range");
+
+    // Byte-identity against the CURRENT rtx-viewer.html page's own literal formula, re-derived independently in
+    // this test rather than by calling V.dragOrbit/V.dollyOrbit again -- catches BOTH sides drifting together.
+    const yawOld = 0.7 + 123 * 0.006, pitchOld = Math.max(0.05, Math.min(1.5, 0.45 + -45 * 0.006));
+    const dNew = V.dragOrbit(0.7, 0.45, 123, -45);
+    ok("!! matches the ORIGINAL inline formula rtx-viewer.html carried before this round, re-derived independently here",
+        dNew.yaw === yawOld && dNew.pitch === pitchOld, `dragOrbit ${JSON.stringify(dNew)} vs inline ${JSON.stringify({ yaw: yawOld, pitch: pitchOld })}`);
+    const distOld = Math.max(3.5 * 1.2, Math.min(3.5 * 20, 8 * Math.exp(77 * 0.001)));
+    ok("!! matches the ORIGINAL inline dolly formula, re-derived independently here",
+        V.dollyOrbit(8, 77, bounds) === distOld, `dollyOrbit ${V.dollyOrbit(8, 77, bounds)} vs inline ${distOld}`);
 }
 
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
@@ -1190,6 +1249,20 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "a page that never read the param would still call makeRtSession successfully (vertexColors defaults to " +
         "false) and every check above this one would still pass -- the same shape of gap round 10/11/12's own " +
         "checks exist to catch, extended to the fifth toggle");
+    ok("!! RTX round 16 -- the page imports dragOrbit/dollyOrbit and its own pointermove/wheel handlers actually " +
+        "CALL them, rather than carrying a second, un-gated copy of the same arithmetic inline",
+        (() => {
+            // Order-independent on purpose: an earlier draft anchored dragOrbit before dollyOrbit inside the
+            // import braces, which would go spuriously red on a harmless import-list reorder -- an adversarial
+            // review flagged it as a robustness nitpick, closed here rather than left standing.
+            const m = /import\s*\{([^}]*)\}\s*from\s*"\/render\/rtViewer\.mjs"/.exec(page);
+            return !!m && /\bdragOrbit\b/.test(m[1]) && /\bdollyOrbit\b/.test(m[1]);
+        })() &&
+        /pointerdown[\s\S]{0,400}pointermove[\s\S]{0,300}dragOrbit\(/.test(page) &&
+        /addEventListener\("wheel"[\s\S]{0,300}dollyOrbit\(/.test(page),
+        "matches render/orbitCamera-selfcheck.mjs's own established section-3 precedent for orrery-gpu.html -- a page " +
+        "that kept the old inline formula (or imported dragOrbit/dollyOrbit but never called them) would still pass " +
+        "every check above this one, since section 1g only tests the FUNCTIONS in isolation, never the page");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
@@ -1198,9 +1271,14 @@ console.log("unchecked here: WHETHER LIVE CANVAS PRESENTATION ITSELF WORKS ON TH
     "this build box loses the WebGPU device on a render pass whose attachment is the canvas's current texture). " +
     "rtx-viewer.html itself presents normally, the way every other live demo page does, and only a real browser " +
     "on real hardware can confirm that picture. Task #99 (a genuine statistical bit-exactness render gate) is " +
-    "CLOSED as of RTX round 14 -- section 4f. Also unchecked: multi-material SBT offset, and orbit-camera pointer " +
-    "handling in rtx-viewer.html itself (pure event wiring, not rendering math -- nothing here simulates pointer " +
-    "events against a live page).");
+    "CLOSED as of RTX round 14 -- section 4f. RTX round 16 extracted the page's own drag/dolly camera math into " +
+    "dragOrbit/dollyOrbit and gated its ARITHMETIC exactly (section 1g) and its WIRING structurally (section 6) -- " +
+    "still unchecked: what a real pointer actually does to the on-screen picture, since no gate anywhere in this " +
+    "tree simulates a genuine PointerEvent against a live page (the same limit render/orbitCamera-selfcheck.mjs's " +
+    "own footer already names for orrery-gpu.html: 'what a drag LOOKS like on a real pointer is the rig's to see'). " +
+    "Also unchecked: multi-material SBT offset -- physics/render/rtPipeline.mjs already proves it correct in " +
+    "isolation, but neither live scene exposes real per-triangle material data through render/rtViewer.mjs's own " +
+    "current dependencies (world/chunkMesherCore.js computes one at mesh time but never returns it).");
 REPORT.table("accumulate kernel and the real mesh render, measured", ["case", "input", "n / frames", "result"], REPORT_ROWS,
     "A number that only reached this terminal is a measurement nobody else can re-read.");
 REPORT.write();

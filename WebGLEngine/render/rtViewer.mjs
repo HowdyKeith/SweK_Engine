@@ -239,6 +239,32 @@ export function orbitEye({ yaw = 0, pitch = 0.4, dist = 4, center = [0, 0, 0] } 
 }
 
 /**
+ * RTX round 16 -- rtx-viewer.html's own pointer-drag math, extracted into a pure, exported, testable function
+ * rather than left inline in the page's event handlers (where it has sat, unimported and unverified by any
+ * gate, since round 3). Mirrors render/orbitCamera.mjs's own established "the page owns the events; this
+ * module owns what they mean" split for orrery-gpu.html -- restated here rather than reusing that module
+ * directly, the same "restated, not shared" precedent orbitEye()'s own doc comment above already states
+ * against kenney-kit.html, because orbitCamera.mjs's own convention (Z-up, orbiting about +z, a wrapped yaw
+ * and a `distance` field on a frozen state object) does not match orbitEye()'s own (Y-up, a bare yaw/pitch/dist
+ * triple, yaw left unwrapped since only sin/cos of it are ever read). Computes the identical arithmetic as the
+ * inline formula it replaces -- "byte-identical" elsewhere in this file means generated WGSL text; this is
+ * plain JS, so that word is avoided here -- scratch-verified before touching this file.
+ */
+export function dragOrbit(yaw, pitch, dx, dy, { sensitivity = 0.006, pitchMin = 0.05, pitchMax = 1.5 } = {}) {
+    return { yaw: yaw + dx * sensitivity, pitch: Math.max(pitchMin, Math.min(pitchMax, pitch + dy * sensitivity)) };
+}
+
+/**
+ * RTX round 16 -- the same extraction for rtx-viewer.html's own wheel-dolly math. `bounds` is the loaded
+ * mesh's own `bounds` (only `.radius` is read) so the clamp scales with whichever scene is loaded, exactly as
+ * the inline formula it replaces already did. Computes the identical arithmetic as that formula, scratch-
+ * verified before touching this file.
+ */
+export function dollyOrbit(dist, deltaY, bounds, { sensitivity = 0.001, minScale = 1.2, maxScale = 20 } = {}) {
+    return Math.max(bounds.radius * minScale, Math.min(bounds.radius * maxScale, dist * Math.exp(deltaY * sensitivity)));
+}
+
+/**
  * The accumulate kernel. `count` is the total float count (w*h*3), baked as a const because it only changes
  * on resize, which already needs new buffers. Pure elementwise arithmetic -- no knowledge of pixels, rays, or
  * the mesh at all, which is what makes it checkable against fabricated input independent of path-tracing noise.
