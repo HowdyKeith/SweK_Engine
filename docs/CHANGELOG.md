@@ -26,6 +26,64 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4664 -- RESPONDING has a third thing, and this port had two of them
+
+This round began as an audit. *Is the port complete?* With the upstream cloned at v4663 that is answerable by
+counting rather than by reading this tree's own notes — and counted against murmur's eighteen sources,
+`st.drive` had **seven sites this port simply did not have**, across six species.
+
+**And all seven are one idea.** v4653 ported the **heading** (a swarm acquires an axis) and the **narrowing**
+(it stops scattering around it). There is a third thing, and murmur names it:
+
+| | murmur's own words | what it is |
+|---|---|---|
+| aura | "responding pulls the tilts halfway toward a common one … make them travel together and faster, **in formation**" | `align = st.drive`, yaw and tilt mix toward a shared angle by half of it |
+| opal | "Responding brightens them in sequence along the procession axis" · "under drive they all lean the same way: **a procession, not a swarm**" | two mixes, both by `st.drive` outright |
+| chorus | the lean pushes the sync knob at **0.85** — larger than the flash's 0.55 that v4661 took alone | the ensemble gathers under the lean too |
+| flux | "responding **stills the turn** and leans it" | the yaw mixes toward a fixed 0.42 |
+
+plus three plain brightnesses — arc's shimmer, flux's and prism's gains.
+
+**Two species did not respond to RESPONDING at all.** chorus and flux each moved **0 of 9,216 bytes**
+between drive 0 and drive 1 — measured on a worktree of v4663 — because neither had any other `st.drive`
+site. They move 16.6% and 19.1% now.
+
+**And aura's rolls are exempt, which aura.ts states in the same breath as the rule:** "The rolls — which are
+what keeps the sheets in visibly different planes — do not align at all."
+
+    at full drive:  yaw spread  4.5640 -> 2.2820     exactly half
+                    tilt spread 1.3691 -> 0.6846     exactly half
+                    ROLL spread 3.4274 -> 3.4274     the same number, to the bit
+
+Three sheets agreeing on all three angles are one sheet drawn three times.
+
+Fourteen sabotages, twelve caught on the first pass. The two that walked were flux's turn mix and opal's
+common lean, and both walked for the same reason: the pixel section asks whether a species *moves* under the
+lean — and flux still did, through its brightness gain on the same round, while opal has no pixel row at all.
+**"It moves" is not "it stills".** Both have rows now: flux's yaw swing shrinks to exactly 0.40 of itself, and
+opal's four flashes sit 14.9% closer while a correlation at the predicted 1.1586 s lag reads **1.000000**
+against **−0.062** for their own independent breaths — and **0.0039 at zero shift**, which is what says the
+procession *travels* rather than pulsing together.
+
+**One of those new rows was self-referential on its first cut.** It asserted flux's measured swing ratio
+equalled one minus *the table's own weight* — true for every weight including zero, so deleting the mix set
+both sides to 1 and the row passed. The bound is murmur's 0.40 written out now, with the identity asserted
+beside it.
+
+And the arc's own proxy narrowed a third time: `murmurClock3`'s "no signal times elapsed time" rule flagged
+opal's procession, whose `uniforms.time` is multiplied by a *constant* angular frequency inside a sine while
+the signal on that line is the mix weight. It reads the **multiplicand** now instead of the line — v4657
+found it firing on limn, v4662 on two swell lines, v4664 on this. A line is the wrong unit for that question,
+and it took three correct sites to say so.
+
+`tools/ship/murmurFormation-selfcheck.mjs` arrives green at 2,032 ms, so the tree holds 1774 gates.
+
+**Is the port complete? No — but it is no longer large.** `st.drive`: all 38 of murmur's coefficients now
+present. `live.voice`: all 20 present, audited here and never previously checked. `st.complete`: done at
+v4661. Four items remain: geode's cadence and fathom's two mix-shaped shells (one shared accumulator —
+drive squared); tempest's bolt slots missing murmur's `small` mix; prism's hue question from v4661; and
+`mh_out`'s triangular-PDF dither.
+
 ## v4663 -- the cadence in four builders that had none, and one signal that was simply the wrong signal
 
 **This round went and read murmur.** Every previous round of this arc transcribed from *this tree's own*

@@ -1161,6 +1161,37 @@ export const NEXT_ROUNDS = [
             "small), which is a style transcription and now checkable against the source; prism's hue " +
             "question from v4661, which the upstream file can settle in one read; and mh_out's " +
             "triangular-PDF dither, the one kit function of 41 still unported.",
+        note13: "*** THE ANSWER TO \"IS THE PORT COMPLETE\" IS NO, AND v4664 IS WHAT THE AUDIT FOUND. *** " +
+            "With krispuckett/murmur-web cloned, the question is answerable by counting rather than by " +
+            "reading this tree's own notes. Counted against murmur's eighteen sources, st.drive had SEVEN " +
+            "sites this port did not have, across six species -- and all seven are one idea. v4653 ported " +
+            "the HEADING and the NARROWING and stopped there; RESPONDING has a THIRD thing and it is " +
+            "FORMATION: aura's ribbons pulled halfway into line, opal's four flashes into a procession, " +
+            "chorus's voices into sync, flux's turn stilled and leaned. chorus and flux moved 0 of 9,216 " +
+            "bytes across the whole lean before this round -- RESPONDING reached no pixel of either.\n\n" +
+            "*** HOW TO RUN THE AUDIT, because it is cheap and it is the only honest way to answer the " +
+            "question: *** clone the upstream, then for each signal count the DISTINCT coefficients murmur " +
+            "writes (grep -oE '[0-9.]+ \\* st.drive' over src/shaders/*.ts) and check each one appears " +
+            "somewhere in render/murmurKit.mjs or the shader. Section 5 of " +
+            "tools/ship/murmurFormation-selfcheck.mjs does exactly that for st.drive, 38 coefficients, and " +
+            "it is deliberately a WEAK check: a number being present does not prove it is on the right " +
+            "expression, which is how v4663 found tempest's 0.85 sitting correctly in a table and " +
+            "multiplying the wrong signal. It catches the other failure -- a coefficient murmur writes that " +
+            "this port does not have -- which is the one that has happened twenty-seven times in seven " +
+            "rounds.\n\n" +
+            "*** MEASURED STATE AFTER v4664. *** st.drive: all 38 of murmur's coefficients present. " +
+            "live.voice: all 20 present -- audited at v4664 and never previously checked, which is worth " +
+            "knowing given how many gaps the other signals held. st.complete: done at v4661. live.pace: " +
+            "one builder short (geode). st.settled: 19 sites on 3 shapes. st.sweep: 8 readers.\n\n" +
+            "*** WHAT IS LEFT, AND IT IS SHORT NOW: *** (1) geode's cadence and fathom's second and third " +
+            "shells -- all three are mixes by st.drive*0.7 with murmur's sp on both arms, so the secular " +
+            "term needs an integral of DRIVE SQUARED the host has never sent; ONE accumulator closes all " +
+            "three, and the expansion is written out in MH_FATHOM_SP's note. (2) tempest's bolt slots are " +
+            "missing murmur's `small` mix, mix(2.9, 5.2, small) and mix(4.3, 7.4, small) -- a style " +
+            "transcription, now checkable against the source. (3) prism's hue question from v4661, which " +
+            "one read of prism.ts settles. (4) mh_out's triangular-PDF dither, the one kit function of 41 " +
+            "still unported.\n\n" +
+            "THAT IS FOUR ITEMS. THE PORT IS NOT COMPLETE AND IT IS NO LONGER LARGE.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

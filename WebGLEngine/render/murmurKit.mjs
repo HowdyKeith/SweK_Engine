@@ -1391,6 +1391,48 @@ export const MH_ADVECT_WARP = 0.5;
 export const MH_ADVECT_SIGN = -1;
 
 /**
+ * *** RESPONDING HAS A THIRD THING AND THIS PORT HAD TWO OF THEM -- v4664. ***
+ *
+ * v4653 ported the HEADING (a swarm acquires an axis) and the NARROWING (it stops scattering around it).
+ * Read across murmur's eighteen sources, st.drive does a third thing at eight more sites, and every one of
+ * them is the same idea in that species' own terms: THE PARTS ACT IN FORMATION.
+ *
+ *   aura    "responding pulls the tilts halfway toward a common one ... What drive actually does is make
+ *           them travel together and faster, in formation." align = st.drive, alignT = 0.5 * align, and
+ *           each ribbon's yaw and tilt mix toward 0.30 and 0.34 by alignT.
+ *           *** THE ROLLS DO NOT ALIGN, AND aura.ts SAYS SO IN THE SAME BREATH: *** "The rolls -- which are
+ *           what keeps the sheets in visibly different planes -- do not align at all." Three sheets that
+ *           agreed on all three angles would be one sheet drawn three times.
+ *   opal    "Responding brightens them in sequence along the procession axis" and "Under drive they all
+ *           lean the same way: a procession, not a swarm." TWO mixes, both by st.drive outright: the life
+ *           toward a travelling wave, and the wander toward a common lean.
+ *   chorus  sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1) -- the same knob the
+ *           flash pushes, pushed by the lean as well. v4661 took the complete term and left this one.
+ *   flux    "responding stills the turn and leans it": ay = mix(mh_drift(...), 0.42, st.drive * 0.6).
+ *
+ * AND THREE THAT ARE PLAIN BRIGHTNESS, which belong here because they are the same signal at the same
+ * instant and nothing else in the roster carries them: arc's shimmer takes 0.75 * st.drive beside its
+ * cadence term, flux's brightness 0.35 and prism's 0.55.
+ *
+ * *** NOT ONE OF THE EIGHT IS A CLOCK. *** Every one multiplies an amplitude, mixes toward a constant, or
+ * moves a knob inside a clamp, so all eight read the INSTANTANEOUS drive and none of them has an integral.
+ * After four rounds of integrating, that is worth stating rather than leaving the reader to check.
+ */
+export const MH_DRIVE_FORMATION = Object.freeze({
+    // aura: the mix target for yaw and tilt, and the HALF that makes it a pull rather than a snap.
+    auraHalf: 0.50, auraYaw: 0.30, auraTilt: 0.34,
+    // opal: both mixes are by st.drive outright, so the constants here are the TARGETS they mix toward.
+    opalLifeB: 0.30, opalLifeK: 0.70, opalPeriod: 5.2, opalLane: 1.4,
+    opalKeep: 0.55, opalLean: Object.freeze([0.42, -0.10, 0.18]),
+    // chorus: the sync knob's drive weight, beside v4661's complete weight of 0.55.
+    chorusSync: 0.85,
+    // flux: the yaw's mix weight and its target -- "stills the turn and leans it".
+    fluxTurn: 0.60, fluxYaw: 0.42,
+    // the three brightnesses
+    arcShim: 0.75, fluxBright: 0.35, prismBright: 0.55,
+});
+
+/**
  * *** AND THE OTHER HALF OF THE LEAN: IT STOPS SCATTERING. ***
  *
  * A heading alone would be a swarm that happens to face one way. What makes murmur's RESPONDING read as

@@ -701,8 +701,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // and a wrong signal, at 2,714 ms with four species rendered -- the fifth reading it needs, tempest
     // across IDLE and THINKING, shares tempest's compile with the cadence sweep, so the round's headline
     // costs no shader of its own.
-    gates: 1773, usesOk: 1752, definesOk: 1744, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1645, condFirst: 96, unknownSignature: 11,
+    // v4664 -- RE-TAKEN 1773 -> 1774 for tools/ship/murmurFormation-selfcheck.mjs, at 2,032 ms with THREE
+    // species rendered out of the six the round touched. The other three are graded in arithmetic on
+    // purpose: aura's alignment is three sheets' planes, opal's procession is a phase relationship between
+    // four flashes, and arc's shimmer is a texture under a geometry that moves at the same instant. None of
+    // the three is a thing 48 px can answer, and the gate says so per section rather than rendering them
+    // and reporting whatever came back.
+    gates: 1774, usesOk: 1753, definesOk: 1745, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1646, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

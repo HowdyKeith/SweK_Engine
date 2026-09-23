@@ -8070,6 +8070,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4664 -- THE 347th CLOSING: RESPONDING's THIRD thing. v4653 ported the heading and the narrowing;
+    // read against murmur's own sources, st.drive does one more thing at eight sites and it is FORMATION.
+    since346: Object.freeze({
+        at: "v4664", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurFormation-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,032 ms on this box, 11 rows in six sections over three rendered species. " +
+                 "*** THE ROUND STARTED AS AN AUDIT AND THE AUDIT IS THE FINDING. *** Keith asked whether " +
+                 "the port was complete. With the upstream cloned at v4663 that is answerable by " +
+                 "measurement rather than from this tree's notes: counted against murmur's eighteen " +
+                 "sources, st.drive has seven sites this port simply did not have, across six species. " +
+                 "*** AND THEY ARE ALL ONE IDEA. *** aura: \"responding pulls the tilts halfway toward a " +
+                 "common one ... make them travel together and faster, IN FORMATION\". opal: \"Responding " +
+                 "brightens them in sequence along the procession axis\" and \"under drive they all lean " +
+                 "the same way: a procession, not a swarm\". chorus: the lean pushes the sync knob at 0.85, " +
+                 "LARGER than the flash's 0.55 that v4661 took alone. flux: \"responding stills the turn " +
+                 "and leans it\". Plus three brightnesses -- arc's shimmer, flux's and prism's gains. " +
+                 "v4653 ported the HEADING and the NARROWING and stopped; the third thing is what the " +
+                 "other eight sites are. " +
+                 "*** TWO SPECIES DID NOT RESPOND TO RESPONDING AT ALL: *** chorus and flux each moved 0 of " +
+                 "9,216 bytes between drive 0 and drive 1 -- measured on a worktree of v4663 -- because " +
+                 "neither had any other st.drive site. They move 16.6% and 19.1% now. " +
+                 "*** AND aura's ROLLS ARE EXEMPT, WHICH aura.ts STATES IN THE SAME BREATH AS THE RULE: *** " +
+                 "\"The rolls -- which are what keeps the sheets in visibly different planes -- do not " +
+                 "align at all.\" Measured: at full drive the yaw spread closes 4.5640 -> 2.2820 and the " +
+                 "tilt 1.3691 -> 0.6846, EXACTLY half in both, while the roll spread is 3.4274 either way " +
+                 "to the bit. Three sheets agreeing on all three angles are one sheet drawn three times. " +
+                 "FOURTEEN SABOTAGES, TWELVE CAUGHT ON THE FIRST PASS. The two that walked were flux's " +
+                 "turn mix and opal's common lean, and both walked for the same reason: section 3 asks " +
+                 "whether a species MOVES under the lean, and flux still did through its brightness gain " +
+                 "while opal has no pixel row at all. \"It moves\" is not \"it stills\". Both have rows now. " +
+                 "*** AND ONE OF THOSE ROWS WAS SELF-REFERENTIAL ON ITS FIRST CUT: *** it asserted flux's " +
+                 "measured swing ratio equalled one minus the TABLE'S OWN weight, which is true for every " +
+                 "weight including zero -- so deleting the mix set both sides to 1 and the row passed. The " +
+                 "bound is murmur's 0.40 written out now, with the identity asserted beside it. " +
+                 "AND THE ARC'S OWN PROXY NARROWED A THIRD TIME: murmurClock3's \"no signal times elapsed " +
+                 "time\" rule flagged opal's procession, whose uniforms.time is multiplied by a CONSTANT " +
+                 "angular frequency inside a sine while the signal on that line is the mix weight. It " +
+                 "reads the MULTIPLICAND now instead of the line -- v4657 found it firing on limn, v4662 " +
+                 "on two swell lines, v4664 on this. A line is the wrong unit for that question and it " +
+                 "took three correct sites to say so.",
+    }),
     // v4663 -- THE 346th CLOSING: the cadence, in four of the five builders that had none -- and tempest's
     // core signal, which was the wrong signal entirely for as long as this port has had a tempest.
     since345: Object.freeze({

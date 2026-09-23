@@ -152,7 +152,8 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
         `exploited when droplet's exclusion was a ternary.`);
 
     // The three saturation sites, named, because each is inside a different species' loop.
-    const sites = [["opal", /KIT\.mhCompleteLift\(KIT\.mhOpalLife\(/],
+    const sites = [// opal's lift wraps the v4664 DRIVE mix now -- murmur's order is drive first, then the saturation
+        ["opal", /KIT\.mhCompleteLift\(\s*mix\(KIT\.mhOpalLife\(/],
                    ["sol", /KIT\.mhCompleteLift\(sn\.mul\(sn\), COMPLETE,/],
                    ["chorus", /KIT\.mhCompleteLift\(\s*life\.add\(select\(/]];
     const found = sites.filter(([, re]) => re.test(raw)).map(([s]) => s);

@@ -252,8 +252,11 @@ sec("4. *** chorus's IS NOT LIGHT AT ALL: st.complete MOVES A PARAMETER, and it 
 
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
     ok("!! ...and it is inside the clamp with the knob, not added after it",
-        /const sync = clamp\(syncKn\.mul\(CH\.syncK\)\.add\(COMPLETE\.mul\(MH_COMPLETE_SINGLE\.chorusSync\)\), 0\.0, 1\.0\)/.test(src),
-        `sync = clamp(knob * ${CH.syncK} + ${SG.chorusSync} * complete, 0, 1). INSIDE matters: a species ` +
+        /const sync = clamp\(syncKn\.mul\(CH\.syncK\)\s*\n\s*\.add\(DRIVE\.mul\(MH_DRIVE_FORMATION\.chorusSync\)\)\s*\n\s*\.add\(COMPLETE\.mul\(MH_COMPLETE_SINGLE\.chorusSync\)\), 0\.0, 1\.0\)/.test(src),
+        `sync = clamp(knob * ${CH.syncK} + ${K.MH_DRIVE_FORMATION.chorusSync} * drive + ${SG.chorusSync} * ` +
+        `complete, 0, 1) -- THE LEAN'S TERM ARRIVED AT v4664 AND IS THE LARGER OF THE TWO, which this row ` +
+        `did not know about at v4661 because the record it was built from held the complete number alone. ` +
+        `INSIDE matters: a species ` +
         `already near alignment is pushed to exactly one and no further, and a clamp applied before the add ` +
         `would let the flash drive the phase mix past its own endpoints. It is also the reason ` +
         `${SG.chorusSync} is enough -- the term does not have to reach 1 on its own.`);

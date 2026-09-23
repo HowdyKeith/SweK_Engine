@@ -135,7 +135,7 @@ sec("2. *** opal's PHASE IS GRADED AGAINST A QUADRATURE OF THE MOVING RATE -- th
         `coefficients land on the right integrals.`);
 
     ok("!! ...and the three sines share ONE phase and scale it, which is why one accumulator is enough",
-        /const c = vec3\(sin\(opalPhase\.mul\(0\.83/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")),
+        /const c0 = vec3\(sin\(opalPhase\.mul\(0\.83/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")),
         `opal.ts spends the same drift on three axes at 0.83+0.11*fk, 0.67+0.13*fk and 0.95+0.09*fk. The ` +
         `integral of drift(t)*m for a constant m is m times the integral of drift(t), so three axes need ` +
         `three multiplications and not three accumulators -- and computing the phase once is what makes ` +
@@ -261,17 +261,49 @@ sec("5. *** THE CENSUS: the clock arc is closed, and the closing is checkable ra
     // proxy and repaired it at v4657 for the identical reason -- "a bounded amplitude and a clock argument
     // side by side is exactly the arrangement this row exists to bless."
     const lines = src.split("\n");
-    const isProduct = (l) => /\.mul\(\s*uniforms\.time\s*\)/.test(l) || /uniforms\.time\.mul\(/.test(l);
-    const hasSignal = (l) => /\b(DRIVE|PACE|VOICE)\b/.test(l);
-    const badProduct = lines.filter((l) => isProduct(l) && hasSignal(l));
+    // *** AND THE TEST READS THE MULTIPLICAND NOW, NOT THE LINE -- v4664, THE THIRD TIME THIS PROXY HAS
+    // FIRED ON A CORRECT SITE. *** It flagged any line holding both a signal and a `.mul(uniforms.time)`.
+    // v4662 narrowed it once, off two swell lines where the time was an ARGUMENT to a bounded oscillator.
+    // v4664 hit the next variant: opal's procession is mix(c0, c0*0.55 + lean*sin(uniforms.time * (2*pi/5.2)
+    // - fk*1.4), DRIVE) -- the time is multiplied by a CONSTANT angular frequency inside a sine, and the
+    // signal on that line is the mix WEIGHT, which is nowhere near it.
+    //
+    // A line is the wrong unit for this question. What the rule is about is one expression: elapsed time
+    // multiplied by something that MOVES. So the multiplicand is extracted by a balanced-paren walk and
+    // asked whether IT mentions a signal -- and `time * (2*pi/5.2)` does not, however many signals share
+    // its line.
+    const mulArg = (l, at) => {
+        let o = l.indexOf("(", at); if (o < 0) return "";
+        let d = 0, j = o;
+        for (; j < l.length; j++) { if (l[j] === "(") d++; else if (l[j] === ")") { d--; if (!d) break; } }
+        return l.slice(o + 1, j);
+    };
+    const sig = /\b(DRIVE|PACE|VOICE)\b/;
+    const isProduct = (l) => {
+        for (let i = 0; (i = l.indexOf("uniforms.time.mul(", i)) !== -1; i += 18)
+            if (sig.test(mulArg(l, i + 17))) return true;
+        for (let i = 0; (i = l.indexOf(".mul(uniforms.time)", i)) !== -1; i += 19) {
+            const head = l.slice(0, i);
+            if (sig.test(head.slice(Math.max(0, head.length - 120)))) return true;
+        }
+        return false;
+    };
+    const hasSignal = (l) => sig.test(l);
+    const badProduct = lines.filter(isProduct);
     const blessed = lines.filter((l) => !isProduct(l) && hasSignal(l) && /uniforms\.time/.test(l));
     say(`MH_DRIVE_HEADING entries still unwired: ${unwired.length ? unwired.join(", ") : "none"}`);
     say(`lines multiplying a signal BY uniforms.time: ${badProduct.length}; lines holding both where the time is an ARGUMENT: ${blessed.length}`);
     ok("!! *** NO ENTRY IS UNWIRED AND NO LINE MULTIPLIES A LIVE SIGNAL BY ELAPSED TIME ITSELF ***",
         unwired.length === 0 && badProduct.length === 0 && blessed.length >= 1,
         `${Object.keys(K.MH_DRIVE_HEADING).length} heading entries, ${unwired.length} unwired; ` +
-        `${badProduct.length} lines spell a signal times uniforms.time, and ${blessed.length} hold both ` +
-        `where the time is an argument to a bounded function and the signal scales its result. THE SECOND ` +
+        `${badProduct.length} expressions multiply uniforms.time by something that mentions a signal, and ` +
+        `${blessed.length} lines hold both where the time is an argument to a bounded function, or is ` +
+        `multiplied by a CONSTANT, while the signal does something else on the same line. THE TEST READS ` +
+        `THE MULTIPLICAND AND NOT THE LINE, which is its third narrowing: v4657 found it firing on limn's ` +
+        `flattening wobble, v4662 on two swell lines where the time was an argument to mh_breath, and v4664 ` +
+        `on opal's procession, whose time is multiplied by a fixed angular frequency inside a sine while ` +
+        `the signal on that line is the mix WEIGHT. A LINE IS THE WRONG UNIT FOR THIS QUESTION and it took ` +
+        `three correct sites to say so. THE SECOND ` +
         `COUNT IS ASSERTED NON-ZERO ON PURPOSE: a refined pattern that matched nothing anywhere would pass ` +
         `this row for being blind, and the sites it must NOT flag are the evidence that it can still see. ` +
         `THIS IS ALSO A LINE TEST AND ITS REACH IS STATED: a product reintroduced through a local variable ` +

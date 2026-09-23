@@ -106,7 +106,8 @@ sec("2. *** comet's IS THE LARGEST NUMBER IN THE TABLE AND IT SITS BESIDE THE SM
 sec("3. *** prism's GOES ON brightP, WHICH IS THE ONE PLACE BOTH ITS CHANNELS READ ***");
 {
     const src = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
-    const onBright = /const brightP = float\(PR\.brightB\)\.add\(VOICE\.mul\(PR\.brightVoice\)\)\s*\n\s*\.mul\(float\(1\.0\)\.add\(COMPLETE\.mul\(MH_COMPLETE_SINGLE\.prismBeam\)\)\)/.test(src);
+    // v4664 put murmur's 0.55 * st.drive on the same brightness, ahead of the complete gain
+    const onBright = /const brightP = float\(PR\.brightB\)\.add\(VOICE\.mul\(PR\.brightVoice\)\)\s*\n\s*\.mul\(float\(1\.0\)\.add\(DRIVE\.mul\(MH_DRIVE_FORMATION\.prismBright\)\)\)\s*\n\s*\.mul\(float\(1\.0\)\.add\(COMPLETE\.mul\(MH_COMPLETE_SINGLE\.prismBeam\)\)\)/.test(src);
     const beamsReads = /const beams = [^\n]*\.mul\(brightP\)/.test(src);
     const hueReads = /const hueWP = [^\n]*\.mul\(brightP\)/.test(src);
     say(`prism: the constant is on brightP (${onBright}); beams reads brightP (${beamsReads}); hueWP reads brightP (${hueReads})`);

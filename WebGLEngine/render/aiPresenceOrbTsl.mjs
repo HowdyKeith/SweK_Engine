@@ -135,7 +135,7 @@ import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE,
          MH_OPAL_DRIFT, MH_GEODE_SPIN, mhGeodeSpinDrive, MH_ADVECT_SIGN, MH_ADVECT_WARP,
-         MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, MH_DRIVE_FORMATION, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -910,15 +910,37 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // floor of 0.16 so nothing ever switches on.
             // opal.ts pulls each flash toward FULL on the flash: life = mix(life, 1.0, st.complete * 0.85).
             // A saturation, not a gain -- at the peak the four lives arrive together whatever they were.
-            const life = KIT.mhCompleteLift(KIT.mhOpalLife(float(fk), uniforms.time), COMPLETE,
+            // *** AND RESPONDING BRIGHTENS THEM IN SEQUENCE ALONG A PROCESSION AXIS -- v4664. *** opal.ts
+            // mixes the life toward 0.30 + 0.70 * max(sin(2*pi*t/5.2 - fk*1.4), 0) by st.drive OUTRIGHT, so
+            // at full lean the four flashes are a travelling wave down the procession rather than four
+            // independent breaths. THE LANE OFFSET fk*1.4 IS WHAT MAKES IT A SEQUENCE: the same phase for
+            // all four would be a single pulse, which is the shape opal.ts spends its opening refusing.
+            //
+            // *** THE ORDER MATTERS AND IT IS murmur's: DRIVE FIRST, THEN COMPLETE. *** opal.ts mixes toward
+            // the procession and THEN saturates toward 1.0 on the flash, so at full drive AND full complete
+            // the result is 1.0 either way -- but at partial complete the two orders differ, because the
+            // saturation pulls from wherever the procession left it and not from the resting breath.
+            const FM = MH_DRIVE_FORMATION;
+            const wave = float(FM.opalLifeB).add(
+                max(sin(uniforms.time.mul(6.2831853 / FM.opalPeriod).sub(fk * FM.opalLane)), float(0.0))
+                    .mul(FM.opalLifeK)).toVar();
+            const life = KIT.mhCompleteLift(
+                mix(KIT.mhOpalLife(float(fk), uniforms.time), wave, DRIVE), COMPLETE,
                 float(MH_COMPLETE_LIFT.opal.k), float(MH_COMPLETE_LIFT.opal.over)).toVar();
             // THE WANDER: three incommensurate rates per flash, so each traces its own slow closed-ish path.
             // THE THREE SINES SHARE ONE PHASE AND SCALE IT, which is what makes one integral enough: the
             // integral of drift(t)*m is m times the integral of drift(t) for a constant m, so three axes on
             // three multipliers need three multiplications and not three accumulators.
-            const c = vec3(sin(opalPhase.mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
-                           sin(opalPhase.mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
-                           sin(opalPhase.mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
+            const c0 = vec3(sin(opalPhase.mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
+                            sin(opalPhase.mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
+                            sin(opalPhase.mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
+            // *** "Under drive they all lean the same way: a procession, not a swarm." *** The wander keeps
+            // 0.55 of its own path and adds a COMMON offset on the same travelling phase the life above
+            // rides, so the four flashes stop tracing four independent loops and file past together. It is
+            // the same idea aura's align is and chorus's sync is, in the one species whose subject is four
+            // things moving separately -- which is why it needs the strongest version of it.
+            const c = mix(c0, c0.mul(FM.opalKeep).add(vec3(...FM.opalLean)
+                .mul(sin(uniforms.time.mul(6.2831853 / FM.opalPeriod).sub(fk * FM.opalLane)))), DRIVE).toVar();
             const rk = opalRad.mul(0.80 + 0.30 * ((fk * 0.37 + 0.21) % 1))
                 .mul(k === 0 ? float(1.0).add(flO.x.mul(0.35)) : float(1.0)).toVar();
             const to = c.sub(P).toVar();
@@ -1607,8 +1629,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // The moire gate, evaluated through the kit rather than baked: at this port's nominal 120 pt mount
             // arc's 4.2 cycles are comfortably resolved and it returns 1, but it is COMPUTED, so a reader can
             // check it against kit.ts instead of taking a 1 on trust.
+            // arc.ts: shimAmt = shimGate * (0.55 * live.pace + 0.75 * st.drive) -- the port carried the
+            // cadence term alone, so arc's filament shimmered when somebody spoke quickly and not at all
+            // when the assistant leaned in. THE TWO ARE ADDED, not multiplied: either signal alone raises it.
             const shimAmt = float(KIT_AA(AR.shimCycles)).mul(float(1.0).sub(smallK))
-                .mul(PACE.mul(AR.shimPace)).toVar();
+                .mul(PACE.mul(AR.shimPace).add(DRIVE.mul(MH_DRIVE_FORMATION.arcShim))).toVar();
 
             const Pa = KIT.mhSpin(KIT.mhRoll(P, ro), ay, ax).toVar();
             const Ra = KIT.mhSpin(KIT.mhRoll(rd, ro), ay, ax).toVar();
@@ -1966,9 +1991,25 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 PH.push(KIT.mhDriftPhase(rateSec.mul(AU.rateLane[k]), rate.mul(AU.rateLane[k]),
                     float(AU.driftWob[k]), float(k + 1), uniforms.time).add(AU.driftPhase[k]).toVar());
                 RO.push(float(AU.rollB[k]).add(sin(uniforms.time.mul(AU.rollRate[k]).add(AU.rollPhase[k])).mul(AU.rollAmp[k])).toVar());
-                AY.push(KIT.mhDrift(uniforms.time, float(AU.yawRate[k]), float(AU.yawWob[k]), float(AU.yawLane[k]))
-                    .add(AU.yawPhase[k]).toVar());
-                AX.push(float(AU.tiltB[k]).add(sin(uniforms.time.mul(AU.tiltRate[k]).add(AU.tiltPhase[k])).mul(AU.tiltAmp[k])).toVar());
+// *** RESPONDING PULLS THE RIBBONS INTO FORMATION, AND THE ROLLS ARE EXEMPT -- v4664. *** aura.ts:
+                // "Each ribbon has its own slow precession; responding pulls the tilts halfway toward a
+                // common one. The rolls -- which are what keeps the sheets in visibly different planes --
+                // do not align at all. What drive actually does is make them travel together and faster,
+                // in formation." So the yaw and the tilt mix toward 0.30 and 0.34 by HALF the drive, and
+                // RO above is untouched.
+                //
+                // THE EXEMPTION IS THE DESIGN AND NOT AN OVERSIGHT: three sheets agreeing on all three
+                // angles are one sheet drawn three times, and the roll is the angle that keeps them in
+                // different planes. A port that aligned all three would read as the species collapsing
+                // under the lean, which is the opposite of what the lean is for.
+                //
+                // AND IT IS HALF: alignT = 0.5 * align, so even at full drive the tilts arrive halfway and
+                // not on top of each other. "Halfway toward a common one" is the sentence, and 0.50 is the
+                // number that makes it true rather than nearly true.
+                const alignT = DRIVE.mul(MH_DRIVE_FORMATION.auraHalf).toVar();
+                AY.push(mix(KIT.mhDrift(uniforms.time, float(AU.yawRate[k]), float(AU.yawWob[k]), float(AU.yawLane[k]))
+                    .add(AU.yawPhase[k]), float(MH_DRIVE_FORMATION.auraYaw), alignT).toVar());
+                AX.push(mix(float(AU.tiltB[k]).add(sin(uniforms.time.mul(AU.tiltRate[k]).add(AU.tiltPhase[k])).mul(AU.tiltAmp[k])), float(MH_DRIVE_FORMATION.auraTilt), alignT).toVar());
                 OF.push(mix(float(AU.offsets[k]), float(AU.offsetsSmall[k]), smallK).toVar());
             }
             const shimAmt = float(KIT_AA(AU.shimCycles)).mul(float(1.0).sub(smallK))
@@ -2059,7 +2100,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const heightK = clamp(uniforms.height, 0.0, 1.0).toVar();
             const flX = KIT.mhFlourish(uniforms.time, float(FX.flourishSlot), float(FX.flourishDur)).toVar();
 
-            const ayF = KIT.mhDrift(uniforms.time, float(FX.yawRate), float(FX.yawWob), float(FX.yawLane)).toVar();
+            // *** "responding stills the turn and leans it" -- v4664. *** flux.ts mixes the display's own
+            // slow yaw toward a fixed 0.42 by st.drive * 0.60, so under the lean the curtains stop turning
+            // away and settle facing one way. A MIX TOWARD A CONSTANT AND NOT A RATE CHANGE, which is why
+            // it is here and not in the clock arc: at full drive the yaw is 0.42 whatever the clock has
+            // accumulated, so nothing about it can teleport.
+            const ayF = mix(KIT.mhDrift(uniforms.time, float(FX.yawRate), float(FX.yawWob), float(FX.yawLane)),
+                float(MH_DRIVE_FORMATION.fluxYaw), DRIVE.mul(MH_DRIVE_FORMATION.fluxTurn)).toVar();
             const axF = float(FX.tiltB).add(sin(uniforms.time.mul(FX.tiltRate)).mul(FX.tiltAmp)).toVar();
             // flux's stream clock, on the same treatment as mist's -- its output multiplier reads the
             // cadence, so it teleported by t * dPace every time the exchange got busier.
@@ -2078,7 +2125,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const secondF = float(1.0).sub(smoothstep(float(FX.secondSmallIn), float(FX.secondSmallOut), smallK)).toVar();
             const thirdF = float(1.0).sub(smoothstep(float(FX.thirdSmallIn), float(FX.thirdSmallOut), smallK)).toVar();
             const WF = [float(1.0).toVar(), secondF, thirdF];
-            const brightF = float(FX.brightB).add(VOICE.mul(FX.brightVoice)).toVar();
+            const brightF = float(FX.brightB).add(VOICE.mul(FX.brightVoice))
+                .mul(float(1.0).add(DRIVE.mul(MH_DRIVE_FORMATION.fluxBright))).toVar();
             const striGate = float(KIT_AA(FX.striCycles)).mul(float(1.0).sub(smallK)).toVar();
             const medAmtF = mix(float(FX.medB), float(FX.medS), smallK).toVar();
 
@@ -2307,7 +2355,15 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // and at one they breathe as a single body. That transition from many rhythms to one is the
             // whole species." So its flash is the ensemble ARRIVING at alignment, and the clamp is what
             // makes 0.55 enough: a species already near sync is pushed to exactly one and no further.
-            const sync = clamp(syncKn.mul(CH.syncK).add(COMPLETE.mul(MH_COMPLETE_SINGLE.chorusSync)), 0.0, 1.0).toVar();
+            // *** AND THE LEAN PUSHES THE SAME KNOB, WHICH v4661 LEFT BEHIND -- v4664. *** chorus.ts:
+            // sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1). v4661 took the
+            // complete term off this port's own recorded note, which held that one number and not this one;
+            // reading chorus.ts shows the flash and the LEAN move the same control, and the lean's weight is
+            // the larger of the two. RESPONDING gathers the ensemble as well -- the same formation aura's
+            // ribbons and opal's flashes take, on the one species whose whole subject is alignment.
+            const sync = clamp(syncKn.mul(CH.syncK)
+                .add(DRIVE.mul(MH_DRIVE_FORMATION.chorusSync))
+                .add(COMPLETE.mul(MH_COMPLETE_SINGLE.chorusSync)), 0.0, 1.0).toVar();
             const per = float(CH.perB).sub(PACE.mul(CH.perPace)).toVar();
             const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
                 .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
@@ -2435,6 +2491,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // one round, on aura's ribbons and helix's strands. Spelled here it reaches both by
             // construction rather than by remembering to write it twice.
             const brightP = float(PR.brightB).add(VOICE.mul(PR.brightVoice))
+                .mul(float(1.0).add(DRIVE.mul(MH_DRIVE_FORMATION.prismBright)))
                 .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.prismBeam))).toVar();
             const shimAmt = float(KIT_AA(PR.shimCycles)).mul(float(1.0).sub(smallK))
                 .mul(PACE.mul(PR.shimK)).toVar();
