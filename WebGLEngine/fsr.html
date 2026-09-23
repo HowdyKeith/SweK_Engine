@@ -710,6 +710,24 @@ async function tick() {
     // motion against an undilated record would compare the foreground's expectation with the background's
     // history at every silhouette -- a disocclusion at every edge, every frame, which is the exact artefact
     // this pass exists to remove.
+    // *** v4665 -- AND IT IS WORTH +1.80 dB, THE LARGEST EFFECT THIS PAGE HAS MEASURED. *** Fifty-one
+    // paired frames over scene 3-53, dilation attached and detached, everything else identical:
+    //
+    //     mean +1.7992 dB, sd 1.9086, 43 frames up and 8 DOWN; paired t = 6.73 (p = 7.9e-9),
+    //     sign test 43/51 (p = 3.4e-7). BOTH tests were required to clear, declared in advance.
+    //
+    // Against this page's other two switchable features: the shading mask is +0.117 dB and the reactive
+    // mask +0.400. Dilation is four and a half times the second and fifteen times the first -- what a
+    // missing STRUCTURAL pass looks like beside two refinements. It is not free: eight frames are worse,
+    // one by 2.43 dB, which is a larger single-frame loss than the reactive mask's worst.
+    //
+    // *** AND IT SUBSUMES MOST OF THE REACTIVE MASK ON THIS CONTENT. *** With dilation on, that mask is
+    // worth +0.0820 dB instead of +0.400 and harms 18 frames instead of 14. v4663 had localised its whole
+    // effect to the one percent of the picture at the slab's silhouette, and this pass rewrites exactly
+    // that population first. The mask is NOT therefore pointless: FSR2 ships it for shader-animated and
+    // transparent content -- particles, foliage -- which this page does not have and which dilation cannot
+    // help with at all. render/dilate-preregistration.md fixed the hypothesis and the statistics before
+    // the data existed, and declared that secondary in advance so it could not be found afterwards.
     const dilateOn = $("dilate").value === "on";
     let dilated = null, dilStat = null;
     if (dolly && dilateOn && dgpu && depth) {

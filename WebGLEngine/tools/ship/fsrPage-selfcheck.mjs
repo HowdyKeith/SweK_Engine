@@ -407,6 +407,43 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n11. *** WHAT THE PASS IS WORTH (v4665), AND WHAT IT COSTS THE FEATURE BESIDE IT ***");
+{
+    const PRE = path.resolve(path.dirname(PAGE), "render", "dilate-preregistration.md");
+    const pre = fs.existsSync(PRE) ? fs.readFileSync(PRE, "utf8") : "";
+    ok("the dilation pre-registration exists and its OUTCOME is filled in",
+       pre.length > 0 && /## OUTCOME/.test(pre) && !/NOT YET COLLECTED/.test(pre),
+       PRE.replace(/.*WebGLEngine./, ""));
+    // *** THE CONJUNCTION IS THE PART THAT HAD TO BE DECLARED. *** v4658's t-test cleared at 21 frames
+    // and its sign test did not, and the round could have quoted whichever it preferred. Requiring BOTH
+    // in advance removes that choice before the data exists, and a later edit dropping one would restore it.
+    ok("!! *** ...and it still requires BOTH tests to clear, which is what stops a round choosing its verdict ***",
+       /BOTH must clear/.test(pre) && /sign test/i.test(pre) && /t-test/i.test(pre),
+       "v4658 learned this the hard way: two tests, two verdicts, and nothing in the method said which one " +
+       "counted. Declared as a conjunction before the data existed.");
+    // the three features' figures, parsed from the record and re-checked against the page's prose
+    const FIGS = ["1.7992", "0.117", "0.400", "0.0820"];
+    const missPre = FIGS.filter((f) => !pre.includes(f)), missPage = FIGS.filter((f) => !raw.includes(f));
+    ok("!! *** the four figures appear in BOTH the record and the page ***",
+       missPre.length === 0 && missPage.length === 0,
+       `dilation +1.7992 dB against the shading mask's +0.117 and the reactive mask's +0.400, and that ` +
+       `mask's +0.0820 once dilation is on. Missing from the record: ${missPre.join(" ") || "none"}; from ` +
+       `the page: ${missPage.join(" ") || "none"}.`);
+    ok("!! ...and both still say the pass COSTS eight frames, the worst by more than the reactive mask's worst",
+       /eight frames are worse/i.test(pre) && /2\.43/.test(pre) && /eight frames are worse/i.test(raw) && /2\.43/.test(raw),
+       "a mean of +1.80 dB with a 2.43 dB single-frame loss inside it is not the same claim as +1.80 dB, " +
+       "and the larger number is the one a reader remembers");
+    ok("!! ...and both still say the reactive mask is NOT therefore pointless",
+       /NOT therefore pointless|not say the reactive mask should be removed/i.test(pre)
+       && /NOT therefore pointless/.test(raw),
+       "its benefit falls from +0.400 to +0.082 on THIS content because dilation rewrites the same one " +
+       "percent of the picture first. FSR2 ships it for shader-animated and transparent content this page " +
+       "does not have and dilation cannot help with. A null on one scene is not a verdict on a feature.");
+    ok("  ...and the default is still OFF, so the figures above are still the control arm's",
+       /still ships dilation OFF/.test(pre) && /<select id="dilate">\s*<option value="off"/.test(raw),
+       "moving the default is a separate round with its own re-measurement, not a consequence of this one");
+}
+
 console.log("\n10. *** FSR2'S EARLIEST PASS (v4664): DILATED DEPTH AND MOTION ***");
 // The pass this tree never had. What matters on the SOURCE is not that it is imported but that the whole
 // chain reads the dilated field and that the RECORD moves with it: dilated motion carries the foreground's
@@ -615,6 +652,13 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4665  the dilation record's OUTCOME reverted to uncollected           1 RED.
+//   v4665  the BOTH-must-clear conjunction relaxed to either                1 RED -- on the SECOND attempt.
+//          The first wrote out the whole sentence, which the record wraps across a line, so the replace
+//          never matched: a NO-OP, not a 0-RED, and recorded as one.
+//   v4665  the page drops "eight frames are worse"                          1 RED.
+//   v4665  the record drops "does not say the reactive mask should be removed"   1 RED.
+//   v4665  the dilate default flipped to ON                                 2 RED (this section and v4664's).
 //   v4664  one chain consumer left on the raw motion field                1 RED.
 //   v4664  dilated motion fed while the undilated depth is still recorded  1 RED -- half the pass wired,
 //          which reintroduces a disocclusion at every silhouette on every frame.

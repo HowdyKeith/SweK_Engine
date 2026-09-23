@@ -66,6 +66,63 @@ ON), and those are collected in the same run.
   is a fourth thing it is not; if it shows the harm gone, that is an association on one window
   and not a mechanism.
 
-## OUTCOME
+## OUTCOME -- H4 IS CONFIRMED, AND IT IS THE LARGEST EFFECT THIS ARC HAS MEASURED
 
-NOT YET COLLECTED. Appended in a later commit, whichever way it falls.
+Collected after everything above was committed. Frames 3–53, 51 paired frames.
+
+    mean delta   +1.7992 dB      sd 1.9086      43 up / 8 down
+    worst -2.43 dB               best +6.52 dB
+    paired t = 6.732, df 50      ONE-SIDED p = 7.9e-9
+    sign test 43/51              ONE-SIDED p = 3.4e-7
+
+**Both tests clear, as the pre-registration required.** Dilation moved a median of 426 pixels
+per frame — 0.97% of the picture.
+
+Against the arc's other two switchable features, measured the same way on the same page:
+
+    shading mask    +0.117 dB    (v4656, 21/21 up)
+    reactive mask   +0.400 dB    (v4658, 37/14)
+    DILATION        +1.799 dB    (here,  43/8)
+
+Four and a half times the reactive mask and fifteen times the shading mask. That is what a
+missing *structural* pass looks like next to two refinements: FSR2 runs dilation before depth
+clip for a reason, and this tree had been feeding every downstream consumer undilated data since
+those consumers were written.
+
+It is not free. **Eight frames are worse, one by 2.43 dB** — a larger single-frame loss than the
+reactive mask's worst (1.22 dB). Giving a background pixel the foreground's motion sends its
+history somewhere the background never went, and on some frames that costs more than the spurious
+disocclusions it removes. The mean is decisive; the variance is real and is not smoothed over
+here.
+
+## SECONDARY S1 -- THE TWO FEATURES OVERLAP, AND DILATION SUBSUMES MOST OF THE REACTIVE MASK
+
+Declared in advance, reported as a count, **not used to decide H4**:
+
+    the reactive mask, dilation OFF   14 of 51 frames worse   mean +0.4004 dB
+    the reactive mask, dilation ON    18 of 51 frames worse   mean +0.0820 dB
+
+With dilation on, the reactive mask's benefit **nearly vanishes** — a fifth of what it was — and
+it harms *more* frames rather than fewer.
+
+That is coherent with v4663 rather than surprising: v4663 localised the mask's entire effect,
+help and harm alike, to about one percent of the picture at the moving slab's silhouette, and
+dilation rewrites exactly that population first. Most of what the mask was buying, dilation has
+already bought. What is left of the mask is the part that was going the wrong way.
+
+**This does not say the reactive mask should be removed.** It says that on THIS content the two
+overlap, and FSR2 ships both because its reactive mask exists for shader-animated and transparent
+content — particles, foliage — which this page does not have and which dilation cannot help with
+at all. A null on one scene is not a verdict on the feature.
+
+## WHAT THIS DOES NOT ESTABLISH
+
+* **Whether dilation is right in general.** One scene, one camera, one slab, one upscale ratio.
+* **Which consumer the gain came from.** v4664 routed the clip test, the lock ring and the
+  reactive mask to the dilated field together. A per-consumer breakdown is a different experiment
+  and nothing here separates them.
+* **Why eight frames lose.** The same shape of question three refuted hypotheses have already
+  been spent on for the reactive mask, and it is not answered here for this one either.
+* **That the default should change.** The page still ships dilation OFF, because every figure in
+  its prose and in five gates was measured on that arm. Moving the default is a separate round
+  with its own re-measurement, not a consequence of this one.

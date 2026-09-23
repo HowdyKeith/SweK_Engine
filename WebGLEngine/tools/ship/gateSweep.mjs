@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4665 -- THE 275th CLOSING: +1.80 dB, and it eats most of the feature beside it.
+    since350: Object.freeze({
+        at: "v4665", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H4 IS CONFIRMED AND IT IS THE LARGEST EFFECT THIS ARC HAS MEASURED. *** v4664 showed " +
+                 "on a fixture that dilation removes 112 spurious disocclusions and leaves 0, which " +
+                 "describes the MECHANISM and is not evidence the picture improves. Pre-registered in a " +
+                 "commit containing no data -- hypothesis, direction, window, and a CONJUNCTION of a " +
+                 "one-sided paired t-test AND a one-sided sign test, both required to clear, declared that " +
+                 "way because v4658's t-test cleared at 21 frames while its sign test did not and the round " +
+                 "could have quoted whichever it preferred. " +
+                 "RESULT over 51 paired frames: mean +1.7992 dB, sd 1.9086, 43 up and 8 DOWN, t = 6.73 " +
+                 "(p = 7.9e-9), sign 43/51 (p = 3.4e-7). Both clear. Against this page's other two " +
+                 "switchable features -- the shading mask at +0.117 and the reactive mask at +0.400 -- this " +
+                 "is four and a half times the second and fifteen times the first: what a missing " +
+                 "STRUCTURAL pass looks like beside two refinements. " +
+                 "*** AND IT IS NOT FREE, WHICH THE MEAN HIDES. *** Eight frames are worse, one by 2.43 dB " +
+                 "-- a LARGER single-frame loss than the reactive mask's worst (1.22). Giving a background " +
+                 "pixel the foreground's motion sends its history where the background never went. " +
+                 "*** THE DECLARED SECONDARY IS THE INTERESTING HALF: THE TWO FEATURES OVERLAP. *** With " +
+                 "dilation on, the reactive mask is worth +0.0820 dB instead of +0.400 and harms 18 frames " +
+                 "instead of 14. Coherent with v4663 rather than surprising: that round localised the " +
+                 "mask's entire effect, help and harm alike, to the one percent of the picture at the " +
+                 "slab's silhouette, and this pass rewrites exactly that population first. Most of what the " +
+                 "mask was buying, dilation has already bought; what is left is the part going the wrong " +
+                 "way. It does NOT follow that the mask should go -- FSR2 ships it for shader-animated and " +
+                 "transparent content this page does not have and dilation cannot help with, and a null on " +
+                 "one scene is not a verdict on a feature. The secondary was declared IN ADVANCE precisely " +
+                 "so it could not become a finding discovered afterwards, which is v4659's eight-predictor " +
+                 "mistake that v4660 spent a round correcting. " +
+                 "The default stays OFF: every figure in this page's prose and in five gates was measured " +
+                 "on that arm, and moving it is a separate round with its own re-measurement. " +
+                 "Five sabotages, five caught, one recorded NO-OP -- a mutation written out as a whole " +
+                 "sentence the record wraps across a line, which never matched and is logged as a no-op " +
+                 "rather than as a 0-RED, because the difference is the whole value of a sabotage log. " +
+                 "No gate added.",
+    }),
     // v4664 -- THE 274th CLOSING: FSR2's earliest pass, which this tree never had.
     since349: Object.freeze({
         at: "v4664", swept: 1, green: 1, red: 0,
