@@ -207,14 +207,90 @@ export const HIT_SHADERS = Object.freeze({ lambertian: 0, mirror: 1, microfacet:
  * see pipelineWgsl's own option object, so they cannot know what shader text will consume their output. Pass
  * `microfacet: "bsdf"|"nee"|"mis"` to pipelineWgsl() whenever the table contains one of these records.
  */
+/**
+ * `msTable` (RTX round 9) is pathTracer.mjs's own `hit.sphere.msTable` -- an OPTIONAL
+ * physics/render/energyCompensation.mjs `buildTable(alpha, ...)` result ({alpha, K, mu, E, Eavg}), left
+ * `undefined` on every record that does not opt into multi-scatter compensation, matching the CPU oracle's own
+ * `T = hit.sphere.msTable || null` falsy-means-absent convention exactly.
+ *
+ * *** THIS IS A PER-RECORD FIELD BUT THE GPU SIDE IS PIPELINE-LEVEL, AND THAT GAP IS A NAMED SCOPE LIMIT, NOT
+ * A BUG. *** pathTracer.mjs genuinely allows a different msTable per sphere (a scene mixing several
+ * roughnesses, each with its own compensation curve); the microfacet SBT record already spends its four spare
+ * floats on [idx, roughness, emit, ior] (see the doc above), leaving no room for a per-record table reference,
+ * so `pipelineWgsl({msComp:true})` binds exactly ONE shared E(mu) table for every microfacet vertex in the
+ * dispatch. `sharedMsTable(sbt)` is what enforces this at the boundary: every microfacet record that sets
+ * `msTable` in one dispatch must set the SAME table object, or it throws rather than silently compensating a
+ * record with the wrong curve (or not compensating one the CPU oracle would have).
+ */
 export function sbtRecord({ centre = [0, 0, 0], radius = 1, hit = "lambertian", albedo = 0.5, emit = 0,
-                            roughness = undefined, ior = undefined } = {}) {
+                            roughness = undefined, ior = undefined, msTable = undefined } = {}) {
     if (!(hit in HIT_SHADERS)) throw new Error("rtPipeline: no closest-hit shader named " + hit);
     if (hit === "microfacet" && roughness === undefined) throw new Error(
         "rtPipeline: a microfacet record needs a roughness -- pathTracer.mjs's own material gate is " +
         "`hit.sphere.roughness !== undefined`, so an unset roughness would silently read as Lambertian on the " +
         "CPU side while the GPU side has no albedo to fall back on at all.");
-    return Object.freeze({ centre: centre.slice(), radius, hit, albedo, emit, roughness, ior });
+    if (msTable !== undefined && hit !== "microfacet") throw new Error(
+        "rtPipeline: msTable is only meaningful on a microfacet record -- pathTracer.mjs's own trace() only " +
+        "ever reads hit.sphere.msTable inside the `roughness !== undefined` branch, so setting it on a " + hit +
+        " record would be silently ignored rather than doing what its presence implies.");
+    return Object.freeze({ centre: centre.slice(), radius, hit, albedo, emit, roughness, ior, msTable });
+}
+
+/**
+ * The single shared multi-scatter table across every microfacet record in `sbt`, or `null` if none opts in --
+ * see sbtRecord's own doc on why this is pipeline-level rather than per-record. Refuses rather than silently
+ * diverging from the CPU oracle: a microfacet record with no msTable mixed among ones that have it, or two
+ * DIFFERENT msTable objects, would each read as a different scene GPU-side (one shared buffer) than CPU-side
+ * (per-record), so both are refused outright.
+ *
+ * `bvh` (optional) is the SAME single mesh-wide descriptor `pipelineUniforms`'s own `bvh` option takes --
+ * *** FOUND BY AN ADVERSARIAL REVIEW: a bvh mesh hit reads its material from EXACTLY the same generated WGSL
+ * dispatch (`if (i32(rec.x) == HIT_SHADERS.microfacet)`) a sphere hit does, so a mesh-wide `hit:"microfacet"`
+ * record is just as real a candidate for msComp as any sphere -- and the review found this function's first
+ * draft only ever scanned `sbt`, silently missing a mesh material entirely: a msComp scene with a sphere
+ * table and a DIFFERENT-alpha microfacet mesh in the same dispatch would apply the sphere's compensation
+ * curve to the mesh with no error, and a mesh-only microfacet scene could never enable msComp at all (nothing
+ * in `sbt` would ever carry a table for `sharedMsTable` to find). Included here for the same reason `sbt`
+ * itself is: it goes through the identical dispatch, so it needs the identical check.
+ *
+ * `meshRecords` (optional) is the SAME array a caller passes to `meshSbtBuffer(records)` -- the per-triangle
+ * `meshMaterials:true` table, a SEPARATE storage buffer this function has no other way to see (it is built and
+ * bound entirely independently of `sbt`/`bvh`). Its own records reach the IDENTICAL generated WGSL dispatch a
+ * sphere or a mesh-wide bvh record does (`bvhSbt[bvhMatIdx[bvhHitTri]]` feeds the same `rec` the main loop
+ * reads either way), so a per-triangle microfacet material is exactly as real a msComp candidate as either of
+ * the other two -- included for the same reason both of them are. pipelineUniforms() REQUIRES this array
+ * whenever `meshMaterials` is true at all (not only when `msComp` also is -- a second adversarial review found
+ * the narrower, msComp-gated version of this requirement still let a per-triangle msTable slip past uncaught
+ * whenever the caller left `msComp` false), precisely so this check cannot be silently skipped by a caller who
+ * built the storage buffer and forgot to mention it here.
+ */
+export function sharedMsTable(sbt, bvh = null, meshRecords = null) {
+    const candidates = sbt.filter((r) => r.hit === "microfacet");
+    if (bvh && bvh.hit === "microfacet") candidates.push(bvh);
+    if (meshRecords) candidates.push(...meshRecords.filter((r) => r.hit === "microfacet"));
+    const withTable = candidates.filter((r) => r.msTable);
+    const withoutTable = candidates.filter((r) => !r.msTable);
+    if (withTable.length === 0) return null;
+    if (withoutTable.length > 0) throw new Error(
+        "rtPipeline: sharedMsTable sees a mix of microfacet records (spheres, the bvh mesh-wide record, and/or " +
+        "per-triangle meshMaterials) with and without msTable in the same dispatch -- the GPU binds ONE shared " +
+        "E(mu) table for the whole dispatch and cannot tell a compensated record apart from an uncompensated " +
+        "one, so every microfacet record must either all set the SAME msTable or none of them set one at all.");
+    const distinct = new Set(withTable.map((r) => r.msTable));
+    if (distinct.size > 1) throw new Error(
+        "rtPipeline: sharedMsTable sees " + distinct.size + " different msTable objects among the microfacet " +
+        "records -- pass the SAME energyCompensation.mjs buildTable() result (the SAME object reference, not " +
+        "merely an equal one -- two separate buildTable() calls with identical arguments are two different " +
+        "objects and this check is reference-based on purpose, so a table built once and shared works, a table " +
+        "rebuilt per record does not) to every record that wants compensation in one dispatch; a scene needing " +
+        "genuinely different curves needs a separate dispatch.");
+    return withTable[0].msTable;
+}
+
+/** The E(mu) table's own storage-buffer input, at MS_TABLE_BINDING -- the caller's `inputs` array to
+ *  runWgslCompute/runWgslComputeNative, mirroring bvhInputs()'s own shape. */
+export function msTableInputs(T) {
+    return [{ binding: MS_TABLE_BINDING, data: Float32Array.from(T.E) }];
 }
 
 /** [r,g,b], whether `albedo` is a number (broadcast to grey) or already a triple -- pathTracer.mjs's col(). */
@@ -277,6 +353,16 @@ export const ENV_META_SLOT = 22;
 /** The texture binding pipelineWgsl's envMap block declares, past every bvh binding (2-5, 7-9) and the probe
  *  kernels' own `rays` (6, a separate, never-co-dispatched shader -- see this file's own binding-index notes). */
 export const ENV_BINDING = 10;
+
+// ================================================================================================
+// MULTI-SCATTER ENERGY COMPENSATION -- RTX round 9, the microfacet material's deferred second lobe
+// ================================================================================================
+
+/** The last free uniform slot the 24-vec4 block has: [K, Eavg, 0, 0] for the shared msTable, when msComp. */
+export const MS_TABLE_SLOT = 23;
+
+/** The E(mu) table's own storage binding -- past ENV_BINDING (10), the next free index. */
+export const MS_TABLE_BINDING = 11;
 
 /**
  * Build a BVH over an indexed triangle mesh and pack it into the four flat buffers the GPU bvh block reads.
@@ -428,6 +514,18 @@ export function meshSbtBuffer(records, { rgb = false } = {}) {
         records.length + " records set emit) -- rtDirectLight only ever samples the sphere table (j < nGeo), " +
         "so a mesh triangle can terminate a path and add its own emission on a direct hit but can never be " +
         "cone-sampled as a light, which is a half-working feature rather than a supported one.");
+    // RTX round 9 -- msTable on a per-triangle record is legitimate (like roughness/ior, sbtRecordFloats
+    // never packs it into the four floats -- it is a JS-side annotation `sharedMsTable(sbt, bvh, meshRecords)`
+    // reads separately), but it is NOT validated here: msTable's own cross-record consistency needs the
+    // sphere table and the bvh mesh-wide record to compare against too, and this function sees neither.
+    // *** FOUND BY AN ADVERSARIAL REVIEW: the first draft of this round refused msTable here outright, since
+    // at the time nothing downstream would have checked it either. sharedMsTable now takes a THIRD argument
+    // for exactly this array, and pipelineUniforms() REQUIRES it (throws if missing) whenever
+    // `meshMaterials && msComp` are both true -- so pass the SAME `records` array given to this function to
+    // pipelineUniforms's own `meshRecords` option, or the mismatch this refusal used to catch goes uncaught
+    // again. This function itself still cannot check anything -- it has no visibility into `sbt`, `bvh`, or
+    // whether msComp will even be requested -- so the validation lives entirely at the one place all three
+    // converge.
     const out = new Float32Array(records.length * 4);
     records.forEach((r, i) => out.set(sbtRecordFloats(r, { rgb }), i * 4));
     return out;
@@ -787,8 +885,10 @@ export function sceneFromSbt(sbt) {
     // roughness/ior (RTX round 8) pass through undefined for lambertian records, preserving pathTracer.mjs's
     // own `hit.sphere.roughness !== undefined` material gate exactly -- sbtRecord() never sets roughness on a
     // non-microfacet record, so this is not a translation, just carrying the field through unmodified.
+    // msTable (RTX round 9) is the same pass-through -- pathTracer.mjs's own `T = hit.sphere.msTable || null`
+    // reads it directly, per record, exactly as sbtRecord() built it.
     return sbt.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo, emit: r.emit,
-                             roughness: r.roughness, ior: r.ior }));
+                             roughness: r.roughness, ior: r.ior, msTable: r.msTable }));
 }
 
 /**
@@ -864,13 +964,23 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                // already hold to); "bsdf"|"nee"|"mis" match pathTracer.mjs's own `direct`
                                // values exactly and select the SAME three emitter-hit treatments trace()'s own
                                // misFrom dispatch uses (see the main loop's own comment on that dispatch).
-                               microfacet = false, plantMicrofacetWrongPdf = false } = {}) {
+                               microfacet = false, plantMicrofacetWrongPdf = false,
+                               // RTX round 9 -- pathTracer.mjs's own two-lobe mixture, the piece
+                               // rtpipeline-microfacet-material's own closure deliberately left unported. false
+                               // (the default) keeps every microfacet code path BYTE IDENTICAL to round 8's own
+                               // output -- see sbtRecord's own doc on why this is one shared table for the
+                               // whole dispatch rather than a per-record one.
+                               msComp = false, plantMsNoDenominator = false } = {}) {
     const PI = "3.141592653589793";
     if (microfacet && !["bsdf", "nee", "mis"].includes(microfacet)) throw new Error(
         "rtPipeline: microfacet must be \"bsdf\", \"nee\" or \"mis\" (pathTracer.mjs's own `direct` values), got " + microfacet);
     if (microfacet && rgb) throw new Error(
         "rtPipeline: microfacet needs the scalar (non-rgb) pipeline -- see sbtRecordFloats's own doc on why " +
         "roughness/ior have no packing slot once a record's spare floats are spent on an rgb albedo triple.");
+    if (msComp && !microfacet) throw new Error(
+        "rtPipeline: msComp needs microfacet -- the multi-scatter lobe only exists as the second half of the " +
+        "microfacet material's own two-lobe mixture (pathTracer.mjs's own trace()), there is nothing for it " +
+        "to compensate without the first (single-scattering) lobe already being requested.");
     const microfacetOn = !!microfacet;
     // sampleCone/coordSystem-based light-cone sampling is needed whenever EITHER the Lambertian NEE loop runs
     // (`nee`) or the microfacet material's own direct-lighting loop runs (`microfacet` at anything but "bsdf",
@@ -897,6 +1007,8 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
 ${bvh ? bvhWgslBlock({ vertexColors, meshMaterials }) : ""}
 ${envMap ? `@group(0) @binding(${ENV_BINDING}) var tAtlas : texture_2d<f32>;` : ""}
+${msComp ? `// RTX round 9 -- the shared multi-scatter E(mu) table, one entry per row, K rows (U[${MS_TABLE_SLOT}].x).
+@group(0) @binding(${MS_TABLE_BINDING}) var<storage, read> msE : array<f32>;` : ""}
 
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
@@ -907,6 +1019,8 @@ ${envMap ? `@group(0) @binding(${ENV_BINDING}) var tAtlas : texture_2d<f32>;` : 
 // U[${MESH_SBT_SLOT}] mesh SBT record (bvh only): hitShaderIndex, albedo, _, _
 // U[${ENV_META_SLOT}] env atlas meta (envMap only): atlasWidth, faceSize, _, _   (faceSize == atlas height,
 //                                                    since a captured atlas is one mip, no LUT -- see envMapTexture)
+// U[${MS_TABLE_SLOT}] shared msTable meta (msComp only): K, Eavg, _, _   (the E(mu) values themselves are
+//                                                    the msE storage buffer above, not packed here)
 const GEO_BASE : i32 = 8;
 const SBT_BASE : i32 = 16;
 const MESH_META : i32 = ${MESH_META_SLOT};
@@ -991,7 +1105,34 @@ fn fresnelR(cosI : f32, ior : f32) -> f32 {
   let rs = (ci - ior * ct) / (ci + ior * ct);
   let rp = (ior * ci - ct) / (ior * ci + ct);
   return 0.5 * (rs * rs + rp * rp);
-}` : ""}
+}
+${msComp ? `
+// RTX round 9 -- physics/render/energyCompensation.mjs's own albedoAt()/msLobe(), term for term, against the
+// SHARED table (U[${MS_TABLE_SLOT}] + the msE storage buffer -- see sbtRecord's own doc on why this is one
+// table per dispatch rather than one per record). Linear interpolation, deliberately not a smarter one:
+// energyCompWgsl.mjs's own comment is the reason -- "this is what a shader does with a 1D texture", and the
+// closure residual's own order in K is a statement about THIS interpolation.
+fn albedoAtGgx(mu : f32) -> f32 {
+  let K = i32(U[${MS_TABLE_SLOT}].x);
+  let x = mu * f32(K) - 0.5;
+  let i = u32(clamp(floor(x), 0.0, f32(K - 2)));
+  let f = clamp(x - f32(i), 0.0, 1.0);
+  return msE[i] * (1.0 - f) + msE[i + 1u] * f;
+}
+// plantMsNoDenominator drops the 1/(1 - Eavg) -- energyCompensation.mjs's own named plant: it UNDER-
+// compensates by exactly (1 - E) Eavg, invisible at low roughness where Eavg -> 1 and there was almost
+// nothing to compensate.
+fn msLobeGgx(muO : f32, muI : f32) -> f32 {
+  let eAvg = U[${MS_TABLE_SLOT}].y;
+  let num = (1.0 - albedoAtGgx(muO)) * (1.0 - albedoAtGgx(muI));
+  ${plantMsNoDenominator ? `return num / ${PI};` : `return num / (${PI} * (1.0 - eAvg));`}
+}
+// The two-lobe mixing probability -- pathTracer.mjs's own p = 1 - E(cos_o), the exact shortfall the single-
+// scattering lobe fails to return, clamped the same [0, 0.95] way so the specular lobe is never starved
+// entirely even where the table says it should be.
+fn msP(cosO : f32) -> f32 {
+  return clamp(1.0 - albedoAtGgx(cosO), 0.0, 0.95);
+}` : ""}` : ""}
 
 fn nrm(v : vec3<f32>) -> vec3<f32> { let l = sqrt(dot(v, v)); if (l == 0.0) { return v; } return v / l; }
 
@@ -1125,6 +1266,12 @@ ${microfacetOn && microfacet !== "bsdf" ? `
 // evaluated inside, and this returns the FULL radiance contribution ready to scale by throughput and add.
 fn rtDirectLightMicrofacet(P : vec3<f32>, N : vec3<f32>, wo : vec3<f32>, cosO : f32, a : f32, ior : f32,
                             nGeo : i32, eps : f32) -> f32 {
+  ${msComp ? `// RTX round 9 -- computed once, matching pathTracer.mjs's own comment ("the two-lobe mixing
+  // probability is needed by the NEE loop as well as by the bounce, so it is computed ONCE here rather than
+  // declared twice -- this tree's most-named defect"). msP() is a pure function of cosO, so calling it again
+  // in the main loop's own bounce dispatch is the WGSL equivalent of "computed once" -- no randomness, no
+  // side effect, same answer both times.
+  let p = msP(cosO);` : ""}
   var sum = 0.0;
   for (var j = 0; j < nGeo; j = j + 1) {
     let rec = U[SBT_BASE + j];
@@ -1151,10 +1298,16 @@ fn rtDirectLightMicrofacet(P : vec3<f32>, N : vec3<f32>, wo : vec3<f32>, cosO : 
     if (cosH <= 0.0 || dotOH <= 0.0) { continue; }
     let Fn = fresnelR(dotOH, ior);
     let fSpec = bsdfEvalGgx(cosO, cosI, cosH, a, Fn);
+    ${msComp ? `// v3499's own comment, term for term: "a light-sampled direction can be reached by EITHER
+    // lobe, so both are evaluated. Leaving f_ms out is the plant: it loses exactly the energy v3492 exists to
+    // give back, and it is invisible at low roughness where p = 1 - E(cos_o) goes to zero".
+    let fMs = msLobeGgx(cosO, cosI);` : ""}
     let pL = 1.0 / (2.0 * ${PI} * (1.0 - cosAlpha));
-    ${microfacet === "mis" ? `let pB = sampleDirPdfGgx(cosH, dotOH, a);
+    ${microfacet === "mis" ? `let pB = ${msComp
+        ? "(1.0 - p) * sampleDirPdfGgx(cosH, dotOH, a) + p * (cosI / " + PI + ")"
+        : "sampleDirPdfGgx(cosH, dotOH, a)"};
     let w = misWeightGgx(pL, pB);` : `let w = 1.0;`}
-    sum = sum + Le * fSpec * cosI * w / pL;
+    sum = sum + Le * ${msComp ? "(fSpec + fMs)" : "fSpec"} * cosI * w / pL;
   }
   return sum;
 }
@@ -1404,7 +1557,45 @@ ${rgb ? `
         if (cosO <= 0.0) { break; }
         let aRough = rec.y;
         let ior = rec.w;
+        ${msComp ? `let p = msP(cosO);` : ""}
         ${microfacet !== "bsdf" ? `radiance = radiance + throughput * rtDirectLightMicrofacet(P, N, wo, cosO, aRough, ior, nGeo, eps);` : ""}
+        ${msComp ? `// RTX round 9 -- TWO LOBES, CHOSEN BY A COIN WHOSE BIAS IS THE SHORTFALL ITSELF (pathTracer.mjs's
+        // own comment, term for term): p = 1 - E(cos_o) is exactly the energy the single-scattering lobe fails
+        // to return, so the compensation is sampled exactly as often as it is needed. The coin-flip draw comes
+        // AFTER rtDirectLightMicrofacet's own draws, matching CPU's own draw order exactly (the NEE loop runs
+        // before the bounce's \`if (T && rand() < p)\` test).
+        if (nextF32() < p) {
+          let r1m = nextF32();
+          let r2m = nextF32();
+          let rM = sqrt(r1m);
+          let phiM = 2.0 * ${PI} * r2m;
+          let localM = vec3<f32>(rM * cos(phiM), sqrt(max(0.0, 1.0 - r1m)), rM * sin(phiM));
+          let basisM = coordSystem(N);
+          let dM = localM.x * basisM[1] + localM.y * basisM[2] + localM.z * basisM[0];
+          // Clamped, not early-exited: cosine-hemisphere sampling relative to N structurally cannot go below
+          // the horizon (the same reason rtClosestHit's own default/Lambertian branch never checks it either)
+          // -- max(0, ...) is a float-precision floor, not a genuine branch, matching pathTracer.mjs's own
+          // \`Math.max(0, dot(d, hit.N))\` exactly.
+          let cosIM = max(0.0, dot(dM, N));
+          // f_ms cos / (cos/pi) = f_ms pi, then divided by the branch probability.
+          throughput = throughput * (msLobeGgx(cosO, cosIM) * ${PI} / p);
+          // The specular lobe's OWN pdf at this randomly-cosine-sampled direction, needed for the mixture pdf
+          // even though this branch did not sample from that lobe -- pathTracer.mjs's own v3499 comment on the
+          // bug this guards against: "MY FIRST VERSION WROTE (1 - p) * 0 HERE... the same quantity, written
+          // correctly in the NEE loop and wrong here... It read 8.37 SIGMA between the strategies at a rough
+          // surface under a large light".
+          let whM = nrm(wo + dM);
+          let cosHM = dot(whM, N);
+          let dotOHM = dot(wo, whM);
+          var pSpec = 0.0;
+          if (cosHM > 0.0 && dotOHM > 0.0) { pSpec = sampleDirPdfGgx(cosHM, dotOHM, aRough); }
+          misFromMode = ${{ bsdf: 0, nee: 1, mis: 2 }[microfacet] ?? 0};
+          misFromP = P;
+          misFromPdf = p * (cosIM / ${PI}) + (1.0 - p) * pSpec;
+          d = dM;
+          o = P + N * eps;
+          continue;
+        }` : ""}
         let r1b = nextF32();
         let r2b = nextF32();
         let whLocal = sampleHalfVectorGgx(r1b, r2b, aRough);
@@ -1422,10 +1613,12 @@ ${rgb ? `
             // real one -- the commonest importance-sampling bug there is, and it leaves the picture smooth.
             let wgt = Fn * ggxG2(cosO, cosI, aRough) * ggxD(cosH, aRough) / (4.0 * cosO * cosI) * cosI / (cosI / ${PI});`
             : `let wgt = bounceWeightGgx(cosO, cosI, cosH, dotOH, aRough, Fn);`}
-        throughput = throughput * wgt;
+        throughput = throughput * ${msComp ? "(wgt / (1.0 - p))" : "wgt"};
         misFromMode = ${{ bsdf: 0, nee: 1, mis: 2 }[microfacet] ?? 0};
         misFromP = P;
-        misFromPdf = sampleDirPdfGgx(cosH, dotOH, aRough);
+        misFromPdf = ${msComp
+            ? "(1.0 - p) * sampleDirPdfGgx(cosH, dotOH, aRough) + p * (cosI / " + PI + ")"
+            : "sampleDirPdfGgx(cosH, dotOH, aRough)"};
         d = dNew;
         o = P + N * eps;
         continue;
@@ -1469,7 +1662,7 @@ ${rgb ? `
  * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
  * asks for.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null, microfacet = false } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null, microfacet = false, msComp = false, meshRecords = null } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     // RTX round 8 -- found by an adversarial review, and refused rather than left silent the way rgb/
     // meshMaterials still are: a `hit: "microfacet"` record packs and binds unconditionally (sbtRecordFloats
@@ -1481,6 +1674,58 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         "rtPipeline: pipelineUniforms sees a microfacet record but was not told pipelineWgsl() was given a " +
         "microfacet mode -- pass the same `microfacet: \"bsdf\"|\"nee\"|\"mis\"` value here, or the generated " +
         "WGSL has no case for HIT_SHADERS.microfacet and the record silently misrenders as Lambertian.");
+    // RTX round 9 -- the same silent-mismatch shape, guarded against proactively this time rather than found
+    // by a second adversarial review: msComp is pipelineWgsl's own flag deciding whether the generated WGSL
+    // reads a shared E(mu) table at all, and sharedMsTable(sbt, bvh, meshRecords) is what the DATA says the
+    // caller wants. The two must agree in both directions -- a table with no msComp is bound but never read
+    // (silently ignored, not fatal, but named plainly instead of left for a caller to discover); no table
+    // with msComp on would read K=0/Eavg=0 out of an unset uniform slot and an unbound storage buffer, a
+    // device-side failure with no useful message at all. `bvh` is passed through: an adversarial review found
+    // the first draft here scanned only `sbt`, silently missing a mesh-wide microfacet record -- see
+    // sharedMsTable's own doc for the reachable failure that left open.
+    //
+    // *** `meshRecords`, THE SAME REVIEW'S THIRD FINDING, FIXED HERE RATHER THAN LEFT A NAMED GAP. *** The
+    // per-triangle `meshMaterials:true` table (meshSbtBuffer()'s own array) is a SEPARATE storage buffer this
+    // function has no other way to see -- so unlike `sbt`/`bvh`, it cannot be found on its own; the caller has
+    // to hand it over.
+    //
+    // *** REQUIRED WHENEVER `meshMaterials` IS TRUE, NOT ONLY WHEN `msComp` ALSO IS -- A SECOND ADVERSARIAL
+    // REVIEW FOUND THE FIRST VERSION OF THIS GUARD STILL ASYMMETRIC. *** `sbt`/`bvh` are scanned by
+    // sharedMsTable() UNCONDITIONALLY, because they are already mandatory/always-passed arguments -- so a
+    // sphere or bvh record that carries an msTable while `msComp` is false is always caught by the `!msComp &&
+    // msTable` throw below. Gating the meshRecords requirement on `msComp` broke that same symmetry for the
+    // per-triangle case: a caller who left `msComp` false (forgotten, or a leftover `msTable` from a copy-paste
+    // after deciding not to enable compensation for this dispatch) was never asked for `meshRecords` at all, so
+    // sharedMsTable() never saw the per-triangle table and the mismatch sailed through uncaught -- silently
+    // contradicting this function's own "must agree in both directions" claim for exactly the source it was
+    // proudest of closing. Every `meshMaterials:true` caller already has a `records` array in scope (nothing
+    // else can build the buffer meshSbtBuffer() packs), so requiring it unconditionally costs the caller
+    // nothing it did not already have -- unlike inventing a structural link to the SEPARATE buffer actually
+    // bound to the GPU, which is a different, larger problem named rather than solved just below.
+    if (meshMaterials && !meshRecords) throw new Error(
+        "rtPipeline: pipelineUniforms needs `meshRecords` (the SAME array passed to meshSbtBuffer()) whenever " +
+        "meshMaterials is true -- otherwise a per-triangle microfacet material's own msTable (or lack of one) " +
+        "can never be checked against the sphere/bvh table or against msComp itself, the exact mismatch this " +
+        "option exists to catch.");
+    // *** WHAT THIS STILL DOES NOT DO, NAMED RATHER THAN QUIETLY ASSUMED: NO STRUCTURAL LINK TO THE ACTUAL GPU
+    // BUFFER. *** `meshRecords` here and the `records` array a caller separately hands to `meshSbtBuffer()` to
+    // build the real per-triangle storage buffer are two independent arguments -- nothing ties them by
+    // reference or by content. A caller could pass a self-consistent `meshRecords` here while actually binding
+    // a buffer built from a different or stale array, and this function has no way to notice. This is the same
+    // SHAPE of gap `rgb`/`meshMaterials`'s own doc above already accepts ("Both are silent. Pass the identical
+    // value to both calls") rather than solves -- closing it for real would mean meshSbtBuffer() handing back
+    // some identity `pipelineUniforms` could cross-check the bound buffer against, which is new plumbing this
+    // round did not build. No production caller uses `meshMaterials && msComp` together yet, so this is not
+    // live anywhere today; named here so it is not silently assumed closed by the fix just above.
+    const msTable = sharedMsTable(sbt, bvh, meshRecords);
+    if (msComp && !msTable) throw new Error(
+        "rtPipeline: pipelineUniforms was told msComp but no microfacet record carries an msTable -- pass the " +
+        "same physics/render/energyCompensation.mjs buildTable() result to sbtRecord({..., msTable}) that " +
+        "pipelineWgsl({msComp:true}) expects to read back through msTableInputs().");
+    if (!msComp && msTable) throw new Error(
+        "rtPipeline: a microfacet record carries an msTable but msComp was not passed here -- pass the same " +
+        "`msComp: true` value given to pipelineWgsl(), or the generated WGSL has no case reading the table " +
+        "and the compensation is silently ignored.");
     const { w, h, eye, look, up, fovDeg } = view;
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     const nrm = (v) => { const l = Math.hypot(v[0], v[1], v[2]); return l === 0 ? v : [v[0] / l, v[1] / l, v[2] / l]; };
@@ -1519,6 +1764,11 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
     // Only width/height are read here: the WGSL side assumes a single-mip, no-LUT atlas (faceSize == height),
     // the same assumption envMapTexture's own doc states.
     if (envMap) U.set([envMap.width, envMap.height, 0, 0], ENV_META_SLOT * 4);
+    // RTX round 9 -- the shared table's own K/Eavg, at the LAST free uniform slot. The E(mu) values themselves
+    // are a storage buffer (msTableInputs(msTable)), not packed here -- K entries do not fit in one vec4 and a
+    // renderer ships this as a texture in the first place (energyCompWgsl.mjs's own header: "the device's job
+    // is not to build the table... it is to READ one").
+    if (msTable) U.set([msTable.K, msTable.Eavg, 0, 0], MS_TABLE_SLOT * 4);
     return U;
 }
 
