@@ -26,6 +26,83 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4661 -- the last nine complete sites, and there is no tenth rule
+
+v4658 took the four that sit on the shared interior line, the three saturations and sol's core gain. v4659
+took four ignition figures that turned out to be **one shape on four different axes**. v4660 took the four
+that were **four shapes**. Each of those rounds found a rule and wrote a table, and the habit that builds is
+to expect a fourth. **There is not one.** These nine are nine lines in seven files and the only thing they
+have in common is the signal that drives them.
+
+| site | constant | shape |
+|---|---|---|
+| still's glint | 0.85 | multiply — on the solved glint, the one event in still's frame |
+| comet's head | 2.20 | multiply — the largest in the table, on the point of light that *is* the species |
+| droplet's core | 0.26 | **add**, beside `0.85·voice` and `0.35·settled` on one brightness |
+| limn's ring | 1.20 | **add, gated by `band`** — the flash lands on the arc and nowhere else |
+| limn's hint | 0.90 | multiply — limn's *second* interior, the wash the edge throws inward |
+| duet's flare | 1.15 | multiply, on each solved light rather than on the balance |
+| duet's shrink | 0.62 | **subtract** — the only subtraction `st.complete` makes anywhere in eighteen species |
+| chorus's sync | 0.55 | **add, to the sync knob** — a *parameter*, not an intensity |
+| prism's beams | 1.10 | multiply, on `brightP`, which the energy and the hue numerator both read |
+
+Nine numbers across **seven** species — limn and duet carry two each — so `MH_COMPLETE_SINGLE` is keyed by
+*site* and not by species. A fourth table keyed by species would have said these nine rhyme.
+
+**`st.complete` is fully ported as of this round.** All 47 of murmur's sites; every species in the roster now
+flashes.
+
+| | at v4660 | after |
+|---|---|---|
+| limn | ×3.74 | **×6.85** |
+| prism | ×2.08 | **×4.73** |
+| comet | ×1.14 | **×1.88** |
+| droplet | ×2.11 | ×2.25 |
+
+**chorus's is the odd one and chorus.ts is why.** "At rest the voices are scattered across the cycle … As
+sync rises they gather, and at one they breathe as a single body. That transition from many rhythms to one is
+the whole species." So its success is not seven lights getting brighter — it is the seven falling into phase,
+and `complete` is added *inside the same clamp as the knob*. The flash takes sync to **0.925 against a knob
+ceiling of 0.750**: past anything the control can reach. Measured, 0.375 of sync is worth 17.9% of chorus's
+bytes — and its *mean light* moves 0.3%, which chorus.ts predicts ("the ensemble's total barely moves"), so a
+row built on the mean would have read as a dead wire.
+
+**duet's is the only subtraction in the roster.** duet.ts names all four terms on its separation in one line —
+"Cadence closes it a little, responding a lot, the gesture briefly, and success all the way in" — and this is
+the last of the four. At `complete` 1 the pair sits at 38% of its separation, and the frame's radius of
+gyration falls 0.3781 → 0.2767 while the interior triples in brightness. That fall is a *lower bound*: duet is
+one of the seven species with the shared shell, and a shell travels outward over exactly that window.
+
+**And the round found a frame in which its own subject did not exist.** still's glint fires once per slot of
+about 10.55 s, and every species gate in this tree renders at t = 7.0 s — where still's gesture envelope is
+*exactly zero*. Wiring the 0.85 moved **0 bytes** and read as a dead term. The gate solves its own frame times
+off the kit's clock now: ×4.470 with the glint running against ×3.191 without it, at the same tau.
+
+**Twice in two rounds, finishing something broke a gate that rested on it being unfinished.** v4660 gave geode
+a figure and `murmurIgnite`'s control species stopped being a control; v4661 gave comet one and the
+*replacement* control stopped being one too — its census said so in one row on the first run: "species with no
+complete anywhere: none (of 18)". Both controls were defined by an **absence the port was busy filling**. The
+control is geode again and the property is a presence now: it flashes and never reads the sweep, so a pair of
+taus solved for *equal* `complete` either side of that signal's peak differs in `settled` and in nothing geode
+can see — **0 → 0.9124 of it**, against the 0.261 the v4660 arrangement could reach. limn and chorus are
+sweepless too, so for the first time that instrument has spares.
+
+Seventeen sabotages across three gates, all caught. **And two of this round's own rows were wrong before they
+shipped.** One asserted limn's added light sits *further out* than limn's own, reasoning that a band-gated
+term lands on the edge — it reads 0.5048 against 0.5174, because limn has three `complete` sites and two of
+them are interiors, so the sum cannot weigh the gated one. Its confinement is graded in the arithmetic instead
+(1.0 at the rim, 5.3e-8 at half the radius) and the pixel gap is stated. The other indexed two frames by
+counting back from the end of a list that had grown, and reported the isolated settle as ×1.000 because it was
+comparing two THINKING frames.
+
+`tools/ship/murmurSingles-selfcheck.mjs` and `murmurSingles2-selfcheck.mjs` arrive green at 2,539 ms and
+2,490 ms, so the tree holds 1770 gates.
+
+**What is left, largest first:** `st.drive`'s rate family — sixteen sites deferred at v4653, with the
+factoring that solves them already built and used by six species, so the remaining ten are transcription
+rather than design; opal's flash-drift live terms; geode's drive mix; tempest's bolt `small` mix; and five
+builders with no cadence at all against murmur giving all eighteen one.
+
 ## v4660 -- the other four ignition figures, which really were four shapes -- and a control that had stopped being one
 
 v4659 found that four of the eight remaining `st.complete` figures were one shape on four axes and gave them
@@ -93,7 +170,9 @@ the other three species as the control.
 
 **What is left of `st.complete` is the singles:** still's glint 0.85, comet's head 2.2, droplet's 0.26, limn's
 ring and its second interior, duet's flare and its one *shrink* (`1 − 0.62·complete`), chorus's sync, prism's
-1.10. Nine numbers across eight species, none sharing a shape with another.
+1.10. Nine numbers across eight species, none sharing a shape with another. *(v4661: seven species, not
+eight — limn and duet carry two each. Counted, not re-counted, when the round that took them came to wire
+them.)*
 
 ## v4659 -- four figures that turned out to be one shape, and two species that still were not flashing
 

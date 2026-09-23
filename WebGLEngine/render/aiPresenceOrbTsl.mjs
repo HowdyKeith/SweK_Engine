@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -479,8 +479,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const argG = max(dot(toG, toG).sub(sG.mul(sG)), float(0.0)).div(max(gw.mul(gw), float(1e-6))).toVar();
         const atG = P.add(rd.mul(sG));
         const visG = KIT.mhInside(atG).mul(exp(sG.mul(-MH_EXT)));
+        // *** still's SUCCESS IS ON THE GLINT AND NOWHERE ELSE -- v4661. *** still.ts spends its complete on
+        // the glint's BRIGHTNESS, which is the species' own argument for where a flash belongs: "the single
+        // glint IS the content", so brightening the medium around it would say nothing. Multiplied onto the
+        // solved light rather than added, so it is 0 at complete 0 for every ray and the branchless form is
+        // exact outside SUCCESS.
         const glintLive = select(sG.greaterThan(0.0).and(sG.lessThan(L)),
-            exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x),
+            exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x)
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.stillGlint))),
             float(0.0));
 
         // *** THE MARCH. *** still.ts's own loop, in its own order: the contribution is multiplied by the
@@ -595,14 +601,26 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const band = exp(negate(dband.mul(dband))).toVar();
         // Fresnel keeps the light physically ON the edge, so the arc bends around the curvature.
         const rimlight = band.mul(float(0.30).add(pow(fres, float(1.6)).mul(0.70))).toVar();
-        const rimE = rimlight.mul(arcProfile).mul(float(1.70).add(VOICE.mul(1.15))).toVar();
+        // *** limn's SUCCESS LANDS ON THE RING, GATED BY THE BAND ITSELF -- v4661. *** limn.ts adds
+        // complete * band * 1.20 rather than scaling rimE, and the difference is the whole point: `band` is
+        // the gaussian that says WHERE the edge is, so the flash is confined to the arc and cannot leak into
+        // the interior. Scaling rimE instead would have multiplied the fresnel and the arc profile too --
+        // the same number, a different picture, and a brighter everything rather than a brighter EDGE.
+        const rimE = rimlight.mul(arcProfile).mul(float(1.70).add(VOICE.mul(1.15)))
+            .add(COMPLETE.mul(band).mul(MH_COMPLETE_SINGLE.limnRing)).toVar();
 
         // THE INTERIOR HINT: the arc as a direction in three dimensions, the volume glowing faintly where
         // that light entered. limn.ts: "It costs one line and it is the difference between a rim drawn ON a
         // dark disc and a rim lighting a dark VOLUME." The exponent is 2.2, down from 3 on murmur's own note
         // that a lower power is a wider wash.
         const arcDir = vec3(cos(phi0), sin(phi0), float(0.0)).toVar();
-        const hintAmt = float(0.22).add(uniforms.innerHint.mul(0.38)).mul(float(1.0).add(VOICE.mul(0.9))).toVar();
+        // *** AND limn IS THE ONLY SPECIES WITH THREE complete SITES -- v4661. *** 1.60 on the shared
+        // interior line since v4658, the ring above, and 0.90 here on the interior HINT: the volume glowing
+        // faintly where the arc's light entered. They are three because they are three different things --
+        // the whole interior, the edge, and the wash the edge throws inward -- and a port that folded them
+        // into one number would brighten the disc uniformly and lose the arc.
+        const hintAmt = float(0.22).add(uniforms.innerHint.mul(0.38)).mul(float(1.0).add(VOICE.mul(0.9)))
+            .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.limnHint))).toVar();
         const accL = float(0.0).toVar();
         const transL = float(1.0).toVar();
         Loop({ start: 0, end: MH_TAPS }, ({ i }) => {
@@ -738,8 +756,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // one bright point settles the point harder than the body around it. The (1 + 2.2 * st.complete)
         // factor its file also carries is comet's OWN ignition figure, not the shared shell, and belongs to
         // the per-species round that follows this one.
+        // *** AND comet's complete IS ON THE SAME POINT OF LIGHT, AT 2.20 -- THE LARGEST IN THE ROSTER --
+        // v4661. *** The settle above is 0.25 on this brightness and the flash is nearly nine times it, which
+        // is comet's whole shape written in two numbers: the head FLARES and then keeps a quarter of it.
+        // v4660 gave comet's sweep the trail's length; this is the only light comet's complete touches.
         const headBright = float(1.0).add(VOICE.mul(1.30))
-            .mul(float(1.0).add(SETTLED.mul(MH_SETTLED_COMET_HEAD)));
+            .mul(float(1.0).add(SETTLED.mul(MH_SETTLED_COMET_HEAD)))
+            .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.cometHead)));
         const headE = select(sH.greaterThan(0.0).and(sH.lessThan(L)),
             exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
             float(0.0)).toVar();
@@ -776,7 +799,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // multiplying a marched accumulation, so it is transcribed here and droplet is excluded from the
         // shared interior factor at the bottom of main. Normalising it into the others' shape would have been
         // tidier and would have been a different species.
-        const coreBright = float(1.0).add(VOICE.mul(0.85)).add(SETTLED.mul(MH_SETTLED.droplet)).toVar();
+        // *** AND THE complete LANDS ON THE SAME LINE, ADDITIVELY, AT 0.26 -- v4661. *** droplet.ts spells
+        // coreBright as 1 + 0.85*live.voice + 0.35*st.settled + 0.26*st.complete: three signals ADDED to a
+        // brightness rather than multiplying an interior, which is the shape this species keeps for the same
+        // reason MH_SETTLED.droplet is carried outside MH_SETTLED_INTERIOR. The flash is the smallest in the
+        // roster and that is the species: droplet's success is a body that swells, not a lamp that flares.
+        const coreBright = float(1.0).add(VOICE.mul(0.85)).add(SETTLED.mul(MH_SETTLED.droplet))
+            .add(COMPLETE.mul(MH_COMPLETE_SINGLE.dropletCore)).toVar();
         const accD = float(0.0).toVar();
         // droplet weights by depth like still, and carries the `fade` a SECOND time -- its e already includes
         // mh_inside and the hue term multiplies by it again. That is droplet.ts as written ("the near half of
@@ -2005,10 +2034,16 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
 
             // duet.ts: "Cadence closes it a little, responding a lot, the gesture briefly, and success all
             // the way in." Four terms on one separation, and this round adds the second of them.
+            // *** AND v4661 ADDS THE FOURTH AND LAST: "success all the way in". *** It is the only
+            // SUBTRACTION st.complete makes anywhere in the roster -- every other site in eighteen species
+            // makes something brighter or larger, and duet's brings the pair TOGETHER. At complete 1 the
+            // separation is 38% of what it was, and the flare on the next line runs at the same instant, so
+            // duet's success is two lights getting brighter as they converge.
             const rSep = mix(float(DU.rNear), float(DU.rFar), sepK)
                 .mul(mix(float(1.0), float(DU.rSmall), smallK))
                 .mul(float(1.0).sub(DRIVE.mul(FORM.sep)))
-                .mul(float(1.0).sub(flD.x.mul(0.30))).toVar();
+                .mul(float(1.0).sub(flD.x.mul(0.30)))
+                .mul(float(1.0).sub(COMPLETE.mul(MH_COMPLETE_SINGLE.duetShrink))).toVar();
             // *** duet's RATE WAS TELEPORTING ON ITS OWN GESTURE, AND v4654 RECORDED THAT AS UNREACHABLE. ***
             // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x). This
             // port carried the FLOURISH term and neither of the other two -- so the pair sped up for its own
@@ -2069,10 +2104,16 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const occA = select(aFirst, float(1.0), exp(coreB.mul(-DU.occlude))).toVar();
             const occB = select(aFirst, exp(coreA.mul(-DU.occlude)), float(1.0)).toVar();
 
+            // *** THE FLARE, ON BOTH LIGHTS AND NOT ON THE BALANCE -- v4661. *** brA + brB is exactly 2 for
+            // every value of bal, which is the measurable form of duet's "brighter THERE and dimmer here",
+            // and a gate asserts it. Folding the flash into the balance would have broken that sum; putting
+            // it on each solved light leaves the SPLIT alone and brightens the pair, which is what a flare
+            // is. Two sites for one constant, for that reason.
+            const flare = float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.duetFlare)).toVar();
             const eA = coreA.mul(DU.coreGain).add(KIT.mhScatter(argA, float(DU.scatterAmp)).mul(visA))
-                .mul(brA).mul(occA).toVar();
+                .mul(brA).mul(occA).mul(flare).toVar();
             const eB = coreB.mul(DU.coreGain).add(KIT.mhScatter(argB, float(DU.scatterAmp)).mul(visB))
-                .mul(brB).mul(occB).toVar();
+                .mul(brB).mul(occB).mul(flare).toVar();
 
             const medAmtD = mix(float(DU.medB), float(DU.medS), smallK).toVar();
             const accD = float(0.0).toVar();
@@ -2110,7 +2151,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const depthKn = clamp(uniforms.breath, 0.0, 1.0).toVar();
             const flC = KIT.mhFlourish(uniforms.time, float(CH.flourishSlot), float(CH.flourishDur)).toVar();
 
-            const sync = clamp(syncKn.mul(CH.syncK), 0.0, 1.0).toVar();
+            // *** chorus's SUCCESS IS NOT LIGHT AT ALL: IT IS THE SYNC -- v4661. *** The only site in
+            // eighteen species where st.complete moves a PARAMETER of the species rather than an intensity.
+            // chorus.ts: "At rest the voices are scattered across the cycle ... As sync rises they gather,
+            // and at one they breathe as a single body. That transition from many rhythms to one is the
+            // whole species." So its flash is the ensemble ARRIVING at alignment, and the clamp is what
+            // makes 0.55 enough: a species already near sync is pushed to exactly one and no further.
+            const sync = clamp(syncKn.mul(CH.syncK).add(COMPLETE.mul(MH_COMPLETE_SINGLE.chorusSync)), 0.0, 1.0).toVar();
             const per = float(CH.perB).sub(PACE.mul(CH.perPace)).toVar();
             const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
                 .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
@@ -2231,7 +2278,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 .mul(float(1.0).add(VOICE.mul(PR.w0Voice))).toVar();
             const wGrow = float(PR.wGrowB).add(beamsK.mul(PR.wGrowK)).toVar();
             const third = float(1.0).sub(smoothstep(float(PR.thirdIn), float(PR.thirdOut), smallK)).toVar();
-            const brightP = float(PR.brightB).add(VOICE.mul(PR.brightVoice)).toVar();
+            // *** prism's SECOND complete GOES ON brightP AND NOT ON `beams` -- v4661, and the site is the
+            // claim. *** beams and hueWP BOTH read brightP, and only beams reads the pulse -- so a gain
+            // spelled on `beams` would lift the energy and leave the hue numerator behind, and prism's hue
+            // is the SPLIT between the outer beams and the anchor. v4660 found exactly that pairing twice in
+            // one round, on aura's ribbons and helix's strands. Spelled here it reaches both by
+            // construction rather than by remembering to write it twice.
+            const brightP = float(PR.brightB).add(VOICE.mul(PR.brightVoice))
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLE.prismBeam))).toVar();
             const shimAmt = float(KIT_AA(PR.shimCycles)).mul(float(1.0).sub(smallK))
                 .mul(PACE.mul(PR.shimK)).toVar();
             const WT = [float(1.0).toVar(), float(1.0).toVar(), third];

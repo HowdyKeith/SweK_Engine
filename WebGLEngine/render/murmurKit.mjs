@@ -977,6 +977,53 @@ export const MH_COMPLETE_LIFT = Object.freeze({
     chorus: Object.freeze({ k: 0.90, over: 0.45 }),
 });
 
+/**
+ * *** THE LAST OF st.complete: NINE NUMBERS ACROSS SEVEN SPECIES, AND NOT ONE OF THEM SHARES A SHAPE -- v4661.
+ * ***
+ *
+ * v4658 took the four that sit on the shared interior line, the three saturations and sol's core gain. v4659
+ * took the four ignition figures that turned out to be ONE shape on four axes. v4660 took the four that were
+ * four shapes. What is left is the residue, and the residue is the point: every arc before this one found a
+ * rule and wrote a table, and the temptation at the end of that is to look for a tenth rule. THERE IS NOT
+ * ONE. These nine are nine lines in seven files, and the only thing they have in common is the signal.
+ *
+ * They are one table anyway, and the reason is the opposite of a rule: a constant per SITE, named for the
+ * site, so a reader can see at a glance that the names do not rhyme. Four of the nine are not even the
+ * family's `(1 + k * complete)` shape:
+ *
+ *   dropletCore  ADDITIVE, beside the voice and the settle on a brightness -- coreBright = 1 + 0.85*voice
+ *                + 0.35*settled + 0.26*complete. droplet's body IS its subject and its core brightness is
+ *                not an interior gain, which is the same reason MH_SETTLED.droplet is carried separately.
+ *   limnRing     ADDITIVE AND GATED BY THE BAND: rimE += complete * band * 1.20, so the flash lands on the
+ *                RING and nowhere else -- limn's arc brightens along its own edge rather than the whole
+ *                volume brightening under it.
+ *   chorusSync   ADDITIVE ON A CONTROL RATHER THAN ON ANY LIGHT: sync = clamp(syncK + 0.55*complete, 0, 1).
+ *                chorus.ts: "That transition from many rhythms to one is the whole species." Its success is
+ *                not the seven getting brighter -- it is the seven falling into phase. The only site in the
+ *                roster where complete moves a PARAMETER of the species instead of an intensity.
+ *   duetShrink   THE ONLY SUBTRACTION: rSep *= (1 - 0.62 * complete). duet.ts names all four terms on that
+ *                separation in one line -- "Cadence closes it a little, responding a lot, the gesture
+ *                briefly, and success all the way in" -- and this is the last of the four. Every other
+ *                complete in the roster makes something larger or brighter; duet's brings the pair together.
+ *
+ * AND TWO SPECIES HAVE TWO EACH, which is why this is nine numbers and seven species rather than nine and
+ * nine. limn spends one on its ring and one on its interior HINT -- the volume glowing where the arc's light
+ * entered -- on top of the 1.60 it already has on the shared interior line, so limn carries THREE. duet
+ * spends one on the flare and one on the shrink, in opposite directions at the same instant: the two lights
+ * get brighter as they come together.
+ */
+export const MH_COMPLETE_SINGLE = Object.freeze({
+    stillGlint: 0.85,     // (1 + k*complete) on the solved glint -- the one event in still's frame
+    cometHead: 2.20,      // (1 + k*complete) on headBright, beside its own 0.25 settle. The largest in the roster.
+    dropletCore: 0.26,    // ADDITIVE on coreBright
+    limnRing: 1.20,       // ADDITIVE and band-gated: rimE += complete * band * k
+    limnHint: 0.90,       // (1 + k*complete) on the interior hint's amount -- limn's SECOND interior
+    duetFlare: 1.15,      // (1 + k*complete) on each of the pair's solved lights
+    duetShrink: 0.62,     // (1 - k*complete) on the separation -- the only SHRINK in the roster
+    chorusSync: 0.55,     // ADDITIVE on the SYNC KNOB, not on a light
+    prismBeam: 1.10,      // (1 + k*complete) on brightP, which beams AND the hue numerator both read
+});
+
 /** sol's SECOND complete, on the core's brightness rather than a figure -- sol.ts line 91. */
 export const MH_COMPLETE_SOL_CORE = 0.55;
 

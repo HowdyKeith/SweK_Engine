@@ -1060,9 +1060,44 @@ export const NEXT_ROUNDS = [
             "WHAT IS LEFT OF st.complete IS THE SINGLES, unchanged from note8: still's glint 0.85, comet's " +
             "head 2.2, droplet's 0.26, limn's ring (complete * band * 1.20) and its second interior 0.9, " +
             "duet's flare 1.15 and its one SHRINK (1 - 0.62*complete), chorus's sync 0.55, prism's 1.10. " +
-            "Nine numbers across eight species, each one a line of its own species' file, and none of them " +
+            "Nine numbers across SEVEN species -- limn carries two and duet carries two, which v4660's " +
+            "first count of this list got wrong and said eight -- each one a line of its own species' " +
+            "file, and none of them " +
             "shares a shape with another -- so the round that takes them is a round of transcriptions and " +
             "should not look for a table to put them in.",
+        note10: "*** st.complete IS DONE. v4661 TOOK THE LAST NINE AND THERE IS NO TENTH RULE. *** All 47 " +
+            "of murmur's sites are ported and every species in the roster flashes. The nine were still's " +
+            "glint 0.85, comet's head 2.20, droplet's core 0.26, limn's ring 1.20 and its interior hint " +
+            "0.90, duet's flare 1.15 and its shrink 0.62, chorus's sync 0.55, prism's beams 1.10 -- nine " +
+            "numbers across SEVEN species (limn and duet carry two each; note9 said eight and was wrong). " +
+            "MH_COMPLETE_SINGLE is keyed BY SITE and not by species, deliberately, because four of the nine " +
+            "are not the family's (1 + k * complete): droplet's and limn's ring ADD, chorus's adds to the " +
+            "SYNC KNOB -- a parameter, not an intensity -- and duet's SUBTRACTS.\n\n" +
+            "*** WHAT THE NEXT READER SHOULD NOT DO IS LOOK FOR A TABLE TO PUT THEM IN. *** Three rounds in " +
+            "a row (v4658, v4659, v4660) each found a rule and wrote a table of species, and the habit that " +
+            "builds is to expect a fourth. These nine are nine lines in seven files.\n\n" +
+            "*** AND TWICE IN TWO ROUNDS, FINISHING SOMETHING BROKE A GATE THAT RESTED ON IT BEING " +
+            "UNFINISHED. *** v4660 gave geode a figure and tools/ship/murmurIgnite-selfcheck.mjs's control " +
+            "species stopped being a control; v4661 gave comet one and the replacement control stopped being " +
+            "one too. Both controls were defined by an ABSENCE the port was busy filling. The control is " +
+            "geode again and the property is a PRESENCE now: it flashes and never reads the sweep, so a " +
+            "pair of taus solved for EQUAL complete either side of that signal's peak differs in `settled` " +
+            "and in nothing geode can see -- 0 to 0.9124 of it, measured, the settle weighed alone in " +
+            "pixels. limn and chorus are sweepless too, so for the first time that instrument has spares.\n\n" +
+            "*** THE MEASURED STATE OF THE PORT AFTER THIS ROUND: *** murmur's kit has 41 functions and 40 " +
+            "are ported (mh_out's triangular-PDF dither is the one). live.pace, live.voice and st.drive's " +
+            "direction/size families are complete; st.settled is 19 sites on 3 shapes; st.sweep is 8 " +
+            "readers and st.complete 23, and complete is DONE. WHAT IS LEFT, LARGEST FIRST: st.drive's RATE " +
+            "family, sixteen sites deferred at v4653 with the teleport hazard recorded in `blocked` below " +
+            "and the factoring that solves it already built (mhRatePhase, v4654-v4657, used by six species " +
+            "-- the remaining ten are transcription, not design); opal's flash-drift live terms; geode's " +
+            "drive mix; tempest's bolt `small` mix; and five builders with no cadence at all -- droplet, " +
+            "opal, mist, fathom, geode -- against murmur giving all eighteen one.\n\n" +
+            "*** ONE OPEN QUESTION THIS ROUND REFUSED TO ANSWER ON AN INFERENCE: *** prism's gesture pulse " +
+            "and its v4659 travelling figure are both on `beams` alone and not on the hue numerator. v4660 " +
+            "found that exact pairing wrong twice (aura's ribbons, helix's strands). v4661 put its own " +
+            "constant on brightP, which both channels already read, and left the other two where it found " +
+            "them. Somebody with murmur's prism.ts in front of them should settle it in one line.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

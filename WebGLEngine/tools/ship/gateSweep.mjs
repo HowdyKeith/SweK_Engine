@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4661 -- THE 344th CLOSING: the last nine st.complete sites, which finishes that signal's port -- and
+    // the second consecutive round in which finishing something broke a gate that rested on it being unfinished.
+    since343: Object.freeze({
+        at: "v4661", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["tools/ship/murmurSingles-selfcheck.mjs", "tools/ship/murmurSingles2-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,539 ms and 2,490 ms on this box, 13 rows in eight sections over six rendered " +
+                 "species between them. TWO FILES FOR NINE CONSTANTS AND THE SPLIT IS THE CLOCK'S: seven " +
+                 "species is seven WGSL compiles and four measure 2,539 ms against a 3,000 ms ceiling. " +
+                 "*** st.complete IS FULLY PORTED AS OF THIS ROUND -- all 47 of murmur's sites -- and every " +
+                 "species in the roster now flashes. *** The nine are still's glint 0.85, comet's head 2.20, " +
+                 "droplet's core 0.26, limn's ring 1.20 AND its interior hint 0.90, duet's flare 1.15 AND " +
+                 "its shrink 0.62, chorus's sync 0.55 and prism's beams 1.10: nine numbers across SEVEN " +
+                 "species, because limn and duet carry two each. v4660's own record said eight and is " +
+                 "corrected in place. " +
+                 "*** FOUR OF THE NINE ARE NOT THE FAMILY'S (1 + k * complete) SHAPE, WHICH IS WHY THE TABLE " +
+                 "IS KEYED BY SITE AND NOT BY SPECIES: *** droplet's ADDS to a brightness beside the voice " +
+                 "and the settle, limn's ring ADDS gated by the band so the flash lands on the arc and " +
+                 "nowhere else, chorus's ADDS to the SYNC KNOB -- the only site in eighteen species where " +
+                 "complete moves a parameter rather than an intensity, and chorus.ts says alignment IS the " +
+                 "species -- and duet's SUBTRACTS, the only subtraction anywhere in the roster, on the " +
+                 "separation duet.ts names four terms on in one line. " +
+                 "MEASURED: comet x1.14 -> x1.88 of interior light at its own complete peak, droplet x2.11 " +
+                 "-> x2.25, limn x3.74 -> x6.85 (the largest in the roster, and it still puts 0 counts of " +
+                 "light outside its silhouette), prism x2.08 -> x4.73. duet's radius of gyration falls " +
+                 "0.3781 -> 0.2767 as its separation goes to 38% -- past its own shell travelling outward " +
+                 "over the same window, so the fall is a lower bound. chorus's flash takes its sync to 0.925 " +
+                 "against a KNOB CEILING of 0.750, and 0.375 of sync is worth 17.9% of its bytes. " +
+                 "*** AND THE ROUND FOUND A FRAME IN WHICH ITS OWN SUBJECT DID NOT EXIST. *** still's glint " +
+                 "fires once per slot of about 10.55 s, and every species gate in this tree renders at " +
+                 "t = 7.0 s, where still's gesture envelope is EXACTLY ZERO -- so wiring the 0.85 moved 0 " +
+                 "bytes and read as a dead term. The gate solves its own frame times off the kit's clock " +
+                 "now: x4.470 with the glint running against x3.191 without it, at the same tau. " +
+                 "SEVENTEEN SABOTAGES, ALL CAUGHT, ACROSS THREE GATES -- the nine constants one at a time, " +
+                 "the shrink spelled as a growth, chorus's term moved outside its clamp, limn's ring scaled " +
+                 "instead of band-gated, prism's gain moved off brightP so the hue is left behind, duet's " +
+                 "flare folded into the balance, still's term lifted outside its gesture's select, a tenth " +
+                 "table entry with no shape recorded for it, and geode given a sweep. " +
+                 "*** AND TWO OF THIS ROUND'S OWN ROWS WERE WRONG BEFORE THEY SHIPPED: *** one asserted " +
+                 "limn's added light sits FURTHER OUT than limn's own, on the reasoning that a band-gated " +
+                 "term lands on the edge -- it reads 0.5048 against 0.5174, because limn has THREE complete " +
+                 "sites and two of them are interiors, so the sum cannot weigh the gated one. That gating is " +
+                 "graded in the arithmetic instead, where it is exact, and the pixel gap is stated. The " +
+                 "other indexed two frames by counting back from the end of a list that had grown, and " +
+                 "reported the isolated settle as x1.000 because it was comparing two THINKING frames.",
+    }),
     // v4660 -- THE 343rd CLOSING: the other four ignition figures, which really were four shapes -- and the
     // control species another gate had been resting on for fifteen rounds without ever checking it.
     since342: Object.freeze({

@@ -684,8 +684,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // trail decay on comet that adds no light at all. Four shapes in one gate is four sets of rows that
     // share nothing; putting them in the axis gate would also have been four more WGSL compiles on a file
     // already measuring 2,736 ms. This one measures 2,690 with its four species.
-    gates: 1768, usesOk: 1747, definesOk: 1739, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1640, condFirst: 96, unknownSignature: 11,
+    // v4661 -- RE-TAKEN 1768 -> 1770 for tools/ship/murmurSingles-selfcheck.mjs and its sibling
+    // murmurSingles2. TWO gates for nine constants, and the split is the budget's rather than the subject's:
+    // the nine sit in seven species, seven species is seven WGSL compiles, and four measured 2,539 ms here
+    // against a 3,000 ms ceiling. The line drawn between them IS by subject as far as it goes -- the first
+    // holds the four that are not the family's (1 + k * complete) shape plus still's, the second the four
+    // plain multiplies -- but the reason there are two files is the clock, and saying otherwise would make
+    // the next round look for a distinction that is not there.
+    gates: 1770, usesOk: 1749, definesOk: 1741, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1642, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
