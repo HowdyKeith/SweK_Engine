@@ -438,11 +438,39 @@ console.log("\n4b. *** THE REFRESH THAT COULD NOT RUN, AND WHAT A STALE LEDGER D
 
     const fresh = ledgerState({ file: writeLed("fresh.json", real) });
     const stale = ledgerState({ file: writeLed("stale.json", withLatest(4485)) });
+
+    // *** v4667 -- THIS ROW STOPPED BEING ABLE TO FAIL, AND THE EDIT THAT DID IT WAS ONE FILE AWAY. ***
+    // supersededBy is max(baseline, latest). The rows below truncate the RELEASES and expect the owed list to
+    // grow -- which works only while the baseline sits BELOW the releases being removed. v4667 raised the
+    // baseline to v4660, above every published release, so max() stopped consulting the ledger at all: both
+    // fixtures came back owing 0 with supersededBy v4660 either way, the comparison read 0 > 0, and a control
+    // written against the real mechanism went vacuous because a NUMBER IN ANOTHER FILE MOVED. It went red
+    // rather than quiet only because it asserts a STRICT inequality; had it asserted ">=" it would have
+    // passed, and the tree would have kept a stale-ledger control that could not see a stale ledger.
+    //
+    // The mechanism is the subject, so the fixture now carries its own floor instead of borrowing the live
+    // one. v4451 is the pre-raise baseline -- a real historical value, below the v4485 truncation -- so the
+    // removed releases are once again the thing deciding supersededBy.
+    const onFloor = (doc) => Object.assign({}, doc, {
+        baseline: Object.assign({}, real.baseline, { throughVersion: 4451 }) });
+    const freshLow = ledgerState({ file: writeLed("fresh-lowfloor.json", onFloor(real)) });
+    const staleLow = ledgerState({ file: writeLed("stale-lowfloor.json", onFloor(withLatest(4485))) });
+
+    ok("!! *** and with the baseline ABOVE every release, a stale ledger changes NOTHING -- which is a " +
+       "property to know, not a pass to bank ***",
+        stale.supersededBy === fresh.supersededBy && fresh.supersededBy === fresh.floor &&
+        fresh.floor > fresh.latest,
+        `baseline v${fresh.floor} is above the newest release v${fresh.latest}, so supersededBy is v` +
+        `${fresh.supersededBy} whatever the ledger says and truncating it moves nothing. That is SAFE TODAY ` +
+        "and it is exactly what made the row below vacuous, so the row below drives its own floor now. If " +
+        "this row ever goes red the baseline has dropped back under the releases and the live comparison is " +
+        "meaningful again -- at which point the fixture is belt and braces rather than the only thing working.");
+
     ok("!! *** a STALE `latest` does not under-report the debt, it INVENTS it ***",
-        stale.owed.length > fresh.owed.length && stale.supersededBy < fresh.supersededBy,
-        `the same tree and the same main, read against a ledger truncated at v4485, owes ` +
-        `${stale.owed.length} (${stale.owed.slice(0, 9).map((v) => "v" + v).join(", ")}) and against the live ` +
-        `ledger owes ${fresh.owed.length}. supersededBy v${stale.supersededBy} vs v${fresh.supersededBy}. ` +
+        staleLow.owed.length > freshLow.owed.length && staleLow.supersededBy < freshLow.supersededBy,
+        `the same tree and the same main on a floor of v4451, read against a ledger truncated at v4485, owes ` +
+        `${staleLow.owed.length} (${staleLow.owed.slice(0, 9).map((v) => "v" + v).join(", ")}) and against the full ` +
+        `ledger owes ${freshLow.owed.length}. supersededBy v${staleLow.supersededBy} vs v${freshLow.supersededBy}. ` +
         "EVERY ONE of the invented names is a version BELOW a release that exists -- superseded, not owed -- " +
         "which is the distinction v4461 built supersededBy for and a stale ledger silently undoes.");
     ok("  ...and the floor it moves can only be raised BY PUBLISHING, which is why this is not an escape hatch",
