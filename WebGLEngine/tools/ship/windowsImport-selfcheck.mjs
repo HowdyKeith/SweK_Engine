@@ -120,6 +120,63 @@ function importArgs(line) {
     }
     return out;
 }
+/**
+ * *** v4668 -- THE THIRD SHAPE, AND THIS SCAN COULD NOT SEE IT EITHER. ***
+ *
+ * importArgs above reads dynamic `import(` CALLS. The --import scan below reads spawn ARGUMENTS. Neither
+ * looks at a STATIC import statement that is WRITTEN INTO A FILE THIS GATE GENERATES -- and that is where
+ * the defect landed next. thrownRow-selfcheck built its fixtures with
+ *
+ *     const NET = `import { reportThrows } from ${JSON.stringify(MOD)};\n`;   // MOD = path.join(...)
+ *
+ * which on POSIX resolves and on Windows becomes `from "C:\\SweK_src\\..."`, where node reads "C:" as a
+ * PROTOCOL and answers ERR_UNSUPPORTED_ESM_URL_SCHEME. Every generated fixture then died at its first line,
+ * so the gate returned exit 1 with ZERO FAIL rows and all four of its sections went red at once -- the
+ * CONTROL among them, which is the tell, because a fixture that does not throw cannot fail for a reason
+ * about throwing. wasmTeardown-selfcheck carried the identical line. BOTH WERE WRITTEN THE SAME WEEK v4646
+ * FIXED TEN SPELLINGS OF THIS, by the same hand, in files sitting beside the fix.
+ *
+ * The classifier was never wrong; it was never ASKED. The surface is what was missing, so the surface is
+ * added rather than the rule widened: a template literal whose text contains `from ${...}` is an import
+ * statement under construction, and its interpolation is a specifier.
+ */
+export function generatedImportArgs(src) {
+    const out = [];
+    // `from ${EXPR}` and `from "${EXPR}"` / '...' / `...` -- the quote may be inside or outside the hole,
+    // and both spellings appear in this tree (thrownRow used the first, fsrPage the second).
+    // *** AND THE FIRST SPELLING OF THIS REGEX COUNTED PROSE, WHICH IS THE DEFECT THIS TREE HAS NOW FOUND
+    // IN ITS OWN SCANNERS MORE TIMES THAN ANY OTHER. *** Matching `from ${...}` alone hit four sentences on
+    // the first run -- brain.js's "the DUNGEON's trained head", KitScatter's "placed N from ${folder}",
+    // ringFloorPhase's and slugNapalm's report lines -- because English puts "from" in front of an
+    // interpolation constantly. An import statement is not the word `from`; it is `import` ... `from`, and
+    // requiring both on one line is what separates the two. Backtick and newline are excluded so a match
+    // cannot run out of one template literal and into the next.
+    for (const m of String(src || "").matchAll(/\bimport\b[^;\n`]{0,160}?\bfrom\s+["'`]?\$\{([^{}]*)\}/g)) {
+        let arg = m[1].trim();
+        // *** JSON.stringify IS A QUOTE, NOT A SPECIFIER, and leaving it on made the rule reject the REPAIR.
+        // *** The generated line is `from ${JSON.stringify(MOD)}`, so the encode supplies the quotation marks
+        // that a literal would have written by hand. Classified as-is, the first identifier is `JSON` and the
+        // file is asked whether it assigned a URL to something called JSON -- which it never does, so a
+        // CORRECTLY repaired `const MOD = pathToFileURL(...).href` was still reported as an offender. The
+        // wrapper is unwrapped here, in the surface, rather than in classifySpecifier: what the encode does
+        // is specific to generating source, and the dynamic-import rule should not learn about it.
+        const enc = /^JSON\.stringify\s*\(([\s\S]*)\)$/.exec(arg);
+        if (enc) arg = enc[1].trim();
+        // *** AND A BARE NAME IS RESOLVED HERE, BECAUSE ON THIS SURFACE IT IS DECIDABLE. ***
+        // classifySpecifier answers "undecidable" to a lone identifier and that is right for a dynamic
+        // import(), where the value can come from anywhere -- twenty of those are reported and not asserted
+        // on. It is the wrong answer here: the module a generated fixture imports is assigned in the SAME
+        // FILE, a few lines up, so the rule can simply read it. Left unresolved, `from ${JSON.stringify(MOD)}`
+        // came back undecidable, undecidable is not an offender, and the defect that took four rows red on
+        // the rig would have gone on passing its own detector.
+        const bare = /^[A-Za-z_$][\w$]*$/.test(arg) &&
+            new RegExp("(?:const|let|var)\\s+" + arg + "\\s*=\\s*([^;\\n]*)").exec(src);
+        if (bare) arg = bare[1].trim();
+        if (arg) out.push(arg);
+    }
+    return out;
+}
+
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 const report = (l) => console.log("  ----  " + l);
@@ -146,6 +203,27 @@ function walk(dir, out = []) {
         // 639 ms to 3,390 -- past the 3,000 ms ceiling, which would have stopped it running at ship time at
         // all and made the repair strictly worse than the defect it fixed. "import(" is a NECESSARY condition
         // for every offender the regex below can find, and skipping the files without it costs one indexOf.
+        // *** v4668 -- AND THE GENERATED SURFACE MUST BE ASKED BEFORE THIS PRE-FILTER, WHICH IS A THIRD
+        // SIGHTING OF ONE MISTAKE IN ONE FILE. *** The line below is a budget pre-filter, and its comment is
+        // right about why: "import(" IS a necessary condition for every offender the DYNAMIC scan can find.
+        // It is not one for a generated STATIC import -- `import { x } from ${p}` contains no "import(" --
+        // so the first draft of the new rule sat behind a filter written for the old question and never saw
+        // a single file. Measured: with the rule below the pre-filter the whole-tree scan reported ZERO
+        // offenders while thrownRow-selfcheck.mjs carried the defect verbatim. A necessary condition for one
+        // question is not a necessary condition for the next one, and reusing it is how a scan goes quiet
+        // without going wrong. Its own condition is `${` -- no interpolation, no generated specifier -- and
+        // it reads RAW source, so it costs an indexOf and no lexing.
+        if (src.includes("${")) {
+            // @vite-ignore is read raw here rather than through codeOnly: the expensive lexer is the thing
+            // the pre-filter below exists to avoid, and a browser marker is a file-wide flag either way.
+            const browserGen = /@vite-ignore/.test(src);
+            for (const arg of generatedImportArgs(src)) {
+                if (browserGen) continue;
+                if (classifySpecifier(arg, src) !== "offender") continue;
+                offenders.push(path.relative(ENG, f).replace(/\\/g, "/") +
+                    " -> GENERATED import from " + arg.slice(0, 54));
+            }
+        }
         if (!src.includes("import(")) continue;
         // *** codeOnly AND NOT TWO REGEXES, AND THIS FILE'S OWN HEADER ALREADY KNEW WHY. *** Section 3 below
         // assembles its fixture from fragments rather than spelling it out, because "spelling the crashing
@@ -283,6 +361,38 @@ function walk(dir, out = []) {
     ok("...and the corrected form is NOT an offender",
        classifySpecifier('pathToFileURL(path.join(ENG, "x.js")).href') === "safe",
        "so the check tracks the defect rather than the word 'import'");
+
+    // *** v4668 -- THE GENERATED-IMPORT SURFACE, DRIVEN ON THE TWO LINES THAT ACTUALLY SHIPPED. *** Both of
+    // these were written the same week v4646 fixed ten spellings of this defect, by the same hand, in files
+    // sitting next to the fix -- and both came back from the rig at v4667 as "exit 1, NO FAILING ROW".
+    const SHIPPED_THROWNROW = 'const MOD = path.join(ENG, "tools", "ship", "thrownRow.mjs");\n' +
+                              'const NET = `import { reportThrows } from ${JSON.stringify(MOD)};`;';
+    const SHIPPED_WASM = 'const body = `import { initNode, mod } from ${JSON.stringify(path.join(ENG, "a/b.mjs"))};`;';
+    const offends = (src) => generatedImportArgs(src).some((a) => classifySpecifier(a, src) === "offender");
+
+    ok("!! *** SABOTAGE: thrownRow's shipped line -- a path.join'd module imported by a GENERATED fixture -- IS an offender ***",
+       offends(SHIPPED_THROWNROW),
+       "on POSIX it resolves; on Windows it reads from \"C:\\\\...\" and node answers " +
+       "ERR_UNSUPPORTED_ESM_URL_SCHEME, so every fixture died at line one and the gate printed no row at all");
+    ok("!! ...and wasmTeardown's identical line is too",
+       offends(SHIPPED_WASM),
+       "two files, one defect, one week -- which is the argument for a surface rather than a habit");
+    ok("...and BOTH repairs are silent",
+       !offends('const MOD = pathToFileURL(path.join(ENG, "a.mjs")).href;\n' +
+                'const NET = `import { reportThrows } from ${JSON.stringify(MOD)};`;') &&
+       !offends('const ENG_URL = pathToFileURL(ENG).href;\nconst b = `import x from "${ENG_URL}/ui/a.mjs";`;'),
+       "the file:// form and fsrPage's named-URL-const form, which is the spelling v4646 already put in the tree");
+
+    // *** AND THE CONTROL THAT COST THE FIRST DRAFT OF THIS RULE. *** Matching `from ${...}` alone flagged
+    // FOUR SENTENCES on its first whole-tree run -- brain.js, KitScatter, ringFloorPhase, slugNapalm --
+    // because English puts "from" in front of an interpolation constantly. This tree has now found itself
+    // counting its own prose more times than any other single mistake.
+    ok("!! CONTROL: PROSE containing 'from ${...}' is NOT an import, even when it also says 'import'",
+       !offends('console.log(`[kitScatter] placed ${n} from "${folder}" now`);') &&
+       !offends('console.log(`could not import ${name} from ${where}`);') &&
+       generatedImportArgs('console.log(`placed ${n} from "${folder}"`);').length === 0,
+       "an import statement is not the word `from`; it is `import` ... `from` on one line, and requiring " +
+       "both is the whole difference between a rule and a permanent red");
     // *** THE CONTROL THAT KEEPS THE RULE FROM BEING "EVERYTHING IS AN OFFENDER". *** A rule that said yes to
     // every argument would pass all four rows above and make the whole-tree scan a permanent red.
     ok("!! CONTROL: an ordinary bare specifier and a relative literal are SAFE, so the rule is not a blanket no",

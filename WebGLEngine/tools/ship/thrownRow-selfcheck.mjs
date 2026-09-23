@@ -33,12 +33,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { codeOnly } from "./sourceScan.mjs";
 import { describeThrow } from "./thrownRow.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const MOD = path.join(ENG, "tools", "ship", "thrownRow.mjs");
+// *** v4668 -- A PATH IS NOT A SPECIFIER ON WINDOWS, AND THIS FILE SHIPPED THE DEFECT ITS OWN WEEK FIXED. ***
+// The fixtures below are GENERATED and import this module by absolute path. On POSIX `import x from
+// "/home/.../thrownRow.mjs"` resolves and the gate is green; on Windows the same line reads
+// "C:\\SweK_src\\...\\thrownRow.mjs" and node answers ERR_UNSUPPORTED_ESM_URL_SCHEME -- "C:" parses as a
+// PROTOCOL. Every fixture then dies at the import, before a single row is printed, so the gate came back
+// exit 1 with ZERO FAIL rows on the rig and all four of its sections went red at once, the control among
+// them. The control failing is the tell: a fixture that does not throw cannot fail for a reason about
+// throwing. v4646 fixed ten spellings of exactly this and fsrPage-selfcheck carries the correct one
+// (ENG_URL = pathToFileURL(ENG).href) fifty lines from here.
+const MOD = pathToFileURL(path.join(ENG, "tools", "ship", "thrownRow.mjs")).href;
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l) => console.log(`  ----  ${l}`);

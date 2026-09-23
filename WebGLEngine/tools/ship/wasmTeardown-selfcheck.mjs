@@ -35,7 +35,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { liveHandles } from "./serverShutdown.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4663, exitCallCount } from "./wasmTeardown.mjs";
@@ -123,7 +123,7 @@ console.log("\n3. *** THE REPAIR, DRIVEN ON TWO SCRIPTS IDENTICAL BUT FOR THEIR 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wasmteardown-"));
     try {
         const body = (last) => `
-import { initNode, mod } from ${JSON.stringify(path.join(ENG, "physics/box3d/box3dNode.mjs"))};
+import { initNode, mod } from ${JSON.stringify(pathToFileURL(path.join(ENG, "physics/box3d/box3dNode.mjs")).href)};   // v4668: a file:// URL, not a path -- see thrownRow-selfcheck
 await initNode();
 const e = mod().__wasmExports;
 const w = e.swk_world_create(0, -10, 0);
