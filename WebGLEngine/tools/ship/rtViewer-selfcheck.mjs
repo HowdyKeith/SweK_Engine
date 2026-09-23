@@ -74,9 +74,12 @@ import { gateReport } from "./gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
-import { pipelineWgsl } from "../../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, bvhBuffersFromMesh } from "../../physics/render/rtPipeline.mjs";
 import { captureAtlasHalves, captureBaseCubemap, packCapturedAtlas } from "../../physics/render/specularProbeCapture.mjs";
 import { fromHalf } from "../../text/slugAtlas.js";
+import { GLBParser } from "../../gpu/GLBParser.js";
+import { meshTriples } from "../../physics/splat/splatMesh.mjs";
+import { faceTexelDir } from "../../render/cubeBake.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -320,6 +323,211 @@ console.log("\n1c. RTX ROUND 12 -- makeRtSession's `direct` OPTION, AGAINST pipe
     }
 }
 
+// ---- 1d. RTX ROUND 13 -- makeRtSession's `sky:"sceneCapture"` AND makeSceneRadianceOf() DIRECTLY (NO GPU) ----
+console.log("\n1d. RTX ROUND 13 -- sky:\"sceneCapture\" AND makeSceneRadianceOf(), AGAINST pipelineWgsl() AND A REAL BVH (NO GPU NEEDED)");
+{
+    const fakeMesh = {
+        bvh: { nodeCount: 1, triCount: 1, bounds: new Float32Array(6), meta: new Float32Array(4),
+                order: new Uint32Array(1), tris: new Float32Array(9) },
+        bounds: { center: [0, 0, 0], radius: 1 }, vertexCount: 3, triangleCount: 1,
+    };
+    const stubDevice = () => {
+        const wgsls = [];
+        return { wgsls, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind() {}, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture() { return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+
+    // *** A REAL, TRACEABLE BVH, NOT `fakeMesh` -- `sky:"sceneCapture"` actually BAKES an atlas at session
+    // creation (captureBaseCubemap calls makeSceneRadianceOf's own radianceOf function once per texel,
+    // synchronously, even under a stub device), unlike `sky:"envMap"`, whose envRadianceOf never touches its
+    // `mesh` argument at all -- `fakeMesh`'s own bvh field has no real MeshBVH instance for raycastFirst() to
+    // call, so it would throw here even though it works fine for every OTHER option this file stubs with it.
+    const cubePositions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+    const cubeIndices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+    const cubeBvh = bvhBuffersFromMesh(cubePositions, cubeIndices, {});
+    const cubeMesh = { bvh: cubeBvh, bounds: V.meshBounds(cubeBvh) };
+
+    // *** WGSL TEXT IS BYTE-IDENTICAL TO sky:"envMap" -- ON PURPOSE, AND THAT IS THE POINT OF THIS CHECK. ***
+    // sky:"sceneCapture" changes ONLY which JS function bakes the atlas's own CONTENT, never the generated WGSL
+    // (both set pipelineWgsl's own envMap:true) -- a WGSL-text comparison alone cannot distinguish the two, the
+    // same "scene-level change WGSL text can't see" shape round 12's own light-record probe exists to catch.
+    const d1 = stubDevice();
+    V.makeRtSession(d1.device, { mesh: cubeMesh, w: 4, h: 4, sky: "sceneCapture" });
+    ok("!! sky:\"sceneCapture\" (material omitted) generates BYTE-IDENTICAL WGSL to sky:\"envMap\" (material omitted)",
+        d1.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: false, envMap: true }),
+        "proves sceneCapture reuses envMap's own WGSL path exactly, not a fourth generated shader shape");
+    const d2 = stubDevice();
+    V.makeRtSession(d2.device, { mesh: cubeMesh, w: 4, h: 4, material: "microfacet", sky: "sceneCapture", direct: "nee" });
+    ok("!! sky:\"sceneCapture\" composes with material:\"microfacet\"+direct:\"nee\" exactly like sky:\"envMap\" does",
+        d2.wgsls[0] === pipelineWgsl({ bvh: true, gradient: false, microfacet: "nee", msComp: true, envMap: true }),
+        "the three sky/material/direct toggles stay orthogonal with a third sky value added, not just with two");
+
+    ok("an unrecognized `sky` value still throws (now that \"sceneCapture\" is a third valid value, not merely two)",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, sky: "hdri" }); return false; }
+                 catch (e) { return /sky must be/.test(e.message); } })(),
+        "widening the valid set from two values to three must not widen it to \"anything not gradient/envMap\"");
+
+    // *** THE BAKE POSITION GENUINELY TRACKS mesh.bounds.center -- NOT A FIXED CONSTANT -- PROVEN AT THE REAL
+    // makeRtSession WIRING LEVEL, NOT JUST INSIDE makeSceneRadianceOf() IN ISOLATION. *** An adversarial review
+    // found `cubeMesh` above is centred at the ORIGIN (its own [-1,1] geometry), so a bug where the bake position
+    // was silently left hardcoded at [0,0,0] instead of actually reading mesh.bounds.center would be numerically
+    // INDISTINGUISHABLE from the correct wiring for this one fixture -- every check above and below this comment
+    // would still pass. *** A first draft of this fix compared a TRANSLATED cube's atlas against the untranslated
+    // one and found them ALWAYS byte-identical -- not a bug in the wiring, a flawed test: translating the WHOLE
+    // mesh (and therefore its bounds.center, and therefore the real bake position right along with it) preserves
+    // every ray's geometry relative to its own capture point, so the two bakes are mathematically forced to agree
+    // regardless of whether bounds.center is genuinely being read. *** Fixed by comparing the REAL session-wired
+    // atlas for an off-centre mesh against what captureBaseCubemap would have produced for that SAME mesh at a
+    // HARDCODED [0,0,0] instead -- the actual failure mode a "forgot to wire bounds.center" bug would produce.
+    const texturedDevice = () => {
+        let data = null;
+        return { getData: () => data, device: {
+            compute({ wgsl }) { return { bind() {}, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture(desc) { data = desc && desc.data; return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+    const translatedPositions = cubePositions.map((p) => [p[0] + 3, p[1] + 4, p[2] + 5]);
+    const translatedBvh = bvhBuffersFromMesh(translatedPositions, cubeIndices, {});
+    const translatedMesh = { bvh: translatedBvh, bounds: V.meshBounds(translatedBvh) };
+    const t2 = texturedDevice();
+    V.makeRtSession(t2.device, { mesh: translatedMesh, w: 4, h: 4, sky: "sceneCapture" });
+    const realAtlasBytes = t2.getData();
+    const hardcodedOriginCapture = packCapturedAtlas(captureBaseCubemap(V.makeSceneRadianceOf(translatedMesh), [0, 0, 0], V.DEFAULT_ENV_FACE_SIZE));
+    const hardcodedOriginBytes = V.packAtlasHalfFloat(hardcodedOriginCapture);
+    ok("!! the REAL session-baked atlas differs from what a HARDCODED-AT-[0,0,0] capture position would have produced " +
+        "for the SAME off-centre mesh -- the bake position genuinely reads mesh.bounds.center, not a fixed constant",
+        !!realAtlasBytes && realAtlasBytes.length === hardcodedOriginBytes.length &&
+        Array.from(realAtlasBytes).some((v, i) => v !== hardcodedOriginBytes[i]),
+        `translated cube centre ${JSON.stringify(translatedMesh.bounds.center.map((v) => +v.toFixed(2)))} (far from [0,0,0]) -- ` +
+        "identical atlas bytes here would mean the bake position never actually reads mesh.bounds.center at all, a bug the " +
+        "cube fixture's own origin-centred geometry (and the earlier, mathematically-flawed pure-translation comparison) cannot otherwise catch");
+
+    // *** makeSceneRadianceOf() ITSELF, AGAINST THE SAME REAL, TRACEABLE CUBE BVH -- THE SAME UNIT CUBE SECTION
+    // 4 BELOW USES THROUGH A REAL DEVICE, HERE PROVEN AT THE JS LEVEL FIRST, NO GPU OR BROWSER NEEDED. ***
+    const radianceOf = V.makeSceneRadianceOf(cubeMesh);
+
+    const hitPos = [0, 0, 4], hitDir = [0, 0, -1]; // straight at the cube's own +z face -- a guaranteed hit
+    const hitColor = radianceOf(hitPos, hitDir);
+    const skyForHitRay = V.envRadianceOf(hitPos, hitDir);
+    ok("!! a ray aimed straight at the cube's own geometry returns a FINITE, REAL hit color -- not NaN, not the sky fallback",
+        hitColor.every((v) => isFinite(v) && v > 0) && hitColor.some((v, i) => Math.abs(v - skyForHitRay[i]) > 1e-6),
+        `hit color ${JSON.stringify(hitColor)} vs what envRadianceOf would have returned for the identical (pos,dir) ${JSON.stringify(skyForHitRay)} -- ` +
+        "identical values here would mean the ray silently fell through to the sky fallback despite hitting real geometry");
+
+    const missPos = [0, 0, 4], missDir = [0, 1, 0]; // straight up, past the cube entirely -- a guaranteed miss
+    const missColor = radianceOf(missPos, missDir);
+    const skyForMissRay = V.envRadianceOf(missPos, missDir);
+    ok("!! a ray that misses the cube entirely falls back to envRadianceOf(pos,dir) EXACTLY, element-wise",
+        missColor.length === skyForMissRay.length && missColor.every((v, i) => v === skyForMissRay[i]),
+        `${JSON.stringify(missColor)} vs ${JSON.stringify(skyForMissRay)} -- the miss path must defer to the SAME analytic sky ` +
+        "round 11 already shipped, not a second, independently-drifting sky formula");
+
+    // A ray hitting a face more directly aligned with the sun direction should read BRIGHTER than one hitting a
+    // face at a shallow/opposed angle -- proves the NdotL shading term actually responds to the hit NORMAL,
+    // not a flat constant regardless of which face or angle was hit.
+    const frontColor = radianceOf([0, 0, 4], [0, 0, -1]);   // +z face
+    const backColor = radianceOf([0, 0, -4], [0, 0, 1]);    // -z face (opposite normal)
+    ok("!! shading VARIES by which face/normal was hit -- not a flat constant regardless of geometry",
+        Math.abs(frontColor[0] - backColor[0]) > 1e-6,
+        `+z face color ${JSON.stringify(frontColor)} vs -z face color ${JSON.stringify(backColor)} -- opposite normals must read ` +
+        "differently against a fixed, directional sun term, or the NdotL term this round adds is not actually wired to the hit normal");
+
+    // *** THE SHADING FORMULA'S OWN CONSTANTS, HELD TO A HAND-COMPUTED EXPECTED VALUE -- an adversarial review
+    // found the checks above only prove SOME nonzero difference exists, not that the ambient/diffuse mix
+    // (0.35 + 0.65*ndotl) or DEFAULT_ALBEDO specifically are what's actually applied; a swap to different
+    // constants would still pass every check above. The +z face hit at pos=[0,0,4] is EXACTLY the triangle
+    // spanning [4,5,6] (verts 4,5,6 at z=1), whose own cross(e1,e2) normal is [0,0,1] (hand-derivable from the
+    // cube's own vertex positions), so ndotl = dot([0,0,1], normalize([0.35,0.55,0.3])) = 0.3/|[0.35,0.55,0.3]|
+    // is computable independently of render/rtViewer.mjs's own ENV_SUN_DIR constant (private, not exported --
+    // re-derived here from the same [0.35,0.55,0.3] its own doc comment states, not imported). ***
+    const sunRaw = [0.35, 0.55, 0.3], sunLen = Math.hypot(sunRaw[0], sunRaw[1], sunRaw[2]);
+    const handNdotL = sunRaw[2] / sunLen; // dot([0,0,1], sunRaw/sunLen) collapses to sunRaw[2]/sunLen
+    const handShade = 0.35 + 0.65 * handNdotL;
+    const handExpected = V.DEFAULT_ALBEDO.map((c) => c * handShade);
+    const closeEnough = (a, b) => Math.abs(a - b) < 1e-9;
+    ok("!! the +z face's hit color matches 0.35+0.65*ndotl times DEFAULT_ALBEDO, computed BY HAND off this file " +
+        "(not by calling triNormal/envRadianceOf again, which would just restate the same formula under test)",
+        frontColor.length === handExpected.length && frontColor.every((v, i) => closeEnough(v, handExpected[i])),
+        `frontColor ${JSON.stringify(frontColor)} vs hand-computed ${JSON.stringify(handExpected)} (ndotl=${handNdotL.toFixed(6)}, ` +
+        "shade=" + handShade.toFixed(6) + ") -- a different ambient/diffuse mix or a non-DEFAULT_ALBEDO base would diverge here " +
+        "even though it would still clear the weaker \"some nonzero difference\" checks above");
+}
+
+// ---- 1e. RTX ROUND 13 -- THE REAL PAVEMENT-TILE SCENE'S OWN CAPTURE POSITION, AGAINST THE ACTUAL GLB (NO GPU) ----
+console.log("\n1e. RTX ROUND 13 -- THE REAL PAVEMENT-TILE GLB'S OWN sky:\"sceneCapture\" HIT/MISS SPLIT (NO GPU NEEDED)");
+{
+    // *** THE ACTUAL BUG AN ADVERSARIAL REVIEW FOUND: this round's OWN first-draft scratch-verification tested
+    // the tile scene against a FABRICATED flat quad, not the real GLB -- and the real pavement.glb is a thin,
+    // CLOSED box, so mesh.bounds.center sits inside its own solid interior (measured directly: 1536/1536 hits,
+    // 0 misses at bounds.center exactly). DEFAULT_SCENE_CAPTURE_HEIGHT_SCALE was added specifically to fix
+    // this -- this section is the permanent gate against the REAL file regressing back to the degenerate case,
+    // not a fabricated stand-in that could not have caught the bug in the first place. ***
+    const glbBuf = fs.readFileSync(path.join(ENG, "vendor/kenney-city/models/pavement.glb"));
+    const parsed = await GLBParser.parse(glbBuf.buffer.slice(glbBuf.byteOffset, glbBuf.byteOffset + glbBuf.byteLength), {});
+    const { positions, indices } = meshTriples({ positions: parsed.positions, indices: parsed.indices });
+    const tileBvh = bvhBuffersFromMesh(positions, indices, {});
+    const tileMesh = { bvh: tileBvh, bounds: V.meshBounds(tileBvh) };
+    // *** V.sceneCaptureBakePos(), NOT AN INLINE RE-DERIVATION OF THE FORMULA -- an adversarial review found a
+    // first draft of THIS section re-typed "bounds.center + radius*scale" independently of makeRtSession's own
+    // copy, so a sabotage of makeRtSession's own bakePos line went undetected (this section's own independently-
+    // correct copy still measured a fine hit/miss split, oblivious to what the real session actually did). Fixed
+    // by extracting ONE shared, exported sceneCaptureBakePos(mesh) that BOTH makeRtSession and this gate call. ***
+    const bakePos = V.sceneCaptureBakePos(tileMesh);
+    const radianceOf = V.makeSceneRadianceOf(tileMesh);
+    const inst = tileMesh.bvh.bvh;
+    let hits = 0, misses = 0, nan = 0;
+    const size = 16;
+    for (let f = 0; f < 6; f++) for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
+        const dir = faceTexelDir(f, i, j, size);
+        if (inst.raycastFirst(bakePos[0], bakePos[1], bakePos[2], dir[0], dir[1], dir[2])) hits++; else misses++;
+        const c = radianceOf(bakePos, dir);
+        if (!c.every((v) => isFinite(v))) nan++;
+    }
+    const total = hits + misses;
+    say(`real pavement.glb: bounds ${JSON.stringify(tileMesh.bounds)}, bake position ${JSON.stringify(bakePos.map((v) => +v.toFixed(4)))}`);
+    say(`hit/miss at the REAL bake position: ${hits} hits (${(100 * hits / total).toFixed(1)}%), ${misses} misses (${(100 * misses / total).toFixed(1)}%)`);
+    ok("!! the real pavement-tile GLB's own capture position is NOT degenerate -- both real geometry hits AND real sky " +
+        "misses, not all-hit (the bug this section exists to catch, since bounds.center EXACTLY was measured all-hit) " +
+        "or all-miss (which would mean the offset overshot into open sky, capturing nothing of the tile at all)",
+        nan === 0 && hits > total * 0.05 && misses > total * 0.05,
+        `${hits}/${total} hit, ${misses}/${total} miss -- either extreme means DEFAULT_SCENE_CAPTURE_HEIGHT_SCALE needs re-tuning ` +
+        "against this real file, not that the fabricated-cube fixture in section 1d above happened to look fine");
+
+    // *** THE REAL SESSION, NOT JUST THE SHARED FORMULA CALLED DIRECTLY -- even with sceneCaptureBakePos() single-
+    // sourced above, makeRtSession's own bakePos LINE could still be sabotaged to bypass that function entirely
+    // (e.g. reverted to bare mesh.bounds.center inline) without this section's own direct call to the same,
+    // un-sabotaged function ever noticing. Closes that gap by running the REAL makeRtSession end to end (behind a
+    // stub device that captures the packed atlas bytes device.texture() would receive) and confirming it does NOT
+    // match what a bounds.center-exactly (the degenerate case) bake would have produced for this SAME real file. ***
+    const texturedDevice = () => {
+        let data = null;
+        return { getData: () => data, device: {
+            compute({ wgsl }) { return { bind() {}, bindTexture() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            texture(desc) { data = desc && desc.data; return { destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+    const realDev = texturedDevice();
+    V.makeRtSession(realDev.device, { mesh: tileMesh, w: 4, h: 4, sky: "sceneCapture" });
+    const realBytes = realDev.getData();
+    const degenerateCapture = packCapturedAtlas(captureBaseCubemap(V.makeSceneRadianceOf(tileMesh), tileMesh.bounds.center, V.DEFAULT_ENV_FACE_SIZE));
+    const degenerateBytes = V.packAtlasHalfFloat(degenerateCapture);
+    ok("!! makeRtSession's OWN real bake for the real tile mesh differs from what a bounds.center-EXACTLY (the degenerate " +
+        "case measured above) bake would have produced -- the SESSION itself applies the height offset, not merely a " +
+        "correct formula sitting in this gate unused by makeRtSession's own wiring",
+        !!realBytes && realBytes.length === degenerateBytes.length && realBytes.some((v, i) => v !== degenerateBytes[i]),
+        "identical bytes here would mean makeRtSession's own bakePos line stopped calling sceneCaptureBakePos() -- " +
+        "a regression the check just above this one, which calls sceneCaptureBakePos() directly rather than through " +
+        "makeRtSession, cannot see");
+}
+
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
 console.log("\n2. accumulateWgsl -- A RUNNING MEAN, HELD TO HAND-COMPUTED EXPECTED VALUES");
 {
@@ -452,9 +660,9 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
                 for (let i = 0; i < 6; i++) await session.renderFrame(view, { offscreen: true, read: true });
                 const accum = new Float32Array(await device.read(session.accumBuf));
-                let nan = 0, min = Infinity, max = -Infinity;
-                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; }
-                out.cubeEnvMap = { nan, min, max, frameCount: session.frameCount() };
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0;
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; }
+                out.cubeEnvMap = { nan, min, max, mean: sum / accum.length, frameCount: session.frameCount() };
                 session.destroy();
             }
 
@@ -503,6 +711,30 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 out.cubeDirectMis = await renderDirect("mis");
             }
 
+            // ---- 4e. RTX ROUND 13 -- the SAME fabricated cube, through sky:"sceneCapture" (the FIRST production
+            // caller) -- proves the real device path (makeSceneRadianceOf's own ray-BVH trace, baked through the
+            // SAME captureBaseCubemap/packCapturedAtlas/device.texture path sky:"envMap" already uses, this time
+            // fed by a scene-derived radianceOf rather than an analytic one) actually executes end to end and
+            // produces a picture measurably different from the analytic sky:"envMap" atlas -- not just that
+            // section 1d's own GPU-free claim (the JS function alone) is correct in isolation. ----
+            {
+                const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+                const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(positions, indices);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 32, h = 24;
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2, sky: "sceneCapture" });
+                const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
+                for (let i = 0; i < 6; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity, sum = 0;
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; sum += v; }
+                out.cubeSceneCapture = { nan, min, max, mean: sum / accum.length, frameCount: session.frameCount() };
+                session.destroy();
+            }
+
             // ---- 5. the real GLB -- fetch, parse, BVH, render; informal sanity only (no radiance oracle for a mesh) ----
             {
                 const res = await fetch("/vendor/kenney-city/models/pavement.glb");
@@ -546,7 +778,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -639,6 +871,34 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "bug where MIS silently reuses NEE's own code path rather than its own weighting, which the mean-gap check " +
         "above cannot tell apart from a real, independently-computed MIS render (found by an adversarial review)");
 
+    console.log("\n4e. RTX ROUND 13 -- THE SAME FABRICATED CUBE, THROUGH sky:\"sceneCapture\" -- THE FIRST PRODUCTION CALLER");
+    say(`accumBuf: ${cubeSceneCapture.nan} NaN/Inf, range [${cubeSceneCapture.min.toFixed(4)}, ${cubeSceneCapture.max.toFixed(4)}], ${cubeSceneCapture.frameCount} frames`);
+    REPORT_ROWS.push(["cube, sceneCapture", "unit cube", `${cubeSceneCapture.frameCount} frames`,
+        `range [${cubeSceneCapture.min.toFixed(4)}, ${cubeSceneCapture.max.toFixed(4)}]`]);
+    ok("!! the SAME cube, the atlas baked from makeSceneRadianceOf's own real ray-BVH trace and uploaded as a real " +
+        "rgba16float texture bound BY NAME, through a REAL WebGPU device -- no NaN, real range",
+        cubeSceneCapture.nan === 0 && cubeSceneCapture.max > cubeSceneCapture.min && cubeSceneCapture.min >= 0.0,
+        "proves the WIRING this round adds -- not just section 1d's own GPU-free claim that makeSceneRadianceOf() " +
+        "itself is correct in isolation -- actually executes end to end: a real BVH trace against this cube's own " +
+        "mesh, baked into a real atlas and bound the first time any production caller has ever passed a scene-derived radianceOf");
+    ok("!! and reads genuinely DIFFERENT from the sky:\"envMap\" render of the IDENTICAL cube and camera -- the scene-captured " +
+        "atlas's own CONTENT actually differs from the analytic one, not just \"doesn't crash\"",
+        Math.abs(cubeSceneCapture.max - cubeEnvMap.max) > 1e-4 || Math.abs(cubeSceneCapture.min - cubeEnvMap.min) > 1e-4,
+        `sceneCapture range [${cubeSceneCapture.min.toFixed(4)}, ${cubeSceneCapture.max.toFixed(4)}] vs envMap range ` +
+        `[${cubeEnvMap.min.toFixed(4)}, ${cubeEnvMap.max.toFixed(4)}] -- both generate BYTE-IDENTICAL WGSL (section 1d's own ` +
+        "claim), so this is the one check proving the JS-level choice of radianceOf function actually reaches the bound texture");
+    // *** MEAN, NOT JUST MIN/MAX -- an adversarial review pointed at this file's OWN section 4d history (a few
+    // sections above): min/max there read byte-IDENTICAL across a real, working change because both extremes
+    // were pinned by unrelated pixels, and mean was the metric that actually caught it. The min/max check above
+    // IS already sabotage-confirmed against a total-substitution bug (this round's own sabotage log), but a
+    // SUBTLE partial difference confined to a few texels could in principle move mean while leaving the two
+    // extreme pixels untouched -- so both metrics are checked, not one instead of the other. ***
+    say(`means: sceneCapture ${cubeSceneCapture.mean.toFixed(6)}, envMap ${cubeEnvMap.mean.toFixed(6)}`);
+    ok("!! the two renders' own MEANS differ too, not just their extremes",
+        Math.abs(cubeSceneCapture.mean - cubeEnvMap.mean) > 1e-4,
+        `sceneCapture mean ${cubeSceneCapture.mean.toFixed(6)} vs envMap mean ${cubeEnvMap.mean.toFixed(6)} -- a difference confined ` +
+        "entirely to the two extreme pixels min/max alone track would leave the bulk of the atlas's own content unverified");
+
     console.log("\n5. A REAL GLB, THROUGH THE FULL loadMeshBvh -> makeRtSession -> device.frame PATH");
     say(`vendor/kenney-city/models/pavement.glb: ${mesh.byteLength} bytes -> ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices`);
     say(`bounds ${JSON.stringify(mesh.bounds)}`);
@@ -682,16 +942,26 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "\"lambertian\") and every check above this one would still pass -- this is the one assertion that would " +
         "catch a demo wired to the JS module but never actually reachable from the page's own toggle");
     ok("!! RTX round 11 -- the page reads a `sky` URL param and passes it into makeRtSession, not just the hardcoded gradient default",
-        /sky.*==.*["']envMap["']|["']envMap["'].*sky/.test(page) &&
-        /sky\s*:\s*SKY/.test(page),
+        /SKY_VALUES/.test(page) && /sky\s*:\s*SKY/.test(page),
         "a page that never read the param would still call makeRtSession successfully (sky defaults to " +
         "\"gradient\") and every check above this one would still pass -- the same shape of gap round 10's own " +
-        "material check exists to catch, extended to the third toggle");
+        "material check exists to catch, extended to the third toggle -- this regex was updated when round 13 " +
+        "changed `sky`'s own reading code from a binary === check to a three-value array (see round 13's own " +
+        "check just below), so it now matches SKY_VALUES the same way round 12's own DIRECT_VALUES check already does");
     ok("!! RTX round 12 -- the page reads a `direct` URL param and passes it into makeRtSession, not just the hardcoded bsdf default",
         /DIRECT_VALUES/.test(page) && /direct\s*:\s*DIRECT/.test(page),
         "a page that never read the param would still call makeRtSession successfully (direct defaults to " +
         "\"bsdf\") and every check above this one would still pass -- the same shape of gap round 10/11's own " +
         "checks exist to catch, extended to the fourth toggle");
+    ok("!! RTX round 13 -- \"sceneCapture\" is a real, reachable THIRD value of the page's own `sky` toggle, not just an " +
+        "option makeRtSession accepts with no way to reach it from the page",
+        /SKY_VALUES\s*=\s*\[[^\]]*["']sceneCapture["'][^\]]*\]/.test(page),
+        "a page that only ever cycled between \"gradient\" and \"envMap\" internally would still pass every check above " +
+        "this one (sky defaults to \"gradient\", and the round-11 check above only proves SOME value threads through) -- " +
+        "this is the one assertion that would catch sceneCapture being added to makeRtSession/render/rtViewer.mjs but " +
+        "never actually wired into the live page's own toggle cycle. Anchored to the ACTUAL SKY_VALUES array literal " +
+        "(not \"the two substrings appear somewhere in the page\", which an adversarial review found would pass even if " +
+        "\"sceneCapture\" only ever appeared in an unused label string, never in the array the toggle logic actually reads)");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
