@@ -51,6 +51,23 @@
 //           the WGSL puts it. The shader-level clamp is therefore belt-and-suspenders against a future present
 //           target that is NOT rgba8unorm (an HDR float target would not clamp for free); kept, and this is
 //           why removing it is not this section's red.
+//   D  RTX round 10 -- makeRtSession's `material` validation throw removed entirely
+//        -> exit=1, 1 red: section 1b's own "an unrecognized `material` value throws..." test, by name.
+//   E  RTX round 10 -- the default (lambertian) branch's own `rgb: true` flipped to `rgb: false` in its
+//      pipelineWgsl() call
+//        -> exit=1, 2 red: section 1b's byte-identity check (the direct target), plus section 4b's own
+//           "genuinely DIFFERENT from Lambertian" check as a real, traceable cascading effect (the mismatched
+//           rgb/uniforms pairing degraded the Lambertian control render itself, not a false alarm).
+//   F  RTX round 11 -- makeRtSession's `sky` validation throw removed entirely
+//        -> exit=1, 1 red: section 1b's own "an unrecognized `sky` value throws..." test, by name.
+//   G  RTX round 11 -- packAtlasHalfFloat's own toHalf()-based conversion replaced with a wrong ad-hoc
+//      fixed-point encoding (`Math.round(x*4096) & 0xFFFF`)
+//        -> exit=1, 1 red: section 1b's own packAtlasHalfFloat-vs-captureAtlasHalves codec check, by name --
+//           the one check that exists specifically to catch this exact class of bug (see that section's own
+//           comment on what it does and does not prove).
+//   H  RTX round 11 -- makeRtSession's `envFaceSize` validation guard removed entirely (added after a
+//      background adversarial review found this option, unlike `sky`/`material`, had none)
+//        -> exit=1, 3 red: section 1b's own three envFaceSize:{0,-4,3.5} tests, each by name.
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
@@ -58,6 +75,8 @@ import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHar
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
 import { pipelineWgsl } from "../../physics/render/rtPipeline.mjs";
+import { captureAtlasHalves, captureBaseCubemap, packCapturedAtlas } from "../../physics/render/specularProbeCapture.mjs";
+import { fromHalf } from "../../text/slugAtlas.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,8 +124,9 @@ console.log("\n1b. RTX ROUND 10 -- makeRtSession's material OPTION, AGAINST pipe
     const stubDevice = () => {
         const wgsls = [];
         return { wgsls, device: {
-            compute({ wgsl }) { wgsls.push(wgsl); return { bind() {} }; },
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind() {}, bindTexture() {} }; },
             buffer() { return { write() {}, destroy() {} }; },
+            texture() { return { destroy() {} }; },
             pipeline() { return {}; },
         } };
     };
@@ -129,6 +149,73 @@ console.log("\n1b. RTX ROUND 10 -- makeRtSession's material OPTION, AGAINST pipe
         (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, material: "mirror" }); return false; }
                  catch (e) { return /material must be/.test(e.message); } })(),
         "a typo in a future caller's `material` string should fail loud, not silently render Lambertian");
+
+    // ---- RTX ROUND 11 -- `sky`, the SAME no-GPU option-passing check extended to envMap. ----
+    const d3 = stubDevice();
+    V.makeRtSession(d3.device, { mesh: fakeMesh, w: 4, h: 4, sky: "envMap" });
+    ok("!! sky:\"envMap\" (material omitted) generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,rgb:true,gradient:false,envMap:true})",
+        d3.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: false, envMap: true }),
+        "proves sky:\"envMap\" actually turns gradient OFF and envMap ON in the generated text, not merely accepted as an option with no effect");
+
+    const d4 = stubDevice();
+    V.makeRtSession(d4.device, { mesh: fakeMesh, w: 4, h: 4, material: "microfacet", sky: "envMap" });
+    ok("!! material:\"microfacet\" + sky:\"envMap\" together generate BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,gradient:false,microfacet:\"bsdf\",msComp:true,envMap:true})",
+        d4.wgsls[0] === pipelineWgsl({ bvh: true, gradient: false, microfacet: "bsdf", msComp: true, envMap: true }),
+        "the two toggles are orthogonal -- envMap composes with microfacet+msComp exactly as pipelineWgsl() itself allows (it throws only on envMap+gradient together), proven here rather than assumed from the option names alone");
+
+    ok("an unrecognized `sky` value throws rather than silently falling back to gradient",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, sky: "hdri" }); return false; }
+                 catch (e) { return /sky must be/.test(e.message); } })(),
+        "a typo in a future caller's `sky` string should fail loud, not silently render the gradient");
+
+    // *** A BACKGROUND ADVERSARIAL REVIEW FOUND `envFaceSize` HAD NO GUARD, UNLIKE ITS SIBLING OPTIONS. ***
+    // roughness/ior merely produce a numerically implausible but still well-formed material at any value; a
+    // degenerate envFaceSize (0, negative, non-integer) instead produces a zero-length or ragged atlas with no
+    // thrown error anywhere in captureBaseCubemap/packSpecularAtlas, which device.texture() then accepts with
+    // no SYNCHRONOUS failure either -- confirmed by direct trace before this guard was added, not assumed.
+    for (const bad of [0, -4, 3.5]) {
+        ok(`envFaceSize:${bad} throws rather than silently baking a zero-length or ragged atlas`,
+            (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, sky: "envMap", envFaceSize: bad }); return false; }
+                     catch (e) { return /envFaceSize must be/.test(e.message); } })(),
+            "a degenerate face size has no synchronous failure anywhere downstream of this guard -- device.texture() " +
+            "accepts a 0 or negative width/height with no thrown error (WebGPU's own dimension validation is async)");
+    }
+    ok("envFaceSize is NOT checked when sky is \"gradient\" -- the option is meaningless there, not a caller mistake",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, envFaceSize: -1 }); return true; }
+                 catch (e) { return false; } })(),
+        "a caller who never asks for envMap should not be penalized for a leftover or irrelevant envFaceSize value");
+
+    // ---- RTX ROUND 11 -- packAtlasHalfFloat()'s OWN APPLICATION of the half-float codec, checked against a
+    // SEPARATE call site (captureAtlasHalves(), physics/render/specularProbeCapture.mjs) that applies the
+    // IDENTICAL toHalf/fromHalf (text/slugAtlas.js) to the same atlas -- NOT an independently-implemented
+    // codec. *** CORRECTED HERE AFTER A BACKGROUND ADVERSARIAL REVIEW FOUND THE ORIGINAL WORDING OVERCLAIMED
+    // EXACTLY THAT. *** captureAtlasHalves() computes fromHalf(toHalf(x)) with the SAME imported functions
+    // packAtlasHalfFloat() uses, so this is the same deterministic expression evaluated by two independent call
+    // sites, not two different codecs cross-checked -- said plainly rather than left as the misleading original
+    // claim. What it DOES still prove, and is the only thing it needs to: packAtlasHalfFloat() applies toHalf()
+    // to the right values, at the right indices, over the right length -- a wrong scale, a channel swap, a
+    // transposed index, or a length mismatch would diverge from captureAtlasHalves()'s own separate call even
+    // though both ultimately call the identical toHalf(), exactly what the sabotage log above (entry G) demonstrates.
+    // Baked at DEFAULT_ENV_FACE_SIZE (the SAME size makeRtSession's own production path uses), not an
+    // arbitrary smaller size, so the reported texel-channel count matches what a real session actually bakes
+    // (also corrected here: an earlier draft used a hardcoded 8, which does not match either the production
+    // path or the number this round's own backlog entry cites). ----
+    {
+        const capture = captureBaseCubemap(V.envRadianceOf, [0, 0, 0], V.DEFAULT_ENV_FACE_SIZE);
+        const atlas = packCapturedAtlas(capture);
+        const half = V.packAtlasHalfFloat(atlas);
+        const quantized = captureAtlasHalves(atlas);
+        let mismatches = 0;
+        for (let i = 0; i < half.length; i++) if (fromHalf(half[i]) !== quantized.data[i]) mismatches++;
+        say(`packAtlasHalfFloat vs captureAtlasHalves (DEFAULT_ENV_FACE_SIZE=${V.DEFAULT_ENV_FACE_SIZE}): ${mismatches} of ${half.length} texel-channels mismatched`);
+        ok("!! packAtlasHalfFloat() applies the SAME toHalf/fromHalf codec captureAtlasHalves() independently calls on the SAME atlas",
+            half.length === atlas.data.length && mismatches === 0,
+            "a wrong scale, a channel swap, a wrong index, or a length mismatch in packAtlasHalfFloat's own loop " +
+            "would diverge from captureAtlasHalves()'s own separate call even though both reach the identical " +
+            "toHalf() underneath -- NOT a comparison against a differently-implemented codec (both use text/" +
+            "slugAtlas.js's own toHalf/fromHalf), said plainly after a review found the original wording here " +
+            "implied otherwise; the sabotage log above (entry G) shows this still catches exactly the bug class it exists for");
+    }
 }
 
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
@@ -247,6 +334,28 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 session.destroy();
             }
 
+            // ---- 4c. RTX ROUND 11 -- the SAME fabricated cube, through sky:"envMap" (the FIRST production
+            // caller of envMap) -- proves the real device path (the baked atlas uploaded as a real
+            // rgba16float texture, bound BY NAME at "tAtlas") actually executes end to end, not just that the
+            // right JS options are chosen (section 1b's own, GPU-free claim). ----
+            {
+                const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+                const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(positions, indices);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 32, h = 24;
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2, sky: "envMap" });
+                const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
+                for (let i = 0; i < 6; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity;
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; }
+                out.cubeEnvMap = { nan, min, max, frameCount: session.frameCount() };
+                session.destroy();
+            }
+
             // ---- 5. the real GLB -- fetch, parse, BVH, render; informal sanity only (no radiance oracle for a mesh) ----
             {
                 const res = await fetch("/vendor/kenney-city/models/pavement.glb");
@@ -290,7 +399,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -320,6 +429,23 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "selection actually changes the picture, not just \"doesn't crash\"",
         Math.abs(cubeMicrofacet.max - cube.max) > 1e-4 || Math.abs(cubeMicrofacet.min - cube.min) > 1e-4,
         `microfacet range [${cubeMicrofacet.min.toFixed(4)}, ${cubeMicrofacet.max.toFixed(4)}] vs lambertian range ` +
+        `[${cube.min.toFixed(4)}, ${cube.max.toFixed(4)}]`);
+
+    console.log("\n4c. RTX ROUND 11 -- THE SAME FABRICATED CUBE, THROUGH sky:\"envMap\" -- THE FIRST PRODUCTION CALLER OF envMap");
+    say(`accumBuf: ${cubeEnvMap.nan} NaN/Inf, range [${cubeEnvMap.min.toFixed(4)}, ${cubeEnvMap.max.toFixed(4)}], ${cubeEnvMap.frameCount} frames`);
+    REPORT_ROWS.push(["cube, envMap", "unit cube", `${cubeEnvMap.frameCount} frames`,
+        `range [${cubeEnvMap.min.toFixed(4)}, ${cubeEnvMap.max.toFixed(4)}]`]);
+    ok("!! the SAME cube, the baked atlas uploaded as a real rgba16float texture and bound BY NAME, through a REAL WebGPU device -- no NaN, real range",
+        cubeEnvMap.nan === 0 && cubeEnvMap.max > cubeEnvMap.min && cubeEnvMap.min >= 0.0,
+        "proves the WIRING this round adds -- not just the math physics/render/rtPipeline-selfcheck.mjs's own section 12 already " +
+        "proved in isolation -- actually executes end to end on a real device: the atlas this session bakes, half-float-packs, " +
+        "and binds as \"tAtlas\". No upper bound asserted here on purpose -- envRadianceOf's own sun highlight peaks near 6.5, " +
+        "well above the plain gradient's own [0.3,1.0] range, and a sky ray reading that value unclamped is the EXPECTED result, " +
+        "not a defect (presentWgsl's own clamp only applies at the display step, never to accumBuf itself)");
+    ok("!! and reads genuinely DIFFERENT from the plain gradient-sky render of the IDENTICAL cube and camera -- envMap selection " +
+        "actually changes the picture, not just \"doesn't crash\"",
+        Math.abs(cubeEnvMap.max - cube.max) > 1e-4 || Math.abs(cubeEnvMap.min - cube.min) > 1e-4,
+        `envMap range [${cubeEnvMap.min.toFixed(4)}, ${cubeEnvMap.max.toFixed(4)}] vs gradient range ` +
         `[${cube.min.toFixed(4)}, ${cube.max.toFixed(4)}]`);
 
     console.log("\n5. A REAL GLB, THROUGH THE FULL loadMeshBvh -> makeRtSession -> device.frame PATH");
@@ -364,6 +490,12 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "a page that never read the param would still call makeRtSession successfully (material defaults to " +
         "\"lambertian\") and every check above this one would still pass -- this is the one assertion that would " +
         "catch a demo wired to the JS module but never actually reachable from the page's own toggle");
+    ok("!! RTX round 11 -- the page reads a `sky` URL param and passes it into makeRtSession, not just the hardcoded gradient default",
+        /sky.*==.*["']envMap["']|["']envMap["'].*sky/.test(page) &&
+        /sky\s*:\s*SKY/.test(page),
+        "a page that never read the param would still call makeRtSession successfully (sky defaults to " +
+        "\"gradient\") and every check above this one would still pass -- the same shape of gap round 10's own " +
+        "material check exists to catch, extended to the third toggle");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));

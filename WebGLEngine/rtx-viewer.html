@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="RTX viewer">
-<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
+<meta name="demo:desc" content="physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Two skies: a gradient (the default), or a captured environment-map atlas -- an analytic sky baked into a real texture once at load (RTX round 11) -- toggle with the third link. Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two. WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.">
 <meta name="demo:category" content="physics">
 <meta name="demo:swatch" content="&#9651;">
 <title>RTX viewer</title>
@@ -25,7 +25,7 @@
 <div id="hud">
   <div id="cap">RTX viewer</div>
   <div id="be">requesting a WebGPU device&hellip;</div>
-  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a href="/server.html">&larr; back</a></div>
+  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a href="/server.html">&larr; back</a></div>
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
@@ -35,6 +35,7 @@ import { loadMeshBvh, loadCityBvh, makeRtSession, orbitEye } from "/render/rtVie
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
 const toggleEl = document.getElementById("sceneToggle");
 const materialToggleEl = document.getElementById("materialToggle");
+const skyToggleEl = document.getElementById("skyToggle");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 
 // RTX round 5 -- which scene to load, read once at page load (not hot-swapped mid-session: a running WebGPU
@@ -44,14 +45,20 @@ const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 const SCENE = new URLSearchParams(location.search).get("scene") === "city" ? "city" : "tile";
 // RTX round 10 -- same shape, same reason: the pipeline's own generated WGSL text is fixed at session creation
 // (makeRtSession builds one compute pipeline from `material`), so this is a second independent page-reload
-// toggle, not a live material swap. Each toggle's own href preserves the OTHER param, so flipping one never
-// silently resets the other back to its default.
+// toggle, not a live material swap. Each toggle's own href preserves the OTHER params, so flipping one never
+// silently resets the others back to their default.
 const MATERIAL = new URLSearchParams(location.search).get("material") === "microfacet" ? "microfacet" : "lambertian";
-const qs = (scene, material) => "?scene=" + scene + "&material=" + material;
-toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL);
+// RTX round 11 -- a THIRD independent toggle, same shape again: makeRtSession bakes the environment atlas and
+// builds its one fixed compute pipeline at session creation, so this is a third page-reload toggle, not a live
+// sky swap.
+const SKY = new URLSearchParams(location.search).get("sky") === "envMap" ? "envMap" : "gradient";
+const qs = (scene, material, sky) => "?scene=" + scene + "&material=" + material + "&sky=" + sky;
+toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY);
 toggleEl.textContent = SCENE === "city" ? "try the pavement tile" : "try the procedural city";
-materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet");
+materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY);
 materialToggleEl.textContent = MATERIAL === "microfacet" ? "try lambertian" : "try microfacet + energy compensation";
+skyToggleEl.href = qs(SCENE, MATERIAL, SKY === "envMap" ? "gradient" : "envMap");
+skyToggleEl.textContent = SKY === "envMap" ? "try the gradient sky" : "try the captured environment map";
 
 let session = null, mesh = null, device = null;
 let yaw = 0.7, pitch = 0.45, dist = 3, dragging = null, dirty = true;
@@ -89,8 +96,8 @@ async function main() {
     } catch (e) { return fail("loading the mesh threw: " + e.message); }
 
     dist = mesh.bounds.radius * 3.2 + 0.5;
-    session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL });
-    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material`;
+    session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY });
+    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky`;
 
     cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; cvs.setPointerCapture(e.pointerId); });
     addEventListener("pointerup", () => { dragging = null; });

@@ -35,6 +35,8 @@ import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
 import { buildTable } from "../physics/render/energyCompensation.mjs";
+import { captureBaseCubemap, packCapturedAtlas } from "../physics/render/specularProbeCapture.mjs";
+import { toHalf } from "../text/slugAtlas.js";
 
 export const DEFAULT_ALBEDO = Object.freeze([0.68, 0.66, 0.62]);
 // RTX round 10 -- the microfacet material's own demo defaults. Roughness picked mid-range (neither a near-
@@ -42,6 +44,52 @@ export const DEFAULT_ALBEDO = Object.freeze([0.68, 0.66, 0.62]);
 // blending into it); ior 1.5 matches pathTracer.mjs's own dielectric default used throughout rtPipeline's gate.
 export const DEFAULT_ROUGHNESS = 0.35;
 export const DEFAULT_IOR = 1.5;
+// RTX round 11 -- captureBaseCubemap()'s own cost is size*size*6 texel evaluations, each a SINGLE prefilterEnv
+// sample (alpha=0, per its own "collapses to a point sample" doc) -- trivial at any reasonable size, so 32 is
+// picked for a texture that reads as an actual atlas rather than a blocky 8x8, not for speed.
+export const DEFAULT_ENV_FACE_SIZE = 32;
+
+/**
+ * RTX round 11 -- the ANALYTIC sky baked into a texture when `sky:"envMap"` is chosen. The gradient TERM is the
+ * exact same formula physics/render/rtPipeline.mjs's own rtMiss/rtMissRgb compute inline for `gradient:true`
+ * (`0.3 + 0.7*0.5*(d.y+1)`, matching physics/render/pathTracerGpu.mjs's own gradientSky twin) -- but a bare
+ * re-bake of that alone would read as "the same picture, more expensively", not a real demonstration of what an
+ * environment map is FOR. A small, fixed-direction sun highlight is added on top so the baked atlas is visibly
+ * DISTINCT from the gradient it replaces, the same "reads as distinct, not blending into the default" taste
+ * DEFAULT_ROUGHNESS's own comment already states. Purely analytic on purpose, matching the one existing envMap
+ * gate's own precedent (physics/render/rtPipeline-selfcheck.mjs section 12 synthesizes its own atlas from an
+ * analytic radianceOf() the identical way) -- a real capture-from-scene or HDRI-import pipeline is exactly the
+ * "meaningfully more plumbing" rtpipeline-demo-wiring-microfacet-msComp's own closure named as still deferred.
+ */
+const ENV_SUN_DIR = Object.freeze((() => {
+    const v = [0.35, 0.55, 0.3], l = Math.hypot(v[0], v[1], v[2]);
+    return [v[0] / l, v[1] / l, v[2] / l];
+})());
+export function envRadianceOf(pos, dir) {
+    const g = 0.3 + 0.7 * 0.5 * (dir[1] + 1.0);
+    const dot = Math.max(0, dir[0] * ENV_SUN_DIR[0] + dir[1] * ENV_SUN_DIR[1] + dir[2] * ENV_SUN_DIR[2]);
+    const sun = Math.pow(dot, 400) * 6;
+    return [g + sun, g + sun * 0.9, g + sun * 0.75];
+}
+
+/**
+ * The Uint16Array a real GPU texture upload needs for an "rgba16float" binding -- NOT what envMapTexture()'s own
+ * `data` field carries. envMapTexture() (physics/render/rtPipeline.mjs) passes an atlas's raw Float32Array
+ * straight through with a format LABEL, because its one caller (tools/ship/headlessGpu.mjs's
+ * runWgslComputeNative) does its OWN separate half-float conversion before calling gpu.queue.writeTexture --
+ * confirmed by reading that file directly rather than assumed from the label. gfx/device.js's device.texture()
+ * does no such conversion: WebGPU's writeTexture copies raw bytes (8 bytes/texel for rgba16float, so a
+ * Float32Array would upload its OWN 4-byte-per-channel bit pattern into a 2-byte-per-channel slot, reading back
+ * as ~4 billion times too large or a subnormal near-zero, not merely imprecise) and WebGL2's HALF_FLOAT texImage2D
+ * path requires the SAME already-packed half-float bits. text/slugAtlas.js's toHalf() is the canonical codec
+ * (headlessGpu.mjs's own comment: its CPU reference "is graded against text/slugAtlas.js's toHalf/fromHalf
+ * specifically") -- reused here rather than re-derived.
+ */
+export function packAtlasHalfFloat(atlas) {
+    const half = new Uint16Array(atlas.data.length);
+    for (let i = 0; i < atlas.data.length; i++) half[i] = toHalf(atlas.data[i]);
+    return half;
+}
 
 /**
  * Axis-aligned bounds of a bvhBuffersFromMesh() result. Node 0 is always the BVH's root, and the root's own
@@ -167,21 +215,51 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * multiscatter-energy-compensation's own round completed the material's story with, and a demo page choosing
  * between three material buttons is more surface than this round's scope asks for -- see this round's own
  * backlog entry for why envMap (the OTHER capability task #142 names) is deferred rather than added here too.
+ *
+ * `sky` (RTX round 11, default "gradient") is that deferral closed: the FIRST production caller of `envMap`,
+ * orthogonal to `material` (envMap composes freely with both rgb and microfacet -- pipelineWgsl() itself throws
+ * only on envMap+gradient together, never envMap+rgb or envMap+microfacet). Left at its default, BYTE-IDENTICAL
+ * WGSL and uniforms to before this round, the same rule `material` above already holds to. `sky:"envMap"` bakes
+ * a small analytic sky (envRadianceOf(), this file's own JS twin of rtMiss's inline gradient formula plus a
+ * fixed-direction sun highlight so the baked result reads as visibly distinct from the gradient it replaces)
+ * into a real texture, ONCE at session creation -- see envRadianceOf's own doc above for why this is analytic
+ * rather than a real scene capture or HDRI import, matching the one existing envMap gate's own precedent.
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
-                                          material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR }) {
+                                          material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
+                                          sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
+    if (sky !== "gradient" && sky !== "envMap") throw new Error(
+        "rtViewer: sky must be \"gradient\" or \"envMap\", got " + sky);
     const { bvh } = mesh;
     const floats = w * h * 3;
     const isMicrofacet = material === "microfacet";
+    const isEnvMap = sky === "envMap";
+    // A background adversarial review found this specific numeric option needed a guard `roughness`/`ior`
+    // do not: those two feed into an otherwise well-formed (if numerically implausible) material regardless of
+    // value, but captureBaseCubemap/packSpecularAtlas do NO validation of `size` at all -- 0, a negative
+    // number, or a non-integer each silently produce a zero-length or ragged atlas (confirmed by direct trace:
+    // size=0 -> {width:0,height:0,data.length:0}; size=-4 -> {width:0,height:-4,data.length:0}; size=3.5 ->
+    // {width:21,height:3.5,data.length:294}), which device.texture() then accepts with no SYNCHRONOUS error at
+    // all (WebGPU's own dimension validation is async, via error scopes) -- the exact silent-failure shape the
+    // `sky must be...` throw two lines above exists to prevent for its own sibling option.
+    if (isEnvMap && !(Number.isInteger(envFaceSize) && envFaceSize > 0)) throw new Error(
+        "rtViewer: envFaceSize must be a positive integer, got " + envFaceSize);
     // Built once, at session creation, from `roughness` alone -- msComp is unconditional whenever `material`
     // is "microfacet" (see this function's own doc above on why there is no separate toggle for it).
     const msTable = isMicrofacet ? buildTable(roughness, { K: 24 }) : null;
+    // RTX round 11 -- the SAME one-time-bake shape buildTable() above already established: a real, gated
+    // capability (physics/render/rtPipeline.mjs's own envMap option, RTX round 7) with no production caller
+    // until now. `sky:"envMap"` supersedes `gradient`'s own effect exactly the way `material:"microfacet"`
+    // already supersedes `rgb`'s -- pipelineWgsl() itself throws on envMap+gradient together (round 7's own
+    // "two different sky sources" refusal), so the two cannot both reach the generated WGSL at once.
+    const envAtlas = isEnvMap ? packCapturedAtlas(captureBaseCubemap(envRadianceOf, [0, 0, 0], envFaceSize)) : null;
+    const useGradient = isEnvMap ? false : gradient;
 
     const rtPipe = device.compute({ wgsl: isMicrofacet
-        ? pipelineWgsl({ bvh: true, gradient, microfacet: "bsdf", msComp: true })
-        : pipelineWgsl({ bvh: true, rgb: true, gradient }) });
+        ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: "bsdf", msComp: true, envMap: isEnvMap })
+        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
     const boundsBuf = device.buffer({ usage: "storage", data: bvh.bounds });
@@ -198,6 +276,12 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // one pipeline-level storage buffer -- see sbtRecord's own doc on why this is shared rather than per-record).
     const msBuf = isMicrofacet ? device.buffer({ usage: "storage", data: Float32Array.from(msTable.E) }) : null;
     if (msBuf) rtPipe.bind("msE", msBuf);
+    // The captured environment atlas, bound as a REAL texture (gfx/device.js's own NAME-based bindTexture(),
+    // not device.buffer()'s storage-binding path msE above uses) -- "tAtlas" is rtPipeline.mjs's own WGSL
+    // binding name at ENV_BINDING, read verbatim from its @group(0)@binding(n) var declaration, not invented.
+    const envTex = isEnvMap ? device.texture({ width: envAtlas.width, height: envAtlas.height,
+        format: "rgba16float", data: packAtlasHalfFloat(envAtlas) }) : null;
+    if (envTex) rtPipe.bindTexture("tAtlas", envTex);
 
     const accumPipe = device.compute({ wgsl: accumulateWgsl(floats) });
     const accumBuf = device.buffer({ usage: "storage", size: floats * 4 });
@@ -229,7 +313,11 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
                 bvh: isMicrofacet
                     ? { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "microfacet", roughness, ior, msTable }
                     : { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo },
-                ...(isMicrofacet ? { microfacet: "bsdf", msComp: true } : {}) }));
+                ...(isMicrofacet ? { microfacet: "bsdf", msComp: true } : {}),
+                // pipelineUniforms's own `envMap` option takes the ATLAS OBJECT itself (matching `bvh`'s own
+                // "take the descriptor" convention), not a boolean -- `isEnvMap` decides whether it is passed
+                // at all, the SAME single flag pipelineWgsl's own envMap option above was built from.
+                ...(isEnvMap ? { envMap: envAtlas } : {}) }));
             fBuf.write(new Float32Array([frame, 0, 0, 0]));
             return device.frame(({ pass }) => {
                 pass.dispatch(rtPipe, rayWg);
@@ -243,6 +331,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
         destroy() {
             const buffers = [outBuf, uBuf, boundsBuf, metaBuf, orderBuf, trisBuf, accumBuf, fBuf];
             if (msBuf) buffers.push(msBuf);
+            if (envTex) buffers.push(envTex);
             for (const b of buffers) { try { b.destroy(); } catch (e) {} }
         },
     });
