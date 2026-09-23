@@ -248,10 +248,14 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
-        declS === 3 && readSe === 3 && readC === 2 && readSw === 1 && igAt === 6 && igMist === 2,
+        declS === 3 && readSe === 3 && readC === 7 && readSw === 1 && igAt === 6 && igMist === 2,
         `settled ${readSe} readers -- the shared interior factor, comet's headBright and droplet's coreBright, ` +
-        `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} -- the ` +
-        `shell and the mist pair's pre-multiply; sweep ${readSw} -- the shell alone. The shell itself is ` +
+        `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
+        `v4658 and 2 before it -- the shell, the mist pair's pre-multiply, and the five v4658 added: the ` +
+        `shared interior BRIGHTENING beside the settle, opal's and sol's and chorus's saturations, and sol's ` +
+        `core gain. SIX SPECIES MOVED ZERO BYTES AT THE PEAK OF THEIR OWN SUCCESS STATE until that round, ` +
+        `because kit.ts's "every species multiplies its own interior energy by (1 + complete)" had no reader ` +
+        `here at all; sweep ${readSw} -- the shell alone. The shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
         `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
         `times with four numbers changed; this file writes them once and reads the numbers from MH_IGNITE.`);
@@ -366,7 +370,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const driveDecl = (code.match(/const DRIVE = /g) || []).length;
     ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 3 && readC === 2 && readSw === 1 && driveDecl === 1 && drive - 1 >= 10,
+        readSe === 3 && readC === 7 && readSw === 1 && driveDecl === 1 && drive - 1 >= 10,
         `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
         `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
         `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +

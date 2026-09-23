@@ -8070,6 +8070,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4658 -- THE 341st CLOSING: the half of the SUCCESS flash that is not the shell, and the six species
+    // that reached the peak of their own success state without moving a byte.
+    since340: Object.freeze({
+        at: "v4658", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurComplete-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 2,969 ms on this box, 11 rows in four sections over four rendered species. " +
+                 "*** kit.ts: \"The light in a success is NOT an overlay: every species multiplies its own " +
+                 "interior energy by (1 + complete), which brightens exactly what is already there and " +
+                 "leaves the dark dark.\" v4644 PORTED THE SHELL AND NOT THAT SENTENCE. *** Measured on real " +
+                 "pixels at stateTau 0.360, where mh_state's complete is exactly 1.0 and settled exactly 0: " +
+                 "limn, arc, aura, flux, sol and chorus each moved 0 of 9,216 bytes between the start of " +
+                 "their own SUCCESS state and its brightest instant. The flash was computed, sent to the " +
+                 "shader as a uniform, and spent by nobody. " +
+                 "AFTER: limn x3.74 of interior light, flux x4.33, chorus x3.88, sol x2.22 -- all four read " +
+                 "x1.000 at HEAD on the same frames. " +
+                 "*** THE FOUR ON THE SHARED INTERIOR LINE ARE FOUND BY A RULE AND NOT BY A LIST: *** every " +
+                 "one of murmur's eighteen species ends its interior with (1 + S * st.settled), and exactly " +
+                 "four of those eighteen lines also carry a complete factor -- limn 1.60, arc 0.90, aura " +
+                 "0.45, flux 0.75. A site belongs in MH_COMPLETE_INTERIOR if and only if its complete factor " +
+                 "sits on the same source line as its settled factor, which a census can check. The table is " +
+                 "a strict SUBSET of MH_SETTLED_INTERIOR and the gate asserts that. " +
+                 "*** AND THREE SPECIES SATURATE WHERE FOUR SCALE, WHICH IS THE OPPOSITE OPERATION. *** " +
+                 "opal's flashes, sol's prominences and chorus's voices are pulled toward a target -- " +
+                 "mix(life, target, complete * k) -- so the differences between them CLOSE: two figures " +
+                 "4.00x apart come out 1.09x apart, where a gain leaves the ratio at exactly 4.00. chorus " +
+                 "alone overshoots, toward 1 + 0.45*complete, because its subject is an ensemble arriving " +
+                 "together and going past full is how that reads as louder than its parts. " +
+                 "THIRTEEN SABOTAGES, ALL CAUGHT, THREE ONLY AFTER REPAIR. *** A PIXEL ROW ABOUT THE DARK " +
+                 "STAYING DARK WAS WRITTEN AND DELETED: *** it read a worst rise of 0.0 counts on all four " +
+                 "species and the population it read that from was ZERO -- every pixel at or below 6 of 255 " +
+                 "was OUTSIDE the silhouette, and it would have passed forever while measuring the paper " +
+                 "behind the orb. The claim is arithmetic and is graded as arithmetic. sol's 0.55 core gain " +
+                 "was invisible because at the roster's default glow its disc is SATURATED (2.0937 against " +
+                 "2.0916 across the flash, a ratio of 0.999); sol is rendered at glow 0.25 now, where the " +
+                 "same core reads x2.56, and has its own row. And the shader twin of the saturation, " +
+                 "rewritten as a GAIN, walked through every pixel row in the round -- because a gain " +
+                 "brightens too -- until mh_complete_lift went into the kit probe's alpha channel on " +
+                 "chorus's overshooting pair, which is where a saturation and a gain part company.",
+    }),
     // v4657 -- THE 340th CLOSING: the two rates this tree recorded as out of reach, one of them because a
     // record said the host could not see a signal it had been keeping all along.
     since339: Object.freeze({

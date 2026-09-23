@@ -931,6 +931,65 @@ export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
     Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
 
 /**
+ * *** THE OTHER HALF OF THE SUCCESS FLASH: IT BRIGHTENS WHAT IS ALREADY THERE -- v4658. ***
+ *
+ * kit.ts: "The light in a success is NOT an overlay: every species multiplies its own interior energy by
+ * (1 + complete), which brightens exactly what is already there and leaves the dark dark." v4644 ported the
+ * SHELL -- the gaussian ring that travels out along `sweep` -- and MH_IGNITE's own note says the rest spend
+ * `complete` on their own figures. What neither said is that FOUR of them spend it at the ONE SITE ALL
+ * EIGHTEEN INTERIORS PASS THROUGH, right beside the settle:
+ *
+ *     interior = acc.x * GAIN * b.m * mh_transmit(b.fres) * (1.0 + K * st.complete) * (1.0 + S * st.settled)
+ *
+ * and this port had the second factor and not the first. Counted in murmur's own eighteen files, exactly the
+ * four below carry a complete factor on that line, and every other `st.complete` in the roster is somewhere
+ * else -- a shell, a per-figure saturation, or a brightness of its own. THE RULE IS CHECKABLE RATHER THAN
+ * REMEMBERED: the shared interior line is the one carrying `(1 + S * st.settled)`, so a site belongs here if
+ * and only if its complete factor sits on that same line. tools/ship/murmurComplete-selfcheck.mjs holds it.
+ *
+ * A MISSING KEY AND NOT A ZERO, for MH_SETTLED_INTERIOR's reason: a table with fourteen zeroes in it reads
+ * as "these species were considered and given nothing", which is false -- they spend their flash elsewhere.
+ */
+export const MH_COMPLETE_INTERIOR = Object.freeze({
+    limn: 1.60, arc: 0.90, aura: 0.45, flux: 0.75,
+});
+
+/**
+ * *** THE SATURATION: A FIGURE THAT IS PULLED TOWARD FULL RATHER THAN SCALED. ***
+ *
+ * Three species spend `complete` on a per-figure LIFE rather than on the interior, and all three spell it as
+ * the same mix:
+ *
+ *     life = mix(life, target, st.complete * k)
+ *
+ * which is a saturation and not a gain: at complete = 1 the figure IS the target whatever it was before, so
+ * a flash makes every flash/prominence/voice arrive together and the differences between them close. That is
+ * the opposite of the interior factor above, which preserves every difference and scales them all.
+ *
+ * *** chorus's TARGET OVERSHOOTS AND THE OTHER TWO DO NOT, which is the one number here worth reading twice.
+ * *** opal and sol mix toward 1.0; chorus mixes toward 1.0 + 0.45 * st.complete, so its seven voices go PAST
+ * full at the peak of the flash. chorus.ts is the one species licensed a rhythm and the one whose subject is
+ * an ensemble arriving together -- overshooting is how the arrival reads as louder than the parts.
+ */
+export const MH_COMPLETE_LIFT = Object.freeze({
+    opal:   Object.freeze({ k: 0.85, over: 0.00 }),
+    sol:    Object.freeze({ k: 0.85, over: 0.00 }),
+    chorus: Object.freeze({ k: 0.90, over: 0.45 }),
+});
+
+/** sol's SECOND complete, on the core's brightness rather than a figure -- sol.ts line 91. */
+export const MH_COMPLETE_SOL_CORE = 0.55;
+
+/**
+ * The saturation itself, so the three callers share one spelling and there is a pair to grade. `over` is
+ * chorus's overshoot and is 0 for the other two, which makes the target 1.0 exactly.
+ */
+export function mhCompleteLift(x, complete, k, over) {
+    const t = 1.0 + over * complete;
+    return x + (t - x) * (complete * k);
+}
+
+/**
  * *** THE IGNITION SHELL: A GAUSSIAN RING THAT LEAVES THE HEART AND REACHES THE SURFACE. ***
  *
  * kit.ts: "`sweep` is the same window read as a POSITION, 0 to 1 over 0.95 s, and it is what each species runs

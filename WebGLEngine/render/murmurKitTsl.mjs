@@ -556,6 +556,15 @@ export function makeMurmurKitTsl(TSL) {
     // removing its floor, flattening its four periods into one and swapping sin squared for a bare sine ALL
     // passed every row in the tree.
 
+    /**
+     * *** THE SUCCESS FLASH's SATURATION -- v4658. *** See render/murmurKit.mjs's MH_COMPLETE_LIFT: three
+     * species pull a per-figure LIFE toward full rather than scaling it, mix(life, target, complete * k),
+     * and chorus's target overshoots past 1 while opal's and sol's do not. A saturation closes the
+     * differences between figures; the interior factor beside the settle preserves them. Both are the flash.
+     */
+    const mhCompleteLift = Fn(([x, complete, k, over]) =>
+        mix(x, float(1.0).add(over.mul(complete)), complete.mul(k)));
+
     /** ONE OF opal's FOUR LIVES. sin SQUARED for flat ends, on a floor of 0.16 -- nothing ever switches on. */
     const mhOpalLife = Fn(([k, t]) => {
         const per = float(14.3).add(k.mul(2.7));
@@ -662,7 +671,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot,
+        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };
@@ -741,8 +750,15 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
                                        float(0.0), float(0.0), float(0.0)).toVar();
             const slotPD = K.mhAbyssSlot(float(0.6), float(0.0), px.div(n),
                                          TSL.floor(py.div(n).mul(3.0)).mul(0.5), float(0.0)).toVar();
+            // *** AND THE ALPHA CHANNEL CARRIES THE SUCCESS FLASH's SATURATION -- v4658. *** x is the figure
+            // going in (0 to 1.5, so it spans BELOW and ABOVE the target) and y is `complete` (0 to 1).
+            // chorus's pair is the one probed because it is the only one whose target OVERSHOOTS, which is
+            // where a saturation and a gain part company most clearly -- and a sabotage that rewrote this
+            // Fn as x * (1 + complete * k) walked through every pixel row in the round, because a gain
+            // brightens too. The per-species constants are a source census; the FUNCTION is this.
+            const lift = K.mhCompleteLift(px.div(n).mul(1.5), py.div(n), float(0.90), float(0.45)).toVar();
             return vec4(clamp(life, 0.0, 1.0), clamp(slot.div(32.0), 0.0, 1.0),
-                        clamp(slotPD.div(32.0), 0.0, 1.0), 1.0);
+                        clamp(slotPD.div(32.0), 0.0, 1.0), clamp(lift.div(2.0), 0.0, 1.0));
         }
         if (mode === "surface") {
             // *** mh_surface OVER A WHOLE SPHERE, AGAINST THE CPU REFERENCE. *** The frame spans -1.2..1.2 in

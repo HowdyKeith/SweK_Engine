@@ -26,6 +26,69 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4658 -- the flash brightens what is already there, and six species were not flashing at all
+
+`kit.ts`, on the whole family's arrival:
+
+> The light in a success is NOT an overlay: every species multiplies its own interior energy by
+> (1 + complete), which brightens exactly what is already there and leaves the dark dark.
+
+v4644 ported the **shell** — `mh_ignite`'s gaussian ring travelling out along `sweep` — and gave seven species
+an `MH_IGNITE` entry. It did not port that sentence.
+
+So at `stateTau` 0.360, where `mh_state`'s `complete` is exactly 1.0 and `settled` exactly 0, **six species
+moved 0 of 9,216 bytes** between the start of their own SUCCESS state and its brightest instant: limn, arc,
+aura, flux, sol and chorus. The flash was computed, handed to the shader as a uniform, and spent by nobody.
+
+| | at HEAD | after |
+|---|---|---|
+| limn | ×1.000 | **×3.74** |
+| flux | ×1.000 | **×4.33** |
+| chorus | ×1.000 | **×3.88** |
+| sol | ×1.000 | **×2.22** |
+
+**The four on the shared interior line are found by a rule, not a list.** Every one of murmur's eighteen
+species ends its interior with `(1 + S · st.settled)` — the factor this port has carried since v4644 — and
+exactly four of those eighteen lines *also* carry a complete factor: limn 1.60, arc 0.90, aura 0.45, flux
+0.75. A site belongs in `MH_COMPLETE_INTERIOR` if and only if its complete factor sits on the same source
+line as its settled factor, which makes the table a strict subset of `MH_SETTLED_INTERIOR` — and the gate
+asserts that rather than the list.
+
+**Three species saturate where four scale, and that is the opposite operation.** opal's flashes, sol's
+prominences and chorus's voices are each pulled *toward* a target — `mix(life, target, complete · k)` — so the
+differences between them **close**: two figures 4.00× apart come out 1.09× apart, where a gain leaves the
+ratio at exactly 4.00. chorus alone overshoots, toward `1 + 0.45·complete`, because its subject is an ensemble
+arriving together and going past full is how that reads as louder than its parts. One spelling for all seven
+would have been wrong about six species in two different directions.
+
+Thirteen sabotages, all caught, three only after repair — and all three were the instrument, not the code.
+
+**A pixel row about the dark staying dark was written here and deleted.** It read a worst rise of 0.0 counts on
+all four species, and the population it read that from was **zero**: every pixel at or below 6 of 255 was
+*outside* the silhouette. It would have passed forever while measuring the paper behind the orb. The claim is
+arithmetic — a multiply cannot create light where there was none — and is graded as arithmetic.
+
+**sol's 0.55 core gain was invisible because its disc is saturated.** At the roster's default glow the core
+reads 2.0937 before the flash and 2.0916 after, a ratio of 0.999: the pixels are already at the top of the
+range. A sabotage deleting that gain walked through, because the lift on the prominences carried the row on
+its own. sol renders at glow 0.25 now, where the same core reads ×2.56, and it has a row of its own. A frame
+where the subject is clipped is not a measurement of the subject.
+
+**And the shader twin of the saturation, rewritten as a gain, walked through every pixel row in the round** —
+because a gain brightens too. `mh_complete_lift` is in the kit probe's alpha channel now, on chorus's
+overshooting pair, which is exactly where a saturation and a gain part company.
+
+`tools/ship/murmurComplete-selfcheck.mjs` arrives green at 2,969 ms, so the tree holds 1766 gates.
+
+**Where the port stands, measured rather than recalled** — because that question was asked and the last three
+rounds each found a record that was wrong. murmur's kit has 41 functions and 40 are ported; the one missing is
+`mh_out`'s triangular-PDF dither. `live.pace`, `live.voice` and `st.drive` are essentially complete after the
+clock arc. `st.settled`'s 19 sites are collapsed onto the 3 shapes they take. **`st.complete` is the large
+one**: 47 sites in murmur, of which this round takes 8 — what remains is eight per-species ignition *figures*
+(arc on its filament, aura on a von Mises following the sweep round its ribbons, geode a flat `lit += 0.70`)
+plus about a dozen singles. `st.sweep` is 15 sites and the port has 1, and those same eight figures are where
+the other fourteen live — so sweep and complete are one job rather than two.
+
 ## v4657 -- the two rates the records gave up on, one of which was never out of reach
 
 `murmurClock-selfcheck.mjs` had carried this sentence for three rounds:

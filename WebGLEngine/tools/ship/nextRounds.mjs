@@ -987,6 +987,34 @@ export const NEXT_ROUNDS = [
             "and mix(4.3, 7.4, small)), and five builders covering six species still have no cadence at " +
             "all -- droplet, opal, mist, fathom, geode. That count has moved in each of the last four " +
             "rounds, from eight species to twelve, and every step was an absence being filled.",
+        note7: "*** st.complete IS THE LARGEST REMAINING GAP AND v4658 TOOK 8 OF ITS 47 SITES. *** The " +
+            "measurement that found it: at stateTau 0.360, where mh_state's complete is exactly 1.0 and " +
+            "settled exactly 0, SIX SPECIES MOVED ZERO OF 9,216 BYTES between the start of their own SUCCESS " +
+            "state and its brightest instant -- limn, arc, aura, flux, sol and chorus. v4644 ported the " +
+            "ignition SHELL and MH_IGNITE's note said the rest \"spend complete on their own figures\", " +
+            "which is true and was read as though it meant there was nothing shared left.\n\n" +
+            "WHAT v4658 TOOK: the four species whose complete factor sits on the SHARED INTERIOR LINE beside " +
+            "the settle (limn 1.60, arc 0.90, aura 0.45, flux 0.75 -- a rule, not a list: it is the line " +
+            "carrying (1 + S * st.settled), so the table is a strict subset of MH_SETTLED_INTERIOR), the " +
+            "three SATURATIONS (opal's lives, sol's prominences, chorus's voices, mix(x, target, complete*k), " +
+            "chorus's target alone overshooting past full), and sol's 0.55 core gain.\n\n" +
+            "*** WHAT IS LEFT OF st.complete, WHICH IS THE NEXT ROUND OR TWO: *** EIGHT per-species ignition " +
+            "FIGURES, none of them MH_IGNITE's one shape -- comet, fathom, geode, arc, aura, flux, prism and " +
+            "helix. arc puts a gaussian on its FILAMENT, aura a von Mises on the ANGLE that follows st.sweep " +
+            "round its ribbons, geode a flat lit += complete * 0.70 with no gaussian at all, helix " +
+            "complete * (0.35 + 2.10 * exp(-sr*sr)), fathom a per-shell weight (0.5 + 2.4*w). Then the " +
+            "singles: still's glint brightness 0.85, comet's head 2.2, droplet's 0.26, limn's ring " +
+            "(complete * band * 1.20) and its SECOND interior 0.9, duet's flare 1.15 and its one SHRINK " +
+            "(1 - 0.62*complete), chorus's sync 0.55, prism's 1.10.\n\n" +
+            "*** AND THE MEASURED STATE OF THE WHOLE PORT, so the next reader does not have to re-derive it: " +
+            "*** murmur's kit has 41 functions and 40 are ported -- the one missing is mh_out's " +
+            "triangular-PDF dither, recorded elsewhere. live.pace, live.voice and st.drive are essentially " +
+            "complete after the clock arc v4653-v4657. st.settled is 19 sites collapsed onto the 3 shapes " +
+            "they take. st.sweep is 15 sites and the port has 1, which is the shell -- and the eight " +
+            "ignition figures above are where the other fourteen live, so sweep and complete are ONE job " +
+            "rather than two. Named absences outside that: opal's flash-drift live terms, geode's drive " +
+            "mix, tempest's bolt `small` mix, and five builders (droplet, opal, mist, fathom, geode) with " +
+            "no cadence at all.",
         blocked: "NOT BLOCKED, BUT READ THIS FIRST -- v4650 found what st.drive is about to walk into. " +
             "The largest family of drive's 45 sites is RATE: sixteen of the eighteen species multiply a " +
             "local clock by (1 + k * st.drive), k from 0.35 to 1.70, and hand the product to mh_drift -- " +

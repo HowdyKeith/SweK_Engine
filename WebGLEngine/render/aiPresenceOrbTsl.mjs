@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -833,7 +833,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const fk = k;
             // THE LIFE comes from the kit, where the CPU twin can grade it. sin squared for flat ends, on a
             // floor of 0.16 so nothing ever switches on.
-            const life = KIT.mhOpalLife(float(fk), uniforms.time).toVar();
+            // opal.ts pulls each flash toward FULL on the flash: life = mix(life, 1.0, st.complete * 0.85).
+            // A saturation, not a gain -- at the peak the four lives arrive together whatever they were.
+            const life = KIT.mhCompleteLift(KIT.mhOpalLife(float(fk), uniforms.time), COMPLETE,
+                float(MH_COMPLETE_LIFT.opal.k), float(MH_COMPLETE_LIFT.opal.over)).toVar();
             // THE WANDER: three incommensurate rates per flash, so each traces its own slow closed-ish path.
             const c = vec3(sin(opalDrift.mul(uniforms.time).mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
                            sin(opalDrift.mul(uniforms.time).mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
@@ -1571,8 +1574,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 .mul(KIT.mhNoise3(sp3.mul(SO.granScale).add(vec3(float(0.0), float(0.0),
                     uniforms.time.mul(float(SO.granRateB).add(PACE.mul(SO.granRateK))))))))
                 .toVar();
+            // sol.ts line 91 gives the core a SECOND complete, beside its voice: a gain on the brightness
+            // itself, where the lift above is a saturation on each prominence.
             const coreE = disc.mul(gran).mul(float(SO.coreB).add(coronaK.mul(SO.coreK))
-                .mul(float(1.0).add(VOICE.mul(SO.coreVoice)))).toVar();
+                .mul(float(1.0).add(VOICE.mul(SO.coreVoice)))
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SOL_CORE)))).toVar();
 
             const coronaW = float(SO.coronaWB).add(coronaK.mul(SO.coronaWK))
                 .mul(float(1.0).add(VOICE.mul(SO.coronaWVoice))).toVar();
@@ -1592,7 +1598,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 const wk = k < 2 ? float(1.0).toVar() : pairB;
                 const per = SO.perB + SO.perK * k;
                 const sn = sin(uniforms.time.mul(2 * Math.PI / per).add(k * 2.13)).toVar();
-                const lift = sn.mul(sn).toVar();
+                // sol.ts: lift = mix(lift, 1.0, st.complete * 0.85) -- the same saturation opal uses, on the
+                // prominences rather than the flashes.
+                const lift = KIT.mhCompleteLift(sn.mul(sn), COMPLETE,
+                    float(MH_COMPLETE_LIFT.sol.k), float(MH_COMPLETE_LIFT.sol.over)).toVar();
                 const a1 = uniforms.time.mul(SO.rootA1 + SO.rootA1K * k).add(k * SO.rootPh1).toVar();
                 const a2 = uniforms.time.mul(SO.rootA2 + SO.rootA2K * k).add(k * SO.rootPh2).toVar();
                 // sol's tumbling root direction, leaned under drive. Its wander IS exactly unit already --
@@ -2079,7 +2088,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 const phase = mix(float(k * CH.phaseStep), float(0.0), sync).mul(2 * Math.PI).toVar();
                 const sn = sin(uniforms.time.mul(2 * Math.PI).div(max(per, float(1e-3))).add(phase)).toVar();
                 const life = float(1.0).sub(breathe).add(breathe.mul(sn).mul(sn)).toVar();
-                const lifeF = life.add(select(flC.z.mul(6.999).floor().equal(float(k)), flC.x.mul(0.85), float(0.0))).toVar();
+                // chorus.ts: life = mix(life, 1.0 + 0.45 * st.complete, st.complete * 0.9) -- the one target
+                // in the roster that goes PAST full, so the seven voices overshoot together at the peak.
+                const lifeF = KIT.mhCompleteLift(
+                    life.add(select(flC.z.mul(6.999).floor().equal(float(k)), flC.x.mul(0.85), float(0.0))),
+                    COMPLETE, float(MH_COMPLETE_LIFT.chorus.k), float(MH_COMPLETE_LIFT.chorus.over)).toVar();
 
                 const to = c.sub(P).toVar();
                 const s = dot(to, rd).toVar();
@@ -2414,7 +2427,19 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // this line used to be and gave droplet its settle twice with nothing red.
         const settleK = MH_SETTLED_INTERIOR[species] ?? 0.0;
         const settleF = settleK === 0.0 ? float(1.0) : float(1.0).add(SETTLED.mul(settleK));
-        const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).mul(settleF).toVar();
+        // *** AND THE FLASH's OWN FACTOR, ON THE SAME LINE -- v4658. *** kit.ts: "The light in a success is
+        // NOT an overlay: every species multiplies its own interior energy by (1 + complete), which
+        // brightens exactly what is already there and leaves the dark dark." v4644 ported the travelling
+        // SHELL and this factor was missed, because MH_IGNITE's note said the species outside its table
+        // "spend complete on their own figures instead" -- true of most of them, and not of these four,
+        // which spend it HERE, one line along from the settle this file already carried.
+        //
+        // THE FOUR ARE NOT A CHOICE: they are exactly the species whose complete factor sits on the same
+        // source line as their settled factor in murmur, which is a rule a census can check rather than a
+        // list somebody drew up. A MISSING KEY and not a zero, for MH_SETTLED_INTERIOR's reason.
+        const compK = MH_COMPLETE_INTERIOR[species] ?? 0.0;
+        const compF = compK === 0.0 ? float(1.0) : float(1.0).add(COMPLETE.mul(compK));
+        const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).mul(compF).mul(settleF).toVar();
         const railE = interior.add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
         // *** THE HUE ARGUMENT WAS ZERO UNTIL v4631, AND THIS NOTE STAYED PAST ITS OWN REPAIR. *** It read
         // "THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP" -- true when written, and contradicted

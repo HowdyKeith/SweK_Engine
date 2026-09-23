@@ -1236,7 +1236,13 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
             // shader twin was missing both of them and this frame graded them at zero in every pixel.
             const wantPD = Math.round(Math.min(1, Math.max(0,
                 K.abyssSlot(0.6, 0, x / N, Math.floor((y / N) * 3) * 0.5, 0) / 32)) * 255);
+            // ...and the SUCCESS flash's saturation in alpha: x is the figure, y is complete, on chorus's
+            // overshooting pair. See the probe's own note -- a gain and a saturation both brighten, so a
+            // pixel row about a species cannot tell them apart and this one can.
+            const wantLift = Math.round(Math.min(1, Math.max(0,
+                K.mhCompleteLift((x / N) * 1.5, y / N, 0.90, 0.45) / 2)) * 255);
             const dL = Math.abs(oa[i] - wantLife), dS = Math.abs(oa[i + 1] - wantSlot);
+            wSlot = Math.max(wSlot, Math.abs(oa[i + 3] - wantLift));
             if (dL > wLife) { wLife = dL; atL = `k=${kk} t=${tt.toFixed(1)}: gpu ${oa[i]} cpu ${wantLife}`; }
             wSlot = Math.max(wSlot, Math.max(dS, Math.abs(oa[i + 2] - wantPD)));
         }
@@ -1245,7 +1251,8 @@ sec("10. *** opal's FOUR LIVES AND abyss's CLOCKS: the two species whose subject
             wLife <= 2 && wSlot <= 2,
             `worst channel error ${wLife} of 255 on the life across four flashes and 24 seconds, and ${wSlot} ` +
             `on the slot across the whole rarity range at three voices AND across the whole cadence range at `+
-            `three drives -- all four of its signal inputs, after v4656 found the shader twin carrying two `+
+            `three drives -- all four of its signal inputs -- and mh_complete_lift's saturation over the figure `+
+            `and the flash, on chorus's overshooting pair. After v4656 found the shader twin carrying two `+
             `of them and this frame sweeping neither. Worst life at ${atL}. This is the row ` +
             `that makes the four CPU rows above mean anything about the PICTURE: without it they describe a ` +
             `reference implementation nothing draws, which is the shape v4632's sabotage sweep caught when ` +

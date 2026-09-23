@@ -666,8 +666,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 3,135 on this box, which against a murmurKit measuring 2,861 here and RECORDED at 2,035 (drift 1.41)
     // is about 2,230 recorded. Computing the same 21 walks twice was a tenth of the budget spent on
     // arithmetic already done, which is a cheaper thing to find than a second gate file.
-    gates: 1765, usesOk: 1744, definesOk: 1736, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1637, condFirst: 96, unknownSignature: 11,
+    // v4658 -- RE-TAKEN 1765 -> 1766 for tools/ship/murmurComplete-selfcheck.mjs. ONE gate, and it renders
+    // FOUR species of the seven the round touched: each is a WGSL compile, seven measured 4,373 ms against a
+    // 3,000 ms ceiling and four measure 2,969. The three left out are not dropped -- arc and aura are carried
+    // by the source census in section 3, and opal was already moving before this round because it has an
+    // ignition shell. What the four are chosen FOR is stated where they are listed: the two largest gains,
+    // the one overshoot, and the species carrying both shapes at once.
+    gates: 1766, usesOk: 1745, definesOk: 1737, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1638, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
