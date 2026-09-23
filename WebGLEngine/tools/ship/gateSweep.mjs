@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4673 -- THE 283rd CLOSING: the first thing in this tree that is not FSR2.
+    since358: Object.freeze({
+        at: "v4673", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/opticalFlow-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2 IS GIVEN THE APPLICATION'S MOTION VECTORS AND TRUSTS THEM; FSR3 CANNOT. *** Frame " +
+                 "generation needs to know where the PICTURE went, not where the GEOMETRY went -- a shadow " +
+                 "sliding across a wall, a reflection tracking in a mirror, a scrolling texture: the " +
+                 "surface did not move, the vector is zero, and an interpolated frame built on it holds the " +
+                 "shadow still while everything slides around it. render/opticalFlow.mjs estimates a second " +
+                 "field from COLOUR: a pyramidal block matcher, which is what FSR3's optical flow is. " +
+                 "*** AND IT IS WHAT v4668's LUMINANCE PYRAMID WAS BUILT FOR. *** That round shipped FSR2's " +
+                 "mip chain with no caller -- the exposure it drives multiplies by one on this content -- " +
+                 "and widened runnerCallers' ratchet with a note rather than wiring a decorative dispatch. " +
+                 "Its closing named this round: 'FSR3's frame interpolation wants the same chain for a " +
+                 "different reason and is where it earns its keep next.' A coarse-to-fine search needs " +
+                 "exactly a luminance pyramid, and this one imports that module rather than building a " +
+                 "second definition of brightness. " +
+                 "*** WHAT THE PYRAMID BUYS, MEASURED IN BOTH DIRECTIONS. *** A shift of (3, -2) is " +
+                 "recovered by 64 of 64 confident blocks at ONE level and 59 at three -- the pyramid COSTS " +
+                 "a little, because a guess formed on a quarter-resolution mip is a multiple of four full " +
+                 "pixels. A shift of (9, -7) or (14, 11) is recovered by ZERO of ~52 at one level and ~34 " +
+                 "at three: a search of +-4 cannot reach it, and the blocks are still CONFIDENT -- they " +
+                 "found a good match in the wrong place, which is the row that says confidence is not " +
+                 "correctness. A round reporting only the second half would be selling the pyramid as free. " +
+                 "*** AND THE ROUND'S OWN DEFECT WAS FOUND BY A ROW WRITTEN TO CHECK ITS OWN HEADER. *** " +
+                 "Two sabotages scored ZERO because the fixture could not tell: a rigid shift of a smoothed " +
+                 "random field is recovered under ANY monotone luma, and no two candidates tie exactly on " +
+                 "it. Two fixtures answer that -- a FLAT field, and a METAMER holding 0.25r + 0.5g + 0.25b " +
+                 "constant while Rec.709 varies. The flat-field row then FAILED on the unsabotaged module: " +
+                 "`best` began at Infinity, so the first candidate scanned won every tie, not the guess. " +
+                 "Sixty-four blocks reported the corner of their search window while the header said 'a tie " +
+                 "leaves the centre alone'. The sentence was false, the row that checked it found it, and " +
+                 "seeding `best` with the guess's score left every other figure unchanged. " +
+                 "Five sabotages, five caught after two repairs. RUNTIME 100 ms. No device mirror yet, " +
+                 "which the closing line names alongside sub-pixel flow, real content, reconciliation with " +
+                 "the application's vectors, and frame interpolation itself -- none of which is started.",
+    }),
     // v4672 -- THE 282nd CLOSING: "FSR2 is complete" becomes a number a reader can recompute.
     since357: Object.freeze({
         at: "v4672", swept: 1, green: 1, red: 0,

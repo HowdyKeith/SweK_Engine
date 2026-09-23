@@ -2166,7 +2166,8 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": 11830,
   "render/dilateGPU-selfcheck.mjs": 971,
   "render/luminancePyramid-selfcheck.mjs": 771,
-  "tools/ship/fsr2Coverage-selfcheck.mjs": 2009
+  "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
+  "render/opticalFlow-selfcheck.mjs": 100
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3934,7 +3935,8 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": 0,
   "render/dilateGPU-selfcheck.mjs": 0,
   "render/luminancePyramid-selfcheck.mjs": 0,
-  "tools/ship/fsr2Coverage-selfcheck.mjs": 0
+  "tools/ship/fsr2Coverage-selfcheck.mjs": 0,
+  "render/opticalFlow-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5702,7 +5704,8 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": "2026-09-21T00:00:00.000Z",
   "render/dilateGPU-selfcheck.mjs": "2026-09-23T00:00:00.000Z",
   "render/luminancePyramid-selfcheck.mjs": "2026-09-23T00:00:00.000Z",
-  "tools/ship/fsr2Coverage-selfcheck.mjs": "2026-09-23T00:00:00.000Z"
+  "tools/ship/fsr2Coverage-selfcheck.mjs": "2026-09-23T00:00:00.000Z",
+  "render/opticalFlow-selfcheck.mjs": "2026-09-23T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10388,7 +10391,8 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": 11830,
   "render/dilateGPU-selfcheck.mjs": 971,
   "render/luminancePyramid-selfcheck.mjs": 771,
-  "tools/ship/fsr2Coverage-selfcheck.mjs": 2009
+  "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
+  "render/opticalFlow-selfcheck.mjs": 100
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -13466,7 +13470,8 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": false,
   "render/dilateGPU-selfcheck.mjs": false,
   "render/luminancePyramid-selfcheck.mjs": false,
-  "tools/ship/fsr2Coverage-selfcheck.mjs": false
+  "tools/ship/fsr2Coverage-selfcheck.mjs": false,
+  "render/opticalFlow-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -15234,6 +15239,7 @@
   "tools/ship/fsrPageClocks-selfcheck.mjs": "alone",
   "render/dilateGPU-selfcheck.mjs": "alone",
   "render/luminancePyramid-selfcheck.mjs": "alone",
-  "tools/ship/fsr2Coverage-selfcheck.mjs": "alone"
+  "tools/ship/fsr2Coverage-selfcheck.mjs": "alone",
+  "render/opticalFlow-selfcheck.mjs": "alone"
  }
 }
