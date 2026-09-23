@@ -34,8 +34,14 @@ import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSo
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
+import { buildTable } from "../physics/render/energyCompensation.mjs";
 
 export const DEFAULT_ALBEDO = Object.freeze([0.68, 0.66, 0.62]);
+// RTX round 10 -- the microfacet material's own demo defaults. Roughness picked mid-range (neither a near-
+// mirror nor near-Lambertian, so the material actually reads as distinct from the default rather than
+// blending into it); ior 1.5 matches pathTracer.mjs's own dielectric default used throughout rtPipeline's gate.
+export const DEFAULT_ROUGHNESS = 0.35;
+export const DEFAULT_IOR = 1.5;
 
 /**
  * Axis-aligned bounds of a bvhBuffersFromMesh() result. Node 0 is always the BVH's root, and the root's own
@@ -151,12 +157,31 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * gfx/device.js device, sharing storage buffers by NAME across pipelines rather than copying between them
  * (outBuf is bound to the raytrace pipeline as its output AND to the accumulate pipeline as `frameBuf`;
  * accumBuf is bound to the accumulate pipeline as read_write AND to the present pipeline as read).
+ *
+ * `material` (RTX round 10, default "lambertian") is the FIRST production caller of `microfacet`/`msComp` --
+ * every gate exercising them until now was physics/render/rtPipeline-selfcheck.mjs alone (see that file's own
+ * backlog entries naming this gap directly). Left at its default, this function's own generated WGSL and
+ * uniforms are BYTE-IDENTICAL to before this round -- the same "a caller which never asks for a capability
+ * sees no change" rule `rgb`/`bvh`/`nee`/`microfacet` itself all already hold to; `material: "microfacet"` is
+ * opt-in. There is no THIRD, msComp-less microfacet mode here on purpose: msComp is what rtpipeline-
+ * multiscatter-energy-compensation's own round completed the material's story with, and a demo page choosing
+ * between three material buttons is more surface than this round's scope asks for -- see this round's own
+ * backlog entry for why envMap (the OTHER capability task #142 names) is deferred rather than added here too.
  */
-export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS }) {
+export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
+                                          material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR }) {
+    if (material !== "lambertian" && material !== "microfacet") throw new Error(
+        "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     const { bvh } = mesh;
     const floats = w * h * 3;
+    const isMicrofacet = material === "microfacet";
+    // Built once, at session creation, from `roughness` alone -- msComp is unconditional whenever `material`
+    // is "microfacet" (see this function's own doc above on why there is no separate toggle for it).
+    const msTable = isMicrofacet ? buildTable(roughness, { K: 24 }) : null;
 
-    const rtPipe = device.compute({ wgsl: pipelineWgsl({ bvh: true, rgb: true, gradient }) });
+    const rtPipe = device.compute({ wgsl: isMicrofacet
+        ? pipelineWgsl({ bvh: true, gradient, microfacet: "bsdf", msComp: true })
+        : pipelineWgsl({ bvh: true, rgb: true, gradient }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
     const boundsBuf = device.buffer({ usage: "storage", data: bvh.bounds });
@@ -169,6 +194,10 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     rtPipe.bind("bvhMeta", metaBuf);
     rtPipe.bind("bvhOrder", orderBuf);
     rtPipe.bind("bvhTris", trisBuf);
+    // The shared multi-scatter E(mu) table (physics/render/rtPipeline.mjs's own `msE` binding, msComp:true's
+    // one pipeline-level storage buffer -- see sbtRecord's own doc on why this is shared rather than per-record).
+    const msBuf = isMicrofacet ? device.buffer({ usage: "storage", data: Float32Array.from(msTable.E) }) : null;
+    if (msBuf) rtPipe.bind("msE", msBuf);
 
     const accumPipe = device.compute({ wgsl: accumulateWgsl(floats) });
     const accumBuf = device.buffer({ usage: "storage", size: floats * 4 });
@@ -192,8 +221,15 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
          * gate-safe path every other device gate in this tree uses. */
         renderFrame(view, opts = {}) {
             frame++;
-            uBuf.write(pipelineUniforms([], { spp, seed: frame, view, eps, rgb: true,
-                bvh: { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo } }));
+            // `rgb`/`bvh.hit`/`microfacet`/`msComp` here MUST match the options `pipelineWgsl()` generated this
+            // pipeline's own WGSL text with above -- rtPipeline.mjs's own doc on pipelineUniforms names this a
+            // silent-misrender trap with no runtime cross-check across two independent calls; `isMicrofacet` is
+            // the ONE flag both sides are computed from, on purpose, so the two calls cannot drift apart.
+            uBuf.write(pipelineUniforms([], { spp, seed: frame, view, eps, rgb: !isMicrofacet,
+                bvh: isMicrofacet
+                    ? { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "microfacet", roughness, ior, msTable }
+                    : { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo },
+                ...(isMicrofacet ? { microfacet: "bsdf", msComp: true } : {}) }));
             fBuf.write(new Float32Array([frame, 0, 0, 0]));
             return device.frame(({ pass }) => {
                 pass.dispatch(rtPipe, rayWg);
@@ -205,7 +241,9 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             }, opts);
         },
         destroy() {
-            for (const b of [outBuf, uBuf, boundsBuf, metaBuf, orderBuf, trisBuf, accumBuf, fBuf]) { try { b.destroy(); } catch (e) {} }
+            const buffers = [outBuf, uBuf, boundsBuf, metaBuf, orderBuf, trisBuf, accumBuf, fBuf];
+            if (msBuf) buffers.push(msBuf);
+            for (const b of buffers) { try { b.destroy(); } catch (e) {} }
         },
     });
 }

@@ -57,6 +57,7 @@ import { gateReport } from "./gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
+import { pipelineWgsl } from "../../physics/render/rtPipeline.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,6 +90,45 @@ console.log("1. THE BROWSER-SAFE LCG COPY, RE-CHECKED AGAINST THE REAL DISK READ
     ok("pathTracerWgsl.mjs's own LCG/EPS are unchanged in VALUE by the refactor (still the disk-reading path)",
         PTW.LCG.mul === liveLcg.mul && PTW.EPS === liveEps,
         "every one of pathTracerWgsl.mjs's 11 other importers gets exactly the values it always got");
+}
+
+// ---- 1b. RTX ROUND 10 -- makeRtSession's OWN GENERATED WGSL, BY `material`, AGAINST pipelineWgsl() DIRECTLY ----
+// No GPU needed: `device` is a stub that only RECORDS what makeRtSession() passes to device.compute(), so this
+// checks the exact JS-level option-passing this round adds, decoupled from whether a real device is present.
+console.log("\n1b. RTX ROUND 10 -- makeRtSession's material OPTION, AGAINST pipelineWgsl() DIRECTLY (NO GPU NEEDED)");
+{
+    const fakeMesh = {
+        bvh: { nodeCount: 1, triCount: 1, bounds: new Float32Array(6), meta: new Float32Array(4),
+                order: new Uint32Array(1), tris: new Float32Array(9) },
+        bounds: { center: [0, 0, 0], radius: 1 }, vertexCount: 3, triangleCount: 1,
+    };
+    const stubDevice = () => {
+        const wgsls = [];
+        return { wgsls, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind() {} }; },
+            buffer() { return { write() {}, destroy() {} }; },
+            pipeline() { return {}; },
+        } };
+    };
+
+    const d1 = stubDevice();
+    V.makeRtSession(d1.device, { mesh: fakeMesh, w: 4, h: 4 });
+    ok("!! material OMITTED (default) generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,rgb:true,gradient:true})",
+        d1.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true }),
+        "the same opt-in rule every prior rtPipeline option already holds to -- a page that never passes `material` " +
+        "must render exactly as it did before this round existed, verified by direct string equality, not assumed");
+
+    const d2 = stubDevice();
+    V.makeRtSession(d2.device, { mesh: fakeMesh, w: 4, h: 4, material: "microfacet" });
+    ok("!! material:\"microfacet\" generates BYTE-IDENTICAL WGSL to pipelineWgsl({bvh:true,gradient:true,microfacet:\"bsdf\",msComp:true})",
+        d2.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "bsdf", msComp: true }),
+        "proves makeRtSession's own microfacet branch calls pipelineWgsl with exactly the options its own doc " +
+        "claims (unconditional msComp, no rgb), not just similar-looking ones");
+
+    ok("an unrecognized `material` value throws rather than silently falling back to lambertian",
+        (() => { try { V.makeRtSession(stubDevice().device, { mesh: fakeMesh, w: 4, h: 4, material: "mirror" }); return false; }
+                 catch (e) { return /material must be/.test(e.message); } })(),
+        "a typo in a future caller's `material` string should fail loud, not silently render Lambertian");
 }
 
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
@@ -185,6 +225,28 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                 session.destroy();
             }
 
+            // ---- 4b. RTX ROUND 10 -- the SAME fabricated cube, through material:"microfacet" (msComp:true, the
+            // FIRST production caller of either) -- proves the real device path (msE buffer built and bound BY
+            // NAME, roughness/ior packed into the bvh uniform slot each frame) actually executes end to end, not
+            // just that the right JS options are chosen (section 1b's own, GPU-free claim). ----
+            {
+                const positions = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+                const indices = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(positions, indices);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 32, h = 24;
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const session = makeRtSession(device, { mesh, w, h, spp: 2, material: "microfacet" });
+                const view = { w, h, ...orbitEye({ yaw: 0.6, pitch: 0.35, dist: 4, center: mesh.bounds.center }), fovDeg: 45 };
+                for (let i = 0; i < 6; i++) await session.renderFrame(view, { offscreen: true, read: true });
+                const accum = new Float32Array(await device.read(session.accumBuf));
+                let nan = 0, min = Infinity, max = -Infinity;
+                for (const v of accum) { if (!isFinite(v)) nan++; if (v < min) min = v; if (v > max) max = v; }
+                out.cubeMicrofacet = { nan, min, max, frameCount: session.frameCount() };
+                session.destroy();
+            }
+
             // ---- 5. the real GLB -- fetch, parse, BVH, render; informal sanity only (no radiance oracle for a mesh) ----
             {
                 const res = await fetch("/vendor/kenney-city/models/pavement.glb");
@@ -228,7 +290,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, mesh, city } = r.result;
+    const { present, cube, cubeMicrofacet, mesh, city } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -244,6 +306,21 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
     ok("!! rtPipeline.mjs's bvh compute kernel, the accumulate kernel and the present kernel all bound BY NAME on one device -- no NaN, real range",
         cube.nan === 0 && cube.max > cube.min && cube.max <= 1.0 && cube.min >= 0.0,
         "this is the first time this WGSL has gone through gfx/device.js's classify()/bindByName rather than an index-based harness");
+
+    console.log("\n4b. RTX ROUND 10 -- THE SAME FABRICATED CUBE, THROUGH material:\"microfacet\" (msComp:true) -- THE FIRST PRODUCTION CALLER");
+    say(`accumBuf: ${cubeMicrofacet.nan} NaN/Inf, range [${cubeMicrofacet.min.toFixed(4)}, ${cubeMicrofacet.max.toFixed(4)}], ${cubeMicrofacet.frameCount} frames`);
+    REPORT_ROWS.push(["cube, microfacet+msComp", "unit cube", `${cubeMicrofacet.frameCount} frames`,
+        `range [${cubeMicrofacet.min.toFixed(4)}, ${cubeMicrofacet.max.toFixed(4)}]`]);
+    ok("!! the SAME cube, the msE buffer built and bound BY NAME, roughness/ior/msTable packed each frame, through a REAL WebGPU device -- no NaN, real range",
+        cubeMicrofacet.nan === 0 && cubeMicrofacet.max > cubeMicrofacet.min && cubeMicrofacet.max <= 1.0 && cubeMicrofacet.min >= 0.0,
+        "proves the WIRING this round adds -- not just the math physics/render/rtPipeline-selfcheck.mjs's own section 14 already " +
+        "proved in isolation -- actually executes end to end on a real device: this session's own msE storage buffer, and the " +
+        "roughness/ior/msTable this session packs into the bvh uniform slot every frame");
+    ok("!! and reads genuinely DIFFERENT from the plain Lambertian render of the IDENTICAL cube and camera -- material " +
+        "selection actually changes the picture, not just \"doesn't crash\"",
+        Math.abs(cubeMicrofacet.max - cube.max) > 1e-4 || Math.abs(cubeMicrofacet.min - cube.min) > 1e-4,
+        `microfacet range [${cubeMicrofacet.min.toFixed(4)}, ${cubeMicrofacet.max.toFixed(4)}] vs lambertian range ` +
+        `[${cube.min.toFixed(4)}, ${cube.max.toFixed(4)}]`);
 
     console.log("\n5. A REAL GLB, THROUGH THE FULL loadMeshBvh -> makeRtSession -> device.frame PATH");
     say(`vendor/kenney-city/models/pavement.glb: ${mesh.byteLength} bytes -> ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices`);
@@ -281,6 +358,12 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
     ok("!! RTX round 5 -- the page imports loadCityBvh and reads the scene toggle from the URL, not just loadMeshBvh",
         /loadCityBvh/.test(page) && /scene.*==.*["']city["']|["']city["'].*scene/.test(page),
         "a page that only ever loaded the hardcoded pavement tile would still pass every check above this one");
+    ok("!! RTX round 10 -- the page reads a `material` URL param and passes it into makeRtSession, not just the hardcoded default",
+        /material.*==.*["']microfacet["']|["']microfacet["'].*material/.test(page) &&
+        /material\s*:\s*MATERIAL/.test(page),
+        "a page that never read the param would still call makeRtSession successfully (material defaults to " +
+        "\"lambertian\") and every check above this one would still pass -- this is the one assertion that would " +
+        "catch a demo wired to the JS module but never actually reachable from the page's own toggle");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));
