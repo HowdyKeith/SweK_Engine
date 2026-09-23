@@ -26,6 +26,106 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4669 -- the last three port items, and two of them were not what the record said
+
+The backlog is empty. All 41 of `kit.ts`'s functions are ported and no recorded murmur item is outstanding.
+Two of the last three, though, turned out to be different questions than the ones written down.
+
+### 1. tempest's bolt slots were not missing a mix
+
+`nextRounds` recorded them as *"missing murmur's `small` mix"*. They weren't.
+
+```
+tempest.ts   mh_flourish(t, 21.0, mix(2.9, 5.2, small) * rate)
+             mh_flourish(t, 27.0, mix(4.3, 7.4, small) * rate)
+```
+
+This shader **compiles for one badge size** and says so where the size dial is declared — *"mh_small is a
+function of the frame size and the pixel scale, both of which this file compiles for rather than varies"*. So
+`small` is 0, murmur's mix **evaluates to 2.9 and 4.3**, and 2.9 and 4.3 are exactly what the table has always
+held. The port had the term, folded correctly, the same way `KIT_AA` and droplet's `tremGate` already fold.
+
+What was genuinely missing was **the other end**: 5.2 and 7.4 existed nowhere in the tree. They're recorded
+now and folded through the kit's own `mhSmall`, which carries all four of murmur's numbers and **moves not one
+byte** — multiplying the gap by a `small` of exactly 0 returns the big end to the bit.
+
+A `size` uniform was considered and rejected. It would have to make `KIT_AA` and `tremGate` live too, and it
+would move nothing at the default — a mechanism added for its own sake, in a tree whose recurring finding is
+mechanisms nobody invokes.
+
+### 2. prism's hue question, open since v4661
+
+Two adjacent lines of `prism.ts` settle it:
+
+```
+float beams = (e0 + e1 + e2) * bright * run * (1.0 + pulse) ...
+float hueW  = (e0 * -1.0 + e2 * 1.0) * bright * run;
+```
+
+`bright` is on both; `(1 + pulse)` is on the beams **alone**. The flash is brighter, not differently coloured.
+The port already matched. v4661 refused to guess and was right to.
+
+The row that pins this asserts the **negative** — that `hueWP` does not mention `pulse` — because the two
+positives would stay green through exactly the tidying that would break it.
+
+### 3. mh_out's dither, the last of the 41
+
+```
+/// One code value of triangular-PDF interleaved-gradient dither, in the encoded
+/// space where the quantization actually happens. Triangular rather than uniform
+/// because uniform dither leaves a faint texture of its own in flat areas.
+```
+
+It goes on the **direct** path only. On the `linear` path this shader feeds `aiPresenceOrbPresent.mjs`, a port
+of murmur's `present.wgsl`, which owns *"exposure, bloom, the tone curve, the dither and the sRGB encode"* and
+has carried its own since the first ship. Two independent noise fields on one image is louder than either.
+
+### The round's worst defect was in its own gate
+
+The first cut of the dither row reconstructed the undithered byte as `round(b - ditherAt(x,y))` and reported
+how often that differed from `b`. **That is a statement about `ditherAt` and about nothing else.** Making the
+shader's dither uniform, or twice as large, or one-sided changed the picture and did not move that row by a
+single count. Five sabotages walked straight through it.
+
+It's a regression now: the render's discrete Laplacian against the model's — which kills any locally linear
+field and leaves the noise — with the **slope** as the statistic, because everything else in that Laplacian is
+uncorrelated with the model and so widens the scatter without biasing the answer.
+
+| | slope |
+|---|---|
+| **as shipped** | **1.0082 ± 0.0534** |
+| dither doubled | 1.62 |
+| one-sided dither | 0.20 |
+| vertically flipped model (control) | −0.019 ± 0.055 |
+
+**And building a real instrument immediately found a bug this round had already shipped.** TSL's
+`screenCoordinate` is the fragment *centre*; the frame helper's `ditherAt` was hashing the integer index. That
+recovers **0.690** of the amplitude — it removes two thirds of the dither and injects a third of a new one. The
+y-flip was checked at the same time and is *not* present, which mattered because three's `uv()` has v at the
+bottom while the readback is top-down.
+
+### Two species gates moved, and neither was wrong about its species
+
+- **murmurSpecies13** counts chorus's voices as strict local maxima over four neighbours — and a pixel that got
+  +1 beside neighbours that got −1 *is* one. The frame helper removes the dither exactly before any
+  measurement now, which fixed it.
+- **murmurSpecies12** located duet's two bodies by argmax. Its far body is dim and broad enough that one code
+  value moved the reading 2 px and the ratio from x1.67 to **x1.35** against a bound of 1.40. That needed a
+  real estimator: the far body's position is the light-weighted centroid of everything beyond a cut from the
+  near body's centre. **x1.61 with the dither and x1.61 without**, and x1.61/x1.65 at cuts of 6 and 7 rather
+  than 5.
+
+**Neither bound was widened.**
+
+### Sabotage
+
+Fourteen, nine caught on the first pass. All five that walked were the dither ones, and all five walked
+through that same self-referential row.
+
+`tools/ship/murmurPortTail-selfcheck.mjs` arrives green at 1,406 ms — two renders, one at 48 px and one at
+128, and the 128 is why the strongest row exists at all: at 48 the standard error on the recovered amplitude
+is ±0.45, which cannot tell a correct dither from one of twice the size. The tree holds 1777 gates.
+
 ## v4668 -- the integral of drive squared, and a gate that had not parsed for two rounds
 
 <!-- Written as v4665 and renumbered FORWARD at the fetch, per the v4333-v4335 rule at the top of this

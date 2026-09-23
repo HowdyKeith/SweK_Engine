@@ -8070,6 +8070,60 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4669 -- THE 349th CLOSING: the last three items of the port's backlog, and two were not what the
+    // record said they were.
+    since348: Object.freeze({
+        at: "v4669", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/murmurPortTail-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 1,406 ms, 8 rows in four sections over two renders. THE BACKLOG IS EMPTY: every " +
+                 "one of kit.ts's 41 functions is ported and no recorded murmur item is outstanding. " +
+                 "*** TWO OF THE THREE WERE NOT WHAT nextRounds SAID. *** (1) tempest's bolt slots were " +
+                 "recorded as 'missing murmur's `small` mix'. They were not: this shader compiles for ONE " +
+                 "badge size and says so where the size dial is declared -- 'mh_small is a function of the " +
+                 "frame size and the pixel scale, both of which this file compiles for rather than varies' " +
+                 "-- so small is 0, murmur's mix(2.9, 5.2, small) evaluates to 2.9, and 2.9 is what the " +
+                 "table always held. What was missing was the OTHER END: 5.2 and 7.4 were nowhere in the " +
+                 "tree. Recording them and folding through the kit's own mhSmall carries all four of " +
+                 "murmur's numbers and moves not one byte -- the fold is exact, since multiplying the gap " +
+                 "by a small of exactly 0 returns the big end to the bit. A `size` uniform was considered " +
+                 "and REJECTED: it would have to make KIT_AA and droplet's tremGate live too and would " +
+                 "move nothing at the default, which is a mechanism added for its own sake. " +
+                 "(2) prism's hue question, open since v4661, is answered by two adjacent lines of " +
+                 "prism.ts -- beams carries (1 + pulse) and hueW does not -- in favour of what already " +
+                 "shipped. The row that pins it asserts the NEGATIVE, because the positives would stay " +
+                 "green through exactly the tidying that would break it. " +
+                 "(3) mh_out was a real absence and is the last of the 41. " +
+                 "*** THE ROUND'S OWN WORST DEFECT WAS IN ITS OWN GATE AND THE SABOTAGE PASS FOUND IT. *** " +
+                 "The first cut of section 4 reconstructed the undithered byte as round(b - ditherAt(x,y)) " +
+                 "and reported how often that differed -- a statement about ditherAt and about NOTHING " +
+                 "ELSE. Making the shader's dither uniform, or twice as large, or one-sided changed the " +
+                 "picture and did not move that row by a single count. It is a regression now: the render's " +
+                 "discrete Laplacian against the model's, which kills any locally linear field and leaves " +
+                 "the noise, and the SLOPE is the statistic because everything else in that Laplacian is " +
+                 "uncorrelated with the model and so widens the scatter without biasing the answer. It " +
+                 "reads 1.0082 +/- 0.0534 against a predicted 1; a doubled dither reads 1.62 and a " +
+                 "one-sided one 0.20. " +
+                 "*** AND BUILDING A REAL INSTRUMENT FOUND A REAL BUG IN WHAT THIS ROUND HAD ALREADY " +
+                 "SHIPPED. *** TSL's screenCoordinate is the fragment CENTRE, and the frame helper's " +
+                 "ditherAt hashed the integer index. Measured, that recovers 0.690 of the amplitude -- it " +
+                 "removes two thirds of the dither and injects a third of a new one. The y-flip was checked " +
+                 "at the same time and is NOT present (-0.019 +/- 0.055, consistent with zero), which " +
+                 "mattered because three's uv() has v at the bottom and the readback is top-down. " +
+                 "FOURTEEN SABOTAGES, NINE CAUGHT ON THE FIRST PASS; all five that walked were the dither " +
+                 "ones and all five walked through that same self-referential row. " +
+                 "*** AND THE DITHER MOVED TWO SPECIES GATES THE HOUR IT LANDED, NEITHER OF WHICH WAS " +
+                 "WRONG ABOUT ITS SPECIES. *** murmurSpecies13 counted chorus's voices as strict local " +
+                 "maxima over four neighbours -- a pixel that got +1 beside neighbours that got -1 IS one. " +
+                 "murmurSpecies12 located duet's two bodies by argmax, and its far body is dim and broad " +
+                 "enough that one code value moved the reading 2 px and the ratio from x1.67 to x1.35 " +
+                 "against a bound of 1.40. The frame helper removes the dither exactly before any " +
+                 "measurement, which fixed the first; the second needed a real estimator, and the far " +
+                 "body's position is the light-weighted centroid of everything beyond a cut from the near " +
+                 "body's centre -- x1.61 with the dither and x1.61 without, and x1.61/x1.65 at cuts of 6 " +
+                 "and 7. NEITHER BOUND WAS WIDENED.",
+    }),
     // v4668 -- THE 348th CLOSING: the drive-squared integral, and a gate that had not parsed for two rounds.
     //
     // *** THIS ROUND WAS WRITTEN AS v4665 AND RENUMBERED FORWARD AT THE FETCH, which is the rule this tree

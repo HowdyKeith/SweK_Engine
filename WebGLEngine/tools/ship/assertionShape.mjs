@@ -715,8 +715,14 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // OVER A GATE THAT COULD NOT PARSE, with a count in it that had been raised for a site nobody had
     // measured. Compiling every *selfcheck*.mjs in the tree without evaluating it answers that in 792 ms for
     // 1,776 files, which is cheap enough to run in the round that edits a gate rather than at the end of it.
-    gates: 1776, usesOk: 1755, definesOk: 1747, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1648, condFirst: 96, unknownSignature: 11,
+    // v4669 -- RE-TAKEN 1776 -> 1777 for tools/ship/murmurPortTail-selfcheck.mjs, at 1,406 ms across two
+    // renders -- one at 48 px and one at 128, and the 128 is the whole reason the round's strongest row
+    // exists: at 48 the standard error on the recovered dither amplitude is +/-0.45, which cannot tell a
+    // correct dither from one of twice the size. It holds the last THREE backlog items rather than one,
+    // because they are a round's subject and not a mechanism, and the file's name says so rather than
+    // borrowing the dither's.
+    gates: 1777, usesOk: 1756, definesOk: 1748, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1649, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

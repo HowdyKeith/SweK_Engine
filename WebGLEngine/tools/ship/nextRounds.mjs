@@ -1161,6 +1161,34 @@ export const NEXT_ROUNDS = [
             "small), which is a style transcription and now checkable against the source; prism's hue " +
             "question from v4661, which the upstream file can settle in one read; and mh_out's " +
             "triangular-PDF dither, the one kit function of 41 still unported.",
+        note15: "*** THE murmur PORT'S BACKLOG IS EMPTY AS OF v4669, AND TWO OF THE LAST THREE ITEMS WERE " +
+            "NOT WHAT THIS FILE SAID THEY WERE. *** All 41 of kit.ts's functions are ported; no recorded " +
+            "item is outstanding.\n\n" +
+            "*** (1) tempest's BOLT SLOTS WERE NOT MISSING A MIX. *** note13 recorded them as 'missing " +
+            "murmur's `small` mix, a style transcription'. render/aiPresenceOrbTsl.mjs compiles for ONE " +
+            "badge size and says so where the size dial is declared, so `small` is 0, mix(2.9, 5.2, small) " +
+            "IS 2.9, and 2.9 is what the table held. The absence was the other end -- 5.2 and 7.4 existed " +
+            "nowhere in this tree. LESSON FOR THIS FILE: a backlog entry written from a diff of two sources " +
+            "describes the SPELLING and not the VALUE, and at a folded operating point those are different " +
+            "claims. Check what the expression evaluates to before recording it as missing.\n\n" +
+            "*** (2) prism's HUE QUESTION IS ANSWERED AND THE PORT WAS ALREADY RIGHT. *** prism.ts: beams " +
+            "carries (1 + pulse) and hueW does not. The flash is brighter, not differently coloured. v4661 " +
+            "refused to guess and was right to.\n\n" +
+            "*** (3) mh_out WAS A REAL ABSENCE *** and is the last of the 41.\n\n" +
+            "*** THE SIZE DIAL IS THE ONE THING WORTH KNOWING FOR A LATER ROUND, AND IT IS NOT A GAP. *** " +
+            "mhSmall(120, 120) is 0 at all 69 of its sites, by a stated decision: the badge size is " +
+            "compiled for, in one place, and KIT_AA and droplet's tremGate fold through it the same way. A " +
+            "`size` uniform would move NOTHING at the default and would have to make those two live as " +
+            "well. If a round ever does want a live dial, tempest's 5.2 and 7.4 are now recorded so it has " +
+            "murmur's numbers rather than a reconstruction -- and it should expect to re-measure every " +
+            "species gate, because 69 sites would start moving at once.\n\n" +
+            "*** AND THE METHODOLOGICAL FINDING, WHICH IS THE ONE TO CARRY FORWARD: A GATE THAT MODELS A " +
+            "SHADER TERM MUST RECOVER IT FROM THE RENDER, NOT RECONSTRUCT IT FROM ITS OWN COPY. *** This " +
+            "round's first cut of the dither row compared ditherAt against itself and five sabotages walked " +
+            "through it untouched. The repair -- regress the render's discrete Laplacian on the model's, " +
+            "and read the SLOPE -- immediately found a bug the round had already shipped: TSL's " +
+            "screenCoordinate is the fragment CENTRE and the helper was hashing the integer index, " +
+            "recovering 0.690 of the amplitude instead of 1.008.",
         note14: "*** v4668 TOOK THE LARGEST ITEM ON note13's LIST, AND FOUND A GATE THAT HAD NOT RUN FOR TWO " +
             "ROUNDS DOING IT. *** Item (1) is closed: geode's spin and tilt and fathom's second and third " +
             "shells. ONE host accumulator -- driveSqInt, the integral of drive squared -- closed all three " +

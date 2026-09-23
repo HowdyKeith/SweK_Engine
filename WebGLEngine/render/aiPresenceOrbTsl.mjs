@@ -141,7 +141,7 @@ import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
          MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_COMPLETE_SINGLE,
          MH_OPAL_DRIFT, MH_GEODE_SPIN, MH_GEODE_SP, mhSpMixCoef, MH_ADVECT_SIGN, MH_ADVECT_WARP,
-         MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, MH_DRIVE_FORMATION, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_ENERGY, MH_DROPLET_TREM, MH_FATHOM_SP, mhSmall, mhBoltSlot, MH_DRIVE_FORMATION, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -193,6 +193,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                   // own tangent, which is the 1/sin(alpha) term the closed-form tube integral divides by.
                   "cross"];
     for (const n of need) if (typeof TSL[n] !== "function") throw new Error(`aiPresenceOrbTsl: the TSL namespace has no ${n}()`);
+    // *** screenCoordinate IS A NODE AND NOT A FUNCTION, so it is checked for presence rather than for
+    // callability -- the loop above would reject it for being the wrong type. *** mh_out's argument is the
+    // FRAGMENT coordinate in device pixels: not uv, and not this port's own size dial, which was an
+    // inviting stand-in sitting right there. A dither whose step is not one pixel of the DISPLAY is not
+    // dither, it is a texture.
+    if (!TSL.screenCoordinate) throw new Error("aiPresenceOrbTsl: the TSL namespace has no screenCoordinate");
+    const { screenCoordinate } = TSL;
     const { Fn, float, vec2, vec3, vec4, uv, dot, length, normalize, max, min, clamp, pow, exp, cos, sin, sqrt,
             abs, mix, smoothstep, select, uniform, negate, cross, Loop } = TSL;
     // *** THE KIT IS IMPORTED RATHER THAN RE-APPROXIMATED, WHICH IS THE WHOLE POINT OF v4623 HAVING BUILT IT. ***
@@ -225,8 +232,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
     // copies of the same sixteen constants free to drift apart is the shape this tree spends most of
     // its gates on. The sabotage that proved this file's colour reaches pixels used to aim at this
     // decode's dominant coefficient -- it aims at the kit's now, which is where the decode lives.
-    const linearToSrgb1 = Fn(([c]) => select(c.lessThanEqual(0.0031308), c.mul(12.92), pow(max(c, 1e-6), 1 / 2.4).mul(1.055).sub(0.055)));
-    const linearToSrgb = Fn(([c]) => vec3(linearToSrgb1(c.x), linearToSrgb1(c.y), linearToSrgb1(c.z)));
+    // *** THE ENCODE MOVED INTO THE KIT AT v4669, and it is one deletion rather than a refactor. *** This
+    // file carried its own linearToSrgb pair while render/murmurKitTsl.mjs is the port of the file that
+    // DEFINES it -- mh_linear_to_srgb, in kit.ts, beside the mh_out that calls it. Two spellings of one
+    // encode is the shape this tree's own records name as the thing that eventually disagrees, and the
+    // version here guarded pow with max(c, 1e-6) where murmur clamps the whole vector to 0 first. Both are
+    // right for every input this shader produces; only one of them is murmur's.
 
     // still.ts's own interior floor: presence lifts it, clarity suppresses it, live voice energy lifts it further.
     const floorAmt = Fn(([vc]) => {
@@ -1210,23 +1221,30 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // voice. energy is 0.85*pace + 0.65*think + 0.55*drive, so the slot COUNT integrates against those
         // three: count = (1/SLOT) * (t + 1.30 * integral of energy).
         const SLT = MH_SLOT_SIGNAL.tempest;
+        // *** THE SLOT LENGTHS ARE murmur's MIX, FOLDED AT THE SIZE THIS FILE COMPILES FOR -- v4669. ***
+        // tempest.ts spells mix(2.9, 5.2, small) and mix(4.3, 7.4, small); `small` is 0 here for the reason
+        // the size dial's own declaration gives, so these are 2.9 and 4.3 and the compiled shader is
+        // byte-identical to v4668's. What changes is that MH_TEMPEST_BOLT now holds BOTH of murmur's numbers
+        // per lane instead of one, folded through the kit's own mhSmall exactly as KIT_AA and droplet's
+        // tremGate are -- so the small-size end is a thing a gate can grade rather than a number nobody kept.
+        const BOLT_SLOT = MH_TEMPEST_BOLT.lanes.map((L) => mhBoltSlot(L, mhSmall(120, 120)));
         const mistRate = float(1.0).div(float(1.0).add(energy.mul(SLT.k))).toVar();
         // The two lanes are spelled out rather than built by a helper: tools/ship/murmurGesture-selfcheck.mjs
         // reads these call sites to check that the slot COUNT integrates against a style base while the
         // LENGTH carries the live signal, and a census cannot see through a closure.
         const flA = species === "tempest"
             ? KIT.mhFlourishPhase(
-                KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[0].slot)), uniforms.time,
+                KIT.mhRatePhase(float(1.0).div(float(BOLT_SLOT[0])), uniforms.time,
                     float(SLT.pace), uniforms.paceInt, float(SLT.think), uniforms.thinkInt,
                     float(SLT.drive), uniforms.driveInt),
-                float(MH_TEMPEST_BOLT.lanes[0].slot).mul(mistRate),
+                float(BOLT_SLOT[0]).mul(mistRate),
                 float(MH_TEMPEST_BOLT.lanes[0].seed)).toVar()
             : KIT.mhFlourish(uniforms.time, float(3.0), float(7.2)).toVar();
         const flB = KIT.mhFlourishPhase(
-            KIT.mhRatePhase(float(1.0).div(float(MH_TEMPEST_BOLT.lanes[1].slot)), uniforms.time,
+            KIT.mhRatePhase(float(1.0).div(float(BOLT_SLOT[1])), uniforms.time,
                 float(SLT.pace), uniforms.paceInt, float(SLT.think), uniforms.thinkInt,
                 float(SLT.drive), uniforms.driveInt),
-            float(MH_TEMPEST_BOLT.lanes[1].slot).mul(mistRate),
+            float(BOLT_SLOT[1]).mul(mistRate),
             float(MH_TEMPEST_BOLT.lanes[1].seed)).toVar();
         const gAng = flA.z.mul(6.2831853).toVar();
         const gPosA = species === "tempest"
@@ -2990,7 +3008,17 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // So the knee goes exactly where linearToSrgb already goes, and for the same reason.
         const litPaper = KIT.mhPresentPaper(railColor, sf.spec, sf.glow, uvY, pal, inkLin);
         const colorLinear = max(linear ? litPaper : KIT.mhPresentKnee(litPaper, pal.paper), vec3(0.0));
-        const outColor = linear ? colorLinear : linearToSrgb(colorLinear);
+        // *** AND THE DITHER, WHICH IS kit.ts's LAST FUNCTION THIS PORT DID NOT HAVE -- v4669. *** mh_out is
+        // "the last thing every field does": one code value of triangular-PDF interleaved-gradient dither in
+        // the ENCODED space, where the rounding to eight bits -- and therefore the banding -- happens.
+        //
+        // *** IT GOES ON THIS PATH AND NOT THE OTHER, AND THE SPLIT IS murmur's OWN. *** On the `linear`
+        // path this shader feeds render/aiPresenceOrbPresent.mjs, a port of murmur's present.wgsl, whose
+        // header says the pass owns "exposure, bloom, the tone curve, THE DITHER and the sRGB encode" -- and
+        // which has carried its own dither since the first ship. Dithering here as well would be two
+        // independent noise fields on one image, which is louder than either and is not what murmur does.
+        // So the direct path gets mh_out and the pipeline path is left exactly as it was.
+        const outColor = linear ? colorLinear : KIT.mhOut(colorLinear, screenCoordinate);
 
         // *** smoothstep(edge0, edge1, x) NEEDS edge0 < edge1 -- "results are undefined" otherwise (GLSL spec,
         // and WGSL inherits the same contract). The mask wants to fall from 1 to 0 as rho RISES past R, which

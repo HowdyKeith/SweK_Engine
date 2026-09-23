@@ -181,8 +181,58 @@ export async function renderSpecies(frames, size = N3) {
 // to 4% near black -- precisely where the dark side of limn's ring and the whole contact-glow band live.
 export const lin = (c) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
 
-/** The summed linear light at an integer pixel. */
-export const light = (px, x, y) => { const i = (y * N3 + x) * 4; return lin(px[i]) + lin(px[i + 1]) + lin(px[i + 2]); };
+/**
+ * *** THE DITHER IS SUBTRACTED BEFORE ANY MEASUREMENT, AND IT IS EXACT ENOUGH TO BE WORTH DOING -- v4669. ***
+ *
+ * mh_out ends every direct-path frame with one code value of triangular-PDF dither, added in the ENCODED
+ * space: the shader writes round(255*srgb + tri). It is there to be INVISIBLE -- to break up the banding
+ * eight-bit rounding creates -- and it is a pure function of the pixel coordinate, so a gate measuring the
+ * FIELD can remove it exactly rather than measure it by accident.
+ *
+ * *** IT IS NOT FASTIDIOUSNESS. TWO GATES WENT RED THE HOUR THE DITHER LANDED, AND BOTH FOR THE SAME REASON:
+ * *** murmurSpecies12 locates duet's two bodies by an argmax over single pixels, and murmurSpecies13 counts
+ * chorus's voices as strict local maxima over four neighbours. One code value flips both -- a pixel that got
+ * +1 beside neighbours that got -1 IS a local maximum, and a broad flat lobe's argmax moves. Neither gate
+ * was wrong about its species and neither bound needed widening: they were reading a pixel where they meant
+ * a figure, and the dither made that visible.
+ *
+ * *** WHAT IT DOES NOT DO IS HIDE mh_out FROM THE SUITE. *** tools/ship/murmurDither-selfcheck.mjs grades
+ * the dither directly -- its distribution, its position in the pipeline and the banding it removes -- which
+ * is where a deliberate noise field should be graded. A gate about duet's separation should not also be an
+ * accidental test of the noise, and before this it would have been.
+ *
+ * THE RECOVERY IS EXACT TO THE ROUNDING THAT WAS ALWAYS THERE: c - tri returns 255*srgb to within the half
+ * code value the quantiser costs anyway. It cannot return what clamping destroyed at 0 and 255, and that is
+ * stated rather than papered over -- a channel pinned at either end was already saturated.
+ */
+/**
+ * *** THE ARGUMENT IS THE FRAGMENT CENTRE AND NOT THE PIXEL INDEX, AND GETTING THAT WRONG MAKES THIS ADD
+ * NOISE INSTEAD OF REMOVING IT. *** The shader hands mh_out TSL's screenCoordinate, which is the fragment's
+ * CENTRE -- (x + 0.5, y + 0.5) for the pixel at integer index (x, y). A first cut of this helper hashed the
+ * integer index instead. It was not obviously wrong, because the hash is smooth enough in its argument that
+ * a half-pixel offset still correlates: measured by regressing the render's Laplacian on the model's, the
+ * integer form recovers a slope of 0.690 +/- 0.054 where the centred form recovers 1.008 +/- 0.053. A
+ * subtraction at 69% of the right amplitude removes two thirds of the dither and injects a third of a NEW
+ * one, which is worse than leaving it alone in the one way that matters: it is uncorrelated with anything.
+ *
+ * THE y AXIS IS NOT FLIPPED, AND THAT WAS CHECKED RATHER THAN ASSUMED: this shader's `p` comes from three's
+ * uv(), whose v is 0 at the BOTTOM, and the readback is top-down, so a flip was the obvious suspect. It
+ * reads a slope of -0.054 +/- 0.055 -- consistent with zero, i.e. no relationship at all -- so the
+ * framebuffer row this helper indexes IS the framebuffer row screenCoordinate saw.
+ */
+export const ditherAt = (x, y) => {
+    const fr = (v) => v - Math.floor(v);
+    const cx = x + 0.5, cy = y + 0.5;
+    const n = fr(52.9829189 * fr(cx * 0.06711056 + cy * 0.00583715));
+    return n < 0.5 ? Math.sqrt(2 * n) - 1 : 1 - Math.sqrt(Math.max(0, 2 - 2 * n));
+};
+
+/** One channel back to linear light with mh_out's own dither removed first. */
+export const linAt = (c, x, y) => lin(c - ditherAt(x, y));
+
+/** The summed linear light at an integer pixel, dither removed. */
+export const light = (px, x, y) => { const i = (y * N3 + x) * 4;
+    return linAt(px[i], x, y) + linAt(px[i + 1], x, y) + linAt(px[i + 2], x, y); };
 
 /** Bilinear, because a 72-sample ring at a 13-px radius snaps onto far fewer than 72 distinct pixels. */
 export const bil = (px, x, y) => {
@@ -191,8 +241,9 @@ export const bil = (px, x, y) => {
     for (const [dx, dy, w] of [[0, 0, (1 - fx) * (1 - fy)], [1, 0, fx * (1 - fy)],
                                [0, 1, (1 - fx) * fy], [1, 1, fx * fy]]) {
         const xx = Math.min(N3 - 1, Math.max(0, x0 + dx)), yy = Math.min(N3 - 1, Math.max(0, y0 + dy));
-        const i = (yy * N3 + xx) * 4;
-        v += w * (lin(px[i]) + lin(px[i + 1]) + lin(px[i + 2]));
+        // the same removal light() makes, at each of the four taps -- the dither is per PIXEL, so it has to
+        // come off before the weighting and not after
+        v += w * light(px, xx, yy);
     }
     return v;
 };

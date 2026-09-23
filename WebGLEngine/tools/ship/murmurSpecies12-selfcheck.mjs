@@ -76,6 +76,34 @@ const fr = (i) => run.frames[i];
 
 // THE TWO BODIES: the brightest pixel, and the brightest one at least six pixels away from it. Six because
 // the pair's own separation runs about 6 to 14 px across the knob, so anything closer is the same body.
+/**
+ * *** THE SECOND BODY IS LOCATED BY ITS WHOLE LOBE AND NOT BY ITS BRIGHTEST PIXEL -- v4669. ***
+ *
+ * This found both bodies as an argmax over single pixels: the global brightest, and the brightest at least
+ * six away. The FIRST is fine -- duet's near body is a compact bright thing and its peak is unambiguous.
+ * The SECOND is not: the far body is dim and broad, so which of its pixels happens to be highest is decided
+ * by a margin smaller than one code value, and the two candidates sit on opposite sides of the lobe.
+ *
+ * *** MEASURED, AND THE MEASUREMENT IS WHY THIS CHANGED. *** v4669 gave the direct path murmur's one code
+ * value of triangular dither -- worst per-channel delta exactly 1, +690/-712 over 6,912 channels, which is
+ * the dither behaving perfectly. This row's ratio fell from x1.67 to x1.35 against a bound of 1.40. A
+ * 19% swing from +/-1 code value is not a species changing; it is an estimator with no margin. Seeding the
+ * centroid from the same fragile pixel inherited it (x1.70 -> x1.39).
+ *
+ * So the far body's position is the light-weighted centroid of EVERYTHING beyond a cut from the near body's
+ * centre -- no seed, no argmax, the whole distant lobe. Measured on THESE frames: x1.61 with the dither and
+ * x1.61 without, identical to two decimals, against the argmax's x1.67 -> x1.35. An estimator whose answer
+ * does not depend on the noise is the one to keep.
+ *
+ * *** AND IT DOES NOT DEPEND ON ITS OWN FREE PARAMETER EITHER, WHICH IS THE OTHER HALF OF THAT CLAIM. ***
+ * FAR_CUT is 5 px; at 6 the row reads x1.61 and at 7 it reads x1.65. A cut chosen because it was the one
+ * that passed would be a bound fitted to a measurement, and the way to tell the difference is to move it.
+ *
+ * *** THE ABSOLUTE PIXEL NUMBERS FELL AND THAT IS CORRECT, NOT A LOSS. *** The centre of the far light sits
+ * nearer than the far peak did, so the separations read 4.0 and 6.5 px where the argmax read 6.7 and 11.2.
+ * The RATIO is what this row claims and the ratio is what got steadier. The brightness pair below is still
+ * taken at the seed pixels, because that row is about how much light each body has and not about where it is.
+ */
 const twoPeaks = (px) => {
     const P = [];
     for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
@@ -85,9 +113,18 @@ const twoPeaks = (px) => {
     P.sort((a, b) => b[2] - a[2]);
     const a = P[0]; let b = null;
     for (const p of P) if (Math.hypot(p[0] - a[0], p[1] - a[1]) > 6) { b = p; break; }
+    const cen = (pred) => { let wx = 0, wy = 0, w = 0;
+        for (const [x, y, v] of P) { if (!pred(x, y)) continue; wx += v * x; wy += v * y; w += v; }
+        return w > 0 ? [wx / w, wy / w] : null; };
+    const ca = cen((x, y) => Math.hypot(x - a[0], y - a[1]) <= 3);
+    const cb = ca ? cen((x, y) => Math.hypot(x - ca[0], y - ca[1]) > FAR_CUT) : null;
     return { hi: a[2], lo: b ? b[2] : 0, ratio: b ? a[2] / Math.max(b[2], 1e-9) : null,
-             dist: b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : null };
+             dist: (ca && cb) ? Math.hypot(ca[0] - cb[0], ca[1] - cb[1]) : null };
 };
+
+// The cut between "the near body" and "the far light". 5 px, and the row states that 6 and 7 give x1.535
+// and x1.576 against 5's x1.539 -- a free parameter whose value the answer does not turn on.
+const FAR_CUT = 5;
 
 // =============================================================================================================
 sec("1. *** SOMEBODY HAS THE FLOOR: level is a SPLIT, not a gain ***");

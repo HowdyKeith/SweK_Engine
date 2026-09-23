@@ -26,10 +26,10 @@ import { MH_R, MH_ETA, MH_EXT, MH_TILT, MH_SCATTER_K, MH_SPREAD, MH_EXIT_CAP, MH
  */
 export function makeMurmurKitTsl(TSL) {
     const need = ["Fn", "float", "vec2", "vec3", "uint", "int", "Loop", "floor", "mix", "exp", "sqrt", "cos",
-                  "sin", "dot", "length", "normalize", "clamp", "max", "min", "pow", "smoothstep", "select", "abs"];
+                  "sin", "dot", "length", "normalize", "clamp", "max", "min", "pow", "smoothstep", "select", "abs", "fract"];
     for (const n of need) if (typeof TSL[n] !== "function") throw new Error(`murmurKitTsl: the TSL namespace has no ${n}()`);
     const { Fn, float, vec2, vec3, uint, int, Loop, floor, mix, exp, sqrt, cos, sin, dot, length,
-            normalize, clamp, max, min, pow, smoothstep, select, abs } = TSL;
+            normalize, clamp, max, min, pow, smoothstep, select, abs, fract } = TSL;
 
     // ---- the integer avalanche ---------------------------------------------------------------------------
     // murmur's own, INCLUDING the first shift of 15 where canonical murmur3 fmix32 uses 16. The two disagree
@@ -648,6 +648,37 @@ export function makeMurmurKitTsl(TSL) {
                               float(0.61)));
     });
 
+    /**
+     * *** THE LAST THING EVERY FIELD DOES -- kit.ts's mh_out, ported at v4669. *** One code value of
+     * triangular-PDF interleaved-gradient dither, IN THE ENCODED SPACE, because that is where the rounding
+     * to eight bits happens and therefore where the banding is made. Its CPU twin is murmurKit's mhOut, and
+     * render/murmurKit.mjs carries the reason the PDF is triangular rather than uniform.
+     *
+     * `pixel` is the FRAGMENT coordinate in device pixels and nothing else -- not the orb's point size, not
+     * a uv. Those are different quantities and this port has a size dial of its own that would have been an
+     * inviting stand-in: the dither has to be one step of the DISPLAY's grid or it is not dither.
+     */
+    /**
+     * murmur's mh_linear_to_srgb, transcribed. The max(c, 0) comes FIRST and that is load-bearing in a
+     * select: both arms are evaluated, and pow() of a negative is a NaN that would reach the framebuffer.
+     * It lives in the kit rather than in the shader because mhOut below needs it and because kit.ts is where
+     * murmur keeps it -- render/aiPresenceOrbTsl.mjs had its own copy until v4669, which is one encode
+     * spelled twice in a tree whose own records name that shape as the thing that eventually disagrees.
+     */
+    const mhLinearToSrgb1 = Fn(([c]) => select(c.greaterThan(0.0031308),
+        pow(c, float(1.0 / 2.4)).mul(1.055).sub(0.055), c.mul(12.92)));
+    const mhLinearToSrgb = Fn(([cIn]) => {
+        const c = max(cIn, vec3(0.0)).toVar();
+        return vec3(mhLinearToSrgb1(c.x), mhLinearToSrgb1(c.y), mhLinearToSrgb1(c.z));
+    });
+
+    const mhOut = Fn(([linearRGB, pixel]) => {
+        const n = fract(float(52.9829189).mul(fract(dot(pixel, vec2(0.06711056, 0.00583715))))).toVar();
+        const tri = select(n.lessThan(0.5), sqrt(n.mul(2.0)).sub(1.0),
+                           float(1.0).sub(sqrt(max(float(0.0), float(2.0).sub(n.mul(2.0)))))).toVar();
+        return clamp(mhLinearToSrgb(linearRGB).add(tri.mul(1.0 / 255.0)), 0.0, 1.0);
+    });
+
     /** THE SIZE DIAL: 1 at 18 pt, 0 at 120 pt and above. Its real midpoint is 52 pt, not the 46 kit.ts says. */
     const mhSmall = Fn(([w, h]) => float(1.0).sub(smoothstep(float(16.0), float(88.0), max(min(w, h), float(1.0)))));
 
@@ -709,7 +740,7 @@ export function makeMurmurKitTsl(TSL) {
         mhHash, mhGrad3, mhNoise3, mhHash1, mhFlourish, mhFlourishPhase, mhBreath, mhDrift, mhSpin, mhRoll, mhTube, MH_SQRTPI, mhLive, mhState, mhIgnite, mhDriveHeading, mhRatePhase, mhCrossPhase, mhSpMixPhase, mhDriftPhase,
         mhRefract, mhLook, mhExit, mhHaze, mhMedium, mhInside, mhTransmit, mhScatter,
         mhDeform, mhBody, MH_AMP_CAP,
-        mhKey, mhSmall, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
+        mhKey, mhSmall, mhOut, mhLinearToSrgb, mhSurface, mhContainment, mhOpalLife, mhAbyssSlot, mhCompleteLift, mhIgniteAxis, mhIgniteLap, mhIgniteTurn,
         mhPaper, mhPalette, mhShade, mhKnee, mhTier, mhPresentFinish, mhPresentPaper, mhPresentKnee, mhLit, mhLchT, labOfSrgb, srgbToLinearT, linearToOklabT, oklabToLinearT,
         Loop,
     };

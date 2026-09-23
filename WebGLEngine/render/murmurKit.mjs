@@ -379,6 +379,37 @@ export function mhDriftPhase(secular, rate, wobble, lane, t) {
     return secular + (k * rate / w2) * Math.sin(w2 * t + lane * 1.71);
 }
 
+/**
+ * *** THE LAST THING EVERY FIELD DOES, AND THE LAST OF kit.ts's 41 FUNCTIONS THIS PORT DID NOT HAVE -- v4669.
+ * ***
+ *
+ * kit.ts: "One code value of triangular-PDF interleaved-gradient dither, in the encoded space where the
+ * quantization actually happens. Triangular rather than uniform because uniform dither leaves a faint
+ * texture of its own in flat areas; triangular does not."
+ *
+ * *** IT IS IN THE ENCODED SPACE AND THAT IS THE WHOLE DESIGN. *** The banding this removes is created by
+ * rounding to 8 bits, so the noise has to be added where that rounding happens -- after linear_to_srgb, in
+ * units of one code value. A dither applied in linear light would be worth a different number of code values
+ * in the shadows than in the highlights, which is the same quantity spent unevenly.
+ *
+ * *** AND THE SHAPE IS NOT AN IMPLEMENTATION DETAIL. *** A UNIFORM dither of one code value flattens the
+ * band edge but leaves its own flat-field texture, because the error it adds is correlated with the signal.
+ * The triangular PDF -- built here by reshaping one uniform hash through sqrt on each half -- makes the
+ * quantisation error independent of the signal, which is the standard result and murmur's stated reason.
+ *
+ * THE HASH IS THE INTERLEAVED GRADIENT, spatially high-frequency so the eye reads it as grain rather than
+ * as a pattern, and it is a pure function of the PIXEL and not of time: a dither that moved frame to frame
+ * would be visible as crawl on a still orb, which is the one thing this roster is never allowed to do.
+ */
+export function mhOut(linearRGB, pixelX, pixelY) {
+    const n = mhFract(52.9829189 * mhFract(pixelX * 0.06711056 + pixelY * 0.00583715));
+    const tri = n < 0.5 ? Math.sqrt(2 * n) - 1 : 1 - Math.sqrt(Math.max(0, 2 - 2 * n));
+    return linearRGB.map((c) => Math.min(1, Math.max(0, linearToSrgb(c) + tri * (1 / 255))));
+}
+
+/** GLSL fract, which is x - floor(x) and NOT the truncation JS's % gives for a negative argument. */
+export function mhFract(x) { return x - Math.floor(x); }
+
 /** The maximum wobble kit.ts allows. Its reason is NOT stated upstream and is not guessed here -- see mhDrift. */
 export const MH_DRIFT_WOBBLE_CAP = 0.72;
 
@@ -2129,11 +2160,39 @@ export const MH_HELIX = Object.freeze({
     flourishSlot: 17.0, flourishDur: 9.3,
 });
 
-/** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
+/**
+ * tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at.
+ *
+ * *** THE SLOT LENGTHS ARE A MIX AND THIS TABLE HELD ONE END OF IT -- v4669. *** tempest.ts:
+ *
+ *     vec4 f0 = mh_flourish(t, 21.0, mix(2.9, 5.2, small) * rate);
+ *     vec4 f1 = mh_flourish(t, 27.0, mix(4.3, 7.4, small) * rate);
+ *
+ * "TWO LIGHTNING LANES, on slots that shorten as the storm rises" -- and that LENGTHEN as the badge shrinks,
+ * because a bolt two pixels long reads as noise unless it is rare enough to be an event.
+ *
+ * *** THE PORT WAS NOT MISSING THE TERM. IT WAS MISSING THE OTHER END OF IT. *** This file compiles for one
+ * badge size and says so where the dial is declared -- "mh_small is a function of the frame size and the
+ * pixel scale, both of which this file compiles for rather than varies" -- so `small` is 0 and murmur's mix
+ * evaluates to 2.9 and 4.3, which is exactly what this table has always held. tools/ship/nextRounds.mjs
+ * recorded this as "missing murmur's `small` mix"; the measured answer is that the mix was FOLDED, correctly,
+ * and only half of murmur's four numbers were written down. Recording `slotSmall` and folding through the
+ * kit's own mhSmall -- the same shape KIT_AA and droplet's tremGate already use -- carries all four, moves
+ * not one byte at the compiled size, and puts the small-size end where a gate can grade it.
+ *
+ * *** IT IS FOLDED AND NOT MADE A UNIFORM, WHICH IS A DECISION AND NOT AN OMISSION. *** A `size` knob would
+ * make this live, and it would also have to make KIT_AA and droplet's tremGate live, and it would move
+ * nothing at all at the default -- a mechanism added for its own sake in a tree whose recurring finding is
+ * mechanisms nobody invokes. The badge size stays decided in one place.
+ */
 export const MH_TEMPEST_BOLT = Object.freeze({
-    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9 }), Object.freeze({ seed: 27.0, slot: 4.3 })]),
+    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9, slotSmall: 5.2 }),
+                          Object.freeze({ seed: 27.0, slot: 4.3, slotSmall: 7.4 })]),
     maskIn: 0.35, maskOut: 0.62,
 });
+
+/** A slot length at the size this file compiles for: murmur's mix(slot, slotSmall, small), evaluated. */
+export function mhBoltSlot(lane, small) { return lane.slot + (lane.slotSmall - lane.slot) * small; }
 
 /** droplet's gain, which is nearly three times any other hero's -- "the body itself is the species". */
 export const MH_DROPLET_GAIN = 3.30;
