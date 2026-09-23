@@ -81,7 +81,20 @@ ok("...and a module that compiles a pipeline but never dispatches one is not a r
 console.log("\n3. THE RATCHET");
 // Seeded at what was measured, two-sided, the shape kernelReach-selfcheck uses -- and which went red there on
 // the same run a round's work landed, which is the behaviour a ratchet is for.
-const GATE_ONLY_AT_V4654 = 2;
+// *** WIDENED TO 3 AT v4668, WITH THE NOTE THIS ROW'S OWN TEXT ASKS FOR RATHER THAN A CALLER. ***
+// render/luminancePyramidGPU.mjs is FSR2's first dispatch: the luminance mip chain that drives auto-
+// exposure. fsr.html's content is already in [0,1] -- no HDR range to compress, no tone curve after the
+// upscaler -- so the exposure derived from that chain is 1 and multiplying by it changes nothing a PSNR
+// can see. Wiring the page to call it anyway would satisfy this census with a dispatch that does nothing,
+// which is the decorative wiring the census exists to make visible, not the debt it exists to collect.
+// This is the row's OWN second case, the one it already grants visibilityGPU: "a note saying why a gate is
+// the only sensible one". What would retire it is HDR content with a tone curve downstream, or FSR3's
+// frame interpolation, which wants the same chain for a different reason.
+//
+// v4657 and v4664 each took the OTHER branch -- reactiveGPU and dilateGPU both arrived here and both got a
+// production caller on the round that added them, because both had real work to do on this content. That
+// this one does not is the distinction the note has to carry.
+const GATE_ONLY_AT_V4654 = 3;
 ok("!! *** no THIRD compute runner arrives with only a gate able to construct it ***",
    R.gateOnly.length <= GATE_ONLY_AT_V4654,
    `${R.gateOnly.length} against a frozen ${GATE_ONLY_AT_V4654}: ${R.gateOnly.map((x) => x.file).join(", ")}. ` +

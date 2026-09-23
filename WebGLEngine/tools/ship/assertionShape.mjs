@@ -471,6 +471,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4657 -- 1758 -> 1759 for render/reactiveGPU-selfcheck.mjs, the factor pass's third input.
     // v4661 -- 1759 -> 1760 for tools/ship/fsrPageClocks-selfcheck.mjs, the scene clock and the history's age.
     // v4664 -- 1760 -> 1761 for render/dilateGPU-selfcheck.mjs, FSR2's dilated depth and motion.
+    // v4668 -- 1761 -> 1762 for render/luminancePyramid-selfcheck.mjs, FSR2's luminance pyramid. nameFirst
+    // bumped in the SAME edit this time, which it was not at v4661 or v4664.
     // Seventh round running with the same four rows by one and the other four held -- and this round bumped
     // THREE of the four on its first pass and shipped the fourth only because the gate went red on it.
     // nameFirst is the one a hand-edit forgets: it is the shape count, not a gate count, so nothing about
@@ -479,8 +481,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // this row caught it, which is the division of labour working and is also the reason the sentence is
     // not enough on its own. The pre-flight cannot see it either -- recordDrift compares four
     // fields and this row compares all nine, which is exactly why that row says so in its own text.
-    gates: 1761, usesOk: 1740, definesOk: 1732, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1633, condFirst: 91, unknownSignature: 16,
+    gates: 1762, usesOk: 1741, definesOk: 1733, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1634, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

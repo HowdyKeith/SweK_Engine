@@ -8032,6 +8032,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4668 -- THE 278th CLOSING: FSR2's first dispatch, and an exposure with nothing to do.
+    since353: Object.freeze({
+        at: "v4668", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/luminancePyramid-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerCallers-selfcheck.mjs"]),
+        verdict: "*** ffx_fsr2_compute_luminance_pyramid IS FSR2's FIRST DISPATCH AND THIS TREE DID NOT HAVE " +
+                 "IT. *** The luminance mip chain down to 1x1, whose bottom is the average luminance that " +
+                 "drives auto-exposure. render/luminancePyramid.mjs, LUMA_PYRAMID_WGSL with base and reduce " +
+                 "entry points, LuminancePyramidGPU, and a gate. The base level imports render/temporal" +
+                 "Reject.mjs's `luma` rather than re-deriving it: 0.25/0.5/0.25 is the Y of the YCoCg the " +
+                 "accumulate pass already clamps in, and a pyramid weighting colour differently from the " +
+                 "pass consuming it would be two definitions of brightness in one pipeline. " +
+                 "*** THE ROUND'S REAL FINDING IS THE EDGE BIAS, MEASURED ACROSS SIZES. *** A 2x2 average " +
+                 "of an odd-width row must do something with the last column; DROPPING it is the plausible " +
+                 "choice -- the mips still halve, the chain still reaches 1x1, every surviving pixel is a " +
+                 "correct average, and the frame's mean quietly stops being the frame's mean. This clamps " +
+                 "instead, double-counting the edge, and the cost was measured rather than waved at: EXACT " +
+                 "at powers of two (8x8, 16x16, 64x64 all 0.0000%), -16.59% at 5x3, -8.50% at 9x9, and " +
+                 "-0.03% at 192x192. It is a SMALL-MIP phenomenon and not an odd-size one -- 191x191 also " +
+                 "reads -0.03% -- so the pass is usable at this tree's sizes and would feed auto-exposure a " +
+                 "number wrong by a sixth at a thumbnail. " +
+                 "*** AND THE EXPOSURE HAS NOTHING TO DO HERE, WHICH IS STATED RATHER THAN DISCOVERED. *** " +
+                 "fsr.html's colour is already in [0,1]: no HDR range to compress, no tone curve after the " +
+                 "upscaler. The scale is 1 to float precision and no PSNR is quoted anywhere in this round, " +
+                 "because claiming an image improvement would be claiming something the content cannot " +
+                 "supply. The pyramid is real and gradeable; the exposure on it is honest arithmetic this " +
+                 "page does not need. " +
+                 "*** THE RATCHET WAS WIDENED RATHER THAN SATISFIED WITH A DECORATIVE CALL. *** " +
+                 "runnerCallers' gate-only census went 2 -> 3 on this runner. v4657 and v4664 each took the " +
+                 "other branch and gave reactiveGPU and dilateGPU a production caller on the round that " +
+                 "added them, because both had real work to do on this content. Wiring fsr.html to dispatch " +
+                 "a pyramid whose exposure multiplies by one would satisfy the census with a dispatch that " +
+                 "does nothing -- the decorative wiring the census exists to make VISIBLE, not the debt it " +
+                 "collects. That row's own text already grants this second case ('a note saying why a gate " +
+                 "is the only sensible one'), and the note says what retires it: HDR content with a tone " +
+                 "curve, or FSR3's interpolation, which wants the same chain. " +
+                 "Five sabotages, five caught, no 0-RED -- and the gate records that its most on-the-nose " +
+                 "row, 'every mip is its parent's average', CANNOT see either size-rule mutation, because " +
+                 "it walks whatever sizes the chain reports. One row was red on arrival: a Float32Array " +
+                 "compared against an f64 luma with ===, the second float32 round-trip this session after " +
+                 "v4664's.",
+    }),
     // v4667 -- THE 277th CLOSING: enabled, and every pinned figure re-measured rather than swapped.
     since352: Object.freeze({
         at: "v4667", swept: 0, green: 0, red: 0,
