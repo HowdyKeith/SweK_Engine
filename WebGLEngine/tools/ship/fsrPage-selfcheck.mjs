@@ -436,6 +436,55 @@ console.log("\n6. *** THE SHADING MASK REACHES THE CHAIN (v4655), AND THIS IS A 
 }
 
 console.log(fails ? `\nfsrPage-selfcheck: ${fails} FAILED` : "\nfsrPage-selfcheck: all checks pass");
+console.log("\n15. *** THE CONFIRMATION, AND THE SECONDARY THAT INVERTED (v4671) ***");
+{
+    const PRE = path.resolve(path.dirname(PAGE), "render", "transparency-preregistration.md");
+    const pre = fs.existsSync(PRE) ? fs.readFileSync(PRE, "utf8") : "";
+    ok("the transparency pre-registration exists and its OUTCOME is filled in",
+       pre.length > 0 && /## OUTCOME/.test(pre) && !says(pre, "NOT YET COLLECTED"),
+       PRE.replace(/.*WebGLEngine./, ""));
+    ok("!! ...and it still requires BOTH tests to clear, and names a window disjoint from the first look",
+       // SCOPED TO THE `Frames.` BULLET. Testing the whole document for "54-98" passed while the bullet
+       // said something else entirely, because the window is also named in the outcome table below -- the
+       // scoping defect this file has now logged five times, found once more by its own sabotage.
+       says(pre, "BOTH must clear") &&
+       // the window the bullet DECLARES, which is its first bolded span -- not merely a mention of it
+       // somewhere in the sentence. 240 characters was still wide enough to catch the same bullet's
+       // reference to v4660 confirming "on 54-98", so the sabotage that rewrote the declaration passed.
+       // Twice scoped, because the first scoping was not a scope.
+       (() => { const m = /\*\*Frames\.\*\* \*\*([^*]+)\*\*/.exec(pre); if (!m) return false;
+                return /54[-\u2013]98/.test(m[1]) && !/3[-\u2013]53/.test(m[1]); })()
+       && /3[-\u2013]53/.test(pre),
+       "v4660's split, for v4660's reason: a lead found on one window is confirmed on another that did no " +
+       "part of finding it");
+    // the primary REPLICATES -- two windows, and the gate re-derives that they agree rather than trusting it
+    // the REPLICATION TABLE's own two rows, in order, and not every occurrence of those figures in the
+    // document: an alternation over the whole file found the same numbers quoted elsewhere and passed
+    // while the table said something different.
+    const tbl = /first look,[\s\S]{0,200}?confirming,[^\n]*/.exec(pre);
+    const nums = tbl ? [...tbl[0].matchAll(/\+(\d\.\d{4}) dB/g)].map((m) => Number(m[1])) : [];
+    ok("!! *** the primary replicates: two disjoint windows agree to two hundredths of a dB ***",
+       nums.length >= 2 && Math.abs(nums[0] - nums[1]) < 0.03 && says(pre, "45 up / 0 down") && says(pre, "51 up / 0 down"),
+       `${nums.join(" and ")} -- ninety-six frames across two windows without ONE going the wrong way. ` +
+       "Nothing else this arc has measured has that record: dilation loses 8 of 51 and the reactive mask " +
+       "on opaque content loses 18.");
+    // *** AND THE SECONDARY DID NOT, WHICH IS THE ROUND. ***
+    ok("!! *** the record says the SECONDARY inverted, and does not quietly drop it ***",
+       says(pre, "IT INVERTS") && /-0\.4662/.test(pre) && says(pre, "9 up / 36")
+       && says(pre, "The reliable half of v4670's claim survived and the headline half did not"),
+       "v4670 reported the app mask at +0.9024 dB with the larger mean; on a fresh window it is +0.1793 " +
+       "and loses 36 of 45 head to head. A near-coin-flip is exactly the statistic that does not " +
+       "replicate, and this is what declaring the secondary in advance was FOR.");
+    ok("!! ...and the superseded record is left standing rather than edited to agree",
+       says(pre, "is not edited to match") && says(pre, "superseded, not wrong"),
+       "v4670's figures were correctly measured on the window it named. A record quietly rewritten to " +
+       "agree with a later round is a record nobody can audit, and this arc's whole method is the audit.");
+    ok("  ...and the page carries the reversal too, not only the record",
+       says(raw, "did not replicate") && /-0\.4662/.test(raw),
+       "the page quotes the app mask; a reader meeting +0.9024 there with no sequel would carry away a " +
+       "number this round retired");
+}
+
 console.log("\n14. *** FSR2's PRIMARY PATH (v4670): A MASK THE APPLICATION DECLARES ***");
 {
     const REC = path.resolve(path.dirname(PAGE), "render", "transparency-measurement.md");
@@ -837,6 +886,25 @@ console.log("\nunchecked here: the ADAPTER path, which is tools/ship/fsrPageDevi
     "they are not -- they are the smallest thing that has parallax.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
+//   v4671  the outcome reverted to uncollected                            1 RED.
+//   v4671  the confirming WINDOW rewritten so it is not disjoint           *** 0 RED TWICE ***. The row
+//          first tested the whole document for "54-98", which the outcome table also contains; scoped to
+//          240 characters of the `Frames.` bullet it STILL passed, because that same bullet mentions
+//          v4660 confirming "on 54-98". It now reads the bolded span the bullet DECLARES. Twice scoped,
+//          because the first scoping was not a scope.
+//   v4671  the two windows' figures edited so they disagree                *** 0 RED AT FIRST ***, same
+//          cause: an alternation over the whole file matched the figures where they are quoted elsewhere.
+//          Scoped to the replication table's own two rows.
+//   v4671  the record drops the inversion and keeps v4670's headline       1 RED.
+//   v4671  the superseded record quietly edited to agree                   1 RED.
+//   v4671  the page drops the reversal                                     1 RED -- on the SECOND attempt;
+//          the first mutation's phrase differed in CASE and never applied. A no-op, not a 0-RED.
+//
+// *** THE SCOPING DEFECT AGAIN, TWICE, IN A ROUND THAT BUILT A HELPER FOR ITS SIBLING. *** v4670 added
+// says() for wrapped prose and converted every row; these two failures are the OTHER half of the same
+// mistake -- not how the phrase is matched but WHERE it is looked for. A document that quotes its own
+// figures in a table, a bullet and a conclusion will satisfy any test that reads all of it. Both rows now
+// name the construct they hold. No helper fixes this one; the scope has to be chosen each time.
 //   v4670  the app mask DERIVES from the picture instead of declaring    1 RED -- and that mutation is the
 //          one that matters: a mask inferring transparency from the frame is the derived mask wearing the
 //          word "application", and would measure as one.

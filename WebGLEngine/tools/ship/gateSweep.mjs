@@ -8032,6 +8032,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4671 -- THE 281st CLOSING: the primary replicates, and the secondary inverts.
+    since356: Object.freeze({
+        at: "v4671", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H5 IS CONFIRMED AND IT REPLICATES TO TWO HUNDREDTHS OF A dB. *** v4669 and v4670 both " +
+                 "measured the reactive mask on translucent content, both found large effects, and both " +
+                 "said in the record and in a gate row that they were FIRST LOOKS naming this round. " +
+                 "Pre-registered in a commit containing no data -- hypothesis, direction, statistic (a " +
+                 "conjunction of one-sided paired t and sign, both required), and a window DISJOINT from " +
+                 "the one that produced the first look. Result over frames 54-98: +0.6456 dB, 45 UP and 0 " +
+                 "down, t = 16.82 (p = 4.4e-21), sign 45/45 (p = 2.8e-14), against the first look's " +
+                 "+0.6673 and 51 of 51. NINETY-SIX FRAMES ACROSS TWO WINDOWS WITHOUT ONE GOING THE WRONG " +
+                 "WAY -- a record nothing else in this arc has: dilation loses 8 of 51, the reactive mask " +
+                 "on opaque content loses 18. " +
+                 "*** AND THE DECLARED SECONDARY DID NOT REPLICATE. IT INVERTED. *** v4670 reported the " +
+                 "APPLICATION-supplied mask with the LARGER MEAN -- +0.9024 dB against the derived mask's " +
+                 "+0.6673, head to head +0.2351 at 28 up and 23 down -- and framed FSR2's primary path as " +
+                 "'larger on average and less reliable'. On the fresh window it is +0.1793 and LOSES 36 OF " +
+                 "45 head to head, -0.4662 dB. The reliable half of that claim survived and the headline " +
+                 "half did not: 28/23 was already near a coin flip, and a near-coin-flip is precisely the " +
+                 "statistic that does not replicate. " +
+                 "*** WHICH IS WHAT DECLARING IT IN ADVANCE WAS FOR. *** Carried forward as a finding, " +
+                 "v4670's number would have made this round publish a reversal instead of catch one -- " +
+                 "v4659's eight-predictor mistake that v4660 spent a round undoing. And the superseded " +
+                 "record is LEFT STANDING rather than edited to agree: v4670's figures were correctly " +
+                 "measured on the window it named, they are superseded and not wrong, and a record quietly " +
+                 "rewritten to match a later round is a record nobody can audit. A gate row fails if it " +
+                 "ever is. " +
+                 "Six sabotages, six caught, TWO 0-REDs and one no-op first. Both 0-REDs are the SCOPING " +
+                 "defect -- a row reading a whole document that quotes its own figures in a table, a bullet " +
+                 "and a conclusion, so a change in one place is masked by another. One of them survived " +
+                 "being scoped ONCE and needed scoping twice. v4670 built says() for the other half of this " +
+                 "mistake (how a phrase is matched); no helper fixes this half, because WHERE to look has " +
+                 "to be chosen each time. No gate added.",
+    }),
     // v4670 -- THE 280th CLOSING: FSR2's primary path, larger on average and less reliable.
     since355: Object.freeze({
         at: "v4670", swept: 0, green: 0, red: 0,

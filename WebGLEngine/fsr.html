@@ -1094,7 +1094,21 @@ async function tick() {
         // computed regardless so its counters keep reporting -- the readout below is the instrument v4659
         // built and it should not go dark because a different mask is in use -- and because the two being
         // side by side every frame is what makes them comparable at all.
-        const rxSource = $("rxsource").value;
+        // *** v4671 -- AND THE APP MASK'S ADVANTAGE DID NOT REPLICATE. IT INVERTED. ***
+    //
+    //                          frames 3-53 (v4670)      frames 54-98 (v4671)
+    //     DERIVED vs no mask    +0.6673  51 up / 0        +0.6456  45 up /  0
+    //     APP     vs no mask    +0.9024  48 up / 3        +0.1793  24 up / 20
+    //     APP vs DERIVED        +0.2351  28 up / 23       -0.4662   9 up / 36
+    //
+    // v4670 reported the application-supplied mask with the LARGER MEAN. On a fresh window that advantage
+    // is gone and the sign is reversed -- the derived mask wins 36 of 45 head to head. The RELIABLE half
+    // of v4670's claim survived and the headline half did not: 28/23 was already near a coin flip, and a
+    // near-coin-flip is precisely the statistic that does not replicate.
+    //
+    // The DERIVED mask, by contrast, reads +0.6673 then +0.6456 across two disjoint windows -- NINETY-SIX
+    // frames without one going the wrong way. Nothing else on this page has that record.
+    const rxSource = $("rxsource").value;
         const appMask = alphaCur < 1 ? renderReactiveApp(vpCur, sxCur, alphaCur) : null;
         reactiveMask = rxSource === "app" ? (appMask || rx.data) : rx.data;
         // The same quantile treatment the shading mask takes, and for the same reason v4655 had to learn:
