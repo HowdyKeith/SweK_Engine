@@ -144,9 +144,17 @@ const fieldMs = Date.now() - t1;
     // on the real tree: no hand-written fixture has a file that is a fifth of its repository.
     const perFile = new Map();
     for (const a of field.water.areas) perFile.set(a.path, (perFile.get(a.path) || 0) + 1);
+    // v4701 -- THE BIGGEST LAKE IS DERIVED, NOT NAMED. This row said "the biggest lake" and tested es-universe.json,
+    // which WAS the biggest when it was written. The learned-gate rounds then committed three larger data files
+    // (tools/ship/genGate-folds.json at v4696, two gzipped fold caches at v4699 and v4701), the star catalogue's
+    // share fell from ~18% to 9.8%, and at v4701 its lake became small enough to need no split -- so the row went
+    // red while the property it names still held: the actual biggest lake was being split. Picking the biggest
+    // by size keeps the row about the splitter, which is what it was for.
+    const biggest = field.lakes.slice().sort((p, q) => q.lines - p.lines)[0];
     ok("!! *** the biggest lake is SPLIT into pieces small enough to survive the stamper's own area cap ***",
-        (perFile.get(star && star.path) || 0) > 1,
-        "es-universe.json -> " + (perFile.get(star && star.path) || 0) + " polygons; " +
+        !!biggest && (perFile.get(biggest.path) || 0) > 1,
+        (biggest ? biggest.path.split("/").pop() + " (" + biggest.lines.toLocaleString() + " lines, " + biggest.cells + " cells)" : "no lake") +
+        " -> " + (biggest ? perFile.get(biggest.path) || 0 : 0) + " polygons; " +
         field.water.areas.length + " polygons for " + field.stats.lakeFiles + " data files");
     let worst = 0;
     for (const a of field.water.areas) {

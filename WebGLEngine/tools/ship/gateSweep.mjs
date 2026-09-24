@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4701 -- THE 308th CLOSING: H5 measured on fresh data, and v4699's observation does not replicate.
+    since383: Object.freeze({
+        at: "v4701", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateAbsoluteMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/repoTerrain-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S DATA TURNED IT RED, and both verify passes said so. The gate maps the real repository and sizes large files by bytes, so the learned-gate caches are now its biggest lakes -- genGate-folds.json (267,142 line-equivalents, v4696) and the two 14 MB gzipped fold caches (~180k each, v4699 and v4701) -- against the star catalogue's 208,406. Its split row said \"the biggest lake\" and tested es-universe.json by name; the catalogue's share had fallen from ~18% to 9.8%, and v4701's cache took its lake below the size that needs a split. The PROPERTY still held -- the actual biggest lake was split into 2 polygons -- so the row now DERIVES the biggest lake instead of naming it. Three sabotages, three red: a splitter that never splits, the smallest lake, and the old name. Noted and not chased: with splitting disabled the cap row still passes, so at today's sizes no lake would exceed the stamper's cap unsplit -- the split row is what keeps that path exercised." }),
+        ]),
+        verdict: "*** H5 IS NOT SUPPORTED, AND NOT NARROWLY. *** v4700's runner ran as committed at slab speed x4, " +
+                 "seeds 11-20: seven scenes harvested, 350 trainings, 319 s. The absolute set beat its OWN shuffled " +
+                 "twin on four folds of seven with a NEGATIVE mean, -0.0386, t p 0.832, sign p 0.5. This is not the " +
+                 "one-fold price v4700 named in advance -- checker, bars and edges all go the wrong way. The " +
+                 "pre-registered reading: v4699's observation does not replicate as a matched comparison at a fresh " +
+                 "cell, and v4700 section 2 said before the data what that cannot separate -- no transfer, or " +
+                 "transfer at x2 that does not survive x4. The x2 cache was not re-analysed, as the document forbade. " +
+                 "*** THE CONTROLS HELD, SO THE NEGATIVE MAY BE READ. *** C11 quiet both ways (sign p 0.5 and 0.773); " +
+                 "C12 re-derived all FIVE arms at fold zone, seed 11 bit for bit; C5 for the weights and both scalers. " +
+                 "And a check v4699 did not need: FRESHNESS. The whole of v4700 rested on data nobody had seen, and a " +
+                 "harvest that ignored the speed control would have handed back x2's frames under an x4 name -- this " +
+                 "page's startframe once did exactly that. Every scene's positive count moved (checker 16918 -> 19278, " +
+                 "bars 9173 -> 11535), and a sabotage that set them equal reddens it. " +
+                 "*** THE ONE THING THAT REPEATS IS AN INVERSION, AND IT IS A DESCRIPTION. *** On edges both learned " +
+                 "sets rank BELOW chance at x2 (0.413, 0.412) and again at x4 (0.340, 0.386); at x4 checker joins it " +
+                 "(0.400, 0.315). The obvious story -- the held-out base rate sits far from the training folds' -- was " +
+                 "written into the first draft of the secondary line and was FALSE when computed: zone's base rate is " +
+                 "as far from its training scenes' as checker's (0.367 against 0.366) and zone ranks above chance. " +
+                 "The line now prints the distances instead of an explanation. " +
+                 "*** FOURTEEN SABOTAGES, FOURTEEN RED, *** including the stale-data one and v4699's own error as code " +
+                 "(h5 reading SHUF_A). The freshness row first compared the x4 labels block by block against the x2 " +
+                 "cache and took the gate to 3269 ms, over budget, to catch a failure that identical COUNTS already " +
+                 "catch; it now reads v4699's recorded counts and runs in 1.8 s. " +
+                 "*** WHERE THE LEARNED GATE STANDS AFTER FIVE HYPOTHESES. *** H1 refuted, H2 refuted, H3 unreportable, " +
+                 "H4 not supported, H5 not supported: with seeds that seed, a statistic that does not pool and data " +
+                 "nobody had seen, no block-local feature set has been shown to rank the per-block decision on content " +
+                 "it did not train on. v4698 section 7 named the next question for exactly this outcome -- whether the " +
+                 "oracle's 0.32 dB is reachable by ANYTHING that does not see the answer -- and it is a different " +
+                 "question from any this arc has asked, not a sixth feature set.",
+    }),
     // v4700 -- THE 307th CLOSING: the observation was mis-named, and its test is declared on data nobody has seen.
     since382: Object.freeze({
         at: "v4700", swept: 0, green: 0, red: 0,
