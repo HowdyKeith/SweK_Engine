@@ -8032,6 +8032,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4681 -- THE 291st CLOSING: frame generation runs on a picture, and loses to a cross-fade.
+    since366: Object.freeze({
+        at: "v4681", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageGen-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** EIGHT ROUNDS OF FSR3 AND EVERY ONE CLOSED BY SAYING fsr.html CALLED NONE OF IT. IT DOES " +
+                 "NOW, AND THE RESULT IS NEGATIVE. *** The page generates the frame between two PRESENTED " +
+                 "frames at half-integer scene time and grades it against a reference it simply draws there, " +
+                 "because the scene is an analytic function of that number. On four consecutive frames the " +
+                 "generated frame is WORSE than a plain cross-fade of the same two inputs: -0.38, -0.82, " +
+                 "-0.25, -0.37 dB. Four of four down, against the fixtures' +9.91 and +7.80. " +
+                 "*** AND THE REASON IS A NUMBER. *** This page's motion is 0.80 to 1.26 px MEAN, against the " +
+                 "3.2 and 8.8 px the fixtures run at -- the slab moves 0.055 world units a frame. Under about " +
+                 "a pixel a cross-fade is very nearly exact while a block grid still pays its quantisation " +
+                 "everywhere. The control is not a straw man: the cross-fade beats HOLDING the previous frame " +
+                 "by 3.0 to 3.7 dB. " +
+                 "*** FIVE SABOTAGES, AND THE TWO THAT SCORED 0 RED ARE THE FINDING. *** Feeding the field as " +
+                 "PREV-indexed -- v4677's assumption, which v4680 measured as a 7.35 dB defect on a " +
+                 "silhouette -- moves this page by between 0.00 and 0.33 dB, MEASURED rather than left as a " +
+                 "zero: -0.38, -0.81, -0.58, -0.44 against -0.38, -0.82, -0.25, -0.37. And recording the " +
+                 "pre-RCAS accumulator instead of what was presented moves nothing a threshold here can see. " +
+                 "*** SO THIS PAGE CANNOT DETECT ITS OWN ARC'S LARGEST CORRECTNESS DEFECT, AND THAT IS A " +
+                 "PROPERTY OF THE CONTENT, NOT OF THE ROWS. *** It was built to measure UPSCALING and its " +
+                 "motion is an order of magnitude below what a frame generator is judged on. A slab-SPEED " +
+                 "control would turn one negative reading into a curve and does not exist; the closing line " +
+                 "names it. OFF is the default and a row holds that every other readout is string-identical " +
+                 "between the arms, so the five older page gates still measure what they measured.",
+    }),
     // v4680 -- THE 290th CLOSING: three rounds of frames were built on the wrong end of the field.
     since365: Object.freeze({
         at: "v4680", swept: 0, green: 0, red: 0,

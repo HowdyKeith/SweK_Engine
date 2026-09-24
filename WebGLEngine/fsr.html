@@ -67,6 +67,10 @@
       <option value="all">dilation feeds: the clip chain AND the reactive mask</option>
       <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
     </select>
+    <select id="genframe">
+      <option value="off">frame generation: OFF (the control -- every figure on this page is this arm)</option>
+      <option value="on">frame generation: ON (FSR3 -- generate the frame between two and grade it)</option>
+    </select>
     <select id="dilate">
       <option value="on">dilate depth+motion: ON (FSR2's early pass)</option>
       <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
@@ -91,6 +95,7 @@
   <div class="stat" id="reactstat"></div>
   <div class="stat" id="splitstat"></div>
   <div class="stat" id="dilstat"></div>
+  <div class="stat" id="genstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -225,6 +230,14 @@ import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors
 import { viewProj } from "./render/rasterProbe.js";
 import { jitterProjection } from "./render/jitter.mjs";
 import { disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU } from "./render/temporalReject.mjs";
+// *** v4681 -- FSR3's FRAME GENERATION, WHICH EVERY GATE IN THAT ARC HAS CLOSED BY SAYING THIS PAGE DOES NOT
+// CALL. *** v4673 estimated motion from colour, v4674 mirrored it on the device, v4675 made it sub-pixel,
+// v4676 reconciled it with the application's field, v4677 turned a field into a frame, v4678 and v4679 filled
+// the holes, and v4680 found that three of those rounds had the field's indexing backwards. Every one of them
+// measured on a synthetic fixture. This is the first time any of it runs on a picture.
+import { opticalFlowCPU } from "./render/opticalFlow.mjs";
+import { reconcileFlowCPU } from "./render/flowReconcile.mjs";
+import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -554,6 +567,11 @@ const sceneTPrev = () => Math.max(startFrame, frame + startFrame - 1);
 // the page has to keep last frame's depth buffer alongside last frame's colour. Null on the first frame for
 // the same reason `hist` is: there is no previous depth, and a zero-filled one would be believed.
 let prevDepth = null;
+// *** THE GENERATOR'S OWN HISTORY, AND IT IS NOT prevDepth. *** prevDepth is the DILATED record the clip test
+// compares against; the generator wants the plain per-pixel depth of the frame it is interpolating from, and
+// render/holeFill.mjs's disocclusion test would read a dilated silhouette as a surface that is not there.
+// Two histories because they answer two questions, which is the same reason `source` and `side` are arrays.
+let prevShown = null, prevDepthGen = null;
 // The scene is flat: it is a function of (u, v) with no z at all, so every pixel sits on one plane and the
 // reprojection is a pure translation. Allocated once -- it never changes.
 const FLAT_DEPTH = new Float32Array(D * D);
@@ -664,6 +682,7 @@ async function reset() {
     jit.index = startFrame % jit.phaseCount;
     if (lockRing && lgpu) { try { lgpu.destroyRing(lockRing); } catch {} }
     lockRing = null;                             // see the declaration: a ring outlives a frame, not a reset
+    prevShown = null; prevDepthGen = null;       // and the generator's pair, for the same reason
     prevDepth = null;                            // the depth history goes with the colour history, or frame 1
                                                  // compares this camera's depths against the last camera's
     // *** THESE THREE READ THE SCENE CLOCK TOO, AND THEY DID NOT IN THE FIRST DRAFT OF THIS CHANGE. ***
@@ -1271,6 +1290,79 @@ async function tick() {
                   `on this arm. FSR2 runs this pass BEFORE depth clip and the locks; this tree has never had ` +
                   `it, and turning it on moves the disocclusion counts, the 212/106 alternation and the ` +
                   `reactive mask's fired set. Whether it moves the PICTURE is a paired measurement.`;
+    // *** v4681 -- THE GENERATED FRAME, AND IT IS GRADED AGAINST ONE THAT WAS REALLY RENDERED. ***
+    //
+    // FSR3 inserts a frame between two PRESENTED frames, so the inputs here are `prevShown` and `shown` --
+    // after accumulation and after RCAS, which is what a viewer sees. The truth is truthPersp at scene time
+    // sceneT() - 0.5, which this page can simply draw: the scene is an analytic function of that number.
+    //
+    // *** THE INPUTS ARE ACCUMULATED AND THE TRUTH IS NOT, SO SOME OF THE ERROR BELOW IS THE ACCUMULATOR'S. ***
+    // That is not hidden and it is not corrected for: the CROSS-FADE control carries exactly the same
+    // handicap, since it is built from the same two presented frames, so the DIFFERENCE between them is the
+    // generator's and the absolute numbers are not. A reader who wants the generator alone wants
+    // render/frameInterp-selfcheck.mjs, where the inputs are clean renders.
+    //
+    // *** AND THE FIELD IS PASSED AS `indexedBy: "cur"`, WHICH IS THE ENTIRE POINT OF v4680. *** reconcile
+    // returns a CUR-indexed field; feeding this page's non-uniform motion to the v4677 assumption would be
+    // the 7.35 dB mistake that round measured, and it would look like a plausible frame.
+    let genStat = null;
+    if (dolly && $("genframe").value === "on" && prevShown && prevDepthGen && depth) {
+        const tG = 0.5;
+        const of = opticalFlowCPU({ cur: shown, prev: prevShown, w: D, h: D, block: 8, searchRadius: 4, levels: 3 });
+        const rc = reconcileFlowCPU({ cur: shown, prev: prevShown, w: D, h: D, ...of, motion: motionUsed, depth });
+        // the block grid's nearest surface, which is what the splat's priority and the fill's `prefer` need
+        const dBlk = new Float32Array(of.bw * of.bh);
+        for (let by = 0; by < of.bh; by++) for (let bx = 0; bx < of.bw; bx++) {
+            let m = Infinity;
+            for (let y = by * of.block; y < Math.min(by * of.block + of.block, D); y++)
+                for (let x = bx * of.block; x < Math.min(bx * of.block + of.block, D); x++) m = Math.min(m, depth[y * D + x]);
+            dBlk[by * of.bw + bx] = m;
+        }
+        const gen = interpolateFrameCPU({ prev: prevShown, cur: shown, w: D, h: D, flow: rc.flow,
+            bw: of.bw, bh: of.bh, block: of.block, depthBlock: dBlk, indexedBy: "cur", t: tG,
+            fill: { side: "depth", depthPrev: prevDepthGen, depthCur: depth, radius: 8 } });
+        const cf = crossFadeCPU({ prev: prevShown, cur: shown, w: D, h: D, t: tG });
+        // *** ANY PIXEL THE FILLER STILL COULD NOT REACH IS CROSS-FADED, AND THE COUNT IS PRINTED. *** Leaving
+        // it at zero would put a black speck in the picture and a hole in the number, and both would be this
+        // page reporting a frame it did not generate as one it did.
+        const patched = Float32Array.from(gen.frame);
+        for (let j = 0; j < D * D; j++) if (gen.hole[j]) for (let c = 0; c < 4; c++) patched[j * 4 + c] = cf[j * 4 + c];
+        const tMid = sceneT() - tG;
+        const midRef = truthPersp(dollyVP(tMid), kind, objects ? tMid * SLAB_DX : 0, alphaCur);
+        // *** HOW BIG THE MOTION IS, BECAUSE A COMPENSATION'S WORTH IS A FUNCTION OF IT AND THE FIXTURES RAN
+        // AT 3.2 AND 8.8 px. *** A field of nearly-zero vectors makes a cross-fade nearly right and gives
+        // block-resolution compensation nothing to win with while it still pays the block grid's error.
+        let magSum = 0, magMax = 0;
+        for (let i = 0; i < of.bw * of.bh; i++) {
+            const m = Math.hypot(rc.flow[i * 2], rc.flow[i * 2 + 1]);
+            magSum += m; magMax = Math.max(magMax, m);
+        }
+        genStat = { gen: psnr(patched, midRef), cf: psnr(cf, midRef), hold: psnr(prevShown, midRef),
+                    left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,
+                    blocks: of.bw * of.bh, tMid, meanMag: magSum / (of.bw * of.bh), maxMag: magMax };
+    }
+    $("genstat").textContent = !dolly ? ""
+        : genStat
+            ? `frame generation [ON]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
+              `scores ${genStat.gen.toFixed(2)} dB against a frame that WAS rendered -- the cross-fade of the same ` +
+              `two presented frames scores ${genStat.cf.toFixed(2)} dB, so motion compensation is worth ` +
+              `${(genStat.gen - genStat.cf >= 0 ? "+" : "") + (genStat.gen - genStat.cf).toFixed(2)} dB here, ` +
+              `and holding the previous frame scores ${genStat.hold.toFixed(2)} dB. THE MOTION IS ` +
+              `${genStat.meanMag.toFixed(2)} px mean and ${genStat.maxMag.toFixed(2)} px worst, against the ` +
+              `3.2 and 8.8 px the fixtures in render/frameInterp-selfcheck.mjs and render/holeFill-selfcheck.mjs run at. ` +
+              `The field: ${genStat.counts.app} of ${genStat.blocks} blocks took the application's vector, ` +
+              `${genStat.counts.flowBeat} the colour flow's on merit, ${genStat.counts.flowOnly} because the ` +
+              `application had none. ${genStat.filled} pixels were filled by the disocclusion test ` +
+              `(${genStat.abst} of them abstaining to a blend) and ${genStat.left} were still unreachable and are ` +
+              `cross-faded. BOTH inputs are accumulated frames and the truth is a clean render, so the absolute ` +
+              `numbers carry the accumulator's error too -- the DIFFERENCE is the generator's, because the ` +
+              `control is built from the same two frames.`
+            : $("genframe").value === "on"
+                ? "frame generation: ON but not computed on this frame (it needs a previous presented frame and a depth buffer -- frame 1 has neither)"
+                : `frame generation [OFF -- the control]: every figure on this page and in its gates was ` +
+                  `measured on this arm. FSR3 inserts a frame between two presented ones; seven rounds built ` +
+                  `that path on synthetic fixtures and none of it has ever run on a picture. Turning it on ` +
+                  `costs a second truthPersp per frame and answers whether it beats a cross-fade here.`;
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +
@@ -1278,6 +1370,11 @@ async function tick() {
               `${objGap.nBg} -- the second is the control, and it is the identity model matrix agreeing with ` +
               `itself   -- computed on ${ogpu ? "the device" : "the CPU"}`
             : "object motion: no gap computed";
+    // *** THE GENERATOR'S HISTORY IS SET LAST, AND FROM `shown` RATHER THAN `hist`. *** What FSR3 interpolates
+    // between is what was PRESENTED, which on this page is post-RCAS. Recording `hist` instead would generate
+    // between two frames nobody saw.
+    prevShown = shown;
+    if (dolly) prevDepthGen = depth;
     requestAnimationFrame(tick);
 }
 

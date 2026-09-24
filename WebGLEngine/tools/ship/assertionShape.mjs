@@ -491,8 +491,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // Ninth round running with the same four rows by one and the other four held.
     // v4678 -- 1766 -> 1767 for render/holeFill-selfcheck.mjs. Tenth round running with the same four rows
     // by one and the other four held.
-    gates: 1767, usesOk: 1746, definesOk: 1738, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1639, condFirst: 91, unknownSignature: 16,
+    // v4681 -- 1767 -> 1768 for tools/ship/fsrPageGen-selfcheck.mjs, FSR3's frame generation on the page.
+    // Eleventh round running with the same four rows by one and the other four held.
+    gates: 1768, usesOk: 1747, definesOk: 1739, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1640, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
