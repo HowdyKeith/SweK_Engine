@@ -296,10 +296,50 @@ trusted from the reading alone. No third-party bytes anywhere, same reasoning as
 **What is still not proven after this round**, named plainly rather than silently: narrower
 `LayerElementMaterial` mapping types (`ByPolygonVertex`/`ByVertice`/`AllSame`) and more than one separate Mesh
 Model in a file; non-`DiffuseColor` texture slots (bump/normal/emissive/specular/alpha) and external (non-
-embedded) texture references; more than one morph target on a mesh, or morph targets combined with skin; and
-the "mixed skin scope" simplification — only the first `SkinnedMesh`'s skeleton is treated as real skin, and
-this is a REAL, UNGATED RISK, not merely a narrower behavior: any other mesh in the same file inherits joint
-0's entire ANIMATED motion at render time (not "stays static"), so a static prop or a mesh meant to follow a
-different bone visibly drags or detaches whenever joint 0 animates — an adversarial review of this round found
-an earlier, softer wording of this note understated that severity; see `gpu/fbxLoad.js`'s own header for the
-corrected wording and `tools/ship/fbxIngest-selfcheck.mjs`'s own header for why no fixture exercises it.
+embedded) texture references; more than one morph target on a mesh, or morph targets combined with skin. The
+"mixed skin scope" simplification's real severity, understated by an earlier, softer wording of this note, is
+fixed as of `fbxMixedSkinScope.ascii.fbx` below — see that entry.
+
+## `fbxMixedSkinScope.ascii.fbx` — the round that fixed the mixed-skin-scope risk an earlier round's own adversarial review found
+
+A tenth file, added when an adversarial review of the four-gap-closure round above (`fbxMultiMaterial.ascii.fbx`
+et al.) found that the pre-existing "mixed skin scope" simplification was a REAL, silent production risk that
+round's own multi-mesh support made reachable for the first time, not merely a narrower named behavior: a
+secondary mesh bound to a synthetic joint 0 inherited joint 0's ENTIRE ANIMATED MOTION at render time, so a
+static prop bundled in the same file would visibly swing with a character's root-bone animation, and a mesh
+meant to follow a different bone would visibly detach from it. Same discipline as every fixture above: hand-
+authored, plain-ASCII FBX 7.4, no third-party content, this time written directly against `gpu/
+SkeletalAnimator.js`'s own real-time joint-matrix computation (confirmed by reading that file directly, not
+assumed) to design a fix that mirrors `gpu/GLBParser.js`'s own PRIMARY `unskinnedPrims` strategy — registering
+a secondary mesh's own node as a new joint with an identity inverse-bind matrix, rather than that file's older
+fallback of baking a parent-chain-relative offset.
+
+**What it is:** the same 2-bone skinned quad as `fbxAnim.ascii.fbx` (root at the origin, child offset
+`(0,1,0)`), but with BOTH bones now animating INDEPENDENTLY — root 0 → 90 degrees about X (so joint 0, root's
+position in `skin.joints`, genuinely animates) and child ALSO 0 → 90 degrees about Y, its own separate curve
+on a separate axis — plus TWO plain, unskinned secondary meshes: `"propMesh"` (a small quad offset to
+`x=10..12`) with no parent-Model connection, so FBXLoader attaches it directly to the scene root, unrelated to
+any bone; and `"attachMesh"` (a small unit quad) WITH a parent-Model connection to `"child"`, a genuine bone
+attachment (e.g. a held item meant to track a wrist).
+
+**What it proves, and the limit:** `tools/ship/fbxIngest-selfcheck.mjs` section 12 proves the fix through the
+shipped pipeline (`skin.joints` comes back `[3, 4, 2, 5]` — root, child, then propMesh's and attachMesh's OWN
+nodes each appended as a new joint, rather than either being silently absent from `skin.joints` and bound to
+existing joint 0, v4's bug) and at RENDER TIME, two ways: propMesh's 6 corners come back EXACTLY their
+authored coordinates at the clip's midpoint (not dragged by root's rotation), and attachMesh's 6 corners match
+an INDEPENDENT three.js oracle (a plain root/child/attach `Object3D` chain, real `Quaternion.setFromAxisAngle`,
+no `FBXLoader`/`normalizeFbxGroup` involved) EXACTLY — correctly tracking CHILD's own Y-rotation composed with
+root's X-rotation, not merely root's rotation alone (what the old joint-0-only binding would give). The
+attachMesh half was added specifically because an adversarial review of this fix's first draft named
+"correctly follows a different bone" as the more discriminating, still-untested scenario next to "stays
+static" — the oracle values were built and cross-checked BEFORE being written into the gate, after a first
+hand-trigonometry attempt at them had its own rotation-order mistake (caught by the cross-check, not shipped).
+The `SHADER_JOINT_LIMIT`-exceeded fallback path (walking the real parent chain for the nearest existing joint
+ancestor and baking the relative transform) is proven separately and directly — see
+`tools/ship/fbxIngest-selfcheck.mjs` section 13, a synthetic 65-joint graph built in plain Node with no FBX
+file at all (this fixture only carries 2 real joints). That fallback's first draft had a genuine math bug an
+adversarial review caught (baking an ancestor-relative delta double-applies the ancestor's own inverse-bind
+matrix and silently drops its accumulated world offset, wrong even at rest pose); section 13 regression-gates
+the corrected formula directly. Not proven anywhere: a `SkinnedMesh` bound to a genuinely different skeleton
+than the reference, which now takes the same new-joint path (no longer dragged by a foreign character's
+motion) but loses its OWN internal multi-bone deformation, a real, narrower, named remaining gap.

@@ -100,19 +100,26 @@
 //     gpu/fbxLoad.js's samplerInterpolation(). A future reader should not read a missing CUBICSPLINE fixture
 //     as an unclosed item on this list; closing it would need a patched or newer FBXLoader, which is out of
 //     this gate's scope entirely, not merely undone within it.
-//   * MIXED-SKIN SCOPE -- A REAL, UNGATED RISK, NOT MERELY A NARROWER DESIGN CHOICE (an adversarial review of
-//     this round found the practical severity here was understated by an earlier, softer wording of this same
-//     bullet). When a file has more than one mesh, only the FIRST SkinnedMesh's skeleton is treated as the
-//     real skin; any other mesh (a plain Mesh, or a SkinnedMesh bound to a DIFFERENT skeleton) gets synthetic
-//     joint-0/full-weight rows. This is NOT "stays static" -- it INHERITS JOINT 0'S ENTIRE ANIMATED MOTION at
-//     render time (the vertex is baked to its correct world bind pose, then the skinning shader multiplies
-//     that by joint 0's current, animated world matrix). A static prop bundled in the same file would visibly
-//     swing with the character's root-bone motion; a mesh meant to follow a DIFFERENT bone would visibly
-//     detach from it. No fixture in this tree exercises this combination -- an animating joint 0 plus a second
-//     mesh together -- so this real risk is documented here rather than gated, not merely a narrower behavior
-//     section 8's multi-mesh path could be assumed to also cover (it does not: section 8's fixture carries no
-//     skin at all). GLBParser.js's own considerably more sophisticated per-primitive "walk the parent chain to
-//     the nearest joint ancestor, bake the bind-pose local transform" logic is what would actually close this.
+//   * MIXED-SKIN SCOPE -- FIXED AND GATED (sections 12-13, v5), AFTER AN ADVERSARIAL REVIEW OF v4 FOUND THE
+//     OLD SYNTHETIC-JOINT-0 BINDING WAS A REAL, SILENT PRODUCTION RISK, NOT MERELY A NARROWER BEHAVIOR: a
+//     secondary mesh in a multi-mesh skinned file INHERITED JOINT 0'S ENTIRE ANIMATED MOTION (a static prop
+//     would visibly swing with a character's root-bone animation; a mesh meant to follow a different bone
+//     would visibly detach from it). gpu/fbxLoad.js's normalizeFbxGroup() now registers a secondary mesh's
+//     OWN node as a new joint (identity inverse-bind matrix), mirroring GLBParser.js's own primary
+//     unskinnedPrims strategy, so the mesh tracks wherever it actually lives in the scene graph -- proven at
+//     RENDER TIME (not just in the parsed shape) by section 12, both for an unrelated static prop AND a
+//     genuine bone attachment checked against an independent three.js oracle. Bounded by a 64-joint
+//     SHADER_JOINT_LIMIT; past that, section 13 proves the fallback (walk the real parent chain for the
+//     nearest existing joint ancestor, bake the FULL world-space bind position) directly, in plain Node, via
+//     a synthetic 65-joint graph -- this exact fallback's FIRST DRAFT had a real, adversarial-review-caught
+//     math bug (baking an ancestor-relative delta double-applies the ancestor's own inverse-bind matrix and
+//     silently drops its accumulated world offset, wrong even at rest pose), which section 13 now regression-
+//     gates directly against the corrected formula. STILL NOT FIXED, named plainly: a SkinnedMesh bound to a
+//     genuinely DIFFERENT skeleton than the reference takes this SAME new-joint path (no longer dragged by a
+//     foreign character's motion) but loses its OWN internal multi-bone deformation, since only a single
+//     rigid joint is registered for it -- supporting a second, fully independent, simultaneously-animated
+//     skeleton in one combined draw call would need merging skeletons into one joint array with per-mesh
+//     index remapping, a distinctly larger piece of work not attempted here.
 //
 // ================================================================================================
 // THE FIXTURES, AND WHY THEY ARE HAND-WRITTEN RATHER THAN SOURCED
@@ -153,7 +160,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1120,13 +1127,297 @@ console.log("       PROVEN AS FAITHFUL PASS-THROUGH -- mapFbxAnimations() NEEDED
     }
 }
 
+// ---- 12. MIXED-SKIN-SCOPE FIX (v5) -- A SECONDARY MESH NO LONGER DRAGS WITH JOINT 0'S MOTION -------------------
+console.log("\n12. *** MIXED-SKIN-SCOPE FIX: a plain secondary mesh in a multi-mesh skinned file now tracks its");
+console.log("       OWN real position in the scene graph, PROVEN AT RENDER TIME (SkeletalAnimator), not just in");
+console.log("       the parsed shape -- an adversarial review of the v4 round found the old synthetic-joint-0");
+console.log("       binding silently dragged it by joint 0's full animated motion ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxMixedSkinScope.ascii.fbx");
+        ok("!! the committed mixed-skin-scope fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        // ---- 12a. the SHIPPED pipeline: skin.joints gets propMesh's OWN node appended, not bound to joint 0 ----
+        const SCRIPT_PARSE = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxMixedSkinScope.ascii"], {
+                "fbxMixedSkinScope.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxMixedSkinScope.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.stack || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                vertexCount: mesh.vertexCount,
+                isRigged: mesh.isRigged,
+                nodeNames: mesh.nodes ? mesh.nodes.map((n) => n.name) : null,
+                skinJoints: mesh.skin ? mesh.skin.joints : null,
+            };
+        }`;
+        const outParse = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT_PARSE });
+        if (outParse.skipped) { say("SKIP: " + outParse.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the 3-mesh (skinned quad + plain prop + bone attachment) fixture ***",
+                outParse.ok && outParse.result && outParse.result.ok,
+                outParse.ok ? JSON.stringify(outParse.result).slice(0, 200) : outParse.reason);
+            if (outParse.ok && outParse.result && outParse.result.ok) {
+                const r = outParse.result;
+                ok("!! *** vertexCount is EXACTLY 18 (6 each from fixtureMesh, propMesh, attachMesh, all non-",
+                    r.vertexCount === 18, "   indexed 2-triangle expansions), isRigged is true. got " + r.vertexCount);
+                ok("!! *** nodes are EXACTLY [\"\", \"fixtureMesh\", \"propMesh\", \"root\", \"child\", \"attachMesh\"] ***",
+                    JSON.stringify(r.nodeNames) === JSON.stringify(["", "fixtureMesh", "propMesh", "root", "child", "attachMesh"]),
+                    JSON.stringify(r.nodeNames));
+                // *** THE CENTRAL SHAPE CLAIM: skin.joints is [3, 4, 2, 5] -- root, child (the real skeleton,
+                // unchanged from fbxAnim.ascii.fbx's own established Cluster order), THEN propMesh's OWN node
+                // (index 2), THEN attachMesh's OWN node (index 5), each appended as a NEW joint in mesh-visit
+                // order. Under v4's bug, neither propMesh nor attachMesh would appear in skin.joints at all --
+                // both were bound to EXISTING joint 0 (root) via a synthetic all-zero joints row, never
+                // registering their own node. ***
+                ok("!! *** skin.joints is EXACTLY [3, 4, 2, 5] -- propMesh's and attachMesh's OWN nodes, NOT",
+                    JSON.stringify(r.skinJoints) === JSON.stringify([3, 4, 2, 5]),
+                    "   re-using joint 0. got " + JSON.stringify(r.skinJoints));
+            }
+        }
+
+        // ---- 12b. RENDER-TIME PROOF: drive gpu/SkeletalAnimator.js to t=0.5s (root at 45deg about X) and ----
+        // ---- confirm propMesh's vertices land EXACTLY where they were authored -- not dragged by root ----
+        const SCRIPT_RENDER = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const { FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js");
+            const { parseFbx, normalizeFbxGroup } = await import("/gpu/fbxLoad.js");
+            const { SkeletalAnimator } = await import("/gpu/SkeletalAnimator.js");
+            try {
+                const buf = await (await fetch("/gpu/fixtures/fbxMixedSkinScope.ascii.fbx")).arrayBuffer();
+                const group = await parseFbx(buf, FBXLoader, { path: "/gpu/fixtures/" });
+                const parsed = await normalizeFbxGroup(group);
+
+                const animator = new SkeletalAnimator(parsed);
+                animator.setClip(0, 0);
+                animator.update(0.5);   // halfway through the 1s clip -> root at 45deg about X
+
+                function applySkin(vIdx) {
+                    const px = parsed.positions[vIdx*3], py = parsed.positions[vIdx*3+1], pz = parsed.positions[vIdx*3+2];
+                    let ox = 0, oy = 0, oz = 0;
+                    for (let k = 0; k < 4; k++) {
+                        const j = parsed.joints[vIdx*4+k];
+                        const w = parsed.weights[vIdx*4+k];
+                        if (w === 0) continue;
+                        const jm = animator.jointMatrices.subarray(j*16, j*16+16);
+                        ox += w * (jm[0]*px + jm[4]*py + jm[8]*pz + jm[12]);
+                        oy += w * (jm[1]*px + jm[5]*py + jm[9]*pz + jm[13]);
+                        oz += w * (jm[2]*px + jm[6]*py + jm[10]*pz + jm[14]);
+                    }
+                    return [ox, oy, oz];
+                }
+                // fixtureMesh corners 0-5 (triangles [0,1,2],[1,3,2] over control points 0-3); propMesh
+                // corners 6-11 (same pattern, control points offset by 10 in X); attachMesh corners 12-17
+                // (control points (0,0,0),(1,0,0),(0,1,0),(1,1,0), parented under "child").
+                const skinnedRoot = applySkin(0);    // control point 0, root-bound, y=z=0 -> on the rotation
+                                                       // axis, should stay put regardless of root's rotation
+                const propCorners = [6,7,8,9,10,11].map(applySkin);
+                const attachCorners = [12,13,14,15,16,17].map(applySkin);
+                return { ok: true, skinnedRoot, propCorners, attachCorners };
+            } catch (e) { return { ok: false, error: String(e && e.stack || e) }; }
+        }`;
+        const outRender = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT_RENDER });
+        if (outRender.skipped) { say("SKIP: " + outRender.reason); fails++; }
+        else {
+            ok("!! *** the render-time probe (parseFbx/normalizeFbxGroup + a real SkeletalAnimator driven to",
+                outRender.ok && outRender.result && outRender.result.ok,
+                "   t=0.5s) runs without error: " +
+                (outRender.ok ? JSON.stringify(outRender.result).slice(0, 200) : outRender.reason));
+            if (outRender.ok && outRender.result && outRender.result.ok) {
+                const r = outRender.result;
+                ok("!! ...sanity: fixtureMesh's root-bound on-axis vertex stays at (0,0,0) -- confirms the",
+                    JSON.stringify(r.skinnedRoot) === JSON.stringify([0, 0, 0]),
+                    "   animator is actually driving something, not a silent no-op. got " + JSON.stringify(r.skinnedRoot));
+                // *** THE CENTRAL RENDER-TIME CLAIM. *** Measured directly against this exact fixture (this
+                // file's own header): under v4's bug, applying joint 0's (root's) 45-degree rotation matrix
+                // to propMesh's raw corners would move e.g. (10,2,0) -> (10, 1.4142135..., 1.4142135...) --
+                // the SAME sin(45)/cos(45) pattern fixtureMesh's own child-bound corners show above (see
+                // section 12b's earlier PASS lines). Under the v5 fix, propMesh has its OWN joint (an
+                // identity-inverse-bind-matrix entry for its own, never-animated node), so it must come back
+                // EXACTLY as authored -- not close, not approximately static, EXACT.
+                const expectProp = [
+                    [10, 0, 0], [12, 0, 0], [10, 2, 0],
+                    [12, 0, 0], [12, 2, 0], [10, 2, 0],
+                ];
+                ok("!! *** THE CENTRAL CLAIM: propMesh's 6 corners are EXACTLY their authored coordinates at",
+                    JSON.stringify(r.propCorners) === JSON.stringify(expectProp),
+                    "   t=0.5s (root mid-rotation) -- NOT dragged by joint 0. got " + JSON.stringify(r.propCorners));
+
+                // *** THE SECOND CLAIM, ADDED AFTER AN ADVERSARIAL REVIEW OF THIS FIX NAMED IT THE MORE
+                // DISCRIMINATING TEST STILL MISSING: *** attachMesh is parented under "child", and child now
+                // carries its OWN independent rotation (0->90deg about Y) SEPARATE from root's (0->90deg about
+                // X) -- so a mesh still (incorrectly) bound to joint 0 alone would show ONLY root's rotation
+                // applied to its bind-pose world position, never child's own additional Y-rotation. The
+                // expected values below are NOT hand-derived trigonometry -- they come from an INDEPENDENT
+                // three.js oracle (a plain root/child/attach Object3D chain, real Quaternion.setFromAxisAngle,
+                // real .updateMatrixWorld(), NO FBXLoader and NO normalizeFbxGroup involved at all) built
+                // specifically to check this fixture, the same "independent oracle" discipline
+                // fbxAnimAdvanced.ascii.fbx's own gate section already established in this file. A first hand-
+                // trigonometry attempt at these numbers had a rotation-order/axis-swap mistake in ITS OWN
+                // math (not in normalizeFbxGroup()) -- caught by cross-checking against this independent
+                // oracle before it was ever written into an assertion, exactly the failure mode this
+                // discipline exists to catch.
+                const expectAttach = [
+                    [0, 0.7071067690849304, 0.7071067690849304],
+                    [0.7071067690849304, 1.207106739282608, 0.2071067988872528],
+                    [0, 1.4142135381698608, 1.4142135381698608],
+                    [0.7071067690849304, 1.207106739282608, 0.2071067988872528],
+                    [0.7071067690849304, 1.9142135083675385, 0.9142135679721832],
+                    [0, 1.4142135381698608, 1.4142135381698608],
+                ];
+                ok("!! *** THE SECOND CENTRAL CLAIM: attachMesh's 6 corners match the INDEPENDENT three.js",
+                    JSON.stringify(r.attachCorners) === JSON.stringify(expectAttach),
+                    "   oracle EXACTLY -- correctly tracking child's OWN Y-rotation, not just root's X-rotation " +
+                    "alone (what joint-0-only binding would give). got " + JSON.stringify(r.attachCorners));
+            }
+        }
+    }
+}
+
+// ---- 13. THE SHADER_JOINT_LIMIT FALLBACK, DIRECTLY, IN PLAIN NODE -- NO BROWSER, NO FBX FILE NEEDED ------------
+console.log("\n13. *** THE SHADER_JOINT_LIMIT-EXCEEDED FALLBACK, EXERCISED DIRECTLY: a 65-joint reference");
+console.log("       skeleton (>= the 64 limit) forces normalizeFbxGroup() into the ancestor-reuse path -- an");
+console.log("       adversarial review of section 12's own first draft caught a REAL MATH BUG here (not merely");
+console.log("       'unproven'): the first version baked an ANCESTOR-RELATIVE delta into the vertex, which");
+console.log("       DOUBLE-APPLIES the ancestor's own inverse-bind matrix at render time and silently drops");
+console.log("       the ancestor's entire accumulated world offset -- wrong even at REST POSE ***");
+{
+    // Plain-Node, no browser, no committed .fbx fixture -- this file's own header states exactly this is the
+    // point of normalizeFbxGroup()'s duck-typing design: "can be exercised against a hand-built fake
+    // THREE.Group in plain Node." A 65-bone linear chain (bone i's world position (0,i,0), pure translation,
+    // no rotation -- simple enough to hand-verify, distinctive enough that a wrong formula produces a wrong
+    // number rather than accidentally the right one) plus a secondary mesh parented under bone 10 with a
+    // real local offset (0,1.5,0) -- mirroring the adversarial review's own live reproduction exactly,
+    // including its reported ground truth (0, 11.5, 0).
+    const fbxLoadUrl = pathToFileURL(path.join(ENG, "gpu/fbxLoad.js")).href;
+    const { normalizeFbxGroup } = await import(fbxLoadUrl);
+
+    function vec3(x, y, z) { return { x, y, z }; }
+    function quatIdentity() { return { x: 0, y: 0, z: 0, w: 1 }; }
+    function mat4Translate(x, y, z) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
+    function mat4Invert(m) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, -m[12],-m[13],-m[14],1]); }
+
+    function buildFakeGroup() {
+        const N_BONES = 65;
+        const bones = [];
+        for (let i = 0; i < N_BONES; i++) {
+            bones.push({
+                name: "bone" + i, isBone: true,
+                position: vec3(0, 1, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+                children: [], parent: null,
+                matrixWorld: { elements: mat4Translate(0, i, 0) },
+            });
+        }
+        for (let i = 1; i < N_BONES; i++) { bones[i - 1].children.push(bones[i]); bones[i].parent = bones[i - 1]; }
+        const boneInverses = bones.map((b) => ({ elements: mat4Invert(b.matrixWorld.elements) }));
+        const refMesh = {
+            name: "refMesh", isMesh: true, isSkinnedMesh: true,
+            position: vec3(0, 0, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [], parent: null,
+            matrixWorld: { elements: mat4Translate(0, 0, 0) },
+            skeleton: { bones, boneInverses },
+            geometry: {
+                attributes: {
+                    position: { array: new Float32Array([0, 0, 0]) },
+                    skinIndex: { array: new Uint16Array([0, 0, 0, 0]) },
+                    skinWeight: { array: new Float32Array([1, 0, 0, 0]) },
+                },
+            },
+            material: {},
+        };
+        const secWorldY = 10 + 1.5;
+        const secondaryMesh = {
+            name: "secondaryMesh", isMesh: true, isSkinnedMesh: false,
+            position: vec3(0, 1.5, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [], parent: bones[10],
+            matrixWorld: { elements: mat4Translate(0, secWorldY, 0) },
+            geometry: { attributes: { position: { array: new Float32Array([0, 0, 0]) } } },
+        };
+        bones[10].children.push(secondaryMesh);
+        const group = {
+            name: "", isMesh: false, isSkinnedMesh: false,
+            position: vec3(0, 0, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [refMesh, bones[0]], parent: null,
+            matrixWorld: { elements: mat4Translate(0, 0, 0) },
+            updateMatrixWorld() { /* no-op -- matrixWorld already hand-set on every node above */ },
+            animations: null,
+        };
+        refMesh.parent = group; bones[0].parent = group;
+        return { group, bones };
+    }
+
+    const { group, bones } = buildFakeGroup();
+    const parsed = await normalizeFbxGroup(group);
+
+    // secondaryMesh is the SECOND mesh visited (after refMesh) -- vertex 1 (positions[3..5]).
+    const bakedPos = [parsed.positions[3], parsed.positions[4], parsed.positions[5]];
+    const secJointSlot = parsed.joints[1 * 4];
+    const secWeight = parsed.weights[1 * 4];
+
+    ok("!! *** skin.joints has 65 entries (>= SHADER_JOINT_LIMIT) and secondaryMesh's own new-joint path is",
+        parsed.skin && parsed.skin.joints.length === 65,
+        "   correctly SKIPPED (forced into the ancestor-reuse fallback). got " + (parsed.skin ? parsed.skin.joints.length : "no skin"));
+    ok("!! *** secondaryMesh is bound to joint slot 10 (bone10, the nearest REAL joint ancestor), weight 1 ***",
+        secJointSlot === 10 && secWeight === 1, "got slot=" + secJointSlot + " weight=" + secWeight);
+    // *** THE CENTRAL CLAIM: bakedPos is the mesh's FULL WORLD-SPACE bind position (0, 11.5, 0) -- bone10's
+    // own +10 world offset PLUS the mesh's own +1.5 local offset -- not an ancestor-relative delta (0, 1.5,
+    // 0), which is what the review's REJECTED first-draft formula would have produced by DROPPING bone10's
+    // own offset entirely (a bug it shares with gpu/GLBParser.js's own analogous fallback, named honestly
+    // rather than silently ported). ***
+    ok("!! *** THE CENTRAL CLAIM: bakedPos is EXACTLY [0, 11.5, 0] -- the mesh's FULL WORLD-SPACE bind",
+        JSON.stringify(bakedPos) === JSON.stringify([0, 11.5, 0]),
+        "   position, not the [0, 1.5, 0] an ancestor-relative delta would give. got " + JSON.stringify(bakedPos));
+    // Apply the skinning formula BY HAND at rest pose (bone10's runtime world == its bind-pose world, since
+    // nothing here animates): jointMatrix = boneWorld * IBM. Both are pure-translation matrices, so their
+    // product's translation is the SUM of the two translations -- and by construction (IBM is defined as
+    // boneWorld's own inverse) that sum is exactly zero, making jointMatrix the identity at rest pose. This
+    // is the SAME formula gpu/SkeletalAnimator.js itself uses (confirmed by reading it directly), not
+    // reimplemented independently here -- applying it to bakedPos should reproduce the ground truth exactly.
+    const ibm = parsed.skin.inverseBindMatrices[secJointSlot];
+    const boneWorld = bones[10].matrixWorld.elements;
+    const finalPos = [
+        bakedPos[0] + boneWorld[12] + ibm[12],
+        bakedPos[1] + boneWorld[13] + ibm[13],
+        bakedPos[2] + boneWorld[14] + ibm[14],
+    ];
+    ok("!! *** applying the real skinning formula (jointMatrix = boneWorld * IBM, at rest pose) to bakedPos",
+        JSON.stringify(finalPos) === JSON.stringify([0, 11.5, 0]),
+        "   reproduces the ground truth (0, 11.5, 0) exactly, matching the adversarial review's own live " +
+        "reproduction. got " + JSON.stringify(finalPos));
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nSections 1-7: task #44/#59's original scope (single-mesh ingest, skin+animation, preRotation/" +
-    "postRotation/multi-clip). Sections 8-11 (this round): multi-mesh/multi-material concat, embedded-texture " +
-    "extraction, morph-target (DeformPercent) animation tracks, and a rotation curve spanning >=180 degrees " +
-    "between keyframes (verification-only -- FBXLoader's own interpolateRotations() needed no code change on " +
-    "this repo's side). See this file's header for what is still deliberately NOT proven within each of those " +
-    "four: narrower LayerElementMaterial mapping types, non-DiffuseColor texture slots, multiple morph targets " +
-    "or morph+skin together, and the mixed-skin-scope simplification. CUBICSPLINE interpolation is NOT an open " +
-    "gap on that list -- it is unreachable from the currently-vendored FBXLoader (see the header for why).");
+    "postRotation/multi-clip). Sections 8-11: multi-mesh/multi-material concat, embedded-texture extraction, " +
+    "morph-target (DeformPercent) animation tracks, and a rotation curve spanning >=180 degrees between " +
+    "keyframes (verification-only). Sections 12-13 (this round): the mixed-skin-scope fix -- a secondary mesh " +
+    "in a multi-mesh skinned file now tracks its own real position in the scene graph at render time, instead " +
+    "of silently dragging with joint 0's full animated motion (the v4 round's own real, adversarial-review-" +
+    "found risk), proven both under the 64-joint limit (section 12, a real fixture, both an unrelated static " +
+    "prop and a genuine bone attachment against an independent three.js oracle) and past it (section 13, a " +
+    "synthetic 65-joint graph in plain Node, catching a real math bug an earlier draft of this same fix had). " +
+    "See this file's header for what is still deliberately NOT proven: narrower LayerElementMaterial " +
+    "mapping types, non-DiffuseColor texture slots, multiple morph targets or morph+skin together, and a " +
+    "SkinnedMesh bound to a genuinely different skeleton losing its OWN internal deformation. " +
+    "CUBICSPLINE interpolation is NOT an open gap on that list -- it is unreachable from the currently-vendored " +
+    "FBXLoader (see the header for why).");
 process.exit(fails ? 1 : 0);

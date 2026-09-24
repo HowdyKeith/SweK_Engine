@@ -1,8 +1,9 @@
 // FILE: gpu/fbxLoad.js
-// VERSION: v4 -- closes four gaps v3's own header named as open: multi-mesh/multi-material concat,
-// embedded-texture extraction, morph-target (DeformPercent) animation tracks, and rotation curves spanning
-// >=180 degrees between keyframes. Three of these are real new code (below); the fourth is NOT -- see its own
-// note further down, it needed a fixture, not a line changed here.
+// VERSION: v5 -- fixes the mixed-skin-scope risk an adversarial review of the v4 round found: a secondary
+// mesh in a multi-mesh skinned file no longer inherits joint 0's full animated motion, it tracks its own
+// real position in the scene graph. v4 closed four gaps v3's own header named as open: multi-mesh/multi-
+// material concat, embedded-texture extraction, morph-target (DeformPercent) animation tracks, and rotation
+// curves spanning >=180 degrees between keyframes.
 //
 // *** THE LOADER IS INJECTED, EXACTLY LIKE gpu/gltfDraco.js AND gpu/glbLoad.js. *** `FBXLoaderCtor` is passed
 // in by the caller rather than imported here, so this module stays testable with no browser and no three.js
@@ -39,25 +40,34 @@
 //     vertexCount}]` / `texturesByMaterial: {idx: ImageBitmap}`, so gpu/gpuAssetLoader.js's _uploadParsedMesh
 //     (shared with GLBParser's output, "nothing below this point knows or cares which source format produced
 //     it") needs no changes.
-//   * MIXED SKIN SCOPE -- NAMED PLAINLY, AND ITS PRACTICAL SEVERITY NAMED PLAINLY TOO (an adversarial review
-//     of this round found the risk here was real but understated by an earlier, softer wording of this same
-//     paragraph -- corrected below rather than left reading gentler than it is). Skin data is taken from the
-//     FIRST SkinnedMesh found and its skeleton ONLY. Any other mesh in the same group -- plain Mesh, or a
-//     SkinnedMesh with a DIFFERENT skeleton object -- contributes synthetic joints=[0,0,0,0]/weights=
-//     [1,0,0,0] rows. *** THIS IS NOT "STAYS STATIC AT BIND POSE" -- IT IS "INHERITS JOINT 0'S ENTIRE
-//     ANIMATED MOTION." *** The mesh's own vertices are baked to their correct WORLD-SPACE bind pose first,
-//     then the render-time skinning shader multiplies that by joint 0's CURRENT (animated) world matrix times
-//     its inverse bind matrix -- identity only at rest pose. The moment joint 0 (typically a character's
-//     root/hip bone) animates at all, any secondary mesh sharing that FBX gets rigidly dragged/orbited around
-//     joint 0's bind-pose origin: an unrelated static prop bundled in the same file visibly swings with the
-//     character's root motion, and a mesh actually meant to follow a DIFFERENT bone (e.g. a held weapon meant
-//     to track a wrist) instead follows the root and visibly detaches whenever wrist and root diverge. This is
-//     a real, deliberate simplification -- not glTF's own considerably more involved "walk the node parent
-//     chain to the nearest joint ancestor, bake the bind-pose local transform" logic (GLBParser.js's own
-//     `unskinnedPrims` handling), not attempted here -- but it is NOT gated end to end with an animating joint
-//     0 plus a second mesh together; no fixture in this tree exercises that combination (see
-//     tools/ship/fbxIngest-selfcheck.mjs's own header). A single skinned mesh (this file's v1-v3 scope) is
-//     unaffected: it IS the reference skeleton, with no secondary mesh to drag.
+//   * MIXED SKIN SCOPE -- FIXED (v5), AFTER AN ADVERSARIAL REVIEW OF v4 FOUND THE OLD SIMPLIFICATION WAS A
+//     REAL, SILENT PRODUCTION RISK, NOT MERELY A NARROWER BEHAVIOR. v4's version of this section (still
+//     accurate about the SYMPTOM, corrected here about the FIX) bound every non-reference mesh to a synthetic
+//     joint 0 -- which, since the mesh's vertices were baked to world space and joint 0's runtime matrix is
+//     animated, meant it INHERITED JOINT 0'S ENTIRE ANIMATED MOTION rather than staying static: an unrelated
+//     prop bundled in the same file would visibly swing with the character's root-bone animation, and a mesh
+//     meant to follow a DIFFERENT bone would visibly detach from it. v5 fixes this by mirroring GLBParser.js's
+//     own PRIMARY unskinnedPrims strategy (not its fallback): register the mesh's OWN node as a NEW joint with
+//     an IDENTITY inverse-bind matrix, and leave that mesh's vertices in LOCAL space instead of world-baking
+//     them. FBX/three.js already collapse "node" and "mesh" into one object -- meshObj IS the node, unlike
+//     glTF's separate node/mesh indices -- so no "find the owning node" lookup is needed, only `indexOf.get
+//     (meshObj)` against the same node list gpu/SkeletalAnimator.js already walks every frame (confirmed by
+//     reading that file directly: it computes each node's REAL world matrix from REST-pose TRS plus any
+//     animation channel targeting it or an ancestor, exactly the glTF convention). The result: a secondary
+//     mesh now tracks wherever it ACTUALLY lives in the scene graph -- static if nothing above it animates,
+//     correctly following a specific bone if it really is parented under one -- with no parent-chain walking
+//     needed in this file for the common case. Bounded by a SHADER_JOINT_LIMIT of 64 (matching GLBParser.js's
+//     own conservative cap, not this engine's actual 128-slot shader uniform, so as not to introduce a second
+//     magic number); past that, falls back to walking meshObj's REAL, already-computed parent chain for the
+//     nearest ancestor that IS already a joint and baking the relative transform, and only as an ultimate
+//     last resort (no joint ancestor found at all) falls back to v1-v4's old world-bake-and-bind-to-joint-0
+//     behavior. STILL NOT FIXED, named plainly: a SkinnedMesh bound to a genuinely DIFFERENT skeleton than
+//     refSkeleton now takes this SAME new-joint path (a real improvement over v4's foreign-joint-0 drag) but
+//     loses its OWN internal multi-bone deformation, since only a single rigid joint is registered for it --
+//     supporting a second, fully independent, simultaneously-animated skeleton in one combined draw call would
+//     need merging skeletons into one joint array with per-mesh index remapping, a distinctly larger piece of
+//     work not attempted here. A single skinned mesh (this file's v1-v3 scope) is unaffected either way: it IS
+//     the reference skeleton, with no secondary mesh in the picture.
 //   * EMBEDDED-TEXTURE EXTRACTION (v4). `parseFbx`'s new `opts.manager` (an injected THREE.LoadingManager
 //     instance -- injected for the same reason FBXLoaderCtor is, see this file's own header) is awaited via
 //     its `onLoad` callback before returning, but ONLY if the parsed group actually references any texture at
@@ -477,8 +487,10 @@ export async function normalizeFbxGroup(group) {
         } catch { /* unreadable image -- leave this material's texture absent rather than throw */ }
     }
 
-    // v4 -- reference skin: the FIRST SkinnedMesh's skeleton. See this file's header on the deliberate
-    // "mixed skin scope" this simplification accepts.
+    // v5 -- reference skin: the FIRST SkinnedMesh's skeleton. See this file's header on the "mixed skin
+    // scope" this simplification still accepts (a genuinely different secondary skeleton loses its OWN
+    // internal per-bone deformation) -- narrower than v4's version of this same limitation, which is fixed
+    // below.
     let refSkeleton = null;
     for (const meshObj of meshList) {
         if (meshObj.isSkinnedMesh && meshObj.skeleton && Array.isArray(meshObj.skeleton.bones)) { refSkeleton = meshObj.skeleton; break; }
@@ -500,6 +512,34 @@ export async function normalizeFbxGroup(group) {
         skin = { joints: jointIndices, inverseBindMatrices, skeleton: null };
     }
 
+    // v5 -- MIXED-SKIN-SCOPE FIX. An adversarial review of the v4 round found that binding every non-
+    // reference mesh to a SYNTHETIC joint 0 made it inherit joint 0's ENTIRE ANIMATED MOTION, not "stay
+    // static" as the v4 wording implied -- an unrelated static prop would visibly swing with a character's
+    // root-bone animation, and a mesh meant to track a different bone would visibly detach from it. Fixed by
+    // mirroring GLBParser.js's own primary unskinnedPrims strategy: register the mesh's OWN node (FBX/
+    // three.js already collapse "node" and "mesh" into one object -- meshObj IS the node, unlike glTF's
+    // separate node/mesh indices) as a NEW joint with an IDENTITY inverse-bind matrix, and leave that mesh's
+    // vertices in LOCAL space rather than baking meshObj.matrixWorld into them. At runtime, SkeletalAnimator
+    // computes every node's REAL world matrix each frame by walking the REAL parent chain (gpu/
+    // SkeletalAnimator.js, confirmed by reading it directly) -- so a mesh given this treatment tracks
+    // wherever it ACTUALLY lives in the scene graph: static if nothing above it animates, or correctly
+    // following a specific bone if it is really parented under one, with no chain-walking needed in THIS
+    // file for the common case. Bounded by SHADER_JOINT_LIMIT (matching GLBParser.js's own conservative cap,
+    // not this engine's actual 128-slot shader uniform, so as not to introduce a second magic number); past
+    // that, falls back to walking meshObj's REAL, already-computed parent chain (meshObj.parent, not an
+    // index reconstruction) for the nearest ancestor that IS already a joint, baking the relative transform
+    // (ancestor.matrixWorld^-1 * meshObj.matrixWorld, using the real THREE.Matrix4 instances' own .clone()/
+    // .invert()/.multiply() methods -- these are objects already handed to this function, not something it
+    // constructs, the same practice as the .updateMatrixWorld() call at the top of normalizeFbxGroup()) --
+    // and if no ancestor is ever a joint, bakes the full world matrix and binds to joint 0, v1-v4's old
+    // behavior, kept only as a last resort rather than the default. STILL NOT FIXED: a SkinnedMesh bound to a
+    // genuinely different skeleton than refSkeleton takes this SAME new-joint path (an improvement over v4's
+    // foreign-joint-0 drag) but loses its OWN internal multi-bone deformation, since only a single rigid
+    // joint is registered for it -- a real, narrower, named remaining gap, not silently claimed solved.
+    const SHADER_JOINT_LIMIT = 64;
+    const jointIndexByNode = new Map();
+    if (skin) for (let j = 0; j < skin.joints.length; j++) jointIndexByNode.set(skin.joints[j], j);
+
     // v4 -- first pass: per-mesh vertex data (positions/normals/uv/indices/skin/groups/morph), unconcatenated.
     const primData = [];
     let allHaveNormals = true, allHaveUVs = true;
@@ -515,29 +555,82 @@ export async function normalizeFbxGroup(group) {
         const srcPositions = posAttr.array;
         const vertexCount = srcPositions.length / 3;
 
-        const m = meshObj.matrixWorld.elements;
+        // v5 -- resolve, BEFORE reading positions/normals, which matrix (if any) to bake into this mesh's
+        // vertices and which synthetic joint (if any) to bind it to. See the "MIXED-SKIN-SCOPE FIX" comment
+        // above for the full rationale.
+        let bakeMatrixElements = meshObj.matrixWorld.elements;   // default: v1-v4 behavior, world-bake
+        let bindJointIdx = null;   // non-null only for a mesh NOT using its own real skinIndex/skinWeight
+        const isReferenceSkinned = !!(meshObj.isSkinnedMesh && meshObj.skeleton === refSkeleton
+            && geo.attributes.skinIndex && geo.attributes.skinWeight);
+        if (skin && !isReferenceSkinned) {
+            const ownNodeIdx = indexOf.get(meshObj);
+            if (ownNodeIdx !== undefined && jointIndexByNode.has(ownNodeIdx)) {
+                bindJointIdx = jointIndexByNode.get(ownNodeIdx);
+                bakeMatrixElements = null;
+            } else if (ownNodeIdx !== undefined && skin.joints.length < SHADER_JOINT_LIMIT) {
+                bindJointIdx = skin.joints.length;
+                skin.joints.push(ownNodeIdx);
+                skin.inverseBindMatrices.push(new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]));
+                jointIndexByNode.set(ownNodeIdx, bindJointIdx);
+                bakeMatrixElements = null;
+            } else {
+                // v5 FALLBACK, CORRECTED. An adversarial review of this round caught a real math bug in the
+                // first draft here (mirrored, it turns out, from an identical flaw in GLBParser.js's own
+                // SHADER_JOINT_LIMIT fallback -- gpu/GLBParser.js's own unskinnedPrims handling): baking
+                // ancestor.matrixWorld^-1 * meshObj.matrixWorld into the vertex and THEN letting the runtime
+                // multiply by jointMatrix(t) = ancestorWorld(t) * IBM_ancestor double-applies the ancestor's
+                // own bind-pose removal, since IBM_ancestor is ALREADY ancestorWorld(bind)^-1 -- the ancestor's
+                // own accumulated world offset cancels out and gets silently dropped, wrong even at rest pose.
+                // Verified with a live 65-joint reproduction (a mesh parented under a mid-chain bone with a
+                // real world offset): the double-application error exactly equalled that bone's own bind-pose
+                // offset. The correct baked position for REUSING an EXISTING joint (one with a real, non-
+                // identity inverse-bind matrix already inherited from refSkeleton.boneInverses) is the mesh's
+                // FULL WORLD-SPACE bind position -- the SAME meshObj.matrixWorld bake this loop's default
+                // already computes -- NOT an ancestor-relative delta. That delta is only correct for the
+                // PRIMARY path above, where the newly-registered joint's own inverse-bind matrix is IDENTITY.
+                let cur = meshObj.parent, foundAncestor = null;
+                while (cur) {
+                    const curIdx = indexOf.get(cur);
+                    if (curIdx !== undefined && jointIndexByNode.has(curIdx)) { foundAncestor = cur; break; }
+                    cur = cur.parent;
+                }
+                bindJointIdx = foundAncestor ? jointIndexByNode.get(indexOf.get(foundAncestor)) : 0;
+                // bakeMatrixElements is already meshObj.matrixWorld.elements (this function's default) --
+                // correct for both the found-ancestor case and the root (joint 0) last-resort case.
+            }
+        }
+
+        const m = bakeMatrixElements;
         const positions = new Float32Array(vertexCount * 3);
-        for (let v = 0; v < vertexCount; v++) {
-            const x = srcPositions[v * 3], y = srcPositions[v * 3 + 1], z = srcPositions[v * 3 + 2];
-            positions[v * 3]     = m[0] * x + m[4] * y + m[8]  * z + m[12];
-            positions[v * 3 + 1] = m[1] * x + m[5] * y + m[9]  * z + m[13];
-            positions[v * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+        if (m) {
+            for (let v = 0; v < vertexCount; v++) {
+                const x = srcPositions[v * 3], y = srcPositions[v * 3 + 1], z = srcPositions[v * 3 + 2];
+                positions[v * 3]     = m[0] * x + m[4] * y + m[8]  * z + m[12];
+                positions[v * 3 + 1] = m[1] * x + m[5] * y + m[9]  * z + m[13];
+                positions[v * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+            }
+        } else {
+            positions.set(srcPositions);
         }
 
         let normals = null;
         const nrmAttr = geo.attributes && geo.attributes.normal;
         if (nrmAttr && nrmAttr.array && nrmAttr.array.length === vertexCount * 3) {
-            const it = inverseTranspose3x3(m);
             const src = nrmAttr.array;
             normals = new Float32Array(vertexCount * 3);
-            for (let v = 0; v < vertexCount; v++) {
-                const x = src[v * 3], y = src[v * 3 + 1], z = src[v * 3 + 2];
-                let nx = it[0] * x + it[1] * y + it[2] * z;
-                let ny = it[3] * x + it[4] * y + it[5] * z;
-                let nz = it[6] * x + it[7] * y + it[8] * z;
-                const len = Math.hypot(nx, ny, nz);
-                if (len > 1e-12) { nx /= len; ny /= len; nz /= len; }
-                normals[v * 3] = nx; normals[v * 3 + 1] = ny; normals[v * 3 + 2] = nz;
+            if (m) {
+                const it = inverseTranspose3x3(m);
+                for (let v = 0; v < vertexCount; v++) {
+                    const x = src[v * 3], y = src[v * 3 + 1], z = src[v * 3 + 2];
+                    let nx = it[0] * x + it[1] * y + it[2] * z;
+                    let ny = it[3] * x + it[4] * y + it[5] * z;
+                    let nz = it[6] * x + it[7] * y + it[8] * z;
+                    const len = Math.hypot(nx, ny, nz);
+                    if (len > 1e-12) { nx /= len; ny /= len; nz /= len; }
+                    normals[v * 3] = nx; normals[v * 3 + 1] = ny; normals[v * 3 + 2] = nz;
+                }
+            } else {
+                normals.set(src);
             }
         }
         if (!normals) allHaveNormals = false;
@@ -557,13 +650,12 @@ export async function normalizeFbxGroup(group) {
             for (let i = 0; i < vertexCount; i++) indices[i] = i;
         }
 
-        // v4 -- per-mesh skin: only meshes sharing the REFERENCE skeleton contribute real joints/weights;
-        // every other mesh in a skinned group gets synthetic joint-0/full-weight rows -- which DRAGS with
-        // joint 0's full animated motion at render time, not "stays static" (see this file's header's own
-        // corrected wording on the practical severity here).
+        // v5 -- per-mesh skin: the reference-skeleton mesh contributes its own real joints/weights; every
+        // other mesh gets a single synthetic joint (bindJointIdx, resolved above -- its OWN node by default,
+        // not joint 0) with full weight.
         let joints = null, weights = null;
         if (skin) {
-            if (meshObj.isSkinnedMesh && meshObj.skeleton === refSkeleton && geo.attributes.skinIndex && geo.attributes.skinWeight) {
+            if (isReferenceSkinned) {
                 const skinIndexAttr = geo.attributes.skinIndex, skinWeightAttr = geo.attributes.skinWeight;
                 joints  = skinIndexAttr.array instanceof Uint16Array || skinIndexAttr.array instanceof Uint8Array
                     ? skinIndexAttr.array
@@ -572,9 +664,9 @@ export async function normalizeFbxGroup(group) {
                     ? skinWeightAttr.array
                     : Float32Array.from(skinWeightAttr.array);
             } else {
-                joints = new Uint16Array(vertexCount * 4);          // all-zero -> follows joint 0's full motion
+                joints = new Uint16Array(vertexCount * 4);
                 weights = new Float32Array(vertexCount * 4);
-                for (let v = 0; v < vertexCount; v++) weights[v * 4] = 1;   // full weight on joint 0
+                for (let v = 0; v < vertexCount; v++) { joints[v * 4] = bindJointIdx; weights[v * 4] = 1; }
             }
         }
 
