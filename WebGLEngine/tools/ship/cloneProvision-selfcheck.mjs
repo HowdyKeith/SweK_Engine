@@ -43,25 +43,34 @@ const trees = [];
 const tree = (o) => { const t = mk(o); trees.push(t); return t; };
 
 // ---- 1. THE PATH IS THE RESOLVER'S, AND THE TWO FILES ARE HELD TOGETHER HERE ---------------------------
-console.log("1. *** THE CHECK ASKS THE QUESTION THE RESOLVER ASKS, NOT WHETHER npm RETURNED ZERO ***");
+console.log("1. *** THE CHECK ASKS THE CONSUMER'S QUESTION, NOT npm's EXIT CODE AND NOT A PATH ***");
 {
+    const CHAIN_SRC = fs.readFileSync(path.join(ENG, "ai-bridge", "sourceChainBridge.js"), "utf8");
     const RES = fs.readFileSync(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"), "utf8");
-    // playwrightResolve builds its first tree-local candidate with path.join(ENG, "tools", "render-qa", ...).
-    const usesQa = /path\.join\(\s*ENG\s*,\s*"tools"\s*,\s*"render-qa"\s*,\s*"node_modules"\s*,\s*"playwright"\s*\)/.test(RES);
-    ok("!! *** the resolver's tree-local candidate IS tools/render-qa/node_modules/playwright ***",
-        usesQa,
-        "read out of playwrightResolve.mjs rather than restated. If that file moves its candidate, THIS ROW " +
-        "goes red and the provisioner below is pointed at a path nothing reads");
 
-    const probe = tree({ installed: true });
-    const at = CHAIN._provisionedAt(probe);
-    ok("!! ...and the chain checks that same path, character for character",
-        at === path.join(probe, "tools", "render-qa", "node_modules", "playwright"),
-        at.slice(-52) + " -- a provisioner that installs somewhere the resolver does not look is a provisioner " +
-        "that reports success and changes nothing");
-    ok("...and QA_REL is the one spelling both of them come from",
-        Array.isArray(CHAIN.QA_REL) && CHAIN.QA_REL.join("/") === "tools/render-qa",
-        JSON.stringify(CHAIN.QA_REL));
+    // *** v4668b -- THE FIRST VERSION OF THIS SECTION ASSERTED A COUPLING THAT SHOULD NOT EXIST, AND
+    // DESCRIBED IT WRONGLY. *** It said the tree-local path was "the resolver's FIRST candidate" and held the
+    // two files to it. PLAYWRIGHT_PATHS tries the bare specifiers "playwright" and "playwright-core" ahead
+    // of it, so it is THIRD -- the row passed while its own sentence was false. Worse, the whole idea was
+    // wrong: a provisioner that re-implements the resolver's search has to be updated whenever that search
+    // moves. It asks the resolver now, so there is no order to get wrong and nothing to keep in step.
+    ok("!! *** the tree-local path is NOT the resolver's first candidate, which the first draft of this row claimed ***",
+        /PLAYWRIGHT_PATHS = \[\s*\n\s*"playwright",\s*\n\s*"playwright-core",/.test(RES),
+        "two bare specifiers come first. The row that asserted otherwise was green the whole time it was " +
+        "wrong, which is why the coupling was removed rather than corrected");
+
+    ok("!! *** provisioning is confirmed by RUNNING the clone's own resolver, not by testing a directory ***",
+        /_askTheResolver/.test(CHAIN_SRC) && /playwrightResolve\.mjs/.test(CHAIN_SRC) &&
+        /browserSkipReason/.test(CHAIN_SRC),
+        "a directory proves the npm PACKAGE landed. `playwright install chromium` is a POSTINSTALL script, " +
+        "so --ignore-scripts, a failed script or a blocked CDN all leave the package there and no browser " +
+        "anywhere -- and the verify then produces the same ~116 reds this round exists to stop, with " +
+        "provisioning reporting success");
+
+    ok("...and the probe is written to the OS temp dir, never into the clone",
+        /mkdtempSync\(path\.join\(os\.tmpdir\(\)/.test(CHAIN_SRC) && !/writeFileSync\(path\.join\(cloneEngine/.test(CHAIN_SRC),
+        "a provisioning step that leaves a file in the tree it is about to grade has changed the thing it " +
+        "is measuring");
 }
 
 // ---- 2. EVERY BRANCH, DRIVEN ---------------------------------------------------------------------------
@@ -95,19 +104,19 @@ console.log("\n2. *** EVERY BRANCH IS DRIVEN, INCLUDING THE TWO THAT WOULD OTHER
     // *** THE ROW THIS FILE IS REALLY FOR. ***
     const lying = tree();
     const r4 = await CHAIN._provision(lying, { run: zero });
-    ok("!! *** npm EXITING ZERO IS NOT PROVISIONED: the path is checked afterwards ***",
-        r4.ok === false && /exited 0 but/.test(r4.reason || ""),
-        "a half-run postinstall, an empty registry answer or a download killed midway all leave a zero " +
-        "behind. Taking the exit code as the answer is the same shape as a gate that exits 1 having printed " +
-        "no FAIL row -- v4668 found that one too, from the other side");
+    ok("!! *** npm EXITING ZERO IS NOT PROVISIONED: the clone's own resolver is asked afterwards ***",
+        r4.ok === false && /resolver still refuses/.test(r4.reason || ""),
+        (r4.reason || "").slice(0, 120) + " -- a half-run postinstall, --ignore-scripts, an empty registry " +
+        "answer or a blocked CDN all leave a zero behind. Taking the exit code as the answer is the same " +
+        "shape as a gate that exits 1 having printed no FAIL row, which v4668 found from the other side");
 
-    // and the success path, with the runner making the directory the way a real install would
-    const good = tree();
-    const landing = async () => { fs.mkdirSync(path.join(good, "tools", "render-qa", "node_modules", "playwright"), { recursive: true }); return { code: 0 }; };
-    const r5 = await CHAIN._provision(good, { run: landing });
-    ok("...and an install that DOES land is reported ok, with how long it took",
-        r5.ok === true && !r5.already && typeof r5.ms === "number",
-        `ok=${r5.ok} ms=${r5.ms}`);
+    // *** AND THE SUCCESS PATH IS NOT DRIVEN HERE, WHICH IS SAID RATHER THAN FAKED. *** Reaching ok:true
+    // now needs the clone's real playwrightResolve.mjs to find a real chromium, so the only honest way to
+    // exercise it is a real install on a real clone. A stub tree that made this row green would be a
+    // fixture asserting that the check it replaced still passes.
+    report("NOT DRIVEN: the ok:true path. It requires the clone's own resolver to find a browser, so it is " +
+        "exercised by the rig pressing Clone -> verify and by nothing here. The number that says it worked " +
+        "is the clone's NEW-red count: 121 before provisioning, 37 after, measured on the rig at v4667.");
 }
 
 // ---- 3. THE PHASE, AND EVERY GUARD THAT MUST KNOW ABOUT IT ---------------------------------------------

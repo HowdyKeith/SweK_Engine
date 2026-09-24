@@ -34,6 +34,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const os = require("os");   // v4668b -- the resolver probe is written to the OS temp dir, never into the clone
 const net = require("net");
 const http = require("http");
 const { spawn } = require("child_process");
@@ -75,6 +76,10 @@ function status() {
                            auth: R.clone.auth, tokenRejected: !!R.clone.tokenRejected } : null,
         verified: R.verified,
         verifyExit: R.verifyExit,
+        // v4668b -- REPORTED, because a field written and never read is a field nobody can act on. Its own
+        // comment said status() shows it while status() did not, which is prose describing a guard that is
+        // not there -- the species this session has now found five times.
+        provision: R.provision,
         error: R.error,
         publish: R.publish,
         launched: R.launched,
@@ -151,17 +156,37 @@ function _spawnIn(cwd, args, label) { return _spawnCmd(process.execPath, args, c
  */
 function _spawnCmd(cmd, args, cwd, label, extra) {
     return new Promise((resolve) => {
-        let child;
+        let child, settled = false, timer = null;
+        const done = (v) => { if (settled) return; settled = true; if (timer) clearTimeout(timer); resolve(v); };
         try {
             child = spawn(cmd, args, Object.assign({ cwd, windowsHide: true }, extra || {}));
         } catch (e) {
             push("[" + label + "] spawn failed: " + ((e && e.message) || e) + "\n");
-            return resolve({ code: -1, spawnError: String((e && e.message) || e) });
+            return done({ code: -1, spawnError: String((e && e.message) || e) });
         }
-        child.on("error", (e) => { push("[" + label + "] error: " + ((e && e.message) || e) + "\n"); });
+        // *** v4668b -- "error" RESOLVES, AND UNTIL THIS ROUND IT ONLY LOGGED. ***
+        // node emits "error" and NOT "exit" when the binary does not exist, so a promise that settles only on
+        // "exit" NEVER SETTLES for ENOENT. Measured: a spawn of a missing binary fires error(ENOENT) and the
+        // promise is still pending three seconds later. That was harmless while this helper only ever ran
+        // process.execPath, which is by definition present -- v4668 pointed it at `npm`, which is not, and
+        // turned a latent shape into a live hang that would pin the chain in "provisioning" with every guard
+        // closed until the bridge was restarted. Found by an adversarial review of v4668's own diff.
+        child.on("error", (e) => {
+            push("[" + label + "] error: " + ((e && e.message) || e) + "\n");
+            done({ code: -1, spawnError: String((e && e.message) || e) });
+        });
         if (child.stdout) child.stdout.on("data", push);
         if (child.stderr) child.stderr.on("data", push);
-        child.on("exit", (code) => resolve({ code }));
+        child.on("exit", (code) => done({ code }));
+        // A timeout is right HERE and wrong for the verify -- see budgetIsOwn above. This one bounds a
+        // download, not a test suite: a stalled npm otherwise holds canPublish() closed indefinitely, and
+        // "the release button never came back" is not a diagnosis anybody can act on.
+        const ms = extra && extra.timeoutMs;
+        if (ms) timer = setTimeout(() => {
+            push("[" + label + "] no output path left: killing after " + Math.round(ms / 1000) + " s\n");
+            try { child.kill(); } catch {}
+            done({ code: -1, timedOut: true });
+        }, ms);
     });
 }
 
@@ -181,13 +206,59 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
 // one. Same reason the phase exists -- see below.
 const QA_REL = ["tools", "render-qa"];
 /**
- * *** THE PATH IS THE RESOLVER'S FIRST CANDIDATE, AND THAT COUPLING IS THE POINT. ***
- * tools/ship/playwrightResolve.mjs looks at <engine>/tools/render-qa/node_modules/playwright before anything
- * else. Checking THAT is what makes this a provisioning check rather than an npm-exited-zero check -- the
- * distinction this tree keeps relearning. The two spellings are held together by
- * tools/ship/cloneProvision-selfcheck.mjs, which reads both files; they are not kept in step by hoping.
+ * Where npm puts the package. NOT a claim about what the resolver checks FIRST -- v4668's comment here said
+ * "the resolver's first candidate" and that was simply false: PLAYWRIGHT_PATHS tries the bare specifiers
+ * "playwright" and "playwright-core" ahead of it, so the tree-local path is THIRD. The order does not matter
+ * to this file any more, because the post-install question is no longer asked of a path at all -- see
+ * _askTheResolver below. This is kept only as the cheap pre-test for "is there anything to skip".
  */
 function _provisionedAt(cloneEngine) { return path.join(cloneEngine, QA_REL[0], QA_REL[1], "node_modules", "playwright"); }
+
+/**
+ * *** ASK THE CONSUMER'S QUESTION, IN THE CONSUMER'S OWN WORDS. ***
+ *
+ * The first version of this check tested that a directory existed. That proves the npm PACKAGE landed and
+ * says nothing about the BROWSER -- and `playwright install chromium` is a postinstall script, so an
+ * --ignore-scripts install, a script that fails, or a proxy that blocks the CDN all leave the package there
+ * and no chromium anywhere. The verify would then produce the same ~116 reds this round exists to stop, with
+ * provisioning reporting success.
+ *
+ * So the clone's OWN tools/ship/playwrightResolve.mjs is run, in the clone, and asked for its skip reason --
+ * the identical call every browser gate makes. If it has nothing to say, the gates will not either. That
+ * also ends the coupling problem outright: no path in this file has to track that file's candidate list.
+ */
+function _askTheResolver(cloneEngine) {
+    return new Promise((resolve) => {
+        // The probe lives in the OS temp dir, never in the clone: a provisioning step that leaves a file
+        // behind in the tree it is about to grade has changed the thing it is measuring.
+        let probe = "";
+        try {
+            probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "swek-probe-")), "probe.mjs");
+            fs.writeFileSync(probe,
+                'import { pathToFileURL } from "node:url";\n' +
+                'import path from "node:path";\n' +
+                'const eng = process.argv[2];\n' +
+                'const m = await import(pathToFileURL(path.join(eng, "tools", "ship", "playwrightResolve.mjs")).href);\n' +
+                'const r = m.resolvePlaywright();\n' +
+                'process.stdout.write(JSON.stringify({ reason: m.browserSkipReason(r.chromium, r.from) || "", from: r.from || "" }));\n');
+        } catch (e) { return resolve({ ok: false, reason: "could not write the resolver probe: " + ((e && e.message) || e) }); }
+
+        let out = "";
+        const child = spawn(process.execPath, [probe, cloneEngine], { cwd: cloneEngine, windowsHide: true });
+        let settled = false;
+        const fin = (v) => { if (settled) return; settled = true;
+            try { fs.rmSync(path.dirname(probe), { recursive: true, force: true }); } catch {}
+            resolve(v); };
+        child.on("error", (e) => fin({ ok: false, reason: "could not run the resolver probe: " + ((e && e.message) || e) }));
+        if (child.stdout) child.stdout.on("data", (d) => { out += String(d); });
+        child.on("exit", () => {
+            let j = null; try { j = JSON.parse(out.trim()); } catch {}
+            if (!j) return fin({ ok: false, reason: "the resolver probe printed nothing readable" });
+            return fin(j.reason ? { ok: false, reason: j.reason } : { ok: true, from: j.from });
+        });
+        setTimeout(() => fin({ ok: false, reason: "the resolver probe did not answer in 60 s" }), 60000);
+    });
+}
 
 // The runner is injectable for the reason versionPreflight's readers are: every branch below has to be
 // drivable without a network, and a branch nothing can reach is a branch nobody has checked. `run` defaults
@@ -207,19 +278,20 @@ async function _provision(cloneEngine, { run = _spawnCmd } = {}) {
     const isWin = process.platform === "win32";
     const t0 = Date.now();
     const r = await run(isWin ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"],
-                        qa, "provision", isWin ? { shell: true } : undefined);
+                        qa, "provision", Object.assign({ timeoutMs: 30 * 60 * 1000 }, isWin ? { shell: true } : {}));
     const ms = Date.now() - t0;
     if (r.code !== 0)
-        return { ok: false, ms, reason: "npm install exited " + r.code + (r.spawnError ? " (" + r.spawnError + ")" : "") +
+        return { ok: false, ms, reason: "npm install " + (r.timedOut ? "was still running after 30 minutes and was killed"
+                 : r.spawnError ? "could not start: " + r.spawnError : "exited " + r.code) +
                  " -- is npm on PATH for the account running this server?" };
     // *** EXIT 0 IS NOT THE QUESTION. *** The question is the one the resolver asks, so it is asked here:
     // a postinstall that half-ran, a registry that served an empty tree, or a download killed midway can all
     // leave a zero behind. v4668's own round note records the same lesson from the other side -- a gate that
     // exits 1 having printed no row.
-    if (!fs.existsSync(_provisionedAt(cloneEngine)))
-        return { ok: false, ms, reason: "npm install exited 0 but " + _provisionedAt(cloneEngine) +
-                 " is not there -- the install did not land where the resolver looks" };
-    return { ok: true, ms };
+    const asked = await _askTheResolver(cloneEngine);
+    if (!asked.ok)
+        return { ok: false, ms, reason: "npm install exited 0 and the clone's OWN resolver still refuses: " + asked.reason };
+    return { ok: true, ms, from: asked.from };
 }
 
 async function start({ repo, ref } = {}) {
@@ -227,7 +299,7 @@ async function start({ repo, ref } = {}) {
         return { ok: false, error: "busy", message: "a chain run is already " + R.phase };
 
     R.phase = "cloning"; R.startedAt = Date.now(); R.finishedAt = 0;
-    R.log = ""; R.clone = null; R.verified = null; R.verifyExit = null; R.error = ""; R.publish = null;
+    R.log = ""; R.clone = null; R.verified = null; R.verifyExit = null; R.error = ""; R.publish = null; R.provision = null;
     push("[chain] clone -> verify. Publishing is a SEPARATE press and needs a green verify.\n");
 
     let gh = null;
