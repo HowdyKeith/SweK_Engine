@@ -506,8 +506,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4690 -- 1774 -> 1775 for render/genGate-selfcheck.mjs, the learned gate's apparatus. Sixteenth round
     // running with the same four rows moving together.
     // v4691 -- 1775 -> 1776 for tools/ship/genGateMeasure-selfcheck.mjs, the pre-registered held-out test.
-    gates: 1776, usesOk: 1755, definesOk: 1747, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1648, condFirst: 91, unknownSignature: 16,
+    // v4693 -- 1776 -> 1777 for tools/ship/genGateCalibrate-selfcheck.mjs, the operating-point test.
+    gates: 1777, usesOk: 1756, definesOk: 1748, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1649, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

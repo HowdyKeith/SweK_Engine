@@ -75,7 +75,8 @@
     </select>
     <select id="gengate">
       <option value="off">learned gate: OFF (the default -- every figure on this page predates it)</option>
-      <option value="cpu">learned gate: ON, on the CPU</option>
+      <option value="cpu">learned gate: ON, on the CPU (v4691 weights, tau 0.5)</option>
+      <option value="cpu2">learned gate: ON, v4693 weights with the VALIDATION-chosen tau</option>
       <option value="device">learned gate: ON, on the DEVICE (MLP_LAYER_WGSL through gfx/device.js)</option>
       <option value="oracle">learned gate: ORACLE (control C1 -- uses the TRUE label, so it is not a prediction)</option>
       <option value="never">learned gate: ALWAYS CROSS-FADE (control C2 -- the predictor that always declines)</option>
@@ -646,7 +647,7 @@ let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null,
 let frgpu = null, figpu = null, hfgpu = null;
 // v4691 -- the learned gate's device runner, and the weights it needs. Both are null until something asks:
 // the weights are fetched once on the first ON frame, and a page that never turns the gate on never fetches.
-let gggpu = null, gateW = null, gateWTried = false;
+let gggpu = null, gateW = null, gateWTried = null;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -1474,9 +1475,14 @@ async function tick() {
                 const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
                 keep = L.y; gateOf = "ORACLE (C1, sees the answer)";
             } else {
-                if (!gateWTried) {
-                    gateWTried = true;
-                    try { gateW = await (await fetch("./render/genGate-weights.json")).json(); } catch { gateW = null; }
+                // *** THE v2 FILE CARRIES ITS OWN THRESHOLD, AND THE PAGE OBEYS IT RATHER THAN 0.5. ***
+                // render/learned-calibration-preregistration.md section 4 fixed the rule that produced it;
+                // 0.5 was never chosen at all, which is the defect v4691 measured and this arm tests.
+                const wantV2 = gateMode === "cpu2";
+                if (gateWTried !== (wantV2 ? "v2" : "v1")) {
+                    gateWTried = wantV2 ? "v2" : "v1";
+                    const file = wantV2 ? "./render/genGate-weights-v2.json" : "./render/genGate-weights.json";
+                    try { gateW = await (await fetch(file)).json(); } catch { gateW = null; }
                 }
                 if (gateW) {
                     const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
@@ -1484,9 +1490,10 @@ async function tick() {
                     const layers = gateW.layers.map((L) => ({ ...L, W: Float32Array.from(L.W), b: Float32Array.from(L.b) }));
                     let p;
                     if (gateMode === "device" && gggpu) { p = await gggpu.forward(layers, Z, nb); gateOf = "the device"; }
-                    else { p = gateForward(layers, Z, nb); gateOf = "the CPU"; }
+                    else { p = gateForward(layers, Z, nb); gateOf = gateMode === "cpu2" ? "the CPU, tau " + (gateW.tau || 0.5).toFixed(4) : "the CPU"; }
+                    const tau = typeof gateW.tau === "number" ? gateW.tau : 0.5;
                     keep = new Uint8Array(nb);
-                    for (let i = 0; i < nb; i++) keep[i] = p[i] >= 0.5 ? 1 : 0;
+                    for (let i = 0; i < nb; i++) keep[i] = p[i] >= tau ? 1 : 0;
                 } else gateOf = "NO WEIGHTS -- render/genGate-weights.json did not load, so the gate did nothing";
             }
             if (keep) {

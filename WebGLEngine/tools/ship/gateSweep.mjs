@@ -8032,6 +8032,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4693 -- THE 301st CLOSING: the operating point was never the problem; the features do not transfer.
+    since376: Object.freeze({
+        at: "v4693", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateCalibrate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H2 REFUTED, AND THE DIAGNOSTIC SAYS WHY BEFORE THE HELD-OUT SCENE IS EVEN TOUCHED. *** " +
+                 "v4692 pre-registered two explanations for v4691's conservatism -- E1 calibration, E2 " +
+                 "representation -- and declared AUC the number that separates them, along with a three-way " +
+                 "split, a parameter-free threshold rule, six controls and four failure conditions, in a commit " +
+                 "containing no data. Fitting on `smooth` alone and choosing the operating point on `zone`: " +
+                 "*** VALIDATION AUC IS 0.4214, WHICH IS WORSE THAN A COIN. *** The network ranks blocks on a " +
+                 "scene it did not train on slightly worse than chance. That is E2, and section 7 named it in " +
+                 "advance as MORE important than the hypothesis would have been, because it retires the feature " +
+                 "set rather than its threshold. " +
+                 "*** THE BASE RATE MOVES BY A FACTOR OF NEARLY THREE BETWEEN TWO TRAINING-SIDE SCENES: *** " +
+                 "generation wins 63.4% of blocks on `smooth` and 23.7% on `zone`. Neither is held out. A " +
+                 "predictor fitted on one is being asked about a population with a different prior, and the " +
+                 "eleven features did not carry a mechanism across that gap -- they carried scene identity. " +
+                 "*** ON THE HELD-OUT SCENE THE GATE COLLAPSED. *** tau 0.3667, chosen by rate matching on " +
+                 "`zone`, keeps 0.01% of `checker` blocks: NOTHING there scores above a threshold chosen " +
+                 "elsewhere. H2 reads -0.0203 dB, t p=0.648, sign p=0.852, and that number is NOT reported as a " +
+                 "measurement of the predictor -- section 7 says to name a collapse as a collapse, and the " +
+                 "collapse and the refutation are one fact rather than two. C1 carried forward unchanged: the " +
+                 "oracle still wins by +0.3191 dB, 33 of 33 frames, so the rig is the rig and the decision is " +
+                 "still worth a third of a dB to something that could make it. " +
+                 "*** SIX SABOTAGES, FOUR OF WHICH SCORED 0 RED FIRST, AND P6 IS v4691'S DEFECT ONE FIELD " +
+                 "OVER. *** v4691 restated the measurement WINDOW and checked it against its own constants; " +
+                 "this round restated the threshold RULE and checked it against the weights file's own string " +
+                 "-- written by the tool that chose the threshold, so it agrees with itself by construction. " +
+                 "Swapping the pre-registration's primary rule for its declared secondary changed nothing. The " +
+                 "rule is now parsed out of the pre-registration beside the window: a record is only a record " +
+                 "if the code reads it. " +
+                 "*** AND THREE MORE WERE INVISIBLE FOR ONE REASON -- THE DATA HAS NO TIES. *** A tau " +
+                 "interpolated between two observed scores still keeps about the right count on near-continuous " +
+                 "data; an AUC that gives tied scores consecutive ranks never meets a tie; a one-class sample " +
+                 "never occurs. All three now have fixtures and all three redden. FOURTH ROUND RUNNING that " +
+                 "this arc has found a guard whose adversarial population was empty. " +
+                 "*** THE ROUND'S OWN DEFECT WAS A ONE-SIDED DETECTOR. *** The pre-registration named one " +
+                 "collapse -- keeping nearly everything -- and the row written for it PASSED while the gate " +
+                 "kept nearly nothing in the very run it was written for. A detector aimed at one end of a " +
+                 "range is not a detector; it is two-sided now, with fixtures at both ends.",
+    }),
     // v4691 -- THE 300th CLOSING: H1 refuted on held-out content, and the oracle says the decision is real.
     since375: Object.freeze({
         at: "v4691", swept: 1, green: 1, red: 0,

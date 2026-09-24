@@ -13,7 +13,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
-import { FEATURE_NAMES, N_FEATURES, HIDDEN, features, labels, fitScaler, applyScaler, forward, applyGate } from "./genGate.mjs";
+import { FEATURE_NAMES, N_FEATURES, HIDDEN, features, labels, fitScaler, applyScaler, forward, applyGate, rateMatch, auc } from "./genGate.mjs";
 import { SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -165,6 +165,39 @@ console.log("\n4. THE SCALER IS FITTED ON TRAINING ROWS ALONE");
 // The pre-registration is unaffected. C4 says no DEVICE NUMBER may be quoted until the CPU and
 // MLP_LAYER_WGSL forward passes agree to 1e-5, and this round quotes none. (It has been measured at 5.96e-8
 // while the runner was in hand, which is why the decision above is about debt and not about doubt.)
+
+console.log("\n6b. THE OPERATING POINT AND THE RANKING, ON FIXTURES THE LIVE DATA DOES NOT REACH");
+{
+    // *** THESE TWO ARRIVED AT v4693 AND THIS IS THE GATE THAT OWES THEM AN ASSERTION. ***
+    // tools/ship/definitionGates-selfcheck.mjs holds a frozen count of exported symbols no gate NAMES, and
+    // its own header says the 81 that preceded them were closed BY ASSERTION rather than by mention. So they
+    // are exercised here, in the gate that shares their module's name, on the shapes the live data has none
+    // of: the block scores are near-continuous, so ties and one-class samples never occur in a real run and
+    // three separate mutations of these functions were invisible against one.
+    const tied = Float32Array.from([0.2, 0.2, 0.2, 0.2, 0.8, 0.8, 0.8, 0.8]);
+    const rm = rateMatch(tied, 0.5);
+    let got = 0; for (const v of tied) if (v >= rm.tau) got++;
+    ok("*** rateMatch returns a tau the scores ATTAIN, on a sample that is all ties ***",
+       rm.rate === 0.5 && got === 4 && tied.some((v) => v === rm.tau),
+       `tau ${rm.tau}, keeping ${got} of ${tied.length}. The keep-rate is a STEP function of tau, so a tau ` +
+       "interpolated between two observed scores is one no threshold test can land on.");
+    ok("...and it hits every rate it is handed, including both degenerate ends",
+       [0, 0.1, 0.25, 0.5, 0.9, 1].every((t) => Math.abs(rateMatch(Float32Array.from({ length: 1000 }, (_, i) => i / 1000), t).rate - t) <= 0.001),
+       "keeping nothing and keeping everything are reachable answers rather than errors");
+    ok("*** auc gives TIED scores their average rank, so an all-ties sample scores exactly a coin ***",
+       auc(Float32Array.from([0.5, 0.5, 0.5, 0.5]), Uint8Array.from([0, 1, 0, 1])).auc === 0.5,
+       "consecutive ranks would turn whatever order the sort produced into a signal");
+    const one = auc(Float32Array.from([0.1, 0.9]), Uint8Array.from([1, 1]));
+    ok("*** auc refuses a ONE-CLASS sample with a reason instead of returning 0.5 ***",
+       one.auc === null && /one class only/.test(one.why || ""),
+       `${JSON.stringify(one.why)}. 0.5 is what a coin scores, so returning it where there is nothing to rank ` +
+       "would report a measurement that does not exist -- the shape tools/ship/pairedStats.mjs uses for a " +
+       "constant sample.");
+    ok("...and the ends of the scale are still the ends",
+       auc(Float32Array.from([0.1, 0.2, 0.8, 0.9]), Uint8Array.from([0, 0, 1, 1])).auc === 1 &&
+       auc(Float32Array.from([0.9, 0.8, 0.2, 0.1]), Uint8Array.from([0, 0, 1, 1])).auc === 0,
+       "perfect ranking 1, perfectly inverted 0");
+}
 
 console.log("\n7. THE GATE APPLIES BLOCKWISE, AND IT IS THE BLOCKS IT SAYS");
 {

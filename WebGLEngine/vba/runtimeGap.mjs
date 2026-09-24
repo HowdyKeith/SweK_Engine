@@ -337,7 +337,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4336,               // v4691: 4333 -> 4336 for render/genGateGPU.mjs, tools/ship/genGateTrain.mjs and
+    files: 4338,               // v4693: 4336 -> 4338 for tools/ship/genGateCalibrate.mjs and its gate -- the
+                               // three-way split's threshold, chosen on VALIDATION. Promises moves 375 -> 376 for
+                               // the calibration tool's page drive; the gate's own await is on the same harness.
+                               // Every row from the census.
+                               // v4691: 4333 -> 4336 for render/genGateGPU.mjs, tools/ship/genGateTrain.mjs and
                                // tools/ship/genGateMeasure-selfcheck.mjs -- the device runner v4690 held back, the
                                // harvest-and-train tool, and the pre-registered held-out measurement. PROMISES moves
                                // 373 -> 375 for the first time in this arc: both new tools AWAIT a page drive, and
@@ -789,7 +793,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4036, closures: 3892, asyncAwait: 1548, typedArrays: 1159, promises: 375,
+    esModules: 4038, closures: 3894, asyncAwait: 1550, typedArrays: 1161, promises: 376,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 166, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

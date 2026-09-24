@@ -26,6 +26,14 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 export const TRAIN_SCENES = Object.freeze(["smooth", "zone"]);
 export const HELD_OUT = "checker";
 export const WEIGHTS = "render/genGate-weights.json";
+// *** v4693 -- THE SPLIT IS THREE-WAY NOW, AND THE MIDDLE SLICE IS WHY. ***
+// render/learned-calibration-preregistration.md section 3: v4691 trained on both scenes and held out the
+// checker, which left nowhere to choose an operating point except on rows the weights had memorised or on
+// the held-out scene itself. So the weights and the scaler are fitted on TRAIN alone, and VALIDATION exists
+// for one purpose -- supplying a threshold -- and is still a training-side scene, not a second held-out one.
+export const TRAIN_ONLY = Object.freeze(["smooth"]);
+export const VALIDATE_ON = "zone";
+export const WEIGHTS_V2 = "render/genGate-weights-v2.json";
 const UPTO = 40;            // frames driven per scene; the pre-registered measurement window is 6-38
 const SPEED = "2";          // slabspeed x2, the pre-registered cell
 
@@ -115,6 +123,22 @@ export function writeWeights(out, { rows, model, scenes }) {
 
 // pathToFileURL, not a template literal: tools/ship/winPathGuard-selfcheck.mjs names `file://` + a path
 // as a Windows-fragile idiom, and it caught this one the round it landed.
+/**
+ * v4693: harvest TRAIN and VALIDATION separately, fit on TRAIN alone, and hand VALIDATION's scores back for
+ * a threshold. The held-out scene is never named here and cannot be: `harvest` takes the scenes it is given.
+ */
+export async function trainThreeWay({ steps = 4000, lr = 0.05, seed = 7 } = {}) {
+    const trainRows = await harvest({ scenes: TRAIN_ONLY });
+    const valRows = await harvest({ scenes: [VALIDATE_ON] });
+    for (const [nm, rows, want] of [["train", trainRows, TRAIN_ONLY], ["validation", valRows, [VALIDATE_ON]]]) {
+        const bad = rows.filter((r) => !want.includes(r.scene));
+        if (bad.length) throw new Error(`genGateTrain.trainThreeWay: ${bad.length} ${nm} rows are not from ${want.join("/")}`);
+        if (rows.some((r) => r.scene === HELD_OUT)) throw new Error(`genGateTrain.trainThreeWay: ${HELD_OUT} reached the ${nm} slice -- the split IS the measurement`);
+    }
+    const model = train(trainRows, { steps, lr, seed });
+    return { model, trainRows, valRows };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const rows = await harvest();
     const bad = rows.filter((r) => !TRAIN_SCENES.includes(r.scene));

@@ -171,3 +171,65 @@ export function applyGate({ gen, cf, keep, w, h, bw, block }) {
     }
     return out;
 }
+
+// ---- v4693 -- THE OPERATING POINT, AND WHY IT IS A FUNCTION OF SCORES ALONE ---------------------------------
+//
+// *** C5 IS STRUCTURAL, NOT A PROMISE. *** render/learned-calibration-preregistration.md section 6 requires
+// that the threshold never see the held-out scene. `rateMatch` takes SCORES AND A TARGET RATE and nothing
+// else -- no scene, no rows, no frames, no labels. There is no argument through which checker data could
+// reach it, which is the same construction that keeps `features()` away from ground truth: the separation
+// lives in the call signature rather than in a comment somebody has to keep honest.
+//
+// *** RATE MATCHING IS PARAMETER-FREE, WHICH IS THE POINT. *** v4691 measured a predictor keeping 21% of
+// blocks where the truth said about 44%. The smallest tau whose keep-rate meets the target is the one
+// correction that introduces no tuning knob -- an accuracy search over a grid would, and is a declared
+// secondary precisely so it cannot quietly become the primary.
+
+/**
+ * The smallest tau (over the observed scores) whose predicted-positive rate meets `targetRate`.
+ * Returns { tau, rate }. Scores are p in [0,1]; ties are handled by scanning DESCENDING and cutting once
+ * the rate is met, so the returned tau is achievable rather than interpolated.
+ */
+export function rateMatch(scores, targetRate) {
+    const n = scores.length;
+    if (!n) throw new Error("genGate.rateMatch: no scores");
+    if (!(targetRate >= 0) || !(targetRate <= 1))
+        throw new Error(`genGate.rateMatch: targetRate must be in [0, 1] -- got ${targetRate}`);
+    // Keeping NOTHING is a legitimate answer at target 0, and keeping everything at target 1; both are
+    // reachable and neither is an error. What is NOT legitimate is interpolating a tau between two observed
+    // scores, because the rate is a step function of tau and a tau nothing attains is a tau nobody can apply.
+    const sorted = Float64Array.from(scores).sort();          // ascending
+    const want = Math.ceil(targetRate * n);
+    if (want <= 0) return { tau: Number.POSITIVE_INFINITY, rate: 0 };
+    if (want >= n) return { tau: Number.NEGATIVE_INFINITY, rate: 1 };
+    const tau = sorted[n - want];
+    let rate = 0; for (let i = 0; i < n; i++) if (scores[i] >= tau) rate++;
+    return { tau, rate: rate / n };
+}
+
+/**
+ * Area under the ROC curve, by the rank-sum identity, with ties taking their average rank.
+ *
+ * *** THIS IS THE DIAGNOSTIC THAT SEPARATES THE ROUND'S TWO EXPLANATIONS, AND IT IS THRESHOLD-FREE. ***
+ * Section 2 of the pre-registration: E1 (calibration) predicts AUC comfortably above 0.5, E2
+ * (representation) predicts about 0.5. It is declared a diagnostic and not a primary because a ranking that
+ * is good does not by itself put dB on the board -- which is a thing this arc can now say from measurement.
+ */
+export function auc(scores, labels) {
+    const n = scores.length;
+    if (n !== labels.length) throw new Error(`genGate.auc: ${n} scores against ${labels.length} labels`);
+    const pos = labels.reduce((a, v) => a + (v ? 1 : 0), 0), neg = n - pos;
+    // A one-class sample has NO auc -- not 0.5, which is the value a coin would score and would read as a
+    // measurement. Null with a reason, the shape tools/ship/pairedStats.mjs uses for a constant sample.
+    if (!pos || !neg) return { auc: null, pos, neg, why: `one class only: ${pos} positive, ${neg} negative` };
+    const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => scores[a] - scores[b]);
+    const rank = new Float64Array(n);
+    for (let i = 0; i < n;) {
+        let j = i; while (j + 1 < n && scores[idx[j + 1]] === scores[idx[i]]) j++;
+        const avg = (i + j) / 2 + 1;                          // ranks are 1-based; ties share the mean rank
+        for (let k = i; k <= j; k++) rank[idx[k]] = avg;
+        i = j + 1;
+    }
+    let sum = 0; for (let i = 0; i < n; i++) if (labels[i]) sum += rank[i];
+    return { auc: (sum - pos * (pos + 1) / 2) / (pos * neg), pos, neg, why: null };
+}
