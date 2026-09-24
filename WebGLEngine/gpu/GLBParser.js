@@ -485,19 +485,34 @@ export class GLBParser {
                 } else {
                     pos = srcPos instanceof Float32Array ? srcPos.slice() : new Float32Array(srcPos);
                 }
-                // Read + transform normals (rotation part only, no translate)
+                // Read + transform normals. CORRECTED to the inverse-
+                // transpose of bakedMatrix's upper-3x3 (matching the
+                // static scene-graph walker's own v771 fix at line ~730),
+                // not a raw upper-3x3 multiply: a raw 3x3 tilts normals
+                // off the surface under NON-UNIFORM scale on an ancestor
+                // in the SHADER_JOINT_LIMIT fallback's parent chain --
+                // found by an adversarial review of the sibling fallback
+                // position/joint-slot fix, filed and fixed as its own
+                // entry (glbparser-fallback-normals-skip-inverse-
+                // transpose) rather than folded into that fix, since the
+                // two are different formulas for different attributes.
                 let norm = null;
                 if (allHaveNormals && a.NORMAL != null) {
                     const srcNorm = this._readAccessor(json, bin, a.NORMAL);
                     if (bakedMatrix) {
                         norm = new Float32Array(srcNorm.length);
+                        const nMat = GLBParser._inverseTranspose3x3(bakedMatrix);
                         for (let v = 0; v < vc; v++) {
                             const x = srcNorm[v * 3 + 0];
                             const y = srcNorm[v * 3 + 1];
                             const z = srcNorm[v * 3 + 2];
-                            norm[v * 3 + 0] = bakedMatrix[0]*x + bakedMatrix[4]*y + bakedMatrix[8] *z;
-                            norm[v * 3 + 1] = bakedMatrix[1]*x + bakedMatrix[5]*y + bakedMatrix[9] *z;
-                            norm[v * 3 + 2] = bakedMatrix[2]*x + bakedMatrix[6]*y + bakedMatrix[10]*z;
+                            let tx = nMat[0]*x + nMat[1]*y + nMat[2]*z;
+                            let ty = nMat[3]*x + nMat[4]*y + nMat[5]*z;
+                            let tz = nMat[6]*x + nMat[7]*y + nMat[8]*z;
+                            const len = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
+                            norm[v * 3 + 0] = tx / len;
+                            norm[v * 3 + 1] = ty / len;
+                            norm[v * 3 + 2] = tz / len;
                         }
                     } else {
                         norm = srcNorm instanceof Float32Array ? srcNorm.slice() : new Float32Array(srcNorm);

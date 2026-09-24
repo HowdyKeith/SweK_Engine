@@ -79,6 +79,38 @@
 //           slot the mesh is bound to, confirming this sabotage isolates slot selection specifically, not the
 //           position formula.
 //
+// SECTION 6 -- GATES the SAME fallback's NORMAL transform (gpu/GLBParser.js:488-511, immediately below the
+// position/joint-slot fix section 5 gates). An adversarial review of that fix (requested to try to break it,
+// which instead correctly declined to conflate an unrelated finding with what it was reviewing) found this
+// ADJACENT, PRE-EXISTING, DIFFERENT bug in the same branch: normals were transformed with the RAW upper-3x3
+// of bakedMatrix instead of its INVERSE-TRANSPOSE. Positions are fine with a raw 4x4 (rotation+translation is
+// exactly right for a point), but normals need (worldMat^-1)^T's upper-3x3 to stay perpendicular to the
+// surface under NON-UNIFORM scale on an ancestor in the fallback's parent chain -- this file already knows
+// that: _inverseTranspose3x3 (line 1123) exists and is USED at line 730 by the static scene-graph walker's
+// own normal transform, for exactly this reason (its own v771 comment: a raw 3x3 "tilts normals away from
+// their geometric surfaces, producing wrong lighting"). Lines 488-511 belong to a different code path (the
+// skinned/unskinned primData concat pass) that never called it. Fixed by calling _inverseTranspose3x3(bakedMatrix)
+// once per primitive (mirroring line 730's own call site exactly) and using it in place of the raw 3x3, with
+// the same renormalize-after-transform line 730 already uses.
+//
+// SABOTAGE LOG -- applied to gpu/GLBParser.js, gate run, exit read, file restored byte for byte:
+//   H  the fix's `nMat = GLBParser._inverseTranspose3x3(bakedMatrix)` + per-vertex `nMat[i]*x+...` dot-products
+//      + renormalize reverted to the original bug: raw `bakedMatrix[0]*x + bakedMatrix[4]*y + bakedMatrix[8]*z`
+//      (no inverse-transpose, no renormalize)
+//        -> exit=1, 2 red: section 6's own exact-normal-value check AND its geometric perpendicularity check
+//           (normal-dot-tangent on the REAL parsed output), both by name -- got the raw-transformed, un-
+//           normalized (2, 1, 0) instead of the correct normalized (0.4472, 0.8944, 0), and a nonzero dot
+//           product (3) against the baked tangent instead of the expected ~0.
+//        -- A REAL PITFALL FOUND WHILE BUILDING THIS FIXTURE, LOGGED HONESTLY: the first draft used a
+//           secondary-mesh edge running purely along local Z ((0,0,0) to (0,0,1)) as the geometric tangent.
+//           Since the fixture's non-uniform scale is diag(2,1,1) -- Z is UNSCALED -- that edge's baked
+//           direction is invariant to the bug, so the perpendicularity check read ~0 (falsely clean) under
+//           BOTH the fixed and the sabotaged code; only the exact-value check caught the sabotage. Rebuilt
+//           the edge as (0,0,0) to (1,-1,0) instead (both X and Y, the two axes diag(2,1,1) scales unevenly)
+//           -- confirmed BOTH checks now go red together under the sabotage above. Kept as a cautionary
+//           example, not silently rewritten away: a geometric invariant check is only as strong as the
+//           geometry chosen to exercise it.
+//
 // Run: node tools/ship/gltfConformance-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import fs from "node:fs";
@@ -292,6 +324,100 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
         `!! the fallback binds to the nearest joint ANCESTOR found while walking to root -- expected joint slot ${SEC_ANCESTOR}, got ${secJoint}`);
 }
 
+// ---- 6. THE SAME FALLBACK'S NORMAL TRANSFORM -- see the header comment above for the bug this section
+// gates. Same fixture shape as section 5 (65-bone chain, secondary mesh under bone_10), but bone_10 ALSO
+// carries non-uniform scale (2,1,1), and the secondary mesh gets a SECOND vertex (an edge, so there is a
+// real geometric tangent to check perpendicularity against) plus real NORMAL data on both meshes
+// (allHaveNormals is scoped to skinnedPrims only -- section 5's own fixture omits NORMAL entirely and would
+// silently skip this whole code path).
+//
+// Independent oracle, not reusing GLBParser's own _mat4Mul/_nodeLocalMatrix/_inverseTranspose3x3: since every
+// node in this fixture uses identity rotation, each node's local matrix is diag(scale) + translation, and the
+// walk's own composition order (root-to-leaf, confirmed by section 5's own comment) reduces the overall
+// baked upper-3x3 to the PRODUCT of each ancestor's own diag(scale) -- every node's scale is [1,1,1] except
+// bone_10's [2,1,1], so the product is exactly diag(2,1,1). Inverse-transpose of a diagonal matrix is its own
+// elementwise reciprocal (a diagonal matrix's transpose is itself): diag(0.5,1,1). A local normal (1,1,0)
+// therefore transforms (before renormalize) to (0.5,1,0), normalized to (0.4472135955, 0.8944271910, 0) --
+// hand-derived here AND cross-checked against a from-scratch 3x3 cofactor-inverse computation before this
+// gate was written (not assumed from the diagonal shortcut alone).
+{
+    const NUM_BONES = 65, SEC_ANCESTOR = 10;
+    const nodes = [{ mesh: 0, skin: 0 }];
+    for (let i = 0; i < NUM_BONES; i++) {
+        const nodeIdx = 1 + i;
+        const translation = i === 0 ? [0, 0, 0] : [0, 1, 0];
+        const children = [];
+        if (i < NUM_BONES - 1) children.push(nodeIdx + 1);
+        if (i === SEC_ANCESTOR) children.push(66);
+        const node = { translation, ...(children.length ? { children } : {}) };
+        if (i === SEC_ANCESTOR) node.scale = [2, 1, 1];   // the non-uniform scale under test
+        nodes[nodeIdx] = node;
+    }
+    nodes[66] = { mesh: 1, translation: [0, 1.5, 0] };
+    const skinJoints = Array.from({ length: NUM_BONES }, (_, i) => 1 + i);
+
+    // Binary layout: [0,12) POSITION mesh0 (origin) | [12,24) NORMAL mesh0 ((0,1,0), unused by this section
+    // but required for allHaveNormals) | [24,28) JOINTS_0 mesh0 (ubyte4, [0,0,0,0]) | [28,44) WEIGHTS_0 mesh0
+    // (float4, [1,0,0,0]) | [44,68) POSITION mesh1 (2 verts: (0,0,0), (1,-1,0) -- see the SABOTAGE LOG above
+    // for why (1,-1,0) and not a Z-only edge) | [68,92) NORMAL mesh1 (2 verts, both (1,1,0)) |
+    // [92, 92+65*64) inverseBindMatrices.
+    const IBM_OFFSET = 92, totalBytes = IBM_OFFSET + NUM_BONES * 64;
+    const buf = new ArrayBuffer(totalBytes);
+    const dv = new DataView(buf);
+    dv.setFloat32(16, 1, true);              // NORMAL mesh0 = (0,1,0)
+    dv.setFloat32(28, 1, true);              // WEIGHTS_0 mesh0 = [1,0,0,0]
+    dv.setFloat32(44 + 12 + 0, 1, true);     // POSITION mesh1 v1.x = 1
+    dv.setFloat32(44 + 12 + 4, -1, true);    // POSITION mesh1 v1.y = -1
+    dv.setFloat32(68 + 0, 1, true); dv.setFloat32(68 + 4, 1, true);    // NORMAL mesh1 v0 = (1,1,0)
+    dv.setFloat32(68 + 12, 1, true); dv.setFloat32(68 + 16, 1, true);  // NORMAL mesh1 v1 = (1,1,0)
+    for (let j = 0; j < NUM_BONES; j++) {
+        const base = IBM_OFFSET + j * 64;
+        dv.setFloat32(base + 0, 1, true); dv.setFloat32(base + 20, 1, true);
+        dv.setFloat32(base + 40, 1, true); dv.setFloat32(base + 60, 1, true);
+        dv.setFloat32(base + 52, -j, true);
+    }
+    const gltf = {
+        asset: { version: "2.0" }, scene: 0, scenes: [{ nodes: [0] }], nodes,
+        meshes: [
+            { primitives: [{ attributes: { POSITION: 0, NORMAL: 1, JOINTS_0: 2, WEIGHTS_0: 3 } }] },
+            { primitives: [{ attributes: { POSITION: 4, NORMAL: 5 } }] },
+        ],
+        accessors: [
+            { bufferView: 0, byteOffset: 0,  componentType: 5126, count: 1, type: "VEC3" },
+            { bufferView: 0, byteOffset: 12, componentType: 5126, count: 1, type: "VEC3" },
+            { bufferView: 0, byteOffset: 24, componentType: 5121, count: 1, type: "VEC4" },
+            { bufferView: 0, byteOffset: 28, componentType: 5126, count: 1, type: "VEC4" },
+            { bufferView: 0, byteOffset: 44, componentType: 5126, count: 2, type: "VEC3" },
+            { bufferView: 0, byteOffset: 68, componentType: 5126, count: 2, type: "VEC3" },
+            { bufferView: 0, byteOffset: IBM_OFFSET, componentType: 5126, count: NUM_BONES, type: "MAT4" },
+        ],
+        bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: totalBytes }],
+        buffers: [{ byteLength: totalBytes }],
+        skins: [{ joints: skinJoints, inverseBindMatrices: 6 }],
+    };
+    const glbBytes = packGlb(gltf, [{ bytes: new Uint8Array(buf), byteOffset: 0 }], totalBytes);
+    const ab = glbBytes.buffer.slice(glbBytes.byteOffset, glbBytes.byteOffset + glbBytes.byteLength);
+    const parsed = await GLBParser.parse(ab, { postProcess: false });
+
+    // Secondary mesh's 2 vertices are vertex indices 1,2 (after mesh0's 1 vertex).
+    const p0 = [parsed.positions[3], parsed.positions[4], parsed.positions[5]];
+    const p1 = [parsed.positions[6], parsed.positions[7], parsed.positions[8]];
+    const n0 = [parsed.normals[3], parsed.normals[4], parsed.normals[5]];
+
+    const expectedNormal = [0.4472135954999579, 0.8944271909999159, 0];
+    const close = (a, b) => Math.abs(a - b) < 1e-5;
+    ok(close(n0[0], expectedNormal[0]) && close(n0[1], expectedNormal[1]) && close(n0[2], expectedNormal[2]),
+        `!! the fallback transforms normals by the INVERSE-TRANSPOSE of bakedMatrix's upper-3x3 (matching line 730's own established fix for non-uniform scale), not the raw 3x3 -- expected ${JSON.stringify(expectedNormal)}, got ${JSON.stringify(n0)}`);
+
+    // Geometric cross-check on the REAL parsed output, independent of trusting the exact-value assertion
+    // above: the baked tangent (edge between the two vertices) must still be perpendicular to the baked
+    // normal, since the local normal and local tangent were chosen perpendicular (n=(1,1,0), t=(1,-1,0), n.t=0).
+    const tangent = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+    const dot = n0[0]*tangent[0] + n0[1]*tangent[1] + n0[2]*tangent[2];
+    ok(Math.abs(dot) < 1e-5,
+        `!! the baked normal must stay geometrically PERPENDICULAR to the baked tangent under non-uniform scale (this is what the inverse-transpose formula exists to guarantee) -- normal . tangent should be ~0, got ${dot}`);
+}
+
 console.log(`gltfConformance-selfcheck: ${pass} passed, ${fail} failed`);
 console.log("unchecked here: sections 1-4 -- sparse accessors combined with an INTERLEAVED (byteStride) " +
     "bufferView, and sparse on a non-FLOAT componentType -- named honestly as remaining scope for whichever " +
@@ -304,6 +430,11 @@ console.log("unchecked here: sections 1-4 -- sparse accessors combined with an I
     "elsewhere -- kenneyKit/sceneGlb/trellisAutoRig/reskin), nor a fixture where several NON-joint ancestors " +
     "sit between the unskinned mesh and its nearest joint ancestor (this fixture's secondary mesh is a DIRECT " +
     "child of its joint ancestor; the nearest-ancestor SEARCH itself was not touched by that round's fix, " +
-    "only whether the walk continues past it). Other feature-matrix gaps, if any survive a future audit, are " +
-    "separate work.");
+    "only whether the walk continues past it). Section 6 gates the SAME fallback's normal transform, found by " +
+    "an adversarial review of section 5's own fix; also honestly incomplete -- it exercises only a SINGLE " +
+    "non-uniform-scale ancestor directly under the secondary mesh, not multiple non-uniform-scale ancestors " +
+    "composed together (bakedMatrix's upper-3x3 would still be a product of diagonal matrices in that case, " +
+    "so the SAME formula should hold, but no fixture proves it), and no currently-loaded real asset was found " +
+    "(this round's own regression-surface review) to reach this fallback branch at all. Other feature-matrix " +
+    "gaps, if any survive a future audit, are separate work.");
 process.exit(fail ? 1 : 0);
