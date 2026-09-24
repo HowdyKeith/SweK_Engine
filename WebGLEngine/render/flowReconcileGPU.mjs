@@ -23,7 +23,9 @@ export class FlowReconcileGPU {
                 `got ${device ? JSON.stringify(device.backend) : "nothing"}. There is no compute stage in WebGL2, ` +
                 "so a caller without one uses reconcileFlowCPU by asking for it.");
         this.device = device;
-        this.pipe = device.compute({ wgsl: RECONCILE_WGSL, entry: "main" });
+        // `entryPoint`, not `entry`: gfx/device.js reads d.entryPoint and defaults to "main". This kernel's
+        // entry IS main, so the wrong key was harmless here -- v4686 found it the hard way on a kernel with three.
+        this.pipe = device.compute({ wgsl: RECONCILE_WGSL, entryPoint: "main" });
     }
     _f32(a) { return a instanceof Float32Array ? a : Float32Array.from(a); }
 

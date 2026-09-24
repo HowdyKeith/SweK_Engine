@@ -8032,6 +8032,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4686 -- THE 296th CLOSING: a scatter with a depth compare, and a 0-RED caused by undefined behaviour.
+    since371: Object.freeze({
+        at: "v4686", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterpGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE SPLAT IS A SCATTER WITH A DEPTH COMPARE, WHICH IS THE ONLY GENUINELY HARD PORT IN THIS " +
+                 "ARC. *** On the CPU, blocks are visited in index order and \"strictly nearer wins\" means the " +
+                 "first claimer keeps a pixel against an equal-depth challenger. On a device every block runs at " +
+                 "once and a plain write returns whatever the scheduler ran last -- an answer about the hardware. " +
+                 "INTERP_WGSL reproduces the CPU's rule in THREE DISPATCHES: atomicMin a monotonic depth KEY, " +
+                 "then atomicMin the BLOCK INDEX among those that tied it, then gather. Among equal depths the " +
+                 "lowest index wins, and the CPU visits indices ascending, so the two sentences are one sentence. " +
+                 "Two atomics because one 32-bit slot cannot hold a full-precision depth key AND an index. " +
+                 "PARITY: the hole mask is IDENTICAL on all 4096 pixels of nine cases, the vectors and the depth " +
+                 "buffer agree EXACTLY (0.00e+0), and the frame to 1.19e-7 through two bilinear fetches and a " +
+                 "blend. The flat-depth case is the one that matters: every block at one depth makes EVERY " +
+                 "contested pixel a tie, which is the mirror image of v4685, where a constant-depth rig could not " +
+                 "test a nearest-pixel rule at all. " +
+                 "*** THE DEPTH KEY IS THE ORDER-PRESERVING FLOAT-TO-UINT MAP AND HAS TO BE: *** clip z is " +
+                 "signed and IEEE floats compare backwards as unsigned below zero, so a raw bitcast orders " +
+                 "negative depths wrongly and a scene with only positive depths would never show it -- one case " +
+                 "carries signed depths for exactly that. nearerIsLess complements the key rather than branching, " +
+                 "so one atomicMin serves both directions. " +
+                 "*** TEN SABOTAGES, AND THE 0-RED IS THE FIRST IN THIS ARC CAUSED BY UNDEFINED BEHAVIOUR. *** " +
+                 "Warping a declined NaN vector anyway changes nothing here, and the gate ASKS THE DEVICE WHY: " +
+                 "i32(round(NaN)) is -2147483648 on this adapter, so the block lands at INT_MIN, its footprint " +
+                 "falls outside the frame and the bounds tests discard it -- accidentally doing the guard's job. " +
+                 "WGSL leaves that conversion UNDEFINED; an adapter returning 0 would splat at the origin and put " +
+                 "NaN in the frame. So unlike v4675's denominator guard or v4677's NaN skip, this guard is not a " +
+                 "no-op -- it is unreachable HERE, and the conversion is measured so the distinction is a number. " +
+                 "A second sabotage scored 0 red until a nearerIsLess-FALSE case existed, since all nine cases " +
+                 "left the flag at its default. " +
+                 "*** AND TWO DEFECTS WERE IN TALKING TO gfx/device.js RATHER THAN IN THE ALGORITHM: *** the " +
+                 "option is `entryPoint` and `entry` is silently ignored, so every pipeline was built for a " +
+                 "function called main that this module does not have -- surfacing only as \"Invalid " +
+                 "ComputePipeline\" while the shader compiled clean; and device.js classifies bindings PER ENTRY " +
+                 "POINT, so each of the three pipelines binds only what its own entry declares. The NaN probe " +
+                 "kernel also carried an escape inside a template literal, the seventh such casualty here. " +
+                 "*** AND THE RUNNER WAS WIRED RATHER THAN RATCHETED, AGAIN, WHICH TURNED UP A RESULT. *** It went " +
+                 "red on arrival in runnerCallers-selfcheck as a fifth gate-only runner; fsr.html's `genengine` " +
+                 "device arm now warps there too. The device arm CANNOT FILL -- render/holeFill.mjs has no kernel, " +
+                 "so the runner takes no `fill` and the page cross-fades what is left, exactly as it already does " +
+                 "for anything the filler cannot reach. Which makes the two arms differ by ONE PASS, and the " +
+                 "measurement is the finding: the arm that fills NOTHING scores HIGHER, -0.7800 dB against the " +
+                 "CPU's -0.8575, by up to 0.13 dB a frame. v4678 measured on a fixture that its ring-dilation " +
+                 "filler was 3.6 dB WORSE than leaving the holes to a cross-fade; this is that result on a picture, " +
+                 "from the other direction -- the page's DEFAULT arm fills, and filling costs it. A row in " +
+                 "fsrPageField-selfcheck that had said \"within a hundredth of a dB\" at v4685 is re-measured " +
+                 "rather than loosened, and now names the pass instead of the port.",
+    }),
     // v4685 -- THE 295th CLOSING: the reconciliation comes off the CPU, and the rig could not test one rule.
     since370: Object.freeze({
         at: "v4685", swept: 1, green: 1, red: 0,

@@ -210,7 +210,9 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
     // hazard; the readout text is the element itself here.
     const dr = r.result.device.seen.slice(1).map((g) => ({
         gen: num(g, /scores (-?[\d.]+) dB against/), cf: num(g, /presented frames scores (-?[\d.]+) dB/),
-        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?") }));
+        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?"),
+        warp: /warped on the device/.test(g) ? "device" : (/warped on the CPU/.test(g) ? "cpu" : "?"),
+        filled: num(g, /(\d+) pixels were filled/), left: num(g, /and (\d+) were still unreachable/) }));
     const dd = dr.map((x) => x.gen - x.cf);
     const cpu = b4;    // smooth x4 block presented -- the CPU arm of the very same cell
     say(`smooth x4 block, reconciled on the DEVICE: delta ${dd.map((v) => v.toFixed(2)).join(", ")} dB   mean ${avg(dd).toFixed(4)}`);
@@ -227,13 +229,26 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
        [b1, p1, b4, p4, c1, c4, ck, zn, znp].every((c) => c.engs.length > 0 && c.engs.every((e) => e === "cpu")),
        `${[b1, p1, b4, p4, c1, c4, ck, zn, znp].reduce((n, c) => n + c.engs.filter((e) => e === "cpu").length, 0)} generated frames across nine CPU cells, every one labelled the CPU, ` +
        `against ${dr.length} labelled the device in the one device cell.`);
-    ok("*** and the device arm lands within a hundredth of a dB of the CPU arm, frame for frame, on live content ***",
-       dd.length === cpu.d.length && dd.every((v, i) => Math.abs(v - cpu.d[i]) < 0.01),
-       `worst per-frame difference ${Math.max(...dd.map((v, i) => Math.abs(v - cpu.d[i]))).toFixed(5)} dB -- which is ZERO ` +
-       `AT THIS READOUT'S TWO DECIMALS, and that is the honest way to say it. The two arms are not bit-identical: ` +
-       `render/flowReconcileGPU-selfcheck.mjs measures the vectors moving about 1.9e-6 px between f32 and f64. ` +
-       `A page that prints two decimals cannot see that, so the CPU stays the default and every figure v4681, v4682 ` +
-       `and v4683 pinned is the CPU arm's -- a difference below a readout's precision is still a difference.`);
+    // *** v4686 -- AND THE WARP RUNS THERE TOO, WITHOUT ITS FILL, WHICH IS THE ONE PASS STILL OWED. ***
+    ok("*** the WARP ran on the device as well, and that arm fills NOTHING -- the difference between the arms is exactly one missing pass ***",
+       dr.every((x) => x.warp === "device") && dr.every((x) => x.filled === 0) && dr.some((x) => x.left > 0),
+       `${dr.filter((x) => x.warp === "device").length} of ${dr.length} frames warped on the device; filled ` +
+       `${dr.map((x) => x.filled).join(",")} and left ${dr.map((x) => x.left).join(",")} unreachable, against the CPU arm's ` +
+       `${cpu.filled ? cpu.filled.join(",") : "own filler"}. render/frameInterpGPU.mjs takes no \`fill\` because render/holeFill.mjs has no kernel; ` +
+       `the page cross-fades what is left, as it already does for anything the filler cannot reach, and a later round closes it.`);
+    // *** THIS ROW SAID "WITHIN A HUNDREDTH OF A dB" AND v4686 MADE THAT FALSE, SO IT IS RE-MEASURED AND NOT
+    // LOOSENED QUIETLY. *** At v4685 the device arm differed only in f32-versus-f64 rounding and read 0.00000 dB.
+    // Since v4686 it also skips the FILL, and the gap is 0.13 dB -- which is the fill's worth on this content,
+    // measured from a direction v4678 could not take: not "what does filling add" but "what does omitting it cost
+    // in a live pipeline". The number belongs to the missing pass, not to the port.
+    const gap = Math.max(...dd.map((v, i) => Math.abs(v - cpu.d[i])));
+    ok("*** the device arm is BETTER than the CPU arm here by up to 0.13 dB, and the difference is the fill it does not do ***",
+       dd.length === cpu.d.length && gap > 0.01 && gap < 0.3 && avg(dd) > avg(cpu.d),
+       `worst per-frame difference ${gap.toFixed(5)} dB; device mean ${avg(dd).toFixed(4)} against the CPU's ${avg(cpu.d).toFixed(4)}. ` +
+       `*** AND THE SIGN IS THE FINDING: the arm that fills NOTHING scores HIGHER. *** v4678 measured on a fixture that ` +
+       `its ring-dilation filler was 3.6 dB WORSE than leaving holes to a cross-fade, and this is that result arriving on a ` +
+       `picture from the other side -- the page's default arm fills, and filling costs it. The f32-versus-f64 part of the ` +
+       `difference is about 1.9e-6 px on the vectors and is invisible at two decimals; everything here is the pass.`);
 }
 
 }

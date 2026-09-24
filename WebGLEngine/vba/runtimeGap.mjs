@@ -337,7 +337,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4325,               // v4685: 4322 -> 4325 for render/flowReconcileWgsl.mjs, its runner and its gate -- FSR3's
+    files: 4328,               // v4686: 4325 -> 4328 for render/frameInterpWgsl.mjs, its runner and its gate -- frame
+                               // generation on the device. Every row taken from the census rather than predicted, after v4685 got two wrong. v4685: 4322 -> 4325 for render/flowReconcileWgsl.mjs, its runner and its gate -- FSR3's
                                // reconciliation on the device. WebGL 163 -> 164 because a kernel gate mentions the backend it refuses,
                                // which v4739's note calls a MENTION counted as a USE and is this census's own recorded limit. v4684: 4319 -> 4322 for tools/ship/pairedStats.mjs, its gate, and tools/ship/fsrPageConfirm-selfcheck.mjs. v4683: 4318 -> 4319 for tools/ship/fsrPageField-selfcheck.mjs. v4681: 4317 -> 4318 for tools/ship/fsrPageGen-selfcheck.mjs; fsr.html is not a .js or .mjs and is not counted. v4678: 4315 -> 4317 for render/holeFill.mjs and its gate. v4677: 4313 -> 4315 for render/frameInterp.mjs and its gate -- the first generated frame. v4676: 4311 -> 4313 for render/flowReconcile.mjs and its gate -- FSR3's reconciliation of the two motion fields. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
@@ -766,8 +767,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4025, closures: 3883, asyncAwait: 1541, typedArrays: 1151, promises: 373,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 164, webgpu: 52, threads: 23, wasm: 23,
+    esModules: 4028, closures: 3885, asyncAwait: 1543, typedArrays: 1153, promises: 373,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 165, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -2172,10 +2172,11 @@
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
   "tools/ship/fsrPageGen-selfcheck.mjs": 19197,
-  "tools/ship/fsrPageField-selfcheck.mjs": 39051,
+  "tools/ship/fsrPageField-selfcheck.mjs": 41652,
   "tools/ship/pairedStats-selfcheck.mjs": 45,
   "tools/ship/fsrPageConfirm-selfcheck.mjs": 74234,
-  "render/flowReconcileGPU-selfcheck.mjs": 2509
+  "render/flowReconcileGPU-selfcheck.mjs": 2509,
+  "render/frameInterpGPU-selfcheck.mjs": 3261
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3952,7 +3953,8 @@
   "tools/ship/fsrPageField-selfcheck.mjs": 0,
   "tools/ship/pairedStats-selfcheck.mjs": 0,
   "tools/ship/fsrPageConfirm-selfcheck.mjs": 0,
-  "render/flowReconcileGPU-selfcheck.mjs": 0
+  "render/flowReconcileGPU-selfcheck.mjs": 0,
+  "render/frameInterpGPU-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5729,7 +5731,8 @@
   "tools/ship/fsrPageField-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
   "tools/ship/pairedStats-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
   "tools/ship/fsrPageConfirm-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
-  "render/flowReconcileGPU-selfcheck.mjs": "2026-09-24T00:00:00.000Z"
+  "render/flowReconcileGPU-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
+  "render/frameInterpGPU-selfcheck.mjs": "2026-09-24T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10421,10 +10424,11 @@
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
   "tools/ship/fsrPageGen-selfcheck.mjs": 19197,
-  "tools/ship/fsrPageField-selfcheck.mjs": 39051,
+  "tools/ship/fsrPageField-selfcheck.mjs": 41652,
   "tools/ship/pairedStats-selfcheck.mjs": 45,
   "tools/ship/fsrPageConfirm-selfcheck.mjs": 74234,
-  "render/flowReconcileGPU-selfcheck.mjs": 2509
+  "render/flowReconcileGPU-selfcheck.mjs": 2509,
+  "render/frameInterpGPU-selfcheck.mjs": 3261
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -15280,6 +15284,7 @@
   "tools/ship/fsrPageField-selfcheck.mjs": "alone",
   "tools/ship/pairedStats-selfcheck.mjs": "alone",
   "tools/ship/fsrPageConfirm-selfcheck.mjs": "alone",
-  "render/flowReconcileGPU-selfcheck.mjs": "alone"
+  "render/flowReconcileGPU-selfcheck.mjs": "alone",
+  "render/frameInterpGPU-selfcheck.mjs": "alone"
  }
 }
