@@ -8032,6 +8032,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4697 -- THE 304th CLOSING: the population widened, and nothing was measured through it.
+    since379: Object.freeze({
+        at: "v4697", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrContent-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE BLOCKER v4696 NAMED WAS THREE SCENES, AND THIS ROUND FIXES THE SCENES AND NOTHING " +
+                 "ELSE. *** That closing ended \"more than three scenes, since three folds were never a " +
+                 "distribution\". fsr.html now offers seven: bars, edges, noise and ramp join zone, smooth and " +
+                 "checker. *** THE FOUR WERE CHOSEN ON STATED GROUNDS BEFORE ANY OF THEM WAS MEASURED, *** " +
+                 "each naming an axis the original three do not span -- orientation, SPARSE rather than dense " +
+                 "high frequency, high frequency WITHOUT lockable structure, and a degenerate smooth low end. " +
+                 "The census then confirms all four, by measurement on the page's own sampler: edges 7.3% " +
+                 "edge-pixels against checker's 100.0%, bars anisotropy 0.138 against 0.000 for all three " +
+                 "originals, noise |lap| 0.0075 at 0.0% edge-pixels, ramp |lap| 0.00000 at variance 0.0108 -- " +
+                 "and the seven now span 0.00000 to 0.6400 in high-frequency energy where three spanned less. " +
+                 "*** NOTHING IS MEASURED THROUGH THE NEW POPULATION IN THIS ROUND, ON PURPOSE. *** No PSNR, " +
+                 "no learned gate, no hypothesis. Measuring the content and testing a hypothesis on it in the " +
+                 "same round would make the content's properties answerable to the hypothesis, which is the " +
+                 "defect a pre-registration exists to prevent; using this set owes a fresh one. And the gate " +
+                 "says the harder thing in its own closing line: SEVEN SYNTHETIC SCENES ARE STILL NOT A " +
+                 "DISTRIBUTION, they are seven points chosen to span an axis. " +
+                 "*** A SILENT `else` THAT MERGED MISSPELLED SCENES INTO THE ZONE PLATE IS GONE. *** The " +
+                 "sampler's trailing bare else returned zone for any unrecognised kind, so a typo in a fold " +
+                 "list would have measured zone twice and reported two scenes. It now names every kind and " +
+                 "throws on the rest -- and the gate proves the throw IN THE PAGE rather than asserting the " +
+                 "source text. " +
+                 "*** THE THREE ORIGINALS ARE HELD BIT FOR BIT, AND THE FIRST ATTEMPT AT THAT ROW WAS WRONG. " +
+                 "*** The rewrite must be inert on prior content or every figure this arc pinned moves under " +
+                 "it. Transcribing the prior formulas into the GATE and comparing against the page read " +
+                 "1.11e-16 -- one ULP -- and the row failed. The residual is not the page's: Math.cos and " +
+                 "Math.exp are implementation-defined, and node and the page's Chromium do not agree to the " +
+                 "last bit on the same expression. The comparison was moved INSIDE the page, where both sides " +
+                 "run on one engine, and reads 4800 of 4800 samples bit-identical at worst 0.00e+0. The row " +
+                 "says ON ONE ENGINE in its own title, because that is the claim it can carry. " +
+                 "*** EIGHT SABOTAGES, SEVEN RED. *** Two of them are the SAME ROW checked in both directions: " +
+                 "the scene-list row's first draft asserted only that the gate's list is a SUBSET of the " +
+                 "page's, so adding a scene to the page and not to the gate scored 0 RED -- a gate measuring " +
+                 "six of seven scenes and calling it complete. It is set EQUALITY now and both directions " +
+                 "redden. *** THAT IS THE SAME SHAPE AS v4696's ONE-SIDED COLLAPSE DETECTOR, ONE ROUND " +
+                 "LATER, *** found the same way and by the same sabotage, which is worth recording as a " +
+                 "recurring habit of this session rather than two unrelated slips: a check written against " +
+                 "the failure that was in mind, blind to its mirror. " +
+                 "*** THE ONE 0-RED IS AN EMPTY ADVERSARIAL POPULATION AND IS RECORDED RATHER THAN CHASED: " +
+                 "THE SEVENTH IN THIS ARC. *** Loosening the bit-equality row to a 1e-9 tolerance does not " +
+                 "redden it, because the measured residual is exactly 0.00e+0: no threshold above zero can be " +
+                 "distinguished from bit equality while the code is bit-exact. The mutation is real and the " +
+                 "row is real; there is simply no input on which they disagree. Chasing it would mean " +
+                 "weakening the code to make the test look sharper.",
+    }),
     // v4696 -- THE 303rd CLOSING: a control fired, and the primary statistic was the thing it caught.
     since378: Object.freeze({
         at: "v4696", swept: 1, green: 1, red: 0,

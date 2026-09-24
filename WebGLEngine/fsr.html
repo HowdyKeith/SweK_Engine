@@ -39,6 +39,10 @@
       <option value="zone">zone plate (detail past Nyquist)</option>
       <option value="smooth">smooth (nothing to recover)</option>
       <option value="checker">pixel checker</option>
+      <option value="bars">bars (mid-frequency, oriented)</option>
+      <option value="edges">edges (sparse high frequency, flat interiors)</option>
+      <option value="noise">noise (broadband, no structure)</option>
+      <option value="ramp">ramp (smooth without oscillation)</option>
     </select>
     <select id="camera">
       <option value="static">camera: static</option>
@@ -276,14 +280,59 @@ const $ = (id) => document.getElementById(id);
 const ctx = (id) => { const c = $(id); c.width = D; c.height = D; return c.getContext("2d"); };
 const cRef = ctx("cRef"), cBil = ctx("cBil"), cFsr = ctx("cFsr"), cTmp = ctx("cTmp");
 
+// *** v4697 -- SEVEN SCENES, AND THE FOUR NEW ONES WERE CHOSEN BEFORE ANYTHING WAS MEASURED ON THEM. ***
+// v4696 closed by saying a sound transfer test needs more than three scenes, because three folds were never a
+// distribution. Adding content AFTER seeing a result is how a scene set becomes a way of choosing an answer,
+// so these are picked on stated grounds and their properties are MEASURED by tools/ship/fsrContent-selfcheck
+// rather than asserted here. The axis this arc found is content spatial frequency; the three originals are
+// low (smooth), swept (zone) and Nyquist-dense (checker), and all three are isotropic or axis-symmetric.
+// The four additions open three axes the originals do not span:
+//
+//   bars      a mid-frequency ORIENTED grating -- the first anisotropic content here
+//   edges     piecewise-constant regions with sharp boundaries: SPARSE high frequency, where the checker's is
+//             dense. Most real content is this shape and none of the originals is
+//   noise     a band-limited stochastic field -- broadband with no structure, which separates "has high
+//             frequencies" from "has repeating structure"
+//   ramp      a linear gradient: the degenerate low end, smooth WITHOUT oscillation, which `smooth` has
+//
+// *** AND THE SILENT FALLBACK IS GONE. *** This function used to end in a bare `else` that produced the zone
+// plate, so any misspelled kind became `zone` without a word. In a transfer experiment that merges two folds
+// into one and the merge is invisible -- exactly the class of defect this arc has spent four rounds on. Every
+// kind is named, and an unknown one throws.
 function scene(u, v, kind) {
     const x = (u - 0.5) * 2, y = (v - 0.5) * 2;
     let s;
-    if (kind === "smooth")      s = 0.5 + 0.35 * Math.cos(2.5 * (x + y)) * Math.exp(-0.6 * (x * x + y * y));
+    if (kind === "smooth")       s = 0.5 + 0.35 * Math.cos(2.5 * (x + y)) * Math.exp(-0.6 * (x * x + y * y));
     else if (kind === "checker") s = ((Math.floor(u * D) + Math.floor(v * D)) & 1) ? 0.9 : 0.1;
-    else                         s = 0.5 + 0.5 * Math.cos(90 * (x * x + y * y));
+    else if (kind === "zone")    s = 0.5 + 0.5 * Math.cos(90 * (x * x + y * y));
+    else if (kind === "bars")    s = 0.5 + 0.45 * Math.cos(28 * (0.8 * x + 0.6 * y));
+    else if (kind === "edges") {
+        // Sparse high frequency: a few large constant plateaus, so the energy is at the BOUNDARIES and the
+        // interiors are flat. A deterministic hash on a coarse lattice, not noise -- the plateaus must be
+        // large enough that most blocks see no edge at all, which is what makes this different from `noise`.
+        const cx = Math.floor((u * 6.0)), cy = Math.floor((v * 6.0));
+        const h = Math.sin(cx * 12.9898 + cy * 78.233) * 43758.5453;
+        s = (h - Math.floor(h)) > 0.5 ? 0.85 : 0.15;
+    }
+    else if (kind === "noise") {
+        // Band-limited stochastic: a fixed sum of incommensurate sinusoids, which is broadband and repeatable
+        // without a PRNG. Deterministic matters -- the generator is sampled at sub-pixel positions by the
+        // warp, and a hash-per-pixel field would not be a continuous function to resample.
+        s = 0.5 + 0.12 * (Math.sin(11.3 * x + 4.1 * y) + Math.sin(7.7 * x - 9.2 * y)
+                        + Math.sin(17.1 * x + 13.9 * y) + Math.sin(23.3 * x - 19.7 * y));
+    }
+    else if (kind === "ramp")    s = 0.5 + 0.45 * x;
+    else throw new Error(`fsr.html scene(): unknown kind ${JSON.stringify(kind)} -- this used to fall through ` +
+        "to the zone plate, which silently merged a misspelled scene into an existing one");
     return [s, s * 0.8 + 0.1, 1 - s, 1];
 }
+
+// *** v4697 -- THE SAMPLER IS EXPOSED UNDER A NAMED DEBUG HANDLE, FOR THE SAME REASON __gateHarvest IS. ***
+// tools/ship/fsrContent-selfcheck.mjs measures what each scene IS, and it has to measure the function the
+// generator actually samples. Reimplementing seven formulas in the gate would create a second definition that
+// can drift from this one silently -- and a content census describing content the page does not draw is worse
+// than no census. The handle is read-only to the page's own behaviour: nothing here calls it.
+if (typeof window !== "undefined") window.__fsrScene = scene;
 
 // ---- THE PERSPECTIVE SCENE: TWO PLANES, WHICH IS THE SMALLEST THING THAT HAS PARALLAX ----------------------
 //

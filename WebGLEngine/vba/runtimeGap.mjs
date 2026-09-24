@@ -337,7 +337,15 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4340,               // v4696: 4338 -> 4340 for tools/ship/genGateTransfer.mjs and its gate -- the
+    files: 4341,               // v4697: 4340 -> 4341 for tools/ship/fsrContent-selfcheck.mjs, the census of what
+                               // fsr.html's seven scenes contain. ONE file and not two: the round's other change
+                               // is to fsr.html itself, and this walk matches .js/.mjs/.cjs and not .html, so the
+                               // four new scenes and the removed silent fallback are invisible here. Six rows move
+                               // together -- ES modules, closures, async/await, typed arrays and Promises -- which
+                               // is the ordinary shape of a gate that awaits a page drive and reads Float64Array
+                               // back out of it. WebGL and WebGPU hold: the gate names neither, because the page
+                               // harness it borrows does the reaching. Every row from the census.
+                               // v4696: 4338 -> 4340 for tools/ship/genGateTransfer.mjs and its gate -- the
                                // leave-one-scene-out comparison, and the control that stopped it. Promises does
                                // NOT move: the gate reads a cached fold file rather than driving the page, which
                                // is why it costs 419 ms where the other two measurement gates cost two minutes.
@@ -805,7 +813,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4040, closures: 3896, asyncAwait: 1552, typedArrays: 1163, promises: 376,
+    esModules: 4041, closures: 3897, asyncAwait: 1553, typedArrays: 1164, promises: 377,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
