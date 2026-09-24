@@ -8032,6 +8032,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4704 -- THE 311th CLOSING: six verdicts that lived in closings now reach the page's user.
+    since386: Object.freeze({
+        at: "v4704", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateVerdicts-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/fsrPage-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S PAGE EDIT CRASHED IT, and the first verify said so. The gate imports fsr.html's module in node against a stub DOM whose elements carry no .options, and the new load-time loop that appends each arm's verdict to its label iterated $(\"gengate\").options unguarded -- a TypeError on import, a crash rather than a red row. Every other lookup on the page is already guarded against that harness; the loop now is too, and the gate is green at 2.6 s. The two over-budget gates that drive the learned arms end to end, which the quick sweep never runs, were run by hand after the change because the arms now take their weights path from the table: tools/ship/genGateMeasure-selfcheck.mjs (144 s) and tools/ship/genGateCalibrate-selfcheck.mjs (112 s), both green." }),
+        ]),
+        verdict: "*** SIX HYPOTHESES WERE MEASURED AND THE PAGE SAID NOTHING ABOUT ANY OF THEM. *** fsr.html offered three " +
+                 "learned-gate arms labelled only by the weights they load, and its readout reported \"GATE ... kept N of M " +
+                 "blocks\" as though that were a feature. Every verdict lived in a closing -- the place v4688 found six gates' " +
+                 "findings reaching nobody for up to eleven rounds. render/genGateVerdicts.mjs now holds the six, and the " +
+                 "page READS it three times: each learned arm's label carries its verdict (\"-- H1 REFUTED at v4691\"), each " +
+                 "arm's weights path comes from the table so a label and a load cannot disagree, and while a learned arm " +
+                 "runs the readout ends by saying the arm is a refuted hypothesis kept as a record, with its evidence, its " +
+                 "document and where the arc stands. oracle and never are CONTROLS and are labelled as nothing. " +
+                 "*** A SUMMARY IS A CLAIM, SO EVERY LINE OF THIS ONE IS GRADED. *** Each entry's numbers must appear in the " +
+                 "closing it names and in its own evidence; each verdict word must be one its closing uses; H4, H5 and H6 " +
+                 "are RE-DERIVED from their result files through the statistics that decided them. The table can say no " +
+                 "more than the measurements did. " +
+                 "*** AND THE PAGE IS DRIVEN, NOT GREPPED. *** The gate loads fsr.html, reads the labels the running page " +
+                 "shows, RUNS the cpu arm until a gated frame is scored, reads the readout a user would see, and spies on the " +
+                 "page's own fetch to confirm the weights it loaded are the file its verdict names. " +
+                 "*** THIRTEEN SABOTAGES, THIRTEEN RED -- AFTER ONE 0-RED THAT WAS A MISSING ROW. *** Giving H2 the H1 weights " +
+                 "passed: the gate checked only that each file EXISTED. Each file is now graded by its own provenance -- its " +
+                 "note must cite its entry's document, and only H2's may carry the validation-chosen tau H2 was about. " +
+                 "The gate takes 3.2 s alone because it runs an arm, over the 3 s budget, so its timing is hand-filed and the " +
+                 "sweep will not time it. " +
+                 "*** NOTHING WAS MEASURED IN THIS ROUND AND NO VERDICT MOVED. *** It is the round that makes the arc's end " +
+                 "visible where someone would actually choose an arm.",
+    }),
     // v4703 -- THE 310th CLOSING: H6 not supported, and the rule ranks BACKWARDS.
     since385: Object.freeze({
         at: "v4703", swept: 1, green: 1, red: 0,

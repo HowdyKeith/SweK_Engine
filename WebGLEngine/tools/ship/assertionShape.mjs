@@ -519,8 +519,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // twenty-first.)
     // v4702 -- 1782 -> 1783 for tools/ship/genGateRule-selfcheck.mjs, the parameter-free rule gated on synthetic frames.
     // v4703 -- 1783 -> 1784 for tools/ship/genGateRuleMeasure-selfcheck.mjs, H6 re-derived from the two caches.
-    gates: 1784, usesOk: 1763, definesOk: 1755, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1656, condFirst: 91, unknownSignature: 16,
+    // v4704 -- 1784 -> 1785 for tools/ship/genGateVerdicts-selfcheck.mjs, the page's verdict table graded and driven.
+    gates: 1785, usesOk: 1764, definesOk: 1756, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1657, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
