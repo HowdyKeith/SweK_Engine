@@ -267,7 +267,7 @@ import { FlowReconcileGPU } from "./render/flowReconcileGPU.mjs";
 import { FrameInterpGPU } from "./render/frameInterpGPU.mjs";
 import { HoleFillGPU } from "./render/holeFillGPU.mjs";
 import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
-import { features as gateFeatures, labels as gateLabels } from "./render/genGate.mjs";
+import { features as gateFeatures, featuresV2 as gateFeaturesV2, labels as gateLabels } from "./render/genGate.mjs";
 import { applyScaler as gateScale, forward as gateForward, applyGate } from "./render/genGate.mjs";
 import { GenGateGPU } from "./render/genGateGPU.mjs";
 
@@ -1511,7 +1511,13 @@ async function tick() {
         if (typeof window !== "undefined" && window.__gateHarvest) {
             const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
             const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
-            window.__gateHarvest.push({ scene: kind, frame, tMid, x: Array.from(F), y: Array.from(L.y), base: L.base });
+            // *** BOTH FEATURE SETS, FROM ONE DRIVE. *** v4695's clause (b) compares them on IDENTICAL
+            // folds, so harvesting them separately would make the two runs differ by the drive as well as by
+            // the features -- and the page's own RNG and slab position advance per frame, so two drives are
+            // not the same data. One drive, two vectors, same blocks.
+            const F2 = gateFeaturesV2({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+            window.__gateHarvest.push({ scene: kind, frame, tMid, x: Array.from(F), x2: Array.from(F2),
+                                        y: Array.from(L.y), base: L.base });
         }
         genStat = { gen: psnr(patched, midRef), cf: psnr(cf, midRef), hold: psnr(genPrev, midRef),
                     left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,

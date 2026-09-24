@@ -13,7 +13,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
-import { FEATURE_NAMES, N_FEATURES, HIDDEN, features, labels, fitScaler, applyScaler, forward, applyGate, rateMatch, auc } from "./genGate.mjs";
+import { FEATURE_NAMES, N_FEATURES, HIDDEN, features, labels, fitScaler, applyScaler, forward, applyGate, rateMatch, auc, featuresV2, FEATURE_NAMES_V2, N_FEATURES_V2, aucP } from "./genGate.mjs";
 import { SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -273,6 +273,47 @@ console.log("\n6b. THE OPERATING POINT AND THE RANKING, ON FIXTURES THE LIVE DAT
        auc(Float32Array.from([0.1, 0.2, 0.8, 0.9]), Uint8Array.from([0, 0, 1, 1])).auc === 1 &&
        auc(Float32Array.from([0.9, 0.8, 0.2, 0.1]), Uint8Array.from([0, 0, 1, 1])).auc === 0,
        "perfect ranking 1, perfectly inverted 0");
+}
+
+console.log("\n6c. THE SCALE-FREE SET, AND THE PROPERTY IT EXISTS FOR");
+{
+    // *** v4695 FIXED THIS LIST BEFORE ANY OF IT WAS COMPUTED, AND THIS IS THE GATE THAT OWES IT AN
+    // ASSERTION. *** The claim the set is built on is falsifiable and is tested directly below: SCALING THE
+    // PICTURE MUST NOT MOVE THE FEATURES. That is the whole mechanism -- absolutes carry the scene's units,
+    // ratios and frame-relative terms do not -- so if a brightness scaling moved these, the set would not be
+    // what it says it is, whatever it scored.
+    ok("*** the v2 list is the pre-registered eleven, in order, and the same COUNT as v1 ***",
+       N_FEATURES_V2 === 11 && N_FEATURES_V2 === N_FEATURES && FEATURE_NAMES_V2.join(",") ===
+       "logFlowOverApp,logStillOverApp,logGain,dispPerBlock,lapPerContrast,varOverFrame,lapOverFrame,holeFrac,depthRank,srcIsApp,srcIsFlowBeat",
+       `${N_FEATURES_V2}: ${FEATURE_NAMES_V2.join(", ")}. Width and count are held constant against v1 so that ` +
+       "a comparison between them is about the KIND of feature and not about capacity.");
+    const rc = mkRc(), hole = new Uint8Array(W * H), depth = new Float32Array(NB).fill(0.5);
+    const mk = (k) => { const c = splitFrame(); const f = Float32Array.from(c); for (let i = 0; i < f.length; i++) if (i % 4 !== 3) f[i] *= k; return f; };
+    const a = featuresV2({ cur: mk(1), w: W, h: H, rc, hole, depthBlock: depth, block: BLK });
+    // the SADs scale with the picture too, so scale them the same way a brighter scene would
+    const rc2 = mkRc(); for (const k of ["sadApp", "sadFlow", "sadStill"]) for (let i = 0; i < NB; i++) rc2[k][i] *= 4;
+    const b = featuresV2({ cur: mk(4), w: W, h: H, rc: rc2, hole, depthBlock: depth, block: BLK });
+    let worst = 0, worstAt = -1;
+    for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d > worst) { worst = d; worstAt = i % N_FEATURES_V2; } }
+    ok("*** SCALING THE WHOLE PICTURE BY 4x MOVES NO v2 FEATURE -- which is the property the set exists for ***",
+       worst < 1e-5,
+       `worst change ${worst.toExponential(2)}${worstAt >= 0 ? ` at ${FEATURE_NAMES_V2[worstAt]}` : ""} over ` +
+       `${a.length} values. v4693 measured that the ABSOLUTE set ranks an unseen scene at 0.4214, and the ` +
+       "mechanism proposed for that is scene units leaking in. A set claiming to be scale-free has to survive " +
+       "a scaling, and this is that test rather than an argument for it.");
+    // and the v1 set must FAIL the same test, or the distinction being drawn is not a distinction
+    const a1 = features({ cur: mk(1), w: W, h: H, rc, hole, depthBlock: depth, block: BLK });
+    const b1 = features({ cur: mk(4), w: W, h: H, rc: rc2, hole, depthBlock: depth, block: BLK });
+    let w1 = 0; for (let i = 0; i < a1.length; i++) w1 = Math.max(w1, Math.abs(a1[i] - b1[i]));
+    ok("*** ...and the v1 set MOVES under the same scaling, so the two really are different kinds ***",
+       w1 > 0.1,
+       `worst v1 change ${w1.toExponential(2)} against v2's ${worst.toExponential(2)}. If both were invariant ` +
+       "the comparison v4695 pre-registered would be between two sets that differ in name only.");
+    ok("*** aucP is the Mann-Whitney normal approximation section 4 declared, not a test chosen later ***",
+       Math.abs(aucP(0.5, 5000, 5000).p - 1) < 1e-9 && aucP(0.6, 5000, 5000).p < 1e-6 &&
+       aucP(0.505, 5000, 5000).p > 0.05 && aucP(0.5, 0, 10).p === null,
+       `AUC 0.5 -> p=1; 0.60 at n=10000 -> p<1e-6; 0.505 at n=10000 -> p=${aucP(0.505, 5000, 5000).p.toFixed(3)} ` +
+       "(not significant, which is the row that says the test is not simply generous); a one-class sample -> null.");
 }
 
 console.log("\n7. THE GATE APPLIES BLOCKWISE, AND IT IS THE BLOCKS IT SAYS");

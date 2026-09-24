@@ -8032,6 +8032,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4696 -- THE 303rd CLOSING: a control fired, and the primary statistic was the thing it caught.
+    since378: Object.freeze({
+        at: "v4696", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateTransfer-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** CONTROL C8 FIRED AND THE ROUND STOPPED, WHICH IS WHAT IT WAS DECLARED FOR. *** v4695 " +
+                 "pre-registered, in a commit with no data, that a SHUFFLED-label run must score pooled AUC " +
+                 "within 0.02 of 0.5, in its own words because \"if shuffling produces signal, every number " +
+                 "here is an artefact of the harness\". It scored 0.2451. Section 7 said what to do -- stop, " +
+                 "report the harness, measure nothing through it -- and H3 IS NOT REPORTED, neither clause, in " +
+                 "either direction. " +
+                 "*** WHAT C8 CAUGHT WAS THE PRE-REGISTRATION'S OWN PRIMARY STATISTIC. *** Section 4 made " +
+                 "POOLED leave-one-scene-out AUC the primary. Pooling ranks blocks scored by THREE DIFFERENT " +
+                 "MODELS, each fitted to a different label prior -- measured at 0.4949, 0.6937 and 0.4355, a " +
+                 "span of 0.258 -- so each fold's scores sit in its own band. And the folds' own base rates " +
+                 "span 0.516 (smooth 0.634, zone 0.237, checker 0.753), so FOLD IDENTITY PREDICTS THE LABEL. " +
+                 "The pooled number is largely which fold a block came from, which is a property of the design " +
+                 "and is present whatever the predictor does. That is exactly why shuffling reproduced it. " +
+                 "*** A SYNTHETIC CONTROL REPRODUCES IT WITH NO FSR DATA AT ALL: *** two made-up groups whose " +
+                 "within-group rankings are coins (0.499 and 0.505) pool to 0.2513, against the real shuffled " +
+                 "run's 0.2451. Removing either the score-band difference or the prior difference sends it back " +
+                 "to 0.5, so the control demonstrates the stated mechanism rather than some other one. " +
+                 "*** AND SWITCHING TO PER-FOLD AUC WOULD NOT HAVE RESCUED THE ROUND, WHICH IS THE HARDER " +
+                 "POINT. *** The SHUFFLED control's per-fold AUCs span 0.364 (0.519, 0.462, 0.156) while the " +
+                 "largest v1-to-v2 per-fold difference is 0.056. At one seed, one step budget and this fold " +
+                 "size the noise floor is six times the effect. Choosing that statistic now, after seeing the " +
+                 "declared one fail, would be the exact move a pre-registration exists to prevent -- and it " +
+                 "would not have worked either. " +
+                 "*** SIX SABOTAGES. TWO OF THEM REDDEN BY EDITING THE PRE-REGISTRATION, *** because the " +
+                 "tolerance and the stop-condition are PARSED out of it rather than restated in the gate: " +
+                 "v4691 restated its window and v4693 restated its rule and both scored 0 RED for it, and this " +
+                 "round inherited the repair instead of the defect. One row had to become a named predicate " +
+                 "with fixtures after `spread >= v1v2` proved to pass just as well as `spread >= 0` -- a row " +
+                 "measuring its own arithmetic. The last is a 0-RED whose adversarial population is empty and " +
+                 "is recorded rather than chased: the FIFTH in this arc. " +
+                 "*** WHAT IS STILL UNKNOWN IS WHETHER THE SCALE-FREE FEATURES TRANSFER. *** They may; they may " +
+                 "not; this design cannot say, and saying so is the round. A sound test needs a statistic that " +
+                 "does not pool across models with different priors, enough seeds to carry an error bar, and " +
+                 "more than three scenes -- three folds were never a distribution and v4693's closing line said " +
+                 "as much before this round began. " +
+                 "*** AND THE GATE WRITTEN TO TEST THE SCALE-FREE CLAIM FOUND THAT ONE PRE-REGISTERED FEATURE " +
+                 "IS NOT SCALE-FREE. *** v4695 section 2 declares lapPerContrast as laplacian / " +
+                 "(sqrt(variance) + eps) with an ABSOLUTE eps. Wherever variance tends to zero -- most of a " +
+                 "flat frame -- the eps dominates the denominator while the numerator still scales with the " +
+                 "picture, so the ratio scales with it too: a 4x brightness scaling moved that feature by " +
+                 "1.50e+5. The denominator is regularised by the FRAME's own contrast instead, which scales " +
+                 "exactly as sqrt(variance) does, and the set then survives the scaling at 5.01e-6 while the " +
+                 "v1 set moves by 1.35e+1 -- which is also the row that says the two sets are different KINDS " +
+                 "and not just different names. v4695 IS LEFT STANDING AND NOT EDITED TO AGREE: it recorded " +
+                 "what was believed before the measurement, and this is the measurement. Nothing in this round " +
+                 "rests on the feature -- C8 failed and H3 was not reported -- so the correction costs no " +
+                 "claim, and a round that wants to USE this set owes a fresh pre-registration naming the " +
+                 "corrected form. The cached folds were re-harvested so the committed data matches the shipped " +
+                 "definition rather than the one that produced the first run.",
+    }),
     // v4694 -- THE 302nd CLOSING: a pre-registered control that nothing asserted, and a runner nothing ran.
     since377: Object.freeze({
         at: "v4694", swept: 0, green: 0, red: 0,

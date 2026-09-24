@@ -233,3 +233,100 @@ export function auc(scores, labels) {
     let sum = 0; for (let i = 0; i < n; i++) if (labels[i]) sum += rank[i];
     return { auc: (sum - pos * (pos + 1) / 2) / (pos * neg), pos, neg, why: null };
 }
+
+// ---- v4696 -- THE SCALE-FREE FEATURE SET -------------------------------------------------------------------
+//
+// *** WHY A SECOND SET RATHER THAN AN EDIT TO THE FIRST. *** render/learned-transfer-preregistration.md
+// clause (b) compares the two on IDENTICAL folds, trainer, seed and split. Editing FEATURE_NAMES in place
+// would make that comparison impossible to run and would silently re-map v4691's and v4693's shipped weights
+// onto different quantities. Both sets live here; the caller says which it wants.
+//
+// *** THE MECHANISM, STATED SO IT CAN BE WRONG. *** Five of the original eleven are in the units of the
+// picture -- sadApp, sadFlow, sadStill, laplacian, variance -- and those units move with the content. The
+// LABEL is a comparison, and a comparison is scale-free, so a network handed absolutes has to infer the
+// scene's scale before it can use them. Inferring the scene's scale IS learning scene identity, which is
+// exactly what v4693 measured: base rate 0.6343 on smooth against 0.2367 on zone, and AUC 0.4214 off-scene.
+
+export const FEATURE_NAMES_V2 = Object.freeze([
+    "logFlowOverApp", "logStillOverApp", "logGain", "dispPerBlock", "lapPerContrast",
+    "varOverFrame", "lapOverFrame", "holeFrac", "depthRank", "srcIsApp", "srcIsFlowBeat",
+]);
+export const N_FEATURES_V2 = FEATURE_NAMES_V2.length;   // 11, deliberately the same count
+const EPS = 1e-6;
+
+/**
+ * The v2 features for one generated frame. Same call shape as features(), and the same refusal: it is NOT
+ * given the true middle frame and has no parameter one could arrive through.
+ *
+ * *** THE TWO FRAME-RELATIVE TERMS ARE THE POINT OF THE SET. *** `varOverFrame` and `lapOverFrame` divide by
+ * the mean of the same quantity over THIS frame, so a block's detail is expressed relative to the picture it
+ * is in rather than in absolute contrast. That is the term a prior shift cannot move, and it costs one extra
+ * pass over the blocks -- computed here rather than on the host, so inference and training see one definition.
+ */
+export function featuresV2({ cur, w, h, rc, hole, depthBlock, block }) {
+    const base = features({ cur, w, h, rc, hole, depthBlock, block });   // reuse the absolute terms
+    const bw = rc.bw, bh = rc.bh, n = bw * bh;
+    const out = new Float32Array(n * N_FEATURES_V2);
+    // frame means for the two relative terms, and the depth ORDER for the rank
+    let sumVar = 0, sumLap = 0;
+    for (let b = 0; b < n; b++) { sumLap += base[b * N_FEATURES + 5]; sumVar += base[b * N_FEATURES + 6]; }
+    const meanLap = sumLap / n || EPS, meanVar = sumVar / n || EPS;
+    // *** THE DEPTH RANK IS A RANK, WHICH IS WHY TIES SHARE ONE. *** Consecutive ranks over tied depths would
+    // turn whatever order the sort produced into a feature -- the same defect auc() is written to avoid, and
+    // flat geometry makes ties the common case rather than the rare one.
+    const order = Array.from({ length: n }, (_, i) => i).sort((a, b2) => depthBlock[a] - depthBlock[b2]);
+    const rank = new Float32Array(n);
+    for (let i = 0; i < n;) {
+        let j = i; while (j + 1 < n && depthBlock[order[j + 1]] === depthBlock[order[i]]) j++;
+        const r = n > 1 ? ((i + j) / 2) / (n - 1) : 0;
+        for (let k = i; k <= j; k++) rank[order[k]] = r;
+        i = j + 1;
+    }
+    for (let b = 0; b < n; b++) {
+        const o = b * N_FEATURES, q = b * N_FEATURES_V2;
+        const sadApp = base[o + 0], sadFlow = base[o + 1], sadStill = base[o + 2];
+        const lap = base[o + 5], vari = base[o + 6];
+        out[q + 0] = Math.log((sadFlow + EPS) / (sadApp + EPS));
+        out[q + 1] = Math.log((sadStill + EPS) / (sadApp + EPS));
+        out[q + 2] = Math.log((Math.min(sadApp, sadFlow) + EPS) / (sadStill + EPS));
+        out[q + 3] = Math.hypot(base[o + 3], base[o + 4]) / block;
+        // *** v4696 -- THE PRE-REGISTERED FORM OF THIS FEATURE IS NOT SCALE-FREE, AND ITS OWN TEST FOUND
+        // THAT. *** render/learned-transfer-preregistration.md section 2 declares
+        // `laplacian / (sqrt(variance) + eps)` with an ABSOLUTE eps. Wherever variance -> 0 -- which is most
+        // of a flat frame -- the eps dominates the denominator, the numerator still scales with the picture,
+        // and the ratio scales with it too. MEASURED by the row in render/genGate-selfcheck.mjs written to
+        // test the scale-free claim: a 4x brightness scaling moved this feature by 1.50e+5.
+        //
+        // The denominator is regularised by the FRAME's own contrast instead, which scales with the picture
+        // exactly as sqrt(variance) does, so the ratio is invariant everywhere including on flat blocks. The
+        // absolute floor that remains bites only on a literally uniform frame, where the numerator is zero too.
+        // *** v4695 IS LEFT STANDING AND IS NOT EDITED TO AGREE. *** It recorded what was believed before the
+        // measurement; this is the measurement. No result in v4696 rests on this feature -- control C8 failed
+        // and H3 was not reported -- so the correction costs nothing that was already claimed, and any round
+        // that wants to USE this set owes a fresh pre-registration naming this form.
+        out[q + 4] = lap / (Math.sqrt(vari) + Math.sqrt(meanVar) + EPS);
+        out[q + 5] = vari / meanVar;
+        out[q + 6] = lap / meanLap;
+        out[q + 7] = base[o + 8];       // holeFrac, already a fraction
+        out[q + 8] = rank[b];
+        out[q + 9] = base[o + 9];       // srcIsApp
+        out[q + 10] = base[o + 10];     // srcIsFlowBeat
+    }
+    return out;
+}
+
+/**
+ * Mann-Whitney normal approximation for an AUC against the null 0.5, as section 4 of the transfer
+ * pre-registration declares it. Returns { z, p, n } with a two-sided p.
+ */
+export function aucP(a, nPos, nNeg) {
+    if (!(nPos > 0) || !(nNeg > 0)) return { z: null, p: null, why: "one class only" };
+    const sd = Math.sqrt(nPos * nNeg * (nPos + nNeg + 1) / 12) / (nPos * nNeg);
+    if (!(sd > 0)) return { z: null, p: null, why: "zero variance" };
+    const z = (a - 0.5) / sd;
+    // two-sided, via the erf complement -- Abramowitz & Stegun 7.1.26, enough digits for a p we compare to 0.05
+    const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t
+        * Math.exp(-((Math.abs(z) / Math.SQRT2) ** 2));
+    return { z, p: Math.min(1, 1 - y), n: nPos + nNeg, why: null };
+}
