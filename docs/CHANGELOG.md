@@ -26,6 +26,137 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4673 -- three ratchets stored a number where they needed a set
+
+*** A COUNT SAYS IT MOVED. IT CAN NEVER SAY WHAT MOVED. ***
+
+Three ratchets guard the orphan census. `graveyard-selfcheck` held `ORPHAN_UTIL_BASELINE = 159`,
+`referenceKind-selfcheck` held `RESCUED_CEILING = 288` and `RITUAL_CEILING = 39`. All three were
+breached, and each failure line read like this one:
+
+    ORPHANED UTILITIES HAVE NOT INCREASED   167 now vs 159 recorded
+
+True, unarguable, and actionable by nobody, because the eight or twelve or fourteen it complains
+about have no names. `referenceKind` says so itself, in a comment written two hundred rounds ago and
+never acted on: **"THE RATCHET IS ON THE COUNT, NOT ON THE NAMES."**
+
+*** THE MEASUREMENT, AND HOW IT WAS MADE HONEST. *** The baseline sets were recovered by running the
+census at `fc12eef` (2026-09-14, the commit that set two of the three ceilings) in a detached
+worktree -- four census runs at 90-105 s each. Before trusting the diff, the census *logic* was
+checked byte-identical across those ten days (`graveyard-selfcheck.mjs`, `moduleRefs.mjs`,
+`unwiredRegister.mjs`, `doorKinds.mjs` unchanged; `referenceKind-selfcheck.mjs` differing only in the
+constant and its comments), because a set difference taken across two scanners is a reading of the
+scanner.
+
+    orphaned utilities   157 -> 167   (+12, -2)   ceiling said 159 -- TWO OPEN SLOTS
+    prose-rescued        289 -> 302   (+18, -5)   ceiling said 289
+    ritual-hidden         39 ->  47   (+11, -3)   ceiling said 39
+
+26 distinct arrivals, 5 departures, across ten days and roughly 137 rounds.
+
+*** THE FIVE DEPARTURES ARE REAL PAYDOWN NOTHING COULD SHOW. *** `anim/ik.mjs`,
+`tools/ship/absenceScope.mjs`, `tools/ship/recordDrift.mjs`, `tools/ship/wgslCorpus.mjs` and
+`vendor/three/jsm/loaders/FBXLoader.js` -- the last being the exact entry `referenceKind`'s own v4535
+note named as "round 2 of the FBX work the vendoring commit already deferred". Somebody finished that
+work. The ratchet netted it against eighteen arrivals and reported one number that made the paydown
+invisible and the growth unattributable.
+
+*** TWO ARRIVALS ARE THE SHIP RITUAL'S OWN DRIVERS. *** `tools/ship/ship.mjs` and
+`tools/ship/verify.mjs` are neither new nor unused -- `ai-bridge/shipBridge.js` execFiles one,
+`ai-bridge/sourceChainBridge.js` spawns the other. `moduleRefs` cannot resolve them because both are
+invoked through a COMPOSED path, `path.join("ship", "ship.mjs")`, rather than a literal specifier.
+They entered the census the day a sweep closing named them. The ritual documented its own driver into
+invisibility, and `tools/ship/nextRounds.mjs` -- the backlog -- arrived the same way.
+
+*** THE SLACK TOLERANCE IS DELETED RATHER THAN PORTED, AND THAT IS A TIGHTENING. *** Both count
+ratchets carried a second check that the ceiling had not been left behind by progress
+(`ceiling - actual <= 8`). It existed for one reason: A COUNT HAS FUNGIBLE SLOTS. Pay two modules down
+and two fresh orphans arrive into the vacancy in silence -- v3673's pageReach finding, and exactly
+what graveyard was doing at 157-under-159 the day this round started. A SET HAS NO SLOTS: arrival is
+membership, not headcount, so a departure is never a vacancy and the tolerance has nothing left to
+protect. Section 2 of the new gate drives the substitution -- one paydown plus one arrival, identical
+length -- and shows the retired rule passing where the set names both.
+
+*** AND THE ROUND'S OWN FILE COMMITTED THE ROUND'S OWN DEFECT. *** `orphanSets.mjs` records 516 module
+names so the ratchet can report which one moved. The moment it existed, `referenceKind` read those 516
+names as MENTIONS and rescued twenty modules nothing had named before -- `scrapeRouter`, `fieldSpace`,
+`backendLimits`, `rayCast`, `bssrdfSample`, `frameRecorder`, `xbarPlugin`, seven roundhouse probes,
+`adapterRecord`, `deterministicRaf`, `frozenReferee`, `wgslAutoLayout`, `foldField` -- taking the
+population 302 -> 322 on a round that wired nothing. That is v3223's law, *"A REGISTER OF ORPHANS IS
+NOT A CONSUMER OF THEM"*, broken on its first run by the file written to enforce it. It is excluded now
+in BOTH censuses identically, because `referenceKind`'s own comment is right that the two numbers stop
+being comparable otherwise -- and it is not the "widen the exclusion to every register" change that
+comment refuses: `reportingTools` stays counted because it is a real door that spawns its modules from
+a `tools.html` row, and `graveyard` stays counted because its header argues about its members.
+`orphanSets` is a list of names and nothing else, which is `unwiredRegister`'s exact shape.
+
+A second self-correction: the first draft added `orphanSets.mjs` to its own recorded set, reasoning
+that a register which exempts itself is the defect `referenceKind` caught in its own first run. Wrong,
+and graveyard's own derivation says so -- `RECORD_EXPORT` matches `export const ADMITTED_V4673`, so the
+file classifies as an ANALYSIS RECORD and never reaches the orphan list. v2988 derives the kind from
+what a module exports precisely so it cannot declare itself into the wrong bucket. Listing it by hand
+would have put a name in a set it is not a member of, and the ratchet would have reported it as
+departed on the first run.
+
+*** AND THEN THE ROUND DID IT A THIRD TIME, TO ITSELF, WRITING ITS OWN RECORDS. ***
+
+With the register excluded and both censuses green, the round wrote gateSweep's 353rd closing and a
+backlog entry. The next full census came back red:
+
+    proseRescued  304 against 302 -- ARRIVED: tools/ship/adapterRecord.mjs, tools/ship/orphanSets.mjs
+    ritualHidden   48 against  47 -- ARRIVED: tools/ship/orphanSets.mjs
+
+The sweep closing NAMES THE MODULE IT GUARDS, and the ship ritual requires that paragraph of every
+round that adds a gate -- so writing it put `orphanSets.mjs` into the very population `orphanSets.mjs`
+was created to record. The backlog entry drafted about shared gate helpers named
+`tools/ship/adapterRecord.mjs`, which put that one in beside it. Neither module was wired, deleted or
+changed. Two sentences moved them.
+
+They are RECORDED rather than argued away. The alternative was deleting the closing and the backlog
+entry -- keeping a number down by removing documentation the ritual mandates, which is gaming the
+instrument. Both are true memberships: `orphanSets.mjs` has two gate importers and no non-gate one,
+`adapterRecord.mjs` has eight, and something names each. The ratchet did precisely the job
+`referenceKind`'s v4386 note set for it -- *"the next round to leave a gate-only module behind is told
+so BY ITS OWN SHIP RUN, rather than 900 rounds later by a census"* -- and it told this one, by name,
+within the round. Every gate-adding round will do the same: that IS the 39 -> 47 drift, seen from the
+inside, roughly one per round. It is not a leak in the ratchet, it is what the ratchet is for. There is
+no regress, because `orphanSets.mjs` is excluded from the mention side of both censuses, so the 519
+names it carries rescue nothing -- only prose in files that are NOT excluded can move the population.
+
+*** AND A FOURTH, CAUSED BY DOCUMENTING THE THIRD. *** The paragraph you are reading went into
+gateSweep's closing, and that closing names `adapterRecord.mjs` -- so adapterRecord, already in
+prose-rescued via the backlog entry, was now rescued by gateSweep too and joined ritual-hidden as well:
+49 against 48. Recording the third instance created the fourth.
+
+It terminates, and the reason is worth stating because it is not obvious: only prose in files that are
+NOT excluded from the mention scan can move these populations -- in practice `gateSweep.mjs` and
+`nextRounds.mjs`. The record itself is excluded, so every name added there is free. The loop closes the
+moment a round stops introducing NEW module names into the closing or the backlog, and the fix for an
+arrival is always an edit to the record rather than to the prose that caused it. Deleting the sentence
+would also work and is the wrong move.
+
+Final recorded membership: orphanUtils 167, proseRescued 304, ritualHidden 49.
+
+*** RESULT: TWO OF THE SIX STANDING REDS ARE CLOSED *** -- `graveyard-selfcheck: all pass`,
+`referenceKind-selfcheck: all checks pass` -- by recording membership, not by raising a number.
+
+THIRTEEN SABOTAGES, THIRTEEN CAUGHT, and one had to be rebuilt: the subset sabotage planted
+`render/panini.js`, which was already in `ritualHidden`, so it reddened as a duplicate and section 4's
+containment row was never exercised. Re-run with `render/murmurKit.mjs` -- in none of the three sets --
+it reddens on STRAYS as intended, with the in-set variant kept as its control.
+
+Records re-derived: assertionShape 1780 -> 1781 gates (usesOk 1760, definesOk 1752, nameFirst 1653;
+condFirst unmoved), runtimeGap 4312 -> 4314 files with three of twelve rows moving and async/await
+NOT among them -- both new files are pure over in-memory sets, so neither awaits, fetches, renders nor
+asks a device -- and gateSweep's 353rd closing.
+
+WHAT THIS ROUND DID NOT DO, ON PURPOSE: the 26 admissions expose two populations the census has no name
+for -- four COMMANDS invoked by a composed path, and four SHARED GATE HELPERS with 8 to 36 distinct gate
+importers (`murmurSpeciesFrames` 36, `temporalLock` 18, `ringFloor` 12, `adapterRecord` 8). They are
+misfiled as orphans. Naming them changes what the census MEASURES, and doing that in the round that
+establishes this baseline would move the population while its membership was being recorded, leaving a
+baseline that could no longer be checked against the historical one this round recovered.
+
 ## v4672 -- a gate evicted for the box being slow, not for being slow
 
 *** THE SHIP-TIME BUDGET IS AN ABSOLUTE WALL IN FRONT OF READINGS THAT ARE NOT ABSOLUTE. ***

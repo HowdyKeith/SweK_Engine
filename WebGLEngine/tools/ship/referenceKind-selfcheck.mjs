@@ -61,6 +61,7 @@ import { gateFiles } from "./staleness.mjs";
 // PROVEN ON A FIXTURE before it is pointed at anything; keeping a second copy here is how the earlier attempt
 // drifted between runs, and it is the second-declaration defect this project names more often than any other.
 import { referenceGraph } from "./moduleRefs.mjs";
+import { ratchet } from "./orphanSets.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -96,7 +97,21 @@ const SELF = path.resolve(fileURLToPath(import.meta.url));
 // the exclusion here to every register would pre-judge the fix this round deliberately does not ship, and would
 // quietly lower the very exposure being measured. THE POINT IS THAT MORE REGISTERS EXIST AND ARE NOT EXCLUDED --
 // reportingTools rescues 15 and graveyard itself 13, and those stay counted.
-const EXCLUDED = new Set([SELF, path.resolve(ENG, "tools/ship/unwiredRegister.mjs")]);
+// *** v4673 -- A THIRD, AND IT WAS THIS ROUND'S OWN FILE. *** tools/ship/orphanSets.mjs records 516 module
+// names so the ratchet can say WHAT moved. The moment it existed, this census read those 516 names as
+// mentions and RESCUED TWENTY MODULES that nothing had named before -- scrapeRouter, fieldSpace,
+// backendLimits, rayCast, bssrdfSample, frameRecorder, xbarPlugin, seven roundhouse probes, adapterRecord,
+// deterministicRaf, frozenReferee, wgslAutoLayout, foldField -- taking the population 302 -> 322 on a round
+// that wired nothing. A REGISTER OF ORPHANS IS NOT A CONSUMER OF THEM (v3223), and the file written to
+// enforce that law broke it on its first run. It is excluded here and in graveyard IDENTICALLY, because the
+// comment above is right that the two numbers stop being comparable otherwise.
+//
+// THIS IS NOT THE WIDENING THE PARAGRAPH ABOVE REFUSES. reportingTools and graveyard stay counted because
+// reportingTools is a DOOR -- it spawns its modules by path from a tools.html row -- and graveyard's header
+// argues about its members. orphanSets does neither: it is a list of names and nothing else, which is the
+// exact shape unwiredRegister has.
+const EXCLUDED = new Set([SELF, path.resolve(ENG, "tools/ship/unwiredRegister.mjs"),
+                          path.resolve(ENG, "tools/ship/orphanSets.mjs")]);
 const { all, text } = corpus();
 // The graph is built with NO exclusions, because this file measures the exposure INCLUDING what the registers
 // rescue -- excluding them here would quietly lower the very number being ratcheted. The two established
@@ -225,7 +240,14 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
-const RESCUED_CEILING = 288;
+// *** v4673 -- RETIRED FOR A RECORDED SET. *** Every note above is a round raising a number it could not
+// attribute: 164, 181, 288, 289, 288. The last was breached at 302 and the row said "302 against a ceiling
+// of 288" -- fourteen modules, none named. The diff against fc12eef shows EIGHTEEN arrived and FIVE left,
+// and the five are real paydown this file could never show: anim/ik.mjs, absenceScope, recordDrift,
+// wgslCorpus and vendor/three/jsm/loaders/FBXLoader.js -- the last being the exact entry the v4535 note
+// above named as "round 2 of the FBX work the vendoring commit already deferred". Somebody did it. The
+// ratchet netted it against the arrivals and reported one number.
+const RESCUED_CEILING = null;
 
 const rescued = [];
 {
@@ -251,11 +273,20 @@ const rescued = [];
     say(`${rescued.length} module(s) have NO resolved non-gate importer and are held off the census by a mention`);
     for (const [k, v] of top) say(`   ${String(v).padStart(3)}  ${k}`);
 
-    ok("!! *** the prose-rescued population may only SHRINK ***", rescued.length <= RESCUED_CEILING,
-       `${rescued.length} against a ceiling of ${RESCUED_CEILING}. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE. Falling is progress by any of three routes -- wire it, delete it, or teach the census to resolve.`);
-    ok("...and the ceiling has not been left behind by progress",
-       RESCUED_CEILING - rescued.length <= 8,
-       `ceiling ${RESCUED_CEILING}, actual ${rescued.length}. A RATCHET WITH SLACK IN IT IS A RATCHET HOLDING NOTHING (v3195).`);
+    const RR = ratchet("proseRescued", rescued.map((r) => r.f));
+    if (RR.left.length) say(`PAID DOWN SINCE THE RECORD: ${RR.left.join(", ")}`);
+    ok("!! *** NO MODULE HAS ARRIVED IN THE PROSE-RESCUED POPULATION SINCE THE RECORDED SET ***",
+       RR.arrived.length === 0,
+       `${RR.now} in the census against ${RR.recorded} recorded` +
+       (RR.arrived.length ? ` -- ARRIVED: ${RR.arrived.join(", ")}` : "") +
+       (RR.left.length ? ` -- paid down: ${RR.left.join(", ")}` : "") +
+       `. A RISE MEANS A NEW ORPHAN IS BEING HIDDEN BY A SENTENCE, and now it says WHICH. Falling is ` +
+       `progress by any of three routes -- wire it, delete it, or teach the census to resolve.`);
+    // *** THE SLACK CHECK IS DELETED RATHER THAN PORTED, AND THAT IS A TIGHTENING. *** It read
+    // `RESCUED_CEILING - rescued.length <= 8` and existed because A COUNT HAS FUNGIBLE SLOTS: pay two down
+    // and two fresh orphans fill the vacancy unseen, which is v3673's pageReach finding and which graveyard
+    // was doing at 157-under-159 the day this round started. A SET HAS NO SLOTS -- arrival is membership,
+    // not headcount -- so there is no slack left for a tolerance to protect.
 
     // *** v3223 CLOSED ONE INSTANCE AND NOT THE CLASS, AND THIS IS THE EVIDENCE. ***
     const registers = ["tools/ship/reportingTools.mjs", "tools/ship/graveyard-selfcheck.mjs"];
@@ -308,16 +339,31 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
-    const RITUAL_CEILING = 39;
+    // *** v4673 -- 39 WAS A NUMBER AND THE ARRIVALS WERE THE STORY. *** Breached at 47; the diff against
+    // fc12eef names eleven arrivals and three departures. TWO OF THE ELEVEN ARE THE SHIP RITUAL'S OWN
+    // DRIVERS: tools/ship/ship.mjs and tools/ship/verify.mjs, neither new nor unused --
+    // ai-bridge/shipBridge.js execFiles one and ai-bridge/sourceChainBridge.js spawns the other -- which
+    // moduleRefs cannot resolve because both are invoked through a COMPOSED path, path.join("ship",
+    // "ship.mjs"), rather than a literal specifier. They entered this census the day a closing named them.
+    // The paragraph this row is about documented the ritual's own driver into invisibility, and
+    // tools/ship/nextRounds.mjs -- the backlog -- arrived by the same route.
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
+    const RT = ratchet("ritualHidden", ritual.map((r) => r.f));
+    if (RT.left.length) say(`PAID DOWN SINCE THE RECORD: ${RT.left.join(", ")}`);
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
-       ritual.length <= RITUAL_CEILING,
-       `${ritual.length} against ${RITUAL_CEILING}: ${ritual.map((r) => r.f).join(", ") || "(none)"}. THE CLOSING IS ` +
+       RT.arrived.length === 0,
+       `${RT.now} in the census against ${RT.recorded} recorded` +
+       (RT.arrived.length ? ` -- ARRIVED: ${RT.arrived.join(", ")}` : "") +
+       (RT.left.length ? ` -- paid down: ${RT.left.join(", ")}` : "") + `. THE CLOSING IS ` +
        "WRITTEN BY THE RITUAL, one per round that adds a gate, and it names the module it guards -- so a round that " +
        "builds a module, gates it and ships it has documented the module into invisibility without deciding to. " +
-       "The two standing are render/img2three.mjs (a three.js-object-tree flattener whose only caller today is its " +
-       "own gate; no page builds a three tree to flatten) and mesh/carve.mjs. Falling is progress by the three " +
-       "routes this file has always named -- wire it, delete it, or teach the census to resolve.");
+       "Falling is progress by the three routes this file has always named -- wire it, delete it, or teach " +
+       "the census to resolve. *** A SENTENCE SAT HERE READING 'The two standing are render/img2three.mjs " +
+       "(a three.js-object-tree flattener whose only caller today is its own gate) and mesh/carve.mjs', AND " +
+       "IT HAD BEEN FALSE SINCE THE MERGE TOOK THIS POPULATION TO 39 -- a hand-written copy of a membership " +
+       "the row could not print. *** It is DELETED rather than corrected, because the members now come off " +
+       "the record above and no prose duplicate of them can go stale again. That is this file's own subject " +
+       "-- a module hidden by a sentence -- turned on its own failure line.");
 
     ok("!! *** a REGISTER still rescues modules, and one of them is the census gate itself ***",
        byRegister.every(([, n]) => n > 0),

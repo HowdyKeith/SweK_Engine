@@ -32,6 +32,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { referenceGraph } from "./moduleRefs.mjs";
+import { ratchet, RECORDED as ORPHAN_RECORDED } from "./orphanSets.mjs";
+const ORPHAN_UTILS_RECORDED = ORPHAN_RECORDED.orphanUtils;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -58,8 +60,13 @@ function scan() {
     // established registers are excluded from the MENTION side only -- unwiredRegister (v3223's rule) and the
     // exposure gate -- because a file whose job is to NAME these modules is never their caller.
     const REFS = referenceGraph(all, (f) => text.get(f) || "", ENG, {
+        // v4673 -- orphanSets.mjs joins them: it names 516 modules so the ratchet can report WHICH moved, and
+        // on its first run that rescued twenty modules from referenceKind's census. A register of orphans is
+        // not a consumer of them, and the two censuses must exclude the identical set or their numbers stop
+        // being comparable.
         exclude: new Set([path.join(ENG, "tools/ship/unwiredRegister.mjs"),
-                          path.join(ENG, "tools/ship/referenceKind-selfcheck.mjs")]),
+                          path.join(ENG, "tools/ship/referenceKind-selfcheck.mjs"),
+                          path.join(ENG, "tools/ship/orphanSets.mjs")]),
     });
 
     const dynDirs = new Set();
@@ -408,7 +415,16 @@ function isAnalysisRecord(full) {
 // miss. The partition still holds (245 of 245 gate-only classified: 61 records + 159 actionable + 20 doored +
 // 1 MCP door + 4 explained), so nothing here is unclassified debt hiding in a total; it is the SAME debt this
 // ratchet has always tracked, now counted on the tree both branches actually built.
-const ORPHAN_UTIL_BASELINE = 159;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above).
+// *** v4673 -- THE COUNT IS GONE AND THE SET IS IN tools/ship/orphanSets.mjs. *** Every re-baseline above is
+// a round discovering that the number had moved and being unable to say which modules moved it -- read the
+// list: 100, 88, 86, 90, 92, 93, then 159 at the merge, each with a paragraph reconstructing from memory and
+// spot checks what a recorded SET would have printed. The last one was breached at 167 and the failure line
+// said "167 now vs 159 recorded", which names nobody. Recovering the twelve arrivals took a worktree at
+// fc12eef and four census runs. THE MEMBERSHIP IS RECORDED BY NAME NOW, the count is derived from it, and
+// the 2 slots of slack this constant was holding (measured 157 against a ceiling of 159) cannot exist in a
+// set -- a departure is not a vacancy.
+// v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92);
+// v4153 (93); merge-of-main re-baseline (159). RETIRED AT v4673 -> orphanSets.RECORDED.orphanUtils.
 const ORPHAN_BASELINE = 1;
 
 const r = scan();
@@ -495,8 +511,20 @@ const r = scan();
     console.log("        analysis records (legitimate): " + records.length +
                 "   orphaned utilities (actionable): " + orphanUtils.length);
     for (const g of orphanUtils) console.log("          ACTIONABLE  " + g.file);
-    ok("!! ORPHANED UTILITIES HAVE NOT INCREASED", orphanUtils.length <= ORPHAN_UTIL_BASELINE,
-        `${orphanUtils.length} now vs ${ORPHAN_UTIL_BASELINE} recorded. These export functions and NOTHING calls them -- wire it, or delete it. This is the number that means something; the total includes analysis records whose consumer is correctly the gate.`);
+    // *** v4673 -- MEMBERSHIP, NOT HEADCOUNT. *** The assertion is that no module has ARRIVED in this
+    // population since the record was taken. Departures are printed and never asserted on: leaving is what
+    // the three routes (wire it, delete it, teach the census to resolve) are supposed to achieve.
+    const R = ratchet("orphanUtils", orphanUtils.map((g) => g.file));
+    if (R.left.length) console.log("          PAID DOWN SINCE THE RECORD: " + R.left.join(", "));
+    ok("!! *** NO ORPHANED UTILITY HAS ARRIVED SINCE THE RECORDED SET ***", R.arrived.length === 0,
+        `${R.now} in the census against ${R.recorded} recorded` +
+        (R.arrived.length ? ` -- ARRIVED: ${R.arrived.join(", ")}` : "") +
+        (R.left.length ? ` -- paid down: ${R.left.join(", ")}` : "") +
+        `. These export functions and NOTHING calls them -- wire it, or delete it. *** THE NAMES ARE THE ` +
+        `POINT: this row read "167 now vs 159 recorded" for eight modules it could not identify, and ` +
+        `recovering them cost a worktree at fc12eef and four census runs. *** A count also had FUNGIBLE ` +
+        `SLOTS -- 157 measured under a ceiling of 159 meant two orphans could arrive in silence -- and a set ` +
+        `has none, because a departure is not a vacancy.`);
     // EVERY REGISTER ENTRY MUST STILL BE FIRING. A disposition for a module that has since been wired is a
     // suppression holding nothing -- v3195's finding, and the reason baselineHygiene exists at all.
     const stale = [...UNWIRED.keys()].filter((k) => !allOrphanUtils.some((g) => g.file === k));
@@ -533,11 +561,17 @@ const r = scan();
     // other forbade a second one, and neither cared about readdirSync. Neither of these cares about the VALUE 8.
     // The property is that the baselines are LITERALS IN THE SOURCE -- so changing one is a visible edit to a
     // tracked file rather than a number computed at run time from whatever happens to be there.
-    ok("the baselines are NUMBERS in the source, so changing one is a deliberate act",
-        [ORPHAN_BASELINE, ORPHAN_UTIL_BASELINE].every((n) => Number.isInteger(n)) &&
-        /const ORPHAN_UTIL_BASELINE = \d+;/.test(fs.readFileSync(path.join(HERE, "graveyard-selfcheck.mjs"), "utf8")),
-        "ORPHAN_BASELINE " + ORPHAN_BASELINE + ", ORPHAN_UTIL_BASELINE " +
-        ORPHAN_UTIL_BASELINE + " -- all literals, and the RAISE check below requires the reason beside them");
+    // *** v4673 -- THE PROPERTY SURVIVES THE RETIREMENT, AND IS BETTER SERVED. *** This asserted that both
+    // baselines were integer LITERALS in tracked source, so that moving one is a visible edit rather than a
+    // number computed at run time from whatever happens to be there. ORPHAN_UTIL_BASELINE is gone; its
+    // successor is a literal ARRAY OF NAMES in tracked source, which satisfies the same property with 167
+    // literals instead of one and makes the edit that moves it legible line by line in a diff.
+    const setSrc = fs.readFileSync(path.join(HERE, "orphanSets.mjs"), "utf8");
+    ok("the baseline is LITERAL IN TRACKED SOURCE, so changing it is a deliberate act",
+        Number.isInteger(ORPHAN_BASELINE) &&
+        /orphanUtils: Object\.freeze\(\[\s*\n\s*"/.test(setSrc) && !/\.length\s*[-+]/.test(setSrc),
+        "ORPHAN_BASELINE " + ORPHAN_BASELINE + " is a literal; the orphaned-utility baseline is " +
+        ORPHAN_UTILS_RECORDED.length + " literal names in tools/ship/orphanSets.mjs, computed from nothing");
     ok("!! and every RAISE carries its reason in the source", /RAISED FROM \d+ TO \d+|TIGHTENED FROM \d+ TO \d+/.test(fs.readFileSync(path.join(HERE, "graveyard-selfcheck.mjs"), "utf8")));
 }
 

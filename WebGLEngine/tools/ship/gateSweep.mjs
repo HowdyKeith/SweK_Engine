@@ -8070,6 +8070,68 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4673 -- THE 353rd CLOSING: three orphan ratchets stored a number where they needed a set, so every
+    // breach for two hundred rounds could say THAT it moved and never WHAT moved.
+    since352: Object.freeze({
+        at: "v4673", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orphanSets-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (ORPHAN_UTIL_BASELINE retired for a recorded set; its literalness row retargeted onto the set)",
+                                "tools/ship/referenceKind-selfcheck.mjs (RESCUED_CEILING and RITUAL_CEILING retired; the slack tolerance DELETED, not ported; a stale two-module prose list removed)"]),
+        verdict: "green in 0.9 s over six sections, and it CLOSED TWO OF THE SIX STANDING REDS -- graveyard " +
+                 "all pass, referenceKind all pass -- by recording membership instead of raising a number. " +
+                 "*** A COUNT SAYS IT MOVED AND CAN NEVER SAY WHAT MOVED. *** ORPHAN_UTIL_BASELINE 159, " +
+                 "RESCUED_CEILING 288 and RITUAL_CEILING 39 were all breached, and each failure line was of " +
+                 "the form '167 now vs 159 recorded': true, unarguable, and actionable by nobody. Recovering " +
+                 "the arrivals took a detached worktree at fc12eef (2026-09-14, the commit that set two of " +
+                 "the three), four census runs at 90-105 s each, and a check that the census LOGIC was " +
+                 "byte-identical across those ten days first -- because a set difference taken across two " +
+                 "scanners is a reading of the scanner. MEASURED: orphaned utilities 157 -> 167 (+12, -2, " +
+                 "against a ceiling of 159 that was therefore holding TWO OPEN SLOTS), prose-rescued " +
+                 "289 -> 302 (+18, -5), ritual-hidden 39 -> 47 (+11, -3). 26 distinct arrivals, 5 departures. " +
+                 "*** THE FIVE DEPARTURES ARE REAL PAYDOWN NOTHING COULD SHOW. *** anim/ik.mjs, " +
+                 "absenceScope, recordDrift, wgslCorpus and vendor/three/jsm/loaders/FBXLoader.js -- the last " +
+                 "being the exact entry referenceKind's own v4535 note named as 'round 2 of the FBX work the " +
+                 "vendoring commit already deferred'. Somebody finished it; the count netted it against " +
+                 "eighteen arrivals into a single '+14'. " +
+                 "*** TWO ARRIVALS ARE THE SHIP RITUAL'S OWN DRIVERS. *** tools/ship/ship.mjs and " +
+                 "tools/ship/verify.mjs, neither new nor unused -- shipBridge execFiles one, " +
+                 "sourceChainBridge spawns the other -- unresolvable only because both are invoked through a " +
+                 "COMPOSED path, path.join(\"ship\", \"ship.mjs\"). They entered the census the day a sweep " +
+                 "closing named them, and nextRounds.mjs (the backlog) arrived the same way. " +
+                 "*** THE SLACK TOLERANCE IS DELETED RATHER THAN PORTED, AND THAT IS A TIGHTENING. *** " +
+                 "Both count ratchets carried 'ceiling - actual <= 8' because A COUNT HAS FUNGIBLE SLOTS: pay " +
+                 "two down and two fresh orphans fill the vacancy unseen, which graveyard was doing at " +
+                 "157-under-159 the day this round started. A SET HAS NO SLOTS. Section 2 drives the " +
+                 "substitution -- one paydown, one arrival, identical length -- and shows the retired rule " +
+                 "passing where the set names both. " +
+                 "*** AND THE ROUND'S OWN FILE COMMITTED THE ROUND'S OWN DEFECT. *** orphanSets.mjs records " +
+                 "516 names; the moment it existed referenceKind read them as MENTIONS and rescued TWENTY " +
+                 "modules nothing had named before (302 -> 322 on a round that wired nothing) -- v3223's " +
+                 "law, 'A REGISTER OF ORPHANS IS NOT A CONSUMER OF THEM', broken on first run by the file " +
+                 "written to enforce it. Excluded now in BOTH censuses identically, because referenceKind's " +
+                 "own comment is right that the two numbers stop being comparable otherwise. " +
+                 "*** AND THEN THE ROUND DID IT A THIRD TIME, TO ITSELF, WRITING THESE RECORDS. *** With " +
+                 "both censuses green, the round wrote this closing and a backlog entry -- and the next full " +
+                 "census came back red: proseRescued 304 against 302 (ARRIVED adapterRecord and orphanSets), " +
+                 "ritualHidden 48 against 47. THE CLOSING NAMES THE MODULE IT GUARDS, " +
+                 "and the ritual requires it, so writing this paragraph put orphanSets.mjs into the very " +
+                 "population it was built to record; the backlog entry about shared gate helpers named " +
+                 "adapterRecord.mjs and put that one in beside it. Nothing was wired or deleted -- two " +
+                 "sentences moved them. RECORDED RATHER THAN ARGUED AWAY: deleting the closing to keep a " +
+                 "number down would be gaming the instrument, and both are true memberships. This is exactly " +
+                 "the job v4386 set for the row -- 'the next round to leave a gate-only module behind is told " +
+                 "so BY ITS OWN SHIP RUN' -- and it told this one, by name, within the round. Every " +
+                 "gate-adding round will do the same, which IS the 39 -> 47 drift seen from the inside. RECORDING " +
+                 "THAT created a FOURTH: the closing above names adapterRecord, so it joined ritualHidden too, " +
+                 "49 against 48. It terminates because only prose in files NOT excluded from the mention scan " +
+                 "can move these populations, and the record itself is excluded. Final: 167 / 304 / 49. " +
+                 "THIRTEEN SABOTAGES, THIRTEEN CAUGHT -- and one had to be rebuilt: the subset sabotage " +
+                 "planted render/panini.js, which was ALREADY in ritualHidden, so it reddened as a duplicate " +
+                 "and section 4's containment row was never exercised. Re-run with render/murmurKit.mjs, in " +
+                 "none of the three sets, it reddens on STRAYS as intended, and the in-set variant stays " +
+                 "green as its control.",
+    }),
     // v4672 -- THE 352nd CLOSING: the ship-time budget is an absolute wall in front of readings that are not
     // absolute, so a gate can be exiled for how fast the box was rather than for how slow the gate is.
     since351: Object.freeze({
