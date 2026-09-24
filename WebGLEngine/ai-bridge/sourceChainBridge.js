@@ -47,7 +47,8 @@ const isMac = process.platform === "darwin";
 // One run at a time. Two clones into the same parent would race on the same `.tmp` directory, and two verifies
 // would halve each other on a box that is also serving this page.
 const R = {
-    phase: "idle",          // idle | cloning | verifying | done
+    phase: "idle",          // idle | cloning | provisioning | verifying | publishing | done
+    provision: null,        // v4668 -- the last run's provisioning result, so status() can show it
     startedAt: 0, finishedAt: 0,
     log: "",
     clone: null,            // the cloneEngineSource result
@@ -68,7 +69,7 @@ function status() {
     return {
         ok: true,
         phase: R.phase,
-        running: R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing",
+        running: R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying" || R.phase === "publishing",
         startedAt: R.startedAt, finishedAt: R.finishedAt,
         clone: R.clone ? { version: R.clone.version, path: R.clone.path, repo: R.clone.repo,
                            auth: R.clone.auth, tokenRejected: !!R.clone.tokenRejected } : null,
@@ -98,7 +99,9 @@ function status() {
  */
 function canPublish(st) {
     const s = st || R;
-    if (s.phase === "cloning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
+    // v4668 -- "provisioning" joins the two, for the reason this file's v4451 note gives about publish:
+    // a phase that no guard names is a window in which the guard is not there.
+    if (s.phase === "cloning" || s.phase === "provisioning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
     // v4451 -- and while a publish is in flight, which was admissible until this round: publish() set no phase
     // at all, so a second press during the upload passed every precondition the first one had.
     if (s.phase === "publishing") return { ok: false, why: "a publish is already in flight" };
@@ -140,11 +143,17 @@ const budgetIsOwn =
     "exists to prevent, so the decision is to run to completion and let the operator stop it.";
 
 /** Spawn a node script inside a given tree's WebGLEngine and resolve with its exit code. */
-function _spawnIn(cwd, args, label) {
+function _spawnIn(cwd, args, label) { return _spawnCmd(process.execPath, args, cwd, label); }
+
+/**
+ * v4668 -- the same streaming spawn, with the BINARY as a parameter, so provisioning reports into this
+ * chain's log exactly as the verify does. _spawnIn kept its name and signature and is now one line.
+ */
+function _spawnCmd(cmd, args, cwd, label, extra) {
     return new Promise((resolve) => {
         let child;
         try {
-            child = spawn(process.execPath, args, { cwd, windowsHide: true });
+            child = spawn(cmd, args, Object.assign({ cwd, windowsHide: true }, extra || {}));
         } catch (e) {
             push("[" + label + "] spawn failed: " + ((e && e.message) || e) + "\n");
             return resolve({ code: -1, spawnError: String((e && e.message) || e) });
@@ -156,8 +165,65 @@ function _spawnIn(cwd, args, label) {
     });
 }
 
+// ---- v4668: PROVISION THE CLONE, BECAUSE THE SAFE ROUTE COULD NOT PASS WITHOUT IT --------------------
+//
+// *** MEASURED ON THE RIG AT v4667: the provisioned working checkout reported 26 NEW red and a FRESH CLONE
+// reported 121, and 116 of the 121 reach the browser harness. *** node_modules is gitignored, playwright is
+// a dependency of WebGLEngine/tools/render-qa, and cloneEngineSource runs `git clone --depth 1` and stops.
+// So every browser gate in the clone failed on "playwright is not installed here", the verdict was RED, and
+// `Publish the verified clone` refuses on a red verdict -- THE SAFE PUBLISH ROUTE COULD NEVER GO GREEN. That
+// is a sufficient explanation for the number this repo's own ship skill calls out: 3 of 261 versions were
+// ever published. The route was not slow or fiddly; it was unpassable, and nothing said so because the 116
+// reds look exactly like 116 broken gates.
+//
+// It lives HERE rather than in cloneEngineSource on purpose: the panel's "Get newer source" button clones
+// without verifying and should not pay for a browser download, while this chain cannot do its job without
+// one. Same reason the phase exists -- see below.
+const QA_REL = ["tools", "render-qa"];
+/**
+ * *** THE PATH IS THE RESOLVER'S FIRST CANDIDATE, AND THAT COUPLING IS THE POINT. ***
+ * tools/ship/playwrightResolve.mjs looks at <engine>/tools/render-qa/node_modules/playwright before anything
+ * else. Checking THAT is what makes this a provisioning check rather than an npm-exited-zero check -- the
+ * distinction this tree keeps relearning. The two spellings are held together by
+ * tools/ship/cloneProvision-selfcheck.mjs, which reads both files; they are not kept in step by hoping.
+ */
+function _provisionedAt(cloneEngine) { return path.join(cloneEngine, QA_REL[0], QA_REL[1], "node_modules", "playwright"); }
+
+// The runner is injectable for the reason versionPreflight's readers are: every branch below has to be
+// drivable without a network, and a branch nothing can reach is a branch nobody has checked. `run` defaults
+// to the real streaming spawn; the gate hands it a stub and asserts WHICH branch was taken -- including the
+// one where it must not be called at all.
+async function _provision(cloneEngine, { run = _spawnCmd } = {}) {
+    const qa = path.join(cloneEngine, QA_REL[0], QA_REL[1]);
+    if (!fs.existsSync(path.join(qa, "package.json")))
+        return { ok: false, reason: "the clone has no " + QA_REL.join("/") + "/package.json -- is it the engine repo?" };
+    if (fs.existsSync(_provisionedAt(cloneEngine))) return { ok: true, already: true, ms: 0 };
+
+    // npm is npm.cmd on Windows and needs a shell to be found; this is the SIXTH spelling of that fact in
+    // this tree (codegraphBridge, devBrowserBridge, webtorrentBridge, renderQaBridge, autoInstall are the
+    // others) and it is filed rather than refactored here, because a six-site change does not belong in the
+    // round that unblocks the publish. The args are LITERAL CONSTANTS and the directory travels as `cwd`
+    // rather than inside a command string, so shell:true adds no interpolation for anything to ride in on.
+    const isWin = process.platform === "win32";
+    const t0 = Date.now();
+    const r = await run(isWin ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"],
+                        qa, "provision", isWin ? { shell: true } : undefined);
+    const ms = Date.now() - t0;
+    if (r.code !== 0)
+        return { ok: false, ms, reason: "npm install exited " + r.code + (r.spawnError ? " (" + r.spawnError + ")" : "") +
+                 " -- is npm on PATH for the account running this server?" };
+    // *** EXIT 0 IS NOT THE QUESTION. *** The question is the one the resolver asks, so it is asked here:
+    // a postinstall that half-ran, a registry that served an empty tree, or a download killed midway can all
+    // leave a zero behind. v4668's own round note records the same lesson from the other side -- a gate that
+    // exits 1 having printed no row.
+    if (!fs.existsSync(_provisionedAt(cloneEngine)))
+        return { ok: false, ms, reason: "npm install exited 0 but " + _provisionedAt(cloneEngine) +
+                 " is not there -- the install did not land where the resolver looks" };
+    return { ok: true, ms };
+}
+
 async function start({ repo, ref } = {}) {
-    if (R.phase === "cloning" || R.phase === "verifying")
+    if (R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying")
         return { ok: false, error: "busy", message: "a chain run is already " + R.phase };
 
     R.phase = "cloning"; R.startedAt = Date.now(); R.finishedAt = 0;
@@ -192,6 +258,26 @@ async function start({ repo, ref } = {}) {
         push("[chain] " + R.error + "\n");
         return { ok: false, error: R.error };
     }
+    // ---- provision, BEFORE the verify and as its own phase -------------------------------------------
+    R.phase = "provisioning";
+    push("\n[chain] provisioning the clone (npm install in " + QA_REL.join("/") + "; pulls Chromium, one-time)\n");
+    const prov = await _provision(cloneEngine);
+    R.provision = prov;
+    if (!prov.ok) {
+        // *** REFUSING IS THE POINT. *** Running the verify anyway would spend an hour producing ~116 reds
+        // that say nothing about the code, and a reader would take them for 116 broken gates -- which is
+        // exactly what happened at v4667 before anybody knew the clone was bare. An unprovisioned tree
+        // cannot answer the question this chain asks, so it says so instead of answering it wrongly.
+        R.phase = "done"; R.finishedAt = Date.now(); R.verified = false;
+        R.error = "could not provision the clone: " + prov.reason +
+                  "  -- refusing to verify a tree whose browser gates cannot run, because the red verdict " +
+                  "would describe the missing install and read as broken code.";
+        push("[chain] " + R.error + "\n");
+        return { ok: false, error: R.error };
+    }
+    push("[chain] " + (prov.already ? "already provisioned -- nothing downloaded" :
+                       "provisioned in " + Math.round(prov.ms / 1000) + " s") + "\n");
+
     R.phase = "verifying";
     push("\n[chain] verifying the CLONE at " + cloneEngine + "\n");
     push("[chain] (this grades what was fetched, not the tree serving this page)\n\n");
@@ -475,8 +561,12 @@ function handle(req, res, sendJson) {
  * DERIVED FROM R.phase, not a second flag: updatePause-selfcheck's own rule is that the answer comes from the
  * runner's OWN state, because "a second flag would one day disagree with the thing it describes".
  */
-function running() { return R.phase === "cloning" || R.phase === "verifying" || R.phase === "publishing"; }
+function running() { return R.phase === "cloning" || R.phase === "provisioning" || R.phase === "verifying" || R.phase === "publishing"; }
 function busyWhat() { return running() ? "the source chain (" + R.phase + ")" : null; }
 
 module.exports = { status, start, publish, launch, canPublish, owns, handle, running, busyWhat, PREFIX, ENGINE_ROOT,
-    _launchGuard, _freePort, _waitHealthy, budgetIsOwn };
+    _launchGuard, _freePort, _waitHealthy, budgetIsOwn,
+    // v4668 -- exported so tools/ship/cloneProvision-selfcheck.mjs can DRIVE every branch rather than
+    // grep for one. QA_REL and _provisionedAt travel with it because the gate holds this file and
+    // playwrightResolve.mjs to the same path.
+    _provision, _provisionedAt, QA_REL };
