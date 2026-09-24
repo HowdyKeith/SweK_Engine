@@ -337,7 +337,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4333,               // v4690: 4331 -> 4333 for render/genGate.mjs and its gate -- the learned per-block
+    files: 4336,               // v4691: 4333 -> 4336 for render/genGateGPU.mjs, tools/ship/genGateTrain.mjs and
+                               // tools/ship/genGateMeasure-selfcheck.mjs -- the device runner v4690 held back, the
+                               // harvest-and-train tool, and the pre-registered held-out measurement. PROMISES moves
+                               // 373 -> 375 for the first time in this arc: both new tools AWAIT a page drive, and
+                               // the census reads what a file's text names. WebGPU holds at 53 and WebGL at 166 --
+                               // the runner reaches the device through gfx/device.js and names neither backend
+                               // except in the refusal its gate exercises. Every row from the census.
+                               // v4690: 4331 -> 4333 for render/genGate.mjs and its gate -- the learned per-block
                                // gate's apparatus, CPU side. TWO files and not three: render/genGateGPU.mjs was
                                // built, measured at 5.96e-8 against the CPU twin, and then HELD BACK, because a
                                // compute runner nothing outside a gate can construct would have forced this arc's
@@ -782,7 +789,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4033, closures: 3889, asyncAwait: 1545, typedArrays: 1157, promises: 373,
+    esModules: 4036, closures: 3892, asyncAwait: 1548, typedArrays: 1159, promises: 375,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 166, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -73,6 +73,13 @@
       <option value="4">slab speed: &times;4</option>
       <option value="8">slab speed: &times;8</option>
     </select>
+    <select id="gengate">
+      <option value="off">learned gate: OFF (the default -- every figure on this page predates it)</option>
+      <option value="cpu">learned gate: ON, on the CPU</option>
+      <option value="device">learned gate: ON, on the DEVICE (MLP_LAYER_WGSL through gfx/device.js)</option>
+      <option value="oracle">learned gate: ORACLE (control C1 -- uses the TRUE label, so it is not a prediction)</option>
+      <option value="never">learned gate: ALWAYS CROSS-FADE (control C2 -- the predictor that always declines)</option>
+    </select>
     <select id="genengine">
       <option value="cpu">reconcile on: the CPU (the default -- every figure on this page is this arm)</option>
       <option value="device">reconcile on: the DEVICE (v4685's kernel, 0 of 64 blocks differ in its gate)</option>
@@ -259,6 +266,9 @@ import { FlowReconcileGPU } from "./render/flowReconcileGPU.mjs";
 import { FrameInterpGPU } from "./render/frameInterpGPU.mjs";
 import { HoleFillGPU } from "./render/holeFillGPU.mjs";
 import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
+import { features as gateFeatures, labels as gateLabels } from "./render/genGate.mjs";
+import { applyScaler as gateScale, forward as gateForward, applyGate } from "./render/genGate.mjs";
+import { GenGateGPU } from "./render/genGateGPU.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -634,6 +644,9 @@ let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null,
 // tools/ship/runnerCallers-selfcheck.mjs's own closing line records that it cannot tell an imported runner
 // from a dispatched one, so the switch below is what makes the difference visible in a readout.
 let frgpu = null, figpu = null, hfgpu = null;
+// v4691 -- the learned gate's device runner, and the weights it needs. Both are null until something asks:
+// the weights are fetched once on the first ON frame, and a page that never turns the gate on never fetches.
+let gggpu = null, gateW = null, gateWTried = false;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -667,6 +680,7 @@ async function initGPU() {
         try { frgpu = new FlowReconcileGPU(dev); } catch { frgpu = null; }
         try { figpu = new FrameInterpGPU(dev); } catch { figpu = null; }
         try { hfgpu = new HoleFillGPU(dev); } catch { hfgpu = null; }
+        try { gggpu = new GenGateGPU(dev); } catch { gggpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -1440,6 +1454,58 @@ async function tick() {
         // *** THE DISPLACEMENT IS ALWAYS THE BLOCK FIELD'S, IN BOTH ARMS. *** It is the axis v4682's curve is
         // drawn against, and measuring it off a different field per arm would make the two arms' rows
         // incomparable on the very number that indexes them.
+        // *** v4691 -- THE LEARNED GATE, AND EVERY ARM OF IT IS A CONTROL THE PRE-REGISTRATION NAMED. ***
+        // render/learned-preregistration.md fixed the hypothesis before any of this existed: a per-block
+        // predictor that decides where to trust the generator. `oracle` uses the TRUE label and is control C1
+        // -- if IT cannot win, the gating mechanism is broken and the hypothesis is untestable. `never` is
+        // control C2, the predictor that always declines, and it is what the network has to beat rather than
+        // merely beating ungated generation. The readout names which arm ran, because a gate whose arm cannot
+        // be read back is a number nobody can attribute.
+        const gateMode = ($("gengate") || { value: "off" }).value;
+        let gateKept = null, gateOf = null;
+        if (gateMode !== "off") {
+            const nb = of.bw * of.bh;
+            let keep = null;
+            if (gateMode === "never") { keep = new Uint8Array(nb); gateOf = "always cross-fade (C2)"; }
+            else if (gateMode === "oracle") {
+                // C1 -- THIS SEES THE ANSWER ON PURPOSE AND IS NOT A PREDICTION. It is here to say whether the
+                // decision is expressible at all, and the readout calls it an oracle so it can never be quoted
+                // as a learned result.
+                const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
+                keep = L.y; gateOf = "ORACLE (C1, sees the answer)";
+            } else {
+                if (!gateWTried) {
+                    gateWTried = true;
+                    try { gateW = await (await fetch("./render/genGate-weights.json")).json(); } catch { gateW = null; }
+                }
+                if (gateW) {
+                    const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+                    const Z = gateScale(F, { mean: Float32Array.from(gateW.scaler.mean), sd: Float32Array.from(gateW.scaler.sd) });
+                    const layers = gateW.layers.map((L) => ({ ...L, W: Float32Array.from(L.W), b: Float32Array.from(L.b) }));
+                    let p;
+                    if (gateMode === "device" && gggpu) { p = await gggpu.forward(layers, Z, nb); gateOf = "the device"; }
+                    else { p = gateForward(layers, Z, nb); gateOf = "the CPU"; }
+                    keep = new Uint8Array(nb);
+                    for (let i = 0; i < nb; i++) keep[i] = p[i] >= 0.5 ? 1 : 0;
+                } else gateOf = "NO WEIGHTS -- render/genGate-weights.json did not load, so the gate did nothing";
+            }
+            if (keep) {
+                gateKept = keep.reduce((a2, b2) => a2 + b2, 0);
+                const gated = applyGate({ gen: patched, cf, keep, w: D, h: D, bw: of.bw, block: blockUse });
+                patched.set(gated);
+            }
+        }
+        // *** v4691 -- THE HARVEST HOOK, AND IT IS OFF UNLESS SOMETHING ASKS. *** The learned gate's training
+        // set is per-BLOCK, and nothing this page prints is per-block: the readout carries frame PSNRs. Rather
+        // than rebuild this page's scene machinery in a harness -- where it would be a copy that can drift from
+        // the thing being measured -- the harness sets `window.__gateHarvest` and this block fills it from the
+        // SAME locals the readout is computed from. render/genGate.mjs's features() is not given `midRef`;
+        // labels() is, and is a separate call, which is the separation the gate reads back off the signatures.
+        if (typeof window !== "undefined" && window.__gateHarvest) {
+            const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+            const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
+            window.__gateHarvest.push({ scene: kind, frame, tMid, x: Array.from(F), y: Array.from(L.y), base: L.base });
+        }
         genStat = { gen: psnr(patched, midRef), cf: psnr(cf, midRef), hold: psnr(genPrev, midRef),
                     left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,
                     blocks: of.bw * of.bh, tMid, meanMag: magSum / (of.bw * of.bh), maxMag: magMax,
@@ -1447,11 +1513,12 @@ async function tick() {
                     src: cleanSrc ? "clean renders" : "presented",
                     engine: onDevice ? "the device" : "the CPU",
                     warped: (onDevice && figpu) ? "the device" : "the CPU",
-                    fillEngine: (onDevice && figpu && hfgpu) ? "the device" : "the CPU" };
+                    fillEngine: (onDevice && figpu && hfgpu) ? "the device" : "the CPU",
+                    gateMode, gateOf, gateKept, gateBlocks: of.bw * of.bh };
     }
     $("genstat").textContent = !dolly ? ""
         : genStat
-            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}, warped on ${genStat.warped}, filled on ${genStat.fillEngine}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
+            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}, warped on ${genStat.warped}, filled on ${genStat.fillEngine}${genStat.gateMode !== "off" ? `, GATE ${genStat.gateOf} kept ${genStat.gateKept} of ${genStat.gateBlocks} blocks` : ""}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
               `scores ${genStat.gen.toFixed(2)} dB against a frame that WAS rendered -- the cross-fade of the same ` +
               `two presented frames scores ${genStat.cf.toFixed(2)} dB, so motion compensation is worth ` +
               `${(genStat.gen - genStat.cf >= 0 ? "+" : "") + (genStat.gen - genStat.cf).toFixed(2)} dB here, ` +

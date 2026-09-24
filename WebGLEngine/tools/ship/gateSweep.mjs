@@ -8032,6 +8032,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4691 -- THE 300th CLOSING: H1 refuted on held-out content, and the oracle says the decision is real.
+    since375: Object.freeze({
+        at: "v4691", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/runnerCallers-selfcheck.mjs", was: "green", now: "green",
+                why: "v4690 held render/genGateGPU.mjs back rather than take this arc's THIRD widening of the gate-only ratchet in twelve rounds. This round lands it WITH its caller: fsr.html's `gengate` control dispatches it on the device arm, so the runner arrives wired and the frozen 4 is untouched. The debt was deferred by exactly one round and then paid rather than widened." }),
+        ]),
+        verdict: "*** THE PRE-REGISTERED HYPOTHESIS IS REFUTED, AND THE CONTROLS ARE WHAT MAKE THAT A RESULT " +
+                 "RATHER THAN A SHRUG. *** v4689 fixed the hypothesis, the population, the statistic, the " +
+                 "threshold and four controls in a commit containing no data. Trained on `smooth` and `zone` " +
+                 "only -- 78 frames, 44,928 blocks, base rate 0.4355 -- and measured on the HELD-OUT `checker`, " +
+                 "frames 6-38, the learned gate scores +0.0530 dB against ungated generation with paired t " +
+                 "p=0.144 and exact sign p=0.636, 16 of 33 frames up. The bar was BOTH p < 0.05 AND a positive " +
+                 "mean. Positive mean, neither test significant: H1 REFUTED, which section 8 named in advance " +
+                 "as a result and not a disappointment. " +
+                 "*** CONTROL C1 IS WHY THE NULL MEANS SOMETHING. *** A gate using the TRUE label beats ungated " +
+                 "generation by +0.3191 dB, 33 of 33 frames up, t p=2.4e-9. So the decision IS expressible and " +
+                 "IS worth about a third of a dB on this content -- the null is about the predictor, not about " +
+                 "the rig. Without that arm the same numbers would have been indistinguishable from a broken " +
+                 "harness, which is the entire reason C1 was declared before anything ran. " +
+                 "*** CONTROL C2 IS WHY IT IS NOT A COLLAPSE. *** The network did NOT learn to always decline: " +
+                 "it keeps 122.2 of 576 blocks, and it beats the always-cross-fade predictor by +0.0733 dB with " +
+                 "t p=1.8e-4 and sign p=1.8e-5. It learned something real. It simply did not learn enough. " +
+                 "*** AND THE SHAPE OF THE FAILURE IS SPECIFIC, WHICH IS THE USEFUL PART. *** The oracle keeps " +
+                 "437.6 of 576 blocks where the network keeps 122.2: it is FOUR TIMES too conservative, and it " +
+                 "captured about a sixth of the 0.32 dB that was on the table. Trained on two scenes where " +
+                 "generation usually loses, it generalised a bias toward declining rather than a mechanism -- " +
+                 "which is exactly the direction v4689 section 5 said the split was chosen to expose, and the " +
+                 "reason the checker was held out rather than trained on. " +
+                 "*** SIX SABOTAGES, AND THE TWO THAT DID NOT BITE WERE BOTH THIS ROUND'S OWN DEFECTS. *** " +
+                 "Editing the pre-registration's WINDOW scored 0 RED, because this gate had restated FROM and " +
+                 "TO and then checked the window against TO - FROM + 1 -- the same constants on both sides of " +
+                 "the equals sign, a count standing in for a property, in the gate whose whole job is holding a " +
+                 "measurement to a pre-registration. The window, scene and speed are now PARSED OUT OF " +
+                 "render/learned-preregistration.md, so narrowing the population means editing the " +
+                 "pre-registration, which is the act it exists to make visible. And making the page compute the " +
+                 "gate but apply nothing CRASHED this gate rather than reddening it: all four arms become one " +
+                 "arm, every paired difference is CONSTANT, pairedStats returns p: null by design -- v4684 " +
+                 "built that after 20 copies of 0.3 produced t = 2.4e16 -- and the detail strings called " +
+                 "toExponential on it. A crash is not a verdict. Every p-value now goes through a null-safe " +
+                 "printer and that mutation reddens four rows. " +
+                 "*** TWO ROWS IN THE FIRST DRAFT COULD NOT FAIL AT ALL, *** written as ok(label, true, detail) " +
+                 "-- the shape v4688 found in its own new row one round earlier. The H1 verdict is now SAID " +
+                 "rather than asserted, because asserting a pre-registered outcome either forbids the " +
+                 "refutation section 8 allows or is a tautology; what is asserted is that the declared test ran " +
+                 "on the declared data. C2's comparison IS asserted, and the asymmetry is deliberate.",
+    }),
     // v4690 -- THE 299th CLOSING: the learned gate's apparatus, with no learned result in it.
     since374: Object.freeze({
         at: "v4690", swept: 1, green: 1, red: 0,
