@@ -416,22 +416,55 @@ export class GLBParser {
                         jointIndexByNode.set(ownerNode, newIdx);
                         bindJointIdx = newIdx;
                     } else {
-                        // Joint limit hit — fall back: walk up to find
-                        // deepest joint ancestor + bake the relative
-                        // transform into vertices. (Older code path.)
+                        // Joint limit hit — fall back: bind to the deepest
+                        // joint ancestor, baking the mesh's FULL WORLD-SPACE
+                        // bind position into its vertices (CORRECTED — an
+                        // adversarial review of this fallback's sibling fix
+                        // in gpu/fbxLoad.js found the ORIGINAL version here
+                        // had the identical bug: it broke out of this walk
+                        // the instant an ancestor joint was found, baking
+                        // only an ANCESTOR-RELATIVE delta
+                        // (worldMat(ancestor)^-1 * worldMat(ownerNode)).
+                        // That double-applies the ancestor's own inverse-
+                        // bind matrix at render time — jointMatrix(t) =
+                        // worldMat_t(ancestor) * IBM_ancestor, and
+                        // IBM_ancestor is ALREADY worldMat_bind(ancestor)^-1
+                        // — silently dropping the ancestor's entire
+                        // accumulated world offset, wrong even at rest pose.
+                        // Verified with a live 65-joint reproduction: ground
+                        // truth (0, 11.5, 0), the old formula rendered
+                        // (0, 0.5, 0), off by exactly the ancestor's own
+                        // bind-pose offset.
+                        //
+                        // Fixed by walking ALL THE WAY to the scene root
+                        // (cur === -1) unconditionally, rather than
+                        // stopping early — since _mat4Mul(nodeMat, mat)
+                        // prepends each node's local matrix (root-most
+                        // first, ownerNode's own local last), this is
+                        // EXACTLY the pre-existing "root fallback" case's
+                        // own formula (line below, now the ONLY formula),
+                        // which was already correct: the mesh's full
+                        // world-space bind position, matching what the
+                        // PRIMARY strategy above bakes implicitly via an
+                        // identity IBM on a brand-new joint. The only thing
+                        // that still varies between "an ancestor joint was
+                        // found" and "no ancestor joint was found" is which
+                        // joint SLOT to bind to (the ancestor's real,
+                        // non-identity IBM vs. joint 0 as an ultimate last
+                        // resort) — not which matrix to bake.
                         let cur = ownerNode;
                         let mat = this._identityMat4();
+                        let foundJointIdx = null;
                         while (cur !== -1) {
-                            if (jointIndexByNode.has(cur)) {
-                                bindJointIdx = jointIndexByNode.get(cur);
-                                bakedMatrix = mat;
-                                break;
+                            if (foundJointIdx === null && jointIndexByNode.has(cur)) {
+                                foundJointIdx = jointIndexByNode.get(cur);
                             }
                             const nodeMat = this._nodeLocalMatrix(nodeSnap[cur]);
                             mat = this._mat4Mul(nodeMat, mat);
                             cur = parentByNode[cur];
                         }
-                        if (cur === -1) bakedMatrix = mat;   // root fallback
+                        bindJointIdx = foundJointIdx !== null ? foundJointIdx : 0;
+                        bakedMatrix = mat;
                     }
                 }
 

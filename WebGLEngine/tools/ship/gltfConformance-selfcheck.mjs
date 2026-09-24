@@ -43,12 +43,49 @@
 //      (forcing every accessor read, sparse or not, to defensively clone)
 //        -> exit=1, 1 red: section 3a's own "still a zero-copy VIEW" check, by name.
 //
+// SECTION 5 -- GATES gpu/GLBParser.js's unskinnedPrims SHADER_JOINT_LIMIT fallback (the branch used once a
+// skinned rig already has >=64 joints and a rigidly-attached static mesh needs to reuse an EXISTING joint
+// ancestor rather than register a new one). An adversarial review of this fallback's SIBLING fix in
+// gpu/fbxLoad.js (same round, task backlog entry "glbparser-unskinned-prims-shader-joint-limit-fallback-bug")
+// found gpu/GLBParser.js's own, older, analogous fallback carried the IDENTICAL bug: it broke out of its
+// parent-chain walk the instant it found an ancestor already registered as a joint, baking only the
+// ANCESTOR-RELATIVE delta (the mesh's local offset from that ancestor) instead of continuing the walk to the
+// scene root. At render time jointMatrix(t) = ancestorWorld(t) * IBM_ancestor, and IBM_ancestor is ALREADY
+// ancestorWorld_bind^-1 -- so baking a delta already expressed relative to the ancestor means the ancestor's
+// own accumulated world offset gets dropped from the final position, silently, even at rest pose. Fixed by
+// removing the early break: the walk now always continues to the scene root (cur === -1) unconditionally,
+// separately tracking the first-found ancestor's joint slot rather than using it to stop the accumulation --
+// making the "ancestor found" case bake the exact same quantity (the mesh's full world-space bind position)
+// that the pre-existing "no ancestor found, bind to joint 0" case already baked correctly. Only the joint
+// SLOT bound to still varies; the baked matrix no longer does.
+//
+// SABOTAGE LOG -- each applied to gpu/GLBParser.js, gate run, exit read, file restored byte for byte:
+//   F  the fix's `while (cur !== -1) { if (foundJointIdx === null && jointIndexByNode.has(cur)) {...} const
+//      nodeMat = ...; mat = this._mat4Mul(nodeMat, mat); cur = parentByNode[cur]; }` reverted to the original
+//      bug: `if (jointIndexByNode.has(cur)) { foundJointIdx = jointIndexByNode.get(cur); break; }` BEFORE the
+//      nodeMat multiply, so the walk stops the instant an ancestor joint is found instead of continuing to
+//      root
+//        -> exit=1, 1 red: section 5's own baked-position check, by name -- got the exact predicted
+//           ancestor-relative delta (0, 1.5, 0) (the secondary mesh's own local offset from its immediate
+//           joint-ancestor parent) instead of the correct full-world-bind position (0, 11.5, 0), off by
+//           exactly the ancestor's own bind-pose world Y (10). The joint-slot check did NOT go red --
+//           `foundJointIdx` still resolves to the correct ancestor slot even with this sabotage, confirming
+//           the two checks are independent and this sabotage isolates the position formula specifically, not
+//           slot selection.
+//   G  `bindJointIdx = foundJointIdx !== null ? foundJointIdx : 0;` changed to `bindJointIdx = 0;`
+//      unconditionally (ignoring whichever ancestor joint was actually found)
+//        -> exit=1, 1 red: section 5's own joint-slot check, by name -- got 0 instead of the correct ancestor
+//           slot 10. The baked-position check did NOT go red -- the position formula is independent of which
+//           slot the mesh is bound to, confirming this sabotage isolates slot selection specifically, not the
+//           position formula.
+//
 // Run: node tools/ship/gltfConformance-selfcheck.mjs   (exit 0 all-pass, 1 on any fail)
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { GLBParser } from "../../gpu/GLBParser.js";
+import { packGlb } from "../export/voxelGlb.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let pass = 0, fail = 0;
@@ -176,11 +213,97 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + 
         `identical bufferView still shows the ORIGINAL base data, got ${JSON.stringify([...reread].slice(0, 3))}`);
 }
 
+// ---- 5. THE unskinnedPrims SHADER_JOINT_LIMIT FALLBACK -- see the header comment above for the bug this
+// section gates. No directly-callable inner method exists for this branch (unlike _readAccessor above), so
+// this builds a REAL packed GLB via tools/export/voxelGlb.mjs's own packGlb() and runs it through the full
+// GLBParser.parse() -- the actual production code path, not a hand-isolated helper.
+//
+// Fixture: a 65-node linear bone chain (node 1 = bone_0 .. node 65 = bone_64), each bone_i (i>=1) with local
+// translation (0,1,0), bone_0 at the root with zero translation -- so bone_j's bind-pose world Y is exactly
+// j. skin.joints = [1..65] (65 entries, node index 1+j at slot j), pushing skin.joints.length to 65 -- at or
+// past SHADER_JOINT_LIMIT (64), forcing every unskinned primitive into the fallback branch this section
+// gates rather than the "append a new joint" primary strategy (already covered by real-asset gates
+// elsewhere; this round's fix did not touch that branch). Node 66 is a SECOND, unskinned mesh's own node,
+// parented directly under bone_10 (node 11, bind-pose world Y=10) with its own local translation (0,1.5,0)
+// -- so its correct full-world-space bind position is (0, 11.5, 0), and its correct joint slot is 10 (the
+// slot skin.joints[10] = node 11 already occupies). Node 0 holds the actual skinned reference mesh (mesh 0,
+// skin 0, one vertex at the local origin, weighted entirely to joint slot 0) so GLBParser's own skin-
+// selection logic (node.mesh === skinnedPrims[0].meshIdx && node.skin != null) finds it. This is the same
+// fixture shape as gpu/fbxLoad.js's own section-13 synthetic 65-bone test (this session, same round) --
+// same ground truth, same reasoning, different file format.
+{
+    const NUM_BONES = 65, SEC_ANCESTOR = 10;
+    const nodes = [{ mesh: 0, skin: 0 }];
+    for (let i = 0; i < NUM_BONES; i++) {
+        const nodeIdx = 1 + i;
+        const translation = i === 0 ? [0, 0, 0] : [0, 1, 0];
+        const children = [];
+        if (i < NUM_BONES - 1) children.push(nodeIdx + 1);
+        if (i === SEC_ANCESTOR) children.push(66);
+        nodes[nodeIdx] = { translation, ...(children.length ? { children } : {}) };
+    }
+    nodes[66] = { mesh: 1, translation: [0, 1.5, 0] };
+    const skinJoints = Array.from({ length: NUM_BONES }, (_, i) => 1 + i);
+
+    // Binary layout: [0,12) POSITION mesh0 (1 vert, origin) | [12,16) JOINTS_0 mesh0 (ubyte4, [0,0,0,0]) |
+    // [16,32) WEIGHTS_0 mesh0 (float4, [1,0,0,0]) | [32,44) POSITION mesh1 (1 vert, origin) |
+    // [44, 44+65*64) inverseBindMatrices (65x MAT4, translate(0,-j,0)) -- IBM values are not exercised by
+    // this parse-time-only check (bindJointIdx/bakedMatrix do not read them) but are filled in correctly
+    // (not just zeros) so the fixture would also be valid input to a future render-time check.
+    const IBM_OFFSET = 44, totalBytes = IBM_OFFSET + NUM_BONES * 64;
+    const buf = new ArrayBuffer(totalBytes);
+    const dv = new DataView(buf);
+    dv.setFloat32(16, 1, true); // WEIGHTS_0 mesh0 = [1,0,0,0], rest of buffer already zero
+    for (let j = 0; j < NUM_BONES; j++) {
+        const base = IBM_OFFSET + j * 64;
+        dv.setFloat32(base + 0, 1, true); dv.setFloat32(base + 20, 1, true); dv.setFloat32(base + 40, 1, true);
+        dv.setFloat32(base + 60, 1, true); dv.setFloat32(base + 52, -j, true); // m[13] = -j, column-major
+    }
+    const gltf = {
+        asset: { version: "2.0" }, scene: 0, scenes: [{ nodes: [0] }], nodes,
+        meshes: [
+            { primitives: [{ attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2 } }] },
+            { primitives: [{ attributes: { POSITION: 3 } }] },
+        ],
+        accessors: [
+            { bufferView: 0, byteOffset: 0,  componentType: 5126, count: 1,         type: "VEC3" },
+            { bufferView: 0, byteOffset: 12, componentType: 5121, count: 1,         type: "VEC4" },
+            { bufferView: 0, byteOffset: 16, componentType: 5126, count: 1,         type: "VEC4" },
+            { bufferView: 0, byteOffset: 32, componentType: 5126, count: 1,         type: "VEC3" },
+            { bufferView: 0, byteOffset: IBM_OFFSET, componentType: 5126, count: NUM_BONES, type: "MAT4" },
+        ],
+        bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: totalBytes }],
+        buffers: [{ byteLength: totalBytes }],
+        skins: [{ joints: skinJoints, inverseBindMatrices: 4 }],
+    };
+    const glbBytes = packGlb(gltf, [{ bytes: new Uint8Array(buf), byteOffset: 0 }], totalBytes);
+    const ab = glbBytes.buffer.slice(glbBytes.byteOffset, glbBytes.byteOffset + glbBytes.byteLength);
+    const parsed = await GLBParser.parse(ab, { postProcess: false });
+
+    ok(parsed.skin.joints.length === 65,
+        `!! the fallback must NOT append a new joint (it reuses an existing ancestor slot) -- skin.joints.length should stay 65, got ${parsed.skin.joints.length}`);
+    // primData order is skinnedPrims first (mesh0, 1 vert) then unskinnedPrims (mesh1, 1 vert) -- the
+    // secondary mesh's baked vertex is vertex index 1 in the concatenated arrays.
+    const secPos = [parsed.positions[3], parsed.positions[4], parsed.positions[5]];
+    const secJoint = parsed.joints[4];
+    ok(Math.abs(secPos[0]) < 1e-6 && Math.abs(secPos[1] - 11.5) < 1e-6 && Math.abs(secPos[2]) < 1e-6,
+        `!! the fallback bakes the mesh's FULL WORLD-SPACE bind position (accumulated all the way to the scene root), not an ancestor-relative delta -- expected (0, 11.5, 0), got ${JSON.stringify(secPos)}`);
+    ok(secJoint === SEC_ANCESTOR,
+        `!! the fallback binds to the nearest joint ANCESTOR found while walking to root -- expected joint slot ${SEC_ANCESTOR}, got ${secJoint}`);
+}
+
 console.log(`gltfConformance-selfcheck: ${pass} passed, ${fail} failed`);
-console.log("unchecked here: sparse accessors combined with an INTERLEAVED (byteStride) bufferView, and " +
-    "sparse on a non-FLOAT componentType -- named honestly as remaining scope for whichever round widens " +
-    "this file's own feature matrix next (see gpu/fixtures/PROVENANCE.md's own entry for SimpleSparseAccessor.glb), " +
-    "not silently assumed covered. This is the FIRST entry in glTF conformance fixtures against the feature " +
-    "matrix (task #7) -- sparse accessors specifically; other feature-matrix gaps, if any survive a future " +
-    "audit, are separate work.");
+console.log("unchecked here: sections 1-4 -- sparse accessors combined with an INTERLEAVED (byteStride) " +
+    "bufferView, and sparse on a non-FLOAT componentType -- named honestly as remaining scope for whichever " +
+    "round widens this file's own feature matrix next (see gpu/fixtures/PROVENANCE.md's own entry for " +
+    "SimpleSparseAccessor.glb), not silently assumed covered. This was originally the FIRST entry in glTF " +
+    "conformance fixtures against the feature matrix (task #7) -- sparse accessors specifically; section 5 " +
+    "(added a later round) gates a real bug fix in a DIFFERENT part of the same file, the unskinnedPrims " +
+    "SHADER_JOINT_LIMIT fallback -- and is itself honestly incomplete: it does not cover the PRIMARY " +
+    "append-a-new-joint strategy (unchanged by that round's fix, and already exercised by real-asset gates " +
+    "elsewhere -- kenneyKit/sceneGlb/trellisAutoRig/reskin), nor a fixture where several NON-joint ancestors " +
+    "sit between the unskinned mesh and its nearest joint ancestor (this fixture's secondary mesh is a DIRECT " +
+    "child of its joint ancestor; the nearest-ancestor SEARCH itself was not touched by that round's fix, " +
+    "only whether the walk continues past it). Other feature-matrix gaps, if any survive a future audit, are " +
+    "separate work.");
 process.exit(fail ? 1 : 0);
