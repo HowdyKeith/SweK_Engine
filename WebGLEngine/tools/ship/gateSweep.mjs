@@ -8032,6 +8032,48 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4678 -- THE 288th CLOSING: the obvious algorithm is worse than doing nothing.
+    since363: Object.freeze({
+        at: "v4678", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFill-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE FIRST ROUND OF THIS ARC WHOSE HEADLINE RESULT IS NEGATIVE. *** v4677 left 3-6% of a " +
+                 "generated frame at zero and said hole filling was next. The obvious filling is iterative " +
+                 "dilation -- grow the vector field one ring per pass -- and MEASURED against a rendered " +
+                 "middle frame it is 3.6 dB WORSE on the holes than leaving them and cross-fading them: " +
+                 "30.8217 -> 27.2034 dB. A ring front grows from BOTH sides of the strip, so half a " +
+                 "four-pixel hole ends up holding the OCCLUDER's vector, and warping background along a " +
+                 "foreground vector drags the foreground back into the gap the foreground leaving is what " +
+                 "made. `growth: \"ring\"` is kept so the number stays reproducible. " +
+                 "*** AND THIS IS THE FIRST CONTENT IN THIS ARC WITH A SILHOUETTE. *** v4673 to v4677 all " +
+                 "ran on a wall at constant depth and all said so. Here a slab at half the wall's distance " +
+                 "slides across it and its trailing edge opens a TRUE disocclusion. " +
+                 "*** WHAT WORKS IS TO SEARCH THE NEIGHBOURHOOD AND TAKE THE FARTHEST VECTOR, NOT TO GROW A " +
+                 "FRONT. *** 30.8217 dB -- exactly the control, to the digit. And `prefer` is then worth " +
+                 "5.7216 dB (farther 30.8217 against nearer 25.1001), where under ring growth it was INERT " +
+                 "and produced bit-identical frames, because a front only ever offers a hole pixel one kind " +
+                 "of neighbour. " +
+                 "*** TYING THE CONTROL IS NOT WINNING: THE BLEND IS WHAT IS LEFT WRONG. *** A disoccluded " +
+                 "pixel's content is in ONE frame only, so (1-t)p + tc mixes the answer with the occluder at " +
+                 "full strength -- which is what a cross-fade does, which is why they tie. One-sided is EXACT " +
+                 "here, zero error on all 256 hole pixels, and the WRONG side is 24.8011, worse than " +
+                 "blending. So the side is DERIVED: the occluder is the nearest filled pixel in the " +
+                 "neighbourhood, and the sign of its vector dotted with the direction to the hole says " +
+                 "whether it is leaving (content in cur) or arriving (content in prev). That rule reaches " +
+                 "the same zero error with NO oracle and abstains on nothing. " +
+                 "*** AND THE RADIUS IS A FUNCTION OF THE DISPLACEMENT THAT THIS PASS DOES NOT WORK OUT. *** " +
+                 "Hole widths 2.20, 4.39 and 8.79 px need radius 2, 4 and 12; the shipped default of 4 is " +
+                 "6 dB wrong on the 17.6 px case, and a row says so rather than a comment. Seventeen " +
+                 "sabotages. *** THE ONE THAT SCORED 0 RED WAS A GAP IN THE CONTENT, NOT A NO-OP. *** " +
+                 "Dropping the occluder's spatial tie-break changed nothing, because the slab is FLAT -- " +
+                 "hundreds of pixels at one depth -- and lies entirely to one side of the strip, so every " +
+                 "one of them gives the same sign. A nine-pixel grid with an occluder pixel adjacent to the " +
+                 "hole and another at the corner the scan reaches first reads the same vector as LEAVING and " +
+                 "ARRIVING; the row was added and the sabotage then scores 1 red. `fill` defaults to null, " +
+                 "so v4677's gate still measures the unfilled frame it was written for, bit for bit, and " +
+                 "its closing line -- which said the holes were unfilled and the next pass owned them -- is " +
+                 "retired in this commit rather than left to outlive its limit.",
+    }),
     // v4677 -- THE 287th CLOSING: a frame nothing rendered, graded against one that was.
     since362: Object.freeze({
         at: "v4677", swept: 1, green: 1, red: 0,

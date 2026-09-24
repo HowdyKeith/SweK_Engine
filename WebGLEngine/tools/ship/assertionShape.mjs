@@ -489,8 +489,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // so the note above has stopped describing the failure and started describing the habit that replaced it.
     // v4677 -- 1765 -> 1766 for render/frameInterp-selfcheck.mjs, the first generated frame in this tree.
     // Ninth round running with the same four rows by one and the other four held.
-    gates: 1766, usesOk: 1745, definesOk: 1737, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1638, condFirst: 91, unknownSignature: 16,
+    // v4678 -- 1766 -> 1767 for render/holeFill-selfcheck.mjs. Tenth round running with the same four rows
+    // by one and the other four held.
+    gates: 1767, usesOk: 1746, definesOk: 1738, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1639, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

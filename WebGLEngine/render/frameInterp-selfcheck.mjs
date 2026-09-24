@@ -366,9 +366,11 @@ console.log("\n8. WHAT IT REFUSES");
 // guard, arriving through a different door, and the module now says which line does the work.
 
 console.log(`\nframeInterp-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
-console.log("unchecked here: THE HOLES, which are 3.1% of the frame and are reported rather than filled -- the " +
-    "next pass owns them, and the figure this file reports for cross-fading them (39.66 dB against 30.96) is a " +
-    "report and not this round's result. THE SPLAT'S COVERAGE IS ROUNDED: a block advanced by t*v covers a " +
+console.log("unchecked here: THE HOLES ARE STILL UNFILLED ON THIS FILE'S DEFAULT PATH, AND THAT IS NOW A CHOICE " +
+    "RATHER THAN A GAP: v4678 added render/holeFill.mjs behind the `fill` switch, which is null here so that every " +
+    "row above keeps measuring the unfilled frame it was written for -- holeFill-selfcheck owns the filled one and " +
+    "found that the obvious filling algorithm is WORSE than the cross-fade this file reports (39.66 dB against " +
+    "30.96), which is why that figure was labelled a report. THE SPLAT'S COVERAGE IS ROUNDED: a block advanced by t*v covers a " +
     "fractional rectangle and is written onto whole pixels, so the warp is sub-pixel accurate while the mask " +
     "saying which pixels HAVE a vector is not -- on a silhouette that is the difference between a hole and a " +
     "smear, and a real splatter accumulates per-pixel coverage instead. THE DEVICE: this is CPU-only, and so " +

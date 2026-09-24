@@ -42,6 +42,7 @@
 // optional: the same nearest-surface rule the rest of the arc uses, at the same block scale
 // render/flowReconcile.mjs reduces the application's vectors on.
 "use strict";
+import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
 
 const clampi = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -81,9 +82,18 @@ export function crossFadeCPU({ prev, cur, w, h, t = 0.5 }) {
  *   holes   how many, so a caller sees the cost of the field it supplied without walking the mask
  *   vec     w*h*2, the splatted field the warp actually sampled along, for auditing a frame rather than
  *           trusting it. NaN in the holes, for the same reason flowReconcile's `appFlow` is.
+ *   side    null unless `fill` was given, then render/holeFill.mjs's SIDE_* code per pixel
+ *   filled  how many pixels the filler gave a vector to, 0 when `fill` is null
+ *   abstained  how many of those the derived side rule could not decide; see holeFill's header
+ *   zbuf    the splat's depth buffer, extended by the filler -- what the tie between two arriving blocks
+ *           was settled on, so a frame can be audited rather than trusted
+ *
+ * `fill` is null by default and this function then behaves exactly as it did at v4677. Passing
+ * { prefer, passes } runs render/holeFill.mjs between the scatter and the gather; see its header for why the
+ * default neighbour is the FARTHER one and why the switch exists at all.
  */
 export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, depthBlock,
-                                     nearerIsLess = true, t = 0.5 }) {
+                                     nearerIsLess = true, t = 0.5, fill = null }) {
     if (!(block >= 1) || block !== Math.floor(block))
         throw new Error(`interpolateFrameCPU: block must be a whole number of pixels, at least 1 -- got ${block}`);
     if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
@@ -139,6 +149,22 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         }
     }
 
+    // ---- OPTIONAL: EXTEND THE FIELD INTO THE HOLES (v4678) ----
+    // *** DEFAULT OFF, AND THAT IS THE CONTROL ARM AND NOT TIMIDITY. *** v4677 shipped with the holes left at
+    // zero and measured what that costs; `fill` is the switch that makes the filler's worth a subtraction
+    // rather than a claim, exactly as `subpixel` does on the flow and `margin` on the reconciliation. With
+    // `fill` null this function behaves as it did at v4677, bit for bit, which is its own gate row.
+    let side = null, filledCount = 0, abstained = 0;
+    if (fill) {
+        const r = fillHolesCPU({ vec, hole, zbuf, w, h, nearerIsLess,
+                                 radius: fill.radius === undefined ? 4 : fill.radius,
+                                 growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
+                                 prefer: fill.prefer === undefined ? "farther" : fill.prefer,
+                                 side: fill.side === undefined ? "derived" : fill.side });
+        vec.set(r.vec); hole.set(r.hole); zbuf.set(r.zbuf);
+        side = r.side; filledCount = r.filled; abstained = r.abstained;
+    }
+
     // ---- GATHER: each pixel with a vector samples backwards in `prev` and forwards in `cur` ----
     const frame = new Float32Array(w * h * 4);
     const a = new Float32Array(4), b = new Float32Array(4);
@@ -149,7 +175,13 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         const vx = vec[j * 2], vy = vec[j * 2 + 1];
         fetch4(prev, w, h, x - t * vx, y - t * vy, a, 0);
         fetch4(cur, w, h, x + (1 - t) * vx, y + (1 - t) * vy, b, 0);
-        for (let c = 0; c < 4; c++) frame[j * 4 + c] = a[c] * (1 - t) + b[c] * t;
+        // *** A DISOCCLUDED PIXEL'S CONTENT IS IN ONE FRAME ONLY, SO THE BLEND IS NOT ALWAYS THE ANSWER. ***
+        // `side` is SIDE_BLEND everywhere the splat landed, so the symmetric blend is what a normal pixel
+        // gets and no second mask is needed; only render/holeFill.mjs's filled pixels can carry anything
+        // else, and its header measures what each setting is worth.
+        const sd = side === null ? SIDE_BLEND : side[j];
+        for (let c = 0; c < 4; c++)
+            frame[j * 4 + c] = sd === SIDE_PREV ? a[c] : sd === SIDE_CUR ? b[c] : a[c] * (1 - t) + b[c] * t;
     }
-    return { frame, hole, holes, vec, w, h };
+    return { frame, hole, holes, vec, side, filled: filledCount, abstained, zbuf, w, h };
 }
