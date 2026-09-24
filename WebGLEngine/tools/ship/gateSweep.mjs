@@ -8032,6 +8032,42 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4683 -- THE 293rd CLOSING: three explanations refuted, and the first positive reading on a picture.
+    since368: Object.freeze({
+        at: "v4683", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrPageField-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED AS render/genfield-preregistration.md, IN A COMMIT WITH NO DATA. *** v4682 " +
+                 "refuted displacement and printed the remaining suspect -- the BLOCK GRID -- with fixture " +
+                 "evidence and no page measurement. holeFill reads 36.79 dB at block 1 and 31.48 at block 8 on " +
+                 "a silhouette, so at this page's block size the warp already loses on the fixture. " +
+                 "*** H1 REFUTED, H2 REFUTED IN THE OPPOSITE DIRECTION: the PER-PIXEL field is WORSE. *** " +
+                 "smooth x1 -0.455 -> -0.552 dB, x4 -0.857 -> -1.075, 0 of 4 frames up at the declared cell. " +
+                 "Sixty-four times the field resolution -- 576 cells to 36,864 -- makes this page worse, where " +
+                 "the fixture reads +5.13 dB for the same change. H3 CONFIRMED as the predicted non-effect: the " +
+                 "block arm reproduces v4682's means exactly. " +
+                 "*** AND THE ACCUMULATOR IS NOT IT EITHER, WHICH THE RECORD NAMED AS WHAT A FAILURE WOULD " +
+                 "LEAVE. *** Interpolating between two CLEAN reference renders instead of two presented frames " +
+                 "moves the mean by 0.022 dB at both speeds, while the per-frame deltas and the displacement " +
+                 "DO move -- so the control fired and the answer did not. Labelled SECONDARY and undeclared, " +
+                 "because naming a thing is not testing it. Three explanations offered by this arc, three " +
+                 "measurements, none of them it. " +
+                 "*** AND THEN THE PAGE'S OWN scene CONTROL, WHICH NOBODY HAD VARIED, GAVE THE FIRST POSITIVE " +
+                 "FRAME-GENERATION READING ON A PICTURE IN THIS TREE. *** smooth -0.857, zone plate -0.965, " +
+                 "PIXEL CHECKER +0.107 dB with 3 of 4 frames up. Every figure this arc took on the page was " +
+                 "taken on `smooth`, whose own option text reads \"nothing to recover\". A cross-fade is exactly " +
+                 "right wherever the picture is flat, so a compensation's worth scales with the spatial " +
+                 "gradient -- and the per-pixel field's sign flips with the scene for the same reason, better " +
+                 "on the zone plate (-0.965 -> -0.512) and worse on smooth. *** IT IS A TENTH OF A dB WITH ONE " +
+                 "FRAME DOWN AND THE ROW SAYS SO: *** a direction, not a result, and the pre-registered " +
+                 "confirmation is named rather than claimed. Six sabotages. *** ONE EXPOSED A ROW WHOSE CLAIM " +
+                 "WAS THAT A QUANTITY IS SMALL, WHICH ITS ABSENCE SATISFIES PERFECTLY: *** making gensource a " +
+                 "no-op scored 0 red until the row also required the two arms to DIFFER per frame -- v4682's Q3 " +
+                 "in a new costume. And ONE IS UNREACHABLE ON THIS CONTENT AND IS RECORDED WITH ITS EVIDENCE: " +
+                 "the per-pixel path's fallback for a pixel the application cannot answer never runs, because " +
+                 "the reconciliation's own census prints a flow-only count of 0 on every frame this arc has " +
+                 "driven. Stated rather than deleted; flowReconcile's own gate reaches that case by hand.",
+    }),
     // v4682 -- THE 292nd CLOSING: the pre-registered primary is refuted, and v4681's diagnosis was wrong.
     since367: Object.freeze({
         at: "v4682", swept: 0, green: 0, red: 0,
