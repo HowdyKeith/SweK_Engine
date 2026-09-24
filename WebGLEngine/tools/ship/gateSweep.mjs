@@ -8032,6 +8032,43 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4703 -- THE 310th CLOSING: H6 not supported, and the rule ranks BACKWARDS.
+    since385: Object.freeze({
+        at: "v4703", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateRuleMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H6 IS NOT SUPPORTED -- AND NOT AS THE DOCUMENT EXPECTED. *** The rule ran as committed, in 1.9 s, on " +
+                 "both harvested cells: no page, no training, no seed. Both cells fail with the same shape -- below chance " +
+                 "on five scenes of seven, sign 2/7, mean AUC-0.5 of -0.0797 at x2 and -0.0184 at x4. The pre-registered " +
+                 "reading for this row said block-local motion evidence \"does not rank the decision\", which anticipated " +
+                 "a score NEAR chance. It is FAR from chance and backwards: checker 0.183 at x2, zone 0.330, noise 0.333. " +
+                 "That is ranking information with the wrong sign, not its absence, and the gate records where the " +
+                 "document's reading and the data part while leaving the document standing. " +
+                 "*** THE NEGATION IS NOT TESTED. *** It would sit above chance on five scenes of seven at both speeds, and " +
+                 "choosing a direction after seeing which one wins is the single move a pre-registration exists to " +
+                 "forbid. It is printed as a number, and anything built on it owes a new document and data it has not seen. " +
+                 "*** THE ONE SCENE WHERE THE RULE LOOKED RIGHT WAS MOSTLY AN ARTEFACT, AND THE FIRST DRAFT READ A MECHANISM " +
+                 "INTO IT. *** edges scored 0.747 and 0.753 -- exactly where every learned arm ranked below chance -- and the " +
+                 "draft offered that as the learned sets having learned the gain with the training scenes' sign. Then the " +
+                 "flat blocks were counted: 63-68% of edges' blocks have all three SADs at eps, score EXACTLY 0, and win " +
+                 "0-1% of the time, because a flat block's two candidates tie and a tie is labelled 0. Without them the " +
+                 "rule's edges AUC is 0.543 and 0.546. No mechanism is claimed; the line says what undercut it. " +
+                 "*** AND A DECLARED SECONDARY TURNED OUT EMPTY. *** S21's threshold, generate iff score > 0, keeps 100% of " +
+                 "blocks on six scenes of seven: every textured block's best motion candidate beats standing still, so the " +
+                 "thresholded rule IS always-generate there. A threshold that separated anything would have to be chosen on " +
+                 "data, which would make it the parameter this rule was built not to have. " +
+                 "*** TEN SABOTAGES, NINE RED. *** The tenth -- H6 supported if ANY cell clears -- is an empty adversarial " +
+                 "population: neither cell clears, so ANY and ALL agree on these data. It is recorded and not chased, the " +
+                 "EIGHTH of its kind in this arc, and the design gate already reddens on it (G6 at v4702). The measurement " +
+                 "gate also loads the REAL caches through checkCell and matchesMeta, so pointing the x4 cell at the x2 cache " +
+                 "reddens here on the actual files. C16 holds on all 314,496 usable blocks at 9.1e-7. Rows are built once " +
+                 "per scene: the first draft rebuilt them six times and took 3.4 s. " +
+                 "*** WHERE THIS LEAVES THE PER-BLOCK GATE. *** Six hypotheses. Learned sets rank forwards where this score " +
+                 "ranks backwards (Spearman -0.643 against V1 at x2, -0.321 at x4) and neither holds a sign across content. " +
+                 "The signal in these columns is real and its sign depends on the scene, which a gate deployed on unseen " +
+                 "content cannot know. No per-block rule over the chain's own SADs has been shown to transfer, fitted or " +
+                 "not, and that closes the question this arc has been asking at this block size.",
+    }),
     // v4702 -- THE 309th CLOSING: learning taken away, and the question put to a rule with nothing fitted.
     since384: Object.freeze({
         at: "v4702", swept: 1, green: 1, red: 0,
