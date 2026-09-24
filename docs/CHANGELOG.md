@@ -26,6 +26,81 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4674 -- the second tier's cap sat below its own slowest member
+
+*** NO GATE ARRIVED THIS ROUND, AND THAT IS THE SHAPE OF IT. ***
+
+The question was how a 95-second gate's finding ever reaches a ship. It already does:
+`tools/ship/recordTier.mjs` has run the guardian gates the sweep cannot afford since v4576, is wired
+into `shipRitual.mjs`, and already treats a cap-kill honestly -- a no-verdict is neither red nor green
+and fails the step. Two things were wrong with it.
+
+*** THE CAP WAS A TYPED 60,000 AND THE TIER'S SLOWEST MEMBER TAKES 60,196. ***
+
+    NO VERDICT  60063 ms  tools/ship/quickSweep-selfcheck.mjs  (6 record(s))
+
+Run alone that gate finishes in 60,196 ms and is ALL GREEN. On a loaded box it needed 105,810 ms. Six
+records lost their verdict to a 0.3% margin, and the ritual's record-tier step was red for a reason
+that was nobody's code.
+
+THE DEEPER ERROR IS TWO JOBS UNDER ONE NAME. In the PARALLEL sweep a cap is a BUDGET -- it bounds what
+the ship spends while eight gates compete. In a SERIAL tier nothing competes, so a cap bounds only what
+a HANG can cost. Pricing a backstop with a budget's number is the fault this tree names most often, and
+it cost six records. The backstop is derived now: floored above the slowest run ever measured here, and
+tracking twice the slowest reading the tier itself files.
+
+MEASURED AFTER: 11 gates, 25 records, **0 no verdict**, the member green at 105,810 ms.
+
+*** AND THE TIER TIMED EVERY GATE ALONE AND THREW THE READING AWAY. ***
+
+Those are the cleanest timings this tree takes -- uncontended by design, run to completion, taken at
+ship time on the ship box. The cost of discarding them, measured: one member carried a recorded
+**5,981 ms against the 60,196 ms it actually takes**, a tenfold understatement in the number that
+decides tier membership and that a reader uses to predict what the tier costs.
+
+It files through `sweepRotation.mergeTimings` -- the rotation's own writer, so the rules about
+`contended`, `finished` and `kinds` are not restated here -- and through `timingsTarget`, so v4647's
+foreign-box rule holds. That was proved on this run: the container's box id had changed, and the tier
+wrote `sweep-timings.local.json` rather than overwriting another machine's record, without being asked.
+
+Filing readings forced reading gate output instead of `stdio: "ignore"`, because a gate that DECLINES
+and a gate that is fast are otherwise the same two hundred milliseconds -- and filing a skip as a
+runtime is what put `placementRender` in the timings at its skip cost three times over. `SKIP_LINE` is
+exported from `quickSweep` now rather than re-spelled. A red gate's own last lines travel with its
+verdict too (v4648's finding): a ship that stops here should not have to re-run a 60-second gate to
+learn what it said.
+
+*** IT ALSO CAUGHT A DEFECT THIS SESSION SHIPPED TWO ROUNDS EARLIER. ***
+
+v4672's section 7 asserted that every stored `boxScale` entry recomputes from `serialRing` NOW. That
+ring is a deliberately rolling three-deep window, and `serialAt` moves whenever a gate is re-timed --
+by the rotation, or by this round's tier. MEASURED: four of the 36 contributors behind one stored scale
+are tier members, so a single ordinary tier run takes that pass to 32 contributors and the stored
+median stops matching. The check could not survive normal operation of the thing it was checking.
+
+Split into INTACT -- same contributor count, must still reproduce to the digit, which is what catches a
+hand edit -- and AGED, reported and required only to stay well-formed. Extracted as
+`quickSweep.boxScaleAudit` so both branches are drivable rather than waiting for the tree to supply one.
+
+TEN SABOTAGES, AND THREE WALKED ON THE FIRST BATTERY. All three were the round's own gate being
+confounded by its own subject:
+
+  - Putting the floor back to 60,000 stayed GREEN, because the live row grades against FILED readings --
+    and the filed readings are precisely the stale ones this round exists to fix. The floor is pinned to
+    the measured 105,810 now, as a literal, so lowering it reddens.
+  - Restoring `stdio: "ignore"` stayed GREEN, because the row checked that the skip RULE was present,
+    not that any output was captured. A rule applied to nothing passes forever.
+  - Collapsing the intact/aged split stayed GREEN, because every live entry is currently intact, so the
+    aged branch was a population of zero. It is driven on a fixture now.
+
+WHAT THIS ROUND DID NOT DO, ON PURPOSE: the tier's CAP is fixed; its POPULATION still rests on
+`recordReach` calling a record `checked` when its cheapest NAMING guardian is affordable -- and naming
+is not noticing. The probe that could settle that can only perturb integers, and **78 of 148 records
+hold none**, including all 17 records that have both an affordable and an unaffordable guardian, and
+v4673's own set-valued `RECORDED`. Logged as `record-probe-perturbation-vocabulary` rather than folded
+in: widening what the census measures would have moved the tier's population while its cost was being
+re-measured, and the round could then not have said which change produced which number.
+
 ## v4673 -- three ratchets stored a number where they needed a set
 
 *** A COUNT SAYS IT MOVED. IT CAN NEVER SAY WHAT MOVED. ***

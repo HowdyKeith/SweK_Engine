@@ -446,6 +446,36 @@ export function scaleOfGate(prior, gate) {
 /** The budget-comparable time: what this reading would have been on a box running at its own history's pace. */
 export function normalisedMs(ms, scale) { return ms / Math.max(1, Math.min(SCALE_MAX, scale || 1)); }
 
+/**
+ * *** v4674 -- AUDIT A STORED SCALE AGAINST THE RING IT WAS TAKEN FROM, SPLIT BY WHETHER THE EVIDENCE SURVIVES.
+ *
+ * v4672 asserted that every stored boxScale entry recomputes from serialRing NOW. That could not hold: the
+ * ring is a THREE-DEEP window and serialAt moves whenever a gate is re-timed, so one ordinary rotation --
+ * or one recordTier run, which from v4674 files a reading per member -- ages a pass out of reproducibility.
+ * MEASURED: four of the 36 gates behind one stored scale are tier members, so a single tier run takes that
+ * pass to 32 contributors and the stored median stops matching. The entry is not wrong; its evidence has
+ * aged, which is a different fact.
+ *
+ * INTACT (same contributor count) must reproduce to the digit -- that is what catches a hand edit. AGED is
+ * reported and required only to stay well-formed. Exported so a gate can drive both branches on a fixture
+ * rather than waiting for the tree to produce one.
+ */
+export function boxScaleAudit(serialRing, serialAt, boxScale, { minN = SCALE_MIN_N } = {}) {
+    const stamps = new Set(Object.values(serialAt || {}));
+    const eq = (a, b) => a && b && a.scale === b.scale && a.n === b.n && a.measured === b.measured;
+    const intact = [], aged = [], bad = [], malformed = [];
+    for (const k of Object.keys(boxScale || {})) {
+        if (!stamps.has(k)) continue;                       // an `at`-stamp alias: audited by its serial twin
+        const was = boxScale[k], now = boxScaleOf(serialRing, serialAt, k);
+        if (now.n === was.n) { intact.push(k); if (!eq(was, now)) bad.push(k); }
+        else {
+            aged.push({ key: k, was: was.n, now: now.n });
+            if (!(was.scale > 0) || was.measured !== true || !(was.n >= minN)) malformed.push(k);
+        }
+    }
+    return Object.freeze({ intact, aged, bad, malformed });
+}
+
 /** The lookup selectGates wants, from a whole record. Returns 1 for every gate when the record knows nothing. */
 export const scaleLookup = (prior) => (g) => scaleOfGate(prior, g).scale;
 
@@ -524,7 +554,9 @@ export function reconcile(rows, register = redRegister()) {
 }
 
 // The convention every skipping gate in the tree already prints, and which selfchecks.mjs has read since v3941.
-const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
+// v4674 -- EXPORTED, because tools/ship/recordTier.mjs now reads a gate's output too and a second
+// spelling of "what a skip looks like" is the drift this tree has repaired most often.
+export const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
 
 // The convention every skipping gate in the tree already prints, and which selfchecks.mjs has read since v3941.
 /**

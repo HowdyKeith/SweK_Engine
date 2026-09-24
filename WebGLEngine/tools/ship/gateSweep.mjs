@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4674 -- THE 354th CLOSING: the second tier exists and works, and its cap sat below its own slowest
+    // member, so six records lost their verdict to a 0.3% margin.
+    since353: Object.freeze({
+        at: "v4674", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/recordTier-selfcheck.mjs (sections 4 and 5: the derived backstop, the filed readings, the imported skip rule, the captured output)",
+                                "tools/ship/relativeBudget-selfcheck.mjs (v4672's section 7 asserted a historical scale reproduces from a ROLLING window; split into intact/aged and driven on a fixture)"]),
+        verdict: "NO GATE ARRIVED THIS ROUND and that is the shape of it: the mechanism the question was " +
+                 "about already existed. tools/ship/recordTier.mjs has run the guardian gates the sweep " +
+                 "cannot afford since v4576, is wired into shipRitual, and already treats a cap-kill " +
+                 "honestly -- a no-verdict fails the step. Two things were wrong with it. " +
+                 "*** THE CAP WAS A TYPED 60,000 AND THE TIER'S SLOWEST MEMBER TAKES 60,196. *** It came " +
+                 "back NO VERDICT at 60,063 ms; run alone it is ALL GREEN at 60,196 ms, and on a loaded box " +
+                 "it needed 105,810. SIX RECORDS lost their verdict to a 0.3% margin and the ritual step was " +
+                 "red for nobody's code. THE DEEPER ERROR IS TWO JOBS UNDER ONE NAME: in the PARALLEL sweep " +
+                 "a cap is a BUDGET, bounding what the ship spends; in a SERIAL tier nothing competes and a " +
+                 "cap bounds only what a HANG can cost. The backstop is derived now -- floored above the " +
+                 "slowest run ever measured here, tracking twice the slowest reading the tier itself files. " +
+                 "MEASURED AFTER: 0 no verdict, the member green at 105,810 ms, six records recovered. " +
+                 "*** AND THE TIER TIMED EVERY GATE ALONE AND THREW THE READING AWAY. *** Those are the " +
+                 "cleanest timings this tree takes -- uncontended by design, run to completion, at ship " +
+                 "time. The cost of discarding them: one member carried a recorded 5,981 ms against the " +
+                 "60,196 ms it actually takes, a TENFOLD understatement in the number that decides tier " +
+                 "membership. It files through sweepRotation.mergeTimings (the rotation's writer, so the " +
+                 "rules about contended/finished/kinds are not restated) and through timingsTarget, so " +
+                 "v4647's foreign-box rule holds -- proved on this run, which detected a changed box id and " +
+                 "wrote sweep-timings.local.json instead of overwriting the record. That forced reading gate " +
+                 "output instead of stdio:\"ignore\", because a skip is otherwise indistinguishable from a " +
+                 "fast run, and SKIP_LINE is now EXPORTED from quickSweep rather than re-spelled. " +
+                 "*** IT ALSO CAUGHT A DEFECT THIS SESSION SHIPPED TWO ROUNDS EARLIER. *** v4672's section 7 " +
+                 "asserted every stored boxScale entry recomputes from serialRing NOW -- but that ring is a " +
+                 "deliberately rolling three-deep window, and four of the 36 contributors behind one stored " +
+                 "scale are tier members, so one ordinary tier run takes that pass to 32 and the stored " +
+                 "median stops matching. The check could not survive normal operation. Split into INTACT " +
+                 "(must reproduce to the digit -- what catches a hand edit) and AGED (reported, required " +
+                 "only to stay well-formed), extracted as quickSweep.boxScaleAudit so both branches are " +
+                 "drivable. " +
+                 "TEN SABOTAGES, AND THREE WALKED ON THE FIRST BATTERY -- all three the round's own gate " +
+                 "being confounded by its subject. Putting the floor back to 60,000 stayed GREEN because " +
+                 "the live row grades against FILED readings, which are precisely the stale ones this round " +
+                 "fixes; the floor is pinned to the measured 105,810 now. Restoring stdio:\"ignore\" stayed " +
+                 "GREEN because the row checked that the skip RULE was present, not that any output was " +
+                 "captured -- a rule applied to nothing passes. And collapsing the intact/aged split stayed " +
+                 "GREEN because every live entry is currently intact, so the aged branch was a population " +
+                 "of zero; it is driven on a fixture now.",
+    }),
     // v4673 -- THE 353rd CLOSING: three orphan ratchets stored a number where they needed a set, so every
     // breach for two hundred rounds could say THAT it moved and never WHAT moved.
     since352: Object.freeze({

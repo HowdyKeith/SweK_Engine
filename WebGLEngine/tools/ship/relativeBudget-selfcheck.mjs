@@ -33,7 +33,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readTimings, selectGates, boxScaleOf, scaleOfGate, scaleLookup, normalisedMs, runQuickSweep,
+import { readTimings, selectGates, boxScaleOf, boxScaleAudit, scaleOfGate, scaleLookup, normalisedMs, runQuickSweep,
          SCALE_MIN_N, SCALE_MAX, DEFAULTS } from "./quickSweep.mjs";
 import { enumerateGates } from "./gateSweep.mjs";
 import { ABSORBING } from "./budgetExile.mjs";
@@ -280,7 +280,48 @@ sec("7. *** THE RECORD ON DISK REPRODUCES FROM THE RING, SO IT CANNOT OUTLIVE IT
     const serialStamps = new Set(Object.values(SAT));
     const direct = keys.filter((k) => serialStamps.has(k));
     const eq = (a, b) => a && b && a.scale === b.scale && a.n === b.n && a.measured === b.measured;
-    const bad = direct.filter((k) => !eq(scale[k], boxScaleOf(RING, SAT, k)));
+    // *** v4674 -- A HISTORICAL READING CANNOT BE REQUIRED TO REPRODUCE FROM DATA THAT ROLLS. ***
+    // This row asserted that every stored scale recomputes from serialRing NOW. serialRing is a THREE-DEEP
+    // window (v4648) and serialAt moves every time any gate is re-timed -- by the rotation, or by
+    // tools/ship/recordTier.mjs, which from v4674 files a reading for each of its eleven members. MEASURED:
+    // four of the 36 gates that contributed to the 2026-09-21T23:27:55.277Z scale are tier members, so one
+    // ordinary tier run takes that pass to 32 contributors and the stored median stops reproducing. The
+    // entry is not wrong; the evidence that produced it has aged out, which is a different fact and the
+    // honest one to report.
+    //
+    // SO THE STRONG CHECK IS KEPT WHERE IT IS STILL MEANINGFUL: an entry whose contributor COUNT is
+    // unchanged must reproduce to the digit -- that is what catches a hand edit -- and an entry whose
+    // contributors have since been re-timed is reported, and required only to stay well-formed. Asserting
+    // reproduction over a moved population would be grading the rotation, not the record.
+    const A = boxScaleAudit(RING, SAT, scale);
+    const { intact, aged, bad, malformed } = A;
+    for (const x of aged)
+        say(`  ${x.key} has aged: ${x.was} contributors when taken, ${x.now} still stamped to it -- ` +
+            `reproduction no longer assertable, well-formedness still is`);
+
+    // *** BOTH BRANCHES ARE DRIVEN ON A FIXTURE, BECAUSE TODAY THE TREE ONLY SUPPLIES ONE. *** Sabotage S9
+    // collapsed the split back to blanket reproduction and this section stayed GREEN -- every live entry is
+    // currently INTACT, so the aged branch was a population of zero, and a population of zero passes forever.
+    // The fixture supplies the other branch by hand so the rule is graded rather than merely present.
+    {
+        const ring = {}, sAt = {};
+        for (let i = 0; i < 40; i++) { ring["g" + i] = [100, 100, 130]; sAt["g" + i] = "P"; }
+        const taken = boxScaleOf(ring, sAt, "P");                       // n = 40, scale 1.3
+        delete ring.g0; delete ring.g1; delete sAt.g0; delete sAt.g1;   // two contributors re-timed away
+        const agedA = boxScaleAudit(ring, sAt, { P: taken });
+        const intactA = boxScaleAudit(ring, sAt, { P: boxScaleOf(ring, sAt, "P") });
+        const editedA = boxScaleAudit(ring, sAt, { P: { ...boxScaleOf(ring, sAt, "P"), scale: 1.9 } });
+        const rottenA = boxScaleAudit(ring, sAt, { P: { ...taken, measured: false } });
+        say(`fixture: 40 contributors taken at ${taken.scale}, two re-timed away -> now ${boxScaleOf(ring, sAt, "P").n}`);
+        ok("!! *** aged is reported and forgiven; intact must reproduce; a HAND EDIT reddens either way ***",
+            agedA.aged.length === 1 && agedA.bad.length === 0 && agedA.malformed.length === 0 &&
+            intactA.intact.length === 1 && intactA.bad.length === 0 &&
+            editedA.bad.length === 1 && rottenA.malformed.length === 1,
+            `an entry whose population shrank is AGED (forgiven, reported); one whose population is intact ` +
+            `must match to the digit, and a scale edited to 1.9 under an intact population is caught; an ` +
+            `aged entry that is also malformed is still caught. Without this fixture the aged branch is ` +
+            `never exercised on this tree and collapsing the split goes unnoticed, which is what S9 showed.`);
+    }
     // An `at`-stamp alias must be the same object's values as some serial stamp's -- a sweep files one
     // measurement under both of the two stamps it writes, and an alias pointing at nothing measurable is a
     // hand edit.
@@ -288,11 +329,13 @@ sec("7. *** THE RECORD ON DISK REPRODUCES FROM THE RING, SO IT CANNOT OUTLIVE IT
     const orphan = alias.filter((k) => !direct.some((d) => eq(scale[k], scale[d])));
     say(`${keys.length} boxScale entries: ${direct.length} keyed by a serial capture stamp, ${alias.length} aliased to an \`at\` stamp`);
     for (const k of direct) say(`  ${k}  scale ${scale[k].scale}  n ${scale[k].n}`);
-    ok("!! *** every stored scale recomputes, to the digit, from the serialRing still in the file ***",
-        keys.length > 0 && bad.length === 0 && direct.length > 0,
-        `${bad.length} entries disagree with boxScaleOf run over the ring now. A scale edited by hand, or ` +
-        `left behind by a rule that changed, reddens here -- which is the guard this tree has had to add ` +
-        `after the fact more than once.`);
+    ok("!! *** every stored scale whose evidence SURVIVES recomputes to the digit, and the rest stay well-formed ***",
+        keys.length > 0 && bad.length === 0 && malformed.length === 0 && direct.length > 0,
+        `${intact.length} entr(y/ies) still hold their full contributor set and ${bad.length} of those disagree; ` +
+        `${aged.length} have aged out of assertable reproduction and ${malformed.length} of those are malformed. ` +
+        `A scale edited by hand reddens here whenever its population is intact -- which is the guard this tree ` +
+        `has had to add after the fact more than once -- while a pass the rotation has since re-timed is ` +
+        `reported rather than called wrong.`);
     ok("  and no alias points at a measurement that does not exist",
         orphan.length === 0 && alias.length > 0,
         `${alias.length} \`at\` aliases, ${orphan.length} orphaned`);
