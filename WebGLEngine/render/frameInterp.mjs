@@ -160,7 +160,8 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
                                  radius: fill.radius === undefined ? 4 : fill.radius,
                                  growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
                                  prefer: fill.prefer === undefined ? "farther" : fill.prefer,
-                                 side: fill.side === undefined ? "derived" : fill.side });
+                                 side: fill.side === undefined ? "derived" : fill.side,
+                                 depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null, t });
         vec.set(r.vec); hole.set(r.hole); zbuf.set(r.zbuf);
         side = r.side; filledCount = r.filled; abstained = r.abstained;
     }

@@ -8032,6 +8032,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4679 -- THE 289th CLOSING: a pre-registered replacement, one refuted hypothesis, and a deviation.
+    since364: Object.freeze({
+        at: "v4679", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED IN A COMMIT WITH NO DATA IN IT, AS render/holeSide-preregistration.md. *** " +
+                 "v4678's closing named this round: motionVectors' zPrev channel and temporalReject's " +
+                 "disocclusion comparison are the real signal that holeFill's dot-product side rule " +
+                 "approximates without them. `side: \"depth\"` samples each frame's OWN depth buffer where the " +
+                 "background would be and takes the side that is not occluded -- no occluder geometry at all. " +
+                 "H1 CONFIRMED: exact wherever the heuristic already was. *** H2, THE PRIMARY, CONFIRMED AND " +
+                 "THE MARGIN IS REPORTED BECAUSE IT IS THIN: *** 24.7571 -> 25.8220 dB at the declared cell, " +
+                 "+1.0648 against a threshold of 1 dB declared in advance -- it clears by 6.5% of the " +
+                 "threshold, which is a pass by the written rule and is also evidence about how the threshold " +
+                 "was chosen. H4 CONFIRMED as a predicted NON-effect: the unfilled counts are identical under " +
+                 "both rules at every radius, which is what makes H2 interpretable at all. " +
+                 "*** H3 IS REFUTED, AND HOW IT IS REFUTED IS THE ROUND'S BEST FINDING. *** The prediction was " +
+                 "that the abstention count would fall below 256. It is 256 under BOTH rules -- AND THE TWO " +
+                 "SETS SHARE NOT ONE PIXEL. A record comparing COUNTS would have reported no effect. Every one " +
+                 "of the depth test's abstentions holds the OCCLUDER's vector, so its cause is the vector " +
+                 "search failing to cross an 8.79 px hole at radius 4, not the side decision. " +
+                 "*** AND THE DEFAULT WAS NOT FLIPPED, WHICH IS A DEVIATION FROM THE PRE-REGISTERED DECISION " +
+                 "RULE AND IS RECORDED AS ONE. *** The record said H2 clearing 1 dB means make it the default. " +
+                 "It does not, because `depth` needs two inputs `derived` does not: the default would throw for " +
+                 "every un-updated caller, and the only alternative -- falling back to `derived` when the " +
+                 "buffers are absent -- is a silent switch between two rules this very table shows differ by " +
+                 "1.06 dB. A pre-registered decision rule does not outrank that; the defect is in the " +
+                 "pre-registration, which should have anticipated the input requirement. Seven sabotages, and " +
+                 "TWO scored 0 red for one reason that was the SCENE's: the slab's background is static, so its " +
+                 "vector in the holes is exactly zero and lands on an integer, making both the sample's " +
+                 "DIRECTION and the fetch's ROUNDING unreachable. Nine pixels with a background moving +3 px " +
+                 "reach both. No gate added -- the rows joined holeFill-selfcheck, whose subject this is.",
+    }),
     // v4678 -- THE 288th CLOSING: the obvious algorithm is worse than doing nothing.
     since363: Object.freeze({
         at: "v4678", swept: 1, green: 1, red: 0,

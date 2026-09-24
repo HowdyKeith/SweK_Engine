@@ -58,6 +58,19 @@
 // line rather than claimed here.
 "use strict";
 
+/**
+ * Nearest-texel depth fetch with clamped edges. NEAREST and not bilinear, deliberately: a depth buffer at a
+ * silhouette holds two surfaces a long way apart in z, and their average is a depth no surface has -- the
+ * classic reason a depth test must not be filtered. render/frameInterp.mjs filters COLOUR bilinearly for the
+ * opposite reason.
+ */
+function depthAt(d, w, h, x, y) {
+    const xi = Math.round(x), yi = Math.round(y);
+    const xc = xi < 0 ? 0 : xi > w - 1 ? w - 1 : xi;
+    const yc = yi < 0 ? 0 : yi > h - 1 ? h - 1 : yi;
+    return d[yc * w + xc];
+}
+
 export const SIDE_BLEND = 0;   // the symmetric (1-t)*prev + t*cur
 export const SIDE_PREV = 1;    // prev alone -- the hole is about to be covered
 export const SIDE_CUR = 2;     // cur alone -- the hole has been uncovered
@@ -72,7 +85,9 @@ export const SIDE_CUR = 2;     // cur alone -- the hole has been uncovered
  *   radius   how far to look, in pixels (Chebyshev). A hole no filled pixel reaches within it stays a hole.
  *   growth   "neighbourhood" (the default) or "ring" -- see the header; "ring" is kept to reproduce a result
  *   prefer   "farther" (the default) or "nearer"
- *   side     "derived" (the default), "blend", "prev" or "cur"
+ *   side     "derived" (the default), "depth" (v4679), "blend", "prev" or "cur"
+ *   depthPrev, depthCur   w*h each, REQUIRED by side "depth" -- the two frames' own depth buffers
+ *   t        where the generated frame sits, needed by side "depth" to know where to sample
  *
  * Returns { vec, hole, zbuf, side, filled, abstained }, all fresh:
  *   side       w*h Int8Array of SIDE_* codes; SIDE_BLEND outside the holes, so a consumer needs no second mask
@@ -82,15 +97,20 @@ export const SIDE_CUR = 2;     // cur alone -- the hole has been uncovered
  *              frame, and on this content the abstentions are the entire gap to a perfect answer.
  */
 export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neighbourhood",
-                               prefer = "farther", side = "derived", nearerIsLess = true }) {
+                               prefer = "farther", side = "derived", nearerIsLess = true,
+                               depthPrev = null, depthCur = null, t = 0.5 }) {
     if (!(radius >= 1) || radius !== Math.floor(radius))
         throw new Error(`fillHolesCPU: radius must be a whole number of pixels, at least 1 -- got ${radius}`);
     if (growth !== "neighbourhood" && growth !== "ring")
         throw new Error(`fillHolesCPU: growth must be "neighbourhood" or "ring" -- got ${JSON.stringify(growth)}`);
     if (prefer !== "farther" && prefer !== "nearer")
         throw new Error(`fillHolesCPU: prefer must be "farther" or "nearer" -- got ${JSON.stringify(prefer)}`);
-    if (!["derived", "blend", "prev", "cur"].includes(side))
-        throw new Error(`fillHolesCPU: side must be "derived", "blend", "prev" or "cur" -- got ${JSON.stringify(side)}`);
+    if (!["depth", "derived", "blend", "prev", "cur"].includes(side))
+        throw new Error(`fillHolesCPU: side must be "depth", "derived", "blend", "prev" or "cur" -- got ${JSON.stringify(side)}`);
+    if (side === "depth" && (!depthPrev || depthPrev.length < w * h || !depthCur || depthCur.length < w * h))
+        throw new Error('fillHolesCPU: side "depth" needs depthPrev and depthCur, each w*h -- it is render/temporalReject.mjs\'s disocclusion comparison and there is nothing to compare without them');
+    if (!(t >= 0) || !(t <= 1))
+        throw new Error(`fillHolesCPU: t must be in [0, 1] -- got ${t}`);
     if (!vec || vec.length < w * h * 2) throw new Error("fillHolesCPU: vec must be w*h*2");
     if (!hole || hole.length < w * h) throw new Error("fillHolesCPU: hole must be w*h");
     if (!zbuf || zbuf.length < w * h)
@@ -158,6 +178,22 @@ export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neig
             if (side === "blend") { S[j] = SIDE_BLEND; continue; }
             if (side === "prev") { S[j] = SIDE_PREV; continue; }
             if (side === "cur") { S[j] = SIDE_CUR; continue; }
+            if (side === "depth") {
+                // *** THE DISOCCLUSION TEST, WHICH CONSULTS NO OCCLUDER GEOMETRY AT ALL (v4679). *** The
+                // background's position in `prev` is p - t*v and in `cur` is p + (1-t)*v. A depth recorded
+                // there that is NEARER than the background's own depth means something was in front of it,
+                // so that frame does not show this content. This is render/temporalReject.mjs's comparison
+                // applied to a hole instead of to a history sample, and it is why v4679 replaced the dot
+                // product: deciding the side no longer requires the search to REACH the occluder, so the
+                // radius stops carrying two unrelated jobs.
+                const vx = V[j * 2], vy = V[j * 2 + 1];
+                const pOcc = farther(bz, depthAt(depthPrev, w, h, x - t * vx, y - t * vy));
+                const cOcc = farther(bz, depthAt(depthCur, w, h, x + (1 - t) * vx, y + (1 - t) * vy));
+                if (pOcc && !cOcc) S[j] = SIDE_CUR;
+                else if (cOcc && !pOcc) S[j] = SIDE_PREV;
+                else { S[j] = SIDE_BLEND; abstained++; }   // both clear, or both blocked: nothing better
+                continue;
+            }
             // "derived": does the occluder's own motion carry it AWAY from this hole, or TOWARD it?
             const qx = oj % w, qy = (oj - qx) / w;
             const dot = V[oj * 2] * (x - qx) + V[oj * 2 + 1] * (y - qy);

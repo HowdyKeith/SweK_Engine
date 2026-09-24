@@ -2170,7 +2170,7 @@
   "render/opticalFlow-selfcheck.mjs": 1386,
   "render/flowReconcile-selfcheck.mjs": 194,
   "render/frameInterp-selfcheck.mjs": 201,
-  "render/holeFill-selfcheck.mjs": 218
+  "render/holeFill-selfcheck.mjs": 326
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -10404,7 +10404,7 @@
   "render/opticalFlow-selfcheck.mjs": 1386,
   "render/flowReconcile-selfcheck.mjs": 194,
   "render/frameInterp-selfcheck.mjs": 201,
-  "render/holeFill-selfcheck.mjs": 218
+  "render/holeFill-selfcheck.mjs": 326
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",

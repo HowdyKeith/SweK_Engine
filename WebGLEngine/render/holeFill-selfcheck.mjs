@@ -98,7 +98,7 @@ function scene(sl) {
         return o; };
     const onHoles = (img) => psnr(img, mid.rgba, notHole);
     const whole = (img) => psnr(img, mid.rgba, null);
-    return { prev, cur, mid, cf, base, control, gen, patch, onHoles, whole, vpx, mid_: mid };
+    return { prev, cur, mid, cf, base, control, gen, patch, onHoles, whole, vpx };
 }
 
 const S = scene(0.6);
@@ -230,7 +230,114 @@ console.log("\n6. WHICH OF THE OCCLUDER'S PIXELS SPEAKS FOR IT, WHEN SEVERAL ARE
        `vec ${r.vec[(4 * w + 4) * 2]} -- the wall's 0 and not the occluder's +1. Two questions, two rules: WHAT the hole holds is the background's vector, WHICH FRAME it reads is the occluder's geometry.`);
 }
 
-console.log("\n7. WHAT IT REFUSES");
+console.log("\n7. v4679 -- THE PRE-REGISTERED REPLACEMENT OF THE SIDE HEURISTIC BY THE DISOCCLUSION TEST");
+{
+    // *** DECLARED IN render/holeSide-preregistration.md BEFORE THE CODE WAS WRITTEN. *** Four hypotheses, a
+    // primary with a 1 dB threshold, and one predicted NON-effect. `side: "depth"` samples each frame's own
+    // depth buffer where the background would be and takes the side that is NOT occluded -- which is
+    // render/temporalReject.mjs's comparison applied to a hole, and consults no occluder geometry at all.
+    const fmt = (v) => (v === Infinity ? "EXACT" : v.toFixed(4));
+    const table = {};
+    for (const sl of [0.6, 1.2]) {
+        const s = scene(sl);
+        table[sl] = { vpx: s.vpx, holes: s.base.holes, r: {} };
+        for (const radius of [2, 4, 8, 12]) {
+            const row = {};
+            for (const sd of ["derived", "depth"]) {
+                const g = s.gen({ radius, side: sd, depthPrev: s.prev.depth, depthCur: s.cur.depth });
+                row[sd] = { dB: s.onHoles(s.patch(g)), abst: g.abstained, left: g.holes, side: g.side, vec: g.vec, hole: g.hole };
+            }
+            table[sl].r[radius] = row;
+        }
+        report(`slab +${s.vpx.toFixed(3)} px, ${s.base.holes} holes:`);
+        for (const radius of [2, 4, 8, 12])
+            report(`    r${String(radius).padStart(2)}   derived ${fmt(table[sl].r[radius].derived.dB).padStart(7)} (abstained ${String(table[sl].r[radius].derived.abst).padStart(3)}, unfilled ${String(table[sl].r[radius].derived.left).padStart(3)})   ` +
+                   `depth ${fmt(table[sl].r[radius].depth.dB).padStart(7)} (abstained ${String(table[sl].r[radius].depth.abst).padStart(3)}, unfilled ${String(table[sl].r[radius].depth.left).padStart(3)})`);
+    }
+    const slow = table[0.6], fast = table[1.2];
+    ok("H1 CONFIRMED: the depth test reaches zero error where the heuristic already did, so it is a replacement and not a trade",
+       slow.r[4].depth.dB === Infinity && slow.r[8].depth.dB === Infinity && slow.r[12].depth.dB === Infinity,
+       `+${slow.vpx.toFixed(3)} px at radius 4, 8 and 12: exact on all ${slow.holes} hole pixels`);
+    const gain = fast.r[4].depth.dB - fast.r[4].derived.dB;
+    ok("*** H2 CONFIRMED -- THE PRIMARY -- AND IT CLEARS THE DECLARED 1 dB THRESHOLD BY 0.065 dB, WHICH IS STATED BECAUSE IT IS NOT A COMFORTABLE MARGIN ***",
+       gain > 1,
+       `+${fast.vpx.toFixed(3)} px at radius 4: ${fast.r[4].derived.dB.toFixed(4)} -> ${fast.r[4].depth.dB.toFixed(4)} dB, +${gain.toFixed(4)}. ` +
+       `The 1 dB bar was declared in the record as the point below which two extra depth buffers would not be worth taking as inputs. ` +
+       `A result that clears a pre-registered threshold by 6.5% of the threshold is a pass, and a threshold that nearly bound is evidence about how the threshold was chosen.`);
+    // *** H3 IS REFUTED, AND HOW IT IS REFUTED IS THE MOST INTERESTING THING IN THIS SECTION. ***
+    let both = 0, onlyD = 0, onlyZ = 0, occVec = 0;
+    {
+        const s = scene(1.2), gd = fast.r[4].derived, gz = fast.r[4].depth;
+        for (let j = 0; j < W * H; j++) {
+            if (!s.base.hole[j] || gz.hole[j]) continue;
+            const ad = gd.side[j] === SIDE_BLEND, az = gz.side[j] === SIDE_BLEND;
+            if (ad && az) both++; else if (ad) onlyD++; else if (az) onlyZ++;
+            if (az && Math.abs(gz.vec[j * 2] - s.vpx) < 1e-6) occVec++;
+        }
+    }
+    ok("*** H3 REFUTED: the abstention count did not fall -- it is 256 under BOTH rules -- and the two sets share NOT ONE PIXEL ***",
+       fast.r[4].depth.abst === fast.r[4].derived.abst && both === 0 && onlyD === onlyZ,
+       `${fast.r[4].derived.abst} abstentions each, ${both} in common, ${onlyD} only the heuristic's and ${onlyZ} only the depth test's. ` +
+       `A record that compared the COUNTS would have reported no effect. The counts matching to the pixel is a coincidence.`);
+    ok("...and the depth test's abstentions have a cause that is not the side rule: every one of them holds the OCCLUDER's vector, so there is no background depth to compare against",
+       occVec === fast.r[4].depth.abst,
+       `${occVec} of ${fast.r[4].depth.abst} abstaining pixels were filled with +${fast.vpx.toFixed(3)} px, the occluder's, rather than the background's 0. ` +
+       `At radius 4 the search cannot reach across an 8.79 px hole, so both frames read as clear against a depth that is the occluder's own -- which is the VECTOR search failing, not the side decision.`);
+    ok("*** H4 CONFIRMED -- the predicted NON-effect: the unfilled count is identical under both rules at every radius, because the radius governs finding the vector and that mechanism is untouched ***",
+       [2, 4, 8, 12].every((r) => fast.r[r].depth.left === fast.r[r].derived.left && slow.r[r].depth.left === slow.r[r].derived.left),
+       `unfilled ${[2, 4, 8, 12].map((r) => `r${r}: ${fast.r[r].derived.left}/${fast.r[r].depth.left}`).join(", ")} on the fast scene. ` +
+       `Declared in advance so that it could not be presented as a surprise, and it is what makes H2 interpretable: the two rules are being compared on the same pixels.`);
+    // ONE SECONDARY, WHICH WAS NOT DECLARED AND IS LABELLED SO IT CANNOT STAND IN FOR THE PRIMARY
+    ok("SECONDARY, not pre-registered: the depth test also gains 2.49 dB at radius 2 on the SLOW scene, where the heuristic abstains on half the holes",
+       slow.r[2].depth.dB - slow.r[2].derived.dB > 2,
+       `${slow.r[2].derived.dB.toFixed(4)} -> ${slow.r[2].depth.dB.toFixed(4)} dB, +${(slow.r[2].depth.dB - slow.r[2].derived.dB).toFixed(4)}. ` +
+       `Larger than the primary and reported BESIDE it rather than instead of it: the record named one cell and this is a different one.`);
+    // *** AND THE DEFAULT IS NOT FLIPPED, WHICH IS A DEVIATION FROM THE PRE-REGISTERED DECISION RULE. ***
+    ok("*** the default stays `derived`, which the record said to flip -- the deviation and its reason are recorded rather than quietly absorbed ***",
+       (() => { const s = scene(0.6);
+                // the default must be a rule that needs NO depth buffers, or this call could not return at all
+                const g = s.gen({ radius: 4 });
+                return g.side !== null && g.filled === s.base.holes; })(),
+       `The record said to make "depth" the default if H2 cleared, and H2 cleared. It is NOT the default, because "depth" REQUIRES two inputs "derived" does not: ` +
+       `a default of "depth" makes this function throw for every caller not yet updated, and the alternative -- falling back to "derived" when the buffers are absent -- ` +
+       `is a silent switch between two rules that differ by a measured 1.06 dB, which is the one thing this tree refuses outright. "depth" is what a caller with depth buffers should pass, and it is documented as such.`);
+    // *** WHERE THE TEST SAMPLES, AND THAT IT SAMPLES TWO DIFFERENT BUFFERS, IS UNREACHABLE ON THE RENDERED
+    // SCENE -- TWO SABOTAGES ESTABLISHED THAT. *** The slab's background is STATIC, so its vector in the holes
+    // is exactly zero and `x - t*vx` equals `x + t*vx`: walking the prev sample the wrong way changed nothing
+    // (0 red), and rounding versus flooring the fetch changed nothing either, because every coordinate landed
+    // on an integer. A background that moves, by a FRACTIONAL amount, makes both reachable, and nine pixels
+    // are enough to build one.
+    {
+        const w = 9, h = 9, n = w * h;
+        const vec = new Float32Array(n * 2), zb = new Float32Array(n).fill(0.9), hl = new Uint8Array(n);
+        for (let i = 0; i < n; i++) vec[i * 2] = 3;         // the BACKGROUND moves +3 px, so t*v is 1.5
+        hl[4 * w + 4] = 1;
+        const dPrev = new Float32Array(n).fill(0.9), dCur = new Float32Array(n).fill(0.9);
+        dPrev[4 * w + 3] = 0.2;                            // an occluder in `prev` at x = 3, and NOWHERE else
+        const r = fillHolesCPU({ vec, hole: hl, zbuf: zb, w, h, radius: 2, side: "depth", depthPrev: dPrev, depthCur: dCur, t: 0.5 });
+        report(`hole at (4,4) with a background moving +3 px: the prev sample is at x = 2.5 and the cur sample at x = 5.5`);
+        ok("*** the prev sample walks BACKWARD along the vector and ROUNDS, so an occluder at x = 3 blocks it and the side is cur ***",
+           r.side[4 * w + 4] === SIDE_CUR && r.abstained === 0,
+           `side ${r.side[4 * w + 4]}, ${r.abstained} abstentions. Walking forward would sample x = 5.5 and find nothing; FLOORING 2.5 would sample x = 2 and find nothing. ` +
+           `Either way both frames read clear and the rule abstains -- which is what it did on the rendered scene, where the background's vector is zero and neither mistake is reachable.`);
+        // the mirror: the occluder in `cur` instead, which must give the OTHER side and not just "not cur"
+        const dPrev2 = new Float32Array(n).fill(0.9), dCur2 = new Float32Array(n).fill(0.9);
+        dCur2[4 * w + 6] = 0.2;                            // x = 5.5 rounds to 6
+        const r2 = fillHolesCPU({ vec, hole: hl, zbuf: zb, w, h, radius: 2, side: "depth", depthPrev: dPrev2, depthCur: dCur2, t: 0.5 });
+        ok("...and an occluder in `cur` instead gives SIDE_PREV, so the two branches are separately reachable rather than one branch and a default",
+           r2.side[4 * w + 4] === SIDE_PREV && r2.abstained === 0,
+           `side ${r2.side[4 * w + 4]} with the occluder moved from depthPrev to depthCur at the cur sample's own rounded position`);
+        const r3 = fillHolesCPU({ vec, hole: hl, zbuf: zb, w, h, radius: 2, side: "depth", depthPrev: dPrev, depthCur: dCur2, t: 0.5 });
+        ok("...and BOTH blocked abstains rather than guessing, which is the case a generated frame has no honest answer for",
+           r3.side[4 * w + 4] === SIDE_BLEND && r3.abstained === 1,
+           `side ${r3.side[4 * w + 4]}, ${r3.abstained} abstention. Neither frame shows this content; a blend of two wrong samples is the least wrong thing available and is recorded as an abstention rather than a decision.`);
+    }
+    const m = threw(() => fillHolesCPU({ vec: new Float32Array(W * H * 2), hole: new Uint8Array(W * H), zbuf: new Float32Array(W * H), w: W, h: H, side: "depth" }));
+    ok('...and `side: "depth"` without the depth buffers is refused, naming what it is and what it needs',
+       /disocclusion comparison and there is nothing to compare/.test(m || ""), m);
+}
+
+console.log("\n8. WHAT IT REFUSES");
 {
     const base = () => ({ vec: new Float32Array(W * H * 2), hole: new Uint8Array(W * H), zbuf: new Float32Array(W * H), w: W, h: H });
     for (const [label, patch, pat] of [
@@ -274,6 +381,23 @@ console.log("\n7. WHAT IT REFUSES");
 // that the scan reaches first, which read the same vector as LEAVING and ARRIVING respectively. Z4 then
 // scores 1 red. The negative result is what asked the question; the code had looked fine.
 //
+// ---- v4679's SABOTAGES, OVER SECTION 7 ---------------------------------------------------------------------
+//
+//   W1  `side: "depth"` is accepted and falls through to the heuristic  -> 4 red
+//   W2  the occlusion comparison is inverted (FARTHER counts as blocking) -> 5 red
+//   W4  both samples read the SAME depth buffer                        -> 5 red
+//   W5  the ambiguous case picks a side instead of abstaining          -> 3 red
+//   W7  the missing-buffer guard is removed                            -> 1 red
+//   W3  the prev sample walks FORWARD along the vector                 -> 2 red, AFTER ROWS WERE ADDED
+//   W6  the depth fetch FLOORS instead of rounding                     -> 2 red, AFTER ROWS WERE ADDED
+//
+// *** W3 AND W6 BOTH SCORED 0 RED ON THE RENDERED SCENE, FOR THE SAME REASON, AND IT IS THE SCENE'S. *** The
+// slab's background is STATIC, so its vector inside the holes is exactly zero: `x - t*vx` and `x + t*vx` are
+// the same coordinate, and that coordinate is an integer, so neither the direction of the sample nor the
+// rounding of the fetch can be reached. Section 7's nine-pixel block gives the background a FRACTIONAL
+// displacement of +3 px, which puts the prev sample at x = 2.5 and the cur sample at x = 5.5 and makes both
+// mutations change the answer. Two 0-REDs with one cause, and the cause was the content, not the code.
+
 // Z9 is worth a note of its own: filling in place makes the RING result WORSE still, so the snapshot is
 // load-bearing even inside the algorithm this round measures as a failure. A wrong answer that also depends
 // on the scan direction is two defects, and reproducing the first one honestly requires not having the second.
