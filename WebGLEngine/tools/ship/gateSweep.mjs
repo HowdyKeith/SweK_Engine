@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4682 -- THE 292nd CLOSING: the pre-registered primary is refuted, and v4681's diagnosis was wrong.
+    since367: Object.freeze({
+        at: "v4682", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED IN A COMMIT WITH NO DATA, AS render/genspeed-preregistration.md. *** " +
+                 "v4681 found frame generation losing to a cross-fade on four of four frames and attributed " +
+                 "it to the page's motion being under 1.3 px where the fixtures run at 3.2 and 8.8. This round " +
+                 "added a slab-SPEED axis to test that. " +
+                 "*** H1 IS REFUTED AT EVERY SPEED: 0 OF 4 FRAMES UP AT x1, x2, x4 AND x8. *** Mean deltas " +
+                 "-0.455, -1.003, -0.857, -1.097 dB at 0.96, 1.82, 3.61 and 6.89 px of mean displacement. " +
+                 "Sixteen frames across an 8x range and not one positive. H2 refuted too -- the curve falls, " +
+                 "falls, RISES, falls, so speed is not even the axis this varies along -- and H3 is not " +
+                 "evaluable because there is no crossover to locate. H4 CONFIRMED as the predicted " +
+                 "non-effect: x1 reproduces v4681's four deltas to the printed digit. " +
+                 "*** SO v4681's DIAGNOSIS WAS WRONG, AND THIS ROUND SAYS SO RATHER THAN QUIETLY MOVING ON. *** " +
+                 "At x8 the page passes 6.89 px, more than double the 3.2 px at which the fixture reads " +
+                 "+9.91 dB, and still loses by a dB. Displacement is not what separates this page from the " +
+                 "fixtures. " +
+                 "*** THE SUSPECT THE PRE-REGISTRATION NAMED FIRST IS THE BLOCK SIZE, AND IT IS ALREADY " +
+                 "MEASURED: *** holeFill's slab scene reads 36.79 dB at block 1 and 31.48 at block 8 against " +
+                 "a cross-fade of 31.66 -- AT BLOCK 8 THE WARP ALREADY LOSES ON THE FIXTURE. The +9.91 dB " +
+                 "figure is the WALL scene, which has no silhouette: uniform motion, where the block grid " +
+                 "costs nothing. This page has a silhouette and uses block 8. A hypothesis with fixture " +
+                 "evidence and NO page measurement, so the gate PRINTS it and asserts nothing. " +
+                 "FOUR SABOTAGES. *** TWO EXPOSED WEAK ROWS WRITTEN THIS SAME ROUND. *** Scaling only the " +
+                 "CURRENT slab offset scored 0 red, because every delta row asserts only that the delta is " +
+                 "NEGATIVE and a worse field satisfies that more comfortably -- closed by a DERIVATION row: " +
+                 "the displacement, taken off the reconciled field, must double when the control doubles. And " +
+                 "fsrPage-selfcheck's new default-is-1 row compared indices, which holds however the options " +
+                 "are ORDERED; swapping them scored 0 red until the row matched the select tag immediately " +
+                 "followed by the x1 option. A row written in the same commit as the feature it guards is not " +
+                 "exempt. AND ONE DEFECT WAS CAUGHT BY A GREEN ROW BEING IMPOSSIBLE: the curve first parsed " +
+                 "the drive's per-frame OBJECT instead of its readout text, every cell was NaN, and the H2 " +
+                 "refutation PASSED on it -- `NaN >= NaN` is false, so `every` was false and the negation " +
+                 "true. A refutation that a total absence of data satisfies is not a refutation, and a " +
+                 "finiteness row now guards all of them. No gate added; the rows joined fsrPageGen, whose " +
+                 "closing line asked for them.",
+    }),
     // v4681 -- THE 291st CLOSING: frame generation runs on a picture, and loses to a cross-fade.
     since366: Object.freeze({
         at: "v4681", swept: 1, green: 1, red: 0,

@@ -2171,7 +2171,7 @@
   "render/flowReconcile-selfcheck.mjs": 194,
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
-  "tools/ship/fsrPageGen-selfcheck.mjs": 8188
+  "tools/ship/fsrPageGen-selfcheck.mjs": 19197
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -10408,7 +10408,7 @@
   "render/flowReconcile-selfcheck.mjs": 194,
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
-  "tools/ship/fsrPageGen-selfcheck.mjs": 8188
+  "tools/ship/fsrPageGen-selfcheck.mjs": 19197
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",

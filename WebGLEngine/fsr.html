@@ -67,6 +67,12 @@
       <option value="all">dilation feeds: the clip chain AND the reactive mask</option>
       <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
     </select>
+    <select id="slabspeed">
+      <option value="1">slab speed: &times;1 (the default -- every figure on this page is this arm)</option>
+      <option value="2">slab speed: &times;2</option>
+      <option value="4">slab speed: &times;4</option>
+      <option value="8">slab speed: &times;8</option>
+    </select>
     <select id="genframe">
       <option value="off">frame generation: OFF (the control -- every figure on this page is this arm)</option>
       <option value="on">frame generation: ON (FSR3 -- generate the frame between two and grade it)</option>
@@ -288,6 +294,12 @@ const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0,
 // 106 genuine disocclusions, the 192-pixel offscreen column -- are quoted in its own prose and in four gates,
 // and a round that moved them while adding a feature would be indistinguishable from a round that broke them.
 const SLAB_DX = 0.055;                         // world units per frame, along +x, on the "objects" camera
+// *** v4682 -- A MULTIPLIER ON THAT, AND IT DEFAULTS TO 1 SO SLAB_DX STAYS THE PAGE'S NUMBER. ***
+// tools/ship/fsrPageGen-selfcheck.mjs closed by saying the page runs under 1.3 px of mean displacement -- the
+// regime where a cross-fade wins by construction -- and that one negative reading is not a curve. This is the
+// axis that turns it into one. At x1 every figure this page and its six gates quote is untouched by
+// construction, and tools/ship/fsrPage-selfcheck.mjs's 2.42 px DERIVATION is the x1 arm's.
+const slabSpeed = () => { const e = $("slabspeed"); return e ? Number(e.value) || 1 : 1; };
 // The two model matrices the "objects" camera needs, column-major to match render/rasterProbe.js's viewProj
 // and everything downstream of it. The background's is the identity ON PURPOSE and not as a placeholder: it
 // is what makes the background pixels a control rather than a second unknown.
@@ -692,7 +704,7 @@ async function reset() {
     // truth the temporal pane never sees. At startFrame = 0 sceneT() is 0 and nothing moves.
     // dx0 is in the SAME units the tick loop's `dx` uses, so the still panes and the moving one agree; on
     // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
-    const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX : 0;
+    const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX * slabSpeed() : 0;
     const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
     ref = dolly ? truthPersp(dollyVP(t0), kind, sx0, slabAlpha()) : truth(kind, dx0);
     draw(cRef, ref);
@@ -729,8 +741,9 @@ async function tick() {
     // the slab's alpha this frame. 1 on every camera but "objects", so the three older cameras cannot
     // see this control at all -- the same guard sxCur carries, for the same reason.
     const alphaCur = objects ? slabAlpha() : 1;
-    const sxCur = objects ? sceneT() * SLAB_DX : 0;
-    const sxPrev = objects ? sceneTPrev() * SLAB_DX : 0;
+    const speed = slabSpeed();                   // v4682: 1 unless the control says otherwise
+    const sxCur = objects ? sceneT() * SLAB_DX * speed : 0;
+    const sxPrev = objects ? sceneTPrev() * SLAB_DX * speed : 0;
     const dx = panning ? sceneT() * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
     // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
@@ -1328,7 +1341,7 @@ async function tick() {
         const patched = Float32Array.from(gen.frame);
         for (let j = 0; j < D * D; j++) if (gen.hole[j]) for (let c = 0; c < 4; c++) patched[j * 4 + c] = cf[j * 4 + c];
         const tMid = sceneT() - tG;
-        const midRef = truthPersp(dollyVP(tMid), kind, objects ? tMid * SLAB_DX : 0, alphaCur);
+        const midRef = truthPersp(dollyVP(tMid), kind, objects ? tMid * SLAB_DX * speed : 0, alphaCur);
         // *** HOW BIG THE MOTION IS, BECAUSE A COMPENSATION'S WORTH IS A FUNCTION OF IT AND THE FIXTURES RAN
         // AT 3.2 AND 8.8 px. *** A field of nearly-zero vectors makes a cross-fade nearly right and gives
         // block-resolution compensation nothing to win with while it still pays the block grid's error.
@@ -1380,7 +1393,7 @@ async function tick() {
 
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "Pause" : "Run"; if (running) tick(); };
 $("reset").onclick = () => { running = false; $("run").textContent = "Run"; reset(); };
-for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();

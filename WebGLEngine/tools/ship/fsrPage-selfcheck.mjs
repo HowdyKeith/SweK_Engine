@@ -301,11 +301,25 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
         "and dolly produced IDENTICAL stat lines over five frames. That control needed the old page on disk " +
         "and cannot ship; this is the property that made it true.");
     ok("  ...and the slab offset reaches the samplers ONLY on the objects camera",
-        /const sxCur = objects \? sceneT\(\) \* SLAB_DX : 0/.test(src)
-        && /const sxPrev = objects \? sceneTPrev\(\) \* SLAB_DX : 0/.test(src),
+        /const sxCur = objects \? sceneT\(\) \* SLAB_DX \* speed : 0/.test(src)
+        && /const sxPrev = objects \? sceneTPrev\(\) \* SLAB_DX \* speed : 0/.test(src),
         "zero on every other camera, so a default that was quietly dropped would still be a no-op there. " +
         "The clock these read is v4661's sceneT(), not `frame`; at startFrame = 0 the two are the same " +
-        "expression, which is what keeps every figure above meaning what it meant.");
+        "expression, which is what keeps every figure above meaning what it meant. *** AND `speed` ARRIVED AT " +
+        "v4682 AND DEFAULTS TO 1. *** It is slabSpeed(), a multiplier on SLAB_DX added so that " +
+        "fsrPageGen-selfcheck's one negative frame-generation reading could become a curve; at x1 it is the " +
+        "identity and the derivation two rows below is the x1 arm's, which the next row holds directly.");
+    ok("!! ...and that multiplier's DEFAULT is 1, which is what keeps the derivation below a derivation rather than a coincidence",
+        /<option value="1">slab speed: &times;1/.test(src)
+        && /const slabSpeed = \(\) => \{ const e = \$\("slabspeed"\); return e \? Number\(e\.value\) \|\| 1 : 1; \}/.test(src)
+        // *** THE FIRST OPTION AFTER THE TAG, NOT MERELY AN OPTION SOMEWHERE AFTER IT. *** The first draft of
+        // this row compared the select's index against the x2 option's, which stays true however the options
+        // are ORDERED -- a sabotage that swapped x1 and x2 scored 0 red against it. What makes a value the
+        // default is being first, so that is what is read.
+        && /<select id="slabspeed">\s*<option value="1">/.test(src),
+        "the x1 option is FIRST in the select, so it is what the page loads with, and the reader falls back to 1 " +
+        "when the element is absent. A multiplier whose default were 2 would move SLAB_DX's screen motion and " +
+        "the 2.42 px below with it, and nothing in the derivation would say so.");
     ok("!! ...and the page reports the gap WITH ITS CONTROL -- the background, whose model matrix is the identity",
         /objGap[\s\S]{0,900}ids\[i\] === 1[\s\S]{0,200}offSlab/.test(src) && /on the background/.test(src),
         "the background number is the control: object-aware and camera-only are the same computation where " +

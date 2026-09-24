@@ -52,7 +52,7 @@ if (skip) {
 } else {
 
 const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000, args: { UPTO }, script: `async (a) => {
-    const drive = async (gen) => {
+    const drive = async (gen, speed = "1") => {
         const ifr = document.createElement("iframe");
         ifr.style.width = "1200px"; ifr.style.height = "900px"; ifr.src = "/fsr.html";
         document.body.appendChild(ifr);
@@ -65,7 +65,8 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000, args: {
         // *** THE SAME ARM THE OTHER PAGE GATES USE, AND DILATION LEFT AT ITS SHIPPED DEFAULT. *** Both masks
         // off for the reason fsrPageClocks records; the objects camera because it is the only one with a
         // moving object, which is what a frame generator is for.
-        const want = [["scene", "smooth"], ["shading", "off"], ["reactive", "off"], ["camera", "objects"], ["genframe", gen]];
+        const want = [["scene", "smooth"], ["shading", "off"], ["reactive", "off"], ["camera", "objects"],
+                      ["slabspeed", speed], ["genframe", gen]];
         let last = null, present = true;
         for (const [id, v] of want) { const e = $(id); if (!e) { present = false; continue; } e.value = v; last = e; }
         last.dispatchEvent(new Event("change"));
@@ -81,13 +82,15 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1800000, args: {
         ifr.remove();
         return { booted, present, readBack: ($ ? null : null), seen };
     };
-    return { on: await drive("on"), off: await drive("off") };
+    const out = { on: await drive("on"), off: await drive("off"), speeds: {} };
+    for (const sp of ["2", "4", "8"]) out.speeds[sp] = await drive("on", sp);
+    return out;
 }` });
 
 if (!r.ok) {
     ok("the page drove headless", false, `${r.reason || "no result"} ${JSON.stringify(r.pageErrors || []).slice(0, 300)}`);
 } else {
-const { on, off } = r.result;
+const { on, off, speeds } = r.result;
 say(`adapter ${r.adapter ? (r.adapter.description || r.adapter.vendor) : "unknown"}${r.software ? " (SOFTWARE)" : ""}`);
 
 console.log("1. THE CONTROL EXISTS, AND OFF IS THE PAGE THAT SHIPPED");
@@ -172,6 +175,68 @@ console.log("\n3. *** AND IT LOSES TO THE CROSS-FADE, ON EVERY FRAME ***");
     ok("...and the disocclusion side test ABSTAINS on nearly every pixel it fills here, which v4679 measured as the signature of a vector the search could not place",
        rows.every((x) => Number.isFinite(x.abst)) && rows.some((x) => x.abst > 100),
        `abstentions ${rows.map((x) => x.abst).join(", ")} of the filled pixels. v4679: an abstaining pixel holds the occluder's vector rather than the background's, so the search did not reach across. Reported, not fixed here.`);
+
+console.log("\n4. v4682 -- *** THE PRE-REGISTERED SPEED CURVE, AND ITS PRIMARY HYPOTHESIS IS REFUTED ***");
+{
+    // *** DECLARED IN render/genspeed-preregistration.md BEFORE THE CONTROL EXISTED. *** H1: there is a speed
+    // among x1, x2, x4, x8 at which the generated frame beats the cross-fade on at least 3 of the 4 measured
+    // frames. H2: the mean delta is monotonically non-decreasing in speed. H3: the crossover sits at a mean
+    // displacement between 1.3 and 4.0 px. H4, a predicted non-effect: x1 is unchanged.
+    const num2 = (str, re) => { const m = re.exec(str); return m ? Number(m[1]) : NaN; };
+    // the drive records one object per frame and the readout text is its `gen` field -- reading the object
+    // itself gave NaN in every cell, and the H2 row PASSED on it, which is recorded in the log below
+    const parse = (seen) => seen.slice(1).map((o) => { const g = o.gen; return {
+        gen: num2(g, /scores (-?[\d.]+) dB against/),
+        cf: num2(g, /presented frames scores (-?[\d.]+) dB/),
+        mean: num2(g, /THE MOTION IS ([\d.]+) px mean/),
+        left: num2(g, /and (\d+) were still unreachable/) }; });
+    const avg = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+    const curve = [["1", parse(on.seen)], ["2", parse(speeds["2"].seen)], ["4", parse(speeds["4"].seen)], ["8", parse(speeds["8"].seen)]]
+        .map(([sp, rs]) => ({ sp, d: rs.map((x) => x.gen - x.cf), disp: avg(rs.map((x) => x.mean)),
+                              left: rs.map((x) => x.left) }));
+    for (const c of curve)
+        say(`speed x${c.sp}: delta ${c.d.map((v) => v.toFixed(2)).join(", ")} dB  (mean ${avg(c.d).toFixed(3)}, ${c.d.filter((v) => v > 0).length} of ${c.d.length} up);  displacement ${c.disp.toFixed(2)} px mean;  unreachable ${c.left.join(",")}`);
+    const last = curve[curve.length - 1];
+    ok("*** H1 REFUTED: there is NO speed among the four at which the generated frame beats the cross-fade -- 0 of 4 frames up at EVERY setting ***",
+       curve.every((c) => c.d.every((v) => v < 0)),
+       `up-counts ${curve.map((c) => "x" + c.sp + ": " + c.d.filter((v) => v > 0).length + "/4").join(", ")}; mean deltas ${curve.map((c) => avg(c.d).toFixed(3)).join(", ")} dB. Sixteen frames across an 8x range of speed and not one of them positive.`);
+    ok("*** and the displacement passes the fixtures' 3.2 px and keeps losing, so DISPLACEMENT IS NOT WHAT SEPARATES THIS PAGE FROM THE FIXTURES ***",
+       last.disp > 3.2 && avg(last.d) < 0,
+       `x8 runs at ${last.disp.toFixed(2)} px mean -- more than double the 3.2 px at which render/frameInterp-selfcheck.mjs reads +9.91 dB -- and still reads ${avg(last.d).toFixed(3)} dB. v4681's diagnosis was that the page was simply too slow. It was wrong, and this is the row that says so.`);
+    // *** EVERY CELL MUST BE FINITE BEFORE ANY OF THESE ROWS MEANS ANYTHING, AND THIS ROW IS WHY. *** The
+    // first draft of this section read the drive's per-frame OBJECT instead of its readout text, so every
+    // number was NaN -- and the H2 row PASSED on it, because `NaN >= NaN` is false, so `every` was false and
+    // the negation was true. A refutation that a total absence of data satisfies is not a refutation.
+    const allFinite = curve.every((c) => [...c.d, c.disp, ...c.left].every(Number.isFinite));
+    ok("*** every cell of the curve parsed to a finite number, which the refutations below are worthless without ***",
+       allFinite, `${curve.length} speeds x ${curve[0].d.length} frames, plus a displacement and an unreachable count each: ${allFinite ? "all finite" : "SOME NaN"}`);
+    ok("H2 REFUTED as well: the curve is not monotone, so speed is not even the axis this varies along",
+       allFinite && !curve.every((c, i) => i === 0 || avg(c.d) >= avg(curve[i - 1].d)),
+       `mean delta ${curve.map((c) => "x" + c.sp + " " + avg(c.d).toFixed(3)).join(", ")}. H3 is not evaluable: there is no crossover to locate.`);
+    // *** AND THE AXIS MUST DO WHAT IT SAYS, WHICH IS A DERIVATION AND NOT A SETTING. *** A control that
+    // doubled the slab's offset in the CURRENT frame and not the previous one would leave the rendered picture
+    // moving at the right rate while the motion field described a different rate entirely -- and every row
+    // above would still pass, because they only assert that the delta is negative. The measured displacement
+    // is what forces the two to agree: it comes off the RECONCILED field, so it is the field's own answer.
+    const ratios = curve.slice(1).map((c, i) => c.disp / curve[i].disp);
+    ok("*** the measured displacement DOUBLES with each doubling of the control, so the field the generator reads agrees with the picture it was rendered from ***",
+       allFinite && ratios.every((r) => r > 1.8 && r < 2.1),
+       `displacements ${curve.map((c) => c.disp.toFixed(2)).join(", ")} px; ratios ${ratios.map((r) => r.toFixed(3)).join(", ")}. ` +
+       `Taken off the reconciled field and not off the control's value, so a speed that scaled the render and not the motion -- or the current frame and not the previous one -- reads here.`);
+    ok("*** H4 CONFIRMED -- the predicted NON-effect: x1 reproduces v4681's four deltas to the printed digit, so the control is the identity where it says it is ***",
+       ["-0.38", "-0.82", "-0.25", "-0.37"].every((v, i) => curve[0].d[i].toFixed(2) === v),
+       `x1: ${curve[0].d.map((v) => v.toFixed(2)).join(", ")} against v4681's -0.38, -0.82, -0.25, -0.37. Declared in advance so that a control which had quietly changed the scene could not pass as a measurement.`);
+    ok("...and the fill starts running out of reach at x8, which is v4678's radius finding arriving on a picture",
+       last.left.some((v) => v > 0) && curve[0].left.every((v) => v === 0),
+       `unreachable pixels x1: ${curve[0].left.join(",")};  x8: ${last.left.join(",")}. render/holeFill-selfcheck.mjs section 4 measured that the radius must grow with the displacement and that the pass does not work it out for the caller. The page passes 8 and at x8 that is no longer enough.`);
+    say("*** THE SUSPECT THE PRE-REGISTRATION NAMED FIRST IS THE BLOCK SIZE, AND IT IS ALREADY MEASURED ON A FIXTURE. ***");
+    say("render/holeFill-selfcheck.mjs's slab scene, exact field: block 1 reads 36.79 dB, block 2 36.79, block 4 35.58, " +
+        "block 8 31.48, block 16 29.18 -- against a cross-fade of 31.66. AT BLOCK 8 THE WARP ALREADY LOSES ON THE FIXTURE, " +
+        "by 0.18 dB. The +9.91 dB result is the WALL scene, which has no silhouette: uniform motion, where the block grid " +
+        "costs nothing. This page has a silhouette and uses block 8. That is a hypothesis with fixture evidence and NO page " +
+        "measurement, so it is printed and not asserted -- the page has no block-size control, and adding one is the next round.");
+}
+
 }
 }
 }
@@ -202,6 +267,28 @@ console.log("\n3. *** AND IT LOSES TO THE CROSS-FADE, ON EVERY FRAME ***");
 // 0.6202 dB). The same gentleness explains P3: RCAS is a mild sharpen, so the presented frame and the
 // accumulator's output are close enough that swapping them moves nothing a threshold here could see.
 //
+// ---- v4682's SABOTAGES, OVER SECTION 4 ---------------------------------------------------------------------
+//
+//   Q1  the `slabspeed` control is accepted and ignored              -> 3 red
+//   Q4  the mid reference does not take the speed, so the truth holds -> 1 red
+//       the slab at its x1 position
+//   Q3  only the CURRENT slab offset is scaled, not the previous one  -> 1 red, AFTER A ROW WAS ADDED
+//   Q2  the x1 option is not FIRST, so the page loads at x2           -> 1 red in fsrPage-selfcheck, AFTER
+//       THAT ROW WAS FIXED
+//
+// *** Q3 SCORED 0 RED FIRST, AND THE REASON IS THE SHAPE OF EVERY ROW ABOVE IT. *** Scaling sxCur without
+// sxPrev leaves the rendered picture moving at the right rate while the motion field describes a different
+// one -- and every delta row still passed, because they assert only that the delta is NEGATIVE, which a worse
+// field satisfies more comfortably. The displacement-RATIO row closes it: the figure is taken off the
+// RECONCILED field, so it is the field's own answer about how far things went, and it must double when the
+// control doubles. That row is a derivation and the others are a sign test.
+//
+// *** AND Q2 EXPOSED A DEFECT IN A ROW WRITTEN THIS SAME ROUND. *** tools/ship/fsrPage-selfcheck.mjs's new
+// row asserted the default by comparing the select tag's index against the x2 option's -- true however the
+// options are ORDERED. Swapping x1 and x2 scored 0 red against it. What makes a value the default is being
+// FIRST, so the row now matches the select tag immediately followed by the x1 option. A row written in the
+// same commit as the feature it guards is not exempt from being broken on purpose.
+
 // The honest reading is not that these rows are weak but that this PAGE is not a discriminating instrument
 // for frame generation -- it was built to measure upscaling, and its motion is an order of magnitude below
 // what a frame generator is judged on. A slab-speed control would change that and does not exist; the closing
@@ -217,4 +304,10 @@ console.log("unchecked here: WHETHER FRAME GENERATION IS WORTH ANYTHING ON CONTE
     "is what makes the DIFFERENCE fair and the absolute dB not. FOUR FRAMES: enough for a unanimous sign and not " +
     "enough for a paired test, which is a pre-registered round of its own. AND THE BLOCK SIZE IS 8 AND UNMEASURED " +
     "HERE: v4678 measured that block size dominates on a silhouette, and nothing on this page varies it.");
+// RUNTIME: 19,197 ms measured at v4682, on FIVE page drives -- the ON arm, the OFF control, and the three
+// extra speeds. *** THAT IS OVER quickSweep's 3,000 ms MEMBERSHIP THRESHOLD AND WELL INSIDE ITS 20,000 ms
+// SIGKILL CAP, WHICH IS TOO CLOSE TO THE CAP TO BE COMFORTABLE. *** The gate is excluded from the sweep by the
+// threshold, so the cap does not apply to it -- but a sixth drive would put it past 20 s, and the next round
+// that wants one should split the file rather than add to it, which is the reason fsrPageClocks-selfcheck
+// exists as a fourth page gate instead of a fifth section in a third.
 process.exit(fails ? 1 : 0);
