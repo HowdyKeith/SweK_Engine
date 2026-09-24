@@ -8032,6 +8032,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4674 -- THE 284th CLOSING: the flow on the device, and no tolerance to hide behind.
+    since359: Object.freeze({
+        at: "v4674", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** OPTICAL_FLOW_WGSL, ONE DISPATCH PER PYRAMID LEVEL. *** The levels are sequential -- " +
+                 "each starts from the one above's answer -- so the runner ping-pongs two flow buffers, " +
+                 "because a single buffer read and written in one dispatch is a race the encoder will not " +
+                 "order. PARITY: 0 OF 256 BLOCKS DIFFER across four cases, worst confidence delta 3.7e-7. " +
+                 "A flow field is INTEGERS, so a single differing block is a different ANSWER and not a " +
+                 "rounding difference -- there is no tolerance to hide behind, which is why this row is " +
+                 "worth more than most parity rows in this arc. " +
+                 "*** AND TWO OF THE FIVE SABOTAGES ARE v4673's OWN DEFECTS, WRITTEN AGAIN. *** Seeding " +
+                 "`best` with a large number instead of the guess, and taking nearer-OR-EQUAL: the exact " +
+                 "pair v4673 found in its CPU search when a row written to check its own header failed. A " +
+                 "mirror drafted from the REPAIRED code still gets them wrong, and the flat-field row is " +
+                 "what catches it -- 64 blocks at the corner of their search window is the signature. " +
+                 "*** THE PYRAMIDS ARE BUILT ON THE CPU AND THAT IS STATED. *** luminancePyramidGPU exists " +
+                 "and could do it, but then the parity row would compare two DEVICE chains and could not " +
+                 "tell a flow defect from a pyramid one. The subject here is the search. Wiring the device " +
+                 "pyramid is a later round and the closing line names it. No gate added.",
+    }),
     // v4673 -- THE 283rd CLOSING: the first thing in this tree that is not FSR2.
     since358: Object.freeze({
         at: "v4673", swept: 1, green: 1, red: 0,

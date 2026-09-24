@@ -2167,7 +2167,7 @@
   "render/dilateGPU-selfcheck.mjs": 971,
   "render/luminancePyramid-selfcheck.mjs": 771,
   "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
-  "render/opticalFlow-selfcheck.mjs": 100
+  "render/opticalFlow-selfcheck.mjs": 1386
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -10392,7 +10392,7 @@
   "render/dilateGPU-selfcheck.mjs": 971,
   "render/luminancePyramid-selfcheck.mjs": 771,
   "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
-  "render/opticalFlow-selfcheck.mjs": 100
+  "render/opticalFlow-selfcheck.mjs": 1386
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",

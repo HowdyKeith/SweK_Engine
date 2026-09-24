@@ -169,6 +169,77 @@ ok("!! ...and the pyramid COSTS accuracy on a displacement one level could alrea
    "multiple of four full-resolution pixels, and the fine refinement has to walk back from it. A round " +
    "reporting only section 3's first two rows would be selling the pyramid as free.");
 
+console.log("\n4. ON THE DEVICE (v4674)");
+{
+const { webgpuSkipReason, runInEngineOrigin } = await import("../tools/ship/webgpuHarness.mjs");
+const path = await import("node:path"); const { fileURLToPath } = await import("node:url");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const skip = await webgpuSkipReason();
+if (skip) { ok("a WebGPU adapter is available", false, skip); }
+else {
+// the same three cases section 3 measures, so the parity row is over content the CPU is KNOWN to get right
+const cases = [[3, -2, 1], [3, -2, 3], [9, -7, 3], [14, 11, 3]];
+const r = await runInEngineOrigin({ engineRoot: ENG, args: {
+        W, H, cases, frames: cases.map(([sx, sy]) => Array.from(shifted(sx, sy))),
+        zero: Array.from(shifted(0, 0)), flatF: Array.from(flat()),
+    }, script: `async (a) => {
+    const { requestDevice } = await import("/gfx/device.js");
+    const { OpticalFlowGPU } = await import("/render/opticalFlowGPU.mjs");
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+    const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+    const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+    const g = new OpticalFlowGPU(dev);
+    const prev = new Float32Array(a.zero);
+    const out = [];
+    for (let i = 0; i < a.cases.length; i++) {
+        const [, , L] = a.cases[i];
+        const f = await g.flow({ cur: new Float32Array(a.frames[i]), prev, w: a.W, h: a.H, block: 8, searchRadius: 4, levels: L });
+        out.push({ flow: Array.from(f.flow), conf: Array.from(f.conf), bw: f.bw, bh: f.bh });
+    }
+    const fl = await g.flow({ cur: new Float32Array(a.flatF), prev: new Float32Array(a.flatF), w: a.W, h: a.H, block: 8, searchRadius: 4, levels: 1 });
+    const refuse = async (fn) => { try { await fn(); return null; } catch (e) { return String(e.message).slice(0, 150); } };
+    const rBlock = await refuse(() => g.flow({ cur: prev, prev, w: a.W, h: a.H, block: 8.5 }));
+    let rBackend = null;
+    try { const c2 = document.createElement("canvas"); const d2 = await requestDevice(c2, { backend: "webgl2", offscreen: true }); new OpticalFlowGPU(d2); }
+    catch (e) { rBackend = String(e.message).slice(0, 150); }
+    return { backend: dev.backend, errs, out, flatFlow: Array.from(fl.flow), flatConf: Array.from(fl.conf), rBlock, rBackend };
+}` });
+
+ok("the kernel ran on a real WebGPU device",
+   r.ok && r.result && r.result.backend === "webgpu" && r.result.errs.length === 0,
+   r.ok ? `${r.result && r.result.backend}; errors ${(r.result && r.result.errs || []).join(" | ")}` : (r.reason || (r.pageErrors || []).join("; ")));
+if (r.ok && r.result) {
+    let worstF = 0, worstC = 0, blockDiffs = 0, nb = 0;
+    for (let i = 0; i < cases.length; i++) {
+        const [sx, sy, L] = cases[i];
+        const c = opticalFlowCPU({ cur: shifted(sx, sy), prev: shifted(0, 0), w: W, h: H, block: 8, searchRadius: 4, levels: L });
+        const d = r.result.out[i];
+        for (let k = 0; k < c.bw * c.bh; k++) {
+            nb++;
+            if (d.flow[k * 2] !== c.flow[k * 2] || d.flow[k * 2 + 1] !== c.flow[k * 2 + 1]) blockDiffs++;
+            worstF = Math.max(worstF, Math.abs(d.flow[k * 2] - c.flow[k * 2]), Math.abs(d.flow[k * 2 + 1] - c.flow[k * 2 + 1]));
+            worstC = Math.max(worstC, Math.abs(d.conf[k] - c.conf[k]));
+        }
+    }
+    say("parity", `${blockDiffs} of ${nb} blocks differ; worst |gpu - cpu| flow ${worstF}, confidence ${worstC.toExponential(2)}`);
+    ok("!! *** the kernel picks the SAME VECTOR as opticalFlowCPU at every block, across four cases ***",
+       blockDiffs === 0 && worstC < 1e-5,
+       "f32 on the device against f64 in JS, through three sequential dispatches that each start from the " +
+       "previous one's answer. A flow field is integers, so a single differing block is a different ANSWER " +
+       "and not a rounding difference -- there is no tolerance to hide behind here.");
+    ok("!! ...and the device keeps the seed-and-tie rule: a flat field reports no motion, not the search corner",
+       r.result.flatFlow.every((v) => v === 0) && r.result.flatConf.every((v) => v === 0),
+       "the defect v4673 found in its own CPU search -- `best` starting at Infinity, so the first candidate " +
+       "scanned won every tie -- is exactly the one a mirror written from the repaired code still gets " +
+       "wrong if it seeds with a large number. 64 blocks at the corner would be the signature.");
+    ok("...and a fractional block is refused on the device too",
+       /block must be a whole number/.test(r.result.rBlock || ""), r.result.rBlock || "NOT REFUSED");
+    ok("...and a non-webgpu device throws at construction",
+       /needs a gfx\/device\.js device on the webgpu backend/.test(r.result.rBackend || ""), r.result.rBackend || "NOT REFUSED");
+}
+}
+}
+
 console.log(fails ? `\nopticalFlow-selfcheck: ${fails} FAILED` : "\nopticalFlow-selfcheck: ALL GREEN");
 console.log("unchecked here: SUB-PIXEL flow, which this returns in whole pixels only -- FSR3 refines to " +
             "fractions and an interpolated frame placed on integer motion would judder; a DEVICE mirror, " +
@@ -177,7 +248,9 @@ console.log("unchecked here: SUB-PIXEL flow, which this returns in whole pixels 
             "matcher ever sees and says nothing about rotation, scaling or an object moving against a " +
             "background; reconciling this field with the APPLICATION's motion vectors, which is the actual " +
             "FSR3 pass and needs both fields on one frame; and FRAME INTERPOLATION itself, which is what " +
-            "all of this is for and has not been started.");
+            "all of this is for and has not been started. The DEVICE mirror arrived at v4674 and builds its " +
+            "pyramids on the CPU, deliberately: a parity row over two device chains could not tell a flow " +
+            "defect from a pyramid one, and the subject here is the SEARCH.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
 //   O1  the sense is not negated -- the field comes back backwards    4 RED.
@@ -201,7 +274,16 @@ console.log("unchecked here: SUB-PIXEL flow, which this returns in whole pixels 
 // leaves the centre alone". The claim was false and the row written to check it is what found it. `best` is
 // seeded with the guess's own score now, and every other figure in this gate is unchanged by the fix.
 //
-// RUNTIME: 100 ms median of five (93 97 100 100 109). No adapter: this module has no device mirror yet,
-// which the closing line names.
+// v4674, the device mirror -- each applied to the live tree, run, and restored:
+//   W1  the kernel seeds best with a large number, not the guess  2 RED.
+//   W2  the kernel does not negate, so the device field is backwards 1 RED, parity.
+//   W3  the runner stops ping-ponging its two flow buffers           1 RED, parity.
+//   W4  the kernel takes nearer-OR-EQUAL                             2 RED.
+//   W5  the runner reads the wrong buffer after the swap             1 RED, parity.
+// Five more, five caught, no 0-RED. W1 and W4 are the defects v4673 found in its OWN search, written
+// again into a mirror: a kernel drafted from the repaired code still gets them wrong if it seeds with a
+// large number, and the flat-field row is what says so.
+//
+// RUNTIME: 1386 ms median of three, WITH the device section. It was 100 ms as a CPU-only gate.
 //
 process.exitCode = fails ? 1 : 0;

@@ -337,7 +337,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4309,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    files: 4311,               // v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -735,6 +735,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // file that drives a GPU, which is exactly what a text census can see and the only thing it can.
     //
     // *** v4657 -- SIX ROWS, FOUR NEW FILES, and the WebGL row moves again for v4648's reason. *** files
+    // v4674 -- 4309 -> 4311, ES modules 4009 -> 4011, closures 3869 -> 3870, async/await 1534 -> 1536,
+    // typed arrays 1142 -> 1143, WebGL 162 -> 163, for render/opticalFlowWgsl.mjs and its runner.
     // v4673 -- 4307 -> 4309, ES modules 4007 -> 4009, closures 3867 -> 3869, typed arrays 1140 -> 1142,
     // for render/opticalFlow.mjs and its gate. async/await does NOT move: the matcher is synchronous and
     // has no device mirror yet, which its own closing line names.
@@ -762,8 +764,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4009, closures: 3869, asyncAwait: 1534, typedArrays: 1142, promises: 370,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 162, webgpu: 52, threads: 23, wasm: 23,
+    esModules: 4011, closures: 3870, asyncAwait: 1536, typedArrays: 1143, promises: 370,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 163, webgpu: 52, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
