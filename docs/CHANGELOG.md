@@ -26,6 +26,73 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4671 -- the file that decides what to build next could not be asked a question
+
+This round started as a question, and the question was the finding. Asked *what is still open?*, the backlog
+answers in **three vocabularies**:
+
+| field | value | entries |
+|---|---|---|
+| `blocker` | `"OPEN"` / `"CLOSED"` | 61 |
+| `state` | `"OPEN"` / `"CLOSED"` | 23 — zero overlap with the above |
+| `blocker` | `"HARDWARE"` / `"UPSTREAM"` | 16 — *not a status at all*, but the kind of thing blocking |
+
+The third is the one that bites. Those entries are open — `browser-screenshot-floor` needs real devices,
+`tet-cut` needs a deformable tetrahedral body this tree doesn't have — but neither word is `"OPEN"`, so a
+filter looking for it drops them silently.
+
+**A reader who knew the first vocabulary returned 26 of 44.** Not a wrong answer — a *confident incomplete*
+one, and nothing about its shape said it was short. `entryStatus`, `entryBlockedBy` and `openEntries` are the
+accessor that was missing. The 82 entries are **not** rewritten: no entry was wrong.
+
+### Two entries were in the file twice, with divergent notes, crossed
+
+`ibl-specular-half` and `terrain-controller` each appeared at two sites — one holding the fresh `ibl` entry
+beside the stale `terrain` one, the other the reverse, which is why neither looked wrong alone.
+
+`ibl`'s dropped note was a strict *prefix* of the one kept. `terrain`'s kept note opens:
+
+> CLOSED AT v4544, AND THE SENTENCE THAT FOLLOWED THIS ONE NAMED THE WRONG STATE. It said 'so a body that
+> walks off a ledge stops there'.
+
+**And that sentence was still sitting in the copy twenty-five lines away.** The backlog was holding a
+correction and the text it corrected, and a reader got whichever they reached first.
+
+### One headline contradicted its own fifteen notes for thirty rounds
+
+`orb-state-terms-wiring`'s `what` said **"NOTHING CALLS IT"** about `mh_state` — which v4653 started calling
+and which now has **72 readers** (settled 3, complete 23, sweep 8, drive 38). Its `how` said `stateTau`
+*"will need"* adding, twenty-seven rounds after v4644 added it.
+
+The notes were never wrong: fifteen accurate paragraphs sitting under a headline that contradicted them, and
+a reader stops at the headline. The old text is **preserved as quoted history** rather than deleted, and the
+gate tests only what an entry *leads* with.
+
+### And it caught this session leaving a gate red a round earlier
+
+v4670 wrote `blocker: "OPEN -- for connecting and shaping ONLY. …"` — a verdict with its reason attached,
+which is better writing and unmatchable by the `===` that `byBlocker()` used. The entry fell out of all three
+report sections and printed **nowhere**, and `shipRitual-selfcheck` asserts precisely that: *"a backlog item
+nobody can see is worse than none."*
+
+**It was red at v4670.** Found here, a round late, because v4670 didn't run it. `byBlocker` and `reachable`
+parse the verdict now instead of comparing it.
+
+### Sabotage
+
+Twelve, nine caught on the first pass — and **all three that walked were this round's own defect reappearing
+inside its own gate:**
+
+- Classifying `HARDWARE` as CLOSED, and reverting `openEntries()` to a blocker-only match, both left every
+  row green — because every row asked `entryStatus()` what it thought and then agreed with it. The expected
+  open set is now built by reading the raw fields *independently*.
+- Putting "NOTHING CALLS IT" back at the **front** of the repaired entry walked, because the
+  preserved-history escape hatch excused the whole field. Only the first 220 characters are examined now, and
+  widening that window back reddens the row.
+
+`tools/ship/backlogIntegrity-selfcheck.mjs` arrives green in 59 ms with no render at all — it reads
+`nextRounds.mjs` as a data structure. The tree holds 1779 gates.
+
 ## v4670 -- the orb's phase 2, and a forty-round blocker that was one res.write() away from gone
 
 `nextRounds`'s `ai-presence-orb-behavior-states-phase2` reserved four behaviour-state names off a review of

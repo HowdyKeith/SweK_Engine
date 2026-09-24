@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4671 -- THE 351st CLOSING: the backlog's own integrity. The file that decides what to build next
+    // could not be asked a question, and asking it one found three things -- including a gate this session
+    // left red a round earlier.
+    since350: Object.freeze({
+        at: "v4671", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/backlogIntegrity-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in 59 ms, 6 rows in four sections and no render at all -- it reads " +
+                 "tools/ship/nextRounds.mjs as a DATA STRUCTURE. *** THE ROUND STARTED AS A QUESTION AND THE " +
+                 "QUESTION WAS THE FINDING. *** Asked what was still open, and the answer verified rather " +
+                 "than believed, the backlog turned out to answer that in THREE vocabularies: blocker:OPEN " +
+                 "(61 entries), state:OPEN (23, zero overlap), and blocker:HARDWARE/UPSTREAM (16 -- not a " +
+                 "status at all but the KIND of thing blocking). A reader who knew the first returned 26 of " +
+                 "44. Not a wrong answer: a confident incomplete one, and nothing about its shape said it " +
+                 "was short. entryStatus/entryBlockedBy/openEntries are the accessor that was missing; the " +
+                 "82 entries are NOT rewritten, because no entry was wrong. " +
+                 "*** TWO ENTRIES WERE IN THE FILE TWICE, WITH DIVERGENT NOTES, AND CROSSED. *** " +
+                 "ibl-specular-half and terrain-controller each appeared at two sites -- one holding the " +
+                 "fresh ibl beside the stale terrain, the other the reverse, which is why neither looked " +
+                 "wrong alone. ibl's dropped note was a strict PREFIX of the one kept. terrain's kept note " +
+                 "opens 'CLOSED AT v4544, AND THE SENTENCE THAT FOLLOWED THIS ONE NAMED THE WRONG STATE' -- " +
+                 "and that sentence was still in the copy twenty-five lines away. The backlog was holding a " +
+                 "correction and the text it corrected, and a reader got whichever they reached first. " +
+                 "*** ONE ENTRY'S HEADLINE CONTRADICTED ITS OWN FIFTEEN NOTES FOR THIRTY ROUNDS. *** " +
+                 "orb-state-terms-wiring's `what` said 'NOTHING CALLS IT' about mh_state, which v4653 " +
+                 "started calling and which now has 72 readers; its `how` said stateTau 'will need' adding " +
+                 "twenty-seven rounds after v4644 added it. The notes were never wrong -- fifteen accurate " +
+                 "paragraphs under a headline that contradicted them, and a reader stops at the headline. " +
+                 "The old text is PRESERVED as quoted history rather than deleted, and section 3 tests only " +
+                 "what an entry LEADS with. " +
+                 "*** AND THE ROUND CAUGHT THIS SESSION LEAVING A GATE RED A ROUND EARLIER. *** v4670 wrote " +
+                 "blocker: 'OPEN -- for connecting and shaping ONLY. ...' -- a verdict with its reason " +
+                 "attached, which is better writing and unmatchable by the === byBlocker() used. The entry " +
+                 "fell out of all three report sections and printed NOWHERE, and " +
+                 "tools/ship/shipRitual-selfcheck.mjs asserts exactly that ('a backlog item nobody can see " +
+                 "is worse than none'). It was red at v4670 and found here, a round late, because v4670 did " +
+                 "not run it. byBlocker and reachable PARSE the verdict now. " +
+                 "TWELVE SABOTAGES, NINE CAUGHT ON THE FIRST PASS, and all three that walked were this " +
+                 "round's own defect reappearing inside its own gate: classifying HARDWARE as CLOSED and " +
+                 "reverting openEntries() to a blocker-only match both left every row green, because every " +
+                 "row asked entryStatus() what it thought and then agreed with it -- so the expected open " +
+                 "set is now built by reading the raw fields independently. The third put 'NOTHING CALLS " +
+                 "IT' back at the FRONT of the repaired entry and walked, because the preserved-history " +
+                 "escape hatch excused the whole field; only the first 220 characters are examined now, and " +
+                 "widening that window back reddens the row.",
+    }),
     // v4670 -- THE 350th CLOSING: phase 2 of the orb -- two behaviour states, and the forty-round blocker
     // that turned out to be one `res.write()` away from gone.
     since349: Object.freeze({

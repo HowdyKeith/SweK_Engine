@@ -725,8 +725,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate that drives a BRIDGE rather than a shader: it calls ai-bridge/ragBridge.js's handle() against a
     // mock req/res and a deliberately slow fetch, because the claim is about WHEN a line reaches the wire
     // and no static read of that file can see it.
-    gates: 1778, usesOk: 1757, definesOk: 1749, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1650, condFirst: 96, unknownSignature: 11,
+    // v4671 -- RE-TAKEN 1778 -> 1779 for tools/ship/backlogIntegrity-selfcheck.mjs, 59 ms and no render at
+    // all: it reads tools/ship/nextRounds.mjs as a DATA STRUCTURE -- unique ids, a classifiable status, one
+    // countable claim that had gone false -- which is the first gate in this tree whose subject is the
+    // backlog's queryability rather than any code the backlog describes.
+    gates: 1779, usesOk: 1758, definesOk: 1750, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1651, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
