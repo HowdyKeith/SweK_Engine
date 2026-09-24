@@ -8032,6 +8032,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4687 -- THE 297th CLOSING: the last of FSR3's four passes leaves the CPU, and a gap closes exactly.
+    since372: Object.freeze({
+        at: "v4687", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFillGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** FSR3'S FOURTH AND LAST PASS COMES OFF THE CPU, AND THE CHAIN IS NOW GRADED END TO END " +
+                 "RATHER THAN PASS BY PASS. *** render/holeFillWgsl.mjs and its runner mirror fillHolesCPU; " +
+                 "render/frameInterpWgsl.mjs grew a FOURTH entry point, gatherFilled, which splats nothing and " +
+                 "warps a field somebody else produced. render/frameInterpGPU-selfcheck.mjs section 8 wires all " +
+                 "three device runners together against interpolateFrameCPU({ fill }), which does the same work " +
+                 "in ONE call: frame to 1.19e-7, the SIDE code identical on all 4096 pixels of four cases, the " +
+                 "filled vectors and the post-fill mask exact. Three passes each matching their CPU twin is not " +
+                 "the chain matching; that is a separate claim and this is the round that makes it. " +
+                 "*** THE CHAIN CANNOT BE ONE PIPELINE ON THIS ADAPTER, AND THE ARITHMETIC IS A ROW RATHER THAN " +
+                 "A SENTENCE. *** A joined warp-and-fill holds prev, cur, flow, depthBlock, key, owner, packed, " +
+                 "packed2, frameOut, depthPrev and depthCur -- ELEVEN storage bindings against the TEN this " +
+                 "adapter reports, and the WebGPU default every adapter may report is EIGHT. So the field goes " +
+                 "host -> device -> host -> device, two readbacks the algorithm does not need, bought by a limit. " +
+                 "Bindings 9 and 10 exist on gatherFilled ALONE, which is what lets the kernel grow a stage " +
+                 "without pushing the other three over: gfx/device.js classifies bindings PER ENTRY POINT, the " +
+                 "fact v4686 learned the hard way and this round spent. " +
+                 "*** AND THE PAGE'S TWO ARMS NOW AGREE TO 0.00000 dB, WHICH IS THE STRONGEST FORM v4686'S " +
+                 "ATTRIBUTION COULD TAKE. *** v4686 measured the unfilled device arm 0.13 dB AHEAD of the CPU's " +
+                 "and said the gap was the missing pass, not the port. v4687 gives that arm its fill and the " +
+                 "gap goes to zero with no residue -- a predicted number, then measured. The row in " +
+                 "fsrPageField-selfcheck has now been written three times (0.00000 at v4685, 0.13 at v4686, " +
+                 "0.00000 here) and each version was true when it was written; v4686's record of its 0.13 stands " +
+                 "where it was written rather than being edited to agree. NOTE WHAT THIS DOES NOT SAY: the " +
+                 "filler still COSTS this content 0.13 dB against leaving the holes to a cross-fade. Both arms " +
+                 "now pay it. Agreement between two engines is parity, not quality. " +
+                 "*** ELEVEN SABOTAGES, AND TWO 0-REDS, BOTH OF WHICH WERE FIXTURE GAPS AND BOTH OF WHICH THIS " +
+                 "TREE HAS SEEN BEFORE. *** Swapping gatherFilled's blend weights scored 0 RED because every " +
+                 "fill case sat at t = 0.5, where a*(1-t)+b*t and a*t+b*(1-t) are the SAME EXPRESSION -- v4686's " +
+                 "own W4 (a flag every case left at its default) at a different parameter, one round later, in " +
+                 "the same gate. A case at t = 0.25 reddens it. And warping a still-holed pixel scored 0 RED " +
+                 "because at radius 4 the filler reaches EVERY hole this rig makes (190 of 190, 318 of 318), so " +
+                 "the branch is dead code; a case at radius 1 leaves 116 unreached and the row that counts them " +
+                 "is a precondition of the three above it. " +
+                 "*** THE THIRD 0-RED IS THE ONE WORTH THE MOST, BECAUSE IT IS v4685'S V2 REPEATING ITSELF. *** " +
+                 "Hardwiring the page's new `filled on ...` label to \"the device\" changed nothing, because the " +
+                 "only row reading it looked at the one cell of ten where that is the right answer. That is " +
+                 "EXACTLY V2, whose fix at v4685 was to make the nine CPU cells assert the RECONCILE label -- " +
+                 "applied to the label rather than to the pattern, so the pattern came back with the next label " +
+                 "added to the same readout. Both labels are now asserted on all ten cells. " +
+                 "*** AND THE ROUND'S OWN DEFECT WAS AN INVENTED API. *** The first wiring called " +
+                 "interpolateFrameCPU with a `__filled` argument that does not exist and never did: the page " +
+                 "would have re-splatted, thrown the fill away, and raised no error anywhere. Nothing in this " +
+                 "tree would have caught it. Reading the function being called is what did. " +
+                 "*** FOUR STALE LIMITS WERE RETIRED RATHER THAN LEFT STANDING: *** frameInterpGPU-selfcheck's " +
+                 "\"the runner takes no fill at all\" and \"the page still calls the CPU\", holeFillGPU-selfcheck's " +
+                 "\"the joined chain is unchecked\" (and its wrong section number), and fsrPageField's \"nothing " +
+                 "here is on the device\" -- which is replaced by the sharper limit that NINE OF TEN CELLS still " +
+                 "are, so every figure this arc's findings rest on, including the checker's +0.107 dB, was " +
+                 "computed on the CPU and no row drives a cell both ways.",
+    }),
     // v4686 -- THE 296th CLOSING: a scatter with a depth compare, and a 0-RED caused by undefined behaviour.
     since371: Object.freeze({
         at: "v4686", swept: 1, green: 1, red: 0,

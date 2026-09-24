@@ -120,11 +120,16 @@ const cell = (sc, fl, sp, sr) => {
         mean: num(g, /THE MOTION IS ([\d.]+) px mean/), cells: num(g, /, (\d+) cells,/),
         field: /field per-pixel/.test(g) ? "per-pixel" : "block 8",
         src: /input clean renders/.test(g) ? "clean" : "presented",
-        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?") }));
+        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?"),
+        // *** THE FILL'S ENGINE IS PARSED ON EVERY CELL AND NOT ONLY ON THE DEVICE ONE. *** v4685's V2 scored
+        // 0 RED by hardwiring the RECONCILE label, because the only row reading it looked at the one cell where
+        // "the device" is the right answer. v4687's Y2 did exactly the same thing to the FILL label, one round
+        // later, in the same file -- so the nine CPU cells now carry it too.
+        fillEng: /filled on the device/.test(g) ? "device" : (/filled on the CPU/.test(g) ? "cpu" : "?") }));
     const d = rs.map((x) => x.gen - x.cf);
     return { sc, fl, sp, sr, d, mean: avg(d), up: d.filter((v) => v > 0).length, disp: avg(rs.map((x) => x.mean)),
              cells: rs[0] ? rs[0].cells : NaN, sawField: rs[0] ? rs[0].field : "", sawSrc: rs[0] ? rs[0].src : "",
-             engs: rs.map((x) => x.eng),
+             engs: rs.map((x) => x.eng), fillEngs: rs.map((x) => x.fillEng),
              finite: rs.length === UPTO - 1 && [...d, ...rs.map((x) => x.mean)].every(Number.isFinite) };
 };
 const show = (c) => say(`${c.sc.padEnd(7)} x${c.sp} ${c.fl.padEnd(5)} ${c.sr.padEnd(9)} (${c.cells} cells): ` +
@@ -212,6 +217,7 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
         gen: num(g, /scores (-?[\d.]+) dB against/), cf: num(g, /presented frames scores (-?[\d.]+) dB/),
         eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?"),
         warp: /warped on the device/.test(g) ? "device" : (/warped on the CPU/.test(g) ? "cpu" : "?"),
+        fillEng: /filled on the device/.test(g) ? "device" : (/filled on the CPU/.test(g) ? "cpu" : "?"),
         filled: num(g, /(\d+) pixels were filled/), left: num(g, /and (\d+) were still unreachable/) }));
     const dd = dr.map((x) => x.gen - x.cf);
     const cpu = b4;    // smooth x4 block presented -- the CPU arm of the very same cell
@@ -225,30 +231,47 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
     // READOUT THAT ALWAYS SAYS SO. *** A sabotage hardwiring the engine string scored 0 red against the row
     // above, because the only cell it checked is the one where "device" is the right answer. Seven cells run on
     // the CPU and now say so.
-    ok("*** ...and every CPU cell's readout names the CPU, so the engine label is a measurement and not a constant ***",
-       [b1, p1, b4, p4, c1, c4, ck, zn, znp].every((c) => c.engs.length > 0 && c.engs.every((e) => e === "cpu")),
-       `${[b1, p1, b4, p4, c1, c4, ck, zn, znp].reduce((n, c) => n + c.engs.filter((e) => e === "cpu").length, 0)} generated frames across nine CPU cells, every one labelled the CPU, ` +
-       `against ${dr.length} labelled the device in the one device cell.`);
-    // *** v4686 -- AND THE WARP RUNS THERE TOO, WITHOUT ITS FILL, WHICH IS THE ONE PASS STILL OWED. ***
-    ok("*** the WARP ran on the device as well, and that arm fills NOTHING -- the difference between the arms is exactly one missing pass ***",
-       dr.every((x) => x.warp === "device") && dr.every((x) => x.filled === 0) && dr.some((x) => x.left > 0),
-       `${dr.filter((x) => x.warp === "device").length} of ${dr.length} frames warped on the device; filled ` +
-       `${dr.map((x) => x.filled).join(",")} and left ${dr.map((x) => x.left).join(",")} unreachable, against the CPU arm's ` +
-       `${cpu.filled ? cpu.filled.join(",") : "own filler"}. render/frameInterpGPU.mjs takes no \`fill\` because render/holeFill.mjs has no kernel; ` +
-       `the page cross-fades what is left, as it already does for anything the filler cannot reach, and a later round closes it.`);
-    // *** THIS ROW SAID "WITHIN A HUNDREDTH OF A dB" AND v4686 MADE THAT FALSE, SO IT IS RE-MEASURED AND NOT
-    // LOOSENED QUIETLY. *** At v4685 the device arm differed only in f32-versus-f64 rounding and read 0.00000 dB.
-    // Since v4686 it also skips the FILL, and the gap is 0.13 dB -- which is the fill's worth on this content,
-    // measured from a direction v4678 could not take: not "what does filling add" but "what does omitting it cost
-    // in a live pipeline". The number belongs to the missing pass, not to the port.
+    const CPU_CELLS = [b1, p1, b4, p4, c1, c4, ck, zn, znp];
+    ok("*** ...and every CPU cell's readout names the CPU for BOTH labels, so neither is a constant ***",
+       CPU_CELLS.every((c) => c.engs.length > 0 && c.engs.every((e) => e === "cpu")) &&
+       CPU_CELLS.every((c) => c.fillEngs.length > 0 && c.fillEngs.every((e) => e === "cpu")),
+       `${CPU_CELLS.reduce((n, c) => n + c.engs.filter((e) => e === "cpu").length, 0)} generated frames across nine CPU cells ` +
+       `labelled the CPU for the reconcile and ` +
+       `${CPU_CELLS.reduce((n, c) => n + c.fillEngs.filter((e) => e === "cpu").length, 0)} for the fill, ` +
+       `against ${dr.length} labelled the device for both in the one device cell. ` +
+       `*** THE FILL HALF OF THIS ROW EXISTS BECAUSE IT WAS MISSING: *** hardwiring the fill label to "the device" ` +
+       `scored 0 RED against a gate that read it on the one cell where that is true -- which is v4685's V2, ` +
+       `repeated one round later on the next label added to the same readout.`);
+    // *** v4687 -- AND THE FILL RUNS THERE NOW TOO, WHICH IS WHAT CLOSES THE GAP THE ROW BELOW MEASURED. ***
+    // v4686's version of this row asserted the device arm fills NOTHING, and said a later round would close it.
+    // That round is this one: render/holeFillGPU.mjs and render/frameInterpWgsl.mjs's fourth entry point exist,
+    // the page calls them, and the assertion has been turned over rather than loosened. v4686's record of the
+    // 0.13 dB it measured stands where it was written; what changed is the page, not the reading.
+    ok("*** all four passes of the device arm now run on the device, and the FILL among them actually fills ***",
+       dr.every((x) => x.warp === "device") && dr.every((x) => x.fillEng === "device") &&
+       dr.every((x) => x.filled > 0) && dr.every((x) => x.left === 0),
+       `${dr.filter((x) => x.warp === "device").length} of ${dr.length} frames warped on the device and ` +
+       `${dr.filter((x) => x.fillEng === "device").length} filled there; filled ` +
+       `${dr.map((x) => x.filled).join(",")} pixels, ${dr.map((x) => x.left).join(",")} left unreachable. ` +
+       `The field crosses the host twice to do it -- a joined warp-and-fill needs eleven storage bindings against ` +
+       `this adapter's ten -- so this is the algorithm on the device and NOT the data staying there.`);
+    // *** THIS ROW HAS NOW BEEN WRITTEN THREE TIMES AND EACH VERSION WAS TRUE WHEN IT WAS WRITTEN. *** At v4685
+    // it read 0.00000 dB, because the device arm differed only in f32-versus-f64 rounding. At v4686 it read
+    // 0.13 dB and the sign was the finding: the arm that skipped the fill scored HIGHER, which is v4678's
+    // fixture result arriving on a picture. v4687 gives that arm its fill, and the difference goes back to zero.
+    //
+    // *** WHICH IS THE STRONGEST FORM v4686'S ATTRIBUTION COULD TAKE. *** It said the 0.13 dB was the missing
+    // pass and not the port. Adding the pass removed the 0.13 dB and left nothing behind -- so the claim was
+    // not merely consistent with the evidence, it predicted a number that was then measured. The cost of being
+    // wrong was a residue, and there is none.
     const gap = Math.max(...dd.map((v, i) => Math.abs(v - cpu.d[i])));
-    ok("*** the device arm is BETTER than the CPU arm here by up to 0.13 dB, and the difference is the fill it does not do ***",
-       dd.length === cpu.d.length && gap > 0.01 && gap < 0.3 && avg(dd) > avg(cpu.d),
+    ok("*** the two arms now agree: the 0.13 dB v4686 attributed to the missing fill went away when the fill landed ***",
+       dd.length === cpu.d.length && gap < 0.01,
        `worst per-frame difference ${gap.toFixed(5)} dB; device mean ${avg(dd).toFixed(4)} against the CPU's ${avg(cpu.d).toFixed(4)}. ` +
-       `*** AND THE SIGN IS THE FINDING: the arm that fills NOTHING scores HIGHER. *** v4678 measured on a fixture that ` +
-       `its ring-dilation filler was 3.6 dB WORSE than leaving holes to a cross-fade, and this is that result arriving on a ` +
-       `picture from the other side -- the page's default arm fills, and filling costs it. The f32-versus-f64 part of the ` +
-       `difference is about 1.9e-6 px on the vectors and is invisible at two decimals; everything here is the pass.`);
+       `v4685 read 0.00000, v4686 read 0.13 with the unfilled arm AHEAD, and this reads ${gap.toFixed(5)} with four passes on each side. ` +
+       `What is left is f32-versus-f64, about 1.9e-6 px on the vectors, invisible at two decimals. *** AND NOTE WHAT THIS DOES ` +
+       `NOT SAY: *** the filler still costs this content 0.13 dB against leaving the holes to a cross-fade -- v4686 measured that ` +
+       `and v4678 measured it on a fixture before it. Both arms now pay it. Agreement between two engines is parity, not quality.`);
 }
 
 }
@@ -263,6 +286,20 @@ console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
 // Nine of the ten cells run on the CPU, and a readout hardwired to say "the device" was invisible to all of
 // them. A row asserting that a label is right on one arm is not a row asserting the label is a measurement; the
 // CPU cells now assert their own label too.
+//
+// ---- v4687's SABOTAGES, OVER SECTION 4 ---------------------------------------------------------------------
+//
+//   Y1  the page skips the device fill entirely (v4686's behaviour)  -> 2 red
+//   Y3  the page fills but throws the re-warp away                   -> 1 red
+//   Y4  warpFrom returns the prev frame unwarped                     -> 1 red
+//   Y2  the readout claims the device filled whatever ran            -> 1 red, AFTER THE ROW WAS WIDENED
+//
+// *** Y2 IS V2 AGAIN, ONE ROUND LATER, ON THE NEXT LABEL ADDED TO THE SAME READOUT. *** V2 scored 0 RED at
+// v4685 because the only row reading the RECONCILE label looked at the single cell where "the device" is the
+// right answer, and the fix was to make the nine CPU cells assert their own label. v4687 added a FILL label to
+// the same readout, wrote the same one-cell row for it, and got the same 0 RED from the same shape of
+// hardwiring. The nine cells now carry both labels -- but the lesson the round actually earned is that the fix
+// at v4685 was applied to the label rather than to the pattern, and the pattern came back with the next one.
 //
 // *** AND THIS SECTION COST FOUR DEFECTS OF ITS OWN BEFORE IT MEASURED ANYTHING. *** (1) It read a .gen field
 // off each element of `seen`, which holds STRINGS in this file where fsrPageGen-selfcheck's holds OBJECTS --
@@ -313,7 +350,11 @@ console.log("unchecked here: A PRE-REGISTERED CONFIRMATION ON THE CHECKER, which
     "SMOOTH CONTENT is measured here and not explained -- sixty-four times the field resolution making a frame " +
     "worse is the reverse of the fixture's +5.13 dB and deserves a decomposition, not a sentence. THE SEARCH " +
     "BLOCK is still 8 in every cell: render/opticalFlow.mjs's patch must stay large, so the matcher's own " +
-    "granularity was deliberately not varied and is therefore not measured. AND NOTHING HERE IS ON THE DEVICE: " +
-    "the whole FSR3 path from reconciliation to pixels is CPU, so a generated frame costs a readback and this " +
-    "page pays it every frame.");
+    "granularity was deliberately not varied and is therefore not measured. AND ONE CELL OF TEN IS ON THE " +
+    "DEVICE, so nine of the ten numbers above -- every figure this section's findings rest on, including the " +
+    "checker's +0.107 -- were computed on the CPU. Section 4 says the two engines agree on the one cell it " +
+    "drives; it does not say they would agree on the other nine, and no row here drives them both ways. AND " +
+    "THE DEVICE ARM STILL CROSSES THE HOST TWICE PER GENERATED FRAME, because a joined warp-and-fill needs " +
+    "eleven storage bindings against this adapter's ten -- so \"on the device\" here means the arithmetic ran " +
+    "there, not that the data stayed there, and NOTHING IN THIS TREE HAS MEASURED WHAT EITHER ARM COSTS IN TIME.");
 process.exit(fails ? 1 : 0);

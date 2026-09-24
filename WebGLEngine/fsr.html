@@ -257,6 +257,7 @@ import { opticalFlowCPU } from "./render/opticalFlow.mjs";
 import { reconcileFlowCPU } from "./render/flowReconcile.mjs";
 import { FlowReconcileGPU } from "./render/flowReconcileGPU.mjs";
 import { FrameInterpGPU } from "./render/frameInterpGPU.mjs";
+import { HoleFillGPU } from "./render/holeFillGPU.mjs";
 import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
 
 const D = 192;                                  // display resolution
@@ -632,7 +633,7 @@ let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null,
 // v4685 -- FSR3's reconciliation on the device. Constructed like the rest and DISPATCHED ONLY WHEN ASKED:
 // tools/ship/runnerCallers-selfcheck.mjs's own closing line records that it cannot tell an imported runner
 // from a dispatched one, so the switch below is what makes the difference visible in a readout.
-let frgpu = null, figpu = null;
+let frgpu = null, figpu = null, hfgpu = null;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -665,6 +666,7 @@ async function initGPU() {
         try { dgpu = new DilateGPU(dev); } catch { dgpu = null; }
         try { frgpu = new FlowReconcileGPU(dev); } catch { frgpu = null; }
         try { figpu = new FrameInterpGPU(dev); } catch { figpu = null; }
+        try { hfgpu = new HoleFillGPU(dev); } catch { hfgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -1394,17 +1396,31 @@ async function tick() {
             }
             flowUse = fp; bwUse = D; bhUse = D; blockUse = 1; depthUse = depth;
         }
-        // *** v4686 -- THE WARP CAN RUN ON THE DEVICE TOO, AND THE DEVICE ARM DOES NOT FILL ITS HOLES. ***
-        // render/holeFill.mjs has no kernel yet, so render/frameInterpGPU.mjs takes no `fill` at all. Rather
-        // than pretend otherwise, the device arm leaves its holes for the cross-fade patch below -- which the
-        // page already applies to anything the filler could not reach -- and the readout reports `filled 0`.
-        // That makes the two arms differ by exactly one pass, which is what a later round has to close.
+        // *** v4686 -- THE WARP CAN RUN ON THE DEVICE TOO. *** At v4686 the device arm stopped here with its
+        // holes still in it, because render/holeFill.mjs had no kernel and render/frameInterpGPU.mjs took no
+        // `fill` at all; the readout said `filled 0` and the two arms differed by exactly one pass. v4687 closed
+        // that, below -- so the comparison the page prints is now between two arms running the SAME four passes,
+        // and the difference between them is the engine rather than the algorithm.
         const interpArgs = { prev: genPrev, cur: genCur, w: D, h: D, flow: flowUse,
                              bw: bwUse, bh: bhUse, block: blockUse, depthBlock: depthUse, indexedBy: "cur", t: tG };
-        const gen = (onDevice && figpu)
+        let gen = (onDevice && figpu)
             ? await figpu.interpolate(interpArgs)
             : interpolateFrameCPU({ ...interpArgs,
                 fill: { side: "depth", depthPrev: prevDepthGen, depthCur: depth, radius: 8 } });
+        // *** v4687 -- AND THE DEVICE ARM NOW FILLS AND RE-WARPS, WHICH COSTS A READBACK IT SHOULD NOT NEED. ***
+        // The three kernels each agree with their CPU twin. Joining them into ONE pipeline needs eleven storage
+        // bindings against this adapter's ten -- render/holeFillGPU-selfcheck.mjs section 5 measures that -- so
+        // the warp's field comes back to the host, goes to the fill, and goes out again to be re-warped. Three
+        // dispatches, one fill, one more dispatch, and two round trips. The readout names where each pass ran
+        // rather than calling the whole thing "the device", because that is not what it is.
+        if (onDevice && figpu && hfgpu) {
+            const f = await hfgpu.fill({ vec: gen.vec, hole: gen.hole, zbuf: gen.zbuf, w: D, h: D,
+                radius: 8, side: "depth", depthPrev: prevDepthGen, depthCur: depth, t: tG });
+            const warped = await figpu.warpFrom({ prev: genPrev, cur: genCur, w: D, h: D,
+                vec: f.vec, side: f.side, hole: f.hole, t: tG });
+            gen = { ...gen, frame: warped.frame, hole: f.hole, holes: warped.holes,
+                    vec: f.vec, filled: f.filled, abstained: f.abstained };
+        }
         const cf = crossFadeCPU({ prev: genPrev, cur: genCur, w: D, h: D, t: tG });
         // *** ANY PIXEL THE FILLER STILL COULD NOT REACH IS CROSS-FADED, AND THE COUNT IS PRINTED. *** Leaving
         // it at zero would put a black speck in the picture and a hole in the number, and both would be this
@@ -1430,11 +1446,12 @@ async function tick() {
                     field: perPixel ? "per-pixel" : "block 8", cells: bwUse * bhUse,
                     src: cleanSrc ? "clean renders" : "presented",
                     engine: onDevice ? "the device" : "the CPU",
-                    warped: (onDevice && figpu) ? "the device" : "the CPU" };
+                    warped: (onDevice && figpu) ? "the device" : "the CPU",
+                    fillEngine: (onDevice && figpu && hfgpu) ? "the device" : "the CPU" };
     }
     $("genstat").textContent = !dolly ? ""
         : genStat
-            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}, warped on ${genStat.warped}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
+            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}, warped on ${genStat.warped}, filled on ${genStat.fillEngine}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
               `scores ${genStat.gen.toFixed(2)} dB against a frame that WAS rendered -- the cross-fade of the same ` +
               `two presented frames scores ${genStat.cf.toFixed(2)} dB, so motion compensation is worth ` +
               `${(genStat.gen - genStat.cf >= 0 ? "+" : "") + (genStat.gen - genStat.cf).toFixed(2)} dB here, ` +

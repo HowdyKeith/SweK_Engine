@@ -43,6 +43,11 @@ struct P { w:u32, h:u32, bw:u32, bh:u32, block:u32, nearerIsLess:u32, indexedByP
 @group(0) @binding(6) var<storage,read_write> frameOut:array<f32>;       // w*h*4
 @group(0) @binding(7) var<storage,read_write> packed:array<f32>;         // w*h*4, see INTERP_STRIDE
 @group(0) @binding(8) var<uniform> u:P;
+// *** BINDINGS 9 AND 10 ARE READ BY gatherFilled ALONE. *** gfx/device.js classifies bindings PER ENTRY POINT,
+// so the three passes above neither see nor bind them -- which is what lets this kernel grow a fourth stage
+// without pushing the others past the storage-binding limit that stops the whole chain being one pipeline.
+@group(0) @binding(9) var<storage,read> vecFilled:array<f32>;   // w*h*2, from render/holeFillGPU.mjs
+@group(0) @binding(10) var<storage,read> sideFilled:array<i32>; // w*h, SIDE_BLEND / SIDE_PREV / SIDE_CUR
 
 // *** ORDER-PRESERVING f32 -> u32. *** See the header: signed floats do not compare as unsigned across zero.
 fn depthKey(d:f32) -> u32 {
@@ -133,6 +138,30 @@ fn fetch4(isCur:bool, x:f32, y:f32) -> vec4<f32> {
     if (c == 0) { o.x = v; } else if (c == 1) { o.y = v; } else if (c == 2) { o.z = v; } else { o.w = v; }
   }
   return o;
+}
+
+/**
+ * Warp from a field this kernel did not splat -- the output of render/holeFillGPU.mjs, whose holes have been
+ * filled and whose pixels carry a SIDE code. *** A DISOCCLUDED PIXEL'S CONTENT IS IN ONE FRAME ONLY, *** so the
+ * symmetric blend is wrong there and the side says which way to read it; render/holeFill.mjs's header measures
+ * what each choice is worth. A pixel still holed after the fill is left at zero, exactly as gather leaves one.
+ */
+@compute @workgroup_size(8, 8)
+fn gatherFilled(@builtin(global_invocation_id) g:vec3<u32>) {
+  if (g.x >= u.w || g.y >= u.h) { return; }
+  let p = g.y * u.w + g.x;
+  let vx = vecFilled[p*2u]; let vy = vecFilled[p*2u+1u];
+  if (!(abs(vx) < 3.4e38) || !(abs(vy) < 3.4e38)) {
+    for (var c:u32 = 0u; c < 4u; c = c + 1u) { frameOut[p*4u+c] = 0.0; }
+    return;
+  }
+  let fx = f32(g.x); let fy = f32(g.y);
+  let a = fetch4(false, fx - u.t * vx,         fy - u.t * vy);
+  let b = fetch4(true,  fx + (1.0 - u.t) * vx, fy + (1.0 - u.t) * vy);
+  let sd = sideFilled[p];
+  var c:vec4<f32>;
+  if (sd == 1) { c = a; } else if (sd == 2) { c = b; } else { c = a * (1.0 - u.t) + b * u.t; }
+  frameOut[p*4u+0u] = c.x; frameOut[p*4u+1u] = c.y; frameOut[p*4u+2u] = c.z; frameOut[p*4u+3u] = c.w;
 }
 
 @compute @workgroup_size(8, 8)

@@ -9,6 +9,12 @@
 // The atomic buffers are CLEARED to their sentinels before the first dispatch -- 0xffffffff for both, which is
 // the largest u32 and therefore loses every atomicMin, and is also NO_OWNER. A buffer left dirty from a previous
 // frame would hand this frame the last one's owners, which looks like content.
+//
+// *** A FOURTH PIPELINE WAS ADDED AT v4687 AND IT IS NOT PART OF THE THREE. *** warpFrom() drives the
+// gatherFilled entry point, which splats nothing: it warps a field somebody else produced -- normally this
+// object's own interpolate() output after render/holeFillGPU.mjs has filled it. It shares the kernel so the
+// two gathers cannot drift apart, and it shares nothing else; the ordering argument above is about the splat
+// and says nothing about this one.
 "use strict";
 import { INTERP_WGSL, INTERP_STRIDE, NO_OWNER } from "./frameInterpWgsl.mjs";
 
@@ -30,6 +36,7 @@ export class FrameInterpGPU {
         this.pipeDepth = device.compute({ wgsl: INTERP_WGSL, entryPoint: "splatDepth" });
         this.pipeOwner = device.compute({ wgsl: INTERP_WGSL, entryPoint: "splatOwner" });
         this.pipeGather = device.compute({ wgsl: INTERP_WGSL, entryPoint: "gather" });
+        this.pipeWarpFrom = device.compute({ wgsl: INTERP_WGSL, entryPoint: "gatherFilled" });
     }
     _f32(a) { return a instanceof Float32Array ? a : Float32Array.from(a); }
 
@@ -94,5 +101,62 @@ export class FrameInterpGPU {
             if (hole[i]) holes++;
         }
         return { frame, hole, holes, vec, zbuf, side: null, filled: 0, abstained: 0, w, h };
+    }
+
+    /**
+     * Warp from a field this object did not splat -- gatherFilled. The caller splats with interpolate(),
+     * fills with render/holeFillGPU.mjs, and hands the filled vec/side/hole back here to be warped again.
+     *
+     * *** THIS EXISTS BECAUSE THE CHAIN CANNOT BE ONE PIPELINE ON THIS ADAPTER. *** A joined warp-and-fill
+     * needs eleven storage bindings against the ten the adapter reports -- render/holeFillGPU-selfcheck.mjs
+     * section 5 does that arithmetic -- so the splat's field comes back to the host, goes out to the fill, and
+     * comes back once more to be warped. Two readbacks the algorithm does not need, bought by a device limit.
+     *
+     * Mirrors the final gather loop of interpolateFrameCPU when `fill` was given: same fetches, same SIDE_*
+     * rule, same zero left in a pixel the filler could not reach.
+     */
+    async warpFrom({ prev, cur, w, h, vec, side, hole, t = 0.5 }) {
+        const n = w * h;
+        if (!(t >= 0) || !(t <= 1)) throw new Error(`frameInterpGPU.warpFrom: t must be in [0, 1] -- got ${t}`);
+        if (!vec || vec.length !== n * 2) throw new Error(`frameInterpGPU.warpFrom: vec must be w*h*2 = ${n * 2} -- got ${vec ? vec.length : "nothing"}`);
+        if (!side || side.length !== n) throw new Error(`frameInterpGPU.warpFrom: side must be w*h = ${n} -- got ${side ? side.length : "nothing"}`);
+        if (!hole || hole.length !== n) throw new Error(`frameInterpGPU.warpFrom: hole must be w*h = ${n} -- got ${hole ? hole.length : "nothing"}`);
+
+        // *** THE KERNEL DECIDES "STILL HOLED" FROM THE VECTOR AND THE CPU DECIDES IT FROM THE MASK, SO THE
+        // TWO ARE CHECKED AGAINST EACH OTHER HERE RATHER THAN ASSUMED EQUAL. *** They agree by construction --
+        // render/holeFill.mjs clears the mask exactly where it writes a finite vector -- but "by construction"
+        // is the phrase that precedes every parity bug in this arc, and the alternative to checking is an
+        // eleventh binding this adapter does not have. A disagreement is a caller error, not a soft fallback:
+        // warping a pixel the filler declined would put a plausible cross-fade where the CPU leaves zero.
+        let holes = 0;
+        for (let i = 0; i < n; i++) {
+            const finite = Number.isFinite(vec[i * 2]) && Number.isFinite(vec[i * 2 + 1]);
+            if (hole[i]) holes++;
+            if (!!hole[i] === finite)
+                throw new Error(`frameInterpGPU.warpFrom: hole mask and vector field disagree at pixel ${i} ` +
+                    `(hole=${hole[i]}, vec=[${vec[i * 2]}, ${vec[i * 2 + 1]}]). gatherFilled reads the VECTOR, ` +
+                    "interpolateFrameCPU reads the MASK, and the two engines only match while those say the " +
+                    "same thing. Pass the vec and hole that came out of one fill, not a mask from elsewhere.");
+        }
+
+        const dev = this.device;
+        const bPrev = dev.buffer({ data: this._f32(prev), usage: ["storage"] });
+        const bCur = dev.buffer({ data: this._f32(cur), usage: ["storage"] });
+        const bVec = dev.buffer({ data: this._f32(vec), usage: ["storage"] });
+        // side arrives as the Int8Array render/holeFillGPU.mjs and render/holeFill.mjs both return; the kernel
+        // reads array<i32>, and WGSL has no 8-bit storage type to read it as, so it is widened here.
+        const bSide = dev.buffer({ data: Int32Array.from(side), usage: ["storage"] });
+        const bFrame = dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] });
+        const ub = new ArrayBuffer(48);
+        new Uint32Array(ub, 0, 8).set([w, h, 0, 0, 0, 0, 0, 0]);
+        new Float32Array(ub, 32, 4).set([t, NaN, 0, 0]);
+        const u = dev.buffer({ data: new Uint8Array(ub), usage: "uniform" });
+
+        this.pipeWarpFrom.bind("prevF", bPrev).bind("curF", bCur).bind("vecFilled", bVec)
+            .bind("sideFilled", bSide).bind("frameOut", bFrame).bind("u", u);
+        dev.frame(({ pass }) => { pass.dispatch(this.pipeWarpFrom, groups(w, h)); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const frame = new Float32Array(await dev.read(bFrame));
+        for (const b of [bPrev, bCur, bVec, bSide, bFrame, u]) b.destroy();
+        return { frame, holes, w, h };
     }
 }
