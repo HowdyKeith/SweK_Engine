@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PREREG, ARMS, ARMS_H5, PREREG_H5, readDoc, declared, seededRng, minFoldsFor, usableFolds, foldMean, clause, h4, h5, c11 } from "./foldStats.mjs";
+import { PREREG, ARMS, ARMS_H5, PREREG_H5, RULE_KEYS, readDoc, declared, seededRng, minFoldsFor, usableFolds, foldMean, clause, h4, h5, c11 } from "./foldStats.mjs";
 import { jointRows, runFolds, shuffled } from "./genGateFolds.mjs";
 import { analyse } from "./genGateAbsolute.mjs";
 import { train } from "./genGateTrain.mjs";
@@ -51,6 +51,14 @@ const docText = fs.readFileSync(path.join(ENG, PREREG), "utf8");
        throws(() => declared(docText.replace("alpha = 0.05", "alpha = 0.05\nalpha = 0.1")), /declared twice/) &&
        throws(() => declared("no block here"), /no ```declared block/),
        "four refusals, each with its own message -- a parser that silently defaulted a missing threshold would be the restated constant v4691 and v4693 both paid for.");
+    // v4702 -- RULE_KEYS, the schema a document with nothing to train declares.
+    const ruleDoc = "```declared\nscenes = a b\nspeeds = 2 4\nalpha = 0.05\nminFolds = 5\nminorityFloor = 0.01\ncolumnTol = 1e-4\n```";
+    ok("*** RULE_KEYS: a rule's document parses under it, a learned key is refused under it, and its own keys are required ***",
+       (() => { try { return declared(ruleDoc, RULE_KEYS).speeds.join() === "2,4"; } catch { return false; } })() &&
+       throws(() => declared(ruleDoc.replace("alpha = 0.05", "alpha = 0.05\nseeds = 1 2"), RULE_KEYS), /not a declared key/) &&
+       throws(() => declared(ruleDoc.replace(/columnTol = .*\n/, ""), RULE_KEYS), /does not declare "columnTol"/) &&
+       throws(() => declared(ruleDoc), /not a declared key|does not declare/),
+       "a rule has no seeds, steps or width: carrying them to satisfy one schema would be five keys nothing reads.");
 }
 
 console.log("\n2. *** THE SEED SEEDS -- WHICH IT DID NOT BEFORE THIS ROUND ***");

@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4702 -- THE 309th CLOSING: learning taken away, and the question put to a rule with nothing fitted.
+    since384: Object.freeze({
+        at: "v4702", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateRule-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/foldStats-selfcheck.mjs (39 checks -> 40, RULE_KEYS closed by assertion)"]),
+        verdict: "*** EVERY LEARNED FAILURE WAS A FAILURE TO TRANSFER, AND A RULE WITH NOTHING FITTED HAS NOTHING TO " +
+                 "TRANSFER. *** v4698 named the next question for the outcome H4 and H5 produced: whether the oracle's " +
+                 "0.32 dB is reachable by anything that does not see the answer. render/gate-rule-preregistration.md " +
+                 "puts it to a score with no weight, threshold, scaler or seed: log(sadStill / min(sadApp, sadFlow)), " +
+                 "how much the chain's best motion candidate beats standing still -- because a cross-fade IS the " +
+                 "no-motion hypothesis. Its direction was fixed by v4695, which named the negated form \"the quantity " +
+                 "the decision is about\", before this document existed. NO DATA IN THE COMMIT: the two harvested " +
+                 "cells (x2, x4) are declared, and what has been seen of them is listed -- learned AUCs and base rates, " +
+                 "never this score. H6 needs BOTH cells to clear, per scene, paired t AND exact sign. " +
+                 "*** THE RULE SHIPS AS CODE AND IS PROVEN ON SYNTHETIC FRAMES THROUGH THE REAL FEATURE CODE. *** C16: " +
+                 "the score is the negated third scale-free column, via features() and featuresV2(), to 1.2e-7 -- the " +
+                 "wrong three columns miss by whole units. C15: scaling the SADs by k leaves it put. C14: rewriting every " +
+                 "scale-free column leaves every AUC identical, and moving the labels moves only the AUC. " +
+                 "*** A GAP FOUND BY READING BEFORE ANY SABOTAGE RAN: *** checkCell tied the RESULT file to its speed and " +
+                 "nothing tied the CACHE to the result, so a cache path pointed at the other cell would have been scored " +
+                 "under this one's name. matchesMeta now requires every scene's usable and positive counts to be the " +
+                 "ones the harvesting run recorded. " +
+                 "*** AND THE FIRST VERIFY CAUGHT WHAT THE GATE DID NOT NAME. *** definitionGates-selfcheck went red on " +
+                 "three exports no name-matched gate mentioned -- loadCell, RESULT_H6 and foldStats' RULE_KEYS -- the " +
+                 "shape rowsOf and flatten had in earlier rounds. Each is closed BY ASSERTION: loadCell must refuse an " +
+                 "undeclared speed by name, which showed its first draft died on a TypeError about `undefined` before " +
+                 "its own check ran; RESULT_H6 must be a path no harvest record uses, so the rule can never overwrite " +
+                 "the files cell identity rests on; RULE_KEYS must refuse a learned key and require its own. " +
+                 "*** NINETEEN SABOTAGES, NINETEEN RED, *** after one crash that was not a verdict -- adding `seeds` to " +
+                 "RULE_KEYS made the row's first call throw out of the row -- and one fixture that could only ever " +
+                 "produce a refusal: a " +
+                 "synthetic signal of 0.3 against noise of 0.2 separated every scene at AUC 1.000, the seven differences " +
+                 "were identical, and pairedT correctly refused a sample with no variance -- so 'a genuine signal clears " +
+                 "H6' failed on a signal too clean to test. And declared() gained a schema, because a rule has no seeds " +
+                 "and a key nothing reads is refused; a sabotage making it ignore the schema reddens rather than crashes, " +
+                 "because the gate now guards its own load.",
+    }),
     // v4701 -- THE 308th CLOSING: H5 measured on fresh data, and v4699's observation does not replicate.
     since383: Object.freeze({
         at: "v4701", swept: 1, green: 1, red: 0,

@@ -33,9 +33,14 @@ const KEYS = Object.freeze({
     scenes: "list", seeds: "ints", alpha: "num", minFolds: "int", minorityFloor: "num",
     steps: "int", hidden: "int", lr: "num", batch: "int", upto: "int", speed: "str",
 });
+// v4702 -- a RULE has no seeds, steps, width or learning rate, and a key nothing reads is refused, so the rule's
+// document declares its own schema rather than carrying five decorative keys to satisfy this one.
+export const RULE_KEYS = Object.freeze({
+    scenes: "list", speeds: "list", alpha: "num", minFolds: "int", minorityFloor: "num", columnTol: "num",
+});
 
 /** Parse the pre-registration's ```declared block. Throws on a missing, extra or malformed key. */
-export function declared(text = fs.readFileSync(path.join(ENG, PREREG), "utf8")) {
+export function declared(text = fs.readFileSync(path.join(ENG, PREREG), "utf8"), keys = KEYS) {
     const m = /```declared\n([\s\S]*?)\n```/.exec(text);
     if (!m) throw new Error(`foldStats.declared: ${PREREG} has no \`\`\`declared block`);
     const out = {};
@@ -43,7 +48,7 @@ export function declared(text = fs.readFileSync(path.join(ENG, PREREG), "utf8"))
         if (!line.trim()) continue;
         const kv = /^\s*(\w+)\s*=\s*(.+?)\s*$/.exec(line);
         if (!kv) throw new Error(`foldStats.declared: unparseable line "${line}"`);
-        const [, k, v] = kv, kind = KEYS[k];
+        const [, k, v] = kv, kind = keys[k];
         if (!kind) throw new Error(`foldStats.declared: "${k}" is not a declared key -- a key nothing reads is decoration`);
         if (k in out) throw new Error(`foldStats.declared: "${k}" is declared twice`);
         const num = (s) => { const n = Number(s); if (!Number.isFinite(n)) throw new Error(`foldStats.declared: ${k} = "${s}" is not a number`); return n; };
@@ -52,7 +57,7 @@ export function declared(text = fs.readFileSync(path.join(ENG, PREREG), "utf8"))
                : kind === "int" ? (() => { const n = num(v); if (!Number.isInteger(n)) throw new Error(`foldStats.declared: ${k} must be an integer`); return n; })()
                : kind === "num" ? num(v) : v;
     }
-    for (const k of Object.keys(KEYS)) if (!(k in out)) throw new Error(`foldStats.declared: ${PREREG} does not declare "${k}"`);
+    for (const k of Object.keys(keys)) if (!(k in out)) throw new Error(`foldStats.declared: ${PREREG} does not declare "${k}"`);
     return Object.freeze(out);
 }
 

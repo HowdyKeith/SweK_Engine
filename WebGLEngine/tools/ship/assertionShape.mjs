@@ -517,8 +517,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4701 -- 1781 -> 1782 for tools/ship/genGateAbsoluteMeasure-selfcheck.mjs, H5 re-derived from its committed
     // data. (v4700 added no gate and held the four rows, so this is the twentieth round of the pattern, not the
     // twenty-first.)
-    gates: 1782, usesOk: 1761, definesOk: 1753, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1654, condFirst: 91, unknownSignature: 16,
+    // v4702 -- 1782 -> 1783 for tools/ship/genGateRule-selfcheck.mjs, the parameter-free rule gated on synthetic frames.
+    gates: 1783, usesOk: 1762, definesOk: 1754, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1655, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
