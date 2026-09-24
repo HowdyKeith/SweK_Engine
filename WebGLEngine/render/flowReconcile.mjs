@@ -118,7 +118,11 @@ function sadAt(a, b, w, h, ax, ay, bx, by, n) {
  *   margin       the fraction by which the flow must beat the application to take a block. See the header.
  *
  * Returns { flow, appFlow, source, sadApp, sadFlow, sadStill, counts, bw, bh, block }:
- *   flow      the reconciled field, 2 floats per block, in `opticalFlowCPU`'s output sense
+ *   flow      the reconciled field, 2 floats per block, in `opticalFlowCPU`'s output sense AND ITS INDEXING:
+ *             the block grid indexes positions in `cur`, not in `prev`, because the search walks blocks of
+ *             `cur` and looks for them in `prev` and the application's per-pixel field is indexed the same
+ *             way. render/frameInterp.mjs takes that as `indexedBy: "cur"`; v4680 measured what feeding it
+ *             the other answer costs
  *   appFlow   the application's vector reduced to the block grid, SAME sense, NaN where no valid vector
  *   source    SRC_APP / SRC_FLOW_BEAT / SRC_FLOW_ONLY per block
  *   sad*      the three scores per block, so a caller can audit a decision instead of trusting it

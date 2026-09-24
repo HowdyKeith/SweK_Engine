@@ -82,8 +82,8 @@ function scene(sl) {
     const vpx = sl * PX_SLAB;
     const flow = new Float32Array(W * H * 2), depthBlock = new Float32Array(W * H);
     for (let i = 0; i < W * H; i++) { depthBlock[i] = prev.depth[i]; flow[i * 2] = prev.fg[i] ? vpx : 0; }
-    const gen = (fill) => interpolateFrameCPU({ prev: prev.rgba, cur: cur.rgba, w: W, h: H, flow,
-                                                bw: W, bh: H, block: 1, depthBlock, t: 0.5, fill });
+    const gen = (fill, indexedBy = "prev") => interpolateFrameCPU({ prev: prev.rgba, cur: cur.rgba, w: W, h: H,
+                                                flow, bw: W, bh: H, block: 1, depthBlock, indexedBy, t: 0.5, fill });
     const base = gen(null);
     const cf = crossFadeCPU({ prev: prev.rgba, cur: cur.rgba, w: W, h: H, t: 0.5 });
     // v4677's control: the warped frame with its holes cross-faded
@@ -337,7 +337,29 @@ console.log("\n7. v4679 -- THE PRE-REGISTERED REPLACEMENT OF THE SIDE HEURISTIC 
        /disocclusion comparison and there is nothing to compare/.test(m || ""), m);
 }
 
-console.log("\n8. WHAT IT REFUSES");
+console.log("\n8. v4680 -- WHAT THE FIELD'S INDEXING IS WORTH WHERE THE MOTION IS NOT UNIFORM");
+{
+    // *** render/frameInterp.mjs SHIPPED AT v4677 ASSUMING A PREV-INDEXED FIELD, AND THE ARC'S OWN PRODUCER
+    // MAKES A CUR-INDEXED ONE. *** MEASURED at v4680 with a bright bar at x 4..7 in `prev` and x 12..15 in
+    // `cur`: opticalFlowCPU puts the +8 on the block covering x 12..15, its CUR position. Nothing in three
+    // rounds could catch it, because a rigid whole-frame translation makes the two indexings nearly the same
+    // field -- frameInterp-selfcheck section 8 measures that gap at 0.0038 and 0.6202 dB. THIS scene has a
+    // foreground moving over a static background, and the field it supplies is prev-indexed by construction,
+    // so reading it as cur-indexed is exactly the mistake and this is what it costs.
+    const s = scene(0.6);
+    const right = s.patch(s.gen({ radius: 4 }, "prev")), wrong = s.patch(s.gen({ radius: 4 }, "cur"));
+    const gRight = s.gen({ radius: 4 }, "prev"), gWrong = s.gen({ radius: 4 }, "cur");
+    report(`slab +${s.vpx.toFixed(3)} px over a static background: prev-indexed ${s.onHoles(right) === Infinity ? "EXACT" : s.onHoles(right).toFixed(4)} on the holes, cur-indexed ${s.onHoles(wrong).toFixed(4)} dB`);
+    report(`    whole frame: ${s.whole(right).toFixed(4)} against ${s.whole(wrong).toFixed(4)} dB;  holes left ${gRight.holes} against ${gWrong.holes}`);
+    ok("*** reading the same field under the wrong indexing costs more than 6 dB on the whole frame, where on a rigid translation it cost 0.62 ***",
+       s.whole(right) - s.whole(wrong) > 6,
+       `${s.whole(right).toFixed(4)} -> ${s.whole(wrong).toFixed(4)} dB, ${(s.whole(right) - s.whole(wrong)).toFixed(4)} dB. The error is the whole displacement wherever a block's vector differs from its neighbours', and zero wherever it does not -- which is why a defect this size lived three rounds behind content that could not see it.`);
+    ok("...and it is worse than the CROSS-FADE, so a misindexed field makes motion compensation actively harmful rather than merely imprecise",
+       s.whole(wrong) < s.whole(s.cf),
+       `cur-indexed ${s.whole(wrong).toFixed(4)} dB against the cross-fade's ${s.whole(s.cf).toFixed(4)}. A frame generator fed the wrong indexing is worse than one with no motion field at all.`);
+}
+
+console.log("\n9. WHAT IT REFUSES");
 {
     const base = () => ({ vec: new Float32Array(W * H * 2), hole: new Uint8Array(W * H), zbuf: new Float32Array(W * H), w: W, h: H });
     for (const [label, patch, pat] of [

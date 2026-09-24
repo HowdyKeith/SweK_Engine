@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4680 -- THE 290th CLOSING: three rounds of frames were built on the wrong end of the field.
+    since365: Object.freeze({
+        at: "v4680", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** render/frameInterp.mjs ASSUMED THE MOTION FIELD WAS INDEXED BY THE BLOCK'S POSITION IN " +
+                 "PREV, AND THE ARC'S OWN PRODUCER INDEXES IT BY CUR. *** MEASURED with a bright bar at x 4..7 " +
+                 "in prev and x 12..15 in cur: opticalFlowCPU puts the +8 on the block covering x 12..15 -- its " +
+                 "CUR position -- because the search walks blocks of CUR and looks for them in PREV. Block 1, " +
+                 "the bar's prev position, reports -7, which is the background trying to explain where the bar " +
+                 "went. flowReconcile inherits that indexing and its appFlow comes from a per-pixel field " +
+                 "indexed the same way. So v4677, v4678 and v4679 all splatted every moving block to the wrong " +
+                 "place by t*v. " +
+                 "*** AND NOTHING IN THREE ROUNDS COULD HAVE CAUGHT IT. *** Under a rigid whole-frame " +
+                 "translation every block holds nearly the same vector, so the two indexings differ by 0.0038 " +
+                 "and 0.6202 dB -- and they differ ONLY in which edge strip they vacate, which v4677's rows " +
+                 "excluded by construction because they score on the UNION of the arms' holes. v4678's slab " +
+                 "scene has non-uniform motion but supplies its field prev-indexed by hand. The defect needed " +
+                 "both at once. " +
+                 "*** ON THE SLAB SCENE IT IS WORTH 7.3464 dB, AND THE WRONG ANSWER IS WORSE THAN NO MOTION " +
+                 "FIELD AT ALL: *** 38.0196 -> 30.6732 dB against the cross-fade's 31.6643. `indexedBy` is now " +
+                 "a REQUIRED argument with no default, because a default would let a caller be wrong for free " +
+                 "in the one case where being wrong costs the whole displacement. " +
+                 "*** AND v4677's FIGURES ARE RE-MEASURED RATHER THAN SWAPPED. *** +10.0618 -> +9.9074 dB on " +
+                 "the camera scene and +7.3791 -> +7.7960 on the texture scene; the colour-flow arm gains a " +
+                 "full dB (38.5109 -> 39.5157), which SHRINKS the reconciliation's measured lead on the camera " +
+                 "scene from 2.5109 to 1.3707 dB and that row's threshold with it. Its t = 0 / t = 1 rows are " +
+                 "corrected too: a cur-indexed block ENDS on its own footprint, so t = 1 is the complete frame " +
+                 "and t = 0 is the holed one -- the mirror of what shipped. Six sabotages. *** TWO NOTES: *** " +
+                 "the indexedBy guard scored 0 red until a refusal row existed, because every call site already " +
+                 "passed it; and the bar row is NOT flipped by any minimal mutation of opticalFlowCPU -- the " +
+                 "closest, swapping which frame the search walks, reddens four rows here and SIX in that " +
+                 "module's own gate without flipping it -- so it is recorded as a measurement the consumer " +
+                 "depends on rather than as a guard, because \"covered in aggregate\" is a weaker claim. " +
+                 "THREE DRAFTS OF THE EXPLANATORY ROW OVERCLAIMED AND EACH WENT RED: bit-identical frames " +
+                 "(they differ by 1 at the edges), an identical common footprint (0.0023 and 0.156), and a gap " +
+                 "under 0.2 dB (it is 0.62). A row written to explain why a defect survived should not contain " +
+                 "one, and all three attempts are in the file.",
+    }),
     // v4679 -- THE 289th CLOSING: a pre-registered replacement, one refuted hypothesis, and a deviation.
     since364: Object.freeze({
         at: "v4679", swept: 0, green: 0, red: 0,

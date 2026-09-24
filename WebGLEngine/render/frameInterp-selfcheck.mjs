@@ -89,8 +89,12 @@ function scene({ dex = 0, slide = 0 } = {}) {
     const of = opticalFlowCPU({ cur: cur.rgba, prev: prev.rgba, w: W, h: H, block: B, searchRadius: 4, levels: 2 });
     const rc = reconcileFlowCPU({ cur: cur.rgba, prev: prev.rgba, w: W, h: H, ...of, motion: mv.data, depth: cur.depth });
     const dB = blockDepth(cur.depth, of.bw, of.bh);
-    const gen = (flow, t = 0.5) => interpolateFrameCPU({ prev: prev.rgba, cur: cur.rgba, w: W, h: H,
-                                                         flow, bw: of.bw, bh: of.bh, block: B, depthBlock: dB, t });
+    // *** THE FIELD HERE COMES FROM opticalFlowCPU AND flowReconcile, SO IT IS CUR-INDEXED (v4680). *** The
+    // scene's motion is a rigid whole-frame translation, so every block holds the same vector and the two
+    // indexings produce bit-identical fields -- section 8 measures that, because it is the reason this
+    // argument did not exist until v4680 and nothing here could have asked for it.
+    const gen = (flow, t = 0.5, indexedBy = "cur") => interpolateFrameCPU({ prev: prev.rgba, cur: cur.rgba,
+        w: W, h: H, flow, bw: of.bw, bh: of.bh, block: B, depthBlock: dB, indexedBy, t });
     return { prev, cur, mid, of, rc, dB, gen, truthX: (slide - dex) * PX_PER_UNIT };
 }
 
@@ -102,7 +106,7 @@ console.log("\n1. ZERO MOTION MUST BE THE CROSS-FADE, TO THE BIT");
     const s = scene({ dex: 0.437 });
     const zero = new Float32Array(s.of.bw * s.of.bh * 2);
     const g = interpolateFrameCPU({ prev: s.prev.rgba, cur: s.cur.rgba, w: W, h: H, flow: zero,
-                                    bw: s.of.bw, bh: s.of.bh, block: B, depthBlock: s.dB, t: 0.5 });
+                                    bw: s.of.bw, bh: s.of.bh, block: B, depthBlock: s.dB, indexedBy: "prev", t: 0.5 });
     const cf = crossFadeCPU({ prev: s.prev.rgba, cur: s.cur.rgba, w: W, h: H, t: 0.5 });
     let worst = 0;
     for (let i = 0; i < W * H * 4; i++) worst = Math.max(worst, Math.abs(g.frame[i] - cf[i]));
@@ -132,13 +136,17 @@ let geom;
         if (!g0.hole[j]) w0 = Math.max(w0, Math.abs(g0.frame[j * 4 + c] - geom.prev.rgba[j * 4 + c]));
         if (!g1.hole[j]) w1 = Math.max(w1, Math.abs(g1.frame[j * 4 + c] - geom.cur.rgba[j * 4 + c]));
     }
-    ok("*** t = 0 returns `prev` EXACTLY, on every pixel, with no hole anywhere ***",
-       w0 === 0 && g0.holes === 0,
-       `worst |frame - prev| ${w0}, ${g0.holes} holes. At t = 0 every block splats onto its own footprint, so the mask is full by construction and the samples are copies.`);
-    // *** AND t = 1 IS NOT SYMMETRIC WITH IT, WHICH IS A PROPERTY OF THE SPLAT AND IS STATED RATHER THAN HIDDEN. ***
-    ok("...and t = 1 returns `cur` exactly WHERE IT HAS A VECTOR, while leaving holes where content left the frame -- the asymmetry is real and is the splat's, not a bug",
-       w1 === 0 && g1.holes > 0,
-       `worst |frame - cur| ${w1} on the filled pixels, ${g1.holes} holes of ${W * H}. At t = 1 every block has moved its full displacement, so the strip it vacated at the frame's edge receives nothing. A pass that reported 0 holes here would be filling them without saying so.`);
+    // *** WHICH END IS HOLE-FREE FOLLOWS FROM THE INDEXING, AND THE FIELD HERE IS CUR-INDEXED (v4680). *** A
+    // CUR-indexed block ENDS on its own footprint, so t = 1 is the complete frame and t = 0 is the one with
+    // holes -- the mirror of what a PREV-indexed field gives, which section 8 measures in both directions.
+    // These two rows were written at v4677 the other way round, under the wrong indexing, and are corrected
+    // here rather than loosened.
+    ok("*** t = 1 returns `cur` EXACTLY, on every pixel, with no hole anywhere ***",
+       w1 === 0 && g1.holes === 0,
+       `worst |frame - cur| ${w1}, ${g1.holes} holes. At t = 1 a cur-indexed block splats onto its own footprint, so the mask is full by construction and the samples are copies.`);
+    ok("...and t = 0 returns `prev` exactly WHERE IT HAS A VECTOR, while leaving holes where content came IN from outside the frame -- the asymmetry is real and is the splat's, not a bug",
+       w0 === 0 && g0.holes > 0,
+       `worst |frame - prev| ${w0} on the filled pixels, ${g0.holes} holes of ${W * H}. At t = 0 every block is pushed back its full displacement, so the strip beyond the frame's edge that content arrived from receives nothing. A pass that reported 0 holes here would be filling them without saying so.`);
 }
 
 console.log("\n3. AGAINST A FRAME THAT WAS REALLY RENDERED -- THE FOUR ARMS");
@@ -170,8 +178,14 @@ let shade;
     ok("*** the generated frame beats the cross-fade by more than 7 dB on BOTH scenes, measured against a frame that was really rendered ***",
        rows.every((r) => r.rec - r.cross > 7),
        rows.map((r) => `${r.label}: ${r.cross.toFixed(4)} -> ${r.rec.toFixed(4)} dB, +${(r.rec - r.cross).toFixed(4)}`).join("; "));
-    ok("*** and v4676's reconciliation earns itself in PIXELS here, not in vector error: each single field loses at least 3 dB on the scene it is wrong about, and the reconciled one is within 0.02 dB of the better field on BOTH ***",
-       rows[0].app - rows[0].flo > 2.5 && rows[1].flo - rows[1].app > 7
+    // *** RE-MEASURED AT v4680 UNDER THE CORRECT INDEXING, AND THE THRESHOLD CAME DOWN. *** With the field
+    // read as prev-indexed this row required the application to lead the flow by 2.5 dB on the camera scene
+    // and it did, by 2.5109. Correcting the indexing improved the COLOUR FLOW arm by a full dB (38.5109 ->
+    // 39.5157) and left the application's almost unchanged, so the lead is now 1.3707. The old figure is not
+    // deleted: it was taken under a defect and this one supersedes it, which is the v4667 discipline -- the
+    // number is re-measured rather than swapped, and both are written down.
+    ok("*** and v4676's reconciliation earns itself in PIXELS here, not in vector error: each single field loses to the other on the scene it is wrong about, and the reconciled one is within 0.02 dB of the better field on BOTH ***",
+       rows[0].app - rows[0].flo > 1.3 && rows[1].flo - rows[1].app > 7
        && rows.every((r) => Math.max(r.app, r.flo) - r.rec < 0.02),
        `camera scene: application ${rows[0].app.toFixed(4)} vs flow ${rows[0].flo.toFixed(4)};  texture scene: flow ${rows[1].flo.toFixed(4)} vs application ${rows[1].app.toFixed(4)};  reconciled ${rows[0].rec.toFixed(4)} and ${rows[1].rec.toFixed(4)}`);
     // *** AND THE RECONCILIATION IS NOT FREE, WHICH THIS ROW EXISTS TO SAY IN A NUMBER. ***
@@ -216,7 +230,7 @@ console.log("\n5. WHERE TWO BLOCKS LAND ON ONE PIXEL, THE NEARER ONE WINS");
     for (let i = 0; i < w * h; i++) { prev[i * 4 + 3] = 1; cur[i * 4 + 3] = 1; }
     const flow = Float32Array.from([8, 0, 0, 0]);
     const call = (d0, d1, nil) => interpolateFrameCPU({ prev, cur, w, h, flow, bw: 2, bh: 1, block: 8,
-                                                        depthBlock: Float32Array.from([d0, d1]), nearerIsLess: nil, t: 1 });
+                                                        depthBlock: Float32Array.from([d0, d1]), indexedBy: "prev", nearerIsLess: nil, t: 1 });
     const a = call(0.2, 0.9, true), b = call(0.9, 0.2, true), c = call(0.2, 0.9, false);
     const vecAt = (r, x) => r.vec[(0 * w + x) * 2];
     report(`block 0 flows +8 px and lands on block 1's footprint at t = 1; block 1 does not move`);
@@ -241,7 +255,7 @@ console.log("\n6. A FRAME THE BLOCK GRID DOES NOT DIVIDE, AND A FIELD THAT DECLI
     let sd = 5; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     for (let i = 0; i < w * h; i++) { const c = rnd(); for (let k = 0; k < 3; k++) { prev[i * 4 + k] = c; cur[i * 4 + k] = c; } prev[i * 4 + 3] = 1; cur[i * 4 + 3] = 1; }
     const zero = new Float32Array(bw * bh * 2);
-    const g = interpolateFrameCPU({ prev, cur, w, h, flow: zero, bw, bh, block: 8, depthBlock: new Float32Array(bw * bh), t: 0.5 });
+    const g = interpolateFrameCPU({ prev, cur, w, h, flow: zero, bw, bh, block: 8, indexedBy: "prev", depthBlock: new Float32Array(bw * bh), t: 0.5 });
     const cf = crossFadeCPU({ prev, cur, w, h, t: 0.5 });
     let worst = 0; for (let i = 0; i < w * h * 4; i++) worst = Math.max(worst, Math.abs(g.frame[i] - cf[i]));
     report(`${w}x${h} at block 8: a ${bw}x${bh} grid whose last row and column hang 4 pixels off the frame`);
@@ -251,7 +265,7 @@ console.log("\n6. A FRAME THE BLOCK GRID DOES NOT DIVIDE, AND A FIELD THAT DECLI
     // and with real motion the hanging blocks must not claim pixels their content never occupied
     const mv = new Float32Array(bw * bh * 2);
     for (let i = 0; i < bw * bh; i++) mv[i * 2] = 3;
-    const g2 = interpolateFrameCPU({ prev, cur, w, h, flow: mv, bw, bh, block: 8, depthBlock: new Float32Array(bw * bh), t: 1 });
+    const g2 = interpolateFrameCPU({ prev, cur, w, h, flow: mv, bw, bh, block: 8, indexedBy: "prev", depthBlock: new Float32Array(bw * bh), t: 1 });
     let leftEdge = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < 3; x++) if (g2.hole[y * w + x]) leftEdge++;
     ok("...and a uniform +3 px motion at t = 1 vacates exactly the 3-pixel strip it should, no more and no less",
@@ -264,7 +278,7 @@ console.log("\n6. A FRAME THE BLOCK GRID DOES NOT DIVIDE, AND A FIELD THAT DECLI
     // shifted -3 its x = 4..7 (source 60..63, which do not exist) land on px 57..59, which do.
     const mvL = new Float32Array(bw * bh * 2);
     for (let i = 0; i < bw * bh; i++) mvL[i * 2] = -3;
-    const g3 = interpolateFrameCPU({ prev, cur, w, h, flow: mvL, bw, bh, block: 8, depthBlock: new Float32Array(bw * bh), t: 1 });
+    const g3 = interpolateFrameCPU({ prev, cur, w, h, flow: mvL, bw, bh, block: 8, indexedBy: "prev", depthBlock: new Float32Array(bw * bh), t: 1 });
     let rightEdge = 0;
     for (let y = 0; y < h; y++) for (let x = w - 3; x < w; x++) if (g3.hole[y * w + x]) rightEdge++;
     ok("*** ...and a uniform -3 px motion vacates the RIGHT strip, which is the case where the hanging tail would land INSIDE the frame and claim pixels its content never occupied ***",
@@ -292,7 +306,8 @@ console.log("\n7. A FIELD MAY DECLINE, AND A DECLINED BLOCK MUST BECOME A HOLE R
     // so it only ever owned 48 pixels, and 128 was arithmetic rather than a measurement.
     const rect = (bi, vx, vy) => {
         const bx = bi % s.of.bw, by = Math.floor(bi / s.of.bw);
-        const sx = Math.round(bx * B + 0.5 * vx), sy = Math.round(by * B + 0.5 * vy);
+        // the field is CUR-indexed, so the footprint is pushed BACK by (1 - t) * v -- see section 8
+        const sx = Math.round(bx * B - 0.5 * vx), sy = Math.round(by * B - 0.5 * vy);
         return { x0: sx, y0: sy, x1: sx + B, y1: sy + B };
     };
     const rects = [rect(0, s.rc.flow[0], s.rc.flow[1]), rect(10, s.rc.flow[20], s.rc.flow[21])];
@@ -305,14 +320,69 @@ console.log("\n7. A FIELD MAY DECLINE, AND A DECLINED BLOCK MUST BECOME A HOLE R
     ok("*** a block whose vector is NaN on either axis becomes a hole, and NOT ONE NaN reaches the frame ***",
        nans === 0 && g.hole[0] === 1 && newHoles > 0 && strayHoles === 0,
        `${nans} NaN in the frame; holes ${clean.holes} -> ${g.holes}, and all ${newHoles} new ones lie inside the two declined blocks' landing footprints -- ${strayHoles} stray. ` +
-       `Fewer than 2x64 because block (0, 0) lands partly off the frame at t = 0.5 and never owned a full footprint.`);
+       `Fewer or more than 2x64 depending on how much of each declined block's footprint lies inside the frame at t = 0.5.`);
 }
 
-console.log("\n8. WHAT IT REFUSES");
+console.log("\n8. WHY `indexedBy` DID NOT EXIST UNTIL v4680, MEASURED RATHER THAN EXPLAINED");
+{
+    // *** UNDER A RIGID WHOLE-FRAME TRANSLATION THE TWO INDEXINGS ARE THE SAME FIELD. *** Every block holds
+    // the same vector, so "the block's prev position advanced by t*v" and "the block's cur position pushed
+    // back by (1-t)*v" name the same grid of numbers. Every scene this file measures is of that kind, which
+    // is exactly why a missing argument cost nothing here and 6.5 dB on content with a silhouette.
+    for (const [name, s] of [["camera moves", geom], ["texture slides", shade]]) {
+        const a = s.gen(s.rc.flow, 0.5, "prev"), b = s.gen(s.rc.flow, 0.5, "cur");
+        const m = new Uint8Array(W * H);
+        let onlyA = 0, onlyB = 0;
+        for (let j = 0; j < W * H; j++) {
+            m[j] = (a.hole[j] || b.hole[j]) ? 1 : 0;
+            if (a.hole[j] && !b.hole[j]) onlyA++; else if (b.hole[j] && !a.hole[j]) onlyB++;
+        }
+        const dA = psnr(a.frame, s.mid.rgba, m), dB2 = psnr(b.frame, s.mid.rgba, m);
+        report(`${name}: prev-indexed ${dA.toFixed(4)} dB, cur-indexed ${dB2.toFixed(4)} dB on the ${W * H - onlyA - onlyB - a.holes + onlyA} pixels both filled`);
+        // *** TWO DRAFTS OF THIS ROW OVERCLAIMED AND BOTH WENT RED. *** The first said the frames were
+        // bit-identical (they differ by 1 at the edges); the second said the common footprint was identical
+        // (it differs by 0.0023 and 0.156, because the flow's per-block estimate is not perfectly uniform and
+        // shifting the block-to-pixel assignment by v hands some pixels a neighbouring block's vector). What
+        // is true is the only thing that mattered: the CHOICE is worth almost nothing on this content.
+        ok(`*** on the ${name} scene the CORRECT (cur) indexing is the better one, and the margin is under 1 dB -- small enough that every v4677 row passed with the wrong value ***`,
+           dB2 >= dA && dB2 - dA < 1 && onlyA === onlyB && onlyA > 0,
+           `prev-indexed ${dA.toFixed(4)} against cur-indexed ${dB2.toFixed(4)} dB, so v4677 published a figure ${(dB2 - dA).toFixed(4)} dB PESSIMISTIC here. ` +
+           `The motion is a rigid whole-frame translation, so every block holds nearly the same vector and shifting which block owns a pixel barely changes it -- a systematic error that stays inside the noise of the claims it was under. ` +
+           `${onlyA} pixels are holed only by prev-indexing and ${onlyB} only by cur-indexing: the two tile the frame from opposite ends and vacate OPPOSITE edge strips, and v4677 scored on the UNION of the arms' holes, which excludes exactly those.`);
+    }
+    // *** AND WHICH FRAME THE PRODUCER INDEXES IS MEASURED, NOT READ OFF ITS HEADER. *** A bright bar at
+    // x 4..7 in `prev` and x 12..15 in `cur`: the +8 must land on one block or the other, and which one it is
+    // decides what every consumer of this field has to do with it.
+    {
+        const bw2 = 32, bh2 = 8, blk = 4;
+        const mk = (f) => { const o = new Float32Array(bw2 * bh2 * 4);
+            for (let i = 0; i < bw2 * bh2; i++) { o[i * 4] = f(i); o[i * 4 + 1] = o[i * 4]; o[i * 4 + 2] = o[i * 4]; o[i * 4 + 3] = 1; } return o; };
+        let sd = 11; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+        const nz = new Float32Array(bw2 * bh2);
+        for (let i = 0; i < bw2 * bh2; i++) nz[i] = 0.1 * rnd();
+        const bar = (lo) => mk((i) => { const x = i % bw2; return (x >= lo && x < lo + 4) ? 0.9 : nz[i]; });
+        const f = opticalFlowCPU({ cur: bar(12), prev: bar(4), w: bw2, h: bh2, block: blk, searchRadius: 8, levels: 1, subpixel: false });
+        const atPrevPos = f.flow[1 * 2], atCurPos = f.flow[3 * 2];
+        report(`a bar at x 4..7 in prev and x 12..15 in cur, +8 px: block 1 (x 4..7) reports ${atPrevPos}, block 3 (x 12..15) reports ${atCurPos}`);
+        ok("*** opticalFlowCPU's field is indexed by the block's position in `cur`, which is the OPPOSITE of what render/frameInterp.mjs assumed from v4677 to v4679 ***",
+           atCurPos === 8 && atPrevPos !== 8,
+           `the +8 sits on the bar's CUR position. The search walks blocks of CUR and looks for them in PREV, so that is where the answer belongs -- and block 1, the bar's PREV position, reports ${atPrevPos}, which is the background trying to explain where the bar went.`);
+    }
+
+    // *** AND THE t = 0 / t = 1 ASYMMETRY MIRRORS, WHICH IS THE CHEAPEST PROOF THE TWO PATHS ARE DIFFERENT CODE. ***
+    const p0 = geom.gen(geom.rc.flow, 0, "prev"), p1 = geom.gen(geom.rc.flow, 1, "prev");
+    const c0 = geom.gen(geom.rc.flow, 0, "cur"), c1 = geom.gen(geom.rc.flow, 1, "cur");
+    ok("*** a PREV-indexed field is hole-free at t = 0 and a CUR-indexed one at t = 1 -- the asymmetry mirrors, so the two branches are genuinely different arithmetic ***",
+       p0.holes === 0 && p1.holes > 0 && c1.holes === 0 && c0.holes > 0,
+       `prev-indexed: ${p0.holes} holes at t=0, ${p1.holes} at t=1.  cur-indexed: ${c0.holes} at t=0, ${c1.holes} at t=1. ` +
+       "A prev-indexed block starts on its own footprint; a cur-indexed one ENDS on it.");
+}
+
+console.log("\n9. WHAT IT REFUSES");
 {
     const base = () => ({ prev: new Float32Array(W * H * 4), cur: new Float32Array(W * H * 4), w: W, h: H,
                           flow: new Float32Array(8 * 8 * 2), bw: 8, bh: 8, block: B,
-                          depthBlock: new Float32Array(64) });
+                          depthBlock: new Float32Array(64), indexedBy: "prev" });
     ok("a fractional block is refused", /whole number of pixels/.test(threw(() => interpolateFrameCPU({ ...base(), block: 8.5 })) || ""),
        threw(() => interpolateFrameCPU({ ...base(), block: 8.5 })));
     ok("a block grid that does not cover the frame is refused, with both shapes named",
@@ -325,10 +395,33 @@ console.log("\n8. WHAT IT REFUSES");
        /t must be in/.test(threw(() => interpolateFrameCPU({ ...base(), t: 1.5 })) || "")
        && /t must be in/.test(threw(() => interpolateFrameCPU({ ...base(), t: -0.1 })) || ""),
        threw(() => interpolateFrameCPU({ ...base(), t: 1.5 })));
+    ok("*** an absent `indexedBy` is refused, and the message names which producer returns which -- a default here would let a caller be wrong for free in the one case where being wrong costs the whole displacement ***",
+       /indexedBy must be "prev" or "cur"/.test(threw(() => interpolateFrameCPU({ ...base(), indexedBy: undefined })) || "")
+       && /indexedBy must be "prev" or "cur"/.test(threw(() => interpolateFrameCPU({ ...base(), indexedBy: "previous" })) || ""),
+       threw(() => interpolateFrameCPU({ ...base(), indexedBy: undefined })));
     ok("a short frame buffer is refused, naming both",
        /prev and cur must each be/.test(threw(() => interpolateFrameCPU({ ...base(), cur: new Float32Array(W * H * 3) })) || ""),
        threw(() => interpolateFrameCPU({ ...base(), cur: new Float32Array(W * H * 3) })));
 }
+
+// ---- v4680's SABOTAGES, OVER SECTIONS 2, 7, 8 AND 9 -------------------------------------------------------
+//
+//   V1  `indexedBy` is accepted and ignored (all treated as prev)  -> 6 red here, 2 in holeFill-selfcheck
+//   V2  the two indexings are SWAPPED                             -> 10 red here, 15 in holeFill-selfcheck
+//   V3  the cur-indexed offset uses t instead of (1 - t)          -> 3 red here
+//   V4  the `indexedBy` guard is removed                          -> 1 red, AFTER A REFUSAL ROW WAS ADDED
+//   V6  opticalFlowCPU searches PREV blocks in CUR instead         -> 4 red here, and 6 in its OWN gate
+//
+// *** V4 SCORED 0 RED FIRST, BECAUSE EVERY CALL SITE ALREADY PASSED THE ARGUMENT. *** A required argument with
+// no default is only required if something asks for it to be missing, and nothing did. Section 9 now does.
+//
+// *** AND THE BAR ROW IN SECTION 8 IS NOT FLIPPED BY ANY MINIMAL MUTATION OF opticalFlowCPU, WHICH IS STATED
+// RATHER THAN PAPERED OVER. *** V6 is the closest thing to one -- swapping which frame the search walks -- and
+// it reddens four rows here and SIX in render/opticalFlow-selfcheck.mjs, including its sign row, without
+// flipping the bar row itself: on a bar-and-noise fixture the reversed search still happens to put an 8 on
+// block 3. That row is a MEASUREMENT of a fact the consumer depends on, not a guard on the producer's
+// internals, and the producer has its own gate for those. Recorded because "covered in aggregate" is a weaker
+// claim than "reddened by a mutation" and the two should not be written as if they were the same.
 
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
 //

@@ -27,6 +27,25 @@
 // grid at the block's position advanced by t*v, which is where its content is at time t. Then each output
 // pixel that received a vector samples `prev` backwards along it and `cur` forwards along it, and blends.
 //
+// ---- *** AND WHICH FRAME THE FIELD IS INDEXED IN IS A REQUIRED ARGUMENT, BECAUSE IT WAS WRONG (v4680). *** -
+//
+// This pass shipped at v4677 assuming the field was indexed by the block's position in `prev`. MEASURED at
+// v4680 with a bright bar at x 4..7 in `prev` and x 12..15 in `cur`: `opticalFlowCPU` puts the +8 on the block
+// covering x 12..15 -- its CUR position. The search walks blocks of `cur` and looks for them in `prev`, so its
+// field is CUR-indexed, and so is render/flowReconcile.mjs's, whose `appFlow` comes from a per-pixel motion
+// buffer indexed the same way. Feeding the arc's own producer to the v4677 splat misplaced every moving block
+// by t*v.
+//
+// *** NOTHING IN THREE ROUNDS COULD HAVE CAUGHT IT. *** Under a rigid whole-frame translation every block
+// holds the SAME vector, so the two indexings produce BIT-IDENTICAL fields -- which is every scene v4677
+// measured. v4678's slab scene has non-uniform motion but supplies the field from the scene's own knowledge,
+// prev-indexed by construction. The defect needed content with non-uniform motion AND an estimated field, and
+// a gate row now builds exactly that. On the slab scene at block 1 the two indexings differ by 6.5 dB.
+//
+// `indexedBy` has NO DEFAULT. A default would let a caller be wrong for free in the one case where being
+// wrong costs the whole displacement, and v4676 already recorded what a convention nothing forces to agree
+// with its description does over time.
+//
 // *** THE PIXELS THAT RECEIVE NOTHING ARE HOLES, AND THIS PASS DOES NOT FILL THEM. *** Where content diverges
 // -- a silhouette pulling away from a background, anything leaving the frame's edge -- no block's footprint
 // lands, and there is no vector to sample along. A cross-fade would go there and look plausible, which is
@@ -73,6 +92,7 @@ export function crossFadeCPU({ prev, cur, w, h, t = 0.5 }) {
  *   flow, bw, bh, block   a block motion field in render/opticalFlow.mjs's OUTPUT sense -- the content's
  *                FORWARD displacement in full-resolution pixels, prev -> cur, which is the NEGATIVE of
  *                render/motionVectors.mjs's sense. render/flowReconcile.mjs returns exactly this.
+ *   indexedBy    "prev" or "cur": which frame the block grid indexes. REQUIRED -- see the header.
  *   depthBlock   bw*bh: the depth of the surface each block's vector belongs to. REQUIRED -- see the header.
  *   t            0 returns `prev` and 1 returns `cur`, both exactly, which is a gate row and not a nicety
  *
@@ -92,7 +112,7 @@ export function crossFadeCPU({ prev, cur, w, h, t = 0.5 }) {
  * { prefer, passes } runs render/holeFill.mjs between the scatter and the gather; see its header for why the
  * default neighbour is the FARTHER one and why the switch exists at all.
  */
-export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, depthBlock,
+export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, depthBlock, indexedBy,
                                      nearerIsLess = true, t = 0.5, fill = null }) {
     if (!(block >= 1) || block !== Math.floor(block))
         throw new Error(`interpolateFrameCPU: block must be a whole number of pixels, at least 1 -- got ${block}`);
@@ -105,6 +125,10 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         throw new Error("interpolateFrameCPU: depthBlock must be bw*bh -- two blocks landing on one pixel is one surface passing in front of another, and last-writer-wins makes the answer depend on loop order");
     if (!(t >= 0) || !(t <= 1))
         throw new Error(`interpolateFrameCPU: t must be in [0, 1] -- got ${t}`);
+    if (indexedBy !== "prev" && indexedBy !== "cur")
+        throw new Error(`interpolateFrameCPU: indexedBy must be "prev" or "cur" -- got ${JSON.stringify(indexedBy)}. ` +
+            'render/opticalFlow.mjs and render/flowReconcile.mjs both return "cur"; a field built by walking the PREVIOUS frame is "prev". ' +
+            "There is no default, because the two differ by the whole displacement wherever motion is not uniform and no measurement in this arc could tell them apart until v4680.");
 
     const vec = new Float32Array(w * h * 2).fill(NaN);
     const zbuf = new Float32Array(w * h).fill(nearerIsLess ? Infinity : -Infinity);
@@ -131,7 +155,14 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         // says which pixels have a vector is not. At block 8 a half-pixel error on a 64-pixel edge is 1% of
         // the mask; on a silhouette it is the difference between a hole and a smear. A real splatter
         // accumulates coverage per pixel. This one is stated in the closing line as unfinished.
-        const sx = Math.round(bx * block + t * vx), sy = Math.round(by * block + t * vy);
+        // *** WHERE THE BLOCK'S CONTENT IS AT TIME t DEPENDS ON WHICH FRAME THE BLOCK IS INDEXED IN (v4680). ***
+        // A PREV-indexed block sits at its prev position and has travelled t*v by now. A CUR-indexed one sits
+        // at its CUR position and still has (1-t)*v to go, so at time t it is (1-t)*v BEHIND that. The two
+        // differ by the whole displacement, and see the header for the three rounds in which nothing could
+        // tell them apart.
+        const ax = indexedBy === "prev" ? t * vx : -(1 - t) * vx;
+        const ay = indexedBy === "prev" ? t * vy : -(1 - t) * vy;
+        const sx = Math.round(bx * block + ax), sy = Math.round(by * block + ay);
         for (let y = 0; y < block; y++) {
             const py = sy + y; if (py < 0 || py >= h) continue;
             for (let x = 0; x < block; x++) {

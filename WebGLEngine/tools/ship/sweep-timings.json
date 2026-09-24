@@ -2169,8 +2169,8 @@
   "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
   "render/opticalFlow-selfcheck.mjs": 1386,
   "render/flowReconcile-selfcheck.mjs": 194,
-  "render/frameInterp-selfcheck.mjs": 201,
-  "render/holeFill-selfcheck.mjs": 326
+  "render/frameInterp-selfcheck.mjs": 176,
+  "render/holeFill-selfcheck.mjs": 308
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -10403,8 +10403,8 @@
   "tools/ship/fsr2Coverage-selfcheck.mjs": 2009,
   "render/opticalFlow-selfcheck.mjs": 1386,
   "render/flowReconcile-selfcheck.mjs": 194,
-  "render/frameInterp-selfcheck.mjs": 201,
-  "render/holeFill-selfcheck.mjs": 326
+  "render/frameInterp-selfcheck.mjs": 176,
+  "render/holeFill-selfcheck.mjs": 308
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
