@@ -721,8 +721,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // correct dither from one of twice the size. It holds the last THREE backlog items rather than one,
     // because they are a round's subject and not a mechanism, and the file's name says so rather than
     // borrowing the dither's.
-    gates: 1777, usesOk: 1756, definesOk: 1748, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1649, condFirst: 96, unknownSignature: 11,
+    // v4670 -- RE-TAKEN 1777 -> 1778 for tools/ship/orbBehaviorStates-selfcheck.mjs. It is the first orb
+    // gate that drives a BRIDGE rather than a shader: it calls ai-bridge/ragBridge.js's handle() against a
+    // mock req/res and a deliberately slow fetch, because the claim is about WHEN a line reaches the wire
+    // and no static read of that file can see it.
+    gates: 1778, usesOk: 1757, definesOk: 1749, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1650, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

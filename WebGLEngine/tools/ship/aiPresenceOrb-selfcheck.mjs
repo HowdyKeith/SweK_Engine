@@ -103,8 +103,28 @@ sec("6. *** SIMPSON'S RULE TEMPO INTEGRATION: EXACT AGAINST THE CLOSED-FORM ANTI
 
 sec("7. *** THE STATE TABLE AND THE ORCHESTRATOR: EXACT VALUES, AND A REAL TRANSITION FIRES THE RIGHT ENTRY ENVELOPE ***");
 {
-    ok("all 6 states named in the backlog entry are present, and only those 6",
-       ST.STATE_NAMES.length === 6 && ["idle", "listening", "thinking", "responding", "success", "error"].every((n) => ST.STATES[n]));
+    // *** THE TABLE GREW AT v4670 AND THE CLAIM GOT STRONGER RATHER THAN LOOSER. *** It used to read
+    // "only those 6", which was true and is now false: `searching` and `weaving` arrived when the RAG
+    // bridge started emitting its two stages separately. Restating it as "murmur's six are the FIRST six,
+    // in this order" keeps everything the old row protected -- every window kit.ts cuts is a claim about
+    // those six positions -- and adds the part that matters now, which is that a new row may only be
+    // APPENDED. A round that inserted one at the front would move listening out of the voice window.
+    const MURMUR_SIX = ["idle", "listening", "thinking", "responding", "success", "error"];
+    ok("!! *** murmur's SIX ARE THE FIRST SIX, IN ORDER, AND ANYTHING THIS TREE ADDS COMES AFTER THEM ***",
+       MURMUR_SIX.every((n, i) => ST.STATE_NAMES[i] === n) && ST.STATE_NAMES.length >= 6 &&
+       MURMUR_SIX.every((n) => ST.STATES[n]),
+       `STATE_NAMES is ${ST.STATE_NAMES.join(", ")}. The first six are murmur's own src/state.ts table in ` +
+       `its own order; ${ST.STATE_NAMES.length - 6} beyond it are this tree's, and they are named in ` +
+       `render/aiPresenceOrbState.mjs as not-murmur's rather than left to look transcribed.`);
+    ok("!! ...and every state this tree added RENDERS AS one of murmur's six, so the shader never sees a 7th index",
+       ST.STATE_NAMES.every((n) => MURMUR_SIX.includes(ST.STATES[n].renders)) &&
+       ST.STATE_NAMES.slice(0, 6).every((n) => ST.STATES[n].renders === n) &&
+       ST.STATE_NAMES.slice(6).every((n) => ST.STATE_RENDER_INDEX[n] < 6),
+       `murmur's six each render as themselves; ${ST.STATE_NAMES.slice(6).map((n) => n + " -> " + ST.STATES[n].renders).join(", ") || "(none)"}. ` +
+       `kit.ts's mh_live and mh_state compare the index against half-unit windows and an index of 6 is ` +
+       `outside ALL of them -- so a host state fed raw would render with less cadence than thinking, which ` +
+       `for a state meaning "searching" is exactly backwards. The mapping is what stops that, and the last ` +
+       `conjunct is what stops somebody "simplifying" it back to the raw index.`);
     ok("thinking/success/error each declare their own distinct entry envelope",
        ST.STATES.thinking.entry === "wake" && ST.STATES.success.entry === "swell" && ST.STATES.error.entry === "stutter");
     ok("idle/listening/responding declare none (only arrival at thinking/success/error is an EVENT worth flashing)",
@@ -125,7 +145,8 @@ sec("7. *** THE STATE TABLE AND THE ORCHESTRATOR: EXACT VALUES, AND A REAL TRANS
        `the correct reading rather than a fallback: an error is neither a listener nor a worker, so it gets the ` +
        `resting weights on both signals and ignites nothing.`);
     ok("...and the index is DERIVED from the one ordering rather than typed out a second time",
-       ST.STATE_NAMES.every((n, i) => IX[n] === i) && Object.keys(IX).length === ST.STATE_NAMES.length,
+       ST.STATE_NAMES.every((n, i) => IX[n] === i) && Object.keys(IX).length === ST.STATE_NAMES.length &&
+       Object.keys(ST.STATE_RENDER_INDEX).length === ST.STATE_NAMES.length,
        `all ${ST.STATE_NAMES.length} names map to their own position in STATE_NAMES and there is no sixth ` +
        `spelling of the order anywhere. Two copies of one ordering is the shape this tree has repaired in its ` +
        `own records three times.`);

@@ -1556,16 +1556,59 @@ async function indexCorpus() {
   $("indexStat").textContent = "indexed " + added + " passages";
   toast("Ship's computer indexed " + added + " passages");
 }
+// *** THE TWO STAGES ARE READ SEPARATELY NOW, AND THE ORB IS TOLD ABOUT EACH -- v4670. ***
+//
+// /ai/brain/ask has always retrieved and THEN generated; until v4670 both halves arrived in one response,
+// so this function could only ever say "thinking" for the whole wait. It streams NDJSON when asked, and the
+// two lines land at the two real moments: the passages when the search finishes, the answer when the model
+// does. The events below are the engine:voice* pattern this file already uses, and ui/aiPresenceOrbWidget.js
+// turns them into the orb's `searching` and `weaving` states.
+//
+// IT FALLS BACK, AND THE FALLBACK IS THE OLD PATH EXACTLY. An older server ignores `stream` and answers with
+// one JSON object; that parses as a single line here and is handled by the same code, so this page works
+// against a bridge that has never heard of staging.
+function fire(name, detail) { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch (_) {} }
 async function askComputer() {
   const q = ($("askInput").value || "").trim(); if (!q) return;
-  const out = $("askAnswer"); out.innerHTML = '<span style="color:var(--dim)">thinking\u2026</span>';
+  const out = $("askAnswer"); out.innerHTML = '<span style="color:var(--dim)">searching\u2026</span>';
+  fire("engine:brainSearching", { query: q });
+  let sources = [], answer = null, sawOk = false;
   try {
-    const r = await fetch("/ai/brain/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, k: 4 }) }).then((x) => x.json());
-    if (!r.ok) { out.textContent = "computer offline"; return; }
-    let html = r.answer ? `<div style="margin-bottom:6px">${escapeHtml(r.answer)}</div>` : '<div style="color:var(--warn);margin-bottom:6px">No LLM reached &mdash; here\'s what I found:</div>';
-    if (r.sources && r.sources.length) html += '<div style="color:var(--dim);font-size:10px">sources: ' + r.sources.map((s) => escapeHtml(String(s.id || "").replace(/^(planet|mission):/, ""))).join(", ") + '</div>';
+    const r = await fetch("/ai/brain/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, k: 4, stream: true }) });
+    const reader = r.body && r.body.getReader ? r.body.getReader() : null;
+    const dec = new TextDecoder();
+    let buf = "";
+    const take = (line) => {
+      if (!line.trim()) return;
+      let o; try { o = JSON.parse(line); } catch (_) { return; }
+      if (o.ok) sawOk = true;
+      // stage 1 -- and the orb is told the COUNT, because `weaving` means several sources and not one
+      if (o.stage === "retrieved" || (o.stage === undefined && o.sources)) {
+        sources = o.sources || [];
+        fire("engine:brainRetrieved", { count: sources.length, grounded: !!o.grounded, sources });
+        if (o.stage === "retrieved") out.innerHTML = '<span style="color:var(--dim)">' +
+          (sources.length ? 'weaving ' + sources.length + ' source' + (sources.length === 1 ? '' : 's') : 'thinking') + '\u2026</span>';
+      }
+      if (o.stage === "answer" || o.stage === undefined) { if (o.answer != null) answer = o.answer; }
+    };
+    if (reader) {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf("\n")) >= 0) { take(buf.slice(0, i)); buf = buf.slice(i + 1); }
+      }
+      take(buf);
+    } else { take(await r.text()); }   // no streaming body (old browser): the whole thing at once
+    if (!sawOk) { out.textContent = "computer offline"; fire("engine:brainError", { why: "not ok" }); return; }
+    let html = answer ? `<div style="margin-bottom:6px">${escapeHtml(answer)}</div>` : '<div style="color:var(--warn);margin-bottom:6px">No LLM reached &mdash; here\'s what I found:</div>';
+    if (sources.length) html += '<div style="color:var(--dim);font-size:10px">sources: ' + sources.map((s) => escapeHtml(String(s.id || "").replace(/^(planet|mission):/, ""))).join(", ") + '</div>';
     out.innerHTML = html || '<span style="color:var(--dim)">nothing on record</span>';
-  } catch (e) { out.textContent = "couldn't reach the computer (need the :8787 server)"; }
+    fire("engine:brainAnswer", { answer: answer || "", count: sources.length });
+  } catch (e) {
+    out.textContent = "couldn't reach the computer (need the :8787 server)";
+    fire("engine:brainError", { why: String(e && e.message || e) });
+  }
 }
 $("indexBtn").onclick = indexCorpus;
 $("askBtn").onclick = askComputer;

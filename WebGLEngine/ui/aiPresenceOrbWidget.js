@@ -63,9 +63,9 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         statePath = "../render/aiPresenceOrbState.mjs",
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, STATE_INDEX;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, stateRenderIndex;
     try {
-        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, STATE_INDEX }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, stateRenderIndex }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
             import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
         ]);
@@ -164,6 +164,54 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             }, SUCCESS_HOLD_MS);
         }, holdS * 1000);
     });
+    // *** THE RAG BRIDGE'S TWO STAGES, WHICH ARE THE ONLY REASON `searching` AND `weaving` EXIST -- v4670. ***
+    //
+    // tools/ship/nextRounds.mjs reserved these two names at v4600-something and REFUSED to wire them for
+    // forty rounds, on a rule this file's own history earned: an unwired state is decoration, not signal.
+    // The blocker was never "no two-stage AI work exists" -- ai-bridge/ragBridge.js has retrieved-then-
+    // generated the whole time -- it was that both stages went out in ONE response, so the page never saw
+    // stage 1 finish and there was nothing for `searching` to be lit DURING. v4670 made that stream.
+    //
+    // BOTH STATES GET REAL SCREEN TIME, which is the test the note above applies to `success`: the retrieval
+    // window is an embed plus a sqlite-vec search, and the generation window is a local LLM answering. They
+    // are not a frame apart; they are the two halves of the wait this orb exists to make legible.
+    window.addEventListener("engine:brainSearching", () => { clearSettle(); state.setState("searching"); });
+    window.addEventListener("engine:brainRetrieved", (e) => {
+        clearSettle();
+        const n = ((e.detail && e.detail.count) | 0);
+        // *** WEAVING MEANS SYNTHESISING SEVERAL SOURCES, SO ONE SOURCE IS NOT WEAVING. *** With 0 passages
+        // the model answers unaided and with 1 it is grounded in a single passage; neither is a synthesis,
+        // and calling them one would make the state mean "the LLM is running", which `thinking` already
+        // means. The honest fallback is `thinking`, and the threshold is the concept's own word.
+        state.setState(n > 1 ? "weaving" : "thinking");
+    });
+    // The answer landing is the same shape as a voice reply: respond, then settle through success to idle,
+    // reusing the estimator above rather than inventing a second timing policy for the same kind of event.
+    window.addEventListener("engine:brainAnswer", (e) => {
+        clearSettle();
+        state.setState("responding");
+        const text = (e.detail && e.detail.answer) || "";
+        const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+        const holdS = Math.min(RESPONDING_HOLD_MAX_S, Math.max(RESPONDING_HOLD_MIN_S, words * SECONDS_PER_WORD));
+        settleTimer = setTimeout(() => {
+            settleTimer = null;
+            if (state.state !== "responding") return;
+            state.setState("success");
+            settleTimer = setTimeout(() => {
+                settleTimer = null;
+                if (state.state === "success") state.setState("idle");
+            }, SUCCESS_HOLD_MS);
+        }, holdS * 1000);
+    });
+    window.addEventListener("engine:brainError", () => {
+        clearSettle();
+        state.setState("error");
+        settleTimer = setTimeout(() => {
+            settleTimer = null;
+            if (state.state === "error") state.setState("idle");
+        }, ERROR_HOLD_MS);
+    });
+
     // the real signal ui/sttLayer.js's converseText() had NONE of before this round -- a failed /ai/chat call
     // (network error, ai.ok false, or an empty reply) left the orb sitting wherever it was, forever, with no
     // indication anything had gone wrong.
@@ -224,7 +272,12 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
             // interior and the pair the SUCCESS shell travels on -- so a stateTau pinned at 0 would hold the
             // orb at the instant of arrival forever: full sweep at the heart, nothing travelling, and the
             // settle never arriving at all.
-            activity: p.activity, stateIndex: STATE_INDEX[p.state], stateTau: p.stateTau,
+            // *** THE RENDERED INDEX AND NOT THE TABLE'S OWN -- v4670. *** The host's state table grew two
+            // rows (searching, weaving) that murmur has no window for; each names the murmur state it
+            // PRESENTS AS, and that is the float the shader is handed. See render/aiPresenceOrbState.mjs's
+            // STATE_RENDER_INDEX note. Feeding the raw index here would send a 6 into mh_live, which is
+            // outside every window murmur defines -- the orb would go QUIET while it searched.
+            activity: p.activity, stateIndex: stateRenderIndex(p.state), stateTau: p.stateTau,
             // *** AND THE THREE SIGNAL INTEGRALS -- v4654. *** A species that modulates a local clock by a
             // live signal cannot multiply the clock by the signal's CURRENT value without the phase jumping
             // whenever the signal moves; the error is t * dSignal and has no ceiling. These carry the

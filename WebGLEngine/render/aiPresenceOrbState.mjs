@@ -76,14 +76,54 @@ export function lchToOklab(L, C, h) { return { L, a: C * Math.cos(h), b: C * Mat
 // defaults, plus which entry envelope (if any) fires on ARRIVAL at that state.
 // ---------------------------------------------------------------------------------------------------------
 export const STATES = Object.freeze({
-    idle:       Object.freeze({ speed: 0.30, glow: 0.65, depth: 0.75, hueShift: 0,     entry: null }),
-    listening:  Object.freeze({ speed: 0.90, glow: 1.10, depth: 1.10, hueShift: 0,     entry: null }),
-    thinking:   Object.freeze({ speed: 1.15, glow: 1.20, depth: 1.25, hueShift: 0,     entry: "wake" }),
-    responding: Object.freeze({ speed: 1.45, glow: 1.30, depth: 1.25, hueShift: 0,     entry: null }),
-    success:    Object.freeze({ speed: 0.55, glow: 1.05, depth: 1.00, hueShift: 0,     entry: "swell" }),
-    error:      Object.freeze({ speed: 0.65, glow: 0.80, depth: 1.20, hueShift: -0.35, entry: "stutter" }),
+    idle:       Object.freeze({ speed: 0.30, glow: 0.65, depth: 0.75, hueShift: 0,     entry: null,      renders: "idle" }),
+    listening:  Object.freeze({ speed: 0.90, glow: 1.10, depth: 1.10, hueShift: 0,     entry: null,      renders: "listening" }),
+    thinking:   Object.freeze({ speed: 1.15, glow: 1.20, depth: 1.25, hueShift: 0,     entry: "wake",    renders: "thinking" }),
+    responding: Object.freeze({ speed: 1.45, glow: 1.30, depth: 1.25, hueShift: 0,     entry: null,      renders: "responding" }),
+    success:    Object.freeze({ speed: 0.55, glow: 1.05, depth: 1.00, hueShift: 0,     entry: "swell",   renders: "success" }),
+    error:      Object.freeze({ speed: 0.65, glow: 0.80, depth: 1.20, hueShift: -0.35, entry: "stutter", renders: "error" }),
+    // ---- v4670: THE TWO STATES THE RAG BRIDGE EARNED. See the note below -- these are NOT murmur's. ----
+    searching:  Object.freeze({ speed: 1.30, glow: 1.05, depth: 1.15, hueShift: 0.18,  entry: "wake",    renders: "thinking" }),
+    weaving:    Object.freeze({ speed: 1.05, glow: 1.25, depth: 1.35, hueShift: 0.10,  entry: null,      renders: "thinking" }),
 });
 export const STATE_NAMES = Object.freeze(Object.keys(STATES));
+
+/**
+ * *** FOUR OF THESE NUMBERS ARE THIS TREE'S OWN, AND THAT IS THE ONLY SUCH ADMISSION IN THE FILE -- v4670. ***
+ *
+ * Every other multiplier above is transcribed from murmur-web's src/state.ts. murmur has SIX states and no
+ * opinion whatever about `searching` or `weaving`: the names come from a review of Jakubantalik/thinking-orbs
+ * (MIT), which names nine behaviour states for AI UIs, and the numbers come from this file. They are marked
+ * so nobody later reads them as upstream and "restores" them to something murmur never wrote.
+ *
+ * *** AND THEY RENDER THROUGH murmur's WINDOWS RATHER THAN BESIDE THEM, WHICH IS THE WHOLE DESIGN. ***
+ * kit.ts's mh_live and mh_state do not take a state NAME, they take a float, and they compare it against
+ * half-unit windows: listening is (0.5, 1.5), WORKING is (1.5, 3.5), drive is (2.5, 3.5), ignition is
+ * (3.5, 4.5). A seventh state appended at index 6 falls outside every one of them -- so `searching`, which
+ * is the orb WORKING, would have rendered with LESS cadence than thinking. Slower while searching than
+ * while thinking is precisely backwards.
+ *
+ * The two ways out were both wrong. Widening murmur's windows is a port editing its source, which this tree
+ * refuses on principle and says so in four other places. Appending and accepting the wrong behaviour is
+ * shipping a state that reads as calmer than the thing it is a more urgent form of.
+ *
+ * So a host state carries TWO things: its own multiplier set, and `renders` -- the murmur state it PRESENTS
+ * AS to the shader. murmur's six windows describe what the MATERIAL does; this table describes what the
+ * ASSISTANT is doing, and those are different vocabularies that happen to share an axis. searching and
+ * weaving both present as thinking: they are work, they lift the cadence, they do not drive and do not
+ * ignite. Their own speed/glow/depth/hueShift is what tells them apart, and that is applied host-side on top.
+ *
+ * STATE_INDEX IS UNCHANGED FOR ALL SIX OF murmur's STATES and the shader never sees a 6 or a 7.
+ */
+export const STATE_RENDER_INDEX = Object.freeze(Object.fromEntries(
+    Object.keys(STATES).map((n) => [n, Object.keys(STATES).indexOf(STATES[n].renders)])));
+
+/** The float the shader is handed for a host state -- murmur's index, never this table's. */
+export function stateRenderIndex(name) {
+    const i = STATE_RENDER_INDEX[name];
+    if (i == null) throw new Error(`stateRenderIndex: unknown state "${name}"`);
+    return i;
+}
 
 /**
  * *** THE STATE'S NUMBER, WHICH murmur's SHADERS INDEX BY AND THIS FILE ALREADY DECIDED WITHOUT SAYING SO. ***
@@ -318,7 +358,10 @@ export function createPresenceState(initial = "idle") {
             // The conditioned signals as the shader will see them this frame, accumulated against dPhase --
             // see the note on the declarations. entryT has already advanced, which is what the shader's own
             // stateTau will carry, so the two read the same point of the ramp.
-            const si = STATE_INDEX[cur];
+            // THE RENDERED index and not this table's own -- see STATE_RENDER_INDEX. A host state that
+            // presents as thinking must accumulate its integrals as thinking too, or the shader's cadence
+            // and the host's would disagree about the same instant.
+            const si = stateRenderIndex(cur);
             const lv = mhLive(voice.value, activity.value, si);
             const stn = mhState(si, entryT);
             paceInt += lv.pace * dPhase;

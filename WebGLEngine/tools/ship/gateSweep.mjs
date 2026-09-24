@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4670 -- THE 350th CLOSING: phase 2 of the orb -- two behaviour states, and the forty-round blocker
+    // that turned out to be one `res.write()` away from gone.
+    since349: Object.freeze({
+        at: "v4670", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/orbBehaviorStates-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green in about 1.2 s, 11 rows in five sections, driving a BRIDGE rather than a shader -- " +
+                 "the first orb gate that does. *** THE BLOCKER WAS NEVER WHAT ITS FIRST WORDING SAID. *** " +
+                 "nextRounds reserved four thinking-orbs behaviour names and refused to wire any of them on " +
+                 "the rule this tree's own orb work earned: an unwired state is decoration, not signal. The " +
+                 "first wording blamed 'no two-stage AI work exists'; v4628 sharpened it to the true one, " +
+                 "that ai-bridge/ragBridge.js HAS retrieved-then-generated all along but sent both stages " +
+                 "in one response, so no page could see stage 1 finish -- 'there is nothing for `searching` " +
+                 "to be lit DURING'. That is a res.write() and a chunked header. " +
+                 "MEASURED: with a 250 ms model, the retrieval line is on the wire 250 ms before the " +
+                 "answer. The gate asserts THE GAP and not the line count, because a handler that built " +
+                 "both objects and wrote them back to back at the end emits the identical two lines and " +
+                 "reads a gap of 0 -- which is the defect, and is invisible from any other angle. " +
+                 "*** THE STREAM IS OPT-IN AND THE OLD SHAPE IS BYTE-FOR-BYTE UNCHANGED, *** because " +
+                 "ev.html's previous path did fetch(...).then(x => x.json()) and NDJSON would have thrown " +
+                 "a syntax error in it. " +
+                 "*** AND THE TWO STATES RENDER THROUGH murmur's WINDOWS RATHER THAN BESIDE THEM. *** " +
+                 "kit.ts cuts mh_live and mh_state on the state NUMBER -- listening (0.5,1.5), working " +
+                 "(1.5,3.5), drive (2.5,3.5), ignition (3.5,4.5) -- so a seventh state appended at index 6 " +
+                 "is outside every one of them. MEASURED: at activity 0.8, searching rendered as thinking " +
+                 "reads a cadence of 0.8272; at its own raw index it reads 0.4963, which is IDLE's number. " +
+                 "A state whose name means the assistant is working, rendering at the resting cadence, is " +
+                 "the thing the mapping exists to prevent. Widening murmur's windows was the other option " +
+                 "and was rejected: a port that edits its source has stopped being a port. So each host " +
+                 "state names the murmur state it PRESENTS AS, murmur's six render as themselves, and " +
+                 "STATE_INDEX 0-5 never moved. " +
+                 "*** FOUR NUMBERS IN THAT TABLE ARE THIS TREE'S OWN AND ARE MARKED AS SUCH, *** which is " +
+                 "the only such admission in the file: every other multiplier is transcribed from murmur's " +
+                 "src/state.ts, and murmur has six states and no opinion about these two. " +
+                 "FOURTEEN SABOTAGES, THIRTEEN CAUGHT ON THE FIRST PASS. The one that walked is the " +
+                 "instructive one: removing `stream: true` from ev.html's request body leaves the bridge " +
+                 "still able to stage, the widget still listening, and the whole battery green while the " +
+                 "orb behaves exactly as it did before the round -- the opt-in that makes the change safe " +
+                 "is also where it can be silently switched off. AND THE FIRST FIX FOR IT WAS ITSELF A " +
+                 "PROXY: /stream: true/ over the file matched TextDecoder's decode(value, { stream: true }) " +
+                 "on the next screen of the same function, and stayed green under the very sabotage it was " +
+                 "written for. It reads the fetch's BODY now. " +
+                 "*** TWO OF THE FOUR RESERVED NAMES ARE STILL RESERVED AND A ROW GUARDS THEM: *** " +
+                 "connecting and shaping have nothing observable in this engine to attach to, and section 5 " +
+                 "goes red the day either appears in the table.",
+    }),
     // v4669 -- THE 349th CLOSING: the last three items of the port's backlog, and two were not what the
     // record said they were.
     since348: Object.freeze({

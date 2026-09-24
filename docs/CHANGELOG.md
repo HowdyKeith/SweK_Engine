@@ -26,6 +26,82 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4670 -- the orb's phase 2, and a forty-round blocker that was one res.write() away from gone
+
+`nextRounds`'s `ai-presence-orb-behavior-states-phase2` reserved four behaviour-state names off a review of
+Jakubantalik/thinking-orbs (MIT) — **searching, connecting, weaving, shaping** — and then refused to wire any
+of them for forty rounds, on a rule this tree's own orb work earned: *an unwired state is decoration, not
+signal.*
+
+Two of the four are wired now. Two are still reserved, and a row guards them.
+
+### The blocker was never what its first wording said
+
+The original entry blamed *"no two-stage AI work exists"*. v4628 sharpened it to the truth:
+`ai-bridge/ragBridge.js` has retrieved-then-generated the whole time — it just sent **both stages in one
+response**, so no page could see stage 1 finish. *"There is nothing for `searching` to be lit DURING."*
+
+That is a `res.write()` and a chunked header.
+
+```
+POST /ai/brain/ask { query, k, stream: true }   ->  application/x-ndjson
+  { stage:"retrieved", ok, k, sources, grounded }    the moment sqlite-vec returns
+  { stage:"answer",    ok, answer, model, note? }
+```
+
+Measured against a 250 ms model, **the retrieval line is on the wire 250 ms before the answer.** The gate
+asserts *that gap*, not the line count — a handler that built both objects and wrote them back to back at the
+end emits the identical two lines and reads a gap of 0. That is the defect, and it is invisible from every
+other angle.
+
+The stream is **opt-in and the old shape is byte-for-byte unchanged**, because `ev.html`'s previous path did
+`fetch(...).then(x => x.json())` and NDJSON would have thrown a syntax error in it.
+
+### The design problem the entry didn't anticipate
+
+The entry said *"no new architecture, four new STATES rows"*. Four new rows is not enough.
+
+`kit.ts` cuts `mh_live` and `mh_state` on the state **number** — listening (0.5, 1.5), working (1.5, 3.5),
+drive (2.5, 3.5), ignition (3.5, 4.5). A row appended at index 6 falls outside every one of them:
+
+| | cadence at activity 0.8 |
+|---|---|
+| idle | 0.4963 |
+| thinking | 0.8272 |
+| **searching, rendered as thinking** | **0.8272** |
+| searching at its own raw index 6 | 0.4963 — *idle's number* |
+
+A state whose name means *the assistant is working*, rendering at the resting cadence, is exactly backwards.
+Widening murmur's windows was the other option and was rejected — a port that edits its source has stopped
+being a port. So each host state now names the murmur state it **presents as**; murmur's six render as
+themselves, and `STATE_INDEX` 0–5 never moved.
+
+`searching` is lit during the retrieval window. `weaving` reads `sources.length` — and only **above one**,
+because the concept is synthesising *several* sources and a single grounded passage is just `thinking`.
+
+**Four numbers in that table are now this tree's own rather than transcribed**, which is a first for the file
+and is marked in it as such. murmur has six states and no opinion about these two.
+
+### Sabotage
+
+Fourteen, thirteen caught on the first pass. The one that walked is the instructive one: removing
+`stream: true` from `ev.html`'s request body leaves the bridge still able to stage, the widget still
+listening, and the whole battery green — while the orb behaves exactly as it did before the round. **The
+opt-in that makes the change safe is also where it can be silently switched off.**
+
+And the first fix for it was itself a proxy: `/stream: true/` over the file matched `TextDecoder`'s
+`decode(value, { stream: true })` on the next screen of the same function, and stayed green under the very
+sabotage it was written for. It reads the fetch's **body** now.
+
+### Still reserved
+
+`connecting` (waiting on a network or session) and `shaping` (building an artifact) have nothing observable in
+this engine to attach to. Section 5 asserts their absence and goes red the day either appears — a reservation
+with a guard on it, not a note.
+
+`tools/ship/orbBehaviorStates-selfcheck.mjs` arrives green — 11 rows in five sections, and the first orb gate
+that drives a *bridge* rather than a shader. The tree holds 1778 gates.
+
 ## v4669 -- the last three port items, and two of them were not what the record said
 
 The backlog is empty. All 41 of `kit.ts`'s functions are ported and no recorded murmur item is outstanding.
