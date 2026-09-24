@@ -52,7 +52,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { codeOnly } from "./sourceScan.mjs";
+import { codeOnly, noComments } from "./sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -217,7 +217,21 @@ function walk(dir, out = []) {
             // @vite-ignore is read raw here rather than through codeOnly: the expensive lexer is the thing
             // the pre-filter below exists to avoid, and a browser marker is a file-wide flag either way.
             const browserGen = /@vite-ignore/.test(src);
-            for (const arg of generatedImportArgs(src)) {
+            // *** v4668b -- AND THE FIFTH SIGHTING OF THE ONE MISTAKE, IN THE FILE WHOSE HEADER NAMES IT. ***
+            // This scan reads RAW source on purpose, because what it is looking for IS string content. Raw
+            // also means COMMENTS, and the round note describing this very defect is a comment -- so the
+            // moment v4668's note landed on main.js's and brain/brain.js's ENGINE_VERSION line, quoting
+            // `import { reportThrows } from ${JSON.stringify(MOD)}` verbatim, the whole-tree scan reported
+            // both files as offenders. The gate's own header has been warning about this since v4622:
+            // "spelling the crashing line out literally makes THIS FILE an offender in its own whole-tree
+            // scan", four sightings listed, and the fifth arrived by a route none of them took -- the note
+            // is not in this file at all, it is in the two files every round edits.
+            //
+            // noComments is the right instrument and not codeOnly: it drops comments and KEEPS strings,
+            // which is precisely the half this rule needs. It is the expensive lexer, so it runs only on
+            // files the cheap raw pass already matched -- a handful, not 4,241.
+            const genSrc = generatedImportArgs(src).length ? noComments(src) : src;
+            for (const arg of generatedImportArgs(genSrc)) {
                 if (browserGen) continue;
                 if (classifySpecifier(arg, src) !== "offender") continue;
                 offenders.push(path.relative(ENG, f).replace(/\\/g, "/") +
@@ -387,6 +401,26 @@ function walk(dir, out = []) {
     // FOUR SENTENCES on its first whole-tree run -- brain.js, KitScatter, ringFloorPhase, slugNapalm --
     // because English puts "from" in front of an interpolation constantly. This tree has now found itself
     // counting its own prose more times than any other single mistake.
+    // *** v4668b -- THE FIFTH SIGHTING, AND IT CAME FROM THE ROUND NOTE. *** The header lists four times this
+    // gate read its own subject as code. The fifth was not in this file: v4668's note quotes the defective
+    // line verbatim, every round writes its note onto main.js's and brain/brain.js's version line, and both
+    // went red in the whole-tree scan the moment it shipped. The scan reads raw source deliberately -- the
+    // thing it hunts IS string content -- and raw includes comments. noComments drops comments and keeps
+    // strings, which is exactly the half needed, so it is applied before the rule and behind a cheap match.
+    ok("!! *** the round note that DESCRIBES this defect is not an instance of it ***",
+       generatedImportArgs(noComments(
+           'const ENGINE_VERSION = "v4668";   // the fixture did `import { x } from ${JSON.stringify(MOD)}` and died\n'
+       )).length === 0,
+       "main.js and brain/brain.js carry the note on their version line, so a comment-blind rule makes every " +
+       "round that writes about this defect an instance of it -- a scanner counting its own prose, which " +
+       "this file's header has now recorded five times");
+    ok("...and the SAME line as real code still is one, so stripping comments did not blunt the rule",
+       generatedImportArgs(noComments(
+           'const MOD = path.join(ENG, "a.mjs");\nconst NET = `import { x } from ${JSON.stringify(MOD)}`;\n'
+       )).some((a) => classifySpecifier(a, 'const MOD = path.join(ENG, "a.mjs");') === "offender"),
+       "the comment strip removes prose, not code -- asserted in both directions because a strip that " +
+       "removed the finding too would make every row above pass vacuously");
+
     ok("!! CONTROL: PROSE containing 'from ${...}' is NOT an import, even when it also says 'import'",
        !offends('console.log(`[kitScatter] placed ${n} from "${folder}" now`);') &&
        !offends('console.log(`could not import ${name} from ${where}`);') &&

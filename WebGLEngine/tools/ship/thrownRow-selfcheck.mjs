@@ -47,7 +47,14 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 // them. The control failing is the tell: a fixture that does not throw cannot fail for a reason about
 // throwing. v4646 fixed ten spellings of exactly this and fsrPage-selfcheck carries the correct one
 // (ENG_URL = pathToFileURL(ENG).href) fifty lines from here.
-const MOD = pathToFileURL(path.join(ENG, "tools", "ship", "thrownRow.mjs")).href;
+// *** AND THE FIRST REPAIR BROKE THE OTHER HALF, BECAUSE ONE CONSTANT WAS SERVING TWO CONTRACTS. ***
+// MOD is used twice: as the SPECIFIER the generated fixtures import (which must be a file:// URL) and as the
+// PATH section 4 reads with fs.readFileSync (which must not be). Turning the single constant into a URL fixed
+// the import and broke the read -- ENOENT on a filename beginning "file:///", at module top level, so the
+// gate died with exit 1 and NOT ONE FAIL ROW: the exact shape this file exists to catch, in this file.
+// Two names now, because they are two contracts and were only ever one identifier by accident.
+const MOD = path.join(ENG, "tools", "ship", "thrownRow.mjs");
+const MOD_URL = pathToFileURL(MOD).href;
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l) => console.log(`  ----  ${l}`);
@@ -75,7 +82,7 @@ const drive = (body) => {
 };
 let FIXTURES = 0;
 const OK_LINE = 'const ok = (l,c,n="") => console.log(`  ${c?"PASS":"FAIL"}  ${l}${n?"   "+n:""}`);\n';
-const NET = `import { reportThrows } from ${JSON.stringify(MOD)};\n`;
+const NET = `import { reportThrows } from ${JSON.stringify(MOD_URL)};\n`;
 
 try {
 // -----------------------------------------------------------------------------------------------------------
