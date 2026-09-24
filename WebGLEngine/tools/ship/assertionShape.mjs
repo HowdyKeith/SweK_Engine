@@ -512,8 +512,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // actually contain. Seventeenth round running with the same four rows moving together by one.
     // v4698 -- 1779 -> 1780 for tools/ship/foldStats-selfcheck.mjs, the seven-fold statistic gated on synthetic
     // data in its pre-registration's round. Eighteenth round running with the four rows moving together by one.
-    gates: 1780, usesOk: 1759, definesOk: 1751, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1652, condFirst: 91, unknownSignature: 16,
+    // v4699 -- 1780 -> 1781 for tools/ship/genGateFoldsMeasure-selfcheck.mjs, H4's measurement re-derived from its
+    // committed data. Nineteenth round running with the four rows moving together by one.
+    gates: 1781, usesOk: 1760, definesOk: 1752, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1653, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

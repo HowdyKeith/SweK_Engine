@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4699 -- THE 306th CLOSING: H4 measured as declared, and not supported.
+    since381: Object.freeze({
+        at: "v4699", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/genGateFoldsMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** H4 IS NOT SUPPORTED. NEITHER CLAUSE CLEARED, AND THE CONTROLS SAY IT MAY BE READ. *** " +
+                 "v4698's runner ran as committed: seven scenes harvested, seven folds, four arms, ten seeds, 280 " +
+                 "trainings, 308 s. C11 stayed quiet in both directions (sign p 0.500 forward, 0.773 back); C12 " +
+                 "re-ran fold zone, arm V2, seed 1 -- the first entry of each declared list, so the choice was not " +
+                 "made by looking -- and reproduced 0.48319808943889936 bit for bit; C5 holds for the weights and, " +
+                 "recomputed from the cached rows, for the scaler. No fold was excluded: ramp, named in advance as " +
+                 "the likeliest, has a base rate of 0.826. " +
+                 "*** CLAUSE (a) FAILED AT EXACTLY THE PRICE THE DOCUMENT STATED BEFORE THE DATA EXISTED. *** The " +
+                 "scale-free set beat its shuffled twin on six folds of seven, mean +0.0652 -- and 6 of 7 is 8/128 = " +
+                 "0.0625, t p 0.0946. The one fold against it is edges, the sparse-high-frequency scene v4697 added, " +
+                 "where the scale-free set ranks at 0.4121, BELOW a coin, against its twin's 0.5624. v4698 wrote " +
+                 "\"one fold moving the wrong way fails a clause\" and \"never trending\", and both are honoured: " +
+                 "the clause is NOT SUPPORTED. " +
+                 "*** CLAUSE (b) FAILED OUTRIGHT, AND IN THE WRONG DIRECTION FOR THE MECHANISM. *** The absolute set " +
+                 "beat the scale-free set on five folds of seven, mean -0.0170. v4695 proposed that absolute " +
+                 "magnitudes force a network to learn scene identity and so block transfer; with seeds that seed, a " +
+                 "statistic that does not pool and six training scenes instead of one, the absolute set does at " +
+                 "least as well. The pre-registered reading is the fails/fails row: the features were not the " +
+                 "problem either. " +
+                 "*** WHAT IS REPORTED AND NOT PROMOTED. *** S13: seed spread per fold ranges 7.8x, from 0.029 on zone " +
+                 "to 0.228 on checker -- the fold values do not carry equal weight, which is the first input to any " +
+                 "next design's power calculation. S14: rank correlation of the V2-over-V1 advantage with v4697's " +
+                 "|laplacian| is -0.107, nothing. And one UNDECLARED observation, printed with no test: the ABSOLUTE " +
+                 "set beats ITS shuffled twin on six folds of seven. That contradicts v4693's \"the features do not " +
+                 "transfer\" -- which was measured training on ONE scene -- and it is not a result here, because no " +
+                 "clause named it. It is the obvious question for a next pre-registration, alongside why edges ranks " +
+                 "below chance for both learned sets. " +
+                 "*** TWELVE SABOTAGES, TWELVE RED. *** Each edits what the gate re-derives -- a recorded AUC by " +
+                 "1e-12, the verdict, C11's flag and its differences, a label count, a training record, a scaler " +
+                 "mean by one part in 10^7, an exclusion, the document's seed list, the runner's fit stream, one " +
+                 "frame of the cache -- and each reddens, because the gate trusts none of the runner's own summary. " +
+                 "The 47 MB cache is committed GZIPPED at 14.5 MB, round-trip verified byte-identical; the runner " +
+                 "is unchanged and still writes plain JSON, so re-deriving the data means gzipping its output.",
+    }),
     // v4698 -- THE 305th CLOSING: a pre-registration whose seeds seed, and the seed that never had.
     since380: Object.freeze({
         at: "v4698", swept: 1, green: 1, red: 0,
