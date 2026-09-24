@@ -10,7 +10,7 @@
  * NO BACKTICKS IN THIS FILE'S COMMENTS: the kernel is a JS template literal and they close it.
  */
 export const OPTICAL_FLOW_WGSL = `
-struct P { lw:u32, lh:u32, bw:u32, bh:u32, block:i32, radius:i32, scale:i32, n:i32 };
+struct P { lw:u32, lh:u32, bw:u32, bh:u32, block:i32, radius:i32, scale:i32, n:i32, refine:i32, p1:i32, p2:i32, p3:i32 };
 @group(0) @binding(0) var<storage,read> curLum:array<f32>;
 @group(0) @binding(1) var<storage,read> prevLum:array<f32>;
 @group(0) @binding(2) var<storage,read> flowIn:array<f32>;
@@ -54,10 +54,29 @@ fn search(@builtin(global_invocation_id) g:vec3<u32>) {
       if (s < best) { best = s; bdx = gx + dx; bdy = gy + dy; }   // STRICTLY better
     }
   }
+  // *** v4675 -- SUB-PIXEL, AND ONLY WHERE THE UNIFORM SAYS SO. *** The refine flag is 1 on the finest level and 0
+  // above it: a fraction found on a quarter-resolution mip is a fraction OF FOUR PIXELS, and the level
+  // below rounds its incoming guess, so the refinement would be computed and thrown away. The parabola
+  // through the winner and its two neighbours locates the vertex; the denominator is guarded because it
+  // vanishes on a flat surface, and the result is clamped to half a pixel because beyond that the
+  // NEIGHBOUR should have won and the model is failing rather than finding an offset.
+  var subx = 0.0;
+  var suby = 0.0;
+  if (u.refine != 0) {
+    let s0 = best;
+    let sxm = sadAt(ox, oy, ox + bdx - 1, oy + bdy);
+    let sxp = sadAt(ox, oy, ox + bdx + 1, oy + bdy);
+    let sym = sadAt(ox, oy, ox + bdx, oy + bdy - 1);
+    let syp = sadAt(ox, oy, ox + bdx, oy + bdy + 1);
+    let denx = sxm - 2.0 * s0 + sxp;
+    if (abs(denx) > 1e-9) { let d = (sxm - sxp) / (2.0 * denx); if (abs(d) <= 0.5) { subx = d; } }
+    let deny = sym - 2.0 * s0 + syp;
+    if (abs(deny) > 1e-9) { let d = (sym - syp) / (2.0 * deny); if (abs(d) <= 0.5) { suby = d; } }
+  }
   let still = sadAt(ox, oy, ox, oy);
   // the negation back to the arc's prev -> cur sense, at one site
-  flowOut[i * 2u] = -f32(bdx * u.scale);
-  flowOut[i * 2u + 1u] = -f32(bdy * u.scale);
+  flowOut[i * 2u] = -(f32(bdx * u.scale) + subx);
+  flowOut[i * 2u + 1u] = -(f32(bdy * u.scale) + suby);
   if (still > 1e-6) {
     confOut[i] = clamp((still - best) / still, 0.0, 1.0);
   } else {

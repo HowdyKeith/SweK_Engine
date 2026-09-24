@@ -8032,6 +8032,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4675 -- THE 285th CLOSING: sub-pixel, and two rows the scoping pass quietly disarmed.
+    since360: Object.freeze({
+        at: "v4675", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]), redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** A WHOLE-PIXEL FLOW CANNOT CARRY A FRAME GENERATOR. *** The true displacement between " +
+                 "two frames is almost never an integer, so an interpolated frame placed on one is misplaced " +
+                 "by a fraction EVERY frame -- judder, not blur. v4673's closing named this first. A parabola " +
+                 "through the winning SAD and its two neighbours locates the vertex, on CPU and in the " +
+                 "kernel, at the FINEST level only. MEASURED against a bilinearly-shifted fixture, with the " +
+                 "refinement switched off as the control arm: 0.500 -> 0.072 px mean error at (3.5, -2), " +
+                 "0.354 -> 0.197 at (2.25, 1.75), 0.585 -> 0.219 at (3.4, -1.6). Better on EVERY shift, not " +
+                 "on average, and it does not drift at a true integer displacement. " +
+                 "*** ADDING IT MADE SECTIONS 1-3 RED, CORRECTLY, AND THE REPAIR DISARMED TWO OTHER ROWS. *** " +
+                 "At a TRUE integer shift the SAD surface of a smoothed random field is not perfectly " +
+                 "symmetric, so the parabola finds a small REAL offset -- 3.0665 rather than 3 -- and rows " +
+                 "asserting integer equality were measuring the search AND the refinement while naming only " +
+                 "the search. Moving them to subpixel: false was right and silently left the CLAMP and the " +
+                 "denominator guard tested by nothing; two sabotages found that. The flat-field row asks for " +
+                 "the refinement again, and a new row drives four displacements at the EDGE of the search " +
+                 "window, where the parabola genuinely overshoots. " +
+                 "*** AND TWO SABOTAGES ARE RECORDED AS 0-RED BECAUSE THEY ARE NOT HOLES. *** Refining at " +
+                 "every level changes nothing: a fraction found on a coarse mip is ROUNDED AWAY when the " +
+                 "guess passes down, exactly as the module's header says -- so `L === 0` is an efficiency " +
+                 "guard and the sabotage turned that sentence from a claim into a measurement. And removing " +
+                 "the denominator guard changes nothing either: on a flat surface d is 0/0 = NaN and " +
+                 "Math.abs(NaN) <= 0.5 is FALSE, so the CLAMP already returns the integer. The guard is " +
+                 "defence in depth and the module now says which line does the work rather than crediting " +
+                 "the wrong one. Device parity holds to 1.9e-6 of a pixel across four cases, two of them " +
+                 "refining. Five sabotages, three caught, two recorded as no-ops with their reasons.",
+    }),
     // v4674 -- THE 284th CLOSING: the flow on the device, and no tolerance to hide behind.
     since359: Object.freeze({
         at: "v4674", swept: 0, green: 0, red: 0,

@@ -45,11 +45,16 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * Coarse-to-fine block-matching optical flow between two rgba frames.
  *
  * Returns { flow, conf, bw, bh, block, levels }:
- *   flow   2 floats per block: the displacement in FULL-RESOLUTION pixels that takes the block in `prev`
+ *   flow   2 floats per block: the displacement in FULL-RESOLUTION pixels, refined to a FRACTION at the
+ *          finest level (v4675), that takes the block in `prev`
  *          to where it is in `cur` -- the same sense render/motionVectors.mjs uses, prev -> cur reversed,
  *          see the note on `sense` below
  *   conf   per block, in [0, 1]: how much better the winning match is than standing still. 0 means the
  *          block is as happy where it was, which is what a flat region reports and is not a failure
+ *
+ * `subpixel` defaults to true and exists so the refinement's worth is MEASURABLE rather than asserted --
+ * the control-arm discipline this arc applies to every switchable thing on its page. Off, the field is
+ * whole pixels, which is what v4673 shipped.
  *   bw,bh  the block grid's dimensions
  *
  * *** THE SENSE IS uvPrev - uvCurr, MATCHING render/motionVectors.mjs, AND THAT IS NOT THE NATURAL OUTPUT
@@ -59,7 +64,8 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * recorded what two conventions cost when nothing forces them to agree. The negation is at the bottom of
  * `refine` and it is the only place it happens.
  */
-export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3 }) {
+export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
+                                 subpixel = true }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -103,7 +109,7 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // header claimed "a tie leaves the centre alone" while the code did the opposite. The gate row
             // written to check that claim is what found it: 0 blocks reporting no motion and 64 reporting
             // the corner. Seeding with the guess makes the sentence true.
-            let bdx = gx, bdy = gy;
+            let bdx = gx, bdy = gy, subx = 0, suby = 0;
             let best = sad(a, b, lw, lh, ox, oy, ox + gx, oy + gy, n);
             for (let dy = -searchRadius; dy <= searchRadius; dy++)
                 for (let dx = -searchRadius; dx <= searchRadius; dx++) {
@@ -114,10 +120,50 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
                     // the loop happens to reach first would otherwise win everywhere.
                     if (s < best) { best = s; bdx = gx + dx; bdy = gy + dy; }
                 }
+            // *** v4675 -- SUB-PIXEL REFINEMENT, AND ONLY AT THE FINEST LEVEL. ***
+            //
+            // A whole-pixel field is unusable for frame generation: an interpolated frame placed on integer
+            // motion judders, because the true displacement between two frames is almost never a whole
+            // number of pixels and the error is a fraction of a pixel of misplacement EVERY frame.
+            //
+            // The SAD surface near its minimum is approximately a parabola, so three samples along an axis
+            // -- the winner and its two neighbours -- locate the vertex:  d = (s- - s+) / (2(s- - 2s0 + s+)).
+            // This is the standard refinement and it is the one FSR3 uses.
+            //
+            // *** IT IS DONE AT L === 0 ONLY, AND THAT IS NOT AN OPTIMISATION. *** A fraction found on a
+            // quarter-resolution mip is a fraction OF FOUR PIXELS, and the level below would then search
+            // around a non-integer guess it cannot represent -- the guess is rounded on the way down, so
+            // the refinement would be computed, scaled up, and thrown away. Refining only the last level
+            // is the only place the answer survives.
+            //
+            // *** AND IT IS CLAMPED TO HALF A PIXEL. *** The parabola is a local model; when the surface is
+            // flat or the winner sits at the edge of the search window the denominator goes small and the
+            // vertex flies off. A displacement more than half a pixel from the winning integer means the
+            // NEIGHBOUR should have won, so anything beyond that is the model failing rather than a real
+            // sub-pixel offset, and the honest response is to keep the integer.
+            if (L === 0 && subpixel) {
+                const px = (dx, dy) => sad(a, b, lw, lh, ox, oy, ox + bdx + dx, oy + bdy + dy, n);
+                const s0 = best, sxm = px(-1, 0), sxp = px(1, 0), sym = px(0, -1), syp = px(0, 1);
+                const vertex = (m, c, p) => { const den = m - 2 * c + p;
+                    // *** THIS GUARD IS DEFENCE IN DEPTH AND NOT LOAD-BEARING, WHICH A SABOTAGE ESTABLISHED
+                    // RATHER THAN ARGUED. *** Removing it scores ZERO failing rows: on a flat surface every
+                    // SAD is equal, den is exactly 0, d is 0/0 = NaN, and `Math.abs(NaN) <= 0.5` is FALSE --
+                    // so the clamp below already returns the integer. The guard is kept because a reader
+                    // should not have to reason about NaN comparison to see that the degenerate case is
+                    // handled, but it is the CLAMP that handles it, and claiming otherwise would be
+                    // crediting the wrong line.
+                    if (!(Math.abs(den) > 1e-9)) return 0;
+                    const d = (m - p) / (2 * den);
+                    return Math.abs(d) <= 0.5 ? d : 0; };
+                subx = vertex(sxm, s0, sxp);
+                suby = vertex(sym, s0, syp);
+            }
             const still = sad(a, b, lw, lh, ox, oy, ox, oy, n);
             // the negation: the search answers cur -> prev, the arc's convention is prev -> cur
-            flow[i * 2] = -bdx * scale;
-            flow[i * 2 + 1] = -bdy * scale;
+            // the sub-pixel part is already at full resolution (L === 0, scale 1) and is negated with
+            // the integer part, at this one site, so the whole vector stays in one sense
+            flow[i * 2] = -(bdx * scale + subx);
+            flow[i * 2 + 1] = -(bdy * scale + suby);
             // how much better than standing still, normalised by standing still. A flat block has
             // still ~ best ~ 0 and reports 0, which is the truthful answer and not a failure.
             conf[i] = still > 1e-6 ? Math.max(0, Math.min(1, (still - best) / still)) : 0;

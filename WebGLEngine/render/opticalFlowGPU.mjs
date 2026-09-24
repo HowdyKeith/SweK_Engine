@@ -31,7 +31,7 @@ export class OpticalFlowGPU {
      * device chains and could not tell a flow defect from a pyramid one. The subject here is the SEARCH.
      * Wiring the device pyramid in is a later round and is named in the gate's closing line.
      */
-    async flow({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3 }) {
+    async flow({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true }) {
         if (!(block >= 2) || block !== Math.floor(block))
             throw new Error(`opticalFlowGPU.flow: block must be a whole number of pixels, at least 2 -- got ${block}`);
         if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -55,9 +55,10 @@ export class OpticalFlowGPU {
             const [lw, lh] = P.sizes[L], scale = 1 << L;
             const bCur = dev.buffer({ data: this._f32(P.mips[L]), usage: ["storage"] });
             const bPrev = dev.buffer({ data: this._f32(Q.mips[L]), usage: ["storage"] });
-            const ub = new ArrayBuffer(32);
+            const ub = new ArrayBuffer(48);
             new Uint32Array(ub, 0, 4).set([lw, lh, bw, bh]);
-            new Int32Array(ub, 16, 4).set([block, searchRadius, scale, block]);
+            // refine only at L === 0, and only if the caller asked -- the same two conditions the CPU applies
+            new Int32Array(ub, 16, 8).set([block, searchRadius, scale, block, (L === 0 && subpixel) ? 1 : 0, 0, 0, 0]);
             const u = dev.buffer({ data: new Uint8Array(ub), usage: "uniform" });
             this.pipe.bind("curLum", bCur).bind("prevLum", bPrev)
                      .bind("flowIn", bIn).bind("flowOut", bOut).bind("confOut", bConf).bind("u", u);
