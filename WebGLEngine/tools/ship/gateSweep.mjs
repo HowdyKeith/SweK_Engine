@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4684 -- THE 294th CLOSING: the confirmation failed on its own terms, and its control was impossible.
+    since369: Object.freeze({
+        at: "v4684", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["tools/ship/pairedStats-selfcheck.mjs", "tools/ship/fsrPageConfirm-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** PRE-REGISTERED AS render/checker-preregistration.md, AND THE PRIMARY IS UNINTERPRETABLE " +
+                 "RATHER THAN NULL. *** v4683 found the first positive frame-generation reading on a picture -- " +
+                 "checker, x4, +0.107 dB, 3 of 4 up -- and asked for a paired test. The record declared one " +
+                 "primary (checker x2, scene frames 6-38, a paired t-test AND an exact sign test both clearing " +
+                 "0.05), three secondaries, and a predicted NON-effect S3: the slab's pixel count constant " +
+                 "across the window, *** because if it moves the window is measuring the slab leaving. *** " +
+                 "IT MOVES: 11,130 pixels to 212, a 98% collapse. The primary cleared neither test (mean " +
+                 "+0.0203 dB, t p 0.35, sign 19/33 p 0.24) and by the record's own terms that null says nothing. " +
+                 "*** AND S3 WAS NEVER SATISFIABLE, WHICH IS A DEFECT IN THE PRE-REGISTRATION. *** The slab " +
+                 "TRANSLATES out of frame, so no window on this camera holds it still. A first draft blamed the " +
+                 "dolly; freezing the dolly was measured and the count still collapses, FASTER on x1 (28% of " +
+                 "its start rather than 70%), while stopping the SLAB holds it at 100%. The window came from a " +
+                 "residency probe that printed frames 1-12 and the last non-zero frame -- and at x2 frames 1-12 " +
+                 "really are constant, the shrinking starts at 13. A window derived from a measurement that " +
+                 "stopped before the interesting part is a chosen window in a derived window's clothes. " +
+                 "*** S1 CLEARED BOTH TESTS AND IS NOT PROMOTED. *** checker x1 over 45 frames: mean +0.1240 dB, " +
+                 "t 4.821 p 8.7e-6, sign 34/43 p 8.5e-5. It was declared in advance as a secondary whose " +
+                 "p-values are not to be quoted as the result, which is exactly why it was named before the " +
+                 "data existed -- promoting it now is the move pre-registration exists to prevent. S2 CONFIRMED " +
+                 "decisively: smooth reads -1.0476 dB with 0 of 33 frames up, so the effect is content-specific. " +
+                 "*** AND THE ROUND SHIPPED THE FIRST RECOMPUTABLE STATISTICS IN THIS TREE. *** v4658, v4660, " +
+                 "v4665 and v4671 all computed their p-values in throwaway drivers; not one was reproducible. " +
+                 "tools/ship/pairedStats.mjs is graded against published t-tables at eight degrees of freedom, " +
+                 "against EXACT rationals by === (11/1024 for nine of ten, in BigInt), and against v4665's own " +
+                 "published 43-of-51 sign test, which it reproduces at 3.4336e-7 against the recorded 3.4e-7. " +
+                 "*** AND ITS POSITIVE CONTROLS FOUND A DEFECT IN IT: *** `sd > 0` does not detect a constant " +
+                 "sample, because twenty copies of 0.3 sum to 6.000000000000001 and have an sd of 1.7e-17 -- the " +
+                 "first draft reported t = 2.4e16 with p = 1e-300 for a sample with no variance, which a " +
+                 "deterministic render pipeline produces routinely. Thirteen sabotages across the two gates; " +
+                 "eight on the statistics, and TWO of those had to be corrected before they could fire -- one " +
+                 "sample used 0.3 + 1e-17, which IS 0.3 below the ULP, and one asked a sign test to clear on a " +
+                 "sample with an exactly even sign split. Both were the gate being wrong and the module right.",
+    }),
     // v4683 -- THE 293rd CLOSING: three explanations refuted, and the first positive reading on a picture.
     since368: Object.freeze({
         at: "v4683", swept: 1, green: 1, red: 0,

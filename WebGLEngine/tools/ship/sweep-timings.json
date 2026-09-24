@@ -2172,7 +2172,9 @@
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
   "tools/ship/fsrPageGen-selfcheck.mjs": 19197,
-  "tools/ship/fsrPageField-selfcheck.mjs": 35084
+  "tools/ship/fsrPageField-selfcheck.mjs": 35084,
+  "tools/ship/pairedStats-selfcheck.mjs": 45,
+  "tools/ship/fsrPageConfirm-selfcheck.mjs": 74234
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3946,7 +3948,9 @@
   "render/frameInterp-selfcheck.mjs": 0,
   "render/holeFill-selfcheck.mjs": 0,
   "tools/ship/fsrPageGen-selfcheck.mjs": 0,
-  "tools/ship/fsrPageField-selfcheck.mjs": 0
+  "tools/ship/fsrPageField-selfcheck.mjs": 0,
+  "tools/ship/pairedStats-selfcheck.mjs": 0,
+  "tools/ship/fsrPageConfirm-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-17T16:44:13.404Z",
@@ -5720,7 +5724,9 @@
   "render/frameInterp-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
   "render/holeFill-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
   "tools/ship/fsrPageGen-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
-  "tools/ship/fsrPageField-selfcheck.mjs": "2026-09-24T00:00:00.000Z"
+  "tools/ship/fsrPageField-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
+  "tools/ship/pairedStats-selfcheck.mjs": "2026-09-24T00:00:00.000Z",
+  "tools/ship/fsrPageConfirm-selfcheck.mjs": "2026-09-24T00:00:00.000Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -10412,7 +10418,9 @@
   "render/frameInterp-selfcheck.mjs": 176,
   "render/holeFill-selfcheck.mjs": 308,
   "tools/ship/fsrPageGen-selfcheck.mjs": 19197,
-  "tools/ship/fsrPageField-selfcheck.mjs": 35084
+  "tools/ship/fsrPageField-selfcheck.mjs": 35084,
+  "tools/ship/pairedStats-selfcheck.mjs": 45,
+  "tools/ship/fsrPageConfirm-selfcheck.mjs": 74234
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-09-16T22:48:41.155Z",
@@ -15265,6 +15273,8 @@
   "render/frameInterp-selfcheck.mjs": "alone",
   "render/holeFill-selfcheck.mjs": "alone",
   "tools/ship/fsrPageGen-selfcheck.mjs": "alone",
-  "tools/ship/fsrPageField-selfcheck.mjs": "alone"
+  "tools/ship/fsrPageField-selfcheck.mjs": "alone",
+  "tools/ship/pairedStats-selfcheck.mjs": "alone",
+  "tools/ship/fsrPageConfirm-selfcheck.mjs": "alone"
  }
 }
