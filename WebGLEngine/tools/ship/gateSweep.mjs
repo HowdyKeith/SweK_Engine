@@ -8070,6 +8070,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4672 -- THE 352nd CLOSING: the ship-time budget is an absolute wall in front of readings that are not
+    // absolute, so a gate can be exiled for how fast the box was rather than for how slow the gate is.
+    since351: Object.freeze({
+        at: "v4672", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/relativeBudget-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/budgetExile-selfcheck.mjs (its section 2 read the UNNORMALISED decision and called it \"the exiled set\"; it now passes the scale, so it grades the rule the ship uses)"]),
+        verdict: "green in 438-462 ms over three runs, 17 rows in nine sections. *** THE COMPARISON, NOT THE " +
+                 "COST. *** selectGates decides membership with timings[g] <= 3000: a constant on the right, " +
+                 "and on the left a millisecond count taken on whatever box at whatever load filed it. " +
+                 "sweep-timings.json's own note has said since v4536 that this box moves 12-36% between " +
+                 "hours on unchanged code, so a gate whose honest cost is 2,800 ms measured in a 26% hour is " +
+                 "filed at 3,528 and stops running -- and nothing about the exile says whether the gate or " +
+                 "the hour was slow. MEASURED ON THE LIVE FILE: a box 10% slow wrongly evicts 26 gates, 26% " +
+                 "slow 86, 50% slow 170, 100% slow 299. " +
+                 "*** THE SCALE IS MEASURED, NOT ASSUMED, AND 21 OF 22 PASSES CANNOT SUPPLY ONE. *** " +
+                 "serialRing (v4648) holds three uncontended readings per gate, so a pass that re-ran gates " +
+                 "which already had history carries paired observations of the same work on the same code: " +
+                 "the median of new/prior is a reading of the BOX, because the gate cancels. The dominant " +
+                 "pass measures 0.9853 over n=185 (p10 0.941, p90 1.031) -- 1.5% FASTER than its own " +
+                 "history. A second pass measures 1.0009 over n=36. The other 20 have zero usable pairs " +
+                 "between them and get NO ENTRY, which reads `measured: false` rather than a 1.0 dressed as " +
+                 "an observation; 339 of 1,780 gates are in that state and select identically to the " +
+                 "pre-v4672 rule. " +
+                 "*** THE CLAMP AT 1 IS A MEASURED DECISION AND NOT TIDINESS. *** Symmetric division by " +
+                 "0.9853 makes the wall STRICTER and would evict five gates today -- fresnelJoin 2970, " +
+                 "pathStrat 2969, magmapDevice 2966, carveJudged 2962, domToTexture 2962, every one of them " +
+                 "four to ten ms under the wall, thrown out to correct for a box that was never slow. " +
+                 "Asymmetric admits 0 and evicts 0 on today's file and still recovers 26/26, 86/86, 170/170 " +
+                 "and 299/299 of the harm above. " +
+                 "*** WHAT IS NOT CLAIMED, AND HOW IT IS BOUNDED INSTEAD. *** The scale is measured on " +
+                 "UNCONTENDED readings and applied to timings[g], which is usually CONTENDED (v4556), so it " +
+                 "assumes a slow box slows both alike -- and nothing in the record can test that, because " +
+                 "there is no parallel ring. So it is capped at SCALE_MAX = 2: a gate readmitted this way " +
+                 "had a raw reading of at most 6,000 ms, and at a 2.5x box the rule declines 84 of 370 " +
+                 "rather than pretending. " +
+                 "TWELVE SABOTAGES ON THE FIRST BATTERY, TWELVE CAUGHT -- and then two more that the first " +
+                 "battery could not have caught, both the round's own defect inside its own gate. Lowering " +
+                 "SCALE_MIN_N to 1 left the headline row GREEN, because the fixture was sized as " +
+                 "`SCALE_MIN_N - 1` and therefore SLID WITH THE CONSTANT: a check whose expectation is " +
+                 "derived from the thing it checks, which grades nothing, and it survived only because a " +
+                 "hardcoded 29 in the row beneath happened to notice. The floor is now LOCATED by walking " +
+                 "1..200 and asking where the answer changes. Raising SCALE_MAX from 2 to 3 made " +
+                 "`rows.find((r) => r.f > SCALE_MAX)` undefined and the row's own detail string dereferenced " +
+                 "it, so THE GATE DIED instead of failing -- a death reports nothing at all, which is " +
+                 "strictly worse than a red. Both repaired, both re-sabotaged, both now red on the change.",
+    }),
     // v4671 -- THE 351st CLOSING: the backlog's own integrity. The file that decides what to build next
     // could not be asked a question, and asking it one found three things -- including a gate this session
     // left red a round earlier.

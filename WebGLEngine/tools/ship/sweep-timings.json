@@ -14150,6 +14150,26 @@
    201
   ]
  },
+ "boxScale": {
+  "2026-09-22T02:20:24.735Z": {
+   "scale": 0.9853,
+   "n": 185,
+   "measured": true,
+   "why": "median of new/prior uncontended ms over the 185 gates this pass re-ran that already had history"
+  },
+  "2026-09-22T02:20:39.928Z": {
+   "scale": 0.9853,
+   "n": 185,
+   "measured": true,
+   "why": "median of new/prior uncontended ms over the 185 gates this pass re-ran that already had history"
+  },
+  "2026-09-21T23:27:55.277Z": {
+   "scale": 1.0009,
+   "n": 36,
+   "measured": true,
+   "why": "median of new/prior uncontended ms over the 36 gates this pass re-ran that already had history"
+  }
+ },
  "contended": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
   "ai-bridge/bootSidecar-selfcheck.mjs": true,

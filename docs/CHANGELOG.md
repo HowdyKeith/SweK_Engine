@@ -26,6 +26,107 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4672 -- a gate evicted for the box being slow, not for being slow
+
+*** THE SHIP-TIME BUDGET IS AN ABSOLUTE WALL IN FRONT OF READINGS THAT ARE NOT ABSOLUTE. ***
+
+`quickSweep.selectGates` decides which gates a round runs with one comparison:
+
+    timings[g] <= 3000
+
+The right side is a constant. The left side is a millisecond count taken on whatever machine, at
+whatever load, ran the sweep that filed it -- and `sweep-timings.json`'s own note has said since
+v4536 that "this box moves 12-36% between hours on unchanged code". So a gate whose honest cost is
+2,800 ms, measured during a 26% hour, is filed at 3,528, crosses the wall, and stops running.
+THE GATE WAS NOT SLOW. THE HOUR WAS, and nothing about the exile says which.
+
+MEASURED ON THE LIVE FILE, against the budget as it stands:
+
+    a box running 10% slow      wrongly evicts   26 gates
+    26% slow                                     86
+    50% slow                                    170
+    100% slow                                   299
+
+Those are gates that pass, cost under budget, and disappear from the ship for a reason that is not
+about them. v4641 and v4642 hand-edited the file three times to undo exactly this, and
+`budgetExile.ABSORBING.escapes` recorded the situation honestly: "raising --budget, or editing the
+file by hand. Nothing automatic."
+
+*** THE MEASUREMENT WAS ALREADY IN THE FILE, WHICH IS WHY THIS IS NOT THE CALIBRATION GATE THE
+BACKLOG PROPOSED. ***
+
+The backlog entry asked for a reference workload run in every pass, to price gates against. It is
+not needed: `serialRing` (v4648) already keeps the last three UNCONTENDED readings per gate. A pass
+that re-ran gates which already had history is therefore its own calibration -- every gate is a
+reference for itself, same work, same code, a different hour -- and the median of `new / median(prior)`
+over those pairs is a reading of THE BOX, because the gate cancels out of each ratio.
+
+    the dominant pass    scale 0.9853    n = 185    p10 0.941   p90 1.031
+    a second pass        scale 1.0009    n =  36
+    the other 20 passes  no entry -- zero usable pairs between them
+
+`boxScaleOf` is pure and takes the two maps, so a gate drives it on a fixture. Below `SCALE_MIN_N`
+(30) pairs there is NO scale: the answer is `measured: false`, not a 1.0 that reads like an
+observation. 339 of the tree's 1,780 gates belong to such a pass and select exactly as they did
+before this round, and say so.
+
+*** THE CLAMP AT 1 IS A MEASURED DECISION, NOT SYMMETRY REFUSED FOR TIDINESS. ***
+
+`normalisedMs` divides by `max(1, min(SCALE_MAX, scale))`. A pass that ran FAST moves nothing. That
+asymmetry was measured before it was chosen: dividing by this file's real 0.9853 -- a box that ran
+1.5% FASTER than its own history -- makes the wall STRICTER and evicts five gates today.
+
+    physics/em/fresnelJoin-selfcheck.mjs        2970 ms
+    physics/render/pathStrat-selfcheck.mjs      2969 ms
+    tools/roundhouse/magmapDevice-selfcheck.mjs 2966 ms
+    tools/ship/carveJudged-selfcheck.mjs        2962 ms
+    tools/ship/domToTexture-selfcheck.mjs       2962 ms
+
+Four to ten milliseconds under the wall, every one thrown out to correct for a box that was never
+slow. The one-sided form admits 0 and evicts 0 on today's file, and still recovers 26/26, 86/86,
+170/170 and 299/299 of the harm above.
+
+*** WHAT IS NOT CLAIMED, AND HOW IT IS BOUNDED INSTEAD OF TRUSTED. ***
+
+The scale is measured on UNCONTENDED readings and applied to `timings[g]`, which is usually a
+CONTENDED sample (v4556's `contended`). That assumes a slow box slows both alike, and nothing in the
+record can test it, because there is no parallel ring. So the divisor is capped at `SCALE_MAX = 2`:
+a gate readmitted this way had a raw reading of at most 6,000 ms, and at a 2.5x box the rule
+declines 84 of 370 rather than pretending. The cap is where the rule stops guessing.
+
+*** THE GATE, AND THE TWO SABOTAGES THAT WERE ITS OWN DEFECT. ***
+
+`tools/ship/relativeBudget-selfcheck.mjs` -- green in 438-462 ms over three runs, 17 rows in nine
+sections. Section 9 drives the real `runQuickSweep` on a fixture with a control differing in one
+field, because a rule `selectGates` knows and `runQuickSweep` never passes it is a mechanism nobody
+invokes.
+
+Twelve sabotages on the first battery, twelve caught. Then two more that the first battery could not
+have caught, both this round's own defect inside its own gate:
+
+  - Lowering `SCALE_MIN_N` to 1 left the headline row GREEN. The fixture was sized as
+    `SCALE_MIN_N - 1`, so it SLID WITH THE CONSTANT -- a check whose expectation is derived from the
+    thing it checks, which grades nothing. It survived only because a hardcoded 29 in the row
+    beneath happened to notice. The floor is now LOCATED by walking 1..200 and asking where the
+    answer changes, against the literals 29 and 30.
+  - Raising `SCALE_MAX` from 2 to 3 made `rows.find((r) => r.f > SCALE_MAX)` undefined, and the row's
+    own detail string dereferenced it, so THE GATE DIED instead of failing. A death reports nothing
+    at all, which is strictly worse than a red: ship time sees a crash and not a finding.
+
+Both repaired, both re-sabotaged, both now red on the change.
+
+`budgetExile-selfcheck` section 2 was widened in the same round: it read the UNNORMALISED decision
+and called it "the exiled set", which stopped being the ship's exiled set the moment this landed.
+And the backlog entry's "cheaper interim step" -- that budgetExile "has the census and the ledger and
+no writer" -- had been done for forty rounds: `sweepRotation --write` IS that writer and `--gate`/
+`--band` ARE the re-admission path, added at v4535 and v4565. The stale text is preserved and
+corrected in a note beside it, the same shape v4671 found in `orb-state-terms-wiring`.
+
+Records re-derived, not adjusted: assertionShape 1779 -> 1780 gates (usesOk 1759, definesOk 1751,
+nameFirst 1652; condFirst did not move), runtimeGap 4311 -> 4312 files with three of twelve rows
+moving (ES modules 4012, closures 3878, async/await 1542) and `closuresOverThreads` holding at 169,
+gateSweep's 352nd closing, and `sweep-timings-box-drift` closed after 31 rounds open.
+
 ## v4671 -- the file that decides what to build next could not be asked a question
 
 This round started as a question, and the question was the finding. Asked *what is still open?*, the backlog

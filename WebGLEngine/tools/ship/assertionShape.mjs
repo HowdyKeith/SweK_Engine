@@ -729,8 +729,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // all: it reads tools/ship/nextRounds.mjs as a DATA STRUCTURE -- unique ids, a classifiable status, one
     // countable claim that had gone false -- which is the first gate in this tree whose subject is the
     // backlog's queryability rather than any code the backlog describes.
-    gates: 1779, usesOk: 1758, definesOk: 1750, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1651, condFirst: 96, unknownSignature: 11,
+    // v4672 -- RE-TAKEN 1779 -> 1780 for tools/ship/relativeBudget-selfcheck.mjs. It is the first gate whose
+    // subject is the SHIP-TIME BUDGET'S COMPARISON rather than any gate's cost: the wall is a constant and the
+    // readings it judges are not, so a gate over it may be over it for a property of the box. nameFirst moved
+    // with usesOk (1651 -> 1652) because every one of its rows leads with the assertion's name, and condFirst
+    // did not move at all.
+    gates: 1780, usesOk: 1759, definesOk: 1751, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1652, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

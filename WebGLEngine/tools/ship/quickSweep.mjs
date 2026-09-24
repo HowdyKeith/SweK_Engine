@@ -357,11 +357,110 @@ export function falseRedSplit(list) {
     return { capped: capped.length, slowed: (list || []).length - capped.length, of: (list || []).length };
 }
 
+// ---- THE BOX, AS A MULTIPLIER ---------------------------------------------------------------------------
+//
+// *** v4672 -- THE WALL IS ABSOLUTE AND THE READINGS ARE NOT, SO A SLOW HOUR EVICTS GATES FOR A PROPERTY OF
+// THE BOX. ***
+//
+// selectGates compares timings[g] against a FIXED 3,000 ms. The number on the left was taken on whatever
+// machine, at whatever load, ran the sweep that filed it -- and this file's own note has said since v4536
+// that "this box moves 12-36% between hours on unchanged code". A gate whose honest cost is 2,800 ms,
+// measured during a 26% hour, is filed at 3,528 and then never runs again: the rotation is what eventually
+// re-times it, but until it does, the gate is out of every ship. THE GATE WAS NOT SLOW. THE HOUR WAS.
+//
+// MEASURED ON THIS FILE, against the budget as it stands: a box running 10% slow would wrongly evict 26
+// gates, 26% slow 86, 50% slow 170, 100% slow 299. Those are gates that pass, cost under budget, and
+// disappear from the ship for a reason that is not about them.
+//
+// *** WHAT CAN BE MEASURED FROM THE FILE, AND WHAT CANNOT. *** serialRing holds the last three UNCONTENDED
+// readings per gate (v4648). A pass that re-ran 185 gates which already had prior readings therefore carries
+// 185 paired observations of the same work on the same code, and the median of new/prior is a reading of
+// THE BOX rather than of any gate. The most recent pass in this file measures 0.9853 over n=185 (p10 0.941,
+// p90 1.031) -- that box ran 1.5% FASTER than its own history. The other 21 passes in the file have zero
+// usable pairs between them, because the ring is three long and they are old; they get no entry, and a gate
+// whose reading came from one of them is normalised by 1 and says so. AN ABSENT SCALE IS NOT A SCALE OF 1
+// DRESSED UP -- scaleOfGate returns `measured: false` for it, and the gate asserts on that field.
+//
+// *** THE ASSUMPTION THIS MAKES, STATED RATHER THAN HIDDEN. *** The scale is measured on SERIAL readings and
+// applied to timings[g], which is usually a CONTENDED one (v4556's `contended`). That assumes a slow box
+// slows both alike. Nothing in this file can test it -- there is no parallel ring -- so the normalisation is
+// bounded on both sides instead of trusted:
+//
+//   ASYMMETRIC. Only a scale ABOVE 1 moves anything: ms / max(1, scale). A pass that ran FAST leaves its
+//   readings alone. This is not symmetry-for-its-own-sake being refused -- it was measured. Dividing by
+//   0.9853 makes the wall stricter and would evict five gates TODAY (fresnelJoin 2970, pathStrat 2969,
+//   magmapDevice 2966, carveJudged 2962, domToTexture 2962 -- all four to ten milliseconds under the wall,
+//   all of them thrown out by a correction for a box that was never slow). Asymmetric admits 0 and evicts 0
+//   on today's file, and still saves every one of the 26 / 86 / 170 / 299 above.
+//
+//   CAPPED at SCALE_MAX. A gate admitted by this rule has a raw reading of at most budgetMs * SCALE_MAX, so
+//   the worst case of the assumption being wrong is a 6-second gate in a 3-second ship, not a 60-second one.
+//   The cap is what makes the failure bounded rather than open: at a 2.5x box it declines to rescue 84 of
+//   370, which is the cap working and not a bug.
+//
+//   FLOORED at SCALE_MIN_N pairs. Fewer than thirty and there is no scale, because the statistic is a median
+//   over gates and a median over four gates is a reading of four gates. Of this file's 22 passes exactly one
+//   clears it.
+export const SCALE_MIN_N = 30;
+export const SCALE_MAX = 2;
+
+const median = (a) => { const s = [...a].sort((x, y) => x - y); const n = s.length;
+                        return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
+
+/**
+ * How fast the box was during one capture pass, relative to the history of the very gates it re-ran.
+ *
+ * Pure, and takes the two maps rather than the record, so a gate can drive it on a fixture. Every ratio is
+ * one gate's newest uncontended reading over the median of ITS OWN earlier ones -- same gate, same code,
+ * different hour -- so the gate cancels and what is left is the machine.
+ */
+export function boxScaleOf(serialRing, serialAt, stamp) {
+    const ratios = [];
+    for (const g of Object.keys(serialRing || {})) {
+        if ((serialAt || {})[g] !== stamp) continue;
+        const r = serialRing[g];
+        if (!Array.isArray(r) || r.length < 2) continue;      // no prior: this gate has nothing to compare to
+        const now = r[r.length - 1], was = median(r.slice(0, -1));
+        if (!(now > 0) || !(was > 0)) continue;
+        ratios.push(now / was);
+    }
+    const n = ratios.length;
+    if (n < SCALE_MIN_N) return { scale: 1, n, measured: false,
+        why: `${n} of the gates re-run in this pass had a prior reading to compare against; ${SCALE_MIN_N} are needed, so no scale was taken` };
+    return { scale: +median(ratios).toFixed(4), n, measured: true,
+        why: `median of new/prior uncontended ms over the ${n} gates this pass re-ran that already had history` };
+}
+
+/**
+ * The scale that applies to timings[gate] -- which is to say, the scale of the pass that PRODUCED that
+ * number. Keyed on at[gate] and nothing else: a gate's serial reading may well come from a different pass
+ * than its filed ms, and a pass's scale is only evidence about the readings that pass took.
+ */
+export function scaleOfGate(prior, gate) {
+    const stamp = ((prior || {}).at || {})[gate];
+    const e = stamp ? ((prior || {}).boxScale || {})[stamp] : null;
+    if (!e || e.measured !== true || !(e.scale > 0)) return { scale: 1, measured: false, n: (e || {}).n ?? 0 };
+    return { scale: Math.min(SCALE_MAX, e.scale), measured: true, n: e.n };
+}
+
+/** The budget-comparable time: what this reading would have been on a box running at its own history's pace. */
+export function normalisedMs(ms, scale) { return ms / Math.max(1, Math.min(SCALE_MAX, scale || 1)); }
+
+/** The lookup selectGates wants, from a whole record. Returns 1 for every gate when the record knows nothing. */
+export const scaleLookup = (prior) => (g) => scaleOfGate(prior, g).scale;
+
 export function selectGates(all, timings, budgetMs, { crossings = null, minCrossings = MIN_CROSSINGS_TO_EVICT,
-                                                      inputRecord = null, skipUnchanged = false } = {}) {
-    const run = [], skipped = [], unmeasured = [], onProbation = [];
+                                                      inputRecord = null, skipUnchanged = false,
+                                                      scaleOf = null } = {}) {
+    const run = [], skipped = [], unmeasured = [], onProbation = [], rescaled = [];
     for (const g of all) {
-        const ms = timings[g];
+        const raw = timings[g];
+        // *** v4672 -- THE COMPARISON IS AGAINST WHAT THIS GATE WOULD HAVE COST ON AN UNREMARKABLE BOX. ***
+        // scaleOf is absent for every caller that hands this function a hand-made map, and then every
+        // `scale` is 1 and `ms === raw` -- which is the rule as it stood before this parameter existed.
+        const scale = scaleOf ? scaleOf(g) : 1;
+        const ms = raw == null ? null : normalisedMs(raw, scale);
+        if (raw != null && ms !== raw) rescaled.push({ gate: g, raw, ms: +ms.toFixed(1), scale });
         if (ms == null) { unmeasured.push(g); run.push(g); }
         else if (ms <= budgetMs) run.push(g);
         // *** PROBATION IS FOR A GATE THAT CROSSED, NOT FOR EVERY GATE ALREADY OUT. *** The first draft ran
@@ -382,7 +481,11 @@ export function selectGates(all, timings, budgetMs, { crossings = null, minCross
         for (const g of run) (skippable(g, inputRecord) ? unchanged : keep).push(g);
         if (skipUnchanged) { run.length = 0; for (const g of keep) run.push(g); }
     }
-    return { run, skipped, unmeasured, onProbation, unchanged };
+    // `rescaled` is every gate whose filed ms and budget-comparable ms differ, with both numbers and the
+    // divisor -- so the question "did the normalisation move anything, and by how much" has an answer from
+    // the return value rather than from re-deriving it. `admitted` is the subset it actually SAVED.
+    const admitted = rescaled.filter((r) => r.raw > budgetMs && r.ms <= budgetMs).map((r) => r.gate);
+    return { run, skipped, unmeasured, onProbation, unchanged, rescaled, admitted };
 }
 
 /** Reconcile serial reds against the register: known (with the record that names them) versus new. */
@@ -496,7 +599,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // every gate, so the sweep behaves exactly as it did before this parameter existed.
     const inputRecord = readInputRecord(root);
     const sel = selectGates(all, prior.timings || {}, budgetMs,
-        { crossings: prior.crossings || {}, inputRecord, skipUnchanged });
+        { crossings: prior.crossings || {}, inputRecord, skipUnchanged, scaleOf: scaleLookup(prior) });
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -565,6 +668,17 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         }
     }
     const out0 = { at: new Date().toISOString() };
+    // *** v4672 -- HOW FAST THIS BOX WAS, MEASURED BEFORE THE READINGS IT TOOK ARE USED AS COSTS. ***
+    // Taken AFTER the slice loop, so every uncontended reading this sweep produced is already in the ring.
+    // The entry is filed under BOTH stamps this sweep writes -- `serialAt` rows carry sliceStamp and `at`
+    // rows carry out0.at -- because they are one sweep on one box, and a lookup by either must find it.
+    const boxScale = { ...(prior.boxScale || {}) };
+    {
+        const bs = boxScaleOf(serialRing, serialAt, sliceStamp);
+        // An unmeasured pass gets NO entry rather than a scale of 1: scaleOfGate then answers
+        // `measured: false`, which is a different statement from "measured, and the box was ordinary".
+        if (bs.measured) { boxScale[sliceStamp] = bs; boxScale[out0.at] = bs; }
+    }
     const rec = reconcile(rows);
     const green = rows.filter((r) => r.verdict === VERDICT.GREEN).length;
     // *** v4647c -- THIS WAS `.length` AND THE ROWS WENT IN THE BIN, WHICH IS THE DEFECT THIS TREE NAMES
@@ -772,7 +886,15 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                   "`contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, " +
                   "false for a serial reading filed there -- by a red re-run, a budget confirm, or " +
                   "sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask " +
-                  "contentionPairs() for the population a contention ratio may be taken over.",
+                  "contentionPairs() for the population a contention ratio may be taken over. " +
+                  "*** `boxScale` (v4672) IS HOW FAST THE BOX WAS DURING ONE CAPTURE PASS, and it is what a ms " +
+                  "must be divided by before it is compared to a budget. Keyed by capture stamp -- both the `at` " +
+                  "stamp and the `serialAt` stamp a sweep writes, which are one sweep -- and measured as the " +
+                  "median of new/prior over the gates that pass re-ran which already had serialRing history, so " +
+                  "the GATE cancels and the MACHINE is what is left. A pass with fewer than SCALE_MIN_N such " +
+                  "gates gets NO ENTRY, which says `no scale was measured` rather than `the box was ordinary`. " +
+                  "selectGates divides by max(1, min(SCALE_MAX, scale)): only a slow pass moves anything, and a " +
+                  "gate readmitted this way had a raw reading of at most budgetMs * SCALE_MAX. ***",
             // *** `finished` IS IN THIS LIST BECAUSE IT WAS NOT, AND THE SWEEP ERASED IT. *** v4568 added the
             // field, wrote it into a local object in the loop above, and left it out of the object actually
             // written -- so the first full sweep after the killed pass silently deleted 140 rows of
@@ -793,7 +915,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // A gate this run swept has an OBSERVED kind and leaves the list. Every other entry keeps whatever
             // it had, because this run learned nothing about it.
             kindsInferred: (prior.kindsInferred || []).filter((g) => !sweptNow.has(g)),
-            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, serialRing, contended, kinds,
+            captured: out.at, budgetMs, capMs, timings, codes, at, capAt, finished, crossings, serial, serialAt, serialRing, contended, kinds, boxScale,
         }, null, 1) + "\n");
     }
     return out;

@@ -813,7 +813,43 @@ export const NEXT_ROUNDS = [
     // is permanent and silent, and because the next round to run four sweeps in a session will hit it again.
     {
         id: "sweep-timings-box-drift",
-        blocker: "OPEN",
+        blocker: "CLOSED at v4672. The relative budget ships: selectGates divides each reading by the " +
+            "measured scale of the capture pass that took it, clamped to [1, SCALE_MAX]. " +
+            "tools/ship/relativeBudget-selfcheck.mjs grades it in nine sections.",
+        note2: "*** WHAT SHIPPED IS NOT THE CALIBRATION GATE THE `upstream` FIELD BELOW PROPOSED, AND THE " +
+            "REASON IS THAT THE FILE ALREADY HELD THE MEASUREMENT. *** The proposal was to price every gate " +
+            "against a reference workload run in the same pass. serialRing (v4648) turns out to make that " +
+            "unnecessary: it keeps the last three UNCONTENDED readings per gate, so a pass that re-ran gates " +
+            "which already had history is itself a calibration -- every gate is its own reference, on its own " +
+            "code, in a different hour. The median of new/prior over those pairs is a reading of the BOX, " +
+            "because the gate cancels out of each ratio. No new workload, no new run, and it works " +
+            "RETROSPECTIVELY on passes the file already recorded.\n\n" +
+            "MEASURED ON THE FILE AS IT STOOD: the dominant pass 0.9853 over n=185 (p10 0.941, p90 1.031) and " +
+            "a second 1.0009 over n=36. The other 20 of 22 passes have zero usable pairs between them -- the " +
+            "ring is three long and they are old -- and they get NO ENTRY rather than a scale of 1, so 339 of " +
+            "1,780 gates select exactly as they did before v4672 and say so. THAT IS THE LIMIT OF THE REPAIR: " +
+            "it corrects the passes it can measure and is honestly silent about the rest.\n\n" +
+            "THE CLAMP AT 1 WAS ALSO MEASURED RATHER THAN CHOSEN. Symmetric division would have made the wall " +
+            "STRICTER on this file -- 0.9853 means the box ran 1.5% FASTER than its own history -- and evicted " +
+            "five gates sitting four to ten ms under it (fresnelJoin 2970, pathStrat 2969, magmapDevice 2966, " +
+            "carveJudged 2962, domToTexture 2962). The one-sided form admits 0 and evicts 0 today, and still " +
+            "recovers every gate this entry\'s own scenario loses: 26/26 at a 10% slow box, 86/86 at 26%, " +
+            "170/170 at 50%, 299/299 at 100%.\n\n" +
+            "AND WHAT IS NOT CLAIMED: the scale is measured on uncontended readings and applied to timings[g], " +
+            "which is usually a CONTENDED sample. Nothing in the record can test that -- there is no parallel " +
+            "ring -- so it is BOUNDED instead of trusted, capped at SCALE_MAX = 2. A gate readmitted this way " +
+            "had a raw reading of at most 6,000 ms, and at a 2.5x box the rule declines 84 of 370 rather than " +
+            "pretending. A ring over the parallel readings would make the assumption testable and is the " +
+            "obvious next step if this ever needs one.",
+        note3: "*** THE `upstream` FIELD\'S \"CHEAPER INTERIM STEP\" HAD BEEN DONE FOR FORTY ROUNDS AND THE " +
+            "ENTRY DID NOT KNOW. *** It says budgetExile \"has the census and the ledger and no writer, so an " +
+            "exiled gate can be shown to be cheap again and still never runs\". tools/ship/sweepRotation.mjs " +
+            "IS that writer: --write files re-measured costs, and --gate/--band are a re-admission path, added " +
+            "at v4535 and v4565, five and thirty-five rounds before this entry was read again. Its `restored` " +
+            "rule is stricter than the one proposed here -- two witnessed readings inside a band, both under " +
+            "budget. Left in place verbatim as the record of what the entry believed; this note is the " +
+            "correction. Same shape as v4671\'s orb-state-terms-wiring: an accurate paragraph going stale " +
+            "underneath, and a reader stopping at the field that reads like a plan.",
         what: "tools/ship/sweep-timings.json records a gate's cost as measured ON A BOX, and this container " +
             "got about 26% slower over one session of four full quickSweep passes and did not recover. Every " +
             "sweep taken in that state wrote inflated costs, and each one evicted a different set of ten to " +
