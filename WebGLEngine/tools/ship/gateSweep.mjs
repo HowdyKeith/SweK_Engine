@@ -8032,6 +8032,64 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4676 -- THE 286th CLOSING: the two motion fields, and a header that had the sense backwards.
+    since361: Object.freeze({
+        at: "v4676", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/flowReconcile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/runnerCallers-selfcheck.mjs"]),
+        verdict: "*** FSR3 HAS TWO MOTION FIELDS ON EVERY FRAME AND FRAME GENERATION NEEDS ONE. *** The " +
+                 "application's vector is EXACT where it applies -- a reprojection, not an estimate -- and " +
+                 "SILENT about everything that is not geometry. The colour flow sees everything and guesses. " +
+                 "render/flowReconcile.mjs picks per block by MEASURING which candidate the two frames " +
+                 "support, not by a heuristic on confidence. Two scenes built so no single arm can pass " +
+                 "both: a wall at constant depth, camera sliding (the application is right to 1.7e-6 px, " +
+                 "the flow is 0.42 px out) and camera still with the texture sliding (the application " +
+                 "reports zero on all 4096 pixels with valid = 1, and is wrong by the whole 3.20 px). " +
+                 "RECONCILED: 0.0043 px on the first, 98x the flow alone, and 0.2651 px on the second " +
+                 "against the application's 3.1997. " +
+                 "*** AND THE FLOW ARM WAS FITTED ON THE STATISTIC THAT JUDGES IT, WHICH IS MEASURED RATHER " +
+                 "THAN ARGUED. *** The search minimised SAD over 81 candidates per block; the application " +
+                 "got one shot. At margin 0 the flow takes 7 of 64 blocks from an application that is " +
+                 "EXACTLY right -- the bias's size in blocks -- and the margin buys them back monotonically, " +
+                 "7 -> 4 -> 2 -> 0. On the shader scene it costs nothing to 0.20. The shipped 0.05 is NOT " +
+                 "tuned on that sweep and a row says so, because 64 blocks of one synthetic shift is a data " +
+                 "point and not a calibration. " +
+                 "*** AND opticalFlow.mjs's HEADER HAD THE SENSE BACKWARDS SINCE v4673. *** It said its " +
+                 "negation put its output in \"the same sense render/motionVectors.mjs uses\". MEASURED: the " +
+                 "two are NEGATIVES of each other -- content displaced +3.20 px gives the flow -3.14 and the " +
+                 "application +3.20. Three rounds of prose nothing forced to agree with the code, which is " +
+                 "the hazard v4638 recorded arriving from the other direction. The negation is kept, the " +
+                 "sentence is what changed, and the one sabotage that can reach those rows is a mutation of " +
+                 "opticalFlow.mjs rather than of this pass. Eleven sabotages; every row reddened by one. " +
+                 "*** ONE IS OF THE RIG AND IS LABELLED AS A WEAKER CLASS. *** Section 3's premise row -- " +
+                 "that the application really is silent -- cannot be reached by any mutation of the pass, " +
+                 "only by moving the scene's camera, and a thousandth of a world unit does it. A FIRST " +
+                 "attempt leaked the slide into the world-point computation instead: the application stayed " +
+                 "genuinely silent, the row stayed green and was RIGHT to, and the near miss is recorded " +
+                 "because a sabotage that misses what a row measures is not evidence about that row. " +
+                 "*** AND THIS ROUND'S VERIFY SWEEP FOUND A RED THIS TREE HAD BEEN CARRYING FOR TWO " +
+                 "VERSIONS. *** render/opticalFlowGPU.mjs arrived at v4674 and reddened " +
+                 "tools/ship/runnerCallers-selfcheck.mjs ON ARRIVAL; v4674 and v4675 both shipped green-" +
+                 "looking and neither named it. *** WHAT LET THAT HAPPEN IS STRUCTURAL AND IS THE FINDING. *** " +
+                 "Both closings declare `swept: 0`, and this record's own invariant is " +
+                 "`red === redOnArrival.length` -- which a round that sweeps NOTHING satisfies trivially. A " +
+                 "round can add a device runner, redden a census, and close with an internally consistent " +
+                 "empty ledger -- and it is worse than that: this record's own shape requires " +
+                 "`added.length === swept` and `redOnArrival` to name only gates in `added`, so a red a round " +
+                 "causes in an EXISTING gate has NO SLOT HERE AT ALL. The ledger is a record of how the " +
+                 "round's OWN gates arrived, and it cannot be made to answer what the round broke elsewhere. The ratchet is widened to 4 with the note it owes -- a flow field has no " +
+                 "consumer on fsr.html, and flowReconcile is CPU-only so it does not retire the debt either " +
+                 "-- and the gate now states that this is the SECOND widening in nine rounds, so the next " +
+                 "round that wants a third has to write the count down. v4674's and v4675's closings are " +
+                 "left exactly as they shipped: a superseded record is evidence about the method. " +
+                 "*** AND THE SAME SWEEP FOUND A SECOND STANDING RED, NAMED HERE AND NOT FIXED HERE. *** " +
+                 "tools/ship/gateReport-selfcheck.mjs is red on four rows and was red at v4675 too, on ten " +
+                 "gates that print a table of numbers and emit no machine-readable report -- " +
+                 "render/opticalFlow-selfcheck.mjs and render/luminancePyramid-selfcheck.mjs among them, so " +
+                 "this arc put two of the ten there. v4676 does not add an eleventh and does not clear it: " +
+                 "that is a round of its own, and claiming it here would be claiming work not done.",
+    }),
     // v4675 -- THE 285th CLOSING: sub-pixel, and two rows the scoping pass quietly disarmed.
     since360: Object.freeze({
         at: "v4675", swept: 0, green: 0, red: 0,

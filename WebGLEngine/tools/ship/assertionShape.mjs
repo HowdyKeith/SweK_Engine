@@ -483,8 +483,12 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // this row caught it, which is the division of labour working and is also the reason the sentence is
     // not enough on its own. The pre-flight cannot see it either -- recordDrift compares four
     // fields and this row compares all nine, which is exactly why that row says so in its own text.
-    gates: 1764, usesOk: 1743, definesOk: 1735, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1636, condFirst: 91, unknownSignature: 16,
+    // v4676 -- 1764 -> 1765 for render/flowReconcile-selfcheck.mjs, FSR3's reconciliation of the two motion
+    // fields. Eighth consecutive round with the same four rows moving by exactly one and the other four
+    // held. nameFirst bumped in the same edit, unprompted, which is the third round in a row it has been --
+    // so the note above has stopped describing the failure and started describing the habit that replaced it.
+    gates: 1765, usesOk: 1744, definesOk: 1736, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1637, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

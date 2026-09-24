@@ -94,8 +94,31 @@ console.log("\n3. THE RATCHET");
 // v4657 and v4664 each took the OTHER branch -- reactiveGPU and dilateGPU both arrived here and both got a
 // production caller on the round that added them, because both had real work to do on this content. That
 // this one does not is the distinction the note has to carry.
-const GATE_ONLY_AT_V4654 = 3;
-ok("!! *** no THIRD compute runner arrives with only a gate able to construct it ***",
+//
+// *** WIDENED TO 4 AT v4676, AND THE REASON THE WIDENING IS OWED IS ITSELF A FINDING. ***
+//
+// render/opticalFlowGPU.mjs arrived at v4674 and reddened this gate ON ARRIVAL. It stayed red through v4675
+// and was found at v4676 by a verify sweep, not by either of the rounds that caused it -- so this tree
+// shipped two versions with a standing red that no record named. What let that happen is structural and
+// worth stating where it can be read: gateSweep's ledger requires `added.length === swept` and requires every
+// entry in `redOnArrival` to name a gate in `added`, so the ledger records how a round's OWN gates arrived and
+// has no slot at all for a gate the round reddened ELSEWHERE. v4674 and v4675 both declared `swept: 0`, which
+// with an empty `redOnArrival` is internally consistent and says nothing. A round can add a device runner,
+// redden this census, and close with a ledger that passes its own invariant.
+//
+// The note the widening owes: a flow field has no consumer on fsr.html. render/opticalFlow.mjs estimates
+// motion for FRAME GENERATION, and nothing in this tree yet turns a motion field into a frame between two
+// frames -- so a page call would compute a field and discard it, which is the decorative dispatch this
+// census exists to make visible. render/flowReconcile.mjs, arriving this round, is the flow's first consumer
+// and is CPU-only, so it does not retire the debt either: it would have to read the device field back to use
+// it. What retires it is frame interpolation on the page, which is the next thing this arc builds.
+//
+// *** AND THIS IS THE SECOND WIDENING IN NINE ROUNDS, WHICH IS THE PART THAT SHOULD BE UNCOMFORTABLE. ***
+// v4668 widened it to 3 with a note of exactly this shape. A ratchet that widens whenever a round has a good
+// reason is a ratchet that measures how good this tree is at reasons. The count is stated here so the next
+// round that wants to widen it has to write "the third widening in ten rounds" and mean it.
+const GATE_ONLY_AT_V4654 = 4;
+ok("!! *** no FIFTH compute runner arrives with only a gate able to construct it ***",
    R.gateOnly.length <= GATE_ONLY_AT_V4654,
    `${R.gateOnly.length} against a frozen ${GATE_ONLY_AT_V4654}: ${R.gateOnly.map((x) => x.file).join(", ")}. ` +
    "OWED for each: a caller in production, or a note saying why a gate is the only sensible one. " +

@@ -46,9 +46,8 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  *
  * Returns { flow, conf, bw, bh, block, levels }:
  *   flow   2 floats per block: the displacement in FULL-RESOLUTION pixels, refined to a FRACTION at the
- *          finest level (v4675), that takes the block in `prev`
- *          to where it is in `cur` -- the same sense render/motionVectors.mjs uses, prev -> cur reversed,
- *          see the note on `sense` below
+ *          finest level (v4675), that takes the block in `prev` to where it is in `cur` -- see the note on
+ *          `sense` below, WHICH SAID THE WRONG THING UNTIL v4676
  *   conf   per block, in [0, 1]: how much better the winning match is than standing still. 0 means the
  *          block is as happy where it was, which is what a flat region reports and is not a failure
  *
@@ -57,12 +56,21 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * whole pixels, which is what v4673 shipped.
  *   bw,bh  the block grid's dimensions
  *
- * *** THE SENSE IS uvPrev - uvCurr, MATCHING render/motionVectors.mjs, AND THAT IS NOT THE NATURAL OUTPUT
- * OF A SEARCH. *** A block matcher naturally answers "where did this block GO", cur -> prev being searched.
- * The arc's motion convention is the reverse: `hu = u + du` samples the history. Returning the search's own
- * sense here would put a second convention in a tree whose every other module shares one, and v4638 already
- * recorded what two conventions cost when nothing forces them to agree. The negation is at the bottom of
- * `refine` and it is the only place it happens.
+ * *** THE SENSE IS THE CONTENT'S FORWARD DISPLACEMENT, prev -> cur, AND IT IS THE NEGATIVE OF
+ * render/motionVectors.mjs's -- WHICH THIS HEADER DENIED FOR THREE ROUNDS. ***
+ *
+ * A block matcher naturally answers "where did this block COME FROM", cur -> prev being searched, and that
+ * is also the arc's motion-vector convention: `du = uvPrev - uvCurr`, `hu = u + du` samples the history.
+ * The negation at the bottom of the loop turns the search's answer into the OPPOSITE of that, not into it.
+ * From v4673 to v4675 this paragraph claimed the negation made the two agree, and v4676 measured it:
+ * content displaced by (+3, -2) pixels makes this function report (+3, -2) on all 64 blocks, where the
+ * application's vector for the same content is (-3, +2).
+ *
+ * The negation is kept and the sentence is what changed. Frame interpolation asks where content is GOING,
+ * so a forward field is the one its consumer wants, and render/flowReconcile.mjs -- which is the module that
+ * has to hold both fields at once -- negates the application's vector on the way in, at one site, and says
+ * so. What v4638 recorded is not that a tree may have only one convention; it is that a convention nothing
+ * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
                                  subpixel = true }) {
@@ -159,7 +167,8 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
                 suby = vertex(sym, s0, syp);
             }
             const still = sad(a, b, lw, lh, ox, oy, ox, oy, n);
-            // the negation: the search answers cur -> prev, the arc's convention is prev -> cur
+            // the negation: the search answers cur -> prev, this function's output is prev -> cur, which is
+            // the NEGATIVE of render/motionVectors.mjs's sense and not the same as it -- see the header
             // the sub-pixel part is already at full resolution (L === 0, scale 1) and is negated with
             // the integer part, at this one site, so the whole vector stays in one sense
             flow[i * 2] = -(bdx * scale + subx);
