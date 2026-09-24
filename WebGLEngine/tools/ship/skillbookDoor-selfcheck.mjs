@@ -24,6 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import http from "node:http";
 import { createRequire } from "node:module";
 import { codeHas } from "./sourceScan.mjs";
 
@@ -152,13 +153,84 @@ const call = (url) => new Promise((res) => bridge.handle({ url }, {}, { sendJson
         `n cap ${idx.nMax} for the mock, ${idx.nMaxModel} for the model, ${idx.budgetMs / 1000}s wall clock -- a model ` +
         "trial is 2n network calls at seconds each, so the mock's cap would be a hang");
 
-    // A model that is not there is a REPORTED STATE, not a crash and not a null result.
-    const down = await call("/skill/trial?device=kerr&caller=ollama");
-    ok("!! *** with no model reachable the trial REFUSES BEFORE IT RUNS, naming which of the three states ***",
-        down.ok === false && down.error === "model-not-ready" && typeof down.verdict === "string" && !!down.fix,
-        `verdict "${down.verdict}" -- ollamaReadiness keeps NOT-RUNNING, RUNNING-WITH-NO-MODELS and ` +
-        "PINNED-MODEL-MISSING apart, and the third one otherwise bites at the first call, MID-RUN, after a device " +
-        "has already been built");
+    // *** v4668 -- THIS ROW USED TO TEST THE BOX, NOT THE BRIDGE. ***
+    // It was one `call("/skill/trial?device=kerr&caller=ollama")` against whatever was on 127.0.0.1:11434,
+    // asserting a REFUSAL. On a box with no Ollama that passes for the wrong reason -- the refusal it saw was
+    // "nothing answered", the one state that needs no bridge logic at all. ON KEITH'S RIG, WHERE OLLAMA IS UP
+    // WITH A MODEL, IT WENT RED AT v4667 AND PRINTED `verdict "undefined"` -- and the note under it blamed
+    // ollamaReadiness for collapsing its three states, WHICH IS NOT WHAT HAPPENED. Readiness worked: it
+    // answered `ready`, the trial correctly did not refuse, and the assertion was simply false on that machine.
+    // A VERDICT NAMING A CAUSE THAT IS NOT TRUE. Reproduced here byte-for-byte by standing a stub on 11434.
+    // Worse: the green path was never green on merit, and the red path was expensive. With a real model up,
+    // that one line starts a 40-device trial -- 80 model calls against a 600 s budget -- inside a gate.
+    // So all three refusals are DRIVEN now, each from an injected base, and none of them reaches a real model.
+    // The env vars are cleared for the block because modelConfig prefers OLLAMA_HOST/OLLAMA_MODEL over ctx,
+    // which would hand the rig back its own answer and make this box-dependent all over again.
+    const envSaved = { h: process.env.OLLAMA_HOST, m: process.env.OLLAMA_MODEL };
+    delete process.env.OLLAMA_HOST; delete process.env.OLLAMA_MODEL;
+    const withBase = (base, pinned = null) => ({ ollamaBase: () => base, ollamaModelName: async () => pinned });
+    const trial = (ctx) => new Promise((res) =>
+        bridge.handle({ url: "/skill/trial?device=kerr&caller=ollama" }, {}, { sendJson: res, ...ctx }));
+    const status = (ctx) => new Promise((res) =>
+        bridge.handle({ url: "/skill/model" }, {}, { sendJson: res, ...ctx }));
+
+    // A stub that answers Ollama's TWO READINESS ROUTES AND NOTHING ELSE, so a trial that wrongly proceeded
+    // fails loudly here instead of quietly burning a real model's time.
+    let tags = { models: [] };
+    const stub = http.createServer((rq, rs) => {
+        rs.setHeader("content-type", "application/json");
+        if (rq.url.startsWith("/api/version")) return rs.end(JSON.stringify({ version: "0.0.0-stub" }));
+        if (rq.url.startsWith("/api/tags")) return rs.end(JSON.stringify(tags));
+        rs.statusCode = 500; rs.end('{"error":"this stub serves readiness only -- a trial got past the refusal"}');
+    });
+    await new Promise((r) => stub.listen(0, "127.0.0.1", r));
+    const STUB = "http://127.0.0.1:" + stub.address().port;
+    const DEAD = "http://127.0.0.1:1";   // port 1 never listens: ECONNREFUSED at once, on every platform
+
+    const states = [];
+    {
+        const down = await trial(withBase(DEAD));
+        states.push(down.verdict);
+        ok("!! *** NOT-RUNNING: with nothing on the port the trial REFUSES BEFORE IT RUNS ***",
+            down.ok === false && down.error === "model-not-ready" && down.verdict === "not-running" && !!down.fix,
+            `error "${down.error}", verdict "${down.verdict}" -- and the fix line has to say to start it, ` +
+            "because NOTHING IN THIS TREE STARTS OLLAMA");
+    }
+    {
+        tags = { models: [] };
+        const down = await trial(withBase(STUB));
+        states.push(down.verdict);
+        ok("!! *** RUNNING-WITH-NO-MODELS is a DIFFERENT verdict from not-running, off the SAME empty list ***",
+            down.ok === false && down.verdict === "running-no-models",
+            `verdict "${down.verdict}" -- listLocalModels returns [] for UNREACHABLE and for GENUINELY EMPTY ` +
+            "alike, so this row is what proves readiness asked the version route first rather than inferring");
+    }
+    {
+        tags = { models: [{ name: "llama3.1:8b" }] };
+        const down = await trial(withBase(STUB, "not-a-model-anyone-has:70b"));
+        states.push(down.verdict);
+        ok("!! *** PINNED-MODEL-MISSING -- the expensive one -- is caught HERE, not at the first call ***",
+            down.ok === false && down.verdict === "pinned-model-missing" &&
+            Array.isArray(down.models) && down.models.includes("llama3.1:8b"),
+            `verdict "${down.verdict}", models ${JSON.stringify(down.models)} -- Ollama running with the WRONG ` +
+            "models looks identical to Ollama running correctly right up until the first call, MID-RUN, after a " +
+            "device has already been built, and a pull is gigabytes");
+    }
+    ok("...and the three are THREE, not one refusal wearing three labels",
+        new Set(states).size === 3, `verdicts: ${states.join(", ")}`);
+    {
+        // READY is the fourth answer, and it is reported through /skill/model, which starts NO trial. The old
+        // row could only ever observe ONE state -- whichever one the machine it ran on happened to be in.
+        tags = { models: [{ name: "llama3.1:8b" }] };
+        const up = await status(withBase(STUB));
+        ok("...and READY is the fourth answer, reported WITHOUT running anything",
+            up.ok === true && up.ready === true && up.verdict === "ready" &&
+            Array.isArray(up.models) && up.models.includes("llama3.1:8b"),
+            `verdict "${up.verdict}", ready ${up.ready} -- the page asks this before it offers the button`);
+    }
+    await new Promise((r) => stub.close(r));
+    if (envSaved.h !== undefined) process.env.OLLAMA_HOST = envSaved.h;
+    if (envSaved.m !== undefined) process.env.OLLAMA_MODEL = envSaved.m;
 
     ok("!! *** the bridge does not decide where the model lives -- server.js hands it the SAME base ragBridge gets ***",
         /ollamaBase: *_ollamaBase/.test(server) && /skillbookBridge\.handle/.test(server) &&
@@ -182,4 +254,14 @@ const call = (url) => new Promise((res) => bridge.handle({ url }, {}, { sendJson
 }
 
 console.log(failed ? "\n[skillbookDoor-selfcheck] FAILED " + failed : "\n[skillbookDoor-selfcheck] all checks pass");
-process.exit(failed ? 1 : 0);
+// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// This gate fast-failed on the rig at v4667 with libuv's UV_HANDLE_CLOSING assert (exit 0xC0000409), the same
+// crash v4663 converted 48 gates for. It was not in that round's population because the population was drawn by
+// asking "does this gate COMPILE A WASM MODULE" -- A CAUSE. The defect is a SYMPTOM: queued platform work at
+// the moment of teardown. This file compiles no wasm.
+// MEASURED HERE, at the instant this line runs: 7.0 ms of background CPU over a 300 ms idle window (5.9 / 8.2 /
+// 7.5 on repeats), against a same-process control of 0.9 ms. SAY THAT HONESTLY: eight times the control, but a
+// FRACTION of range-selfcheck's 103.7 ms or bz-tactics' 81.7 ms, and taken on Linux when the crash is Windows'.
+// The number supports "there is background work here at exit". It does not rank this gate, and it is not the
+// reason the conversion is right -- process.exit() during a live teardown is wrong at 7 ms as it is at 103.
+process.exitCode = failed ? 1 : 0;

@@ -187,4 +187,14 @@ console.log(`${pass} passed, ${fail} failed`);
     ok("nothing is still holding the event loop open at exit", live.length === 0,
         live.length ? "STILL LIVE: " + live.join(", ") : "no sockets, no server, no timers");
 }
-process.exit(fail ? 1 : 0);
+// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// This gate dies on the rig with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c`
+// (exit 0xC0000409) AFTER printing `52 passed, 0 failed` AND AFTER the liveness row above says the loop is
+// clean. Both facts are true at once, and together they say what the culprit is NOT: it is not a socket, a
+// server or a timer, because liveHandles() enumerates those and found none. The handle libuv aborts on is
+// NodePlatform's own `flush_tasks_` async, which no JS API can see -- so a liveness row can never catch this
+// one, and the fix cannot be "close one more thing".
+// MEASURED HERE, at the instant this line runs: 103.7 ms of background CPU over a 300 ms idle window, against
+// a same-process control of 0.9 ms. THE PLATFORM IS STILL BUSY. process.exit() tears it down mid-flight.
+// The assert's source line is NOT an identifier: it reads 94 on node v24.17.0 and 76 on v24.15.0.
+process.exitCode = fail ? 1 : 0;

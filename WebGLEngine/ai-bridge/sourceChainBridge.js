@@ -177,15 +177,39 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
         });
         if (child.stdout) child.stdout.on("data", push);
         if (child.stderr) child.stderr.on("data", push);
-        child.on("exit", (code) => done({ code }));
+        let timedOut = false;
+        child.on("exit", (code) => done(timedOut ? { code, timedOut: true, killed: true } : { code }));
         // A timeout is right HERE and wrong for the verify -- see budgetIsOwn above. This one bounds a
         // download, not a test suite: a stalled npm otherwise holds canPublish() closed indefinitely, and
         // "the release button never came back" is not a diagnosis anybody can act on.
+        //
+        // *** AND THE KILL IS RE-CHECKED, BECAUSE THE FIRST SPELLING OF IT WAS NOT. ***
+        // v4668's first version was `try { child.kill(); } catch {} done({ timedOut: true })` -- signal sent,
+        // result never looked at, which is boundaryLint's KILL_NOT_VERIFIED exactly. kill() SENDS a signal; it
+        // does not mean the child is gone. On Windows child.kill() is TerminateProcess against the npm
+        // launcher, and npm's own child tree can outlive it. A stalled `npm install` left running holds the
+        // cache lock, so the NEXT provisioning attempt fails too -- with a different error, on a different
+        // run, pointing nowhere near here. So: signal, wait, escalate, wait, and REPORT WHICH HAPPENED.
+        // `killed: false` in the result is the chain saying a process was left behind rather than assuming not.
         const ms = extra && extra.timeoutMs;
+        const GRACE_MS = 5000;
         if (ms) timer = setTimeout(() => {
+            timedOut = true;
             push("[" + label + "] no output path left: killing after " + Math.round(ms / 1000) + " s\n");
             try { child.kill(); } catch {}
-            done({ code: -1, timedOut: true });
+            // The exit listener above settles this promise the moment the child actually dies, and stamps
+            // killed:true when it does. These two only run if it does NOT.
+            const escalate = setTimeout(() => {
+                push("[" + label + "] still alive " + (GRACE_MS / 1000) + " s after the signal -- SIGKILL\n");
+                try { child.kill("SIGKILL"); } catch {}
+                const giveUp = setTimeout(() => {
+                    push("[" + label + "] pid " + child.pid + " SURVIVED SIGKILL AND IS STILL RUNNING. The " +
+                         "next provisioning attempt may fail on a lock this process is holding.\n");
+                    done({ code: -1, timedOut: true, killed: false });
+                }, GRACE_MS);
+                if (giveUp.unref) giveUp.unref();
+            }, GRACE_MS);
+            if (escalate.unref) escalate.unref();
         }, ms);
     });
 }
@@ -641,4 +665,6 @@ module.exports = { status, start, publish, launch, canPublish, owns, handle, run
     // v4668 -- exported so tools/ship/cloneProvision-selfcheck.mjs can DRIVE every branch rather than
     // grep for one. QA_REL and _provisionedAt travel with it because the gate holds this file and
     // playwrightResolve.mjs to the same path.
-    _provision, _provisionedAt, QA_REL };
+    // _spawnCmd is exported for the same reason: the timeout's kill escalation is a PATH, and a path nobody
+    // drives is a paragraph. The gate runs it against a child that ignores SIGTERM.
+    _provision, _provisionedAt, QA_REL, _spawnCmd };

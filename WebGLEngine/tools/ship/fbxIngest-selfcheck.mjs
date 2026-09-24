@@ -118,6 +118,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { codeOnly, noComments } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -129,13 +130,30 @@ const gpuAssetLoaderSrc = fs.readFileSync(path.join(ENG, "gpu/gpuAssetLoader.js"
 const fbxLoadSrc        = fs.readFileSync(path.join(ENG, "gpu/fbxLoad.js"), "utf8");
 const indexHtmlSrc      = fs.readFileSync(path.join(ENG, "index.html"), "utf8");
 
+// *** v4668 -- TWO ROWS BELOW ASSERTED "THE CODE DOES X" AGAINST RAW SOURCE, which is a gate that would pass
+// on a COMMENT SAYING IT SHOULD. commentFalsePass reported both as GENUINE.
+//
+// THEY NEED DIFFERENT VIEWS, AND PICKING codeOnly FOR BOTH WAS TRIED FIRST AND WAS WRONG. codeOnly blanks
+// TEMPLATE LITERALS along with comments -- deliberately, so that a claim about code cannot be satisfied by the
+// text of a shader -- and the URL this gate is about IS a template literal: `${this.basePath}${name}.fbx`.
+// Read through codeOnly that row went red against code that is perfectly correct. noComments() is the view
+// that fits: comments gone, literals kept.
+// And the third claim is ABOUT a comment, so it reads raw and proves the text is absent from noComments --
+// which is what makes it a header rather than a string the code happens to carry.
+const gpuAssetLoaderCode = noComments(gpuAssetLoaderSrc);
+const fbxLoadCode        = codeOnly(fbxLoadSrc);
+const fbxLoadNoComments  = noComments(fbxLoadSrc);
+
 // ---- 1. THE .fbx EXTENSION IS IN THE HEAD-PROBE CHAIN --------------------------------------------------------
 console.log("1. *** .fbx IS A REAL BRANCH IN _load()'S HEAD-PROBE CHAIN, NOT JUST A STRING SOMEWHERE ***");
 {
     ok("!! tryFbx is read from the per-asset format map, alongside tryGlb/tryObj",
         /const tryFbx\s*=\s*!fmt\s*\|\|\s*fmt\.fbx/.test(gpuAssetLoaderSrc));
     ok("!! _load() HEAD-probes `${this.basePath}${name}.fbx` and calls _loadFBX() on a 200",
-        /tryFbx[\s\S]{0,400}?\$\{this\.basePath\}\$\{name\}\.fbx[\s\S]{0,300}?this\._loadFBX\(name, fbxUrl\)/.test(gpuAssetLoaderSrc));
+        /tryFbx[\s\S]{0,400}?\$\{this\.basePath\}\$\{name\}\.fbx[\s\S]{0,300}?this\._loadFBX\(name, fbxUrl\)/.test(gpuAssetLoaderCode),
+        "v4668: read through noComments. The two [\\s\\S] spans are 400 and 300 characters wide, and on RAW " +
+        "source there are five comment lines inside the first window alone, any of which could have supplied " +
+        "the middle of this chain. NOT codeOnly: the URL is a template literal, which codeOnly blanks");
     ok("!! the probe sits BEFORE the legacy mesh.json folder fallback, mirroring .glb/.obj",
         gpuAssetLoaderSrc.indexOf("this._loadFBX(name, fbxUrl)") < gpuAssetLoaderSrc.indexOf("if (!tryFolder)"));
     ok("!! _loadFBX exists as a real method, not just referenced",
@@ -163,9 +181,18 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
         /\.isMesh \|\| obj\.isSkinnedMesh/.test(fbxLoadSrc));
     ok("!! the remaining v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
         /SINGLE MESH ONLY/.test(fbxLoadSrc) && /NO TEXTURES, NO VERTEX COLORS/.test(fbxLoadSrc));
-    ok("!! ...and task #59's animation-mapping closure is documented too, not silently folded in",
-        /ANIMATION MAPPING \(task #59\)/.test(fbxLoadSrc) &&
-        /mapFbxAnimations/.test(fbxLoadSrc));
+    // v4668 -- SPLIT, because this was one row making two claims of opposite kinds and reading raw source for
+    // both. "It is documented" is a claim ABOUT A COMMENT and must read the comments; "the function exists" is
+    // a claim about code and must not. Joined with && against raw text, the second was satisfiable by the
+    // first -- the header sentence names mapFbxAnimations, so a file with the header and no function passed.
+    ok("!! ...and task #59's animation-mapping closure is DOCUMENTED -- asserted of the comments, where it lives",
+        /ANIMATION MAPPING \(task #59\)/.test(fbxLoadSrc) && !/ANIMATION MAPPING \(task #59\)/.test(fbxLoadNoComments),
+        "present in the raw file and ABSENT once the comments are stripped: that pair is what makes it a " +
+        "header rather than a string the code happens to carry");
+    ok("!! ...and mapFbxAnimations is a real function, asserted of the CODE and not of the header naming it",
+        /mapFbxAnimations/.test(fbxLoadCode),
+        "the header sentence above contains the identifier, so the raw-source form of this check was passable " +
+        "by documentation alone");
 }
 
 // ---- 3. THE FIXTURE, THROUGH THE REAL PIPELINE, IN A REAL BROWSER ----------------------------------------------

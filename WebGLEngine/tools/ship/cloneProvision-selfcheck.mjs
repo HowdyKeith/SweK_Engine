@@ -145,6 +145,47 @@ console.log("\n3. *** A PHASE NO GUARD NAMES IS A WINDOW IN WHICH THE GUARD IS N
         "reader takes it for 116 broken gates -- which is precisely what v4667 did");
 }
 
+// ---- THE TIMEOUT'S KILL, DRIVEN -- BECAUSE A KILL NOBODY RE-CHECKS IS A CLAIM RESTING ON NOTHING ---------
+//
+// v4668's first spelling of the provisioning timeout was `try { child.kill(); } catch {}` followed immediately
+// by resolving with `timedOut: true`. boundaryLint reports that shape as KILL_NOT_VERIFIED and it is right to:
+// kill() SENDS a signal. On Windows it is TerminateProcess against the npm launcher, whose own child tree can
+// outlive it, and a surviving `npm install` holds the cache lock -- so the NEXT attempt fails too, with a
+// different error, on a different run, pointing nowhere near this file.
+//
+// These rows run the real helper against real children. Nothing is mocked and nothing is grepped.
+{
+    const IGNORES_SIGTERM = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);";
+    const t0 = Date.now();
+    const stubborn = await CHAIN._spawnCmd(process.execPath, ["-e", IGNORES_SIGTERM], os.tmpdir(), "probe",
+        { timeoutMs: 1000 });
+    const tookMs = Date.now() - t0;
+    ok("!! *** a child that IGNORES SIGTERM is escalated to SIGKILL and the result says it actually died ***",
+        stubborn.timedOut === true && stubborn.killed === true && tookMs > 1000,
+        `${JSON.stringify(stubborn)} after ${tookMs} ms -- the 1 s cap, then a grace period, then SIGKILL. ` +
+        "`killed` is read off the child's own exit event, not assumed from having sent a signal");
+
+    const easy = await CHAIN._spawnCmd(process.execPath, ["-e", "setInterval(() => {}, 1000);"], os.tmpdir(),
+        "probe", { timeoutMs: 1000 });
+    ok("...and one that respects it needs no escalation, so the ordinary case is not slowed by the hard case",
+        easy.timedOut === true && easy.killed === true, JSON.stringify(easy));
+
+    // THE CONTROL: the two rows above would both pass if the helper simply stamped killed:true on everything.
+    const fine = await CHAIN._spawnCmd(process.execPath, ["-e", "process.exit(7)"], os.tmpdir(), "probe",
+        { timeoutMs: 30000 });
+    ok("...and a child that finishes on its own carries NEITHER stamp, so the stamps mean something",
+        fine.code === 7 && fine.timedOut === undefined && fine.killed === undefined, JSON.stringify(fine));
+
+    // v4668b's hang, kept driven. node emits "error" and NOT "exit" for ENOENT, so a promise settling only on
+    // "exit" never settles -- which pinned the chain in "provisioning" with every guard closed.
+    const t1 = Date.now();
+    const gone = await CHAIN._spawnCmd("swek-definitely-not-a-binary", [], os.tmpdir(), "probe", { timeoutMs: 30000 });
+    ok("...and a MISSING BINARY resolves at once on `error` rather than waiting out the 30 s cap",
+        gone.code === -1 && /ENOENT/.test(String(gone.spawnError)) && Date.now() - t1 < 1000,
+        `${gone.spawnError} in ${Date.now() - t1} ms -- if this ever hangs again, the cap is the only thing ` +
+        "between the bridge and a permanently closed publish button");
+}
+
 for (const t of trees) { try { fs.rmSync(t, { recursive: true, force: true }); } catch {} }
 
 console.log("\nunchecked here: A REAL npm install. Every row above injects the runner, so what is graded is the " +

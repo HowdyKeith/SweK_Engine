@@ -237,4 +237,15 @@ try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
 
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// THIS GATE IS THE INTERMITTENT ONE, and that is the evidence, not a caveat. On the rig at v4667 it fast-failed
+// with libuv's UV_HANDLE_CLOSING assert; re-run ALONE on the same box it passed in 381 ms against 1090 ms
+// loaded. A defect that appears only under load is a RACE, and a race between "the platform still has queued
+// work" and "the process is being torn down" is exactly the shape process.exit() creates. Re-running it alone
+// is therefore not a clearance -- it is a measurement of how narrow the window is.
+// MEASURED HERE, at the instant this line runs: 81.7 ms of background CPU over a 300 ms idle window, against a
+// same-process control of 0.9 ms. The liveness row above is still worth keeping -- it catches the keep-alive
+// sockets, which are a real and separate defect -- but it CANNOT catch this one: the handle libuv aborts on is
+// NodePlatform's `flush_tasks_` async, which liveHandles() does not enumerate.
+// The assert's source line is NOT an identifier: it reads 94 on node v24.17.0 and 76 on v24.15.0.
+process.exitCode = fail ? 1 : 0;

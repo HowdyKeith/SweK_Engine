@@ -252,6 +252,63 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
         "0.8 ms for the control and 23 ms for the wasm population. ONE READING, ONE BOX, and the method is " +
         "idleBackgroundCpuMs' -- an awaited timer across cpuUsage -- applied to a patched copy of the gate.");
 
+    // *** THREE MORE FROM THE SAME CLONE-VERIFY, AND THE POPULATION IS NOW FOUR. ***
+    // The v4667 run named three further gates: ai-bridge/tools/range-selfcheck.mjs and
+    // bz/tools/bz-tactics-selfcheck.mjs, both aborting on the assertion, and tools/ship/skillbookDoor-selfcheck.mjs.
+    // None of the three compiles wasm either. Each was measured with the same instrument as above, on this
+    // box, against the same 0.9 ms same-process control:
+    //
+    //     range-selfcheck        103.7 ms   /300 ms idle
+    //     bz-tactics-selfcheck    81.7 ms
+    //     skillbookDoor          7.0 ms   (5.9 / 8.2 / 7.5 on repeats)
+    //     CONTROL                 0.9 ms
+    //
+    // skillbookDoor is the honest one to look at: eight times the control, and a FOURTEENTH of range's
+    // reading. If the rule were "convert what the number says is busy" it would not obviously qualify -- so
+    // the rule is not that. The rule is that process.exit() during a live platform teardown is wrong at 7 ms
+    // exactly as at 103, and the number is evidence that background work exists, not a ranking or a threshold.
+    //
+    // TWO FACTS ABOUT THE CRASH THAT A READER WILL OTHERWISE GET WRONG:
+    //
+    //   1. IT IS INTERMITTENT. bz-tactics came back GREEN on a re-run alone on the same rig -- 381 ms alone
+    //      against 1090 ms under the sweep's load. A re-run that passes is therefore NOT a clearance. It is a
+    //      measurement of how narrow the window is, and a race between queued work and teardown is precisely
+    //      the shape that behaves this way.
+    //   2. THE ASSERTION'S SOURCE LINE IS NOT AN IDENTIFIER. `src\win\async.c` reads line 94 on node
+    //      v24.17.0 and line 76 on v24.15.0. Matching on the line number across boxes would split one defect
+    //      into two, or merge two into one.
+    //
+    // AND THE LIVENESS ROW CANNOT CATCH IT. range-selfcheck prints `52 passed, 0 failed` AND its own
+    // "nothing is still holding the event loop open at exit" row passes, AND THEN THE PLATFORM ABORTS. Both
+    // are true: liveHandles() enumerates sockets, servers and timers, and the handle libuv asserts on is
+    // NodePlatform's `flush_tasks_` async, which no JS API exposes. A gate cannot assert its way out of this.
+    const V4668_FOUND = [
+        ["ai-bridge/tools/range-selfcheck.mjs", 103.7],
+        ["bz/tools/bz-tactics-selfcheck.mjs", 81.7],
+        ["tools/ship/skillbookDoor-selfcheck.mjs", 7.0],
+    ];
+    for (const [rel, cpuMs] of V4668_FOUND) {
+        const src = fs.readFileSync(path.join(ENG, rel), "utf8");
+        const left = exitCallCount(codeOnly(src));
+        ok(`...and so is ${rel.split("/").pop()}`, left === 0 && /process\.exitCode\s*=/.test(src),
+            `${left} process.exit() call(s) left in code; measured ${cpuMs} ms background CPU per 300 ms idle ` +
+            "at the exit line, against a 0.9 ms same-process control");
+    }
+    // THE ROW ABOVE CAN FAIL, SHOWN RATHER THAN CLAIMED: the same predicate run over a source that still
+    // calls process.exit() has to come back false, or the four PASSes above mean nothing.
+    {
+        const sab = "console.log('x');\nprocess.exit(fail ? 1 : 0);\n";
+        ok("...and the predicate those four rows use is one a still-unconverted gate FAILS",
+            exitCallCount(codeOnly(sab)) === 1 && !/process\.exitCode\s*=/.test(sab),
+            "a control that cannot fail is not a control -- the same two tests, over a two-line source with " +
+            "the old shape, and both come back the other way");
+    }
+
+    report("MEASURED at v4668, same instrument, same box: range 103.7 ms, bz-tactics 81.7 ms, skillbookDoor " +
+        "7.0 ms of background CPU per 300 ms idle window at the exit line, control 0.9 ms. bz-tactics is " +
+        "INTERMITTENT (381 ms alone vs 1090 ms loaded on the rig), so a green re-run is not a clearance. The " +
+        "assert's source line moves with the node build -- 94 on v24.17.0, 76 on v24.15.0 -- and is not an id.");
+
     // *** AND THE TRUE CANDIDATE SET, STATED AS A CEILING RATHER THAN A TO-DO LIST. ***
     // The walk is local and cheap: names only, no lexing, and the -selfcheck suffix is the tree's own
     // definition of a gate (the same one buildKnowledgeIndex uses).
@@ -273,8 +330,9 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
         "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
         "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
         "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
-        "is a round of its own. Until then the population is known to be larger than 48 and smaller than " +
-        `${stillExit.length}, and that is the honest width of it.`);
+        "is a round of its own. Until then the population is known to be at least " +
+        `${48 + 1 + V4668_FOUND.length} -- v4663's 48 compilers plus the ${1 + V4668_FOUND.length} the rig ` +
+        `found at v4667 -- and at most ${stillExit.length}, and that is the honest width of it.`);
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");

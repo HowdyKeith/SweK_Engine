@@ -246,9 +246,38 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
         "set before the work and restored in a FINALLY -- publish() has eight return paths and a restore " +
         "written at each is seven chances to miss one; the one missed leaves the phase stuck and updates " +
         "deferred forever, a guard that fails closed and never reopens");
-    ok("...and running() covers the publish, not just the clone and the verify",
-        /R\.phase === "cloning" \|\| R\.phase === "verifying" \|\| R\.phase === "publishing"/.test(chain),
-        "the upload is the step that matters most here and it was the one step with no phase at all");
+    // *** v4668 -- THIS ROW WAS A SPELLING, AND A CORRECT CHANGE BROKE IT. ***
+    // It pinned the exact disjunction `"cloning" || "verifying" || "publishing"`. v4668 added a fourth phase,
+    // "provisioning", and wired it into running() -- and this row went red against a guard that had just been
+    // made MORE complete. A gate that fails when the thing it guards improves teaches the next writer to edit
+    // the gate, which is the opposite of what it is for.
+    // So the set is DERIVED. Every phase the chain ever assigns is read out of the file, "done" (the resting
+    // state) is set aside, and running() must name each of the rest. A FIFTH phase added without touching
+    // running() still goes red -- that is the failure this row exists for -- but adding one correctly does not.
+    {
+        const assigned = new Set([...chain.matchAll(/R\.phase = "([a-z]+)"/g)].map((m) => m[1]));
+        assigned.delete("done");
+        const runningLine = (/function running\(\) \{[^}]*\}/.exec(chain) || [""])[0];
+        const named = [...assigned].filter((ph) => runningLine.includes('"' + ph + '"'));
+        ok("...and running() names EVERY phase the chain assigns, derived rather than spelled out here",
+            assigned.size >= 4 && named.length === assigned.size,
+            `phases assigned: ${[...assigned].sort().join(", ")}; named by running(): ${named.sort().join(", ")}` +
+            ". The upload is the step that matters most here and was once the one step with no phase at all; " +
+            "provisioning (v4668) is the second one that had to be added, which is why this is now a set and " +
+            "not a sentence");
+
+        // THE SABOTAGE, because a derived row that always finds what it derived is not a check. The same two
+        // lines over a copy of the file with one phase dropped from running() must come back short.
+        // Sabotage THE running() LINE, not the first copy of the disjunct in the file. The first attempt used
+        // chain.replace(...) on the whole source and hit canPublish() instead -- four predicates name these
+        // phases -- so the "sabotaged" text left running() untouched and the row below went red for a reason
+        // that had nothing to do with what it was testing.
+        const sabLine = runningLine.replace('R.phase === "provisioning" || ', "");
+        ok("...and the row above FAILS on a copy with one phase missing from running()",
+            sabLine !== runningLine && [...assigned].filter((ph) => sabLine.includes('"' + ph + '"')).length < assigned.size,
+            "drop `provisioning` from the disjunction and the derived set no longer matches -- so a fifth " +
+            "phase wired nowhere would be caught, which is the only reason to derive it");
+    }
     ok("!! ...and canPublish() now refuses a SECOND publish while one is in flight",
         /if \(s\.phase === "publishing"\) return \{ ok: false/.test(chain),
         "with no phase set, a second press during the upload passed every precondition the first one had");

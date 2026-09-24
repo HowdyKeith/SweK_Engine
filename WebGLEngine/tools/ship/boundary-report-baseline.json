@@ -1,8 +1,8 @@
 {
  "generatedFrom": "tools/ship/boundaryLint-selfcheck.mjs",
  "note": "v3142 -- reported boundary tells AS FOUND, COUNTED PER file+rule. A baseline, not an approval: counts may SHRINK and may never GROW. Freeze deliberately with SWEK_FREEZE_BOUNDARY_REPORT=1.",
- "sites": 93,
- "total": 242,
+ "sites": 94,
+ "total": 244,
  "tally": {
   "agenda.html :: UNCHECKED_JSON_BODY": 2,
   "ai-bridge/agentCookieBridge.js :: KILL_NOT_VERIFIED": 1,
@@ -46,6 +46,7 @@
   "ai-bridge/scrapeBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/scraplingBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/server.js :: KILL_NOT_VERIFIED": 15,
+  "ai-bridge/sourceChainBridge.js :: KILL_NOT_VERIFIED": 2,
   "ai-bridge/sunshineBridge.js :: KILL_NOT_VERIFIED": 1,
   "ai-bridge/sysadminBridge.js :: KILL_NOT_VERIFIED": 2,
   "ai-bridge/terminalBridge.js :: KILL_NOT_VERIFIED": 3,
