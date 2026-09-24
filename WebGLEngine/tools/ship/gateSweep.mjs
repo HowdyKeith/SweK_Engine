@@ -8032,6 +8032,70 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4688 -- THE 298th CLOSING: six gates were red outside the register, and none of them was this round's.
+    since373: Object.freeze({
+        at: "v4688", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        // *** THE SLOT THIS LEDGER DID NOT HAVE, AND WHOSE ABSENCE IS WHY THIS ROUND EXISTS. ***
+        // tools/ship/runnerCallers-selfcheck.mjs wrote the diagnosis at v4676 and nothing acted on it: the
+        // invariant is `added.length === swept` and every `redOnArrival` entry must name a gate in `added`, so
+        // the ledger can only describe how a round's OWN gates arrived. A round that reddens or repairs a gate
+        // ELSEWHERE has nowhere to say so, and closes clean by declaring swept: 0. Six gates went red under
+        // exactly that hole. `elsewhere` is the slot; tools/ship/gateSweep-selfcheck.mjs grades its shape.
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/wiringClaims-selfcheck.mjs", was: "red", now: "green",
+                why: "it reported render/opticalFlow.mjs as a prose wiring-claim whose subject is REACHABLE, which is exactly its job. The claim was in runnerCallers-selfcheck's note explaining a ratchet widening, and three of that note's clauses had been false since v4677. Fixed by correcting the prose, not by widening KNOWN_CONTRAST." }),
+            Object.freeze({ gate: "tools/ship/definitionGates-selfcheck.mjs", was: "red", now: "green",
+                why: "ONE symbol took its tree-wide all-shapes census from a frozen 703 to 704: render/temporalLockGPU.mjs:FLOOR_PHASE, found by diffing the ungated population across git worktrees at v4645 and v4686. Closed BY ASSERTION in temporalLockGPU-selfcheck, the way that gate's header says its previous 81 were closed, and both frozen numbers are back at 703 and 533 rather than re-baselined." }),
+            Object.freeze({ gate: "tools/ship/harnessLiveness-selfcheck.mjs", was: "red", now: "green",
+                why: "nine WGSL producers were neither in the corpus nor excluded with a reason. Five are now real corpus entries agreeing bit-for-bit on both backends; two are excluded as ordered multi-dispatch chains. The first draft excluded SEVEN on a reason that temporalCorpus.mjs had disproved since v4572, which is the failure that list exists to prevent." }),
+            Object.freeze({ gate: "tools/ship/backendParity-selfcheck.mjs", was: "red", now: "green",
+                why: "wgslBearing and wgslOnly were eleven rounds stale. The nine new WGSL-only files are NAMED per v4470's rule; the count is nine and not eleven because two of this arc's own gates were counted as shipping WGSL -- one embedded an inline probe kernel, the other contained the stage attribute inside a regex written to count it -- which also made the gfx/device.js consumer row read four consumers. Repaired at the cause per v4278, not with an exemption." }),
+            Object.freeze({ gate: "tools/ship/timingKind-selfcheck.mjs", was: "red", now: "green",
+                why: "six entries were unaccounted, and they shared a structural property: all over the sweep's budget, all stamped after the last rotation. An over-budget gate arriving between two rotations has no legitimate observer, so the name-list became a self-clearing RULE with five positive controls -- two of its three clauses have an empty live population and would have scored 0-RED against the tree alone." }),
+            Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", was: "red", now: "green",
+                why: "box3d gained a dependant that neither imports nor reads it: constantRows-selfcheck feeds the literal string vendor/box3d/LICENSE to a census as a TEST INPUT. Eighth instance of the scanner-in-its-own-sample shape and the first of that third kind, so it joined NOT_IMPORTERS rather than the baseline." }),
+            // *** THE SEVENTH ENTRY IS THE OTHER DIRECTION, AND IT IS WHY THIS SLOT EXISTS AT ALL. ***
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "green", now: "red",
+                why: "this round's verify sweep REFILED two timings and its margin row then failed: frozenRecords-selfcheck 2003 -> 2318 ms and recordDrift-selfcheck 1688 -> 1959 ms, against a 3000 ms budget and a row that demands 800 ms of margin. MEASURED, DIRECTLY, THAT THIS IS NOT A REGRESSION THIS ROUND CAUSED: frozenRecords run serially three times at HEAD reads 2232/2288/2350 ms and three times on this tree reads 2320/2241/2252 -- indistinguishable. Both filed figures rose about 15% TOGETHER, which is the signature of a slower container rather than of either gate changing. HEAD passes only because its filed 2003 was taken on a faster occasion, so the row was resting on a stale reading. The margin really is about 730 ms on this machine and the row is right to say so. NOT FIXED HERE and NOT REGISTERED as a known red: the repair is to make frozenRecords-selfcheck cheaper, which is a round of its own, and widening the 800 ms bar would be the one thing this round spent itself arguing against." }),
+        ]),
+        verdict: "*** SIX GATES WERE RED OUTSIDE THE RED REGISTER, EVERY ONE OF THEM RED AT v4686'S HEAD TOO, " +
+                 "AND NOT ONE OF THEM WAS CAUSED BY THE ROUND THAT FOUND THEM. *** Measured by stashing v4687's " +
+                 "work and running all six at aab8595: six exit 1. They are ratchet censuses whose counts had " +
+                 "been drifting for up to eleven rounds. So the arc shipped several rounds without a full sweep, " +
+                 "and this round found that rather than causing it. " +
+                 "*** THE UNIFYING FINDING IS THAT A RED GATE'S FINDINGS REACH NOBODY. *** Every one of the six " +
+                 "named its own problem correctly, by name, every time it ran -- harnessLiveness printed nine " +
+                 "symbols, backendParity printed both drifted numbers, orreryEjecta printed the arriving file " +
+                 "within the minute, definitionGates printed the growth. Into a log nobody read. A standing red " +
+                 "does not merely fail to check its own subject; it silences every other finding in the same " +
+                 "file, and that is the cost this round paid and is what `elsewhere` exists to stop recurring. " +
+                 "*** EVERY ONE IS FIXED AT ITS CAUSE AND NOT ONE NUMBER WAS WIDENED TO AGREE. *** Two rotted " +
+                 "prose claims corrected, one export closed by assertion, five kernels put INTO the corpus, two " +
+                 "self-counting gates repaired by assembling the marker, one name added to NOT_IMPORTERS, one " +
+                 "name-list replaced by a rule. definitionGates' 703 and 533 and timingKind's three-name list " +
+                 "are all exactly where they were. " +
+                 "*** AND THE ROUND'S OWN MISTAKES WERE THE INSTRUCTIVE PART, ALL FOUR FOUND BY MEASUREMENT. *** " +
+                 "(1) It excluded seven kernels from the corpus on a reason it had not checked, which " +
+                 "temporalCorpus.mjs disproves; five of them are now graded on both backends. (2) Three fixtures " +
+                 "were wrong in ways only the gates could see: a uniform value-converted instead of bit-packed, " +
+                 "a uniform struct short by two words, and a binding supplied to an entry point that does not " +
+                 "declare it. (3) An \"all six green\" reading was an artefact of $(basename) resetting $? " +
+                 "before it was read, and definitionGates was still red. (4) Writing the note about the " +
+                 "self-counting trap SPELLED ALL THREE STAGE ATTRIBUTES in render/backendParity.mjs and turned " +
+                 "that gate's literal-marker row red on the prose explaining why they must not appear -- the " +
+                 "ELEVENTH instance of that shape and the second in this one round, which v4278 recorded " +
+                 "happening to it in the same file for the same reason. " +
+                 "*** TWO 0-REDS, BOTH WITH CAUSES RATHER THAN GAPS, AND ONE MUTATION THAT IS NOT A VERDICT. *** " +
+                 "Changing a corpus fixture's dilation radius reddens nothing, correctly: crossBackend asks " +
+                 "whether two backends AGREE, and both compute the same different thing -- correctness belongs " +
+                 "to the CPU-twin gates. Hardwiring timingKind's live `unaccounted` to [] passes every row " +
+                 "including the partition row, because the true answer IS zero and nothing inside a gate can " +
+                 "tell a computed zero from a written one. And making packU value-convert HANGS the device: the " +
+                 "kernels read a dimension of 1090519040 and loop, so crossBackend ran the full 2400-second " +
+                 "timeout without returning -- recorded as unrunnable, because a crash is not a verdict.",
+    }),
     // v4687 -- THE 297th CLOSING: the last of FSR3's four passes leaves the CPU, and a gap closes exactly.
     since372: Object.freeze({
         at: "v4687", swept: 1, green: 1, red: 0,

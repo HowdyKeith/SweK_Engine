@@ -133,7 +133,53 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     // SABOTAGE v4641: one of the three names removed, so a real entry falls out of the accounted set --
     // 1 RED, by name, printing the gate it could not account for. The row it replaces would have passed
     // that mutation at any count below fifty, which is the argument for the shape rather than for the list.
-    const unaccounted = observedElsewhere.filter((g) => !rotated.has(g) && !HAND_OBSERVED_V4641.includes(g));
+    //
+    // *** v4688 -- A FOURTH ARRIVED, AND THEN A FIFTH, AND THE ANSWER IS NOT A LONGER LIST. *** Six entries
+    // came up unaccounted at once: five fsrPage gates and render/frameInterpGPU-selfcheck, added between
+    // v4681 and v4687. Naming them would have made the list nine and taught nothing, because THEY SHARE A
+    // PROPERTY AND IT IS STRUCTURAL:
+    //
+    //   every one is OVER THE BUDGET, so the quick sweep cannot stamp it -- step 3b re-times only the
+    //   under-budget gates and sends the rest to the rotation; and
+    //   every one arrived AFTER THE LAST ROTATION RAN, so the rotation has not had a turn at it yet.
+    //
+    // An over-budget gate arriving between two rotations therefore has NO legitimate observer: the sweep
+    // will not take its millisecond and the rotation has not yet. The round that adds it times it by hand,
+    // serially, which is the right quantity -- and this row called that "unaccounted" because its only
+    // notion of legitimacy was a list of three names taken one round in September.
+    //
+    // *** SO THE FOURTH CATEGORY IS A RULE, AND THE RULE IS SELF-CLEARING. *** An entry is accounted as an
+    // ARRIVAL when it is over budget, carries the `alone` kind a serial hand-timing produces, and its stamp
+    // is LATER than the rotation ledger's own. That last clause is what keeps this a ratchet rather than an
+    // amnesty: the moment a rotation runs, these six land in the ledger and stop qualifying here, and an
+    // over-budget `alone` entry that PREDATES the last rotation stays unaccounted -- because the rotation
+    // should have taken it and did not. A list would have had to be pruned by hand to say that; a rule says
+    // it for free, and says it about gates nobody has written yet.
+    const rotAt = Date.parse((ROT && ROT.at) || "");
+    const stampOf = (g) => Date.parse((S.at || {})[g] || "");
+    const BUDGET = S.budgetMs;
+    // *** THE RULE IS A PURE FUNCTION OF FOUR NUMBERS, SO IT CAN BE DRIVEN WITH FIXTURES. *** Two of its three
+    // clauses have an EMPTY POPULATION in the live file -- there is no over-budget `alone` entry predating the
+    // rotation, and no under-budget one claiming to be an arrival -- so deleting either clause changes nothing
+    // here and a sabotage of it would score 0 RED against a rig that cannot reach it. That is the shape this
+    // arc has been caught by four times (v4686's nearerIsLess, v4687's t and its fill radius), and the answer
+    // each time was a case rather than a note. Here the cases are synthetic, because the entries they describe
+    // are ones the tree should never have: a positive control is how you test a guard whose population is zero.
+    const isArrival = (ms, kind, stamp, rot) =>
+        Number.isFinite(rot) && Number.isFinite(stamp) && stamp > rot && ms > BUDGET && kind === "alone";
+    const arrivedSinceRotation = (g) => isArrival(S.timings[g], S.kinds[g], stampOf(g), rotAt);
+    // *** THE ACCOUNTING IS ALSO A FUNCTION, FOR THE REASON THE RULE IS. *** A sabotage replacing the live
+    // `unaccounted` with an empty array scored 0 RED: every control below graded the RULE, and none of them
+    // graded the SUBTRACTION that uses it, so the row asserting "0 unaccounted" was satisfied by a constant.
+    // That is this file's own lesson -- a count standing in for a property -- arriving in the check written
+    // to fix it. The split lets the fixture below drive the whole accounting, not just its predicate.
+    const accountFor = (entries, inLedger, named, arrival) => ({
+        unaccounted: entries.filter((g) => !inLedger(g) && !named(g) && !arrival(g)),
+        arrivals: entries.filter((g) => !inLedger(g) && !named(g) && arrival(g)),
+    });
+    const ACC = accountFor(observedElsewhere, (g) => rotated.has(g),
+                           (g) => HAND_OBSERVED_V4641.includes(g), arrivedSinceRotation);
+    const unaccounted = ACC.unaccounted, arrivals = ACC.arrivals;
     ok(`*** an entry's kind is INFERRED unless the run that took its millisecond watched it, and kindsInferred is exactly that set ***`,
         inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 &&
         ROT !== null && rotated.size > 0 && unaccounted.length === 0,
@@ -141,9 +187,91 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
         `${observedElsewhere.length} observed entries carry an earlier stamp -- ` +
         `${observedElsewhere.filter((g) => rotated.has(g)).length} of them are in the rotation's own ledger, ` +
         `${observedElsewhere.filter((g) => HAND_OBSERVED_V4641.includes(g)).length} are the named hand-observed few, ` +
+        `${arrivals.length} are over-budget arrivals since the last rotation (${arrivals.join(", ") || "none"}), ` +
         `and ${unaccounted.length} are unaccounted for` +
         (unaccounted.length ? ": " + unaccounted.join(", ") : "") +
         ". A COUNT here would go red for the rotation doing its job, which is exactly what it did at v4641.");
+    // ---- v4688'S SABOTAGE LOG, OVER THE ARRIVAL RULE AND THE ACCOUNTING --------------------------------
+    //
+    //   Z7  the NAMED list is allowed to absorb everything            -> 3 red
+    //   Z1  the rule drops the AFTER-the-rotation clause              -> 1 red
+    //   Z2  the rule drops the OVER-BUDGET clause                     -> 1 red
+    //   Z3  the rule drops the `alone` KIND clause                    -> 1 red
+    //   Z4  an unreadable ledger excuses every arrival, not none      -> 1 red
+    //   Z6  the accounting drops the arrival category entirely        -> 1 red
+    //   Z5  the live `unaccounted` is hardwired to []                 -> 0 RED, AND IT CANNOT BE OTHERWISE
+    //
+    // *** Z1 THROUGH Z4 REDDEN ONLY BECAUSE THE CONTROLS BELOW EXIST. *** Two of the rule's three clauses have
+    // an EMPTY POPULATION in the live file -- no over-budget `alone` entry predates the rotation, and no
+    // under-budget entry claims to be an arrival -- so deleting either changes no live answer. Against the
+    // tree alone all three sabotages would have scored 0 RED, and the rule would have read as three conditions
+    // while measuring as one. The fixtures are what make it three.
+    //
+    // *** Z5 IS A 0-RED WITH A CAUSE THAT IS NOT A FIXTURE GAP, AND IT IS WORTH STATING PLAINLY. *** Replacing
+    // the live subtraction with `[]` passes every row here, including the partition row -- because the true
+    // answer IS zero, so 55 + 3 + 6 + 0 adds up either way. WHEN A GATE'S CORRECT READING IS ZERO, NOTHING
+    // INSIDE THAT GATE CAN TELL A COMPUTED ZERO FROM A WRITTEN ONE. There is no second source of truth for
+    // the live number to hold it against, and inventing one would be writing the same subtraction twice. So
+    // the function is graded on a fixture where the answer is NOT zero, which is the part that can be tested,
+    // and this paragraph is the part that cannot. Unlike v4686's undefined-behaviour 0-RED, no future adapter
+    // or case turns this one red -- it goes red only when a real entry falls out of every category, which is
+    // the day the row is supposed to fire.
+
+    // ---- POSITIVE CONTROL FOR THE ACCOUNTING ITSELF ----------------------------------------------------
+    // *** THE ROW ABOVE SAYS "0 UNACCOUNTED", AND A CONSTANT SATISFIES THAT. *** Measured: replacing the live
+    // subtraction with an empty array passed every row in this file. So the accounting is driven here against
+    // a fixture where the right answer is NOT zero, which is the only way "zero" becomes a reading.
+    {
+        const F = ["in-ledger.mjs", "named.mjs", "a-real-arrival.mjs", "NOBODY-ACCOUNTS-FOR-THIS.mjs"];
+        const r = accountFor(F, (g) => g === "in-ledger.mjs", (g) => g === "named.mjs",
+                             (g) => g === "a-real-arrival.mjs");
+        ok("  CONTROL: the accounting REPORTS an entry no category claims -- 'zero unaccounted' is a reading, not a constant",
+           r.unaccounted.length === 1 && r.unaccounted[0] === "NOBODY-ACCOUNTS-FOR-THIS.mjs" && r.arrivals.length === 1,
+           `fixture of four: ${r.unaccounted.length} unaccounted (${r.unaccounted.join(", ")}), ${r.arrivals.length} arrival. ` +
+           "A sabotage hardwiring the live list to [] passed every other row in this file, which is a count " +
+           "standing in for a property -- the exact defect v4637 and v4641 each wrote a paragraph about here.");
+        ok("  CONTROL: ...and each of the three categories absorbs its own, so none of them is doing nothing",
+           accountFor(["x"], () => true, () => false, () => false).unaccounted.length === 0 &&
+           accountFor(["x"], () => false, () => true, () => false).unaccounted.length === 0 &&
+           accountFor(["x"], () => false, () => false, () => true).unaccounted.length === 0,
+           "ledger, named list and arrival rule each account for an entry the other two refuse");
+    }
+
+    // *** AND THE FOUR CATEGORIES MUST PARTITION THE SET, WHICH IS A DIFFERENT CLAIM FROM "NONE IS LEFT". ***
+    // Two categories both claiming one entry, or one silently dropping members, leaves "0 unaccounted" true
+    // and the arithmetic wrong. This adds up rather than subtracting.
+    ok("  ...and the four categories PARTITION the observed-elsewhere set, so nothing is double-counted or dropped",
+       observedElsewhere.filter((g) => rotated.has(g)).length +
+       observedElsewhere.filter((g) => !rotated.has(g) && HAND_OBSERVED_V4641.includes(g)).length +
+       arrivals.length + unaccounted.length === observedElsewhere.length,
+       `${observedElsewhere.filter((g) => rotated.has(g)).length} + ` +
+       `${observedElsewhere.filter((g) => !rotated.has(g) && HAND_OBSERVED_V4641.includes(g)).length} + ` +
+       `${arrivals.length} + ${unaccounted.length} against ${observedElsewhere.length}`);
+
+    // ---- POSITIVE CONTROLS FOR THE ARRIVAL RULE, one per clause ----------------------------------------
+    // Each fixture differs from a legitimate arrival in exactly ONE way and must be refused. Without these the
+    // rule reads as three conditions and measures as one, because only the budget clause has live members.
+    {
+        const R0 = Date.parse("2026-09-17T16:20:39.742Z"), after = Date.parse("2026-09-24T00:00:00.000Z");
+        const before = Date.parse("2026-09-10T00:00:00.000Z");
+        ok("  CONTROL: an over-budget `alone` entry stamped AFTER the last rotation IS an arrival",
+           isArrival(42056, "alone", after, R0) === true,
+           "the shape all six live members have: the sweep cannot stamp it and the rotation has not reached it");
+        ok("  CONTROL: ...but one stamped BEFORE the last rotation is NOT -- the rotation should have taken it",
+           isArrival(42056, "alone", before, R0) === false,
+           "this is what keeps the category self-clearing: when a rotation runs, today's six land in its ledger " +
+           "and an entry it passed over stops being excusable. NO LIVE ENTRY HAS THIS SHAPE, which is why it is a fixture.");
+        ok("  CONTROL: ...and an UNDER-budget entry is not, because the sweep could have stamped it and did not",
+           isArrival(BUDGET - 1, "alone", after, R0) === false,
+           `budget ${BUDGET} ms; under it, step 3b re-times the gate itself, so a hand reading is a choice rather than a necessity`);
+        ok("  CONTROL: ...and a `loaded` kind is not, because a parallel reading is the wrong quantity for an over-budget gate",
+           isArrival(42056, "loaded", after, R0) === false,
+           "v4578 measured the two kinds about 1.93x apart; an over-budget gate hand-timed under load is a number nobody should file");
+        ok("  CONTROL: ...and a missing rotation ledger refuses EVERY arrival rather than excusing all of them",
+           isArrival(42056, "alone", after, NaN) === false,
+           "an unreadable sweep-rotation.json must not turn this category into an amnesty -- the failure direction is the safe one");
+    }
+
     // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.
     //
     // *** v4637 -- AND THE BRANCH RULE STOPPED ASKING WHETHER THE PROCESS FINISHED BY COMPARING A NUMBER TO

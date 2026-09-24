@@ -106,12 +106,30 @@ console.log("\n3. THE RATCHET");
 // with an empty `redOnArrival` is internally consistent and says nothing. A round can add a device runner,
 // redden this census, and close with a ledger that passes its own invariant.
 //
-// The note the widening owes: a flow field has no consumer on fsr.html. render/opticalFlow.mjs estimates
-// motion for FRAME GENERATION, and nothing in this tree yet turns a motion field into a frame between two
-// frames -- so a page call would compute a field and discard it, which is the decorative dispatch this
-// census exists to make visible. render/flowReconcile.mjs, arriving this round, is the flow's first consumer
-// and is CPU-only, so it does not retire the debt either: it would have to read the device field back to use
-// it. What retires it is frame interpolation on the page, which is the next thing this arc builds.
+// The note the widening owed, AS WRITTEN AT v4676: "a flow field has no consumer on fsr.html ... nothing in
+// this tree yet turns a motion field into a frame between two frames ... what retires it is frame
+// interpolation on the page, which is the next thing this arc builds."
+//
+// *** THAT NOTE WENT FALSE AT v4677 AND SAT HERE UNCORRECTED FOR TEN ROUNDS. *** render/frameInterp.mjs turns
+// a motion field into a frame between two frames (v4677); fsr.html has generated frames since v4681 and calls
+// opticalFlowCPU to do it; render/flowReconcile.mjs stopped being CPU-only at v4685. Three of the note's
+// clauses were wrong and the paragraph still read as the reason a ratchet had been widened.
+//
+// *** AND THE GATE THAT CATCHES EXACTLY THIS CAUGHT IT, WHILE NOBODY WAS LOOKING. ***
+// tools/ship/wiringClaims-selfcheck.mjs exists to find a prose wiring-claim whose subject is REACHABLE, which
+// is what this had become -- and it reported render/opticalFlow.mjs by name. It was red when it did, one of
+// six gates red outside the register since before v4686, so its finding was printed into a log nobody read.
+// A red gate is a gate whose findings are invisible; that is the cost of a standing red, stated where the
+// round that paid it can be found.
+//
+// WHAT IS ACTUALLY OWED, NOW: render/opticalFlowGPU.mjs is still gate-only, and the reason is no longer that
+// the flow has no consumer. The page's flow comes off the CPU because the DEVICE field would have to be read
+// back before render/flowReconcile.mjs could use it, and v4687 measured what that shape costs in the one
+// place this arc has it: the device fill crosses the host twice per generated frame because a joined
+// warp-and-fill needs eleven storage bindings against this adapter's ten. A device flow would add a third
+// crossing to buy nothing, because the consumer above it is still on the host. What retires it is
+// render/flowReconcileGPU.mjs reading the device field IN PLACE -- which exists, and which fsr.html does not
+// yet chain to a device flow. That is a round, and it is named here rather than left as "the next thing".
 //
 // *** AND THIS IS THE SECOND WIDENING IN NINE ROUNDS, WHICH IS THE PART THAT SHOULD BE UNCOMFORTABLE. ***
 // v4668 widened it to 3 with a note of exactly this shape. A ratchet that widens whenever a round has a good

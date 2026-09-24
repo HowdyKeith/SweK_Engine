@@ -384,6 +384,102 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
                              c.redOnArrival.every((r) => c.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40)),
        "...the second closing's reds are named with why (red on arrival, red on origin/main too), and its count adds up",
        `${S2.green} green, ${S2.red} red of ${S2.swept}: ` + S2.redOnArrival.map((r) => r.gate.split("/").pop() + " -- " + r.why).join("; "));
+    // *** v4688 -- `elsewhere`: THE SLOT THIS LEDGER DID NOT HAVE, AND WHOSE ABSENCE COST SIX STANDING REDS. ***
+    // The invariant above is about a round's OWN gates: added.length === swept, and every redOnArrival entry
+    // must name a gate in `added`. So a round that reddens or repairs a gate somewhere ELSE has nowhere in the
+    // ledger to say so, and closes clean by declaring swept: 0 with an empty redOnArrival -- internally
+    // consistent and silent. tools/ship/runnerCallers-selfcheck.mjs wrote that diagnosis at v4676, after
+    // render/opticalFlowGPU.mjs reddened it on arrival and stayed red through two rounds; nothing acted on it,
+    // and v4688 then found SIX gates red outside the register, none of them caused by the round that found them.
+    //
+    // The field is optional, because 297 closings predate it. Where it exists it is GRADED: every entry names a
+    // gate file that EXISTS, that is NOT in the same closing's `added` (that is what redOnArrival is for), with
+    // `was` and `now` drawn from red/green and a `why` long enough to be a reason rather than a label.
+    // *** THE GRADER IS A PURE FUNCTION OF (closings, exists), FOR THE REASON timingKind's ARRIVAL RULE IS. ***
+    // Two of its clauses have an EMPTY ADVERSARIAL POPULATION in the live ledger: no entry names a gate that is
+    // also in its closing's `added`, and the set is not empty. Deleting either clause changes no live answer, so
+    // both sabotages score 0 RED against the tree alone -- measured, both of them. The fixtures below are what
+    // make those clauses mean anything, and `exists` is injected so a fixture need not put files on disk.
+    const gradeElsewhere = (cs, exists) => {
+        const withElsewhere = cs.filter((c) => Array.isArray(c.elsewhere) && c.elsewhere.length > 0);
+        const bad = [];
+        for (const c of withElsewhere)
+            for (const e of c.elsewhere) {
+                if (!e || typeof e.gate !== "string") { bad.push(`${c.at}: an entry with no gate`); continue; }
+                if (!exists(e.gate)) bad.push(`${c.at}: ${e.gate} does not exist`);
+                if ((c.added || []).includes(e.gate)) bad.push(`${c.at}: ${e.gate} is in added -- that is redOnArrival's job`);
+                if (!["red", "green"].includes(e.was) || !["red", "green"].includes(e.now))
+                    bad.push(`${c.at}: ${e.gate} was/now must be red or green, got ${JSON.stringify(e.was)}/${JSON.stringify(e.now)}`);
+                if (typeof e.why !== "string" || e.why.length <= 40) bad.push(`${c.at}: ${e.gate} has no reason`);
+            }
+        return { bad, n: withElsewhere.reduce((k, c) => k + c.elsewhere.length, 0), closings: withElsewhere.length };
+    };
+    {
+        const live = gradeElsewhere(closings, (g) => fs.existsSync(path.join(GS.ENG, g)));
+        const bad = live.bad, n = live.n, withElsewhere = { length: live.closings };
+        // ---- FIXTURE CONTROLS, one per clause, because two clauses have no live members to break ----
+        const OK = { at: "vTEST", added: [], elsewhere: [{ gate: "a-selfcheck.mjs", was: "red", now: "green", why: "x".repeat(41) }] };
+        const yes = () => true;
+        const g1 = gradeElsewhere([OK], yes);
+        const g2 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], gate: "missing-selfcheck.mjs" }] }], (x) => x !== "missing-selfcheck.mjs");
+        const g3 = gradeElsewhere([{ ...OK, added: ["a-selfcheck.mjs"] }], yes);
+        const g4 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], was: "amber" }] }], yes);
+        const g5 = gradeElsewhere([{ ...OK, elsewhere: [{ ...OK.elsewhere[0], why: "too short" }] }], yes);
+        const g6 = gradeElsewhere([{ ...OK, elsewhere: [{ was: "red", now: "green", why: "x".repeat(41) }] }], yes);
+        ok(g1.bad.length === 0 && g1.n === 1, "  CONTROL: a well-formed `elsewhere` entry is accepted",
+           "otherwise every row below reports its own strictness rather than the ledger's shape");
+        ok(g2.bad.length === 1 && /does not exist/.test(g2.bad[0]),
+           "  CONTROL: a gate that is not on disk is refused", g2.bad.join("; "));
+        ok(g3.bad.length === 1 && /is in added/.test(g3.bad[0]),
+           "  CONTROL: a gate in the closing's OWN `added` is refused -- that is redOnArrival's job, and NO LIVE ENTRY HAS THIS SHAPE",
+           g3.bad.join("; ") + ". Removing this clause reddens nothing against the live ledger, which is why it is a fixture.");
+        ok(g4.bad.length === 1 && /must be red or green/.test(g4.bad[0]),
+           "  CONTROL: a verdict outside red/green is refused", g4.bad.join("; "));
+        ok(g5.bad.length === 1 && /has no reason/.test(g5.bad[0]),
+           "  CONTROL: a `why` short enough to be a label rather than a reason is refused", g5.bad.join("; "));
+        ok(g6.bad.length === 1 && /no gate/.test(g6.bad[0]),
+           "  CONTROL: an entry with no gate at all is refused", g6.bad.join("; "));
+        ok(gradeElsewhere([], yes).n === 0 && gradeElsewhere([{ at: "vTEST", added: [], elsewhere: [] }], yes).n === 0,
+           "  CONTROL: an EMPTY set counts zero, which is what the live row's `n > 0` clause refuses",
+           "a grader that reported nothing over an empty ledger and a row that accepted that would be a check " +
+           "over nothing -- and the live n > 0 is the only thing standing between those two facts");
+        // *** THIS HELPER IS CONDITION-FIRST, AND THE FIRST DRAFT OF THIS ROW WAS NAME-FIRST. *** It printed
+        // "PASS  true" -- the label sat in the condition slot, where a non-empty string is always truthy -- so
+        // the row could not fail and all five of its sabotages scored 0 RED. tools/ship/assertionShape.mjs
+        // censuses exactly this: 91 gates in the tree take the condition first and 1646 take the name, and a
+        // line pasted between the two families always passes. Caught by reading the output, because a row that
+        // cannot fail says PASS in precisely the voice of one that works.
+        ok(bad.length === 0 && n > 0,
+           "*** a closing may record a gate it reddened or repaired ELSEWHERE, and every such entry is graded ***",
+           bad.length ? bad.join("; ")
+                      : `${n} entr${n === 1 ? "y" : "ies"} across ${withElsewhere.length} closing(s), every gate on disk, ` +
+                        "none of them the closing's own arrival, each with a verdict and a reason. THE FIELD IS " +
+                        "OPTIONAL because 297 closings predate it, so this row measures the ones that use it -- and " +
+                        "n > 0 is part of the claim, because a check over an empty set is a check that cannot fail.");
+        // ---- v4688'S SABOTAGE LOG, OVER THE `elsewhere` GRADER --------------------------------------------
+        //
+        //   F7  the no-gate clause dropped                        -> 1 red
+        //   F6  the gate-exists clause dropped                    -> 1 red
+        //   F5  the own-`added` clause dropped                    -> 1 red
+        //   F2  the `why`-length clause dropped                   -> 1 red
+        //   F1  a live entry names a gate not on disk             -> 1 red
+        //   F3  a live entry's verdict set to "amber"             -> 1 red
+        //   F4  the live row's `n > 0` removed                    -> 0 RED, AND IT CANNOT BE OTHERWISE TODAY
+        //
+        // *** F5 AND F6 REDDEN ONLY BECAUSE THE FIXTURES ABOVE EXIST. *** Against the live ledger alone, no
+        // entry names a gate that is also in its closing's `added` and none names a missing file, so deleting
+        // either clause changes no live answer -- both scored 0 RED before the controls were written, measured.
+        // THE FIRST DRAFT OF THIS ROW WAS WORSE THAN THAT: it was written name-first for a CONDITION-FIRST
+        // helper, printed "PASS  true", and could not fail at all -- all five of its sabotages scored 0 RED
+        // and the row looked exactly like one that worked.
+        //
+        // *** F4 IS THE SECOND 0-RED IN THIS ROUND OF A CLASS THAT IS NOT A FIXTURE GAP. *** `n > 0` stops this
+        // row going vacuous on a FUTURE ledger where no closing uses the field; with six live entries, removing
+        // it changes nothing. Its adversarial population is a tree that does not exist yet, so no fixture can
+        // make the LIVE clause bite -- the control above grades the grader's zero instead. The same shape as
+        // timingKind-selfcheck's hardwired-[] mutation: when a gate's correct reading is a value the mutation
+        // also produces, nothing inside the gate can tell the two apart.
+    }
     ok(SS.green === SS.swept && SS.red === 0 && SS.regressions === 0,
        "...and none of them is red, so nothing has regressed since v4297 either",
        `${SS.green} green of ${SS.swept}, ${SS.falseReds} false red and ${SS.unmeasuredAtCap} unmeasured at ` +

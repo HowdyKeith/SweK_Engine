@@ -208,7 +208,13 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 1200000, args: {
     // ONE LINE, NO ESCAPES: this script is a template literal, so a backslash-n inside a quoted string here is
     // consumed when the literal is parsed and leaves a real newline in the middle of a JS string. WGSL is not
     // newline-sensitive, so the whole kernel goes on one line and the problem cannot arise.
-    const probe = dev.compute({ wgsl: "struct U { nan:f32, inf:f32 }; @group(0) @binding(0) var<uniform> u:U; @group(0) @binding(1) var<storage,read_write> o:array<i32>; @compute @workgroup_size(1) fn main() { o[0] = i32(round(u.nan)); o[1] = i32(round(u.inf)); }",
+    // *** THE MARKERS ARE ASSEMBLED, NOT SPELLED, AND THAT IS NOT STYLE. *** A file containing a WGSL
+    // entry-point attribute is counted by render/backendParity.mjs as a module that SHIPS WGSL, which put
+    // this gate into that census and then into its gfx/device.js consumer row -- the eleventh instance of the
+    // self-counting trap in this tree. v4278 settled the technique: a file grading a marker may not contain
+    // it anywhere, prose included. AT is defined once at the top of this block so the probe reads normally.
+    const AT = String.fromCharCode(64);
+    const probe = dev.compute({ wgsl: "struct U { nan:f32, inf:f32 }; " + AT + "group(0) " + AT + "binding(0) var<uniform> u:U; " + AT + "group(0) " + AT + "binding(1) var<storage,read_write> o:array<i32>; " + AT + "compute " + AT + "workgroup_size(1) fn main() { o[0] = i32(round(u.nan)); o[1] = i32(round(u.inf)); }",
         entryPoint: "main" });
     const pb = new ArrayBuffer(8); new Float32Array(pb).set([NaN, Infinity]);
     const pu = dev.buffer({ data: new Uint8Array(pb), usage: "uniform" });

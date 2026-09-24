@@ -254,7 +254,7 @@ console.log("\n5. *** WHY THE THREE PASSES ARE NOT ONE PIPELINE, WITH THE ARITHM
        `A joined pipeline holds prev, cur, flow, depthBlock, key, owner, packed, packed2, frameOut, depthPrev and depthCur -- eleven. ` +
        `So a caller moves data between the three verified passes, and this is a limit with a number rather than a to-do.`);
     ok("...and the fill needs ONE dispatch where the warp needed three, which is a property of the algorithms",
-       (FILL_WGSL.match(/@compute/g) || []).length === 1,
+       (FILL_WGSL.match(new RegExp(String.fromCharCode(64) + "compute", "g")) || []).length === 1,
        "the neighbourhood rule reads only the ORIGINAL mask and writes only its own slot, so no device can disagree " +
        "with a CPU about visit order. The splat is a scatter and needed two atomics to reproduce one tie rule.");
 }

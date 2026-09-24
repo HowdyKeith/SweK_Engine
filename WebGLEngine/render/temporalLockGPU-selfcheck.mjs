@@ -53,6 +53,7 @@ import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness
 import { makeLumaState, pushLuma, shadingShiftCPU, lumaMean, ridgesCPU, coherentRidgesCPU,
          depthRidgesCPU, gateLocks, lockCandidatesFromRing } from "./temporalLock.mjs";
 import { ringFloorCPU, RESOLUTION_TAU } from "./ringFloor.mjs";
+import { FLOOR_PHASE } from "./temporalLockGPU.mjs";
 import { codeOnly } from "./backendParity.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -358,6 +359,28 @@ if (r.ok && r.result) {
     ok("...and the two forms genuinely DIFFER, so a runner that ignored `phase` would not pass",
        (() => { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.abs(R.floorFrame[i] - R.floorWin[i])); return m > 1e-4; })(),
        (() => { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.abs(R.floorFrame[i] - R.floorWin[i])); return `worst gap between the forms ${m.toExponential(2)}`; })());
+    // *** FLOOR_PHASE WAS AN EXPORT NO GATE NAMED, FOR FORTY-ODD ROUNDS. *** definitionGates-selfcheck found
+    // it -- the ONE symbol that took its tree-wide all-shapes census from a frozen 703 to 704 -- and that gate
+    // had been red outside the red register since before v4686, so it said so into a log nobody read. It is
+    // closed here the way that gate's own header says the 81 before it were closed: BY ASSERTION, not by
+    // mention. A row that merely spelled the name would have satisfied the census and measured nothing.
+    ok("!! *** FLOOR_PHASE's words are the ones RING_FLOOR_WGSL actually reads, not a parallel naming ***",
+       FLOOR_PHASE.FRAME === 0 && FLOOR_PHASE.WINDOW === 1 &&
+       Object.isFrozen(FLOOR_PHASE) && Object.keys(FLOOR_PHASE).length === 2,
+       `FRAME ${FLOOR_PHASE.FRAME}, WINDOW ${FLOOR_PHASE.WINDOW}, frozen, two words. The runner packs this ` +
+       "straight into the uniform's windowPhase slot, so a constant that drifted from the kernel would send " +
+       "every caller the other form silently -- the exact failure the named constant exists to prevent, and " +
+       "the reason its point is 'a caller never passes a bare 1'.");
+    // SABOTAGE v4688: the two words made EQUAL -> 4 red, because every phase argument in the tree then selects
+    // the frame form and the window parity rows go with it. FLOOR_PHASE left unfrozen -> 1 red. Both by name,
+    // and the four-red one is why this is closed by ASSERTION rather than by mention: a row that merely spelled
+    // the symbol would have satisfied definitionGates-selfcheck and survived both mutations untouched.
+    ok("  ...and the two words SELECT the two forms, so the constant is load-bearing rather than decorative",
+       (() => { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.abs(R.floorFrame[i] - R.floorWin[i])); return m > 1e-4; })() &&
+       FLOOR_PHASE.FRAME !== FLOOR_PHASE.WINDOW,
+       "the row above measures that the frame and window fields differ; this says the two differing fields are " +
+       "the ones these two words choose between. A constant whose members were equal would name two things and " +
+       "select one, and every phase argument in the tree would quietly become the frame form.");
     ok("!! ...and the FRAME form IGNORES a ring it is handed, BIT for BIT",
        worst(R.floorFrameWithRing, R.floorFrame, N) === 0,
        `${diffs(R.floorFrameWithRing, R.floorFrame, N)} of ${N} floats differ. The ring term predates no ` +

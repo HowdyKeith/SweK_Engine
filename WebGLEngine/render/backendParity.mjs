@@ -201,6 +201,46 @@ export const PARITY_BASELINE = Object.freeze({
     // both languages) and its gate physics/render/specularProbeLit-selfcheck.mjs (a real WGSL compute dispatch of
     // the fragment logic plus a real GLSL vertex/fragment pair, counted per this file's own v4392 rule that a gate
     // embedding shader text is counted rather than exempted, not exempted as this gate exempts itself).
+    // *** v4688 -- wgslBearing 97 -> 106 and wgslOnly 74 -> 83, THE SAME NINE, AND ALL OF THEM THIS ARC'S. ***
+    // Named rather than counted, per v4470's rule that a baseline which stops naming its population stops
+    // describing the tree. Derived by listing the live wgslOnly set and asking git which of its members did
+    // not exist at the v4645 baseline commit, rather than by adding up eleven commit messages:
+    //   render/dilateWgsl.mjs, render/luminancePyramidWgsl.mjs, render/objectMotionWgsl.mjs,
+    //   render/opticalFlowWgsl.mjs, render/reactiveWgsl.mjs, render/visibilityWgsl.mjs,
+    //   render/flowReconcileWgsl.mjs, render/frameInterpWgsl.mjs, render/holeFillWgsl.mjs
+    // Every one is WGSL-ONLY, which is why the two rows move together by the same amount and `both`,
+    // glslBearing, glslDirective and glslFramework do not move at all -- the same signature v4645's ten had,
+    // for the same reason: a compute pass has no WebGL2 half, so its twin is JavaScript rather than GLSL.
+    //
+    // *** THE COUNT WAS ELEVEN BEFORE IT WAS NINE, AND THE TWO THAT LEFT ARE THE INTERESTING PART. ***
+    // render/frameInterpGPU-selfcheck.mjs and render/holeFillGPU-selfcheck.mjs were counted as WGSL-bearing
+    // because each CONTAINED a WGSL entry-point attribute: one in an inline NaN-probe kernel, one inside a
+    // REGEX WRITTEN TO COUNT THAT VERY ATTRIBUTE in another file. Being in this census put them in the
+    // gfx/device.js consumer row, which then read four consumers instead of two. v4278 hit exactly this and
+    // settled the rule -- a file grading a marker may not contain it anywhere, prose included -- and the fix
+    // is the same one: assemble the marker from pieces. So the consumer row is repaired at its CAUSE rather
+    // than by an exemption list, which is what v4278 tried first and then removed in the same round.
+    //
+    // SABOTAGE v4688: the baseline put back to its stale 74 -> 1 red. Each repaired gate made to spell a real
+    // WGSL marker again -> 3 red apiece, both of them: the file re-enters the census, wgslBearing and wgslOnly
+    // both move, and the gfx/device.js consumer row reads four consumers instead of two. THE FIRST ATTEMPT AT
+    // THAT MUTATION SCORED 0 RED AND WAS A NO-OP RATHER THAN A FINDING: it replaced the assembled marker with
+    // a bare at-sign, which matches none of WGSL_MARKS (the three stage attributes this file assembles at the
+    // top rather than spelling), so the text changed and the
+    // census did not. A mutation that fails to reintroduce the property under test measures nothing, and
+    // recording it as a 0-RED would have been a claim about a control that was never exercised.
+    //
+    // *** AND WRITING THE SENTENCE ABOVE SPELLED ALL THREE MARKERS OUT IN THIS FILE, WHICH TURNED SECTION 2'S
+    // LITERAL-MARKER ROW RED ON THE PROSE EXPLAINING WHY THEY MUST NOT APPEAR. *** Eleventh instance, and the
+    // second time in this one round -- the first was the pair of gates this note is about. v4278 recorded the
+    // same thing happening to it, in this same file, in the same shape: the rule is not "assemble the markers
+    // in code", it is that a file grading a marker may not contain it ANYWHERE, prose included. The list is
+    // referred to by name here instead.
+    //
+    // *** AND THE COUNT WAS ELEVEN ROUNDS STALE BECAUSE THIS GATE WAS RED, NOT BECAUSE NOBODY LOOKED. ***
+    // backendParity-selfcheck was one of six gates red outside the register from before v4686 through v4687.
+    // It named the drift every time it ran; a red gate's findings reach nobody, which is what a standing red
+    // actually costs and is recorded here because this file is where the cost landed.
     // *** v4645 -- RE-DERIVED AT THE main MERGE: wgslBearing 87 -> 97 and wgslOnly 64 -> 74, THE SAME TEN. ***
     // main's baseline was correct for main's tree, which is why v4642 could repair this gate there and why it
     // goes red here: the merge brought ten WGSL-bearing files main does not have, every one of them this
@@ -277,10 +317,10 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 97,
+    wgslBearing: 106,
     both: 23,            // +2 over the last-recorded 21: fae26dbf's specularProbeLit.mjs and specularProbeLit-selfcheck.mjs
     glslOnly: 135,
-    wgslOnly: 74,
+    wgslOnly: 83,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),
