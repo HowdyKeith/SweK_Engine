@@ -68,6 +68,48 @@
 // underlying blow-up (a real fix -- footprint-bounded clipping, or merging near-duplicate small fragments --
 // is not attempted this round).
 //
+// FOUR REAL BUGS/GAPS, ALL FOUND BY AN ADVERSARIAL REVIEW OF THIS ROUND'S ORIGINAL DIFF, VERIFIED BY DIRECT
+// EXECUTION, AND FIXED HERE:
+//   (1) the maxFragments cap could be silently EXCEEDED, not just eventually hit -- the original check ran only
+//   at the TOP of the per-plane loop, before that plane was applied, so the LAST plane processed could push
+//   fragments.length arbitrarily far past the cap with nothing catching it (measured: maxFragments=191 on a
+//   20-plane spoke scenario returned capped:false with fragments.length:192). Fixed with a second check
+//   immediately after each plane is applied, so the cap is enforced everywhere fragments.length can grow.
+//   (2) accumulateFragments() crashed on candidateTriBs=undefined -- exactly what
+//   groupCandidatesByTriA(pairs).get(triA) returns for the common case of a triA with zero overlap candidates,
+//   this module's own documented typical calling pattern. Fixed with a one-line default-to-[] guard.
+//   (3) `planeCount`'s own JSDoc says "distinct planes actually applied (after dedup)", but the code always
+//   returned the full pre-loop dedup'd count regardless of an early cap-triggered exit -- overstating how many
+//   planes were really applied whenever capped. Fixed by tracking applied-plane count separately from the
+//   dedup pass's own plane count (the latter still backs `duplicatePlanesCollapsed`, a property of the
+//   candidate list itself, not of how much of it got applied).
+//   (4) the plane-identity dedup (Finding 1) only merged candidates whose normals point the SAME direction --
+//   two B-triangles occupying the identical geometric plane but wound OPPOSITELY (n2~=-n1, d2~=-d1, e.g. from a
+//   multi-part or inconsistently-wound mesh B) were treated as two distinct planes. The review traced (and
+//   confirmed by running the real code) that this never produces a WRONG final classification -- a fragment
+//   reaching the un-deduped duplicate's own re-application is already entirely on one side of that locus, and
+//   resolveDegenerate()'s per-vertex sign-agreement test is invariant to the plane's own sign convention -- so
+//   it cost only wasted work and inflated planeCount/duplicatePlanesCollapsed stats, not silent corruption.
+//   Fixed anyway, directly, by widening the dedup check to also match the negated (n,d) convention.
+//
+// A FIFTH FINDING, LEFT HONESTLY UNRESOLVED RATHER THAN FORCED INTO A FIX THIS ROUND: repeated clipping can
+// cascade a run of near-zero-area sliver fragments when several candidate planes are NEAR-duplicates of each
+// other -- genuinely distinct by construction, not a floating-point artifact of one true plane, but close
+// enough together (just outside PLANE_EPS) that each one shaves a vanishingly thin extra slice off an
+// already-once-clipped fragment instead of contributing a meaningfully different cut. The review demonstrated
+// this concretely (a chain of near-duplicate planes jittered just above PLANE_EPS produced real, kept,
+// non-degenerate fragments with area at the double-precision noise floor, area conservation still holding) and,
+// combined with the maxFragments cap, a WORSE variant: enough near-duplicate slivers can consume the entire
+// fragment budget before a genuinely necessary, geometrically distinct plane is ever applied -- `capped:true`
+// is still honestly reported, but a caller has no signal that the planes actually applied before the cap were
+// disproportionately low-value ones. This is NOT the same risk as PLANE_EPS being too LOOSE (which Finding 1
+// already handles: genuine duplicates get merged); it is a design trade-off in how TIGHT PLANE_EPS should be
+// between "correctly telling near-but-genuinely-different planes apart" and "not cascading slivers from planes
+// that are different in principle but practically insignificant" -- resolving it needs either a smarter
+// plane-processing order (prioritizing planes with larger geometric effect first, not attempted here) or a
+// fragment-merge/prune step this round does not build. Reproduced directly in this module's own gate (see
+// triFragmentAccumulate-selfcheck.mjs) rather than only described here.
+//
 // SCOPE: this module produces a CLASSIFIABLE fragment set for one triangle of mesh A against every relevant
 // candidate of mesh B -- it does not itself classify fragments (hand the result's fragment centroids to
 // physics/mesh/meshPointClassify.mjs's pointInMesh(), round 4's own primitive, for that), and it does not
@@ -189,9 +231,21 @@ function resolveDegenerate(tri, nRaw, dRaw) {
 export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {}) {
     const planeEps = opts.planeEps ?? PLANE_EPS;
     const maxFragments = opts.maxFragments ?? DEFAULT_MAX_FRAGMENTS;
+    // An adversarial review of this round found candidateTriBs=undefined -- exactly what
+    // groupCandidatesByTriA(pairs).get(triA) returns for the common case of a triA with zero overlap
+    // candidates, this module's own documented typical calling pattern -- crashed with a TypeError instead of
+    // behaving like the already-tested empty-array case. Fixed with this one-line guard.
+    candidateTriBs = candidateTriBs || [];
 
     // Finding 1: dedup candidates by PLANE IDENTITY before clipping, not by trusting triClip.mjs's own
-    // short-circuit to no-op a repeat (see this file's own header for why it does not).
+    // short-circuit to no-op a repeat (see this file's own header for why it does not). ALSO merges a
+    // candidate whose plane is the same locus but OPPOSITELY WOUND (n2~=-n1, d2~=-d1) -- found missing by an
+    // adversarial review of this round's original diff: the review confirmed (both by hand and by running the
+    // real code) that leaving an opposite-facing duplicate un-merged never produces a WRONG final
+    // classification (resolveDegenerate()'s own per-vertex sign-agreement test is invariant to a global sign
+    // flip of the plane's own convention) -- but it did inflate planeCount/duplicatePlanesCollapsed and waste
+    // real work re-resolving an already-settled split, which this fix closes directly rather than merely
+    // documenting.
     const planes = [];
     const seenTriB = new Set();
     for (const triB of candidateTriBs) {
@@ -202,17 +256,20 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
                                           // triTriIntersect.mjs/triClip.mjs already use for a degenerate input)
         let match = null;
         for (const p of planes) {
-            if (dot(p.n, plane.n) > 1 - planeEps && Math.abs(p.d - plane.d) < planeEps) { match = p; break; }
+            const c = dot(p.n, plane.n);
+            if (c > 1 - planeEps && Math.abs(p.d - plane.d) < planeEps) { match = p; break; }
+            if (c < -(1 - planeEps) && Math.abs(p.d + plane.d) < planeEps) { match = p; break; }
         }
         if (match) match.triBs.push(triB); else planes.push({ n: plane.n, d: plane.d, triBs: [triB] });
     }
 
     let fragments = [{ tri: readTri(trisA, triA), splitBy: [] }];
-    let degenerateFallbacks = 0, unresolvedCount = 0, capped = false;
+    let degenerateFallbacks = 0, unresolvedCount = 0, capped = false, appliedPlaneCount = 0;
     const scratch = new Float64Array(9);
 
     for (const plane of planes) {
         if (fragments.length >= maxFragments) { capped = true; break; }
+        appliedPlaneCount++;
         const next = [];
         for (const frag of fragments) {
             packScratch(scratch, frag.tri);
@@ -240,10 +297,25 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
             }
         }
         fragments = next;
+        // An adversarial review of this round found the ORIGINAL cap check (only at the top of this loop,
+        // before a plane is applied) lets the LAST applied plane push fragments.length arbitrarily far past
+        // maxFragments before the next iteration's check would have caught it -- reproduced concretely:
+        // maxFragments=191 on a 20-plane spoke scenario returned capped:false with fragments.length:192,
+        // silently violating this function's own documented contract ("reports capped:true rather than
+        // growing unbounded ... without saying so"). This second check, right after a plane is applied, closes
+        // that gap: the cap is now enforced at every point fragments.length can grow, not just between planes.
+        if (fragments.length >= maxFragments) { capped = true; break; }
     }
     return {
         fragments,
-        planeCount: planes.length,
+        // planeCount is now the count of planes ACTUALLY APPLIED (honoring its own documented contract even
+        // under capping) -- an adversarial review found this previously always reported the full pre-loop
+        // dedup'd count (planes.length) regardless of an early cap-triggered exit, contradicting its own JSDoc
+        // ("distinct planes actually applied (after dedup)"). duplicatePlanesCollapsed stays based on the full
+        // dedup pass (planes.length) on purpose -- it answers "how many candidates did dedup fold together",
+        // a property of the candidate list itself, independent of how many of the resulting planes later got
+        // applied before any cap.
+        planeCount: appliedPlaneCount,
         duplicatePlanesCollapsed: candidateTriBs.length - planes.length,
         degenerateFallbacks,
         unresolvedCount,
