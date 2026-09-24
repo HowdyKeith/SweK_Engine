@@ -8032,6 +8032,58 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4698 -- THE 305th CLOSING: a pre-registration whose seeds seed, and the seed that never had.
+    since380: Object.freeze({
+        at: "v4698", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/foldStats-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze(["tools/ship/genGateTransfer-selfcheck.mjs"]),
+        verdict: "*** THE SEED NEVER SEEDED THE TRAINING, AND NOBODY HAD CHECKED. *** Writing a design that " +
+                 "needs ten seeds to carry an error bar meant asking what a seed fixes. brain/learn.js's " +
+                 "MLPTrainer.step() drew its minibatches from Math.random, so every learned round since v4689 " +
+                 "seeded the INITIAL WEIGHTS and nothing after. Measured on synthetic rows: same seed twice, 0 of " +
+                 "192 weights shared, worst |dW| 4.98. v4695 held \"the seed stays 7\" fixed as a control and " +
+                 "v4696 compared v1 against v2 \"on the same seed\" -- two draws, not one draw with one thing " +
+                 "changed -- and genGateTrain's comment said in plain words that the seed made a run " +
+                 "reproducible. The trainer now takes an `rng`, defaulting to Math.random LOOKED UP AT CALL TIME " +
+                 "so the live brain and any gate that swaps Math.random are unchanged; the learned-gate tools " +
+                 "pass a seeded one. The records of v4689 to v4696 stand as measured. " +
+                 "*** THE PROBE THAT FOUND IT WAS WRONG FIRST, AND WRONG IN AN INSTRUCTIVE WAY. *** It fed " +
+                 "Float32Array rows to genGateTrain.train and got 192 of 192 weights IDENTICAL across runs -- " +
+                 "which looked like reproducibility. `.flat()` does not flatten a typed array: every feature " +
+                 "became NaN, every ReLU died, only the output bias trained, and a constant network is trivially " +
+                 "reproducible. No committed result met this -- page rows arrive as plain arrays through JSON -- " +
+                 "but train() accepted it with no error, so it now flattens typed rows correctly AND refuses a " +
+                 "non-finite feature. " +
+                 "*** THE PRE-REGISTRATION: render/learned-folds-preregistration.md, WITH NO DATA IN THE COMMIT. " +
+                 "*** Seven folds, leave one scene out; four arms per fold per seed -- the scale-free set, the " +
+                 "absolute set, and two shuffled-label twins that differ only in their permutation stream; ten " +
+                 "seeds; the UNIT OF REPLICATION IS THE FOLD, one seed-averaged AUC per arm, because 22,464 " +
+                 "correlated blocks are not 22,464 observations and a within-fold AUC cannot see a fold's prior " +
+                 "or score band. H4 needs both clauses -- beats its shuffled twin, beats the absolute set -- by " +
+                 "paired t AND exact sign, an intersection-union test. The price is stated in advance: at seven " +
+                 "folds the sign test clears only at 7 of 7, so ONE fold against the direction fails a clause. " +
+                 "What has already been seen is declared by name. Pooled AUC is retired rather than reported. " +
+                 "*** AND THE ANALYSIS IS COMMITTED AS CODE, NOT PROSE. *** tools/ship/foldStats.mjs parses every " +
+                 "constant out of the document's `declared` block and refuses a missing, duplicated or unread " +
+                 "key; the one constant arithmetic can check -- five folds, the fewest at which the sign test can " +
+                 "reach 0.05 -- is DERIVED and must agree. tools/ship/genGateFolds.mjs is the runner, driven here " +
+                 "over seven made-up scenes and NOT over the page: control C10 shows v4696's band-and-prior " +
+                 "mechanism giving a pooled AUC of 0.6970 and per-fold differences of EXACTLY zero. " +
+                 "*** TWENTY-TWO SABOTAGES, TWENTY-TWO RED -- AFTER ONE 0-RED THAT WAS A MISSING ROW, NOT AN " +
+                 "EMPTY POPULATION. *** Control C5 names the scaler and the weights both, and the gate checked " +
+                 "only which SCENES each fold trained on; a scaler fitted on held-out rows would have passed. " +
+                 "That is v4694's defect -- a pre-registered control nothing asserted -- inside the round that " +
+                 "declared it. The runner now records every fold's scaler, and the gate recomputes it from the " +
+                 "training rows. Two other rows were built so the adversarial population could not be empty: the " +
+                 "half-open generator is tested at the ONE LCG state where a closed one returns exactly 1, " +
+                 "SOLVED for by modular inverse rather than hoped for in 200,000 draws. " +
+                 "*** TWO DEFECTS IN v4696's GATE, BOTH THE PATTERN THIS SESSION KEEPS FINDING. *** rowsOf's " +
+                 "comment promised to drop a non-finite block from BOTH feature sets and the code filtered each " +
+                 "on its own row; its fixture made one block bad in BOTH sets, the single case where the two " +
+                 "agree. And its scene-list row still said \"fsr.html offers exactly these\" a round after v4697 " +
+                 "made that false, green because it never read the page. Both fixed; both inert on the cached " +
+                 "data, which holds no non-finite value in either set.",
+    }),
     // v4697 -- THE 304th CLOSING: the population widened, and nothing was measured through it.
     since379: Object.freeze({
         at: "v4697", swept: 1, green: 1, red: 0,

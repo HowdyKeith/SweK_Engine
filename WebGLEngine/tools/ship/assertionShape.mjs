@@ -510,8 +510,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4696 -- 1777 -> 1778 for tools/ship/genGateTransfer-selfcheck.mjs, the round where a control fired.
     // v4697 -- 1778 -> 1779 for tools/ship/fsrContent-selfcheck.mjs, the census of what fsr.html's seven scenes
     // actually contain. Seventeenth round running with the same four rows moving together by one.
-    gates: 1779, usesOk: 1758, definesOk: 1750, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1651, condFirst: 91, unknownSignature: 16,
+    // v4698 -- 1779 -> 1780 for tools/ship/foldStats-selfcheck.mjs, the seven-fold statistic gated on synthetic
+    // data in its pre-registration's round. Eighteenth round running with the four rows moving together by one.
+    gates: 1780, usesOk: 1759, definesOk: 1751, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1652, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

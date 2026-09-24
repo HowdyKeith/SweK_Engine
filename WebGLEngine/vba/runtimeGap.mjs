@@ -337,7 +337,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4341,               // v4697: 4340 -> 4341 for tools/ship/fsrContent-selfcheck.mjs, the census of what
+    files: 4344,               // v4698: 4341 -> 4344 for tools/ship/foldStats.mjs, tools/ship/genGateFolds.mjs and
+                               // tools/ship/foldStats-selfcheck.mjs -- the pre-registered statistic, its runner,
+                               // and their synthetic-data gate. THREE files; the pre-registration is .md and the
+                               // edits to brain/learn.js and the two older learned-gate tools add none. async/await
+                               // moves by ONE, not two: genGateFolds' harvestAll is async and the gate is not,
+                               // because nothing in it drives the page -- the whole point of the round. Promises
+                               // holds at 377 for the same reason. Every row from the census.
+                               // v4697: 4340 -> 4341 for tools/ship/fsrContent-selfcheck.mjs, the census of what
                                // fsr.html's seven scenes contain. ONE file and not two: the round's other change
                                // is to fsr.html itself, and this walk matches .js/.mjs/.cjs and not .html, so the
                                // four new scenes and the removed silent fallback are invisible here. Six rows move
@@ -813,7 +820,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4041, closures: 3897, asyncAwait: 1553, typedArrays: 1164, promises: 377,
+    esModules: 4044, closures: 3900, asyncAwait: 1554, typedArrays: 1166, promises: 377,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

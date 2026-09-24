@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import { N_FEATURES, HIDDEN, fitScaler, applyScaler } from "../../render/genGate.mjs";
 import { MLPTrainer } from "../../brain/learn.js";
+import { seededRng } from "./foldStats.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const TRAIN_SCENES = Object.freeze(["smooth", "zone"]);
@@ -77,7 +78,12 @@ export async function harvest({ scenes = TRAIN_SCENES, upto = UPTO, speed = SPEE
  *
  * *** brain/learn.js's MLPTrainer IS A BANDIT HEAD AND ITS `step()` SAMPLES ITS REPLAY BUFFER AT RANDOM. ***
  * That is what it was built for and it is not changed here. What it means for a supervised split is that the
- * pass count is a budget rather than an epoch count, and the seed below is what makes a run reproducible.
+ * pass count is a budget rather than an epoch count.
+ *
+ * *** v4698 -- AND UNTIL v4698 THE SEED DID NOT MAKE A RUN REPRODUCIBLE, WHATEVER THIS COMMENT SAID. *** It
+ * seeded the initial weights; the sampler drew from Math.random. Same seed twice shared 0 of 192 weights. The
+ * trainer now takes an `rng` and this passes a seeded one, so the sentence is true from here on. v4691's and
+ * v4693's weights were trained before it was, and their records stand as measured.
  */
 export function train(rows, { steps = 4000, lr = 0.05, seed = 7 } = {}) {
     let sd = seed >>> 0;
@@ -85,10 +91,15 @@ export function train(rows, { steps = 4000, lr = 0.05, seed = 7 } = {}) {
     const X = [], Y = [];
     for (const row of rows) {
         const nb = row.y.length;
-        for (let b = 0; b < nb; b++) { X.push(row.x.slice(b * N_FEATURES, (b + 1) * N_FEATURES)); Y.push(row.y[b]); }
+        // Array.from: `.flat()` does not flatten a TYPED array, so rows arriving as Float32Array became one NaN
+        // apiece, every ReLU died and only the output bias trained -- a constant network, with no error. Rows off
+        // the page arrive as plain arrays through JSON, so no committed result met this; a caller that did would.
+        for (let b = 0; b < nb; b++) { X.push(Array.from(row.x.slice(b * N_FEATURES, (b + 1) * N_FEATURES))); Y.push(row.y[b]); }
     }
     if (!X.length) throw new Error("genGateTrain.train: no rows harvested");
     const flat = Float32Array.from(X.flat());
+    if (flat.length !== X.length * N_FEATURES || !flat.every(Number.isFinite))
+        throw new Error(`genGateTrain.train: ${flat.length} feature values for ${X.length} rows of ${N_FEATURES}, or a non-finite one -- a NaN feature trains a constant network silently`);
     const scaler = fitScaler(flat);
     const Z = applyScaler(flat, scaler);
     // Xavier-ish init off the same seed, so a re-run reproduces the weights rather than merely the shape.
@@ -98,7 +109,7 @@ export function train(rows, { steps = 4000, lr = 0.05, seed = 7 } = {}) {
     const L2 = { nIn: HIDDEN, nOut: 1, act: "sigmoid",
                  W: Float32Array.from({ length: HIDDEN }, () => (rnd() * 2 - 1) / Math.sqrt(HIDDEN)),
                  b: new Float32Array(1) };
-    const t = new MLPTrainer([L1, L2], { lr, batch: 32, minBuffer: 64, bufferCap: X.length + 8 });
+    const t = new MLPTrainer([L1, L2], { lr, batch: 32, minBuffer: 64, bufferCap: X.length + 8, rng: seededRng(seed) });
     for (let i = 0; i < X.length; i++)
         t.buffer.push({ x: Z.subarray(i * N_FEATURES, (i + 1) * N_FEATURES), r: Y[i], w: 1 });
     let did = 0;

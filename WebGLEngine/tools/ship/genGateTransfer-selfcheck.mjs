@@ -53,15 +53,29 @@ console.log("\n1b. THIS FILE'S OWN MODULE, ASSERTED RATHER THAN MENTIONED");
 {
     // definitionGates-selfcheck counts exported symbols no gate NAMES, and its header says the 81 before them
     // were closed BY ASSERTION. Each is exercised rather than spelled.
-    ok("*** SCENES is the page's whole scene list, which is why there are three folds and not more ***",
-       SCENES.length === 3 && SCENES.every((s2) => /^(smooth|zone|checker)$/.test(s2)),
-       `${SCENES.join(", ")}. fsr.html offers exactly these, so leave-one-out gives three folds -- and the ` +
-       "pre-registration says in advance that three is not a distribution.");
+    // v4698 -- THIS ROW SAID "fsr.html offers exactly these" FOR A ROUND AFTER IT STOPPED BEING TRUE. v4697 gave
+    // the page seven scenes, and the row stayed green because it compared SCENES against a literal and never
+    // read the page. It now asserts what is still true -- these are v4695's pre-registered three, all of them
+    // on the page -- and says the page offers more, reading the page to say it.
+    ok("*** SCENES is v4695's pre-registered three, every one of them on the page -- which offers MORE since v4697 ***",
+       (() => {
+           const html = fs.readFileSync(path.join(ENG, "fsr.html"), "utf8");
+           const m = /<select id="scene">([\s\S]*?)<\/select>/.exec(html);
+           const page = m ? [...m[1].matchAll(/<option value="(\w+)">/g)].map((x) => x[1]) : [];
+           const pre = fs.readFileSync(path.join(ENG, "render/learned-transfer-preregistration.md"), "utf8");
+           return SCENES.length === 3 && SCENES.every((s2) => page.includes(s2) && pre.includes("`" + s2 + "`")) &&
+                  page.length > SCENES.length;
+       })(),
+       `${SCENES.join(", ")}: the three v4695 pre-registered, and v4696's folds are over those three alone. The ` +
+       "page's scene list is larger now and a seven-fold design is render/learned-folds-preregistration.md's.");
     ok("*** rowsOf drops a block whose row is non-finite, and drops it from BOTH sets alike ***",
        (() => {
-           const bad = [{ scene: "x", y: [1, 0], base: 0.5,
-                          x: [...Array(N1).fill(1), ...Array(N1).fill(NaN)],
-                          x2: [...Array(N2).fill(1), ...Array(N2).fill(NaN)] }];
+           // v4698 -- block 1 non-finite in v2 ALONE, block 2 in v1 alone. The v4696 fixture made one block
+           // non-finite in BOTH sets, which is the one case where filtering each set on its own row and
+           // filtering jointly agree -- so the row could not see that the code did the former.
+           const bad = [{ scene: "x", y: [1, 0, 1], base: 0.67,
+                          x: [...Array(N1).fill(1), ...Array(N1).fill(1), ...Array(N1).fill(NaN)],
+                          x2: [...Array(N2).fill(1), ...Array(N2).fill(NaN), ...Array(N2).fill(1)] }];
            return rowsOf(bad, "v1").n === 1 && rowsOf(bad, "v2").n === 1;
        })(),
        "a declined block can carry a non-finite log-ratio in v2 and a finite absolute in v1. Dropping it from " +

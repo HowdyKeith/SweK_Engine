@@ -15,6 +15,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { N_FEATURES, N_FEATURES_V2, HIDDEN, fitScaler, applyScaler, forward, auc, aucP } from "../../render/genGate.mjs";
 import { harvest } from "./genGateTrain.mjs";
 import { MLPTrainer } from "../../brain/learn.js";
+import { seededRng } from "./foldStats.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SCENES = Object.freeze(["smooth", "zone", "checker"]);
@@ -27,7 +28,11 @@ export function rowsOf(frames, which) {
     const X = [], Y = [];
     for (const f of frames) for (let b = 0; b < f.y.length; b++) {
         const r = f[key].slice(b * NF, (b + 1) * NF);
-        if (!r.every(Number.isFinite)) continue;   // a declined block can carry a non-finite ratio; drop it from BOTH sets alike
+        // A declined block can carry a non-finite ratio; drop it from BOTH sets alike. v4698: until then this
+        // tested only the set being built, so a block non-finite in v2 alone stayed in v1 -- the comment's claim
+        // with the code's opposite. Inert on the committed cache, which holds no non-finite value in either set.
+        const r1 = f.x.slice(b * N_FEATURES, (b + 1) * N_FEATURES), r2 = f.x2.slice(b * N_FEATURES_V2, (b + 1) * N_FEATURES_V2);
+        if (!r1.every(Number.isFinite) || !r2.every(Number.isFinite)) continue;
         X.push(...r); Y.push(f.y[b]);
     }
     return { x: Float32Array.from(X), y: Uint8Array.from(Y), n: Y.length, nf: NF };
@@ -44,7 +49,8 @@ function fit(train, nf, seed) {
     const L2 = { nIn: HIDDEN, nOut: 1, act: "sigmoid",
                  W: Float32Array.from({ length: HIDDEN }, () => (rnd() * 2 - 1) / Math.sqrt(HIDDEN)),
                  b: new Float32Array(1) };
-    const t = new MLPTrainer([L1, L2], { lr: 0.05, batch: 32, minBuffer: 64, bufferCap: train.n + 8 });
+    // v4698: the sampler is seeded too. At v4696 it was not, so "same seed" held the init fixed and nothing after.
+    const t = new MLPTrainer([L1, L2], { lr: 0.05, batch: 32, minBuffer: 64, bufferCap: train.n + 8, rng: seededRng(seed) });
     for (let i = 0; i < train.n; i++) t.buffer.push({ x: Z.subarray(i * nf, (i + 1) * nf), r: train.y[i], w: 1 });
     for (let s = 0; s < 4000; s++) t.step();
     return { layers: [L1, L2], scaler };
