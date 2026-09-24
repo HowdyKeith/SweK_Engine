@@ -8032,6 +8032,53 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4694 -- THE 302nd CLOSING: a pre-registered control that nothing asserted, and a runner nothing ran.
+    since377: Object.freeze({
+        at: "v4694", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "render/genGate-selfcheck.mjs", was: "green", now: "green",
+                why: "it got CONTROL C4 back. v4690 removed the section with a note saying render/genGateGPU.mjs was held back to avoid forcing runnerCallers' third ratchet widening; that was true then and stopped being true at v4691, which landed the runner WITH its caller. The note outlived the limit by three rounds and the section never came back with the runner, so a grep for GenGateGPU across every selfcheck in the tree returned NOTHING. The gate now drives the device and reads 5.96e-8 against the pre-registered 1e-5, reproducing v4690's figure." }),
+            Object.freeze({ gate: "tools/ship/genGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "it drives the DEVICE arm of fsr.html's gate for the first time. Both measurement gates had driven the CPU arm only, so the page path the readout names was a path nothing had run -- runnerCallers passes on the import alone and its own closing line says it cannot tell an imported runner from a dispatched one. The arm agrees with the CPU arm at 0.00e+0 dB and keeps the identical 122.2 of 576 blocks, and every H1 figure reproduces unchanged." }),
+        ]),
+        verdict: "*** THIS ROUND ADDS NO GATE AND MEASURES NOTHING NEW. IT PAYS FOR TWO CLAIMS THE TREE WAS " +
+                 "CARRYING WITHOUT CHECKING THEM. *** " +
+                 "*** THE FIRST IS A PRE-REGISTERED CONTROL THAT WAS ASSERTED NOWHERE. *** " +
+                 "render/learned-preregistration.md section 7 makes C4 -- CPU and MLP_LAYER_WGSL agreeing to " +
+                 "1e-5 -- the condition on quoting ANY device number. v4690 measured it at 5.96e-8 and then " +
+                 "removed the section in the same round, to keep render/genGateGPU.mjs out of a tree where it " +
+                 "would have been a fifth gate-only runner. v4691 landed the runner with its caller and did not " +
+                 "bring the rows back. For three rounds the control existed only in a commit message, which is " +
+                 "not a control, and the note explaining its absence described a limit that had expired -- the " +
+                 "same rotted-note shape v4688 found in runnerCallers and fixed there. Restored, it reads " +
+                 "5.96e-8 again, and four sabotages of the runner redden it: no ping-pong, a hard-wired " +
+                 "activation, a single workgroup, and a threshold-free keep(). " +
+                 "*** THE SECOND IS A RUNNER NOTHING HAD EVER DISPATCHED THROUGH THE PAGE. *** fsr.html's " +
+                 "`gengate` control has had a device arm since v4691 and both measurement gates drove the CPU " +
+                 "arm only. runnerCallers-selfcheck passes on an IMPORT and says so in its own closing line, so " +
+                 "\"wired\" was a claim nothing checked: a page that quietly ran the CPU forward pass under a " +
+                 "readout saying \"the device\" would have read identically. It is driven now and held to the " +
+                 "CPU arm rather than quoted on its own -- same weights, same layers, same threshold, so " +
+                 "EQUALITY is the claim -- and it agrees at 0.00e+0 dB on all 33 frames while keeping the same " +
+                 "122.2 of 576 blocks. A silent fallback to the CPU reddens it by two; a device arm thresholding " +
+                 "differently reddens it by one. " +
+                 "*** AND THE CENSUS RECORDED THE REPAIR RATHER THAN AN ARRIVAL. *** No file was added, and two " +
+                 "runtimeGap rows moved anyway -- async/await and WebGL, both of which had been counted at v4690 " +
+                 "and were LOST when that round removed the section. A census that moves when nothing arrives is " +
+                 "a census noticing that something came back. " +
+                 "*** AND v4688'S ARRIVAL RULE TRIPPED THIS ROUND'S AUTHOR FOR THE SECOND TIME, CORRECTLY. *** " +
+                 "render/genGate-selfcheck.mjs was hand-timed at 693 ms and filed with an `alone` kind. It is " +
+                 "UNDER the 3000 ms budget, so the quick sweep is what should stamp it, and until the sweep ran " +
+                 "the entry had no legitimate observer -- timingKind-selfcheck went red DURING the verify and " +
+                 "green immediately after, because the sweep rewrites sweep-timings.json mid-run and re-stamped " +
+                 "it at 1464 ms `loaded`. The same trip happened at v4690. The practice the two occurrences " +
+                 "teach is narrow and worth stating: HAND-FILE A TIMING ONLY FOR AN OVER-BUDGET GATE, which the " +
+                 "sweep will not re-time; an under-budget gate's stamp belongs to the sweep. The two gates in " +
+                 "this arc that are over budget keep their hand readings and are accounted as arrivals; the one " +
+                 "that is not, does not.",
+    }),
     // v4693 -- THE 301st CLOSING: the operating point was never the problem; the features do not transfer.
     since376: Object.freeze({
         at: "v4693", swept: 1, green: 1, red: 0,

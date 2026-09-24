@@ -153,18 +153,94 @@ console.log("\n4. THE SCALER IS FITTED ON TRAINING ROWS ALONE");
        zc.every((v) => v === 0), `all ${zc.length} standardised values are ${zc[0]}, not NaN or Infinity`);
 }
 
-// *** SECTIONS 5 AND 6 -- CONTROL C4 AND THE DEVICE RUNNER'S REFUSALS -- ARE NOT HERE, AND THAT IS A
-// RATCHET DECISION RATHER THAN AN OMISSION. *** render/genGateGPU.mjs is a compute runner, and
-// tools/ship/runnerCallers-selfcheck.mjs holds a frozen count of runners NOTHING OUTSIDE A GATE CAN
-// CONSTRUCT. Landing it here would take that count from 4 to 5 and force this arc's THIRD widening in twelve
-// rounds -- and v4680's own note says the next round that wants to widen has to write "the third widening"
-// and mean it. It does not have to: the runner cannot have a production caller until trained weights exist,
-// and the round that trains them is the round that wires it into fsr.html. So the runner arrives WITH its
-// caller, and the ratchet stays at 4.
+// *** v4694 -- CONTROL C4 IS BACK, AND ITS ABSENCE WAS A STALE LIMIT RATHER THAN A DECISION. ***
+// v4690 removed this section with a note saying render/genGateGPU.mjs was held back to avoid forcing
+// runnerCallers' THIRD ratchet widening in twelve rounds. That was true when it was written and stopped
+// being true at v4691, which landed the runner WITH its caller: fsr.html's `gengate` control dispatches it.
+// The note outlived the limit and sat here for three rounds while the count it protected read 4 the whole
+// time -- the same shape v4688 found in runnerCallers' own rotted note, in the file that fixed it.
 //
-// The pre-registration is unaffected. C4 says no DEVICE NUMBER may be quoted until the CPU and
-// MLP_LAYER_WGSL forward passes agree to 1e-5, and this round quotes none. (It has been measured at 5.96e-8
-// while the runner was in hand, which is why the decision above is about debt and not about doubt.)
+// *** WHAT THAT COST IS SPECIFIC: C4 WAS ASSERTED NOWHERE. *** A grep for GenGateGPU across every
+// *-selfcheck.mjs in the tree returned nothing. The 5.96e-8 figure v4690 quotes is real and was measured,
+// but it was measured ONCE in a working tree and no gate re-measured it afterwards. A pre-registered control
+// that lives only in a commit message is not a control, and every device number this arc could quote rested
+// on it. That is the debt this section pays.
+
+console.log("\n5. *** CONTROL C4 -- THE CPU FORWARD PASS AND MLP_LAYER_WGSL AGREE ***");
+const skip = await webgpuSkipReason();
+if (skip) { ok("a WebGPU adapter is available", false, skip); }
+else {
+const BATCH = NB;
+const L1 = { nIn: N_FEATURES, nOut: HIDDEN, act: "relu",
+             W: new Float32Array(HIDDEN * N_FEATURES).map(() => rnd() * 2 - 1), b: new Float32Array(HIDDEN).map(() => rnd() - 0.5) };
+const L2 = { nIn: HIDDEN, nOut: 1, act: "sigmoid",
+             W: new Float32Array(HIDDEN).map(() => rnd() * 2 - 1), b: new Float32Array(1).map(() => rnd() - 0.5) };
+const X = new Float32Array(BATCH * N_FEATURES).map(() => rnd() * 4 - 2);
+const cpu = forward([L1, L2], X, BATCH);
+
+const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: {
+    layers: [{ nIn: L1.nIn, nOut: L1.nOut, act: L1.act, W: Array.from(L1.W), b: Array.from(L1.b) },
+             { nIn: L2.nIn, nOut: L2.nOut, act: L2.act, W: Array.from(L2.W), b: Array.from(L2.b) }],
+    x: Array.from(X), batch: BATCH }, script: `async (a) => {
+    const { requestDevice } = await import("/gfx/device.js");
+    const { GenGateGPU } = await import("/render/genGateGPU.mjs");
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+    const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
+    const errs = [];
+    if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+    const g = new GenGateGPU(dev);
+    const layers = a.layers.map((L) => ({ ...L, W: Float32Array.from(L.W), b: Float32Array.from(L.b) }));
+    const y = await g.forward(layers, Float32Array.from(a.x), a.batch);
+    const k = await g.keep(layers, Float32Array.from(a.x), a.batch, 0.5);
+    const bad = [];
+    for (const [label, patch] of [["batch", { batch: 0 }], ["x", { x: [1, 2] }], ["act", { act: "softmax" }], ["chain", { chain: true }]]) {
+        try {
+            let LL = layers, xx = Float32Array.from(a.x), bb = a.batch;
+            if (patch.batch !== undefined) bb = patch.batch;
+            if (patch.x) xx = Float32Array.from(patch.x);
+            if (patch.act) LL = [{ ...layers[0], act: patch.act }, layers[1]];
+            if (patch.chain) LL = [layers[0], { ...layers[1], nIn: 3, W: Float32Array.from([1, 2, 3]) }];
+            await g.forward(LL, xx, bb); bad.push([label, null]);
+        } catch (e) { bad.push([label, String(e.message)]); }
+    }
+    let wrongBackend = null;
+    try { const c2 = document.createElement("canvas");
+          new GenGateGPU(await requestDevice(c2, { backend: "webgl2", offscreen: true })); }
+    catch (e) { wrongBackend = String(e.message).slice(0, 160); }
+    return { y: Array.from(y), keep: Array.from(k.keep), p: Array.from(k.p), backend: dev.backend, errs, bad, wrongBackend };
+}` });
+
+if (!r.ok) { ok("the device ran", false, `${r.reason || "no result"} ${JSON.stringify(r.pageErrors || []).slice(0, 400)}`); }
+else {
+say(`adapter ${r.adapter ? (r.adapter.description || r.adapter.vendor) : "unknown"}${r.software ? " (SOFTWARE)" : ""}, backend ${r.result.backend}`);
+const dev = Float32Array.from(r.result.y);
+let worst = 0; for (let i = 0; i < cpu.length; i++) worst = Math.max(worst, Math.abs(cpu[i] - dev[i]));
+ok("*** CONTROL C4: two layers on the device match the CPU forward pass, at the pre-registered threshold ***",
+   r.result.backend === "webgpu" && r.result.errs.length === 0 && worst < 1e-5,
+   `worst |cpu - device| ${worst.toExponential(2)} over ${cpu.length} outputs, against the pre-registered 1e-5. ` +
+   `errors ${JSON.stringify(r.result.errs)}. render/learned-preregistration.md section 7: without this, no ` +
+   "device number may be quoted at all -- and between v4690 and v4694 nothing in the tree asserted it.");
+ok("...and the kernel is brain/mlp.js's own text, imported rather than copied, so the two runners cannot drift",
+   /k_layer/.test((await import("../brain/mlp.js")).MLP_LAYER_WGSL),
+   "BatchedMLP takes a RAW WebGPU device and this runner takes a gfx/device.js one; sharing the WGSL is what " +
+   "keeps that a difference in plumbing rather than in arithmetic.");
+const p = Float32Array.from(r.result.p);
+ok("...and the sigmoid head really is a probability, so a threshold on it means something",
+   p.every((v) => v > 0 && v < 1), `range [${Math.min(...p).toFixed(4)}, ${Math.max(...p).toFixed(4)}] over ${p.length} blocks`);
+ok("...and `keep` is exactly that probability thresholded, not a second opinion",
+   r.result.keep.every((k, i) => k === (p[i] >= 0.5 ? 1 : 0)), `${r.result.keep.reduce((a, b) => a + b, 0)} of ${p.length} kept`);
+ok("...and a non-webgpu device is refused at construction",
+   /needs a gfx\/device\.js device on the webgpu backend/.test(r.result.wrongBackend || ""), r.result.wrongBackend);
+
+console.log("\n6. WHAT THE RUNNER REFUSES");
+{
+    const bad = Object.fromEntries(r.result.bad);
+    for (const [label, pat] of [["batch", /batch must be a whole number/], ["x", /x must be batch\*nIn/],
+                                ["act", /unknown activation/], ["chain", /takes 3 inputs but layer 0 produces/]])
+        ok(`  a bad ${label} is refused, in the page`, bad[label] !== null && pat.test(bad[label] || ""), bad[label]);
+}
+}
+}
 
 console.log("\n6b. THE OPERATING POINT AND THE RANKING, ON FIXTURES THE LIVE DATA DOES NOT REACH");
 {
@@ -242,11 +318,18 @@ console.log("\n7. THE GATE APPLIES BLOCKWISE, AND IT IS THE BLOCKS IT SAYS");
 // `acc = f(acc)` -- syntactically valid, semantically inert -- it reddens, and so does the same mutation on
 // the sigmoid.
 //
-// *** THREE FURTHER SABOTAGES WERE RUN AGAINST THE DEVICE RUNNER AND EACH REDDENED C4 BY 2 -- not
-// ping-ponging the activations, hard-wiring the activation code to `none`, and dispatching a single
-// workgroup. They are recorded here rather than listed above because the rows they broke travel with
-// render/genGateGPU.mjs into the round that wires it; measuring them early is why that runner is known to
-// work before it is known to be wanted.
+// *** v4694 -- THE FOUR DEVICE SABOTAGES, NOW THAT THE ROWS THEY BREAK ARE BACK IN THIS FILE. ***
+//
+//   Q1  the runner never ping-pongs, so layer 2 reads layer 1's input   -> 2 red
+//   Q2  the runner ignores the activation code                          -> 2 red
+//   Q3  the runner dispatches one workgroup, covering part of the batch -> 2 red
+//   Q4  keep() ignores its threshold                                    -> 1 red
+//
+// Each of the first three is a different way for a device forward pass to disagree with the CPU one, and
+// each reddens BOTH C4 and the probability row -- a value that never went through the sigmoid is not in
+// (0, 1). v4690 measured the same three while the runner was in hand and then removed the rows with it;
+// that removal is the defect this round repaired, because for three rounds the tree carried a
+// pre-registered control that nothing asserted.
 //
 // *** AND THREE OF THIS GATE'S OWN ROWS WERE WRONG BEFORE ANY SABOTAGE RAN, ALL THREE FIXTURE ERRORS. ***
 // (1) The flat half's Laplacian was asserted to be zero and measures 5.00e-2, because the flat half BORDERS

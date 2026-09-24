@@ -50,7 +50,13 @@ const WINDOW = (() => {
 })();
 const FROM = WINDOW.from, TO = WINDOW.to;
 const UPTO = TO + 1;
-const ARMS = ["off", "cpu", "oracle", "never"];
+// *** v4694 -- THE DEVICE ARM IS DRIVEN NOW, AND ITS ABSENCE WAS THE OTHER HALF OF C4'S DEBT. ***
+// render/genGateGPU.mjs has been wired into fsr.html since v4691 and no gate had ever DISPATCHED it through
+// the page -- both measurement gates drove the CPU arm only. runnerCallers-selfcheck passes on the import
+// alone and its own closing line says it cannot tell an imported runner from a dispatched one, so "wired"
+// was a claim nothing checked. This arm is not here to add a number: it is here so the page path the readout
+// names is a path something has run.
+const ARMS = ["off", "cpu", "oracle", "never", "device"];
 
 console.log("genGateMeasure-selfcheck -- the pre-registered test, on content the network never trained on\n");
 
@@ -132,9 +138,25 @@ const A = Object.fromEntries(ARMS.map((g) => [g, parse(g)]));
 for (const g of ARMS) say(`${g.padEnd(7)}: ${A[g].length} frames, mean gen ${avg(A[g].map((x) => x.gen)).toFixed(4)} dB` +
     (A[g][0] && A[g][0].of ? `, gate ${A[g][0].of}, kept ${avg(A[g].map((x) => x.kept)).toFixed(1)} of ${A[g][0].blocks}` : ""));
 
-ok("*** every arm produced the whole window and named the arm it ran, so the four are comparable ***",
+// *** THE DEVICE ARM IS HELD TO THE CPU ARM, NOT QUOTED ON ITS OWN. *** They run the SAME weights through
+// the same two layers; the only difference is which forward pass computed the probabilities. So the claim is
+// equality, and any difference is C4's tolerance arriving on a picture instead of on a fixture.
+{
+    const dCpu = A.cpu.map((x) => x.gen), dDev = A.device.map((x) => x.gen);
+    let worst = 0; for (let i = 0; i < dCpu.length; i++) worst = Math.max(worst, Math.abs(dCpu[i] - dDev[i]));
+    const keptCpu = avg(A.cpu.map((x) => x.kept)), keptDev = avg(A.device.map((x) => x.kept));
+    ok("*** the DEVICE arm was dispatched through the page and agrees with the CPU arm frame for frame ***",
+       A.device.length === TO - FROM + 1 && A.device[0].of === "the device" && worst < 0.01 && keptCpu === keptDev,
+       `arm named ${JSON.stringify(A.device[0].of)}; worst per-frame PSNR difference ${worst.toExponential(2)} dB, ` +
+       `and both arms keep ${keptDev.toFixed(1)} of ${A.device[0].blocks} blocks. Same weights, same two layers, ` +
+       "same threshold -- only the forward pass differs, so equality is the claim and a difference would be " +
+       "C4's 5.96e-8 tolerance arriving on a picture rather than on a fixture.");
+}
+
+ok("*** every arm produced the whole window and named the arm it ran, so the five are comparable ***",
    ARMS.every((g) => A[g].length === TO - FROM + 1 && A[g].every((x) => Number.isFinite(x.gen))) &&
-   A.cpu[0].of === "the CPU" && A.oracle[0].of === "ORACLE (C1, sees the answer)" && A.never[0].of === "always cross-fade (C2)",
+   A.cpu[0].of === "the CPU" && A.oracle[0].of === "ORACLE (C1, sees the answer)" &&
+   A.never[0].of === "always cross-fade (C2)" && A.device[0].of === "the device",
    `${TO - FROM + 1} frames each; arms named ${ARMS.map((g) => `${g}=${A[g][0].of || "none"}`).join(", ")}. ` +
    "A readout that could not name its own arm would make every number below unattributable.");
 
@@ -214,6 +236,18 @@ console.log("\n6. SECONDARIES -- DECLARED IN SECTION 9, REPORTED, NEVER PROMOTED
        "before the run and a secondary is never promoted to a primary, whatever it reads.");
 }
 }
+
+// ---- v4694'S SABOTAGES, OVER THE DEVICE ARM --------------------------------------------------------------
+//
+//   R1  the page's device arm silently falls back to the CPU        -> 2 red
+//   R2  the device arm thresholds at 0.9 while the CPU arm uses tau -> 1 red
+//
+// *** R1 IS THE FAILURE THIS ARM EXISTS TO CATCH. *** render/genGateGPU.mjs was wired into fsr.html at v4691
+// and no gate had ever DISPATCHED it through the page: both measurement gates drove the CPU arm only.
+// tools/ship/runnerCallers-selfcheck.mjs passes on the import alone and its own closing line says it cannot
+// tell an imported runner from a dispatched one -- so "wired" was a claim nothing checked, and a page that
+// quietly computed the CPU forward pass under a readout saying "the device" would have read identically.
+// It does not any more.
 
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
 //

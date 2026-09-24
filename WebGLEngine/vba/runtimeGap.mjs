@@ -337,7 +337,14 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4338,               // v4693: 4336 -> 4338 for tools/ship/genGateCalibrate.mjs and its gate -- the
+    files: 4338,               // v4694: NO new file -- the round restored rows to an existing gate. Two rows
+                               // move anyway and both belong to render/genGate-selfcheck.mjs getting its C4
+                               // section back: async/await 1550 -> 1551 for the awaited device drive, and WebGL
+                               // 166 -> 167 for the refusal row that builds a webgl2 device to prove the runner
+                               // throws on it. Both had been counted at v4690 and were LOST when that round
+                               // removed the section; this is the census recording the repair rather than an
+                               // arrival. Every row from the census.
+                               // v4693: 4336 -> 4338 for tools/ship/genGateCalibrate.mjs and its gate -- the
                                // three-way split's threshold, chosen on VALIDATION. Promises moves 375 -> 376 for
                                // the calibration tool's page drive; the gate's own await is on the same harness.
                                // Every row from the census.
@@ -793,8 +800,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4038, closures: 3894, asyncAwait: 1550, typedArrays: 1161, promises: 376,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 166, webgpu: 53, threads: 23, wasm: 23,
+    esModules: 4038, closures: 3894, asyncAwait: 1551, typedArrays: 1161, promises: 376,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
