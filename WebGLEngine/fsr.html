@@ -73,6 +73,10 @@
       <option value="4">slab speed: &times;4</option>
       <option value="8">slab speed: &times;8</option>
     </select>
+    <select id="genengine">
+      <option value="cpu">reconcile on: the CPU (the default -- every figure on this page is this arm)</option>
+      <option value="device">reconcile on: the DEVICE (v4685's kernel, 0 of 64 blocks differ in its gate)</option>
+    </select>
     <select id="gensource">
       <option value="presented">generator input: PRESENTED frames (the default -- what a viewer sees)</option>
       <option value="clean">generator input: CLEAN renders (isolates the accumulator, exploratory)</option>
@@ -251,6 +255,7 @@ import { disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU } from "./ren
 // measured on a synthetic fixture. This is the first time any of it runs on a picture.
 import { opticalFlowCPU } from "./render/opticalFlow.mjs";
 import { reconcileFlowCPU } from "./render/flowReconcile.mjs";
+import { FlowReconcileGPU } from "./render/flowReconcileGPU.mjs";
 import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
 
 const D = 192;                                  // display resolution
@@ -623,6 +628,10 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
 let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null, xgpu = null, dgpu = null;
+// v4685 -- FSR3's reconciliation on the device. Constructed like the rest and DISPATCHED ONLY WHEN ASKED:
+// tools/ship/runnerCallers-selfcheck.mjs's own closing line records that it cannot tell an imported runner
+// from a dispatched one, so the switch below is what makes the difference visible in a readout.
+let frgpu = null;
 // The lock ring lives across frames and belongs to one camera and one size, so it is torn
 // down whenever reset() changes either. A ring carried across a resolution change would be
 // read with the wrong stride and would look like content rather than like a mistake.
@@ -653,6 +662,7 @@ async function initGPU() {
         try { lgpu = new TemporalLockGPU(dev); } catch { lgpu = null; }
         try { xgpu = new ReactiveGPU(dev); } catch { xgpu = null; }
         try { dgpu = new DilateGPU(dev); } catch { dgpu = null; }
+        try { frgpu = new FlowReconcileGPU(dev); } catch { frgpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -1339,7 +1349,16 @@ async function tick() {
     if (dolly && $("genframe").value === "on" && genPrev && genCur && prevDepthGen && depth) {
         const tG = 0.5;
         const of = opticalFlowCPU({ cur: genCur, prev: genPrev, w: D, h: D, block: 8, searchRadius: 4, levels: 3 });
-        const rc = reconcileFlowCPU({ cur: genCur, prev: genPrev, w: D, h: D, ...of, motion: motionUsed, depth });
+        // *** v4685 -- THE RECONCILIATION CAN RUN ON THE DEVICE, AND IT DEFAULTS TO THE CPU. *** Its gate
+        // measures 0 of 64 blocks differing across eight cases, with the vectors agreeing to 1.9e-6 -- which is
+        // not zero, so the generated frame's last bits move and every figure v4681, v4682 and v4683 pinned was
+        // taken on the CPU arm. Default off for v4664's reason: a round that moved those while adding a feature
+        // could not be told from a round that broke them.
+        const onDevice = $("genengine").value === "device" && frgpu;
+        const rc = onDevice
+            ? await frgpu.reconcile({ cur: genCur, prev: genPrev, w: D, h: D, flow: of.flow,
+                                      bw: of.bw, bh: of.bh, block: of.block, motion: motionUsed, depth })
+            : reconcileFlowCPU({ cur: genCur, prev: genPrev, w: D, h: D, ...of, motion: motionUsed, depth });
         // the block grid's nearest surface, which is what the splat's priority and the fill's `prefer` need
         const dBlk = new Float32Array(of.bw * of.bh);
         for (let by = 0; by < of.bh; by++) for (let bx = 0; bx < of.bw; bx++) {
@@ -1399,11 +1418,12 @@ async function tick() {
                     left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,
                     blocks: of.bw * of.bh, tMid, meanMag: magSum / (of.bw * of.bh), maxMag: magMax,
                     field: perPixel ? "per-pixel" : "block 8", cells: bwUse * bhUse,
-                    src: cleanSrc ? "clean renders" : "presented" };
+                    src: cleanSrc ? "clean renders" : "presented",
+                    engine: onDevice ? "the device" : "the CPU" };
     }
     $("genstat").textContent = !dolly ? ""
         : genStat
-            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
+            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
               `scores ${genStat.gen.toFixed(2)} dB against a frame that WAS rendered -- the cross-fade of the same ` +
               `two presented frames scores ${genStat.cf.toFixed(2)} dB, so motion compensation is worth ` +
               `${(genStat.gen - genStat.cf >= 0 ? "+" : "") + (genStat.gen - genStat.cf).toFixed(2)} dB here, ` +

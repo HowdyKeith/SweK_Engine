@@ -498,8 +498,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4684 -- 1769 -> 1771 for tools/ship/pairedStats-selfcheck.mjs and tools/ship/fsrPageConfirm-selfcheck.mjs.
     // TWO gates in one round, so the four rows move by TWO and not by one -- the first time in thirteen rounds
     // that the step is not exactly one, and it is stated here so the pattern's break is not read as a slip.
-    gates: 1771, usesOk: 1750, definesOk: 1742, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1643, condFirst: 91, unknownSignature: 16,
+    // v4685 -- 1771 -> 1772 for render/flowReconcileGPU-selfcheck.mjs, FSR3's reconciliation on the device.
+    gates: 1772, usesOk: 1751, definesOk: 1743, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1644, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

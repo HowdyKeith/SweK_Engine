@@ -8032,6 +8032,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4685 -- THE 295th CLOSING: the reconciliation comes off the CPU, and the rig could not test one rule.
+    since370: Object.freeze({
+        at: "v4685", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/flowReconcileGPU-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** EVERY GATE FROM v4676 TO v4684 CLOSED BY SAYING THE FSR3 PATH IS CPU-ONLY. THIS IS THE " +
+                 "FIRST OF THE THREE PASSES OFF IT. *** RECONCILE_WGSL mirrors render/flowReconcile.mjs: one " +
+                 "dispatch over the block grid, the arc's own luma (0.25/0.5/0.25, which is level 0 of " +
+                 "luminancePyramid), the same bilinear SAD, the same strictly-better comparison and the same " +
+                 "nearest-VALID-pixel rule. PARITY: 0 OF 64 BLOCKS DIFFER on every case -- geometry, shader, " +
+                 "both, flat, three margins, invalid, silhouette. `source` is one of three integers, so one " +
+                 "differing block is a different ANSWER and there is no tolerance to hide behind; the vectors " +
+                 "agree to 1.9e-6 and the SADs to 3.7e-6 through 64 bilinear fetches each. The census tracks " +
+                 "across margins 0 / 0.05 / 0.20 at 7 / 2 / 0 flow blocks, so a kernel ignoring the uniform " +
+                 "cannot pass by agreeing at one setting. " +
+                 "*** THE OUTPUT IS ONE PACKED BUFFER BECAUSE WEBGPU ALLOWS EIGHT STORAGE BINDINGS. *** Eight " +
+                 "floats per block, with `source` riding as an f32 the runner converts back to an Int32Array so " +
+                 "the parity row compares two integer arrays. Stated as a limit: a ninth input needs the " +
+                 "packing changed before the pass is. " +
+                 "*** AND WGSL REFUSES TO LET A KERNEL SPELL A NaN. *** bitcast<f32>(0x7fc00000u) is " +
+                 "const-folded and rejected outright, and 0.0/0.0 goes the same way; gfx/device.js surfaced it " +
+                 "only as \"Invalid ComputePipeline\", so the shader module's getCompilationInfo had to be read " +
+                 "directly. The NaN an unanswerable block reports now arrives through the uniform, which is the " +
+                 "better construction anyway: the CPU's own NaN handed over rather than one the kernel " +
+                 "manufactured with a trick a future compiler may fold. " +
+                 "*** NINE SABOTAGES, AND THE ONE THAT SCORED 0 RED WAS THE RIG'S FAULT. *** Taking the block's " +
+                 "FARTHEST pixel instead of its nearest changed nothing across all six rendered cases, because " +
+                 "the wall is perpendicular to the view at constant distance and every pixel of every block " +
+                 "sits at ONE depth -- so the nearest-valid-pixel rule, one of the three things this file names " +
+                 "as what a mirror most easily drops, was covered by none of them. A silhouette built by hand, " +
+                 "as flowReconcile-selfcheck's own section 6 does, and the sabotage then reddens. A parity gate " +
+                 "whose content cannot exercise a rule does not cover that rule. NO TIMING CLAIM: this " +
+                 "container's adapter is SwiftShader and v4561 recorded what a round that forgets that publishes. " +
+                 "*** AND THE RUNNER WENT RED ON ARRIVAL IN tools/ship/runnerCallers-selfcheck.mjs AND WAS WIRED " +
+                 "RATHER THAN RATCHETED. *** A fifth gate-only compute runner would have been the THIRD widening " +
+                 "of that census in ten rounds, and v4680's note demanded the count be written down before a " +
+                 "third. So fsr.html imports and DISPATCHES it instead, behind a `genengine` switch defaulting " +
+                 "to the CPU -- because the two arms are NOT bit-identical (1.9e-6 px on the vectors) and every " +
+                 "figure v4681, v4682 and v4683 pinned is the CPU arm's. On live content the device arm matches " +
+                 "the CPU frame for frame to 0.00000 dB, which is zero at the readout's two decimals and is " +
+                 "stated that way. The ratchet holds at 4. *** AND THE PAGE ROW COST FOUR DEFECTS OF ITS OWN: *** " +
+                 "reading a .gen field off a `seen` array that holds STRINGS here where the sibling gate's holds " +
+                 "OBJECTS (v4682's parse defect, inverted, one round later); sampling on the frame counter's " +
+                 "edge and getting the PREVIOUS frame's readout, which the awaited device dispatch widened into " +
+                 "a NaN; a first fix that accepted the \"not computed\" text at every frame, which is the stale " +
+                 "text it was meant to skip; and BACKTICKS inside a JS template literal, the sixth time in this " +
+                 "arc. A sabotage claiming the device on every frame also scored 0 red until the nine CPU cells " +
+                 "were made to assert their own label.",
+    }),
     // v4684 -- THE 294th CLOSING: the confirmation failed on its own terms, and its control was impossible.
     since369: Object.freeze({
         at: "v4684", swept: 2, green: 2, red: 0,

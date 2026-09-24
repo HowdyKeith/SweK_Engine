@@ -49,6 +49,9 @@ const CELLS = [
     ["checker", "block", "4", "presented"], ["zone", "block", "4", "presented"],
     ["zone", "pixel", "4", "presented"],
 ];
+// v4685 -- and one cell driven with the reconciliation on the DEVICE, to hold that the page's new arm really
+// dispatches the kernel and lands the same answer the CPU arm does on live content.
+const DEVICE_CELL = ["smooth", "block", "4", "presented"];
 
 console.log("fsrPageField-selfcheck -- the field's resolution, the accumulator, and what actually governs it\n");
 
@@ -57,8 +60,8 @@ if (skip) {
     ok("a WebGPU adapter is available", false, skip);
 } else {
 
-const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 2400000, args: { UPTO, CELLS }, script: `async (a) => {
-    const drive = async (scene, field, speed, src) => {
+const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 2400000, args: { UPTO, CELLS, DEVICE_CELL }, script: `async (a) => {
+    const drive = async (scene, field, speed, src, engine = "cpu") => {
         const ifr = document.createElement("iframe");
         ifr.style.width = "1200px"; ifr.style.height = "900px"; ifr.src = "/fsr.html";
         document.body.appendChild(ifr);
@@ -69,19 +72,38 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 2400000, args: {
         const fno = () => { const m = /frame (\\d+)/.exec((($("metric") || {}).textContent || "")); return m ? Number(m[1]) : -1; };
         const booted = await until(() => fno() === 0 && /engine:/.test(($("engine") || {}).textContent || ""), 180000);
         const want = [["scene", scene], ["shading", "off"], ["reactive", "off"], ["camera", "objects"],
-                      ["slabspeed", speed], ["genfield", field], ["gensource", src], ["genframe", "on"]];
+                      ["slabspeed", speed], ["genfield", field], ["gensource", src], ["genengine", engine], ["genframe", "on"]];
         let last = null, present = true;
         for (const [id, v] of want) { const e = $(id); if (!e) { present = false; continue; } e.value = v; last = e; }
         last.dispatchEvent(new Event("change"));
         await until(() => fno() === 0, 180000);
         const seen = [];
         $("run").click();
-        for (let f = 1; f <= a.UPTO; f++) { await until(() => fno() >= f, 900000); seen.push(($("genstat") || {}).textContent || ""); }
+        // *** SAMPLING ON THE FRAME COUNTER'S EDGE READS THE PREVIOUS FRAME'S READOUT. *** The page increments
+        // its frame counter BEFORE the generator writes genstat, so a wait that only watches the counter can
+        // catch stale text --
+        // NO BACKTICKS ANYWHERE IN THIS SCRIPT: it is a JS template literal and they close it. Sixth time.
+        // and v4685's device arm, whose reconciliation is awaited, widened that window enough to put a NaN in
+        // the first cell of section 4. The wait now also requires the readout to NAME the scene time it should
+        // (f - 0.5), or to say it declined, which frame 1 does.
+        for (let f = 1; f <= a.UPTO; f++) {
+            const wantT = "scene time " + (f - 0.5).toFixed(1);
+            await until(() => { if (fno() < f) return false;
+                const g = ($("genstat") || {}).textContent || "";
+                // *** THE not-computed ESCAPE BELONGS TO FRAME 1 ONLY. *** Accepting it at every frame is how
+                // the first version of this fix still read stale text: frame 1's readout says "not computed",
+                // so at f = 2 the condition was satisfied by the very text it was meant to skip past.
+                if (f === 1) return true;
+                return g.indexOf(wantT) >= 0 || /OFF -- the control/.test(g); }, 900000);
+            seen.push(($("genstat") || {}).textContent || "");
+        }
         $("run").click(); ifr.remove();
         return { booted, present, seen };
     };
     const out = {};
     for (const [sc, fl, sp, sr] of a.CELLS) out[[sc, fl, sp, sr].join("|")] = await drive(sc, fl, sp, sr);
+    const [dsc, dfl, dsp, dsr] = a.DEVICE_CELL;
+    out.device = await drive(dsc, dfl, dsp, dsr, "device");
     return out;
 }` });
 
@@ -97,10 +119,12 @@ const cell = (sc, fl, sp, sr) => {
         gen: num(g, /scores (-?[\d.]+) dB against/), cf: num(g, /presented frames scores (-?[\d.]+) dB/),
         mean: num(g, /THE MOTION IS ([\d.]+) px mean/), cells: num(g, /, (\d+) cells,/),
         field: /field per-pixel/.test(g) ? "per-pixel" : "block 8",
-        src: /input clean renders/.test(g) ? "clean" : "presented" }));
+        src: /input clean renders/.test(g) ? "clean" : "presented",
+        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?") }));
     const d = rs.map((x) => x.gen - x.cf);
     return { sc, fl, sp, sr, d, mean: avg(d), up: d.filter((v) => v > 0).length, disp: avg(rs.map((x) => x.mean)),
              cells: rs[0] ? rs[0].cells : NaN, sawField: rs[0] ? rs[0].field : "", sawSrc: rs[0] ? rs[0].src : "",
+             engs: rs.map((x) => x.eng),
              finite: rs.length === UPTO - 1 && [...d, ...rs.map((x) => x.mean)].every(Number.isFinite) };
 };
 const show = (c) => say(`${c.sc.padEnd(7)} x${c.sp} ${c.fl.padEnd(5)} ${c.sr.padEnd(9)} (${c.cells} cells): ` +
@@ -173,8 +197,67 @@ const znp = cell("zone", "pixel", "4", "presented");
        `on the zone plate the per-pixel field is BETTER (${zn.mean.toFixed(3)} -> ${znp.mean.toFixed(3)} dB) and on smooth it is WORSE (${b4.mean.toFixed(3)} -> ${p4.mean.toFixed(3)}). ` +
        `A field resolution that helps on detail and hurts on flatness is the same mechanism read from the other side.`);
 }
+
+console.log("\n4. v4685 -- THE RECONCILIATION ON THE DEVICE, ON LIVE CONTENT");
+{
+    // *** THE KERNEL'S OWN GATE MEASURES 0 OF 64 BLOCKS DIFFERING ON FIXTURES. THIS IS THAT KERNEL ON A
+    // PICTURE. *** A runner a page imports and never dispatches satisfies tools/ship/runnerCallers-selfcheck
+    // and does nothing, which that census names as its own limit in its closing line -- so the page's readout
+    // says which engine ran, and this row reads it back rather than trusting the import.
+    // *** THIS GATE'S `seen` HOLDS STRINGS, WHERE fsrPageGen-selfcheck's HOLDS OBJECTS. *** The first draft of
+    // this block read `.gen` off each element and got NaN in every cell -- which is v4682's own parse defect
+    // arriving INVERTED, in the sibling file, one round later. Two page gates with two drive shapes is the
+    // hazard; the readout text is the element itself here.
+    const dr = r.result.device.seen.slice(1).map((g) => ({
+        gen: num(g, /scores (-?[\d.]+) dB against/), cf: num(g, /presented frames scores (-?[\d.]+) dB/),
+        eng: /reconciled on the device/.test(g) ? "device" : (/reconciled on the CPU/.test(g) ? "cpu" : "?") }));
+    const dd = dr.map((x) => x.gen - x.cf);
+    const cpu = b4;    // smooth x4 block presented -- the CPU arm of the very same cell
+    say(`smooth x4 block, reconciled on the DEVICE: delta ${dd.map((v) => v.toFixed(2)).join(", ")} dB   mean ${avg(dd).toFixed(4)}`);
+    say(`   the same cell on the CPU:               delta ${cpu.d.map((v) => v.toFixed(2)).join(", ")} dB   mean ${avg(cpu.d).toFixed(4)}`);
+    ok("*** the page really DISPATCHED the kernel -- its readout names the device on every generated frame ***",
+       dr.length > 0 && dr.every((x) => x.eng === "device"),
+       `${dr.filter((x) => x.eng === "device").length} of ${dr.length} generated frames reconciled on the device. ` +
+       `runnerCallers cannot tell an imported runner from a dispatched one and says so; this readout can, which is why it names the engine.`);
+    // *** AND THE READOUT MUST NAME THE CPU WHERE THE CPU RAN, OR "it names the device" IS SATISFIED BY A
+    // READOUT THAT ALWAYS SAYS SO. *** A sabotage hardwiring the engine string scored 0 red against the row
+    // above, because the only cell it checked is the one where "device" is the right answer. Seven cells run on
+    // the CPU and now say so.
+    ok("*** ...and every CPU cell's readout names the CPU, so the engine label is a measurement and not a constant ***",
+       [b1, p1, b4, p4, c1, c4, ck, zn, znp].every((c) => c.engs.length > 0 && c.engs.every((e) => e === "cpu")),
+       `${[b1, p1, b4, p4, c1, c4, ck, zn, znp].reduce((n, c) => n + c.engs.filter((e) => e === "cpu").length, 0)} generated frames across nine CPU cells, every one labelled the CPU, ` +
+       `against ${dr.length} labelled the device in the one device cell.`);
+    ok("*** and the device arm lands within a hundredth of a dB of the CPU arm, frame for frame, on live content ***",
+       dd.length === cpu.d.length && dd.every((v, i) => Math.abs(v - cpu.d[i]) < 0.01),
+       `worst per-frame difference ${Math.max(...dd.map((v, i) => Math.abs(v - cpu.d[i]))).toFixed(5)} dB -- which is ZERO ` +
+       `AT THIS READOUT'S TWO DECIMALS, and that is the honest way to say it. The two arms are not bit-identical: ` +
+       `render/flowReconcileGPU-selfcheck.mjs measures the vectors moving about 1.9e-6 px between f32 and f64. ` +
+       `A page that prints two decimals cannot see that, so the CPU stays the default and every figure v4681, v4682 ` +
+       `and v4683 pinned is the CPU arm's -- a difference below a readout's precision is still a difference.`);
+}
+
 }
 }
+
+// ---- v4685's SABOTAGES, OVER SECTION 4 ---------------------------------------------------------------------
+//
+//   V1  the `genengine` control is accepted and ignored          -> 1 red
+//   V2  the readout claims the device whatever ran               -> 1 red, AFTER A ROW WAS ADDED
+//
+// *** V2 SCORED 0 RED BECAUSE THE ONLY ENGINE-CHECKING ROW WAS ON THE ONE CELL WHERE "device" IS CORRECT. ***
+// Nine of the ten cells run on the CPU, and a readout hardwired to say "the device" was invisible to all of
+// them. A row asserting that a label is right on one arm is not a row asserting the label is a measurement; the
+// CPU cells now assert their own label too.
+//
+// *** AND THIS SECTION COST FOUR DEFECTS OF ITS OWN BEFORE IT MEASURED ANYTHING. *** (1) It read a .gen field
+// off each element of `seen`, which holds STRINGS in this file where fsrPageGen-selfcheck's holds OBJECTS --
+// v4682's parse defect arriving inverted, in the sibling file, one round later. (2) Sampling on the frame
+// counter's edge read the PREVIOUS frame's readout, because the page increments its counter before the generator
+// writes; the device arm's await widened that window enough to put a NaN in the first cell, and the wait now
+// requires the readout to name the scene time it should. (3) The first version of that fix accepted the
+// "not computed" message at EVERY frame -- which is exactly the stale text it was meant to skip past, so it
+// changed nothing. And (4) the comment explaining it contained BACKTICKS inside a JS template literal, which
+// closed the script: the sixth time in this arc.
 
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
 //
