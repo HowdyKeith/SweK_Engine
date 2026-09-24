@@ -10,8 +10,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PREREG, ARMS, declared, seededRng, minFoldsFor, usableFolds, foldMean, h4, c11 } from "./foldStats.mjs";
+import { PREREG, ARMS, ARMS_H5, PREREG_H5, readDoc, declared, seededRng, minFoldsFor, usableFolds, foldMean, clause, h4, h5, c11 } from "./foldStats.mjs";
 import { jointRows, runFolds, shuffled } from "./genGateFolds.mjs";
+import { analyse } from "./genGateAbsolute.mjs";
 import { train } from "./genGateTrain.mjs";
 import { N_FEATURES, N_FEATURES_V2, HIDDEN, auc, fitScaler } from "../../render/genGate.mjs";
 import { MLPTrainer } from "../../brain/learn.js";
@@ -20,6 +21,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);
+const J = (x) => JSON.stringify(x);
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };
 
 console.log("foldStats-selfcheck -- the seven-fold statistic, declared and proven before any fold is run\n");
@@ -229,8 +231,90 @@ function world({ signal = 0, reverse = null, prior = (k) => 0.2 + 0.1 * k, band 
     ok("*** ...and FIRES when the artefact is in arm B -- the mirror a one-sided check would miss ***", b.fired && b.back.cleared && !b.fwd.cleared);
 }
 
+console.log("\n5. *** v4700: THE SECOND DOCUMENT -- THE ABSOLUTE SET AGAINST ITS OWN TWIN, AT A CELL NOBODY HAS HARVESTED ***");
+{
+    const e = declared(readDoc(PREREG_H5));
+    const html = fs.readFileSync(path.join(ENG, "fsr.html"), "utf8");
+    const opts = (id) => { const m = new RegExp(`<select id="${id}">([\\s\\S]*?)<\\/select>`).exec(html);
+        return m ? [...m[1].matchAll(/<option value="(\w+)">/g)].map((x) => x[1]) : []; };
+    const page = opts("scene"), speeds = opts("slabspeed");
+    ok("*** H5's document parses, its minFolds is the derived one, and its scenes are the page's, both directions ***",
+       e.minFolds === minFoldsFor(e.alpha) && J(e.scenes.slice().sort()) === J(page.slice().sort()),
+       `${e.scenes.length} scenes, minFolds ${e.minFolds}`);
+    ok("*** the cell is FRESH: a speed the page offers, and not the one v4698's data were harvested at ***",
+       speeds.includes(e.speed) && e.speed !== d.speed, `x${e.speed} against v4698's x${d.speed}; the page offers ${speeds.map((x) => "x" + x).join(" ")}.`);
+    ok("*** ...and the seeds are DISJOINT from v4698's, so no seed that produced the observation is reused ***",
+       e.seeds.length === d.seeds.length && e.seeds.every((x) => !d.seeds.includes(x)), `${e.seeds.join(" ")}`);
+    const same = ["alpha", "minorityFloor", "steps", "hidden", "lr", "batch", "upto"].filter((k) => e[k] !== d[k]);
+    ok("*** every other constant IS v4698's -- the cell and the seeds are the only things that move ***", !same.length,
+       same.length ? `differs: ${same.join(", ")}` : "alpha, minorityFloor, steps, hidden, lr, batch, upto -- all equal.");
+
+    // C13. A permutation of a CONSTANT label vector is the identity, so on a fold whose training labels are all
+    // one class a shuffled arm is its unshuffled source, bit for bit -- which proves which features it trains on.
+    let sd = 77; const r = () => ((sd = (Math.imul(sd, 1103515245) + 12345) & 0x7fffffff) / 0x80000000);
+    const by = {};
+    for (const sc of d.scenes) { const fr = [];
+        for (let f = 0; f < 2; f++) { const x = [], x2 = [], y = [];
+            for (let b = 0; b < 40; b++) { const lab = sc === "zone" ? (b % 2) : 1; y.push(lab);
+                for (let j = 0; j < N_FEATURES; j++) x.push(r() + (j === 0 ? lab : 0));
+                for (let j = 0; j < N_FEATURES_V2; j++) x2.push(r() + (j === 1 ? lab : 0)); }
+            fr.push({ scene: sc, x, x2, y }); }
+        by[sc] = fr; }
+    let t5 = null, t5err = "";
+    try { t5 = runFolds(by, { ...e, steps: 40, seeds: [11] }, ARMS_H5).results.zone;
+          if (!ARMS_H5.every((a) => t5[a] && Number.isFinite(t5[a][0]))) { t5err = `arms returned: ${Object.keys(t5).join(",")}`; t5 = null; } }
+    catch (err) { t5err = String(err.message).slice(0, 120); }
+    ok("*** C13: with constant training labels SHUF1_A IS V1 and SHUF_A IS V2, bit for bit -- each twin trains on the set its name says ***",
+       t5 !== null && t5.SHUF1_A[0] === t5.V1[0] && t5.SHUF1_B[0] === t5.V1[0] && t5.SHUF_A[0] === t5.V2[0] && t5.V1[0] !== t5.V2[0],
+       t5 === null ? `the runner did not return the five arms: ${t5err}` :
+       `V1 ${t5.V1[0].toFixed(6)} = SHUF1_A ${t5.SHUF1_A[0].toFixed(6)}; V2 ${t5.V2[0].toFixed(6)} = SHUF_A ${t5.SHUF_A[0].toFixed(6)}; ` +
+       "and V1 != V2, or the row would pass on two sets that were the same. v4699 named SHUF_A as V1's twin in prose; this is the property checked.");
+    const y8 = Uint8Array.from([1, 1, 1, 0, 0, 0, 0, 0]);
+    const p1 = shuffled(y8, 11, "SHUF1_A"), p2 = shuffled(y8, 11, "SHUF1_B"), p3 = shuffled(y8, 11, "SHUF_A");
+    ok("*** the absolute twins have streams of their OWN -- different from each other and from the scale-free twin's ***",
+       p1.join() !== p2.join() && p1.join() !== p3.join(), `SHUF1_A ${p1.join("")}, SHUF1_B ${p2.join("")}, SHUF_A ${p3.join("")}`);
+
+    const world5 = ({ signal = 0, reverse = null, art = null, artSize = 0.3 }) => {
+        const results = {}, meta = {};
+        d.scenes.forEach((f, k) => { results[f] = Object.fromEntries(ARMS_H5.map((a) => [a, []]));
+            for (const s2 of e.seeds.slice(0, 3)) { const rr = seededRng(97 * k + s2), n = 600, y = new Uint8Array(n);
+                const cols = Object.fromEntries(ARMS_H5.map((a) => [a, new Float32Array(n)]));
+                for (let i = 0; i < n; i++) { y[i] = rr() < 0.4 ? 1 : 0; for (const a of ARMS_H5) cols[a][i] = rr(); }
+                const sg = f === reverse ? -1 : 1;
+                for (const a of ARMS_H5) { const add = (a === "V1" ? sg * signal : 0) + (a === art ? artSize : 0);
+                    results[f][a].push(auc(cols[a].map((v, i) => v + add * y[i]), y).auc); }
+                meta[f] = { n, pos: y.reduce((q, v) => q + v, 0), neg: n - y.reduce((q, v) => q + v, 0) }; } });
+        return { results, meta };
+    };
+    const w1 = world5({ signal: 0.25 }), w2 = world5({ signal: 0.25, reverse: "edges" });
+    const a1 = h5(w1.results, w1.meta, e), a2 = h5(w2.results, w2.meta, e);
+    ok("*** h5 clears on a genuine within-fold V1 signal, and FAILS when edges alone reverses -- the price section 5 names ***",
+       a1.reportable && a1.supported && a2.reportable && !a2.supported && a2.a.test.sign.up === 6 && a2.a.test.sign.p === 8 / 128,
+       `clean: sign ${a1.a.test.sign.up}/7; edges reversed: sign ${a2.a.test.sign.up}/7 p ${a2.a.test.sign.p}`);
+    // *** WHICH ARM h5 READS, IDENTIFIED RATHER THAN ASSUMED. *** Push ONE arm below chance on every fold. If that
+    // arm is h5's baseline, V1 minus it is positive everywhere and h5 clears; if it is not, h5 stays at chance. So
+    // exactly one arm may move h5, and it must be SHUF1_A. The first draft pushed SHUF_A UP, where a mis-wired h5
+    // fails too; the second pushed SHUF_A down and checked only SHUF_A, and a sabotage pointing h5 at V2 passed it.
+    const moves = ["SHUF1_A", "SHUF1_B", "V2", "SHUF_A"].map((arm) => {
+        const q = world5({ art: arm, artSize: -0.3 });
+        return { arm, wouldClear: clause(q.results, d.scenes, "V1", arm, e.alpha).cleared, h5: h5(q.results, q.meta, e).supported };
+    });
+    ok("*** h5 reads SHUF1_A and NOTHING ELSE: of four arms pushed below chance, only SHUF1_A moves it ***",
+       moves.every((m) => m.wouldClear) && moves.filter((m) => m.h5).map((m) => m.arm).join() === "SHUF1_A",
+       moves.map((m) => `${m.arm}: ${m.h5 ? "MOVES h5" : "h5 unmoved"}`).join("; ") + ". Every one of the four would clear a clause taken against it, so each probe has teeth.");
+    ok("...and h5 refuses a declared minFolds the arithmetic contradicts",
+       throws(() => h5(w1.results, w1.meta, { ...e, minFolds: 4 }), /derives 5/));
+    const q1 = world5({ art: "SHUF1_A" }), q2 = world5({ art: "SHUF1_B" }), q3 = world5({ art: "SHUF_A" });
+    const an = (w) => analyse(w, e).c11;
+    ok("*** the runner's C11 watches the ABSOLUTE twins, in both directions -- and not the scale-free one ***",
+       an(q1).fired && an(q2).fired && !an(q3).fired && !an(world5({})).fired,
+       "fires on an artefact in SHUF1_A, fires on one in SHUF1_B, stays quiet when only SHUF_A carries one -- that arm is a secondary here.");
+}
+
 console.log(`\nfoldStats-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY RESULT ON FSR DATA. No scene is harvested, no fold of the real design is run, no AUC " +
-            "on bars, edges, noise or ramp exists. The declared seeds and steps are exercised at 2 seeds and 60 steps " +
-            "on made-up scenes, which proves the machinery and says nothing about what it will find.");
+// v4700 -- THIS LINE SAID "no AUC on bars, edges, noise or ramp exists" UNTIL v4700, A ROUND AFTER v4699 MADE IT FALSE.
+console.log("unchecked here: ANY RESULT ON FSR DATA. This gate reads none: v4699's seven-fold measurement is " +
+            "tools/ship/genGateFoldsMeasure-selfcheck.mjs's, and v4700's x4 cell has not been harvested. Seeds and steps " +
+            "are exercised at one or two seeds and tens of steps on made-up scenes, which proves the machinery and says " +
+            "nothing about what it will find.");
 process.exit(fails ? 1 : 0);

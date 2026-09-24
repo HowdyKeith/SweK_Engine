@@ -22,6 +22,12 @@ import { pairedBoth, signTest } from "./pairedStats.mjs";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG = "render/learned-folds-preregistration.md";
 export const ARMS = Object.freeze(["V2", "V1", "SHUF_A", "SHUF_B"]);
+// v4700 -- the second pre-registration's arms. SHUF1_A and SHUF1_B are the ABSOLUTE set's own shuffled twins,
+// which v4698's design never had: its SHUF_A is trained on the scale-free features, and v4699 compared V1
+// against it and called it V1's twin. V2 and SHUF_A ride along as SECONDARIES.
+export const PREREG_H5 = "render/learned-absolute-preregistration.md";
+export const ARMS_H5 = Object.freeze(["V1", "SHUF1_A", "SHUF1_B", "V2", "SHUF_A"]);
+export const readDoc = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 
 const KEYS = Object.freeze({
     scenes: "list", seeds: "ints", alpha: "num", minFolds: "int", minorityFloor: "num",
@@ -85,7 +91,7 @@ export function foldMean(aucs) {
     return aucs.reduce((s, v) => s + v, 0) / aucs.length;
 }
 
-function clause(results, folds, arm, base, alpha) {
+export function clause(results, folds, arm, base, alpha) {
     const diffs = folds.map((f) => foldMean(results[f][arm]) - foldMean(results[f][base]));
     const test = pairedBoth(diffs, alpha);
     return { diffs, test, cleared: test.cleared && test.t.mean > 0 };
@@ -113,8 +119,25 @@ export function h4(results, meta, d) {
  * C11: two shuffled arms that differ ONLY in the permutation must not separate, in EITHER direction. A one-sided
  * check here would be v4696's collapse detector and v4697's scene list over again: blind to its mirror.
  */
-export function c11(results, folds, alpha) {
-    const g = folds.map((f) => foldMean(results[f].SHUF_A) - foldMean(results[f].SHUF_B));
+export function c11(results, folds, alpha, a = "SHUF_A", b = "SHUF_B") {
+    const g = folds.map((f) => foldMean(results[f][a]) - foldMean(results[f][b]));
     const fwd = pairedBoth(g, alpha), back = pairedBoth(g.map((v) => -v), alpha);
     return { g, fwd, back, fired: fwd.cleared || back.cleared };
+}
+
+/**
+ * v4700 -- H5 as render/learned-absolute-preregistration.md declares it: ONE clause, the absolute set against
+ * its OWN shuffled twin, fold by fold, paired t AND exact sign at alpha with a positive mean. The same
+ * exclusion rule and the same derived minimum as H4, because they are properties of the test, not of the question.
+ */
+export function h5(results, meta, d) {
+    const { usable, excluded } = usableFolds(meta, d);
+    for (const f of usable) for (const arm of ARMS_H5)
+        if (foldMean((results[f] || {})[arm]) === null) throw new Error(`foldStats.h5: fold ${f} arm ${arm} has an undefined AUC on a usable fold`);
+    const derived = minFoldsFor(d.alpha);
+    if (d.minFolds !== derived) throw new Error(`foldStats.h5: the document declares minFolds ${d.minFolds} but alpha ${d.alpha} derives ${derived}`);
+    if (usable.length < d.minFolds) return { usable, excluded, reportable: false,
+        why: `${usable.length} usable folds; the sign test cannot reach ${d.alpha} below ${d.minFolds}` };
+    const a = clause(results, usable, "V1", "SHUF1_A", d.alpha);
+    return { usable, excluded, reportable: true, a, supported: a.cleared };
 }

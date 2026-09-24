@@ -18,6 +18,17 @@ import { N_FEATURES, N_FEATURES_V2, fitScaler, applyScaler, forward, auc } from 
 import { MLPTrainer } from "../../brain/learn.js";
 import { ARMS, declared, seededRng, h4, c11, usableFolds } from "./foldStats.mjs";
 
+/**
+ * v4700 -- which feature set each arm trains on and which permutation stream, if any, shuffles its labels.
+ * v4698's four arms are exactly what they were, so v4699's data re-derive unchanged; SHUF1_A and SHUF1_B are
+ * the absolute set's own twins, on streams of their own.
+ */
+export const ARM_SPEC = Object.freeze({
+    V2: Object.freeze({ set: "v2", shuf: null }), V1: Object.freeze({ set: "v1", shuf: null }),
+    SHUF_A: Object.freeze({ set: "v2", shuf: "SHUF_A" }), SHUF_B: Object.freeze({ set: "v2", shuf: "SHUF_B" }),
+    SHUF1_A: Object.freeze({ set: "v1", shuf: "SHUF1_A" }), SHUF1_B: Object.freeze({ set: "v1", shuf: "SHUF1_B" }),
+});
+
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CACHE = "tools/ship/genGate-folds7.json";
 export const RESULT = "tools/ship/genGate-folds7-result.json";
@@ -35,7 +46,7 @@ export function jointRows(frames) {
 }
 
 /** Distinct, reproducible streams per (seed, purpose): init+sampling, and each shuffled arm's permutation. */
-const STREAM = Object.freeze({ fit: 0x1000, SHUF_A: 0x2000, SHUF_B: 0x3000 });
+const STREAM = Object.freeze({ fit: 0x1000, SHUF_A: 0x2000, SHUF_B: 0x3000, SHUF1_A: 0x4000, SHUF1_B: 0x5000 });
 const rngFor = (seed, purpose) => seededRng(Math.imul(seed, 0x9e3779b1) ^ STREAM[purpose]);
 
 export function fit(x, y, n, nf, seed, d, scaler) {
@@ -65,7 +76,7 @@ export function shuffled(y, seed, arm) {
  * scaler as well as the weights, and not on the loop's source text. (v4698: the first draft recorded the scenes
  * alone, so a scaler fitted on the held-out rows passed; a sabotage found it.)
  */
-export function runFolds(byScene, d) {
+export function runFolds(byScene, d, arms = ARMS) {
     const results = {}, meta = {}, trainedOn = {}, scalers = {};
     for (const held of d.scenes) {
         const trainScenes = d.scenes.filter((s) => s !== held);
@@ -73,13 +84,15 @@ export function runFolds(byScene, d) {
         const tr = jointRows(trainScenes.flatMap((s) => byScene[s])), te = jointRows(byScene[held]);
         const pos = te.y.reduce((a, v) => a + v, 0);
         meta[held] = { n: te.n, pos, neg: te.n - pos };
-        results[held] = Object.fromEntries(ARMS.map((a) => [a, []]));
+        results[held] = Object.fromEntries(arms.map((a) => [a, []]));
         const sc = { v1: fitScaler(tr.x1), v2: fitScaler(tr.x2) };
         scalers[held] = sc;
-        for (const seed of d.seeds) for (const arm of ARMS) {
-            const v2 = arm !== "V1";
+        for (const seed of d.seeds) for (const arm of arms) {
+            const spec = ARM_SPEC[arm];
+            if (!spec) throw new Error(`genGateFolds.runFolds: no arm "${arm}" -- the arms are ${Object.keys(ARM_SPEC).join(", ")}`);
+            const v2 = spec.set === "v2";
             const [xtr, xte, nf] = v2 ? [tr.x2, te.x2, N_FEATURES_V2] : [tr.x1, te.x1, N_FEATURES];
-            const ytr = arm.startsWith("SHUF") ? shuffled(tr.y, seed, arm) : tr.y;
+            const ytr = spec.shuf ? shuffled(tr.y, seed, spec.shuf) : tr.y;
             const m = fit(xtr, ytr, tr.n, nf, seed, d, v2 ? sc.v2 : sc.v1);
             results[held][arm].push(auc(forward(m.layers, applyScaler(xte, m.scaler), te.n), te.y).auc);
         }

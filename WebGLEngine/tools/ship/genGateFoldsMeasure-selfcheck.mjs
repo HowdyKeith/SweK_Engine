@@ -18,7 +18,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { ARMS, declared, usableFolds, foldMean, h4, c11 } from "./foldStats.mjs";
-import { jointRows, fit, shuffled, RESULT } from "./genGateFolds.mjs";
+import { jointRows, fit, shuffled, ARM_SPEC, RESULT } from "./genGateFolds.mjs";
 import { N_FEATURES, N_FEATURES_V2, fitScaler, applyScaler, forward, auc } from "../../render/genGate.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -74,6 +74,19 @@ console.log("\n2. *** THE CONTROLS THAT DECIDE WHETHER ANYTHING BELOW MAY BE REA
     ok(`*** C12: re-running fold ${h}, arm ${arm}, seed ${seed} reproduces its recorded AUC BIT FOR BIT ***`,
        a === R.results[h][arm][0],
        `${a} vs ${R.results[h][arm][0]}, retrained from the cache in ${Date.now() - t0} ms. The seeds are replicates of something -- which, before v4698, they were not.`);
+    // v4700 -- ALL FOUR ARMS, not V2 alone. v4700 generalised the runner's arms, and "v4698's four arms are
+    // exactly what they were" is only a claim until every one of them re-derives its recorded AUC.
+    // One fold, not runFolds: the runner would re-train all seven folds to answer a question about one.
+    const sc1 = fitScaler(tr.x1), sc2 = fitScaler(tr.x2);
+    const redo = Object.fromEntries(ARMS.map((a2) => {
+        const sp = ARM_SPEC[a2], v2 = sp.set === "v2";
+        const ytr = sp.shuf ? shuffled(tr.y, seed, sp.shuf) : tr.y;
+        const mm = fit(v2 ? tr.x2 : tr.x1, ytr, tr.n, v2 ? N_FEATURES_V2 : N_FEATURES, seed, d, v2 ? sc2 : sc1);
+        return [a2, auc(forward(mm.layers, applyScaler(v2 ? rows[h].x2 : rows[h].x1, mm.scaler), rows[h].n), rows[h].y).auc];
+    }));
+    ok(`*** C12, every arm: fold ${h}, seed ${seed}, all four arms re-derive their recorded AUCs bit for bit ***`,
+       ARMS.every((a2) => redo[a2] === R.results[h][a2][0]),
+       ARMS.map((a2) => `${a2} ${redo[a2].toFixed(6)}`).join("  ") + " -- through ARM_SPEC as it stands after v4700 generalised the runner's arms.");
     const q = c11(R.results, R.h4.usable, d.alpha);
     ok("*** C11 DID NOT FIRE: the two shuffled arms separate in neither direction, recomputed ***",
        !q.fired && J(q.g) === J(R.c11.g) && R.c11.fired === false,
@@ -119,8 +132,12 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
     say(`S14 Spearman rho between the V2-over-V1 advantage and v4697's |laplacian|: ${rho.toFixed(3)} over seven scenes -- ` +
         "no visible relation, and seven points could not carry one. (The |laplacian| figures are copied from v4697's census output.)");
     const v1t = d.scenes.map((f) => foldMean(R.results[f].V1) - foldMean(R.results[f].SHUF_A));
-    say(`UNDECLARED, NO TEST RUN ON IT: V1 minus the shuffled twin per fold is ${v1t.map((x) => x.toFixed(4)).join(" ")}. ` +
-        "Six of seven positive. It is not a result -- no clause named it -- and it is the question a next pre-registration could ask.");
+    // v4700 -- THIS LINE SAID "V1 minus the shuffled twin" AT v4699, AND SHUF_A IS NOT V1'S TWIN. It is trained on
+    // the SCALE-FREE features; v4698's design has no shuffled arm on the absolute set at all. v4699's closing
+    // repeated it as "the absolute set beats ITS shuffled twin". The closing stands; this label is corrected.
+    say(`UNDECLARED, NO TEST RUN ON IT: V1 minus SHUF_A per fold is ${v1t.map((x) => x.toFixed(4)).join(" ")}. ` +
+        "Six of seven positive. SHUF_A is V2's twin, trained on the SCALE-FREE features, so this is not a matched comparison -- " +
+        "render/learned-absolute-preregistration.md builds the matched one on fresh data. It is not a result here.");
 }
 
 console.log(`\ngenGateFoldsMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);

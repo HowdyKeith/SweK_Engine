@@ -8032,6 +8032,49 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4700 -- THE 307th CLOSING: the observation was mis-named, and its test is declared on data nobody has seen.
+    since382: Object.freeze({
+        at: "v4700", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/foldStats-selfcheck.mjs (29 checks -> 39, the H5 document and its arms)",
+            "tools/ship/genGateFoldsMeasure-selfcheck.mjs (12 checks -> 13, C12 across every arm)",
+        ]),
+        verdict: "*** v4699 NAMED ITS OWN OBSERVATION WRONGLY. *** It printed \"V1 minus the shuffled twin\" and its " +
+                 "closing said \"the absolute set beats ITS shuffled twin\" -- but SHUF_A is trained on the SCALE-FREE " +
+                 "features. v4698's design has no shuffled arm on the absolute set at all, so the observation was an " +
+                 "UNMATCHED comparison as well as an undeclared one. The closing stands as written; the gate's label " +
+                 "is corrected, and render/learned-absolute-preregistration.md says so in its first section. " +
+                 "*** H5 IS DECLARED ON DATA NOBODY HAS HARVESTED, WITH NO DATA IN THE COMMIT. *** A hypothesis a " +
+                 "dataset suggested cannot be confirmed on that dataset, so the x2 cache is not re-analysed for H5 " +
+                 "in either direction. The fresh cell is slab speed x4 -- a page axis never harvested for the " +
+                 "learned gate -- with seeds 11-20, disjoint from 1-10. Later scene time was considered and refused: " +
+                 "the dolly and slab move linearly, and picking a window where the scene is still in frame would mean " +
+                 "looking at it first. THE COST IS STATED BEFORE IT IS PAID: x4 moves the motion regime as well as " +
+                 "the frames, so a failure cannot distinguish \"no transfer\" from \"transfer at x2 only\". One " +
+                 "clause: the absolute set against its OWN twin (SHUF1_A, same features, same init and sampling, " +
+                 "permuted labels), fold by fold, paired t AND exact sign; edges, below chance for every learned arm " +
+                 "at x2, is named in advance as the fold that fails it by construction if it recurs. " +
+                 "*** THE RUNNER GAINED ARMS AND LOST NOTHING: *** ARM_SPEC names each arm's feature set and " +
+                 "permutation stream, and v4699's C12 now re-derives ALL FOUR of v4698's arms at fold zone, seed 1, bit " +
+                 "for bit through it -- the first draft of that row called runFolds and retrained seven folds to check " +
+                 "one, 7.6 s; it now retrains the one, 1.95 s. " +
+                 "*** C13 IS WHAT v4699 GOT WRONG, AS A PROPERTY. *** A permutation of a constant label vector is the " +
+                 "identity, so on a fold whose training labels are one class a shuffled arm IS its unshuffled source: " +
+                 "SHUF1_A reproduces V1 and SHUF_A reproduces V2 bit for bit, and V1 differs from V2. Which features a " +
+                 "twin trains on is proved by behaviour, not by its name. " +
+                 "*** FIFTEEN SABOTAGES, FIFTEEN RED -- AFTER ONE 0-RED AND ONE CRASH, BOTH REAL. *** Pointing h5's " +
+                 "baseline at V2 passed: the row meant to pin the baseline pushed SHUF_A below chance and checked " +
+                 "only SHUF_A. Its first draft had pushed SHUF_A UP, where a mis-wired h5 fails as well -- a row that " +
+                 "could not tell two wirings apart, rewritten once and still incomplete. It now IDENTIFIES the " +
+                 "baseline: four arms are each pushed below chance, each would clear a clause taken against it, and " +
+                 "only SHUF1_A moves h5. And a runner ignoring its arms argument CRASHED C13 rather than reddening it; " +
+                 "a crash is not a verdict, so the row now catches and reports it. " +
+                 "*** AND ONE MORE LIMIT THAT OUTLIVED ITS LIMIT: *** foldStats-selfcheck's closing line said \"no AUC " +
+                 "on bars, edges, noise or ramp exists\" for a round after v4699 measured them all -- the defect this " +
+                 "session fixed in v4696's gate one round earlier, found here by reading rather than by a sabotage.",
+    }),
     // v4699 -- THE 306th CLOSING: H4 measured as declared, and not supported.
     since381: Object.freeze({
         at: "v4699", swept: 1, green: 1, red: 0,
