@@ -729,6 +729,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // all: it reads tools/ship/nextRounds.mjs as a DATA STRUCTURE -- unique ids, a classifiable status, one
     // countable claim that had gone false -- which is the first gate in this tree whose subject is the
     // backlog's queryability rather than any code the backlog describes.
+    // v4675 -- RE-TAKEN 1781 -> 1782 for tools/ship/recordProbe-selfcheck.mjs. It grades a HARNESS that writes
+    // to tracked source: the +7 probe deciding whether a frozen record is guarded was run twice and committed
+    // neither time, so the tree could not re-ask the question. Its sections are mostly the scars of getting the
+    // harness wrong -- twelve defects across five census passes, four of them discarded.
     // v4673 -- RE-TAKEN 1780 -> 1781 for tools/ship/orphanSets-selfcheck.mjs. It grades a RECORD rather than
     // code: three orphan ratchets stored a bare integer, so a breach could say "167 now vs 159 recorded" and
     // name nobody, and recovering the arrivals cost a worktree at fc12eef plus four census runs. nameFirst
@@ -738,8 +742,8 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // readings it judges are not, so a gate over it may be over it for a property of the box. nameFirst moved
     // with usesOk (1651 -> 1652) because every one of its rows leads with the assertion's name, and condFirst
     // did not move at all.
-    gates: 1781, usesOk: 1760, definesOk: 1752, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1653, condFirst: 96, unknownSignature: 11,
+    gates: 1782, usesOk: 1761, definesOk: 1753, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1654, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

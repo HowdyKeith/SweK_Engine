@@ -368,7 +368,11 @@ console.log("\n2. the observer effect, checked to be exactly one");
     // v4536: this module now carries TWO records -- the v4487 sweep and the v4536 re-run that supersedes it --
     // so the delta is DERIVED from what the module actually declares rather than typed as a number. The row
     // that mattered is unchanged: the count moves by exactly the records this file adds, and no more.
-    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536"];
+    // v4675: THREE now -- the v4487 sweep, the v4536 re-run that supersedes it, and the v4675 re-run with a
+    // perturbation vocabulary that reaches list-valued records. The list stays TYPED rather than derived from
+    // the file, because deriving it would make the row agree with whatever the file happens to hold: a record
+    // added here without a line added there is exactly the drift this row exists to catch.
+    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536", "PROBE_AT_V4675"];
     ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
         all.records.length - without.records.length === MINE.length &&
         MINE.every((n) => all.records.some((r) => r.name === n)) &&
@@ -541,11 +545,15 @@ ok("...and the counted subsets do not exceed the population they are drawn from"
 {
     const F = REC;
     ok("!! the with-module and without-module readings differ by exactly this module's own records",
-        F.currentIncludingModule.records - F.excluding.records === 2 &&
-        F.currentIncludingModule.withFields - F.excluding.withFields === 2,
+        // v4675: THREE, for PROBE_AT_V4675. Both differences move together by construction -- all three of
+        // this module's records carry numeric fields -- so a round that updates one reading and not the other
+        // reddens here rather than leaving the pair quietly inconsistent.
+        F.currentIncludingModule.records - F.excluding.records === 3 &&
+        F.currentIncludingModule.withFields - F.excluding.withFields === 3,
         `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
-        "PROBE_AT_V4536 and PROBE_AT_V4487, the two records this file holds. A pair of numbers that drifted " +
-        "apart by anything else would mean the exclude pattern had stopped matching this module.");
+        "PROBE_AT_V4487, PROBE_AT_V4536 and PROBE_AT_V4675, the three records this file holds. A pair of " +
+        "numbers that drifted apart by anything else would mean the exclude pattern had stopped matching " +
+        "this module.");
 }
 ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",
     /bump one integer field by 7/.test(String(REC.method)) && /every gate that NAMES/.test(String(REC.method)) &&

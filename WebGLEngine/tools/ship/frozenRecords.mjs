@@ -613,7 +613,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4647g -- RE-TAKEN alongside `excluding`: 146 / 69 / 392 -> 147 / 70 / 393. The two halves are one
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
-    currentIncludingModule: Object.freeze({ records: 147, withFields: 70, fields: 393 }),
+    // v4675 -- RE-TAKEN with `excluding` below: 147/70/393 -> 149/71/399. THREE of the difference is this
+    // module's own records, which is now PROBE_AT_V4487, PROBE_AT_V4536 and PROBE_AT_V4675 -- the third is the
+    // re-run of the +7 probe with a vocabulary that reaches list-valued records, and the pair below asserts
+    // the gap is exactly this module's own set rather than a number that drifted.
+    currentIncludingModule: Object.freeze({ records: 149, withFields: 71, fields: 399 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -794,7 +798,12 @@ export const PROBE_AT_V4536 = Object.freeze({
     // tools/ship/cliArgs.mjs -- a record with fields, so all three move by one. Re-taken in the round that
     // added it: the two before it were found by a red gate four rounds late, which is the whole argument
     // for the line this row already carried -- a round that adds a record re-takes this.
-    excluding: Object.freeze({ records: 145, withFields: 68, fields: 373 }),
+    // v4675 -- RE-TAKEN with `currentIncludingModule` above: 145/68/373 -> 146/68/373. The one arrival is
+    // MEASURED_AT_V4415 in physics/render/pathTracerGpu.mjs, and IT IS NOT NEW -- it has been declared in plain
+    // code since v4415 and was invisible to every earlier reading of this census because the old locator lost
+    // it inside a WGSL template literal. tools/ship/recordProbe.mjs's string-aware scan is what recovered it.
+    // withFields and fields do not move: its fields were already counted, only its declaration was unfindable.
+    excluding: Object.freeze({ records: 146, withFields: 68, fields: 373 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
@@ -927,3 +936,68 @@ export function reportLines(c = null) {
            "same property, and some are real gaps. Four were read by hand and split three ways.");
     return L;
 }
+
+/**
+ * *** THE +7 PROBE, RE-RUN WITH A VOCABULARY WIDE ENOUGH TO REACH THE RECORDS IT COULD NOT ASK. ***
+ *
+ * PROBE_AT_V4487 and PROBE_AT_V4536 recorded two runs of the right experiment with a harness nobody
+ * committed, so the tree could not re-ask the question and v4536s headline stood for 138 rounds. The harness
+ * is tools/ship/recordProbe.mjs now.
+ *
+ * TWO THINGS THE OLD ANSWER COULD NOT SAY, AND BOTH ARE FIXED HERE:
+ *   THE VOCABULARY WAS INTEGER-ONLY. A bump reaches 63 of 148 records; the other 85 hold no bare integer.
+ *     retitle (change one element of a list to a value no tree can contain) and drop (remove one, changing
+ *     the length) reach them: {"bump":63,"retitle":64,"drop":37} mutations were used across this run.
+ *   THE PAIRS WERE DISCARDED. v4536 stored noticed 83 / unnoticed 61 and no names, so 61 known
+ *     non-detecting relationships existed and nobody could name one. 159 pairs are recorded below.
+ */
+export const PROBE_AT_V4675 = Object.freeze({
+    at: "v4675",
+    method: "locate the declaration as CODE (not in a comment, string, template interpolation or regex), " +
+            "choose a mutation from what the record actually holds, run every gate that NAMES the record, " +
+            "restore and verify every touched file byte-for-byte; a gate already red or killed cannot answer " +
+            "and is UNMEASURABLE rather than blind (v4536s rule)",
+    records: 148, pairs: 159,
+    // THE PARTITION: every record in exactly one class, checked on every run rather than promised.
+    noticed: 79, blind: 2, unmeasurable: 21,
+    opaque: 1, empty: 23, derived: 11,
+    unguarded: 11,
+    baselineGates: 84, baselineRed: 14,
+    // *** SHAPE, BECAUSE "NOTHING COULD CORRUPT IT" WAS THREE ANSWERS IN ONE. *** An EMPTY record
+    // (Object.freeze([])) has nothing in it to make false. A DERIVED one (Object.freeze(X.map(...))) holds no
+    // frozen value: the corruption that tests it is a corruption of its SOURCE, already a record here with its
+    // own guardians -- it INHERITS rather than going unguarded. Only a LITERAL with no available mutation is a
+    // gap in the vocabulary, and there is exactly one.
+    nothingNoticed: Object.freeze(["ADDED_AT_V4403", "MEASURED_AT_V4422"]),
+    opaqueRecords: Object.freeze(["OVERCOUNT_AT_V4455"]),
+    // *** THE PAIRS v4536 THREW AWAY. *** Every guardian that was asked and did not change its verdict, by
+    // name. A blind pair is not a bug in the record and not always a gap: a gate may legitimately name a
+    // record it does not check. It is the list nobody could produce before.
+    blindPairs: Object.freeze([
+        Object.freeze({ record: "PLAYER_BODY_AT_V4549", gate: "tools/ship/playerGround-selfcheck.mjs" }),
+        Object.freeze({ record: "GROUND_AT_V4543", gate: "tools/ship/playerBody-selfcheck.mjs" }),
+        Object.freeze({ record: "MEASURED_AT_V4415", gate: "tools/ship/recordProbe-selfcheck.mjs" }),
+        Object.freeze({ record: "ADDED_AT_V4403", gate: "tools/ship/playerGround-selfcheck.mjs" }),
+        Object.freeze({ record: "MEASURED_AT_V4424", gate: "tools/ship/slowCensus-selfcheck.mjs" }),
+        Object.freeze({ record: "MEASURED_AT_V4412", gate: "ev/shipDebris-selfcheck.mjs" }),
+        Object.freeze({ record: "MEASURED_AT_V4422", gate: "render/fireSpread-selfcheck.mjs" }),
+        Object.freeze({ record: "MEASURED_AT_V4463", gate: "tools/ship/playerGround-selfcheck.mjs" }),
+        Object.freeze({ record: "ADMITTED_V4673", gate: "tools/ship/recordProbe-selfcheck.mjs" }),
+        Object.freeze({ record: "RECOVERED_SINCE_V4279", gate: "tools/ship/slowCensus-selfcheck.mjs" }),
+    ]),
+    // *** AND FOUR OF THOSE PAIRS ARE THIS ROUNDS OWN PROSE. *** tools/ship/recordProbe-selfcheck.mjs NAMES
+    // MEASURED_AT_V4415, PROBE_AT_V4536, PROBE_AT_V4487 and ADMITTED_V4673 while checking none of them, and
+    // readSites reads a mention as guardianship -- so documenting a record makes you its guardian. It is the
+    // sole guardian of NONE of them, so no records classification rests on it, but recordReachs guardian sets
+    // are partly built from documentation and that is a round of its own.
+    proseGuardianship: Object.freeze(["MEASURED_AT_V4415", "PROBE_AT_V4536", "PROBE_AT_V4487", "ADMITTED_V4673"]),
+    // *** WHAT THIS RUN COST, RECORDED BECAUSE A DISCARDED READING IS EVIDENCE ABOUT THE METHOD. *** Five full
+    // census passes were run and the first four thrown away, for twelve defects in the harness -- a baseline
+    // taken after the treatment (48 of 81 gates read as red; three spot-checks were green), buckets that did
+    // not partition (149 names over 148), a locator that matched a name in prose, a mutation that corrupted
+    // comment text (inflating nothing-noticed from 2 to 10), an exclusion that cost nine real records, a
+    // second lexer that disagreed with recordBody on comments, regex literals and template interpolation, and
+    // a restore that only ran on the happy path -- which left a sentinel in tools/ship/orphanSets.mjs when a
+    // run was killed. Every one was found by disbelieving a surprising number.
+    passesRun: 5, passesDiscarded: 4, harnessDefects: 12,
+});

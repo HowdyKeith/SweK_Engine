@@ -8070,6 +8070,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // run -- on Keith's gen-9 box and then here -- and it was red on BOTH, alongside assertionShape's
     // 1751 -> 1757 and runtimeGap's 4275 -> 4286, which are the same six arrivals seen from two other
     // instruments. The surplus mechanism worked exactly as designed; nobody looked at it for six rounds.
+    // v4675 -- THE 355th CLOSING: the experiment that decides whether a frozen record is guarded was run twice
+    // and committed neither time, so the tree could not re-ask its own question.
+    since354: Object.freeze({
+        at: "v4675", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/recordProbe-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/recordReach.mjs (blockers required a READING: an untimed guardian was entering the tier at null ms)",
+                                "tools/ship/frozenRecords.mjs (PROBE_AT_V4675, and the own-records pair re-taken 2 -> 3)",
+                                "tools/ship/frozenRecords-selfcheck.mjs, tools/ship/recordReach.mjs records re-derived for the arrival AND for one RECOVERY"]),
+        verdict: "green in about 2.0 s over eight sections. *** THE PROBE WAS A MEMORY, NOT A MECHANISM. *** " +
+                 "PROBE_AT_V4487 and PROBE_AT_V4536 record two runs of the only experiment that can answer " +
+                 "whether a frozen record is load-bearing -- corrupt it and see who shouts -- and the harness " +
+                 "went in nobody's commit, so v4536's headline stood for 138 rounds because nothing could " +
+                 "re-ask it. tools/ship/recordProbe.mjs is that harness. " +
+                 "*** THE VOCABULARY WAS INTEGER-ONLY AND MOST RECORDS HOLD NO INTEGER. *** A +7 bump reaches " +
+                 "63 of 148; retitle (change a list element to a value no tree can contain) and drop (remove " +
+                 "one, changing the length) reach the rest -- 63 bump, 64 retitle, 37 drop across the run. " +
+                 "*** AND THE PAIRS WERE DISCARDED. *** v4536 stored noticed 83 / unnoticed 61 and no names, " +
+                 "so 61 known non-detecting relationships existed and nobody could name one. 159 pairs are " +
+                 "recorded now, 10 of them blind, by record AND gate. " +
+                 "MEASURED over 148 records, partition checked every run: 79 noticed, 2 nothing-noticed " +
+                 "(ADDED_AT_V4403, MEASURED_AT_V4422), 21 unmeasurable, 1 opaque (OVERCOUNT_AT_V4455), 23 " +
+                 "empty, 11 derived, 11 unguarded. 65 distinct gates changed their verdict under corruption. " +
+                 "*** SHAPE, BECAUSE \"NOTHING COULD CORRUPT IT\" WAS THREE ANSWERS IN ONE. *** An EMPTY " +
+                 "record has nothing to make false; a DERIVED one holds no frozen value and INHERITS its " +
+                 "guardian through its source; only a LITERAL with no mutation is a gap, and there is one. " +
+                 "*** AND IT RECOVERED A RECORD NOBODY HAD EVER PROBED. *** MEASURED_AT_V4415 has been " +
+                 "declared in plain code since v4415 and was invisible to every reading of the census, lost " +
+                 "inside a WGSL template literal; the string-aware locator found it, which is why " +
+                 "recordReach's total moves 147 -> 149 for ONE arrival and ONE recovery. " +
+                 "*** THE HONEST COST: FIVE CENSUS PASSES, FOUR DISCARDED, TWELVE DEFECTS IN THE HARNESS. *** " +
+                 "A baseline taken AFTER the treatment (48 of 81 gates read red; three spot-checks were " +
+                 "green -- a control measured after the corruption measures the corruption). Buckets that did " +
+                 "not partition, 149 names over 148. A locator matching a bare name in prose, which captured " +
+                 "25 KB of the wrong record from a comment in v4673's own header. A mutation corrupting " +
+                 "COMMENT TEXT, inflating nothing-noticed from 2 to 10 -- in the direction that flatters the " +
+                 "round. An exclusion of gate-declared records that cost NINE real ones, all nine of which " +
+                 "its own evidence showed were noticed by their own gate. A SECOND LEXER beside recordBody " +
+                 "that disagreed on comments, regex literals and template interpolation. A restore that ran " +
+                 "only on the happy path, which left a sentinel in tools/ship/orphanSets.mjs when a run was " +
+                 "killed -- reproduced, fixed and now proved by killing a real child mid-corruption. And a " +
+                 "literal record pattern in the gate's own fixtures THREE TIMES, which once mutated the gate " +
+                 "that grades the probe and left it unparseable; section 7 greps its own source for it now, " +
+                 "because remembering is not a mechanism. SIXTEEN SABOTAGES, ALL CAUGHT, after three walked " +
+                 "on populations of zero -- the string and comment branches had no live example once the " +
+                 "round de-patterned its own prose, so every branch is fixture-driven. " +
+                 "*** AND THE ROUND WROTE AN UNGUARDED RECORD. *** Appending PROBE_AT_V4675 took recordReach's " +
+                 "unguarded count 17 -> 18: a round about records nothing checks had written one nothing " +
+                 "checked. Section 8 guards it, on its internal arithmetic, and the count is back to 17.",
+    }),
     // v4674 -- THE 354th CLOSING: the second tier exists and works, and its cap sat below its own slowest
     // member, so six records lost their verdict to a 0.3% margin.
     since353: Object.freeze({

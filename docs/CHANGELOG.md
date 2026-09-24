@@ -26,6 +26,101 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      of numeric order were moved into it. NO ROUND'S NUMBER, TEXT OR BYTES CHANGED -- only two headings
      gained a tag, and two blocks moved. -->
 
+## v4675 -- the probe that decides whether a record is guarded was a memory, not a mechanism
+
+*** WHETHER A FROZEN RECORD IS LOAD-BEARING CAN ONLY BE ANSWERED BY CORRUPTING IT AND SEEING WHO
+SHOUTS, AND THIS TREE ANSWERED IT TWICE WITH A HARNESS NOBODY COMMITTED. ***
+
+`frozenRecords.mjs` carries `PROBE_AT_V4487` and `PROBE_AT_V4536`: "bump one integer field by 7 in
+place, run every gate that NAMES the record, restore and verify by md5". The method is right and no
+static rule can replace it. But the code that did it went in nobody's commit, so v4536's headline stood
+for 138 rounds -- nothing could re-ask the question. `tools/ship/recordProbe.mjs` is that harness,
+committed.
+
+Two things were wrong with the answer, and both are measured.
+
+**THE VOCABULARY WAS INTEGER-ONLY, AND MOST RECORDS HOLD NO INTEGER.** A `+7` bump reaches 63 of 148.
+`retitle` (change one list element to a value no tree can contain) and `drop` (remove one, changing the
+length) reach the rest: **63 bump, 64 retitle, 37 drop** across the run.
+
+**AND THE PAIRS WERE DISCARDED.** v4536 stored `noticed: 83, unnoticed: 61` and no names -- 61 known
+non-detecting relationships and nobody could name one. That is v4673's defect (a count where a set was
+needed) one level up. **159 pairs are recorded now, 10 of them blind, by record and by gate.**
+
+Measured over 148 records, with the partition checked on every run:
+
+    79  noticed          a guardian changed its verdict
+     2  nothing noticed  ADDED_AT_V4403, MEASURED_AT_V4422
+    21  unmeasurable     the guardian was already red or killed -- v4536's rule
+     1  opaque           OVERCOUNT_AT_V4455: a literal with no mutation available
+    23  empty            Object.freeze([]) -- nothing in it to make false
+    11  derived          Object.freeze(X.map(...)) -- INHERITS its guardian through its source
+    11  unguarded        no gate names it at all
+
+65 distinct gates changed their verdict under corruption.
+
+*** "NOTHING COULD CORRUPT IT" WAS THREE ANSWERS IN ONE. *** 18 of the first cut's 20 unperturbable
+records were one family, which is a pattern and not a coincidence. An EMPTY record cannot drift. A
+DERIVED one holds no frozen value, so the corruption that tests it is a corruption of its SOURCE --
+already a record here with its own guardians. Only a LITERAL with no mutation is a gap in the
+vocabulary, and there is exactly one.
+
+*** AND IT RECOVERED A RECORD NOBODY HAD EVER PROBED. *** `MEASURED_AT_V4415` has been declared in
+plain code since v4415 and was invisible to every earlier reading of the census -- lost inside a WGSL
+template literal, because `${...}` interpolation can contain quotes and further backticks. The
+string-aware locator found it. That is why `recordReach`'s total moves 147 -> 149 for **one arrival and
+one recovery**, which are different things.
+
+*** THE HONEST COST: FIVE CENSUS PASSES, FOUR DISCARDED, TWELVE DEFECTS IN THE HARNESS. ***
+
+Every one was found by refusing to believe a surprising number, which is the method working -- but a
+round needing twelve corrections says the thing was harder than the scoping judged.
+
+  - **A baseline taken after the treatment.** `base(g)` was called lazily inside the mutation loop, so a
+    guardian first seen while another record sat corrupted was measured against the corrupted tree: a
+    gate that NOTICED had its red cached as "already red" and every record it guards filed
+    `unmeasurable`. It reported 48 of 81 gates red; spot-checking `playerGround`, `cameraFall` and
+    `colourReach` found all three ALL GREEN. A control measured after the corruption measures the
+    corruption.
+  - **Buckets that did not partition** -- 149 names over 148 records, union of 145.
+  - **A locator matching a bare name in prose.** `indexOf("export const ADMITTED_V4673")` hit a comment
+    in v4673's own header and captured 25 KB of a different record.
+  - **A mutation corrupting comment text.** It "corrupted" `"a red that has been repaired and left on"`
+    and counted guardians that rightly ignore comments as blind -- inflating nothing-noticed from 2 to
+    10, in the direction that flatters the round.
+  - **An exclusion that cost nine real records.** Dropping every record declared inside a gate, on the
+    reasoning that a gate's frozen values are fixtures. Its own evidence refuted it: all nine excluded
+    are real and all nine are NOTICED by their own gate.
+  - **A second lexer.** `isCodeOffset` beside `recordBody`, disagreeing on comments (9 records lost),
+    regex literals, and template interpolation. The duplication is not removable today, so the gate
+    asserts the two AGREE on every record in the census.
+  - **A restore that ran only on the happy path.** A killed run left
+    `__recordProbe..._not_a_real_value__` in `tools/ship/orphanSets.mjs`; `git status` cannot tell that
+    from work in progress. Reproduced, fixed, and now proved by killing a real child mid-corruption --
+    with the caveat recorded that `spawnSync` blocks the event loop, so the window is bounded by one
+    guardian's runtime rather than zero.
+  - **A literal record pattern in the gate's own fixtures, three times.** `RECORD_RE` is a text scan, so
+    a written-out fixture becomes a census record: once it MUTATED THE GATE that grades the probe and
+    left it unparseable. Section 7 greps its own source for the pattern now, because remembering to use
+    a helper is not a mechanism.
+
+SIXTEEN SABOTAGES, ALL CAUGHT, after three walked on populations of zero -- once the round de-patterned
+its own prose, the string and comment branches had no live example, so every branch is fixture-driven.
+
+*** AND THE ROUND WROTE AN UNGUARDED RECORD. *** Appending `PROBE_AT_V4675` took `recordReach`'s
+unguarded count from 17 to 18: a round whose subject is records nothing checks had written one nothing
+checked. Section 8 guards it on its internal arithmetic -- the seven classes must sum to the population,
+the named lists must match the counts beside them -- and the count is back to 17.
+
+One more fix fell out: `recordReach`'s `blockers` list took EVERY guardian of an over-budget record,
+including untimed ones, so the new gate entered the record tier at `null` ms and `recordTier` reported
+"cheapest is 0 ms against a 3,000 ms budget". A guardian with no reading is not known to be over budget.
+That is v4674's fault one level down -- a population sized from a number that is not there.
+
+Records re-derived: assertionShape 1781 -> 1782, runtimeGap 4314 -> 4316 (four of twelve rows; v4674
+added no file at all, which is why that line carried a v4673 note until now), frozenRecords' own pair
+2 -> 3, recordReach 147 -> 149, and gateSweep's 355th closing.
+
 ## v4674 -- the second tier's cap sat below its own slowest member
 
 *** NO GATE ARRIVED THIS ROUND, AND THAT IS THE SHAPE OF IT. ***

@@ -108,7 +108,15 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
     // stand there. Sorted slowest first, because the three at the cap are a different problem from the
     // three that are a few hundred milliseconds over.
     const blockers = new Map();
-    for (const r of overBudget) for (const g of r.guardians) {
+    // *** v4675 -- A GUARDIAN WITH NO READING IS NOT KNOWN TO BE OVER BUDGET, AND THIS PUT ONE IN THE TIER. ***
+    // The loop took EVERY guardian of an over-budget record. A record is OVER_BUDGET when its cheapest TIMED
+    // guardian is dear; its other guardians may simply never have been swept -- a gate added this round has no
+    // entry at all. MEASURED: adding tools/ship/recordProbe-selfcheck.mjs, which runs in about two seconds,
+    // made it a blocker of MEASURED_AT_V4415 at `null` ms, and recordTier's own row reported "cheapest is 0 ms
+    // against a 3,000 ms budget". The tier would then have run it at ship time on no evidence, which is the
+    // fault v4674 repaired one level up: a population sized from a number that is not there. An untimed
+    // guardian belongs to UNMEASURED, which this function already counts, and not to the tier.
+    for (const r of overBudget) for (const g of r.guardians.filter((x) => timed(x) && !runsAtShipTime(x))) {
         if (!blockers.has(g)) blockers.set(g, { gate: g, ms: t.timings?.[g] ?? null, records: [] });
         blockers.get(g).records.push(r.name);
     }
@@ -286,7 +294,12 @@ export const REACH_AT_V4548 = Object.freeze({
     // and runs at 574 ms, under the budget -- so `unguarded` is unmoved at 17 and `unchecked` does not rise.
     // That is what adding a record properly looks like, and it is re-taken in the round that added it
     // rather than four rounds later, which is how the previous two came to be found by a red gate.
-    total: 147,
+    // v4675 -- 147 -> 149: PROBE_AT_V4675 in tools/ship/frozenRecords.mjs (the re-run of the +7 probe with a
+    // vocabulary that reaches list-valued records) and MEASURED_AT_V4415 in physics/render/pathTracerGpu.mjs,
+    // which is NOT new -- it was invisible to every earlier reading because the locator lost it inside a WGSL
+    // template literal, and tools/ship/recordProbe.mjs's string-aware scan is what found it. One arrival and
+    // one recovery, and they are different things.
+    total: 149,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -492,7 +505,11 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // looks like. The other three fields are structural and unchanged.
     // v4647g -- 146 -> 147, the one arrival re-taken above. `unguarded` does not move: the new record is
     // named by the gate in its own defining file's sibling.
-    structural: Object.freeze({ total: 147, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
+    // v4675 -- 147 -> 149 for the arrival and the recovery above. `unguarded` does NOT move: PROBE_AT_V4675
+    // is guarded by section 8 of tools/ship/recordProbe-selfcheck.mjs, which was added because appending the
+    // record took this count from 17 to 18 and a round about records nothing checks had written one nothing
+    // checked. MEASURED_AT_V4415 already had its sibling gate.
+    structural: Object.freeze({ total: 149, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
