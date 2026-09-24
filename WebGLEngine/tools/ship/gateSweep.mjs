@@ -8032,6 +8032,55 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4690 -- THE 299th CLOSING: the learned gate's apparatus, with no learned result in it.
+    since374: Object.freeze({
+        at: "v4690", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/genGate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE FIRST TIME brain/ HAS TOUCHED THE RENDER PATH, AND THE ROUND MEASURES NO LEARNED " +
+                 "RESULT ON PURPOSE. *** v4689 pre-registered the hypothesis, the statistic, the threshold and " +
+                 "four controls in a commit containing no data; this round builds the apparatus and grades it, " +
+                 "and the measurement is the next round's under that test. " +
+                 "*** WHAT IS LEARNED IS A DECISION, AND ITS SHAPE WAS FIXED BY READING THE TRAINER RATHER THAN " +
+                 "BY TASTE. *** brain/learn.js's MLPTrainer has a SCALAR SIGMOID head -- one z2, one L2.b[0], a " +
+                 "p - r update, binary cross-entropy. It cannot regress a vector or do 3-way classification, so " +
+                 "the learned quantity must be one number in [0, 1]: a per-block gate predicting whether the " +
+                 "generated block will beat a cross-fade there. A learned blend weight or a learned `source` " +
+                 "choice would each have needed the trainer rewritten and neither was attempted. " +
+                 "*** AND brain/mlp.js's BatchedMLP TAKES A RAW WebGPU DEVICE, *** calling createShaderModule and " +
+                 "createComputePipeline itself, while every runner in this arc goes through gfx/device.js. Rather " +
+                 "than make fsr.html hold the arc's first raw-device object, the KERNEL gets a second runner that " +
+                 "imports MLP_LAYER_WGSL rather than copying it -- plumbing that differs, arithmetic that cannot. " +
+                 "*** IT WAS BUILT, MEASURED AT 5.96e-8 AGAINST THE CPU TWIN, AND THEN HELD BACK OUT OF THIS " +
+                 "ROUND. *** tools/ship/runnerCallers-selfcheck.mjs freezes the count of compute runners nothing " +
+                 "outside a gate can construct, and landing it here would have taken that 4 to 5 and forced this " +
+                 "arc's THIRD widening in twelve rounds. v4680's note says the next round that wants to widen has " +
+                 "to write \"the third widening\" and mean it; this one does not have to, because the runner " +
+                 "cannot have a production caller until trained weights exist and the round that trains them is " +
+                 "the round that wires it. So it arrives WITH its caller and the ratchet stays at 4. Control C4 " +
+                 "forbids quoting a DEVICE NUMBER, and this round quotes none -- the 5.96e-8 is why the decision " +
+                 "is about debt rather than about doubt. " +
+                 "*** NO FEATURE CAN SEE THE ANSWER, AND THAT IS STRUCTURAL. *** features() is not GIVEN the true " +
+                 "middle frame -- its parameter list has no slot for one -- and labels(), which needs ground " +
+                 "truth, is a separate function. The separation is in the call signature rather than in a comment " +
+                 "somebody has to keep honest, and a gate row reads the signature back. The scaler is fitted on " +
+                 "training rows alone, with a row measuring that including the held-out rows really does move all " +
+                 "eleven means: fitting on both is the quietest way to make a held-out measurement report an " +
+                 "in-distribution one. " +
+                 "*** FIFTEEN SABOTAGES, ALL FIFTEEN RED, AND ONE THAT WAS A CRASH RATHER THAN A 0-RED. *** " +
+                 "Deleting the relu line left a dangling else-if and killed the gate on a syntax error: 0 FAIL " +
+                 "rows and exit 1 is a process that never reached a verdict. Rewritten as an inert but valid " +
+                 "assignment it reddens, and so does the same mutation on the sigmoid. " +
+                 "*** AND THREE OF THIS GATE'S OWN ROWS WERE WRONG BEFORE ANY SABOTAGE RAN, ALL THREE FIXTURE " +
+                 "ERRORS THE GATE CAUGHT. *** The flat half's Laplacian was asserted zero and measures 5.00e-2, " +
+                 "because it BORDERS the checker and the seam is in the last flat block's neighbourhood -- the " +
+                 "operator working and the fixture misdescribed; the row now claims separation by ratio. The " +
+                 "label row asserted 1 everywhere and read a base rate of 0.5, because the cross-fade IS the " +
+                 "truth on the flat half: those blocks are exact ties, and a tie is not a win -- the row now " +
+                 "asserts both outcomes, which is more than the first draft tried to. And a refusal probe set " +
+                 "nIn without setting W, so the W-length guard fired first and the guard under test was never " +
+                 "reached.",
+    }),
     // v4688 -- THE 298th CLOSING: six gates were red outside the register, and none of them was this round's.
     since373: Object.freeze({
         at: "v4688", swept: 0, green: 0, red: 0,
