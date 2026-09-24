@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4677 -- THE 287th CLOSING: a frame nothing rendered, graded against one that was.
+    since362: Object.freeze({
+        at: "v4677", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterp-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** FOUR ROUNDS OF MOTION FIELDS AND NOT ONE PIXEL; THIS IS THE PIXEL. *** v4673 to v4676 " +
+                 "each closed by saying frame interpolation was what they were for and had not been started. " +
+                 "render/frameInterp.mjs splats the block field forward to time t, then each output pixel " +
+                 "that received a vector samples `prev` backwards along it and `cur` forwards along it and " +
+                 "blends. *** THE SCENE HAS A TRUE MIDDLE FRAME, SO THE GENERATED ONE IS GRADED AGAINST A " +
+                 "RENDER AND NOT AGAINST A PROXY. *** The wall is analytic, so t = 0.5 is simply drawn at " +
+                 "half the camera's travel. AND THE CONTROL ARM IS THE CROSS-FADE, which is four instructions " +
+                 "per pixel and exactly right wherever nothing moved: " +
+                 "camera scene 30.9451 -> 41.0068 dB (+10.0618), texture scene 30.9585 -> 38.3376 (+7.3791). " +
+                 "*** AND v4676's RECONCILIATION EARNS ITSELF IN PIXELS RATHER THAN IN VECTOR ERROR. *** " +
+                 "Application field alone: 41.02 on the camera scene, 30.96 on the texture scene -- where its " +
+                 "field is exactly zero, so its generated frame IS the cross-fade, which is all FSR2's inputs " +
+                 "can offer a frame generator. Colour flow alone: 38.51 and 38.34. Reconciled: 41.01 and " +
+                 "38.34 -- within 0.02 dB of the better field on BOTH, and a row says it is NOT the maximum " +
+                 "of the two: it is 0.0140 dB WORSE than the application on the scene the application gets " +
+                 "right, which is v4676's two stolen blocks arriving as picture quality, traded for 7.38 dB " +
+                 "on the scene the application cannot see. " +
+                 "*** THE 3.1% OF PIXELS NOTHING SPLATTED ONTO ARE LEFT AT ZERO WITH NaN VECTORS. *** A " +
+                 "cross-fade would look plausible in every one of them, which is why it is not written there; " +
+                 "hole filling is the next pass and the 39.66 dB this file reports for patching them is " +
+                 "labelled a report, not a result. t = 0 returns `prev` bit-exactly with no hole; t = 1 " +
+                 "returns `cur` bit-exactly and leaves holes where content left the frame, and the asymmetry " +
+                 "is stated rather than hidden. Zero motion reproduces the cross-fade TO THE BIT. " +
+                 "*** FIFTEEN SABOTAGES, AND THE TWO THAT SCORED 0 RED ARE DIFFERENT ANIMALS. *** The " +
+                 "phantom-tail guard was UNREACHABLE under the section's +3 px case, because a tail moving " +
+                 "right leaves the frame anyway -- a hole in the gate, closed with a -3 px row where the tail " +
+                 "lands on px 57..59 of a 60-wide frame from source pixels that do not exist. The NaN-decline " +
+                 "guard is a TRUE no-op: Math.round(NaN) is NaN, a NaN bounds test is false, and zbuf[NaN] " +
+                 "reads undefined, against which both comparisons fail -- so nothing is written and the " +
+                 "pixels stay holes either way. Recorded, not repaired, exactly as v4675 recorded " +
+                 "opticalFlow's denominator guard. AND THE f32-VERSUS-f64 DEFECT ARRIVED A THIRD TIME: the " +
+                 "cross-fade row compared a Float32Array cell to an f64 product and read 0.4679146409 " +
+                 "against 0.4679146484. Math.fround on the expectation, tolerance still zero.",
+    }),
     // v4676 -- THE 286th CLOSING: the two motion fields, and a header that had the sense backwards.
     since361: Object.freeze({
         at: "v4676", swept: 1, green: 1, red: 0,

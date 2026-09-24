@@ -487,8 +487,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // fields. Eighth consecutive round with the same four rows moving by exactly one and the other four
     // held. nameFirst bumped in the same edit, unprompted, which is the third round in a row it has been --
     // so the note above has stopped describing the failure and started describing the habit that replaced it.
-    gates: 1765, usesOk: 1744, definesOk: 1736, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1637, condFirst: 91, unknownSignature: 16,
+    // v4677 -- 1765 -> 1766 for render/frameInterp-selfcheck.mjs, the first generated frame in this tree.
+    // Ninth round running with the same four rows by one and the other four held.
+    gates: 1766, usesOk: 1745, definesOk: 1737, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1638, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
