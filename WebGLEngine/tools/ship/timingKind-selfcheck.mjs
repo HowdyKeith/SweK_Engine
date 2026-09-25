@@ -242,9 +242,24 @@ console.log("\n4. AND THE ENUMERATION HAD TWO FALSE MEMBERS THAT THE MEASUREMENT
 console.log("\n5. *** AND THE PRE-FLIGHT DEMANDS A KIND NOW, WHICH IS WHAT ENDS THE CLASS ***");
 {
     const RD = fs.readFileSync(path.join(ENG, "tools", "ship", "recordDrift.mjs"), "utf8");
+    // *** v4680 -- THIS ROW WAS A REGEX OVER recordDrift.mjs, AND v4679 MOVED THE LOOKUP IT SPELLED. *** It
+    // matched `(rec.kinds || {})[g]`; v4679 sent coverage through tools/ship/boxTimings.mjs, which carries the
+    // kind as `e.kind` on a merged entry, and the obligation survived while the spelling did not -- so the row
+    // went red on a tree that still enforced exactly what it asks about. A text match reports whether a line
+    // is WRITTEN a certain way. Asked of the mechanism instead: drop one gate's kind from every record and the
+    // pre-flight must name that gate.
+    const RDM = await import("./recordDrift.mjs");
+    const BT = await import("./boxTimings.mjs");
+    const world = BT.records(ENG);
+    const g0 = Object.keys(S.kinds).find((g) => fs.existsSync(path.join(ENG, g)));
+    const noKind = world.map((r) => ({ ...r, rec: { ...r.rec,
+        kinds: Object.fromEntries(Object.entries(r.rec.kinds || {}).filter(([k]) => k !== g0)) } }));
+    const kRow = (await RDM.checks({ records: noKind, only: "sweep timings" })).find((c) => c.name === "sweep timings");
+    const cRow = (await RDM.checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings");
     ok("recordDrift's sweep-timings check requires a kind alongside the runtime and the stamp",
-        /rec\.kinds \|\| \{\}\)\[g\]/.test(RD),
-        "a new gate owes the file a kind exactly as it owes a runtime and a capture stamp");
+        kRow.stale === true && kRow.detail.includes(g0) && cRow.stale === false,
+        `a gate with a runtime and a stamp but no kind (${g0}, removed from all ${world.length} records) is named as ` +
+        "missing, and the untouched records are clean -- a new gate owes the file a kind exactly as it owes a runtime and a capture stamp");
     ok("  and it says so in its own detail line, so a reader of the pre-flight learns what the obligation is",
         /a kind/.test(RD), "every gate has a timing, its own capture stamp and a kind");
     ok(`*** which is the repair v4578 named and did not do: seventeen wrong entries across five rounds is what a column without a marked quantity costs, and this is the check that stops the eighteenth ***`,

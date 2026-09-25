@@ -714,7 +714,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (this branch's capability row, superseded by the merge re-derive below)
     // fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 23, wasm: 24,
     // ---- the murmuration line, RE-DERIVED at v4667 over the merged tree ----
-    esModules: 4013, closures: 3880, asyncAwait: 1538, typedArrays: 1127, promises: 374,
+    // v4680 -- asyncAwait 1538 -> 1540 and Promises 374 -> 375, and NO FILE ARRIVED: shipVerdict's main() became
+    // an exported async function so its gate can drive it under real signals, and that gate's live driver awaits
+    // a child's close. Two rows moved and ten held; `files` did not move because the round added no module.
+    esModules: 4013, closures: 3880, asyncAwait: 1540, typedArrays: 1127, promises: 375,
     // wasm 23 -> 24: this branch's tools/ship/wasmExitHook.cjs. A DUPLICATE KEY nearly hid it -- both
     // lines' capability rows survived the merge and the LATER one silently won, so the merged tree
     // would have carried main's 23 under a record claiming to describe the union. JS does not warn

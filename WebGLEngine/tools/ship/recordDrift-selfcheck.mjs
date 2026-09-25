@@ -199,18 +199,30 @@ console.log("\n2. handed a stale record, each check names it");
             `\`tries > 1\` IS THE POINT OF THE HEALED CASE -- succeeding on attempt one would prove nothing.`);
     }
     say(`the live timings hold ${Object.keys(t.timings).length} readings and ${Object.keys(t.at).length} stamps`);
-    const noStamp = { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) };
-    const dStamp = await checks({ timings: noStamp, only: "sweep timings" });
+    // *** v4680 -- THE SABOTAGE IS APPLIED TO EVERY RECORD, NOT ONLY THE SHARED ONE. *** Coverage is the union of
+    // every box's record (v4679), so a gate deleted from the shared file alone is still covered by whichever
+    // other record holds it -- the untracked sweep-timings.local.json a foreign box's sweep writes, for one. These
+    // rows were green only while no such file existed, and went red the first time a local verify wrote it.
+    const BT = await import("./boxTimings.mjs");
+    const world = BT.records(ENG);
+    const without = (field) => world.map((r) => ({ ...r, rec: { ...r.rec,
+        [field]: Object.fromEntries(Object.entries(r.rec[field] || {}).filter(([k]) => k !== rel)) } }));
+    const dStamp = await checks({ records: without("at"), only: "sweep timings" });
     const rowStamp = dStamp.find((c) => c.name === "sweep timings");
     ok("!! a reading WITH a time but WITHOUT its own capture stamp counts as missing evidence",
         rowStamp.stale === true && rowStamp.detail.includes(rel),
         "sabotage D: v4408 found one file-level `captured` covering 1,440 readings of which the run had taken " +
-        "937 -- an entry carries its own stamp or it carries nothing");
-    const noTime = { ...t, timings: Object.fromEntries(Object.entries(t.timings).filter(([k]) => k !== rel)) };
+        `937 -- an entry carries its own stamp or it carries nothing. Removed from all ${world.length} record(s) ` +
+        `(${world.map((r) => r.kind).join(", ")}), since any one of them covers the gate for the rest`);
     ok("...and a missing reading is caught too, so the check is not only about stamps",
-        (await checks({ timings: noTime, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
-    ok("...while the untouched record is clean, so neither is simply always true",
-        (await checks({ timings: t, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
+        (await checks({ records: without("timings"), only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
+    ok("...while the untouched records are clean, so neither is simply always true",
+        (await checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
+    ok("!! ...and the planted hole is NOT masked when only the shared record is sabotaged and a local record exists -- which is WHY the rows above sabotage every record",
+        world.length < 2 || world.some((r) => r.kind !== "shared" && (r.rec.at || {})[rel]) === false ||
+        (await checks({ timings: { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) }, only: "sweep timings" }))
+            .find((c) => c.name === "sweep timings").stale === false,
+        "the v4679 shape of this row, kept as a witness to the masking rather than as the test");
 }
 
 {

@@ -146,7 +146,7 @@ console.log("\n3. *** A PHASE NO GUARD NAMES IS A WINDOW IN WHICH THE GUARD IS N
             "several-minute browser download");
 
     ok("!! *** the chain REFUSES to verify an unprovisioned clone rather than reporting its 116 reds ***",
-        /refusing to verify a tree whose browser gates cannot run/.test(SRC) &&
+        /refusing to verify a tree whose browser gates cannot run/.test(SRC.replace(/\n\s*\/\/\s?/g, " ")) &&
         /R\.phase = "done"; R\.finishedAt = Date\.now\(\); R\.verified = false;/.test(SRC),
         "running it anyway spends an hour producing a verdict that describes the missing install, and a " +
         "reader takes it for 116 broken gates -- which is precisely what v4667 did");

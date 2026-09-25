@@ -79,7 +79,14 @@ const SHELL_RE = new RegExp(EXECS + "\\(\\s*[\"'`]\\s*(" + POSIX_TOOLS.join("|")
 const SPEC_RE = new RegExp("import[^\"'`\\n]{0,40}from\\s*\"\\s*\\+\\s*JSON\\.stringify\\(\\s*path\\.");
 const GIT_RE = new RegExp(EXECS + "\\(\\s*[\"'`]git[\"'`]");
 const REL_RE = /path\.relative\(/g;
-const NORM_RE = new RegExp("toPosix|replace\\(/\\\\\\\\/g");
+// v4680 -- AND `split(path.sep).join("/")`, which normalises exactly as toPosix does and which this rule could
+// not see. The census moved 154 -> 159 callers with `normalised` flat at 54, which reads as five new
+// raw-separator sites; three of the arrivals are this line's own (exitBusy, deadlineLeak, declaredCost's gate)
+// and all three normalise, in this spelling. Recognising it moves `normalised` 54 -> 106 on the same 159
+// callers: FIFTY-TWO files had been counted as never normalising while doing it correctly. The census is
+// REPORTED, not asserted, for exactly this reason -- a file-level proxy -- and this is the proxy's largest
+// miss so far.
+const NORM_RE = new RegExp("toPosix|replace\\(/\\\\\\\\/g|split\\(path\\.sep\\)\\.join\\([\"'`]/[\"'`]\\)");
 
 /** Comment lines carry prose about these patterns; the code is what runs. */
 const codeOf = (src) => src.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
@@ -190,8 +197,8 @@ export const POSIX_AT_V4485 = Object.freeze({
             saw: "fatal: ambiguous argument 'HEAD~1': unknown revision" }),
     ]),
     // The separator population under ONE stated rule, so a later reading is comparable to this one.
-    separatorRule: "a file calling path.relative, against whether the file mentions toPosix or a backslash " +
-                   "replace anywhere in its code",
+    separatorRule: "a file calling path.relative, against whether the file mentions toPosix, a backslash " +
+                   "replace, or split(path.sep).join('/') anywhere in its code (the third idiom added at v4680)",
     // *** v4534 -- RE-TAKEN. *** The row above allows the callers count to move by 4 "within what the round
     // itself moved", and several rounds moved it: 128 -> 133, five arrivals, one past the band. The record was
     // taken at v4487 and the WGSL and racing arcs have landed since. Re-taken under the SAME rule stated two
@@ -223,7 +230,11 @@ export const POSIX_AT_V4485 = Object.freeze({
     // fixtureLitter's own reclaim. The tolerance the gate compares by is +/- 4 callers; this round moved
     // eight, which is why it went red rather than because anything was undone -- and re-taking rather
     // than widening that tolerance is the point, since the tolerance is what catches a silent drift.
-    separator: Object.freeze({ callers: 154, calls: 207, normalised: 54, never: 100 }),
+    // v4680 -- RE-TAKEN UNDER A CHANGED RULE, which is why separatorRule above changed with it: 154/207/54/100
+    // becomes 159/216/106/53. The callers grew by five and the rule grew by one idiom, in one step, and the two
+    // are separable: under the OLD rule the same tree reads 159/216/54/105, so the population moved +5/+9 with
+    // nothing un-normalised, and the rule change alone moved 52 files from `never` to `normalised`.
+    separator: Object.freeze({ callers: 159, calls: 216, normalised: 106, never: 53 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

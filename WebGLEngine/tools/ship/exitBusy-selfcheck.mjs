@@ -291,7 +291,7 @@ console.log("\n6. *** THE THRESHOLD IS A READING OF A BOX, AND SAYS SO ***");
         /0\.1-1\.1 ms/.test(src) && /7\.0 ms at the lowest/.test(src),
         "a bound with no argument behind it is the next thing somebody moves without one");
     ok("...and the disproven Atomics.wait instrument is recorded in the module, not only in this gate",
-        /Atomics\.wait/.test(src) && /measures the absence of the work/.test(src),
+        /Atomics\.wait/.test(src) && /measures the absence of the work/.test(src.replace(/\n\s*\/\/\s?/g, " ")),
         "the next reader reaches for that hook because it is the obvious design; the module is where they will " +
         "be looking");
 }

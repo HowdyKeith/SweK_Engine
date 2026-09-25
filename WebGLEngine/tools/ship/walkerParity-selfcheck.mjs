@@ -199,7 +199,11 @@ console.log("\n2. *** AND THE GUARD IS NOT ONE SPELLING, WHICH A ROW HERE ASSERT
     const DRIVEN = ["ai-bridge/gateWalk.js:allGates", "tools/ship/gateSweep.mjs:enumerateGates",
                     "tools/ship/treeRead.mjs:treePaths", "tools/ship/staleness.mjs:gateFiles",
                     "tools/ship/assertionShape.mjs:gateFiles"];
-    const DELEGATES = ["tools/ship/singleSource-selfcheck.mjs:gateFiles"];
+    // v4680: exitBusy.allGates arrived at v4677 as its OWN readdir walk -- this row went red on arrival, as it
+    // says it will, and stayed red for three rounds because the sweep that would have shown it never finished on
+    // the rig. It delegates to enumerateGates now, and the row after this one checks that it does rather than
+    // taking the list's word for it.
+    const DELEGATES = ["tools/ship/singleSource-selfcheck.mjs:gateFiles", "tools/ship/exitBusy.mjs:allGates"];
     const unknown = exporters.filter((e) => !DRIVEN.includes(e) && !DELEGATES.includes(e));
     say("modules exporting a gate population", exporters.length + ": " + exporters.map((e) => e.split("/").pop()).join(", "));
     // AND THE TWO LISTS IN THIS FILE MUST AGREE: dropping rigRunner from section 1's table left this row happily
@@ -217,6 +221,15 @@ console.log("\n2. *** AND THE GUARD IS NOT ONE SPELLING, WHICH A ROW HERE ASSERT
                        : `${DRIVEN.length} driven, ${DELEGATES.length} delegating. A SIXTH FAILS THIS ROW ON ` +
                          "ARRIVAL, which is the whole point: v4409's rule reached its third and fourth walkers " +
                          "three rounds apart because nothing was counting walkers.");
+
+    {
+        const EB = await import("./exitBusy.mjs");
+        const GS = await import("./gateSweep.mjs");
+        const mine = EB.allGates(), theirs = GS.enumerateGates().map((p) => path.relative(ENG, p).split(path.sep).join("/")).sort();
+        ok("...and a DELEGATE really delegates: exitBusy.allGates is enumerateGates' population, sorted",
+            JSON.stringify(mine) === JSON.stringify(theirs),
+            `${mine.length} and ${theirs.length} -- a delegate that keeps its own walk is a sixth population with a label on it`);
+    }
 
     // The twin-comparison gate keeps its OWN planted-fixture drive, because its two walks can only be told apart
     // while a file exists -- removing that plant was a 0-RED here until this row existed.

@@ -56,6 +56,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { enumerateGates } from "./gateSweep.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const COPY_SUFFIX = ".__exitbusy.mjs";
@@ -206,14 +207,17 @@ export function classify(row) {
 
 /** Every gate in the tree, by the tree's own definition of one (the -selfcheck.mjs suffix buildKnowledgeIndex
  *  uses). Names only, no lexing. */
-export function allGates(dir = ENG, out = []) {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor" || e.name === "GPU_Assets") continue;
-        const q = path.join(dir, e.name);
-        if (e.isDirectory()) allGates(q, out);
-        else if (/-selfcheck\.mjs$/.test(e.name)) out.push(path.relative(ENG, q).split(path.sep).join("/"));
-    }
-    return out;
+// *** v4680 -- A SECOND GATE WALKER, WHICH IS THE DEFECT tools/ship/walkerParity-selfcheck.mjs EXISTS TO NAME. ***
+// This was its own readdir recursion with its own skip list. It happened to agree with gateSweep.enumerateGates
+// (1775 and 1775, same set) -- but it skipped GPU_Assets where the sweep skips .claude, and agreement by luck is
+// the state that walker drifts out of. Delegated now. AND SORTED, which the old walker was not: pickSample below
+// is seeded over the list's ORDER, and readdir order is the filesystem's choice -- NTFS and ext4 disagree -- so
+// "the next reader gets the same gates" was true only on a box with this box's directory layout. The v4677 census
+// draw was taken in that unsorted order and did not record the drawn list, so it is not re-drawable exactly;
+// what it claims (an estimate with its Wilson width) does not depend on which 120 were drawn, and a new draw
+// from this sorted list is reproducible on any machine.
+export function allGates(dir = ENG) {
+    return enumerateGates(dir).map((p) => path.relative(dir, p).split(path.sep).join("/")).sort();
 }
 
 /** A SEEDED sample, so the next reader gets the same gates and can check the number rather than take it.

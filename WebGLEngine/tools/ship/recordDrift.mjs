@@ -158,7 +158,7 @@ const once = (fn, make) => {
  * also MORE PRECISE than it was: a fixture that breaks the timings file should not be able to pass or fail
  * on the assertion census, and until now it could.
  */
-export async function checks({ load = null, timings = null, only = null } = {}) {
+export async function checks({ load = null, timings = null, records = null, only = null } = {}) {
     const mod = load || ((p) => import(p));
     const out = [];
     const wanted = (n) => !only || (Array.isArray(only) ? only.includes(n) : only === n);
@@ -350,7 +350,16 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
         // the shared one does not speak for them. Replacing ALL records was tried first and took the
         // "untouched record is clean" control red -- correctly, because with the per-box records excluded the
         // real shared file genuinely does lack this round's four new gates.
-        const cov = timings
+        //
+        // *** v4680 -- AND "ONLY FOR IT" MADE THE SABOTAGE ROWS DEPEND ON WHICH FILES THE BOX HAPPENED TO HOLD. ***
+        // Those rows delete ONE gate's stamp from the injected shared record and expect the check to notice. With
+        // the other records read live, any record that also covers that gate fills the hole: the untracked
+        // sweep-timings.local.json a foreign box's own sweep writes does exactly that, so the gate went red on
+        // this box the first time a local verify wrote one -- and the rig has had one all along. A fixture must
+        // be able to state the WHOLE world, so `records` injects every record at once and wins over `timings`.
+        const cov = records
+            ? BT.coverageOf(records)
+            : timings
             ? BT.coverageOf([{ file: BT.FILES.shared, kind: "shared", host: timings.host || null, rec: timings },
                              ...BT.records(ENG).filter((r) => r.kind !== "shared")])
             : BT.coverage(ENG);
