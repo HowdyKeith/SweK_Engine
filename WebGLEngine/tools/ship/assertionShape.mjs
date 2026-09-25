@@ -524,8 +524,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4706 -- 1786 -> 1787 for tools/ship/frameGateMeasure-selfcheck.mjs, H7 re-derived and C12 re-harvested.
     // v4707 -- 1787 -> 1788 for tools/ship/frameHoles-selfcheck.mjs, H8's statistic on synthetic frames.
     // v4708 -- 1788 -> 1789 for tools/ship/frameHolesMeasure-selfcheck.mjs, H8 re-derived and C12 re-harvested.
-    gates: 1789, usesOk: 1768, definesOk: 1760, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1661, condFirst: 91, unknownSignature: 16,
+    // v4709 -- 1789 -> 1790 for tools/ship/frameHoled-selfcheck.mjs, H9's statistic and C21, the ratio proven honoured.
+    gates: 1790, usesOk: 1769, definesOk: 1761, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1662, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

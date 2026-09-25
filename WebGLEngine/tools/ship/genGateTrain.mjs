@@ -39,8 +39,10 @@ const UPTO = 40;            // frames driven per scene; the pre-registered measu
 const SPEED = "2";          // slabspeed x2, the pre-registered cell
 
 /** Drive fsr.html over the training scenes with the harvest hook on. */
-export async function harvest({ scenes = TRAIN_SCENES, upto = UPTO, speed = SPEED } = {}) {
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 3600000, args: { scenes, upto, speed }, script: `async (a) => {
+// v4709 -- `settings` sets further page controls by id (e.g. { ratio: "3" }) BEFORE the change that resets the page.
+// Empty by default, so every earlier harvest -- and every C12 re-harvest of one -- drives exactly what it drove.
+export async function harvest({ scenes = TRAIN_SCENES, upto = UPTO, speed = SPEED, settings = {} } = {}) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 3600000, args: { scenes, upto, speed, settings }, script: `async (a) => {
         const rows = [];
         for (const scene of a.scenes) {
             const ifr = document.createElement("iframe");
@@ -54,10 +56,15 @@ export async function harvest({ scenes = TRAIN_SCENES, upto = UPTO, speed = SPEE
             await until(() => fno() === 0 && /engine:/.test(($("engine") || {}).textContent || ""), 180000);
             const want = [["scene", scene], ["shading", "off"], ["reactive", "off"], ["camera", "objects"],
                           ["slabspeed", a.speed], ["genfield", "block"], ["gensource", "presented"],
-                          ["genengine", "cpu"], ["genframe", "on"]];
+                          ["genengine", "cpu"], ...Object.entries(a.settings || {}), ["genframe", "on"]];
             let last = null;
             for (const [id, v] of want) { const e = $(id); if (e) { e.value = v; last = e; } }
-            last.dispatchEvent(new Event("change"));
+            // *** v4709 -- DISPATCHED ON "scene", WHICH CARRIES reset(). *** Until v4709 this dispatched on the LAST
+            // control set -- genframe -- and fsr.html gives genframe NO change handler, so reset() never ran after the
+            // harvest set its controls. Every control the harvest had set was read LIVE by tick() (scene, camera, slab
+            // speed), so the data were right; only reset() reads the ratio and startframe, and no harvest set either
+            // until v4709's frameHoled-selfcheck C21 set the ratio and watched nothing move.
+            ($("scene") || last).dispatchEvent(new Event("change"));
             await until(() => fno() === 0, 180000);
             // THE HOOK IS SET ON THE IFRAME'S OWN window, which is the one the page's tick() reads.
             ifr.contentWindow.__gateHarvest = [];

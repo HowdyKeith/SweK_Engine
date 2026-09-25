@@ -337,7 +337,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4358,               // v4708: 4357 -> 4358 for tools/ship/frameHolesMeasure-selfcheck.mjs -- v4706's shape to
+    files: 4360,               // v4709: 4358 -> 4360 for tools/ship/frameHoled.mjs and its gate. async/await moves by
+                               // two -- the runner's harvest and the gate's C21, which drives the page twice to prove
+                               // the ratio is honoured. Every row from the census.
+                               // v4708: 4357 -> 4358 for tools/ship/frameHolesMeasure-selfcheck.mjs -- v4706's shape to
                                // the row: async/await moves by one for C12's re-harvest. Every row from the census.
                                // v4707: 4355 -> 4357 for tools/ship/frameHoles.mjs and its gate. async/await moves by
                                // one, for the runner's harvest; the gate drives no page -- v4705's C18 already tied the
@@ -857,7 +860,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4058, closures: 3913, asyncAwait: 1561, typedArrays: 1169, promises: 379,
+    esModules: 4060, closures: 3915, asyncAwait: 1563, typedArrays: 1169, promises: 379,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

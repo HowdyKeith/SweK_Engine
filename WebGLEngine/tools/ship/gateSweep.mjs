@@ -8032,6 +8032,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4709 -- THE 316th CLOSING: a replication declared, and the control it needed was found broken before any data.
+    since391: Object.freeze({
+        at: "v4709", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoled-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after the harvest's dispatch fix because its C12 re-harvests zone at x2 through that code: all 39 rows identical to v4706's cache, which is the proof that the fix changed no committed measurement." }),
+            Object.freeze({ gate: "tools/ship/frameHolesMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run for the same reason: its C12 re-harvests zone at x1, and all 39 rows are identical to v4708's cache." }),
+        ]),
+        verdict: "*** H9 IS DECLARED AS A REPLICATION, AND SAYS WHAT IS NOT FRESH ABOUT IT. *** render/frame-holed-" +
+                 "preregistration.md, NO DATA IN THE COMMIT, asks whether frames with any occlusion lose more than frames " +
+                 "with none -- the form taken FROM v4708's secondary, and it says so -- at x8 with the upscale ratio at 1.5x " +
+                 "and 3x. The slab speeds are spent: x1 has no holes, x8 produced the observation, x2 and x4 are forbidden by " +
+                 "v4707's own document, and the gate reads that prohibition from it. The ratio re-renders every presented " +
+                 "frame while leaving geometry alone, so WHICH frames carry holes is largely known in advance: H9 tests the " +
+                 "effect's robustness across resolution, not its discovery, and the document does not claim otherwise. " +
+                 "*** C21 FOUND THE CONTROL BROKEN BEFORE A DECLARED FRAME WAS HARVESTED. *** Setting only the ratio moved no " +
+                 "frame's dB. The cause was not the page: tools/ship/genGateTrain.mjs's harvest set every control and then " +
+                 "dispatched `change` on the LAST one -- genframe -- which fsr.html gives no handler, so reset() NEVER RAN " +
+                 "after a harvest set its controls, in every harvest since v4691. Scene, camera, slab speed and slab alpha " +
+                 "are read LIVE by tick(), so every committed dataset got them right; only reset() reads the ratio and the " +
+                 "start frame, and no harvest set either until this round asked for the ratio. The harvest now dispatches on " +
+                 "`scene`, which carries reset(). THE PROOF THAT NO COMMITTED MEASUREMENT MOVED is run rather than argued: " +
+                 "both earlier C12 re-harvests go through the fixed code and reproduce v4706's and v4708's caches, 39 rows " +
+                 "each, bit for bit. C21 itself is two drives at x1, a speed H9 does not declare: the plain harvest must " +
+                 "reproduce v4708's cached rows, and the ratio-3 harvest must move every one of them, so the difference is " +
+                 "the ratio's and not the page's nondeterminism. " +
+                 "*** THIS IS THE STARTFRAME LESSON A SECOND TIME, CAUGHT ONE STEP EARLIER. *** v4661 found a control that " +
+                 "accepted a value and silently did nothing, by reading a result that did not move; here the check was " +
+                 "written into the pre-registration's own gate, and it fired before any data existed. " +
+                 "*** TWELVE SABOTAGES, TWELVE RED, *** including restoring the old dispatch, which C21 reddens. The gate " +
+                 "drives the page twice and runs 11.3 s alone; its timing is hand-filed.",
+    }),
     // v4708 -- THE 315th CLOSING: H8 not reported -- by the route the document named -- and one cell that cleared.
     since390: Object.freeze({
         at: "v4708", swept: 1, green: 1, red: 0,
