@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractClaims } from "./claimsGate.mjs";
 import { gateFiles } from "./staleness.mjs";
+import * as TR from "./treeRead.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -67,7 +68,10 @@ export function buildIndex() {
     const gates = gateFiles().map((p) => {
         const rel = path.relative(ENG, p).replace(/\\/g, "/");
         let purpose = "";
-        try { purpose = gatePurpose(fs.readFileSync(p, "utf8")); } catch {}
+        // v4718 -- THROUGH treeRead's MEMO, NOT THE DISK. The same paths as before and the same text -- textOf returns the walk's
+        // copy when it has one and reads the file when it does not -- but recordDrift-selfcheck runs this beside three censuses
+        // that have already read every one of these files, and re-reading ~5,800 from disk put it within recordReach's margin.
+        try { purpose = gatePurpose(TR.textOf(p)); } catch {}
         return { kind: "gate", id: path.basename(p, ".mjs"), path: rel, text: purpose };
     }).sort((a, b) => a.path.localeCompare(b.path));
 
@@ -94,7 +98,7 @@ export function buildIndex() {
     const findings = [];
     for (const f of walk(ENG, (n) => /\.mjs$|\.js$/.test(n))) {
         let src = "";
-        try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        try { src = TR.textOf(f); } catch { continue; }   // v4718: the memo, as above; the walk that chose `f` is unchanged
         // The same shape the census uses to recognise an analysis record -- derived, never declared.
         for (const m of src.matchAll(/export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+)\s*=/g)) {
             // Take the contiguous run of // lines immediately above the export -- that is where the finding is

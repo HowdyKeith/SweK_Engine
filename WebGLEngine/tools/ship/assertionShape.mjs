@@ -533,8 +533,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4715 -- 1795 -> 1796 for tools/ship/frameGainMeasure-selfcheck.mjs, H11 re-derived with C12 and C23 on both cells.
     // v4716 -- 1796 -> 1797 for tools/ship/frameReverse-selfcheck.mjs, H12's and H13's document and statistic, no declared data.
     // v4717 -- 1797 -> 1798 for tools/ship/frameReverseMeasure-selfcheck.mjs, H12 and H13 re-derived with C12 and C24.
-    gates: 1798, usesOk: 1777, definesOk: 1769, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1670, condFirst: 91, unknownSignature: 16,
+    // v4718 -- 1798 -> 1799 for tools/ship/frameSway-selfcheck.mjs, the page's new slab path proven and H14 declared on it.
+    gates: 1799, usesOk: 1778, definesOk: 1770, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1671, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

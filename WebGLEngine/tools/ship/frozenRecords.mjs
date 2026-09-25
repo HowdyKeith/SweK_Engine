@@ -355,10 +355,17 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // one file: a transitive closure over the whole tree would start crediting a record with guardians that
     // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
     // defining module's own text, which is the same standard the NAME search uses.
+    // v4718 -- WHICH FILES HOLD RECORDS IS KNOWN BEFORE ANY FILE IS STRIPPED. Both loops below stripped the comments out of all
+    // ~4,000 source files and only then asked whether the file defined a record -- a handful do -- so nearly every strip was
+    // thrown away, and on a slower host that alone took frozenRecords-selfcheck under recordReach's 800 ms of headroom. The
+    // question now comes first. The stripped text is read only for files with records, so the census is unchanged by
+    // construction, and it was measured byte-identical over the whole tree when this landed.
+    const byFile = new Map();
+    for (const x of all) { if (!byFile.has(x.f)) byFile.set(x.f, []); byFile.get(x.f).push(x.r.name); }
     for (const f of mjs) {
-        const src = stripComments(rd(f));
-        const here = all.filter((x) => x.f === f).map((x) => x.r.name);
+        const here = byFile.get(f) || [];
         if (here.length < 2) continue;
+        const src = stripComments(rd(f));
         for (const r of here) {
             const at = src.indexOf("export const " + r + " = Object.freeze(");
             if (at < 0) continue;
@@ -385,9 +392,9 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     // that imports it, which is how a coverage number stops meaning anything.
     const DEFAULT_ARG = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g;
     for (const f of mjs) {
-        const src = stripComments(rd(f));
-        const here = new Set(all.filter((x) => x.f === f).map((x) => x.r.name));
+        const here = new Set(byFile.get(f) || []);
         if (!here.size) continue;
+        const src = stripComments(rd(f));
         const target = rel(f);
         for (const m of src.matchAll(DEFAULT_ARG)) {
             const fn = m[1];

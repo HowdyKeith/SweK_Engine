@@ -81,6 +81,10 @@
       <option value="x">slab moves: ALONG x, with the dolly (the default -- every figure on this page is this arm)</option>
       <option value="z">slab moves: VERTICALLY, across the dolly (v4711 -- new occlusion geometry)</option>
     </select>
+    <select id="slabpath">
+      <option value="linear">slab path: STRAIGHT ON (the default -- every figure on this page is this arm; it leaves the view)</option>
+      <option value="sway">slab path: SWAY, reversing so it never leaves the view (v4718)</option>
+    </select>
     <select id="gengate">
       <option value="off">learned gate: OFF (the default -- every figure on this page predates it)</option>
       <option value="cpu">learned gate: ON, on the CPU (v4691 weights, tau 0.5)</option>
@@ -282,6 +286,7 @@ import { GenGateGPU } from "./render/genGateGPU.mjs";
 // choosing one is told it is a refuted hypothesis kept as a record -- the verdicts had lived only in closings.
 import { armWeights, optionSuffix, readoutNote } from "./render/genGateVerdicts.mjs";
 import { frameOptionSuffix, frameNote, frameOffNote } from "./render/frameVerdicts.mjs";
+import { SLAB_DX, DOLLY, SLAB_PATHS, slabOffset } from "./render/slabPath.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -366,7 +371,7 @@ if (typeof window !== "undefined") window.__fsrScene = scene;
 // coordinates, so the zone plate, the smooth field and the checker all still say what they say.
 const Y_NEAR = -4, Y_FAR = 0;                  // world y of the slab and the background; the eye sits at y = -8
 const SLAB_X = [-1.2, 1.2], SLAB_Z = [-1.2, 1.2];
-const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5), DOLLY = 0.02;   // world units per frame along +x
+const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5);   // DOLLY (world units per frame along +x) is render/slabPath.mjs's since v4718
 
 /** The dolly camera at frame f -- the basis render/jitter-selfcheck.mjs drives, looking down +y. */
 const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TANFOV, 1, NEAR, FAR);
@@ -376,7 +381,8 @@ const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0,
 // picture, depth and truth it got before. That is deliberate rather than tidy: this page's dolly numbers --
 // 106 genuine disocclusions, the 192-pixel offscreen column -- are quoted in its own prose and in four gates,
 // and a round that moved them while adding a feature would be indistinguishable from a round that broke them.
-const SLAB_DX = 0.055;                         // world units per frame, along +x, on the "objects" camera
+// SLAB_DX (0.055 world units per frame, along +x, on the "objects" camera) is render/slabPath.mjs's since v4718, so the page
+// and the analysis that computes where the slab was cannot hold two different numbers.
 // *** v4682 -- A MULTIPLIER ON THAT, AND IT DEFAULTS TO 1 SO SLAB_DX STAYS THE PAGE'S NUMBER. ***
 // tools/ship/fsrPageGen-selfcheck.mjs closed by saying the page runs under 1.3 px of mean displacement -- the
 // regime where a cross-fade wins by construction -- and that one negative reading is not a curve. This is the
@@ -392,6 +398,12 @@ const slabSpeed = () => { const e = $("slabspeed"); return e ? Number(e.value) |
 const SLAB_DIRS = Object.freeze({ x: Object.freeze([1, 0]), z: Object.freeze([0, 1]) });
 let SLAB_DIR = SLAB_DIRS.x;
 const readSlabDir = () => { SLAB_DIR = SLAB_DIRS[($("slabdir") || { value: "x" }).value] || SLAB_DIRS.x; };
+// *** v4718 -- THE SLAB'S PATH. *** `linear` is every harvest before it: t * SLAB_DX * speed, the same expression and
+// association. `sway` reverses the slab so it never leaves the view -- render/slabPath.mjs says why, and computes both.
+// Every site that turns scene time into a slab offset calls slabAt, so the page and the analysis agree by construction.
+let SLAB_PATH = "linear";
+const readSlabPath = () => { const v = ($("slabpath") || { value: "linear" }).value; SLAB_PATH = SLAB_PATHS.includes(v) ? v : "linear"; };
+const slabAt = (t, speed) => slabOffset(t, speed, SLAB_PATH, SLAB_DIR[0]);
 // The two model matrices the "objects" camera needs, column-major to match render/rasterProbe.js's viewProj
 // and everything downstream of it. The background's is the identity ON PURPOSE and not as a placeholder: it
 // is what makes the background pixels a control rather than a second unknown.
@@ -808,8 +820,8 @@ async function reset() {
     // truth the temporal pane never sees. At startFrame = 0 sceneT() is 0 and nothing moves.
     // dx0 is in the SAME units the tick loop's `dx` uses, so the still panes and the moving one agree; on
     // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
-    readSlabDir();
-    const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX * slabSpeed() : 0;
+    readSlabDir(); readSlabPath();
+    const t0 = startFrame, sx0 = objectsCam ? slabAt(t0, slabSpeed()) : 0;
     const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
     ref = dolly ? truthPersp(dollyVP(t0), kind, sx0, slabAlpha()) : truth(kind, dx0);
     draw(cRef, ref);
@@ -846,10 +858,10 @@ async function tick() {
     // the slab's alpha this frame. 1 on every camera but "objects", so the three older cameras cannot
     // see this control at all -- the same guard sxCur carries, for the same reason.
     const alphaCur = objects ? slabAlpha() : 1;
-    readSlabDir();                               // v4711: live, like the speed below
+    readSlabDir(); readSlabPath();               // v4711: live, like the speed below; v4718: the path too
     const speed = slabSpeed();                   // v4682: 1 unless the control says otherwise
-    const sxCur = objects ? sceneT() * SLAB_DX * speed : 0;
-    const sxPrev = objects ? sceneTPrev() * SLAB_DX * speed : 0;
+    const sxCur = objects ? slabAt(sceneT(), speed) : 0;
+    const sxPrev = objects ? slabAt(sceneTPrev(), speed) : 0;
     const dx = panning ? sceneT() * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
     // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
@@ -1512,7 +1524,7 @@ async function tick() {
         const patched = Float32Array.from(gen.frame);
         for (let j = 0; j < D * D; j++) if (gen.hole[j]) for (let c = 0; c < 4; c++) patched[j * 4 + c] = cf[j * 4 + c];
         const tMid = sceneT() - tG;
-        const midRef = truthPersp(dollyVP(tMid), kind, objects ? tMid * SLAB_DX * speed : 0, alphaCur);
+        const midRef = truthPersp(dollyVP(tMid), kind, objects ? slabAt(tMid, speed) : 0, alphaCur);
         // *** HOW BIG THE MOTION IS, BECAUSE A COMPENSATION'S WORTH IS A FUNCTION OF IT AND THE FIXTURES RAN
         // AT 3.2 AND 8.8 px. *** A field of nearly-zero vectors makes a cross-fade nearly right and gives
         // block-resolution compensation nothing to win with while it still pays the block grid's error.
@@ -1647,7 +1659,7 @@ $("reset").onclick = () => { running = false; $("run").textContent = "Run"; rese
 { const g = $("gengate"); if (g && g.options) for (const o of g.options) o.textContent += optionSuffix(o.value); }
 // v4713 -- and an option that exists only for a frame-level hypothesis carries that verdict, from render/frameVerdicts.mjs.
 { const g = $("slabdir"); if (g && g.options) for (const o of g.options) o.textContent += frameOptionSuffix("slabdir", o.value); }
-for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir", "slabpath"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();

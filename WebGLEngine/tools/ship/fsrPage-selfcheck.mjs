@@ -304,8 +304,12 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
         "and dolly produced IDENTICAL stat lines over five frames. That control needed the old page on disk " +
         "and cannot ship; this is the property that made it true.");
     ok("  ...and the slab offset reaches the samplers ONLY on the objects camera",
-        /const sxCur = objects \? sceneT\(\) \* SLAB_DX \* speed : 0/.test(src)
-        && /const sxPrev = objects \? sceneTPrev\(\) \* SLAB_DX \* speed : 0/.test(src),
+        // v4718 -- WIDENED, NOT LOOSENED: the offset now comes from slabAt, render/slabPath.mjs's function, because the page
+        // gained a second path. The objects-only guard is what this row is about and it is still required verbatim, and the
+        // linear path must still be the old expression -- checked on the module's source, where the arithmetic now lives.
+        /const sxCur = objects \? slabAt\(sceneT\(\), speed\) : 0/.test(src)
+        && /const sxPrev = objects \? slabAt\(sceneTPrev\(\), speed\) : 0/.test(src)
+        && /if \(path === "linear"\) return t \* SLAB_DX \* speed;/.test(fs.readFileSync(path.join(ENG, "render/slabPath.mjs"), "utf8")),
         "zero on every other camera, so a default that was quietly dropped would still be a no-op there. " +
         "The clock these read is v4661's sceneT(), not `frame`; at startFrame = 0 the two are the same " +
         "expression, which is what keeps every figure above meaning what it meant. *** AND `speed` ARRIVED AT " +
@@ -331,8 +335,11 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
     // DERIVED, not quoted: the gap the page prints must be the slab's own screen motion, because camera-only
     // predicts zero object motion and so its error IS the object's screen displacement.
     const TANFOV = Math.tan(0.5), DIST = 4, D = 192;
-    const m = /const SLAB_DX = ([\d.]+);/.exec(src);
-    const dx = m ? Number(m[1]) : NaN;
+    // v4718 -- SLAB_DX MOVED TO render/slabPath.mjs, which the page imports, so it is read there: the page and the analysis
+    // that computes where the slab was now share one number. The page must still IMPORT it from there, or it holds another.
+    const mod = fs.readFileSync(path.join(ENG, "render/slabPath.mjs"), "utf8");
+    const m = /export const SLAB_DX = ([\d.]+);/.exec(mod);
+    const dx = m && /import \{[^}]*\bSLAB_DX\b[^}]*\} from "\.\/render\/slabPath\.mjs";/.test(src) ? Number(m[1]) : NaN;
     const predicted = dx / (2 * DIST * TANFOV) * D;
     report(`SLAB_DX ${dx} world units/frame -> ${predicted.toFixed(3)} display px/frame at the slab plane`);
     ok("!! ...and that predicted motion is the 2.42 px the page prints, which is what makes the number a DERIVATION",

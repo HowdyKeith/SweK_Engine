@@ -8032,6 +8032,56 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4718 -- THE 325th CLOSING: the page gains a slab path that never leaves the view, and H14 is declared on it.
+    since400: Object.freeze({
+        at: "v4718", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSway-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs (the objects-only offset row now requires slabAt, and the linear " +
+                                "expression on the module; the 2.42 px derivation reads SLAB_DX where the page now imports it from)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameReverseMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab path, with the five other frame-level measurement gates (frameGate, frameHoles, " +
+                     "frameHoled, frameVertical, frameGain): each C12 re-harvests through the page on the default linear path, and all six " +
+                     "reproduced their caches bit for bit -- 234 frames across x1 to x8, ratios 1.5 and 3, and vertical motion." }),
+            Object.freeze({ gate: "tools/ship/genGateCalibrate-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run with every other gate that drives fsr.html -- fsrPageGen, fsrPageObjects, fsrPageConfirm, fsrPageClocks, " +
+                     "fsrPageDevice, genGateVerdicts, frameVerdicts and genGateMeasure -- because four slab-offset sites changed; all green." }),
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "red", now: "red",
+                why: "THIS ROUND'S VERIFY RAN ON A SLOWER HOST, AND recordReach SAID SO TWICE. The container restarted mid-arc, and HEAD's own " +
+                     "fsrPage-selfcheck went from 2.35 s to 3.8 s with no code change; 33 gates crossed the 3,000 ms budget. Its headroom row " +
+                     "read 587 ms where it requires 800, and profiling found two costs that were waste rather than load. frozenRecords' " +
+                     "census stripped comments from all ~4,000 source files before asking which ones define a record; it now asks first, " +
+                     "and census() is byte-identical over the whole tree while the gate falls from ~2.4 s to ~1.6 s. And " +
+                     "buildKnowledgeIndex re-read ~5,800 files from disk that recordDrift's other censuses had already read; it now reads " +
+                     "them through treeRead's memo, the index is byte-identical, and recordDrift falls from ~2.35 s to ~2.15 s. Three " +
+                     "sabotages: two red in frozenRecords-selfcheck, and one red in recordDrift-selfcheck. The index sabotage passes " +
+                     "staleness-selfcheck, which is recorded, not chased. AND recordReach IS STILL RED, SAID EXACTLY: the re-run verify " +
+                     "read its headroom row at 798 ms against 800 -- from 587, with recordDrift at 2,202 ms serial -- and its ceiling row " +
+                     "at 62 records whose only guardians are over budget against 50 recorded, because on this host 524 of 1,799 gates " +
+                     "sit over the budget. The waste is gone; the host speed is not something either change can remove." }),
+        ]),
+        verdict: "*** H11 AT x4 WAS, IN EFFECT, SLAB AGAINST NO SLAB. *** Counted from H11's own committed rows through the depth column " +
+                 "-- a block nearer than the midpoint of the page's two planes is slab -- the slab starts to leave the view at frame 7 " +
+                 "and is gone by frame 18 on forward motion, 6 and 17 vertically, so it is in only 16 and 15 of each scene's 39 frames, " +
+                 "identically in every scene. v4717 could only partial that clock out. *** SO THE PAGE GETS A PATH THAT REMOVES IT BY " +
+                 "DESIGN. *** render/slabPath.mjs owns SLAB_DX and DOLLY now and computes the slab's offset for the page AND the analysis: " +
+                 "`linear` is the old expression exactly, and `sway` moves the slab at the same speed but reverses it -- a triangle wave " +
+                 "of amplitude 0.9 centred on the camera's track along the slab's axis, inside the 0.985 the page's own geometry allows, " +
+                 "so the slab stays whole. Frames whose interval holds a turn move non-linearly and are excluded, computed from the path. " +
+                 "Every site that turns scene time into an offset -- reset, current, previous and the mid-frame truth -- calls slabAt, " +
+                 "and a static row holds that: a mid-frame truth left on the old expression would score every sway frame against the " +
+                 "wrong picture and no driven row would see it. *** THE DEFAULT IS PROVEN INERT BY RUNNING, NOT ARGUED: *** six C12 " +
+                 "re-harvests, 234 frames bit for bit, and the design gate's own x1 drive reproduces v4708's whole cached window with " +
+                 "features. Driven with sway, every frame's dB moves, the slab holds all 196 of its blocks while on linear it falls, and " +
+                 "its screen centroid peaks at the frame turnsBetween names. *** H14 IS DECLARED WITH NO DATA: *** H12's question and " +
+                 "statistic on sway at x4, both geometries, with `direction` read from H12's result and zone named as the price again. " +
+                 "*** THIRTEEN SABOTAGES, THIRTEEN RED -- AFTER ONE EMPTY POPULATION, ONE CRASH AND ONE NO-OP. *** Re-associating the " +
+                 "linear product passed, because every page speed is a power of two and multiplying by one is exact: the row now tries " +
+                 "speeds that are not, and 107 of 324 offsets differ there. Declaring the path linear reddened four rows and then threw " +
+                 "on a turn that did not exist; the row now fails instead. A document edit matched the path twice and changed nothing; " +
+                 "redone on the declared line it reddens five rows. The gate runs 135.4 s alone and is hand-filed.",
+    }),
     // v4717 -- THE 324th CLOSING: H12 and H13 not supported -- the backwards ranking replicates, and much of it is the clock.
     since399: Object.freeze({
         at: "v4717", swept: 1, green: 1, red: 0,
