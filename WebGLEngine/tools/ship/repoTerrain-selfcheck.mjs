@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { repoHeightfield, treemapLeaves, buildTree, isWaterEntry, biomeIdFor, boxBlur,
+import { repoHeightfield, treemapLeaves, buildTree, isWaterEntry, biomeIdFor, boxBlur, LAKE_SPLIT_LIMIT,
          BIOME_ORDER, LANGUAGE_BIOME, DATA_EXT, DEFAULTS } from "../../world/repoHeightfield.js";
 import { biomeColumnMaterials } from "../../world/biomeTerrain.js";
 import { applyRealTerrain, clearRealTerrain } from "../../world/realTerrainStamp.js";
@@ -144,18 +144,34 @@ const fieldMs = Date.now() - t1;
     // on the real tree: no hand-written fixture has a file that is a fifth of its repository.
     const perFile = new Map();
     for (const a of field.water.areas) perFile.set(a.path, (perFile.get(a.path) || 0) + 1);
-    // v4701 -- THE BIGGEST LAKE IS DERIVED, NOT NAMED. This row said "the biggest lake" and tested es-universe.json,
-    // which WAS the biggest when it was written. The learned-gate rounds then committed three larger data files
-    // (tools/ship/genGate-folds.json at v4696, two gzipped fold caches at v4699 and v4701), the star catalogue's
-    // share fell from ~18% to 9.8%, and at v4701 its lake became small enough to need no split -- so the row went
-    // red while the property it names still held: the actual biggest lake was being split. Picking the biggest
-    // by size keeps the row about the splitter, which is what it was for.
-    const biggest = field.lakes.slice().sort((p, q) => q.lines - p.lines)[0];
-    ok("!! *** the biggest lake is SPLIT into pieces small enough to survive the stamper's own area cap ***",
-        !!biggest && (perFile.get(biggest.path) || 0) > 1,
-        (biggest ? biggest.path.split("/").pop() + " (" + biggest.lines.toLocaleString() + " lines, " + biggest.cells + " cells)" : "no lake") +
-        " -> " + (biggest ? perFile.get(biggest.path) || 0 : 0) + " polygons; " +
+    // v4710 -- THE SPLITTER'S CONTRACT, READ OFF ITS OUTPUT. This row said "the biggest lake is SPLIT". v4701 made "biggest"
+    // derived -- by LINE COUNT -- after the row had named es-universe.json, and at v4710 it went red again: the largest
+    // file by lines, a gzipped frame cache, landed in a SQUARER treemap rectangle that fits inside the limit and rightly
+    // needs no split. Whether a lake is split is decided by its rectangle's sides, not its size, so "biggest" was the wrong
+    // question twice. The row now checks the contract itself: every lake left in ONE piece spans no more than
+    // LAKE_SPLIT_LIMIT on either side, and at least one lake on the real map IS split, so the split path is exercised.
+    const pieces = new Map();
+    for (const a of field.water.areas) { if (!pieces.has(a.path)) pieces.set(a.path, []); pieces.get(a.path).push(a.poly); }
+    const extent = (polys) => { const xs = polys.flat().map((p) => p[1]), ys = polys.flat().map((p) => 1 - p[0]);
+        return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)); };
+    const whole = [...pieces].filter(([, ps]) => ps.length === 1), split = [...pieces].filter(([, ps]) => ps.length > 1);
+    const tooWide = whole.filter(([, ps]) => extent(ps) > LAKE_SPLIT_LIMIT + 1e-9);
+    const widest = [...pieces].map(([p, ps]) => [p, extent(ps), ps.length]).sort((a, b) => b[1] - a[1])[0];
+    ok("!! *** the splitter's contract ON THE REAL TREE: no lake left WHOLE spans more than the limit ***",
+        tooWide.length === 0,
+        `${split.length} lake(s) split, ${whole.length} whole; ${tooWide.length} whole lake(s) wider than ${LAKE_SPLIT_LIMIT}. Widest: ` +
+        `${widest ? widest[0].split("/").pop() + " spanning " + widest[1].toFixed(3) + " in " + widest[2] + " piece(s)" : "none"}; ` +
         field.water.areas.length + " polygons for " + field.stats.lakeFiles + " data files");
+    // *** AND THE SPLIT PATH, EXERCISED ON PURPOSE. *** The real tree used to exercise it -- a file a fifth of the repository
+    // -- but as the tree grew every lake's share fell, and at v4710 the widest spans 0.295, just inside the limit: nothing
+    // on the real map needs splitting any more. So the REAL entries get ONE synthetic data file as large as everything
+    // else together, which must come back in more than one piece, every piece inside the limit.
+    const big = { path: "fixture/half-the-repository.json", lines: scan.lines, bytes: 0, binary: false };
+    const fx = repoHeightfield([...scan.entries, big], { grid: 128 });
+    const bigPieces = fx.water.areas.filter((a) => a.path === big.path).map((a) => a.poly);
+    ok("!! *** a lake as large as the rest of the tree together IS split, and every piece stays inside the limit ***",
+        bigPieces.length > 1 && bigPieces.every((pp) => extent([pp]) <= LAKE_SPLIT_LIMIT + 1e-9),
+        `${bigPieces.length} pieces, widest ${bigPieces.length ? Math.max(...bigPieces.map((pp) => extent([pp]))).toFixed(3) : "-"} against ${LAKE_SPLIT_LIMIT}`);
     let worst = 0;
     for (const a of field.water.areas) {
         const xs = a.poly.map((p) => p[1]), ys = a.poly.map((p) => 1 - p[0]);

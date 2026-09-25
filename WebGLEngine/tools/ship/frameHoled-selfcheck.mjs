@@ -42,7 +42,10 @@ const opts = (id) => { const m = new RegExp(`<select id="${id}">([\\s\\S]*?)<\\/
        `ratios ${d.ratios.join(", ")}; the page default -- the harvest never set it before v4709 -- is ${pageDefault}`);
     ok("*** minFolds is derived, and the scenes are the page's both ways ***",
        d.minFolds === minFoldsFor(d.alpha) && J(d.scenes.slice().sort()) === J(opts("scene").slice().sort()));
-    ok("*** NO DATA IN THE COMMIT ***", !fs.existsSync(path.join(ENG, CACHE_H9)) && !fs.existsSync(path.join(ENG, RESULT_H9)));
+    // v4710 -- INVERTED, as v4706 and v4708 inverted theirs: the measurement ran, under THIS document's constants.
+    const resOk = fs.existsSync(path.join(ENG, CACHE_H9)) && fs.existsSync(path.join(ENG, RESULT_H9)) &&
+        J(JSON.parse(fs.readFileSync(path.join(ENG, RESULT_H9), "utf8")).declared) === J(d);
+    ok("*** the measurement exists, produced under THIS document's constants -- v4709's 'no data yet', inverted ***", resOk);
 }
 
 console.log("\n2. *** THE CONTRAST ***");

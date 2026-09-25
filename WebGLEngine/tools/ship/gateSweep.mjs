@@ -8032,6 +8032,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4710 -- THE 317th CLOSING: H9 not supported -- one scene, at one ratio, at exactly the declared price.
+    since392: Object.freeze({
+        at: "v4710", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoledMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/repoTerrain-selfcheck.mjs", was: "green", now: "green",
+                why: "THIS ROUND'S DATA TURNED IT RED A SECOND TIME, AND THE FIRST REPAIR WAS PART OF WHY. At v4701 its split row -- \"the biggest lake is SPLIT\" -- stopped naming es-universe.json and derived the biggest lake by LINE COUNT. At v4710 the biggest by lines became a gzipped frame cache whose treemap rectangle is squarer and fits inside the limit, so it rightly needs no split and the row went red. Whether a lake is split depends on its rectangle's sides, not its size: 'biggest' was the wrong question twice. The row now checks the splitter's CONTRACT from its output -- no lake left whole spans more than LAKE_SPLIT_LIMIT, now exported from world/repoHeightfield.js so the gate reads it rather than restating 0.30 -- and it found something the old row hid: as the tree grew with these caches, every lake's share fell, and NO lake on the real map needs splitting any more (the widest spans 0.295). So the split path is exercised on purpose: the real entries plus one synthetic data file as large as the rest of the tree together, which comes back in 6 pieces, all inside the limit. Two sabotages, two red: a splitter that never splits, and one cutting at 0.5 while the exported limit says 0.3." }),
+        ]),
+        widened: Object.freeze(["tools/ship/frameHoled-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H9 IS NOT SUPPORTED, AND THE MARGIN IS THE ONE THE DOCUMENT PRICED IN ADVANCE. *** v4709's runner ran as " +
+                 "committed at x8, ratios 1.5x and 3x: 546 frames, 498 s. At 3x the cell clears, 7 of 7 (sign p 0.0078, t p 0.010). " +
+                 "At 1.5x the t-test clears (p 0.0055) and the exact sign test does not: 6 of 7, p 8/128 = 0.0625, and the one " +
+                 "scene against it is CHECKER, whose holed frames score +0.305 dB against its clean +0.013 -- they do better. H9 was " +
+                 "declared as both ratios, so it is not supported, and the 3x cell is reported as a cell, as v4708's x8 cell was. " +
+                 "Every sabotage that would rescue it -- the t-test alone, any one ratio, checker dropped from the document after " +
+                 "the run -- reddens the gate. " +
+                 "*** C21 HELD ON THE DECLARED CELLS: *** 0 of 273 frames at either ratio carry the dB v4708 read at ratio 2, so " +
+                 "the control v4709 found broken and fixed was honoured throughout. C12 re-harvested zone at x8, ratio 1.5, and " +
+                 "every row came back identical. " +
+                 "*** THE DOCUMENT'S 'LARGELY KNOWN IN ADVANCE' HELD FOR FIVE SCENES, AND NOT FOR THE ONE THAT DECIDED IT. *** " +
+                 "Holed frame indices are shared across ratios for zone, smooth, edges, noise and ramp. bars moves (2 holed at 2x, " +
+                 "5 and 4 at 1.5x and 3x, 2 shared) and checker moves most: 3 at 2x, 6 at 1.5x, 13 at 3x with only 2 shared. The " +
+                 "resolution moves the reconciler's vectors and the splat with them, most on the most detailed scene. " +
+                 "*** AND A DESCRIPTION WAS WRITTEN BEFORE IT WAS COMPUTED, AGAIN. *** The first draft of the cross-cell line said " +
+                 "checker was 'the exception twice' with the weakest rho at v4708; the weakest was bars, and at 2x checker's holed " +
+                 "frames sat below its clean ones. Computed, it reads 7 of 7, 6 of 7, 7 of 7 across the three cells -- one " +
+                 "reversal in 21 scene-cells, landing in a declared cell. The line now counts. " +
+                 "*** NINE SABOTAGES, NINE RED. *** The gate runs 35.1 s alone and is hand-filed.",
+    }),
     // v4709 -- THE 316th CLOSING: a replication declared, and the control it needed was found broken before any data.
     since391: Object.freeze({
         at: "v4709", swept: 1, green: 1, red: 0,
