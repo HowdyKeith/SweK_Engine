@@ -154,6 +154,11 @@ export async function main({ eng, argv = [], verifyPath = null, out = (m) => con
         try {
             process.on(sig, () => {
                 try { out(interruptedTrailer(sig, Date.now() - t0)); } catch {}
+                // NOT VERIFIED, AND CANNOT BE: this process exits on the next line, and on Windows a closed console
+                // gives it seconds. boundaryLint reports it (KILL_NOT_VERIFIED, baselined at v4680 for this reason).
+                // The backstop is the platform's: verify is a non-detached child, so on Windows it sits in this
+                // process's libuv job object and dies with it; shipVerdict-selfcheck section 6 polls for the child
+                // after a live SIGHUP and goes red if it survives.
                 try { if (child) child.kill(); } catch {}
                 exit(sig === "SIGINT" ? 130 : 1);
             });
