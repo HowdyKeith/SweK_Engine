@@ -174,7 +174,7 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         "rename must not silently re-open an exclusion, so the comparison is import.meta.url and not a string");
 }
 
-// ---- v4670: noRecord WAS COMPUTED AND NOTHING READ IT -------------------------------------------------------
+// ---- v4678: noRecord WAS COMPUTED AND NOTHING READ IT -------------------------------------------------------
 //
 // *** census() HAS RETURNED A `noRecord` LIST SINCE IT WAS WRITTEN, AND NO GATE IN THE TREE REFERENCED IT. ***
 // A gate that DECLARES a cost and has no recorded timing cannot have its declaration compared with anything, so
@@ -183,7 +183,7 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
 // twelve). Third sighting, and this time the consequence was paid:
 //
 //   tools/ship/cloneProvision-selfcheck.mjs declared 0.2s, ran 60.1s, and sat in `noRecord` where nothing
-//   looked. The 0.2s was TRUE when written; v4668c's kill-escalation rows took it to 7.1s of real work, and a
+//   looked. The 0.2s was TRUE when written; v4676c's kill-escalation rows took it to 7.1s of real work, and a
 //   60 s deadline timer whose handle had been thrown away held the process for the other 53. The declaration
 //   disagreeing with the clock was the ONLY visible symptom of a real defect, and it was in an unread list.
 //
@@ -209,7 +209,7 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
 
     ok("...and each one's declaration is a MEASUREMENT, not the placeholder the header format allows",
         nr.every((r) => r.declaredMs >= 1000 || /\(~\s*[0-9.]+\s*ms/.test(fs.readFileSync(path.join(ENG, r.gate), "utf8").slice(0, 4000))),
-        "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4668's leak, so it " +
+        "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4676's leak, so it " +
         "has to be a number somebody took rather than a round guess");
 
     // THE CONTROL: this row would be vacuous if noRecord were empty, and it is not empty today -- but it will

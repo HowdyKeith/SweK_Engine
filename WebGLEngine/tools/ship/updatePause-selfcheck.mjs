@@ -246,8 +246,8 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
         "set before the work and restored in a FINALLY -- publish() has eight return paths and a restore " +
         "written at each is seven chances to miss one; the one missed leaves the phase stuck and updates " +
         "deferred forever, a guard that fails closed and never reopens");
-    // *** v4668 -- THIS ROW WAS A SPELLING, AND A CORRECT CHANGE BROKE IT. ***
-    // It pinned the exact disjunction `"cloning" || "verifying" || "publishing"`. v4668 added a fourth phase,
+    // *** v4676 -- THIS ROW WAS A SPELLING, AND A CORRECT CHANGE BROKE IT. ***
+    // It pinned the exact disjunction `"cloning" || "verifying" || "publishing"`. v4676 added a fourth phase,
     // "provisioning", and wired it into running() -- and this row went red against a guard that had just been
     // made MORE complete. A gate that fails when the thing it guards improves teaches the next writer to edit
     // the gate, which is the opposite of what it is for.
@@ -263,7 +263,7 @@ const uCode = codeOnly(sysadmin), rCode = codeOnly(runBusy);
             assigned.size >= 4 && named.length === assigned.size,
             `phases assigned: ${[...assigned].sort().join(", ")}; named by running(): ${named.sort().join(", ")}` +
             ". The upload is the step that matters most here and was once the one step with no phase at all; " +
-            "provisioning (v4668) is the second one that had to be added, which is why this is now a set and " +
+            "provisioning (v4676) is the second one that had to be added, which is why this is now a set and " +
             "not a sentence");
 
         // THE SABOTAGE, because a derived row that always finds what it derived is not a check. The same two

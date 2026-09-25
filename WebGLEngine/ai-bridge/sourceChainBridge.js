@@ -34,7 +34,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const os = require("os");   // v4668b -- the resolver probe is written to the OS temp dir, never into the clone
+const os = require("os");   // v4676b -- the resolver probe is written to the OS temp dir, never into the clone
 const net = require("net");
 const http = require("http");
 const { spawn } = require("child_process");
@@ -49,7 +49,7 @@ const isMac = process.platform === "darwin";
 // would halve each other on a box that is also serving this page.
 const R = {
     phase: "idle",          // idle | cloning | provisioning | verifying | publishing | done
-    provision: null,        // v4668 -- the last run's provisioning result, so status() can show it
+    provision: null,        // v4676 -- the last run's provisioning result, so status() can show it
     startedAt: 0, finishedAt: 0,
     log: "",
     clone: null,            // the cloneEngineSource result
@@ -76,7 +76,7 @@ function status() {
                            auth: R.clone.auth, tokenRejected: !!R.clone.tokenRejected } : null,
         verified: R.verified,
         verifyExit: R.verifyExit,
-        // v4668b -- REPORTED, because a field written and never read is a field nobody can act on. Its own
+        // v4676b -- REPORTED, because a field written and never read is a field nobody can act on. Its own
         // comment said status() shows it while status() did not, which is prose describing a guard that is
         // not there -- the species this session has now found five times.
         provision: R.provision,
@@ -104,7 +104,7 @@ function status() {
  */
 function canPublish(st) {
     const s = st || R;
-    // v4668 -- "provisioning" joins the two, for the reason this file's v4451 note gives about publish:
+    // v4676 -- "provisioning" joins the two, for the reason this file's v4451 note gives about publish:
     // a phase that no guard names is a window in which the guard is not there.
     if (s.phase === "cloning" || s.phase === "provisioning" || s.phase === "verifying") return { ok: false, why: "the chain is still running" };
     // v4451 -- and while a publish is in flight, which was admissible until this round: publish() set no phase
@@ -151,7 +151,7 @@ const budgetIsOwn =
 function _spawnIn(cwd, args, label) { return _spawnCmd(process.execPath, args, cwd, label); }
 
 /**
- * v4668 -- the same streaming spawn, with the BINARY as a parameter, so provisioning reports into this
+ * v4676 -- the same streaming spawn, with the BINARY as a parameter, so provisioning reports into this
  * chain's log exactly as the verify does. _spawnIn kept its name and signature and is now one line.
  */
 function _spawnCmd(cmd, args, cwd, label, extra) {
@@ -164,13 +164,13 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
             push("[" + label + "] spawn failed: " + ((e && e.message) || e) + "\n");
             return done({ code: -1, spawnError: String((e && e.message) || e) });
         }
-        // *** v4668b -- "error" RESOLVES, AND UNTIL THIS ROUND IT ONLY LOGGED. ***
+        // *** v4676b -- "error" RESOLVES, AND UNTIL THIS ROUND IT ONLY LOGGED. ***
         // node emits "error" and NOT "exit" when the binary does not exist, so a promise that settles only on
         // "exit" NEVER SETTLES for ENOENT. Measured: a spawn of a missing binary fires error(ENOENT) and the
         // promise is still pending three seconds later. That was harmless while this helper only ever ran
-        // process.execPath, which is by definition present -- v4668 pointed it at `npm`, which is not, and
+        // process.execPath, which is by definition present -- v4676 pointed it at `npm`, which is not, and
         // turned a latent shape into a live hang that would pin the chain in "provisioning" with every guard
-        // closed until the bridge was restarted. Found by an adversarial review of v4668's own diff.
+        // closed until the bridge was restarted. Found by an adversarial review of v4676's own diff.
         child.on("error", (e) => {
             push("[" + label + "] error: " + ((e && e.message) || e) + "\n");
             done({ code: -1, spawnError: String((e && e.message) || e) });
@@ -184,7 +184,7 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
         // "the release button never came back" is not a diagnosis anybody can act on.
         //
         // *** AND THE KILL IS RE-CHECKED, BECAUSE THE FIRST SPELLING OF IT WAS NOT. ***
-        // v4668's first version was `try { child.kill(); } catch {} done({ timedOut: true })` -- signal sent,
+        // v4676's first version was `try { child.kill(); } catch {} done({ timedOut: true })` -- signal sent,
         // result never looked at, which is boundaryLint's KILL_NOT_VERIFIED exactly. kill() SENDS a signal; it
         // does not mean the child is gone. On Windows child.kill() is TerminateProcess against the npm
         // launcher, and npm's own child tree can outlive it. A stalled `npm install` left running holds the
@@ -214,7 +214,7 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
     });
 }
 
-// ---- v4668: PROVISION THE CLONE, BECAUSE THE SAFE ROUTE COULD NOT PASS WITHOUT IT --------------------
+// ---- v4676: PROVISION THE CLONE, BECAUSE THE SAFE ROUTE COULD NOT PASS WITHOUT IT --------------------
 //
 // *** MEASURED ON THE RIG AT v4667: the provisioned working checkout reported 26 NEW red and a FRESH CLONE
 // reported 121, and 116 of the 121 reach the browser harness. *** node_modules is gitignored, playwright is
@@ -230,7 +230,7 @@ function _spawnCmd(cmd, args, cwd, label, extra) {
 // one. Same reason the phase exists -- see below.
 const QA_REL = ["tools", "render-qa"];
 /**
- * Where npm puts the package. NOT a claim about what the resolver checks FIRST -- v4668's comment here said
+ * Where npm puts the package. NOT a claim about what the resolver checks FIRST -- v4676's comment here said
  * "the resolver's first candidate" and that was simply false: PLAYWRIGHT_PATHS tries the bare specifiers
  * "playwright" and "playwright-core" ahead of it, so the tree-local path is THIRD. The order does not matter
  * to this file any more, because the post-install question is no longer asked of a path at all -- see
@@ -270,8 +270,8 @@ function _askTheResolver(cloneEngine) {
         let out = "";
         const child = spawn(process.execPath, [probe, cloneEngine], { cwd: cloneEngine, windowsHide: true });
         let settled = false, deadline = null;
-        // *** v4670 -- THE DEADLINE TIMER IS CLEARED, AND NOT CLEARING IT COST SIXTY SECONDS PER CALL. ***
-            // v4668 wrote `setTimeout(() => fin(...), 60000)` with the handle thrown away. fin() is once-only,
+        // *** v4678 -- THE DEADLINE TIMER IS CLEARED, AND NOT CLEARING IT COST SIXTY SECONDS PER CALL. ***
+            // v4676 wrote `setTimeout(() => fin(...), 60000)` with the handle thrown away. fin() is once-only,
             // so the late fire was HARMLESS -- and the timer still held the event loop open for the full sixty
             // seconds after the probe had already answered. In the bridge, a long-running server, that is
             // invisible. In a short-lived process it is the whole runtime:
@@ -326,7 +326,7 @@ async function _provision(cloneEngine, { run = _spawnCmd } = {}) {
                  " -- is npm on PATH for the account running this server?" };
     // *** EXIT 0 IS NOT THE QUESTION. *** The question is the one the resolver asks, so it is asked here:
     // a postinstall that half-ran, a registry that served an empty tree, or a download killed midway can all
-    // leave a zero behind. v4668's own round note records the same lesson from the other side -- a gate that
+    // leave a zero behind. v4676's own round note records the same lesson from the other side -- a gate that
     // exits 1 having printed no row.
     const asked = await _askTheResolver(cloneEngine);
     if (!asked.ok)
@@ -678,7 +678,7 @@ function busyWhat() { return running() ? "the source chain (" + R.phase + ")" : 
 
 module.exports = { status, start, publish, launch, canPublish, owns, handle, running, busyWhat, PREFIX, ENGINE_ROOT,
     _launchGuard, _freePort, _waitHealthy, budgetIsOwn,
-    // v4668 -- exported so tools/ship/cloneProvision-selfcheck.mjs can DRIVE every branch rather than
+    // v4676 -- exported so tools/ship/cloneProvision-selfcheck.mjs can DRIVE every branch rather than
     // grep for one. QA_REL and _provisionedAt travel with it because the gate holds this file and
     // playwrightResolve.mjs to the same path.
     // _spawnCmd is exported for the same reason: the timeout's kill escalation is a PATH, and a path nobody

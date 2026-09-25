@@ -187,7 +187,7 @@ console.log(`${pass} passed, ${fail} failed`);
     ok("nothing is still holding the event loop open at exit", live.length === 0,
         live.length ? "STILL LIVE: " + live.join(", ") : "no sockets, no server, no timers");
 }
-// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// *** v4676 -- process.exitCode, NOT process.exit(). ***
 // This gate dies on the rig with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c`
 // (exit 0xC0000409) AFTER printing `52 passed, 0 failed` AND AFTER the liveness row above says the loop is
 // clean. Both facts are true at once, and together they say what the culprit is NOT: it is not a socket, a

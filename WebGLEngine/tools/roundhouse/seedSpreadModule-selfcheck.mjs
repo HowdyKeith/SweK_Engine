@@ -106,7 +106,7 @@ console.log("\n4. THE LOAD-BEARING NEGATIVE, AND IT IS ABOUT THIS INSTRUMENT");
 }
 
 console.log(`\nseedSpreadModule-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
-// *** v4669 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// *** v4677 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
 // libuv aborts a Windows process.exit() taken while the platform still has queued work:
 //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
 // after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a

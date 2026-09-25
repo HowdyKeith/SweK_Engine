@@ -143,10 +143,10 @@ console.log("\n4. WHAT IS STILL NOT GUARDED, SAID OUT LOUD");
 }
 
 console.log(fails ? `\nlockstepDt-selfcheck: ${fails} FAILED` : "\nlockstepDt-selfcheck: all checks pass");
-// *** v4669 -- process.exitCode, NOT process.exit. A FALSE NEGATIVE THE FIRST PASS MISSED. ***
+// *** v4677 -- process.exitCode, NOT process.exit. A FALSE NEGATIVE THE FIRST PASS MISSED. ***
 // libuv aborts a Windows process.exit() taken while the platform still has queued main-thread work:
 //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
-// The v4669 screen (tools/ship/exitBusy.mjs) read this gate ONCE at 4.2 ms of CPU across an awaited 300 ms
+// The v4677 screen (tools/ship/exitBusy.mjs) read this gate ONCE at 4.2 ms of CPU across an awaited 300 ms
 // window opened at this line, under a 5 ms floor, and filed it QUIET. Re-measured three times it reads
 // 5.4,5.1,2.1 ms -- median 5.1 -- and it is a member. THE SINGLE READING WAS THE ERROR, not the floor: the
 // repeatability check in tools/ship/exit-busy-census.json shows readings are stable far from the floor in both

@@ -1,10 +1,10 @@
-// WebGLEngine/tools/ship/deadlineLeak-selfcheck.mjs -- v4670
+// WebGLEngine/tools/ship/deadlineLeak-selfcheck.mjs -- v4678
 //
 // Run: node tools/ship/deadlineLeak-selfcheck.mjs      (~11s)
 //
 // *** A GATE DECLARED 0.2s, TOOK 60.1s, AND EVERY CHECK IN IT PASSED THE WHOLE TIME. ***
 //
-// v4668 wrapped a spawn in a promise and wrote the deadline as
+// v4676 wrapped a spawn in a promise and wrote the deadline as
 //     setTimeout(() => fin({ ok: false, reason: "...did not answer in 60 s" }), 60000);
 // with the handle discarded. `fin` is once-only, so the late fire did nothing -- and the timer held the event
 // loop open for the whole minute after the answer had arrived. In a long-running bridge that is invisible. In
@@ -99,7 +99,7 @@ console.log("\n2. *** THE POPULATION AS A CEILING, AND THE REPAIRED SITE ABSENT 
         `${r.found.length ? (r.found[0].ms === null ? "not a literal" : r.found[0].ms + " ms") : "n/a"}`);
     ok("!! *** the repaired site is NOT in the list, which is what says the scan sees a repair ***",
         !r.found.some((f) => f.file === "ai-bridge/sourceChainBridge.js"),
-        "sourceChainBridge's resolver deadline is both cleared in fin() and unref'd; before v4670 it was the " +
+        "sourceChainBridge's resolver deadline is both cleared in fin() and unref'd; before v4678 it was the " +
         "longest entry in this list");
     ok("...and the list is not empty, or the row above would pass on a scan that finds nothing anywhere",
         r.found.length > 0, `${r.found.length} remain, reported as a CEILING and not a debt`);
@@ -148,11 +148,11 @@ process.exitCode = 0;
         "which is why it is the better of the two: the source rule cannot see a deadline reached through a " +
         "helper in another file, and this does not care");
 
-    // THE REAL SITE, RE-MEASURED. This is the row that would have gone red before v4670.
+    // THE REAL SITE, RE-MEASURED. This is the row that would have gone red before v4678.
     const cp = await DL.deadTail("tools/ship/cloneProvision-selfcheck.mjs", { capMs: 200000 });
     ok("!! *** and the gate that cost 53 s of dead time now has none ***",
         cp.ok && cp.leaking === false && cp.workMs > 3000,
-        cp.ok ? `work=${cp.workMs}ms tail=${cp.tailMs}ms wall=${cp.wallMs}ms. BEFORE v4670: 7,100 ms of work and ` +
+        cp.ok ? `work=${cp.workMs}ms tail=${cp.tailMs}ms wall=${cp.wallMs}ms. BEFORE v4678: 7,100 ms of work and ` +
                 "60,136 ms of wall clock. The work did not change; one clearTimeout and one unref did"
               : "UNKNOWN: " + cp.why);
 
@@ -199,6 +199,6 @@ console.log("\n4. *** THE RULE FINDS 13 AND THE MEASUREMENT FINDS ZERO PAID, AND
 console.log("\nunchecked here: WHETHER THE REMAINING SITES ARE EVER PAID. A stray deadline is free in a process " +
     "that is held open anyway, and every site left in section 2 is in a bridge. What would settle it is the " +
     "dead-tail screen over the whole sweep rather than the sample in tools/ship/deadline-tails.json -- one run " +
-    "per gate, no source rule, and it would have caught v4668's leak on the round that shipped it.");
+    "per gate, no source rule, and it would have caught v4676's leak on the round that shipped it.");
 console.log(fails ? `\ndeadlineLeak-selfcheck: ${fails} FAILED` : "\ndeadlineLeak-selfcheck: all checks pass");
 process.exitCode = fails ? 1 : 0;

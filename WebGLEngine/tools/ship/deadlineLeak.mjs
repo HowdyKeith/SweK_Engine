@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/deadlineLeak.mjs -- v4670
+// WebGLEngine/tools/ship/deadlineLeak.mjs -- v4678
 //
 // *** A DEADLINE TIMER WHOSE HANDLE IS THROWN AWAY HOLDS THE EVENT LOOP FOR ITS FULL LENGTH, AND IN A SERVER
 // THAT IS INVISIBLE. ***
@@ -151,7 +151,7 @@ export function scan(root = ENG) {
  * times from a gate's LAST BYTE OF OUTPUT to its process exit. A gate that has printed its verdict and then
  * sits there is paying for a handle nobody released, whatever shape that handle has.
  *
- * It is the instrument that would have found v4668's leak on the round that shipped it, and it costs one run.
+ * It is the instrument that would have found v4676's leak on the round that shipped it, and it costs one run.
  *
  * NOT A LEAK: a gate whose final work produces no output (a long teardown, an awaited flush) has a real tail.
  * So a tail is a CANDIDATE, and `graceMs` is the line below which nothing is reported -- 250 ms, which is above

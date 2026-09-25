@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/exitBusy-selfcheck.mjs -- v4669
+// WebGLEngine/tools/ship/exitBusy-selfcheck.mjs -- v4677
 //
 // Run: node tools/ship/exitBusy-selfcheck.mjs      (~16s)
 //

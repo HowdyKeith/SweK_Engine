@@ -153,7 +153,7 @@ const call = (url) => new Promise((res) => bridge.handle({ url }, {}, { sendJson
         `n cap ${idx.nMax} for the mock, ${idx.nMaxModel} for the model, ${idx.budgetMs / 1000}s wall clock -- a model ` +
         "trial is 2n network calls at seconds each, so the mock's cap would be a hang");
 
-    // *** v4668 -- THIS ROW USED TO TEST THE BOX, NOT THE BRIDGE. ***
+    // *** v4676 -- THIS ROW USED TO TEST THE BOX, NOT THE BRIDGE. ***
     // It was one `call("/skill/trial?device=kerr&caller=ollama")` against whatever was on 127.0.0.1:11434,
     // asserting a REFUSAL. On a box with no Ollama that passes for the wrong reason -- the refusal it saw was
     // "nothing answered", the one state that needs no bridge logic at all. ON KEITH'S RIG, WHERE OLLAMA IS UP
@@ -254,7 +254,7 @@ const call = (url) => new Promise((res) => bridge.handle({ url }, {}, { sendJson
 }
 
 console.log(failed ? "\n[skillbookDoor-selfcheck] FAILED " + failed : "\n[skillbookDoor-selfcheck] all checks pass");
-// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// *** v4676 -- process.exitCode, NOT process.exit(). ***
 // This gate fast-failed on the rig at v4667 with libuv's UV_HANDLE_CLOSING assert (exit 0xC0000409), the same
 // crash v4663 converted 48 gates for. It was not in that round's population because the population was drawn by
 // asking "does this gate COMPILE A WASM MODULE" -- A CAUSE. The defect is a SYMPTOM: queued platform work at

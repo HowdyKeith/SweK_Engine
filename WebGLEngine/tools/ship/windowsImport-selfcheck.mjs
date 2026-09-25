@@ -121,7 +121,7 @@ function importArgs(line) {
     return out;
 }
 /**
- * *** v4668 -- THE THIRD SHAPE, AND THIS SCAN COULD NOT SEE IT EITHER. ***
+ * *** v4676 -- THE THIRD SHAPE, AND THIS SCAN COULD NOT SEE IT EITHER. ***
  *
  * importArgs above reads dynamic `import(` CALLS. The --import scan below reads spawn ARGUMENTS. Neither
  * looks at a STATIC import statement that is WRITTEN INTO A FILE THIS GATE GENERATES -- and that is where
@@ -203,7 +203,7 @@ function walk(dir, out = []) {
         // 639 ms to 3,390 -- past the 3,000 ms ceiling, which would have stopped it running at ship time at
         // all and made the repair strictly worse than the defect it fixed. "import(" is a NECESSARY condition
         // for every offender the regex below can find, and skipping the files without it costs one indexOf.
-        // *** v4668 -- AND THE GENERATED SURFACE MUST BE ASKED BEFORE THIS PRE-FILTER, WHICH IS A THIRD
+        // *** v4676 -- AND THE GENERATED SURFACE MUST BE ASKED BEFORE THIS PRE-FILTER, WHICH IS A THIRD
         // SIGHTING OF ONE MISTAKE IN ONE FILE. *** The line below is a budget pre-filter, and its comment is
         // right about why: "import(" IS a necessary condition for every offender the DYNAMIC scan can find.
         // It is not one for a generated STATIC import -- `import { x } from ${p}` contains no "import(" --
@@ -217,10 +217,10 @@ function walk(dir, out = []) {
             // @vite-ignore is read raw here rather than through codeOnly: the expensive lexer is the thing
             // the pre-filter below exists to avoid, and a browser marker is a file-wide flag either way.
             const browserGen = /@vite-ignore/.test(src);
-            // *** v4668b -- AND THE FIFTH SIGHTING OF THE ONE MISTAKE, IN THE FILE WHOSE HEADER NAMES IT. ***
+            // *** v4676b -- AND THE FIFTH SIGHTING OF THE ONE MISTAKE, IN THE FILE WHOSE HEADER NAMES IT. ***
             // This scan reads RAW source on purpose, because what it is looking for IS string content. Raw
             // also means COMMENTS, and the round note describing this very defect is a comment -- so the
-            // moment v4668's note landed on main.js's and brain/brain.js's ENGINE_VERSION line, quoting
+            // moment v4676's note landed on main.js's and brain/brain.js's ENGINE_VERSION line, quoting
             // `import { reportThrows } from ${JSON.stringify(MOD)}` verbatim, the whole-tree scan reported
             // both files as offenders. The gate's own header has been warning about this since v4622:
             // "spelling the crashing line out literally makes THIS FILE an offender in its own whole-tree
@@ -376,7 +376,7 @@ function walk(dir, out = []) {
        classifySpecifier('pathToFileURL(path.join(ENG, "x.js")).href') === "safe",
        "so the check tracks the defect rather than the word 'import'");
 
-    // *** v4668 -- THE GENERATED-IMPORT SURFACE, DRIVEN ON THE TWO LINES THAT ACTUALLY SHIPPED. *** Both of
+    // *** v4676 -- THE GENERATED-IMPORT SURFACE, DRIVEN ON THE TWO LINES THAT ACTUALLY SHIPPED. *** Both of
     // these were written the same week v4646 fixed ten spellings of this defect, by the same hand, in files
     // sitting next to the fix -- and both came back from the rig at v4667 as "exit 1, NO FAILING ROW".
     const SHIPPED_THROWNROW = 'const MOD = path.join(ENG, "tools", "ship", "thrownRow.mjs");\n' +
@@ -401,15 +401,15 @@ function walk(dir, out = []) {
     // FOUR SENTENCES on its first whole-tree run -- brain.js, KitScatter, ringFloorPhase, slugNapalm --
     // because English puts "from" in front of an interpolation constantly. This tree has now found itself
     // counting its own prose more times than any other single mistake.
-    // *** v4668b -- THE FIFTH SIGHTING, AND IT CAME FROM THE ROUND NOTE. *** The header lists four times this
-    // gate read its own subject as code. The fifth was not in this file: v4668's note quotes the defective
+    // *** v4676b -- THE FIFTH SIGHTING, AND IT CAME FROM THE ROUND NOTE. *** The header lists four times this
+    // gate read its own subject as code. The fifth was not in this file: v4676's note quotes the defective
     // line verbatim, every round writes its note onto main.js's and brain/brain.js's version line, and both
     // went red in the whole-tree scan the moment it shipped. The scan reads raw source deliberately -- the
     // thing it hunts IS string content -- and raw includes comments. noComments drops comments and keeps
     // strings, which is exactly the half needed, so it is applied before the rule and behind a cheap match.
     ok("!! *** the round note that DESCRIBES this defect is not an instance of it ***",
        generatedImportArgs(noComments(
-           'const ENGINE_VERSION = "v4668";   // the fixture did `import { x } from ${JSON.stringify(MOD)}` and died\n'
+           'const ENGINE_VERSION = "v4676";   // the fixture did `import { x } from ${JSON.stringify(MOD)}` and died\n'
        )).length === 0,
        "main.js and brain/brain.js carry the note on their version line, so a comment-blind rule makes every " +
        "round that writes about this defect an instance of it -- a scanner counting its own prose, which " +

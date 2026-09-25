@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/exitBusy.mjs -- v4669
+// WebGLEngine/tools/ship/exitBusy.mjs -- v4677
 //
 // *** HOW MUCH MAIN-THREAD WORK IS STILL QUEUED AT THE INSTANT A GATE CALLS process.exit(). ***
 //

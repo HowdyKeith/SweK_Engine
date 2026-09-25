@@ -237,7 +237,7 @@ try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
 
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
-// *** v4668 -- process.exitCode, NOT process.exit(). ***
+// *** v4676 -- process.exitCode, NOT process.exit(). ***
 // THIS GATE IS THE INTERMITTENT ONE, and that is the evidence, not a caveat. On the rig at v4667 it fast-failed
 // with libuv's UV_HANDLE_CLOSING assert; re-run ALONE on the same box it passed in 381 ms against 1090 ms
 // loaded. A defect that appears only under load is a RACE, and a race between "the platform still has queued

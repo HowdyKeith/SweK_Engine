@@ -130,7 +130,7 @@ const gpuAssetLoaderSrc = fs.readFileSync(path.join(ENG, "gpu/gpuAssetLoader.js"
 const fbxLoadSrc        = fs.readFileSync(path.join(ENG, "gpu/fbxLoad.js"), "utf8");
 const indexHtmlSrc      = fs.readFileSync(path.join(ENG, "index.html"), "utf8");
 
-// *** v4668 -- TWO ROWS BELOW ASSERTED "THE CODE DOES X" AGAINST RAW SOURCE, which is a gate that would pass
+// *** v4676 -- TWO ROWS BELOW ASSERTED "THE CODE DOES X" AGAINST RAW SOURCE, which is a gate that would pass
 // on a COMMENT SAYING IT SHOULD. commentFalsePass reported both as GENUINE.
 //
 // THEY NEED DIFFERENT VIEWS, AND PICKING codeOnly FOR BOTH WAS TRIED FIRST AND WAS WRONG. codeOnly blanks
@@ -151,7 +151,7 @@ console.log("1. *** .fbx IS A REAL BRANCH IN _load()'S HEAD-PROBE CHAIN, NOT JUS
         /const tryFbx\s*=\s*!fmt\s*\|\|\s*fmt\.fbx/.test(gpuAssetLoaderSrc));
     ok("!! _load() HEAD-probes `${this.basePath}${name}.fbx` and calls _loadFBX() on a 200",
         /tryFbx[\s\S]{0,400}?\$\{this\.basePath\}\$\{name\}\.fbx[\s\S]{0,300}?this\._loadFBX\(name, fbxUrl\)/.test(gpuAssetLoaderCode),
-        "v4668: read through noComments. The two [\\s\\S] spans are 400 and 300 characters wide, and on RAW " +
+        "v4676: read through noComments. The two [\\s\\S] spans are 400 and 300 characters wide, and on RAW " +
         "source there are five comment lines inside the first window alone, any of which could have supplied " +
         "the middle of this chain. NOT codeOnly: the URL is a template literal, which codeOnly blanks");
     ok("!! the probe sits BEFORE the legacy mesh.json folder fallback, mirroring .glb/.obj",
@@ -181,7 +181,7 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
         /\.isMesh \|\| obj\.isSkinnedMesh/.test(fbxLoadSrc));
     ok("!! the remaining v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
         /SINGLE MESH ONLY/.test(fbxLoadSrc) && /NO TEXTURES, NO VERTEX COLORS/.test(fbxLoadSrc));
-    // v4668 -- SPLIT, because this was one row making two claims of opposite kinds and reading raw source for
+    // v4676 -- SPLIT, because this was one row making two claims of opposite kinds and reading raw source for
     // both. "It is documented" is a claim ABOUT A COMMENT and must read the comments; "the function exists" is
     // a claim about code and must not. Joined with && against raw text, the second was satisfiable by the
     // first -- the header sentence names mapFbxAnimations, so a file with the header and no function passed.

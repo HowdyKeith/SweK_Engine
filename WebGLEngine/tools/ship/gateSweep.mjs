@@ -8076,13 +8076,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
     since349: Object.freeze({
-        at: "v4670", swept: 1, green: 1, red: 0,
+        at: "v4678", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "tools/ship/deadlineLeak-selfcheck.mjs",
         ]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
-        verdict: "green, 11 s. A DISCARDED DEADLINE HANDLE COST 53 SECONDS AND NO CHECK COULD SEE IT. v4668 wrote " +
+        verdict: "green, 11 s. A DISCARDED DEADLINE HANDLE COST 53 SECONDS AND NO CHECK COULD SEE IT. v4676 wrote " +
                  "`setTimeout(() => fin(...), 60000)` in sourceChainBridge's resolver probe with the handle thrown " +
                  "away; fin() is once-only so the late fire did nothing, and the timer held the loop open for the " +
                  "full minute after the answer arrived. cloneProvision-selfcheck did 7,100 ms of work in 60,136 ms " +
@@ -8100,16 +8100,16 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "unread list was the only place the 0.2s-vs-60s disagreement appeared.",
     }),
     since348: Object.freeze({
-        at: "v4669", swept: 2, green: 2, red: 0,
+        at: "v4677", swept: 2, green: 2, red: 0,
         added: Object.freeze([
             "tools/ship/cloneProvision-selfcheck.mjs",
             "tools/ship/exitBusy-selfcheck.mjs",
         ]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
-        verdict: "green, 1.3 s and 46 s. TWO gates in one closing because v4668 added cloneProvision and did NOT write " +
+        verdict: "green, 1.3 s and 46 s. TWO gates in one closing because v4676 added cloneProvision and did NOT write " +
                  "one -- the tree shipped a gate ahead of this ledger, assertionShape's record was already red at " +
-                 "b826aea8 before v4669 touched anything, and the omission was found by recordDrift rather than by " +
+                 "b826aea8 before v4677 touched anything, and the omission was found by recordDrift rather than by " +
                  "reading. cloneProvision drives the provisioning branch with an injected runner and now also drives the " +
                  "timeout's kill escalation against a real SIGTERM-ignoring child. exitBusy is the screen that narrowed " +
                  "the libuv-teardown population from 'at least 52, at most 1708' to about 223 of 1413 (145-333). " +

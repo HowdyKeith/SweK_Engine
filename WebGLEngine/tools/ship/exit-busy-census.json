@@ -1,6 +1,6 @@
 {
  "generatedFrom": "tools/ship/exitBusy.mjs, driven over a seeded uniform sample",
- "note": "v4669 -- HOW MANY GATES ARE STILL DOING MAIN-THREAD WORK AT THE INSTANT THEY CALL process.exit(). v4663 drew its population of 48 by asking DOES THIS GATE COMPILE A WASM MODULE, which is a CAUSE; the defect is a SYMPTOM. wasmTeardown-selfcheck could only state the size as 'at least 52, at most 1708'. This is that range narrowed by MEASURING the property: process CPU across an awaited 300 ms window opened where the gate wanted to leave, taken twice so a burst can be told from a steady cost. *** THE ESTIMATE IS A FLOOR, FOR THREE NAMED REASONS. *** (1) 2 of 114 measured gates were BUSIER IN THE SECOND WINDOW than the first, so a burst that has not begun inside 300 ms is under-read -- they are counted here but there may be more. (2) 5 gates were killed at the 45 s cap and are UNKNOWN, never quiet, and capped gates are the EXPENSIVE ones, which are the likelier members. (3) Every reading is Linux, where this teardown is SILENT -- unix/async.c has no UV_HANDLE_CLOSING assertion -- so a member here is a CANDIDATE and the rig's clone-verify is the instrument for the fact. ALSO RECORDED: the probe writes a copy of the gate beside the original while it runs, and a gate that WALKS THE TREE sees it. wiringClaims-selfcheck came back RED in the first screen for that reason alone and is green by hand. measure() now takes a baseline run and reports `perturbed` rather than leaving that in the data.",
+ "note": "v4677 -- HOW MANY GATES ARE STILL DOING MAIN-THREAD WORK AT THE INSTANT THEY CALL process.exit(). v4663 drew its population of 48 by asking DOES THIS GATE COMPILE A WASM MODULE, which is a CAUSE; the defect is a SYMPTOM. wasmTeardown-selfcheck could only state the size as 'at least 52, at most 1708'. This is that range narrowed by MEASURING the property: process CPU across an awaited 300 ms window opened where the gate wanted to leave, taken twice so a burst can be told from a steady cost. *** THE ESTIMATE IS A FLOOR, FOR THREE NAMED REASONS. *** (1) 2 of 114 measured gates were BUSIER IN THE SECOND WINDOW than the first, so a burst that has not begun inside 300 ms is under-read -- they are counted here but there may be more. (2) 5 gates were killed at the 45 s cap and are UNKNOWN, never quiet, and capped gates are the EXPENSIVE ones, which are the likelier members. (3) Every reading is Linux, where this teardown is SILENT -- unix/async.c has no UV_HANDLE_CLOSING assertion -- so a member here is a CANDIDATE and the rig's clone-verify is the instrument for the fact. ALSO RECORDED: the probe writes a copy of the gate beside the original while it runs, and a gate that WALKS THE TREE sees it. wiringClaims-selfcheck came back RED in the first screen for that reason alone and is green by hand. measure() now takes a baseline run and reports `perturbed` rather than leaving that in the data.",
  "at": "2026-09-25",
  "method": {
   "windowMs": 300,
@@ -37,7 +37,7 @@
   "overPopulation": 223,
   "loCount": 145,
   "hiCount": 333,
-  "priorRange": "at least 52, at most 1708 (v4668c)"
+  "priorRange": "at least 52, at most 1708 (v4676c)"
  },
  "members": [
   {

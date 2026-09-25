@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/ship/cloneProvision-selfcheck.mjs -- v4668
+// tools/ship/cloneProvision-selfcheck.mjs -- v4676
 //
 // Run: node tools/ship/cloneProvision-selfcheck.mjs      (~7.2s)
 //
-// *** v4670 -- THIS LINE SAID 0.2s AND THE GATE TOOK 60.1s, AND THE HEADER WAS NOT THE DEFECT. ***
-// 0.2s was TRUE at v4668, when every row drove _provision with an injected runner. v4668c added the kill-
+// *** v4678 -- THIS LINE SAID 0.2s AND THE GATE TOOK 60.1s, AND THE HEADER WAS NOT THE DEFECT. ***
+// 0.2s was TRUE at v4676, when every row drove _provision with an injected runner. v4676c added the kill-
 // escalation rows, which spawn real children and wait out a real grace period: 7.1s of actual work. The other
-// 53 SECONDS were a 60 s deadline timer in sourceChainBridge's resolver probe whose handle v4668 threw away --
+// 53 SECONDS were a 60 s deadline timer in sourceChainBridge's resolver probe whose handle v4676 threw away --
 // harmless, since the settle was once-only, and it held the event loop open for the full minute anyway.
 // FOUND BY ASKING WHY THE DECLARATION DISAGREED WITH THE CLOCK. See tools/ship/deadlineLeak.mjs.
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
@@ -55,7 +55,7 @@ console.log("1. *** THE CHECK ASKS THE CONSUMER'S QUESTION, NOT npm's EXIT CODE 
     const CHAIN_SRC = fs.readFileSync(path.join(ENG, "ai-bridge", "sourceChainBridge.js"), "utf8");
     const RES = fs.readFileSync(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"), "utf8");
 
-    // *** v4668b -- THE FIRST VERSION OF THIS SECTION ASSERTED A COUPLING THAT SHOULD NOT EXIST, AND
+    // *** v4676b -- THE FIRST VERSION OF THIS SECTION ASSERTED A COUPLING THAT SHOULD NOT EXIST, AND
     // DESCRIBED IT WRONGLY. *** It said the tree-local path was "the resolver's FIRST candidate" and held the
     // two files to it. PLAYWRIGHT_PATHS tries the bare specifiers "playwright" and "playwright-core" ahead
     // of it, so it is THIRD -- the row passed while its own sentence was false. Worse, the whole idea was
@@ -115,7 +115,7 @@ console.log("\n2. *** EVERY BRANCH IS DRIVEN, INCLUDING THE TWO THAT WOULD OTHER
         r4.ok === false && /resolver still refuses/.test(r4.reason || ""),
         (r4.reason || "").slice(0, 120) + " -- a half-run postinstall, --ignore-scripts, an empty registry " +
         "answer or a blocked CDN all leave a zero behind. Taking the exit code as the answer is the same " +
-        "shape as a gate that exits 1 having printed no FAIL row, which v4668 found from the other side");
+        "shape as a gate that exits 1 having printed no FAIL row, which v4676 found from the other side");
 
     // *** AND THE SUCCESS PATH IS NOT DRIVEN HERE, WHICH IS SAID RATHER THAN FAKED. *** Reaching ok:true
     // now needs the clone's real playwrightResolve.mjs to find a real chromium, so the only honest way to
@@ -154,7 +154,7 @@ console.log("\n3. *** A PHASE NO GUARD NAMES IS A WINDOW IN WHICH THE GUARD IS N
 
 // ---- THE TIMEOUT'S KILL, DRIVEN -- BECAUSE A KILL NOBODY RE-CHECKS IS A CLAIM RESTING ON NOTHING ---------
 //
-// v4668's first spelling of the provisioning timeout was `try { child.kill(); } catch {}` followed immediately
+// v4676's first spelling of the provisioning timeout was `try { child.kill(); } catch {}` followed immediately
 // by resolving with `timedOut: true`. boundaryLint reports that shape as KILL_NOT_VERIFIED and it is right to:
 // kill() SENDS a signal. On Windows it is TerminateProcess against the npm launcher, whose own child tree can
 // outlive it, and a surviving `npm install` holds the cache lock -- so the NEXT attempt fails too, with a
@@ -183,7 +183,7 @@ console.log("\n3. *** A PHASE NO GUARD NAMES IS A WINDOW IN WHICH THE GUARD IS N
     ok("...and a child that finishes on its own carries NEITHER stamp, so the stamps mean something",
         fine.code === 7 && fine.timedOut === undefined && fine.killed === undefined, JSON.stringify(fine));
 
-    // v4668b's hang, kept driven. node emits "error" and NOT "exit" for ENOENT, so a promise settling only on
+    // v4676b's hang, kept driven. node emits "error" and NOT "exit" for ENOENT, so a promise settling only on
     // "exit" never settles -- which pinned the chain in "provisioning" with every guard closed.
     const t1 = Date.now();
     const gone = await CHAIN._spawnCmd("swek-definitely-not-a-binary", [], os.tmpdir(), "probe", { timeoutMs: 30000 });

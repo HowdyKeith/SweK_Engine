@@ -38,7 +38,7 @@ import { codeOnly } from "./sourceScan.mjs";
 import { describeThrow } from "./thrownRow.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-// *** v4668 -- A PATH IS NOT A SPECIFIER ON WINDOWS, AND THIS FILE SHIPPED THE DEFECT ITS OWN WEEK FIXED. ***
+// *** v4676 -- A PATH IS NOT A SPECIFIER ON WINDOWS, AND THIS FILE SHIPPED THE DEFECT ITS OWN WEEK FIXED. ***
 // The fixtures below are GENERATED and import this module by absolute path. On POSIX `import x from
 // "/home/.../thrownRow.mjs"` resolves and the gate is green; on Windows the same line reads
 // "C:\\SweK_src\\...\\thrownRow.mjs" and node answers ERR_UNSUPPORTED_ESM_URL_SCHEME -- "C:" parses as a

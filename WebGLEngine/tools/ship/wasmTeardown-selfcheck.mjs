@@ -123,7 +123,7 @@ console.log("\n3. *** THE REPAIR, DRIVEN ON TWO SCRIPTS IDENTICAL BUT FOR THEIR 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wasmteardown-"));
     try {
         const body = (last) => `
-import { initNode, mod } from ${JSON.stringify(pathToFileURL(path.join(ENG, "physics/box3d/box3dNode.mjs")).href)};   // v4668: a file:// URL, not a path -- see thrownRow-selfcheck
+import { initNode, mod } from ${JSON.stringify(pathToFileURL(path.join(ENG, "physics/box3d/box3dNode.mjs")).href)};   // v4676: a file:// URL, not a path -- see thrownRow-selfcheck
 await initNode();
 const e = mod().__wasmExports;
 const w = e.swk_world_create(0, -10, 0);
@@ -221,7 +221,7 @@ console.log("\n5. *** HOW BIG THE POPULATION IS, MEASURED ONCE, WITH ITS GAP NAM
 }
 
 // -----------------------------------------------------------------------------------------------------------
-console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY THE WRONG QUESTION ***");
+console.log("\n5. *** v4676 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY THE WRONG QUESTION ***");
 {
     // The round above screened 246 gates by asking DOES THIS COMPILE A WASM MODULE and converted the 48 that
     // did. The rig's v4667 clone-verify then produced ai-bridge/tools/localModelResolve-selfcheck.mjs dying
@@ -248,7 +248,7 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
     // than the ones included. It is not frozen as an assertion because it is one reading on one box of a
     // quantity that moves with load; it is recorded so the next reader has the evidence rather than the
     // conclusion.
-    report("MEASURED at v4668: localModelResolve idles 94.6 ms of background CPU per 300 ms at exit, against " +
+    report("MEASURED at v4676: localModelResolve idles 94.6 ms of background CPU per 300 ms at exit, against " +
         "0.8 ms for the control and 23 ms for the wasm population. ONE READING, ONE BOX, and the method is " +
         "idleBackgroundCpuMs' -- an awaited timer across cpuUsage -- applied to a patched copy of the gate.");
 
@@ -304,7 +304,7 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
             "the old shape, and both come back the other way");
     }
 
-    report("MEASURED at v4668, same instrument, same box: range 103.7 ms, bz-tactics 81.7 ms, skillbookDoor " +
+    report("MEASURED at v4676, same instrument, same box: range 103.7 ms, bz-tactics 81.7 ms, skillbookDoor " +
         "7.0 ms of background CPU per 300 ms idle window at the exit line, control 0.9 ms. bz-tactics is " +
         "INTERMITTENT (381 ms alone vs 1090 ms loaded on the rig), so a green re-run is not a clearance. The " +
         "assert's source line moves with the node build -- 94 on v24.17.0, 76 on v24.15.0 -- and is not an id.");
@@ -330,10 +330,10 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
         "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
         "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
         "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
-        "is a round of its own. THAT ROUND IS v4669: tools/ship/exitBusy.mjs is the screen, and " +
+        "is a round of its own. THAT ROUND IS v4677: tools/ship/exitBusy.mjs is the screen, and " +
         "tools/ship/exit-busy-census.json is what it measured. The width below is what was known BEFORE it.");
 
-    // *** v4669 -- THE WIDTH ABOVE, NARROWED BY MEASUREMENT, AND THE NUMBER IS A FLOOR. ***
+    // *** v4677 -- THE WIDTH ABOVE, NARROWED BY MEASUREMENT, AND THE NUMBER IS A FLOOR. ***
     // A seeded uniform sample of 120 of the screenable gates, measured serially: 114 read, 16 BUSY and 2 LATE
     // (a burst that had not begun inside the first 300 ms), 1 STEADY, 95 QUIET, 6 UNKNOWN. That is 15.8% of the
     // measured set, 95% CI 10.2-23.6%, which over the 1413 gates with a terminal exit is ABOUT 223 (145-333).
@@ -365,7 +365,7 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
     {
         // Keep the old width, computed, so the narrowing can be seen rather than asserted.
         const floor = 48 + 1 + V4668_FOUND.length;
-        report(`THE WIDTH BEFORE v4669: at least ${floor} and at most ${stillExit.length} -- a factor of ` +
+        report(`THE WIDTH BEFORE v4677: at least ${floor} and at most ${stillExit.length} -- a factor of ` +
             `${(stillExit.length / floor).toFixed(0)}. AFTER: 145 to 333, a factor of 2.3, from a sample whose ` +
             "seed, cap, holes and disproven first instrument are all in exit-busy-census.json.");
     }

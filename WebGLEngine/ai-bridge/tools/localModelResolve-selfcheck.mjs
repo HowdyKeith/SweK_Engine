@@ -226,7 +226,7 @@ console.log("\n6. *** THE CATALOG ADMITS SOMETHING IT CANNOT INSTALL ***");
 }
 
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASS");
-// *** v4668 -- process.exitCode, NOT process.exit(), AND THIS GATE WAS NOT IN v4663'S POPULATION. ***
+// *** v4676 -- process.exitCode, NOT process.exit(), AND THIS GATE WAS NOT IN v4663'S POPULATION. ***
 // It died on the rig at v4667 with exactly the crash that round was about:
 //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94   (exit 0xC0000409)
 // after printing ALL PASS. v4663 converted 48 gates and screened 246, and it chose them by asking "does this
