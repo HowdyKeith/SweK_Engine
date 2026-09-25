@@ -40,7 +40,10 @@ const opts = (id) => { const m = new RegExp(`<select id="${id}">([\\s\\S]*?)<\\/
        dirs.includes(d.slabdir) && dirs[0] !== d.slabdir, `declared ${d.slabdir}; page default ${dirs[0]}; options ${dirs.join(", ")}`);
     ok("*** the speed is a page option, minFolds is derived, and the scenes are the page's both ways ***",
        opts("slabspeed").includes(d.speed) && d.minFolds === minFoldsFor(d.alpha) && J(d.scenes.slice().sort()) === J(opts("scene").slice().sort()));
-    ok("*** NO DATA IN THE COMMIT ***", !fs.existsSync(path.join(ENG, CACHE_H10)) && !fs.existsSync(path.join(ENG, RESULT_H10)));
+    // v4712 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    const resOk = fs.existsSync(path.join(ENG, CACHE_H10)) && fs.existsSync(path.join(ENG, RESULT_H10)) &&
+        J(JSON.parse(fs.readFileSync(path.join(ENG, RESULT_H10), "utf8")).declared) === J(d);
+    ok("*** the measurement exists, produced under THIS document's constants -- v4711's 'no data yet', inverted ***", resOk);
 }
 
 console.log("\n2. *** THE STATISTIC IS v4709's, APPLIED AS ONE CELL ***");

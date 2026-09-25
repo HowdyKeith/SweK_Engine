@@ -8032,6 +8032,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4712 -- THE 319th CLOSING: H10 not supported -- the holed-frame pattern was one geometry's, not occlusion's.
+    since394: Object.freeze({
+        at: "v4712", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVerticalMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameVertical-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H10 IS NOT SUPPORTED, AND NOT BY A MARGIN. *** v4711's runner ran as committed: seven scenes at x8 with the " +
+                 "slab moving VERTICALLY, 273 frames, 268 s. Contrast mean +0.184 dB, t p 0.356, sign 5 of 7 (p 0.227) -- not the " +
+                 "one-scene price v4711 named, and not its no-answer route either: every scene carried 4 to 7 holed frames. " +
+                 "*** AND TWO SCENES REVERSE HARD. *** On vertical motion bars's holed frames score +2.202 dB against its clean " +
+                 "+0.369, and smooth's +0.912 against -0.020: there, the frames with holes are where generation WINS. Across the " +
+                 "three forward cells no scene's holed frames averaged above +0.305 dB -- a ceiling the gate reads off the forward " +
+                 "caches rather than a number typed into it. " +
+                 "*** WHAT THIS SETTLES, STATED AS A DESCRIPTION: *** holed frames lost in 20 of 21 scene-cells when the slab moved " +
+                 "WITH the dolly, and in 5 of 7 when it moved across it, with the exceptions reversing by up to 1.83 dB. Whether a " +
+                 "holed frame loses depends on the geometry that made the hole, so a hole is not a signal a frame gate can carry " +
+                 "to geometry it has not seen. That is why v4711 built a second geometry, and it did its job: H8's x8 cell, H9's 3x " +
+                 "cell and the 20 of 21 were all the forward geometry speaking. " +
+                 "*** C22 held on the declared cell *** (0 of 273 vertical frames carry the forward dB), and C12 re-harvested zone " +
+                 "on vertical motion identically. " +
+                 "*** EIGHT SABOTAGES, EIGHT RED, *** including one scene's rows swapped for the forward geometry's, which C22 " +
+                 "reddens. Two numbers the first draft of this gate TYPED -- the forward ceiling and the largest reversal -- are now " +
+                 "computed; this time they were right, and the rule exists because twice in this arc they were not. The gate runs " +
+                 "42.2 s alone and is hand-filed.",
+    }),
     // v4711 -- THE 318th CLOSING: the page gains a second occlusion geometry, and H10 is declared on it.
     since393: Object.freeze({
         at: "v4711", swept: 1, green: 1, red: 0,

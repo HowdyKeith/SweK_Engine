@@ -1,0 +1,115 @@
+{
+ "declared": {
+  "scenes": [
+   "zone",
+   "smooth",
+   "checker",
+   "bars",
+   "edges",
+   "noise",
+   "ramp"
+  ],
+  "speed": "8",
+  "slabdir": "z",
+  "alpha": 0.05,
+  "minFolds": 5,
+  "upto": 40,
+  "minGroup": 2
+ },
+ "per": {
+  "zone": {
+   "n": 39,
+   "nHoled": 6,
+   "nClean": 33,
+   "holedAdv": -1.3410526411974448,
+   "cleanAdv": -0.41088352259433086,
+   "contrast": 0.930169118603114
+  },
+  "smooth": {
+   "n": 39,
+   "nHoled": 7,
+   "nClean": 32,
+   "holedAdv": 0.9121496761312287,
+   "cleanAdv": -0.020460637716881447,
+   "contrast": -0.9326103138481101
+  },
+  "checker": {
+   "n": 39,
+   "nHoled": 5,
+   "nClean": 34,
+   "holedAdv": 0.2897366097273231,
+   "cleanAdv": 0.3081827424641303,
+   "contrast": 0.018446132736807175
+  },
+  "bars": {
+   "n": 39,
+   "nHoled": 4,
+   "nClean": 35,
+   "holedAdv": 2.2018902511905165,
+   "cleanAdv": 0.36935283297419447,
+   "contrast": -1.832537418216322
+  },
+  "edges": {
+   "n": 39,
+   "nHoled": 6,
+   "nClean": 33,
+   "holedAdv": -1.9736296269467353,
+   "cleanAdv": -0.16380711314246013,
+   "contrast": 1.8098225138042752
+  },
+  "noise": {
+   "n": 39,
+   "nHoled": 7,
+   "nClean": 32,
+   "holedAdv": -1.1354325004680936,
+   "cleanAdv": -0.027600193083523794,
+   "contrast": 1.10783230738457
+  },
+  "ramp": {
+   "n": 39,
+   "nHoled": 7,
+   "nClean": 32,
+   "holedAdv": -0.21447432252663745,
+   "cleanAdv": -0.02965998250947166,
+   "contrast": 0.1848143400171658
+  }
+ },
+ "h10": {
+  "cell": {
+   "usable": [
+    "zone",
+    "smooth",
+    "checker",
+    "bars",
+    "edges",
+    "noise",
+    "ramp"
+   ],
+   "excluded": [],
+   "reportable": true,
+   "test": {
+    "t": {
+     "n": 7,
+     "mean": 0.18370524006878572,
+     "sd": 1.251278227927171,
+     "t": 0.38843349857256076,
+     "df": 6,
+     "p": 0.355551982846636
+    },
+    "sign": {
+     "up": 5,
+     "down": 2,
+     "ties": 0,
+     "n": 7,
+     "p": 0.2265625,
+     "exact": true
+    },
+    "alpha": 0.05,
+    "cleared": false
+   },
+   "cleared": false
+  },
+  "reportable": true,
+  "supported": false
+ }
+}
