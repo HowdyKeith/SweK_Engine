@@ -1,0 +1,89 @@
+{
+ "generatedFrom": "tools/ship/deadlineLeak.mjs deadTail(), over the SAME seeded sample as exit-busy-census.json",
+ "note": "v4670 -- WALL CLOCK MINUS WORK, PER GATE, MEASURED BY RUNNING. A deadline timer whose handle is thrown away holds the event loop for its full length after the promise has already settled. In a long-running bridge that is invisible; in a gate it is the whole runtime. ai-bridge/sourceChainBridge.js's resolver probe did exactly this with a 60 s deadline, and tools/ship/cloneProvision-selfcheck.mjs did 7,100 ms of work in 60,136 ms of wall clock -- 53 s of dead time, against a sweep budget of 3,000 ms, with every check in the gate passing the whole time. FOUND BY ASKING WHY THAT GATE DECLARED 0.2s. *** THE SOURCE RULE FINDS 13 SITES AND THE MEASUREMENT FINDS ZERO PAID ONES. *** Both numbers are here because they answer different questions: 13 is how many places carry the shape (a CEILING -- all but the repaired one are in bridges, where nothing is held that was not held anyway), and 0 of 115 measured gates has a tail over the 250 ms grace. The population that was PAID was one, it was this session's own, and it is fixed. The tail is the better instrument of the two: it needs no source rule, so it catches a deadline reached through a helper in another file, which the rule admits it cannot see.",
+ "at": "2026-09-25",
+ "method": {
+  "graceMs": 250,
+  "seed": 1,
+  "drawn": 120,
+  "population": "the same 120 gates as exit-busy-census.json, so a gate can be looked up in both",
+  "whyThisGrace": "every clean gate on this box reads 3-59 ms of tail; the one real leak cost 53,000 ms. 250 sits between them with three orders of magnitude to spare"
+ },
+ "measured": 115,
+ "unknown": 5,
+ "leaking": 0,
+ "leakingMembers": [],
+ "widestTails": [
+  {
+   "gate": "physics/stellar/laneEmden-selfcheck.mjs",
+   "tailMs": 73,
+   "workMs": 10901
+  },
+  {
+   "gate": "tools/ship/generatedLadder-selfcheck.mjs",
+   "tailMs": 59,
+   "workMs": 29270
+  },
+  {
+   "gate": "tools/ship/contactOverlay-selfcheck.mjs",
+   "tailMs": 39,
+   "workMs": 121
+  },
+  {
+   "gate": "tools/ship/slugCurve-selfcheck.mjs",
+   "tailMs": 35,
+   "workMs": 7573
+  },
+  {
+   "gate": "tools/ship/probeLab-selfcheck.mjs",
+   "tailMs": 25,
+   "workMs": 3447
+  },
+  {
+   "gate": "physics/mesh/discontinuity-selfcheck.mjs",
+   "tailMs": 22,
+   "workMs": 146
+  },
+  {
+   "gate": "physics/mesh/rankRepair3-selfcheck.mjs",
+   "tailMs": 20,
+   "workMs": 354
+  },
+  {
+   "gate": "fx/fsr/fsrGPU-selfcheck.mjs",
+   "tailMs": 19,
+   "workMs": 2962
+  }
+ ],
+ "unknownMembers": [
+  {
+   "gate": "tools/ship/doorKinds-selfcheck.mjs",
+   "why": "killed at the 60000 ms cap"
+  },
+  {
+   "gate": "physics/nuclear/reactorControl-selfcheck.mjs",
+   "why": "killed at the 60000 ms cap"
+  },
+  {
+   "gate": "tools/ship/orphanTriage-selfcheck.mjs",
+   "why": "killed at the 60000 ms cap"
+  },
+  {
+   "gate": "physics/sph/tiltPower-selfcheck.mjs",
+   "why": "killed at the 60000 ms cap"
+  },
+  {
+   "gate": "tools/ship/gateSelection-selfcheck.mjs",
+   "why": "killed at the 60000 ms cap"
+  }
+ ],
+ "repaired": {
+  "site": "ai-bridge/sourceChainBridge.js _askTheResolver",
+  "gate": "tools/ship/cloneProvision-selfcheck.mjs",
+  "beforeMs": 60136,
+  "afterMs": 7158,
+  "workMs": 7100,
+  "fix": "clearTimeout in the settle path AND unref on the handle -- clearing depends on the settle path being reached, unref does not"
+ },
+ "sourceRuleCeiling": 13
+}

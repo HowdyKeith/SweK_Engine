@@ -708,8 +708,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // nothing else -- the same four rows, for the twenty-somethingth consecutive arrival, which is what keeps
     // the other five rows worth comparing. THE DRIFT WAS NOT A FOREIGN BRANCH'S: both gates are this session's,
     // and the honest reading is that the previous round forgot the step, not that someone else moved the tree.
-    gates: 1773, usesOk: 1752, definesOk: 1744, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1645, condFirst: 96, unknownSignature: 11,
+    // v4670 -- RE-TAKEN 1773 -> 1774 for tools/ship/deadlineLeak-selfcheck.mjs. ONE gate, and the same four rows
+    // by one each: gates, usesOk, definesOk, nameFirst. The other five held, as they have through every arrival.
+    gates: 1774, usesOk: 1753, definesOk: 1745, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1646, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

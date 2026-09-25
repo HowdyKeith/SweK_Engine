@@ -1,5 +1,7 @@
 // WebGLEngine/tools/ship/exitBusy-selfcheck.mjs -- v4669
 //
+// Run: node tools/ship/exitBusy-selfcheck.mjs      (~16s)
+//
 // *** THE FIRST INSTRUMENT THIS ROUND BUILT MEASURED ZERO, AND THE ROW THAT SAYS SO IS THE POINT OF THIS FILE. ***
 //
 // The screen exists because v4663 drew its population by asking DOES THIS GATE COMPILE A WASM MODULE -- a CAUSE

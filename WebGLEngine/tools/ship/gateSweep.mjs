@@ -8075,6 +8075,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    since349: Object.freeze({
+        at: "v4670", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/deadlineLeak-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 11 s. A DISCARDED DEADLINE HANDLE COST 53 SECONDS AND NO CHECK COULD SEE IT. v4668 wrote " +
+                 "`setTimeout(() => fin(...), 60000)` in sourceChainBridge's resolver probe with the handle thrown " +
+                 "away; fin() is once-only so the late fire did nothing, and the timer held the loop open for the " +
+                 "full minute after the answer arrived. cloneProvision-selfcheck did 7,100 ms of work in 60,136 ms " +
+                 "of wall clock -- twenty times the sweep's 3,000 ms budget -- with every row passing throughout. " +
+                 "FOUND BY ASKING WHY THAT GATE DECLARED 0.2s. Fixed by clearTimeout in the settle path AND unref " +
+                 "on the handle (clearing depends on the settle path being reached; unref does not): 60,136 -> " +
+                 "7,158 ms on unchanged work. *** TWO INSTRUMENTS, AND THEY DISAGREE USEFULLY: *** a source rule " +
+                 "finds 13 sites carrying the shape, and the dead-tail measurement -- wall clock minus work, per " +
+                 "gate, needing no source rule -- finds 0 of 115 measured gates paying for one. 13 is a CEILING " +
+                 "(the rest are in bridges, held open regardless); 0 is the measured debt; the 5 gates killed at " +
+                 "the 60 s cap are UNKNOWN and named, because a cap kill hides a tail rather than clearing it and " +
+                 "those five are exactly where a leak would survive. Also closed: declaredCost's `noRecord` list " +
+                 "had been computed since the module was written and NO GATE READ IT -- third sighting of that " +
+                 "shape after assertionShape's four-of-nine and runtimeGap's three-of-twelve, and this time the " +
+                 "unread list was the only place the 0.2s-vs-60s disagreement appeared.",
+    }),
     since348: Object.freeze({
         at: "v4669", swept: 2, green: 2, red: 0,
         added: Object.freeze([

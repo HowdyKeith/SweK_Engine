@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 // tools/ship/cloneProvision-selfcheck.mjs -- v4668
 //
-// Run: node tools/ship/cloneProvision-selfcheck.mjs      (~0.2s)
+// Run: node tools/ship/cloneProvision-selfcheck.mjs      (~7.2s)
+//
+// *** v4670 -- THIS LINE SAID 0.2s AND THE GATE TOOK 60.1s, AND THE HEADER WAS NOT THE DEFECT. ***
+// 0.2s was TRUE at v4668, when every row drove _provision with an injected runner. v4668c added the kill-
+// escalation rows, which spawn real children and wait out a real grace period: 7.1s of actual work. The other
+// 53 SECONDS were a 60 s deadline timer in sourceChainBridge's resolver probe whose handle v4668 threw away --
+// harmless, since the settle was once-only, and it held the event loop open for the full minute anyway.
+// FOUND BY ASKING WHY THE DECLARATION DISAGREED WITH THE CLOCK. See tools/ship/deadlineLeak.mjs.
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ai-bridge/sourceChainBridge.js's provisioning step.

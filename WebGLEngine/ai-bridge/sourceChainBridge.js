@@ -269,18 +269,34 @@ function _askTheResolver(cloneEngine) {
 
         let out = "";
         const child = spawn(process.execPath, [probe, cloneEngine], { cwd: cloneEngine, windowsHide: true });
-        let settled = false;
+        let settled = false, deadline = null;
+        // *** v4670 -- THE DEADLINE TIMER IS CLEARED, AND NOT CLEARING IT COST SIXTY SECONDS PER CALL. ***
+            // v4668 wrote `setTimeout(() => fin(...), 60000)` with the handle thrown away. fin() is once-only,
+            // so the late fire was HARMLESS -- and the timer still held the event loop open for the full sixty
+            // seconds after the probe had already answered. In the bridge, a long-running server, that is
+            // invisible. In a short-lived process it is the whole runtime:
+            // tools/ship/cloneProvision-selfcheck.mjs did its work in 7.1 s and took 60.1 s to exit, and the
+            // 53 s of dead time was found only by asking why the gate DECLARED 200 ms. A correct verdict, a
+            // correct cleanup, and a minute of wall clock that no row could see.
         const fin = (v) => { if (settled) return; settled = true;
+            if (deadline) clearTimeout(deadline);
             try { fs.rmSync(path.dirname(probe), { recursive: true, force: true }); } catch {}
             resolve(v); };
         child.on("error", (e) => fin({ ok: false, reason: "could not run the resolver probe: " + ((e && e.message) || e) }));
         if (child.stdout) child.stdout.on("data", (d) => { out += String(d); });
+        // stderr is drained too: a probe that writes more than a pipe buffer to a stream NOBODY READS blocks on
+        // the write and never reaches its exit, which would turn this deadline into the only way out.
+        if (child.stderr) child.stderr.on("data", () => {});
         child.on("exit", () => {
             let j = null; try { j = JSON.parse(out.trim()); } catch {}
             if (!j) return fin({ ok: false, reason: "the resolver probe printed nothing readable" });
             return fin(j.reason ? { ok: false, reason: j.reason } : { ok: true, from: j.from });
         });
-        setTimeout(() => fin({ ok: false, reason: "the resolver probe did not answer in 60 s" }), 60000);
+        deadline = setTimeout(() => fin({ ok: false, reason: "the resolver probe did not answer in 60 s" }), 60000);
+        // AND unref'd as well as cleared -- belt and braces, because clearing depends on fin() being reached
+        // and unref'ing does not. An unref'd deadline still fires while the loop is alive for any other reason,
+        // which is every case this deadline exists for.
+        if (deadline.unref) deadline.unref();
     });
 }
 

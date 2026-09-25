@@ -174,6 +174,53 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         "rename must not silently re-open an exclusion, so the comparison is import.meta.url and not a string");
 }
 
+// ---- v4670: noRecord WAS COMPUTED AND NOTHING READ IT -------------------------------------------------------
+//
+// *** census() HAS RETURNED A `noRecord` LIST SINCE IT WAS WRITTEN, AND NO GATE IN THE TREE REFERENCED IT. ***
+// A gate that DECLARES a cost and has no recorded timing cannot have its declaration compared with anything, so
+// it is not in `agree` and not in `rotted` -- it is in a third list, and that list was decoration. The same
+// shape assertionShape found in itself (four of nine rows compared) and runtimeGap found in itself (three of
+// twelve). Third sighting, and this time the consequence was paid:
+//
+//   tools/ship/cloneProvision-selfcheck.mjs declared 0.2s, ran 60.1s, and sat in `noRecord` where nothing
+//   looked. The 0.2s was TRUE when written; v4668c's kill-escalation rows took it to 7.1s of real work, and a
+//   60 s deadline timer whose handle had been thrown away held the process for the other 53. The declaration
+//   disagreeing with the clock was the ONLY visible symptom of a real defect, and it was in an unread list.
+//
+// So the list is asserted on now. NOT at zero: a gate added on a box whose CPU model differs from the one that
+// captured sweep-timings.json CANNOT be entered into that record (its `host` is a single file-wide field keyed
+// on a CPU-model hash -- see task #85), so a newly added gate legitimately has no recorded timing. What must be
+// true is that the population is SMALL, BOUNDED and NAMED, and that every member actually declares a cost --
+// because a member that declares nothing is in `missing` and is a different, larger problem.
+{
+    // The census is re-derived here rather than reached for: `c` above is block-scoped, and the first version of
+    // this section read it anyway -- the gate CRASHED with "c is not defined" instead of failing, exit 1 with
+    // ZERO FAIL rows. That is the fourth sighting of that shape this session and the reason failLines.mjs grades
+    // exit codes rather than counting FAIL lines.
+    const SELF_REL = path.relative(ENG, fileURLToPath(import.meta.url)).split(path.sep).join("/");
+    const nr = census(ENG, null, { exclude: (g) => g === SELF_REL }).noRecord;
+    ok("!! *** every gate with no recorded timing is NAMED, and the list is bounded rather than reported ***",
+        nr.length <= 4 && nr.every((r) => typeof r.declaredMs === "number" && r.declaredMs > 0),
+        nr.length
+            ? `${nr.length}: ` + nr.map((r) => `${r.gate} declares ${(r.declaredMs / 1000).toFixed(1)}s`).join("; ") +
+              ". A gate added on a box that cannot write sweep-timings.json has no reading through no fault of " +
+              "its own; FOUR is the bound because that is more rounds of new gates than should ever be waiting"
+            : "none -- every declaring gate has a recorded reading to be compared against");
+
+    ok("...and each one's declaration is a MEASUREMENT, not the placeholder the header format allows",
+        nr.every((r) => r.declaredMs >= 1000 || /\(~\s*[0-9.]+\s*ms/.test(fs.readFileSync(path.join(ENG, r.gate), "utf8").slice(0, 4000))),
+        "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4668's leak, so it " +
+        "has to be a number somebody took rather than a round guess");
+
+    // THE CONTROL: this row would be vacuous if noRecord were empty, and it is not empty today -- but it will
+    // be one day, and a row that passes because a list is empty is the defect two sections above.
+    ok("...and the assertion is not vacuous today, which is stated rather than assumed",
+        nr.length > 0,
+        `noRecord holds ${nr.length}. IF THIS ROW EVER GOES RED IT IS GOOD NEWS -- it means every declaring ` +
+        "gate has a reading -- and the row above should then be re-read as a bound on an empty set, which is " +
+        "not a check. Delete this row and tighten that one to zero when that happens; do not leave both");
+}
+
 console.log(fails ? `\ndeclaredCost-selfcheck: ${fails} FAILED` : "\ndeclaredCost-selfcheck: all checks pass");
 console.log("\nunchecked here: WHETHER ANY DECLARED COST IS TRUE. This file grades the reading of a header " +
     "against a record, and a header that is wrong in the same way the record is wrong would pass. The 7 that " +
