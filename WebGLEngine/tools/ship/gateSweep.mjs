@@ -8032,6 +8032,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4721 -- THE 328th CLOSING: H15 not supported -- the direction holds at x2 and the consistency does not.
+    since403: Object.freeze({
+        at: "v4721", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayRepMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameSwayRep-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H15 re-derived)"]),
+        verdict: "*** H15 IS NOT SUPPORTED: NEITHER CELL CLEARS, AND THE READING IS THE TABLE'S THIRD ROW -- THE DIRECTION HOLDS AND " +
+                 "THE STRENGTH DOES NOT REPLICATE. *** v4720's runner ran as committed on sway at x2, upscale 3x, both geometries -- " +
+                 "546 frames, 945 s. Each cell stops at 6 of 7, exact sign p 0.0625: forward with bars against it at +0.466 (t p " +
+                 "0.078), vertical with smooth against it at +0.063 (t p 0.018). 12 of 14 scene-cells rank backwards, mean rho -0.234 " +
+                 "forward and -0.316 vertical. H14's split does not recur: the forward geometry, which cleared at x4, does not clear " +
+                 "at x2. The document named bars and zone as the scenes that had gone against it before; bars did, forward, and " +
+                 "smooth -- not named -- did vertically. *** WHAT DID NOT REPLICATE, AS A DESCRIPTION: *** the mean rho at x2 is " +
+                 "close to H14's -- -0.234 against -0.235 forward, -0.316 against -0.258 vertical -- so what the exact sign test " +
+                 "failed on is consistency. Across the four sway cells 25 of 28 scene-cells rank backwards, and the scenes against " +
+                 "it are bars, smooth, none and bars; five scenes go backwards in all four. No test is attached and no scene is " +
+                 "dropped. *** C25 AND C26 HELD ON BOTH CELLS: *** the slab stayed whole in all 518 scored frames, and it reversed in " +
+                 "the picture within 1.5 frames of both turns in all fourteen scene-cells, so the path was honoured where it was " +
+                 "declared. C12 re-harvested zone on sway identically. The first draft of the description typed 'a different scene " +
+                 "each time', and bars went against it in two of the four cells; the list is now computed. H15 joins " +
+                 "render/frameVerdicts.mjs, re-derived. *** THIRTEEN SABOTAGES, THIRTEEN RED, AFTER ONE CRASH THAT WAS THE GATE'S. " +
+                 "*** Scoring the turn frames let a cell reach 7 of 7, and the verdict row read `.rho` off a scene that was not " +
+                 "against it; it now reads through a lookup that can be empty, and the same sabotage reddens three rows. One C26 " +
+                 "sabotage isolates it: a forward scene swapped for H14's sway rows at x4 keeps the slab whole -- C25 passes -- but " +
+                 "turns at the wrong times, and C26 reddens. The measurement gate runs 70.8 s alone and is hand-filed.",
+    }),
     // v4720 -- THE 327th CLOSING: pre-registration -- H14 replicated at x2, with a ratio chosen so no declared frame was seen.
     since402: Object.freeze({
         at: "v4720", swept: 1, green: 1, red: 0,

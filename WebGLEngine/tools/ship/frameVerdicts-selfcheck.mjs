@@ -26,6 +26,7 @@ import { PREREG_H10, CACHE_H10, RESULT_H10, VERT_KEYS, h10 } from "./frameVertic
 import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, h11, cellOf } from "./frameGain.mjs";
 import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, reverse } from "./frameReverse.mjs";
 import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, h14 } from "./frameSway.mjs";
+import { PREREG_H15, CACHE_H15, RESULT_H15, REP_KEYS, h15 } from "./frameSwayRep.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -53,6 +54,7 @@ const RUN = {
     // v4717 -- H13 is H12's document read on H12's frames: it has a runner and no cache of its own, so no frame is counted twice.
     H13: { doc: PREREG_H12, cache: null, d: declared(readDoc(PREREG_H12), REV_KEYS) },
     H14: { doc: PREREG_H14, cache: CACHE_H14, d: declared(readDoc(PREREG_H14), SWAY_KEYS) },
+    H15: { doc: PREREG_H15, cache: CACHE_H15, d: declared(readDoc(PREREG_H15), REP_KEYS) },
 };
 
 console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hypotheses, what the page says about them, and whether it is true\n`);
@@ -60,8 +62,8 @@ console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hyp
 console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
 {
     // v4717 -- "in the order measured" allows two hypotheses from one round (H12 and H13 share a document and a harvest).
-    ok("*** H7 to H14, in the order they were measured -- and every one has a runner here ***",
-       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11", "H12", "H13", "H14"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
+    ok("*** H7 to H15, in the order they were measured -- and every one has a runner here ***",
+       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11", "H12", "H13", "H14", "H15"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
        FRAME_VERDICTS.every((v, i) => i === 0 || Number(v.round.slice(1)) >= Number(FRAME_VERDICTS[i - 1].round.slice(1))),
        FRAME_VERDICTS.map((v) => `${v.id}@${v.round}`).join(" "));
     const bad = [];
@@ -157,6 +159,17 @@ const R7 = res(RESULT_H7), R8 = res(RESULT_H8), R9 = res(RESULT_H9), R10 = res(R
     ok("*** H14: not supported -- 13 of 14 backwards at the recorded share of H11's strength, and bars the one scene against it -- recomputed ***",
        word(h) === v14.verdict && back === 13 && kept.every((k) => v14.evidence.includes(`${k}%`)) && J(against) === J(["bars"]) && v14.evidence.includes("bars"),
        `${word(h)}; ${back} backwards; kept ${kept.map((k) => k + "%").join(", ")} of H11; against: ${against.join(", ")}`);
+}
+
+{
+    const R15 = res(RESULT_H15), d15 = RUN.H15.d, h = h15(R15.per, d15), v15 = entry("H15");
+    const back = d15.cells.flatMap((c) => d15.scenes.filter((s) => d15.direction * R15.per[c][s].rho > 0)).length;
+    const means = d15.cells.map((c) => (d15.scenes.reduce((a, s) => a + R15.per[c][s].rho, 0) / d15.scenes.length).toFixed(3));
+    const ag = d15.cells.map((c) => d15.scenes.filter((s) => d15.direction * R15.per[c][s].rho < 0));
+    ok("*** H15: not supported -- 12 of 14 backwards at the recorded means, each cell at 6 of 7 with bars and smooth against it -- recomputed ***",
+       word(h) === v15.verdict && back === 12 && means.every((m) => v15.evidence.includes(m)) && d15.cells.every((c) => h.cells[c].test.sign.up === 6) &&
+       J(ag) === J([["bars"], ["smooth"]]) && ag.flat().every((s2) => v15.evidence.includes(s2)),
+       `${word(h)}; ${back} backwards; means ${means.join(", ")}; against: ${ag.map((a) => a.join(",")).join(" / ")}`);
 }
 
 console.log("\n3. *** EVERY COUNT AND THE HEADROOM, RECOMPUTED FROM THE CACHES ***");

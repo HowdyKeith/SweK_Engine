@@ -85,8 +85,9 @@ const d14 = declared(readDoc(PREREG_H14), SWAY_KEYS), cells = d.cells.map(cellOf
     const v14 = FRAME_VERDICTS.find((v) => v.id === "H14"), quoted = ["**13 of 14**", "**57%**", "**65%**"];
     ok("*** the numbers it quotes from H14 are the ones the page's verdict table holds for H14 ***",
        quoted.every((q) => doc.includes(q) && v14.numbers.includes(q.replace(/\*/g, ""))), quoted.join(", "));
-    ok("*** no data yet: no cache and no result -- the measurement round inverts this row ***",
-       !fs.existsSync(path.join(ENG, CACHE_H15)) && !fs.existsSync(path.join(ENG, RESULT_H15)));
+    // v4721 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    ok("*** the measurement exists, produced under THIS document's constants -- v4720's 'no data yet', inverted ***",
+       fs.existsSync(path.join(ENG, CACHE_H15)) && fs.existsSync(path.join(ENG, RESULT_H15)) && J(res(RESULT_H15).declared) === J(d));
 }
 
 console.log("\n2. *** THE STATISTIC IS H14's, AND THE TURNS ARE x2's ***");
@@ -158,6 +159,6 @@ console.log("\n3. *** THE PAGE, DRIVEN AT x1 -- A SPEED THE DOCUMENT DOES NOT DE
 }
 
 console.log(`\nframeSwayRep-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY DECLARED CELL -- nothing is harvested on sway at x2; C25, C26 and C12 on the declared cells are the " +
-            "measurement round's.");
+console.log("unchecked here: THE DECLARED CELLS -- they are tools/ship/frameSwayRepMeasure-selfcheck.mjs's, which re-derives H15 and " +
+            "checks C25, C26 and C12 on them.");
 process.exit(fails ? 1 : 0);
