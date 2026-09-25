@@ -17,6 +17,24 @@
 // header, "Finding 2") across 8 independently-shuffled candidate orderings, so a future edit that reintroduces
 // the naive policy fails this gate rather than passing by luck on whichever order happens to be tested.
 //
+// ROUND 7 SABOTAGES (section 14), applied to the real file with a `finally` restore verified by md5sum, and
+// RE-MEASURED against the final file after the adversarial-review fixes -- counts are THIS gate's reds;
+// meshBooleanBlast-selfcheck.mjs's header has all three gates' counts for the same mutations:
+//   S1  gate inverted -> 7 red: 14b x2, 14c straddle, 14d, 14e, 14g, 14i
+//   S2  gate consults only the FIRST member of a coplanar group -> 1 red: 14d, the fixture built for it
+//   S3  gate honours only "intersect" -> 2 red: 14e and 14g
+//   S4  default flipped ON (gateByIntersection !== false) -> 2 red: 14a (the round-5 contract) and 14c's
+//       fewer-fragments comparison, whose "ungated" run is the default call
+//   R1  plane dedup reverted to round 5's normal+offset test -> 1 red: 14h (planeCount 1)
+//   R2  per-plane group pre-filter removed -> 1 red: 14i (groupsSkipped 0) -- correctness-neutral by design
+//   R3  pre-filter keeps only "intersect" members -> 2 red: 14e and 14g
+//   R5  fragment gate treats "coplanar" as not meeting -> 1 red: 14g, added because the review's version of
+//       this mutation went 0 red here
+//   The first draft of 14f's oracle (10-step sampling, T0/T1 crossing z=1 along 0.2 units) could not see the
+//   UNSPLIT triangle straddle farB at all -- 14f itself caught that before any sabotage was run. The first draft
+//   of 14i put its missing triangle in T0's own plane, where it joined a group that DOES meet triA -- 14i went
+//   red on its own fixture and was moved to its own plane.
+//
 // SABOTAGE LOG -- each applied to the real physics/mesh/triFragmentAccumulate.mjs, gate run, exit read, file
 // restored byte for byte (restore verified via md5sum against a saved copy before every sabotage). Sabotages
 // A/B/C predate an adversarial review of this round; D-H were added to gate that review's own fixes (see this
@@ -500,6 +518,169 @@ const candBp = groupCandidatesByTriA(pairsBp).get(TRI_A);
         `capped=${r2.capped} planeCount=${r2.planeCount} fragCount=${r2.fragments.length} -- the real y=0.4 plane's ` +
         `own index (8) appears in ANY surviving fragment's splitBy: ${realPlaneApplied} (the near-duplicate cascade ` +
         `starved the budget before the geometrically necessary cut was ever applied); see triFragmentAccumulate.mjs's own header)`);
+}
+
+// ---- 14. *** ROUND 7: THE OPT-IN INTERSECTION GATE (gateByIntersection). *** See triFragmentAccumulate.mjs's
+// own ROUND 7 header paragraph for the argument. The ORACLE here shares no code with the gate: a plain
+// Moller-Trumbore segment-vs-triangle test, run between every pair of barycentric sample points inside each
+// final fragment, against every B-triangle -- if any such segment crosses a B-triangle's interior, that fragment
+// STRADDLES B's surface and its centroid cannot speak for it. That property (and nothing about where cuts land)
+// is what the downstream classifier needs, so it is what is checked, on both paths. Sampling density (a
+// 24-step barycentric grid) and T0/T1's size in 14c were RAISED after 14f caught the first draft (a 10-step
+// grid, T0/T1 crossing z=1 along only 0.2 units) never sampling across the crossing at all -- an oracle that
+// could not see the UNSPLIT triangle straddle is not an oracle.
+{
+    function segCrossesTri(p, q, T) {
+        const [a, b, c] = T;
+        const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], e2 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+        const d = [q[0]-p[0], q[1]-p[1], q[2]-p[2]];
+        const h = [d[1]*e2[2]-d[2]*e2[1], d[2]*e2[0]-d[0]*e2[2], d[0]*e2[1]-d[1]*e2[0]];
+        const det = e1[0]*h[0] + e1[1]*h[1] + e1[2]*h[2];
+        if (Math.abs(det) < 1e-14) return false;
+        const f = 1 / det, sv = [p[0]-a[0], p[1]-a[1], p[2]-a[2]];
+        const u = f * (sv[0]*h[0] + sv[1]*h[1] + sv[2]*h[2]);
+        if (u <= 1e-9 || u >= 1 - 1e-9) return false;
+        const qv = [sv[1]*e1[2]-sv[2]*e1[1], sv[2]*e1[0]-sv[0]*e1[2], sv[0]*e1[1]-sv[1]*e1[0]];
+        const v = f * (d[0]*qv[0] + d[1]*qv[1] + d[2]*qv[2]);
+        if (v <= 1e-9 || u + v >= 1 - 1e-9) return false;
+        const t = f * (e2[0]*qv[0] + e2[1]*qv[1] + e2[2]*qv[2]);
+        return t > 1e-9 && t < 1 - 1e-9;
+    }
+    function samples(tri, n = 24) {
+        const out = [];
+        for (let i = 1; i < n; i++) for (let j = 1; i + j < n; j++) {
+            const a = i / n, b = j / n, c = 1 - a - b;
+            out.push([0, 1, 2].map((k) => a*tri[0][k] + b*tri[1][k] + c*tri[2][k]));
+        }
+        return out;
+    }
+    function straddlers(fragments, bTris) {
+        let n = 0;
+        for (const f of fragments) {
+            const S = samples(f.tri);
+            let hit = false;
+            for (const T of bTris) {
+                for (let i = 0; i < S.length && !hit; i++) for (let j = i + 1; j < S.length && !hit; j++) {
+                    if (segCrossesTri(S[i], S[j], T)) hit = true;
+                }
+                if (hit) break;
+            }
+            if (hit) n++;
+        }
+        return n;
+    }
+    const areaSum = (fr) => fr.reduce((s, f) => s + triArea(f.tri), 0);
+
+    // 14a. default is OFF: byte-identical to round 5 when the option is absent.
+    const d0 = accumulateFragments(cubeA, TRI_A, cubeB, candB);
+    const d1 = accumulateFragments(cubeA, TRI_A, cubeB, candB, { gateByIntersection: false });
+    ok("14a. gateByIntersection defaults OFF -- round 5's own behaviour, byte-identical, zero gate counters",
+        JSON.stringify(d0.fragments) === JSON.stringify(d1.fragments) && d0.gateSkipped === 0 && d0.gateTested === 0,
+        "fragments=" + d0.fragments.length + " gateSkipped=" + d0.gateSkipped + " gateTested=" + d0.gateTested);
+
+    // 14b. on this file's OWN closed-B scenarios (literal B, asymmetric B'), gated and ungated give the same
+    // inside/outside area split -- the 0.08 section 6 exists to hold, now held on the gated path too.
+    for (const [name, trisB, bvh, cand] of [["literal B", cubeB, bvhB, candB], ["asymmetric B'", cubeBp, bvhBp, candBp]]) {
+        const u = splitArea(bvh, accumulateFragments(cubeA, TRI_A, trisB, cand).fragments);
+        const gr = accumulateFragments(cubeA, TRI_A, trisB, cand, { gateByIntersection: true });
+        const g = splitArea(bvh, gr.fragments);
+        ok("14b. " + name + ": gated inside/outside split equals the ungated one",
+            close(g.inside, u.inside, 1e-12) && close(g.outside, u.outside, 1e-12) && close(g.sum, 0.5, 1e-12) &&
+            windingOk(TRI_A_TRI, gr.fragments),
+            "gated in=" + g.inside + " out=" + g.outside + " vs ungated in=" + u.inside + " out=" + u.outside);
+    }
+
+    // 14c. THE POINT OF THE GATE: a large triA, and B-triangles that are SMALL and FAR APART. T0 (plane x=3) sits
+    // near y=-4.4; T1 (plane y=-4) sits near x=4.4. Ungated, T1's plane re-cuts the x<3 fragment T0 created,
+    // though T1 is nowhere near it. Gated, it does not -- and neither path leaves a fragment straddling B.
+    const bigA = mkBuf([[[-5,-5,1],[5,-5,1],[5,5,1]]]);
+    const farB = [
+        [[3,-4.9,0.5],[3,-3.9,0.5],[3,-4.4,1.5]],   // T0: plane x=3, crosses z=1 for y in [-4.65,-4.15]
+        [[3.9,-4,0.5],[4.9,-4,0.5],[4.4,-4,1.5]],   // T1: plane y=-4, crosses z=1 for x in [4.15,4.65]
+    ];
+    const farBuf = mkBuf(farB);
+    const cu = accumulateFragments(bigA, 0, farBuf, [0, 1]);
+    const cg = accumulateFragments(bigA, 0, farBuf, [0, 1], { gateByIntersection: true });
+    ok("14c. far-apart small B-triangles: the gate declines a cut the ungated path makes, and emits fewer fragments",
+        cg.gateSkipped > 0 && cg.fragments.length < cu.fragments.length,
+        "gated " + cg.fragments.length + " fragments (gateSkipped=" + cg.gateSkipped + ", gateTested=" + cg.gateTested +
+        ") vs ungated " + cu.fragments.length);
+    ok("14c. ...and NEITHER path leaves a fragment straddling a B-triangle (segment-crossing oracle), area conserved, winding kept",
+        straddlers(cg.fragments, farB) === 0 && straddlers(cu.fragments, farB) === 0 &&
+        close(areaSum(cg.fragments), 50, 1e-9) && windingOk([[-5,-5,1],[5,-5,1],[5,5,1]], cg.fragments),
+        "gated straddlers=" + straddlers(cg.fragments, farB) + " ungated straddlers=" + straddlers(cu.fragments, farB) +
+        " gated area=" + areaSum(cg.fragments));
+
+    // 14d. A COPLANAR GROUP WHERE ONLY THE SECOND MEMBER MEETS THE FRAGMENT. T2 (plane y=-2, spanning the whole
+    // triangle) splits triA first. Then T3 and T4 share plane x=3 and dedup into ONE group: T3 lies below y=-2,
+    // T4 above it. The upper fragment meets T4 but not T3, so a gate that consulted only the group's first
+    // member would wrongly skip it and leave it straddling T4. The gate must consult EVERY member.
+    const grpB = [
+        [[-6,-2,0.5],[6,-2,0.5],[0,-2,1.5]],        // T2: plane y=-2, crosses the whole triangle
+        [[3,-4.6,0.5],[3,-4.2,0.5],[3,-4.4,1.5]],   // T3: plane x=3, footprint y in [-4.6,-4.2] (below y=-2)
+        [[3,0,0.5],[3,2,0.5],[3,1,1.5]],            // T4: plane x=3, footprint y in [0,2] (above y=-2)
+    ];
+    const gg = accumulateFragments(bigA, 0, mkBuf(grpB), [0, 1, 2], { gateByIntersection: true });
+    ok("14d. coplanar group, only its SECOND member meets the upper fragment: the gate still cuts it (no straddler)",
+        straddlers(gg.fragments, grpB) === 0 && gg.planeCount === 2 && close(areaSum(gg.fragments), 50, 1e-9),
+        "straddlers=" + straddlers(gg.fragments, grpB) + " planeCount=" + gg.planeCount + " fragments=" + gg.fragments.length);
+
+    // 14e. triTriIntersect's "degenerate" status must COUNT AS MEETING. T5 (plane y=-3) has one vertex exactly on
+    // triA's own plane z=1 and crosses it along a real segment from x=2 to x=4 -- triTriIntersect snaps that
+    // vertex to zero and answers "degenerate", not "intersect". A gate that only honoured "intersect" would skip
+    // it and leave the fragment straddling T5.
+    const degB = [[[2,-3,1],[4,-3,0.5],[4,-3,1.5]]];
+    const dg = accumulateFragments(bigA, 0, mkBuf(degB), [0], { gateByIntersection: true });
+    ok("14e. a B-triangle triTriIntersect calls 'degenerate' still cuts the fragment (no straddler)",
+        straddlers(dg.fragments, degB) === 0 && dg.gateTested === 1 && dg.fragments.length > 1,
+        "straddlers=" + straddlers(dg.fragments, degB) + " gateTested=" + dg.gateTested + " fragments=" + dg.fragments.length);
+    const skipAll = { fragments: [{ tri: [[-5,-5,1],[5,-5,1],[5,5,1]] }] };
+    ok("14f. the straddle oracle is not vacuous: the UNSPLIT triangle straddles every fixture above",
+        straddlers(skipAll.fragments, farB) === 1 && straddlers(skipAll.fragments, grpB) === 1 &&
+        straddlers(skipAll.fragments, degB) === 1,
+        "farB=" + straddlers(skipAll.fragments, farB) + " grpB=" + straddlers(skipAll.fragments, grpB) +
+        " degB=" + straddlers(skipAll.fragments, degB));
+
+    // 14g. triTriIntersect's "coplanar" must COUNT AS MEETING too. The adversarial review of round 7 found this
+    // unpinned: a mutation treating "coplanar" like "none" went 0 red in this gate and in meshBooleanBlast.
+    // (Behaviourally near-harmless -- splitting a fragment by a plane it lies in cannot separate it -- but the
+    // header promises the conservative side, so the counters are pinned: the offer reaches the clip.)
+    const copB = [[[0,-3,1],[2,-3,1],[1,-1,1]]];   // lies IN triA's own plane z=1, inside its footprint
+    const cp = accumulateFragments(bigA, 0, mkBuf(copB), [0], { gateByIntersection: true });
+    ok("14g. a B-triangle triTriIntersect calls 'coplanar' is offered to the clip, not skipped",
+        cp.gateTested === 1 && cp.gateSkipped === 0,
+        "gateTested=" + cp.gateTested + " gateSkipped=" + cp.gateSkipped + " unresolved=" + cp.unresolvedCount);
+
+    // 14h. THE PLANE-DEDUP FIX (round 7 review; a round-5 bug, not the gate's). T1 lies in z = +s*y, T2 in
+    // z = -s*y, s = 1e-5: a 2e-5-rad fold whose line runs through the origin. The old merge test (normals within
+    // cos > 1-1e-9, offsets within 1e-9) merged them and clipped by T1's plane alone, so T2 could still cross a
+    // kept fragment. The new test (every vertex within planeEps of the representative plane) keeps them apart.
+    const s5 = 1e-5;
+    const foldB = [
+        [[-1,0,0],[1,0,0],[0,10,10*s5]],     // T1: z = +s*y
+        [[-1,0,0],[0,-10,10*s5],[1,0,0]],    // T2: z = -s*y
+        [[-1,0,0],[1,0,0],[0,10,10*s5]].map((v) => [v[0], v[1], v[2]]).reverse(),   // T1 wound the other way
+    ];
+    const vA = mkBuf([[[0,-5,-1],[0,5,-1],[0,0,1]]]);   // a vertical triangle crossing both halves of the fold
+    const fh = accumulateFragments(vA, 0, mkBuf(foldB), [0, 1, 2]);
+    ok("14h. a 2e-5-rad fold through the origin is TWO planes; an oppositely-wound exact duplicate still merges",
+        fh.planeCount === 2 && fh.duplicatePlanesCollapsed === 1 && straddlers(fh.fragments, foldB) === 0,
+        "planeCount=" + fh.planeCount + " duplicatePlanesCollapsed=" + fh.duplicatePlanesCollapsed +
+        " straddlers=" + straddlers(fh.fragments, foldB));
+
+    // 14i. THE PER-PLANE GROUP PRE-FILTER (round 7 review). A coplanar group whose members all miss triA as a
+    // whole (a copy of 14c's T0 moved to plane x=2 and to z in [2,3], so its plane crosses bigA but it never
+    // touches it) is skipped for every fragment at once, and the result equals the run without it. The first
+    // draft left it in T0's own plane x=3, where it simply joined T0's group -- which DOES meet triA -- so
+    // groupsSkipped read 0 and this check went red on its own fixture.
+    const missB = [...farB, [[2,-4.9,2],[2,-3.9,2],[2,-4.4,3]]];
+    const withMiss = accumulateFragments(bigA, 0, mkBuf(missB), [2, 0, 1], { gateByIntersection: true });
+    const without = accumulateFragments(bigA, 0, farBuf, [0, 1], { gateByIntersection: true });
+    ok("14i. a plane group that misses the whole triangle is skipped wholesale and changes nothing",
+        withMiss.fragments.length === without.fragments.length && withMiss.groupsSkipped === 1 &&
+        without.groupsSkipped === 0 && straddlers(withMiss.fragments, missB) === 0,
+        "with the missing group " + withMiss.fragments.length + " fragments (groupsSkipped=" + withMiss.groupsSkipped +
+        "), without it " + without.fragments.length + " (groupsSkipped=" + without.groupsSkipped + ")");
 }
 
 console.log(`triFragmentAccumulate-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

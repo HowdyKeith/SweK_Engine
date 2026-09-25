@@ -110,6 +110,45 @@
 // fragment-merge/prune step this round does not build. Reproduced directly in this module's own gate (see
 // triFragmentAccumulate-selfcheck.mjs) rather than only described here.
 //
+// *** ROUND 7: THE "FOOTPRINT-BOUNDED CLIPPING" THE CAP PARAGRAPH ABOVE DEFERRED, AS AN OPT-IN GATE. ***
+// opts.gateByIntersection (default FALSE, so every round-5 caller and this module's own round-5 gate see
+// byte-identical behaviour) applies a candidate plane to a live fragment ONLY IF that fragment actually meets
+// at least one of the B-triangles grouped under that plane -- round 2's own triTriIntersect() returning
+// anything other than "none" ("intersect", "coplanar" and "degenerate" all still split, so every uncertain
+// answer falls on the conservative side). WHY THIS IS NOT MERELY FASTER BUT STILL CORRECT: the only property
+// the classifier downstream needs is that no final fragment has B's SURFACE crossing its interior (then its
+// centroid speaks for all of it). Take any final fragment f and any B-triangle T. f descends from exactly one
+// ancestor that was offered T's plane. If that ancestor met T, it was split by T's plane, so f lies on one
+// side of it and T can at most touch f's boundary. If it did not meet T, f is a subset of it and cannot meet T
+// either. Either way T does not cross f's interior -- for every T, so B's whole surface does not. The
+// ungated path splits by T's plane EVERYWHERE it crosses the triangle, including kilometres from T itself,
+// and on a realistic workload that is the difference between right and wrong: physics/mesh/meshCSG.mjs's own
+// wall-minus-jagged-blob fixture (12-triangle wall, 224-triangle blob) produced 18,129 output triangles
+// uncapped, and at the default maxFragments=256 hit the cap and came back 0.20 units of volume wrong (0.74%)
+// -- gated, 473 triangles, exact volume, cap never reached. Measured and gated in
+// physics/mesh/meshBooleanBlast-selfcheck.mjs, not asserted here.
+//
+// *** THE ARGUMENT ABOVE HAD A HOLE, AND IT WAS ROUND 5's, FOUND BY ROUND 7's ADVERSARIAL REVIEW. *** "split by
+// T's plane" was not true: Finding 1's dedup merged candidates whose normals were within cos>1-1e-9 (up to
+// 4.47e-5 rad) and whose offsets matched within 1e-9 -- which any fold whose line passes near the origin
+// satisfies -- and then clipped the whole group by the REPRESENTATIVE's plane. A roof prism with a 2e-5-rad
+// ridge through the origin, subtracted from a box, came back 0.048 units of volume wrong on the gated,
+// ungated and round-6 paths identically (meshCSG.mjs's BSP: exact). FIXED at the merge: a candidate now joins
+// a group only if every one of its own vertices lies within planeEps of the representative's plane, which is
+// the property the clip needs. The argument holds with that test, to within planeEps: a merged T lies in a
+// planeEps slab about the plane that did the cut. Gated in triFragmentAccumulate-selfcheck.mjs 14h and
+// meshBoolean-selfcheck.mjs section 14 (the roof itself, exact on every slope).
+//
+// TWO MORE ROUND-7 REVIEW CHANGES: the gate first filters each plane group ONCE against the whole triA (every
+// fragment is a subset of triA, so a member that misses triA misses every fragment) -- a large flat group that
+// crossed triA's plane without touching it had cost fragments x members triTriIntersect calls, 7.9M and 2.1 s
+// on one triangle, 0.22 s after. And it is NOT a fix for scaling: every plane is still tested against every
+// live fragment of its triangle, with no spatial index of the fragments, so cost grows roughly quadratically
+// with how finely B is tessellated where it crosses one A-triangle. Measured by the review (wall minus
+// jaggedBlob subdiv n, one blast): n=8 71 ms, 16 103 ms, 32 898 ms, 64 14.6 s (7x the BSP), 96 121 s, and at
+// n=128 (65,024 blob triangles) 7.1 minutes ending capped. A per-triangle fragment index is the fix; it is not
+// built.
+//
 // SCOPE: this module produces a CLASSIFIABLE fragment set for one triangle of mesh A against every relevant
 // candidate of mesh B -- it does not itself classify fragments (hand the result's fragment centroids to
 // physics/mesh/meshPointClassify.mjs's pointInMesh(), round 4's own primitive, for that), and it does not
@@ -121,6 +160,7 @@
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { trianglePlane, clipTriangleByPlane } from "./triClip.mjs";
+import { triTriIntersect } from "./triTriIntersect.mjs";
 
 const EPS = 1e-9;
 // Plane-identity dedup tolerance: cos(angle-between-normals) > 1-PLANE_EPS AND |offset difference| < PLANE_EPS.
@@ -210,9 +250,11 @@ function resolveDegenerate(tri, nRaw, dRaw) {
  * @param {number[]} candidateTriBs  typically groupCandidatesByTriA(pairOverlap(bvhA,bvhB)).get(triA) -- an
  *   ALREADY-FILTERED per-triangle candidate list, not raw pairOverlap() output (see groupCandidatesByTriA()'s
  *   own docs for why this function does not call pairOverlap() itself).
- * @param {{planeEps?:number, maxFragments?:number}} [opts]
+ * @param {{planeEps?:number, maxFragments?:number, gateByIntersection?:boolean}} [opts]
+ *   gateByIntersection: see this file's own ROUND 7 header paragraph. Default false (round-5 behaviour).
  * @returns {{fragments:{tri:number[][], splitBy:number[], lowConfidence?:boolean}[], planeCount:number,
- *   duplicatePlanesCollapsed:number, degenerateFallbacks:number, unresolvedCount:number, capped:boolean}}
+ *   duplicatePlanesCollapsed:number, degenerateFallbacks:number, unresolvedCount:number, capped:boolean,
+ *   gateSkipped:number, gateTested:number, groupsSkipped:number}}
  *   fragments: each a fresh [p0,p1,p2] raw-point triangle plus splitBy (the distinct planes' own representative
  *     triB indices that actually produced a cut kept in this fragment's ancestry) and lowConfidence (present
  *     and true only if this fragment or an ancestor hit the genuinely-unresolved all-three-vertices-on-plane
@@ -227,10 +269,14 @@ function resolveDegenerate(tri, nRaw, dRaw) {
  *     on the plane) -- the honestly-named residual gap this round leaves, not silently absorbed into
  *     degenerateFallbacks.
  *   capped: true if maxFragments was reached before every candidate plane was applied.
+ *   gateSkipped / gateTested: (fragment, plane) offers the intersection gate declined / passed on to the clip.
+ *     Both 0 when gateByIntersection is off.
+ *   groupsSkipped: plane groups the gate dropped WHOLESALE because no member meets triA at all (round 7).
  */
 export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {}) {
     const planeEps = opts.planeEps ?? PLANE_EPS;
     const maxFragments = opts.maxFragments ?? DEFAULT_MAX_FRAGMENTS;
+    const gate = opts.gateByIntersection === true;
     // An adversarial review of this round found candidateTriBs=undefined -- exactly what
     // groupCandidatesByTriA(pairs).get(triA) returns for the common case of a triA with zero overlap
     // candidates, this module's own documented typical calling pattern -- crashed with a TypeError instead of
@@ -254,25 +300,55 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
         const plane = trianglePlane(trisB, triB);
         if (plane === null) continue;   // zero-area B-triangle: no well-defined plane, skip (same convention
                                           // triTriIntersect.mjs/triClip.mjs already use for a degenerate input)
+        // ROUND 7 FIX (found by that round's adversarial review, reproduced before it was changed): the merge
+        // test used to be "normals within cos>1-planeEps AND offsets within planeEps". cos>1-1e-9 admits normals
+        // up to 4.47e-5 rad apart, and the offset test passes whenever the fold line between the two planes
+        // runs near the origin -- a roof ridge on y=0, a corrugated sheet centred on the origin. The group is
+        // then clipped by its REPRESENTATIVE's plane only, so a merged triangle whose own plane is 2e-5 rad off
+        // still crosses the kept fragments: a roof prism 0.2 units tall over 100 units, subtracted from a box,
+        // came back 0.048 units of volume wrong (and 0.024, 0.0024 at shallower slopes), identically on the
+        // gated, ungated and round-6 paths, where meshCSG.mjs's BSP was exact. The test is now the property the
+        // clip actually needs: every vertex of the candidate lies within planeEps of the representative's
+        // plane (distance is sign-free, so an oppositely-wound duplicate still merges -- round 5's fix (4)).
+        const tv = readTri(trisB, triB);
         let match = null;
         for (const p of planes) {
-            const c = dot(p.n, plane.n);
-            if (c > 1 - planeEps && Math.abs(p.d - plane.d) < planeEps) { match = p; break; }
-            if (c < -(1 - planeEps) && Math.abs(p.d + plane.d) < planeEps) { match = p; break; }
+            if (tv.every((v) => Math.abs(dot(p.n, v) + p.d) < planeEps)) { match = p; break; }
         }
         if (match) match.triBs.push(triB); else planes.push({ n: plane.n, d: plane.d, triBs: [triB] });
     }
 
     let fragments = [{ tri: readTri(trisA, triA), splitBy: [] }];
     let degenerateFallbacks = 0, unresolvedCount = 0, capped = false, appliedPlaneCount = 0;
+    let gateSkipped = 0, gateTested = 0, groupsSkipped = 0;
     const scratch = new Float64Array(9);
 
     for (const plane of planes) {
         if (fragments.length >= maxFragments) { capped = true; break; }
         appliedPlaneCount++;
+        // Round 7, found by that round's adversarial review: the gate below scans every member of a coplanar
+        // group for every live fragment, so a large group that crosses triA's plane but never touches triA (a
+        // finely tessellated flat sheet) cost fragments x members triTriIntersect calls -- 7.9M calls, 1.8 s,
+        // on one triangle when the group happened to come last. Every fragment is a subset of triA, so a
+        // member that misses the WHOLE of triA cannot meet any fragment: filter the group once, here.
+        let members = plane.triBs;
+        if (gate) {
+            members = plane.triBs.filter((triB) => triTriIntersect(trisA, triA, trisB, triB).status !== "none");
+            if (members.length === 0) { gateSkipped += fragments.length; groupsSkipped++; continue; }
+        }
         const next = [];
         for (const frag of fragments) {
             packScratch(scratch, frag.tri);
+            if (gate) {
+                // Round 7: only "none" skips -- see this file's own header for why that keeps every final
+                // fragment free of B's surface in its interior.
+                let meets = false;
+                for (const triB of members) {
+                    if (triTriIntersect(scratch, 0, trisB, triB).status !== "none") { meets = true; break; }
+                }
+                if (!meets) { gateSkipped++; next.push(frag); continue; }
+                gateTested++;
+            }
             const res = clipTriangleByPlane(scratch, 0, plane.n, plane.d);
             if (res.status === "allFront" || res.status === "allBack") {
                 next.push(frag);
@@ -320,6 +396,9 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
         degenerateFallbacks,
         unresolvedCount,
         capped,
+        gateSkipped,
+        gateTested,
+        groupsSkipped,
     };
 }
 

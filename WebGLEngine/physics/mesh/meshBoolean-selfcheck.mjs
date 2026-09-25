@@ -40,6 +40,23 @@
 // scratch-verification independently confirmed AND EXTENDED (found a third failing case the research's own
 // probe did not report), not previously known to any prior round of this arc.
 //
+// ROUND 7 (intersection gate on by default, cap raised, top-level `capped`, and the adversarial review's
+// fixes): section 11 was RE-BASELINED -- 29/117 unmatched gated (ceiling tightened 45 -> 35) with round 6's
+// 37/189 kept as its own ungated reproduction -- section 8 gained two top-level-capped checks, and section 14
+// the plane-dedup roof and the accOpts merge. Sabotages on the real files, `finally`-restored, md5 verified,
+// RE-MEASURED against the final files; counts are THIS gate's reds (meshBooleanBlast-selfcheck.mjs's header
+// has all three gates'):
+//   S1 gate inverted -> 16.  S2 first-group-member only -> 1.  S3 only "intersect" meets -> 8.
+//   S4 accumulate default flipped ON -> 0 (not this file's contract; triFragmentAccumulate-selfcheck 14a).
+//   S5 meshBoolean default gate OFF -> 3: section 11 both, section 14's merge check.
+//   S6 default cap back to 256 -> 0 here (no box fixture needs 257 fragments); meshBooleanBlast catches it.
+//   S7 top-level capped = stats.a.capped only -> 0 red on the FIRST run, across all three gates -- a real gap.
+//      Section 8's B-only fixture (the blob as A, meshCSG's wall as B, round 6's ungated 256-cap path) was
+//      added for it; re-run: 1 red, that check.
+//   R1 plane dedup reverted -> 1 (section 14's roof, 0.048).  R2 pre-filter removed -> 0 (perf-only; pinned in
+//   triFragmentAccumulate-selfcheck 14i).  R3 pre-filter keeps only "intersect" -> 6.  R4 accOpts plain spread
+//   -> 1 (section 14).  R5 "coplanar" treated as not meeting -> 1, incidental (section 5's drop demo).
+//
 // SABOTAGE LOG -- each applied to the real physics/mesh/meshBoolean.mjs, gate run, exit read, file restored
 // byte for byte (restore verified via md5sum against a saved copy before every sabotage). Sabotages A-E were
 // first measured before sections 12/13 existed (an earlier version of this log recorded those smaller counts
@@ -106,7 +123,7 @@ import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 
 let fails = 0;
@@ -405,6 +422,27 @@ console.log("\n8. *** REUSING meshCSG-selfcheck.mjs's OWN 8 DEGENERATE-CONTACT F
         ok("!! stats.capped correctly reports true when accOpts.maxFragments is forced tiny (exercises the true/nonzero propagation path, not just false)",
             rCapped.stats.a.capped === true || rCapped.stats.b.capped === true,
             "statsA.capped=" + rCapped.stats.a.capped + " statsB.capped=" + rCapped.stats.b.capped);
+        // Round 7: a capped result is WRONG, not approximate (meshBooleanBlast-selfcheck.mjs section 1 measures
+        // 0.74% on meshCSG's own blast fixture), so meshBoolean() now surfaces it at the TOP LEVEL rather than
+        // leaving it in stats.a/stats.b where round 6 left it. Both directions checked: true when forced, false
+        // on the same fixture at the default cap.
+        const rDefault = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
+        ok("!! round 7: the top-level `capped` is true when either side capped, and false at the default cap",
+            rCapped.capped === true && rDefault.capped === false &&
+            rCapped.capped === (rCapped.stats.a.capped || rCapped.stats.b.capped),
+            "forced-tiny capped=" + rCapped.capped + ", default capped=" + rDefault.capped +
+            " (default cap MESH_BOOLEAN_MAX_FRAGMENTS=" + MESH_BOOLEAN_MAX_FRAGMENTS + ")");
+        // ...and when ONLY side B caps. The first draft of this check used only the forced-tiny fixture above,
+        // where side A caps, so a sabotage reporting `capped = stats.a.capped` alone went 0 red. Here the blob
+        // is A (few candidates per triangle, never caps) and meshCSG's wall is B (its big face triangles cap at
+        // 256 on round 6's ungated path): stats.a false, stats.b true, and the top level must still say true.
+        const blobBuf = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 8, 12345));
+        const wallBuf = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [4, 3, 0.3]));
+        const rB = meshBoolean(blobBuf, new MeshBVH(blobBuf), wallBuf, new MeshBVH(wallBuf), "union",
+            { accOpts: { gateByIntersection: false, maxFragments: 256 } });
+        ok("!! round 7: the top-level `capped` is true when ONLY side B capped",
+            rB.stats.a.capped === false && rB.stats.b.capped === true && rB.capped === true,
+            "stats.a.capped=" + rB.stats.a.capped + " stats.b.capped=" + rB.stats.b.capped + " capped=" + rB.capped);
     }
 }
 
@@ -482,8 +520,24 @@ console.log("\n11. *** THE A-VS-B SEAM DOES NOT COINCIDE, MEASURED AS A NAMED, N
         " matched-within-1e-6=" + matched + " (" + (matchRate*100).toFixed(1) + "%) -- measured baseline, not a correctness claim");
     const r = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract");
     const wt = M.watertight(wrapAsPolys(r.tris));
+    // ROUND 7 RE-BASELINE, NOT A LOOSENING: meshBoolean() now gates accumulation by actual intersection by
+    // default (see triFragmentAccumulate.mjs's own ROUND 7 paragraph). The same fixture measured 37/189
+    // unmatched with 104 A-side cut vertices (17.3% coinciding with a B-side one) under round 6's ungated path;
+    // gated it measured 32/120 with 36 A-side cut vertices (47.2%), and 29/117 with 33 (48.5%) once round 7's
+    // review added the per-plane group pre-filter (a group missing the whole triangle no longer splits it). The
+    // ceiling is TIGHTENED from 45 to 35 for the default path, and round 6's ungated number is kept as its own
+    // reproduction so the comparison stays in the gate rather than only in this comment. (An adversarial review
+    // noted the gated unmatched RATIO is worse -- 29/117 is 25% against 37/189's 20% -- the count and the mesh
+    // are smaller, the fraction of seam edges is not; stated here rather than letting "improved" stand alone.)
     ok("!! watertight() unmatched-edge count on the primary fixture stays within the measured baseline (non-regression, not zero-crack)",
-        wt.unmatched <= 45, "unmatched=" + wt.unmatched + "/" + wt.edges + " (baseline measured at 37/189 during scratch-verification)");
+        wt.unmatched <= 35, "unmatched=" + wt.unmatched + "/" + wt.edges + " (gated default, measured 29/117 at round 7)");
+    const r6 = meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract",
+        { accOpts: { gateByIntersection: false } });
+    const wt6 = M.watertight(wrapAsPolys(r6.tris));
+    ok("   ...and round 6's ungated path, kept reachable by option, still measures its own round-6 baseline",
+        wt6.unmatched <= 45 && wt6.edges > wt.edges && r6.triCount > r.triCount,
+        "ungated unmatched=" + wt6.unmatched + "/" + wt6.edges + " tris=" + r6.triCount + " vs gated tris=" + r.triCount +
+        " (round 6 measured 37/189)");
 }
 
 // =============================================================================================================
@@ -540,6 +594,55 @@ console.log("\n13. *** A DEGENERATE (ZERO-VOLUME) OPERAND -- A NEW, MEASURED, NO
     ok("!! ...and confirms the wrong-SIGN symptom specifically: subtract of a zero-volume operand yields a NEGATIVE volume (mathematically impossible for a real subtract result)",
         (() => { const r = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract"); return M.volume(wrapAsPolys(r.tris)) < 0; })(),
         "confirms the review's own headline finding, not merely a magnitude error");
+}
+
+// =============================================================================================================
+console.log("\n14. *** ROUND 7 REVIEW FIXES: THE PLANE-DEDUP ROOF, AND accOpts THAT ARE PRESENT BUT UNDEFINED ***");
+{
+    // An adversarial review of round 7 found round 5's plane dedup merging B-triangles whose normals differ by
+    // up to 4.47e-5 rad (cos > 1-1e-9) whenever their fold line ran near the origin, then clipping the whole
+    // group by ONE representative plane. B here is a closed roof prism, ridge on y=0 through the origin, roof
+    // z = z0 - s|y| over |y| <= 100; A is a 2 x 120 x 1 box whose top face cuts the roof. Exact A - B volume
+    // is 2*(60 + s*3600) by hand (the roof's wedge over |y|<=60, x in [-1,1]). Measured BEFORE the fix, on
+    // gated, ungated and round-6 paths alike: s=2e-5 -> -0.048, 1e-5 -> -0.024, 1e-6 -> -0.0024. meshCSG's
+    // BSP was exact. Checked on BOTH centrings the review used (ridge through the origin, and 5 units above).
+    const quad = (a, b, c, d) => [[a, b, c], [a, c, d]];
+    function roofPrism(s, z0) {
+        const W = 100, X = 10, Z = z0 - 1;
+        const pts = (x) => [[x, -W, Z], [x, W, Z], [x, W, z0 - s * W], [x, 0, z0], [x, -W, z0 - s * W]];
+        const L = pts(-X), R = pts(X), T = [];
+        for (let i = 1; i < 4; i++) { T.push([R[0], R[i], R[i + 1]]); T.push([L[0], L[i + 1], L[i]]); }
+        for (let k = 0; k < 5; k++) { const k1 = (k + 1) % 5; T.push(...quad(L[k], L[k1], R[k1], R[k])); }
+        const buf = new Float64Array(T.length * 9);
+        T.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = t[v][c]; });
+        return buf;
+    }
+    let worst = 0, worstUngated = 0, detail = [];
+    for (const z0 of [0, 5]) for (const s of [2e-5, 1e-5, 1e-6]) {
+        const bufB = roofPrism(s, z0);
+        const bufA = M.toTriangleBuffer(M.boxPolys([0, 0, z0], [1, 60, 0.5]));
+        const bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
+        const exact = 2 * (60 + s * 3600);
+        const g = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract").tris)) - exact;
+        const u = M.volume(wrapAsPolys(meshBoolean(bufA, bA, bufB, bB, "subtract",
+            { accOpts: { gateByIntersection: false, maxFragments: 256 } }).tris)) - exact;
+        worst = Math.max(worst, Math.abs(g)); worstUngated = Math.max(worstUngated, Math.abs(u));
+        detail.push("z0=" + z0 + ",s=" + s + ":" + g.toExponential(1));
+    }
+    ok("!! shallow roof ridge (dihedral 4e-6..4e-5 rad) subtracted from a box: exact on every slope and centring",
+        worst < 1e-9 && worstUngated < 1e-9,
+        "worst |err| gated " + worst.toExponential(2) + ", round-6 path " + worstUngated.toExponential(2) +
+        " (before the fix: 0.048 / 0.024 / 0.0024 on both) -- " + detail.join(" "));
+
+    // {maxFragments: undefined} used to spread over the default and fall through to triFragmentAccumulate's own
+    // 256; {gateByIntersection: undefined} used to turn the gate off. Both must now leave the defaults alone.
+    const { bufA, bvhA, bufB, bvhB } = PRIMARY;
+    const d0 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract");
+    const dU = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: undefined, maxFragments: null } });
+    ok("!! accOpts keys that are present but undefined/null do NOT override meshBoolean's defaults",
+        dU.triCount === d0.triCount && dU.stats.a.gateTested === d0.stats.a.gateTested && dU.stats.a.gateTested > 0,
+        "default tris=" + d0.triCount + " gateTested=" + d0.stats.a.gateTested + "; with undefined/null keys tris=" +
+        dU.triCount + " gateTested=" + dU.stats.a.gateTested);
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

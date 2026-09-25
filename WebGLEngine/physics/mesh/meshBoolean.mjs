@@ -178,7 +178,45 @@
 //   low-confidence, neither attempted here. Reproduced directly in this file's own gate (not hidden).
 //
 // Built with ZERO changes to mesh/meshBVH.mjs, bvhPairOverlap.mjs, triClip.mjs, meshPointClassify.mjs, or
-// triFragmentAccumulate.mjs, continuing every prior round's own convention.
+// triFragmentAccumulate.mjs, continuing every prior round's own convention. (Round 6's statement. Round 7 DID
+// change triFragmentAccumulate.mjs -- one opt-in option, default off, see below -- rather than copy its
+// private resolveDegenerate() into a new file to avoid touching it.)
+//
+// *** ROUND 7: THIS FILE WAS WRONG ON THE WORKLOAD THE ARC EXISTS FOR, AND NOTHING IN ITS OWN GATE COULD SEE IT.
+// *** Every round-6 fixture was two 12-triangle boxes. Run on physics/mesh/meshCSG.mjs's own wall-minus-jagged-
+// blob fixture (a 12-triangle wall, a 224-triangle blob), round 6 returned a volume 0.2012 units wrong (0.74%),
+// the wrong answer carried only by a `capped:true` inside stats.a. Cause: triFragmentAccumulate.mjs split each
+// live fragment by every candidate B-plane as an INFINITE plane, so each of the blob's facets sliced the wall's
+// big face triangles edge to edge; the full arrangement is 18,129 triangles for one blast, and the default
+// 256-fragment cap cut it off with real cuts still unapplied. TWO CHANGES, BOTH DEFAULTS OF THIS FILE:
+//   (1) accOpts.gateByIntersection defaults TRUE -- triFragmentAccumulate.mjs's ROUND 7 option, which offers a
+//       plane to a fragment only if the fragment actually meets one of that plane's B-triangles (the argument
+//       that this still leaves no fragment straddling B's surface is in that file's header). Same blast: 473
+//       triangles, volume within 3.6e-15 of the BSP, cap never approached.
+//   (2) accOpts.maxFragments defaults to MESH_BOOLEAN_MAX_FRAGMENTS (65536), not 256 -- because the GATED
+//       demand is real carving, not waste, and meshCSG-selfcheck.mjs's twelve-blast wall measured up to 269
+//       fragments for one wall triangle on shot 2. At 256 that chain capped and came back 5.6e-5 wrong. And
+//       the result now carries a top-level `capped` (true = cuts may have been skipped; treat as unreliable).
+// Round 6's behaviour stays reachable (accOpts:{gateByIntersection:false, maxFragments:256}) and is reproduced
+// in physics/mesh/meshBooleanBlast-selfcheck.mjs section 1 so the before/after lives in a gate. That file is
+// the head-to-head against meshCSG.mjs on its own one-blast and twelve-blast fixtures: see it for the numbers,
+// including where the two disagree and which one a 1000x-scale run says is right.
+//
+// WHAT ROUND 7's ADVERSARIAL REVIEW CHANGED OR NAMED HERE (three reviewers: soundness, claims, integration):
+//   FIXED -- accOpts keys present but undefined/null used to override the two defaults above ({maxFragments:
+//   undefined} fell through to 256 and reproduced the 5.62e-5 twelve-blast error; {gateByIntersection:
+//   undefined} turned the gate off). Only defined keys override now. The round-5 plane-dedup hole and the
+//   coplanar-group cost are fixed in triFragmentAccumulate.mjs (see its header).
+//   NAMED, NOT FIXED -- (a) SCALING: cost grows roughly quadratically with how finely B is tessellated across
+//   one A-triangle; 7x slower than meshCSG's BSP at a 16,128-triangle blob, 7.1 minutes and capped at 65,024
+//   (triFragmentAccumulate.mjs has the table). Faster than the BSP only on small-to-moderate inputs like the
+//   ones the head-to-head gate runs. (b) SCALE: absolute tolerances (1e-9 plane dedup, triClip's EPS,
+//   pointInMesh's) make results wrong below ~1e-4 scale -- up to 34% of volume at 1e-6..7e-5 -- gated and
+//   ungated alike; and at coordinates ~1e8 the gate can skip a pair whose overlap is ~4 ULP (5 of 60 far-offset
+//   fuzz cases, <=9.1e-9 relative volume). (c) PRE-EXISTING GAPS the gate neither causes nor fixes: two unit
+//   boxes with one face tilted 1e-10..3e-9 rad about an edge, intersected, return -0.12 against a true ~1e-10
+//   (the touching-contact family above, but with genuinely overlapping faces); a blob minus the same blob
+//   rotated by 1e-12..1e-6 returns up to -1.43 with non-closed output.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -214,8 +252,11 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  * @param {Float64Array|Float32Array} trisOther
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhOther  built over trisOther
  * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ *   accOpts defaults to {gateByIntersection:true, maxFragments:MESH_BOOLEAN_MAX_FRAGMENTS} since round 7 --
+ *   NOT triFragmentAccumulate.mjs's own defaults; defined caller keys override, undefined/null ones do not.
  * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean}[], stats:{triCount:number,
- *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number}}}
+ *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number,
+ *   gateSkipped:number, gateTested:number}}}
  */
 export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther, opts = {}) {
     const agreementThreshold = opts.agreementThreshold ?? 1;
@@ -224,6 +265,16 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     const triCount = trisSelf.length / 9;
     const fragments = [];
     let emptyCandidateShortcuts = 0, accumulatedFragments = 0, capped = false, unresolvedCount = 0;
+    let gateSkipped = 0, gateTested = 0;
+    // Round 7: the intersection gate is ON by default here, and the per-triangle fragment cap is raised from
+    // triFragmentAccumulate.mjs's own 256 to MESH_BOOLEAN_MAX_FRAGMENTS -- see this file's own header for both.
+    // A caller can still pass accOpts:{gateByIntersection:false, maxFragments:256} to get round 6's behaviour.
+    // Only DEFINED caller keys override: an adversarial review found {maxFragments: undefined} (or null) spread
+    // over the defaults, then fell through triFragmentAccumulate.mjs's own `??` to its 256 cap -- the exact
+    // twelve-blast failure above (5.62e-5 wrong) -- and {gateByIntersection: undefined} silently turned the gate
+    // off. A value that is present but not a real override is now ignored rather than obeyed.
+    const accOpts = { gateByIntersection: true, maxFragments: MESH_BOOLEAN_MAX_FRAGMENTS };
+    for (const [k, v] of Object.entries(opts.accOpts || {})) if (v !== undefined && v !== null) accOpts[k] = v;
 
     for (let t = 0; t < triCount; t++) {
         const cands = byTri.get(t);
@@ -237,9 +288,11 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
             continue;
         }
-        const acc = accumulateFragments(trisSelf, t, trisOther, cands, opts.accOpts);
+        const acc = accumulateFragments(trisSelf, t, trisOther, cands, accOpts);
         if (acc.capped) capped = true;
         unresolvedCount += acc.unresolvedCount;
+        gateSkipped += acc.gateSkipped;
+        gateTested += acc.gateTested;
         for (const frag of acc.fragments) {
             accumulatedFragments++;
             const c = centroid(frag.tri);
@@ -248,7 +301,8 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             fragments.push({ tri: frag.tri, inside: cls.inside, ambiguous });
         }
     }
-    return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount } };
+    return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
+                                 gateSkipped, gateTested } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
@@ -258,6 +312,17 @@ function keepA(op, inside) {
     return (op === "union" && !inside) || (op === "subtract" && !inside) || (op === "intersect" && inside);
 }
 const VALID_OPS = new Set(["union", "subtract", "intersect"]);
+/**
+ * Per-triangle fragment cap meshBoolean() hands triFragmentAccumulate.mjs by default (its own default is 256).
+ * Measured at round 7: with the intersection gate on, meshCSG-selfcheck.mjs's twelve-blast wall needs up to 269
+ * fragments for ONE wall triangle (shot 2 -- a face triangle carved round a 224-facet blob, real cuts, not
+ * waste), so 256 silently left cuts unapplied and the chain came back 5.6e-5 units of volume wrong. Raised
+ * with ~240x headroom over that measurement; hitting it is reported as the top-level `capped` in meshBoolean()'s
+ * return and means the result MAY BE WRONG, not approximate: cuts may have been left unapplied. (Not
+ * certainly wrong -- triFragmentAccumulate.mjs also reports capped when the LAST plane lands exactly on the
+ * cap with every cut applied; an adversarial review measured that false alarm on a 9-fragment fixture.)
+ */
+export const MESH_BOOLEAN_MAX_FRAGMENTS = 65536;
 function bKeepAndFlip(op, inside) {
     if (op === "union") return inside ? null : { flip: false };
     if (op === "subtract") return inside ? { flip: true } : null;
@@ -312,8 +377,13 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
  * @param {"union"|"subtract"|"intersect"} op
  * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
- * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], stats:{a:object,b:object}}}
+ * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], capped:boolean,
+ *   stats:{a:object,b:object}}}
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.
+ *   capped: true if EITHER side hit the per-triangle fragment cap. Treat a capped result as unreliable: cuts
+ *     may have been left unapplied (it is not CERTAINLY wrong -- the cap can also trip exactly as the last
+ *     plane finishes). Surfaced at the top level since round 7, where it was found buried in stats.a.capped
+ *     while the volume came back 0.74% off.
  */
 export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
     const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, opts);
@@ -323,5 +393,7 @@ export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
     for (let i = 0; i < tris.length; i++) {
         for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = tris[i][v][c];
     }
-    return { tris: buf, triCount: tris.length, ambiguousTriIndices, stats: { a: classifiedA.stats, b: classifiedB.stats } };
+    const capped = classifiedA.stats.capped || classifiedB.stats.capped;
+    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped,
+             stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }
