@@ -530,8 +530,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4712 -- 1792 -> 1793 for tools/ship/frameVerticalMeasure-selfcheck.mjs, H10 re-derived with C12 and C22 on its cell.
     // v4713 -- 1793 -> 1794 for tools/ship/frameVerdicts-selfcheck.mjs, H7-H10 as the page states them, graded and driven.
     // v4714 -- 1794 -> 1795 for tools/ship/frameGain-selfcheck.mjs, H11's document, score and statistic, no declared data.
-    gates: 1795, usesOk: 1774, definesOk: 1766, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1667, condFirst: 91, unknownSignature: 16,
+    // v4715 -- 1795 -> 1796 for tools/ship/frameGainMeasure-selfcheck.mjs, H11 re-derived with C12 and C23 on both cells.
+    gates: 1796, usesOk: 1775, definesOk: 1767, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1668, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

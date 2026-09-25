@@ -23,6 +23,7 @@ import { PREREG_H7, CACHE_H7, RESULT_H7, FRAME_KEYS, h7 } from "./frameGate.mjs"
 import { PREREG_H8, CACHE_H8, RESULT_H8, h8 } from "./frameHoles.mjs";
 import { PREREG_H9, CACHE_H9, RESULT_H9, HOLED_KEYS, h9 } from "./frameHoled.mjs";
 import { PREREG_H10, CACHE_H10, RESULT_H10, VERT_KEYS, h10 } from "./frameVertical.mjs";
+import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, h11 } from "./frameGain.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -34,6 +35,9 @@ const gz = (rel) => JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(ENG, re
 const signed = (x, k = 3) => (x >= 0 ? "+" : "") + x.toFixed(k);
 const rows = (o) => Array.isArray(o) ? o.length : Object.values(o).reduce((s, v) => s + rows(v), 0);
 /** The verdict word a result earns: unanswerable first, then the test. */
+// v4715 -- A HYPOTHESIS MISSING FROM THE TABLE IS A RED ROW, NOT A CRASH. Removing H11's entry threw on the next line
+// that read its verdict; every per-hypothesis row now reads its entry through this, which cannot be undefined.
+const entry = (id) => FRAME_VERDICTS.find((x) => x.id === id) || { id, verdict: "(absent from the table)", evidence: "", numbers: [] };
 const word = (r) => !r.reportable ? "not reported" : r.supported ? "supported" : "not supported";
 
 // Each hypothesis's runner, its document and its declared constants -- the table's `doc` must be the runner's own.
@@ -42,14 +46,15 @@ const RUN = {
     H8: { doc: PREREG_H8, cache: CACHE_H8, d: declared(readDoc(PREREG_H8), FRAME_KEYS) },
     H9: { doc: PREREG_H9, cache: CACHE_H9, d: declared(readDoc(PREREG_H9), HOLED_KEYS) },
     H10: { doc: PREREG_H10, cache: CACHE_H10, d: declared(readDoc(PREREG_H10), VERT_KEYS) },
+    H11: { doc: PREREG_H11, cache: CACHE_H11, d: declared(readDoc(PREREG_H11), GAIN_KEYS) },
 };
 
-console.log("frameVerdicts-selfcheck -- four frame-level hypotheses, what the page now says about them, and whether it is true\n");
+console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hypotheses, what the page says about them, and whether it is true\n`);
 
 console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
 {
-    ok("*** four hypotheses, H7 to H10, in the order they were measured ***",
-       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10"]) &&
+    ok("*** five hypotheses, H7 to H11, in the order they were measured -- and every one has a runner here ***",
+       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
        FRAME_VERDICTS.every((v, i) => i === 0 || Number(v.round.slice(1)) > Number(FRAME_VERDICTS[i - 1].round.slice(1))),
        FRAME_VERDICTS.map((v) => `${v.id}@${v.round}`).join(" "));
     const bad = [];
@@ -63,12 +68,16 @@ console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
         if (!fs.existsSync(path.join(ENG, v.doc))) bad.push(`${v.id}: ${v.doc} missing`);
     }
     ok("*** each verdict, each number and each document is in the record it names -- the table cannot say more than the closings did ***",
-       !bad.length, bad.length ? bad.join("; ") : `${FRAME_VERDICTS.reduce((s, v) => s + v.numbers.length, 0)} numbers across four closings; each document is its runner's own PREREG constant.`);
+       !bad.length, bad.length ? bad.join("; ") : `${FRAME_VERDICTS.reduce((s, v) => s + v.numbers.length, 0)} numbers across ${FRAME_VERDICTS.length} closings; each document is its runner's own PREREG constant.`);
     const arc = CLOSINGS[FRAME_ARC.closing], h = FRAME_ARC.headroom, hc = CLOSINGS[h.closing], fr = CLOSINGS[FRAME_FIRST_RUN.closing];
-    ok("*** the arc's finding is the words its closings used: the hole from v4712's, spatial detail from v4706's ***",
-       !!arc && arc.at === FRAME_ARC.standsAt && arc.at === FRAME_VERDICTS.at(-1).round && /geometry it has not seen/.test(arc.verdict) &&
-       FRAME_ARC.finding.includes("geometry it has not seen") && !!hc && /Spatial detail is not what separates/.test(hc.verdict) && /spatial detail did not decide/.test(FRAME_ARC.finding),
-       `${FRAME_ARC.closing} @ ${FRAME_ARC.standsAt}, the last hypothesis measured`);
+    // v4715 -- WIDENED from two hard-coded phrases to the table's own quotes: each must be in the closing it names and in
+    // the finding, and the finding must be made of nothing else but them and the words joining them.
+    const lc = (t) => t.toLowerCase(), badQ = FRAME_ARC.quotes.filter((q) => !CLOSINGS[q.closing] || !lc(CLOSINGS[q.closing].verdict).includes(lc(q.text)) || !lc(FRAME_ARC.finding).includes(lc(q.text)));
+    ok("*** the arc's finding is made of quotes, each in the closing it names -- the last from the closing of the last hypothesis measured ***",
+       !!arc && arc.at === FRAME_ARC.standsAt && arc.at === FRAME_VERDICTS.at(-1).round && !badQ.length &&
+       FRAME_ARC.quotes.at(-1).closing === FRAME_ARC.closing && FRAME_ARC.quotes.length >= 3,
+       badQ.length ? `not in their closings or the finding: ${badQ.map((q) => `"${q.text}" (${q.closing})`).join("; ")}` :
+       `${FRAME_ARC.quotes.map((q) => q.closing).join(", ")}; stands at ${FRAME_ARC.closing} @ ${FRAME_ARC.standsAt}`);
     ok("*** the headroom's round, closing and numbers are v4706's, which is where the words 'HEADROOM EXISTS' were first used ***",
        !!hc && hc.at === h.round && /HEADROOM EXISTS/.test(hc.verdict) && Object.values(h.scenes).every((g) => hc.verdict.includes(g.replace("+", ""))) &&
        new RegExp(`At x${h.speed}, `).test(hc.verdict),
@@ -82,27 +91,37 @@ console.log("\n2. *** EACH VERDICT RE-DERIVED FROM ITS RESULT FILE, WITH ITS DOC
 const R7 = res(RESULT_H7), R8 = res(RESULT_H8), R9 = res(RESULT_H9), R10 = res(RESULT_H10);
 {
     const a = h7(R7.per, RUN.H7.d), rep = { reportable: RUN.H7.d.speeds.every((sp) => a.cells[sp].within.reportable), supported: a.supported };
-    const v = FRAME_VERDICTS.find((x) => x.id === "H7");
+    const v = entry("H7");
     ok("*** H7: reading \"neither\", across rho 0.3214 (p 0.2488) at x2 and 0.0000 at x4 -- recomputed ***",
        word(rep) === v.verdict && a.reading === "neither" && a.cells["2"].across.rho.toFixed(4) === "0.3214" &&
        a.cells["2"].across.p.toFixed(4) === "0.2488" && a.cells["4"].across.rho.toFixed(4) === "0.0000" && v.evidence.includes(`"${a.reading}"`),
        `${word(rep)}, "${a.reading}", x2 rho ${a.cells["2"].across.rho.toFixed(4)} p ${a.cells["2"].across.p.toFixed(4)}, x4 rho ${a.cells["4"].across.rho.toFixed(4)}`);
-    const b = h8(R8.per, RUN.H8.d), v8 = FRAME_VERDICTS.find((x) => x.id === "H8");
+    const b = h8(R8.per, RUN.H8.d), v8 = entry("H8");
     const x1 = b.cells["1"], x8 = b.cells["8"];
     ok("*** H8: not reported -- x1 has one usable scene in seven, and x8 cleared at sign p 0.0078 -- recomputed ***",
        word(b) === v8.verdict && !x1.reportable && x1.excluded.length === 6 && x8.reportable && x8.cleared && x8.test.sign.p.toFixed(4) === "0.0078",
        `${word(b)}; x1 ${x1.usable.length} usable, ${x1.excluded.length} holeless; x8 ${x8.test.sign.up}/7 p ${x8.test.sign.p.toFixed(4)}`);
-    const c = h9(R9.per, RUN.H9.d), v9 = FRAME_VERDICTS.find((x) => x.id === "H9");
+    const c = h9(R9.per, RUN.H9.d), v9 = entry("H9");
     const chk = R9.per["1.5"].checker;
     ok("*** H9: not supported -- 3x clears, 1.5x misses at sign p 8/128 with checker the one against, its holed frames at +0.305 dB ***",
        word(c) === v9.verdict && c.cells["3"].cleared && !c.cells["1.5"].cleared && c.cells["1.5"].test.sign.p === 8 / 128 &&
        c.cells["1.5"].test.sign.down === 1 && chk.contrast < 0 && signed(chk.holedAdv) === "+0.305",
        `${word(c)}; 1.5x sign ${c.cells["1.5"].test.sign.up}/7, checker holed ${signed(chk.holedAdv)} vs clean ${signed(chk.cleanAdv)}`);
-    const e = h10(R10.per, RUN.H10.d), v10 = FRAME_VERDICTS.find((x) => x.id === "H10");
+    const e = h10(R10.per, RUN.H10.d), v10 = entry("H10");
     ok("*** H10: not supported -- 5 of 7, t p 0.356, bars's and smooth's holed frames at +2.202 and +0.912 dB ***",
        word(e) === v10.verdict && e.cell.test.sign.up === 5 && e.cell.test.t.p.toFixed(3) === "0.356" &&
        signed(R10.per.bars.holedAdv) === "+2.202" && signed(R10.per.smooth.holedAdv) === "+0.912" && v10.evidence.includes(`${e.cell.test.sign.up} of 7`),
        `${word(e)}; sign ${e.cell.test.sign.up}/7, t p ${e.cell.test.t.p.toFixed(3)}; bars ${signed(R10.per.bars.holedAdv)}, smooth ${signed(R10.per.smooth.holedAdv)}`);
+}
+
+{
+    const R11 = res(RESULT_H11), f = h11(R11.per, RUN.H11.d), v11 = entry("H11"), cs = RUN.H11.d.cells;
+    const negs = cs.map((c) => RUN.H11.d.scenes.filter((s) => R11.per[c][s].rho < 0)), exc = cs.map((c) => RUN.H11.d.scenes.filter((s) => R11.per[c][s].rho > 0));
+    const means = cs.map((c) => { const r = RUN.H11.d.scenes.map((s) => R11.per[c][s].rho); return r.reduce((a, b) => a + b, 0) / r.length; });
+    ok("*** H11: not supported -- sign 1 of 7 in both cells, 12 of 14 scene-cells backwards, one exception shared by both geometries -- recomputed ***",
+       word(f) === v11.verdict && cs.every((c) => f.cells[c].test.sign.up === 1) && negs.flat().length === 12 && J(exc[0]) === J(exc[1]) &&
+       means.every((m) => v11.evidence.includes(m.toFixed(3))) && v11.evidence.includes(`${negs.flat().length} of ${cs.length * RUN.H11.d.scenes.length}`),
+       `${word(f)}; ${cs.map((c, i) => `${c} sign ${f.cells[c].test.sign.up}/7, mean rho ${means[i].toFixed(3)}`).join("; ")}; the exception on both: ${exc[0].join(", ")}`);
 }
 
 console.log("\n3. *** EVERY COUNT AND THE HEADROOM, RECOMPUTED FROM THE CACHES ***");

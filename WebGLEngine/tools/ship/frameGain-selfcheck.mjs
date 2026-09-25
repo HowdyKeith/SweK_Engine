@@ -62,8 +62,10 @@ const cells = d.cells.map(cellOf), DEF = { slabdir: opts("slabdir")[0], ratio: o
     const fresh = d.cells.filter((c) => !seen.has(c) && !(cellOf(c).slabdir === DEF.slabdir && cellOf(c).ratio === DEF.ratio));
     ok("*** NEITHER declared cell has been harvested by any round -- checked against the result files, and against every pre-v4709 harvest ***",
        fresh.length === d.cells.length, `harvested: ${[...seen].join(", ")}, plus every speed at ${DEF.slabdir}/${DEF.ratio}; declared: ${d.cells.join(", ")}`);
-    ok("*** no data yet: no cache and no result for H11 -- the measurement round inverts this row ***",
-       !fs.existsSync(path.join(ENG, CACHE_H11)) && !fs.existsSync(path.join(ENG, RESULT_H11)));
+    // v4715 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    const resOk = fs.existsSync(path.join(ENG, CACHE_H11)) && fs.existsSync(path.join(ENG, RESULT_H11)) &&
+        J(res(RESULT_H11).declared) === J(d);
+    ok("*** the measurement exists, produced under THIS document's constants -- v4714's 'no data yet', inverted ***", resOk);
     const em = /`eps = ([\d.e-]+)`/.exec(doc);
     ok("*** the document's eps is the one the score imports, and that is H6's ***", !!em && Number(em[1]) === EPS, em ? `eps ${em[1]}` : "no eps in the document");
     // The document's facts about earlier rounds, each read from where it lives.
@@ -148,6 +150,6 @@ console.log("\n4. *** THE RUNNER ON REAL ROWS -- AT x1, FORWARD, 2x, WHICH THE D
 }
 
 console.log(`\nframeGain-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY DECLARED CELL -- nothing is harvested at x4 forward 3x or x4 vertical, and no gain has been " +
-            "computed on any frame at a declared cell.");
+console.log("unchecked here: THE DECLARED CELLS -- they are tools/ship/frameGainMeasure-selfcheck.mjs's, which re-derives H11 from " +
+            "their cache and re-harvests one scene.");
 process.exit(fails ? 1 : 0);

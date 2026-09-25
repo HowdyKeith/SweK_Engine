@@ -34,18 +34,31 @@ export const FRAME_VERDICTS = Object.freeze([
         claim: "H9's contrast holds when the slab moves vertically, across the dolly",
         evidence: "5 of 7 scenes, t p 0.356; bars's holed frames scored +2.202 dB and smooth's +0.912 -- where generation WON",
         numbers: Object.freeze(["0.356", "+2.202", "+0.912"]) }),
+    Object.freeze({ id: "H11", round: "v4715", closing: "since397", doc: "render/frame-gain-preregistration.md", verdict: "not supported",
+        signal: "motion's gain",
+        claim: "a frame's summed gain from motion over standing still predicts where generation beats a cross-fade, on both geometries",
+        evidence: "sign 1 of 7 in both cells: 12 of 14 scene-cells ranked BACKWARDS, mean rho -0.412 and -0.397, with the same exception on both",
+        numbers: Object.freeze(["12 of 14", "-0.412", "-0.397"]) }),
 ]);
 
 /** How much picture the arc stands on: frames harvested with both dB, per hypothesis. The gate counts the caches. */
-export const FRAME_MEASURED = Object.freeze({ H7: 546, H8: 546, H9: 546, H10: 273 });
+export const FRAME_MEASURED = Object.freeze({ H7: 546, H8: 546, H9: 546, H10: 273, H11: 546 });
 
 /** The round the path first ran on a picture, and how many scenes every hypothesis declared. Both graded by the gate. */
 export const FRAME_FIRST_RUN = Object.freeze({ round: "v4681", closing: "since366" });
 export const FRAME_SCENE_COUNT = 7;
 
 /** Where the arc stands. The headroom is v4706's frame oracle over the better fixed policy, recomputed by the gate. */
-export const FRAME_ARC = Object.freeze({ standsAt: "v4712", closing: "since394",
-    finding: "a hole is not a signal a frame gate can carry to geometry it has not seen, and spatial detail did not decide either",
+// v4715 -- the finding is built from QUOTES, each graded against the closing it came from, so it can say no more than they did.
+export const FRAME_ARC = Object.freeze({ standsAt: "v4715", closing: "since397",
+    quotes: Object.freeze([
+        Object.freeze({ closing: "since388", text: "spatial detail is not what separates" }),
+        Object.freeze({ closing: "since394", text: "a hole is not a signal a frame gate can carry to geometry it has not seen" }),
+        Object.freeze({ closing: "since397", text: "motion's gain over standing still ranks frames backwards on both geometries" }),
+    ]),
+    finding: "spatial detail is not what separates the frames generation wins; a hole is not a signal a frame gate can carry to " +
+             "geometry it has not seen; and motion's gain over standing still ranks frames backwards on both geometries -- " +
+             "the opposite of the direction fixed before any data, which is a pattern and not yet a predictor",
     headroom: Object.freeze({ round: "v4706", closing: "since388", speed: "4",
         scenes: Object.freeze({ ramp: "+0.368", smooth: "+0.232" }) }) });
 

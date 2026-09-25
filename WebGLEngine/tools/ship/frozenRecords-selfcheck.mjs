@@ -25,8 +25,10 @@
 // already moved it, which is why the frozen number is compared against nothing live.
 "use strict";
 import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
-         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG }
+         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG, guardianSearch, guardianSearchNaive }
     from "./frozenRecords.mjs";
+import { stripComments } from "../../vba/runtimeGap.mjs";
+import * as TR from "./treeRead.mjs";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -602,6 +604,29 @@ console.log("\n4. what was closed, checked against the files rather than claimed
         /buildsWhereNothingMoved <= REC\.builds/.test(taint) && /NOT a re-derivation/.test(taint),
         "the sweep those numbers came from is 40 builds, so a gate cannot re-run it -- and a consistency " +
         "check that pretended to be a re-derivation would be the worse of the two failures");
+}
+
+console.log("\n5. v4715: the guardian search, taken by the runs a name can live in, gives the pairwise answer");
+{
+    // Every record name in the tree, and every tenth gate's comment-stripped source: the full pairwise pass costs about
+    // half a second, which is the headroom this change bought, so it was run once at v4715 (census byte-identical) and
+    // is held here on a tenth of the live gates plus the cases that could split the two methods.
+    // The names are census()'s own records and the texts come through treeRead's memo, which census() already filled:
+    // the first draft re-read 4,000 files from disk here and gave back 280 ms of the headroom this change bought.
+    const names = new Set(census().records.map((r) => r.name));
+    const gates = sources().filter((f) => /-selfcheck\.mjs$/.test(f)).filter((_, i) => i % 10 === 0)
+        .map((f) => [path.relative(ENG, f), stripComments(TR.textOf(f))]);
+    const n0 = [...names][0], n1 = [...names].find((n) => n !== n0);
+    const edge = [["edge/inside", `x = ${n0}_GATES;`], ["edge/lower", `a${n0}b`], ["edge/digits", `9${n0}9`],
+                  ["edge/both", `${n0}${n1}`], ["edge/punct", `(${n0}).x`], ["edge/none", "V4715 and v4715 and nothing"]];
+    const run = (fn, src) => { const named = new Map([...names].map((n) => [n, []])); fn(src, named);
+        return JSON.stringify([...named].filter(([, g]) => g.length)); };
+    const live = run(guardianSearch, gates) === run(guardianSearchNaive, gates);
+    const fast = JSON.parse(run(guardianSearch, edge)), slow = run(guardianSearchNaive, edge);
+    ok("*** the run-based search and the pairwise one agree on every tenth live gate and on every edge case ***",
+       live && JSON.stringify(fast) === slow && fast.some(([n, g]) => n === n0 && g.includes("edge/inside") && g.includes("edge/lower") && g.includes("edge/both")),
+       `${gates.length} live gates x ${names.size} names; edge cases: a name inside a longer identifier, between lowercase ` +
+       `letters, between digits, run into another name, and in punctuation -- the last must match nothing`);
 }
 
 console.log(`\nfrozenRecords-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

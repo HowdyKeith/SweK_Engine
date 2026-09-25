@@ -284,6 +284,22 @@ export function readSites(names, { root = ENG } = {}) {
     return out;
 }
 
+/** Which gates name which records: `src.includes(name)` for every pair, computed through the runs a name can live in. */
+export function guardianSearch(gateSrc, named) {
+    const names = [...named.keys()], memo = new Map();
+    const namesIn = (tok) => { let hit = memo.get(tok); if (!hit) { hit = names.filter((n) => tok.includes(n)); memo.set(tok, hit); } return hit; };
+    for (const [g, src] of gateSrc) {
+        const found = new Set();
+        for (const m of src.matchAll(/[A-Z0-9_]+/g)) if (/V\d{3}/.test(m[0])) for (const n of namesIn(m[0])) found.add(n);
+        for (const n of names) if (found.has(n)) named.get(n).push(g);
+    }
+}
+
+/** The pairwise search guardianSearch replaces, kept so the gate can hold the two equal. */
+export function guardianSearchNaive(gateSrc, named) {
+    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+}
+
 export function census({ files = null, read = null, exclude = null } = {}) {
     const memoable = files === null && read === null;
     const key = String(exclude);
@@ -319,7 +335,15 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     const all = [];
     for (const f of mjs) for (const r of (memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
-    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    // v4715 -- THE SAME ANSWER WITHOUT ~270,000 SUBSTRING SEARCHES. Every gate source was searched for every record name,
+    // and that loop was the largest self-time in this census while recordReach demands 800 ms of headroom from it. A
+    // name is RECORD_RE's capture -- only [A-Z0-9_], and always holding V and three or four digits -- so wherever it
+    // occurs it sits inside one maximal [A-Z0-9_]+ run that also holds V\d{3}. Those runs are collected per gate and
+    // each distinct run is matched against the names once, tree-wide: `src.includes(name)` is true exactly when some
+    // collected run includes it. Measured once over the whole tree, census() came back byte-identical, 1,124 -> 899 ms;
+    // tools/ship/frozenRecords-selfcheck.mjs section 5 holds the two ways equal on every tenth live gate and on the
+    // edge cases, since the full pairwise pass would spend the headroom it bought.
+    guardianSearch(gateSrc, named);
     // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
     // The search above asks which gates NAME a record. Seven records failed it for a reason that is not a gap
     // in the tree: redCensus.mjs defines `RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...))`, so the

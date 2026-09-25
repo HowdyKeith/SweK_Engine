@@ -8032,6 +8032,59 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4715 -- THE 322nd CLOSING: H11 not supported -- and it failed by the route the document named, on both geometries.
+    since397: Object.freeze({
+        at: "v4715", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGainMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameGain-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H11 re-derived, and the arc's finding graded quote by quote against its closings)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/splatSort-selfcheck.mjs", was: "red", now: "green",
+                why: "THIS ROUND'S VERIFY FOUND IT RED WITH NO LINE OF THE SORT CHANGED, and verify's serial re-run, uncontended, " +
+                     "agreed. Its frame-budget row asserted an absolute WALL-CLOCK bound -- radix under 16.7 ms at 500K splats -- " +
+                     "with about 1.4x of margin, on the best of two runs. Reproduced on purpose: with the 4 cores oversubscribed " +
+                     "2x the row failed 6 of 6 at 25-35 ms of wall, while the relative rows held at 13-26x. The row is a claim " +
+                     "about the sort's WORK, so it now reads process CPU time, and the radix side takes the best of nine (about " +
+                     "a tenth of a second): 6 of 6 green under the same load at 12.7-14.4 ms. Two sabotages, both red: the row " +
+                     "put back on wall clock under that load, and a radix sort that secretly calls the comparison sort." }),
+            Object.freeze({ gate: "tools/ship/recordReach-selfcheck.mjs", was: "red", now: "green",
+                why: "THE SAME VERIFY FOUND ITS HEADROOM ROW RED, AND THIS TIME IT WAS NOT LOAD: frozenRecords-selfcheck ran " +
+                     "2,216 ms serial and uncontended against a 3,000 ms budget, 784 ms of margin where the row demands 800, " +
+                     "and 2,197-2,265 ms alone. It is the erosion the row exists to catch -- a swept gate that walks the tree " +
+                     "grows with it. Profiled rather than re-filed: the largest self-time in frozenRecords' census was every " +
+                     "gate's source searched for every record name, about 270,000 substring searches. A name is only " +
+                     "[A-Z0-9_] and always holds V and three or four digits, so it can only occur inside one maximal " +
+                     "[A-Z0-9_]+ run that also holds V\\d{3}; the search now collects those runs once per gate and matches " +
+                     "each distinct run once. census() came back byte-identical over the whole tree, 1,124 -> 899 ms, and " +
+                     "the gate runs 1.84-1.94 s. frozenRecords-selfcheck gains a row holding the two methods equal on every " +
+                     "tenth live gate and on the edge cases; its first draft re-read the tree from disk and gave back 280 ms, " +
+                     "and now reads census()'s memo. Three sabotages, all red -- one, exact token match, only by the new row." }),
+        ]),
+        verdict: "*** H11 IS NOT SUPPORTED, AND IT FAILED THE WAY THE DOCUMENT SAID IT MIGHT. *** v4714's runner ran as committed: " +
+                 "seven scenes in each of two cells nobody had harvested -- x4 forward at upscale 3x, and x4 with the slab moving " +
+                 "vertically -- 546 frames, 746 s. Both cells are reportable, no scene excluded, and neither clears: sign 1 of 7 in " +
+                 "each, one-sided p near 1. *** THE RHOS LEAN NEGATIVE, ON BOTH GEOMETRIES, WITH THE SAME EXCEPTION. *** 12 of 14 " +
+                 "scene-cells rank backwards, mean rho -0.412 forward and -0.397 vertical, and zone is the one positive scene in " +
+                 "BOTH. v4714 named exactly this as the reason to expect failure: H6's block-level shape replicated where the " +
+                 "decision is made. H6's mean of block scores agrees in sign on all 14 scene-cells, so summing -- which gives flat " +
+                 "blocks no weight -- did not change the direction either. *** WHAT THIS SETTLES, AS A DESCRIPTION: *** motion's " +
+                 "gain over standing still ranks frames backwards on both geometries -- the first frame-level pattern in this arc " +
+                 "to keep its sign across the two geometries H10 showed disagree about holes, and the opposite of the direction " +
+                 "v4695 and v4702 fixed. THE NEGATION IS NOT TESTED: v4703 requires a negation to get its own document and data it " +
+                 "has not seen, and these are now seen data. The window confound v4705 named still applies -- the slab leaves the " +
+                 "view within the harvest, moving a frame's motion and its advantage together -- and nothing here separates them. " +
+                 "*** C23 HELD ON BOTH CELLS *** (0 of 273 frames in either carries v4706's forward x4 2x dB), and C12 re-harvested " +
+                 "zone at x4 forward 3x identically in 58 s. *** THE PAGE SAYS SO THE DAY IT IS MEASURED. *** H11 joins " +
+                 "render/frameVerdicts.mjs, re-derived by its gate, and the arc's finding is now built from quotes each graded against " +
+                 "the closing it came from, rather than two phrases the gate had hard-coded. *** ELEVEN SABOTAGES, TEN RED, AND ONE " +
+                 "CRASH THAT WAS THE GATE'S. *** Removing H11 from the table threw instead of reddening: every per-hypothesis row " +
+                 "read its entry unguarded. They now read it through one lookup that cannot be undefined, and the same removal " +
+                 "reddens three rows. The one 0-RED -- H11 supported if ANY cell clears -- is an empty adversarial population, the " +
+                 "TWELFTH: neither cell clears, so ANY and ALL agree on these data, and the design gate already reddens it (G6 at " +
+                 "v4714). One vertical scene's rows swapped for v4706's forward rows reddens C23, and a harvest that ignores its " +
+                 "settings reddens C12. The measurement gate runs 56.7 s alone and is hand-filed.",
+    }),
     // v4714 -- THE 321st CLOSING: pre-registration -- H6's score asked of the frame, on two cells nobody has harvested.
     since396: Object.freeze({
         at: "v4714", swept: 1, green: 1, red: 0,
