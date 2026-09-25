@@ -8032,6 +8032,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4705 -- THE 312th CLOSING: the block closed, the question moves to the frame, and the arc's own suspect is declared.
+    since387: Object.freeze({
+        at: "v4705", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGate-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** THE BLOCK IS CLOSED; A FRAME GENERATOR'S REAL DECISION IS PER FRAME. *** render/frame-gate-" +
+                 "preregistration.md declares H7 with NO DATA IN THE COMMIT. Before writing it, the arc's own frame-level " +
+                 "record was read, and it changed the design: MOTION IS ALREADY REFUTED at frame level (v4682: 0 of 16 " +
+                 "frames up across x1-x8, a curve that falls, falls, rises, falls), so a motion threshold would re-test a " +
+                 "dead hypothesis. The arc named its own suspect at v4683 -- \"a compensation's worth scales with the " +
+                 "spatial gradient\" -- and H7 tests that sentence with its direction fixed there: the frame's mean " +
+                 "per-block laplacian, found by NAME, against genDb minus cfDb. TWO CLAUSES, both at x2 and x4: ACROSS " +
+                 "scenes by exact permutation over all 5,040 orderings (rho >= 0.7143 clears, 0.6786 does not), and WITHIN " +
+                 "scenes by paired t AND exact sign over per-scene rhos. The table reads across-only as a CONTENT decision " +
+                 "and within-only as the per-block pathology one level up. What has been seen is listed by round -- " +
+                 "smooth, zone and checker at frame level in v4682-v4684, where zone already breaks the laplacian order " +
+                 "-- and v4684's window defect, the slab leaving frame, is named rather than corrected. " +
+                 "*** THE PAGE NOW HARVESTS EACH FRAME'S TWO dB, *** which no earlier cache carries, and C18 proves they " +
+                 "are the numbers the readout prints -- by driving the page at x8, a cell the document never names, and " +
+                 "printing no difference between them. C19 refuses a pre-v4705 row instead of averaging a NaN. " +
+                 "*** SIXTEEN SABOTAGES, FIFTEEN RED. *** Two real defects surfaced first. The within clause ignoring the " +
+                 "sign test passed, because every made-up world cleared both tests or neither; six strong positive rhos " +
+                 "and one negative now clear the t-test at 8.6e-4 and fail 6 of 7. And a document that gained a speed " +
+                 "CRASHED the gate instead of reddening it: the worlds were built for two hard-coded speeds and h7 indexed " +
+                 "the missing one. The worlds now follow the declared speeds and h7 refuses a missing cell by name. The " +
+                 "one 0-RED is an empty adversarial population -- the NINTH in this arc: the across clause's `rho > 0` " +
+                 "can never change a verdict, because the permutation distribution is symmetric and a negative rho's " +
+                 "one-sided p is at least 0.5. Two fixtures were wrong before they were right: the critical-value row " +
+                 "first used orderings picked by eye that read 0.8929 and 0.8571, testing neither side of 0.7143 -- " +
+                 "they are now constructed from sum(d^2) = 16 and 18 -- and the cvFloor row first used IDENTICAL " +
+                 "values, where Spearman has no value anyway, so it could not see the floor at all. The gate drives the " +
+                 "page and runs 4.5 s alone, over budget, so its timing is hand-filed.",
+    }),
     // v4704 -- THE 311th CLOSING: six verdicts that lived in closings now reach the page's user.
     since386: Object.freeze({
         at: "v4704", swept: 1, green: 1, red: 0,

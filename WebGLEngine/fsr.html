@@ -1570,8 +1570,12 @@ async function tick() {
             // the features -- and the page's own RNG and slab position advance per frame, so two drives are
             // not the same data. One drive, two vectors, same blocks.
             const F2 = gateFeaturesV2({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+            // v4705 -- AND THE FRAME'S OWN SCORE: generated and cross-faded PSNR against the rendered middle
+            // frame, the same two numbers the readout prints. render/frame-gate-preregistration.md asks a FRAME-level
+            // question, and every block cache before this carried only per-block labels, from which a frame's dB
+            // cannot be recovered.
             window.__gateHarvest.push({ scene: kind, frame, tMid, x: Array.from(F), x2: Array.from(F2),
-                                        y: Array.from(L.y), base: L.base });
+                                        y: Array.from(L.y), base: L.base, genDb: psnr(patched, midRef), cfDb: psnr(cf, midRef) });
         }
         genStat = { gen: psnr(patched, midRef), cf: psnr(cf, midRef), hold: psnr(genPrev, midRef),
                     left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,
