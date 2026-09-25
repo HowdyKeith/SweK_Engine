@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/exitBusy-selfcheck.mjs -- v4677
 //
-// Run: node tools/ship/exitBusy-selfcheck.mjs      (~16s)
+// Run: node tools/ship/exitBusy-selfcheck.mjs      (~11.6s -- MEASURED at v4680 beside a running verify; ~16s before, when section 2 measured the real wiringClaims in the real tree)
 //
 // *** THE FIRST INSTRUMENT THIS ROUND BUILT MEASURED ZERO, AND THE ROW THAT SAYS SO IS THE POINT OF THIS FILE. ***
 //
@@ -19,6 +19,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as EB from "./exitBusy.mjs";
+import { fileURLToPath } from "node:url";
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -142,17 +144,37 @@ console.log("\n2b. *** THE PROBE IS A STRING THIS FILE BUILDS, SO IT IS GRADED A
         EB.baselineExit(GREEN, { cwd: TMP, capMs: 20000 }) === 0,
         "without it, a gate the instrument broke and a gate that was already broken are the same row");
 
-    const wc = "tools/ship/wiringClaims-selfcheck.mjs";
-    const m = EB.measure(wc, { capMs: 200000, withBaseline: true });
-    ok("!! *** and `perturbed` FIRES ON THE REAL CASE: wiringClaims is green alone and red under the probe ***",
+    // *** v4680 -- THIS ROW USED TO MEASURE THE REAL wiringClaims-selfcheck, IN THE REAL TREE, INSIDE THE SWEEP,
+    // AND THE SWEEP'S CAP LEFT ITS COPY BEHIND. *** measure() writes the probe copy BESIDE the gate and removes it
+    // in a `finally` -- which a SIGKILL skips. wiringClaims takes ~15 s alone at a 200 s cap, so under the
+    // sweep's 8-way load this gate crossed the 20 s cap, was killed mid-measurement, and stranded
+    // tools/ship/wiringClaims-selfcheck.__exitbusy.mjs in the tree. That copy then turned wiringClaims AND
+    // recordDrift red for everyone after it -- found on this box during the local verify of v4679, by the
+    // investigation into the rig's truncated one. fixtureLitter reclaims `__`-PREFIXED files only, so nothing
+    // cleaned it up. A gate that writes into the source tree has to survive its own kill, and this one could not.
+    //
+    // The MECHANISM is what the row is about, and it does not need the real gate: `walker` fails when it sees a
+    // probe copy beside itself, exactly as wiringClaims does, in TMP, in milliseconds. The real gate's reading
+    // is a RECORDED fact and is read from the census, where the screen that took it wrote it down.
+    const WALK = write("walker-selfcheck.mjs",
+        'import fs from "node:fs";\nimport path from "node:path";\nimport { fileURLToPath } from "node:url";\n' +
+        'const here = path.dirname(fileURLToPath(import.meta.url));\n' +
+        `const extra = fs.readdirSync(here).filter((f) => f.endsWith(${JSON.stringify(EB.COPY_SUFFIX)}));\n` +
+        'console.log(extra.length ? "  FAIL  a stray copy: " + extra.join(", ") : "  PASS  nothing beside me");\n' +
+        'process.exit(extra.length ? 1 : 0);\n');
+    const m = EB.measure(WALK, { cwd: TMP, capMs: 20000, withBaseline: true });
+    ok("!! *** and `perturbed` FIRES ON THE CASE IT EXISTS FOR: a gate that walks its directory is green alone and red under the probe ***",
         m.ok && m.baseExitCode === 0 && m.exitCode !== 0 && m.perturbed === true,
-        m.ok ? `baseline exit ${m.baseExitCode}, under the probe ${m.exitCode} -- it walks the tree, finds the copy ` +
-               `and adjudicates it. *** AND THE CONSEQUENCE IS WORSE THAN A WRONG EXIT CODE, WHICH AN EARLIER ` +
-               `VERSION OF THIS ROW GOT WRONG: *** it said the CPU reading was unaffected. It is not. A perturbed ` +
-               `gate RUNS DIFFERENT CODE, and this one reads 0.5 / 12.2 / 17.7 ms over three runs -- BIMODAL, not ` +
-               `noise round a mean (this run: ${m.win1Ms.toFixed(1)} ms). So a perturbed row is marked uncertain in ` +
-               "the census and counted as evidence for nothing."
+        m.ok ? `baseline exit ${m.baseExitCode}, under the probe ${m.exitCode} -- it finds the copy and adjudicates it. ` +
+               "A perturbed gate RUNS DIFFERENT CODE, so its CPU reading is suspect too, not only its exit code"
              : "UNKNOWN: " + m.why);
+    const census = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "exit-busy-census.json"), "utf8"));
+    const wcRow = [...(census.members || []), ...(census.steadyMembers || []), ...(census.demoted || [])]
+        .find((r) => r && r.gate === "tools/ship/wiringClaims-selfcheck.mjs");
+    ok("...and the REAL case it was found on is on record: wiringClaims is marked perturbed in the census",
+        !!wcRow && wcRow.perturbed === true,
+        wcRow ? "0.5 / 12.2 / 17.7 ms over three runs -- bimodal, marked uncertain, counted as evidence for nothing"
+              : "no wiringClaims row found in exit-busy-census.json");
     ok("...and it does NOT fire on a gate the probe leaves alone, so it is not always true",
         (() => { const g = EB.measure(GREEN, { cwd: TMP, capMs: 20000, withBaseline: true });
                  return g.ok && g.perturbed === false; })(),
