@@ -274,7 +274,10 @@ console.log("\n5. *** THE OBJECT-MOTION CAMERA (v4649): THE FIRST TIME THIS PAGE
         "computed and discarded on the next line. The producer here is a `return`, and a row that let this " +
         "become a second traversal of the scene would be letting the page recompute what it already knew.");
     ok("!! ...and the SLAB'S PATTERN travels with the slab, so a moving surface is not sliding under a fixed texture",
-        /patternUV = \(p, sx = 0\)/.test(src) && /p\[0\] - sx - SLAB_X\[0\]/.test(src),
+        // v4711: the slab gained a DIRECTION (fsr.html's slabdir), so the pattern must subtract the offset along BOTH
+        // axes -- x as it always did, and z for the vertical arm. The row checked only x's form, which v4711 rewrote.
+        /patternUV = \(p, sx = 0\)/.test(src) && /p\[0\] - sx \* SLAB_DIR\[0\] - SLAB_X\[0\]/.test(src) &&
+        /p\[2\] - sx \* SLAB_DIR\[1\] - SLAB_Z\[0\]/.test(src),
         "a slab that moved in the depth and id buffers and stood still in the picture is a scene no motion " +
         "vector can be right about, and every row below would be measuring that instead of the reprojection");
     // *** THE ADDITIVITY IS A SOURCE CLAIM BECAUSE IT HAS TO SURVIVE WITHOUT THE BASELINE FILE. ***

@@ -77,6 +77,10 @@
       <option value="4">slab speed: &times;4</option>
       <option value="8">slab speed: &times;8</option>
     </select>
+    <select id="slabdir">
+      <option value="x">slab moves: ALONG x, with the dolly (the default -- every figure on this page is this arm)</option>
+      <option value="z">slab moves: VERTICALLY, across the dolly (v4711 -- new occlusion geometry)</option>
+    </select>
     <select id="gengate">
       <option value="off">learned gate: OFF (the default -- every figure on this page predates it)</option>
       <option value="cpu">learned gate: ON, on the CPU (v4691 weights, tau 0.5)</option>
@@ -378,11 +382,20 @@ const SLAB_DX = 0.055;                         // world units per frame, along +
 // axis that turns it into one. At x1 every figure this page and its six gates quote is untouched by
 // construction, and tools/ship/fsrPage-selfcheck.mjs's 2.42 px DERIVATION is the x1 arm's.
 const slabSpeed = () => { const e = $("slabspeed"); return e ? Number(e.value) || 1 : 1; };
+// *** v4711 -- THE SLAB'S DIRECTION, A UNIT VECTOR IN (x, z). *** The offset stays the scalar `sx` every sampler already
+// threads; the three places that turn it into GEOMETRY -- hitBoth's bounds, patternUV, and the motion vectors' model
+// matrix -- multiply it by this. Along x the added terms are sx*0, exactly zero, so the default arm is bit-identical to
+// every figure before it; the three frame-level C12 re-harvests prove that rather than this comment asserting it.
+// Vertical motion runs ACROSS the dolly instead of with it, so it disoccludes the slab's horizontal edges: occlusion
+// geometry no earlier cell has had. Held in a variable, not read per call, because hitBoth runs once per pixel ray.
+const SLAB_DIRS = Object.freeze({ x: Object.freeze([1, 0]), z: Object.freeze([0, 1]) });
+let SLAB_DIR = SLAB_DIRS.x;
+const readSlabDir = () => { SLAB_DIR = SLAB_DIRS[($("slabdir") || { value: "x" }).value] || SLAB_DIRS.x; };
 // The two model matrices the "objects" camera needs, column-major to match render/rasterProbe.js's viewProj
 // and everything downstream of it. The background's is the identity ON PURPOSE and not as a placeholder: it
 // is what makes the background pixels a control rather than a second unknown.
 const IDENT4 = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-const translate4 = (tx) => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, 0, 1]);
+const translate4 = (tx, tz = 0) => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, tz, 1]);
 
 /** Where this pixel's ray meets the scene: the slab if it covers it, the background otherwise. */
 /**
@@ -416,7 +429,8 @@ function hitBoth(inv, u, v, sx = 0) {
     const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
     const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
     const n = at(Y_NEAR);
-    const onSlab = n[0] >= SLAB_X[0] + sx && n[0] <= SLAB_X[1] + sx && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
+    const ox = sx * SLAB_DIR[0], oz = sx * SLAB_DIR[1];
+    const onSlab = n[0] >= SLAB_X[0] + ox && n[0] <= SLAB_X[1] + ox && n[2] >= SLAB_Z[0] + oz && n[2] <= SLAB_Z[1] + oz;
     return { near: onSlab ? n : null, far: at(Y_FAR) };
 }
 
@@ -509,7 +523,7 @@ function renderIds(vp, sx = 0, alpha = 1) {
 // to the world. A slab that slid under a stationary texture would move in the depth and id buffers and stand
 // still in the picture, which is a scene no motion vector can be right about.
 const patternUV = (p, sx = 0) => p[1] === Y_NEAR
-    ? [(p[0] - sx - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
+    ? [(p[0] - sx * SLAB_DIR[0] - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - sx * SLAB_DIR[1] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
     : [(p[0] + 6) / 12, (p[2] + 6) / 12];
 
 /** Colour at R x R through a (jittered) view-projection. */
@@ -793,6 +807,7 @@ async function reset() {
     // truth the temporal pane never sees. At startFrame = 0 sceneT() is 0 and nothing moves.
     // dx0 is in the SAME units the tick loop's `dx` uses, so the still panes and the moving one agree; on
     // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
+    readSlabDir();
     const t0 = startFrame, sx0 = objectsCam ? t0 * SLAB_DX * slabSpeed() : 0;
     const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
     ref = dolly ? truthPersp(dollyVP(t0), kind, sx0, slabAlpha()) : truth(kind, dx0);
@@ -830,6 +845,7 @@ async function tick() {
     // the slab's alpha this frame. 1 on every camera but "objects", so the three older cameras cannot
     // see this control at all -- the same guard sxCur carries, for the same reason.
     const alphaCur = objects ? slabAlpha() : 1;
+    readSlabDir();                               // v4711: live, like the speed below
     const speed = slabSpeed();                   // v4682: 1 unless the control says otherwise
     const sxCur = objects ? sceneT() * SLAB_DX * speed : 0;
     const sxPrev = objects ? sceneTPrev() * SLAB_DX * speed : 0;
@@ -902,8 +918,8 @@ async function tick() {
     const ids = objects ? renderIds(vpCur, sxCur, alphaCur) : null;
     const objMats = objects ? buildObjectMatrices({
         vpCur, vpPrev,
-        models:     [IDENT4, translate4(sxCur)],     // 0 = background (never moves), 1 = the slab
-        prevModels: [IDENT4, translate4(sxPrev)],
+        models:     [IDENT4, translate4(sxCur * SLAB_DIR[0], sxCur * SLAB_DIR[1])],     // 0 = background (never moves), 1 = the slab
+        prevModels: [IDENT4, translate4(sxPrev * SLAB_DIR[0], sxPrev * SLAB_DIR[1])],
     }) : null;
     const motion = objects
         ? ogpu ? (await ogpu.motion({ depth, ids, w: D, h: D, invMVPCur: objMats.invMVPCur, mvpPrev: objMats.mvpPrev })).data
@@ -1630,7 +1646,7 @@ $("reset").onclick = () => { running = false; $("run").textContent = "Run"; rese
 // Guarded like every other lookup here: tools/ship/fsrPage-selfcheck.mjs runs this module against a stub DOM whose
 // elements carry no .options, and the unguarded first draft crashed it on import.
 { const g = $("gengate"); if (g && g.options) for (const o of g.options) o.textContent += optionSuffix(o.value); }
-for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();

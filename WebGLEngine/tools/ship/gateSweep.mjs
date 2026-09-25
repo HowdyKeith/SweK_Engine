@@ -8032,6 +8032,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4711 -- THE 318th CLOSING: the page gains a second occlusion geometry, and H10 is declared on it.
+    since393: Object.freeze({
+        at: "v4711", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVertical-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/fsrPage-selfcheck.mjs (the slab-pattern row now requires BOTH axes of the offset)"]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/frameGateMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab direction, because its C12 re-harvests through the page on the default path: zone at x2, 39 rows bit-identical." }),
+            Object.freeze({ gate: "tools/ship/frameHolesMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run after fsr.html gained a slab direction, because its C12 re-harvests through the page on the default path: zone at x1, 39 rows bit-identical." }),
+            Object.freeze({ gate: "tools/ship/frameHoledMeasure-selfcheck.mjs", was: "green", now: "green",
+                why: "the same, at x8 and upscale 1.5: 39 rows bit-identical -- 117 frames across three speeds, which is the proof that the default direction is inert." }),
+        ]),
+        verdict: "*** EVERY CELL THE HOLED-FRAME CONTRAST HAD BEEN READ AT SHARED ONE OCCLUSION GEOMETRY, SO THE PAGE GOT A SECOND. " +
+                 "*** fsr.html's slab moved only along x, with the dolly, disoccluding its vertical edges; v4710 said a further honest " +
+                 "test needed a camera path the page did not have. The slab's offset was a scalar threaded through a dozen samplers, " +
+                 "but only THREE places turn it into geometry -- hitBoth's bounds, patternUV, and the motion vectors' model matrix -- " +
+                 "so the offset became that scalar times a unit direction, and `slabdir` picks x (the default) or z: VERTICAL, ACROSS " +
+                 "the dolly, disoccluding horizontal edges no harvest has seen. Along x every added term is sx * 0, exactly zero, and " +
+                 "the three frame-level measurement gates' C12 re-harvests PROVE the default inert rather than a comment asserting " +
+                 "it: 117 frames across x1, x2 and x8, bit for bit. " +
+                 "*** H10 IS DECLARED ON IT WITH NO DATA IN THE COMMIT: *** H9's exact question and statistic -- imported, not " +
+                 "rewritten -- at x8 with the slab moving vertically. One cell. The price is named (one scene reversed fails, and " +
+                 "checker is named), and so is a way it can fail to answer: the slab crosses its own height in about five frames " +
+                 "at x8, so it may leave the view before enough frames carry holes. " +
+                 "*** C22 PROVES THE DIRECTION IS HONOURED, AND ONE ROW PROVES IT IS HONOURED GEOMETRICALLY. *** At x1, which H10 " +
+                 "does not declare, the plain harvest reproduces v4708's cached rows and the vertical one moves every frame. But the " +
+                 "dB moving would not catch hitBoth's vertical bounds being missed -- the texture and motion would travel while the " +
+                 "outline stayed -- so the slab's NEAR-DEPTH CLUSTER is tracked across 11 frames: 2 columns and 0 rows by default, " +
+                 "1 column and 3 rows vertically. The first draft required one axis to dominate 3 to 1 within an arm and failed a " +
+                 "correct slab, because the dolly drifts the view along x in BOTH arms; the row now compares the arms. " +
+                 "*** SEVEN SABOTAGES, SEVEN RED, *** after three re-runs: removing the direction read in tick() alone changed " +
+                 "nothing -- every slabdir change goes through reset(), which reads it too -- so both reads were removed and it " +
+                 "reddens; a vertical slab whose TEXTURE stays still is caught by fsrPage-selfcheck's pattern row, widened this round " +
+                 "to both axes; and one sabotage of the document first matched twice and was a no-op until anchored. The gate drives " +
+                 "the page four times and runs 27.2 s alone; its timing is hand-filed.",
+    }),
     // v4710 -- THE 317th CLOSING: H9 not supported -- one scene, at one ratio, at exactly the declared price.
     since392: Object.freeze({
         at: "v4710", swept: 1, green: 1, red: 0,
