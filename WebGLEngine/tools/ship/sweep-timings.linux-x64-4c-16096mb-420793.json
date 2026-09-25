@@ -1,0 +1,29 @@
+{
+ "host": "linux-x64-4c-16096mb-420793",
+ "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87.",
+ "captured": "2026-09-25T03:35:16.858Z",
+ "timings": {
+  "tools/ship/cloneProvision-selfcheck.mjs": 7171,
+  "tools/ship/exitBusy-selfcheck.mjs": 15284,
+  "tools/ship/deadlineLeak-selfcheck.mjs": 11841,
+  "tools/ship/boxTimings-selfcheck.mjs": 76
+ },
+ "at": {
+  "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
+  "tools/ship/exitBusy-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
+  "tools/ship/deadlineLeak-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
+  "tools/ship/boxTimings-selfcheck.mjs": "2026-09-25T03:35:16.858Z"
+ },
+ "kinds": {
+  "tools/ship/cloneProvision-selfcheck.mjs": "alone",
+  "tools/ship/exitBusy-selfcheck.mjs": "alone",
+  "tools/ship/deadlineLeak-selfcheck.mjs": "alone",
+  "tools/ship/boxTimings-selfcheck.mjs": "alone"
+ },
+ "codes": {
+  "tools/ship/cloneProvision-selfcheck.mjs": 0,
+  "tools/ship/exitBusy-selfcheck.mjs": 0,
+  "tools/ship/deadlineLeak-selfcheck.mjs": 0,
+  "tools/ship/boxTimings-selfcheck.mjs": 0
+ }
+}

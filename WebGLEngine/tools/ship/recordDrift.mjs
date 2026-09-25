@@ -54,6 +54,7 @@
 // asks the ONE question a new module makes urgent -- has what I just added moved this number.
 
 import fs from "node:fs";
+import * as BT from "./boxTimings.mjs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as TR from "./treeRead.mjs";
@@ -328,14 +329,48 @@ export async function checks({ load = null, timings = null, only = null } = {}) 
         // quickSweep writes `kinds` now. This check is what stops the class coming back: a new gate owes the file
         // a kind exactly as it owes it a runtime and a stamp, and a reading whose quantity is unknown is not a
         // reading anybody can compare.
+        // *** v4679 -- THIS ASKED A COVERAGE QUESTION OF A COST-SCOPED RECORD, AND THAT MADE IT UNCLEARABLE. ***
+        // It read ONLY sweep-timings.json. That file is host-claimed: v4647 made it refuse a foreign write,
+        // rightly, because "two machines' runtimes in one set of fields is not a record, it is whichever ran
+        // last". Its host is a LINUX 4-core container -- the rig can never claim it, and the container that
+        // could is gone, so NO LIVE BOX CAN ADD AN ENTRY. Every round that added a gate left this row red with
+        // no action available that would clear it, which is a ratchet with no mechanism rather than a check.
+        //
+        // The question this row is FOR is "has this gate ever been timed" -- coverage -- and any box's record
+        // answers that. The question the FILE answers is "what does it cost on the box that owns this record"
+        // -- cost -- and only one box's record answers that. tools/ship/boxTimings.mjs holds the distinction;
+        // this reads its coverage side. THE BUDGET IS UNCHANGED and still reads the shared file alone: that is
+        // task #87, it decides which gates the sweep runs, and it is not smuggled in here.
+        // An INJECTED record is the only record: a fixture handing in a timings object means "this is the
+        // state of the world", and reading the real files alongside it would let the tree answer for the
+        // fixture. The first spelling of this line called BT.coverage(ENG) unconditionally and took two of
+        // this check's own sabotage rows red -- the fixture could not reach the check at all.
+        // An injected record STANDS IN FOR sweep-timings.json AND ONLY FOR IT. The parameter is named
+        // `timings` and that is the file it names; the per-box records are separate files and a fixture about
+        // the shared one does not speak for them. Replacing ALL records was tried first and took the
+        // "untouched record is clean" control red -- correctly, because with the per-box records excluded the
+        // real shared file genuinely does lack this round's four new gates.
+        const cov = timings
+            ? BT.coverageOf([{ file: BT.FILES.shared, kind: "shared", host: timings.host || null, rec: timings },
+                             ...BT.records(ENG).filter((r) => r.kind !== "shared")])
+            : BT.coverage(ENG);
         const missing = gateFiles
             .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
-            .filter((g) => !(g in (rec.timings || {})) || !((rec.at || {})[g]) || !((rec.kinds || {})[g]));
+            .filter((g) => {
+                const e = cov.entries.get(g);
+                return !e || !e.at || !e.kind;
+            });
+        const foreignOnly = gateFiles.length - missing.length - cov.localCount;
         out.push({
             name: "sweep timings", owes: OWES.timing,
             recorded: 0, actual: missing.length,
             stale: missing.length > 0,
-            detail: missing.length ? missing.join(", ") : "every gate has a timing, its own capture stamp and a kind",
+            detail: missing.length
+                ? missing.join(", ")
+                : `every gate has a timing, its own capture stamp and a kind, across ${cov.records.length} ` +
+                  `record(s): ${cov.localCount} measured on THIS box (${cov.thisBox}) and the rest on another. ` +
+                  "A foreign reading answers COVERAGE and not COST, and the budget deliberately still reads " +
+                  "the shared file -- see task #87",
         });
     }
 

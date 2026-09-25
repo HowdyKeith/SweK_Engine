@@ -8075,6 +8075,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    since350: Object.freeze({
+        at: "v4679", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/boxTimings-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 76 ms. A RATCHET WITH NO REACHABLE CLEAR STATE. recordDrift's sweep-timings row asked " +
+                 "whether every gate has a reading in sweep-timings.json -- a HOST-CLAIMED file whose owner is a " +
+                 "cloud container that no longer exists. The rig cannot claim it and a new container hashes " +
+                 "differently, so NO LIVE BOX COULD ADD AN ENTRY and every round that added a gate left the row red " +
+                 "with no action that would clear it. The row was asking a COVERAGE question (has this gate ever " +
+                 "been timed) of a COST-scoped record (what does it cost on the box that owns this file). " +
+                 "*** AND THE FALLBACK THE REFUSAL WROTE TO WAS NEVER READ: *** LOCAL_TIMINGS occurred six times in " +
+                 "the tree -- its definition, one default parameter, and four assertions about the FILENAME and the " +
+                 "ROUTING -- so the rig's 1,409 readings per sweep went to a dead file while its gate selection came " +
+                 "from a foreign box's numbers, which its own verify says in so many words. Per-box records are read " +
+                 "now, the legacy single-name file is still read so the rig's existing measurements are not " +
+                 "orphaned, and this box's four previously-untimed gates are recorded. THE BUDGET IS UNTOUCHED and " +
+                 "says so in a row: quickSweep does not import this module, gate selection on the rig is still " +
+                 "computed from another machine, and that is task #87 because it changes which gates run.",
+    }),
     since349: Object.freeze({
         at: "v4678", swept: 1, green: 1, red: 0,
         added: Object.freeze([

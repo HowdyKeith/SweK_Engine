@@ -710,8 +710,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // and the honest reading is that the previous round forgot the step, not that someone else moved the tree.
     // v4678 -- RE-TAKEN 1773 -> 1774 for tools/ship/deadlineLeak-selfcheck.mjs. ONE gate, and the same four rows
     // by one each: gates, usesOk, definesOk, nameFirst. The other five held, as they have through every arrival.
-    gates: 1774, usesOk: 1753, definesOk: 1745, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1646, condFirst: 96, unknownSignature: 11,
+    // v4679 -- RE-TAKEN 1774 -> 1775 for tools/ship/boxTimings-selfcheck.mjs. ONE gate, the same four rows by
+    // one each, the other five unmoved -- the shape that says the patterns discriminate rather than track size.
+    gates: 1775, usesOk: 1754, definesOk: 1746, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1647, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
