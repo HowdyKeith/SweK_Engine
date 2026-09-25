@@ -1658,7 +1658,8 @@ $("reset").onclick = () => { running = false; $("run").textContent = "Run"; rese
 // elements carry no .options, and the unguarded first draft crashed it on import.
 { const g = $("gengate"); if (g && g.options) for (const o of g.options) o.textContent += optionSuffix(o.value); }
 // v4713 -- and an option that exists only for a frame-level hypothesis carries that verdict, from render/frameVerdicts.mjs.
-{ const g = $("slabdir"); if (g && g.options) for (const o of g.options) o.textContent += frameOptionSuffix("slabdir", o.value); }
+// v4719 -- and the slab PATH, whose sway arm exists only for H14.
+for (const id of ["slabdir", "slabpath"]) { const g = $(id); if (g && g.options) for (const o of g.options) o.textContent += frameOptionSuffix(id, o.value); }
 for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir", "slabpath"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };

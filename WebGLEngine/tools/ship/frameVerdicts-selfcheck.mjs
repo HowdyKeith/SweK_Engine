@@ -23,8 +23,9 @@ import { PREREG_H7, CACHE_H7, RESULT_H7, FRAME_KEYS, h7 } from "./frameGate.mjs"
 import { PREREG_H8, CACHE_H8, RESULT_H8, h8 } from "./frameHoles.mjs";
 import { PREREG_H9, CACHE_H9, RESULT_H9, HOLED_KEYS, h9 } from "./frameHoled.mjs";
 import { PREREG_H10, CACHE_H10, RESULT_H10, VERT_KEYS, h10 } from "./frameVertical.mjs";
-import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, h11 } from "./frameGain.mjs";
+import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, h11, cellOf } from "./frameGain.mjs";
 import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, reverse } from "./frameReverse.mjs";
+import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, h14 } from "./frameSway.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -51,6 +52,7 @@ const RUN = {
     H12: { doc: PREREG_H12, cache: CACHE_H12, d: declared(readDoc(PREREG_H12), REV_KEYS) },
     // v4717 -- H13 is H12's document read on H12's frames: it has a runner and no cache of its own, so no frame is counted twice.
     H13: { doc: PREREG_H12, cache: null, d: declared(readDoc(PREREG_H12), REV_KEYS) },
+    H14: { doc: PREREG_H14, cache: CACHE_H14, d: declared(readDoc(PREREG_H14), SWAY_KEYS) },
 };
 
 console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hypotheses, what the page says about them, and whether it is true\n`);
@@ -58,8 +60,8 @@ console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hyp
 console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
 {
     // v4717 -- "in the order measured" allows two hypotheses from one round (H12 and H13 share a document and a harvest).
-    ok("*** H7 to H13, in the order they were measured -- and every one has a runner here ***",
-       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11", "H12", "H13"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
+    ok("*** H7 to H14, in the order they were measured -- and every one has a runner here ***",
+       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11", "H12", "H13", "H14"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
        FRAME_VERDICTS.every((v, i) => i === 0 || Number(v.round.slice(1)) >= Number(FRAME_VERDICTS[i - 1].round.slice(1))),
        FRAME_VERDICTS.map((v) => `${v.id}@${v.round}`).join(" "));
     const bad = [];
@@ -145,6 +147,18 @@ const R7 = res(RESULT_H7), R8 = res(RESULT_H8), R9 = res(RESULT_H9), R10 = res(R
        `${word(h.h13)}; clock's share of the mean rho ${share.map((p) => p + "%").join(", ")}`);
 }
 
+{
+    const R14 = res(RESULT_H14), d14 = RUN.H14.d, h = h14(R14.per, d14), v14 = entry("H14"), R11 = res(RESULT_H11);
+    const back = d14.cells.flatMap((c) => d14.scenes.filter((s) => d14.direction * R14.per[c][s].rho > 0)).length;
+    const m = (per) => d14.scenes.reduce((a, s) => a + per[s].rho, 0) / d14.scenes.length;
+    const twin = (c) => R11.declared.cells.find((q) => { const a = cellOf(q), b = cellOf(c); return a.speed === b.speed && a.slabdir === b.slabdir; });
+    const kept = d14.cells.map((c) => Math.round(100 * m(R14.per[c]) / m(R11.per[twin(c)])));
+    const failing = d14.cells.filter((c) => !h.cells[c].cleared), against = failing.length === 1 ? d14.scenes.filter((s) => d14.direction * R14.per[failing[0]][s].rho < 0) : [];
+    ok("*** H14: not supported -- 13 of 14 backwards at the recorded share of H11's strength, and bars the one scene against it -- recomputed ***",
+       word(h) === v14.verdict && back === 13 && kept.every((k) => v14.evidence.includes(`${k}%`)) && J(against) === J(["bars"]) && v14.evidence.includes("bars"),
+       `${word(h)}; ${back} backwards; kept ${kept.map((k) => k + "%").join(", ")} of H11; against: ${against.join(", ")}`);
+}
+
 console.log("\n3. *** EVERY COUNT AND THE HEADROOM, RECOMPUTED FROM THE CACHES ***");
 {
     const counted = Object.fromEntries(Object.entries(RUN).filter(([, r]) => r.cache).map(([id, r]) => [id, rows(gz(r.cache))]));
@@ -161,10 +175,15 @@ console.log("\n3. *** EVERY COUNT AND THE HEADROOM, RECOMPUTED FROM THE CACHES *
     ok("*** the headroom is the frame oracle over the better fixed policy, recomputed -- and the scenes named are the LARGEST, not chosen ***",
        Object.entries(h.scenes).every(([s, g]) => gain[s] !== undefined && signed(gain[s]) === g) && J(top.sort()) === J(Object.keys(h.scenes).sort()),
        `x${h.speed}: ${Object.entries(gain).map(([s, g]) => `${s} ${signed(g)}`).join(", ")}`);
-    const hv = frameVerdictFor("slabdir", RUN.H10.d.slabdir);
-    ok("*** the option that carries H10's verdict is the one H10's document declared, and only it carries one ***",
-       !!hv && hv.id === "H10" && FRAME_VERDICTS.filter((v) => v.option).length === 1 && frameOptionSuffix("slabdir", "x") === "",
-       `slabdir=${RUN.H10.d.slabdir}${frameOptionSuffix("slabdir", RUN.H10.d.slabdir)}`);
+    // v4719 -- WIDENED FROM ONE OPTION TO EVERY ONE. Each verdict that labels a page option must label the value its own document
+    // declared -- H10 the slab direction, H14 the slab path -- and each select's DEFAULT, the arm every earlier figure is, carries none.
+    const DECLARED_OPT = { H10: ["slabdir", RUN.H10.d.slabdir], H14: ["slabpath", RUN.H14.d.path] };
+    const withOpt = FRAME_VERDICTS.filter((v) => v.option);
+    const optBad = withOpt.filter((v) => !DECLARED_OPT[v.id] || v.option.select !== DECLARED_OPT[v.id][0] || v.option.value !== DECLARED_OPT[v.id][1] ||
+        frameVerdictFor(v.option.select, v.option.value) !== v);
+    ok("*** every option that carries a verdict is the one that verdict's document declared, and the defaults carry none ***",
+       J(withOpt.map((v) => v.id)) === J(Object.keys(DECLARED_OPT)) && !optBad.length && frameOptionSuffix("slabdir", "x") === "" && frameOptionSuffix("slabpath", "linear") === "",
+       withOpt.map((v) => `${v.option.select}=${v.option.value}${frameOptionSuffix(v.option.select, v.option.value)}`).join("; "));
 }
 
 console.log("\n4. *** THE PAGE READS IT -- DRIVEN, NOT GREPPED ***");
@@ -180,6 +199,7 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: {}
     const stat = () => ($("genstat") || {}).textContent || "";
     await until(() => fno() === 0 && /engine:/.test(($("engine") || {}).textContent || ""), 180000);
     const labels = Object.fromEntries([...$("slabdir").options].map((o) => [o.value, o.textContent]));
+    const pathLabels = Object.fromEntries([...$("slabpath").options].map((o) => [o.value, o.textContent]));
     for (const [id, v] of [["scene", "zone"], ["shading", "off"], ["reactive", "off"], ["camera", "objects"], ["slabspeed", "2"],
                            ["genfield", "block"], ["gensource", "presented"], ["genengine", "cpu"], ["gengate", "off"], ["genframe", "off"]]) { const e = $(id); if (e) e.value = v; }
     $("scene").dispatchEvent(new Event("change"));
@@ -190,11 +210,14 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: {}
     $("genframe").value = "on";
     await until(() => /frame generation \\[ON/.test(stat()), 120000);
     $("run").click();
-    return { labels, off, on: stat() };
+    return { labels, pathLabels, off, on: stat() };
 }` });
 if (!r.ok) ok("the page ran", false, `${r.reason || "no result"} ${JSON.stringify(r.pageErrors || []).slice(0, 300)}`);
 else {
-    const { labels, off, on } = r.result;
+    const { labels, pathLabels, off, on } = r.result;
+    ok("*** and the sway path's label carries H14's verdict, while the linear default carries none ***",
+       !!pathLabels.sway && pathLabels.sway.endsWith(frameOptionSuffix("slabpath", "sway")) && frameOptionSuffix("slabpath", "sway") !== "" &&
+       !!pathLabels.linear && !/SUPPORTED|REPORTED/.test(pathLabels.linear), `sway: "...${(pathLabels.sway || "").slice(-45)}"`);
     ok("*** in the RUNNING page, the vertical slab's label carries H10's verdict and the default carries none ***",
        !!labels.z && labels.z.endsWith(frameOptionSuffix("slabdir", "z")) && !!labels.x && !/SUPPORTED|REPORTED/.test(labels.x),
        `z: "...${(labels.z || "").slice(-45)}"`);

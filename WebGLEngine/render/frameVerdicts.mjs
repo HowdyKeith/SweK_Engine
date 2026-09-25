@@ -49,11 +49,16 @@ export const FRAME_VERDICTS = Object.freeze([
         claim: "the backwards ranking survives when the frame's position in the window is partialled out",
         evidence: "neither cell clears; 39% of the forward mean rho and 68% of the vertical goes with the clock",
         numbers: Object.freeze(["39%", "68%"]) }),
+    Object.freeze({ id: "H14", round: "v4719", closing: "since401", doc: "render/frame-sway-preregistration.md", verdict: "not supported",
+        signal: "motion's gain, slab in view", option: Object.freeze({ select: "slabpath", value: "sway" }),
+        claim: "the backwards ranking holds when the slab never leaves the view, on both geometries",
+        evidence: "13 of 14 scene-cells backwards at 57% and 65% of the linear path's strength; forward cleared, vertical stopped at 6 of 7 with bars against it",
+        numbers: Object.freeze(["13 of 14", "57%", "65%"]) }),
 ]);
 
 /** How much picture the arc stands on: frames harvested with both dB, per hypothesis. The gate counts the caches. */
 // H13 is measured on H12's frames, so it has no entry of its own: a frame is counted once however many hypotheses read it.
-export const FRAME_MEASURED = Object.freeze({ H7: 546, H8: 546, H9: 546, H10: 273, H11: 546, H12: 546 });
+export const FRAME_MEASURED = Object.freeze({ H7: 546, H8: 546, H9: 546, H10: 273, H11: 546, H12: 546, H14: 546 });
 
 /** The round the path first ran on a picture, and how many scenes every hypothesis declared. Both graded by the gate. */
 export const FRAME_FIRST_RUN = Object.freeze({ round: "v4681", closing: "since366" });
@@ -61,16 +66,18 @@ export const FRAME_SCENE_COUNT = 7;
 
 /** Where the arc stands. The headroom is v4706's frame oracle over the better fixed policy, recomputed by the gate. */
 // v4715 -- the finding is built from QUOTES, each graded against the closing it came from, so it can say no more than they did.
-export const FRAME_ARC = Object.freeze({ standsAt: "v4717", closing: "since399",
+export const FRAME_ARC = Object.freeze({ standsAt: "v4719", closing: "since401",
     quotes: Object.freeze([
         Object.freeze({ closing: "since388", text: "spatial detail is not what separates" }),
         Object.freeze({ closing: "since394", text: "a hole is not a signal a frame gate can carry to geometry it has not seen" }),
         Object.freeze({ closing: "since397", text: "motion's gain over standing still ranks frames backwards on both geometries" }),
         Object.freeze({ closing: "since399", text: "a large share of that ranking goes with the window's clock" }),
+        Object.freeze({ closing: "since401", text: "with the slab whole in view, a weaker backwards ranking survives" }),
     ]),
     finding: "spatial detail is not what separates the frames generation wins; a hole is not a signal a frame gate can carry to " +
              "geometry it has not seen; and motion's gain over standing still ranks frames backwards on both geometries, at x2 " +
-             "as at x4 -- but a large share of that ranking goes with the window's clock, and what survives it clears nowhere",
+             "as at x4 -- but a large share of that ranking goes with the window's clock; and with the slab whole in view, a weaker " +
+             "backwards ranking survives, clearing on one geometry and not the other",
     headroom: Object.freeze({ round: "v4706", closing: "since388", speed: "4",
         scenes: Object.freeze({ ramp: "+0.368", smooth: "+0.232" }) }) });
 

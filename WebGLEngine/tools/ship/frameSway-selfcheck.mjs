@@ -111,8 +111,9 @@ const doc = readDoc(PREREG_H14).replace(/\s+/g, " ");
        cells.every((c) => R11.declared.cells.some((q) => cellOf(q).speed === c.speed)), `x${cells[0].speed}`);
     const R12 = res(RESULT_H12), signs = R12.declared.cells.map((c) => Math.sign(mean(R12.declared.scenes.map((s) => R12.per[c][s].rho))));
     ok("*** `direction` is the sign H12 recorded, the same in both of its cells ***", signs.every((s) => s === d.direction), `H12 ${signs.join(", ")}; declared ${d.direction}`);
-    ok("*** no data yet: no cache and no result -- the measurement round inverts this row ***",
-       !fs.existsSync(path.join(ENG, CACHE_H14)) && !fs.existsSync(path.join(ENG, RESULT_H14)));
+    // v4719 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    ok("*** the measurement exists, produced under THIS document's constants -- v4718's 'no data yet', inverted ***",
+       fs.existsSync(path.join(ENG, CACHE_H14)) && fs.existsSync(path.join(ENG, RESULT_H14)) && J(res(RESULT_H14).declared) === J(d));
     // The document's account of the window, counted from H11's committed rows -- geometry only, no gain and no dB read.
     const c11 = gz(CACHE_H11), cut = (rows) => { const full = slabBlocks(rows[0]);
         return { leave: (rows.find((r) => slabBlocks(r) < full) || {}).frame, gone: (rows.find((r) => slabBlocks(r) === 0) || {}).frame,
@@ -182,5 +183,6 @@ console.log("\n4. *** THE PAGE, DRIVEN AT x1 -- A SPEED THE DOCUMENT DOES NOT DE
 }
 
 console.log(`\nframeSway-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY DECLARED CELL -- nothing is harvested on sway at x4; C25 on the declared cells and C12 are the measurement round's.");
+console.log("unchecked here: THE DECLARED CELLS -- they are tools/ship/frameSwayMeasure-selfcheck.mjs's, which re-derives H14 and checks " +
+            "C25, C26 and C12 on them.");
 process.exit(fails ? 1 : 0);

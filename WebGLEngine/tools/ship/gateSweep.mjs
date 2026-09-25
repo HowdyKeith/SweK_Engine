@@ -8032,6 +8032,37 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4719 -- THE 326th CLOSING: H14 not supported -- with the slab whole in view, a weaker backwards ranking survives.
+    since401: Object.freeze({
+        at: "v4719", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameSway-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H14 re-derived; every option that carries a verdict is the one its document declared)"]),
+        verdict: "*** H14 IS NOT SUPPORTED, AND THE SCENE THAT BROKE IT IS NOT THE ONE ITS DOCUMENT NAMED. *** v4718's runner ran as " +
+                 "committed on sway at x4, both geometries -- 546 frames, 883 s. Forward CLEARS, 7 of 7 at t p 0.0129; vertical stops " +
+                 "at 6 of 7, exact sign p 0.0625, with bars against it at +0.243. The document named zone as the likely price, and zone " +
+                 "went WITH the direction in both cells, -0.518 and -0.014. The forward cell is reported as that cell's outcome and not " +
+                 "promoted. *** C25 HELD: *** the slab kept 196 to 210 blocks in every one of the 476 scored frames, so the design did " +
+                 "what the document said. *** THE READING IS THE TABLE'S THIRD ROW: *** with the slab whole in view, a weaker backwards " +
+                 "ranking survives -- 13 of 14 scene-cells backwards, mean rho -0.235 forward and -0.258 vertical, 57% and 65% of H11's " +
+                 "strength at the same speed and geometry on the linear path. So what separates the two paths -- the slab leaving the " +
+                 "view most visibly -- is part of H11's ranking and not all of it; the paths also differ in how the slab moves against " +
+                 "the camera, and nothing here separates those. On sway the clock is nearly gone: partialling out frame order moves the " +
+                 "mean rho by 13% and 15%, against 39% and 68% on the linear path. *** C26 WAS WRONG IN ITS FIRST DRAFT, ABOUT THE PATH " +
+                 "AND NOT THE DATA. *** It demanded that every sway frame differ from its linear twin, and 21 vertical frames did not: " +
+                 "vertically the sway has no camera term, and a triangle wave rises at exactly the linear speed until its first turn at " +
+                 "t 4.09, so frames 2, 3 and 4 sit on the same path to 1e-15. C26 now computes where the paths coincide from " +
+                 "render/slabPath.mjs and requires every frame OFF that set to differ: 21 of 273 match, all 21 on it, none off it. C12 " +
+                 "re-harvested zone on sway identically. *** H14 JOINS render/frameVerdicts.mjs, *** and slabpath=sway -- which exists " +
+                 "only for it -- carries its verdict on the page, as slabdir=z carries H10's. *** FIFTEEN SABOTAGES, FIFTEEN RED, AFTER " +
+                 "ONE CRASH THAT WAS THE SABOTAGE'S. *** Removing H14 from the table first threw a SyntaxError: its entry holds a " +
+                 "nested Object.freeze for its option, and the non-greedy removal stopped inside it and left broken source -- the " +
+                 "table never loaded, which is a malformed mutation and not a verdict. Removed whole, it reddens five rows. One sway " +
+                 "scene swapped for its linear twin reddens C25 and C26 together, on either geometry; declaring the path linear after " +
+                 "the run reddens six rows, C12 among them, because C12 re-harvests on the declared path. The measurement gate runs " +
+                 "about 69 s alone and is hand-filed.",
+    }),
     // v4718 -- THE 325th CLOSING: the page gains a slab path that never leaves the view, and H14 is declared on it.
     since400: Object.freeze({
         at: "v4718", swept: 1, green: 1, red: 0,
