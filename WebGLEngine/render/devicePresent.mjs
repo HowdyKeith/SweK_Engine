@@ -61,7 +61,11 @@ export async function presentCheck(canvas, backend, opts = {}) {
     try {
         device = await requestDevice(canvas, { backend });
         if (!device || device.backend !== backend) { out.state = "no-backend"; out.lost = "requestDevice gave " + (device ? device.backend : "nothing"); return out; }
-        if (device.gpu && device.gpu.lost) device.gpu.lost.then((info) => { out.lost = "device lost: " + (info && info.message || "(no message)"); out._resolveLost(); });
+        // v4680 -- guarded: if device.gpu.lost resolves AFTER presentCheck has already returned "presented"
+        // (measured on win32: the device outlives A's and B's own reads, then dies asynchronously later),
+        // the `finally` below has already deleted _resolveLost, and calling it threw an unhandled rejection
+        // ("out._resolveLost is not a function") instead of just recording the late loss.
+        if (device.gpu && device.gpu.lost) device.gpu.lost.then((info) => { out.lost = "device lost: " + (info && info.message || "(no message)"); out._resolveLost && out._resolveLost(); });
         const pipe = device.pipeline(renderPipelineDesc());
         const left = device.buffer({ usage: "vertex", data: quad(-1, 0, 0.5, LEFT) }), right = device.buffer({ usage: "vertex", data: quad(0, 1, 0.5, RIGHT) });
         const rec = new Float32Array(12); rec[3] = 1; const inst = device.buffer({ usage: "vertex", data: rec });
