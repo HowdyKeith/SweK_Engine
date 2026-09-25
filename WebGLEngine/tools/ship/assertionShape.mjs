@@ -701,8 +701,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // 1742, nameFirst 1640 -> 1643. The union of two lines that had each re-taken over their own tree --
     // +3 gates from this branch (wasmTeardown, thrownRow, declaredCost) on top of the murmuration line's
     // count, and the ordinary four-by-one shape three times over. condFirst and unknownSignature held.
-    gates: 1771, usesOk: 1750, definesOk: 1742, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1643, condFirst: 96, unknownSignature: 11,
+    // v4669 -- RE-TAKEN 1771 -> 1773. TWO gates, and THE RECORD CAUGHT ITS OWN ROUND'S OMISSION: v4668 added
+    // tools/ship/cloneProvision-selfcheck.mjs and did NOT re-take this, so the tree shipped one gate ahead of
+    // the record and this line was already red at b826aea8 before v4669 touched anything. v4669 adds
+    // tools/ship/exitBusy-selfcheck.mjs. Both move gates/usesOk/definesOk/nameFirst by one each and move
+    // nothing else -- the same four rows, for the twenty-somethingth consecutive arrival, which is what keeps
+    // the other five rows worth comparing. THE DRIFT WAS NOT A FOREIGN BRANCH'S: both gates are this session's,
+    // and the honest reading is that the previous round forgot the step, not that someone else moved the tree.
+    gates: 1773, usesOk: 1752, definesOk: 1744, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1645, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

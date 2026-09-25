@@ -1,0 +1,276 @@
+{
+ "generatedFrom": "tools/ship/exitBusy.mjs, driven over a seeded uniform sample",
+ "note": "v4669 -- HOW MANY GATES ARE STILL DOING MAIN-THREAD WORK AT THE INSTANT THEY CALL process.exit(). v4663 drew its population of 48 by asking DOES THIS GATE COMPILE A WASM MODULE, which is a CAUSE; the defect is a SYMPTOM. wasmTeardown-selfcheck could only state the size as 'at least 52, at most 1708'. This is that range narrowed by MEASURING the property: process CPU across an awaited 300 ms window opened where the gate wanted to leave, taken twice so a burst can be told from a steady cost. *** THE ESTIMATE IS A FLOOR, FOR THREE NAMED REASONS. *** (1) 2 of 114 measured gates were BUSIER IN THE SECOND WINDOW than the first, so a burst that has not begun inside 300 ms is under-read -- they are counted here but there may be more. (2) 5 gates were killed at the 45 s cap and are UNKNOWN, never quiet, and capped gates are the EXPENSIVE ones, which are the likelier members. (3) Every reading is Linux, where this teardown is SILENT -- unix/async.c has no UV_HANDLE_CLOSING assertion -- so a member here is a CANDIDATE and the rig's clone-verify is the instrument for the fact. ALSO RECORDED: the probe writes a copy of the gate beside the original while it runs, and a gate that WALKS THE TREE sees it. wiringClaims-selfcheck came back RED in the first screen for that reason alone and is green by hand. measure() now takes a baseline run and reports `perturbed` rather than leaving that in the data.",
+ "at": "2026-09-25",
+ "method": {
+  "windowMs": 300,
+  "windows": 2,
+  "capMs": 45000,
+  "serial": true,
+  "floorMs": 5,
+  "ratio": 5,
+  "controlMs": 0.9,
+  "disprovenInstrument": "a --require hook parking the main thread with Atomics.wait read 0.1-0.2 ms for ALL FOUR gates the rig has actually crashed on, against 7-104 ms by hand: the work is ON the main thread and parking it forbids the work being measured"
+ },
+ "sample": {
+  "seed": 1,
+  "drawn": 120,
+  "measured": 114,
+  "unknown": 6,
+  "population": 1413,
+  "allGates": 1773,
+  "unknownReasons": {
+   "killed at the 45000 ms cap (SIGTERM)": 5,
+   "no marker; the gate exited 1 before the probe": 1
+  }
+ },
+ "counts": {
+  "busy": 16,
+  "late": 2,
+  "steady": 1,
+  "quiet": 95
+ },
+ "estimate": {
+  "rate": 0.1579,
+  "lo": 0.1023,
+  "hi": 0.2358,
+  "overPopulation": 223,
+  "loCount": 145,
+  "hiCount": 333,
+  "priorRange": "at least 52, at most 1708 (v4668c)"
+ },
+ "members": [
+  {
+   "gate": "tools/ship/contactOverlay-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 87.1,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "physics/lockstep-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 45.1,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "tools/roundhouse/seedSpreadModule-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 25.9,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "tools/roundhouse/lensLiveness-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 23.8,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "physics/mesh/discontinuity-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 22.0,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "tools/roundhouse/sackurTetrodeBind-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 21.7,
+   "win2Ms": 0.2,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "tools/ship/wiringClaims-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 12.2,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": false,
+   "perturbed": true,
+   "converted": true,
+   "countedAsEvidence": false,
+   "why": "perturbed by the probe, so the reading is suspect too"
+  },
+  {
+   "gate": "ui/dockStats-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 11.8,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "physics/mesh/rankRepair3-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 10.1,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "ai-bridge/deviceWorker-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 9,
+   "win2Ms": 0.3,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "tools/ship/moduleHistory-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 6.6,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": false,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "tools/ship/deliveredAssets-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 6.4,
+   "win2Ms": 0.3,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "physics/xpbd/muscle-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 6.3,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "physics/soft/fleshSph-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 6.3,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": false,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "physics/elasticity/buckling-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 5.3,
+   "win2Ms": 0.2,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "physics/lockstepDt-selfcheck.mjs",
+   "klass": "busy",
+   "win1Ms": 5.1,
+   "win2Ms": 0.3,
+   "from": "median of 3",
+   "stableAcrossRuns": false,
+   "perturbed": false,
+   "converted": true
+  },
+  {
+   "gate": "tools/ship/probeLab-selfcheck.mjs",
+   "klass": "late",
+   "win1Ms": 2.4,
+   "win2Ms": 36.7,
+   "from": "single reading",
+   "stableAcrossRuns": null,
+   "perturbed": null,
+   "converted": true
+  },
+  {
+   "gate": "fx/fsr/fsrGPU-selfcheck.mjs",
+   "klass": "late",
+   "win1Ms": 0.4,
+   "win2Ms": 15.8,
+   "from": "median of 3",
+   "stableAcrossRuns": true,
+   "perturbed": false,
+   "converted": true
+  }
+ ],
+ "steadyMembers": [
+  {
+   "gate": "tools/ship/slugCurve-selfcheck.mjs",
+   "win1Ms": 14.6,
+   "win2Ms": 22.9,
+   "converted": false,
+   "why": "a STEADY cost is not a teardown burst: the work never drains, so converting it could HANG rather than help. Left alone deliberately and named here."
+  }
+ ],
+ "unknownMembers": [
+  {
+   "gate": "tools/ship/doorKinds-selfcheck.mjs",
+   "why": "killed at the 45000 ms cap (SIGTERM)"
+  },
+  {
+   "gate": "physics/nuclear/reactorControl-selfcheck.mjs",
+   "why": "killed at the 45000 ms cap (SIGTERM)"
+  },
+  {
+   "gate": "tools/ship/orphanTriage-selfcheck.mjs",
+   "why": "killed at the 45000 ms cap (SIGTERM)"
+  },
+  {
+   "gate": "physics/sph/tiltPower-selfcheck.mjs",
+   "why": "killed at the 45000 ms cap (SIGTERM)"
+  },
+  {
+   "gate": "tools/ship/gateSelection-selfcheck.mjs",
+   "why": "killed at the 45000 ms cap (SIGTERM)"
+  },
+  {
+   "gate": "tools/ship/buildEngineCatalog-selfcheck.mjs",
+   "why": "no marker; the gate exited 1 before the probe"
+  }
+ ],
+ "repeatability": {
+  "method": "every row in the 3-20 ms band re-measured 3 times; membership taken from the MEDIAN, not the first reading",
+  "banded": 20,
+  "classificationUnstableAcrossRuns": 6,
+  "perturbedByTheProbe": 2,
+  "finding": "READINGS ARE STABLE FAR FROM THE FLOOR IN BOTH DIRECTIONS AND UNSTABLE NEAR IT. Three runs each: lockstep 41.1/45.3/39.3 and seedSpreadModule 22.9/23.8/22.7 never changed class; bootSidecar 0.4/0.5/0.4 and roundhouseDevices 0.6x3 never changed class; but 6 of the 20 gates in the 3-20 ms band changed class between runs. SO A SINGLE READING NEAR THE FLOOR IS NOT A VERDICT, and the single-reading pass was wrong in BOTH directions: pageGround read 6.2 once and medians 2.5 (a FALSE POSITIVE, demoted here, its conversion kept because it costs nothing and its comment says so), and lockstepDt read 4.2 once and medians 5.4 (a FALSE NEGATIVE the first pass filed as quiet -- now converted). The RATE survived the re-measurement and the MEMBERSHIP did not: one in, one out, still 18 of 114.",
+  "perturbationIsWorseThanAWrongExitCode": "wiringClaims and seamCensus are perturbed. A perturbed gate RUNS DIFFERENT CODE -- it walks the tree, finds the probe copy and reports a failure -- so its CPU reading is suspect too, not just its exit code. wiringClaims reads 0.5 / 12.2 / 17.7 across three runs: BIMODAL, not noise around a mean. It is marked uncertain and is not counted as evidence. An earlier note in exitBusy-selfcheck claimed the CPU reading was unaffected by perturbation; that was wrong and is corrected."
+ },
+ "demoted": [
+  {
+   "gate": "tools/ship/pageGround-selfcheck.mjs",
+   "why": "read 6.218 once, medians 2.5 over 3 runs -- under the floor, NOT a member; conversion kept because it costs nothing",
+   "convertedAnyway": true
+  }
+ ]
+}

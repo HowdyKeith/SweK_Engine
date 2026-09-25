@@ -8075,6 +8075,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    since348: Object.freeze({
+        at: "v4669", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "tools/ship/cloneProvision-selfcheck.mjs",
+            "tools/ship/exitBusy-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "green, 1.3 s and 46 s. TWO gates in one closing because v4668 added cloneProvision and did NOT write " +
+                 "one -- the tree shipped a gate ahead of this ledger, assertionShape's record was already red at " +
+                 "b826aea8 before v4669 touched anything, and the omission was found by recordDrift rather than by " +
+                 "reading. cloneProvision drives the provisioning branch with an injected runner and now also drives the " +
+                 "timeout's kill escalation against a real SIGTERM-ignoring child. exitBusy is the screen that narrowed " +
+                 "the libuv-teardown population from 'at least 52, at most 1708' to about 223 of 1413 (145-333). " +
+                 "*** THE FIRST INSTRUMENT IT SHIPPED WITH MEASURED ZERO AND IS RECORDED RATHER THAN DELETED: *** a " +
+                 "--require hook parking the main thread with Atomics.wait read 0.1-0.2 ms for all four gates the rig has " +
+                 "actually crashed on, against 7-104 ms taken by hand, because the work is ON the main thread and parking " +
+                 "it forbids the work being measured. *** AND THE SCREEN WAS WRONG IN BOTH DIRECTIONS ON A SINGLE " +
+                 "READING: *** 6 of 20 gates in the 3-20 ms band changed class between runs, pageGround read 6.2 once and " +
+                 "medians 2.5 (a false positive, demoted, conversion kept) while lockstepDt read 4.2 once and medians 5.4 " +
+                 "(a false negative, converted). The rate survived the re-measurement and the membership did not. " +
+                 "Two gates are PERTURBED by the probe copy -- wiringClaims walks the tree, finds it and goes red -- so " +
+                 "measure() takes a baseline run and reports it, and a perturbed row counts as evidence for nothing.",
+    }),
     since347: Object.freeze({
         at: "v4666", swept: 1, green: 1, red: 0,
         added: Object.freeze([

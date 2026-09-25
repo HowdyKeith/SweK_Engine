@@ -130,4 +130,14 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 }
 
 console.log(fails ? ("[buckling-selfcheck] FAILED " + fails) : "[buckling-selfcheck] all passed");
-process.exit(fails ? 1 : 0);
+// *** v4669 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// libuv aborts a Windows process.exit() taken while the platform still has queued work:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
+// after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a
+// CAUSE. This one was found by measuring the SYMPTOM with tools/ship/exitBusy.mjs: process CPU across an
+// awaited 300 ms window starting at this line, taken twice.
+//   window 1: 5.1 ms     window 2: 0.3 ms   -- a BURST, drained by one turn of the loop
+// Against a same-process control of 0.9 ms on this box. ONE READING, ON LINUX, where the identical teardown is
+// SILENT -- unix/async.c carries no such assertion. So this is a CANDIDATE, not a confirmed crash, and the
+// rig's clone-verify remains the instrument for the fact. The conversion costs nothing either way.
+process.exitCode = fails ? 1 : 0;

@@ -81,4 +81,21 @@ ok("!! the check does not FORBID the sentences, and that is deliberate",
         " claims, every one adjudicated and every adjudication still used"));
 
 console.log(failed ? "wiringClaims-selfcheck: " + failed + " FAILED" : "wiringClaims-selfcheck: all checks pass");
-process.exit(failed ? 1 : 0);
+// *** v4669 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// libuv aborts a Windows process.exit() taken while the platform still has queued work:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
+// after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a
+// CAUSE. This one was found by measuring the SYMPTOM with tools/ship/exitBusy.mjs: process CPU across an
+// awaited 300 ms window starting at this line, taken twice.
+//   window 1: 13.2 ms (ONE reading); re-measured three times: [0.5, 12.2, 17.7], median 12.2 ms.
+// *** AND THIS GATE IS PERTURBED BY THE INSTRUMENT, SO ITS MEMBERSHIP IS UNCERTAIN AND MARKED SO. ***
+// The screen writes a copy of the gate beside the original while it runs. This gate WALKS THE TREE, sees the
+// extra file, adjudicates it and goes RED -- green by hand, exit 1 under the probe, which is why
+// tools/ship/exitBusy.mjs now takes a baseline run and reports `perturbed`. The consequence is worse than a
+// wrong exit code: a perturbed gate RUNS DIFFERENT CODE, so the CPU reading is suspect too, and the three
+// readings above are bimodal (0.5 / 12.2 / 17.7) rather than noisy around a mean. The conversion stands on its
+// own -- process.exit() during a live teardown is wrong regardless -- but this gate is NOT counted as evidence.
+// Against a same-process control of 0.9 ms on this box. ONE READING, ON LINUX, where the identical teardown is
+// SILENT -- unix/async.c carries no such assertion. So this is a CANDIDATE, not a confirmed crash, and the
+// rig's clone-verify remains the instrument for the fact. The conversion costs nothing either way.
+process.exitCode = failed ? 1 : 0;

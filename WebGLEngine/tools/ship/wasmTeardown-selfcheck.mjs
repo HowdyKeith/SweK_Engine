@@ -330,9 +330,45 @@ console.log("\n5. *** v4668 -- THE RIG ANSWERED, AND THE POPULATION WAS DRAWN BY
         "TARGET: process.exit() is correct whenever nothing is queued, and converting a gate that is idle at " +
         "exit buys nothing. WHAT IS NOT BUILT is the screen that would say WHICH of them are busy -- the " +
         "measurement above costs a patched copy and a 300 ms window per gate, and running it over this many " +
-        "is a round of its own. Until then the population is known to be at least " +
-        `${48 + 1 + V4668_FOUND.length} -- v4663's 48 compilers plus the ${1 + V4668_FOUND.length} the rig ` +
-        `found at v4667 -- and at most ${stillExit.length}, and that is the honest width of it.`);
+        "is a round of its own. THAT ROUND IS v4669: tools/ship/exitBusy.mjs is the screen, and " +
+        "tools/ship/exit-busy-census.json is what it measured. The width below is what was known BEFORE it.");
+
+    // *** v4669 -- THE WIDTH ABOVE, NARROWED BY MEASUREMENT, AND THE NUMBER IS A FLOOR. ***
+    // A seeded uniform sample of 120 of the screenable gates, measured serially: 114 read, 16 BUSY and 2 LATE
+    // (a burst that had not begun inside the first 300 ms), 1 STEADY, 95 QUIET, 6 UNKNOWN. That is 15.8% of the
+    // measured set, 95% CI 10.2-23.6%, which over the 1413 gates with a terminal exit is ABOUT 223 (145-333).
+    // Set against "at least 52, at most 1708", the interval is twelve times narrower and it has an argument.
+    // IT IS A FLOOR FOR THREE REASONS, ALL IN THE RECORD: the two late-burst gates say one window under-reads;
+    // the 5 cap kills are UNKNOWN and are the EXPENSIVE gates, the likelier members; and every reading is Linux,
+    // where this teardown is silent. The 18 found are converted. The STEADY one is NOT -- its work never drains,
+    // so converting it could hang rather than help, and it is named in the record instead of quietly listed.
+    {
+        const CENSUS = path.join(ENG, "tools", "ship", "exit-busy-census.json");
+        let c = null; try { c = JSON.parse(fs.readFileSync(CENSUS, "utf8")); } catch {}
+        ok("!! *** the width is now a measured interval with its sample, its seed and its holes ***",
+            !!c && c.estimate && c.estimate.loCount > 52 && c.estimate.hiCount < stillExit.length &&
+            c.sample.measured > 100 && c.sample.unknown > 0 && Object.keys(c.sample.unknownReasons).length > 0 &&
+            c.members.length === c.counts.busy + c.counts.late && c.steadyMembers.length === c.counts.steady,
+            c ? `${c.estimate.overPopulation} of ${c.sample.population} (${c.estimate.loCount}-${c.estimate.hiCount}), ` +
+                `from ${c.sample.measured} measured of ${c.sample.drawn} drawn at seed ${c.sample.seed}, with ` +
+                `${c.sample.unknown} UNKNOWN. Prior: ${c.estimate.priorRange}`
+              : "exit-busy-census.json is missing, so there is no measured width -- the row above is all there is");
+        ok("...and every member it names is converted, while the STEADY one is deliberately not",
+            !!c && c.members.every((m) => m.converted === true) &&
+            c.steadyMembers.every((m) => m.converted === false && /could HANG/.test(m.why || "")),
+            c ? `${c.members.length} converted, ${c.steadyMembers.length} left alone with the reason recorded` : "");
+        ok("...and the census records the instrument that DID NOT work, so it is not rebuilt",
+            !!c && /Atomics\.wait/.test(c.method.disprovenInstrument || "") &&
+            /forbids the work/.test(c.method.disprovenInstrument || ""),
+            "a --require hook parking the main thread read 0.1-0.2 ms for all four gates the rig crashed on");
+    }
+    {
+        // Keep the old width, computed, so the narrowing can be seen rather than asserted.
+        const floor = 48 + 1 + V4668_FOUND.length;
+        report(`THE WIDTH BEFORE v4669: at least ${floor} and at most ${stillExit.length} -- a factor of ` +
+            `${(stillExit.length / floor).toFixed(0)}. AFTER: 145 to 333, a factor of 2.3, from a sample whose ` +
+            "seed, cap, holes and disproven first instrument are all in exit-busy-census.json.");
+    }
 }
 
 console.log(fails ? `\nwasmTeardown-selfcheck: ${fails} FAILED` : "\nwasmTeardown-selfcheck: all checks pass");

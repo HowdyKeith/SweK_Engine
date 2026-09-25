@@ -158,4 +158,19 @@ for (const f of FIXED) {
 }
 
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
-process.exit(fails ? 1 : 0);
+// *** v4669 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// libuv aborts a Windows process.exit() taken while the platform still has queued work:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
+// after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a
+// CAUSE. This one was found by measuring the SYMPTOM with tools/ship/exitBusy.mjs: process CPU across an
+// awaited 300 ms window starting at this line, taken twice.
+//   window 1: 6.2 ms (ONE reading) -- and re-measured three times it is [2.5, 2.9, 2.3], MEDIAN 2.5 ms.
+// *** SO THIS GATE IS A FALSE POSITIVE OF THE SINGLE-READING PASS, AND SAYS SO RATHER THAN BEING QUIETLY
+// UNCONVERTED. *** It sits under the 5 ms floor on the median and is NOT counted as a member in
+// tools/ship/exit-busy-census.json. The conversion is kept because process.exitCode costs nothing either way
+// and reverting it would only put back a call that can only ever hurt -- but the number above is not evidence
+// for it, and a reader comparing the census to the tree would otherwise find a member that is not in the list.
+// Against a same-process control of 0.9 ms on this box. ONE READING, ON LINUX, where the identical teardown is
+// SILENT -- unix/async.c carries no such assertion. So this is a CANDIDATE, not a confirmed crash, and the
+// rig's clone-verify remains the instrument for the fact. The conversion costs nothing either way.
+process.exitCode = fails ? 1 : 0;

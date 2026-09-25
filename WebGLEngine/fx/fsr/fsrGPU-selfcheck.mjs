@@ -311,4 +311,17 @@ console.log("unchecked here: the TEMPORAL path on the device -- render/temporalR
             "the CPU whatever the adapter does; a storage-TEXTURE path, since gfx/device.js binds storage buffers " +
             "and the reference writes textureStore; and the timings above on real hardware, which this box does " +
             "not have -- they are this adapter's numbers and are labelled with it.");
-process.exit(fails ? 1 : 0);
+// *** v4669 -- process.exitCode, NOT process.exit(). MEASURED, NOT ASSUMED. ***
+// libuv aborts a Windows process.exit() taken while the platform still has queued work:
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c   (exit 0xC0000409)
+// after a clean scoreline. v4663 picked its 48 conversions by asking DOES THIS GATE COMPILE A WASM MODULE -- a
+// CAUSE. This one was found by measuring the SYMPTOM with tools/ship/exitBusy.mjs: process CPU across an
+// awaited 300 ms window starting at this line, taken twice.
+//   window 1: 1.0 ms     window 2: 15.3 ms
+// *** THE SECOND WINDOW IS THE BUSIER ONE. *** The work is queued but has not STARTED inside the first 300 ms,
+// so a single-window screen reads this gate as quiet. It is not quiet, and that is why the round's population
+// estimate is stated as a floor rather than a count.
+// Against a same-process control of 0.9 ms on this box. ONE READING, ON LINUX, where the identical teardown is
+// SILENT -- unix/async.c carries no such assertion. So this is a CANDIDATE, not a confirmed crash, and the
+// rig's clone-verify remains the instrument for the fact. The conversion costs nothing either way.
+process.exitCode = fails ? 1 : 0;
