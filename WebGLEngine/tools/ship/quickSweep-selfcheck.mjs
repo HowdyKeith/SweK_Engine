@@ -43,6 +43,10 @@
 //
 // Run: node tools/ship/quickSweep-selfcheck.mjs
 //
+// ---- v4680 SABOTAGE, RESULT BY NAME ---------------------------------------------------------------------
+// Deleted runQuickSweep's per-gate `stage({ stage: "alone", ... gate })` call -> exactly the two new section-4
+// rows went red ("phase 2 announces ... names every gate" and "each gate is named BEFORE it runs", the latter
+// because `seer` could no longer see its own announcement and came back NEW red). Restored.
 // ---- v4647i SABOTAGES, RESULTS BY NAME (gateSweep-selfcheck / quickSweep-selfcheck) ---------------------
 //
 //   VA. every non-zero code is a finding again           -> 3 / 4 RED
@@ -331,6 +335,32 @@ sec("4. THE RUNNER RUNS AND CLASSIFIES -- HERMETICALLY, THEN AGAINST REAL GATES 
     mk("hang-selfcheck.mjs", "setTimeout(() => {}, 60000);\n");
     const h = await Q.runQuickSweep({ root: tmp, gates: ["hang-selfcheck.mjs"], budgetMs: 60000, workers: 1, capMs: 1500, write: false });
     ok(h.unmeasured.length === 1 && h.newRed.length === 0, "a gate that hangs past the cap is UNMEASURED, not red", `${h.ms} ms`);
+
+    // *** v4680 -- THE SERIAL PHASES ANNOUNCE EACH GATE BEFORE IT RUNS. *** The rig's v4679 log ended at
+    // phase 1's last line and could not say whether the run died in phase 2, in the slice, or never reached
+    // either. "Before" is the property that matters -- an announcement made after the run is useless for a
+    // run that never comes back -- so it is proven by the gate itself: `seer` is red unless a file that ONLY
+    // onStage writes already names it, so it can go green in phase 2 only if its announcement came first.
+    const seen = path.join(tmp, "stage-seen.txt");
+    mk("seer-selfcheck.mjs", `import fs from "node:fs";\nlet s = ""; try { s = fs.readFileSync(${JSON.stringify(seen)}, "utf8"); } catch {}\nprocess.exitCode = s.trim() === "seer-selfcheck.mjs" ? 0 : 1;\n`);
+    mk("slowgreen-selfcheck.mjs", "setTimeout(() => {}, 700);\n");
+    mk("fast-selfcheck.mjs", "process.exitCode = 0;\n");
+    const ev = [];
+    const st = await Q.runQuickSweep({ root: tmp, gates: ["seer-selfcheck.mjs", "slowgreen-selfcheck.mjs", "fast-selfcheck.mjs"],
+        budgetMs: 400, workers: 3, capMs: 20000, write: false, serialSliceMs: 0,
+        onStage: (e) => { ev.push(e); if (e.gate) fs.writeFileSync(seen, e.gate); if (e.stage === "write") throw new Error("a throwing sink"); } });
+    const head = ev.find((e) => e.stage === "alone" && !e.gate);
+    const named = ev.filter((e) => e.stage === "alone" && e.gate).map((e) => e.gate).sort();
+    ok(head && head.total === 2 && head.red === 1 && named.join(",") === "seer-selfcheck.mjs,slowgreen-selfcheck.mjs",
+       "!! *** phase 2 announces its size and split, then names every gate it re-runs -- and only those ***",
+       JSON.stringify({ head, named }));
+    const seerRow = st.falseRedList.find((f) => f.gate === "seer-selfcheck.mjs");
+    ok(!!seerRow && st.newRed.length === 0,
+       "!! *** ...and each gate is named BEFORE it runs: the gate that can only pass after its own announcement passed alone ***",
+       seerRow ? `red in phase 1, green alone -- the announcement preceded the run` : `newRed ${JSON.stringify(st.newRed.map((r) => r.gate))}`);
+    ok(ev.length && ev[ev.length - 1].stage === "write" && ev.every((e) => typeof e.elapsedMs === "number"),
+       "...the last event says the sweep reached its write, every event carries its clock, and a sink that throws did not stop the sweep",
+       ev.map((e) => e.stage + (e.gate ? ":" + e.gate.split("-")[0] : "")).join(" "));
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
 }
 

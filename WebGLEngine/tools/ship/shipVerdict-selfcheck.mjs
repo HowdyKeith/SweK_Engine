@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipVerdict-selfcheck.mjs
 //
-// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~0.83s -- MEASURED)
+// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~4.9s -- MEASURED at v4680; was ~0.83s before section 6's live drivers)
 //
 // v4405 -- *** THE ROUND BEFORE THIS ONE SHIPPED A CONFLICT MARKER ONTO main, PAST A VERIFY THAT SAID
 // "DO NOT SHIP". ***
@@ -28,10 +28,17 @@
 //     row went red BY NAME. Restored.
 //   * put a conflict marker at line start in a scratch tracked file -> section 2 named the file and the line.
 //     Removed.
+//   * v4680: deleted the child.kill() in main()'s signal handler -> section 6's "takes its verify child with it"
+//     went red alone (the first draft of that row read the child's liveness ONCE and was red on the unsabotaged
+//     code too -- the child dies a moment after the driver; it is polled for 2 s now). Restored.
+//   * v4680: registered the handlers over an empty list -> the SIGHUP, child and SIGINT rows went red, three by
+//     name; the SIGKILL control stayed green, as it must. Restored.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import os from "node:os";
+import { spawn } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as SV from "./shipVerdict.mjs";
 import { gateReport } from "./gateReport.mjs";
 
@@ -131,6 +138,65 @@ console.log("\n5. the ritual points at the status, not at the log");
     ok("...and says in as many words that the exit status decides", /exit status|\$\?/.test(src),
         "LIMIT: this is a check for words in prose, which is the weakest shape in the tree and is named as such. " +
         "It cannot tell whether the hand running the ritual obeys it. Section 2 is the one that catches the result");
+}
+
+console.log("\n6. a run ended from outside says so where it can -- and the silence that remains has one meaning");
+// v4680 -- Keith's v4679 rig log stopped at "[verify] quick sweep 1413/1413" with no trailer. Driven LIVE: a real
+// driver process runs main() against a stand-in verify that never finishes, and is sent a real signal. The
+// stand-in is imported by FILE URL, not by a path string -- v4676's thrownRow/wasmTeardown lesson: "C:" parses
+// as a protocol on the rig.
+{
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shipverdict-sig-"));
+    const standIn = path.join(dir, "verify-standin.mjs");
+    fs.writeFileSync(standIn, 'process.stderr.write("[standin] pid " + process.pid + "\\n");\nsetInterval(() => {}, 1000);\n');
+    const driver = path.join(dir, "driver.mjs");
+    fs.writeFileSync(driver, `import { main } from ${JSON.stringify(pathToFileURL(path.join(ENG, "tools", "ship", "shipVerdict.mjs")).href)};\n` +
+        `await main({ eng: ${JSON.stringify(ENG)}, verifyPath: ${JSON.stringify(standIn)} });\n`);
+    const drive = (sig) => new Promise((resolve) => {
+        const p = spawn(process.execPath, [driver], { stdio: ["ignore", "pipe", "pipe"] });
+        let out = "", err = "", sent = false, standinPid = null;
+        const t = setTimeout(() => { try { p.kill("SIGKILL"); } catch {} }, 20000);
+        const maybe = () => {
+            const m = /\[standin\] pid (\d+)/.exec(err);
+            if (!sent && m && out.includes("[ship] shipVerdict pid")) { sent = true; standinPid = Number(m[1]); p.kill(sig); }
+        };
+        p.stdout.on("data", (b) => { out += b; maybe(); });
+        p.stderr.on("data", (b) => { err += b; maybe(); });
+        p.on("close", async (code, signal) => {
+            clearTimeout(t);
+            // Polled, not read once: the child is signalled as the driver exits, and dies a moment later.
+            const alive = () => { try { process.kill(standinPid, 0); return true; } catch { return false; } };
+            let standinAlive = false;
+            if (standinPid) {
+                const until = Date.now() + 2000;
+                while ((standinAlive = alive()) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+                try { process.kill(standinPid, "SIGKILL"); } catch {}
+            }
+            resolve({ code, signal, out, sent, standinAlive });
+        });
+    });
+    const pure = SV.interruptedTrailer("SIGHUP", 2600);
+    ok("the interrupted trailer names the signal, what it means, the clock, and NO VERDICT",
+        /interrupted by SIGHUP after 3 s/.test(pure) && /console window was closed/.test(pure) && /DO NOT SHIP -- NO VERDICT/.test(pure),
+        pure.trim().split("\n").join(" | "));
+    if (process.platform !== "win32") {
+        const hup = await drive("SIGHUP");
+        ok("!! *** a LIVE run sent SIGHUP -- what a closed console window delivers on Windows -- prints the NO VERDICT trailer ***",
+            hup.sent && hup.code === 1 && /interrupted by SIGHUP/.test(hup.out) && /NO VERDICT/.test(hup.out),
+            `exit=${hup.code} sent=${hup.sent} tail=${JSON.stringify(hup.out.trim().split("\n").slice(-1)[0])}`);
+        ok("...and takes its verify child with it rather than leaving it running", hup.sent && !hup.standinAlive,
+            "an orphaned verify would keep sweeping into a log nobody is reading");
+        const int = await drive("SIGINT");
+        ok("...Ctrl+C likewise, exiting 130", int.sent && int.code === 130 && /interrupted by SIGINT/.test(int.out), `exit=${int.code}`);
+    } else {
+        say("SIGHUP/SIGINT cannot be SENT from here on win32 -- child.kill(sig) is TerminateProcess there -- so the " +
+            "catchable rows are driven on POSIX. What IS driven here is the row below, which is the Windows half.");
+    }
+    const kill = await drive("SIGKILL");
+    ok("!! *** CONTROL: a TerminateProcess-class kill leaves NO trailer -- so on the rig, a missing trailer now means exactly that ***",
+        kill.sent && !/\[ship\] (verify exit|DO NOT SHIP|SHIP)/.test(kill.out) && kill.out.includes("[ship] shipVerdict pid"),
+        `exit=${kill.code} signal=${kill.signal} -- taskkill /F, End task, a job-object kill or a power loss; the start line is there, the trailer is not`);
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 }
 
 say("WHAT THIS DOES NOT CLAIM. That a round cannot be pushed unverified -- nothing in a repository can stop a " +

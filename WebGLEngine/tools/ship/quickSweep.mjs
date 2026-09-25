@@ -487,7 +487,7 @@ function runOneAsync(rel, capMs, root) {
 export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
                                       serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false,
-                                      log = (m) => console.log(m) } = {}) {
+                                      onStage = null, log = (m) => console.log(m) } = {}) {
     const t00 = Date.now();
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
@@ -508,9 +508,24 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     }
     await Promise.all(Array.from({ length: Math.max(1, workers) }, worker));
     // phase 2: every candidate alone, at the same cap (a gate under budget has no business needing more)
+    //
+    // *** v4680 -- PHASE 2 WAS SILENT, AND A RUN THAT DIED IN IT LEFT A LOG THAT COULD NOT SAY SO. *** Keith's
+    // v4679 rig verify ended at "[verify] quick sweep 1413/1413" and then nothing: no summary, no trailer. Every
+    // line after that one is printed only once phase 2 AND the slice are over, and phase 2 is serial -- every
+    // red and every budget crosser, one at a time at up to capMs each, which on a box that runs another box's
+    // membership list is hundreds of gates. So "stopped in phase 2 at gate X after N s", "stopped in the slice"
+    // and "never got past phase 1" were one indistinguishable log. `onStage` is called BEFORE each serial run,
+    // so the last line a killed run leaves names the gate that was running. Optional and null by default: the
+    // nine programmatic callers are fixtures and a re-timer, and none of them asked for output.
+    const stage = (e) => { if (onStage) { try { onStage({ ...e, elapsedMs: Date.now() - t00 }); } catch {} } };
+    const alone = sel.run.filter((rel) => { const p1 = phase1.get(rel); return p1.code !== 0 || p1.ms > budgetMs; });
+    stage({ stage: "alone", done: 0, total: alone.length,
+            red: alone.filter((rel) => phase1.get(rel).code !== 0).length });
+    let aloneDone = 0;
     const rows = [];
     for (const rel of sel.run) {
         const p1 = phase1.get(rel);
+        if (p1.code !== 0 || p1.ms > budgetMs) stage({ stage: "alone", done: ++aloneDone, total: alone.length, gate: rel });
         const parallel = { code: p1.code, ms: p1.ms, timedOut: p1.timedOut };
         if (p1.code === 0) {
             // v4408 -- *** A GREEN GATE'S PARALLEL TIME IS NOT ITS COST, AND THIS IS WHERE THE DOOR USED TO SHUT. ***
@@ -558,8 +573,10 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     if (serialSliceMs > 0) {
         const owed = serialSliceOrder(sel.run.filter((g) => serialAt[g] !== sliceStamp), serialAt);
         const until = Date.now() + serialSliceMs;
+        stage({ stage: "slice", done: 0, total: owed.length, sliceMs: serialSliceMs });
         for (const rel of owed) {
             if (Date.now() >= until) break;
+            stage({ stage: "slice", done: sliced + 1, total: owed.length, gate: rel });
             const one = await runOneAsync(rel, capMs, root);
             serial[rel] = one.ms; serialAt[rel] = sliceStamp; ring(rel, one.ms); sliced++;
         }
@@ -745,6 +762,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         onProbation: sel.onProbation, crossedOnce: Object.keys(crossings).filter((g) => crossings[g] === 1).length,
         evictable: Object.keys(crossings).filter((g) => crossings[g] >= MIN_CROSSINGS_TO_EVICT).length,
     };
+    stage({ stage: "write", write });
     if (write) {
         // v4647 -- whose stopwatch. A foreign box writes its own file rather than overwriting this one.
         const target = timingsTarget(prior, { file: timingsFile });

@@ -573,7 +573,23 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // thing somebody changes for a good reason somewhere else -- v4574 changed it to true for about ten
     // minutes before sweepCoverage-selfcheck showed why that was wrong -- and an argument at the call site
     // is a decision THIS file made, which the next person to arm something can see was considered here.
-    const r = await runQuickSweep({ budgetMs, skipUnchanged: false, onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}\n`); } });
+    // *** v4680 -- EVERY PROGRESS LINE CARRIES ITS CLOCK, AND PHASE 2 AND THE SLICE PRINT AT ALL. *** The rig's
+    // v4679 log stopped at "quick sweep 1413/1413" with no summary and no trailer, and could not say whether the
+    // run died a second after that line or forty minutes into the silent serial phase that follows it. Each
+    // serial gate is named BEFORE it runs, so a killed run's last line is the gate that was running and the
+    // `+Ns` beside it bounds when. stderr, like the phase-1 lines: stdout is where the verdict is read.
+    const t0Sweep = Date.now();
+    const clock = () => `+${Math.round((Date.now() - t0Sweep) / 1000)}s`;
+    const r = await runQuickSweep({ budgetMs, skipUnchanged: false,
+      onProgress: (d, t) => { if (d === t || d % 200 === 0) process.stderr.write(`[verify] quick sweep ${d}/${t}  ${clock()}\n`); },
+      onStage: (e) => {
+        if (e.stage === "alone" && !e.gate)
+          process.stderr.write(`[verify] phase 2: ${e.total} gate(s) re-run ALONE, serially -- ${e.red} red, ${e.total - e.red} over budget  ${clock()}\n`);
+        else if (e.stage === "alone") process.stderr.write(`[verify]   alone ${e.done}/${e.total}  ${clock()}  ${e.gate}\n`);
+        else if (e.stage === "slice" && !e.gate) process.stderr.write(`[verify] serial slice: up to ${e.sliceMs / 1000} s over ${e.total} owed gate(s)  ${clock()}\n`);
+        else if (e.stage === "slice") process.stderr.write(`[verify]   slice ${e.done}  ${clock()}  ${e.gate}\n`);
+        else if (e.stage === "write") process.stderr.write(`[verify] sweep done, recording timings  ${clock()}\n`);
+      } });
     console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);

@@ -108,6 +108,7 @@ export function decide({ verify, conflicts }) {
 export function runProcess(cmd, argv, opts = {}) {
     return new Promise((resolve) => {
         const p = spawn(cmd, argv, { cwd: opts.cwd, env: { ...process.env, ...(opts.env || {}) } });
+        if (opts.onChild) opts.onChild(p);
         let out = "";
         const keep = (b) => { out += b; if (out.length > 200000) out = out.slice(-100000); if (opts.echo) process.stderr.write(b); };
         p.stdout.on("data", keep);
@@ -117,18 +118,61 @@ export function runProcess(cmd, argv, opts = {}) {
     });
 }
 
+// *** v4680 -- A RUN THAT IS ENDED FROM OUTSIDE STILL SAYS SO, WHERE IT CAN. ***
+//
+// Keith's v4679 rig log ended at "[verify] quick sweep 1413/1413" with no trailer at all, and "the window exited
+// without stated result". The file header above says a missing exit status is NO VERDICT -- but that rule lived
+// in verdict(), which only runs if this process survives to call it, so the one case it exists for printed
+// nothing. Some endings CAN be caught: on Windows a closed console window arrives as SIGHUP (with a few seconds'
+// grace), Ctrl+C as SIGINT and Ctrl+Break as SIGBREAK; SIGTERM is the polite kill everywhere. Each now writes
+// the trailer, naming the signal and how long the run had been going, and exits nonzero. What CANNOT be caught
+// is TerminateProcess -- `taskkill /F`, a job-object kill, Task Manager's End task -- and a power loss; those
+// still leave no trailer, and with this change the ABSENCE of one now means exactly that set.
+export const CATCHABLE = Object.freeze(["SIGINT", "SIGHUP", "SIGBREAK", "SIGTERM"]);
+const SIGNAL_MEANS = Object.freeze({
+    SIGINT: "Ctrl+C in the console", SIGHUP: "the console window was closed",
+    SIGBREAK: "Ctrl+Break in the console", SIGTERM: "a polite kill from another process",
+});
+
+export function interruptedTrailer(sig, ms, conflicts = null) {
+    return [
+        "",
+        `[ship] verify exit=none  interrupted by ${sig} after ${Math.round(ms / 1000)} s` +
+            (conflicts ? `  conflicts=${conflicts.hits.length}/${conflicts.scanned} files` : ""),
+        `[ship] DO NOT SHIP -- NO VERDICT: shipVerdict received ${sig} (${SIGNAL_MEANS[sig] || "a signal"}) before verify finished`,
+    ].join("\n");
+}
+
+// `verifyPath` is injectable so shipVerdict-selfcheck can drive THIS function, signals included, against a
+// stand-in verify rather than a twenty-minute sweep. The CLI below passes the real one.
+export async function main({ eng, argv = [], verifyPath = null, out = (m) => console.log(m), exit = (c) => process.exit(c) }) {
+    const root = path.resolve(eng, "..");
+    const t0 = Date.now();
+    let child = null;
+    out(`[ship] shipVerdict pid ${process.pid} started ${new Date(t0).toISOString()}  node ${process.version} ${process.platform}`);
+    for (const sig of CATCHABLE) {
+        try {
+            process.on(sig, () => {
+                try { out(interruptedTrailer(sig, Date.now() - t0)); } catch {}
+                try { if (child) child.kill(); } catch {}
+                exit(sig === "SIGINT" ? 130 : 1);
+            });
+        } catch {}   // SIGBREAK exists only on Windows; registering it elsewhere is harmless, but never let it throw
+    }
+    const verify = await runProcess(process.execPath, [verifyPath || path.join(eng, "tools", "ship", "verify.mjs"), ...argv],
+                                    { cwd: eng, echo: true, onChild: (p) => { child = p; } });
+    const conflicts = scanTracked(root);
+    const d = decide({ verify, conflicts });
+    out("");
+    out(`[ship] verify exit=${verify.code}  conflicts=${conflicts.hits.length}/${conflicts.scanned} files  after ${Math.round((Date.now() - t0) / 1000)} s`);
+    for (const h of conflicts.hits) out(`[ship]   conflict  ${h.file}  line(s) ${h.marks.map((m) => m.line).join(", ")}`);
+    out(`[ship] ${d.ship ? "SHIP" : "DO NOT SHIP"} -- ${d.reason}`);
+    exit(d.ship ? 0 : 1);
+    return d;
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]).endsWith("shipVerdict.mjs");
 if (isMain) {
     const eng = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-    const root = path.resolve(eng, "..");
-    const pass = process.argv.slice(2);
-    const verify = await runProcess(process.execPath, [path.join(eng, "tools", "ship", "verify.mjs"), ...pass],
-                                    { cwd: eng, echo: true });
-    const conflicts = scanTracked(root);
-    const d = decide({ verify, conflicts });
-    console.log("");
-    console.log(`[ship] verify exit=${verify.code}  conflicts=${conflicts.hits.length}/${conflicts.scanned} files`);
-    for (const h of conflicts.hits) console.log(`[ship]   conflict  ${h.file}  line(s) ${h.marks.map((m) => m.line).join(", ")}`);
-    console.log(`[ship] ${d.ship ? "SHIP" : "DO NOT SHIP"} -- ${d.reason}`);
-    process.exit(d.ship ? 0 : 1);
+    await main({ eng, argv: process.argv.slice(2) });
 }
