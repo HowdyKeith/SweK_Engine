@@ -281,6 +281,7 @@ import { GenGateGPU } from "./render/genGateGPU.mjs";
 // v4704 -- what the arc FOUND. The learned arms are labelled, loaded and read out from this table, so a user
 // choosing one is told it is a refuted hypothesis kept as a record -- the verdicts had lived only in closings.
 import { armWeights, optionSuffix, readoutNote } from "./render/genGateVerdicts.mjs";
+import { frameOptionSuffix, frameNote, frameOffNote } from "./render/frameVerdicts.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
@@ -1618,13 +1619,11 @@ async function tick() {
               `(${genStat.abst} of them abstaining to a blend) and ${genStat.left} were still unreachable and are ` +
               `cross-faded. BOTH inputs are accumulated frames and the truth is a clean render, so the absolute ` +
               `numbers carry the accumulator's error too -- the DIFFERENCE is the generator's, because the ` +
-              `control is built from the same two frames.` + readoutNote(genStat.gateMode)
+              `control is built from the same two frames.` + frameNote() + readoutNote(genStat.gateMode)
             : $("genframe").value === "on"
                 ? "frame generation: ON but not computed on this frame (it needs a previous presented frame and a depth buffer -- frame 1 has neither)"
-                : `frame generation [OFF -- the control]: every figure on this page and in its gates was ` +
-                  `measured on this arm. FSR3 inserts a frame between two presented ones; seven rounds built ` +
-                  `that path on synthetic fixtures and none of it has ever run on a picture. Turning it on ` +
-                  `costs a second truthPersp per frame and answers whether it beats a cross-fade here.`;
+                : `frame generation [OFF -- the control]: every upscaling figure on this page was measured on ` +
+                  `this arm. FSR3 inserts a frame between two presented ones; ` + frameOffNote();
     $("objstat").textContent = !objects ? ""
         : objGap
             ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +
@@ -1646,6 +1645,8 @@ $("reset").onclick = () => { running = false; $("run").textContent = "Run"; rese
 // Guarded like every other lookup here: tools/ship/fsrPage-selfcheck.mjs runs this module against a stub DOM whose
 // elements carry no .options, and the unguarded first draft crashed it on import.
 { const g = $("gengate"); if (g && g.options) for (const o of g.options) o.textContent += optionSuffix(o.value); }
+// v4713 -- and an option that exists only for a frame-level hypothesis carries that verdict, from render/frameVerdicts.mjs.
+{ const g = $("slabdir"); if (g && g.options) for (const o of g.options) o.textContent += frameOptionSuffix("slabdir", o.value); }
 for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };

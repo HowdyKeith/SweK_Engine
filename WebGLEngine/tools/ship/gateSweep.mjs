@@ -8032,6 +8032,45 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4713 -- THE 320th CLOSING: four frame-level verdicts reach the page, and a sentence that outlived its limit leaves it.
+    since395: Object.freeze({
+        at: "v4713", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameVerdicts-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        elsewhere: Object.freeze([
+            Object.freeze({ gate: "tools/ship/fsrPageGen-selfcheck.mjs", was: "green", now: "green",
+                why: "ITS OWN CLOSING NOTE CONTRADICTED ITS OWN SECTION 3 FOR THIRTY-ONE ROUNDS. Written at v4681, it said a " +
+                     "page control for the slab's speed 'does not exist' and that a paired test was 'a pre-registered round of " +
+                     "its own'; v4682 added the control and this gate's speed curve, and four paired-test rounds followed, and " +
+                     "the note was never re-read. It now says what the gate drives and counts what the frame arc measured from " +
+                     "render/frameVerdicts.mjs rather than typing it. Green at 25.8 s before and after; no row changed." }),
+            Object.freeze({ gate: "tools/ship/genGateVerdicts-selfcheck.mjs", was: "green", now: "green",
+                why: "re-run because its readout row reads the same fsr.html line the frame note now joins: with the cpu arm " +
+                     "running, the readout must still END with H1's record sentence, and it does -- the frame note is placed " +
+                     "before it, not after. 3.4 s." }),
+        ]),
+        verdict: "*** THE PAGE SAID FRAME GENERATION HAD NEVER RUN ON A PICTURE, THIRTY-ONE ROUNDS AND 1,911 HARVESTED FRAMES " +
+                 "AFTER IT FIRST DID. *** fsr.html's OFF readout -- 'seven rounds built that path on synthetic fixtures and none " +
+                 "of it has ever run on a picture' -- was written before v4681 turned the path on, and nothing read it against " +
+                 "the record since. Four pre-registered hypotheses about WHEN to generate a frame were measured, and the page " +
+                 "said nothing about any of them: the ON readout printed each frame's advantage over a cross-fade with no word " +
+                 "on whether anything predicts it, and the vertical slab option existed only for H10 and named no verdict. " +
+                 "*** render/frameVerdicts.mjs HOLDS H7-H10, AND THE PAGE READS IT THREE TIMES, *** as v4704 did for H1-H6: " +
+                 "the OFF readout says what the path has done, the ON readout ends by saying whether to generate a frame is an " +
+                 "open question -- each verdict, the headroom v4706 found (+0.368 dB on ramp, +0.232 on smooth at x4) and " +
+                 "where the arc stands -- and slabdir=z carries 'H10 NOT SUPPORTED at v4712'. *** EVERY LINE IS GRADED. *** " +
+                 "Each entry's numbers must be in its closing and its own evidence, and its document must be its runner's own " +
+                 "PREREG constant; each verdict is RE-DERIVED from its result file through h7-h10 with the constants read from " +
+                 "the document; the frame counts are the caches' rows, the scene count every document's declaration, and the " +
+                 "headroom is recomputed from H7's cache -- with a row that the scenes it names are the LARGEST, so a true " +
+                 "number for a chosen scene reddens it. The page is driven: both readouts and the option label are read from " +
+                 "the running page. *** FOURTEEN SABOTAGES, FOURTEEN RED, *** and one of them was not what it claimed: a " +
+                 "result file with smooth's holed frames flipped reddened on the evidence row, because h10 reads the contrast " +
+                 "and not the field changed, so the verdict-word path had not been exercised. A fourteenth sabotage makes the " +
+                 "H10 result CLEAR -- every contrast positive -- and the re-derivation reads 'supported' and reddens. Nothing " +
+                 "was measured and no verdict moved. The gate runs 8.2 s alone and is hand-filed.",
+    }),
     // v4712 -- THE 319th CLOSING: H10 not supported -- the holed-frame pattern was one geometry's, not occlusion's.
     since394: Object.freeze({
         at: "v4712", swept: 1, green: 1, red: 0,

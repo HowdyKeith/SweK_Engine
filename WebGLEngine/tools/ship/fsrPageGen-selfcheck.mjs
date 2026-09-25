@@ -34,6 +34,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { FRAME_VERDICTS, FRAME_MEASURED } from "../../render/frameVerdicts.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -295,15 +296,24 @@ console.log("\n4. v4682 -- *** THE PRE-REGISTERED SPEED CURVE, AND ITS PRIMARY H
 // line names it.
 
 console.log(`\nfsrPageGen-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
-console.log("unchecked here: WHETHER FRAME GENERATION IS WORTH ANYTHING ON CONTENT THAT MOVES. This page's slab " +
-    "travels 0.055 world units a frame and its camera dollies slowly, so the whole window runs under 1.3 px of " +
-    "mean displacement -- the regime where a cross-fade wins by construction. A page control for the slab's " +
-    "SPEED would turn this one negative reading into a curve, and it does not exist. THE INPUTS ARE ACCUMULATED: " +
-    "both frames the generator reads have been through temporal accumulation and RCAS, so they are not clean " +
-    "samples of scene time, and the truth is a clean render -- the cross-fade carries the same handicap, which " +
-    "is what makes the DIFFERENCE fair and the absolute dB not. FOUR FRAMES: enough for a unanimous sign and not " +
-    "enough for a paired test, which is a pre-registered round of its own. AND THE BLOCK SIZE IS 8 AND UNMEASURED " +
-    "HERE: v4678 measured that block size dominates on a silhouette, and nothing on this page varies it.");
+// v4713 -- THIS NOTE SAID A SLAB-SPEED CONTROL "DOES NOT EXIST" FOR THIRTY-ONE ROUNDS WHILE SECTION 3 DROVE IT. It was
+// written at v4681; v4682 added the control and the curve above and left the note alone, and "a paired test ... is a
+// pre-registered round of its own" outlived four such rounds. What those rounds found is counted from
+// render/frameVerdicts.mjs, not typed here, and is graded by tools/ship/frameVerdicts-selfcheck.mjs.
+{
+    const n = Object.values(FRAME_MEASURED).reduce((a, b) => a + b, 0);
+    console.log("unchecked here: WHETHER FRAME GENERATION IS WORTH ANYTHING BEYOND THIS WINDOW. The window is five frames " +
+        "per arm, and at the page's default speed it runs under 1.3 px of mean displacement -- the regime where a " +
+        "cross-fade wins by construction; section 3 drives the `slabspeed` control v4682 added and finds no speed that " +
+        `changes the sign. WHICH frames generation wins, and whether anything predicts them, is ${FRAME_VERDICTS.map((v) => v.id).join(", ")} -- ` +
+        `${n} harvested frames, ${FRAME_VERDICTS.map((v) => `${v.id} ${v.verdict}`).join(", ")} -- and none of it is checked ` +
+        "here. THE INPUTS ARE ACCUMULATED: both frames the generator reads have been through temporal accumulation " +
+        "and RCAS, so they are not clean samples of scene time, and the truth is a clean render -- the cross-fade " +
+        "carries the same handicap, which is what makes the DIFFERENCE fair and the absolute dB not. FOUR FRAMES A " +
+        "SPEED: enough for a unanimous sign and not for a paired test; the paired tests are the frame arc's gates'. " +
+        "AND THE BLOCK SIZE IS 8 AND UNMEASURED HERE: v4678 measured that block size dominates on a silhouette, and " +
+        "the page offers a block-8 field or a per-pixel one, never another size.");
+}
 // RUNTIME: 19,197 ms measured at v4682, on FIVE page drives -- the ON arm, the OFF control, and the three
 // extra speeds. *** THAT IS OVER quickSweep's 3,000 ms MEMBERSHIP THRESHOLD AND WELL INSIDE ITS 20,000 ms
 // SIGKILL CAP, WHICH IS TOO CLOSE TO THE CAP TO BE COMFORTABLE. *** The gate is excluded from the sweep by the
