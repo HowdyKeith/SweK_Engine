@@ -215,9 +215,14 @@ async function runWebGL2InEngineOrigin({ engineRoot, script, args = null, sabota
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        // LAUNCH_ARGS carries win32's extra --use-angle=d3d11 (tools/ship/webgpuHarness.mjs); without it
-        // requestAdapter() came back null on that platform and the WebGPU half never produced a shot.
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", ...LAUNCH_ARGS] });
+        // v4680 -- --use-gl=swiftshader (here since this file's first commit, 071725b4) DROPPED: measured
+        // on win32 with a standalone probe (three launches, same page shape, WebGL2 + WebGPU checked
+        // separately) that swiftshader alone makes requestAdapter() come back null even WITH LAUNCH_ARGS'
+        // --use-angle=d3d11 present -- the two flags conflict, not just the ANGLE one being insufficient
+        // alone. Dropping swiftshader and keeping only LAUNCH_ARGS fixed the adapter on that probe, and this
+        // gate's own WebGL2 half (renderer at "forceWebGL: true" below) still passes cleanly on Linux without
+        // it, so the software-GL fallback was not load-bearing on either platform.
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));
