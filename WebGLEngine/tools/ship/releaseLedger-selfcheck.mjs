@@ -456,15 +456,40 @@ console.log("\n4b. *** THE REFRESH THAT COULD NOT RUN, AND WHAT A STALE LEDGER D
     const freshLow = ledgerState({ file: writeLed("fresh-lowfloor.json", onFloor(real)) });
     const staleLow = ledgerState({ file: writeLed("stale-lowfloor.json", onFloor(withLatest(4485))) });
 
-    ok("!! *** and with the baseline ABOVE every release, a stale ledger changes NOTHING -- which is a " +
-       "property to know, not a pass to bank ***",
-        stale.supersededBy === fresh.supersededBy && fresh.supersededBy === fresh.floor &&
-        fresh.floor > fresh.latest,
-        `baseline v${fresh.floor} is above the newest release v${fresh.latest}, so supersededBy is v` +
-        `${fresh.supersededBy} whatever the ledger says and truncating it moves nothing. That is SAFE TODAY ` +
-        "and it is exactly what made the row below vacuous, so the row below drives its own floor now. If " +
-        "this row ever goes red the baseline has dropped back under the releases and the live comparison is " +
-        "meaningful again -- at which point the fixture is belt and braces rather than the only thing working.");
+    // *** v4679 -- THE PREDICTION IN THE NOTE ABOVE CAME TRUE, AND A PUBLISH IS WHAT DID IT. ***
+    // The v4667 row asserted `floor > latest` -- the baseline above every release -- and said in so many
+    // words: "If this row ever goes red the baseline has dropped back under the releases and the live
+    // comparison is meaningful again." v4667 was then PUBLISHED from the rig, so latest moved 4645 -> 4667,
+    // above the v4660 baseline, and max() consults the ledger once more. The row went red for the right
+    // reason: its premise had inverted.
+    //
+    // *** AND A ROW WITH TWO REGIMES MUST NOT BE A ROW THAT PASSES IN EITHER. *** Rewriting it to assert
+    // `latest > floor` would just queue up the same red for the next baseline raise, and asserting the
+    // disjunction would pass on anything. So the regime is DERIVED and the property asserted is the one that
+    // regime implies -- each with a failure that means something:
+    //
+    //   PUBLISH-FLOOR (latest > floor): a truncated ledger MUST move supersededBy and MUST grow the owed
+    //       list. If it does not, max() has stopped reading the ledger while the ledger is the binding term,
+    //       which is the live mechanism being broken.
+    //   BASELINE-FLOOR (floor >= latest): a truncated ledger must move NOTHING, because max() is not
+    //       consulting it -- and the low-floor fixture below is then the only live test of the mechanism.
+    //
+    // Both are checked against the SAME two states, so whichever regime holds, one real comparison is made.
+    const publishFloor = fresh.latest > fresh.floor;
+    ok("!! *** the ledger's sensitivity to a stale `latest` follows from WHICH TERM IS THE FLOOR, derived ***",
+        publishFloor
+            ? (stale.supersededBy < fresh.supersededBy && stale.owed.length > fresh.owed.length)
+            : (stale.supersededBy === fresh.supersededBy && fresh.supersededBy === fresh.floor),
+        publishFloor
+            ? `PUBLISH-FLOOR: newest release v${fresh.latest} is above the baseline v${fresh.floor}, so ` +
+              `supersededBy is the RELEASE and the ledger binds. Truncated to v4485 it drops to ` +
+              `v${stale.supersededBy} and the owed list grows ${fresh.owed.length} -> ${stale.owed.length}. ` +
+              "THE LIVE COMPARISON IS MEANINGFUL AGAIN, which is what publishing v4667 bought -- and it is the " +
+              "regime the v4667 note predicted this row would enter"
+            : `BASELINE-FLOOR: baseline v${fresh.floor} is at or above the newest release v${fresh.latest}, so ` +
+              `supersededBy is v${fresh.supersededBy} whatever the ledger says. Truncating it moves nothing, ` +
+              "which is SAFE but makes this row vacuous as a test of the mechanism -- the low-floor fixture " +
+              "below is then carrying it alone, which is why that fixture exists");
 
     ok("!! *** a STALE `latest` does not under-report the debt, it INVENTS it ***",
         staleLow.owed.length > freshLow.owed.length && staleLow.supersededBy < freshLow.supersededBy,
