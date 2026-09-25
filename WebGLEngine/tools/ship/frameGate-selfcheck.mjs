@@ -37,9 +37,13 @@ if (d === null) { console.log(`\nframeGate-selfcheck: ${fails} FAILED`); process
     ok("*** minFolds is derived, the scenes are the page's in both directions, and every speed is a page option ***",
        d.minFolds === minFoldsFor(d.alpha) && J(d.scenes.slice().sort()) === J(opts("scene").slice().sort()) && d.speeds.every((sp) => opts("slabspeed").includes(sp)),
        `${d.scenes.length} scenes at x${d.speeds.join(", x")}`);
-    ok("*** NO DATA IN THE COMMIT: neither the cache nor the result exists yet ***",
-       !fs.existsSync(path.join(ENG, CACHE_H7)) && !fs.existsSync(path.join(ENG, RESULT_H7)),
-       `${CACHE_H7}, ${RESULT_H7} -- the measurement round creates both. (This row is the pre-registration's own claim, checked; the measurement round inverts it.)`);
+    // v4706 -- INVERTED, AS v4705 SAID IT WOULD BE. At v4705 this row asserted that neither file existed: the
+    // pre-registration's own claim, checked. v4706 ran the measurement, so both now exist -- and the claim worth keeping
+    // is that the result was produced under THIS document's constants, which is what makes it the declared run.
+    const resOk = fs.existsSync(path.join(ENG, CACHE_H7)) && fs.existsSync(path.join(ENG, RESULT_H7)) &&
+        J(JSON.parse(fs.readFileSync(path.join(ENG, RESULT_H7), "utf8")).declared) === J(d);
+    ok("*** the measurement exists, and was produced under THIS document's constants -- v4705's 'no data yet', inverted ***", resOk,
+       `${CACHE_H7}, ${RESULT_H7} -- tools/ship/frameGateMeasure-selfcheck.mjs re-derives them.`);
 }
 
 console.log("\n2. *** THE SIGNAL AND THE TARGET ***");

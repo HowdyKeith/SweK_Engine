@@ -8032,6 +8032,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4706 -- THE 313th CLOSING: H7 measured, "neither" -- the spatial gradient does not decide the frame.
+    since388: Object.freeze({
+        at: "v4706", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGateMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameGate-selfcheck.mjs (the no-data row inverted, as v4705 said it would be)"]),
+        verdict: "*** H7 IS NOT SUPPORTED, AND THE READING IS THE TABLE'S LAST ROW: NEITHER. *** v4705's runner ran as " +
+                 "committed: seven scenes at x2 and x4, 546 frames, 505 s. ACROSS scenes the laplacian-to-advantage rho is " +
+                 "0.3214 at x2 (exact p 0.2488) and 0.0000 at x4 (p 0.5183), against the 0.7143 it needed. WITHIN scenes the " +
+                 "rhos lean NEGATIVE -- 4 of 7 at x2, 6 of 7 at x4, mean -0.552 -- so inside most scenes the frames with more " +
+                 "detail are where generation does worse. v4683's sentence, \"a compensation's worth scales with the spatial " +
+                 "gradient\", is not supported at frame level across content or within it. Only checker gains, +0.260 dB " +
+                 "at x4 with 36 of 39 frames up; it is the most detailed scene, and the other six do not follow its order. " +
+                 "*** C12 RAN, IT WAS NOT REMEMBERED. *** zone at x2 was harvested again and every row came back identical -- " +
+                 "frame, both dB, labels, features -- in 35 s, so the cache IS the page. That takes the gate to 35.6 s alone, " +
+                 "and its timing is hand-filed. A sabotage that swaps the page's genDb and cfDb reddens it, which a cache-only " +
+                 "gate could never see. " +
+                 "*** THE WITHIN-SCENE NEGATIVES ARE A DESCRIPTION, and the document named the confound before the data: " +
+                 "v4684's slab leaves the frame across this window, moving a frame's detail and its moving content " +
+                 "together. The gate says it cannot separate them and claims no mechanism. " +
+                 "*** AND THE ONE THING THIS MEASUREMENT SHOWS THAT NO EARLIER ONE COULD: FRAME-LEVEL HEADROOM EXISTS. *** " +
+                 "At x4, ramp wins 17 of 39 frames and smooth 19, and a frame oracle would gain +0.368 and +0.232 dB there " +
+                 "over the better fixed policy -- numerically above the per-block oracle's +0.32 dB, though that was v4691's " +
+                 "held-out checker and these are different scenes and a different granularity. Spatial detail is not what " +
+                 "separates those frames. What does is an open question that owes its own document; nothing here has been " +
+                 "shown to reach that headroom. " +
+                 "*** ELEVEN SABOTAGES, TEN RED, after one crash that was not a verdict: *** dropping a scene from the cache " +
+                 "reddened the provenance row and then threw on the next line; the gate now stops at an incomplete cache with " +
+                 "the failure counted. The one 0-RED -- H7 needing one speed -- is an empty adversarial population, the TENTH " +
+                 "in this arc: no cell clears, so any and all agree here, and the design gate reddens on it (F8). v4705's " +
+                 "design gate asserted that no data existed yet and said this round would invert it; it is inverted to 'the " +
+                 "result was produced under this document's constants', and a sabotage of those constants reddens it.",
+    }),
     // v4705 -- THE 312th CLOSING: the block closed, the question moves to the frame, and the arc's own suspect is declared.
     since387: Object.freeze({
         at: "v4705", swept: 1, green: 1, red: 0,
