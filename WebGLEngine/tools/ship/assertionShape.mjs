@@ -529,8 +529,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4711 -- 1791 -> 1792 for tools/ship/frameVertical-selfcheck.mjs, the slab's new direction proven and H10 declared.
     // v4712 -- 1792 -> 1793 for tools/ship/frameVerticalMeasure-selfcheck.mjs, H10 re-derived with C12 and C22 on its cell.
     // v4713 -- 1793 -> 1794 for tools/ship/frameVerdicts-selfcheck.mjs, H7-H10 as the page states them, graded and driven.
-    gates: 1794, usesOk: 1773, definesOk: 1765, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1666, condFirst: 91, unknownSignature: 16,
+    // v4714 -- 1794 -> 1795 for tools/ship/frameGain-selfcheck.mjs, H11's document, score and statistic, no declared data.
+    gates: 1795, usesOk: 1774, definesOk: 1766, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1667, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

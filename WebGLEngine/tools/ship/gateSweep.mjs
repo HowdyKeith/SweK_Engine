@@ -8032,6 +8032,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4714 -- THE 321st CLOSING: pre-registration -- H6's score asked of the frame, on two cells nobody has harvested.
+    since396: Object.freeze({
+        at: "v4714", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameGain-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE FRAME ARC HAS HEADROOM AND NO PREDICTOR, AND BOTH SIGNALS IT TRIED DESCRIBED THE PICTURE. *** Spatial " +
+                 "detail (H7) and occlusion (H8-H10) say what the frame looks like; neither says what a cross-fade gets wrong, " +
+                 "which is that it assumes nothing moved. The chain measures how much motion lowers the matching error below " +
+                 "standing still before any middle frame exists -- v4702's score, H6 -- and H6 asked it only of the BLOCK, where " +
+                 "it ranked backwards and its closing shut the question 'at this block size'. *** render/frame-gain-preregistration.md " +
+                 "DECLARES H11 WITH NO DATA IN THE COMMIT: *** the frame's summed sadStill over its summed best-candidate residual, " +
+                 "log-ratio, direction and eps H6's, within scenes by paired t AND exact sign, intersection-union over two cells -- " +
+                 "x4 forward at upscale 3x and x4 vertical -- one per geometry, because H10 is why a single geometry proves nothing. " +
+                 "*** WHAT MAKES IT A DIFFERENT QUESTION IS A ROW, NOT A SENTENCE: *** on a one-block frame the score IS H6's, " +
+                 "exactly, and adding flat blocks leaves it bit-identical while H6's mean of block scores moves -- the flat blocks " +
+                 "v4703 found were 63-68% of edges'. The reason to expect failure is named: if the frame rhos also lean negative, " +
+                 "H6's shape has replicated where the decision is made, and the negation is still not tested. *** 'NOBODY HAS " +
+                 "HARVESTED THESE' IS MEASURED: *** the gate derives every harvested cell from the four frame result files, adds " +
+                 "every pre-v4709 harvest at the page defaults, and checks both declared cells against the union. The runner " +
+                 "drives the page at x1, undeclared, reproducing v4708's cached rows with features, and its settings object at " +
+                 "the defaults changes nothing. *** FOURTEEN SABOTAGES, TWELVE RED ON THE FIRST RUN, AND BOTH 0-REDs WERE THE " +
+                 "GATE'S. *** Swapping sadApp and sadStill in the runner passed because the fixture placed the SADs with the " +
+                 "runner's own column map, so the swap read back consistent; the fixture now places them by genGate's names and " +
+                 "the swap reddens four rows. Removing the cv floor passed because the 'flat' scenes were exactly constant, where " +
+                 "Spearman returns null unaided; they now vary by about 0.1%, below the floor, and only the floor excludes them. " +
+                 "Both re-run red. The gate runs 35.9 s alone and is hand-filed.",
+    }),
     // v4713 -- THE 320th CLOSING: four frame-level verdicts reach the page, and a sentence that outlived its limit leaves it.
     since395: Object.freeze({
         at: "v4713", swept: 1, green: 1, red: 0,
