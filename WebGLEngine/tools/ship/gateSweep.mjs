@@ -8032,6 +8032,35 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4720 -- THE 327th CLOSING: pre-registration -- H14 replicated at x2, with a ratio chosen so no declared frame was seen.
+    since402: Object.freeze({
+        at: "v4720", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameSwayRep-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H14 FOUND A WEAKER BACKWARDS RANKING WITH THE SLAB IN VIEW, CLEARING ON ONE GEOMETRY. ONE SPEED IS ONE " +
+                 "OBSERVATION. *** render/frame-sway2-preregistration.md declares H15 with NO DATA IN THE COMMIT: H14's statistic, " +
+                 "imported, on sway at x2 on both geometries. A new key, `replicates`, names the hypothesis it replicates, and the " +
+                 "gate reads `direction` from THAT hypothesis's result. The reading table names what the forward/vertical split " +
+                 "recurring would mean, as a description. *** THE RATIO IS NOT THE DEFAULT, AND THE REASON IS COMPUTED. *** " +
+                 "Vertically the sway rises at exactly the linear speed until its first turn -- t 8.18 at x2 -- so at upscale 2x " +
+                 "frames 2 to 8 of every vertical scene would re-walk H12's harvested vertical x2 cell: 7 of 39 frames already " +
+                 "seen. At 3x no linear vertical x2 frame exists. The gate derives every harvested cell WITH ITS PATH from the " +
+                 "committed results, and checks that no declared frame sits on a linear path anyone harvested. *** C26 IS NEW: " +
+                 "THE REVERSAL, READ OFF THE PICTURE. *** The slab's centroid along its own screen axis must turn round within 1.5 " +
+                 "frames of each turn. It replaces a linear twin that does not exist for the vertical cell. Its first draft asked " +
+                 "for two consecutive steps of opposite sign; the page, driven at x1, turned on both geometries and that draft saw " +
+                 "neither, because a block-quantised centroid moves in steps with flat runs between. It now compares the net " +
+                 "movement before and after the turn and locates the extreme. *** FOURTEEN SABOTAGES; OF THE FIRST THIRTEEN, ELEVEN RED ON THE FIRST RUN, " +
+                 "AND BOTH 0-REDs WERE C26's. *** Dropping the sign condition passed, and so did dropping the location check, " +
+                 "because the only negative case was the linear path, whose extreme sits at the far end of the window. Each " +
+                 "condition now has the made-up picture that needs it: a monotone slab whose rows end just past the turn (the " +
+                 "sign), and a real reversal asked about 2 frames late (the location). Both sabotages redden. *** AND " +
+                 "definitionGates CAUGHT AN EXPORT THE GATE NEVER NAMED: *** GRID, the block field's side, took the tree's " +
+                 "unmentioned definitions from 703 to 704. It is now asserted rather than mentioned -- the harvested field must be " +
+                 "GRID x GRID at both ratios, or the centroid's columns and rows are not the screen's axes -- and a fourteenth " +
+                 "sabotage, GRID 20, reddens three rows. The gate runs 142.2 s alone and is hand-filed.",
+    }),
     // v4719 -- THE 326th CLOSING: H14 not supported -- with the slab whole in view, a weaker backwards ranking survives.
     since401: Object.freeze({
         at: "v4719", swept: 1, green: 1, red: 0,
