@@ -8032,6 +8032,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4708 -- THE 315th CLOSING: H8 not reported -- by the route the document named -- and one cell that cleared.
+    since390: Object.freeze({
+        at: "v4708", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHolesMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameHoles-selfcheck.mjs (the no-data row inverted, as it said it would be)"]),
+        verdict: "*** H8 IS NOT REPORTED, AND THE DOCUMENT SAID BEFORE THE DATA EXACTLY HOW THAT WOULD HAPPEN. *** v4707's runner " +
+                 "ran as committed at x1 and x8: 546 frames, 466 s. At x1 the splat left NO hole in any frame of six scenes -- only " +
+                 "zone has any, in two frames -- so one scene was usable against the five the sign test needs, x1 cannot answer, " +
+                 "and H8, declared as BOTH speeds, is neither supported nor refuted. Section 4 wrote that sentence before a frame " +
+                 "was harvested, and a made-up world with no holes had held the gate to it. " +
+                 "*** THE x8 CELL MET ITS DECLARED TEST, AND IT IS NOT PROMOTED. *** All seven within-scene rhos are negative, as " +
+                 "the physics predicted: sign 7 of 7 (p 0.0078), t p 7.4e-4. It is reported as what it is, one declared cell's " +
+                 "outcome; calling it H8 would re-declare the hypothesis after seeing which half cleared, and the sabotage that " +
+                 "does exactly that -- supported if ANY speed clears -- reddens the gate. " +
+                 "*** AND WHAT THAT CELL IS MADE OF IS PRINTED BESIDE IT. *** Holes appear in only 2 to 7 frames per scene at x8 and " +
+                 "cover a few hundredths of a percent of the frame; those frames lose far more (zone -1.708 dB holed against " +
+                 "-0.350 clean, edges -1.841 against -0.103). The rho is close to a holed-against-clean comparison over a handful " +
+                 "of frames. It says holed frames are bad frames; it does not say the hole pixels are why. " +
+                 "*** A PREDICTION IN THE DOCUMENT WAS PARTLY WRONG, AND IS RECORDED SO. *** Section 3 dropped the across-scene " +
+                 "clause because the seven hole sequences would be 'nearly the same sequence'. At x8 their pairwise rho runs " +
+                 "-0.07 to 1.00, median 0.66: related, not nearly identical; the texture moves the holes through the " +
+                 "reconciler's choice of vector more than expected. " +
+                 "*** C12 RAN: *** zone at x1 re-harvested, every row identical, 33 s; the gate is 34.2 s alone and hand-filed. " +
+                 "*** NINE SABOTAGES, EIGHT RED. *** The one 0-RED -- the x8 test made two-sided -- is an empty adversarial " +
+                 "population, the ELEVENTH: every x8 rho is negative, so |rho| and -rho are the same numbers; the design gate " +
+                 "reddens on it (H4 at v4707). A sabotage reading x1's silence as a NULL instead of unanswerable reddens three rows.",
+    }),
     // v4707 -- THE 314th CLOSING: occlusion, declared on cells nobody has harvested.
     since389: Object.freeze({
         at: "v4707", swept: 1, green: 1, red: 0,

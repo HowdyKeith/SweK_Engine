@@ -34,9 +34,12 @@ if (d === null) { console.log(`\nframeHoles-selfcheck: ${fails} FAILED`); proces
         return m ? [...m[1].matchAll(/<option value="(\w+)">/g)].map((x) => x[1]) : []; };
     ok("*** minFolds is derived, the scenes are the page's both ways, every speed is a page option ***",
        d.minFolds === minFoldsFor(d.alpha) && J(d.scenes.slice().sort()) === J(opts("scene").slice().sort()) && d.speeds.every((sp) => opts("slabspeed").includes(sp)));
-    ok("*** NO DATA IN THE COMMIT: neither the cache nor the result exists yet ***",
-       !fs.existsSync(path.join(ENG, CACHE_H8)) && !fs.existsSync(path.join(ENG, RESULT_H8)),
-       "the measurement round creates both, and inverts this row as v4706 inverted v4705's.");
+    // v4708 -- INVERTED, as this row said it would be: the measurement ran, and what is worth keeping is that it ran under
+    // THIS document's constants.
+    const resOk = fs.existsSync(path.join(ENG, CACHE_H8)) && fs.existsSync(path.join(ENG, RESULT_H8)) &&
+        J(JSON.parse(fs.readFileSync(path.join(ENG, RESULT_H8), "utf8")).declared) === J(d);
+    ok("*** the measurement exists, and was produced under THIS document's constants -- v4707's 'no data yet', inverted ***", resOk,
+       "tools/ship/frameHolesMeasure-selfcheck.mjs re-derives it.");
 }
 
 console.log("\n2. *** C20: THE SIGNAL IS holeFrac AND NOTHING ELSE ***");
