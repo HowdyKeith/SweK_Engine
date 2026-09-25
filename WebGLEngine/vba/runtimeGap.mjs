@@ -337,7 +337,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4355,               // v4706: 4354 -> 4355 for tools/ship/frameGateMeasure-selfcheck.mjs. async/await moves
+    files: 4357,               // v4707: 4355 -> 4357 for tools/ship/frameHoles.mjs and its gate. async/await moves by
+                               // one, for the runner's harvest; the gate drives no page -- v4705's C18 already tied the
+                               // harvested dB to the readout. Every row from the census.
+                               // v4706: 4354 -> 4355 for tools/ship/frameGateMeasure-selfcheck.mjs. async/await moves
                                // by one: C12 AWAITS a real re-harvest of the first declared cell rather than trusting the
                                // cache. Every row from the census.
                                // v4705: 4352 -> 4354 for tools/ship/frameGate.mjs and its gate -- the frame-level
@@ -852,7 +855,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4055, closures: 3910, asyncAwait: 1559, typedArrays: 1169, promises: 379,
+    esModules: 4057, closures: 3912, asyncAwait: 1560, typedArrays: 1169, promises: 379,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

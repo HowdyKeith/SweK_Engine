@@ -8032,6 +8032,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4707 -- THE 314th CLOSING: occlusion, declared on cells nobody has harvested.
+    since389: Object.freeze({
+        at: "v4707", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameHoles-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]), widened: Object.freeze([]),
+        verdict: "*** v4706 FOUND FRAME-LEVEL HEADROOM AND NOTHING THAT REACHES IT. H8 ASKS THE TEXTBOOK QUESTION. *** " +
+                 "render/frame-holes-preregistration.md declares, with NO DATA IN THE COMMIT, that within a scene the frames " +
+                 "with more OCCLUSION -- the chain's own holeFrac, found by name -- are the frames where generation does worse. " +
+                 "The direction is the physics of interpolation, fixed in the document; a positive relation FAILS it, and a " +
+                 "made-up world with exactly that relation is the row that proves the test is one-sided. " +
+                 "*** THE DOCUMENT SAYS WHAT CONSTRAINS IT. *** The signal was chosen AFTER v4706's within-scene rhos leaned " +
+                 "negative, so v4706's cells are forbidden to it in either direction: H8 runs at x1 and x8, which no frame has " +
+                 "been harvested at with its dB, and the gate reads the forbidden speeds out of v4705's document rather than " +
+                 "restating them. What has been seen at x1 and x8 is listed by round. " +
+                 "*** THERE IS NO ACROSS-SCENE CLAUSE, AND THE REASON IS GEOMETRY. *** All seven scenes share one camera and " +
+                 "one slab; occlusion is geometry, so their hole sequences are nearly the same sequence, and a rank across " +
+                 "seven nearly-equal numbers would be noise with a p-value. The question is within a scene, where v4706 found " +
+                 "the headroom. And a way it can fail to ANSWER is named in advance: at x1 the splat may leave almost no holes, " +
+                 "every scene falls under the floor, and H8 is then not reported rather than read as null -- a made-up world " +
+                 "with no holes is the row that holds the gate to that. " +
+                 "*** ELEVEN SABOTAGES, ELEVEN RED ON THE FIRST RUN *** -- the first round of this frame arc where no row had to " +
+                 "be rebuilt after a sabotage found it blind, which is a statement about this gate's rows and not a claim that " +
+                 "they are complete.",
+    }),
     // v4706 -- THE 313th CLOSING: H7 measured, "neither" -- the spatial gradient does not decide the frame.
     since388: Object.freeze({
         at: "v4706", swept: 1, green: 1, red: 0,
