@@ -337,7 +337,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4371,               // v4716: 4369 -> 4371 for tools/ship/frameReverse.mjs and its gate. async/await by one --
+    files: 4372,               // v4717: 4371 -> 4372 for tools/ship/frameReverseMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4716: 4369 -> 4371 for tools/ship/frameReverse.mjs and its gate. async/await by one --
                                // the runner's harvest; the gate drives no page. Every row from the census.
                                // v4715: 4368 -> 4369 for tools/ship/frameGainMeasure-selfcheck.mjs, the measurement
                                // gates' shape: async/await by one for C12. Every row from the census.
@@ -876,7 +878,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4071, closures: 3926, asyncAwait: 1572, typedArrays: 1169, promises: 380,
+    esModules: 4072, closures: 3927, asyncAwait: 1573, typedArrays: 1169, promises: 380,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -69,8 +69,9 @@ const R11 = res(RESULT_H11);
     const missing = facts.filter((f) => !doc.includes(f));
     ok("*** every number the document quotes from H11 is the one H11's result holds, and the shared exception is computed ***",
        !missing.length, missing.length ? `not in the document: ${missing.join(", ")}` : facts.join(", "));
-    ok("*** no data yet: no cache and no result -- the measurement round inverts this row ***",
-       !fs.existsSync(path.join(ENG, CACHE_H12)) && !fs.existsSync(path.join(ENG, RESULT_H12)));
+    // v4717 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    ok("*** the measurement exists, produced under THIS document's constants -- v4716's 'no data yet', inverted ***",
+       fs.existsSync(path.join(ENG, CACHE_H12)) && fs.existsSync(path.join(ENG, RESULT_H12)) && J(res(RESULT_H12).declared) === J(d));
 }
 
 console.log("\n2. *** THE PARTIAL, AND WHAT IT MUST SEPARATE ***");
@@ -133,6 +134,6 @@ console.log("\n3. *** THE SUMMARY ON REAL COMMITTED ROWS -- x1 FORWARD, WHICH NO
 }
 
 console.log(`\nframeReverse-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY DECLARED CELL -- nothing is harvested at x2 forward 3x or x2 vertical; C24 and C12 are the " +
-            "measurement round's, on the harvest path v4715's C12 and C23 proved.");
+console.log("unchecked here: THE DECLARED CELLS -- they are tools/ship/frameReverseMeasure-selfcheck.mjs's, which re-derives H12 and " +
+            "H13 from their cache, checks C24 on both cells and re-harvests one scene.");
 process.exit(fails ? 1 : 0);

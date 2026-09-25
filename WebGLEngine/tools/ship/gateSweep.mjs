@@ -8032,6 +8032,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4717 -- THE 324th CLOSING: H12 and H13 not supported -- the backwards ranking replicates, and much of it is the clock.
+    since399: Object.freeze({
+        at: "v4717", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameReverseMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameReverse-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H12 and H13 re-derived; H13 reads H12's frames and is not counted twice)"]),
+        verdict: "*** H12 IS NOT SUPPORTED, BY EXACTLY THE PRICE ITS DOCUMENT NAMED. *** v4716's runner ran as committed on two cells " +
+                 "nobody had harvested -- x2 forward at upscale 3x and x2 vertical -- 546 frames, 951 s. The vertical cell clears, 7 of " +
+                 "7 at t p 0.0003. The forward cell stops at 6 of 7, exact sign p 0.0625, with zone against it: the scene v4716 named " +
+                 "as the likely price, because it was H11's exception on both geometries. Its t-test clears at 0.0077; the document " +
+                 "required both, and the sign test is what fails. The vertical cell is reported as that cell's outcome and NOT " +
+                 "promoted. *** THE RAW PATTERN DID REPLICATE: *** 13 of 14 scene-cells rank backwards at x2, against H11's 12 of 14 " +
+                 "at x4. *** H13 IS NOT SUPPORTED EITHER. *** With the frame's position in the window partialled out, neither cell " +
+                 "clears -- forward 5 of 7, vertical 6 of 7 -- and the document's table says H13 is then reported without " +
+                 "interpretation. *** WHAT THE CLOCK TOOK, AS A DESCRIPTION: *** gain falls with frame index in 11 of 14 scene-cells " +
+                 "and advantage rises with it in 13 of 14, so a large share of that ranking goes with the window's clock -- 39% of " +
+                 "the forward mean rho, 68% of the vertical. What survives the partial beyond 0.25 survives in the SAME three scenes on " +
+                 "both geometries: smooth, checker and ramp. That is a description with no test attached; the partial removes a " +
+                 "monotone trend and nothing else. The design that would separate the clock from the signal rather than partial it " +
+                 "out is a window in which the slab never leaves the view. *** C24 HELD ON BOTH CELLS *** (0 of 273 frames in either " +
+                 "carries v4706's forward x2 2x dB), and C12 re-harvested zone at x2 forward 3x identically. *** THE PAGE SAYS SO " +
+                 "THE DAY IT IS MEASURED: *** H12 and H13 join render/frameVerdicts.mjs, re-derived, and the arc's finding gains the " +
+                 "clock's share as a quote graded against this closing. The first draft of the gate's description said 'most of " +
+                 "that ranking is the clock' -- true vertically, false forward at 39% -- and it is now computed per cell. *** THIRTEEN " +
+                 "SABOTAGES, THIRTEEN RED, AFTER TWO CRASHES AND ONE NO-OP THAT WERE NOT VERDICTS. *** A test that ignores `direction`, " +
+                 "and one decided by the t-test alone, each made the forward cell clear; the H12 rows indexed the one failing cell " +
+                 "they expected and threw. They now read it through a lookup that is null when that population is absent, and both " +
+                 "sabotages redden three and four rows. Flipping a recorded rho first matched two places in the result file and " +
+                 "changed nothing -- a NO-OP, not a 0-RED -- and redone on the per-scene value it reddens the provenance row. H12 " +
+                 "supported if ANY cell clears reddens here, because the vertical cell DOES clear: the adversarial population is not " +
+                 "empty this time. One vertical scene swapped for v4706's forward x2 rows reddens C24. The measurement gate runs " +
+                 "74.7 s alone, and frameVerdicts-selfcheck 14.2 s; both are hand-filed.",
+    }),
     // v4716 -- THE 323rd CLOSING: pre-registration -- H11's negation on cells it has not seen, and the same with the clock out.
     since398: Object.freeze({
         at: "v4716", swept: 1, green: 1, red: 0,

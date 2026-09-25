@@ -24,6 +24,7 @@ import { PREREG_H8, CACHE_H8, RESULT_H8, h8 } from "./frameHoles.mjs";
 import { PREREG_H9, CACHE_H9, RESULT_H9, HOLED_KEYS, h9 } from "./frameHoled.mjs";
 import { PREREG_H10, CACHE_H10, RESULT_H10, VERT_KEYS, h10 } from "./frameVertical.mjs";
 import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, h11 } from "./frameGain.mjs";
+import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, reverse } from "./frameReverse.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -47,15 +48,19 @@ const RUN = {
     H9: { doc: PREREG_H9, cache: CACHE_H9, d: declared(readDoc(PREREG_H9), HOLED_KEYS) },
     H10: { doc: PREREG_H10, cache: CACHE_H10, d: declared(readDoc(PREREG_H10), VERT_KEYS) },
     H11: { doc: PREREG_H11, cache: CACHE_H11, d: declared(readDoc(PREREG_H11), GAIN_KEYS) },
+    H12: { doc: PREREG_H12, cache: CACHE_H12, d: declared(readDoc(PREREG_H12), REV_KEYS) },
+    // v4717 -- H13 is H12's document read on H12's frames: it has a runner and no cache of its own, so no frame is counted twice.
+    H13: { doc: PREREG_H12, cache: null, d: declared(readDoc(PREREG_H12), REV_KEYS) },
 };
 
 console.log(`frameVerdicts-selfcheck -- ${FRAME_VERDICTS.length} frame-level hypotheses, what the page says about them, and whether it is true\n`);
 
 console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
 {
-    ok("*** five hypotheses, H7 to H11, in the order they were measured -- and every one has a runner here ***",
-       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
-       FRAME_VERDICTS.every((v, i) => i === 0 || Number(v.round.slice(1)) > Number(FRAME_VERDICTS[i - 1].round.slice(1))),
+    // v4717 -- "in the order measured" allows two hypotheses from one round (H12 and H13 share a document and a harvest).
+    ok("*** H7 to H13, in the order they were measured -- and every one has a runner here ***",
+       J(FRAME_VERDICTS.map((v) => v.id)) === J(["H7", "H8", "H9", "H10", "H11", "H12", "H13"]) && J(Object.keys(RUN)) === J(FRAME_VERDICTS.map((v) => v.id)) &&
+       FRAME_VERDICTS.every((v, i) => i === 0 || Number(v.round.slice(1)) >= Number(FRAME_VERDICTS[i - 1].round.slice(1))),
        FRAME_VERDICTS.map((v) => `${v.id}@${v.round}`).join(" "));
     const bad = [];
     for (const v of FRAME_VERDICTS) {
@@ -124,9 +129,25 @@ const R7 = res(RESULT_H7), R8 = res(RESULT_H8), R9 = res(RESULT_H9), R10 = res(R
        `${word(f)}; ${cs.map((c, i) => `${c} sign ${f.cells[c].test.sign.up}/7, mean rho ${means[i].toFixed(3)}`).join("; ")}; the exception on both: ${exc[0].join(", ")}`);
 }
 
+{
+    const R12 = res(RESULT_H12), d12 = RUN.H12.d, h = reverse(R12.per, d12), v12 = entry("H12"), v13 = entry("H13");
+    const back = d12.cells.flatMap((c) => d12.scenes.filter((s) => d12.direction * R12.per[c][s].rho > 0)).length;
+    const failing = d12.cells.filter((c) => !h.h12.cells[c].cleared);
+    const against = failing.length === 1 ? d12.scenes.filter((s) => d12.direction * R12.per[failing[0]][s].rho < 0) : [];
+    ok("*** H12: not supported -- 13 of 14 backwards, but one cell stops at 6 of 7 with zone against it, sign p 0.0625 -- recomputed ***",
+       word(h.h12) === v12.verdict && back === 13 && failing.length === 1 && J(against) === J(["zone"]) &&
+       h.h12.cells[failing[0]].test.sign.p === 8 / 128 && v12.evidence.includes(`${back} of ${d12.cells.length * d12.scenes.length}`),
+       `${word(h.h12)}; ${back} backwards; ${failing.join("")} against: ${against.join(", ")}`);
+    const share = d12.cells.map((c) => { const m = (k) => d12.scenes.reduce((a, s) => a + R12.per[c][s][k], 0) / d12.scenes.length;
+        return Math.round(100 * (1 - m("partial") / m("rho"))); });
+    ok("*** H13: not supported -- neither cell clears once the clock is partialled out, and the shares it took are recomputed ***",
+       word(h.h13) === v13.verdict && d12.cells.every((c) => !h.h13.cells[c].cleared) && share.every((p) => v13.evidence.includes(`${p}%`)),
+       `${word(h.h13)}; clock's share of the mean rho ${share.map((p) => p + "%").join(", ")}`);
+}
+
 console.log("\n3. *** EVERY COUNT AND THE HEADROOM, RECOMPUTED FROM THE CACHES ***");
 {
-    const counted = Object.fromEntries(Object.entries(RUN).map(([id, r]) => [id, rows(gz(r.cache))]));
+    const counted = Object.fromEntries(Object.entries(RUN).filter(([, r]) => r.cache).map(([id, r]) => [id, rows(gz(r.cache))]));
     ok("*** the frames each hypothesis stands on are the rows in its committed cache ***",
        J(counted) === J(FRAME_MEASURED), `${Object.entries(counted).map(([id, n]) => `${id} ${n}`).join(", ")}; the page says ${Object.values(FRAME_MEASURED).reduce((s, n) => s + n, 0)}`);
     const scenes = Object.values(RUN).map((r) => r.d.scenes), union = new Set(scenes.flat());
