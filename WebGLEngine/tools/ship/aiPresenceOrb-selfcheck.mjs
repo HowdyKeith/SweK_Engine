@@ -11,7 +11,7 @@
 // needs Chromium -- WebGL2 always, real WebGPU too since tools/ship/webgpuHarness.mjs's swizzle workaround),
 // so a math regression fails in milliseconds rather than after a browser boot.
 "use strict";
-import { SECURE_HOST } from "./webgpuHarness.mjs";   // v4627: renderThreeTslToPixels is no longer needed -- section 10 reads its WebGPU shot out of RENDER_SCRIPT's own launch
+import { SECURE_HOST, LAUNCH_ARGS } from "./webgpuHarness.mjs";   // v4627: renderThreeTslToPixels is no longer needed -- section 10 reads its WebGPU shot out of RENDER_SCRIPT's own launch
 import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
@@ -215,7 +215,9 @@ async function runWebGL2InEngineOrigin({ engineRoot, script, args = null, sabota
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+        // LAUNCH_ARGS carries win32's extra --use-angle=d3d11 (tools/ship/webgpuHarness.mjs); without it
+        // requestAdapter() came back null on that platform and the WebGPU half never produced a shot.
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", ...LAUNCH_ARGS] });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));

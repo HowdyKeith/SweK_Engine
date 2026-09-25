@@ -29,6 +29,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../ship/playwrightResolve.mjs";
+import { LAUNCH_ARGS } from "../ship/webgpuHarness.mjs";
 import { noComments } from "../ship/sourceScan.mjs";
 import { reportThrows } from "../ship/thrownRow.mjs";
 import { VARIANTS, validateVariant, SHARED_CAP } from "./magmapVariants.mjs";
@@ -96,8 +97,10 @@ if (skip) {
     process.exit(fails ? 1 : 0);
 }
 
+// LAUNCH_ARGS carries win32's extra --use-angle=d3d11 (tools/ship/webgpuHarness.mjs); without it
+// requestAdapter() came back null on that platform and the null read below threw instead of failing a row.
 const b = BROWSER = await chromium.launch({ executablePath: HEADLESS_SHELL,
-    args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"] });
+    args: [...LAUNCH_ARGS, "--enable-features=Vulkan,WebGPU"] });
 const page = await (await b.newContext()).newPage();
 await page.route("**/*", (route) => {
     const u = new URL(route.request().url());
