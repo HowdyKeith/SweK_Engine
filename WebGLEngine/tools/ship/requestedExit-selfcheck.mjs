@@ -4,6 +4,10 @@
 // RUNTIME 1.08s MEASURED (median of 3 -- 1067/1146/1075 -- with date(1) around the run). Four short-lived node
 // children dominate it: three real bridge loads in section 1 and 5(b), plus process spawn. No header guess was
 // written here first -- this line has been wrong by 13x in this tree before, so the number went in after date(1).
+// v4680: a fifth child (restart()'s Windows branch driven into a spawn stub on every box). 2866/2933/2898 ms
+// measured WHILE A FULL VERIFY RAN ON THE SAME 4 CORES -- a contended reading, not this gate's cost alone.
+// SABOTAGE (v4680): gave that child no stub -> the new "WINDOWS branch ... captured, never started" row went red
+// alone ("would have run: nothing"). Restored. On the rig the same deletion would have OPENED A REAL LAUNCHER.
 //
 // *** A STOP THAT WAS ASKED FOR USED TO LOOK EXACTLY LIKE THE ONE SHAPE THE LAUNCHER STOPS THE WINDOW OVER. ***
 //
@@ -46,10 +50,22 @@ const BRIDGE = path.join(ENG, "ai-bridge", "sysadminBridge.js");
 
 // Run one exported call of the real bridge in a child, with TMPDIR pointed at a scratch directory so we can see
 // whether anything was written to os.tmpdir() -- which is where swek_superseded.flag would land.
+//
+// *** v4680 -- AND child_process.spawn IS STUBBED IN THAT CHILD, BECAUSE ON WINDOWS restart() IS NOT A FUNCTION
+// CALL, IT IS THE ENGINE'S REAL LAUNCHER. *** Since v4011 this gate has run the real restart() in a real child,
+// and on win32 that does `cmd /c start "" /d <repo root> START_NODE_Engine.bat` -- in the real checkout. Every
+// rig sweep therefore opened a launcher window that asks the running engine on :8787 to exit, frees the port,
+// and starts a fresh engine, the KPop listener, the GPU brain and a browser tab. Found by the investigation
+// into the v4679 rig verify that ended with no verdict; it is NOT that run's cause (it ran identically at
+// v4667, which finished) but it is a gate reaching far outside itself. sysadminBridge destructures spawn at
+// require time, so replacing it BEFORE the require captures every launch; the child prints what it WOULD
+// have started, and the row below asserts on that -- which is a stronger check than "a window opened".
+const STUB = "const cp=require('child_process');const spawned=[];" +
+    "cp.spawn=(cmd,args)=>{spawned.push([cmd].concat(args||[]));return {unref(){},on(){return this},pid:0};};";
 function runCall(expr) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "swek-exitgate-"));
     const r = spawnSync(process.execPath,
-        ["-e", `const sb=require(${JSON.stringify(BRIDGE)});const r=sb.${expr};process.stdout.write(JSON.stringify(r));`],
+        ["-e", STUB + `const sb=require(${JSON.stringify(BRIDGE)});const r=sb.${expr};process.stdout.write(JSON.stringify({r,spawned}));`],
         { cwd: ENG, env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp }, encoding: "utf8", timeout: 20000 });
     let wrote = [];
     try { wrote = fs.readdirSync(tmp); } catch {}
@@ -85,18 +101,42 @@ console.log("1. *** THE REAL FUNCTION, IN A REAL PROCESS: WHAT EXIT CODE DOES IT
     // which is what "someone else has the baton" is SUPPOSED to do (see the boundary rule above this function).
     const r = runCall("restart()");
     if (process.platform === "win32" || process.platform === "darwin") {
-        let parsed = null; try { parsed = JSON.parse(r.out); } catch {}
+        let whole = null; try { whole = JSON.parse(r.out); } catch {}
+        const parsed = whole && whole.r, spawned = (whole && whole.spawned) || [];
         const flagged = r.wrote.some((f) => /swek_superseded/.test(f));
         ok("!! restart() on " + process.platform + " either hands off to a real launcher (flag written, ok) " +
            "or reports one is missing -- never silently exits claiming nothing",
             (parsed && parsed.ok === true && flagged) || (parsed && parsed.ok === false && /launcher not found/.test(parsed.error || "")),
             JSON.stringify(parsed) + " flag=" + flagged);
+        ok("!! ...and the launch it hands off to is CAPTURED, not performed -- a gate does not start the engine",
+            parsed && (parsed.ok === false || (spawned.length === 1 &&
+                (process.platform !== "win32" || (spawned[0][0] === "cmd" && /\.bat$/i.test(String(spawned[0].slice(-1)[0])))))),
+            spawned.length ? "would have run: " + spawned.map((a) => a.join(" ")).join(" | ")
+                           : "no launch attempted (" + JSON.stringify(parsed) + ")");
         report("the no-relauncher fallback (exit " + EXPECTED + ") is unreachable on this platform by " +
                "construction -- asserting it here would be checking a branch this OS's restart() can never take");
     } else {
         ok("!! restart()'s no-relauncher fallback exits " + EXPECTED + " too -- nobody has the baton there either",
             r.code === EXPECTED, `child exited ${r.code}`);
     }
+    // The row above can only fire on the rig. Its WINDOWS BRANCH is driven here on every box: the child is told
+    // it is win32 before the bridge is required (isWin is read at require time), so restart() takes the path
+    // that launches START_NODE_Engine.bat -- into the stub. Deleting the stub makes this row open a real
+    // launcher on Windows and fail on POSIX, where `cmd` does not exist; either way it is red, not silent.
+    const tmpW = fs.mkdtempSync(path.join(os.tmpdir(), "swek-exitgate-w-"));
+    const w = spawnSync(process.execPath, ["-e",
+        "Object.defineProperty(process,'platform',{value:'win32'});" + STUB +
+        `const sb=require(${JSON.stringify(BRIDGE)});const r=sb.restart();process.stdout.write(JSON.stringify({r,spawned}));`],
+        { cwd: ENG, env: { ...process.env, TMPDIR: tmpW, TEMP: tmpW, TMP: tmpW }, encoding: "utf8", timeout: 20000 });
+    try { fs.rmSync(tmpW, { recursive: true, force: true }); } catch {}
+    let ww = null; try { ww = JSON.parse(w.stdout || ""); } catch {}
+    const launch = ww && ww.spawned && ww.spawned[0];
+    ok("!! *** restart()'s WINDOWS branch, driven on any box: the launcher is captured, never started ***",
+        !!ww && ww.r && ww.r.ok === true && ww.spawned.length === 1 && launch[0] === "cmd" &&
+        launch.includes("start") && /\.bat$/i.test(String(launch[launch.length - 1])),
+        ww ? "would have run: " + (launch ? launch.join(" ") : "nothing") + " -- a real sweep on the rig used to RUN this, " +
+             "stopping the engine on :8787 and opening four windows"
+           : "child printed nothing parseable: " + String(w.stderr || "").trim().slice(0, 200));
     report("both are run as the real module in a real child; the code read here is the code a launcher reads");
 }
 
