@@ -210,7 +210,11 @@
 //   NAMED, NOT FIXED -- (a) SCALING: cost grows roughly quadratically with how finely B is tessellated across
 //   one A-triangle; 7x slower than meshCSG's BSP at a 16,128-triangle blob, 7.1 minutes and capped at 65,024
 //   (triFragmentAccumulate.mjs has the table). Faster than the BSP only on small-to-moderate inputs like the
-//   ones the head-to-head gate runs. (b) SCALE: absolute tolerances (1e-9 plane dedup, triClip's EPS,
+//   ones the head-to-head gate runs. ROUND 8 attacked the plane-vs-every-fragment scan: a box precondition in the
+//   gate's predicate (most of the gain) and a spatial index (byte-identical output) -- 1.3-1.5x at subdiv 32-64
+//   and 2.1x at 96, same-machine paired runs (subdiv 64: 10.7 s -> 7.1 s; the BSP 1.7 s). Fragment count from
+//   full-plane cuts, and the per-fragment classification it drives, remain; triFragmentAccumulate.mjs's ROUND 8
+//   paragraph has the profile and the corrected attribution. (b) SCALE: absolute tolerances (1e-9 plane dedup, triClip's EPS,
 //   pointInMesh's) make results wrong below ~1e-4 scale -- up to 34% of volume at 1e-6..7e-5 -- gated and
 //   ungated alike; and at coordinates ~1e8 the gate can skip a pair whose overlap is ~4 ULP (5 of 60 far-offset
 //   fuzz cases, <=9.1e-9 relative volume). (c) PRE-EXISTING GAPS the gate neither causes nor fixes: two unit
@@ -256,7 +260,7 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  *   NOT triFragmentAccumulate.mjs's own defaults; defined caller keys override, undefined/null ones do not.
  * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean}[], stats:{triCount:number,
  *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number,
- *   gateSkipped:number, gateTested:number}}}
+ *   gateSkipped:number, gateTested:number, examined:number}}}
  */
 export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther, opts = {}) {
     const agreementThreshold = opts.agreementThreshold ?? 1;
@@ -265,7 +269,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     const triCount = trisSelf.length / 9;
     const fragments = [];
     let emptyCandidateShortcuts = 0, accumulatedFragments = 0, capped = false, unresolvedCount = 0;
-    let gateSkipped = 0, gateTested = 0;
+    let gateSkipped = 0, gateTested = 0, examined = 0;
     // Round 7: the intersection gate is ON by default here, and the per-triangle fragment cap is raised from
     // triFragmentAccumulate.mjs's own 256 to MESH_BOOLEAN_MAX_FRAGMENTS -- see this file's own header for both.
     // A caller can still pass accOpts:{gateByIntersection:false, maxFragments:256} to get round 6's behaviour.
@@ -293,6 +297,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         unresolvedCount += acc.unresolvedCount;
         gateSkipped += acc.gateSkipped;
         gateTested += acc.gateTested;
+        examined += acc.examined;
         for (const frag of acc.fragments) {
             accumulatedFragments++;
             const c = centroid(frag.tri);
@@ -302,7 +307,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         }
     }
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
-                                 gateSkipped, gateTested } };
+                                 gateSkipped, gateTested, examined } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its

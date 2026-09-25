@@ -147,7 +147,51 @@
 // with how finely B is tessellated where it crosses one A-triangle. Measured by the review (wall minus
 // jaggedBlob subdiv n, one blast): n=8 71 ms, 16 103 ms, 32 898 ms, 64 14.6 s (7x the BSP), 96 121 s, and at
 // n=128 (65,024 blob triangles) 7.1 minutes ending capped. A per-triangle fragment index is the fix; it is not
-// built.
+// built. (Round 7's words. Round 8 built it and measured that it is HALF the fix -- see the next paragraph.)
+//
+// *** ROUND 8: A SPATIAL INDEX -- AND THE REVIEW'S CORRECTION OF WHAT IT IS WORTH, WHICH REPLACES THE FIRST DRAFT'S
+// CLAIM RATHER THAN SITTING BESIDE IT. *** Profiled first, on wall minus jaggedBlob subdiv 48 (one wall triangle: ~1,560
+// planes, ~6,271 fragments): every plane scanned every live fragment. Two changes answer that, and the first draft
+// of this paragraph credited the wrong one. (1) THE PREDICATE GAINED A CONDITION: boxes must meet (padded 1e-9)
+// before triTriIntersect() is asked. triTriIntersect() answers "degenerate" -- before its interval test -- for any
+// member with a vertex within EPS of the fragment's plane however far away it lies, so round 7's gate cut
+// fragments edge to edge for members metres away; and a box test is far cheaper than a tri-tri test. Sound on its
+// own (disjoint boxes share no point). It changed round 7's fragments on 9 of the 1,378 triangles in
+// triFragmentAccumulate-selfcheck 15a's battery (all flush-contact box cases) and not one number in
+// meshBoolean-selfcheck or meshBooleanBlast-selfcheck. (2) accumulateIndexed(): a uniform grid over triA's plane
+// (the two axes left after dropping its dominant normal axis; G = ceil(sqrt(planes)), measured best of
+// 0.25x..4x), fragments registered per cell, a plane asking only fragments in cells its members' boxes touch,
+// order kept by a linked list. Both paths share one predicate (fragmentMeetsAny) and one cut (cutFragment), so
+// the index changes who is asked and nothing else: output byte-identical to the plain loop (15a: 1,378
+// triangles, index forced on every one, uncapped and at three caps; meshBooleanBlast section 7 end to end).
+// *** WHAT EACH IS WORTH, SAME MACHINE, PAIRED RUNS, IDENTICAL OUTPUT HASHES (meshBoolean, one blast): *** subdiv 32
+// round 7 0.87 s / precondition only 0.66 s / + index 0.66 s; subdiv 48 3.29 / 2.53 / 2.35 s; subdiv 64 10.7 /
+// 7.85 / 7.08 s; subdiv 96 (the review's run) 87 / 56 / 42 s. THE PRECONDITION IS ~75-80% OF THE GAIN; THE INDEX
+// ADDS 1.0-1.1x end to end up to subdiv 64 and 1.34x at 96 (1.8x on accumulation alone at 64). The first draft
+// said "14.6 s -> 6.6 s, 2-3x" and credited the index: 14.6 s and 121 s were round 7's REVIEW figures on a
+// busier machine; paired, the whole round is 1.3-1.5x at 32-64 and 2.1x at 96. The BSP: 0.38, 0.87, 1.7, 4.6 s.
+// THREE REVIEW FINDINGS ON THE INDEX ITSELF, ALL FIXED: (a) it was 30% SLOWER on accumulation (11% end to end) on
+// small inputs, 1-4 planes per triangle -- it is now used only above INDEX_MIN_PLANES = 16 planes; (b) on nested
+// slivers (members in parallel diagonal planes cutting triA into strips whose every box contains every later
+// member's box) it handed over every live fragment through many cells, P^2 work where the plain loop does P --
+// 6x slower, 2x the heap. A plane now prices its query in cell entries first and walks the list when that is
+// dearer (listScans counts it), so its work is bounded by the plain loop's, and cut fragments are released
+// rather than kept to the end; (c) an extent overflowing to Infinity made the cell map NaN and left triA uncut
+// -- such a triangle now goes to the plain loop. Gated: 15c-15f.
+// SO THE INDEX IS NOT THE SCALING FIX, and the profile says why -- two costs neither change touches: (1) FRAGMENT
+// COUNT. A cut runs the member's PLANE across the whole fragment it splits, not just the member's own segment,
+// so early cuts leave long slivers that later members cut again: 37,458 fragments from 5,360 candidates at
+// subdiv 64, more than 65,536 on ONE wall triangle at 128, which still caps (129.5 s, wrong; the BSP 14.4 s).
+// (2) CLASSIFICATION: pointInMesh() fires five full rays per fragment -- about 5.8 s of 6.9 s at 64. Both scale
+// with fragment count, so the next piece is SEGMENT-BOUNDED CUTTING -- a planar arrangement of the actual
+// intersection segments inside triA, one classification per face -- not a better index.
+// TRIED AND REJECTED, WITH NUMBERS: an adaptive quadtree over triA (cut by axis-aligned mid-planes until each
+// cell holds few members, then cut members per cell, so lines stop at cell borders). jaggedBlob's spikes make
+// member boxes ~0.4 units wide with ~25 covering a common point at subdiv 32, so no cell size separates them:
+// with a plain member-count stop it recursed to depth 12, made ~93,000 cells, capped and came back 0.1-0.4 units
+// of volume WRONG; with a stop-when-the-split-does-not-separate rule it was exact but refined only one level,
+// 4.8 s against the index's 6.6 s at n=64 in that session -- and its output differs from the unrefined path.
+// Not kept.
 //
 // SCOPE: this module produces a CLASSIFIABLE fragment set for one triangle of mesh A against every relevant
 // candidate of mesh B -- it does not itself classify fragments (hand the result's fragment centroids to
@@ -250,11 +294,17 @@ function resolveDegenerate(tri, nRaw, dRaw) {
  * @param {number[]} candidateTriBs  typically groupCandidatesByTriA(pairOverlap(bvhA,bvhB)).get(triA) -- an
  *   ALREADY-FILTERED per-triangle candidate list, not raw pairOverlap() output (see groupCandidatesByTriA()'s
  *   own docs for why this function does not call pairOverlap() itself).
- * @param {{planeEps?:number, maxFragments?:number, gateByIntersection?:boolean}} [opts]
+ * @param {{planeEps?:number, maxFragments?:number, gateByIntersection?:boolean, spatialIndex?:boolean,
+ *   indexMinPlanes?:number}} [opts]
  *   gateByIntersection: see this file's own ROUND 7 header paragraph. Default false (round-5 behaviour).
+ *   spatialIndex: ROUND 8. With the gate on, triangles with more than indexMinPlanes (default 16) distinct planes
+ *     go through accumulateIndexed() unless this is false. Changes which fragments are ASKED, never the result:
+ *     the output equals spatialIndex:false's byte for byte (see the ROUND 8 header paragraph). Ignored when the
+ *     gate is off.
+ *   indexMinPlanes: the plane count above which the index is used (default INDEX_MIN_PLANES = 16; 0 forces it).
  * @returns {{fragments:{tri:number[][], splitBy:number[], lowConfidence?:boolean}[], planeCount:number,
  *   duplicatePlanesCollapsed:number, degenerateFallbacks:number, unresolvedCount:number, capped:boolean,
- *   gateSkipped:number, gateTested:number, groupsSkipped:number}}
+ *   gateSkipped:number, gateTested:number, groupsSkipped:number, examined:number, listScans?:number}}
  *   fragments: each a fresh [p0,p1,p2] raw-point triangle plus splitBy (the distinct planes' own representative
  *     triB indices that actually produced a cut kept in this fragment's ancestry) and lowConfidence (present
  *     and true only if this fragment or an ancestor hit the genuinely-unresolved all-three-vertices-on-plane
@@ -272,6 +322,10 @@ function resolveDegenerate(tri, nRaw, dRaw) {
  *   gateSkipped / gateTested: (fragment, plane) offers the intersection gate declined / passed on to the clip.
  *     Both 0 when gateByIntersection is off.
  *   groupsSkipped: plane groups the gate dropped WHOLESALE because no member meets triA at all (round 7).
+ *   examined: (fragment, plane) pairs whose gate predicate was actually evaluated -- every live fragment per
+ *     plane on the plain loop, the index's candidates on the indexed path (round 8; 0 with the gate off). The
+ *     honest measure of the index's saving; gateSkipped also counts wholesale-dropped groups and overstates it.
+ *   listScans: indexed path only -- planes whose query was dearer than walking every live fragment, so it did.
  */
 export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {}) {
     const planeEps = opts.planeEps ?? PLANE_EPS;
@@ -318,10 +372,20 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
         if (match) match.triBs.push(triB); else planes.push({ n: plane.n, d: plane.d, triBs: [triB] });
     }
 
+    // Round 8: with the gate on, the spatially indexed path is the default (opts.spatialIndex:false selects the
+    // plain loop below, which applies the SAME per-(fragment, member) predicate to every live fragment and is
+    // kept as the readable reference the index is gated against, byte for byte).
+    if (gate && opts.spatialIndex !== false && planes.length > (opts.indexMinPlanes ?? INDEX_MIN_PLANES)) {
+        const r = accumulateIndexed(trisA, triA, trisB, planes, candidateTriBs.length, maxFragments);
+        if (r) return r;   // null: triA's extent is not finite, which the grid cannot map -- use the plain loop
+    }
+
     let fragments = [{ tri: readTri(trisA, triA), splitBy: [] }];
-    let degenerateFallbacks = 0, unresolvedCount = 0, capped = false, appliedPlaneCount = 0;
-    let gateSkipped = 0, gateTested = 0, groupsSkipped = 0;
+    let capped = false, appliedPlaneCount = 0;
+    let gateSkipped = 0, gateTested = 0, groupsSkipped = 0, examined = 0;
+    const st = { degenerateFallbacks: 0, unresolvedCount: 0 };
     const scratch = new Float64Array(9);
+    const boxOf = memberBoxCache(trisB);
 
     for (const plane of planes) {
         if (fragments.length >= maxFragments) { capped = true; break; }
@@ -337,40 +401,14 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
             if (members.length === 0) { gateSkipped += fragments.length; groupsSkipped++; continue; }
         }
         const next = [];
+        if (gate) examined += fragments.length;
         for (const frag of fragments) {
             packScratch(scratch, frag.tri);
             if (gate) {
-                // Round 7: only "none" skips -- see this file's own header for why that keeps every final
-                // fragment free of B's surface in its interior.
-                let meets = false;
-                for (const triB of members) {
-                    if (triTriIntersect(scratch, 0, trisB, triB).status !== "none") { meets = true; break; }
-                }
-                if (!meets) { gateSkipped++; next.push(frag); continue; }
+                if (!fragmentMeetsAny(frag.tri, scratch, trisB, members, boxOf)) { gateSkipped++; next.push(frag); continue; }
                 gateTested++;
             }
-            const res = clipTriangleByPlane(scratch, 0, plane.n, plane.d);
-            if (res.status === "allFront" || res.status === "allBack") {
-                next.push(frag);
-            } else if (res.status === "clipped") {
-                for (const t of [...res.front, ...res.back]) {
-                    next.push({ tri: t, splitBy: [...frag.splitBy, plane.triBs[0]], lowConfidence: frag.lowConfidence });
-                }
-            } else {
-                // Finding 2: resolve rather than blanket-flag-and-pass-through.
-                degenerateFallbacks++;
-                const r = resolveDegenerate(frag.tri, plane.n, plane.d);
-                if (r.status === "allFront" || r.status === "allBack") {
-                    next.push(frag);
-                } else if (r.status === "clipped") {
-                    for (const t of [...r.front, ...r.back]) {
-                        next.push({ tri: t, splitBy: [...frag.splitBy, plane.triBs[0]], lowConfidence: frag.lowConfidence });
-                    }
-                } else {
-                    unresolvedCount++;
-                    next.push({ tri: frag.tri, splitBy: frag.splitBy, lowConfidence: true });
-                }
-            }
+            for (const piece of cutFragment(frag, scratch, plane, st)) next.push(piece);
         }
         fragments = next;
         // An adversarial review of this round found the ORIGINAL cap check (only at the top of this loop,
@@ -393,12 +431,209 @@ export function accumulateFragments(trisA, triA, trisB, candidateTriBs, opts = {
         // applied before any cap.
         planeCount: appliedPlaneCount,
         duplicatePlanesCollapsed: candidateTriBs.length - planes.length,
-        degenerateFallbacks,
-        unresolvedCount,
+        degenerateFallbacks: st.degenerateFallbacks,
+        unresolvedCount: st.unresolvedCount,
         capped,
         gateSkipped,
         gateTested,
         groupsSkipped,
+        examined,
+    };
+}
+
+// ---- ROUND 8: THE PREDICATE, THE CUT, AND THE INDEX -----------------------------------------------------------
+
+// Bounding-box padding for the gate's precondition below: the same 1e-9 absolute tolerance triTriIntersect.mjs
+// and triClip.mjs use, so a pair touching within that tolerance is still offered to the exact test.
+const BOX_PAD = 1e-9;
+// The index is used only for triangles with more distinct planes than this: below it, building the grid costs
+// more than it saves (a review measured the indexed path +30% on accumulation, +11% end to end, on box-vs-box
+// fixtures with 1-4 planes per triangle; with this threshold at 16 the regression was gone and n=64 unchanged).
+const INDEX_MIN_PLANES = 16;
+function fragBox(tri) {
+    const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    for (const v of tri) for (let c = 0; c < 3; c++) { if (v[c] < b[c]) b[c] = v[c]; if (v[c] > b[3 + c]) b[3 + c] = v[c]; }
+    return b;
+}
+function boxesMeet(a, b) {
+    return a[0] <= b[3] + BOX_PAD && b[0] <= a[3] + BOX_PAD && a[1] <= b[4] + BOX_PAD && b[1] <= a[4] + BOX_PAD &&
+           a[2] <= b[5] + BOX_PAD && b[2] <= a[5] + BOX_PAD;
+}
+function memberBoxCache(trisB) {
+    const m = new Map();
+    return (triB) => { let b = m.get(triB); if (!b) { b = fragBox(readTri(trisB, triB)); m.set(triB, b); } return b; };
+}
+
+/**
+ * THE GATE'S PREDICATE, ONE DEFINITION FOR BOTH PATHS: does this fragment meet any of these B-triangles?
+ * Round 7 used triTriIntersect() alone. Round 8 adds a (padded) bounding-box precondition, because
+ * triTriIntersect() answers "degenerate" -- before its interval test -- for ANY pair where one triangle has a
+ * vertex within EPS of the other's plane, however far apart the two lie within that plane. A spatial index
+ * can only ever find pairs that are near each other, so without the precondition no index could reproduce
+ * the gate. It is SOUND on its own: two triangles whose bounding boxes are disjoint share no point, so the
+ * member cannot cross the fragment and skipping it keeps the no-straddle property. Measured before adoption:
+ * it changed round 7's fragments on 7 of 1,722 triangles over flush-contact box fixtures and changed no
+ * number in meshBoolean-selfcheck.mjs or meshBooleanBlast-selfcheck.mjs.
+ */
+function fragmentMeetsAny(fragTri, scratch, trisB, members, boxOf, fb = fragBox(fragTri)) {
+    for (const triB of members) {
+        if (!boxesMeet(fb, boxOf(triB))) continue;
+        if (triTriIntersect(scratch, 0, trisB, triB).status !== "none") return true;
+    }
+    return false;
+}
+
+/**
+ * Cut one fragment (already packed into `scratch`) by `plane`: returns [frag] when it is left whole, else its
+ * pieces in order (front pieces, then back). Counts degenerate fallbacks and unresolved cases into `st`.
+ * Shared by the plain loop and the indexed path, so the two cannot drift apart in what a cut does.
+ */
+function cutFragment(frag, scratch, plane, st) {
+    const res = clipTriangleByPlane(scratch, 0, plane.n, plane.d);
+    if (res.status === "allFront" || res.status === "allBack") return [frag];
+    if (res.status === "clipped") {
+        return [...res.front, ...res.back].map((t) => ({ tri: t, splitBy: [...frag.splitBy, plane.triBs[0]], lowConfidence: frag.lowConfidence }));
+    }
+    // Finding 2: resolve rather than blanket-flag-and-pass-through.
+    st.degenerateFallbacks++;
+    const r = resolveDegenerate(frag.tri, plane.n, plane.d);
+    if (r.status === "allFront" || r.status === "allBack") return [frag];
+    if (r.status === "clipped") {
+        return [...r.front, ...r.back].map((t) => ({ tri: t, splitBy: [...frag.splitBy, plane.triBs[0]], lowConfidence: frag.lowConfidence }));
+    }
+    st.unresolvedCount++;
+    return [{ tri: frag.tri, splitBy: frag.splitBy, lowConfidence: true }];
+}
+
+/**
+ * THE INDEXED PATH. Same planes, same order, same prefilter, same predicate, same cuts as the plain loop -- the
+ * only difference is WHICH fragments are asked. A uniform G x G grid over triA's bounding box, in the two axes
+ * that remain after dropping triA's dominant normal axis (so a fragment's footprint is never degenerate), with
+ * G = ceil(sqrt(distinct planes)) (measured best of 0.25x..4x that, at subdiv 48 and 64). Every live fragment
+ * is registered in each cell its padded box overlaps; a plane asks only fragments registered in cells a
+ * member's padded box overlaps, then applies the exact predicate. A fragment that meets a member shares a
+ * point with it, so its box and the member's overlap in those two axes and they share a cell: the index never
+ * misses a fragment the plain loop would cut. Order is kept by a doubly linked list -- a cut replaces the
+ * fragment in place by its pieces -- so the output is the plain loop's output, byte for byte, and
+ * gateSkipped keeps its meaning (live fragments this plane did not cut = live before - tested).
+ */
+function accumulateIndexed(trisA, triA, trisB, planes, candCount, maxFragments) {
+    const t0 = readTri(trisA, triA);
+    const e1 = sub(t0[1], t0[0]), e2 = sub(t0[2], t0[0]);
+    const an = [Math.abs(e1[1] * e2[2] - e1[2] * e2[1]), Math.abs(e1[2] * e2[0] - e1[0] * e2[2]), Math.abs(e1[0] * e2[1] - e1[1] * e2[0])];
+    const drop = an[0] >= an[1] && an[0] >= an[2] ? 0 : (an[1] >= an[2] ? 1 : 2);
+    const ax = drop === 0 ? 1 : 0, bx = drop === 2 ? 1 : 2;
+    const root = fragBox(t0);
+    const lo0 = root[ax] - BOX_PAD, lo1 = root[bx] - BOX_PAD;
+    const span0 = (root[3 + ax] - root[ax]) + 2 * BOX_PAD, span1 = (root[3 + bx] - root[bx]) + 2 * BOX_PAD;
+    // An adversarial review found an extent that overflows (|coordinates| near 1e308, or Infinity from a
+    // Float32Array) makes (x - lo) / span NaN, the root is registered in no cell, and triA comes back uncut
+    // where the plain loop cuts it. The grid cannot map such a triangle; the caller falls back to the plain loop.
+    if (!Number.isFinite(span0) || !Number.isFinite(span1) || !Number.isFinite(lo0) || !Number.isFinite(lo1)) return null;
+    const G = Math.max(1, Math.min(256, Math.ceil(Math.sqrt(planes.length))));
+    const cells = [];
+    for (let c = 0; c < G * G; c++) cells.push([]);
+    const cellOf = (x, lo, span) => {
+        const k = span > 0 ? Math.floor((x - lo) / span * G) : 0;
+        return k < 0 ? 0 : (k >= G ? G - 1 : k);
+    };
+    const F = [], box = [], alive = [], nxt = [], prv = [], stamp = [];
+    let head = -1, live = 0, qstamp = 0;
+    function insertAfter(frag, after) {
+        const id = F.length, b = fragBox(frag.tri);
+        F.push(frag); box.push(b); alive.push(true); stamp.push(0);
+        if (after < 0) { nxt.push(head); prv.push(-1); if (head >= 0) prv[head] = id; head = id; }
+        else { nxt.push(nxt[after]); prv.push(after); if (nxt[after] >= 0) prv[nxt[after]] = id; nxt[after] = id; }
+        live++;
+        const i0 = cellOf(b[ax] - BOX_PAD, lo0, span0), i1 = cellOf(b[3 + ax] + BOX_PAD, lo0, span0);
+        const j0 = cellOf(b[bx] - BOX_PAD, lo1, span1), j1 = cellOf(b[3 + bx] + BOX_PAD, lo1, span1);
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) cells[i * G + j].push(id);
+        return id;
+    }
+    function unlink(id) {
+        alive[id] = false; live--;
+        F[id] = null; box[id] = null;   // let a cut fragment go (a review measured ~2x the plain loop's heap without this)
+        if (prv[id] >= 0) nxt[prv[id]] = nxt[id]; else head = nxt[id];
+        if (nxt[id] >= 0) prv[nxt[id]] = prv[id];
+    }
+    insertAfter({ tri: t0, splitBy: [] }, -1);
+
+    let capped = false, appliedPlaneCount = 0, gateSkipped = 0, gateTested = 0, groupsSkipped = 0, examined = 0;
+    let listScans = 0;
+    const st = { degenerateFallbacks: 0, unresolvedCount: 0 };
+    const scratch = new Float64Array(9);
+    const boxOf = memberBoxCache(trisB);
+    for (const plane of planes) {
+        if (live >= maxFragments) { capped = true; break; }
+        appliedPlaneCount++;
+        const members = plane.triBs.filter((triB) => triTriIntersect(trisA, triA, trisB, triB).status !== "none");
+        if (members.length === 0) { gateSkipped += live; groupsSkipped++; continue; }
+        // Snapshot the candidates BEFORE cutting anything: pieces inserted by this plane must not be asked again.
+        qstamp++;
+        const cand = [];
+        // ADAPTIVE FALLBACK (adversarial review): when fragment boxes are large -- nested slivers whose boxes all
+        // contain every later member's box -- the cells under a plane's members hold nearly every live fragment,
+        // many times over, and the index did P^2 work where the plain loop did P (measured 6x slower, 2x heap).
+        // So price the query first by the cell entries it would read; if that is more than the live fragment
+        // count, just take every live fragment from the list. Either way the exact predicate decides, so the
+        // output cannot change; only the cost is bounded by the plain loop's.
+        let price = 0;
+        const ranges = [];
+        for (const triB of members) {
+            const mb = boxOf(triB);
+            const r = [cellOf(mb[ax] - BOX_PAD, lo0, span0), cellOf(mb[3 + ax] + BOX_PAD, lo0, span0),
+                       cellOf(mb[bx] - BOX_PAD, lo1, span1), cellOf(mb[3 + bx] + BOX_PAD, lo1, span1)];
+            ranges.push(r);
+            for (let i = r[0]; i <= r[1]; i++) for (let j = r[2]; j <= r[3]; j++) price += cells[i * G + j].length;
+        }
+        if (price > live) {
+            listScans++;
+            for (let id = head; id >= 0; id = nxt[id]) cand.push(id);
+        } else for (const [i0, i1, j0, j1] of ranges) {
+            for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+                const cell = cells[i * G + j];
+                let w = 0;
+                for (let r = 0; r < cell.length; r++) {
+                    const id = cell[r];
+                    if (!alive[id]) continue;          // lazy compaction: dead ids fall out as cells are read
+                    cell[w++] = id;
+                    if (stamp[id] !== qstamp) { stamp[id] = qstamp; cand.push(id); }
+                }
+                cell.length = w;
+            }
+        }
+        examined += cand.length;
+        const liveBefore = live;
+        let tested = 0;
+        for (const id of cand) {
+            const frag = F[id];
+            packScratch(scratch, frag.tri);
+            if (!fragmentMeetsAny(frag.tri, scratch, trisB, members, boxOf, box[id])) continue;
+            tested++;
+            const pieces = cutFragment(frag, scratch, plane, st);
+            if (pieces.length === 1 && pieces[0] === frag) continue;
+            let after = prv[id];
+            unlink(id);
+            for (const piece of pieces) after = insertAfter(piece, after);
+        }
+        gateTested += tested;
+        gateSkipped += liveBefore - tested;
+        if (live >= maxFragments) { capped = true; break; }
+    }
+    const fragments = [];
+    for (let id = head; id >= 0; id = nxt[id]) fragments.push(F[id]);
+    return {
+        fragments,
+        planeCount: appliedPlaneCount,
+        duplicatePlanesCollapsed: candCount - planes.length,
+        degenerateFallbacks: st.degenerateFallbacks,
+        unresolvedCount: st.unresolvedCount,
+        capped,
+        gateSkipped,
+        gateTested,
+        groupsSkipped,
+        examined,
+        listScans,
     };
 }
 

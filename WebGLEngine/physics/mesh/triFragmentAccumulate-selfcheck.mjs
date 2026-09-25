@@ -17,6 +17,32 @@
 // header, "Finding 2") across 8 independently-shuffled candidate orderings, so a future edit that reintroduces
 // the naive policy fails this gate rather than passing by luck on whichever order happens to be tested.
 //
+// ROUND 8 SABOTAGES (section 15, the spatial index), on the real file, `finally`-restored, md5 verified,
+// RE-MEASURED against the FINAL file after the adversarial review's fixes (reds as THIS gate / meshBoolean-selfcheck
+// / meshBooleanBlast-selfcheck; an earlier run against the pre-review file recorded different counts and is
+// replaced, not kept):
+//   I1  index queried with the FIRST member's box only -> 1 / 0 / 0. ON ITS FIRST RUN THIS GATE WAS BLIND (0 red):
+//       every battery group was one blob facet or a box face's two triangles, which share one bounding box. The
+//       twin/four separated-box fixtures in 15a were added for it.
+//   I2  per-query dedupe removed -> CRASH (exit 1, TypeError) here and in meshBooleanBlast, 0 named reds: a
+//       fragment asked twice is dead the second time, and dead fragments are now released (F[id] = null, a
+//       review fix), so the second ask throws instead of cutting again. Loud, not named; stated as such.
+//   I3  alive check removed -> the same crash, same reason.
+//   I4  Math.round for Math.floor in the cell map -> 0 / 0 / 0 AND THAT IS CORRECT: any MONOTONE map used for
+//       both registration and query keeps overlapping intervals in overlapping cell ranges -- a performance
+//       change. Replaced by I4c, a genuinely broken map (the query range one cell short on one axis) -> 1 / 0 / 8.
+//   I5  pieces inserted at the head, not in place -> 3 / 0 / 1 (only byte-for-byte checks can see order)
+//   I6  box precondition removed from the shared predicate -> 1 / 0 / 0 (15b; 15a stays green because both paths
+//       share the predicate, which is the design)
+//   I7  indexed gateSkipped counting tested fragments too -> 3 / 0 / 0
+//   I8  grid collapsed to one cell -> 1 / 0 / 1 (the work counts; output unchanged, as it must be)
+//   F1  the adaptive list fallback removed -> 1 / 0 / 0 (15e: examined exceeds the plain loop's on nested slivers)
+//   F2  the INDEX_MIN_PLANES threshold ignored -> 1 / 0 / 0 (15b's check that a 1-plane triangle takes the plain
+//       loop by default -- a performance rule, pinned by the counter that tells the paths apart)
+//   F3  the non-finite-extent guard removed -> 1 / 0 / 0 (15f)
+//   F4  BOX_PAD removed from BOTH registration and query -> 1 / 0 / 0 (15d). Found by the review: before 15d
+//       existed this went 0 red across all three gates while breaking byte-identity.
+//
 // ROUND 7 SABOTAGES (section 14), applied to the real file with a `finally` restore verified by md5sum, and
 // RE-MEASURED against the final file after the adversarial-review fixes -- counts are THIS gate's reds;
 // meshBooleanBlast-selfcheck.mjs's header has all three gates' counts for the same mutations:
@@ -107,6 +133,8 @@ import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { groupCandidatesByTriA, accumulateFragments, accumulateFragmentsFromBVH } from "./triFragmentAccumulate.mjs";
+import { triTriIntersect } from "./triTriIntersect.mjs";
+import * as CSG from "./meshCSG.mjs";   // round 8: fixture shapes only (boxPolys, jaggedBlob, toTriangleBuffer)
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -681,6 +709,148 @@ const candBp = groupCandidatesByTriA(pairsBp).get(TRI_A);
         without.groupsSkipped === 0 && straddlers(withMiss.fragments, missB) === 0,
         "with the missing group " + withMiss.fragments.length + " fragments (groupsSkipped=" + withMiss.groupsSkipped +
         "), without it " + without.fragments.length + " (groupsSkipped=" + without.groupsSkipped + ")");
+}
+
+// ---- 15. *** ROUND 8: THE SPATIAL INDEX. *** With the gate on, accumulateFragments() now asks only the fragments
+// a grid over triA's plane says are near each plane's members; opts.spatialIndex:false keeps the plain loop,
+// which asks every live fragment. Both apply ONE predicate (fragmentMeetsAny) and ONE cut (cutFragment), so the
+// index may change WHO is asked and nothing else. The oracle is therefore exact: the two paths' full results --
+// fragments, their order, splitBy, lowConfidence, and every counter except examined and listScans (which describe how the answer was found) -- must be
+// byte-identical, over a battery that includes the flush-contact box cases where round 7's gate and round 8's
+// differ, randomly rotated boxes (faces in every orientation, so every dropped-axis choice is exercised), and
+// real wall-minus-blob and blob-vs-blob workloads, uncapped and capped.
+{
+    // examined and listScans are the two counters that describe HOW the answer was found, and so legitimately
+    // differ between the paths; everything else must match.
+    const strip = (r) => { const o = { ...r }; delete o.examined; delete o.listScans; return JSON.stringify(o); };
+    const battery = [];
+    const wall = CSG.toTriangleBuffer(CSG.boxPolys([0, 0, 0], [4, 3, 0.3]));
+    for (const n of [8, 16]) battery.push(["wall-blob" + n, wall, CSG.toTriangleBuffer(CSG.jaggedBlob([0, 0, 0], 1.0, n, 12345))]);
+    battery.push(["blob-blob", CSG.toTriangleBuffer(CSG.jaggedBlob([0, 0, 0], 1.0, 10, 7)), CSG.toTriangleBuffer(CSG.jaggedBlob([0.5, 0.2, 0.1], 0.9, 10, 99))]);
+    const W = CSG.boxPolys([0, 0, 0], [2, 1.5, 0.3]);
+    for (const [c, h] of [[[0,0,0],[0.5,0.5,0.5]], [[2,0,0],[0.5,0.5,0.3]], [[0,0,0.55],[0.5,0.5,0.25]], [[2.5,1.5,0],[0.5,0.5,0.5]],
+                          [[0,0,0],[2,1.5,0.3]], [[0,0,0],[0.5,0.5,0.3]], [[1,0.3,0.2],[0.4,0.7,0.4]]]) {
+        battery.push(["flush-box " + JSON.stringify([c, h]), CSG.toTriangleBuffer(W), CSG.toTriangleBuffer(CSG.boxPolys(c, h))]);
+    }
+    // PLANE GROUPS WHOSE MEMBERS LIE FAR APART: separated boxes of equal height, so their tops, bottoms, fronts and
+    // backs are coplanar ACROSS boxes and dedup into one group per plane with members metres apart. Added after
+    // a sabotage querying the index with the group's FIRST member box only went 0 red here: every other fixture's
+    // groups were single blob facets or a box face's two triangles, which share one bounding box.
+    const concat = (...bufs) => { const out = new Float64Array(bufs.reduce((n, b) => n + b.length, 0)); let o = 0; for (const b of bufs) { out.set(b, o); o += b.length; } return out; };
+    const twin = concat(CSG.toTriangleBuffer(CSG.boxPolys([-2.5, 0, 0], [0.4, 0.4, 0.6])), CSG.toTriangleBuffer(CSG.boxPolys([2.5, 0.3, 0], [0.4, 0.4, 0.6])));
+    const quad4 = concat(...[[-3, -2], [3, -2], [-3, 2], [3, 2]].map(([x, y]) => CSG.toTriangleBuffer(CSG.boxPolys([x, y, 0.2], [0.3, 0.3, 0.5]))));
+    battery.push(["twin separated boxes", wall, twin], ["four separated boxes", wall, quad4]);
+    const rnd = lcg(8);
+    for (let i = 0; i < 20; i++) {
+        const c = [rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1], h = [0.2 + rnd(), 0.2 + rnd(), 0.2 + rnd()];
+        const ang = rnd() * Math.PI, ca = Math.cos(ang), sa = Math.sin(ang), tilt = rnd() * 0.8, ct = Math.cos(tilt), stl = Math.sin(tilt);
+        const B = CSG.boxPolys(c, h).map((p) => {
+            const vs = p.vs.map((v) => { const x = ca * v[0] - sa * v[1], y = sa * v[0] + ca * v[1]; return [x, ct * y - stl * v[2], stl * y + ct * v[2]]; });
+            return { vs, pl: CSG.planeOf(vs) };
+        });
+        battery.push(["rotated-box" + i, CSG.toTriangleBuffer(CSG.boxPolys([0, 0, 0], [1, 1, 1])), CSG.toTriangleBuffer(B)]);
+    }
+    let tris = 0, diffs = 0, cappedDiffs = 0, firstDiff = "";
+    let offers24 = 0, cands24 = 0;
+    for (const [name, X0, Y0] of battery) for (const [X, Y] of [[X0, Y0], [Y0, X0]]) {
+        for (const [tr, c] of groupCandidatesByTriA(pairOverlap(new MeshBVH(X), new MeshBVH(Y)))) {
+            tris++;
+            // indexMinPlanes:0 forces the index even on 1-plane triangles (the default leaves those to the plain
+            // loop), so every triangle of the battery exercises it; the default call is compared too.
+            const plain = accumulateFragments(X, tr, Y, c, { gateByIntersection: true, spatialIndex: false, maxFragments: 65536 });
+            const idx = accumulateFragments(X, tr, Y, c, { gateByIntersection: true, maxFragments: 65536, indexMinPlanes: 0 });
+            const dflt = accumulateFragments(X, tr, Y, c, { gateByIntersection: true, maxFragments: 65536 });
+            if (strip(plain) !== strip(idx) || strip(plain) !== strip(dflt)) { diffs++; if (!firstDiff) firstDiff = name + " tri " + tr; }
+            for (const mf of [3, 7, 20]) {
+                if (strip(accumulateFragments(X, tr, Y, c, { gateByIntersection: true, spatialIndex: false, maxFragments: mf })) !==
+                    strip(accumulateFragments(X, tr, Y, c, { gateByIntersection: true, maxFragments: mf, indexMinPlanes: 0 }))) { cappedDiffs++; if (!firstDiff) firstDiff = name + " tri " + tr + " cap " + mf; }
+            }
+        }
+    }
+    ok("15a. indexed (forced on every triangle, and the default) == plain loop, BYTE FOR BYTE (fragments, order, splitBy, lowConfidence, every result counter), uncapped and at caps 3/7/20",
+        diffs === 0 && cappedDiffs === 0 && tris > 1000,
+        tris + " triangles over " + battery.length + " fixture pairs (both directions): " + diffs + " uncapped and " +
+        cappedDiffs + " capped differences" + (firstDiff ? " -- first: " + firstDiff : ""));
+
+    // 15b. THE PREDICATE'S NEW PRECONDITION, ON THE CASE THAT FORCED IT. T5-like: a vertical B-triangle in plane
+    // y=0.5 with one vertex exactly on triA's plane z=0 -- but at x=5..6, nowhere near triA (x,y in [0,1]).
+    // triTriIntersect() answers "degenerate" before its interval test ever runs, so round 7's gate cut triA along
+    // y=0.5 edge to edge for a triangle it never touches. Disjoint boxes share no point; round 8 declines it.
+    const nearA = mkBuf([[[0,0,0],[1,0,0],[0,1,0]]]);
+    const farT = mkBuf([[[5,0.5,0],[6,0.5,1],[6,0.5,-1]]]);
+    const status = triTriIntersect(nearA, 0, farT, 0).status;
+    const pb = accumulateFragments(nearA, 0, farT, [0], { gateByIntersection: true });
+    const pbPlain = accumulateFragments(nearA, 0, farT, [0], { gateByIntersection: true, spatialIndex: false });
+    const pbUngated = accumulateFragments(nearA, 0, farT, [0]);
+    ok("15b. a laterally-far B-triangle triTriIntersect calls 'degenerate' is declined by the box precondition (both paths)",
+        status === "degenerate" && pb.fragments.length === 1 && pb.gateTested === 0 && pb.gateSkipped === 1 &&
+        strip(pb) === strip(pbPlain) && pbUngated.fragments.length > 1 &&
+        !("listScans" in pb) && ("listScans" in accumulateFragments(nearA, 0, farT, [0], { gateByIntersection: true, indexMinPlanes: 0 })),
+        "triTriIntersect says '" + status + "'; (a 1-plane triangle, so the default leaves it to the plain loop -- only the " +
+        "indexed path reports listScans -- and indexMinPlanes:0 forces the index); gated fragments=" + pb.fragments.length + " (tested " + pb.gateTested +
+        ", skipped " + pb.gateSkipped + "); the ungated path, which cuts by every plane, makes " + pbUngated.fragments.length);
+
+    // 15c. THE POINT OF THE INDEX, AS A COUNT, NOT A TIME. On wall-minus-blob subdiv 24 (one blast), sum over the
+    // wall's triangles: how many (fragment, plane) offers the plain loop makes (gateSkipped + gateTested, which
+    // counts every live fragment for every plane) against how many fragments the index actually hands over.
+    function workAt(n) {
+        const blob = CSG.toTriangleBuffer(CSG.jaggedBlob([0, 0, 0], 1.0, n, 12345));
+        let plainEx = 0, idxEx = 0;
+        for (const [tr, c] of groupCandidatesByTriA(pairOverlap(new MeshBVH(wall), new MeshBVH(blob)))) {
+            plainEx += accumulateFragments(wall, tr, blob, c, { gateByIntersection: true, spatialIndex: false, maxFragments: 65536 }).examined;
+            idxEx += accumulateFragments(wall, tr, blob, c, { gateByIntersection: true, maxFragments: 65536 }).examined;
+        }
+        return { plainEx, idxEx, ratio: plainEx / idxEx };
+    }
+    const w12 = workAt(12), w24 = workAt(24);
+    // CORRECTED AFTER AN ADVERSARIAL REVIEW: the first version compared the index's candidates with the plain
+    // loop's gateSkipped+gateTested, which also counts every live fragment of every plane group the prefilter
+    // drops WHOLESALE -- work the plain loop never does -- and so overstated the index's advantage about 2x
+    // (6.0x claimed at subdiv 24; 2.97x real). `examined` counts the same thing on both paths: fragments whose
+    // predicate was actually evaluated. Thresholds from that measurement: >2x at 24, and growing from 12 to 24.
+    ok("15c. the index examines a fraction of the fragments the plain loop examines, and the fraction shrinks as the blob grows",
+        w24.idxEx > 0 && w24.ratio > 2 && w24.ratio > w12.ratio,
+        "subdiv 12: index " + w12.idxEx + " vs plain " + w12.plainEx + " (" + w12.ratio.toFixed(2) + "x); subdiv 24: " +
+        w24.idxEx + " vs " + w24.plainEx + " (" + w24.ratio.toFixed(2) + "x)");
+
+    // 15d. THE PADDING IS LOAD-BEARING. triA is the unit right triangle at z=0; M1 cuts it along x = 0.5 - 3e-10;
+    // M2 (plane y=0.3) begins at x = M1 + gap, a gap under BOX_PAD, so a piece of triA's left half and M2's box
+    // are within the padding of each other, straddling a cell line of the grid. Found by the review: removing the
+    // padding from BOTH registration and query (either alone is harmless) broke byte-identity here while all
+    // three gates stayed green.
+    let padDiffs = 0, padTried = 0;
+    for (const cut of [0.5 - 3e-10, 0.5 - 1e-10, 0.5 - 4e-10]) for (const gap of [1e-10, 3e-10, 6e-10, 9e-10]) {
+        const x2 = cut + gap, A1 = mkBuf([[[0,0,0],[1,0,0],[0,1,0]]]);
+        const B = mkBuf([[[cut,-1,-1],[cut,2,-1],[cut,0.5,1]], [[x2,0.3,-1],[x2,0.3,1],[0.9,0.3,0]]]);
+        padTried++;
+        if (strip(accumulateFragments(A1, 0, B, [0, 1], { gateByIntersection: true, spatialIndex: false })) !==
+            strip(accumulateFragments(A1, 0, B, [0, 1], { gateByIntersection: true, indexMinPlanes: 0 }))) padDiffs++;
+    }
+    ok("15d. members within BOX_PAD of a fragment across a cell line: indexed == plain on every case",
+        padDiffs === 0 && padTried === 12, padDiffs + " differences of " + padTried);
+
+    // 15e. THE ADAPTIVE FALLBACK. Found by the review: P vertical members in parallel diagonal planes x+y=c, taken
+    // in descending c, cut triA into nested strips whose every box contains every later member's box -- the
+    // index then handed over ALL live fragments per plane through many cells (P^2 work; measured 6x slower than
+    // the plain loop, 2x its heap). A plane now prices its query in cell entries first and walks the plain list
+    // when that is dearer. Same output; examined no more than the plain loop's.
+    const P = 120, diag = [];
+    for (let k = 0; k < P; k++) { const cc = 1 - (k + 0.5) / P; diag.push([[cc + 0.01, -0.01, -0.5], [-0.01, cc + 0.01, -0.5], [cc / 2, cc / 2, 0.5]]); }
+    const dA = mkBuf([[[0,0,0],[1,0,0],[0,1,0]]]), dB = mkBuf(diag), dc = diag.map((_, k) => k);
+    const dPlain = accumulateFragments(dA, 0, dB, dc, { gateByIntersection: true, spatialIndex: false, maxFragments: 65536 });
+    const dIdx = accumulateFragments(dA, 0, dB, dc, { gateByIntersection: true, maxFragments: 65536 });
+    ok("15e. nested diagonal slivers: the index falls back to the list, examines no more than the plain loop, same output",
+        strip(dPlain) === strip(dIdx) && dIdx.listScans > P / 2 && dIdx.examined <= dPlain.examined,
+        "listScans " + dIdx.listScans + " of " + P + " planes; examined " + dIdx.examined + " vs plain " + dPlain.examined +
+        "; fragments " + dIdx.fragments.length);
+
+    // 15f. A NON-FINITE EXTENT. triA spanning +/-1e308 overflows the grid's span to Infinity; found by the review
+    // to leave triA uncut on the indexed path. The index now declines such a triangle and the plain loop answers.
+    const hugeA = mkBuf([[[-1e308,0,0],[1e308,0,0],[0,1,0]]]), hugeB = mkBuf([[[0,-1,-1],[0,2,-1],[0,0.5,1]]]);
+    ok("15f. a triangle whose extent overflows is handed to the plain loop, not silently left uncut",
+        strip(accumulateFragments(hugeA, 0, hugeB, [0], { gateByIntersection: true, indexMinPlanes: 0 })) ===
+        strip(accumulateFragments(hugeA, 0, hugeB, [0], { gateByIntersection: true, spatialIndex: false })),
+        "indexed and plain agree");
 }
 
 console.log(`triFragmentAccumulate-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

@@ -55,6 +55,10 @@
 //   R4  accOpts merge back to a plain spread                               -> 0 / 1 / 0 (section 14's merge check)
 //   R5  fragment gate treats "coplanar" as not meeting                     -> 1 / 1 / 0 (14g; meshBoolean's red is
 //       incidental -- its ambiguous-drop demo loses its ambiguous fragments)
+// ROUND 8 (section 7, the spatial index end to end): all index sabotages and their reds in the three gates are
+// logged in triFragmentAccumulate-selfcheck.mjs's header (final, post-review file). Here: I4c (query range one
+// cell short) 8, I5 (order broken) 1 -- section 7's buffer comparison -- I8 (one cell) 1, section 7's work count;
+// I2 and I3 crash this gate (exit 1) rather than name a red.
 // A PROCESS MISTAKE, DISCLOSED: the first runner had no `finally`; S1 timed out on this gate and the crash left
 // triFragmentAccumulate.mjs sabotaged on disk. Caught by an md5 check before anything else ran; restored.
 "use strict";
@@ -304,13 +308,43 @@ console.log("\n6. *** MILLIMETRE SCALE: THE REGIME meshCSG's OWN HEADER CALLS RE
          "~1e-4 scale -- up to 34% of volume at 1e-6..7e-5, on the gated and ungated paths alike");
 }
 
+// =============================================================================================================
+console.log("\n7. *** ROUND 8: THE SPATIAL INDEX CHANGES WHO IS ASKED, NOT WHAT IS CUT -- END TO END ***");
+{
+    // triFragmentAccumulate-selfcheck.mjs section 15 holds the index to the plain loop per triangle. This holds it
+    // through meshBoolean() on a blast four times the one above (subdiv 16, 960 blob triangles): the whole output
+    // buffer, compared float by float, and the index's work against the plain loop's scan.
+    const A = M.toTriangleBuffer(WALL()), B = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 16, 12345));
+    const bA = new MeshBVH(A), bB = new MeshBVH(B);
+    let t = now(); const ix = meshBoolean(A, bA, B, bB, "subtract"); const ixMs = now() - t;
+    t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { accOpts: { spatialIndex: false } }); const plMs = now() - t;
+    let same = ix.tris.length === pl.tris.length;
+    for (let i = 0; same && i < ix.tris.length; i++) if (ix.tris[i] !== pl.tris[i]) same = false;
+    ok("!! indexed and plain-loop meshBoolean produce the SAME output buffer, float for float (subdiv-16 blast)",
+        same && ix.triCount > 1000 && JSON.stringify(ix.ambiguousTriIndices) === JSON.stringify(pl.ambiguousTriIndices),
+        ix.triCount + " triangles each; buffers " + (same ? "identical" : "DIFFER"));
+    // CORRECTED AFTER AN ADVERSARIAL REVIEW: the first version compared index candidates with gateSkipped +
+    // gateTested, which counts plane groups the prefilter drops wholesale as work the plain loop never does
+    // (79,250 "offers" of which 37,608 were real). `examined` counts the same thing on both paths.
+    // Threshold from measurement: 19,083 vs 37,608 (1.97x) at this size, with triangles of 16 planes or fewer left
+    // to the plain loop by INDEX_MIN_PLANES. The first draft of this line asserted 2x and went red at 1.97x.
+    ok("   ...and the index examined well under the plain loop's fragment count (>1.5x fewer)",
+        ix.stats.a.examined * 1.5 < pl.stats.a.examined,
+        "index examined " + ix.stats.a.examined + " vs plain loop " + pl.stats.a.examined);
+    info("timings (printed, not asserted): indexed " + ixMs.toFixed(0) + " ms, plain loop " + plMs.toFixed(0) + " ms. " +
+         "Round 8, same machine, paired, one blast, wall minus jaggedBlob subdiv n (round 7 / box precondition only / " +
+         "+ index): n=48 3.29 / 2.53 / 2.35 s, n=64 10.7 / 7.85 / 7.08 s -- the precondition is most of it. See " +
+         "triFragmentAccumulate.mjs's ROUND 8 paragraph for why neither is the whole scaling fix");
+}
+
 console.log(`\nmeshBooleanBlast-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: ONE workload family (a box wall, 224-triangle jagged blobs, subtract " +
     "only) -- the round-7 integration review ran union/intersect on wall-vs-blob and blob-vs-blob by hand (12 of 12 " +
     "within 7.7e-11 of their own 1000x runs) but no gate does; THIS WORKLOAD FLATTERS meshBoolean ON SPEED: the same " +
-    "review measured it 7x slower than the BSP at a 16,128-triangle blob and 7.1 minutes, capped, at 65,024 (no " +
-    "per-triangle fragment index -- see triFragmentAccumulate.mjs), so 'faster than the BSP' holds for inputs this " +
-    "size, not in general; the watertight win in section 5 is over meshCSG's current EPS and at 1x only; meshBoolean's " +
+    "review measured it 7x slower than the BSP at a 16,128-triangle blob and 7.1 minutes, capped, at 65,024; round 8 " +
+    "(box precondition + spatial index) took subdiv 64 from 10.7 s to 7.1 s against the BSP's 1.7 s, but fragment count " +
+    "and per-fragment classification still scale badly and n=128 still caps (see triFragmentAccumulate.mjs), so " +
+    "'faster than the BSP' holds for inputs this size, not in general; the watertight win in section 5 is over meshCSG's current EPS and at 1x only; meshBoolean's " +
     "raw output is NOT watertight without meshCSG's settle() and this round adds no weld of its own; each shot rebuilds " +
     "both BVHs from scratch; below ~1e-4 scale meshBoolean is wrong too (its own absolute tolerances); the touching-" +
     "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand gaps meshBoolean.mjs's header " +
