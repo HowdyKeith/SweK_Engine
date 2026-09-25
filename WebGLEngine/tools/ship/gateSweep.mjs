@@ -8032,6 +8032,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4716 -- THE 323rd CLOSING: pre-registration -- H11's negation on cells it has not seen, and the same with the clock out.
+    since398: Object.freeze({
+        at: "v4716", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameReverse-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** H11 FOUND A PATTERN THAT KEPT ITS SIGN ACROSS GEOMETRY, IN THE WRONG DIRECTION, AND v4703's RULE SAYS WHAT " +
+                 "THAT BUYS: A NEW DOCUMENT AND DATA NOBODY HAS SEEN. *** render/frame-reverse-preregistration.md declares, with NO " +
+                 "DATA IN THE COMMIT, two hypotheses on two cells nobody has harvested -- x2 forward at upscale 3x and x2 vertical, " +
+                 "a speed H11 did not use, one cell per geometry. H12 is the negation, transferred: within scenes, more gain means " +
+                 "generation does WORSE. H13 is the same after the frame's position in the window is partialled out, because " +
+                 "v4705 named a window in which the slab leaves the view and a frame's motion and advantage move together with " +
+                 "time; a gate reading the gain could be reading the frame number. *** THE DIRECTION IS NOT CHOSEN. *** `direction` " +
+                 "is a declared key the statistic multiplies by, and the gate requires it to equal the sign H11 recorded -- the " +
+                 "same in both of H11's cells, read from its committed result. The numbers the document quotes from H11 are " +
+                 "computed, and so is the scene it names as the likely price: zone, H11's shared exception, which if it reverses " +
+                 "again caps each cell at 6 of 7. The document says so rather than dropping zone after seeing it. *** THE CLOCK IS " +
+                 "A ROW. *** A made-up world where gain and advantage merely follow the frame number clears H12 and FAILS H13, and " +
+                 "one where the gain orders the advantage independently of time clears both -- if the partial could not tell them " +
+                 "apart it would be decoration. A variable the clock ranks perfectly has no partial and is excluded rather than " +
+                 "scored. *** TWELVE SABOTAGES, TWELVE RED ON THE FIRST RUN, *** among them the partial replaced by the raw rho, " +
+                 "the partial conditioned on the gain instead of the clock, and a test that ignores `direction`. The gate drives " +
+                 "no page and runs in about a second; C24 and C12 are the measurement round's, on the harvest path v4715 proved.",
+    }),
     // v4715 -- THE 322nd CLOSING: H11 not supported -- and it failed by the route the document named, on both geometries.
     since397: Object.freeze({
         at: "v4715", swept: 1, green: 1, red: 0,
