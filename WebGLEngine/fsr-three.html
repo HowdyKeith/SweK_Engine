@@ -78,7 +78,9 @@
       <option value="30">30x</option>
       <option value="60">60x</option>
     </select></label>
-    <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector (fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
+    <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector, or twice as well where the vector says the surface stood still (fx/fsr/fsrFrameGenFlow-selfcheck.mjs and fx/fsr/fsrFrameGenScene-selfcheck.mjs measure what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
+    <label title="The generated-frame views: a HUD over the scene -- a crosshair and a bar across the knot, and panels at the edges. Its pixels stand still, and every motion vector under them is the scene's behind."><input id="genhud" type="checkbox"> gen: HUD</label>
+    <label title="With the HUD: generate from HUD-less frames and lay the newer frame's HUD over the generated one, as FSR3 composes UI (fx/fsr/fsrFrameGenScene-selfcheck.mjs: the HUD exact, +4.9 dB on the whole frame under a pan). Off, the HUD is drawn into the frames and generated with the scene, and it is dragged with the knot. The FSR3 views always composite it: FSR2 renders the scene alone."><input id="genui" type="checkbox" checked> gen: composite the HUD</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
 </div>
@@ -168,6 +170,24 @@ try {
     // v4738: both views are fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen -- the driver fx/fsr/fsrFrameGen-selfcheck.mjs grades --
     // with its default fill (the blend, which that gate measured paying on this knot) or none.
     const gens = {};
+    // v4745 -- A HUD, and FSR3'S UI COMPOSITION: drawn into the frames it is generated with the scene -- every vector under it is
+    // the knot's or the floor's -- and composited (makeFrameGen's `ui`) it is the HUD the newer frame drew, exactly. It stands
+    // still, so it is drawn once into a transparent target, premultiplied as the generator asks
+    const hud = new THREE.Scene();
+    { const hm = new THREE.MeshBasicNodeMaterial(); hm.colorNode = TSL.vec3(0.95, 0.9, 0.2);
+      for (const [x, y, w, h] of [[0, 0, 0.6, 0.012], [0, 0, 0.007, 0.1], [-0.72, 0.86, 0.4, 0.05], [0.7, 0.86, 0.3, 0.08], [0, -0.86, 0.9, 0.03]]) {
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), hm); m.position.set(x, y, 0); hud.add(m); } }
+    let uiTarget = null;
+    const hudUi = async () => {
+        if (!uiTarget) {
+            uiTarget = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+            const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+            renderer.setRenderTarget(uiTarget); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
+            renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; renderer.setClearColor(cc, ca);
+        }
+        return uiTarget.texture;
+    };
+    const hudInto = async (target) => { renderer.setRenderTarget(target); renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; };
     // v4741: and with the optical flow reconciled in, per pixel (render/flowReconcileTsl.mjs), when "gen: + optical flow" is on
     // v4744: and on the arc, when "gen: motion on the arc" is on -- a toward stage (render/temporalTsl.mjs) renders each pixel's
     // displacement to its pose half-way between the two frames, and the generator splats with that
@@ -182,11 +202,13 @@ try {
             gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, { w: DW, h: DH, ...(filled ? {} : { fill: null }), ...(withFlow ? { flow: {} } : {}), ...(withArc ? { arc: true } : {}) }) };
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
+        const withHud = $("genhud").checked, composite = withHud && $("genui").checked;
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
+        if (withHud && !composite) await hudInto(cur);
         await motionStage.render(renderer, scene, camera);
         if (withArc) await towardStage.render(renderer, scene, camera, 0.5);
         await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture,
-                                         toward: withArc ? towardStage.motion.texture : null }, null);
+                                         toward: withArc ? towardStage.motion.texture : null, ui: composite ? await hudUi() : null }, null);
         g.k++;
     };
 
@@ -233,7 +255,7 @@ try {
             built3 = key;
         }
         await fsr3.render(scene, camera, false);
-        await fsr3.generate(null);
+        await fsr3.generate(null, $("genhud").checked ? { ui: await hudUi() } : {});
     };
 
     // v4743 -- FSR3 PACED: a real FSR2 frame every N refreshes -- the scene rendered at 1 / N of the display's rate -- and
@@ -259,8 +281,9 @@ try {
         const s = P.pacer.at(T), f = P.f3.frames;
         // the pacer asks only for what the generator holds -- the pair of the last two real frames -- and a hold draws nothing:
         // the canvas keeps what it last showed
-        if (s.kind === "gen" && s.k === f - 1) await P.f3.generate(null, { t: s.t });
-        else if (s.kind === "real" && (s.k === f - 1 || s.k === f - 2)) await P.f3.show(s.k, null);
+        const ui = $("genhud").checked ? await hudUi() : null;
+        if (s.kind === "gen" && s.k === f - 1) await P.f3.generate(null, { t: s.t, ui });
+        else if (s.kind === "real" && (s.k === f - 1 || s.k === f - 2)) { if (ui) await P.f3.frameGen.composite(renderer, P.f3.targets.frames[s.k % 2].texture, ui, null); else await P.f3.show(s.k, null); }
         P.counts[s.kind === "gen" || s.kind === "real" ? s.kind : "hold"]++;
         P.v++;
     };
@@ -366,6 +389,7 @@ try {
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
             + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genflow").checked ? " + optical flow" : "")
             + ((mode === "gen" || mode === "genholes") ? `${$("genarc").checked && !$("genflow").checked ? " + arc" : ""}, spin ${$("speed").value}x` : "")
+            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genhud").checked ? ($("genui").checked || mode === "fsr3gen" || mode === "fsr3paced" ? " + HUD composited" : " + HUD in the frames") : "")
             + (mode === "fsr3paced" && paced ? ` | real every ${paced.N}, ${paced.pacer.policy}: ${paced.counts.gen} generated, ${paced.counts.real} real, ${paced.counts.hold} held` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);

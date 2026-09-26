@@ -556,8 +556,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4742 -- 1823 -> 1824 for fx/fsr/fsr3Tsl-selfcheck.mjs -- FSR3's frame generation on FSR2's upscaled frames, against a frame rendered at the midpoint.
     // v4743 -- 1824 -> 1826 for render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs -- when each frame is shown: FSR3's half-way frame against timed generation, in ms and in dB.
     // v4744 -- 1826 -> 1827 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- motion on the arc for frame generation, and the chord-vs-arc error measured before it was built.
-    gates: 1827, usesOk: 1806, definesOk: 1798, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1699, condFirst: 91, unknownSignature: 16,
+    // v4745 -- 1827 -> 1828 for fx/fsr/fsrFrameGenScene-selfcheck.mjs -- shadows, a reflection and a HUD drawn by three.js, between two frames: the still-surface margin and FSR3's UI composition.
+    gates: 1828, usesOk: 1807, definesOk: 1799, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1700, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -62,18 +62,21 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
         /**
          * The frame between the last two real frames, at `output` -- at `t` if given (v4743: a pacer's), the generator's own
          * otherwise. With one real frame so far it is that frame. A second call before the next real frame is a second frame
-         * between the same two, and the generator is told so.
+         * between the same two, and the generator is told so. `ui` (v4745) is the newer frame's UI, premultiplied, at display
+         * size, composited over whatever is shown -- FSR2 renders the scene alone, so the frames are HUD-less as the generator
+         * then needs.
          */
-        async generate(output = null, { t = null } = {}) {
+        async generate(output = null, { t = null, ui = null } = {}) {
             if (frames === 0) throw new Error("fx/fsr/fsr3Tsl: generate needs a real frame first -- call render");
             const cur = frames2[(frames - 1) % 2], prev = frames >= 2 ? frames2[frames % 2] : cur;
             const { motion, depth } = fieldOf();
             lastInputs = { prev: prev.texture, cur: cur.texture, motion, depth };
-            await gen.generate(renderer, lastInputs, output, { t, again: lastPair === frames });
+            await gen.generate(renderer, ui ? { ...lastInputs, ui } : lastInputs, output, { t, again: lastPair === frames });
             lastPair = frames;
             // one real frame in there is nothing to be between: the call above only primed the generator's older depth, and
             // what is shown is the frame itself
-            if (frames === 1) { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[0], ortho); renderer.setRenderTarget(keep); }
+            if (frames === 1) { if (ui) await gen.composite(renderer, frames2[0].texture, ui, output);
+                else { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[0], ortho); renderer.setRenderTarget(keep); } }
         },
         /** Show real frame k again at `output` -- the newest or the one before it, the two this holds. */
         async show(k, output = null) {

@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
 import * as F3 from "./fsr3Tsl.mjs";
+import { compositeUiCPU } from "../../render/frameInterp.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -106,7 +107,16 @@ else {
                         setT(0); await f1.render(scene, cam, false); await f1.generate(o2);
                         const g1 = await read(o2, D), r1 = await read(f1.targets.frames[0], D);
                         let md = 0; for (let i = 0; i < D * D * 4; i++) if (i % 4 !== 3) md = Math.max(md, Math.abs(g1[i] - r1[i]));
-                        o.early = early; o.oneFrameDiff = md; f1.dispose();
+                        o.early = early; o.oneFrameDiff = md;
+                        // v4745: the UI, premultiplied -- opaque over the left half of a band, half-transparent over the right --
+                        // over the one frame, and over a frame generated between two
+                        const ua = new Float32Array(D * D * 4);
+                        for (let y = 0; y < 16; y++) for (let x = 0; x < D; x++) { const i = y * D + x, al = x < D / 2 ? 1 : 0.5; ua[i * 4] = 0.95 * al; ua[i * 4 + 1] = 0.9 * al; ua[i * 4 + 2] = 0.2 * al; ua[i * 4 + 3] = al; }
+                        const ui = new THREE.DataTexture(ua, D, D, THREE.RGBAFormat, THREE.FloatType); ui.needsUpdate = true;
+                        await f1.generate(o2, { ui }); const u1 = { frame: Array.from(r1), out: Array.from(await read(o2, D)) };
+                        setT(1); await f1.render(scene, cam, false); await f1.generate(o2, { ui });
+                        const u2 = { frame: Array.from(await read(f1.frameGen.targets.pre, D)), out: Array.from(await read(o2, D)) };
+                        o.ui = { ui: Array.from(ua), one: u1, two: u2 }; ui.dispose(); f1.dispose();
                         }
                     }
                     f3.dispose();
@@ -158,6 +168,12 @@ else {
            o.sceneRenders === 0 && o.calls > 0 && o.fieldIsStage === true, "the motion stage FSR2 runs at display resolution is the generator's input; nothing is rendered twice");
         ok(`  [${mode}] ...and before two real frames it is honest: generate() before any refuses, and after one it is that frame, exactly (worst |difference| ${o.oneFrameDiff})`,
            /needs a real frame first/.test(o.early || "") && o.oneFrameDiff === 0, o.early);
+        // v4745: the UI over what is shown, one real frame in and between two
+        const U = o.ui, uiA = Float32Array.from(U.ui), dev = (x) => { const c = compositeUiCPU({ frame: Float32Array.from(x.frame), ui: uiA, w: DW, h: DW });
+            let e = 0, moved = 0; for (let i = 0; i < DW * DW * 4; i++) { e = Math.max(e, Math.abs(c[i] - x.out[i])); if (uiA[i - (i % 4) + 3] > 0 && x.out[i] !== x.frame[i]) moved++; } return { e, moved }; };
+        const u1 = dev(U.one), u2 = dev(U.two);
+        ok(`  [${mode}] ...and v4745's \`ui\` is composited over whatever generate() shows -- the one real frame (to ${u1.e.toExponential(1)}) and a frame generated between two (to ${u2.e.toExponential(1)}) -- as render/frameInterp.mjs's compositeUiCPU has it`,
+           u1.e < 1e-6 && u2.e < 1e-6 && u1.moved > 0 && u2.moved > 0, "FSR2 renders the scene alone, so its frames are the HUD-less ones the generator needs; the UI is laid over after");
     }
 }
 
@@ -176,7 +192,11 @@ else {
 // real one by 3 dB, the blend acting as an anti-alias the upscaled frames had already had. The row reports that now.
 // WEBGPU ONLY: the first run read both backends within 0.16 dB of each other and took 25 s; every pass is held to its
 // mirror on both backends by its own gate.
+// ---- v4745 SABOTAGE LOG ----------------------------------------------------------------------------------------
+//   F8 the UI not handed to the generator                           -> 1, the harness: the composite's target was never made
+//   F9 one frame in, the frame shown without the UI                 -> 1
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: PACING, which render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs grade (v4743); content the vectors do not see, which makeFrameGen's `flow` handles and " +
-    "fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures on native frames; and the generated frame's own temporal stability.");
+    "fx/fsr/fsrFrameGenFlow-selfcheck.mjs and fx/fsr/fsrFrameGenScene-selfcheck.mjs measure on native frames; and the generated frame's own temporal stability.");
 process.exitCode = fails ? 1 : 0;

@@ -294,26 +294,34 @@ console.log("\n9. v4741 -- PER PIXEL, FOR A GENERATOR THAT SPLATS ONE VECTOR A P
         if (sh.rc.source[b] !== SRC_APP && F[i * 4] === sh.rc.flow[b * 2] && F[i * 4 + 3] === 1) blockV++; }
     ok("reconciledPixelFieldCPU carries a flow block's vector to every pixel of it, valid, on the sliding texture",
        blockV === W * H && sh.rc.counts.flowBeat === sh.n, `${blockV} of ${W * H} pixels; render/flowReconcileTsl-selfcheck.mjs holds the application's side, pixel by pixel`);
-    // reconcilePixelsCPU at its default margin, 0.9: the camera scene is the application's everywhere, the slide the flow's
-    // away from the edge the new content enters at
+    // reconcilePixelsCPU at its default margins: the camera scene is the application's everywhere, the slide the flow's
+    // away from the edge the new content enters at. v4745: the slide's vectors are exactly zero -- the wall did not move on
+    // screen -- so it is judged at `marginStill`, 0.5, and 0.9 is asked for by name
     const args = (sc) => ({ cur: sc.cur.rgba, prev: sc.prev.rgba, w: W, h: H, flow: sc.of.flow, bw: sc.of.bw, bh: sc.of.bh, block: BLOCK, motion: sc.mv.data, depth: sc.cur.depth });
     const pg = reconcilePixelsCPU(args(g)), ps = reconcilePixelsCPU(args(sh));
-    let lead = 0, leadN = 0, inner = 0, innerN = 0;
+    const innerOf = (r) => { let n = 0; for (let y = 8; y < H - 8; y++) for (let x = 8; x < W - 8; x++) if (r.source[y * W + x] === SRC_FLOW_BEAT) n++; return n; };
+    let lead = 0, leadN = 0, innerN = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x;
-        if (x < 4) { leadN++; if (ps.source[i] === SRC_APP) lead++; } else if (x >= 8 && x < W - 8 && y >= 8 && y < H - 8) { innerN++; if (ps.source[i] === SRC_FLOW_BEAT) inner++; } }
-    report(`per pixel at margin 0.9: the camera scene ${pg.counts.app}/${pg.counts.flowBeat}/${pg.counts.flowOnly}, the slide ${ps.counts.app}/${ps.counts.flowBeat}/${ps.counts.flowOnly} (kept / beaten / alone)`);
-    const pl = reconcilePixelsCPU({ ...args(sh), margin: 0.05 });
-    let innerLow = 0; for (let y = 8; y < H - 8; y++) for (let x = 8; x < W - 8; x++) if (pl.source[y * W + x] === SRC_FLOW_BEAT) innerLow++;
+        if (x < 4) { leadN++; if (ps.source[i] === SRC_APP) lead++; } else if (x >= 8 && x < W - 8 && y >= 8 && y < H - 8) innerN++; }
+    report(`per pixel at the defaults: the camera scene ${pg.counts.app}/${pg.counts.flowBeat}/${pg.counts.flowOnly}, the slide ${ps.counts.app}/${ps.counts.flowBeat}/${ps.counts.flowOnly} (kept / beaten / alone)`);
+    const inner = innerOf(ps), inner9 = innerOf(reconcilePixelsCPU({ ...args(sh), marginStill: 0.9 })), innerLow = innerOf(reconcilePixelsCPU({ ...args(sh), margin: 0.05, marginStill: 0.05 }));
     ok("*** reconcilePixelsCPU keeps the application's exact vector at every pixel where the CAMERA moved, and gives the flow over half the slide's interior ***",
-       pg.counts.app === W * H && inner > innerN / 2 && innerLow > inner,
-       `${pg.counts.app} of ${W * H} kept on the camera scene; ${inner} of ${innerN} interior pixels of the slide to the flow at the default 0.9, ${innerLow} at 0.05. ` +
-       "The margin asks for a window explained ten times better, and on this wall's near-pixel-scale texture a 3 x 3 window often is not -- the pixels it leaves keep a vector of zero, which is the vectors-only answer; the reason for 0.9 is a measurement, in the function's own note");
+       pg.counts.app === W * H && inner9 > innerN / 2 && inner > inner9 && innerLow >= inner,
+       `${pg.counts.app} of ${W * H} kept on the camera scene; ${inner} of ${innerN} interior pixels of the slide to the flow at its default (the still surface's 0.5), ${inner9} at 0.9, ${innerLow} at 0.05. ` +
+       "The margin asks for a window explained so many times better, and on this wall's near-pixel-scale texture a 3 x 3 window often is not -- the pixels it leaves keep a vector of zero, which is the vectors-only answer; the reasons for 0.9 and 0.5 are measurements, in the function's own note");
+    // v4745: which margin a pixel gets is read off ITS OWN vector. The camera scene's are 3.2 pixels, so a marginStill of
+    // 0.05 changes nothing there -- unless stillPx is raised past them, when the exact vectors are handed to the flow
+    const gStill = reconcilePixelsCPU({ ...args(g), marginStill: 0.05 }), gAll = reconcilePixelsCPU({ ...args(g), marginStill: 0.05, stillPx: 10 });
+    ok("  ...and v4745's still-surface margin is chosen by the pixel's OWN vector: 0.05 for still surfaces leaves the moving camera scene untouched, and the same 0.05 with every vector counted still hands the flow what it does not deserve",
+       gStill.counts.app === W * H && gAll.counts.flowBeat > W * H / 10,
+       `${gStill.counts.app} of ${W * H} kept with marginStill 0.05; ${gAll.counts.flowBeat} beaten when stillPx is 10 pixels and the camera's 3.2-pixel vectors count as still`);
     ok("...and the slide's LEADING edge stays the application's, because the flow's evidence there was read off the frame",
        lead === leadN, `${lead} of ${leadN} pixels in the first four columns: the texture moves right 3.2 pixels, so their windows carried back along the flow start left of pixel 0`);
     const threwP = (patch) => threw(() => reconcilePixelsCPU({ ...args(g), ...patch })) || "";
-    ok("...and it refuses what its block sibling refuses, and a window wider than nine pixels",
+    ok("...and it refuses what its block sibling refuses, a window wider than nine pixels, and a still-surface margin or threshold that is not one",
        /whole number of pixels, at least 2/.test(threwP({ block: 8.5 })) && /margin must be in/.test(threwP({ margin: 1 })) && /radius must be a whole number/.test(threwP({ radius: 5 }))
-       && /does not cover the frame/.test(threwP({ bw: 7 })), `${threwP({ radius: 5 })}`);
+       && /does not cover the frame/.test(threwP({ bw: 7 })) && /marginStill must be in/.test(threwP({ marginStill: 1 })) && /marginStill must be in/.test(threwP({ marginStill: null }))
+       && /stillPx must be/.test(threwP({ stillPx: -1 })), `${threwP({ radius: 5 })} | ${threwP({ stillPx: -1 })}`);
 }
 
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
@@ -349,6 +357,16 @@ console.log("\n9. v4741 -- PER PIXEL, FOR A GENERATOR THAT SPLATS ONE VECTOR A P
 // camera, which moved the picture without moving the matrices: the application stayed genuinely silent, the
 // row stayed green, and it was RIGHT to. Recorded because the near miss is the useful part -- a sabotage that
 // scores 0 red because it did not touch what the row measures is not evidence about the row.
+
+// ---- v4745 SABOTAGE LOG: THE STILL-SURFACE MARGIN ----------------------------------------------------------------
+// Against reconcilePixelsCPU, here and in render/flowReconcileTsl-selfcheck.mjs:
+//   M1  marginStill ignored, every pixel at `margin`           -> 2 here, 4 there
+//   M2  the still test against stillPx, not its square         -> 1 here, 4 there
+//   M3  a marginStill that is not a number accepted            -> 1 here, 0 there
+// *** THE ROW M1 REDS FIRST WAS RED BEFORE IT WAS SABOTAGED. *** Section 9's headline compared the slide at "the default
+// 0.9" with 0.05, and the slide's vectors are all zero: with the still-surface margin both calls ran at 0.5 and read the
+// same 2300 pixels. The comparison now names 0.9 as marginStill, and a row of its own holds which margin a pixel gets.
+// M3 is `null >= 0`, which JavaScript calls true: the first refusal let null through as a margin of zero.
 
 console.log(`\nflowReconcile-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: THE DEVICE. render/opticalFlowGPU.mjs mirrors the search on WebGPU and this pass has no mirror, so " +

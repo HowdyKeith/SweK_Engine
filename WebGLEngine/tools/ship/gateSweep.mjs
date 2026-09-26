@@ -8032,6 +8032,32 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4745 -- THE 352nd CLOSING: shadows, reflections and UI as real content.
+    since427: Object.freeze({
+        at: "v4745", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenScene-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcile-selfcheck.mjs (the still-surface margin: which margin a pixel gets, by its own vector)",
+                                "render/flowReconcileTsl-selfcheck.mjs (shaderStill and geometryAll, the still branch held to its mirror on both backends)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the `moved` arm, v4741's 0.9 everywhere, and what the split gives up)",
+                                "render/frameInterp-selfcheck.mjs (compositeUiCPU)",
+                                "fx/fsr/fsr3Tsl-selfcheck.mjs (the UI over the one real frame and over a generated one)"]),
+        verdict: "*** 0.9 WAS FOR SURFACES THAT MOVED, AND A SHADOW OR A REFLECTION FALLS ON ONE THAT DID NOT. *** Drawn by three.js " +
+                 "itself -- a ball's shadow crossing a plain and a textured floor, a knot over a mirror floor, a HUD over a pan -- " +
+                 "the per-pixel reconciliation at 0.9 left most of the flow's worth unclaimed: +1.06 dB on the reflection's whole " +
+                 "frame, +0.18 on the textured shadow's. 0.5 everywhere hands the moving knot's exact vectors back to the flow " +
+                 "(-0.82 under a pan). So the margin is chosen by the pixel's OWN vector: 0.5 where it is under 0.05 pixels, a " +
+                 "surface that stood still on screen and where whatever moved is shading, and 0.9 elsewhere -- in the CPU mirror " +
+                 "and the TSL, exact on both backends. Where the frame changed: reflection +6.17 dB over the vectors and +5.10 " +
+                 "over 0.9 everywhere, textured shadow +5.40 and +4.87, plain shadow +7.55 and +3.71; on v4741's own cases, " +
+                 "never worse on the whole frame, and what it gives up is stated -- the scrolling wall's clear interior, +10.94 " +
+                 "at 0.9 and +3.92 split. A HUD is not reconciled but COMPOSITED, as FSR3 does: every vector under it is the " +
+                 "scene's, and the vectors and the flow drag it with the pan (20.4 and 21.7 dB on its pixels); generated from " +
+                 "HUD-less frames with the newer frame's UI laid over (makeFrameGen's `ui`, compositeUiCPU its mirror), it is " +
+                 "the HUD exactly and +4.85 dB on the whole frame. three's reflector sizes its target from the canvas, and the " +
+                 "first run graded an 8 x 8 blur. Fifteen sabotages, all red once one equivalent mutant was replaced. fsr-three.html " +
+                 "gains a HUD and the switch between drawing it into the frames and compositing it.",
+    }),
     // v4744 -- THE 351st CLOSING: motion on the arc, and the premise measured before it was built.
     since426: Object.freeze({
         at: "v4744", swept: 1, green: 1, red: 0,

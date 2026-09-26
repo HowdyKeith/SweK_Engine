@@ -8,7 +8,9 @@
 //
 // The arms, each makeFrameGen with the same fill:
 //   vectors   flow: null -- v4738's generator, the application's field alone
-//   default   flow: {} -- render/opticalFlowTsl.mjs, then render/flowReconcileTsl.mjs per PIXEL at margin 0.9
+//   default   flow: {} -- render/opticalFlowTsl.mjs, then render/flowReconcileTsl.mjs per PIXEL at margin 0.9, and (v4745) 0.5
+//             where the pixel's own vector is under 0.05 pixels
+//   moved     v4741's default: 0.9 at every pixel, still or not -- v4745's control
 //   low       the per-pixel rule at the block rule's margin, 0.05
 //   block     FSR3's rule as render/flowReconcile.mjs has it: per BLOCK at 0.05, applied per pixel
 // and the two controls every frame generator is measured against, repeating the older frame and a cross-fade.
@@ -58,10 +60,12 @@ else {
                 // one generator per arm, reused across the cases: compiling them is most of what this gate costs
                 const stage = TT.makeMotionStage(THREE, T, { w: D, h: D, gl });
                 const arms = { vectors: FG.makeFrameGen(THREE, T, { w: D, h: D }), default: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: {} }),
+                               moved: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { marginStill: 0.9 } }),
                                low: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { margin: 0.05 } }), block: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { mode: "block" } }) };
                 const A = tgt(D), B = tgt(D), out2 = tgt(D), km = tgt(D), big = tgt(D * 4);
                 const cross = quad(FI.crossFadeNode(T, A.texture, B.texture).node);
-                const o = { margins: { default: arms.default.reconcile.margin, low: arms.low.reconcile.margin, block: arms.block.reconcile.margin } };
+                const o = { margins: { default: arms.default.reconcile.margin, low: arms.low.reconcile.margin, block: arms.block.reconcile.margin },
+                           stillMargins: { default: arms.default.reconcile.marginStill, moved: arms.moved.reconcile.marginStill, low: arms.low.reconcile.marginStill } };
                 for (const [cn, sc, spin, pan] of [["scroll", 0.12, 6, 0], ["still", 0, 6, 0], ["pan", 0, 1, 0.05], ["panScroll", 0.12, 1, 0.05]]) {
                     const setT = (k) => { const t = k / 60 * spin; knot.rotation.set(0.4 + t * 0.4, 0.6 + t * 0.6, 0); knot.updateMatrixWorld(); scroll.value = k * sc;
                         cam.position.set(k * pan, 0.6, 5.2); cam.lookAt(k * pan, 0, 0); cam.updateMatrixWorld(); };
@@ -120,7 +124,7 @@ else {
         for (const cn of ["scroll", "still", "pan", "panScroll"]) {
             const c = o[cn];
             say(`[${mode}] ${cn.padEnd(9)} whole frame: vectors ${f(c.all.vectors)}, default ${d(c.all.default, c.all.vectors)}, low ${d(c.all.low, c.all.vectors)}, block ${d(c.all.block, c.all.vectors)} (cross-fade ${f(c.all.crossFade)}, repeat ${f(c.all.repeat)}); ` +
-                `wall's interior (${c.innerPx} px): vectors ${f(c.wall.vectors)}, default ${d(c.wall.default, c.wall.vectors)}; the default took ${c.took.default.wall[0]} of the wall's ${c.took.default.wall[1]} pixels and ${c.took.default.knot[0]} of the knot's ${c.took.default.knot[1]}`);
+                `wall's interior (${c.innerPx} px): vectors ${f(c.wall.vectors)}, default ${d(c.wall.default, c.wall.vectors)}, moved ${d(c.wall.moved, c.wall.vectors)}; moved whole frame ${d(c.all.moved, c.all.vectors)}; the default took ${c.took.default.wall[0]} of the wall's ${c.took.default.wall[1]} pixels and ${c.took.default.knot[0]} of the knot's ${c.took.default.knot[1]}`);
         }
         const S = o.scroll, P = o.panScroll;
         ok(`*** [${mode}] where the texture scrolls, the reconciled frame beats the vectors alone: ${d(S.all.default, S.all.vectors)} dB over the frame with the knot still turning, ${d(P.all.default, P.all.vectors)} under a pan -- and ${d(S.wall.default, S.wall.vectors)} and ${d(P.wall.default, P.wall.vectors)} on the wall's interior ***`,
@@ -128,7 +132,7 @@ else {
            "the wall's vectors are zero and the texture moved; the vectors-only frame there is a cross-fade of two displaced copies, and the flow's is the texture where it was at the midpoint");
         ok(`  [${mode}] ...and where no texture moves it costs next to nothing: ${d(o.still.all.default, o.still.all.vectors)} dB with the wall still, ${d(o.pan.all.default, o.pan.all.vectors)} under a pan, where every vector is exact`,
            o.still.all.default - o.still.all.vectors >= -0.1 && o.pan.all.default - o.pan.all.vectors >= -0.1,
-           "the application is the incumbent: the flow takes a pixel only by explaining its window ten times better");
+           "the application is the incumbent: the flow takes a pixel only by explaining its window ten times better where the pixel moved on screen, and twice as well where it did not");
         ok(`  [${mode}] ...which is what the margin is for: at the block rule's 0.05 the same rule takes ${S.took.low.knot[0]} of the knot's ${S.took.low.knot[1]} pixels from their vectors (the default ${S.took.default.knot[0]}), and under the pan, where every vector is exact, that costs ${d(o.pan.all.low, o.pan.all.vectors)} dB, and ${d(P.all.low, P.all.vectors)} with the texture scrolling too`,
            S.took.low.knot[0] > 3 * S.took.default.knot[0] && o.pan.all.low < o.pan.all.default - 0.5 && P.all.low < P.all.default - 0.5,
            "a 3 x 3 window under an exact vector still carries a residual wherever the shading turns with the surface, and a small margin reads that as the vector being wrong");
@@ -138,8 +142,16 @@ else {
         ok(`  [${mode}] ...and FSR3's rule as the tree's mirror has it -- per BLOCK, at 0.05 -- does WORSE than the vectors alone where the texture scrolls (${d(S.all.block, S.all.vectors)} dB): a block straddling the silhouette gives its one vector to the knot's pixels`,
            S.all.block < S.all.vectors && S.all.block < S.all.default,
            "which is why the default decides per pixel; the block mode is kept as the port and as this row's control");
-        ok(`  [${mode}] ...and the arms are the configurations they claim: margins ${o.margins.default}, ${o.margins.low} and ${o.margins.block}; the wall's interior is ${S.innerPx} pixels`,
-           o.margins.default === 0.9 && o.margins.low === 0.05 && o.margins.block === 0.05 && S.innerPx > 2000);
+        // v4745: the still-surface margin against v4741's 0.9 everywhere
+        const cs = ["scroll", "still", "pan", "panScroll"], gain = cs.map((c) => o[c].all.default - o[c].all.moved);
+        ok(`*** [${mode}] v4745's still-surface margin is at least as good as v4741's 0.9 everywhere on the whole frame, in all four cases: ${cs.map((c, i) => `${c} ${d(o[c].all.default, o[c].all.moved)}`).join(", ")} dB ***`,
+           gain.every((g) => g >= -0.05) && gain.some((g) => g > 0.1),
+           "the wall's vectors are zero, so its pixels are judged at 0.5; the knot's move, so its are judged at 0.9 as before -- fx/fsr/fsrFrameGenScene-selfcheck.mjs holds the shadow and the reflection this was chosen on");
+        ok(`  [${mode}] ...and what it GIVES UP, measured rather than hidden: the scrolling wall's clear interior, ${d(S.wall.moved, S.wall.vectors)} dB over the vectors at 0.9 everywhere and ${d(S.wall.default, S.wall.vectors)} split, with the knot turning (${d(P.wall.moved, P.wall.vectors)} and ${d(P.wall.default, P.wall.vectors)} under the pan)`,
+           S.wall.default < S.wall.moved && S.wall.default - S.wall.vectors >= 3,
+           "at 0.5 more of the wall takes its block's colour vector, and a block near the knot's silhouette carries the knot's. The whole frame gains all the same; where that gain sits is not located here");
+        ok(`  [${mode}] ...and the arms are the configurations they claim: margins ${o.margins.default}, ${o.margins.low} and ${o.margins.block}, still-surface margins ${o.stillMargins.default}, ${o.stillMargins.moved} and ${o.stillMargins.low}; the wall's interior is ${S.innerPx} pixels`,
+           o.margins.default === 0.9 && o.margins.low === 0.05 && o.margins.block === 0.05 && o.stillMargins.default === 0.5 && o.stillMargins.moved === 0.9 && o.stillMargins.low === 0.5 && S.innerPx > 2000);
     }
 }
 
@@ -161,9 +173,11 @@ else {
 // *** WEBGPU ONLY, AND WHY. *** The first run took 31 s over both backends and read the same figures on both to 0.05 dB; the
 // passes are held to their mirrors on both by render/opticalFlowTsl-selfcheck.mjs and render/flowReconcileTsl-selfcheck.mjs,
 // and what is measured here is what the arithmetic buys, which is one number.
+// *** v4745 ADDED THE `moved` ARM, v4741's 0.9 EVERYWHERE, AND TWO ROWS ON IT. *** Sabotages logged at the modules' own
+// gates reach them here: the generator dropping marginStill (G12) -> 3, the TSL's still and moving margins swapped (R14)
+// -> 5, the TSL reporting a marginStill it did not use (R16) -> 1.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a SHADOW or a REFLECTION, which move differently from the surface they fall on and are this round's reason " +
-    "as much as a scrolling texture is -- the wall is the case three.js draws most simply, and the rule decides per pixel from colour, " +
-    "so it cannot tell them apart; UI and particles over a moving scene, where a pixel's colour belongs to neither layer; and the cost: " +
-    "the flow is a pyramid and a search every generated frame, which fsr-three.html's frame time shows and this gate does not measure.");
+console.log("unchecked here: shadows, reflections and a HUD, which fx/fsr/fsrFrameGenScene-selfcheck.mjs draws with three.js itself " +
+    "(v4745); particles, which move and carry no vectors of their own; and the cost: the flow is a pyramid and a search every " +
+    "generated frame, which fsr-three.html's frame time shows and this gate does not measure.");
 process.exitCode = fails ? 1 : 0;

@@ -265,11 +265,22 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * pixels from exact vectors, and those pixels, splatted nearer than the wall, carried the knot onto it. The flow pays where
  * the vectors are silent, which is where they are wrong by a whole displacement and the ratio is large. What 0.9 gives
  * up is the knot turning at 12x, which a low margin helped by 2 dB; the vectors stay the incumbent, and that is the price.
+ *
+ * *** v4745: AND 0.9 IS FOR SURFACES THAT MOVED. A SURFACE THAT DID NOT GETS `marginStill`, 0.5. *** Measured on a shadow, a
+ * reflection and a HUD (fx/fsr/fsrFrameGenScene-selfcheck.mjs), 0.9 left most of the flow's worth unclaimed -- +1.06 dB on a
+ * reflection where 0.5 buys +5.84 -- and 0.5 everywhere hands the moving knot's exact vectors to the flow again (-0.82 under
+ * a pan). The two are different surfaces: where the pixel's own vector is under `stillPx` the surface stood still on screen,
+ * so whatever moved there is shading -- a shadow, a reflection, a texture -- and the vector has nothing to protect. Every
+ * case measured is at least as good split as at 0.9 alone: reflection +6.08, textured shadow +1.24, the knot at 6x +0.90,
+ * the scroll +0.70, both pans unchanged. The one thing it gives up: the scrolling wall's clear interior, +10.9 at 0.9 and
+ * +3.9 split, where more of the wall takes a block's vector that is the knot's. The test is in SCREEN space, so a camera
+ * that moves makes every surface "moving" and a shadow under a pan gets 0.9.
  * *** NOT BECAUSE THE VECTOR IS A CHORD, WHICH THIS NOTE SAID UNTIL v4744. *** At 12x the half-way point is 0.05 pixels off
  * the chord's midpoint; what the low margin buys there is at the knot's silhouettes and self-occlusion edges, where a block
  * vector blends an edge the pixel's exact vector moves whole (fx/fsr/fsrFrameGenArc-selfcheck.mjs's header).
  */
-export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motion, depth, radius = 1, margin = 0.9 }) {
+export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motion, depth, radius = 1, margin = 0.9,
+                                    marginStill = 0.5, stillPx = 0.05 }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`reconcilePixelsCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
@@ -277,6 +288,8 @@ export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motio
     if (!(radius >= 0) || radius !== Math.floor(radius) || radius > 4)
         throw new Error(`reconcilePixelsCPU: radius must be a whole number of pixels from 0 to 4 -- got ${radius}`);
     if (!(margin >= 0) || !(margin < 1)) throw new Error(`reconcilePixelsCPU: margin must be in [0, 1) -- got ${margin}`);
+    if (typeof marginStill !== "number" || !(marginStill >= 0) || !(marginStill < 1)) throw new Error(`reconcilePixelsCPU: marginStill must be in [0, 1) -- got ${marginStill}`);
+    if (typeof stillPx !== "number" || !(stillPx >= 0)) throw new Error(`reconcilePixelsCPU: stillPx must be a non-negative number of pixels -- got ${stillPx}`);
     if (!motion || motion.length < w * h * 4) throw new Error("reconcilePixelsCPU: motion must be w*h*4 -- (du, dv, valid, zPrev)");
     if (!depth || depth.length < w * h) throw new Error("reconcilePixelsCPU: depth must be w*h");
     const A = luminancePyramidCPU({ src: cur, w, h }).mips[0], B = luminancePyramidCPU({ src: prev, w, h }).mips[0];
@@ -295,7 +308,9 @@ export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motio
         else {
             const ax = -motion[j * 4] * w, ay = -motion[j * 4 + 1] * h;
             sadApp[j] = sadAt(A, B, w, h, ox, oy, ox - ax, oy - ay, n);
-            if (seen && sadFlow[j] < sadApp[j] * (1 - margin)) { source[j] = SRC_FLOW_BEAT; counts.flowBeat++; }
+            // v4745: a surface that did not move on screen gets the smaller margin -- whatever moved there is shading
+            const m = Math.fround(ax * ax + ay * ay) < Math.fround(stillPx * stillPx) ? marginStill : margin;
+            if (seen && sadFlow[j] < sadApp[j] * (1 - m)) { source[j] = SRC_FLOW_BEAT; counts.flowBeat++; }
             else { source[j] = SRC_APP; counts.app++; vx = ax; vy = ay; }
         }
         field[j * 4] = vx; field[j * 4 + 1] = vy; field[j * 4 + 2] = depth[j]; field[j * 4 + 3] = 1;

@@ -20,7 +20,7 @@
 "use strict";
 import { opticalFlowCPU } from "./opticalFlow.mjs";
 import { reconcileFlowCPU } from "./flowReconcile.mjs";
-import { interpolateFrameCPU, crossFadeCPU } from "./frameInterp.mjs";
+import { interpolateFrameCPU, crossFadeCPU, compositeUiCPU } from "./frameInterp.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./motionVectors.mjs";
 import { viewProj } from "./rasterProbe.js";
 
@@ -404,6 +404,29 @@ console.log("\n9. WHAT IT REFUSES");
        threw(() => interpolateFrameCPU({ ...base(), cur: new Float32Array(W * H * 3) })));
 }
 
+console.log("\n10. v4745 -- THE UI OVER A GENERATED FRAME: compositeUiCPU");
+{
+    // a generated frame and a premultiplied HUD: opaque in one band, half-transparent in another, absent elsewhere
+    let sd = 11; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const frame = Float32Array.from({ length: W * H * 4 }, () => rnd()), ui = new Float32Array(W * H * 4);
+    const col = [0.95, 0.9, 0.2];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x, a = y < 8 ? 1 : y >= H - 8 ? 0.5 : 0;
+        for (let c = 0; c < 3; c++) ui[i * 4 + c] = Math.fround(col[c] * a); ui[i * 4 + 3] = a; }
+    const o = compositeUiCPU({ frame, ui, w: W, h: H });
+    let opaque = 0, clear = 0, half = 0, halfN = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x;
+        if (y < 8) { if (o[i * 4] === ui[i * 4] && o[i * 4 + 1] === ui[i * 4 + 1] && o[i * 4 + 2] === ui[i * 4 + 2] && o[i * 4 + 3] === 1) opaque++; }
+        else if (y >= H - 8) { halfN++; if (Math.abs(o[i * 4] - (col[0] * 0.5 + frame[i * 4] * 0.5)) < 1e-6) half++; }
+        else if ([0, 1, 2, 3].every((c) => o[i * 4 + c] === frame[i * 4 + c])) clear++; }
+    ok("*** where the UI is opaque the frame is the UI to the bit, where there is none it is the generated frame to the bit, and between them it is the premultiplied `over` ***",
+       opaque === 8 * W && clear === (H - 16) * W && half === halfN,
+       `${opaque} of ${8 * W} opaque, ${clear} of ${(H - 16) * W} clear, ${half} of ${halfN} half-transparent pixels`);
+    const bad = new Float32Array(ui); bad[3] = 1.5;
+    ok("...and a UI whose alpha is not in [0, 1] is refused, as is a short buffer -- neither is premultiplied UI",
+       /alpha must be in \[0, 1\]/.test(threw(() => compositeUiCPU({ frame, ui: bad, w: W, h: H })) || "") && /must each be w\*h\*4/.test(threw(() => compositeUiCPU({ frame, ui: ui.subarray(4), w: W, h: H })) || ""),
+       threw(() => compositeUiCPU({ frame, ui: bad, w: W, h: H })));
+}
+
 // ---- v4680's SABOTAGES, OVER SECTIONS 2, 7, 8 AND 9 -------------------------------------------------------
 //
 //   V1  `indexedBy` is accepted and ignored (all treated as prev)  -> 6 red here, 2 in holeFill-selfcheck
@@ -457,6 +480,11 @@ console.log("\n9. WHAT IT REFUSES");
 // the guard buys is 64 skipped iterations per declined block and a reader who does not have to reason about
 // NaN array indexing. This is the same finding v4675 recorded about render/opticalFlow.mjs's denominator
 // guard, arriving through a different door, and the module now says which line does the work.
+
+// ---- v4745 SABOTAGE LOG: compositeUiCPU ------------------------------------------------------------------------
+//   I1  the frame kept by alpha, not 1 - alpha                 -> 1 here, 1 in fx/fsr/fsrFrameGenScene-selfcheck.mjs, 1 in
+//                                                                 fx/fsr/fsr3Tsl-selfcheck.mjs, which hold the device to it
+//   I2  any alpha accepted                                      -> 1 here
 
 console.log(`\nframeInterp-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: THE HOLES ARE STILL UNFILLED ON THIS FILE'S DEFAULT PATH, AND THAT IS NOW A CHOICE " +

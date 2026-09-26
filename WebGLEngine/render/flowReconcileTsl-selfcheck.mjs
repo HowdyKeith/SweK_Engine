@@ -31,7 +31,9 @@ console.log("\n1. WITHOUT A DEVICE: the refusals, and the per-pixel rule on the 
     const full = new Proxy({}, { get: () => () => {} });
     const refuse = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
     const a = refuse(() => RT.makeFlowReconcile({}, full, { w: 64, h: 64, block: 8.5 })), b = refuse(() => RT.makeFlowReconcile({}, full, { w: 64, h: 64, margin: 1 }));
-    ok("makeFlowReconcile refuses a fractional block and a margin outside [0, 1), as reconcileFlowCPU does", /block must be a whole number/.test(a) && /margin must be in \[0, 1\)/.test(b), `${a} | ${b}`);
+    const c = refuse(() => RT.makeFlowReconcile({}, full, { w: 64, h: 64, marginStill: null })), d = refuse(() => RT.makeFlowReconcile({}, full, { w: 64, h: 64, stillPx: -1 }));
+    ok("makeFlowReconcile refuses a fractional block and a margin outside [0, 1), as reconcileFlowCPU does, and a still-surface margin or threshold that is not one, as reconcilePixelsCPU does",
+       /block must be a whole number/.test(a) && /margin must be in \[0, 1\)/.test(b) && /marginStill must be in \[0, 1\)/.test(c) && /stillPx must be/.test(d), `${a} | ${b} | ${c} | ${d}`);
 }
 
 // ---- render/flowReconcileGPU-selfcheck.mjs's rig: render/flowReconcile-selfcheck.mjs's wall ----
@@ -108,10 +110,14 @@ const CASES = {
 const cpu = {}, cpuField = {};
 for (const [k, c] of Object.entries(CASES)) { cpu[k] = reconcileFlowCPU(c); cpuField[k] = reconciledPixelFieldCPU({ rc: cpu[k], motion: c.motion, depth: c.depth, w: W, h: H }); }
 // the per-pixel rule's cases: the same scenes, its own margins and windows -- the default 0.9, the block rule's 0.05 (where
-// the flow takes the most), a 5 x 5 window, a single pixel, and margin 0 on flat grey
+// the flow takes the most), a 5 x 5 window, a single pixel, and margin 0 on flat grey. v4745: the sliding texture's vectors
+// are exactly zero, so it is judged at `marginStill` -- its default 0.5 in shaderStill, and set to the margin where the
+// margin is what the case is about; and the camera scene with every vector counted as still (geometryAll), which is the
+// only way its exact vectors reach the still branch
 const PIX = {
-    geometry: { ...CASES.geometry, margin: 0.9, radius: 1 }, shader: { ...CASES.shader, margin: 0.9, radius: 1 },
-    shaderLow: { ...CASES.shader, margin: 0.05, radius: 1 }, bothLow: { ...CASES.both, margin: 0.05, radius: 2 },
+    geometry: { ...CASES.geometry, margin: 0.9, radius: 1 }, shader: { ...CASES.shader, margin: 0.9, marginStill: 0.9, radius: 1 },
+    shaderStill: { ...CASES.shader, margin: 0.9, radius: 1 }, geometryAll: { ...CASES.geometry, margin: 0.9, marginStill: 0.05, stillPx: 10, radius: 1 },
+    shaderLow: { ...CASES.shader, margin: 0.05, marginStill: 0.05, radius: 1 }, bothLow: { ...CASES.both, margin: 0.05, radius: 2 },
     jitteredLow: { ...CASES.jittered, margin: 0.05, radius: 0 }, flat: { ...CASES.flat, margin: 0, radius: 1 },
     invalid: { ...CASES.invalid, margin: 0.05, radius: 1 },
 };
@@ -149,7 +155,7 @@ else {
     const payloadPix = {};
     for (const [k, c] of Object.entries(PIX)) {
         const base = Object.keys(CASES).find((q) => CASES[q].cur === c.cur && CASES[q].motion === c.motion);
-        payloadPix[k] = { of: base, margin: c.margin, radius: c.radius };
+        payloadPix[k] = { of: base, margin: c.margin, marginStill: c.marginStill ?? 0.5, stillPx: c.stillPx ?? 0.05, radius: c.radius };
     }
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, B, payload, payloadPix }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
@@ -177,8 +183,8 @@ else {
                 }
                 o.pix = {};
                 for (const [k, q] of Object.entries(a.payloadPix)) {
-                    const p = a.payload[q.of], key = "pix|" + q.margin + "|" + q.radius;
-                    if (!recs.has(key)) recs.set(key, RT.makeFlowReconcile(THREE, T, { w: a.W, h: a.H, block: a.B, margin: q.margin, mode: "pixel", radius: q.radius, audit: true }));
+                    const p = a.payload[q.of], key = "pix|" + q.margin + "|" + q.marginStill + "|" + q.stillPx + "|" + q.radius;
+                    if (!recs.has(key)) recs.set(key, RT.makeFlowReconcile(THREE, T, { w: a.W, h: a.H, block: a.B, margin: q.margin, marginStill: q.marginStill, stillPx: q.stillPx, mode: "pixel", radius: q.radius, audit: true }));
                     const R = recs.get(key), cur = tex(p.cur, a.W, a.H), prev = tex(p.prev, a.W, a.H), flow = tex(p.flow, p.bw, p.bh), motion = tex(p.motion, a.W, a.H), depth = tex(p.depth, a.W, a.H);
                     await pc.build(renderer, cur); await pp.build(renderer, prev);
                     await R.reconcile(renderer, { lumaCur: pc.targets[0].texture, lumaPrev: pp.targets[0].texture, flow, motion, depth });
@@ -258,8 +264,8 @@ else {
            srcD === 0 && fieldD === 0 && census[SRC_APP] > 0 && census[SRC_FLOW_BEAT] > 0 && census[SRC_FLOW_ONLY] > 0,
            `${srcD} sources and ${fieldD} field components differ; the scores agree to ${sadW.toExponential(2)}`);
         const beat = (k) => cpuPix[k].counts.flowBeat;
-        ok(`  [${mode}] ...and the per-pixel rules reach their populations: the margin moves the flow's share on the sliding texture (${beat("shaderLow")} pixels at 0.05, ${beat("shader")} at 0.9), flat grey at margin 0 is the application's everywhere (${cpuPix.flat.counts.app} of ${W * H}), and the slide's leading edge keeps the application where the flow's evidence left the frame (${edgeKept} of ${4 * (H - 16)} pixels in its first four columns, against ${(() => { let n = 0; const x = cpuPix.shaderLow; for (let y = 8; y < H - 8; y++) for (let xx = 8; xx < 12; xx++) if (x.source[y * W + xx] === SRC_APP) n++; return n; })()} four columns in)`,
-           beat("shaderLow") > beat("shader") && beat("shader") > 0 && cpuPix.flat.counts.app === W * H && edgeKept === 4 * (H - 16) && sadW < 1e-3,
+        ok(`  [${mode}] ...and the per-pixel rules reach their populations: the margin moves the flow's share on the sliding texture (${beat("shaderLow")} pixels at 0.05, ${beat("shaderStill")} at the still surface's 0.5, ${beat("shader")} at 0.9), the camera scene's exact vectors reach the still margin only when counted as still (${beat("geometry")} beaten, ${beat("geometryAll")} with stillPx 10), flat grey at margin 0 is the application's everywhere (${cpuPix.flat.counts.app} of ${W * H}), and the slide's leading edge keeps the application where the flow's evidence left the frame (${edgeKept} of ${4 * (H - 16)} pixels in its first four columns, against ${(() => { let n = 0; const x = cpuPix.shaderLow; for (let y = 8; y < H - 8; y++) for (let xx = 8; xx < 12; xx++) if (x.source[y * W + xx] === SRC_APP) n++; return n; })()} four columns in)`,
+           beat("shaderLow") > beat("shaderStill") && beat("shaderStill") > beat("shader") && beat("shader") > 0 && beat("geometry") === 0 && beat("geometryAll") > 0 && cpuPix.flat.counts.app === W * H && edgeKept === 4 * (H - 16) && sadW < 1e-3,
            "the incumbent keeps a pixel on a tie and wherever the challenger's window was read off the frame");
     }
 }
@@ -281,6 +287,15 @@ else {
 // through the clamp, a copy of the edge pixel of its own block, which the y-outer, x-inner scan has always visited first;
 // a copy is never STRICTLY nearer than its original, so it never takes the block. The bounds test is the mirror's and
 // stays, as v4737's L9 did.
+// ---- v4745 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against render/flowReconcileTsl.mjs, here, in fx/fsr/fsrFrameGenFlow-selfcheck.mjs and in fx/fsr/fsrFrameGenScene-selfcheck.mjs:
+//   R14 the still and moving margins swapped                   -> 2 here, 5, 4
+//   R15 the still test against stillPx, not its square          -> 2 here, 0, 0
+//   R16 the marginStill it reports not the one it used          -> 0 here, 1, 0
+// *** R15 IS SEEN ONLY BY THE MIRROR. *** Unsquared, the threshold is |v| under 0.22 pixels rather than 0.05, and no scene
+// the generator gates render has enough pixels moving between the two to move a decibel; geometryAll's stillPx of 10 does
+// (the camera's 3.2-pixel vectors fall under 100 and not under 10). R16 is a report, read by the gate whose arms need it.
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: what reconciling buys a generated frame, which fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures against a frame " +
     "rendered at the midpoint; and widths that are not a power of two, where -du * w rounds once in f32 and once in f64 and the application's " +

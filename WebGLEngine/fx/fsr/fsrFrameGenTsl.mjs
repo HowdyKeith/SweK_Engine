@@ -14,12 +14,20 @@
 // reconciles the game's motion vectors with an optical flow of the colour, because the vectors do not see what is not
 // geometry -- shadows, reflections, particles, UI, a texture scrolling on a surface that stands still. `flow: {}` runs
 // render/opticalFlowTsl.mjs and render/flowReconcileTsl.mjs first and splats their field: per PIXEL, each pixel's own vector
-// against its block's flow on the 3 x 3 window about it, the flow winning only by explaining it ten times better and only on
-// evidence read inside the frame. fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures it: +0.5 to +0.8 dB over the frame where a
-// wall's texture scrolls behind the knot (+11 to +16 on the wall itself), -0.03 under a pan where every vector is exact --
+// against its block's flow on the 3 x 3 window about it, the flow winning only by explaining it ten times better -- twice as
+// well where the pixel's own vector is under 0.05 pixels (v4745: a surface that stood still on screen, where whatever moved
+// is shading) -- and only on evidence read inside the frame. fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures it: +0.7 to +0.8
+// dB over the frame where a wall's texture scrolls behind the knot (+4 to +16 on the wall itself), -0.03 under a pan where
+// every vector is exact; fx/fsr/fsrFrameGenScene-selfcheck.mjs on a shadow, +1.2 to +1.5, and a reflection, +6.1 --
 // and render/flowReconcile.mjs's block rule, applied per pixel, BELOW the vectors alone where the texture scrolls, because a
 // block straddling the knot's silhouette hands its one vector to the knot. It is not the default: it pays only on content
 // the vectors miss, and it is a pyramid and a search every generated frame.
+//
+// *** A HUD IS NOT RECONCILED, IT IS COMPOSITED (v4745). *** Every vector under a HUD is the scene's behind it, and under a
+// pan the flow judges a HUD pixel at 0.9 because that vector moved, so both warp the HUD with the scene: 20.4 and 21.7 dB on
+// the HUD's pixels. FSR3's answer is the one here: generate from HUD-LESS frames and give the newer frame's UI as `ui`,
+// premultiplied, laid over the generated frame -- the HUD exactly, and +4.9 dB on the whole frame
+// (fx/fsr/fsrFrameGenScene-selfcheck.mjs).
 //
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
@@ -48,8 +56,10 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * convention: uvPrev - uvCurr, and clip depth). The first call has no older depth and fills with the newer one's.
  * `fill` is makeFrameInterp's, the depth textures supplied here; null generates with the holes left at zero.
  * `flow` (v4741) reconciles the vectors with an optical flow of the two frames first: { block, searchRadius, levels } for
- * render/opticalFlowTsl.mjs and { margin, mode, radius } for render/flowReconcileTsl.mjs, {} for their defaults, null for
- * the vectors alone.
+ * render/opticalFlowTsl.mjs and { margin, marginStill, stillPx, mode, radius } for render/flowReconcileTsl.mjs, {} for their
+ * defaults, null for the vectors alone.
+ * `ui` (v4745), given to generate, is the newer frame's UI as a premultiplied w x h texture: `prev` and `cur` are then the
+ * frames WITHOUT it, and the generated frame gets it composited over, exactly (render/frameInterp.mjs's compositeUiCPU).
  */
 export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null, arc = false } = {}) {
     if (arc && flow) throw new Error("fx/fsr/fsrFrameGenTsl: arc and flow are not combined -- the flow's vectors are chords, and a pixel the flow took has no displacement to time t");
@@ -67,21 +77,31 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
     const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3 }) : null;
-    const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
+    const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
     // displacement to time t in pixels, and its validity
     const toT = arc ? flat() : null;
     const toTNode = (toward) => TSL.Fn(() => { const m = at(toward); return TSL.vec4(m.x.mul(w), m.y.mul(h), 0.0, TSL.select(m.z.equal(0.0), TSL.float(0.0), TSL.float(1.0))); })();
+    // v4745: the UI -- the frame generated from HUD-less frames goes to `pre`, made the first time a `ui` is given, and the
+    // newer frame's premultiplied UI over it to the output (render/frameInterp.mjs's compositeUiCPU)
+    const targets = { field, depthNow, depthOld, depthPair, toT, pre: null };
+    const uiNode = (src, ui) => TSL.Fn(() => { const g = at(src), u = at(ui); return u.add(g.mul(TSL.float(1.0).sub(u.w))); })();
+    const sized = (ui) => { if (!ui || !ui.image || ui.image.width !== w || ui.image.height !== h)
+        throw new Error(`fx/fsr/fsrFrameGenTsl: ui must be a ${w} x ${h} texture, the generated frame's size -- got ${ui && ui.image ? ui.image.width + " x " + ui.image.height : "no image"}`); };
+    const composite = async (renderer, src, ui, output) => { await draw(renderer, once("ui|" + src.uuid + "|" + ui.uuid, () => quad(uiNode(src, ui))), output); };
     let generated = 0;
     return {
-        interp: fi, targets: { field, depthNow, depthOld, depthPair, toT }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec, arc,
+        interp: fi, targets, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec, arc,
         get generated() { return generated; },
+        /** v4745: `ui`, premultiplied, over the w x h texture `src`, at `output` -- what generate does with its `ui`, for a real frame. */
+        async composite(renderer, src, ui, output = null) { sized(ui); const keep = renderer.getRenderTarget(); await composite(renderer, src, ui, output); renderer.setRenderTarget(keep); },
         /**
          * `t` (v4743) generates at that time instead of the one the generator was made with, and `again` says this is the
          * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
-        async generate(renderer, { prev, cur, motion, depth, toward = null }, output = null, { t: at_ = null, again = false } = {}) {
+        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null }, output = null, { t: at_ = null, again = false } = {}) {
+            if (ui) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
             const keep = renderer.getRenderTarget();
@@ -104,11 +124,13 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
             }
             if (arc && !again) await draw(renderer, once("toT|" + toward.uuid, () => quad(toTNode(toward))), toT);
             await fi.splat(renderer, of ? rec.targets.field.texture : field.texture, arc ? toT.texture : null);
-            await fi.gather(renderer, prev, cur, output);
+            if (ui && !targets.pre) targets.pre = flat();
+            await fi.gather(renderer, prev, cur, ui ? targets.pre : output);
+            if (ui) await composite(renderer, targets.pre.texture, ui, output);
             if (!again) await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next pair's older depth
             renderer.setRenderTarget(keep);
             generated++;
         },
-        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld, depthPair, toT]) if (x) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
+        dispose() { fi.dispose(); for (const x of Object.values(targets)) if (x) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
     };
 }

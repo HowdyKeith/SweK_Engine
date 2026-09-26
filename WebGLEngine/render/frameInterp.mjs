@@ -85,6 +85,26 @@ export function crossFadeCPU({ prev, cur, w, h, t = 0.5 }) {
 }
 
 /**
+ * v4745: the UI over a generated frame, as FSR3 composes it -- the frame generated from two HUD-LESS frames, and the
+ * newer frame's UI laid over it: `ui` is w*h*4 PREMULTIPLIED (rgb already times alpha, zero where there is no UI), and
+ * every channel is ui + frame * (1 - ui.alpha), rounded to float32 at each step as the device does it. A HUD is not
+ * content the scene moved, and a generator that warps it with the scene's vectors or the colour's flow drags it with
+ * whatever is behind it (fx/fsr/fsrFrameGenScene-selfcheck.mjs); composed, it is exactly the HUD the newer frame drew.
+ * An alpha outside [0, 1] is refused: it is not premultiplied UI, and the composite would brighten or invert the frame.
+ */
+export function compositeUiCPU({ frame, ui, w, h }) {
+    if (!frame || frame.length < w * h * 4 || !ui || ui.length < w * h * 4) throw new Error("compositeUiCPU: frame and ui must each be w*h*4");
+    const out = new Float32Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+        const a = ui[i * 4 + 3];
+        if (!(a >= 0 && a <= 1)) throw new Error(`compositeUiCPU: ui alpha must be in [0, 1] -- got ${a} at pixel ${i}; ui is premultiplied`);
+        const k = Math.fround(1 - a);
+        for (let c = 0; c < 4; c++) out[i * 4 + c] = Math.fround(ui[i * 4 + c] + Math.fround(frame[i * 4 + c] * k));
+    }
+    return out;
+}
+
+/**
  * One interpolated frame at time `t` in (0, 1) between `prev` and `cur`.
  *
  * Inputs:

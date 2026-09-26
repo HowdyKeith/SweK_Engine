@@ -33,17 +33,19 @@ import { SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
  * luma (x channel, render/opticalFlowTsl.mjs's pyramid level 0), the colour flow (bw x bh: fx, fy, conf, 1, forward),
  * the application's motion field (du, dv, valid, _) and the NEWER frame's depth, and writes targets.field, w x h:
  * (vx, vy, depth, valid), the splat's input. And, by mode:
- *   "pixel"  (radius, the window's; margin 0.9 unless given) with `audit`, targets.pixel, w x h: (source, sadApp, sadFlow,
- *            1) -- reconcilePixelsCPU
+ *   "pixel"  (radius, the window's; margin 0.9 unless given, and marginStill 0.5 where the pixel's own vector is under
+ *            stillPx) with `audit`, targets.pixel, w x h: (source, sadApp, sadFlow, 1) -- reconcilePixelsCPU
  *   "block"  (margin 0.05 unless given) targets.decision, bw x bh: (vx, vy, source, 1) -- reconcileFlowCPU's -- and with `audit`
  *            targets.app and .sad, bw x bh: (ax, ay, found, 1) and (sadApp, sadFlow, sadStill, 1); `nearerIsLess` is its
  */
-export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, mode = "pixel", radius = 1, nearerIsLess = true, audit = false }) {
+export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, marginStill = 0.5, stillPx = 0.05, mode = "pixel", radius = 1, nearerIsLess = true, audit = false }) {
     requireTsl(TSL);
     // each mode's own mirror's default: 0.05 per block (reconcileFlowCPU), 0.9 per pixel (reconcilePixelsCPU, which says why)
     if (margin === null) margin = mode === "block" ? 0.05 : 0.9;
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/flowReconcileTsl: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(margin >= 0) || !(margin < 1)) throw new Error(`render/flowReconcileTsl: margin must be in [0, 1) -- got ${margin}`);
+    if (mode === "pixel" && (typeof marginStill !== "number" || !(marginStill >= 0) || !(marginStill < 1))) throw new Error(`render/flowReconcileTsl: marginStill must be in [0, 1) -- got ${marginStill}`);
+    if (mode === "pixel" && (typeof stillPx !== "number" || !(stillPx >= 0))) throw new Error(`render/flowReconcileTsl: stillPx must be a non-negative number of pixels -- got ${stillPx}`);
     if (mode !== "pixel" && mode !== "block") throw new Error(`render/flowReconcileTsl: mode must be "pixel" or "block" -- got ${JSON.stringify(mode)}`);
     if (!(radius >= 0) || radius !== Math.floor(radius) || radius > 4) throw new Error(`render/flowReconcileTsl: radius must be a whole number of pixels from 0 to 4 -- got ${radius}`);
     const { Fn, Loop, float, int, vec4, ivec2, textureLoad, screenCoordinate, clamp, floor, abs, select } = TSL;
@@ -124,7 +126,11 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
         // a comparison with the clamped edge (reconcilePixelsCPU's note)
         const sx = ox.sub(f.x), sy = oy.sub(f.y);
         const seen = sx.greaterThanEqual(0.0).and(sy.greaterThanEqual(0.0)).and(sx.add(k).lessThanEqual(float(w - 1))).and(sy.add(k).lessThanEqual(float(h - 1)));
-        const beat = seen.and(sadFlow.lessThan(sadApp.mul(1.0 - margin)));          // STRICTLY: a tie is the application's
+        // v4745: a surface that did not move on screen gets `marginStill` -- whatever moved there is shading (reconcilePixelsCPU)
+        // the threshold as the float32 the mirror compares against, converted here rather than by the shader compiler's literal
+        // parse (and not by name: render/shaderRound-selfcheck.mjs reads every round( in a TSL file as the shader's)
+        const still = ax.mul(ax).add(ay.mul(ay)).lessThan(new Float32Array([stillPx * stillPx])[0]);
+        const beat = seen.and(sadFlow.lessThan(sadApp.mul(select(still, float(1.0 - marginStill), float(1.0 - margin)))));   // STRICTLY: a tie is the application's
         const src = select(m.z.equal(0.0), float(SRC_FLOW_ONLY), select(beat, float(SRC_FLOW_BEAT), float(SRC_APP)));
         const isApp = select(src.equal(float(SRC_APP)), float(1.0), float(0.0));
         if (which === "field") return vec4(pick(f.x, ax, isApp), pick(f.y, ay, isApp), d, 1.0);
@@ -134,7 +140,7 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
     const scenes = new Map();
     const keyOf = (I) => [I.lumaCur, I.lumaPrev, I.flow, I.motion, I.depth].map((t) => t.uuid).join("|");
     return {
-        bw, bh, block, margin, mode, targets,
+        bw, bh, block, margin, marginStill: mode === "pixel" ? marginStill : null, stillPx: mode === "pixel" ? stillPx : null, mode, targets,
         async reconcile(renderer, inputs) {
             for (const k of ["lumaCur", "lumaPrev", "flow", "motion", "depth"]) if (!inputs[k]) throw new Error(`render/flowReconcileTsl: reconcile needs ${k}`);
             const key = keyOf(inputs);
