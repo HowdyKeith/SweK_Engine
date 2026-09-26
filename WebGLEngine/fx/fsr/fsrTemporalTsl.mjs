@@ -32,6 +32,11 @@
 // them once the wires move) without the ring's 64 slots a pixel, and costs 0.03 dB at worst where there is nothing
 // thin; and a life of 8 frames, the knee -- a life of 32 buys 0.14 dB more on the wires and costs three times as much
 // on the fast-turning knot, where a lock outlives the ridge it was set on. `lockFrom: null` is the chain without locks.
+// *** THE DEFAULT IS SAFE BECAUSE OF THE MASKS, AND ONLY WITH BOTH. *** On a pixel-scale chequer every cell is a ridge
+// and the frame's locks hold the clamp open on 70% of the picture; with a box sliding across it and only the clamp
+// between the history and a ghost, they cost the uncovered trail 0.94 dB. As shipped they move it +0.09 -- the depth
+// clip and the reactive mask discard the trail's history before the relaxation can let it through, and taking either
+// away leaves a cost (fx/fsr/fsrTemporalLockGhost-selfcheck.mjs). A caller turning `reactive` off turns that off too.
 // The instability kill (advanceLocks' instabilityKill) is not wired: its default is off.
 //
 // *** THE THRESHOLD IS REQUIRED. *** disocclusionCPU and reactiveCPU both refuse a default -- a clip-z gap means a

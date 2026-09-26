@@ -117,7 +117,7 @@ else {
 // gate, 1 red, and a missing lock state is now read as null), D22 the ring's mean not refreshed (2). The four
 // composition errors that score 0 here (D14, D15, D16, D19) are red in the composition gate, which is what it is for.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a scene whose thin detail is TEXTURE at the pixel scale under a moving occluder -- render/temporalLock-selfcheck.mjs " +
-    "section 5 measured locks making that ghost 26% worse where disocclusion only killed locks; here disocclusion also discards the history, " +
-    "and no row draws that case; and perceived sharpness, which PSNR does not measure.");
+console.log("unchecked here: what the locks cost where a pixel-scale TEXTURE sits under a moving occluder -- fx/fsr/fsrTemporalLockGhost-selfcheck.mjs " +
+    "draws that (render/temporalLock-selfcheck.mjs section 5's ghost), and finds both masks are what make the default safe; " +
+    "and perceived sharpness, which PSNR does not measure.");
 process.exitCode = fails ? 1 : 0;

@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4735 -- THE 342nd CLOSING: the case a lock is dangerous in, drawn through the driver.
+    since417: Object.freeze({
+        at: "v4735", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalLockGhost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE GHOST render/temporalLock.mjs MEASURED IS REAL IN THE DRIVER TOO, AND THE DEFAULT IS SAFE ONLY BECAUSE BOTH " +
+                 "MASKS DISCARD WHAT THE LOCKS WOULD LET THROUGH. *** v4732 shipped locks on by default and named, without a row, the " +
+                 "case render/temporalLock-selfcheck.mjs section 5 measured as 26% worse ghosting: a lock detector reads a pixel-scale " +
+                 "texture as ridges everywhere. fx/fsr/fsrTemporalLockGhost-selfcheck.mjs draws it -- a 1.13-pixel chequer, a box " +
+                 "sliding across it, 64 -> 128 against a supersampled truth, graded on the TRAIL the box just uncovered. The frame's " +
+                 "locks hold the clamp open on 70% of the frame. With the depth clip and the reactive mask off, so that the clamp is " +
+                 "the only defence, they cost the trail 0.94 dB -- 11% more RMS, the ghost reproduced; as the driver ships they move " +
+                 "it +0.09. The sabotages sharpened the claim: without the depth clip alone the cost is 0.19 dB, without the reactive " +
+                 "mask alone 0.35, so it takes BOTH; and a lock surviving disocclusion scores 0 RED because disocclusion already " +
+                 "discards that history -- advanceLocks' kill rule is redundant in this chain and load-bearing in one without the " +
+                 "factor, which is why its mirror still holds it (K12). Measured before the gate: at 2.5x the speed and a 2.5-pixel " +
+                 "cell, at most 0.063 dB on the trail as shipped. The gate first took 28 s; the truth and the trail are reduced in " +
+                 "the page now, 8.6 s.",
+    }),
     // v4734 -- THE 341st CLOSING: three more round() ties, fixed, and a census so there is not a fifth.
     since416: Object.freeze({
         at: "v4734", swept: 1, green: 1, red: 0,
