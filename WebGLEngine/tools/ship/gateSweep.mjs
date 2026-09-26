@@ -8032,6 +8032,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4740 -- THE 347th CLOSING: FSR3's optical flow for a three.js scene, as TSL.
+    since422: Object.freeze({
+        at: "v4740", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/shaderRound-selfcheck.mjs (the census reads *Tsl.mjs files: 20 more, and TSL's round() in every spelling)"]),
+        verdict: "*** THE MOTION FSR3 TAKES FROM THE COLOUR, FOR WHAT THE VECTORS DO NOT SEE, RUNS ON A THREE.JS SCENE NOW. *** " +
+                 "render/opticalFlowTsl.mjs ports luminancePyramidCPU and opticalFlowCPU: the pyramid built on the device, one " +
+                 "fragment pass per level into a target of one texel a block, each seeded with the guess's own score, strict on a " +
+                 "tie, refined at the finest level only and clamped to half a pixel, every rounding floor(x + 0.5). The gate grades " +
+                 "the pyramid on its own first -- every level of a 45 x 27 chain, 5.96e-8 -- and then the search against the " +
+                 "mirror on 14 cases, both backends: the same vector at all 868 blocks. The metamer is left out of that row and " +
+                 "says why: flat in the tree's luma, every candidate ties and rounding picks, 56 of 64 vectors apart about nothing; " +
+                 "its confidence is held. The first draft was wrong at 693 of 868 blocks: TSL names a Loop's index by its place in " +
+                 "the call and not its depth, so the nested SAD loop's `i` shadowed the candidate loop's, and the candidate's " +
+                 "offsets, emitted where they were used, read the inner one. Two defences, each enough alone -- named loops, and the " +
+                 "offsets made variables in the outer scope -- and both kept. A window-edge shift of exactly 4.5 put the parabola's " +
+                 "vertex ON the half-pixel clamp and was moved to 4.7. Nineteen sabotages: Q16, the scan order, was 0 until a " +
+                 "diagonal fixture tied six candidates bitwise; Q6 is arithmetic, as v4734's T4 was, and render/shaderRound-" +
+                 "selfcheck.mjs, which said 'unchecked here: TSL', reads *Tsl.mjs files now and holds it. fsr-three.html's " +
+                 "'optical flow' view is the caller, beside a floor whose texture scrolls while its motion vectors stay zero.",
+    }),
     // v4739 -- THE 346th CLOSING: this box presents a WebGPU canvas after all, and the device loss was the flags.
     since421: Object.freeze({
         at: "v4739", swept: 1, green: 1, red: 0,

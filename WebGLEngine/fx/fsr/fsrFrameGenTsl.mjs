@@ -13,8 +13,10 @@
 // *** THE MOTION IS THE APPLICATION'S AND NOT AN OPTICAL FLOW, AND THAT IS WHAT A THREE.JS SCENE OFFERS FOR FREE. ***
 // FSR3 reconciles the game's motion vectors with an optical flow of the colour, because the vectors do not see what is
 // not geometry -- shadows, reflections, particles, UI. render/opticalFlow.mjs and render/flowReconcile.mjs are this tree's
-// versions and are not ported: every surface a three.js scene draws carries its own vector here (render/temporalTsl.mjs's
-// VelocityNode subclass keeps each object's previous matrix), and the gate's scene is geometry. The limit is named.
+// versions; the flow is TSL since v4740 (render/opticalFlowTsl.mjs, and fsr-three.html's "optical flow" view beside a floor
+// whose texture scrolls while the floor stands still), the reconciliation is not, and this driver reads only the vectors:
+// every surface a three.js scene draws carries its own here (render/temporalTsl.mjs's VelocityNode subclass keeps each
+// object's previous matrix), and the gate's scene is geometry. The limit is named.
 //
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene

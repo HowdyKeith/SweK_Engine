@@ -551,8 +551,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4737 -- 1817 -> 1818 for render/holeFillTsl-selfcheck.mjs -- the holes of a generated frame filled as TSL, fillHolesCPU exactly, and the whole splat-fill-warp against interpolateFrameCPU({ fill }).
     // v4738 -- 1818 -> 1819 for fx/fsr/fsrFrameGen-selfcheck.mjs -- FSR3's frame generation driver on a three.js scene against a frame rendered at the midpoint, a cross-fade and a repeated frame.
     // v4739 -- 1819 -> 1820 for tools/ship/pageShot-selfcheck.mjs -- a three.js page shot presented on WebGPU on this box, against the flags that lose the device.
-    gates: 1820, usesOk: 1799, definesOk: 1791, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1692, condFirst: 91, unknownSignature: 16,
+    // v4740 -- 1820 -> 1821 for render/opticalFlowTsl-selfcheck.mjs -- FSR3's optical flow for a three.js scene: the luma pyramid and the block matcher as TSL, the same vector as opticalFlowCPU at every graded block.
+    gates: 1821, usesOk: 1800, definesOk: 1792, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1693, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

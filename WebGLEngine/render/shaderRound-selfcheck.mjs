@@ -18,6 +18,11 @@
 // attribute as one that SHIPS WGSL, and a gate that greps for the marker may not contain it (v4278). The first draft
 // assembled the WGSL ones and spelled the GLSL ones, and counted ITSELF -- its own doc comment naming round() was the
 // first "unexplained" site it found.
+//
+// v4740: AND TSL. A three.js node graph's round() -- TSL.round(x), a destructured round(x), or x.round() -- compiles to
+// the backend's own, ties to even on both, and render/opticalFlowTsl.mjs mirrors the same Math.round the WGSL kernel did.
+// This gate said "unchecked here: TSL" because a TSL file carries no shader marker; a file named *Tsl.mjs is one, and in
+// it every round( that is not Math.round( is a call into the graph.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -51,28 +56,28 @@ function walk(dir, out) {
 
 console.log("\n1. THE CENSUS: every round() in a file that carries shader source");
 const found = new Map();
-let scanned = 0;
+let scanned = 0, scannedTsl = 0;
 for (const f of walk(ENG, [])) {
-    const src = fs.readFileSync(f, "utf8");
-    if (!MARKERS.some((m) => src.includes(m))) continue;
-    scanned++;
+    const src = fs.readFileSync(f, "utf8"), tsl = /Tsl\.mjs$/.test(f);
+    if (!tsl && !MARKERS.some((m) => src.includes(m))) continue;
+    scanned++; if (tsl) scannedTsl++;
     const rel = path.relative(ENG, f).split(path.sep).join("/");
     src.split("\n").forEach((line, i) => {
         const code = line.replace(/\/\/.*$/, "");               // a comment naming round() is not a call
-        if (!/(^|[^A-Za-z0-9_.])round\(/.test(code)) return;
+        if (tsl ? !/round\(/.test(code.replace(/Math\.round\(/g, "")) : !/(^|[^A-Za-z0-9_.])round\(/.test(code)) return;
         if (/^\s*\*/.test(line)) return;                          // a JSDoc line
         found.set(`${rel} :: ${line.trim()}`, i + 1);
     });
 }
 const kept = new Set(Object.keys(KEPT)), seen = new Set(found.keys());
 const unexplained = [...seen].filter((k) => !kept.has(k)), stale = [...kept].filter((k) => !seen.has(k));
-ok(`*** the round() calls in ${scanned} shader-bearing files are EXACTLY the ${kept.size} kept with a reason ***`,
-   unexplained.length === 0 && stale.length === 0 && scanned > 50,
+ok(`*** the round() calls in ${scanned} shader-bearing files, ${scannedTsl} of them TSL, are EXACTLY the ${kept.size} kept with a reason ***`,
+   unexplained.length === 0 && stale.length === 0 && scanned > 50 && scannedTsl >= 20,
    unexplained.length ? `UNEXPLAINED: ${unexplained.map((k) => `${k} (line ${found.get(k)})`).join("; ")}` :
    stale.length ? `KEPT BUT GONE -- take it off the list: ${stale.join("; ")}` :
    "a new round() goes red here until its verdict is written into KEPT; one that is removed goes red until it is taken off");
 
-console.log("\n2. THE FIVE THAT WERE CHANGED, AND WHAT THEY WERE CHANGED TO");
+console.log("\n2. THE FIVE THAT WERE CHANGED, AND WHAT THEY WERE CHANGED TO -- AND THE TSL MIRROR THAT WAS WRITTEN WITH THE RULE");
 {
     const read = (p) => fs.readFileSync(path.join(ENG, p), "utf8");
     const has = (p, re) => re.test(read(p));
@@ -83,6 +88,9 @@ console.log("\n2. THE FIVE THAT WERE CHANGED, AND WHAT THEY WERE CHANGED TO");
     ok("[v4734] a block's origin and the guess carried down are floor(x + 0.5)",
        has("render/opticalFlowWgsl.mjs", /let ox = i32\(floor\(f32\(i32\(g\.x\) \* u\.block\) \/ f32\(u\.scale\) \+ 0\.5\)\);/) &&
        has("render/opticalFlowWgsl.mjs", /let gx = i32\(floor\(-flowIn\[i \* 2u\] \/ f32\(u\.scale\) \+ 0\.5\)\);/));
+    ok("[v4740] ...and render/opticalFlowTsl.mjs's are too, written that way from the start",
+       has("render/opticalFlowTsl.mjs", /const ox = floor\(bx\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\), oy = floor\(by\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\);/) &&
+       has("render/opticalFlowTsl.mjs", /const gx = floor\(g\.x\.negate\(\)\.div\(scale\)\.add\(0\.5\)\), gy = floor\(g\.y\.negate\(\)\.div\(scale\)\.add\(0\.5\)\);/));
 }
 
 // ---- v4734 SABOTAGE LOG ----------------------------------------------------------------------------------------
@@ -96,11 +104,13 @@ console.log("\n2. THE FIVE THAT WERE CHANGED, AND WHAT THEY WERE CHANGED TO");
 //   T7 ...the origin floored without the half                                               1          1
 // And against the census itself: R1 a round() added to render/dilateWgsl.mjs's code -> 1; R2 the MPM site taken off
 // KEPT -> 1; R3 a KEPT entry whose site no longer exists -> 1.
+// v4740, TSL: render/opticalFlowTsl.mjs's origin by TSL.round() -> 2, its carried guess by TSL.round() -> 2 (0 on the device,
+// as T4 was), its origin floored without the half -> 1; R4 a method-chained .round() added to render/holeFillTsl.mjs -> 1.
 // *** T4 IS 0 RED ON THE DEVICE, AND THAT IS ARITHMETIC, NOT A BLIND SPOT. *** The guess a level carries down is the
 // level above's whole-pixel answer, doubled, divided by this level's scale: always whole, so round() has no tie to
 // break there. It was changed anyway, so the kernel has one rounding rule and not two -- two spellings of one law is
 // how the ring's copy drifted from the kernel's at v4559 -- and this census is what holds it.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: TSL, whose round() compiles to the same tie-to-even and is not text this scan can read as a call site " +
-    "(fx/fsr/fsrTsl.mjs and render/*Tsl.mjs use floor throughout, by hand); and GLSL built at runtime from pieces no file holds whole.");
+console.log("unchecked here: TSL outside a file named *Tsl.mjs -- a page's inline node graph, fsr-three.html's among them; and GLSL " +
+    "built at runtime from pieces no file holds whole.");
 process.exitCode = fails ? 1 : 0;

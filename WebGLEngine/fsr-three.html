@@ -41,6 +41,7 @@
       <option value="locks">FSR2 with its locks in red (debug)</option>
       <option value="gen">generated frame, halfway between the last two, holes filled (debug)</option>
       <option value="genholes">generated frame, halfway between the last two, holes black (debug)</option>
+      <option value="flow">optical flow, from the colour alone (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -60,6 +61,7 @@
       <option value="none">none (EASU on linear values)</option>
     </select></label>
     <label><input id="spin" type="checkbox" checked> spin</label>
+    <label title="The floor's stripes slide along the floor, which does not move: its motion vectors stay zero and only the optical flow sees it -- the case FSR3 runs a flow for."><input id="scroll" type="checkbox"> scroll the floor's texture</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
 </div>
@@ -73,6 +75,7 @@ import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/tempor
 import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
 import { makeFrameGen } from "./fx/fsr/fsrFrameGenTsl.mjs";
+import { makeOpticalFlow } from "./render/opticalFlowTsl.mjs";
 import { jitterPhaseCount } from "./render/jitter.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -91,8 +94,8 @@ try {
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0.02, 0.03, 0.06);
     const camera = new THREE.PerspectiveCamera(40, DW / DH, 0.1, 50); camera.position.set(0, 0.6, 5.2); camera.lookAt(0, 0, 0);
     const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.9, 0.28, 220, 24), new THREE.MeshNormalNodeMaterial()); scene.add(knot);
-    const stripes = new THREE.MeshBasicNodeMaterial();
-    stripes.colorNode = TSL.Fn(() => { const s = TSL.floor(TSL.uv().x.mul(48.0).add(TSL.uv().y.mul(9.0))).mod(2.0); return TSL.mix(TSL.vec3(0.05, 0.08, 0.14), TSL.vec3(0.95, 0.72, 0.3), s); })();
+    const stripes = new THREE.MeshBasicNodeMaterial(), scrollU = TSL.uniform(0.0);   // v4740: the stripes can slide on a still floor
+    stripes.colorNode = TSL.Fn(() => { const s = TSL.floor(TSL.uv().x.mul(48.0).add(TSL.uv().y.mul(9.0)).add(scrollU)).mod(2.0); return TSL.mix(TSL.vec3(0.05, 0.08, 0.14), TSL.vec3(0.95, 0.72, 0.3), s); })();
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), stripes); floor.rotation.x = -Math.PI / 2; floor.position.y = -1.3; scene.add(floor);
 
     // the bilinear comparison is the driver's own renderBilinear: the same low-resolution frame, read through the
@@ -157,6 +160,33 @@ try {
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
         await motionStage.render(renderer, scene, camera);
         await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture }, null);
+        g.k++;
+    };
+
+    // v4740 -- MOTION FROM THE COLOUR ALONE: render/opticalFlowTsl.mjs, FSR3's other field, of the last two native frames --
+    // a block matcher over a luma pyramid, 8-pixel blocks, three levels, +-4 at each. The colours are the motion view's for
+    // the same motion (the flow is the forward displacement, so it is negated into the motion field's uvPrev - uvCurr), and a
+    // block the matcher is not confident of fades to grey: flat colour, and a stripe's length, match anywhere. With the
+    // floor's texture scrolling, the motion view shows the floor still and this one shows it moving.
+    let flowDbg = null;
+    const showFlow = async () => {
+        if (!flowDbg) {
+            const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+            const of = makeOpticalFlow(THREE, TSL, { w: DW, h: DH, block: 8, searchRadius: 4, levels: 3 });
+            const frames = [col(), col()], at = (t) => TSL.textureLoad(t, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+            const views = frames.map((fr) => { const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+                m.fragmentNode = TSL.Fn(() => {
+                    const f = TSL.textureLoad(of.target.texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x.div(8.0)), TSL.int(TSL.screenCoordinate.y.div(8.0))));
+                    const c = at(fr.texture), grey = c.x.add(c.y).add(c.z).mul(0.12);
+                    return TSL.vec4(f.x.negate().mul(60.0 / DW).mul(f.z).add(0.5), f.y.negate().mul(60.0 / DH).mul(f.z).add(0.5), grey, 1.0);
+                })();
+                const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; });
+            flowDbg = { of, frames, views, k: 0 };
+        }
+        const g = flowDbg, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
+        renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
+        await g.of.flow(renderer, cur.texture, g.k ? prev.texture : cur.texture);
+        renderer.setRenderTarget(null); await renderer.renderAsync(g.views[g.k % 2], ortho);
         g.k++;
     };
 
@@ -237,8 +267,10 @@ try {
         // the frame-generation views step the scene ONE NOMINAL 60 Hz FRAME per drawn frame, not by the wall clock: what
         // they interpolate is the motion between two consecutive frames, and on a slow device the wall clock turns that
         // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
-        const genView = $("mode").value === "gen" || $("mode").value === "genholes";
+        // -- and the flow view, whose search reaches 16 pixels at three levels and no further (v4740)
+        const genView = $("mode").value === "gen" || $("mode").value === "genholes" || $("mode").value === "flow";
         if ($("spin").checked) t += genView ? 1 / 60 : dt / 1000;
+        if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
         knot.rotation.set(t * 0.4, t * 0.6, 0);
         const mode = $("mode").value, k = Number($("scale").value);
         const t0 = performance.now();
@@ -249,9 +281,10 @@ try {
         else if (mode === "motion") await showMotion();
         else if (mode === "masks") await showMasks();
         else if (mode === "gen" || mode === "genholes") await showGen(mode === "gen");
+        else if (mode === "flow") await showFlow();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
+        const res = mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
