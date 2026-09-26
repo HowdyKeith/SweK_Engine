@@ -8032,6 +8032,40 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4722 -- THE 329th CLOSING: pre-registration -- a different signal: whether the chain's two motion estimates disagree.
+    since404: Object.freeze({
+        at: "v4722", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameDisagree-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THREE FRAME SIGNALS DESCRIBED THE PICTURE OR THE MOTION; NONE ASKED WHETHER THE CHAIN'S MOTION IS TRUSTWORTHY. *** " +
+                 "render/frame-disagree-preregistration.md declares H16 with NO DATA IN THE COMMIT: the frame's fraction of blocks " +
+                 "where the colour flow beat the application's own vector on merit -- srcIsFlowBeat, named by the document and found " +
+                 "by name. The direction is fixed by the physics before data: the application's vector is the geometry's motion, so " +
+                 "a colour match that beats it is usually false, and more disagreement should mean generation does worse. On sway at " +
+                 "x4, upscale 3x, both geometries: every cell and every frame unseen, turn frames excluded, H12's test imported. *** " +
+                 "A QUALIFIER FIXED IN ADVANCE: *** disagreement and H11's gain both read the chain's SADs, so if within scenes they " +
+                 "rank frames alike -- mean |rho| above 0.7 -- H16 is reported as NOT DISTINCT from gain and is not supported " +
+                 "whatever the test says. A made-up world where the signal is the gain re-ranked clears the test and is not " +
+                 "supported. *** THE SIGNAL IS GRADED ON BEING NEW: *** its column is none of those the arc's earlier runners used, " +
+                 "read from their own exports, and the spread the document quotes -- cv 0.147 to 0.866 -- is computed at x1, which " +
+                 "nothing declares; no correlation with the advantage is computed on any real frame. *** THIRTEEN SABOTAGES, " +
+                 "THIRTEEN RED -- AFTER TWO CRASHES AND ONE FIXTURE THAT COULD NOT SEE ITS SABOTAGE, ALL THE GATE'S. *** A signal " +
+                 "genGate lacks failed its row and then threw on the first made-up frame; the gate now stops there with the failure " +
+                 "counted. A wrong column left no testable cell and a row read `.sign` off nothing; it now fails on the untested " +
+                 "cell. And dropping the turn exclusion passed: the first draft gave each turn frame an opposite effect ten times " +
+                 "the signal's and claimed only the exclusion kept the world backwards, but five frames in 39 do not move a rank " +
+                 "correlation that far -- measured across six seeds and two placements, the verdict never changed. The row now asks " +
+                 "the summary which frames it scored. Unzipping one cache twice put the gate within 250 ms of the sweep's budget; " +
+                 "memoised, it runs 1.5 s. *** AND THE FIRST VERIFY WENT RED ON tools/ship/timingKind-selfcheck.mjs, FOR A FILING " +
+                 "THIS ROUND GOT WRONG. *** The new gate is under budget, and it was hand-filed as an `alone` reading so the drift " +
+                 "pre-flight would find it (v4716 went red for the lack). timingKind accounts an earlier-stamped `alone` entry only " +
+                 "if it is in the rotation's ledger, one of the three named, or an OVER-budget arrival -- an under-budget gate is the " +
+                 "sweep's to time, and this one was none of those. Reproduced on the rebuilt pre-verify file, and the filing that " +
+                 "satisfies both checks measured there: an under-budget arrival is pre-filed INFERRED -- kind `loaded`, listed in " +
+                 "kindsInferred -- and the sweep then stamps it as observed. The sweep had already re-timed this gate, so the " +
+                 "committed file was consistent; the second verify is the one this closing reports.",
+    }),
     // v4721 -- THE 328th CLOSING: H15 not supported -- the direction holds at x2 and the consistency does not.
     since403: Object.freeze({
         at: "v4721", swept: 1, green: 1, red: 0,

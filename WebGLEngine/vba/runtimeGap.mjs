@@ -337,7 +337,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4379,               // v4721: 4378 -> 4379 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, the measurement
+    files: 4381,               // v4722: 4379 -> 4381 for tools/ship/frameDisagree.mjs and its gate. async/await by one --
+                               // the runner's harvest; the gate drives no page. Every row from the census.
+                               // v4721: 4378 -> 4379 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, the measurement
                                // gates' shape: async/await by one for C12. Every row from the census.
                                // v4720: 4376 -> 4378 for tools/ship/frameSwayRep.mjs and its gate. async/await by two --
                                // the runner's harvest and the gate's x1 drives. Every row from the census.
@@ -887,7 +889,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4079, closures: 3934, asyncAwait: 1579, typedArrays: 1169, promises: 380,
+    esModules: 4081, closures: 3936, asyncAwait: 1580, typedArrays: 1169, promises: 380,
     fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 167, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
