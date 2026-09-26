@@ -36,6 +36,7 @@
       <option value="bilinear">bilinear stretch</option>
       <option value="native">native resolution</option>
       <option value="motion">motion vectors (debug)</option>
+      <option value="masks">clip + lock masks (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -58,6 +59,8 @@ import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
 import { makeMotionStage, glClip } from "./render/temporalTsl.mjs";
+import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/temporalClipTsl.mjs";
+import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 
 const $ = (id) => document.getElementById(id);
 const DW = 960, DH = 540;
@@ -120,6 +123,41 @@ try {
         renderer.setRenderTarget(null); await renderer.renderAsync(motionView, ortho);
     };
 
+    // v4730 -- THE DEPTH CLIP'S MASK AND THE LOCK RING'S, OF THE LIVE SCENE. Red: disocclusion -- where the
+    // knot uncovered what was behind it and the history there belongs to the knot. Green: the shading-shift mask
+    // from the reprojected luma ring -- where the LIGHT changed rather than the surface moved (the knot's normal
+    // shading turns with it). Blue: the frame, dimmed, for orientation. The ring here runs at the 1x period, 16 slots
+    // a pixel -- 66 MB at 960x540 in float -- where a 2x period's 64 slots would be 265 MB; that cost is the ring's
+    // design (render/temporalLock.mjs keeps every luma, FSR2 keeps a lock and a short history) and it is stated.
+    let maskDbg = null;
+    const showMasks = async () => {
+        if (!motionStage) await showMotion();   // builds the shared stage (and draws once, which the masks then replace)
+        if (!maskDbg) {
+            const flat = () => new THREE.RenderTarget(DW, DH, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+            const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
+                const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;   // the knot's front against the floor behind it
+            const dMot = flat(), rec = [flat(), flat()], mask = flat(), shade = flat(), current = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType });
+            const dil = dilateNodes(TSL, motionStage.depth.texture, motionStage.motion.texture, { w: DW, h: DH });
+            const ring = makeLumaRing(THREE, TSL, { w: DW, h: DH, period: 8, currentTex: current.texture, motionTex: dMot.texture });
+            const at = (t) => TSL.textureLoad(t, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+            const view = quad(TSL.Fn(() => { const c = at(current.texture); return TSL.vec4(at(mask.texture).x, at(shade.texture).x.mul(4.0), c.x.add(c.y).add(c.z).mul(0.08), 1.0); })());
+            maskDbg = { dMot, rec, mask, shade, current, ring, view, k: 0, scM: quad(dil.motionNode), scD: quad(dil.depthNode),
+                        scX: [0, 1].map((k) => quad(disocclusionNode(TSL, dMot.texture, rec[1 - k].texture, { w: DW, h: DH, threshold }).node)) };
+        }
+        const g = maskDbg, k = g.k % 2;
+        renderer.setRenderTarget(g.current); await renderer.renderAsync(scene, camera);
+        await motionStage.render(renderer, scene, camera);
+        renderer.setRenderTarget(g.dMot); await renderer.renderAsync(g.scM, ortho);
+        renderer.setRenderTarget(g.rec[k]); await renderer.renderAsync(g.scD, ortho);
+        renderer.setRenderTarget(g.mask); await renderer.renderAsync(g.scX[k], ortho);
+        await g.ring.push(renderer); await g.ring.shading(renderer, g.shade);
+        renderer.setRenderTarget(null); await renderer.renderAsync(g.view, ortho);
+        g.k++;
+    };
+
     let last = performance.now(), avg = 0, t = 0;
     const frame = async () => {
         const now = performance.now(), dt = now - last; last = now;
@@ -130,9 +168,10 @@ try {
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
         else if (mode === "motion") await showMotion();
+        else if (mode === "masks") await showMasks();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" || mode === "motion" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
+        const res = mode === "native" || mode === "motion" || mode === "masks" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };

@@ -8032,6 +8032,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4730 -- THE 337th CLOSING: the lock ring as TSL.
+    since412: Object.freeze({
+        at: "v4730", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalClipTsl-selfcheck.mjs", "render/temporalLockTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (narrowed: the depth clip and the lock ring moved to their own gates; requireTsl named)"]),
+        verdict: "*** THE LOCK STAGE fsr.html's CHAIN RUNS -- THE REPROJECTED LUMA RING AND ITS SHADING-SHIFT MASK -- RUNS ON A " +
+                 "THREE.JS SCENE. *** render/temporalTsl.mjs gains makeLumaRing: 2 x period lumas a pixel packed four to a texel in " +
+                 "a float target ceil(F/4) slices tall, every slot bilinearly reprojected through the motion field each push (two " +
+                 "fetches a texel: slots 4s..4s+2 read the next component of their slice, 4s+3 the first of the next), the fill " +
+                 "count at the nearest texel capped at 255, and render/temporalLock.mjs's shadingShiftCPU as a third pass. On a " +
+                 "panning camera over a wall with a pulsing lamp, 24 pushes at period 8 on both backends: every one of 16 slots of " +
+                 "1,024 pixels is pushLuma's to 4.77e-7, the fill counts are exact, the mask is shadingShiftCPU's to 2.68e-7 " +
+                 "(280 pixels firing where the light changed, 576 still unknown where the pan broke the ring) and again at scale " +
+                 "0.5, and 240 still pushes later every count is min(255, count + 240). advanceLocks and lockRelaxation -- lock " +
+                 "life and the clamp relaxation -- have no caller in this tree, fsr.html included, so they are not the chain and " +
+                 "are not ported; v4728 measured what they are for. *** THIRTEEN SABOTAGES, THIRTEEN RED, *** after the first " +
+                 "draft's slow pan left every ring full, scale 1 made the scale term invisible, and L13 scored 0 RED because every " +
+                 "real pixel's motion is valid -- the ring now reads a field with an invalid band. *** AND THE GATE WAS SPLIT, " +
+                 "BECAUSE IT STOPPED FINISHING. *** render/temporalTsl-selfcheck.mjs, grown a section a round, ran 25.4 s and the " +
+                 "rotation killed it at its 20 s cap -- no verdict. The depth clip moved to render/temporalClipTsl.mjs and the " +
+                 "ring to render/temporalLockTsl.mjs, each with a gate of its own name (13.7 s, 6.1 s, 4.3 s now), the way " +
+                 "render/ already holds the CPU references; the eleven clip and thirteen ring sabotages were RE-TAKEN on the " +
+                 "split gates and came back identical, and the split's own rows (a threshold refusal, a period refusal, the " +
+                 "shared requireTsl) are one red each. *** THE RING'S MEMORY, STATED: *** 2 x period lumas a pixel is 64 at 2x -- " +
+                 "265 MB of float at 960x540 across the ping-pong pair -- because render/temporalLock.mjs keeps every luma where " +
+                 "FSR2 keeps a lock and a short history. fsr-three.html's new clip + lock masks view (disocclusion red, " +
+                 "shading shift green, of the live scene) runs the 1x period, 66 MB, and says why; it is also what reaches the " +
+                 "two new modules outside their gates.",
+    }),
     // v4729 -- THE 336th CLOSING: the depth clip as TSL.
     since411: Object.freeze({
         at: "v4729", swept: 0, green: 0, red: 0,

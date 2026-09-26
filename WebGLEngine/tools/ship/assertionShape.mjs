@@ -541,8 +541,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4723 -- 1803 -> 1804 for tools/ship/frameDisagreeMeasure-selfcheck.mjs, H16 re-derived with C25, C26 and C12.
     // v4726 -- 1804 -> 1805 for fx/fsr/fsrTsl-selfcheck.mjs, FSR1 as TSL nodes held to fx/fsr/fsr.js on both of three's backends.
     // v4727 -- 1805 -> 1806 for render/temporalTsl-selfcheck.mjs, the temporal chain's inputs for a three.js scene held to motionVectorsCPU and objectMotionCPU.
-    gates: 1806, usesOk: 1785, definesOk: 1777, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1678, condFirst: 91, unknownSignature: 16,
+    // v4730 -- 1806 -> 1808 for render/temporalClipTsl-selfcheck.mjs and render/temporalLockTsl-selfcheck.mjs, the depth clip and the lock ring split out of render/temporalTsl-selfcheck.mjs when it passed the 20 s cap.
+    gates: 1808, usesOk: 1787, definesOk: 1779, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1680, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
