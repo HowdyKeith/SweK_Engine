@@ -49,12 +49,14 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  */
 export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null } = {}) {
     const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
-    const field = flat(), depthNow = flat(), depthOld = flat();
+    // depthOld: the newest depth seen, kept for the NEXT pair; depthPair: the older depth of the pair being generated, which
+    // the fill reads -- two targets, so a pair can be generated again at another t (v4743) without losing its older depth
+    const field = flat(), depthNow = flat(), depthOld = flat(), depthPair = flat();
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
     const at = (tex) => TSL.textureLoad(tex, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
     const fi = makeFrameInterp(THREE, TSL, { w, h, block: 1, indexedBy: "cur", t,
-        fill: fill ? { ...fill, depthPrev: depthOld.texture, depthCur: depthNow.texture } : null });
+        fill: fill ? { ...fill, depthPrev: depthPair.texture, depthCur: depthNow.texture } : null });
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
@@ -63,15 +65,26 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     let generated = 0;
     return {
-        interp: fi, targets: { field, depthNow, depthOld }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec,
+        interp: fi, targets: { field, depthNow, depthOld, depthPair }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec,
         get generated() { return generated; },
-        async generate(renderer, { prev, cur, motion, depth }, output = null) {
+        /**
+         * `t` (v4743) generates at that time instead of the one the generator was made with, and `again` says this is the
+         * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
+         * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
+         */
+        async generate(renderer, { prev, cur, motion, depth }, output = null, { t: at_ = null, again = false } = {}) {
             const keep = renderer.getRenderTarget();
-            const copyNow = once("now|" + depth.uuid, () => quad(at(depth)));
-            if (!of) await draw(renderer, once("field|" + motion.uuid + "|" + depth.uuid, () => quad(flowFromMotionNode(TSL, motion, depth, { w, h }).node)), field);
-            await draw(renderer, copyNow, depthNow);
-            if (generated === 0) await draw(renderer, once("old0", () => quad(at(depthNow.texture))), depthOld);
-            if (of) {
+            if (at_ !== null && !(at_ >= 0 && at_ <= 1)) throw new Error(`fx/fsr/fsrFrameGenTsl: t must be in [0, 1] -- got ${at_}`);
+            fi.uniforms.t.value = at_ === null ? t : at_;                                // each call's own: the made-with t unless given
+            if (again && generated === 0) throw new Error("fx/fsr/fsrFrameGenTsl: `again` needs a pair generated before it");
+            if (!again) {
+                const copyNow = once("now|" + depth.uuid, () => quad(at(depth)));
+                if (!of) await draw(renderer, once("field|" + motion.uuid + "|" + depth.uuid, () => quad(flowFromMotionNode(TSL, motion, depth, { w, h }).node)), field);
+                await draw(renderer, copyNow, depthNow);
+                // the pair's older depth: the last pair's newer one, or this frame's own on the first call
+                await draw(renderer, once(generated === 0 ? "pair0" : "pair", () => quad(at(generated === 0 ? depthNow.texture : depthOld.texture))), depthPair);
+            }
+            if (of && !again) {
                 // the colour's own motion, prev -> cur, and per block the one the two frames support better -- per pixel, the
                 // application's own vector wherever its block kept it (render/flowReconcileTsl.mjs)
                 await of.flow(renderer, cur, prev);
@@ -80,10 +93,10 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
             }
             await fi.splat(renderer, of ? rec.targets.field.texture : field.texture);
             await fi.gather(renderer, prev, cur, output);
-            await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next call's older depth
+            if (!again) await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next pair's older depth
             renderer.setRenderTarget(keep);
             generated++;
         },
-        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld]) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
+        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld, depthPair]) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
     };
 }

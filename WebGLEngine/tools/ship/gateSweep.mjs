@@ -8032,6 +8032,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4743 -- THE 350th CLOSING: when each frame is shown, and what the half-way frame costs off the half.
+    since425: Object.freeze({
+        at: "v4743", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/framePacer-selfcheck.mjs", "fx/fsr/fsr3Pacing-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A GENERATED FRAME IS WORTH WHAT ITS TIMING MAKES IT, AND FSR3'S HALF-WAY FRAME IS EXACT ONLY AT HALF THE " +
+                 "REFRESH. *** render/framePacer.mjs decides at each refresh what a display shows -- no generation, as soon as " +
+                 "possible, FSR3's midpoint hold, or TIMED generation at the t a refresh stands for -- graded by judder (the RMS " +
+                 "distance of the shown scene times from a line, in ms), new images a second and latency. At 30 real frames a " +
+                 "second on 60 Hz the half-way frame takes judder from 8.33 ms to 0 and doubles the new images; at 40, 45 and " +
+                 "24 it judders 3.4 to 5.9 ms and timed generation 0, for 5.7 to 16.7 ms more latency; with each frame 5 ms " +
+                 "either side of 33, 1.85 against 6.05. And the hold FSR3 uses to space the pair buys nothing on a FIXED " +
+                 "refresh -- judder identical to showing both at once in every case, 8.3 ms of latency for it at 20 frames a " +
+                 "second: it is for a display that refreshes when told. fx/fsr/fsr3Pacing-selfcheck.mjs drives fx/fsr/fsr3Tsl.mjs " +
+                 "with it on the device, a real FSR2 frame every third refresh, and grades each refresh's IMAGE against the " +
+                 "scene at the time smooth motion shows there: timed 22.62 dB a refresh, half-way 22.01, none 20.74, worst " +
+                 "refreshes in the same order. makeFrameGen gained a per-call t and a second frame between the same pair " +
+                 "that keeps the pair's older depth. The first draft generated a real frame again at t = 1e-16 -- a float, " +
+                 "snapped now; four generator sabotages scored 0 until rows compared each timed frame with the scene at its " +
+                 "own t. fsr-three.html's 'FSR3 paced' view runs it with a cadence and a policy.",
+    }),
     // v4742 -- THE 349th CLOSING: FSR3 as FSR3 is composed -- frames generated between FSR2's upscaled frames.
     since424: Object.freeze({
         at: "v4742", swept: 1, green: 1, red: 0,

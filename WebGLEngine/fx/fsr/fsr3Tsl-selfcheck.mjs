@@ -177,7 +177,6 @@ else {
 // WEBGPU ONLY: the first run read both backends within 0.16 dB of each other and took 25 s; every pass is held to its
 // mirror on both backends by its own gate.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: PACING -- a generated frame is worth having only if it is SHOWN halfway between the two it came from, " +
-    "which is fsr-three.html's and a later round's; content the vectors do not see, which makeFrameGen's `flow` handles and " +
+console.log("unchecked here: PACING, which render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs grade (v4743); content the vectors do not see, which makeFrameGen's `flow` handles and " +
     "fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures on native frames; and the generated frame's own temporal stability.");
 process.exitCode = fails ? 1 : 0;

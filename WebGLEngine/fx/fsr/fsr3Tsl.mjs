@@ -41,7 +41,7 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
         const s = new THREE.Scene(); s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return s; };
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const show = frames2.map((f) => quad(TSL.textureLoad(f.texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)))));
-    let frames = 0, lastInputs = null;
+    let frames = 0, lastInputs = null, lastPair = -1;
     // the NEWER frame's field, as makeFrameGen asks: FSR2's stage holds the last real frame's, which is the newer of the pair
     // *** THE DEPTH IS THE STAGE'S IN BOTH MODES, ONLY THE MOTION IS DILATED. *** FSR2's record -- the dilated depth -- is a
     // ping-pong pair and the one this frame wrote is record[k % 2]; reading it here would tie the generator to the chain's
@@ -59,16 +59,26 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
             if (output !== undefined && output !== false) { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[k], ortho); renderer.setRenderTarget(keep); }
             frames++;
         },
-        /** The frame between the last two real frames, at `output`. With one real frame so far it is that frame. */
-        async generate(output = null) {
+        /**
+         * The frame between the last two real frames, at `output` -- at `t` if given (v4743: a pacer's), the generator's own
+         * otherwise. With one real frame so far it is that frame. A second call before the next real frame is a second frame
+         * between the same two, and the generator is told so.
+         */
+        async generate(output = null, { t = null } = {}) {
             if (frames === 0) throw new Error("fx/fsr/fsr3Tsl: generate needs a real frame first -- call render");
             const cur = frames2[(frames - 1) % 2], prev = frames >= 2 ? frames2[frames % 2] : cur;
             const { motion, depth } = fieldOf();
             lastInputs = { prev: prev.texture, cur: cur.texture, motion, depth };
-            await gen.generate(renderer, lastInputs, output);
+            await gen.generate(renderer, lastInputs, output, { t, again: lastPair === frames });
+            lastPair = frames;
             // one real frame in there is nothing to be between: the call above only primed the generator's older depth, and
             // what is shown is the frame itself
             if (frames === 1) { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[0], ortho); renderer.setRenderTarget(keep); }
+        },
+        /** Show real frame k again at `output` -- the newest or the one before it, the two this holds. */
+        async show(k, output = null) {
+            if (!(k === frames - 1 || (k === frames - 2 && k >= 0))) throw new Error(`fx/fsr/fsr3Tsl: show holds the last two real frames, ${frames - 2} and ${frames - 1} -- got ${k}`);
+            const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[k % 2], ortho); renderer.setRenderTarget(keep);
         },
         dispose() { up.dispose(); gen.dispose(); for (const f of frames2) f.dispose(); },
     };

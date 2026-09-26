@@ -43,6 +43,7 @@
       <option value="genholes">generated frame, halfway between the last two, holes black (debug)</option>
       <option value="flow">optical flow, from the colour alone (debug)</option>
       <option value="fsr3gen">FSR3: the frame generated between the last two FSR2 frames (debug)</option>
+      <option value="fsr3paced">FSR3 paced: real FSR2 frames every few refreshes, generated frames between</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -63,6 +64,13 @@
     </select></label>
     <label><input id="spin" type="checkbox" checked> spin</label>
     <label title="The floor's stripes slide along the floor, which does not move: its motion vectors stay zero and only the optical flow sees it -- the case FSR3 runs a flow for."><input id="scroll" type="checkbox"> scroll the floor's texture</label>
+    <label title="FSR3 paced: a real FSR2 frame every N refreshes, and render/framePacer.mjs choosing, at each refresh, a generated frame, a real one or neither.">pacing <select id="cadence">
+      <option value="2" selected>real every 2nd refresh</option>
+      <option value="3">real every 3rd refresh</option>
+    </select> <select id="policy">
+      <option value="midpoint" selected>FSR3's half-way frame</option>
+      <option value="timed">timed: a frame at each refresh's own time</option>
+    </select></label>
     <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector (fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
@@ -78,6 +86,7 @@ import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
 import { makeFrameGen } from "./fx/fsr/fsrFrameGenTsl.mjs";
 import { makeFsr3 } from "./fx/fsr/fsr3Tsl.mjs";
+import { makeFramePacer } from "./render/framePacer.mjs";
 import { makeOpticalFlow } from "./render/opticalFlowTsl.mjs";
 import { jitterPhaseCount } from "./render/jitter.mjs";
 
@@ -213,6 +222,35 @@ try {
         await fsr3.generate(null);
     };
 
+    // v4743 -- FSR3 PACED: a real FSR2 frame every N refreshes -- the scene rendered at 1 / N of the display's rate -- and
+    // render/framePacer.mjs deciding at each refresh what is shown: the frame generated between the last two real ones (at
+    // t = 0.5, FSR3's, or at the time that refresh stands for, "timed"), a real one, or nothing new. render/framePacer-
+    // selfcheck.mjs measures the two: at every 2nd refresh they are the same; at every 3rd the half-way frame judders and the
+    // timed one does not. A real frame counts as ready the refresh it is rendered in, so the pacer's margin is 0 here.
+    let paced = null;
+    const REFRESH = 1000 / 60;
+    const showPaced = async () => {
+        const k = Number($("scale").value), N = Number($("cadence").value), pol = $("policy").value, key = [k, N, pol, $("genflow").checked].join("|");
+        if (!paced || paced.key !== key) {
+            if (paced) paced.f3.dispose();
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+            paced = { key, N, v: 0, counts: { gen: 0, real: 0, hold: 0 }, pacer: makeFramePacer({ refresh: REFRESH, policy: pol, margin: 0 }),
+                      f3: makeFsr3(THREE, TSL, renderer, { fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
+                                                           frameGen: $("genflow").checked ? { flow: {} } : {} }) };
+        }
+        const P = paced, T = P.v * REFRESH;
+        if (P.v % P.N === 0) { await P.f3.render(scene, camera, false); P.pacer.real(P.v / P.N, T, T); }
+        const s = P.pacer.at(T), f = P.f3.frames;
+        // the pacer asks only for what the generator holds -- the pair of the last two real frames -- and a hold draws nothing:
+        // the canvas keeps what it last showed
+        if (s.kind === "gen" && s.k === f - 1) await P.f3.generate(null, { t: s.t });
+        else if (s.kind === "real" && (s.k === f - 1 || s.k === f - 2)) await P.f3.show(s.k, null);
+        P.counts[s.kind === "gen" || s.kind === "real" ? s.kind : "hold"]++;
+        P.v++;
+    };
+
     // v4730 -- THE DEPTH CLIP'S MASK AND THE LOCK RING'S, OF THE LIVE SCENE. Red: disocclusion -- where the
     // knot uncovered what was behind it and the history there belongs to the knot. Green: the shading-shift mask
     // from the reprojected luma ring -- where the LIGHT changed rather than the surface moved (the knot's normal
@@ -291,7 +329,7 @@ try {
         // they interpolate is the motion between two consecutive frames, and on a slow device the wall clock turns that
         // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
         // -- and the flow view, whose search reaches 16 pixels at three levels and no further (v4740)
-        const genView = $("mode").value === "gen" || $("mode").value === "genholes" || $("mode").value === "flow" || $("mode").value === "fsr3gen";
+        const genView = ["gen", "genholes", "flow", "fsr3gen", "fsr3paced"].includes($("mode").value);
         if ($("spin").checked) t += genView ? 1 / 60 : dt / 1000;
         if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
         knot.rotation.set(t * 0.4, t * 0.6, 0);
@@ -306,11 +344,13 @@ try {
         else if (mode === "gen" || mode === "genholes") await showGen(mode === "gen");
         else if (mode === "flow") await showFlow();
         else if (mode === "fsr3gen") await showFsr3();
+        else if (mode === "fsr3paced") await showPaced();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
         const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
-            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen") && $("genflow").checked ? " + optical flow" : "");
+            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genflow").checked ? " + optical flow" : "")
+            + (mode === "fsr3paced" && paced ? ` | real every ${paced.N}, ${paced.pacer.policy}: ${paced.counts.gen} generated, ${paced.counts.real} real, ${paced.counts.hold} held` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };
