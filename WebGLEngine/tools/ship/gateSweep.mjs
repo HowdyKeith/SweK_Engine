@@ -8032,6 +8032,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4733 -- THE 340th CLOSING: FSR2's chain graded at the half precision it ships with.
+    since415: Object.freeze({
+        at: "v4733", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalHalf-selfcheck.mjs", "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE CONFIGURATION fsr-three.html RUNS WAS THE ONE NOTHING HELD TO ANYTHING, AND AT HALF IT IS THE CHAIN TO TWO " +
+                 "ULPS. *** makeFsrTemporal defaults its colour, resolved and history targets to HalfFloatType, and every gate in the " +
+                 "arc replaced that with FloatType to grade the arithmetic. fx/fsr/fsrTemporalHalf-selfcheck.mjs derives where a half " +
+                 "history stops converging -- the step alpha * (current - history) rounds to nothing under half an ulp, so it stalls " +
+                 "within ulp / (2 alpha), five ulps at alpha 0.1, 102 of 102 runs inside -- and runs the CPU chain from the device's " +
+                 "renders ROUNDED TO HALF at the device's three half writes (text/slugAtlas.js's toHalf, one definition): worst 2 " +
+                 "half ulps over 24 frames at 2x on both backends, 239 of 294,912 values differing at all. " +
+                 "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs measures the cost: half against float, 0.000 dB on fsr-three.html's scene " +
+                 "and on moving wires (25.273 against 25.272 at 64 -> 128), every history value but one within the stall bound. " +
+                 "*** TWO READBACK FACTS, BOTH MEASURED BY GETTING THEM WRONG FIRST. *** A half target reads back as raw binary16 " +
+                 "words in a Uint16Array (read as numbers, the half history sat '12,000' from float); and on WebGPU its rows pad to 256 " +
+                 "bytes like a float target's, at half the bytes a texel, so a width must be a multiple of 32 (a 48-wide history came " +
+                 "back 2,047 ulps off, and WebGL2 read the same run to 2). *** AND PSNR CANNOT TELL HALF FROM 8-BIT. *** Sabotage H7 " +
+                 "made the default 8-bit and PSNR moved 0.003 dB -- against a truth ~20 dB away precision is not the limit -- so the " +
+                 "stall rows are the grade: half within 2.4e-3 of float at 0.5, where 8-bit stalls at 2.0e-2 and clips above 1. Five " +
+                 "sabotages, every one red somewhere; the resolve kept at float is visible only to the composition (393 ulps). The " +
+                 "two sections first took 49 s together and were split.",
+    }),
     // v4732 -- THE 339th CLOSING: FSR2's lock life and clamp relaxation as TSL, on by default, and what they buy.
     since414: Object.freeze({
         at: "v4732", swept: 1, green: 1, red: 0,

@@ -197,5 +197,5 @@ else {
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether the chain HELPS a three.js scene, frame against truth -- fx/fsr/fsrTemporalQuality-selfcheck.mjs and " +
     "fx/fsr/fsrTemporalLocks-selfcheck.mjs measure that; HalfFloat targets, the driver's default, which this gate replaces with FloatType " +
-    "to grade the arithmetic; and the 2x ring, whose 64 slots at display size are why the driver ships with it off.");
+    "to grade the arithmetic and fx/fsr/fsrTemporalHalf-selfcheck.mjs grades at half; and the 2x ring, whose 64 slots at display size are why the driver ships with it off.");
 process.exitCode = fails ? 1 : 0;

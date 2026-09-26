@@ -544,8 +544,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4730 -- 1806 -> 1808 for render/temporalClipTsl-selfcheck.mjs and render/temporalLockTsl-selfcheck.mjs, the depth clip and the lock ring split out of render/temporalTsl-selfcheck.mjs when it passed the 20 s cap.
     // v4731 -- 1808 -> 1811 for render/reactiveTsl-selfcheck.mjs, fx/fsr/fsrTemporalTsl-selfcheck.mjs and fx/fsr/fsrTemporalQuality-selfcheck.mjs -- the reactive mask, FSR2's composition over three.js, and what it buys.
     // v4732 -- 1811 -> 1812 for fx/fsr/fsrTemporalLocks-selfcheck.mjs -- what FSR2's lock life and clamp relaxation buy a three.js scene, measured through the driver on both backends.
-    gates: 1812, usesOk: 1791, definesOk: 1783, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1684, condFirst: 91, unknownSignature: 16,
+    // v4733 -- 1812 -> 1814 for fx/fsr/fsrTemporalHalf-selfcheck.mjs and fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs -- FSR2's chain at the half precision it ships with: the stall derived, the composition at half, and what half costs.
+    gates: 1814, usesOk: 1793, definesOk: 1785, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1686, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -88,5 +88,5 @@ else {
 // removing any one of the three things that make it an accumulation of jittered samples removes the gain.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a MOVING scene's quality, where the reprojection, the clamp and the masks decide it and the answer " +
-    "depends on content (fsr.html measured its own); HalfFloat targets; and perceived sharpness, which PSNR does not measure.");
+    "depends on content (fsr.html measured its own); and perceived sharpness, which PSNR does not measure.");
 process.exitCode = fails ? 1 : 0;

@@ -119,5 +119,5 @@ else {
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a scene whose thin detail is TEXTURE at the pixel scale under a moving occluder -- render/temporalLock-selfcheck.mjs " +
     "section 5 measured locks making that ghost 26% worse where disocclusion only killed locks; here disocclusion also discards the history, " +
-    "and no row draws that case; HalfFloat targets; and perceived sharpness, which PSNR does not measure.");
+    "and no row draws that case; and perceived sharpness, which PSNR does not measure.");
 process.exitCode = fails ? 1 : 0;
