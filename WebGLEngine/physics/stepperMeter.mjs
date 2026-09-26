@@ -209,7 +209,11 @@ export function exactSolutionVerdict(c = CENT) {
 }
 
 export const MEASURED_V3605 = {
-    shippedPathHashes: { shmRun: "44e16980bad7a927", reportLines: "231302d32555b445" },
+    // v4680 -- shmRun's hash re-taken after physics/stepperMeter-selfcheck.mjs stopped hashing a raw
+    // toString() of r.ratio/r.perStep (see that file's own note): rounded to the same toExponential(6) its
+    // report already used, then re-measured on Node 22.22.2 AND Node 24.15.0 -- both now read
+    // ae6b64faa3d09533. The value here changed because the INPUT TO THE HASH changed; shmRun itself did not.
+    shippedPathHashes: { shmRun: "ae6b64faa3d09533", reportLines: "231302d32555b445" },
     symplecticAtOne: { energyRatio: 1.0, verdict: "FAITHFUL", worstAbsFromCos: 1.999961, theoreticalMax: 2 },
     discretePeriodKey: { wdt: 1.0, relErr: 1.48e-16 },
     exactSolutionReads: "EXPLODES",
