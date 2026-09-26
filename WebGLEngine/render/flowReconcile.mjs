@@ -202,3 +202,101 @@ export function reconcileFlowCPU({ cur, prev, w, h, flow, conf, bw, bh, block,
     }
     return { flow: out, appFlow, source, sadApp, sadFlow, sadStill, counts, bw, bh, block, conf };
 }
+
+/**
+ * v4741 -- THE RECONCILED FIELD PER PIXEL, for a frame generator that splats one vector a pixel (fx/fsr/fsrFrameGenTsl.mjs,
+ * through render/flowReconcileTsl.mjs). `rc` is reconcileFlowCPU's result for the same frames, `motion` and `depth` the
+ * application's per-pixel field and the newer frame's depth. Returns w*h*4: (vx, vy, depth, valid), forward, in pixels.
+ *
+ * *** THE DECISION IS THE BLOCK'S AND THE VECTOR IS THE PIXEL'S WHERE THE APPLICATION KEPT THE BLOCK. *** A block the
+ * application kept was kept because its nearest pixel's vector explained the block at least as well as the flow did;
+ * every pixel of it keeps its OWN vector, which on a three.js scene is exact, and its own validity. A block the flow took
+ * gives every pixel the block's flow, valid: the colour moved there, whatever the geometry says. Reducing the
+ * application's field to blocks as reconcileFlowCPU's output does would cost every silhouette the whole scene has.
+ */
+export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
+    if (!rc || !rc.source || rc.bw !== Math.ceil(w / rc.block) || rc.bh !== Math.ceil(h / rc.block))
+        throw new Error("reconciledPixelFieldCPU: rc must be reconcileFlowCPU's result for a w x h frame");
+    if (!motion || motion.length < w * h * 4) throw new Error("reconciledPixelFieldCPU: motion must be w*h*4 -- (du, dv, valid, zPrev)");
+    if (!depth || depth.length < w * h) throw new Error("reconciledPixelFieldCPU: depth must be w*h");
+    const out = new Float32Array(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const j = y * w + x, b = Math.floor(y / rc.block) * rc.bw + Math.floor(x / rc.block);
+        if (rc.source[b] === SRC_APP) {
+            out[j * 4] = -motion[j * 4] * w; out[j * 4 + 1] = -motion[j * 4 + 1] * h; out[j * 4 + 3] = motion[j * 4 + 2] ? 1 : 0;
+        } else {
+            out[j * 4] = rc.flow[b * 2]; out[j * 4 + 1] = rc.flow[b * 2 + 1]; out[j * 4 + 3] = 1;
+        }
+        out[j * 4 + 2] = depth[j];
+    }
+    return out;
+}
+
+/**
+ * v4741 -- THE DECISION PER PIXEL, which is what a frame generator on a three.js scene needs and reconcileFlowCPU is not.
+ * For each pixel of `cur`: its own application vector against its block's colour flow, each scored by the bilinear SAD of
+ * the (2 radius + 1)^2 window about the pixel (sadAt, the same scorer), the flow taking the pixel only by beating the
+ * application by `margin`, STRICTLY -- the block rule's two defences, at pixel scale -- and only where the window it was
+ * scored on, carried back along the flow, lies inside `prev`. A pixel with no valid vector takes the flow. Returns { field, source, sadApp, sadFlow, counts }: field is w*h*4 (vx, vy, depth, 1), forward, in pixels --
+ * every pixel carries a vector, so none is left to the fill for want of one.
+ *
+ * *** WHY NOT THE BLOCK'S DECISION, APPLIED PER PIXEL (reconciledPixelFieldCPU), WHICH THIS ROUND BUILT FIRST. *** It was
+ * measured on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's scene -- a turning knot over a wall whose texture scrolls -- and made
+ * the generated frame WORSE than the vectors alone, by five dB on the wall. A block straddling the knot's silhouette holds
+ * two motions; its nearest pixel's vector is the knot's and cannot explain the wall, so the flow takes the block, and its
+ * ONE vector -- the wall's -- then overwrites the knot's pixels, whose own vectors were exact. Scored per pixel, a knot
+ * pixel's window is the knot's and keeps its vector, and a wall pixel's is the wall's and takes the flow.
+ *
+ * *** THE FLOW MAY NOT TAKE A PIXEL WHOSE EVIDENCE CAME FROM OUTSIDE THE FRAME. *** Where content enters -- the leading edge of
+ * a scroll or a pan -- the window's samples in `prev`, carried back along the flow, fall off the frame and read the clamped
+ * edge; the flow's score there is a comparison with a smear, the application's is no better, and the first draft let the
+ * flow win about half of them: 8 x 8 blocks of the wrong vector down the frame's leading edge, -3 dB on that border. Such a
+ * pixel keeps the application's vector, which is the vectors-only generator's answer there.
+ *
+ * *** AND THE MARGIN IS 0.9 HERE, NOT THE BLOCK RULE'S 0.05: the flow takes a pixel only by explaining its window TEN TIMES
+ * better. *** Measured on that scene, generated frames against frames rendered at the midpoint, dB over the vectors alone:
+ *                        scroll   still   knot at 12x   pan    pan + scroll
+ *   margin 0.05          -0.36    -0.22      +2.03      -0.93     -0.88
+ *   margin 0.8           +1.15    -0.03      +0.77      -0.09     +1.45
+ *   margin 0.9           +1.34    +0.01      +0.22      -0.05     +1.36
+ *   margin 0.98          +0.80     0.00       0.00       0.00     +0.29
+ * A three.js scene's vector is EXACT on geometry, and a 3 x 3 window scored under it still carries a residual wherever the
+ * shading moves with the surface -- the knot's normal colours turn with it -- so at 0.05 the flow took 42% of the knot's
+ * pixels from exact vectors, and those pixels, splatted nearer than the wall, carried the knot onto it. The flow pays where
+ * the vectors are silent, which is where they are wrong by a whole displacement and the ratio is large. What 0.9 gives
+ * up is the knot turning at 12x -- a chord where the motion is an arc -- which a low margin helped by 2 dB; the vectors
+ * stay the incumbent, and that is the price.
+ */
+export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motion, depth, radius = 1, margin = 0.9 }) {
+    if (!(block >= 2) || block !== Math.floor(block))
+        throw new Error(`reconcilePixelsCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
+    if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
+        throw new Error(`reconcilePixelsCPU: the block grid does not cover the frame -- got ${bw}x${bh} for ${w}x${h} at block ${block}`);
+    if (!(radius >= 0) || radius !== Math.floor(radius) || radius > 4)
+        throw new Error(`reconcilePixelsCPU: radius must be a whole number of pixels from 0 to 4 -- got ${radius}`);
+    if (!(margin >= 0) || !(margin < 1)) throw new Error(`reconcilePixelsCPU: margin must be in [0, 1) -- got ${margin}`);
+    if (!motion || motion.length < w * h * 4) throw new Error("reconcilePixelsCPU: motion must be w*h*4 -- (du, dv, valid, zPrev)");
+    if (!depth || depth.length < w * h) throw new Error("reconcilePixelsCPU: depth must be w*h");
+    const A = luminancePyramidCPU({ src: cur, w, h }).mips[0], B = luminancePyramidCPU({ src: prev, w, h }).mips[0];
+    const n = 2 * radius + 1;
+    const field = new Float32Array(w * h * 4), source = new Int32Array(w * h);
+    const sadApp = new Float32Array(w * h).fill(NaN), sadFlow = new Float32Array(w * h);
+    const counts = { app: 0, flowBeat: 0, flowOnly: 0 };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const j = y * w + x, b = Math.floor(y / block) * bw + Math.floor(x / block);
+        const fx = flow[b * 2], fy = flow[b * 2 + 1], ox = x - radius, oy = y - radius;
+        sadFlow[j] = sadAt(A, B, w, h, ox, oy, ox - fx, oy - fy, n);
+        let vx = fx, vy = fy;
+        // every bilinear tap of the window, carried back along the flow, inside `prev`
+        const seen = ox - fx >= 0 && oy - fy >= 0 && ox - fx + n <= w - 1 && oy - fy + n <= h - 1;
+        if (!motion[j * 4 + 2]) { source[j] = SRC_FLOW_ONLY; counts.flowOnly++; }
+        else {
+            const ax = -motion[j * 4] * w, ay = -motion[j * 4 + 1] * h;
+            sadApp[j] = sadAt(A, B, w, h, ox, oy, ox - ax, oy - ay, n);
+            if (seen && sadFlow[j] < sadApp[j] * (1 - margin)) { source[j] = SRC_FLOW_BEAT; counts.flowBeat++; }
+            else { source[j] = SRC_APP; counts.app++; vx = ax; vy = ay; }
+        }
+        field[j * 4] = vx; field[j * 4 + 1] = vy; field[j * 4 + 2] = depth[j]; field[j * 4 + 3] = 1;
+    }
+    return { field, source, sadApp, sadFlow, counts };
+}

@@ -10,13 +10,16 @@
 //   2. the splat, the fill and the warp at time t (makeFrameInterp with `fill`)
 //   3. the newer frame's depth is kept, because the next generation's fill asks where the OLDER frame's surfaces were
 //
-// *** THE MOTION IS THE APPLICATION'S AND NOT AN OPTICAL FLOW, AND THAT IS WHAT A THREE.JS SCENE OFFERS FOR FREE. ***
-// FSR3 reconciles the game's motion vectors with an optical flow of the colour, because the vectors do not see what is
-// not geometry -- shadows, reflections, particles, UI. render/opticalFlow.mjs and render/flowReconcile.mjs are this tree's
-// versions; the flow is TSL since v4740 (render/opticalFlowTsl.mjs, and fsr-three.html's "optical flow" view beside a floor
-// whose texture scrolls while the floor stands still), the reconciliation is not, and this driver reads only the vectors:
-// every surface a three.js scene draws carries its own here (render/temporalTsl.mjs's VelocityNode subclass keeps each
-// object's previous matrix), and the gate's scene is geometry. The limit is named.
+// *** THE MOTION IS THE APPLICATION'S, AND SINCE v4741 THE COLOUR'S TOO WHERE THE APPLICATION'S IS SILENT. *** FSR3
+// reconciles the game's motion vectors with an optical flow of the colour, because the vectors do not see what is not
+// geometry -- shadows, reflections, particles, UI, a texture scrolling on a surface that stands still. `flow: {}` runs
+// render/opticalFlowTsl.mjs and render/flowReconcileTsl.mjs first and splats their field: per PIXEL, each pixel's own vector
+// against its block's flow on the 3 x 3 window about it, the flow winning only by explaining it ten times better and only on
+// evidence read inside the frame. fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures it: +0.5 to +0.8 dB over the frame where a
+// wall's texture scrolls behind the knot (+11 to +16 on the wall itself), -0.03 under a pan where every vector is exact --
+// and render/flowReconcile.mjs's block rule, applied per pixel, BELOW the vectors alone where the texture scrolls, because a
+// block straddling the knot's silhouette hands its one vector to the knot. It is not the default: it pays only on content
+// the vectors miss, and it is a pyramid and a search every generated frame.
 //
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
@@ -32,14 +35,19 @@
 // at zero put the frame BELOW a plain cross-fade (fx/fsr/fsrFrameGen-selfcheck.mjs).
 "use strict";
 import { makeFrameInterp, flowFromMotionNode } from "../../render/frameInterpTsl.mjs";
+import { makeOpticalFlow } from "../../render/opticalFlowTsl.mjs";
+import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
 
 /**
  * The generator for w x h frames. generate(renderer, { prev, cur, motion, depth }, output) writes the frame at time t
  * between the textures `prev` and `cur`, where `motion` and `depth` are the NEWER frame's (render/temporalTsl.mjs's
  * convention: uvPrev - uvCurr, and clip depth). The first call has no older depth and fills with the newer one's.
  * `fill` is makeFrameInterp's, the depth textures supplied here; null generates with the holes left at zero.
+ * `flow` (v4741) reconciles the vectors with an optical flow of the two frames first: { block, searchRadius, levels } for
+ * render/opticalFlowTsl.mjs and { margin, mode, radius } for render/flowReconcileTsl.mjs, {} for their defaults, null for
+ * the vectors alone.
  */
-export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" } } = {}) {
+export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null } = {}) {
     const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     const field = flat(), depthNow = flat(), depthOld = flat();
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
@@ -51,23 +59,31 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
+    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3 }) : null;
+    const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     let generated = 0;
     return {
-        interp: fi, targets: { field, depthNow, depthOld }, uniforms: fi.uniforms,
+        interp: fi, targets: { field, depthNow, depthOld }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec,
         get generated() { return generated; },
         async generate(renderer, { prev, cur, motion, depth }, output = null) {
             const keep = renderer.getRenderTarget();
-            const fieldSc = once("field|" + motion.uuid + "|" + depth.uuid, () => quad(flowFromMotionNode(TSL, motion, depth, { w, h }).node));
             const copyNow = once("now|" + depth.uuid, () => quad(at(depth)));
-            await draw(renderer, fieldSc, field);
+            if (!of) await draw(renderer, once("field|" + motion.uuid + "|" + depth.uuid, () => quad(flowFromMotionNode(TSL, motion, depth, { w, h }).node)), field);
             await draw(renderer, copyNow, depthNow);
             if (generated === 0) await draw(renderer, once("old0", () => quad(at(depthNow.texture))), depthOld);
-            await fi.splat(renderer, field.texture);
+            if (of) {
+                // the colour's own motion, prev -> cur, and per block the one the two frames support better -- per pixel, the
+                // application's own vector wherever its block kept it (render/flowReconcileTsl.mjs)
+                await of.flow(renderer, cur, prev);
+                await rec.reconcile(renderer, { lumaCur: of.pyramids.cur.targets[0].texture, lumaPrev: of.pyramids.prev.targets[0].texture,
+                                                flow: of.target.texture, motion, depth });
+            }
+            await fi.splat(renderer, of ? rec.targets.field.texture : field.texture);
             await fi.gather(renderer, prev, cur, output);
             await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next call's older depth
             renderer.setRenderTarget(keep);
             generated++;
         },
-        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld]) x.dispose(); },
+        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld]) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
     };
 }

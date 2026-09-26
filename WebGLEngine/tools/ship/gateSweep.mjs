@@ -8032,6 +8032,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4741 -- THE 348th CLOSING: the vectors reconciled with the colour's motion, and FSR3's rule measured losing.
+    since423: Object.freeze({
+        at: "v4741", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flowReconcileTsl-selfcheck.mjs", "fx/fsr/fsrFrameGenFlow-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcile-selfcheck.mjs (section 9: the per-pixel rule and the per-pixel field on the CPU)"]),
+        verdict: "*** THE GENERATED FRAME NOW SEES WHAT THE VECTORS DO NOT, AND THE RULE THAT DOES IT IS NOT THE ONE THE MIRROR HAD. *** " +
+                 "render/flowReconcileTsl.mjs ports render/flowReconcile.mjs's reconcileFlowCPU exactly -- every block's source and " +
+                 "vector on both backends, the nearest-valid-pixel rule, the strict margin -- and its decision applied per pixel. " +
+                 "Wired into fx/fsr/fsrFrameGenTsl.mjs and measured against frames rendered at the midpoint, on a wall whose " +
+                 "texture scrolls behind the turning knot, that made the frame WORSE than the vectors alone: a block straddling " +
+                 "the silhouette holds two motions, its nearest pixel's vector is the knot's and cannot explain the wall, and the " +
+                 "flow's one vector then overwrote knot pixels whose own vectors were exact. So the decision is per PIXEL now -- " +
+                 "reconcilePixelsCPU, added to the mirror: each pixel's own vector against its block's flow on the 3 x 3 window " +
+                 "about it -- with two rules the measurement found: the flow may not take a pixel on evidence read off the frame " +
+                 "(the scroll's leading edge had been -3 dB), and the margin is 0.9, not 0.05, because a window under an exact " +
+                 "vector still carries the residual of shading that turns with the surface and a small margin handed 42% of the " +
+                 "knot's pixels to the flow. Confirmed on speeds the margin was not chosen on: +0.53 and +0.82 dB over the frame " +
+                 "where the texture scrolls, +10.9 and +15.7 on the wall, -0.03 under a pan; one pre-registered row failed and is " +
+                 "now a finding -- the knot turning at 6x gains +1.33 at the low margin, because its vector is a chord. The first " +
+                 "fixture was a float texture, unfilterable and point-sampled into blocks, and the second a sum of sines the " +
+                 "matcher locked onto the wrong repeat of; the wall is shader noise. mix() missed a copied vector by an ulp and the " +
+                 "weights are written out. Twenty-two sabotages; R8 is equivalent by construction. fsr-three.html's generated " +
+                 "views take the flow with 'gen: + optical flow'.",
+    }),
     // v4740 -- THE 347th CLOSING: FSR3's optical flow for a three.js scene, as TSL.
     since422: Object.freeze({
         at: "v4740", swept: 1, green: 1, red: 0,

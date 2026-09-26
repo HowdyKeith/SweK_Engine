@@ -25,7 +25,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { opticalFlowCPU } from "./opticalFlow.mjs";
-import { reconcileFlowCPU, SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
+import { reconcileFlowCPU, reconciledPixelFieldCPU, reconcilePixelsCPU, SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./motionVectors.mjs";
 import { viewProj } from "./rasterProbe.js";
 
@@ -282,6 +282,38 @@ console.log("\n8. WHAT IT REFUSES");
     ok("a three-channel motion buffer is refused, naming all four channels",
        /du, dv, valid, zPrev/.test(threw(() => reconcileFlowCPU({ ...base(), motion: new Float32Array(W * H * 3) })) || ""),
        threw(() => reconcileFlowCPU({ ...base(), motion: new Float32Array(W * H * 3) })));
+}
+
+console.log("\n9. v4741 -- PER PIXEL, FOR A GENERATOR THAT SPLATS ONE VECTOR A PIXEL");
+{
+    // reconciledPixelFieldCPU: the block's decision, each pixel's own vector where the application kept the block
+    const g = scene({ dex: 0.437 }), sh = scene({ slide: 0.437 });
+    const F = reconciledPixelFieldCPU({ rc: sh.rc, motion: sh.mv.data, depth: sh.cur.depth, w: W, h: H });
+    let blockV = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x, b = Math.floor(y / BLOCK) * sh.rc.bw + Math.floor(x / BLOCK);
+        if (sh.rc.source[b] !== SRC_APP && F[i * 4] === sh.rc.flow[b * 2] && F[i * 4 + 3] === 1) blockV++; }
+    ok("reconciledPixelFieldCPU carries a flow block's vector to every pixel of it, valid, on the sliding texture",
+       blockV === W * H && sh.rc.counts.flowBeat === sh.n, `${blockV} of ${W * H} pixels; render/flowReconcileTsl-selfcheck.mjs holds the application's side, pixel by pixel`);
+    // reconcilePixelsCPU at its default margin, 0.9: the camera scene is the application's everywhere, the slide the flow's
+    // away from the edge the new content enters at
+    const args = (sc) => ({ cur: sc.cur.rgba, prev: sc.prev.rgba, w: W, h: H, flow: sc.of.flow, bw: sc.of.bw, bh: sc.of.bh, block: BLOCK, motion: sc.mv.data, depth: sc.cur.depth });
+    const pg = reconcilePixelsCPU(args(g)), ps = reconcilePixelsCPU(args(sh));
+    let lead = 0, leadN = 0, inner = 0, innerN = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x;
+        if (x < 4) { leadN++; if (ps.source[i] === SRC_APP) lead++; } else if (x >= 8 && x < W - 8 && y >= 8 && y < H - 8) { innerN++; if (ps.source[i] === SRC_FLOW_BEAT) inner++; } }
+    report(`per pixel at margin 0.9: the camera scene ${pg.counts.app}/${pg.counts.flowBeat}/${pg.counts.flowOnly}, the slide ${ps.counts.app}/${ps.counts.flowBeat}/${ps.counts.flowOnly} (kept / beaten / alone)`);
+    const pl = reconcilePixelsCPU({ ...args(sh), margin: 0.05 });
+    let innerLow = 0; for (let y = 8; y < H - 8; y++) for (let x = 8; x < W - 8; x++) if (pl.source[y * W + x] === SRC_FLOW_BEAT) innerLow++;
+    ok("*** reconcilePixelsCPU keeps the application's exact vector at every pixel where the CAMERA moved, and gives the flow over half the slide's interior ***",
+       pg.counts.app === W * H && inner > innerN / 2 && innerLow > inner,
+       `${pg.counts.app} of ${W * H} kept on the camera scene; ${inner} of ${innerN} interior pixels of the slide to the flow at the default 0.9, ${innerLow} at 0.05. ` +
+       "The margin asks for a window explained ten times better, and on this wall's near-pixel-scale texture a 3 x 3 window often is not -- the pixels it leaves keep a vector of zero, which is the vectors-only answer; the reason for 0.9 is a measurement, in the function's own note");
+    ok("...and the slide's LEADING edge stays the application's, because the flow's evidence there was read off the frame",
+       lead === leadN, `${lead} of ${leadN} pixels in the first four columns: the texture moves right 3.2 pixels, so their windows carried back along the flow start left of pixel 0`);
+    const threwP = (patch) => threw(() => reconcilePixelsCPU({ ...args(g), ...patch })) || "";
+    ok("...and it refuses what its block sibling refuses, and a window wider than nine pixels",
+       /whole number of pixels, at least 2/.test(threwP({ block: 8.5 })) && /margin must be in/.test(threwP({ margin: 1 })) && /radius must be a whole number/.test(threwP({ radius: 5 }))
+       && /does not cover the frame/.test(threwP({ bw: 7 })), `${threwP({ radius: 5 })}`);
 }
 
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------

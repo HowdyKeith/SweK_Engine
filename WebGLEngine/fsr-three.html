@@ -62,6 +62,7 @@
     </select></label>
     <label><input id="spin" type="checkbox" checked> spin</label>
     <label title="The floor's stripes slide along the floor, which does not move: its motion vectors stay zero and only the optical flow sees it -- the case FSR3 runs a flow for."><input id="scroll" type="checkbox"> scroll the floor's texture</label>
+    <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector (fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
 </div>
@@ -149,12 +150,13 @@ try {
     // v4738: both views are fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen -- the driver fx/fsr/fsrFrameGen-selfcheck.mjs grades --
     // with its default fill (the blend, which that gate measured paying on this knot) or none.
     const gens = {};
+    // v4741: and with the optical flow reconciled in, per pixel (render/flowReconcileTsl.mjs), when "gen: + optical flow" is on
     const showGen = async (filled) => {
-        const key = filled ? "filled" : "holes"; let gen = gens[key];
+        const withFlow = $("genflow").checked, key = (filled ? "filled" : "holes") + (withFlow ? "+flow" : ""); let gen = gens[key];
         if (!motionStage) await showMotion();
         if (!gen) {
             const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, filled ? { w: DW, h: DH } : { w: DW, h: DH, fill: null }) };
+            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, { w: DW, h: DH, ...(filled ? {} : { fill: null }), ...(withFlow ? { flow: {} } : {}) }) };
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
@@ -284,8 +286,9 @@ try {
         else if (mode === "flow") await showFlow();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
-            + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "");
+        const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
+            + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
+            + ((mode === "gen" || mode === "genholes") && $("genflow").checked ? " + optical flow" : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };
