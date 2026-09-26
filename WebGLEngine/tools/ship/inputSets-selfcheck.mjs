@@ -682,6 +682,14 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
     const KEEP_REL = FIXTURE_DIR + "/zz_not_an_inputsets_fixture.txt";
     const run = (...args) => spawnSync(process.execPath, [LITTER, ...args], { encoding: "utf8" });
     const there = (rel) => fs.existsSync(fixtureAbs(rel));
+    // v4680 -- SIGKILL ITSELF HAS NO WINDOWS MEANING, AND THE ROWS BELOW ASSERTED ITS POSIX ECHO. Windows has
+    // no signals; process.kill(pid, "SIGKILL") calls TerminateProcess() there, and the child spawnSync sees
+    // back is signal: null with a nonzero status, never signal: "SIGKILL" -- measured on the box that ships
+    // this branch: "the child died on null". The mutation, the ledger and the restore all worked correctly
+    // there too (reclaimedMut still included the path and the file still came back byte-for-byte); only the
+    // signal-name literal was POSIX-only. wasKilled() reads the platform's own idiom for "died the hard way"
+    // instead of the one name Windows cannot produce.
+    const wasKilled = (r) => process.platform === "win32" ? r.signal === null && r.status !== 0 : r.signal === "SIGKILL";
 
     const reg = run();
     const leftReg = there(PROBE_REG);
@@ -724,9 +732,9 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
     const duringKill = fs.readFileSync(scratch, "utf8");
     const reclaimedMut = reclaimMutations();
     ok("*** a gate left MUTATED by a SIGKILL is put back by the next run, from a ledger outside the tree ***",
-       killed.signal === "SIGKILL" && duringKill !== ORIGINAL &&
+       wasKilled(killed) && duringKill !== ORIGINAL &&
        reclaimedMut.includes(scratch) && fs.readFileSync(scratch, "utf8") === ORIGINAL,
-       `the child died on ${killed.signal} with the file changed, and the reclaim restored ${reclaimedMut.length} ` +
+       `the child died on ${killed.signal ?? "signal:null, status:" + killed.status} with the file changed, and the reclaim restored ${reclaimedMut.length} ` +
        "of them byte for byte. A finally cannot run in this death -- that is the whole reason the ledger exists");
 
     fs.writeFileSync(scratch, ORIGINAL);
@@ -735,7 +743,7 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
     const rawAfter = fs.readFileSync(scratch, "utf8");
     try { fs.unlinkSync(scratch); } catch {}
     ok("!! CONTROL: the same child writing the same bytes WITHOUT ledgering is NOT put back",
-       rawKilled.signal === "SIGKILL" && rawReclaimed.length === 0 && rawAfter !== ORIGINAL,
+       wasKilled(rawKilled) && rawReclaimed.length === 0 && rawAfter !== ORIGINAL,
        `reclaimed ${rawReclaimed.length}, file still ${JSON.stringify(rawAfter.slice(0, 24))}. This is what the ` +
        "code did before the ledger, and it is exactly the state Keith's tree was left in");
     ok("  and the ledger is gone once it has been acted on, so a repaired tree does not report itself forever",
