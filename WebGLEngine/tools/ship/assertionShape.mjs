@@ -553,8 +553,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4739 -- 1819 -> 1820 for tools/ship/pageShot-selfcheck.mjs -- a three.js page shot presented on WebGPU on this box, against the flags that lose the device.
     // v4740 -- 1820 -> 1821 for render/opticalFlowTsl-selfcheck.mjs -- FSR3's optical flow for a three.js scene: the luma pyramid and the block matcher as TSL, the same vector as opticalFlowCPU at every graded block.
     // v4741 -- 1821 -> 1823 for render/flowReconcileTsl-selfcheck.mjs and fx/fsr/fsrFrameGenFlow-selfcheck.mjs -- the reconciliation as TSL, per block and per pixel, and what it buys a generated frame.
-    gates: 1823, usesOk: 1802, definesOk: 1794, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1695, condFirst: 91, unknownSignature: 16,
+    // v4742 -- 1823 -> 1824 for fx/fsr/fsr3Tsl-selfcheck.mjs -- FSR3's frame generation on FSR2's upscaled frames, against a frame rendered at the midpoint.
+    gates: 1824, usesOk: 1803, definesOk: 1795, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1696, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -8032,6 +8032,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4742 -- THE 349th CLOSING: FSR3 as FSR3 is composed -- frames generated between FSR2's upscaled frames.
+    since424: Object.freeze({
+        at: "v4742", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Tsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE GENERATOR RUNS ON THE UPSCALER'S FRAMES NOW, AND DRAWS NO SCENE OF ITS OWN. *** Until this round " +
+                 "fx/fsr/fsrFrameGenTsl.mjs ran only on native frames, the scene rendered at display resolution -- the frames FSR3 " +
+                 "exists not to render. fx/fsr/fsr3Tsl.mjs's makeFsr3 runs FSR2's chain into a pair of display-resolution targets " +
+                 "and makes the frame between each two from the motion field and depth FSR2's stage already renders at display " +
+                 "resolution through the unjittered camera: zero scene renders across fifteen generations, measured by counting " +
+                 "them. Against a 4 x 4-supersampled frame at the midpoint, 64 -> 128 on fsr-three.html's scene: +0.74, +2.10 and " +
+                 "+5.80 dB over showing an upscaled frame twice (the knot at 4x and 12x, a camera pan), +0.49 and +2.77 over a " +
+                 "cross-fade where things move, and within 0.2 dB of the upscaled real frames around it. Two rows were wrong on " +
+                 "the first run: a pan under a pixel a frame could not separate anything from a cross-fade, and a row asserting " +
+                 "the gap to NATIVE generation tracks the real frames' own was broken by the pan -- a frame blended from two " +
+                 "aliased native frames a fraction of a pixel apart beats a native real frame by 1.4 dB against a supersampled " +
+                 "truth, an anti-alias FSR2's accumulated frames had already collected. The raw field and FSR2's dilated one are " +
+                 "within a tenth of a dB; raw is the default. Seven sabotages, all red, two of them after rows were added for them. " +
+                 "fsr-three.html's 'FSR3' view shows the generated frames.",
+    }),
     // v4741 -- THE 348th CLOSING: the vectors reconciled with the colour's motion, and FSR3's rule measured losing.
     since423: Object.freeze({
         at: "v4741", swept: 2, green: 2, red: 0,

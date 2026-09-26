@@ -129,6 +129,6 @@ else {
 // page now, and the configurations nothing needs (the pan has no hole) are not built -- 17 s.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: content the motion field does not describe -- shadows, reflections, particles, UI -- which is what FSR3's " +
-    "optical flow is for, and which fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures with the flow reconciled in (v4741); frame generation on FSR2's upscaled output rather " +
+    "optical flow is for, and which fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures with the flow reconciled in (v4741); frame generation on FSR2's upscaled output, which fx/fsr/fsr3Tsl-selfcheck.mjs measures (v4742), rather " +
     "than a native frame; and PACING, since a generated frame is only worth having if it is shown between the two it came from.");
 process.exitCode = fails ? 1 : 0;

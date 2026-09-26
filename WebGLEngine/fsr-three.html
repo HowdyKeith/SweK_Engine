@@ -42,6 +42,7 @@
       <option value="gen">generated frame, halfway between the last two, holes filled (debug)</option>
       <option value="genholes">generated frame, halfway between the last two, holes black (debug)</option>
       <option value="flow">optical flow, from the colour alone (debug)</option>
+      <option value="fsr3gen">FSR3: the frame generated between the last two FSR2 frames (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -76,6 +77,7 @@ import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/tempor
 import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
 import { makeFrameGen } from "./fx/fsr/fsrFrameGenTsl.mjs";
+import { makeFsr3 } from "./fx/fsr/fsr3Tsl.mjs";
 import { makeOpticalFlow } from "./render/opticalFlowTsl.mjs";
 import { jitterPhaseCount } from "./render/jitter.mjs";
 
@@ -192,6 +194,25 @@ try {
         g.k++;
     };
 
+    // v4742 -- FSR3: fx/fsr/fsr3Tsl.mjs, FSR2 at this scale and the frame between each two of its upscaled frames, made from
+    // the motion field FSR2 already renders at display resolution -- no scene is drawn for it. This view shows only the
+    // generated frames; "gen: + optical flow" reconciles the vectors with the colour's motion there as well.
+    let fsr3 = null, built3 = "";
+    const showFsr3 = async () => {
+        const k = Number($("scale").value), key = [k, $("genflow").checked].join("|");
+        if (key !== built3) {
+            if (fsr3) fsr3.dispose();
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+            fsr3 = makeFsr3(THREE, TSL, renderer, { fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
+                                                    frameGen: $("genflow").checked ? { flow: {} } : {} });
+            built3 = key;
+        }
+        await fsr3.render(scene, camera, false);
+        await fsr3.generate(null);
+    };
+
     // v4730 -- THE DEPTH CLIP'S MASK AND THE LOCK RING'S, OF THE LIVE SCENE. Red: disocclusion -- where the
     // knot uncovered what was behind it and the history there belongs to the knot. Green: the shading-shift mask
     // from the reprojected luma ring -- where the LIGHT changed rather than the surface moved (the knot's normal
@@ -270,7 +291,7 @@ try {
         // they interpolate is the motion between two consecutive frames, and on a slow device the wall clock turns that
         // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
         // -- and the flow view, whose search reaches 16 pixels at three levels and no further (v4740)
-        const genView = $("mode").value === "gen" || $("mode").value === "genholes" || $("mode").value === "flow";
+        const genView = $("mode").value === "gen" || $("mode").value === "genholes" || $("mode").value === "flow" || $("mode").value === "fsr3gen";
         if ($("spin").checked) t += genView ? 1 / 60 : dt / 1000;
         if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
         knot.rotation.set(t * 0.4, t * 0.6, 0);
@@ -284,11 +305,12 @@ try {
         else if (mode === "masks") await showMasks();
         else if (mode === "gen" || mode === "genholes") await showGen(mode === "gen");
         else if (mode === "flow") await showFlow();
+        else if (mode === "fsr3gen") await showFsr3();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
         const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
-            + ((mode === "gen" || mode === "genholes") && $("genflow").checked ? " + optical flow" : "");
+            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen") && $("genflow").checked ? " + optical flow" : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };
