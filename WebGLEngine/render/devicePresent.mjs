@@ -76,24 +76,34 @@ export async function presentCheck(canvas, backend, opts = {}) {
             pass.use(pipe); pass.uniform("viewProj", I); pass.vertices(right); pass.instances(inst); pass.draw(6, 1);
         };
         const want = expectedPattern(W, H);
-        // A: the presented canvas, read by the device in the same task
-        const frA = await Promise.race([device.frame(draw, { read: true }), lostP.then(() => null)]);
-        if (!frA) { out.state = "device-lost"; return out; }
-        out.A = comparePixels(frA.pixels, want);
-        // v4680 -- TRIED AND DISPROVEN: waiting for a render step (two rAFs) before reading C, scoped to
-        // webgpu only. Measured on real hardware (a 1080 Ti, Chrome 153): the result was BYTE-IDENTICAL to
-        // no wait at all -- still 16384 of 16384 wrong at worst=255. A real timing gap would show SOME
-        // improvement from waiting two whole frames; getting the exact same failure regardless of wait
-        // length means this was never a task-boundary problem. Removed rather than left in place doing
-        // nothing: see the round note for what's actually being checked next (drawImage from a WebGPU
-        // canvas may not be seeing that canvas's content at all, independent of timing).
-        // C: what the compositor is handed -- a 2D copy of the presented canvas, taken right after the frame
+        // v4680 -- C MUST BE CAPTURED SYNCHRONOUSLY, BEFORE AWAITING A, NOT AFTER.
+        // Measured directly on real hardware (a 1080 Ti, Chrome 153), with a minimal page that draws a
+        // solid colour via WebGPU and repeatedly samples it through drawImage: a draw followed by an
+        // IMMEDIATE (same-task, no await at all) drawImage read is byte-correct EVERY time, including
+        // after redrawing; a drawImage read taken after ANY yield to the event loop -- even the lightest
+        // one, device.queue.onSubmittedWorkDone() -- reads back fully blank, EVERY time, with no recovery
+        // however long you then wait or how many times you redraw. device.lost never fires -- the device
+        // stays healthy throughout. So this was never about waiting long enough; it is strictly about
+        // which task the drawImage call runs in.
+        // device.frame() (gfx/device.js) is not async: it encodes the draw and calls gpu.queue.submit()
+        // SYNCHRONOUSLY before ever returning -- only the pixel-mapping tail that follows is a promise.
+        // So the fix is to capture C right after CALLING device.frame(), in the same task, before
+        // awaiting its result at all -- not after, as this used to.
+        const frAPromise = device.frame(draw, { read: true });
+        // C: what the compositor is handed -- a 2D copy of the presented canvas, captured in the same
+        // task as the call above, which is the only task in which drawImage sees real WebGPU content.
+        let cBytes = null, cErr = null;
         try {
             const c2 = document.createElement("canvas"); c2.width = W; c2.height = H;
             const ctx = c2.getContext("2d"); ctx.drawImage(canvas, 0, 0);
-            out.C = comparePixels(new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer), want);
-            out.AC = comparePixels(frA.pixels, new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer));
-        } catch (e) { out.C = { differing: -1, worst: 255, n: 0, reason: "drawImage: " + e.message }; }
+            cBytes = new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer);
+        } catch (e) { cErr = "drawImage: " + e.message; }
+        // A: the presented canvas, read by the device in the same task it was drawn
+        const frA = await Promise.race([frAPromise, lostP.then(() => null)]);
+        if (!frA) { out.state = "device-lost"; return out; }
+        out.A = comparePixels(frA.pixels, want);
+        if (cErr) out.C = { differing: -1, worst: 255, n: 0, reason: cErr };
+        else { out.C = comparePixels(cBytes, want); out.AC = comparePixels(frA.pixels, cBytes); }
         // B: the offscreen path every gate uses, same commands
         const frB = await Promise.race([device.frame(draw, { offscreen: true, read: true }), lostP.then(() => null)]);
         if (!frB) { out.state = "device-lost"; return out; }
