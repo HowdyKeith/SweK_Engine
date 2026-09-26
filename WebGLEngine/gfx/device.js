@@ -468,6 +468,8 @@ async function webgpuBackend(canvas, opts = {}) {
     // waited on or not -- four variants, all lost. An offscreen texture of the same format renders and reads
     // back correctly. So a gate that wants pixels from this backend asks for offscreen, and the frame's readback
     // copies from wherever the frame went. On a browser with a compositor the canvas path is the product.
+    // v4739: the loss was the LAUNCH FLAGS, not the shell -- with the compositor on SwiftShader too (tools/ship/
+    // webgpuHarness.mjs's PRESENT_ARGS) this box presents, and tools/ship/devicePresent-selfcheck.mjs section 3 holds it.
     const offscreen = !!opts.offscreen;
     // *** Level 12 -- DEPTH, ON BY DEFAULT, BECAUSE THE WebGL2 BACKEND HAS HAD gl.enable(DEPTH_TEST) SINCE IT WAS
     // WRITTEN AND THIS ONE HAD NOTHING. *** Two overlapping instances drew in submission order here and in

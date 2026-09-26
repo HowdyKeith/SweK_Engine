@@ -61,6 +61,22 @@ export const LAUNCH_ARGS = Object.freeze(
     process.platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"]
 );
 
+// *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
+// gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded
+// as a property of the headless shell. It is not: it is a property of the flags. Measured on this box, headless shell and
+// full Chromium alike, drawing fsr-three.html on WebGPU:
+//     --enable-unsafe-webgpu alone                               device lost ("A valid external Instance reference")
+//     + --enable-features=Vulkan --use-vulkan=swiftshader         still lost
+//     + --use-angle=swiftshader as well                           PRESENTS, and the compositor sees the frame
+// and each of the three added flags, removed alone from the working set, loses the device again; --use-webgpu-adapter=
+// swiftshader and --ignore-gpu-blocklist were tried and are not needed. The compositor has to be on the same software
+// stack as Dawn's SwiftShader Vulkan for the canvas's texture to reach it. LAUNCH_ARGS is left as it was -- every gate's
+// numbers were taken under it -- and PRESENT_ARGS is what a gate or tool that wants a PRESENTED frame asks for. Measured
+// on Linux only; elsewhere it is LAUNCH_ARGS.
+export const PRESENT_ARGS = Object.freeze(
+    process.platform === "linux" ? ["--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-vulkan=swiftshader", "--use-angle=swiftshader"] : [...LAUNCH_ARGS]
+);
+
 /** *** NOT about:blank. *** See the header -- this is the whole reason the harness has a server in it. */
 export const SECURE_HOST = "127.0.0.1";
 
@@ -768,7 +784,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
  *
  * Returns { ok, result, pageErrors, reason }. A thrown error inside the script is a RESULT with its message.
  */
-export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000 }) {
+export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000, launchArgs = LAUNCH_ARGS }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [], adapter: null, software: null };
@@ -788,7 +804,7 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...launchArgs] });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 300)));

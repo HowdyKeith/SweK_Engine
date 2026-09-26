@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4739 -- THE 346th CLOSING: this box presents a WebGPU canvas after all, and the device loss was the flags.
+    since421: Object.freeze({
+        at: "v4739", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/pageShot-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/devicePresent-selfcheck.mjs (section 3: WebGPU presents under PRESENT_ARGS, all three readbacks exact)"]),
+        verdict: "*** THE BUILD BOX DOES PRESENT A WebGPU CANVAS -- THE DEVICE LOSS gfx/device.js's LEVEL 11 RECORDED WAS THE LAUNCH " +
+                 "FLAGS, NOT THE HEADLESS SHELL. *** Measured, headless shell and full Chromium alike: --enable-unsafe-webgpu alone " +
+                 "loses the device on a presented pass; adding --enable-features=Vulkan --use-vulkan=swiftshader still loses it; " +
+                 "adding --use-angle=swiftshader as well PRESENTS, and each of the three removed alone loses it again " +
+                 "(--use-webgpu-adapter and --ignore-gpu-blocklist were tried and are not needed) -- the compositor has to be on the " +
+                 "same software stack as Dawn's SwiftShader Vulkan. tools/ship/webgpuHarness.mjs gains PRESENT_ARGS and a launchArgs " +
+                 "option, LAUNCH_ARGS unchanged under every other gate's numbers. tools/ship/devicePresent-selfcheck.mjs section 3: " +
+                 "WebGPU presents, the device's canvas readback, the offscreen frame and the compositor's copy exact, three runs of " +
+                 "three -- after a fix the new section forced: the compositor copy was taken after an awaited read, and a WebGPU " +
+                 "canvas's texture expires at the next rendering update, so the copy was the pattern on some runs and transparent " +
+                 "black on others; render/devicePresent.mjs takes it in the same task as a frame with no read now. " +
+                 "tools/ship/pageShot.mjs shoots a page as presented: fsr-three.html on WebGPU paints 24,248 colours in its canvas " +
+                 "under PRESENT_ARGS and one under LAUNCH_ARGS, the control. Seven sabotages, all red.",
+    }),
     // v4738 -- THE 345th CLOSING: FSR3's frame generation on a three.js scene, and what it buys.
     since420: Object.freeze({
         at: "v4738", swept: 1, green: 1, red: 0,

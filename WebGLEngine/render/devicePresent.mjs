@@ -11,7 +11,8 @@
 // canvas the device PRESENTS to, and reads the result back three ways:
 //   A  the device's own canvas-mode readback (frame({ read: true }) with the canvas as the attachment);
 //   B  an OFFSCREEN frame with the same commands (frame({ offscreen: true, read: true })), the path every gate uses;
-//   C  a 2D canvas's drawImage() of the presented canvas, then getImageData(): what the COMPOSITOR is handed.
+//   C  a 2D canvas's drawImage() of the presented canvas, then getImageData(): what the COMPOSITOR is handed --
+//      taken in the same task as a frame submitted without a readback (v4739: after an awaited read it was a race).
 // Each is compared with the expectation and with the others; the result names every count. A device that is lost
 // on the presented pass is reported as that, by the message the browser gave, not as a crash.
 //
@@ -72,17 +73,26 @@ export async function presentCheck(canvas, backend, opts = {}) {
             pass.use(pipe); pass.uniform("viewProj", I); pass.vertices(right); pass.instances(inst); pass.draw(6, 1);
         };
         const want = expectedPattern(W, H);
-        // A: the presented canvas, read by the device in the same task
+        // C: what the compositor is handed -- a 2D copy of the presented canvas, taken IN THE SAME TASK as a frame
+        // submitted without a readback. *** v4739: IT WAS TAKEN AFTER AWAITING A READ, AND ON WebGPU THAT IS A RACE. ***
+        // A WebGPU canvas's texture expires at the page's next rendering update, and a frame with `read: true` awaits a
+        // buffer map, which crosses tasks; the copy then read the pattern on some runs and TRANSPARENT BLACK on others --
+        // measured, the same call alternating. A frame without `read` submits synchronously (gfx/device.js), so the copy
+        // below is of that frame, before anything is awaited; A reads a second frame of the same commands.
+        let cPixels = null;
+        try {
+            const pending = device.frame(draw);
+            const c2 = document.createElement("canvas"); c2.width = W; c2.height = H;
+            const ctx = c2.getContext("2d"); ctx.drawImage(canvas, 0, 0);
+            cPixels = new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer);
+            out.C = comparePixels(cPixels, want);
+            if (pending && pending.then) await pending;
+        } catch (e) { out.C = { differing: -1, worst: 255, n: 0, reason: "drawImage: " + e.message }; }
+        // A: the presented canvas, read by the device
         const frA = await Promise.race([device.frame(draw, { read: true }), lostP.then(() => null)]);
         if (!frA) { out.state = "device-lost"; return out; }
         out.A = comparePixels(frA.pixels, want);
-        // C: what the compositor is handed -- a 2D copy of the presented canvas, taken right after the frame
-        try {
-            const c2 = document.createElement("canvas"); c2.width = W; c2.height = H;
-            const ctx = c2.getContext("2d"); ctx.drawImage(canvas, 0, 0);
-            out.C = comparePixels(new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer), want);
-            out.AC = comparePixels(frA.pixels, new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer));
-        } catch (e) { out.C = { differing: -1, worst: 255, n: 0, reason: "drawImage: " + e.message }; }
+        if (cPixels) out.AC = comparePixels(frA.pixels, cPixels);
         // B: the offscreen path every gate uses, same commands
         const frB = await Promise.race([device.frame(draw, { offscreen: true, read: true }), lostP.then(() => null)]);
         if (!frB) { out.state = "device-lost"; return out; }

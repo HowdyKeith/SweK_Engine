@@ -16,6 +16,10 @@
 //     nobody can clear from here is a red that gets registered, and the whole point of this page is that the
 //     answer lives on Galaxina. A THIRD state -- neither presented nor lost -- IS red.
 //
+// v4739 -- SECTION 3: under tools/ship/webgpuHarness.mjs's PRESENT_ARGS this box DOES present on WebGPU, all three readbacks
+// exact. It also found the compositor copy racing: taken after an awaited read, a WebGPU canvas's texture had expired on
+// some runs and the copy was transparent; render/devicePresent.mjs now takes it in the same task as a frame with no read.
+//
 // The pure half (the pattern, the comparison) is held to fabricated inputs first, so "0 of 2048 differ" is a
 // measurement and not a comparison that cannot fail.
 //
@@ -28,7 +32,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { runInEngineOrigin, webgpuSkipReason, PRESENT_ARGS, LAUNCH_ARGS } from "./webgpuHarness.mjs";
 import { expectedPattern, comparePixels, LEFT, RIGHT } from "../../render/devicePresent.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -40,7 +44,8 @@ const codeOf = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[
 
 const W = 64, H = 32;
 export const RIG_LINE = "RIG-ONLY: open device-present.html on Galaxina (WebGPU) and read PASS on all three readbacks; " +
-    "the build box loses the WebGPU device on a presented pass, so only the rig can answer whether presentation is right.";
+    "under LAUNCH_ARGS the build box loses the WebGPU device on a presented pass (section 3 presents under PRESENT_ARGS, on SwiftShader -- " +
+    "a real GPU's compositor is still the rig's answer).";
 
 console.log("\n1. THE PATTERN AND THE COMPARISON, HELD TO FABRICATED INPUTS");
 {
@@ -97,6 +102,33 @@ console.log("\n2. ON THIS BOX: WebGL2 PRESENTS; WebGPU PRESENTS OR LOSES THE DEV
     }
 }
 
+console.log("\n3. [v4739] UNDER PRESENT_ARGS, WebGPU PRESENTS ON THIS BOX -- AND UNDER LAUNCH_ARGS IT DOES NOT");
+{
+    // Section 2 runs under LAUNCH_ARGS, which every gate's numbers were taken under, and there the device is lost on the
+    // presented pass (gfx/device.js Level 11). tools/ship/webgpuHarness.mjs's PRESENT_ARGS puts the compositor on the
+    // same software stack as Dawn's SwiftShader Vulkan; measured, each of its three added flags is necessary.
+    const skip = webgpuSkipReason();
+    if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+    else if (process.platform !== "linux") report("PRESENT_ARGS was measured on Linux only; on this platform it is LAUNCH_ARGS and this section has nothing new to say");
+    else {
+        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H }, launchArgs: PRESENT_ARGS, script: `async (a) => {
+            const { presentCheck, describe } = await import("/render/devicePresent.mjs");
+            const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.H; document.body.appendChild(cv);
+            const r = await Promise.race([presentCheck(cv, "webgpu"), new Promise((res) => setTimeout(() => res({ backend: "webgpu", state: "timeout", lost: "did not settle in 20 s" }), 20000))]);
+            delete r.device; return { ...r, line: describe(r) };
+        }`, timeoutMs: 90000 });
+        ok("the routine ran under PRESENT_ARGS", r.ok && r.result, r.ok ? "" : r.reason);
+        if (r.ok && r.result) {
+            const G = r.result; report(G.line);
+            ok(`*** WebGPU PRESENTS under ${PRESENT_ARGS.join(" ")}: the device's canvas readback, the offscreen frame and the COMPOSITOR's copy all equal the pattern and each other, byte for byte ***`,
+               G.state === "presented" && [G.A, G.B, G.C, G.AB, G.AC].every((c) => c && c.differing === 0) && G.C.n === W * H,
+               "the canvas path is the product, and until v4739 nothing on this box could draw it on WebGPU");
+            ok("  and the flags are the difference: under LAUNCH_ARGS -- the same box, the same routine -- section 2 lost the device",
+               LAUNCH_ARGS.length < PRESENT_ARGS.length && PRESENT_ARGS.includes("--use-angle=swiftshader") && PRESENT_ARGS.includes("--use-vulkan=swiftshader") && PRESENT_ARGS.includes("--enable-features=Vulkan"),
+               "section 2 prints which it saw; the ablation that found the three flags is in tools/ship/webgpuHarness.mjs's note");
+        }
+    }
+}
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WebGPU PRESENTATION ITSELF unless the line above says this box presented -- that is the rig's " +
     "answer and the page's purpose; a canvas the page has resized between frames; and a frame drawn after the " +
