@@ -557,8 +557,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4743 -- 1824 -> 1826 for render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs -- when each frame is shown: FSR3's half-way frame against timed generation, in ms and in dB.
     // v4744 -- 1826 -> 1827 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- motion on the arc for frame generation, and the chord-vs-arc error measured before it was built.
     // v4745 -- 1827 -> 1828 for fx/fsr/fsrFrameGenScene-selfcheck.mjs -- shadows, a reflection and a HUD drawn by three.js, between two frames: the still-surface margin and FSR3's UI composition.
-    gates: 1828, usesOk: 1807, definesOk: 1799, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1700, condFirst: 91, unknownSignature: 16,
+    // v4746 -- 1828 -> 1830 for render/flicker-selfcheck.mjs and fx/fsr/fsrFlicker-selfcheck.mjs -- flicker between real and generated frames: the measure, and FSR3 against native frames.
+    gates: 1830, usesOk: 1809, definesOk: 1801, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1702, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

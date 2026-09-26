@@ -23,6 +23,12 @@
 // block straddling the knot's silhouette hands its one vector to the knot. It is not the default: it pays only on content
 // the vectors miss, and it is a pyramid and a search every generated frame.
 //
+// *** BETWEEN ALIASED FRAMES IT FLICKERS (v4746). *** A generated frame blends two frames, which anti-aliases what a
+// single-sample frame aliases, so between native frames the display alternates aliased and anti-aliased: under a pan over
+// fine stripes the shown sequence alternates +1.3 / 255 more than the scene does, with the generated frames 1.6 dB closer
+// to the truth than the real ones. Between FSR2's frames -- FSR3 as it is composed -- it adds none; 4x MSAA takes a turning
+// knot's but not the stripes'; sharpening the generated frames makes it worse (fx/fsr/fsrFlicker-selfcheck.mjs).
+//
 // *** A HUD IS NOT RECONCILED, IT IS COMPOSITED (v4745). *** Every vector under a HUD is the scene's behind it, and under a
 // pan the flow judges a HUD pixel at 0.9 because that vector moved, so both warp the HUD with the scene: 20.4 and 21.7 dB on
 // the HUD's pixels. FSR3's answer is the one here: generate from HUD-LESS frames and give the newer frame's UI as `ui`,

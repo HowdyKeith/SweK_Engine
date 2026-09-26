@@ -8032,6 +8032,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4746 -- THE 353rd CLOSING: flicker between real and generated frames.
+    since428: Object.freeze({
+        at: "v4746", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flicker-selfcheck.mjs", "fx/fsr/fsrFlicker-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR3 AS IT IS COMPOSED DOES NOT FLICKER; GENERATION BETWEEN ALIASED FRAMES DOES, AND SHARPENING MAKES IT WORSE. *** " +
+                 "Every frame-generation gate graded one frame; render/flicker.mjs grades the sequence a display shows -- real, " +
+                 "generated, real -- by how much it alternates at half the display rate beyond what the scene does, from each " +
+                 "pixel's second difference (a moving scene's trend is not flicker, and the plain alternating sum the probe began " +
+                 "with read the truth itself as flickering) under a Hann taper (a short window leaks motion into the half-rate " +
+                 "bin: untapered, a held frame under a pan read +0.30 on one window and -1.14 on another). On fsr-three.html's knot " +
+                 "and stripes: between FSR2's frames the generator adds +0.04 / 255 with the knot turning and alternates LESS than " +
+                 "the scene under a pan; between native single-sample frames it adds +1.28 under the pan, its generated frames 1.6 " +
+                 "dB closer to the truth than the real ones -- a blend of two frames anti-aliases what one frame aliases, and the " +
+                 "display alternates the two. 4x MSAA takes the turning knot's (+0.12 to +0.05) and not the stripes'; RCAS over " +
+                 "the generated frames, the obvious fix, makes both worse. Eight sabotages of the measure, all red; the held-frame " +
+                 "control is graded on the knot alone, because under the pan the scene has half-rate content of its own.",
+    }),
     // v4745 -- THE 352nd CLOSING: shadows, reflections and UI as real content.
     since427: Object.freeze({
         at: "v4745", swept: 1, green: 1, red: 0,
