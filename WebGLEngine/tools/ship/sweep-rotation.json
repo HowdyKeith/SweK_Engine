@@ -1,7 +1,8 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
- "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed.",
- "at": "2026-09-17T16:20:39.742Z",
+ "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
+ "at": "2026-09-26T01:36:38.301Z",
+ "poolAt": "2026-09-17T16:20:39.742Z",
  "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
@@ -2521,10 +2522,10 @@
   },
   {
    "gate": "tools/ship/registerDrift-selfcheck.mjs",
-   "ms": 2821,
-   "code": 1,
-   "priorMs": 6399,
-   "at": "2026-09-17T16:04:29.927Z"
+   "ms": 2810,
+   "code": 0,
+   "priorMs": 3281,
+   "at": "2026-09-26T01:36:38.301Z"
   },
   {
    "gate": "tools/ship/registerResidue-selfcheck.mjs",
@@ -2794,10 +2795,10 @@
   },
   {
    "gate": "tools/ship/sweepCoverage-selfcheck.mjs",
-   "ms": 2654,
-   "code": 0,
-   "priorMs": 9186,
-   "at": "2026-09-09T18:54:50.543Z"
+   "ms": 2744,
+   "code": 1,
+   "priorMs": 3042,
+   "at": "2026-09-26T01:36:35.315Z"
   },
   {
    "gate": "tools/ship/toolFrontDoor-selfcheck.mjs",

@@ -33,6 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND } from "./quickSweep.mjs";
+import { ledgerStamps, selectionKind } from "./sweepCoverage.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -155,7 +156,10 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     // over-budget `alone` entry that PREDATES the last rotation stays unaccounted -- because the rotation
     // should have taken it and did not. A list would have had to be pruned by hand to say that; a rule says
     // it for free, and says it about gates nobody has written yet.
-    const rotAt = Date.parse((ROT && ROT.at) || "");
+    // v4725: `poolAt`, not `at`. A --gate run moves `at` and selected nothing but the gates it named, so it
+    // cannot have passed an arrival over; only the last unfiltered pool pass could (sweepCoverage.ledgerStamps).
+    const rotRef = (rot) => Date.parse((rot && (rot.poolAt || rot.at)) || "");
+    const rotAt = rotRef(ROT);
     const stampOf = (g) => Date.parse((S.at || {})[g] || "");
     const BUDGET = S.budgetMs;
     // *** THE RULE IS A PURE FUNCTION OF FOUR NUMBERS, SO IT CAN BE DRIVEN WITH FIXTURES. *** Two of its three
@@ -270,6 +274,36 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
         ok("  CONTROL: ...and a missing rotation ledger refuses EVERY arrival rather than excusing all of them",
            isArrival(42056, "alone", after, NaN) === false,
            "an unreadable sweep-rotation.json must not turn this category into an amnesty -- the failure direction is the safe one");
+    }
+    // ---- v4725: A NAMED RE-TIMING IS NOT A ROTATION THAT PASSED ANYTHING OVER -------------------------------
+    // Re-timing sweepCoverage and registerDrift with --gate moved the ledger's `at` and turned 49 arrivals into
+    // "unaccounted" -- entries the run never had in its selection. The writer now keeps `poolAt` for the last
+    // unfiltered pool pass and this file reads it; these rows drive both ends with fixtures, because the live
+    // ledger holds exactly one history and cannot show a pool pass and a named one side by side.
+    //
+    // v4725 SABOTAGE LOG:  S1 reader reads `at` again -> 2 red (the live row: 49 unaccounted)
+    //   S2 every write moves poolAt -> 1   S3 a pool pass never moves it -> 1   S4 no backfill from `at` -> 1
+    //   S5 --band counts as a pool pass -> 1   S6 every run is a pool pass -> 1
+    {
+        const R0 = "2026-09-17T16:20:39.742Z", later = "2026-09-26T01:34:52.528Z";
+        const arrived = Date.parse("2026-09-24T00:00:00.000Z");
+        const named = ledgerStamps({ at: R0 }, later, "named");
+        ok("  v4725: a --gate/--band/--killed write moves `at` and carries `poolAt` forward from the ledger it replaces",
+           named.at === later && named.poolAt === R0 &&
+           ledgerStamps({ at: later, poolAt: R0 }, "2026-09-27T00:00:00.000Z", "named").poolAt === R0,
+           `named write at ${later}: poolAt ${named.poolAt}, so an arrival stamped between the two stays an arrival`);
+        ok("  v4725: ...an unfiltered pool pass moves both, so the ratchet still closes when a real rotation runs",
+           ledgerStamps({ at: R0, poolAt: R0 }, later, "pool").poolAt === later &&
+           isArrival(42056, "alone", arrived, rotRef(ledgerStamps({ at: R0 }, later, "pool"))) === false,
+           "after a pool pass the same arrival predates the rotation and is unaccounted again -- the v4688 ratchet, intact");
+        ok("  v4725: ...and the reader takes `poolAt` over `at`, falling back to `at` for a ledger written before it existed",
+           isArrival(42056, "alone", arrived, rotRef({ at: later, poolAt: R0 })) === true &&
+           rotRef({ at: R0 }) === Date.parse(R0) && Number.isNaN(rotRef(null)),
+           `live ledger: at ${(ROT && ROT.at) || "?"}, poolAt ${(ROT && ROT.poolAt) || "(absent)"}`);
+        ok("  v4725: ...and the CLI calls only an unfiltered run a pool pass: --gate, --band and --killed each are not",
+           selectionKind({}) === "pool" && selectionKind({ gate: "registerDrift" }) === "named" &&
+           selectionKind({ band: "3000-8000" }) === "named" && selectionKind({ killed: true }) === "named",
+           "--band filters the pool by recorded cost, so a gate outside the band was never in its selection either");
     }
 
     // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.

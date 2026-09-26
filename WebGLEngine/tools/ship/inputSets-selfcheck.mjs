@@ -30,7 +30,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENG, RECORD, FORMAT, hashFile, hashDir, readRecord, whyRun, skippable, partition, reasonHistogram,
          encode, decode, clearHashCache, CONFLICT, FLAGS, firstMoved, markChangedDuringPass,
-         carryForward } from "./inputSets.mjs";
+         carryForward, readRecordCached } from "./inputSets.mjs";
+import os from "node:os";
 import { usesNamedFsImport, probeOne, entryFor } from "./recordInputs.mjs";
 import { selectGates } from "./quickSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
@@ -577,6 +578,27 @@ console.log("\n8. the record's field list, because a hand-spelled serialiser alr
     ok("  and FLAGS names every non-path field the rule reads, so the list has one home",
        FLAGS.includes("spawnedNonNode") && FLAGS.includes("net") && FLAGS.every((f) => f in e),
        FLAGS.join(", "));
+}
+
+console.log("\nv4725. the record, read once per process while its file is unchanged");
+{
+    // The live record through both readers: the cached one must give the same decoded record, and a second call the SAME object.
+    const a = readRecordCached(), b2 = readRecordCached();
+    ok("the cached read decodes to exactly what readRecord does, and a second call reuses it rather than re-reading 3.5 MB",
+       JSON.stringify(a) === JSON.stringify(REC) && a === b2, `${Object.keys(a.gates || {}).length} gates either way`);
+    // A rewrite must miss. On a temporary root, so the live record is never touched: write, read, rewrite with a different
+    // size and a later mtime, read again.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "inputsets-memo-"));
+    const file = path.join(tmp, RECORD);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const put = (rec, secs) => { fs.writeFileSync(file, JSON.stringify(rec)); fs.utimesSync(file, secs, secs); };
+    put({ note: "one", at: "t1", gates: {} }, 1000);
+    const first = readRecordCached(tmp);
+    put({ note: "two, and longer", at: "t2", gates: {} }, 2000);
+    const second = readRecordCached(tmp);
+    fs.rmSync(tmp, { recursive: true, force: true });
+    ok("...and a REWRITTEN record is a miss: the cache is keyed on the file's mtime and size, not on its path alone",
+       first.note === "one" && second.note === "two, and longer" && first !== second, `${first.note} -> ${second.note}`);
 }
 
 console.log(fails ? `\nFAIL -- ${fails} check(s)` : "\nALL GREEN");

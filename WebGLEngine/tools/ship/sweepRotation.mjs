@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { enumerateGates } from "./gateSweep.mjs";
-import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS } from "./sweepCoverage.mjs";
+import { ENG, census, rotation, readFile, backfillStamps, BUDGET_MS, CAP_MS, ledgerStamps, selectionKind } from "./sweepCoverage.mjs";
 import { runGate } from "./redCensus.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -246,9 +246,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // quotes it. A legacy row is backfilled with the ledger's PREVIOUS date, which is its real
         // provenance, before the file-level one moves.
         let priorLedger = {};
-        let priorAt = null;
+        let priorAt = null, prevLedger = null;
         try {
             const prev = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+            prevLedger = prev;
             priorAt = prev.at || null;
             for (const r of prev.rotated || []) priorLedger[r.gate] = r.at ? r : { ...r, at: priorAt };
         } catch {}
@@ -259,8 +260,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
                   "MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that " +
-                  "measured that row, and a row survives until its own gate is re-timed.",
-            at: stamp, budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
+                  "measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is " +
+                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
+            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode })),
+            budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
         console.log(`[rotation] wrote ${rows.length} entries with at=${stamp}`);
     } else console.log("[rotation] dry run -- pass --write to record");

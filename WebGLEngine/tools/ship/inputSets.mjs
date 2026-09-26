@@ -205,6 +205,25 @@ export function readRecord(root = ENG) {
 }
 
 /**
+ * *** v4725 -- THE SAME RECORD, READ ONCE PER PROCESS WHILE THE FILE IS UNCHANGED. *** runQuickSweep read and decoded the
+ * 3.5 MB record on every call, and a gate that drives three small sweeps paid for it three times -- sweepCoverage-selfcheck,
+ * which on the slower host sat 42 ms over the quick sweep's budget and took eight frozen records out of the ship-time check.
+ * The key is the file's path, mtime and size, so any rewrite -- recordInputs' included -- is a miss. For READERS ONLY: the
+ * object is shared between callers, which is why readRecord, which recordInputs mutates before writing, is left as it was.
+ */
+const _recordMemo = new Map();
+export function readRecordCached(root = ENG) {
+    const file = path.join(root, RECORD);
+    let st = null;
+    try { st = fs.statSync(file); } catch { return readRecord(root); }
+    const key = `${st.mtimeMs}:${st.size}`, hit = _recordMemo.get(file);
+    if (hit && hit.key === key) return hit.value;
+    const value = readRecord(root);
+    _recordMemo.set(file, { key, value });
+    return value;
+}
+
+/**
  * Why a gate cannot be skipped, or null when it can. A STRING rather than a boolean on purpose: a sweep that
  * says "skipped 700" and cannot say why it ran the other 450 is a sweep nobody will trust enough to use.
  */

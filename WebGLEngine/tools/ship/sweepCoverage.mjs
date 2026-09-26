@@ -1358,3 +1358,20 @@ export function readRotation(p = path.join(ENG, "tools", "ship", "sweep-rotation
 export function readFile(p = path.join(ENG, "tools", "ship", "sweep-timings.json")) {
     try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return { timings: {}, codes: {}, at: {} }; }
 }
+
+// *** v4725 -- WHICH RUN COULD HAVE PASSED A GATE OVER. *** (Written by sweepRotation.mjs's --write; it lives here, beside
+// rotation() and the ledger's other readers, so timingKind-selfcheck reads it through a module its recorded input set
+// already holds.) timingKind accounts an over-budget, hand-timed
+// `alone` entry as an ARRIVAL while its stamp is later than the last rotation, on the reasoning that a rotation
+// run after it "should have taken it". That reads the ledger's file-level `at`, which EVERY --write moves --
+// including a --gate run that selected two gates by name. v4725 re-timed two guardians that way and 49 arrivals
+// went unaccounted, though the run never had one of them in its selection. Only an UNFILTERED stalest-first
+// pass selects from the whole over-budget pool, so only that run moves `poolAt`; --gate, --band and --killed
+// carry it forward. A ledger written before this field existed backfills it with its own `at`, which is the
+// reference the arrival rule already used, so the first write changes nothing about what counts.
+export const selectionKind = ({ gate = null, band = null, killed = false } = {}) =>
+    (gate || band || killed ? "named" : "pool");
+export function ledgerStamps(prev, stamp, selection) {
+    const priorPool = prev ? (prev.poolAt || prev.at || null) : null;
+    return { at: stamp, poolAt: selection === "pool" ? stamp : priorPool };
+}

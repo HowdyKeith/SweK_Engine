@@ -8032,6 +8032,36 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4725 -- THE 332nd CLOSING: two guardians back under budget, and a named re-timing no longer passes anything over.
+    since407: Object.freeze({
+        at: "v4725", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/inputSets-selfcheck.mjs (the record read once per process while its file is unchanged)",
+                                "tools/ship/timingKind-selfcheck.mjs (the arrival rule reads the last pool pass, not the last write)"]),
+        verdict: "*** TWO GUARDIANS ARE BACK UNDER BUDGET, AND THE ROUTE THAT BROUGHT THEM BACK HAD A FAULT OF ITS OWN. *** verify's " +
+                 "standing reds were the version markers and recordReach's ceiling, 62 unchecked records against 50, because the host " +
+                 "has been slower since the container restart and two guardians of many records -- sweepCoverage-selfcheck at 3,042 ms " +
+                 "and registerDrift-selfcheck at 3,281 -- sat just over the 3,000 ms budget. quickSweep and its gates re-read the input " +
+                 "record once per gate; tools/ship/inputSets.mjs gains readRecordCached, which reads it once per process and again only " +
+                 "when the file's mtime or size changes, while readRecord stays uncached because recordInputs mutates what it returns. " +
+                 "Two rows grade it, and a rewritten record in a temporary root is a miss. The rotation, which is the only legitimate " +
+                 "re-timer of an over-budget gate, re-timed them by name: 2,744 and 2,810 ms, both returnees, and recordReach is green. " +
+                 "*** THE FAULT: *** every --write moved the rotation ledger's `at`, and timingKind's arrival rule reads that as the last " +
+                 "rotation, reasoning that a rotation run after an over-budget hand-timed gate 'should have taken it'. A --gate run " +
+                 "selects only the gates it names, so after the first attempt 49 arrivals read as unaccounted though the run never had " +
+                 "one of them in its selection. The ledger writes were reverted, and the rotation ledger now keeps `poolAt`, moved " +
+                 "only by an unfiltered stalest-first pass -- --gate, --band and --killed carry it forward, and a ledger without it " +
+                 "backfills from its own `at`, so the first write changed nothing about what counts. timingKind reads `poolAt`. The " +
+                 "two helpers live in sweepCoverage.mjs rather than the rotation: importing the rotation put a file in timingKind's " +
+                 "closure its recorded input set lacked, and importClosure went red. Re-recording that one gate with recordInputs " +
+                 "--gates was tried and reverted -- carryForward drops every entry whose inputs moved, 205 of 1,339, which is " +
+                 "correct for skipping and turned inputSets-selfcheck and recordShape-selfcheck red, because both read the widest " +
+                 "entries as live. That dependence of two gates on a full record is a separate round. Four rows grade the writer, " +
+                 "the reader and the CLI's choice with fixtures. *** SIX SABOTAGES, SIX RED *** across the new rows, and two on the " +
+                 "memo, both red. *** THE MARKERS STAY: *** ENGINE_VERSION and BRAIN_BUILD mark the last SHIPPED " +
+                 "build, v4645, and shipping fast-forwards main, which is not done without the owner's say. Nothing was measured.",
+    }),
     // v4724 -- THE 331st CLOSING: the frame-level arc is closed, and the page says so.
     since406: Object.freeze({
         at: "v4724", swept: 0, green: 0, red: 0,
