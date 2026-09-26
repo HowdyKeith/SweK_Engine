@@ -549,8 +549,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4735 -- 1815 -> 1816 for fx/fsr/fsrTemporalLockGhost-selfcheck.mjs -- FSR2's default locks on a pixel-scale texture under a moving occluder: the ghost is real with the clamp alone, and both masks remove it.
     // v4736 -- 1816 -> 1817 for render/frameInterpTsl-selfcheck.mjs -- FSR3's frame generation for a three.js scene begins: the splat as a depth-tested draw and the warp, held to interpolateFrameCPU exactly.
     // v4737 -- 1817 -> 1818 for render/holeFillTsl-selfcheck.mjs -- the holes of a generated frame filled as TSL, fillHolesCPU exactly, and the whole splat-fill-warp against interpolateFrameCPU({ fill }).
-    gates: 1818, usesOk: 1797, definesOk: 1789, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1690, condFirst: 91, unknownSignature: 16,
+    // v4738 -- 1818 -> 1819 for fx/fsr/fsrFrameGen-selfcheck.mjs -- FSR3's frame generation driver on a three.js scene against a frame rendered at the midpoint, a cross-fade and a repeated frame.
+    gates: 1819, usesOk: 1798, definesOk: 1790, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1691, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -8032,6 +8032,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4738 -- THE 345th CLOSING: FSR3's frame generation on a three.js scene, and what it buys.
+    since420: Object.freeze({
+        at: "v4738", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGen-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A FRAME NO RENDERER DREW, BETWEEN TWO THAT ONE DID, IS CLOSER TO THE FRAME THAT WOULD HAVE BEEN DRAWN THAN " +
+                 "EITHER THING A GENERATOR MUST BEAT. *** fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen composes v4736's splat and warp and " +
+                 "v4737's fill over the scene's own motion field and depth, keeping the newer depth for the next call's fill. " +
+                 "fx/fsr/fsrFrameGen-selfcheck.mjs renders fsr-three.html's scene at frames k and k + 1 and a 4x4-supersampled " +
+                 "truth AT k + 1/2: the generated frame reads 26.02 dB with the knot turning at 4x the page's rate (+0.15 over a " +
+                 "cross-fade, +1.63 over repeating frame k), 24.44 at 12x (+0.87, +3.44) and 29.83 under a camera pan (+1.00, " +
+                 "+6.58), identically on both backends. THE FILL IS WHAT MAKES IT PAY: holes left at zero put the frame below the " +
+                 "cross-fade (24.03, 20.48). And the DEFAULT FILL IS THE BLEND, a measurement that overrules v4679's: on the hole " +
+                 "pixels a turning, self-occluding knot scores blend 19.87 dB, depth 18.16, derived 15.98 -- both frames are partly " +
+                 "right in a hole, and a one-sided rule that picks the wrong one costs more than a blend that is half right; the " +
+                 "depth mode stays for translating content. fsr-three.html's generated-frame views run the driver. Six sabotages, " +
+                 "all red; the older depth not being kept scored 0 first (it matters from the third call, and the only depth row " +
+                 "favoured a broken depth mode) and is now read back directly. Not ported and named: FSR3's optical flow, for " +
+                 "what motion vectors do not see.",
+    }),
     // v4737 -- THE 344th CLOSING: the holes of a generated frame, filled, as TSL.
     since419: Object.freeze({
         at: "v4737", swept: 1, green: 1, red: 0,

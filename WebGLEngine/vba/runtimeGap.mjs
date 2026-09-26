@@ -337,7 +337,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4404,               // v4737: 4402 -> 4404 for render/holeFillTsl.mjs and its gate -- the fill as a fragment gather, both preferences and all five side modes,
+    files: 4406,               // v4738: 4404 -> 4406 for fx/fsr/fsrFrameGenTsl.mjs and its gate -- the frame-generation driver: motion field to flow, splat, fill,
+                               // warp, and the older depth kept. Every row from the census.
+                               // v4737: 4402 -> 4404 for render/holeFillTsl.mjs and its gate -- the fill as a fragment gather, both preferences and all five side modes,
                                // and the side-aware warp. Every row from the census.
                                // v4736: 4400 -> 4402 for render/frameInterpTsl.mjs and its gate -- frame interpolation as TSL: one instanced quad per block,
                                // depth-tested strictly, so the nearer block wins and a tie keeps the first writer. Every row from the census.
@@ -912,8 +914,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4104, closures: 3959, asyncAwait: 1599, typedArrays: 1181, promises: 380,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 180, webgpu: 53, threads: 23, wasm: 23,
+    esModules: 4106, closures: 3961, asyncAwait: 1601, typedArrays: 1182, promises: 380,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 181, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

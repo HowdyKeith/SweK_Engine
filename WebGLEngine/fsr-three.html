@@ -72,7 +72,7 @@ import { makeMotionStage, glClip } from "./render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/temporalClipTsl.mjs";
 import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
-import { makeFrameInterp, flowFromMotionNode } from "./render/frameInterpTsl.mjs";
+import { makeFrameGen } from "./fx/fsr/fsrFrameGenTsl.mjs";
 import { jitterPhaseCount } from "./render/jitter.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -143,25 +143,20 @@ try {
     // motion reaches is a HOLE: the "holes black" view leaves it at zero, on purpose -- a hole filled silently is a hole
     // nobody measures (render/frameInterp.mjs's rule) -- and v4737's view fills it (render/holeFillTsl.mjs): each hole takes
     // the FARTHER vector near it, and the frame its content is visible in, by the derived rule.
+    // v4738: both views are fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen -- the driver fx/fsr/fsrFrameGen-selfcheck.mjs grades --
+    // with its default fill (the blend, which that gate measured paying on this knot) or none.
     const gens = {};
     const showGen = async (filled) => {
         const key = filled ? "filled" : "holes"; let gen = gens[key];
         if (!motionStage) await showMotion();
         if (!gen) {
             const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-            const field = new THREE.RenderTarget(DW, DH, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
-            const fm = flowFromMotionNode(TSL, motionStage.motion.texture, motionStage.depth.texture, { w: DW, h: DH });
-            const m = new THREE.NodeMaterial(); m.fragmentNode = fm.node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
-            const fieldScene = new THREE.Scene(); fieldScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
-            gen = gens[key] = { frames: [col(), col()], field, fieldScene, k: 0,
-                                fi: makeFrameInterp(THREE, TSL, { w: DW, h: DH, block: 1, indexedBy: "cur", t: 0.5, fill: filled ? { radius: 4, side: "derived" } : null }) };
+            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, filled ? { w: DW, h: DH } : { w: DW, h: DH, fill: null }) };
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
         await motionStage.render(renderer, scene, camera);
-        renderer.setRenderTarget(g.field); await renderer.renderAsync(g.fieldScene, ortho);
-        await g.fi.splat(renderer, g.field.texture);
-        await g.fi.gather(renderer, g.k ? prev.texture : cur.texture, cur.texture, null);
+        await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture }, null);
         g.k++;
     };
 
