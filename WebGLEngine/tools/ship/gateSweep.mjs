@@ -8032,6 +8032,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4724 -- THE 331st CLOSING: the frame-level arc is closed, and the page says so.
+    since406: Object.freeze({
+        at: "v4724", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameVerdicts-selfcheck.mjs (the closure graded: after every hypothesis, no supported verdict, families derived)"]),
+        verdict: "*** THE FRAME-LEVEL ARC IS CLOSED: NO SIGNAL THE CHAIN MEASURES HAS BEEN SHOWN TO DECIDE WHICH FRAMES TO GENERATE ON " +
+                 "CONTENT AND GEOMETRY IT WAS NOT DECLARED ON. *** Ten pre-registered hypotheses, H7 to H16, over 4,641 harvested " +
+                 "frames, tested four signal families: spatial detail (H7), occlusion (H8-H10), motion's gain over standing still " +
+                 "(H11-H15) and vector disagreement (H16). None was supported. Motion's gain is the only one with a pattern that kept " +
+                 "its sign -- backwards, frames with more gain are where generation does worse -- across both geometries, both paths " +
+                 "and two speeds; with the slab whole in view it was weaker, cleared on one geometry at x4 and on neither at x2. Vector " +
+                 "disagreement was a different signal and barely ordered the frames. The headroom v4706 found stands: a frame oracle " +
+                 "would gain +0.368 dB on ramp and +0.232 on smooth at x4, and nothing tested reaches it. *** THE CLOSURE IS A RECORD " +
+                 "THE PAGE READS. *** render/frameVerdicts.mjs gains FRAME_CLOSED and frameFamilies(), which derives the four families " +
+                 "from the table's own signals, and fsr.html's readout, while generation runs, now says the arc is closed and names " +
+                 "them instead of calling the question open. tools/ship/frameVerdicts-selfcheck.mjs grades it: the closure must come " +
+                 "after every hypothesis in the table, its closing must carry its words, no verdict may be supported, and the families " +
+                 "the page names must be the ones the table gives. Reopening the question needs a signal outside those families and " +
+                 "a document of its own. Nothing was measured. *** FIVE SABOTAGES, FIVE RED: *** the closure dated before the last " +
+                 "hypothesis, a verdict in the table marked supported, the closure's words paraphrased past its closing, the page " +
+                 "left calling the question open, and the families typed instead of derived.",
+    }),
     // v4723 -- THE 330th CLOSING: H16 not supported -- a different signal from gain, and a weak one.
     since405: Object.freeze({
         at: "v4723", swept: 1, green: 1, red: 0,

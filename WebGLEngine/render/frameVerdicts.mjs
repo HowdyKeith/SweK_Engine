@@ -95,6 +95,20 @@ export const FRAME_ARC = Object.freeze({ standsAt: "v4723", closing: "since405",
     headroom: Object.freeze({ round: "v4706", closing: "since388", speed: "4",
         scenes: Object.freeze({ ramp: "+0.368", smooth: "+0.232" }) }) });
 
+/**
+ * *** v4724 -- THE ARC IS CLOSED, AND THE CLOSURE IS A RECORD THE PAGE READS. *** Ten pre-registered hypotheses asked, per
+ * frame, whether generating it beats cross-fading it, and none was supported. `at` is the round that closed the arc, which
+ * must come after every hypothesis in the table; `text` is a quote its closing must carry. Reopening the question needs a
+ * signal outside frameFamilies() and a document of its own -- which is what the families list is for.
+ */
+export const FRAME_CLOSED = Object.freeze({ at: "v4724", closing: "since406",
+    text: "no signal the chain measures has been shown to decide which frames to generate on content and geometry it was not declared on" });
+
+/** The signal families the arc tested, derived from the table: each verdict's signal up to its first comma, in order. */
+export function frameFamilies() {
+    return [...new Set(FRAME_VERDICTS.map((v) => v.signal.split(",")[0].trim()))];
+}
+
 export function frameVerdictFor(select, value) {
     return FRAME_VERDICTS.find((v) => v.option && v.option.select === select && v.option.value === value) || null;
 }
@@ -110,7 +124,10 @@ const total = () => Object.values(FRAME_MEASURED).reduce((s, n) => s + n, 0);
 /** The sentence the ON readout ends with: what predicting this frame's advantage has come to. */
 export function frameNote() {
     const h = FRAME_ARC.headroom, list = FRAME_VERDICTS.map((v) => `${v.id} (${v.signal}) ${v.verdict.toUpperCase()} at ${v.round}`).join(", ");
-    return ` WHETHER TO GENERATE A FRAME IS AN OPEN QUESTION: ${list} -- ${FRAME_VERDICTS.length} hypotheses over ` +
+    const fam = frameFamilies();
+    const head = FRAME_CLOSED ? ` THE FRAME-LEVEL ARC IS CLOSED (${FRAME_CLOSED.at}): ${FRAME_CLOSED.text}. It tested ${fam.length} signal ` +
+                                `families -- ${fam.join(", ")} -- in` : " WHETHER TO GENERATE A FRAME IS AN OPEN QUESTION:";
+    return `${head} ${list} -- ${FRAME_VERDICTS.length} hypotheses over ` +
            `${total()} harvested frames (${FRAME_VERDICTS.map((v) => v.doc).join(", ")}). Headroom exists: at ` +
            `x${h.speed} a frame oracle would gain ${Object.entries(h.scenes).map(([s, g]) => `${g} dB on ${s}`).join(" and ")} ` +
            `over the better fixed policy (${h.round}). As of ${FRAME_ARC.standsAt}, ${FRAME_ARC.finding}.`;

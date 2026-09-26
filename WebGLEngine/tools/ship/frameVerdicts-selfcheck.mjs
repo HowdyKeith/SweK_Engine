@@ -16,7 +16,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import { SWEEP_SINCE_V4297 as CLOSINGS } from "./gateSweep.mjs";
-import { FRAME_VERDICTS, FRAME_MEASURED, FRAME_FIRST_RUN, FRAME_SCENE_COUNT, FRAME_ARC,
+import { FRAME_VERDICTS, FRAME_MEASURED, FRAME_FIRST_RUN, FRAME_SCENE_COUNT, FRAME_ARC, FRAME_CLOSED, frameFamilies,
          frameVerdictFor, frameOptionSuffix, frameNote, frameOffNote } from "../../render/frameVerdicts.mjs";
 import { declared, readDoc } from "./foldStats.mjs";
 import { PREREG_H7, CACHE_H7, RESULT_H7, FRAME_KEYS, h7 } from "./frameGate.mjs";
@@ -89,6 +89,18 @@ console.log("1. *** EVERY ENTRY AGAINST THE CLOSING IT NAMES ***");
        FRAME_ARC.quotes.at(-1).closing === FRAME_ARC.closing && FRAME_ARC.quotes.length >= 3,
        badQ.length ? `not in their closings or the finding: ${badQ.map((q) => `"${q.text}" (${q.closing})`).join("; ")}` :
        `${FRAME_ARC.quotes.map((q) => q.closing).join(", ")}; stands at ${FRAME_ARC.closing} @ ${FRAME_ARC.standsAt}`);
+    // v4724 -- THE CLOSURE IS GRADED LIKE EVERY OTHER LINE. It must come AFTER every hypothesis in the table, its closing must
+    // carry its words, no verdict in the table may be `supported` -- a closed arc with a supported hypothesis in it would be a
+    // claim the table contradicts -- and the families the page names are the ones the table's own signals give.
+    const cc = CLOSINGS[FRAME_CLOSED.closing], rn = (r) => Number(r.slice(1));
+    const fam = frameFamilies(), note = frameNote();
+    ok("*** the arc is CLOSED after every hypothesis it holds, by a closing that says so, with no supported verdict in the table ***",
+       !!cc && cc.at === FRAME_CLOSED.at && FRAME_VERDICTS.every((v) => rn(v.round) < rn(FRAME_CLOSED.at)) &&
+       lc(cc.verdict).includes(lc(FRAME_CLOSED.text)) && FRAME_VERDICTS.every((v) => v.verdict !== "supported") &&
+       note.includes("THE FRAME-LEVEL ARC IS CLOSED") && !note.includes("OPEN QUESTION") && fam.every((f) => note.includes(f)) &&
+       J(fam) === J([...new Set(FRAME_VERDICTS.map((v) => v.signal.split(",")[0].trim()))]),
+       `${FRAME_CLOSED.closing} @ ${FRAME_CLOSED.at}, after ${FRAME_VERDICTS.at(-1).id} @ ${FRAME_VERDICTS.at(-1).round}; ` +
+       `${FRAME_VERDICTS.length} hypotheses, ${fam.length} families (${fam.join(", ")}), none supported`);
     ok("*** the headroom's round, closing and numbers are v4706's, which is where the words 'HEADROOM EXISTS' were first used ***",
        !!hc && hc.at === h.round && /HEADROOM EXISTS/.test(hc.verdict) && Object.values(h.scenes).every((g) => hc.verdict.includes(g.replace("+", ""))) &&
        new RegExp(`At x${h.speed}, `).test(hc.verdict),
