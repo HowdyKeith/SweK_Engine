@@ -73,12 +73,14 @@ export function crossFadeNode(TSL, prevTex, curTex, { t = 0.5 } = {}) {
  * requires it. `fill` is interpolateFrameCPU's: { radius, prefer, side, depthPrev, depthCur } -- the two depths as
  * TEXTURES here -- and null by default, when this is v4736's pass exactly.
  */
-export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLess = true, t = 0.5, fill = null }) {
+export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLess = true, t = 0.5, fill = null, arc = false }) {
     requireTsl(TSL);
     if (!(block >= 1) || block !== Math.floor(block)) throw new Error(`render/frameInterpTsl: block must be a whole number of pixels, at least 1 -- got ${block}`);
     if (indexedBy !== "prev" && indexedBy !== "cur")
         throw new Error(`render/frameInterpTsl: indexedBy must be "prev" or "cur" -- got ${JSON.stringify(indexedBy)}; there is no default, for render/frameInterp.mjs's reason (v4680)`);
     if (!(t >= 0) || !(t <= 1)) throw new Error(`render/frameInterpTsl: t must be in [0, 1] -- got ${t}`);
+    if (arc && indexedBy !== "cur") throw new Error('render/frameInterpTsl: arc needs indexedBy "cur" -- the displacement to time t is from each block\'s CUR position');
+    if (arc && fill && (fill.side || "derived") !== "blend") throw new Error('render/frameInterpTsl: with arc the fill\'s side must be "blend" -- the other side rules read one vector as a chord');
     const { Fn, float, int, uint, vec4, ivec2, uniform, textureLoad, screenCoordinate, instanceIndex, positionGeometry,
             varying, floor, min, select, clamp, abs } = TSL;
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
@@ -91,10 +93,17 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
     if (fillN) fillN.uniforms.t = u.t;   // one time for the splat, the fill's side test and the warp
     const filledT = fill ? flat() : null, sideT = fill ? flat() : null;
     const field = fill ? filledT : vecT;
+    // v4744, THE ARC: a second splat of the same blocks at the same depths -- so the same winners -- carrying the offset each
+    // landed pixel samples `prev` at, and the same fill over it; `field` then holds the offset it samples `cur` at
+    const depthTexture2 = arc ? new THREE.DepthTexture(w, h) : null; if (arc) depthTexture2.type = THREE.FloatType;
+    const vecT2 = arc ? new THREE.RenderTarget(w, h, { type: THREE.FloatType, depthTexture: depthTexture2, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }) : null;
+    const fillN2 = arc && fill ? fillHolesNodes(TSL, vecT2.texture, { w, h, nearerIsLess, t, radius: fill.radius === undefined ? 4 : fill.radius, prefer: fill.prefer || "farther", side: "blend" }) : null;
+    const filledT2 = fillN2 ? flat() : null;
+    const field2 = arc ? (fill ? filledT2 : vecT2) : null;
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     // ---- SCATTER: one quad per block, placed where the block's content is at time t ----
-    const splatScene = (fieldTex) => {
+    const splatScene = (fieldTex, toTTex = null, which = "cur") => {
         const g = new THREE.InstancedBufferGeometry(), pg = new THREE.PlaneGeometry(1, 1);
         g.index = pg.index; g.setAttribute("position", pg.getAttribute("position")); g.instanceCount = bw * bh;
         const m = new THREE.NodeMaterial();
@@ -103,18 +112,22 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
         const byU = instanceIndex.div(u.bw), bxU = instanceIndex.sub(byU.mul(u.bw));
         const bx = float(bxU), by = float(byU);
         const f = textureLoad(fieldTex, ivec2(int(bxU), int(byU)));
-        const ax = indexedBy === "prev" ? u.t.mul(f.x) : float(1.0).sub(u.t).mul(f.x).negate();
-        const ay = indexedBy === "prev" ? u.t.mul(f.y) : float(1.0).sub(u.t).mul(f.y).negate();
+        const tt = toTTex ? textureLoad(toTTex, ivec2(int(bxU), int(byU))) : null;
+        const ax = tt ? tt.x : indexedBy === "prev" ? u.t.mul(f.x) : float(1.0).sub(u.t).mul(f.x).negate();
+        const ay = tt ? tt.y : indexedBy === "prev" ? u.t.mul(f.y) : float(1.0).sub(u.t).mul(f.y).negate();
         const sx = floor(bx.mul(u.block).add(ax).add(0.5)), sy = floor(by.mul(u.block).add(ay).add(0.5));   // Math.round
         // the block's own extent in `prev` stops at the frame edge, so its tail does not splat
         const fw = min(u.block, u.w.sub(bx.mul(u.block))), fh = min(u.block, u.h.sub(by.mul(u.block)));
         const corner = positionGeometry.xy.add(0.5);   // 0 or 1 at each corner of the unit quad
         const px = sx.add(corner.x.mul(fw)), py = sy.add(corner.y.mul(fh));
         // a declined block is sent off the frame rather than discarded, so no fragment of it exists at all
-        const nx = select(f.w.greaterThan(0.5), px.div(u.w).mul(2.0).sub(1.0), float(4.0));
+        const valid = tt ? f.w.greaterThan(0.5).and(tt.w.greaterThan(0.5)) : f.w.greaterThan(0.5);
+        const nx = select(valid, px.div(u.w).mul(2.0).sub(1.0), float(4.0));
         m.vertexNode = vec4(nx, float(1.0).sub(py.div(u.h).mul(2.0)), 0.5, 1.0);
-        const fv = varying(f);
-        m.fragmentNode = vec4(fv.x, fv.y, fv.z, 1.0);
+        const fv = varying(f), gv = tt ? varying(tt) : null;
+        // the arc's two offsets from the landing: to `cur`, -toT; to `prev`, -flow - toT (interpolateFrameCPU's order)
+        m.fragmentNode = !tt ? vec4(fv.x, fv.y, fv.z, 1.0)
+            : which === "cur" ? vec4(gv.x.negate(), gv.y.negate(), fv.z, 1.0) : vec4(fv.x.negate().sub(gv.x), fv.y.negate().sub(gv.y), fv.z, 1.0);
         m.depthNode = nearerIsLess ? float(0.5).add(fv.z.mul(0.25)) : float(0.5).sub(fv.z.mul(0.25));
         const sc = new THREE.Scene(), mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; sc.add(mesh);
         return { sc, dispose: () => { g.dispose(); pg.dispose(); m.dispose(); } };
@@ -132,8 +145,9 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
     const gatherNode = (prevTex, curTex) => Fn(() => {
         const x = floor(screenCoordinate.x), y = floor(screenCoordinate.y);
         const v = textureLoad(field.texture, ivec2(int(x), int(y)));
-        const a = fetch4(prevTex, x.sub(u.t.mul(v.x)), y.sub(u.t.mul(v.y)));
-        const b = fetch4(curTex, x.add(float(1.0).sub(u.t).mul(v.x)), y.add(float(1.0).sub(u.t).mul(v.y)));
+        const vp = arc ? textureLoad(field2.texture, ivec2(int(x), int(y))) : null;
+        const a = arc ? fetch4(prevTex, x.add(vp.x), y.add(vp.y)) : fetch4(prevTex, x.sub(u.t.mul(v.x)), y.sub(u.t.mul(v.y)));
+        const b = arc ? fetch4(curTex, x.add(v.x), y.add(v.y)) : fetch4(curTex, x.add(float(1.0).sub(u.t).mul(v.x)), y.add(float(1.0).sub(u.t).mul(v.y)));
         // a filled pixel's content may be in ONE frame only -- the side the fill decided; everything else blends.
         // *** THE WEIGHTS ARE ARITHMETIC, NOT select(), AND TWO DRAFTS SAY WHY. *** The first chose a vec4 with a select
         // nested in a select -- v4733's WebGL2 defect, and every WebGL2 frame came back as the target's clear colour. The
@@ -153,19 +167,26 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
 
     const splats = new Map(), gathers = new Map();
-    const fillScenes = fill ? { field: quad(fillN.fieldNode), side: quad(fillN.sideNode) } : null;
+    const fillScenes = fill ? { field: quad(fillN.fieldNode), side: quad(fillN.sideNode), field2: fillN2 ? quad(fillN2.fieldNode) : null } : null;
     const once = (map, key, make) => { if (!map.has(key)) map.set(key, make()); return map.get(key); };
     return {
-        bw, bh, uniforms: u, targets: { vec: vecT, filled: filledT, side: sideT },
-        /** Scatter `fieldTex` (bw x bh: vx, vy, depth, valid) into targets.vec, clearing it and its depth first. */
-        async splat(renderer, fieldTex) {
-            const s = once(splats, fieldTex, () => splatScene(fieldTex));
+        bw, bh, uniforms: u, targets: { vec: vecT, filled: filledT, side: sideT, vecPrev: vecT2, filledPrev: filledT2 },
+        /**
+         * Scatter `fieldTex` (bw x bh: vx, vy, depth, valid) into targets.vec, clearing it and its depth first. With `arc`,
+         * `toTTex` (bw x bh: the displacement from each block's cur position to time t, xy, and its validity in w) too.
+         */
+        async splat(renderer, fieldTex, toTTex = null) {
+            if (arc && !toTTex) throw new Error("render/frameInterpTsl: an arc splat needs the displacement to time t");
+            const s = once(splats, fieldTex.uuid + "|" + (toTTex ? toTTex.uuid : ""), () => splatScene(fieldTex, toTTex, "cur"));
+            const s2 = arc ? once(splats, "prev|" + fieldTex.uuid + "|" + toTTex.uuid, () => splatScene(fieldTex, toTTex, "prev")) : null;
             const prev = renderer.getRenderTarget(), pc = new THREE.Color(), pa = renderer.getClearAlpha(); renderer.getClearColor(pc);
             renderer.setRenderTarget(vecT); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
             await renderer.renderAsync(s.sc, ortho);
+            if (s2) { renderer.setRenderTarget(vecT2); await renderer.clearAsync(); await renderer.renderAsync(s2.sc, ortho); }
             if (fillScenes) {
                 renderer.setRenderTarget(filledT); await renderer.renderAsync(fillScenes.field, ortho);
                 renderer.setRenderTarget(sideT); await renderer.renderAsync(fillScenes.side, ortho);
+                if (fillScenes.field2) { renderer.setRenderTarget(filledT2); await renderer.renderAsync(fillScenes.field2, ortho); }
             }
             renderer.setClearColor(pc, pa); renderer.setRenderTarget(prev);
         },
@@ -175,6 +196,7 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
             const prev = renderer.getRenderTarget();
             renderer.setRenderTarget(output); await renderer.renderAsync(sc, ortho); renderer.setRenderTarget(prev);
         },
-        dispose() { vecT.dispose(); depthTexture.dispose(); if (filledT) { filledT.dispose(); sideT.dispose(); } for (const s of splats.values()) s.dispose(); },
+        dispose() { vecT.dispose(); depthTexture.dispose(); if (filledT) { filledT.dispose(); sideT.dispose(); }
+            if (arc) { vecT2.dispose(); depthTexture2.dispose(); if (filledT2) filledT2.dispose(); } for (const s of splats.values()) s.dispose(); },
     };
 }

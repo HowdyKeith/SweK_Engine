@@ -337,7 +337,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4418,               // v4743: 4415 -> 4418 for render/framePacer.mjs and two gates -- a pacer for frame generation, four policies graded by judder,\nnew images and latency, and FSR3 driven by it on the device. Every row from the census.
+    files: 4419,               // v4744: 4418 -> 4419 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- the toward stage and the arc generator, and the measurement that\ncorrected v4741. Every row from the census.
+                               // v4743: 4415 -> 4418 for render/framePacer.mjs and two gates -- a pacer for frame generation, four policies graded by judder,\nnew images and latency, and FSR3 driven by it on the device. Every row from the census.
                                // v4742: 4413 -> 4415 for fx/fsr/fsr3Tsl.mjs and its gate -- FSR2 with frame generation between its upscaled frames, from\nthe field FSR2 already renders. Every row from the census.
                                // v4741: 4410 -> 4413 for render/flowReconcileTsl.mjs and two gates -- the vectors reconciled with the optical flow, per block as the\nmirror and per pixel as measured. Every row from the census.
                                // v4740: 4408 -> 4410 for render/opticalFlowTsl.mjs and its gate -- the optical flow as TSL: a luma pyramid built on the device and one\nsearch pass per level, nested Loops named. Every row from the census.
@@ -920,8 +921,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4118, closures: 3973, asyncAwait: 1611, typedArrays: 1187, promises: 381,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 186, webgpu: 53, threads: 23, wasm: 23,
+    esModules: 4119, closures: 3974, asyncAwait: 1612, typedArrays: 1188, promises: 381,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 187, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

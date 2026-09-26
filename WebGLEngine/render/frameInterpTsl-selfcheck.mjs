@@ -91,6 +91,37 @@ const CASES = {
 };
 const cpu = {};
 for (const [k, c] of Object.entries(CASES)) cpu[k] = interpolateFrameCPU(c);
+
+// ---- v4744: THE ARC -- each block's displacement from its cur position to time t, given rather than taken as (1 - t) of
+// the vector. "chord" gives exactly that, so the frame must be the chord's; "curve" bends it by up to 1.5 pixels a block,
+// across the vector, as a turning body's path does; a declined displacement leaves its block a hole; and one goes through
+// the fill, whose two passes must choose alike.
+function arcOf(c, kind, decline = []) {
+    const n = c.bw * c.bh, toT = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+        const fx = c.flow[i * 2], fy = c.flow[i * 2 + 1], cx = Math.fround(-(1 - c.t) * fx), cy = Math.fround(-(1 - c.t) * fy);
+        const bend = kind === "curve" ? Math.fround(1.5 * Math.sin(i * 1.7)) : 0, len = Math.hypot(fx, fy) || 1;
+        toT[i * 2] = Math.fround(cx - bend * fy / len); toT[i * 2 + 1] = Math.fround(cy + bend * fx / len);
+    }
+    for (const i of decline) { toT[i * 2] = NaN; toT[i * 2 + 1] = NaN; }
+    return { ...c, toT };
+}
+const ARC = {
+    arcChord: arcOf(CASES.checker, "chord"), arcCurve: arcOf(CASES.checker, "curve"), arcContested: arcOf(CASES.contested, "curve"),
+    arcPerPixel: arcOf(CASES.perPixel, "curve"), arcDeclined: arcOf(CASES.checker, "curve", [3, 20, 41]),
+    arcFilled: { ...arcOf(CASES.contested, "curve"), fill: { radius: 4, side: "blend" } },
+};
+const cpuArc = {};
+for (const [k, c] of Object.entries(ARC)) cpuArc[k] = interpolateFrameCPU(c);
+{
+    // on the CPU: a displacement that IS the chord's reproduces the chord's frame, and a curved one does not
+    const ch = cpuArc.arcChord.frame, base = cpu.checker.frame, cv = cpuArc.arcCurve.frame; let wc = 0, wv = 0;
+    for (let i = 0; i < ch.length; i++) { wc = Math.max(wc, Math.abs(ch[i] - base[i])); wv = Math.max(wv, Math.abs(cv[i] - base[i])); }
+    const refuse = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
+    const r1 = refuse(() => interpolateFrameCPU({ ...ARC.arcChord, indexedBy: "prev" })), r2 = refuse(() => interpolateFrameCPU({ ...ARC.arcChord, fill: { side: "derived" } }));
+    ok(`interpolateFrameCPU's arc: the chord's own displacement reproduces the chord's frame (worst ${wc.toExponential(2)}), a bent one moves it (${wv.toFixed(3)}); a prev-indexed field and a fill that is not "blend" are refused`,
+       wc < 1e-6 && wv > 0.05 && /indexedBy "cur"/.test(r1) && /side must be "blend"/.test(r2), `${r1.slice(0, 50)} | ${r2.slice(0, 50)}`);
+}
 // how many of contestedFlat's pixels more than one block lands on -- the tie population, counted from the case
 const TIES = (() => { const c = CASES.contestedFlat, hits = new Uint8Array(c.w * c.h);
     for (let by = 0; by < c.bh; by++) for (let bx = 0; bx < c.bw; bx++) { const i = by * c.bw + bx;
@@ -111,7 +142,15 @@ else {
         payload[k] = { w: c.w, h: c.h, block: c.block, bw: c.bw, bh: c.bh, indexedBy: c.indexedBy, t: c.t, nearerIsLess: c.nearerIsLess,
                        prev: Array.from(c.prev), cur: Array.from(c.cur), field };
     }
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { payload }, script: `async (a) => {
+    const payloadArc = {};
+    for (const [k, c] of Object.entries(ARC)) {
+        const field = [], toT = [];
+        for (let i = 0; i < c.bw * c.bh; i++) { const ok = Number.isFinite(c.flow[i * 2]); field.push(ok ? c.flow[i * 2] : 0, ok ? c.flow[i * 2 + 1] : 0, c.depthBlock[i], ok ? 1 : 0);
+            const okT = Number.isFinite(c.toT[i * 2]); toT.push(okT ? c.toT[i * 2] : 0, okT ? c.toT[i * 2 + 1] : 0, 0, okT ? 1 : 0); }
+        payloadArc[k] = { w: c.w, h: c.h, block: c.block, bw: c.bw, bh: c.bh, t: c.t, nearerIsLess: c.nearerIsLess, fill: c.fill || null,
+                          prev: Array.from(c.prev), cur: Array.from(c.cur), field, toT };
+    }
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { payload, payloadArc }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const FI = await import("/render/frameInterpTsl.mjs");
         const out = {};
@@ -133,6 +172,16 @@ else {
                         await renderer.renderAsync(sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(null);
                         o.crossFade = Array.from(await renderer.readRenderTargetPixelsAsync(outRT, 0, 0, p.w, p.h)); }
                     fi.dispose(); prev.dispose(); cur.dispose(); field.dispose(); outRT.dispose();
+                }
+                o.arc = {};
+                for (const [k, p] of Object.entries(a.payloadArc)) {
+                    const fi = FI.makeFrameInterp(THREE, T, { w: p.w, h: p.h, block: p.block, indexedBy: "cur", nearerIsLess: p.nearerIsLess, t: p.t, fill: p.fill, arc: true });
+                    const prev = tex(p.prev, p.w, p.h), cur = tex(p.cur, p.w, p.h), field = tex(p.field, p.bw, p.bh), toT = tex(p.toT, p.bw, p.bh);
+                    const outRT = new THREE.RenderTarget(p.w, p.h, { type: THREE.FloatType, depthBuffer: false });
+                    await fi.splat(renderer, field, toT); await fi.gather(renderer, prev, cur, outRT);
+                    const rd = async (rt) => Array.from(await renderer.readRenderTargetPixelsAsync(rt, 0, 0, p.w, p.h));
+                    o.arc[k] = { cur: await rd(p.fill ? fi.targets.filled : fi.targets.vec), prev: await rd(p.fill ? fi.targets.filledPrev : fi.targets.vecPrev), frame: await rd(outRT) };
+                    fi.dispose(); for (const x of [prev, cur, field, toT, outRT]) x.dispose();
                 }
                 // flowFromMotionNode: a synthetic motion field (uvPrev - uvCurr) with its top rows INVALID, and a depth
                 {
@@ -180,6 +229,23 @@ else {
            "t = 1 on a cur-indexed field is a copy with no hole; t = 0 is not");
         const cf = up(o.crossFade, 64, 64), ref = crossFadeCPU(CASES.checker); let cw = 0; for (let i = 0; i < cf.length; i++) cw = Math.max(cw, Math.abs(cf[i] - ref[i]));
         ok(`  [${mode}] the CONTROL ARM is crossFadeCPU's, worst ${cw.toExponential(2)}`, cw < 1e-6, "the cross-fade every generated frame has to beat");
+        {
+            // v4744, the arc: both offsets at every landed pixel exactly, and the frame to f32
+            const rowsA = Object.entries(ARC).map(([k, c]) => {
+                const x = cpuArc[k], d = o.arc[k], va = up(d.cur, c.w, c.h), vb = up(d.prev, c.w, c.h), f = up(d.frame, c.w, c.h);
+                let holeD = 0, aD = 0, bD = 0, fw = 0;
+                for (let i = 0; i < c.w * c.h; i++) {
+                    const hole = va[i * 4 + 3] < 0.5 ? 1 : 0; if (hole !== x.hole[i]) { holeD++; continue; }
+                    if (!hole) { if (va[i * 4] !== x.vec[i * 2] || va[i * 4 + 1] !== x.vec[i * 2 + 1]) aD++; if (vb[i * 4] !== x.vecPrev[i * 2] || vb[i * 4 + 1] !== x.vecPrev[i * 2 + 1]) bD++; }
+                    for (let q2 = 0; q2 < 4; q2++) fw = Math.max(fw, Math.abs(f[i * 4 + q2] - x.frame[i * 4 + q2]));
+                }
+                return [k, { holeD, aD, bD, fw, holes: x.holes, filled: x.filled }];
+            });
+            for (const [k, x] of rowsA) say(`[${mode}] ${k.padEnd(13)} CPU ${String(x.holes).padStart(4)} holes${x.filled ? `, ${x.filled} filled` : ""}; mask differs ${x.holeD}, cur offset ${x.aD}, prev offset ${x.bD}; worst |frame| ${x.fw.toExponential(2)}`);
+            ok(`*** [${mode}] the ARC is interpolateFrameCPU({ toT })'s on every pixel of all ${rowsA.length} cases -- the mask and BOTH offsets exactly, through the fill too, the frame to f32 ***`,
+               rowsA.every(([, x]) => x.holeD === 0 && x.aD === 0 && x.bD === 0 && x.fw < 2e-6) && cpuArc.arcDeclined.holes > cpuArc.arcCurve.holes && cpuArc.arcFilled.filled > 0,
+               "a second splat of the same blocks at the same depths settles the same winners, and the same fill over it chooses the same neighbours -- the blend's choice is the depth's");
+        }
         { const q = o.flowFromMotion, g = up(q.got, q.W, q.H); let wv = 0, bad = 0, invalid = 0;
           for (let i = 0; i < q.W * q.H; i++) { const vx = Math.fround(-q.mo[i * 4] * q.W), vy = Math.fround(-q.mo[i * 4 + 1] * q.H), valid = q.mo[i * 4 + 2] === 0 ? 0 : 1;
               if (!valid) invalid++;
@@ -206,6 +272,7 @@ else {
 // blind spot; the row now counts its ties instead of asserting them.
 // F3 is 2 and not 4 because TSL's round() and floor(x + 0.5) part only on tieHalf -- the case v4734 added to the WGSL
 // kernel's gate for the same reason.
+// v4744, the arc: A5-A11 in fx/fsr/fsrFrameGenArc-selfcheck.mjs's log redden the arc row here, two or three each.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the FILL (render/holeFill.mjs), which interpolateFrameCPU runs between the two when asked and this module does not " +
     "yet carry; depths closer than the key's ~6e-8, which become ties; and a field on a real three.js scene, which the driver's gate draws.");

@@ -87,9 +87,12 @@ export function clipDepth(windowDepth, gl) { return gl ? windowDepth * 2 - 1 : w
  * node.setPreviousCamera(projection, view) before each draw; the first draw of an object sees itself as its own
  * previous (zero object motion), which is the first-frame rule the rest of the chain already keeps.
  */
-export function makeMotionNode(THREE, TSL) {
+export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     need(TSL);
     if (typeof THREE.VelocityNode !== "function") throw new Error("render/temporalTsl: this three build exports no VelocityNode");
+    // v4744: `toward` ({ t }) makes the "previous" pose the one at time t between the last draw and this one -- the arc --
+    // so the field is each surface's displacement from THIS frame to time t, not to the last frame
+    const scratch = toward ? new THREE.Matrix4() : null;
     const { vec4, select, cameraProjectionMatrix, modelViewMatrix, positionLocal, positionPrevious } = TSL;
     const prev = new WeakMap();
     class MotionNode extends THREE.VelocityNode {
@@ -102,7 +105,7 @@ export function makeMotionNode(THREE, TSL) {
         update({ object }) {
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
-            this.previousModelWorldMatrix.value.copy(m);
+            this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
         }
         updateAfter({ object }) {
             const m = prev.get(object);
@@ -119,6 +122,17 @@ export function makeMotionNode(THREE, TSL) {
         }
     }
     return new MotionNode();
+}
+
+/**
+ * v4744: the rigid pose at time t between two world matrices -- translation and scale lerped, rotation slerped -- which is
+ * where a body turning at a steady rate between two frames is; a lerp of the matrices themselves would shrink it through
+ * the turn. `out` receives it.
+ */
+export function poseAt(THREE, a, b, t, out = new THREE.Matrix4()) {
+    const pa = new THREE.Vector3(), qa = new THREE.Quaternion(), sa = new THREE.Vector3(), pb = new THREE.Vector3(), qb = new THREE.Quaternion(), sb = new THREE.Vector3();
+    a.decompose(pa, qa, sa); b.decompose(pb, qb, sb);
+    return out.compose(pa.lerp(pb, t), qa.slerp(qb, t), sa.lerp(sb, t));
 }
 
 /**
@@ -157,13 +171,17 @@ export function motionCompleteNodes(THREE, TSL, motionTex, depthTex, { w, h, gl 
  * camera) into `surface` (rgba float + a depth texture), then the completion into `motion` and the clip depth into
  * `depth`. `render(renderer, scene, camera)` draws all three; the caller has restored the unjittered projection.
  */
-export function makeMotionStage(THREE, TSL, { w, h, gl, type = null }) {
+export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = false }) {
     const T = type == null ? THREE.FloatType : type;
     const surface = new THREE.RenderTarget(w, h, { type: T, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     surface.depthTexture = new THREE.DepthTexture(w, h); surface.depthTexture.type = THREE.FloatType;
     const flat = { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false };
     const motion = new THREE.RenderTarget(w, h, flat), depth = new THREE.RenderTarget(w, h, flat);
-    const motionNode = makeMotionNode(THREE, TSL);
+    // v4744: a TOWARD stage renders each pixel's displacement to time t between the last frame and this one, on the arc:
+    // render(renderer, scene, camera, t). Its output's du, dv are uv(t) - uv(this frame) and its w the clip depth at t.
+    const towardState = toward ? { t: 0.5 } : null;
+    const motionNode = makeMotionNode(THREE, TSL, { toward: towardState });
+    const camA = toward ? new THREE.Matrix4() : null, camB = toward ? new THREE.Matrix4() : null, camT = toward ? new THREE.Matrix4() : null;
     const override = new THREE.NodeMaterial(); override.fragmentNode = motionNode; override.blending = THREE.NoBlending;
     const comp = motionCompleteNodes(THREE, TSL, surface.texture, surface.depthTexture, { w, h, gl });
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.depthTest = false; m.depthWrite = false; m.blending = THREE.NoBlending;
@@ -175,9 +193,18 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null }) {
         surface, motion, depth, motionNode, uniforms: comp.uniforms,
         /** Whether the field just rendered carries a previous frame -- frame one's is every object against itself. */
         get hasHistory() { return frames > 1; },   // after a render: motionVectors.hasHistory's own rule
-        async render(renderer, scene, camera) {
+        async render(renderer, scene, camera, t = 0.5) {
             camera.updateMatrixWorld();
             if (frames === 0) { prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse); }
+            const lastP = prevP.clone();
+            if (toward) {
+                if (!(t >= 0 && t <= 1)) throw new Error(`render/temporalTsl: a toward stage's t must be in [0, 1] -- got ${t}`);
+                towardState.t = t;
+                // the camera at time t: its world pose on the arc, its projection lerped
+                camA.copy(prevV).invert(); camB.copy(camera.matrixWorldInverse).invert();
+                prevV.copy(poseAt(THREE, camA, camB, t, camT)).invert();
+                for (let i = 0; i < 16; i++) prevP.elements[i] = lastP.elements[i] + t * (camera.projectionMatrix.elements[i] - lastP.elements[i]);
+            }
             motionNode.setPreviousCamera(prevP, prevV);
             vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
             comp.uniforms.invVPCur.value.copy(vp).invert();

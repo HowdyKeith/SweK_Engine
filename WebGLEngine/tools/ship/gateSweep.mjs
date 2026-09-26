@@ -8032,6 +8032,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4744 -- THE 351st CLOSING: motion on the arc, and the premise measured before it was built.
+    since426: Object.freeze({
+        at: "v4744", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenArc-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/frameInterpTsl-selfcheck.mjs (the arc: six cases, both offsets exact, through the fill)",
+                                "render/temporalTsl-selfcheck.mjs (poseAt)"]),
+        verdict: "*** THE ARC IS REAL ONLY WHERE ROTATION IS FAST, AND THE CLAIM THAT STARTED THIS ROUND WAS WRONG. *** v4741 " +
+                 "explained a low reconciliation margin's +1.33 dB on the knot turning at 6x as the vector being the chord of an " +
+                 "arc. Measured on the knot's own vertices: the half-way point is 0.012 pixels off the chord's midpoint at 6x, " +
+                 "0.05 at 12x, 0.28 at 30x, 1.08 at 60x. The gain at 6x is at the knot's silhouettes and self-occlusion edges -- " +
+                 "plain landed pixels, where a block vector blends a hard edge -- and partly the supersampled truth's soft edge " +
+                 "(+0.8, not +1.3, against a single-sample render); an FSR2-style flag taking the newer frame alone where the " +
+                 "older one hid the surface recovered none of it (-0.30 at 6x) and was taken out. Motion on the arc was built all " +
+                 "the same, for fast rotation: render/temporalTsl.mjs's makeMotionStage({ toward: true }) renders each pixel's " +
+                 "displacement to its pose at time t (poseAt: lerped translation and scale, slerped rotation, the camera too -- " +
+                 "exactly the ordinary field at t = 0 and nothing at t = 1), render/frameInterp.mjs's `toT` and its TSL mirror land " +
+                 "each block there and sample each frame at its own offset -- a second splat and fill, the mask and both offsets " +
+                 "exact on both backends -- and fx/fsr/fsrFrameGenTsl.mjs's `arc` wires it: +0.68 dB at 60x the page's spin, " +
+                 "+0.19 at 30x, nothing at 4x or 12x. An option, not a default. Thirteen sabotages, all red. The live notes that " +
+                 "repeated the chord claim are corrected; fsr-three.html gains 'gen: motion on the arc' and a spin rate.",
+    }),
     // v4743 -- THE 350th CLOSING: when each frame is shown, and what the half-way frame costs off the half.
     since425: Object.freeze({
         at: "v4743", swept: 2, green: 2, red: 0,

@@ -108,12 +108,19 @@ export function crossFadeCPU({ prev, cur, w, h, t = 0.5 }) {
  *   zbuf    the splat's depth buffer, extended by the filler -- what the tie between two arriving blocks
  *           was settled on, so a frame can be audited rather than trusted
  *
+ * `toT` (v4744) is the ARC: bw*bh*2, each block's displacement from its CUR position to where its content is at time t,
+ * which a rigid body turning between the frames reaches along an arc and not the chord. With it, a block lands at its cur
+ * position plus toT, and each pixel samples `cur` and `prev` at the offsets that block carried there -- -toT and
+ * -flow - toT -- instead of (1 - t) and -t of one vector. `flow` is then the displacement to `prev`, negated, as always.
+ * It needs indexedBy "cur" and a fill, if any, whose side is "blend": the other side rules read one vector as a chord.
+ * `vecPrev` is returned beside `vec`, the prev offsets the warp sampled along.
+ *
  * `fill` is null by default and this function then behaves exactly as it did at v4677. Passing
  * { prefer, passes } runs render/holeFill.mjs between the scatter and the gather; see its header for why the
  * default neighbour is the FARTHER one and why the switch exists at all.
  */
 export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, depthBlock, indexedBy,
-                                     nearerIsLess = true, t = 0.5, fill = null }) {
+                                     nearerIsLess = true, t = 0.5, fill = null, toT = null }) {
     if (!(block >= 1) || block !== Math.floor(block))
         throw new Error(`interpolateFrameCPU: block must be a whole number of pixels, at least 1 -- got ${block}`);
     if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
@@ -130,7 +137,13 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
             'render/opticalFlow.mjs and render/flowReconcile.mjs both return "cur"; a field built by walking the PREVIOUS frame is "prev". ' +
             "There is no default, because the two differ by the whole displacement wherever motion is not uniform and no measurement in this arc could tell them apart until v4680.");
 
+    if (toT && (toT.length < bw * bh * 2 || indexedBy !== "cur"))
+        throw new Error('interpolateFrameCPU: toT must be bw*bh*2 and the field indexedBy "cur" -- it is the displacement from each block\'s CUR position to time t');
+    if (toT && fill && (fill.side === undefined ? "derived" : fill.side) !== "blend")
+        throw new Error('interpolateFrameCPU: with toT the fill\'s side must be "blend" -- the other side rules read the splatted vector as a chord');
     const vec = new Float32Array(w * h * 2).fill(NaN);
+    // v4744, the arc: the offset each landed pixel samples `prev` at (and `vec` then holds the one it samples `cur` at)
+    const vecPrev = toT ? new Float32Array(w * h * 2).fill(NaN) : null;
     const zbuf = new Float32Array(w * h).fill(nearerIsLess ? Infinity : -Infinity);
     const hole = new Uint8Array(w * h).fill(1);
 
@@ -160,8 +173,9 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         // at its CUR position and still has (1-t)*v to go, so at time t it is (1-t)*v BEHIND that. The two
         // differ by the whole displacement, and see the header for the three rounds in which nothing could
         // tell them apart.
-        const ax = indexedBy === "prev" ? t * vx : -(1 - t) * vx;
-        const ay = indexedBy === "prev" ? t * vy : -(1 - t) * vy;
+        const ax = toT ? toT[i * 2] : indexedBy === "prev" ? t * vx : -(1 - t) * vx;
+        const ay = toT ? toT[i * 2 + 1] : indexedBy === "prev" ? t * vy : -(1 - t) * vy;
+        if (toT && (!Number.isFinite(ax) || !Number.isFinite(ay))) continue;
         const sx = Math.round(bx * block + ax), sy = Math.round(by * block + ay);
         for (let y = 0; y < block; y++) {
             const py = sy + y; if (py < 0 || py >= h) continue;
@@ -174,7 +188,9 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
                 // it has one: on equal depths whichever block the loop reaches first would otherwise win
                 // everywhere, which is an answer that depends on the iteration order and not on the scene
                 if (nearerIsLess ? d < zbuf[j] : d > zbuf[j]) {
-                    zbuf[j] = d; vec[j * 2] = vx; vec[j * 2 + 1] = vy; hole[j] = 0;
+                    zbuf[j] = d; hole[j] = 0;
+                    if (toT) { vec[j * 2] = -ax; vec[j * 2 + 1] = -ay; vecPrev[j * 2] = -vx - ax; vecPrev[j * 2 + 1] = -vy - ay; }
+                    else { vec[j * 2] = vx; vec[j * 2 + 1] = vy; }
                 }
             }
         }
@@ -187,6 +203,14 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
     // `fill` null this function behaves as it did at v4677, bit for bit, which is its own gate row.
     let side = null, filledCount = 0, abstained = 0;
     if (fill) {
+        // the arc's prev offsets are filled by the same search -- blend's choice is the depth's, not the vector's, so the
+        // same neighbour is taken for both
+        if (toT) {
+            const r2 = fillHolesCPU({ vec: vecPrev, hole: hole.slice(), zbuf: zbuf.slice(), w, h, nearerIsLess,
+                                      radius: fill.radius === undefined ? 4 : fill.radius, growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
+                                      prefer: fill.prefer === undefined ? "farther" : fill.prefer, side: "blend", t });
+            vecPrev.set(r2.vec);
+        }
         const r = fillHolesCPU({ vec, hole, zbuf, w, h, nearerIsLess,
                                  radius: fill.radius === undefined ? 4 : fill.radius,
                                  growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
@@ -205,8 +229,11 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         const j = y * w + x;
         if (hole[j]) { holes++; continue; }             // left at zero on purpose -- see the header
         const vx = vec[j * 2], vy = vec[j * 2 + 1];
-        fetch4(prev, w, h, x - t * vx, y - t * vy, a, 0);
-        fetch4(cur, w, h, x + (1 - t) * vx, y + (1 - t) * vy, b, 0);
+        if (toT) { fetch4(prev, w, h, x + vecPrev[j * 2], y + vecPrev[j * 2 + 1], a, 0); fetch4(cur, w, h, x + vx, y + vy, b, 0); }
+        else {
+            fetch4(prev, w, h, x - t * vx, y - t * vy, a, 0);
+            fetch4(cur, w, h, x + (1 - t) * vx, y + (1 - t) * vy, b, 0);
+        }
         // *** A DISOCCLUDED PIXEL'S CONTENT IS IN ONE FRAME ONLY, SO THE BLEND IS NOT ALWAYS THE ANSWER. ***
         // `side` is SIDE_BLEND everywhere the splat landed, so the symmetric blend is what a normal pixel
         // gets and no second mask is needed; only render/holeFill.mjs's filled pixels can carry anything
@@ -215,5 +242,5 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         for (let c = 0; c < 4; c++)
             frame[j * 4 + c] = sd === SIDE_PREV ? a[c] : sd === SIDE_CUR ? b[c] : a[c] * (1 - t) + b[c] * t;
     }
-    return { frame, hole, holes, vec, side, filled: filledCount, abstained, zbuf, w, h };
+    return { frame, hole, holes, vec, vecPrev, side, filled: filledCount, abstained, zbuf, w, h };
 }

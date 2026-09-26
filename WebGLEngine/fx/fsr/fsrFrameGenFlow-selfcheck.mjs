@@ -134,7 +134,7 @@ else {
            "a 3 x 3 window under an exact vector still carries a residual wherever the shading turns with the surface, and a small margin reads that as the vector being wrong");
         ok(`  [${mode}] ...and what the margin GIVES UP, measured rather than hidden: with the wall still and the knot turning at 6x, the low margin is ${d(o.still.all.low, o.still.all.vectors)} dB over the vectors and the default ${d(o.still.all.default, o.still.all.vectors)}`,
            o.still.all.low > o.still.all.default,
-           "a turning knot's vector is the CHORD of an arc (fx/fsr/fsrFrameGenTsl.mjs's header), and the colour sees the arc; this row was written first asserting the opposite -- that the low margin costs here as under the pan -- and it failed. The default keeps the pan");
+           "v4741 said a turning knot's vector is the CHORD of an arc; v4744 measured the arc at 6x at 0.012 pixels (fx/fsr/fsrFrameGenArc-selfcheck.mjs) and found the gain at the knot's silhouettes and self-occlusion edges instead, where a block vector blends a hard edge. This row was written first asserting the opposite -- that the low margin costs here as under the pan -- and it failed. The default keeps the pan");
         ok(`  [${mode}] ...and FSR3's rule as the tree's mirror has it -- per BLOCK, at 0.05 -- does WORSE than the vectors alone where the texture scrolls (${d(S.all.block, S.all.vectors)} dB): a block straddling the silhouette gives its one vector to the knot's pixels`,
            S.all.block < S.all.vectors && S.all.block < S.all.default,
            "which is why the default decides per pixel; the block mode is kept as the port and as this row's control");
@@ -152,9 +152,12 @@ else {
 //   G11 the splat given a field the flow path never drew            -> 5
 // and render/flowReconcileTsl.mjs's pixel-mode default margin put back to 0.05 (its R13) -> 5.
 // *** ONE PRE-REGISTERED ROW FAILED, AND IT WAS THE ROW'S PREMISE. *** It asserted that the low margin costs where "the vectors
-// are right", and counted the knot turning over a still wall among those cases. At 6x it gains +1.33 dB there: the vector is
-// the chord and the colour follows the arc. The row now says so, as its own finding, and the pan -- a straight line, where
-// the vectors ARE the motion -- is the control.
+// are right", and counted the knot turning over a still wall among those cases. At 6x it gains +1.33 dB there. The row now
+// says so, as its own finding, and the pan -- a straight line, where the vectors ARE the motion -- is the control.
+// *** AND THE EXPLANATION WRITTEN WITH IT WAS WRONG (v4744). *** It said the vector is the chord of the arc the knot turns
+// on. At 6x the half-way point is 0.012 pixels off the chord's midpoint; the gain is at the knot's silhouettes and where one
+// tube crosses another -- plain landed pixels, not holes, not arcs -- partly the supersampled truth's soft edge (+0.8 dB, not
+// +1.3, against a single-sample render). fx/fsr/fsrFrameGenArc-selfcheck.mjs holds the measurement.
 // *** WEBGPU ONLY, AND WHY. *** The first run took 31 s over both backends and read the same figures on both to 0.05 dB; the
 // passes are held to their mirrors on both by render/opticalFlowTsl-selfcheck.mjs and render/flowReconcileTsl-selfcheck.mjs,
 // and what is measured here is what the arithmetic buys, which is one number.

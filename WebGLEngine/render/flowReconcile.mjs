@@ -264,8 +264,10 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * shading moves with the surface -- the knot's normal colours turn with it -- so at 0.05 the flow took 42% of the knot's
  * pixels from exact vectors, and those pixels, splatted nearer than the wall, carried the knot onto it. The flow pays where
  * the vectors are silent, which is where they are wrong by a whole displacement and the ratio is large. What 0.9 gives
- * up is the knot turning at 12x -- a chord where the motion is an arc -- which a low margin helped by 2 dB; the vectors
- * stay the incumbent, and that is the price.
+ * up is the knot turning at 12x, which a low margin helped by 2 dB; the vectors stay the incumbent, and that is the price.
+ * *** NOT BECAUSE THE VECTOR IS A CHORD, WHICH THIS NOTE SAID UNTIL v4744. *** At 12x the half-way point is 0.05 pixels off
+ * the chord's midpoint; what the low margin buys there is at the knot's silhouettes and self-occlusion edges, where a block
+ * vector blends an edge the pixel's exact vector moves whole (fx/fsr/fsrFrameGenArc-selfcheck.mjs's header).
  */
 export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motion, depth, radius = 1, margin = 0.9 }) {
     if (!(block >= 2) || block !== Math.floor(block))

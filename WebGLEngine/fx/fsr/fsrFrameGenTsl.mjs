@@ -24,6 +24,10 @@
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
 // turning at the rate it does between two real frames, where the chord and the arc agree to a fraction of a pixel.
+// `arc: true` (v4744) splats with a toward stage's field instead -- render/temporalTsl.mjs's makeMotionStage({ toward:
+// true }), each pixel's displacement to its pose at time t -- and pays where rotation is fast: +0.68 dB at 60x the page's
+// spin, +0.19 at 30x, nothing at 4x or 12x, where the arc is a hundredth of a pixel from the chord
+// (fx/fsr/fsrFrameGenArc-selfcheck.mjs). It costs a second geometry pass, splat and fill, so it is not the default.
 //
 // *** THE DEFAULT FILL BLENDS BOTH FRAMES IN A HOLE, AND THAT IS THIS SCENE'S MEASUREMENT OVERRULING v4679's. *** On
 // render/holeFill.mjs's slab -- an occluder TRANSLATING off a background -- the depth side mode was exact and the blend
@@ -47,7 +51,8 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * render/opticalFlowTsl.mjs and { margin, mode, radius } for render/flowReconcileTsl.mjs, {} for their defaults, null for
  * the vectors alone.
  */
-export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null } = {}) {
+export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null, arc = false } = {}) {
+    if (arc && flow) throw new Error("fx/fsr/fsrFrameGenTsl: arc and flow are not combined -- the flow's vectors are chords, and a pixel the flow took has no displacement to time t");
     const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     // depthOld: the newest depth seen, kept for the NEXT pair; depthPair: the older depth of the pair being generated, which
     // the fill reads -- two targets, so a pair can be generated again at another t (v4743) without losing its older depth
@@ -55,7 +60,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
     const at = (tex) => TSL.textureLoad(tex, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
-    const fi = makeFrameInterp(THREE, TSL, { w, h, block: 1, indexedBy: "cur", t,
+    const fi = makeFrameInterp(THREE, TSL, { w, h, block: 1, indexedBy: "cur", t, arc,
         fill: fill ? { ...fill, depthPrev: depthPair.texture, depthCur: depthNow.texture } : null });
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const scenes = new Map();
@@ -63,16 +68,22 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
     const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3 }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
+    // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
+    // displacement to time t in pixels, and its validity
+    const toT = arc ? flat() : null;
+    const toTNode = (toward) => TSL.Fn(() => { const m = at(toward); return TSL.vec4(m.x.mul(w), m.y.mul(h), 0.0, TSL.select(m.z.equal(0.0), TSL.float(0.0), TSL.float(1.0))); })();
     let generated = 0;
     return {
-        interp: fi, targets: { field, depthNow, depthOld, depthPair }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec,
+        interp: fi, targets: { field, depthNow, depthOld, depthPair, toT }, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec, arc,
         get generated() { return generated; },
         /**
          * `t` (v4743) generates at that time instead of the one the generator was made with, and `again` says this is the
          * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
-        async generate(renderer, { prev, cur, motion, depth }, output = null, { t: at_ = null, again = false } = {}) {
+        async generate(renderer, { prev, cur, motion, depth, toward = null }, output = null, { t: at_ = null, again = false } = {}) {
+            if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
+            if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
             const keep = renderer.getRenderTarget();
             if (at_ !== null && !(at_ >= 0 && at_ <= 1)) throw new Error(`fx/fsr/fsrFrameGenTsl: t must be in [0, 1] -- got ${at_}`);
             fi.uniforms.t.value = at_ === null ? t : at_;                                // each call's own: the made-with t unless given
@@ -91,12 +102,13 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
                 await rec.reconcile(renderer, { lumaCur: of.pyramids.cur.targets[0].texture, lumaPrev: of.pyramids.prev.targets[0].texture,
                                                 flow: of.target.texture, motion, depth });
             }
-            await fi.splat(renderer, of ? rec.targets.field.texture : field.texture);
+            if (arc && !again) await draw(renderer, once("toT|" + toward.uuid, () => quad(toTNode(toward))), toT);
+            await fi.splat(renderer, of ? rec.targets.field.texture : field.texture, arc ? toT.texture : null);
             await fi.gather(renderer, prev, cur, output);
             if (!again) await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next pair's older depth
             renderer.setRenderTarget(keep);
             generated++;
         },
-        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld, depthPair]) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
+        dispose() { fi.dispose(); for (const x of [field, depthNow, depthOld, depthPair, toT]) if (x) x.dispose(); if (of) { of.dispose(); rec.dispose(); } },
     };
 }

@@ -23,6 +23,7 @@ import { buildObjectMatrices, objectMotionCPU } from "./objectMotion.mjs";
 import { resolveJitterAwareCPU } from "./temporalResolve.mjs";
 import { rectifiedAccumulateCPU } from "./temporalReject.mjs";
 import * as TT from "./temporalTsl.mjs";
+import * as THREE from "../vendor/three-webgpu/three.webgpu.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -51,6 +52,12 @@ console.log("\n1. WITHOUT A DEVICE: the refusals and the depth mapping");
     ok("clipDepth maps window depth to WebGL's [-1, 1] and leaves WebGPU's [0, 1] alone",
        TT.clipDepth(0, true) === -1 && TT.clipDepth(1, true) === 1 && TT.clipDepth(0.25, true) === -0.5 &&
        TT.clipDepth(0.25, false) === 0.25, "0 -> -1, 1 -> 1, 0.25 -> -0.5 on WebGL; identity on WebGPU");
+    // v4744: poseAt, the pose a toward stage's "previous" is -- a quarter turn about y from the origin to (4, 0, 0)
+    const a = new THREE.Matrix4(), b = new THREE.Matrix4().compose(new THREE.Vector3(4, 0, 0), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2), new THREE.Vector3(1, 1, 1));
+    const q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); TT.poseAt(THREE, a, b, 0.25).decompose(p, q, s);
+    ok("  v4744: poseAt at a quarter of the way is an eighth of a turn at a quarter of the distance, at full scale -- the slerp's pose, not the matrices' lerp",
+       Math.abs(q.angleTo(new THREE.Quaternion()) - Math.PI / 8) < 1e-9 && p.distanceTo(new THREE.Vector3(1, 0, 0)) < 1e-12 && Math.abs(s.x - 1) < 1e-12,
+       "fx/fsr/fsrFrameGenArc-selfcheck.mjs measures what the toward stage built on it buys");
 }
 
 console.log("\n2. ON THE DEVICE: the motion field of a three.js scene, on both backends");

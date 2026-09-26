@@ -555,8 +555,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4741 -- 1821 -> 1823 for render/flowReconcileTsl-selfcheck.mjs and fx/fsr/fsrFrameGenFlow-selfcheck.mjs -- the reconciliation as TSL, per block and per pixel, and what it buys a generated frame.
     // v4742 -- 1823 -> 1824 for fx/fsr/fsr3Tsl-selfcheck.mjs -- FSR3's frame generation on FSR2's upscaled frames, against a frame rendered at the midpoint.
     // v4743 -- 1824 -> 1826 for render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs -- when each frame is shown: FSR3's half-way frame against timed generation, in ms and in dB.
-    gates: 1826, usesOk: 1805, definesOk: 1797, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1698, condFirst: 91, unknownSignature: 16,
+    // v4744 -- 1826 -> 1827 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- motion on the arc for frame generation, and the chord-vs-arc error measured before it was built.
+    gates: 1827, usesOk: 1806, definesOk: 1798, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1699, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

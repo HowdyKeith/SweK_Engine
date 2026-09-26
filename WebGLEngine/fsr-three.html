@@ -71,6 +71,13 @@
       <option value="midpoint" selected>FSR3's half-way frame</option>
       <option value="timed">timed: a frame at each refresh's own time</option>
     </select></label>
+    <label title="The generated-frame views: splat with each pixel's displacement to its pose at the half-way time -- the arc a turning body follows -- instead of half its vector, the chord. It pays only where rotation is fast (fx/fsr/fsrFrameGenArc-selfcheck.mjs); not with the optical flow."><input id="genarc" type="checkbox"> gen: motion on the arc</label>
+    <label title="How fast the knot turns in the generated-frame views, in multiples of the page's rate: the arc is a hundredth of a pixel from the chord at 4x and pixels at 60x.">gen spin <select id="speed">
+      <option value="1" selected>1x</option>
+      <option value="4">4x</option>
+      <option value="30">30x</option>
+      <option value="60">60x</option>
+    </select></label>
     <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector (fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
@@ -162,17 +169,24 @@ try {
     // with its default fill (the blend, which that gate measured paying on this knot) or none.
     const gens = {};
     // v4741: and with the optical flow reconciled in, per pixel (render/flowReconcileTsl.mjs), when "gen: + optical flow" is on
+    // v4744: and on the arc, when "gen: motion on the arc" is on -- a toward stage (render/temporalTsl.mjs) renders each pixel's
+    // displacement to its pose half-way between the two frames, and the generator splats with that
+    let towardStage = null;
     const showGen = async (filled) => {
-        const withFlow = $("genflow").checked, key = (filled ? "filled" : "holes") + (withFlow ? "+flow" : ""); let gen = gens[key];
+        const withFlow = $("genflow").checked, withArc = $("genarc").checked && !withFlow;
+        const key = (filled ? "filled" : "holes") + (withFlow ? "+flow" : "") + (withArc ? "+arc" : ""); let gen = gens[key];
         if (!motionStage) await showMotion();
+        if (withArc && !towardStage) towardStage = makeMotionStage(THREE, TSL, { w: DW, h: DH, gl: glClip(THREE, renderer), toward: true });
         if (!gen) {
             const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, { w: DW, h: DH, ...(filled ? {} : { fill: null }), ...(withFlow ? { flow: {} } : {}) }) };
+            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, { w: DW, h: DH, ...(filled ? {} : { fill: null }), ...(withFlow ? { flow: {} } : {}), ...(withArc ? { arc: true } : {}) }) };
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
         await motionStage.render(renderer, scene, camera);
-        await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture }, null);
+        if (withArc) await towardStage.render(renderer, scene, camera, 0.5);
+        await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture,
+                                         toward: withArc ? towardStage.motion.texture : null }, null);
         g.k++;
     };
 
@@ -330,7 +344,8 @@ try {
         // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
         // -- and the flow view, whose search reaches 16 pixels at three levels and no further (v4740)
         const genView = ["gen", "genholes", "flow", "fsr3gen", "fsr3paced"].includes($("mode").value);
-        if ($("spin").checked) t += genView ? 1 / 60 : dt / 1000;
+        const genSpin = $("mode").value === "gen" || $("mode").value === "genholes" ? Number($("speed").value) : 1;
+        if ($("spin").checked) t += genView ? genSpin / 60 : dt / 1000;
         if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
         knot.rotation.set(t * 0.4, t * 0.6, 0);
         const mode = $("mode").value, k = Number($("scale").value);
@@ -350,6 +365,7 @@ try {
         const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
             + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genflow").checked ? " + optical flow" : "")
+            + ((mode === "gen" || mode === "genholes") ? `${$("genarc").checked && !$("genflow").checked ? " + arc" : ""}, spin ${$("speed").value}x` : "")
             + (mode === "fsr3paced" && paced ? ` | real every ${paced.N}, ${paced.pacer.policy}: ${paced.counts.gen} generated, ${paced.counts.real} real, ${paced.counts.hold} held` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
