@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-09-26T13:10:20.833Z",
+ "at": "2026-09-26T13:35:16.389Z",
  "poolAt": "2026-09-17T16:20:39.742Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -697,9 +697,10 @@
   },
   {
    "gate": "render/frameInterpTsl-selfcheck.mjs",
-   "ms": 8424,
+   "ms": 8828,
    "code": 0,
-   "at": "2026-09-26T13:10:20.833Z"
+   "priorMs": 8424,
+   "at": "2026-09-26T13:35:16.389Z"
   },
   {
    "gate": "render/holeFillGPU-selfcheck.mjs",
@@ -707,6 +708,12 @@
    "code": 0,
    "priorMs": 1695,
    "at": "2026-09-26T12:36:43.676Z"
+  },
+  {
+   "gate": "render/holeFillTsl-selfcheck.mjs",
+   "ms": 7163,
+   "code": 0,
+   "at": "2026-09-26T13:35:07.441Z"
   },
   {
    "gate": "render/mossField-selfcheck.mjs",

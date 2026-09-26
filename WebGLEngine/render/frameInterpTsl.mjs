@@ -32,6 +32,8 @@
 // NaN). flowFromMotionNode builds one from this tree's motion field at a block of 1.
 "use strict";
 import { requireTsl } from "./temporalTsl.mjs";
+import { fillHolesNodes } from "./holeFillTsl.mjs";
+import { SIDE_PREV } from "./holeFill.mjs";
 
 /**
  * A per-pixel field (block 1) from a three.js motion field: vec4(vx, vy, depth, valid) with (vx, vy) = -(du * w, dv * h)
@@ -64,22 +66,31 @@ export function crossFadeNode(TSL, prevTex, curTex, { t = 0.5 } = {}) {
 }
 
 /**
- * interpolateFrameCPU without `fill`: splat(renderer, fieldTex) scatters the field into `targets.vec` -- vec4(vx, vy,
- * zbuf, 1) where a block landed and alpha 0 in a hole -- and gather(renderer, prevTex, curTex, output) warps. uniforms.t
- * is the time, shared by both. `indexedBy` ("prev" or "cur") is REQUIRED, as interpolateFrameCPU requires it.
+ * interpolateFrameCPU: splat(renderer, fieldTex) scatters the field into `targets.vec` -- vec4(vx, vy, zbuf, 1) where a
+ * block landed and alpha 0 in a hole -- and, when `fill` is given, extends it into the holes (render/holeFillTsl.mjs)
+ * into `targets.filled` and `targets.side`; gather(renderer, prevTex, curTex, output) warps along whichever is last.
+ * uniforms.t is the time, shared by all of them. `indexedBy` ("prev" or "cur") is REQUIRED, as interpolateFrameCPU
+ * requires it. `fill` is interpolateFrameCPU's: { radius, prefer, side, depthPrev, depthCur } -- the two depths as
+ * TEXTURES here -- and null by default, when this is v4736's pass exactly.
  */
-export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLess = true, t = 0.5 }) {
+export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLess = true, t = 0.5, fill = null }) {
     requireTsl(TSL);
     if (!(block >= 1) || block !== Math.floor(block)) throw new Error(`render/frameInterpTsl: block must be a whole number of pixels, at least 1 -- got ${block}`);
     if (indexedBy !== "prev" && indexedBy !== "cur")
         throw new Error(`render/frameInterpTsl: indexedBy must be "prev" or "cur" -- got ${JSON.stringify(indexedBy)}; there is no default, for render/frameInterp.mjs's reason (v4680)`);
     if (!(t >= 0) || !(t <= 1)) throw new Error(`render/frameInterpTsl: t must be in [0, 1] -- got ${t}`);
     const { Fn, float, int, uint, vec4, ivec2, uniform, textureLoad, screenCoordinate, instanceIndex, positionGeometry,
-            varying, floor, min, select, clamp } = TSL;
+            varying, floor, min, select, clamp, abs } = TSL;
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
     const u = { t: uniform(float(t)), w: uniform(float(w)), h: uniform(float(h)), block: uniform(float(block)), bw: uniform(uint(bw)) };
     const depthTexture = new THREE.DepthTexture(w, h); depthTexture.type = THREE.FloatType;
     const vecT = new THREE.RenderTarget(w, h, { type: THREE.FloatType, depthTexture, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const fillN = fill ? fillHolesNodes(TSL, vecT.texture, { w, h, nearerIsLess, t, radius: fill.radius === undefined ? 4 : fill.radius,
+        prefer: fill.prefer || "farther", side: fill.side || "derived", depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null }) : null;
+    if (fillN) fillN.uniforms.t = u.t;   // one time for the splat, the fill's side test and the warp
+    const filledT = fill ? flat() : null, sideT = fill ? flat() : null;
+    const field = fill ? filledT : vecT;
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
     // ---- SCATTER: one quad per block, placed where the block's content is at time t ----
@@ -120,24 +131,42 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
     };
     const gatherNode = (prevTex, curTex) => Fn(() => {
         const x = floor(screenCoordinate.x), y = floor(screenCoordinate.y);
-        const v = textureLoad(vecT.texture, ivec2(int(x), int(y)));
+        const v = textureLoad(field.texture, ivec2(int(x), int(y)));
         const a = fetch4(prevTex, x.sub(u.t.mul(v.x)), y.sub(u.t.mul(v.y)));
         const b = fetch4(curTex, x.add(float(1.0).sub(u.t).mul(v.x)), y.add(float(1.0).sub(u.t).mul(v.y)));
-        return select(v.w.lessThan(0.5), vec4(0.0), a.mul(float(1.0).sub(u.t)).add(b.mul(u.t)));   // a hole stays ZERO
+        // a filled pixel's content may be in ONE frame only -- the side the fill decided; everything else blends.
+        // *** THE WEIGHTS ARE ARITHMETIC, NOT select(), AND TWO DRAFTS SAY WHY. *** The first chose a vec4 with a select
+        // nested in a select -- v4733's WebGL2 defect, and every WebGL2 frame came back as the target's clear colour. The
+        // second chose SCALAR weights the same way and failed the same way, with a TSL build error on WebGL2 only
+        // ("reading 'addToStack'"), so the draw never happened. For side codes 0, 1 and 2 these give exactly (1-t, t),
+        // (1, 0) and (0, 1) -- every term is a product with an exact 0 or 1 -- so the blend is the mirror's a(1-t) + bt.
+        let wa = float(1.0).sub(u.t), wb = u.t;
+        if (sideT) {
+            const sd = textureLoad(sideT.texture, ivec2(int(x), int(y))).x;
+            const isB = clamp(float(1.0).sub(sd), 0.0, 1.0), isP = clamp(float(1.0).sub(abs(sd.sub(float(SIDE_PREV)))), 0.0, 1.0),
+                  isC = clamp(sd.sub(float(SIDE_PREV)), 0.0, 1.0);
+            wa = isB.mul(float(1.0).sub(u.t)).add(isP); wb = isB.mul(u.t).add(isC);
+        }
+        return select(v.w.lessThan(0.5), vec4(0.0), a.mul(wa).add(b.mul(wb)));   // a hole stays ZERO
     })();
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
 
     const splats = new Map(), gathers = new Map();
+    const fillScenes = fill ? { field: quad(fillN.fieldNode), side: quad(fillN.sideNode) } : null;
     const once = (map, key, make) => { if (!map.has(key)) map.set(key, make()); return map.get(key); };
     return {
-        bw, bh, uniforms: u, targets: { vec: vecT },
+        bw, bh, uniforms: u, targets: { vec: vecT, filled: filledT, side: sideT },
         /** Scatter `fieldTex` (bw x bh: vx, vy, depth, valid) into targets.vec, clearing it and its depth first. */
         async splat(renderer, fieldTex) {
             const s = once(splats, fieldTex, () => splatScene(fieldTex));
             const prev = renderer.getRenderTarget(), pc = new THREE.Color(), pa = renderer.getClearAlpha(); renderer.getClearColor(pc);
             renderer.setRenderTarget(vecT); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
             await renderer.renderAsync(s.sc, ortho);
+            if (fillScenes) {
+                renderer.setRenderTarget(filledT); await renderer.renderAsync(fillScenes.field, ortho);
+                renderer.setRenderTarget(sideT); await renderer.renderAsync(fillScenes.side, ortho);
+            }
             renderer.setClearColor(pc, pa); renderer.setRenderTarget(prev);
         },
         /** Warp `prevTex` and `curTex` along the splatted field into `output` (null for the canvas). */
@@ -146,6 +175,6 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
             const prev = renderer.getRenderTarget();
             renderer.setRenderTarget(output); await renderer.renderAsync(sc, ortho); renderer.setRenderTarget(prev);
         },
-        dispose() { vecT.dispose(); depthTexture.dispose(); for (const s of splats.values()) s.dispose(); },
+        dispose() { vecT.dispose(); depthTexture.dispose(); if (filledT) { filledT.dispose(); sideT.dispose(); } for (const s of splats.values()) s.dispose(); },
     };
 }

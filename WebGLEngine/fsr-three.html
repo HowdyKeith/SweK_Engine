@@ -39,7 +39,8 @@
       <option value="motion">motion vectors (debug)</option>
       <option value="masks">clip + lock masks (debug)</option>
       <option value="locks">FSR2 with its locks in red (debug)</option>
-      <option value="gen">generated frame, halfway between the last two, holes black (debug)</option>
+      <option value="gen">generated frame, halfway between the last two, holes filled (debug)</option>
+      <option value="genholes">generated frame, halfway between the last two, holes black (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -139,10 +140,12 @@ try {
     // scene. The last two native frames, and the scene's own motion field for the newer one turned into a per-pixel
     // forward flow (flowFromMotionNode): every pixel is splatted to where its content was halfway between the two -- a
     // depth-tested draw, the nearer surface winning -- and the frame is warped from both along it. What no pixel's
-    // motion reaches is a HOLE and is left BLACK here, on purpose: it is the disocclusion the next round's fill is for,
-    // and a hole filled silently is a hole nobody measures (render/frameInterp.mjs's rule).
-    let gen = null;
-    const showGen = async () => {
+    // motion reaches is a HOLE: the "holes black" view leaves it at zero, on purpose -- a hole filled silently is a hole
+    // nobody measures (render/frameInterp.mjs's rule) -- and v4737's view fills it (render/holeFillTsl.mjs): each hole takes
+    // the FARTHER vector near it, and the frame its content is visible in, by the derived rule.
+    const gens = {};
+    const showGen = async (filled) => {
+        const key = filled ? "filled" : "holes"; let gen = gens[key];
         if (!motionStage) await showMotion();
         if (!gen) {
             const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
@@ -150,7 +153,8 @@ try {
             const fm = flowFromMotionNode(TSL, motionStage.motion.texture, motionStage.depth.texture, { w: DW, h: DH });
             const m = new THREE.NodeMaterial(); m.fragmentNode = fm.node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
             const fieldScene = new THREE.Scene(); fieldScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
-            gen = { frames: [col(), col()], field, fieldScene, fi: makeFrameInterp(THREE, TSL, { w: DW, h: DH, block: 1, indexedBy: "cur", t: 0.5 }), k: 0 };
+            gen = gens[key] = { frames: [col(), col()], field, fieldScene, k: 0,
+                                fi: makeFrameInterp(THREE, TSL, { w: DW, h: DH, block: 1, indexedBy: "cur", t: 0.5, fill: filled ? { radius: 4, side: "derived" } : null }) };
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
         renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
@@ -235,7 +239,11 @@ try {
     let last = performance.now(), avg = 0, t = 0;
     const frame = async () => {
         const now = performance.now(), dt = now - last; last = now;
-        if ($("spin").checked) t += dt / 1000;
+        // the frame-generation views step the scene ONE NOMINAL 60 Hz FRAME per drawn frame, not by the wall clock: what
+        // they interpolate is the motion between two consecutive frames, and on a slow device the wall clock turns that
+        // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
+        const genView = $("mode").value === "gen" || $("mode").value === "genholes";
+        if ($("spin").checked) t += genView ? 1 / 60 : dt / 1000;
         knot.rotation.set(t * 0.4, t * 0.6, 0);
         const mode = $("mode").value, k = Number($("scale").value);
         const t0 = performance.now();
@@ -245,10 +253,10 @@ try {
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
         else if (mode === "motion") await showMotion();
         else if (mode === "masks") await showMasks();
-        else if (mode === "gen") await showGen();
+        else if (mode === "gen" || mode === "genholes") await showGen(mode === "gen");
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
+        const res = mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);

@@ -8032,6 +8032,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4737 -- THE 344th CLOSING: the holes of a generated frame, filled, as TSL.
+    since419: Object.freeze({
+        at: "v4737", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/holeFillTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE FILL IS A GATHER, SO IT RAN AS A FRAGMENT PASS ON BOTH BACKENDS -- AND THE SIDE-AWARE WARP FOUND A SECOND " +
+                 "WEBGL2 DEFECT. *** render/holeFillTsl.mjs ports fillHolesCPU's neighbourhood search -- the vector `prefer` picks, the " +
+                 "occluder (nearest surface, spatially closest on a tie), and all five side modes, the depth mode's fetch at " +
+                 "floor(x + 0.5) -- in the mirror's scan order with its strict comparisons, so both tie rules keep the first found. " +
+                 "Graded on render/holeFillGPU-selfcheck.mjs's eleven fixtures (the wrapped occluder and v4734's depth tie among them): " +
+                 "side codes, mask, vector and depth EXACT on both backends, filled and abstained counts equal; and render/frameInterpTsl.mjs " +
+                 "gains `fill` and a warp that draws a filled pixel from the one frame its content is in -- splat, fill and warp " +
+                 "together equal interpolateFrameCPU({ fill }) in three cases, 156 to 272 pixels drawn one-sided. The side-aware warp " +
+                 "failed on WebGL2 twice: a vec4 select nested in a select (v4733's defect), then SCALAR selects, which failed with a " +
+                 "TSL build error on WebGL2 alone ('reading addToStack') -- the draw never ran and the target kept its clear colour; " +
+                 "isolated by building the warp with and without the side read, and the weights are arithmetic now. The fill's first " +
+                 "draft unrolled its 81 taps and the gate compiled for 48 s; one loop, 7.6. fsr-three.html's generated frame is " +
+                 "filled now, with the unfilled view kept beside it, and both step the scene a nominal 60 Hz frame per drawn frame -- " +
+                 "under the software renderer the wall clock made the motion between two frames a jump no fill radius could cross. " +
+                 "Fourteen sabotages, thirteen red; the zero (off-frame taps counted) is an equivalent mutant, because a clamped " +
+                 "off-frame copy's real self is always strictly nearer.",
+    }),
     // v4736 -- THE 343rd CLOSING: FSR3's frame generation begins on a three.js scene -- the splat and the warp.
     since418: Object.freeze({
         at: "v4736", swept: 1, green: 1, red: 0,
