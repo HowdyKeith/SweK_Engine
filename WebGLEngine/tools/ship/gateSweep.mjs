@@ -8032,6 +8032,38 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4726 -- THE 333rd CLOSING: FSR1 for a three.js scene, as TSL nodes held to the CPU reference.
+    since408: Object.freeze({
+        at: "v4726", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/sweepCoverage-selfcheck.mjs (v4725's ledgerStamps and selectionKind named by the gate that shares their module's name)"]),
+        verdict: "*** BACKLOG ITEM pmndrs-upscaler-tsl WAS MOSTLY DONE, UNDER OTHER NAMES, AND ITS OWN ENTRY SAID 'GENUINELY UNSTARTED'. *** " +
+                 "The entry had searched render/ and gfx/ for the package's four identifiers. FSR1 landed at v4546-v4547 in fx/fsr/ " +
+                 "as this tree's own EASU and RCAS -- after that round measured @pmndrs/upscaler@0.2.0 and chose the algorithm over " +
+                 "the package -- and the temporal chain after it in render/, which fsr.html runs every frame; tools/ship/fsr2Coverage.mjs " +
+                 "derives how much of FSR2 is wired. No branch carries unmerged work on any of it beyond two gate-level fixes. What was " +
+                 "genuinely missing was the package's purpose: a three.js scene could not be put through any of it, because gfx/device.js " +
+                 "creates its own device. *** AND THE PACKAGE IS NOT A TSL PORT, BY ITS OWN README: *** hand-written WGSL on " +
+                 "renderer.backend.device, no TSL, no WebGL fallback; three ships a spatial FSR1Node in TSL. So the spatial half is a " +
+                 "fragment-node job. fx/fsr/fsrTsl.mjs transcribes easuCPU and rcasCPU statement by statement, plus a bilinear node and " +
+                 "a three-pass driver. fx/fsr/fsrTsl-selfcheck.mjs renders them on BOTH of three's backends and holds them to the " +
+                 "reference: EASU 2.98e-7 -- the WGSL kernel's own figure -- RCAS 3.58e-7 and 2.98e-7 on its two settings, a real " +
+                 "three.js scene through the driver 7.15e-7, and the bilinear pane 5.96e-8. Two things the port forced: a colour " +
+                 "transfer (a three.js target is linear and EASU wants perceptual; 'srgb' encodes with three's own sRGBTransferOETF and " +
+                 "decodes after RCAS) and a clamp at 0 before that decode, because RCAS undershoots a local minimum to -1.1 and three's " +
+                 "sRGBTransferEOTF of a negative reads NaN on both backends, measured. fsr-three.html is the caller, linked from " +
+                 "server.html, with the origin notice every WebGPU page carries and the page and launch indexes rebuilt. *** ITS FIRST " +
+                 "DRAFT DREW THE BILINEAR PANE UPSIDE DOWN *** on WebGL2 beside an upright FSR1 pane, seen by screenshot, because it " +
+                 "sampled the target with texture(t, uv()); both panes now read through the same coordinates. The readback of a " +
+                 "float target on WebGPU pads rows to 256 bytes, so every size is a multiple of 16 and every length is asserted. " +
+                 "*** EIGHTEEN SABOTAGES, EIGHTEEN RED, AFTER TWO 0-REDS: *** the RCAS guard's removal, because no fixture had a lone " +
+                 "pixel against a flat ring (the fourteenth empty adversarial population), and a driver skipping the bilinear pass's " +
+                 "scene render, because the gate's order left the same frame behind. *** ALSO: *** definitionGates' tree-wide ratchet " +
+                 "had sat at 364 against 362 since v4725, whose two ledger helpers were named only by timingKind; sweepCoverage's gate " +
+                 "now names them. The backlog entry records what is done and what is left: the temporal half for a three.js scene, " +
+                 "which needs the package's route. Nothing about FSR's quality was measured beyond agreement with the reference.",
+    }),
     // v4725 -- THE 332nd CLOSING: two guardians back under budget, and a named re-timing no longer passes anything over.
     since407: Object.freeze({
         at: "v4725", swept: 0, green: 0, red: 0,

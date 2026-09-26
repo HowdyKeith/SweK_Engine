@@ -539,8 +539,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4721 -- 1801 -> 1802 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, H15 re-derived with C25, C26 and C12.
     // v4722 -- 1802 -> 1803 for tools/ship/frameDisagree-selfcheck.mjs, H16's document, signal and qualifier, no declared data.
     // v4723 -- 1803 -> 1804 for tools/ship/frameDisagreeMeasure-selfcheck.mjs, H16 re-derived with C25, C26 and C12.
-    gates: 1804, usesOk: 1783, definesOk: 1775, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1676, condFirst: 91, unknownSignature: 16,
+    // v4726 -- 1804 -> 1805 for fx/fsr/fsrTsl-selfcheck.mjs, FSR1 as TSL nodes held to fx/fsr/fsr.js on both of three's backends.
+    gates: 1805, usesOk: 1784, definesOk: 1776, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1677, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 472,
+ "count": 473,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1282,6 +1282,13 @@
    "t": "SweK LLM Cost",
    "d": "",
    "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "fsr-three.html",
+   "t": "FSR1 on a three.js scene",
+   "d": "A three.js WebGPURenderer scene rendered at reduced resolution and brought back up by FSR1 -- EASU then RCAS -- written as TSL nodes (fx/fsr/fsrTsl.mjs) and graded against this tree's CPU reference on both of three's backends. Compare against a bilinear stretch and the native render; move the scale, the sharpness and the colour transfer.",
+   "g": "",
    "p": 0
   },
   {

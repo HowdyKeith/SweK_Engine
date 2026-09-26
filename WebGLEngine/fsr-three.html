@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="FSR1 on a three.js scene (TSL)">
+<meta name="demo:desc" content="A three.js WebGPURenderer scene rendered at reduced resolution and brought back up by FSR1 -- EASU then RCAS -- written as TSL nodes (fx/fsr/fsrTsl.mjs) and graded against this tree's CPU reference on both of three's backends. Compare against a bilinear stretch and the native render; move the scale, the sharpness and the colour transfer.">
+<meta name="demo:category" content="fx">
+<title>FSR1 on a three.js scene</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #hud { padding:14px 16px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  select, input[type=checkbox] { accent-color:var(--cyan); background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:6px; font:12px ui-monospace, monospace; padding:3px 6px; }
+  input[type=range] { accent-color:var(--cyan); }
+  .stat { color:var(--dim); font-size:12px; }
+  .fail { color:#f08080; }
+  #view { display:block; margin:0 16px 20px; max-width:calc(100% - 32px); border:1px solid #14203a; border-radius:8px; background:#000; image-rendering:pixelated; }
+</style>
+</head>
+<body>
+<!--
+  v4726 -- FSR1 FOR A THREE.JS SCENE, WHERE A PERSON CAN LOOK AT IT. fx/fsr/fsrTsl.mjs is graded by
+  fx/fsr/fsrTsl-selfcheck.mjs against fx/fsr/fsr.js on SwiftShader, which is not a GPU and does not present a
+  canvas; this page is the caller that renders a moving scene through the three passes on the machine it is opened
+  on. Nothing here is measured or asserted -- the frame time in the readout is this browser's, and the picture is
+  for eyes.
+-->
+<div id="hud">
+  <h1>&#9673; FSR1 on a three.js scene &middot; TSL</h1>
+  <div class="row">
+    <label>mode <select id="mode">
+      <option value="fsr" selected>FSR1 (EASU + RCAS)</option>
+      <option value="bilinear">bilinear stretch</option>
+      <option value="native">native resolution</option>
+    </select></label>
+    <label>scale <select id="scale">
+      <option value="1.5">1.5x</option>
+      <option value="2" selected>2x</option>
+      <option value="3">3x</option>
+    </select></label>
+    <label>sharpness <input id="sharp" type="range" min="0" max="1" step="0.05" value="0.8"> <span id="sharpV">0.80</span></label>
+    <label><input id="denoise" type="checkbox"> denoise</label>
+    <label>transfer <select id="transfer">
+      <option value="srgb" selected>srgb (EASU on perceptual values)</option>
+      <option value="none">none (EASU on linear values)</option>
+    </select></label>
+    <label><input id="spin" type="checkbox" checked> spin</label>
+  </div>
+  <div class="stat" id="stat">starting&hellip;</div>
+</div>
+<canvas id="view"></canvas>
+<script type="module">
+import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
+import * as TSL from "./vendor/three-webgpu/three.tsl.js";
+import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
+
+const $ = (id) => document.getElementById(id);
+const DW = 960, DH = 540;
+const stat = $("stat");
+try {
+    const canvas = $("view");
+    // ?backend=webgl2 asks three for its WebGL2 backend; the nodes compile to both, and the gate grades both
+    const forceWebGL = new URLSearchParams(location.search).get("backend") === "webgl2";
+    const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL });
+    await renderer.init();
+    renderer.setPixelRatio(1); renderer.setSize(DW, DH, false);   // the RCAS node reads screenCoordinate: the drawing buffer IS the display size
+    const backend = renderer.backend.isWebGPUBackend ? "WebGPU" : "WebGL2";
+
+    // a scene with the things an upscaler is judged on: thin high-contrast stripes, curved silhouettes, flat colour
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0.02, 0.03, 0.06);
+    const camera = new THREE.PerspectiveCamera(40, DW / DH, 0.1, 50); camera.position.set(0, 0.6, 5.2); camera.lookAt(0, 0, 0);
+    const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.9, 0.28, 220, 24), new THREE.MeshNormalNodeMaterial()); scene.add(knot);
+    const stripes = new THREE.MeshBasicNodeMaterial();
+    stripes.colorNode = TSL.Fn(() => { const s = TSL.floor(TSL.uv().x.mul(48.0).add(TSL.uv().y.mul(9.0))).mod(2.0); return TSL.mix(TSL.vec3(0.05, 0.08, 0.14), TSL.vec3(0.95, 0.72, 0.3), s); })();
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), stripes); floor.rotation.x = -Math.PI / 2; floor.position.y = -1.3; scene.add(floor);
+
+    // the bilinear comparison is the driver's own renderBilinear: the same low-resolution frame, read through the
+    // same coordinates as EASU (see bilinearNode's note on why not a sampled texture)
+    let fsr = null, built = "";
+    const build = () => {
+        const k = Number($("scale").value), rw = Math.round(DW / k), rh = Math.round(DH / k);
+        const key = [k, $("transfer").value].join("|");
+        if (key === built) return;
+        if (fsr) fsr.dispose();
+        fsr = makeFsrSpatial(THREE, TSL, { renderWidth: rw, renderHeight: rh, displayWidth: DW, displayHeight: DH,
+                                           sharpness: Number($("sharp").value), denoise: $("denoise").checked, transfer: $("transfer").value });
+        built = key;
+    };
+    const syncKnobs = () => {
+        $("sharpV").textContent = Number($("sharp").value).toFixed(2);
+        if (!fsr) return;
+        fsr.rcas.uniforms.sharpness.value = Number($("sharp").value);
+        fsr.rcas.uniforms.denoise.value = $("denoise").checked ? 1 : 0;
+    };
+    for (const id of ["scale", "transfer"]) $(id).addEventListener("change", () => { build(); syncKnobs(); });
+    for (const id of ["sharp", "denoise"]) $(id).addEventListener("input", syncKnobs);
+    build(); syncKnobs();
+
+    let last = performance.now(), avg = 0, t = 0;
+    const frame = async () => {
+        const now = performance.now(), dt = now - last; last = now;
+        if ($("spin").checked) t += dt / 1000;
+        knot.rotation.set(t * 0.4, t * 0.6, 0);
+        const mode = $("mode").value, k = Number($("scale").value);
+        const t0 = performance.now();
+        if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
+        else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
+        else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
+        avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
+        const res = mode === "native" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
+        stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
+        requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+} catch (e) {
+    stat.innerHTML = `<span class="fail">could not start: ${String(e && e.message || e)}</span>`;
+}
+</script>
+<script type="module" src="/ui/originNotice.js"></script>
+</body>
+</html>
