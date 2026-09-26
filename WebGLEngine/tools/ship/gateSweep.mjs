@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4729 -- THE 336th CLOSING: the depth clip as TSL.
+    since411: Object.freeze({
+        at: "v4729", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (dilation, disocclusion, the history factor and clipGapThreshold)"]),
+        verdict: "*** THE DEPTH CLIP RUNS ON A THREE.JS SCENE, AND IT AGREES WITH ITS MIRRORS TO THE BIT. *** render/temporalTsl.mjs " +
+                 "gains dilateNodes (render/dilate.mjs's dilateCPU: the nearest depth in the 3x3 and all four motion channels from " +
+                 "that same texel, off-frame neighbours skipped, a tie keeping the centre), disocclusionNode (disocclusionCPU against " +
+                 "LAST frame's dilated record), historyFactorNode (historyFactorCPU) and clipGapThreshold (fsr.html's quarter of " +
+                 "the clip-z gap between two named surfaces, checked against an independent route through transform4). On a " +
+                 "tilted wall under a moving camera, a box sliding past it and a face-on square spinning in its own plane, five " +
+                 "frames on both backends: dilation moves 22,573 pixels and matches dilateCPU with worst 0; disocclusion flags " +
+                 "1,122 genuine and 352 no-history pixels (1,181 and 352 on WebGL2, whose clip range doubles every gap and the " +
+                 "threshold with it) and matches with worst 0; the factor discards exactly their sum. Selections, not arithmetic, " +
+                 "so the device agrees to the bit or not at all. *** ELEVEN SABOTAGES, ELEVEN RED. *** The fixture was grown " +
+                 "before they ran, on reasoning and said so: a flat wall's tied neighbours carry identical motion, a static edge " +
+                 "reads the same zero, and the completed field has nothing invalid -- three rules with no population in the " +
+                 "first scene.",
+    }),
     // v4728 -- THE 335th CLOSING: the resolve and the accumulate as TSL, and a tie the WGSL resolve got wrong.
     since410: Object.freeze({
         at: "v4728", swept: 0, green: 0, red: 0,
