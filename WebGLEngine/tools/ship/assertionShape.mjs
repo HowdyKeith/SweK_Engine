@@ -538,8 +538,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4720 -- 1800 -> 1801 for tools/ship/frameSwayRep-selfcheck.mjs, H15's document, statistic and C26, no declared data.
     // v4721 -- 1801 -> 1802 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, H15 re-derived with C25, C26 and C12.
     // v4722 -- 1802 -> 1803 for tools/ship/frameDisagree-selfcheck.mjs, H16's document, signal and qualifier, no declared data.
-    gates: 1803, usesOk: 1782, definesOk: 1774, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1675, condFirst: 91, unknownSignature: 16,
+    // v4723 -- 1803 -> 1804 for tools/ship/frameDisagreeMeasure-selfcheck.mjs, H16 re-derived with C25, C26 and C12.
+    gates: 1804, usesOk: 1783, definesOk: 1775, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1676, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -79,8 +79,9 @@ const cells = d.cells.map(cellOf);
     const lo = Math.min(...cvs).toFixed(3), hi = Math.max(...cvs).toFixed(3);
     ok("*** the spread the document quotes is COMPUTED at x1, where nothing is declared -- the signal varies within every scene ***",
        doc.includes(`**${lo}**`) && doc.includes(`**${hi}**`) && cvs.every((v) => v >= d.cvFloor), `cv ${lo} to ${hi}; no correlation computed`);
-    ok("*** no data yet: no cache and no result -- the measurement round inverts this row ***",
-       !fs.existsSync(path.join(ENG, CACHE_H16)) && !fs.existsSync(path.join(ENG, RESULT_H16)));
+    // v4723 -- INVERTED, as every design gate in this arc has been: the measurement ran, under THIS document's constants.
+    ok("*** the measurement exists, produced under THIS document's constants -- v4722's 'no data yet', inverted ***",
+       fs.existsSync(path.join(ENG, CACHE_H16)) && fs.existsSync(path.join(ENG, RESULT_H16)) && J(res(RESULT_H16).declared) === J(d));
 }
 // A document naming a signal genGate does not have has failed its row above; nothing below can run without the column,
 // so the gate stops here with that failure counted rather than throwing on the first made-up frame.
@@ -141,5 +142,5 @@ console.log("\n3. *** THE SUMMARY ON REAL COMMITTED ROWS -- x1, WHICH NOTHING HE
 }
 
 console.log(`\nframeDisagree-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
-console.log("unchecked here: ANY DECLARED CELL -- nothing is harvested on sway at x4 and 3x; C25, C26 and C12 there are the measurement round's.");
+console.log("unchecked here: THE DECLARED CELLS -- they are tools/ship/frameDisagreeMeasure-selfcheck.mjs's, which re-derives H16 and checks C25, C26 and C12.");
 process.exit(fails ? 1 : 0);

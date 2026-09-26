@@ -8032,6 +8032,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4723 -- THE 330th CLOSING: H16 not supported -- a different signal from gain, and a weak one.
+    since405: Object.freeze({
+        at: "v4723", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/frameDisagreeMeasure-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/frameDisagree-selfcheck.mjs (the no-data row inverted, as it said it would be)",
+                                "tools/ship/frameVerdicts-selfcheck.mjs (H16 re-derived)"]),
+        verdict: "*** H16 IS NOT SUPPORTED, AND THE READING IS THE TABLE'S THIRD ROW: VECTOR DISAGREEMENT DOES NOT RANK THE FRAME " +
+                 "DECISION HERE. *** v4722's runner ran as committed on sway at x4, upscale 3x, both geometries -- 546 frames, 945 s. " +
+                 "The forward cell is near chance: 4 of 7, t p 0.247, mean rho -0.051, with bars, edges and ramp against it. The " +
+                 "vertical cell leans the declared way and misses: 6 of 7, exact sign p 0.0625, t p 0.0287, mean rho -0.139, with " +
+                 "noise against it. *** THE QUALIFIER HELD: *** within scenes the signal and H11's gain rank frames at mean |rho| " +
+                 "0.187, far under the 0.7 fixed in advance, so this is a different signal and not gain measured again. As a " +
+                 "description, vector disagreement is a different signal from motion's gain, and it barely orders which frames " +
+                 "generation wins: 10 of 14 scene-cells lean the declared way, no cell's mean reaches 0.2, and motion's gain on the " +
+                 "same path and speed (H14) sat at -0.235 and -0.258. *** C25 AND C26 HELD *** on all 476 scored frames and all " +
+                 "seventy turn-scene pairs, and C12 re-harvested zone identically. The first draft of the gate typed gain's " +
+                 "strength as 'about -0.25'; it is now read from H14's result. H16 joins render/frameVerdicts.mjs, re-derived. " +
+                 "*** TWELVE SABOTAGES, ELEVEN RED. *** The 0-RED -- the qualifier dropped -- is an empty adversarial population, " +
+                 "the THIRTEENTH: H16 neither clears nor fails the qualifier on these data, so removing the qualifier changes " +
+                 "nothing, and the design gate already reddens it (D6 at v4722). A forward scene swapped for H15's x2 sway rows " +
+                 "keeps the slab whole and turns at the wrong times, and C26 alone reddens; tightening the qualifier to 0.1 after " +
+                 "the run reddens it and the provenance row together. The measurement gate runs about 71 s alone and is hand-filed.",
+    }),
     // v4722 -- THE 329th CLOSING: pre-registration -- a different signal: whether the chain's two motion estimates disagree.
     since404: Object.freeze({
         at: "v4722", swept: 1, green: 1, red: 0,
