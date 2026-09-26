@@ -352,8 +352,24 @@ console.log("sharpBridge-selfcheck -- where a research-licensed splat is allowed
     const r3 = M.install();
     ok("!! once a job finishes, Install can be pressed again -- a broken step must be retryable",
         r3.ok === true, JSON.stringify(r3));
-    // give the second run's fast pip a moment to finish before the fixture is torn down under it
-    await new Promise((r) => setTimeout(r, 800));
+    // v4680 -- WAS A FIXED 800ms GUESS, WHICH WINDOWS TURNS INTO A CRASH RATHER THAN A FLAKE. This waited a
+    // fixed amount for r3's pip to finish before rmSync tore down the directory it was running in, instead of
+    // polling installStatus() the way job r1/r2's own completion is verified two screens up. Linux hides the
+    // race even when the guess is wrong: unlink succeeds on a file a process still has open, so an unfinished
+    // pip cost nothing worse than a leaked process. Windows does not allow deleting a file that is still open,
+    // so the same race throws EBUSY/EPERM outright the moment anything -- a slow disk, a scan of the freshly
+    // spawned pip.exe, this box simply being loaded -- pushes r3 past 800ms. Measured on the box that ships
+    // this branch: `{ syscall: 'rm', ... }`, an uncaught fs.rmSync exception, is exactly that crash. Polled
+    // instead, on the same job object and the same 15 s budget the first install() is already held to.
+    const r3Deadline = Date.now() + 15000;
+    let r3Job = null;
+    while (Date.now() < r3Deadline) {
+        r3Job = M.installStatus();
+        if (r3Job && r3Job.done) break;
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    ok("!! ...and the resumed job actually finishes too, so the fixture teardown below is not racing it",
+        !!r3Job && r3Job.done === true, r3Job ? ("code " + r3Job.code) : "(timed out waiting)");
 
     delete process.env.SHARP_SRC_DIR;
     delete require_.cache[require_.resolve(path.join(ENG, "ai-bridge", "sharpBridge.js"))];
