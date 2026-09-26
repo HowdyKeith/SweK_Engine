@@ -8032,6 +8032,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4736 -- THE 343rd CLOSING: FSR3's frame generation begins on a three.js scene -- the splat and the warp.
+    since418: Object.freeze({
+        at: "v4736", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/frameInterpTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A FRAME NOTHING RENDERED, ON A THREE.JS SCENE, AND ITS SCATTER IS A RASTERISATION BECAUSE WEBGL2 HAS NO " +
+                 "ATOMICS. *** render/frameInterpWgsl.mjs splats a motion field forward to time t with atomicMin on a storage buffer; " +
+                 "three's WebGL2 backend has neither. render/frameInterpTsl.mjs draws ONE INSTANCED QUAD PER BLOCK at its landing, " +
+                 "writes (vx, vy, depth) and a depth key, and lets a strict less depth test on a float target settle ownership: the " +
+                 "nearer block wins and, instances going in index order, a tie keeps the first writer -- interpolateFrameCPU's " +
+                 "`d < zbuf[j]`. Prototyped first on both backends, then graded: fifteen cases (flat, checker and signed depth, " +
+                 "prev and cur indexing, t = 0 and 1, contested blocks at checker and at one depth, nearer-is-more, declined " +
+                 "blocks, zero motion, a whole-pixel flow landing on half pixels, a frame the grid does not divide, and a PER-PIXEL " +
+                 "field) agree with the CPU EXACTLY on the hole mask, the vector and its depth, and to 2.7e-7 on the frame, on both " +
+                 "backends. flowFromMotionNode turns this tree's motion field into the splat's forward per-pixel flow, and " +
+                 "fsr-three.html gains a view of the frame halfway between the last two, holes left black for the fill. Fourteen " +
+                 "sabotages, all red. The first draft's row claimed flat depth made every overlap a tie; under a uniform flow it " +
+                 "had no overlaps -- the row now COUNTS its ties (128) on a case built for them. A guess that the old fixture " +
+                 "would have let a last-writer tie rule through was checked and was WRONG: the checker case already had ties.",
+    }),
     // v4735 -- THE 342nd CLOSING: the case a lock is dangerous in, drawn through the driver.
     since417: Object.freeze({
         at: "v4735", swept: 1, green: 1, red: 0,

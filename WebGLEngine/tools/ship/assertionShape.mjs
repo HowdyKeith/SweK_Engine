@@ -547,8 +547,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4733 -- 1812 -> 1814 for fx/fsr/fsrTemporalHalf-selfcheck.mjs and fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs -- FSR2's chain at the half precision it ships with: the stall derived, the composition at half, and what half costs.
     // v4734 -- 1814 -> 1815 for render/shaderRound-selfcheck.mjs -- every round() in a shipped shader, each with a verdict, after the fourth tie-to-even divergence.
     // v4735 -- 1815 -> 1816 for fx/fsr/fsrTemporalLockGhost-selfcheck.mjs -- FSR2's default locks on a pixel-scale texture under a moving occluder: the ghost is real with the clamp alone, and both masks remove it.
-    gates: 1816, usesOk: 1795, definesOk: 1787, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1688, condFirst: 91, unknownSignature: 16,
+    // v4736 -- 1816 -> 1817 for render/frameInterpTsl-selfcheck.mjs -- FSR3's frame generation for a three.js scene begins: the splat as a depth-tested draw and the warp, held to interpolateFrameCPU exactly.
+    gates: 1817, usesOk: 1796, definesOk: 1788, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1689, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
