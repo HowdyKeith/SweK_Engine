@@ -337,7 +337,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4390,               // v4730: 4386 -> 4390 for render/temporalClipTsl.mjs, render/temporalLockTsl.mjs and their two gates -- the depth clip and the lock ring,
+    files: 4395,               // v4731: 4390 -> 4395 for render/reactiveTsl.mjs, fx/fsr/fsrTemporalTsl.mjs and three gates -- the reactive mask, the driver that
+                               // composes FSR2's chain over a three.js scene, and the gate that measures it against FSR1. Every row from the census.
+                               // v4730: 4386 -> 4390 for render/temporalClipTsl.mjs, render/temporalLockTsl.mjs and their two gates -- the depth clip and the lock ring,
                                // split out of render/temporalTsl.mjs. Every row from the census.
                                // v4727: 4384 -> 4386 for render/temporalTsl.mjs and its gate -- the temporal chain's inputs as TSL. ES modules,
                                // closures and async/await by two, typed arrays by one, WebGL by one. Every row from the census.
@@ -898,8 +900,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4090, closures: 3945, asyncAwait: 1588, typedArrays: 1173, promises: 380,
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 171, webgpu: 53, threads: 23, wasm: 23,
+    esModules: 4095, closures: 3950, asyncAwait: 1592, typedArrays: 1176, promises: 380,
+    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 174, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

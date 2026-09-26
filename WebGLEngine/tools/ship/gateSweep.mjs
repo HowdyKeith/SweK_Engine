@@ -8032,6 +8032,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4731 -- THE 338th CLOSING: the reactive mask, FSR2's chain over a three.js scene, and what it buys.
+    since413: Object.freeze({
+        at: "v4731", swept: 3, green: 3, red: 0,
+        added: Object.freeze(["render/reactiveTsl-selfcheck.mjs", "fx/fsr/fsrTemporalTsl-selfcheck.mjs", "fx/fsr/fsrTemporalQuality-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** FSR2'S CHAIN RUNS ON A THREE.JS SCENE, IT IS fsr.html's CHAIN, AND IT IS 2.42 dB CLOSER TO THE TRUTH THAN FSR1. *** " +
+                 "render/reactiveTsl.mjs ports reactiveCPU -- colour against the reprojected history, depth-gated -- and its gate " +
+                 "holds it to 3.73e-7 on both backends with all three declines populated (640 invalid, 140 off the frame, 170 " +
+                 "depth-gated). fx/fsr/fsrTemporalTsl.mjs's makeFsrTemporal composes the five rounds' passes in fsr.html's order: " +
+                 "jittered colour, the display-resolution motion field and clip depth, dilation (its depth the next frame's record), " +
+                 "the jitter-aware resolve, the lock ring and its shading mask (optional: 64 lumas a pixel at 2x is 269 MB at " +
+                 "960x540, and the period may not be chosen for cost), the reactive mask, disocclusion, the history factor, the " +
+                 "rectified accumulate and RCAS. fx/fsr/fsrTemporalTsl-selfcheck.mjs runs it 40 frames at 1.5x with every mask live " +
+                 "and, from the device's renders alone, runs fsr.html's order with the CPU references carrying its own history: " +
+                 "worst 1.36e-5 over all 40 frames, every mask the mirror's on the last, the output RCAS of the history to 1.19e-7. " +
+                 "fx/fsr/fsrTemporalQuality-selfcheck.mjs measures what it buys on fsr-three.html's own scene at 2x against a 4x4-" +
+                 "supersampled render: bilinear 22.79 dB, FSR1 22.82, FSR2 25.24 -- the accumulation's gain (the history before " +
+                 "RCAS reads 25.09, FSR2's own first frame 21.83). fsr-three.html gains the FSR2 mode and a lock-ring switch that " +
+                 "states its memory. *** THIRTY-FIVE SABOTAGES ACROSS THE THREE GATES, THIRTY-FOUR RED. *** The 0-RED corrected a " +
+                 "claim: sharing the accumulate's bilinear with the reactive mask differs by rounding, under the bound, so the " +
+                 "reactive module's own order is kept for fidelity and its header now says only that. SIX OTHERS SCORED 0 RED " +
+                 "FIRST, every one a blind spot of the comparison rather than of the chain: a flat wall left declined pixels " +
+                 "unchanged (X4, X5), an unwritten record declined everything on frame one (X6, D11 -- the driver now starts its " +
+                 "record at the far plane), and a CPU chain fed the device's own colour and motion could not see an unjittered " +
+                 "colour pass or a jittered motion pass (D6, D7 -- the colour pass is now redrawn with the reported phase). " +
+                 "pmndrs-upscaler-tsl is CLOSED.",
+    }),
     // v4730 -- THE 337th CLOSING: the lock ring as TSL.
     since412: Object.freeze({
         at: "v4730", swept: 2, green: 2, red: 0,

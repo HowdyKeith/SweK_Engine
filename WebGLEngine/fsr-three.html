@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:title" content="FSR1 on a three.js scene (TSL)">
-<meta name="demo:desc" content="A three.js WebGPURenderer scene rendered at reduced resolution and brought back up by FSR1 -- EASU then RCAS -- written as TSL nodes (fx/fsr/fsrTsl.mjs) and graded against this tree's CPU reference on both of three's backends. Compare against a bilinear stretch and the native render; move the scale, the sharpness and the colour transfer.">
+<meta name="demo:title" content="FSR on a three.js scene (TSL)">
+<meta name="demo:desc" content="A three.js WebGPURenderer scene rendered at reduced resolution and brought back up two ways, both written as TSL and graded against this tree's CPU references on both of three's backends: FSR1 (EASU then RCAS, one frame) and FSR2 (fsr.html's temporal chain -- jitter, motion, dilation, depth clip, reactive and lock masks, accumulation, RCAS). On this scene FSR2 is 2.4 dB closer to a supersampled render than FSR1. Compare against a bilinear stretch and the native render; debug views show the motion field and the masks.">
 <meta name="demo:category" content="fx">
-<title>FSR1 on a three.js scene</title>
+<title>FSR on a three.js scene</title>
 <style>
   :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
   body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
@@ -29,11 +29,12 @@
   for eyes.
 -->
 <div id="hud">
-  <h1>&#9673; FSR1 on a three.js scene &middot; TSL</h1>
+  <h1>&#9673; FSR on a three.js scene &middot; TSL</h1>
   <div class="row">
     <label>mode <select id="mode">
       <option value="fsr" selected>FSR1 (EASU + RCAS)</option>
       <option value="bilinear">bilinear stretch</option>
+      <option value="fsr2">FSR2 (temporal: jitter, dilation, clip, masks, accumulate, RCAS)</option>
       <option value="native">native resolution</option>
       <option value="motion">motion vectors (debug)</option>
       <option value="masks">clip + lock masks (debug)</option>
@@ -45,6 +46,7 @@
     </select></label>
     <label>sharpness <input id="sharp" type="range" min="0" max="1" step="0.05" value="0.8"> <span id="sharpV">0.80</span></label>
     <label><input id="denoise" type="checkbox"> denoise</label>
+    <label title="FSR2's lock stage as fsr.html runs it: a reprojected luma ring whose period must be the jitter's phase count. It keeps every luma, so it is large -- the figure is its float memory at this scale."><input id="lock" type="checkbox"> lock ring <span id="lockMB"></span></label>
     <label>transfer <select id="transfer">
       <option value="srgb" selected>srgb (EASU on perceptual values)</option>
       <option value="none">none (EASU on linear values)</option>
@@ -61,6 +63,8 @@ import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
 import { makeMotionStage, glClip } from "./render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/temporalClipTsl.mjs";
 import { makeLumaRing } from "./render/temporalLockTsl.mjs";
+import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
+import { jitterPhaseCount } from "./render/jitter.mjs";
 
 const $ = (id) => document.getElementById(id);
 const DW = 960, DH = 540;
@@ -158,6 +162,28 @@ try {
         g.k++;
     };
 
+    // v4731 -- FSR2 ON THIS SCENE: fx/fsr/fsrTemporalTsl.mjs, the chain fsr.html runs, composed over three.js. The
+    // camera here is still and the knot turns, so what accumulates is everything the knot is not, and the knot itself
+    // rides its own motion vectors. The threshold is a quarter of the clip-z gap between the knot's front and the floor
+    // behind it (clipGapThreshold). The lock ring is a switch because of its size; the label says what it costs.
+    let fsr2 = null, built2 = "";
+    const ringMB = (k) => { const w = DW, h = DH, per = jitterPhaseCount(k); return (2 * w * h * Math.ceil(2 * per / 4) * 16 + 2 * w * h * 16) / 1048576; };
+    const build2 = () => {
+        const k = Number($("scale").value), key = [k, $("lock").checked].join("|");
+        $("lockMB").textContent = `(${ringMB(k).toFixed(0)} MB at ${k}x)`;
+        if (key === built2 || $("mode").value !== "fsr2") return;
+        if (fsr2) fsr2.dispose();
+        camera.updateMatrixWorld();
+        const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+        const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+        fsr2 = makeFsrTemporal(THREE, TSL, renderer, { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH,
+                                                       ratio: k, threshold, lock: $("lock").checked, sharpness: Number($("sharp").value) });
+        built2 = key;
+    };
+    for (const id of ["scale", "lock", "mode"]) $(id).addEventListener("change", build2);
+    $("sharp").addEventListener("input", () => { if (fsr2 && fsr2.uniforms.rcas) for (const u of fsr2.uniforms.rcas) u.sharpness.value = Number($("sharp").value); });
+    build2();
+
     let last = performance.now(), avg = 0, t = 0;
     const frame = async () => {
         const now = performance.now(), dt = now - last; last = now;
@@ -166,6 +192,7 @@ try {
         const mode = $("mode").value, k = Number($("scale").value);
         const t0 = performance.now();
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
+        else if (mode === "fsr2") { if (!fsr2) build2(); await fsr2.render(scene, camera, null); }
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
         else if (mode === "motion") await showMotion();
         else if (mode === "masks") await showMasks();

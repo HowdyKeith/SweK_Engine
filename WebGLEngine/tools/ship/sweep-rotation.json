@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-09-26T08:51:52.405Z",
+ "at": "2026-09-26T09:18:19.887Z",
  "poolAt": "2026-09-17T16:20:39.742Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -145,6 +145,18 @@
    "code": 0,
    "priorMs": 3084,
    "at": "2026-09-16T21:13:42.631Z"
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
+   "ms": 13946,
+   "code": 0,
+   "at": "2026-09-26T09:18:19.887Z"
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
+   "ms": 15793,
+   "code": 0,
+   "at": "2026-09-26T09:18:05.778Z"
   },
   {
    "gate": "fx/fsr/fsrTsl-selfcheck.mjs",
@@ -655,6 +667,12 @@
    "code": 0,
    "priorMs": 20211,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "render/reactiveTsl-selfcheck.mjs",
+   "ms": 2592,
+   "code": 0,
+   "at": "2026-09-26T09:17:49.866Z"
   },
   {
    "gate": "render/temporalClipTsl-selfcheck.mjs",

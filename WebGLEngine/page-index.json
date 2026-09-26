@@ -1286,8 +1286,8 @@
   },
   {
    "f": "fsr-three.html",
-   "t": "FSR1 on a three.js scene",
-   "d": "A three.js WebGPURenderer scene rendered at reduced resolution and brought back up by FSR1 -- EASU then RCAS -- written as TSL nodes (fx/fsr/fsrTsl.mjs) and graded against this tree's CPU reference on both of three's backends. Compare against a bilinear stretch and the native render; move the scale, the sharpness and the colour transfer.",
+   "t": "FSR on a three.js scene",
+   "d": "A three.js WebGPURenderer scene rendered at reduced resolution and brought back up two ways, both written as TSL and graded against this tree's CPU references on both of three's backends: FSR1 (EASU then RCAS, one frame) and FSR2 (fsr.html's temporal chain -- jitter, motion, dilation, depth clip, reactive and lock masks, accumulation, RCAS). On this scene FSR2 is 2.4 dB closer to a supersampled render than FSR1. Compare against a bilinear stretch and the native render; debug views show the motion field and the masks.",
    "g": "",
    "p": 0
   },
