@@ -197,3 +197,99 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null }) {
         dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); qM.material.dispose(); qD.material.dispose(); },
     };
 }
+
+// ================================================================================================================
+// v4728 -- THE RESOLVE AND THE ACCUMULATE: render/temporalResolve.mjs's resolveJitterAwareCPU and
+// render/temporalReject.mjs's rectifiedAccumulateCPU, statement by statement, reading the way every node here reads
+// -- textureLoad at screenCoordinate -- so the gate can hold them to the byte-order of the mirrors.
+//
+// *** THE BASE TEXEL IS floor(x + 0.5), WHICH IS Math.round, AND THE WGSL KERNEL HAD round(). *** round() ties to
+// even in WGSL and GLSL; the mirror's Math.round ties up. At a 2x upscale jitter phases 1 and 2 of 32 land on exact
+// halves on every other column, and there the two pick different 3x3 windows -- 6.31e-2 apart on the device. v4728
+// fixed render/temporalResolveWgsl.mjs to floor(x + 0.5) and gave its gate a row at a phase with ties.
+//
+// Not carried, and said so: the resolve's CONFIDENCE buffer (nothing in the chain reads it) and the accumulate's
+// per-reason counters and `relax` input (fsr.html's chain passes relax null; the lock enters through the factor).
+// ================================================================================================================
+export const RESOLVE_TSL_NEEDS = Object.freeze(["abs", "sin", "clamp", "floor", "max", "min", "vec3", "select"]);
+function needAll(TSL, names) { need(TSL); for (const n of names) if (TSL[n] === undefined) throw new Error(`render/temporalTsl: the TSL namespace has no ${n}`); }
+
+/** Lanczos2 as a node: lanczos2 in render/temporalResolve.mjs, including its 1e-4 and 2.0 guards. */
+function lanczos2Node(TSL, x) {
+    const { float, abs, sin, select } = TSL;
+    const ax = abs(x), px = ax.mul(Math.PI);
+    const v = float(2.0).mul(sin(px)).mul(sin(px.mul(0.5))).div(px.mul(px));
+    return select(ax.lessThan(1e-4), float(1.0), select(ax.greaterThanEqual(2.0), float(0.0), v));
+}
+
+/**
+ * The jitter-aware Lanczos2 resolve: one render-resolution frame (`tex`, rw x rh) to a display pixel, dered.
+ * uniforms.jx / jy are THIS frame's jitter in render/jitter.mjs's units -- the same numbers applyJitter was given.
+ */
+export function resolveNode(TSL, tex, { rw, rh, dw, dh }) {
+    needAll(TSL, RESOLVE_TSL_NEEDS);
+    const { Fn, float, int, vec3, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
+    const u = { rw: uniform(float(rw)), rh: uniform(float(rh)), dw: uniform(float(dw)), dh: uniform(float(dh)),
+                jx: uniform(float(0)), jy: uniform(float(0)) };
+    const node = Fn(() => {
+        const uu = screenCoordinate.x.div(u.dw), vv = screenCoordinate.y.div(u.dh);
+        const sx = uu.mul(u.rw).sub(0.5).sub(u.jx).toVar(), sy = vv.mul(u.rh).sub(0.5).sub(u.jy).toVar();
+        const bx = floor(sx.add(0.5)).toVar(), by = floor(sy.add(0.5)).toVar();   // Math.round -- see the note above
+        const wsum = float(0.0).toVar(), csum = vec3(0.0).toVar();
+        const lo = vec3(1e9).toVar(), hi = vec3(-1e9).toVar();
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const cx = clamp(bx.add(dx), 0.0, u.rw.sub(1.0)), cy = clamp(by.add(dy), 0.0, u.rh.sub(1.0));
+            const w = lanczos2Node(TSL, sx.sub(bx.add(dx))).mul(lanczos2Node(TSL, sy.sub(by.add(dy))));
+            const s = textureLoad(tex, ivec2(int(cx), int(cy))).xyz;
+            wsum.addAssign(w); csum.addAssign(s.mul(w));
+            lo.assign(min(lo, s)); hi.assign(max(hi, s));
+        }
+        const den = select(abs(wsum).greaterThan(1e-4), wsum, float(1e-4));
+        return vec4(clamp(csum.div(den), lo, hi), 1.0);
+    })();
+    return { node, uniforms: u };
+}
+
+/** RGB -> YCoCg and back, the lifting form render/temporalReject.mjs uses, in its order of operations. */
+function toYCoCg(TSL, c) { const { vec3 } = TSL; return vec3(c.x.mul(0.25).add(c.y.mul(0.5)).add(c.z.mul(0.25)), c.x.mul(0.5).sub(c.z.mul(0.5)), c.x.mul(-0.25).add(c.y.mul(0.5)).sub(c.z.mul(0.25))); }
+function fromYCoCg(TSL, q) { const { vec3 } = TSL; const t = q.x.sub(q.z); return vec3(t.add(q.y), q.x.add(q.z), t.sub(q.y)); }
+
+/**
+ * The rectified accumulate: reproject through `motion`, fetch the history bilinearly, clamp it to the 3x3 of the
+ * current frame IN YCoCg, and blend with alpha weighted by `factor` (a texture whose .x is the history factor, or
+ * null for 1 everywhere). uniforms.alpha is the blend; uniforms.hasHistory is 0 on the first frame, where the output
+ * is the current frame -- the mirror's `history === null`.
+ */
+export function accumulateNode(TSL, { current, history, motion, factor = null }, { w, h, alpha = 0.1 }) {
+    needAll(TSL, RESOLVE_TSL_NEEDS);
+    const { Fn, float, int, vec3, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, max, min, select } = TSL;
+    const u = { w: uniform(float(w)), h: uniform(float(h)), alpha: uniform(float(alpha)), hasHistory: uniform(float(0)) };
+    const node = Fn(() => {
+        const px = floor(screenCoordinate.x), py = floor(screenCoordinate.y);
+        const at = (tex, x, y) => textureLoad(tex, ivec2(int(clamp(x, 0.0, u.w.sub(1.0))), int(clamp(y, 0.0, u.h.sub(1.0)))));
+        const cur = at(current, px, py).xyz.toVar();
+        const m = at(motion, px, py).toVar();
+        const uu = screenCoordinate.x.div(u.w), vv = screenCoordinate.y.div(u.h);
+        const hu = uu.add(m.x), hv = vv.add(m.y);
+        // sampleBilinear3, in its order
+        const x = hu.mul(u.w).sub(0.5), y = hv.mul(u.h).sub(0.5);
+        const x0 = floor(x), y0 = floor(y), fx = x.sub(x0), fy = y.sub(y0);
+        const ifx = float(1.0).sub(fx), ify = float(1.0).sub(fy);
+        const hist = at(history, x0, y0).xyz.mul(ifx).mul(ify).add(at(history, x0.add(1.0), y0).xyz.mul(fx).mul(ify))
+            .add(at(history, x0, y0.add(1.0)).xyz.mul(ifx).mul(fy)).add(at(history, x0.add(1.0), y0.add(1.0)).xyz.mul(fx).mul(fy)).toVar();
+        // the box of the CURRENT frame's 3x3, in YCoCg
+        const lo = vec3(1e30).toVar(), hi = vec3(-1e30).toVar();
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const s = toYCoCg(TSL, at(current, px.add(dx), py.add(dy)).xyz);
+            lo.assign(min(lo, s)); hi.assign(max(hi, s));
+        }
+        const rect = fromYCoCg(TSL, clamp(toYCoCg(TSL, hist), lo, hi));
+        const f = factor ? clamp(at(factor, px, py).x, 0.0, 1.0) : float(1.0);
+        const a = float(1.0).sub(float(1.0).sub(u.alpha).mul(f));
+        const blended = rect.mul(float(1.0).sub(a)).add(cur.mul(a));
+        const take = u.hasHistory.lessThan(0.5).or(m.z.equal(0.0)).or(hu.lessThan(0.0)).or(hu.greaterThanEqual(1.0))
+            .or(hv.lessThan(0.0)).or(hv.greaterThanEqual(1.0));
+        return vec4(select(take, cur, blended), 1.0);
+    })();
+    return { node, uniforms: u };
+}

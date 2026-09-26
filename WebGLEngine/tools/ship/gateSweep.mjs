@@ -8032,6 +8032,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4728 -- THE 335th CLOSING: the resolve and the accumulate as TSL, and a tie the WGSL resolve got wrong.
+    since410: Object.freeze({
+        at: "v4728", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (the resolve and the rectified accumulate, per frame, end to end, and converging)",
+                                "render/temporalResolve-selfcheck.mjs (a device row at a jitter phase with ties)"]),
+        verdict: "*** THE RESOLVE AND THE ACCUMULATE RUN ON A THREE.JS SCENE, AND PORTING THE RESOLVE FOUND A DEFECT IN THE WGSL " +
+                 "ONE. *** render/temporalTsl.mjs gains resolveNode (resolveJitterAwareCPU: nine Lanczos2 taps, dered) and " +
+                 "accumulateNode (rectifiedAccumulateCPU: bilinear history through the motion field, a YCoCg box of the current " +
+                 "3x3, a factor-weighted blend). render/temporalTsl-selfcheck.mjs runs twelve jittered frames of a moving scene " +
+                 "on both backends and holds each pass to its mirror on the device's own inputs every frame -- the resolve to " +
+                 "1.49e-5 (the WGSL kernel's own LSB/50), the accumulate to 1.13e-6 -- and the whole chain run on the CPU from " +
+                 "the device's renders alone lands 4.71e-6 from the device's picture after twelve frames. A factor texture and " +
+                 "an invalid quarter act as the mirror's do. *** TEMPORAL UPSCALING, MEASURED: *** 32 jittered 32x32 frames of " +
+                 "a still camera beat one resolved frame by 1.68 dB against a 4x4-supersampled 64x64 truth (1.18 on WebGL2), and " +
+                 "the same renders WITHOUT the neighbourhood clamp by 3.39 dB -- the clamp takes half the gain on detail finer than " +
+                 "the render resolution, in the mirror exactly as in the port, which is the question FSR2's locks answer. *** THE " +
+                 "DEFECT: *** the resolve's base texel is Math.round in the mirror and was round() in the WGSL, which ties to EVEN; " +
+                 "at a 2x upscale jitter phases 1 and 2 of 32 land on exact halves on every other column and the kernel read the " +
+                 "other 3x3 window there, 6.31e-2 from its mirror on the device. The device row graded SEQ[7], which has no ties. " +
+                 "render/temporalResolveWgsl.mjs now takes floor(x + 0.5), as render/temporalLockWgsl.mjs already did for the " +
+                 "same pair, and its gate grades a phase it first proves has ties (24 half-texel landings on its grid). " +
+                 "render/frameInterpWgsl.mjs, holeFillWgsl.mjs and opticalFlowWgsl.mjs index with round() too; whether their " +
+                 "mirrors tie the other way was not checked here. *** THIRTEEN SABOTAGES, THIRTEEN RED, *** one only after the " +
+                 "factor row was given an invalid quarter: with the far plane completed, every pixel of the moving run was valid.",
+    }),
     // v4727 -- THE 334th CLOSING: the temporal chain's inputs for a three.js scene.
     since409: Object.freeze({
         at: "v4727", swept: 1, green: 1, red: 0,
