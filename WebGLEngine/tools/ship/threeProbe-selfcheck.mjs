@@ -8,17 +8,26 @@
 // CHANGED SHAPE, NOT JUST ITS NUMBERS. *** Before the re-vendor, PROBE_CONTROL (vendored) and PROBE_VERSIONS[0]
 // (fetched fresh from the registry) were two DIFFERENT builds, so the control was expected to succeed
 // everywhere and only the newer, untested version was expected to fail on webgpu -- a control failure meant
-// the harness was broken. They are now the SAME build, 0.185.1, so on THIS box's Chromium (still the one that
-// refused at v4319) the control is EXPECTED to fail on webgpu too, with the identical named error: "Failed to
-// execute 'createView' on 'GPUTexture': Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor':
-// The provided value is not of type 'GPUTextureComponentSwizzle'". render/threeProbe.mjs's gradeProbe() was
-// updated to accept exactly that one named shape from the control without opening a general escape hatch --
-// see its own comment. This gate checks: the vendored files and a fresh registry fetch of the SAME version
-// agree (revision, swizzle presence, webgl2 success, webgpu refusal, and the refusal's exact wording) --
-// proving the vendored copy is a faithful, unmodified-beyond-the-one-documented-edit copy of upstream, not
-// that the box behaves like v4319 anymore. Section 3 (the rig's own record) already shows 0.185.1 drawing
-// cleanly on a real Windows/Chrome 152 WebGPU -- that finding is what justified vendoring it in the first
-// place and is unaffected by any of this.
+// the harness was broken. They are now the SAME build, 0.185.1, so this gate checks: the vendored files and a
+// fresh registry fetch of the SAME version agree (revision, swizzle presence, webgl2 success, and on webgpu
+// whichever of drawing or refusing the box does, by the SAME named shape) -- proving the vendored copy is a
+// faithful, unmodified-beyond-the-one-documented-edit copy of upstream, not that the box behaves any
+// particular way. Section 3 (the rig's own record) already shows 0.185.1 drawing cleanly on a real
+// Windows/Chrome 152 WebGPU -- that finding is what justified vendoring it in the first place and is
+// unaffected by any of this.
+//
+// *** v4680 -- "REFUSES ON WEBGPU" STOPPED BEING UNIVERSAL, ON A REAL BOX, AND THE GATE ONCE ASSERTED IT WAS. ***
+// This section originally hardcoded refusal (the named swizzle TypeError) as the only passing shape on webgpu,
+// because that was the only shape ever measured -- this sandbox's Chromium 141-ish still throws it. A real
+// Windows box shipping this branch (Chrome 153) drew three@0.185.1 on WebGPU cleanly, PIXEL-VERIFIED by
+// three-probe.html's own renderProbe() (it throws unless the read-back gradient is real), through BOTH the
+// control and a fresh fetch -- and the gate called that a failure, twice, because "it drew" and "control drew"
+// were the two detail strings its old two-`ok()` shape could only ever print on the FAIL branch. The invariant
+// that matters was never "refuses"; it is that a fresh fetch and the vendored control OF THE SAME BUILD agree.
+// Restated on that: both drawing is a pass (the swizzle bug going away upstream, not a code defect here), both
+// refusing by the same named error is still a pass (v4319's finding, alive on a box that still has it), and
+// only a SPLIT between the two -- one drawing, the other not, on one build -- is what "the box, not the
+// version" actually looks like now.
 //
 // SABOTAGE (v4494): A  untar reading the size field from the wrong offset (the mode field)              -> exit=1, red: the tar-walker row (the big file no longer round-trips)
 //                   B  rewriteImports leaving three.tsl.js's import alone                                  -> exit=1, red 3: the rewrite row (0x) and both routes -- the CONTROL fails to import, and the
@@ -161,11 +170,31 @@ sec(`2. THIS BOX: three@${VERSION} from the registry (cached), the page on both 
                     ok(`  webgl2: three@${VERSION} draws on three's WebGL2 backend here too (revision ${n.revision}) -- the refusal is not the build, it is a WebGPU API`,
                         n.ok && n.revision === rev && n.backend === "webgl2", n.error || `${n.ms} ms`);
                 } else {
-                    ok(`*** webgpu: THIS BOX REFUSES three@${VERSION} ON WebGPU BY NAME -- ${n.ok ? "it drew" : n.error.slice(0, 140)} ***`, !n.ok && SWIZZLE.test(n.error || "") && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(n.error || ""),
-                        "v4319's finding reproduced: the browser's GPUTextureViewDescriptor has no swizzle; the pin is at least the build box's");
-                    ok(`*** webgpu: AND THE VENDORED CONTROL -- THE SAME BUILD -- REFUSES THE SAME WAY, WHICH IS WHY THIS IS NOT "the box, not the version" ***`,
-                        !c.ok && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(c.error || ""), c.ok ? "control drew (unexpected post-re-vendor)" : c.error.slice(0, 140));
-                    report(`the rig's half is section 3; if a rig's Chrome knows GPUTextureComponentSwizzle the same page will say so there`);
+                    // *** v4680 -- A REAL WINDOWS BOX (Chrome 153) DREW three@0.185.1 ON WebGPU, PIXEL-VERIFIED,
+                    // AND THE HARDCODED "REFUSAL IS THE ONLY PASS" SHAPE BELOW CALLED THAT A FAILURE. ***
+                    // Measured on the box that ships this branch: both the fresh registry fetch AND the vendored
+                    // control drew the gradient (renderProbe()'s own corner-pixel check, not merely "did not
+                    // throw") -- "it drew" / "control drew (unexpected post-re-vendor)", the two detail strings
+                    // this section's OLD two-`ok()` shape could only ever print as failures. v4319's finding was
+                    // that ONE box's Chromium was stricter than the spec required about an ignored dictionary
+                    // member; a LATER Chromium stopping being stricter than the spec is the bug going away, not
+                    // a reason to keep failing a gate whose real job (this section's own comment, one line up)
+                    // is proving the control and a fresh fetch of the SAME build agree -- not that they agree by
+                    // refusing specifically. Restated on that actual invariant: agreement is the pass, and
+                    // DISAGREEMENT between two copies of one build -- the shape v4319 never had to consider -- is
+                    // the only thing that still means "the box, not the version".
+                    const bothDrew = n.ok && c.ok, bothRefused = !n.ok && !c.ok;
+                    const refusalNamed = bothRefused && SWIZZLE.test(n.error || "") && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(n.error || "") && KNOWN_WEBGPU_SWIZZLE_REFUSAL.test(c.error || "");
+                    ok(`*** webgpu: CONTROL AND A FRESH FETCH OF THE SAME BUILD AGREE -- ${bothDrew ? "both drew, pixel-verified" : bothRefused ? "both refused, by the same named error" : "THEY DISAGREE"} ***`,
+                        bothDrew || refusalNamed,
+                        bothDrew
+                            ? `newest ${n.ms} ms, control ${c.ms} ms -- this box's Chromium no longer throws on GPUTextureViewDescriptor.swizzle; v4319's finding is retired on THIS box, not universally`
+                            : bothRefused
+                            ? "v4319's finding reproduced on both: the browser's GPUTextureViewDescriptor has no swizzle; the pin is at least the build box's"
+                            : `newest ${n.ok ? "drew" : "refused (" + (n.error || "").slice(0, 80) + ")"}, control ${c.ok ? "drew" : "refused (" + (c.error || "").slice(0, 80) + ")"} -- the SAME build behaving two different ways is the box, not the version`);
+                    report(bothDrew
+                        ? "the rig's half is section 3; a rig that also draws confirms the box moved, not the vendored copy"
+                        : "the rig's half is section 3; if a rig's Chrome knows GPUTextureComponentSwizzle the same page will say so there");
                 }
                 ok(`  ${route}: no page errors`, out[route].errs.length === 0, out[route].errs.join(" | ").slice(0, 200));
             }
