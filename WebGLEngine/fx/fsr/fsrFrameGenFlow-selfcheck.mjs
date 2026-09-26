@@ -61,10 +61,12 @@ else {
                 const stage = TT.makeMotionStage(THREE, T, { w: D, h: D, gl });
                 const arms = { vectors: FG.makeFrameGen(THREE, T, { w: D, h: D }), default: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: {} }),
                                moved: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { marginStill: 0.9 } }),
+                               refine: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { refineRadius: 2 } }),
                                low: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { margin: 0.05 } }), block: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: { mode: "block" } }) };
                 const A = tgt(D), B = tgt(D), out2 = tgt(D), km = tgt(D), big = tgt(D * 4);
                 const cross = quad(FI.crossFadeNode(T, A.texture, B.texture).node);
                 const o = { margins: { default: arms.default.reconcile.margin, low: arms.low.reconcile.margin, block: arms.block.reconcile.margin },
+                           refineRadii: { default: arms.default.opticalFlow.refineRadius, refine: arms.refine.opticalFlow.refineRadius },
                            stillMargins: { default: arms.default.reconcile.marginStill, moved: arms.moved.reconcile.marginStill, low: arms.low.reconcile.marginStill } };
                 for (const [cn, sc, spin, pan] of [["scroll", 0.12, 6, 0], ["still", 0, 6, 0], ["pan", 0, 1, 0.05], ["panScroll", 0.12, 1, 0.05]]) {
                     const setT = (k) => { const t = k / 60 * spin; knot.rotation.set(0.4 + t * 0.4, 0.6 + t * 0.6, 0); knot.updateMatrixWorld(); scroll.value = k * sc;
@@ -150,6 +152,11 @@ else {
         ok(`  [${mode}] ...and what it GIVES UP, measured rather than hidden: the scrolling wall's clear interior, ${d(S.wall.moved, S.wall.vectors)} dB over the vectors at 0.9 everywhere and ${d(S.wall.default, S.wall.vectors)} split, with the knot turning (${d(P.wall.moved, P.wall.vectors)} and ${d(P.wall.default, P.wall.vectors)} under the pan)`,
            S.wall.default < S.wall.moved && S.wall.default - S.wall.vectors >= 3,
            "at 0.5 more of the wall takes its block's colour vector, and a block near the knot's silhouette carries the knot's. The whole frame gains all the same; where that gain sits is not located here");
+        // v4748: the flow refining within 2 below its coarsest level -- about half the reads (render/flowCost.mjs)
+        const rd = cs.map((c) => o[c].all.refine - o[c].all.default);
+        ok(`  [${mode}] ...and refining within 2 below the coarsest level, at about half the flow's reads, is within 0.1 dB of the full window in all four cases: ${cs.map((c, i) => `${c} ${rd[i] >= 0 ? "+" : ""}${rd[i].toFixed(2)}`).join(", ")}`,
+           rd.every((v) => Math.abs(v) <= 0.1) && o.refineRadii.default === 4 && o.refineRadii.refine === 2,
+           "render/flowCost-selfcheck.mjs: it finds the same shifts, because the reach is the coarsest level's; fx/fsr/fsrFlowCost-selfcheck.mjs: its time on the device is its reads'. Not the default -- a plain shadow's changed pixels read 0.85 dB lower with it (the v4748 probe), and nothing here is fast");
         ok(`  [${mode}] ...and the arms are the configurations they claim: margins ${o.margins.default}, ${o.margins.low} and ${o.margins.block}, still-surface margins ${o.stillMargins.default}, ${o.stillMargins.moved} and ${o.stillMargins.low}; the wall's interior is ${S.innerPx} pixels`,
            o.margins.default === 0.9 && o.margins.low === 0.05 && o.margins.block === 0.05 && o.stillMargins.default === 0.5 && o.stillMargins.moved === 0.9 && o.stillMargins.low === 0.5 && S.innerPx > 2000);
     }

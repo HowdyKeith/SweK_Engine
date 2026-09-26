@@ -73,11 +73,14 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
-                                 subpixel = true }) {
+                                 subpixel = true, refineRadius = null, tally = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
         throw new Error(`opticalFlowCPU: searchRadius must be a whole number of pixels, at least 1 -- got ${searchRadius}`);
+    if (refineRadius === null) refineRadius = searchRadius;
+    if (!(refineRadius >= 1) || refineRadius !== Math.floor(refineRadius))
+        throw new Error(`opticalFlowCPU: refineRadius must be a whole number of pixels, at least 1 -- got ${refineRadius}`);
     if (!(levels >= 1) || levels !== Math.floor(levels))
         throw new Error(`opticalFlowCPU: levels must be a whole number, at least 1 -- got ${levels}`);
     // *** THE PYRAMID IS render/luminancePyramid.mjs's, NOT A SECOND ONE. *** Its base level imports the
@@ -86,6 +89,8 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
     const P = luminancePyramidCPU({ src: cur, w, h });
     const Q = luminancePyramidCPU({ src: prev, w, h });
     const top = Math.min(levels, P.levels) - 1;      // the coarsest level this search will start from
+    // v4748: `tally`, given, counts every score and the reads it makes -- render/flowCost.mjs's model is held to it
+    const score = tally ? (a, b, lw, lh, ax, ay, bx, by, n) => { tally.scores++; tally.reads += 2 * n * n; return sad(a, b, lw, lh, ax, ay, bx, by, n); } : sad;
 
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
     const flow = new Float32Array(bw * bh * 2);
@@ -118,10 +123,13 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // written to check that claim is what found it: 0 blocks reporting no motion and 64 reporting
             // the corner. Seeding with the guess makes the sentence true.
             let bdx = gx, bdy = gy, subx = 0, suby = 0;
-            let best = sad(a, b, lw, lh, ox, oy, ox + gx, oy + gy, n);
-            for (let dy = -searchRadius; dy <= searchRadius; dy++)
-                for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                    const s = sad(a, b, lw, lh, ox, oy, ox + gx + dx, oy + gy + dy, n);
+            if (tally && L !== top) tally.reads++;        // the guess, which the device reads from the level above's target
+            let best = score(a, b, lw, lh, ox, oy, ox + gx, oy + gy, n);
+            // v4748: the coarsest level searches `searchRadius`; the levels below refine the guess within `refineRadius`
+            const r = L === top ? searchRadius : refineRadius;
+            for (let dy = -r; dy <= r; dy++)
+                for (let dx = -r; dx <= r; dx++) {
+                    const s = score(a, b, lw, lh, ox, oy, ox + gx + dx, oy + gy + dy, n);
                     // STRICTLY better, so a tie leaves the guess alone -- which is only true because
                     // `best` is seeded with the guess's score above. render/dilate.mjs takes the same rule
                     // for the same reason: on flat content every candidate ties, and whichever candidate
@@ -150,7 +158,7 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // NEIGHBOUR should have won, so anything beyond that is the model failing rather than a real
             // sub-pixel offset, and the honest response is to keep the integer.
             if (L === 0 && subpixel) {
-                const px = (dx, dy) => sad(a, b, lw, lh, ox, oy, ox + bdx + dx, oy + bdy + dy, n);
+                const px = (dx, dy) => score(a, b, lw, lh, ox, oy, ox + bdx + dx, oy + bdy + dy, n);
                 const s0 = best, sxm = px(-1, 0), sxp = px(1, 0), sym = px(0, -1), syp = px(0, 1);
                 const vertex = (m, c, p) => { const den = m - 2 * c + p;
                     // *** THIS GUARD IS DEFENCE IN DEPTH AND NOT LOAD-BEARING, WHICH A SABOTAGE ESTABLISHED
@@ -166,7 +174,7 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
                 subx = vertex(sxm, s0, sxp);
                 suby = vertex(sym, s0, syp);
             }
-            const still = sad(a, b, lw, lh, ox, oy, ox, oy, n);
+            const still = score(a, b, lw, lh, ox, oy, ox, oy, n);
             // the negation: the search answers cur -> prev, this function's output is prev -> cur, which is
             // the NEGATIVE of render/motionVectors.mjs's sense and not the same as it -- see the header
             // the sub-pixel part is already at full resolution (L === 0, scale 1) and is negated with

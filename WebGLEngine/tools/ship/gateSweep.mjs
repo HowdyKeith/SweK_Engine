@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4748 -- THE 355th CLOSING: what the optical flow costs.
+    since430: Object.freeze({
+        at: "v4748", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/flowCost-selfcheck.mjs", "fx/fsr/fsrFlowCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs (two refineRadius cases, exact on both backends)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the `refine` arm)"]),
+        verdict: "*** THE FLOW'S COST IS ITS SEARCH, AND HALF OF THE SEARCH FINDS NOTHING THE COARSEST LEVEL DID NOT. *** Timing on " +
+                 "this tree's device says little about a GPU -- SwiftShader rasterises on the CPU, and the generator's splat, 65 536 " +
+                 "instanced quads at 256 x 256, took 1.1 to 1.5 s there against the flow's 0.17 -- so render/flowCost.mjs COUNTS: " +
+                 "every score the search makes and the reads it costs, held to opticalFlowCPU's own tally to the read under six " +
+                 "settings, and the device's time for the flow held to the count's ratios within 11% under five. The search is over " +
+                 "nine tenths of the flow's reads, 264M a frame at 960 x 540. v4748's refineRadius searches the whole window at the " +
+                 "coarsest level only and refines below it: 56% of the reads, and it finds the same shifts -- 99% of blocks at 18 " +
+                 "pixels, as the full window does -- because the reach is the coarsest level's; the same cut made by shrinking every " +
+                 "window finds 18% at 14 pixels. Within 0.1 dB of the full window on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's four " +
+                 "cases; not the default, because a plain shadow's changed pixels read 0.85 dB lower with it. The mirror, the TSL " +
+                 "(exact on both backends) and the generator take it; fsr-three.html gains 'gen: cheaper flow' and prints the flow's " +
+                 "reads. Nine sabotages, all red.",
+    }),
     // v4747 -- THE 354th CLOSING: pacing on a variable refresh, what generating costs, and a late frame on the device.
     since429: Object.freeze({
         at: "v4747", swept: 1, green: 1, red: 0,

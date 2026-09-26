@@ -29,9 +29,9 @@ console.log("\n1. WITHOUT A DEVICE: the refusals");
 {
     const full = new Proxy({}, { get: () => () => {} });
     let n = 0; const got = [];
-    for (const a of [{ block: 1 }, { block: 8.5 }, { searchRadius: 0 }, { searchRadius: 1.5 }, { levels: 0 }, { levels: 2.5 }])
+    for (const a of [{ block: 1 }, { block: 8.5 }, { searchRadius: 0 }, { searchRadius: 1.5 }, { levels: 0 }, { levels: 2.5 }, { refineRadius: 0 }, { refineRadius: 1.5 }])
         try { OF.makeOpticalFlow({}, full, { w: 64, h: 64, ...a }); got.push("no throw"); } catch (e) { if (/must be a whole number/.test(e.message)) n++; got.push(e.message.slice(0, 60)); }
-    ok("makeOpticalFlow refuses a fractional or too-small block, radius or level count, as opticalFlowCPU does", n === 6, `${n} of 6`);
+    ok("makeOpticalFlow refuses a fractional or too-small block, radius, level count or (v4748) refinement radius, as opticalFlowCPU does", n === 8, `${n} of 8`);
 }
 
 // ---- render/opticalFlow-selfcheck.mjs's fixtures ----
@@ -70,6 +70,8 @@ const CASES = [
     ["(3.4, -1.6) refined", fracShift(3.4, -1.6), fracShift(0, 0), 8, 1, true], ["(3.4, -1.6) whole", fracShift(3.4, -1.6), fracShift(0, 0), 8, 1, false],
     ["(4.7, -4) window edge", fracShift(4.7, -4), fracShift(0, 0), 8, 1, true], ["(-4, 4) window edge", fracShift(-4, 4), fracShift(0, 0), 8, 1, true],
     ["(3, -2) five levels, block 8", shifted(3, -2), zero, 8, 5, true], ["(5, 3) four levels, block 12", shifted(5, 3), zero, 12, 4, true],
+    // v4748: the levels below the coarsest refining within a smaller window -- the last element is refineRadius
+    ["(14, 11) three levels, refining within 1", shifted(14, 11), zero, 8, 3, false, 1], ["(9, -7) three levels, refining within 2", shifted(9, -7), zero, 8, 3, true, 2],
 ];
 // *** TWO CASES ARE NOT IN THE PARITY ROW'S "EVERY BLOCK", AND THE FIXTURES ARE WHY. *** The METAMER is flat in the tree's luma
 // in exact arithmetic, so every candidate TIES and the vector is whichever rounding of 0.25r + 0.5g + 0.25b is lowest -- f64
@@ -78,7 +80,7 @@ const CASES = [
 // the SAD at 4 and at 5 EQUAL, which puts the parabola's vertex exactly on the half-pixel clamp, and 7 blocks went to either
 // side of `<= 0.5` by one rounding. It is (4.7, -4) now, where the vertex is 0.2 past the clamp and the clamp decides.
 const NOT_PARITY = new Set(["metamer (3, 0)"]);
-const cpu = CASES.map(([, cur, prev, block, levels, subpixel]) => opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel }));
+const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null]) => opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius }));
 const cpuPyr = luminancePyramidCPU({ src: pyrSrc, w: PW, h: PH });
 
 // the populations the parity row needs in order to see the refinement and its clamp at all
@@ -103,7 +105,7 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     // the distinct frames, sent once each
     const frames = [], index = new Map(), ref = (f) => { if (!index.has(f)) { index.set(f, frames.length); frames.push(Array.from(f)); } return index.get(f); };
-    const cases = CASES.map(([name, cur, prev, block, levels, subpixel]) => ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel }));
+    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null]) => ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius }));
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, frames, cases, PW, PH, pyrSrc: Array.from(pyrSrc) }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const OF = await import("/render/opticalFlowTsl.mjs");
@@ -124,8 +126,8 @@ else {
                 o.pyrSizes = P.sizes; P.dispose(); ps.dispose();
                 const makers = new Map();
                 for (const c of a.cases) {
-                    const key = c.block + "|" + c.levels + "|" + c.subpixel;
-                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel }));
+                    const key = c.block + "|" + c.levels + "|" + c.subpixel + "|" + c.refineRadius;
+                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel, refineRadius: c.refineRadius }));
                     const F = makers.get(key);
                     await F.flow(renderer, texs[c.cur], texs[c.prev]);
                     o.flow.push({ px: await read(F.target, F.bw, F.bh), bw: F.bw, bh: F.bh, levels: F.levels });

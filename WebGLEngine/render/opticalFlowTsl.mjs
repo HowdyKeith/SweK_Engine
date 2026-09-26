@@ -69,11 +69,13 @@ export function makeLumaPyramid(THREE, TSL, { w, h, levels = Infinity }) {
  * opticalFlowCPU over two pyramids: flow(renderer, curPyr, prevPyr) writes `target` (bw x bh: fx, fy, conf, 1). The
  * pyramids must hold at least min(levels, their own) levels, which makeOpticalFlow's own pyramids do.
  */
-export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true }) {
+export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null }) {
     requireTsl(TSL);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/opticalFlowTsl: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius)) throw new Error(`render/opticalFlowTsl: searchRadius must be a whole number of pixels, at least 1 -- got ${searchRadius}`);
     if (!(levels >= 1) || levels !== Math.floor(levels)) throw new Error(`render/opticalFlowTsl: levels must be a whole number, at least 1 -- got ${levels}`);
+    if (refineRadius === null) refineRadius = searchRadius;
+    if (!(refineRadius >= 1) || refineRadius !== Math.floor(refineRadius)) throw new Error(`render/opticalFlowTsl: refineRadius must be a whole number of pixels, at least 1 -- got ${refineRadius}`);
     const { Fn, Loop, float, int, vec4, ivec2, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
     const cur = makeLumaPyramid(THREE, TSL, { w, h, levels }), prev = makeLumaPyramid(THREE, TSL, { w, h, levels });
@@ -83,10 +85,11 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const n = block, R = searchRadius;
+    const n = block;
     // level L's pass: reads the coarser level's answer from `guessTex` (null at the top, where the guess is zero)
     const levelNode = (L, guessTex) => Fn(() => {
         const [lw, lh] = cur.sizes[L], a = cur.targets[L].texture, b = prev.targets[L].texture, scale = 1 << L;
+        const R = L === top ? searchRadius : refineRadius;           // v4748: the coarsest level searches, the others refine
         const bx = floor(screenCoordinate.x), by = floor(screenCoordinate.y);
         const lum = (tex, x, y) => textureLoad(tex, ivec2(int(clamp(x, 0.0, float(lw - 1))), int(clamp(y, 0.0, float(lh - 1))))).x;
         // sad(), in the mirror's order: y outer, x inner, each term |a - b|. *** ITS LOOP IS NAMED, AND THE CANDIDATE LOOP'S TOO. ***
@@ -134,7 +137,7 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
     const passes = [];
     for (let L = top, k = 0; L >= 0; L--, k++) passes.push({ L, out: flows[k % 2], sc: quad(levelNode(L, L === top ? null : flows[(k + 1) % 2].texture)) });
     return {
-        bw, bh, block, levels: top + 1, pyramids: { cur, prev },
+        bw, bh, block, levels: top + 1, searchRadius, refineRadius, pyramids: { cur, prev },
         /** The target holding the finest level's answer. */
         get target() { return passes[passes.length - 1].out; },
         /** Build both pyramids from rgba textures and search. */

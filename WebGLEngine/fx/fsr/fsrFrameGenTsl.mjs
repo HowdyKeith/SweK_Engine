@@ -23,6 +23,12 @@
 // block straddling the knot's silhouette hands its one vector to the knot. It is not the default: it pays only on content
 // the vectors miss, and it is a pyramid and a search every generated frame.
 //
+// *** WHAT THE FLOW COSTS (v4748). *** Its search is over nine tenths of its reads -- 264M a frame at 960 x 540, each 8 x 8
+// block scoring 84 to 88 candidates at every level (render/flowCost.mjs, which this device's timings follow to 11%).
+// `flow: { refineRadius: 2 }` searches the whole window at the coarsest level only and refines below it: 56% of the reads,
+// the same shifts found (the reach is the coarsest level's), within 0.1 dB on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's
+// four cases. It is not the default: a plain shadow's changed pixels read 0.85 dB lower with it.
+//
 // *** BETWEEN ALIASED FRAMES IT FLICKERS (v4746). *** A generated frame blends two frames, which anti-aliases what a
 // single-sample frame aliases, so between native frames the display alternates aliased and anti-aliased: under a pan over
 // fine stripes the shown sequence alternates +1.3 / 255 more than the scene does, with the generated frames 1.6 dB closer
@@ -62,7 +68,7 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * convention: uvPrev - uvCurr, and clip depth). The first call has no older depth and fills with the newer one's.
  * `fill` is makeFrameInterp's, the depth textures supplied here; null generates with the holes left at zero.
  * `flow` (v4741) reconciles the vectors with an optical flow of the two frames first: { block, searchRadius, levels } for
- * render/opticalFlowTsl.mjs and { margin, marginStill, stillPx, mode, radius } for render/flowReconcileTsl.mjs, {} for their
+ * render/opticalFlowTsl.mjs (and v4748's refineRadius) and { margin, marginStill, stillPx, mode, radius } for render/flowReconcileTsl.mjs, {} for their
  * defaults, null for the vectors alone.
  * `ui` (v4745), given to generate, is the newer frame's UI as a premultiplied w x h texture: `prev` and `cur` are then the
  * frames WITHOUT it, and the generated frame gets it composited over, exactly (render/frameInterp.mjs's compositeUiCPU).
@@ -82,7 +88,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
-    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3 }) : null;
+    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
     // displacement to time t in pixels, and its validity
