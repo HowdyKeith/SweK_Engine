@@ -38,6 +38,7 @@
       <option value="native">native resolution</option>
       <option value="motion">motion vectors (debug)</option>
       <option value="masks">clip + lock masks (debug)</option>
+      <option value="locks">FSR2 with its locks in red (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -47,6 +48,11 @@
     <label>sharpness <input id="sharp" type="range" min="0" max="1" step="0.05" value="0.8"> <span id="sharpV">0.80</span></label>
     <label><input id="denoise" type="checkbox"> denoise</label>
     <label title="FSR2's lock stage as fsr.html runs it: a reprojected luma ring whose period must be the jitter's phase count. It keeps every luma, so it is large -- the figure is its float memory at this scale."><input id="lock" type="checkbox"> lock ring <span id="lockMB"></span></label>
+    <label title="Where FSR2 relaxes its neighbourhood clamp: pixels holding a feature thinner than a pixel, found by a ridge test on this frame's luma or on the lock ring's jitter-free mean, held for 8 frames. fx/fsr/fsrTemporalLocks-selfcheck.mjs measures what it buys.">locks <select id="lockFrom">
+      <option value="frame" selected>from the frame</option>
+      <option value="ring">from the ring (needs the lock ring)</option>
+      <option value="off">off</option>
+    </select></label>
     <label>transfer <select id="transfer">
       <option value="srgb" selected>srgb (EASU on perceptual values)</option>
       <option value="none">none (EASU on linear values)</option>
@@ -168,19 +174,33 @@ try {
     // behind it (clipGapThreshold). The lock ring is a switch because of its size; the label says what it costs.
     let fsr2 = null, built2 = "";
     const ringMB = (k) => { const w = DW, h = DH, per = jitterPhaseCount(k); return (2 * w * h * Math.ceil(2 * per / 4) * 16 + 2 * w * h * 16) / 1048576; };
+    // v4732: the locks. "ring" without the ring is refused by the driver, so the page falls back to the frame and says so.
+    let lockView = null;
     const build2 = () => {
-        const k = Number($("scale").value), key = [k, $("lock").checked].join("|");
+        const k = Number($("scale").value), sel = $("lockFrom").value;
+        const lockFrom = sel === "off" ? null : sel === "ring" && !$("lock").checked ? "frame" : sel;
+        const key = [k, $("lock").checked, lockFrom].join("|");
         $("lockMB").textContent = `(${ringMB(k).toFixed(0)} MB at ${k}x)`;
-        if (key === built2 || $("mode").value !== "fsr2") return;
+        $("lockFrom").title = sel === "ring" && !$("lock").checked ? "the ring is off, so the locks come from the frame" : "";
+        if (key === built2 || ($("mode").value !== "fsr2" && $("mode").value !== "locks")) return;
         if (fsr2) fsr2.dispose();
         camera.updateMatrixWorld();
         const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
         const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
         fsr2 = makeFsrTemporal(THREE, TSL, renderer, { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH,
-                                                       ratio: k, threshold, lock: $("lock").checked, sharpness: Number($("sharp").value) });
+                                                       ratio: k, threshold, lock: $("lock").checked, lockFrom, sharpness: Number($("sharp").value) });
+        // the locks view: FSR2's output with the clamp relaxation laid over it in red
+        if (lockView) lockView.target.dispose();
+        const target = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType });
+        const at = (tex) => TSL.textureLoad(tex, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+        const relax = fsr2.targets.relax ? at(fsr2.targets.relax.texture).x : TSL.float(0.0);
+        const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+        m.fragmentNode = TSL.vec4(TSL.mix(at(target.texture).xyz, TSL.vec3(1.0, 0.1, 0.1), relax.mul(0.8)), 1.0);
+        const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+        lockView = { target, sc };
         built2 = key;
     };
-    for (const id of ["scale", "lock", "mode"]) $(id).addEventListener("change", build2);
+    for (const id of ["scale", "lock", "mode", "lockFrom"]) $(id).addEventListener("change", build2);
     $("sharp").addEventListener("input", () => { if (fsr2 && fsr2.uniforms.rcas) for (const u of fsr2.uniforms.rcas) u.sharpness.value = Number($("sharp").value); });
     build2();
 
@@ -193,12 +213,14 @@ try {
         const t0 = performance.now();
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
         else if (mode === "fsr2") { if (!fsr2) build2(); await fsr2.render(scene, camera, null); }
+        else if (mode === "locks") { if (!fsr2) build2(); await fsr2.render(scene, camera, lockView.target); renderer.setRenderTarget(null); await renderer.renderAsync(lockView.sc, ortho); }
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
         else if (mode === "motion") await showMotion();
         else if (mode === "masks") await showMasks();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" || mode === "motion" || mode === "masks" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
+        const res = mode === "native" || mode === "motion" || mode === "masks" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`
+            + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "");
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };

@@ -1,4 +1,4 @@
-// fx/fsr/fsrTemporalTsl.mjs -- v4731 -- FSR2'S CHAIN FOR A THREE.JS SCENE: the temporal passes of render/*Tsl.mjs
+// fx/fsr/fsrTemporalTsl.mjs -- v4731, v4732 -- FSR2'S CHAIN FOR A THREE.JS SCENE: the temporal passes of render/*Tsl.mjs
 // composed in the order fsr.html runs them, driving a WebGPURenderer scene.
 //
 // Per frame, fsr.html's order (its dolly camera, the path with every pass on):
@@ -9,8 +9,12 @@
 //   5. the LOCK RING pushed with current and the dilated field, and its SHADING-SHIFT mask (makeLumaRing) -- OPTIONAL
 //   6. the REACTIVE mask: current against last frame's history through the dilated field, depth-gated (reactiveNode)
 //   7. DISOCCLUSION against last frame's record (disocclusionNode), and the three masks' HISTORY FACTOR
-//   8. the RECTIFIED ACCUMULATE: history through the field, YCoCg-clamped to current, factor-weighted (accumulateNode)
-//   9. RCAS on the accumulated history to the output (fx/fsr/fsrTsl.mjs's rcasNode) -- FSR2's final sharpen
+//   8. LOCK LIFE -- OPTIONAL, v4732: candidates (a ridge test over this frame's luma, or over the ring's jitter-free
+//      mean), advanced through the dilated field and killed by this frame's disocclusion, and their RELAXATION
+//      (render/temporalLockTsl.mjs's makeLockLife) -- the order render/temporalLock-selfcheck.mjs drives the CPU in
+//   9. the RECTIFIED ACCUMULATE: history through the field, YCoCg-clamped to current -- the clamp relaxed where a lock
+//      holds -- factor-weighted (accumulateNode)
+//  10. RCAS on the accumulated history to the output (fx/fsr/fsrTsl.mjs's rcasNode) -- FSR2's final sharpen
 // Every pass is graded against its CPU mirror in its own gate; fx/fsr/fsrTemporalTsl-selfcheck.mjs grades the
 // COMPOSITION -- the whole chain run on the CPU from the device's renders, frame by frame, against the device.
 //
@@ -18,6 +22,17 @@
 // mask reads sampling as shading (fsr.html: "may not be chosen for cost"), which at 2x is 64 lumas a pixel: 265 MB of
 // float at 960x540 across the ping-pong pair. render/temporalLock.mjs keeps every luma where FSR2 keeps a lock and a
 // short history. `lock: true` turns it on and `memory` reports what it costs.
+//
+// *** LOCKS ARE `lockFrom`, AND WHAT THEY BUY IS THE CONTENT'S. *** null (no locks), "frame" (newLocksCPU: the ridge test
+// over this frame's resolved luma, which needs no ring) or "ring" (lockCandidatesFromRing: over the ring's mean, which
+// needs `lock: true`). v4732 measured the chain on the CPU from device renders: on fsr-three.html's own scene no clamp
+// at all moves the still picture 0.013 dB, so there is nothing for a lock to recover; on wires 0.4 render pixels wide
+// the ring's locks buy 1.09 dB. fx/fsr/fsrTemporalLocks-selfcheck.mjs holds that on the device, and the DEFAULTS are
+// its rows': "frame", because it buys most of what the ring's locks do (0.97 of 1.12 dB on still wires, and MORE than
+// them once the wires move) without the ring's 64 slots a pixel, and costs 0.03 dB at worst where there is nothing
+// thin; and a life of 8 frames, the knee -- a life of 32 buys 0.14 dB more on the wires and costs three times as much
+// on the fast-turning knot, where a lock outlives the ridge it was set on. `lockFrom: null` is the chain without locks.
+// The instability kill (advanceLocks' instabilityKill) is not wired: its default is off.
 //
 // *** THE THRESHOLD IS REQUIRED. *** disocclusionCPU and reactiveCPU both refuse a default -- a clip-z gap means a
 // different distance at every depth -- so the caller passes one, typically render/temporalClipTsl.mjs's
@@ -29,7 +44,7 @@
 import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from "../../render/jitter.mjs";
 import { applyJitter, restoreProjection, glClip, makeMotionStage, resolveNode, accumulateNode } from "../../render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, historyFactorNode } from "../../render/temporalClipTsl.mjs";
-import { makeLumaRing } from "../../render/temporalLockTsl.mjs";
+import { makeLumaRing, makeLockLife, ridgesNode, newLocksNode } from "../../render/temporalLockTsl.mjs";
 import { reactiveNode } from "../../render/reactiveTsl.mjs";
 import { rcasNode } from "./fsrTsl.mjs";
 
@@ -39,8 +54,11 @@ import { rcasNode } from "./fsrTsl.mjs";
  */
 export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeight, displayWidth, displayHeight, ratio = null,
                                                          threshold, alpha = 0.1, reactive = true, lock = false,
+                                                         lockFrom = "frame", lockLife = 8, lockMargin = 0.05,
                                                          sharpness = 0.5, rcas = true, type = null } = {}) {
     if (!(threshold > 0)) throw new Error("fx/fsr/fsrTemporalTsl: threshold must be a positive clip-z gap -- see clipGapThreshold in render/temporalClipTsl.mjs");
+    if (![null, "frame", "ring"].includes(lockFrom)) throw new Error(`fx/fsr/fsrTemporalTsl: lockFrom must be null, "frame" or "ring" -- got ${JSON.stringify(lockFrom)}`);
+    if (lockFrom === "ring" && !lock) throw new Error('fx/fsr/fsrTemporalTsl: lockFrom "ring" reads the lock ring, which is what lock: true builds -- pass it, or lockFrom "frame", which needs no ring');
     const rw = renderWidth, rh = renderHeight, dw = displayWidth, dh = displayHeight;
     const up = ratio == null ? dw / rw : ratio;
     const colType = type == null ? THREE.HalfFloatType : type;
@@ -51,6 +69,7 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
         colour: new THREE.RenderTarget(rw, rh, { type: colType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }),
         resolved: col(), dMotion: flat(), record: [flat(), flat()], disocclusion: flat(), reactive: reactive ? flat() : null,
         shading: lock ? flat() : null, factor: flat(), history: [col(), col()],
+        candidates: lockFrom ? flat() : null, lumaMean: lockFrom === "ring" ? flat() : null, relax: lockFrom ? flat() : null,
     };
     const stage = makeMotionStage(THREE, TSL, { w: dw, h: dh, gl });
     t.motion = stage.motion; t.depth = stage.depth;
@@ -66,11 +85,17 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
                                                           { w: dw, h: dh, threshold })) : null;
     const dis = [0, 1].map((k) => disocclusionNode(TSL, t.dMotion.texture, t.record[1 - k].texture, { w: dw, h: dh, threshold }));
     const fac = historyFactorNode(TSL, { disocclusion: t.disocclusion.texture, reactive: reactive ? t.reactive.texture : null, shading: lock ? t.shading.texture : null });
-    const acc = [0, 1].map((k) => accumulateNode(TSL, { current: t.resolved.texture, history: t.history[1 - k].texture, motion: t.dMotion.texture, factor: t.factor.texture }, { w: dw, h: dh, alpha }));
+    const cand = lockFrom === "ring" ? ridgesNode(TSL, t.lumaMean.texture, { w: dw, h: dh, margin: lockMargin })
+               : lockFrom === "frame" ? newLocksNode(TSL, t.resolved.texture, { w: dw, h: dh, margin: lockMargin }) : null;
+    const locks = lockFrom ? makeLockLife(THREE, TSL, { w: dw, h: dh, motionTex: t.dMotion.texture, candidatesTex: t.candidates.texture,
+                                                        disocclusionTex: t.disocclusion.texture, life: lockLife }) : null;
+    const acc = [0, 1].map((k) => accumulateNode(TSL, { current: t.resolved.texture, history: t.history[1 - k].texture, motion: t.dMotion.texture, factor: t.factor.texture,
+                                                        relax: lockFrom ? t.relax.texture : null }, { w: dw, h: dh, alpha }));
     const sharp = rcas ? [0, 1].map((k) => rcasNode(TSL, t.history[k].texture, { w: dw, h: dh, sharpness, transfer: "none" })) : null;
     const copy = [0, 1].map((k) => quad(TSL.textureLoad(t.history[k].texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)))));
     const sc = { dM: quad(dil.motionNode), dD: quad(dil.depthNode), res: quad(res.node), rx: rx ? rx.map((x) => quad(x.node)) : null,
-                 dis: dis.map((x) => quad(x.node)), fac: quad(fac.node), acc: acc.map((x) => quad(x.node)), out: sharp ? sharp.map((x) => quad(x.node)) : copy };
+                 dis: dis.map((x) => quad(x.node)), fac: quad(fac.node), acc: acc.map((x) => quad(x.node)), out: sharp ? sharp.map((x) => quad(x.node)) : copy,
+                 cand: cand ? quad(cand.node) : null };
     // *** THE RECORD STARTS AT THE FAR PLANE. *** Frame one's disocclusion reads a record nothing has written. Left as
     // zeros, every pixel is "nearer than expected" and flagged, the factor goes to 0 and the history is discarded --
     // right answer, wrong reason: hasHistory is what should decide frame one, and the gate's sabotage D11 (frame one
@@ -81,10 +106,12 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const draw = async (scene, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(scene, ortho); };
     const px = dw * dh, floatBytes = 16;
     return {
-        targets: t, stage, ring, jitter: jit, period,
-        uniforms: { resolve: res.uniforms, accumulate: acc.map((x) => x.uniforms), rcas: sharp ? sharp.map((x) => x.uniforms) : null, reactive: rx ? rx.map((x) => x.uniforms) : null },
+        targets: t, stage, ring, locks, lockFrom, jitter: jit, period,
+        uniforms: { resolve: res.uniforms, accumulate: acc.map((x) => x.uniforms), rcas: sharp ? sharp.map((x) => x.uniforms) : null, reactive: rx ? rx.map((x) => x.uniforms) : null,
+                    candidates: cand ? cand.uniforms : null },
         /** What the chain's float state costs in bytes, the ring separately because it is the part that is large. */
-        memory: { ring: lock ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : 0, period },
+        memory: { ring: lock ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : 0, period,
+                  locks: lockFrom ? (lockFrom === "ring" ? 5 : 4) * px * floatBytes : 0 },
         get frames() { return frames; },
         /** This frame's jitter, as the colour pass will be offset by it -- [jx, jy] in render pixels. */
         get phase() { return jitterCurrent(jit); },
@@ -103,13 +130,17 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
             if (rx) { rx[k].uniforms.hasHistory.value = hist; await draw(sc.rx[k], t.reactive); }
             await draw(sc.dis[k], t.disocclusion);
             await draw(sc.fac, t.factor);
+            if (locks) {
+                if (lockFrom === "ring") await ring.mean(renderer, t.lumaMean);
+                await draw(sc.cand, t.candidates); await locks.advance(renderer); await locks.relaxation(renderer, t.relax);
+            }
             acc[k].uniforms.hasHistory.value = hist; acc[k].uniforms.alpha.value = alpha; await draw(sc.acc[k], t.history[k]);
             await draw(sc.out[k], output);
             renderer.setRenderTarget(prev);
             frames++; advanceJitter(jit);
         },
         dispose() {
-            stage.dispose(); if (ring) ring.dispose();
+            stage.dispose(); if (ring) ring.dispose(); if (locks) locks.dispose();
             for (const v of Object.values(t)) for (const x of [].concat(v)) if (x && x.dispose && x !== stage.motion && x !== stage.depth) x.dispose();
         },
     };

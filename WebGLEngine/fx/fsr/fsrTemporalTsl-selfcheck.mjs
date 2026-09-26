@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/fx/fsr/fsrTemporalTsl-selfcheck.mjs -- v4731
+// WebGLEngine/fx/fsr/fsrTemporalTsl-selfcheck.mjs -- v4731, v4732
 //
 // FSR2'S CHAIN ON A THREE.JS SCENE, HELD TO fsr.html's CHAIN ON THE CPU. Every pass fx/fsr/fsrTemporalTsl.mjs composes
 // is graded against its own mirror in its own gate (render/temporalTsl, temporalClipTsl, temporalLockTsl, reactiveTsl).
@@ -8,6 +8,12 @@
 // and motion field alone, runs fsr.html's order with the CPU references -- resolveJitterAwareCPU, dilateCPU, pushLuma
 // and shadingShiftCPU, reactiveCPU, disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU -- carrying its OWN
 // history, and compares the two pictures every frame. A pass reading the wrong frame's input is a picture that drifts.
+//
+// v4732: the LOCKS joined the chain (candidates, lock life killed by this frame's disocclusion, the clamp relaxed where
+// a lock holds), and the CPU carries them too -- from the RING's mean on webgpu and the FRAME's luma on webgl2. The
+// composition is JavaScript and runs the same on either backend, and every lock pass is graded on both backends in
+// render/temporalLockTsl-selfcheck.mjs, so one mode a backend buys both modes' composition at one run's cost. The
+// history is compared on every other frame and the last: the locks took this gate to 19 s of the sweep's 20.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +22,7 @@ import { resolveJitterAwareCPU } from "../../render/temporalResolve.mjs";
 import { dilateCPU } from "../../render/dilate.mjs";
 import { disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU } from "../../render/temporalReject.mjs";
 import { reactiveCPU } from "../../render/reactive.mjs";
-import { makeLumaState, pushLuma, shadingShiftCPU } from "../../render/temporalLock.mjs";
+import { makeLumaState, pushLuma, shadingShiftCPU, lockCandidatesFromRing, newLocksCPU, makeLockState, advanceLocks, lockRelaxation } from "../../render/temporalLock.mjs";
 import { jitterPhaseCount, jitterSequence } from "../../render/jitter.mjs";
 import { rcasCPU } from "./fsr.js";
 import * as FT from "./fsrTemporalTsl.mjs";
@@ -60,8 +66,8 @@ else {
                 const vp = Array.from(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements);
                 const threshold = TC.clipGapThreshold(vp, [0, 0, 0.3], [0, 0, -1.5]); o.threshold = threshold;
                 const fsr = FT.makeFsrTemporal(THREE, T, renderer, { renderWidth: a.RW, renderHeight: a.RW, displayWidth: a.DW, displayHeight: a.DW,
-                    threshold, alpha: a.ALPHA, reactive: true, lock: true, sharpness: a.SHARP, type: THREE.FloatType });
-                o.period = fsr.period; o.memory = fsr.memory;
+                    threshold, alpha: a.ALPHA, reactive: true, lock: true, lockFrom: mode === "webgpu" ? "ring" : "frame", sharpness: a.SHARP, type: THREE.FloatType });
+                o.period = fsr.period; o.memory = fsr.memory; o.lockFrom = fsr.lockFrom; o.lockLife = fsr.locks.life;
                 const outRT = new THREE.RenderTarget(a.DW, a.DW, { type: THREE.FloatType, depthBuffer: false });
                 const refRT = new THREE.RenderTarget(a.RW, a.RW, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
                 for (let k = 0; k < a.N; k++) {
@@ -76,10 +82,13 @@ else {
                     if (k % 7 === 3) { TT.applyJitter(cam, before, phase[0], phase[1], a.RW, a.RW); renderer.setRenderTarget(refRT); await renderer.renderAsync(scene, cam);
                         TT.restoreProjection(cam, before); const mine = await read(refRT, a.RW), theirs = await read(fsr.targets.colour, a.RW);
                         let d = 0; for (let i = 0; i < mine.length; i++) d = Math.max(d, Math.abs(mine[i] - theirs[i])); o.jitterGap = Math.max(o.jitterGap || 0, d); o.jitterChecks = (o.jitterChecks || 0) + 1; }
-                    const f = { phase, colour: await read(fsr.targets.colour, a.RW), depth: await read(fsr.targets.depth, a.DW), motion: await read(fsr.targets.motion, a.DW),
-                                history: await read(fsr.targets.history[k % 2], a.DW) };
+                    // the history is read on odd frames and the last (v4732, when the locks took the gate to 19 s of its 20):
+                    // a pass reading the wrong frame's input drifts from then on, so every other frame sees it as surely
+                    const f = { phase, colour: await read(fsr.targets.colour, a.RW), depth: await read(fsr.targets.depth, a.DW), motion: await read(fsr.targets.motion, a.DW) };
+                    if (k % 2 === 1 || k === a.N - 1) f.history = await read(fsr.targets.history[k % 2], a.DW);
                     if (k === a.N - 1) Object.assign(f, { dis: await read(fsr.targets.disocclusion, a.DW), rx: await read(fsr.targets.reactive, a.DW),
-                        shade: await read(fsr.targets.shading, a.DW), factor: await read(fsr.targets.factor, a.DW), out: await read(outRT, a.DW) });
+                        shade: await read(fsr.targets.shading, a.DW), factor: await read(fsr.targets.factor, a.DW), out: await read(outRT, a.DW),
+                        cand: await read(fsr.targets.candidates, a.DW), relax: await read(fsr.targets.relax, a.DW) });
                     o.frames.push(f);
                 }
                 fsr.dispose(); out[mode] = o; renderer.dispose();
@@ -105,8 +114,8 @@ else {
         ok(`[${mode}] the colour pass IS the scene through applyJitter at the reported phase -- ${o.jitterChecks} frames redrawn, worst ${o.jitterGap} -- and the camera comes back with its own projection`,
            o.jitterChecks > 3 && o.jitterGap === 0 && o.restored === true, "the CPU chain resolves whatever the device drew, so it cannot see a colour pass that forgot to jitter or a motion pass that ran jittered");
         // fsr.html's order, on the CPU, from the device's renders alone
-        const st = makeLumaState(DW, DW, o.period);
-        let hist = null, rec = null, wHist = 0, wAt = -1, last = null;
+        const st = makeLumaState(DW, DW, o.period), ls = makeLockState(DW, DW);
+        let hist = null, rec = null, wHist = 0, wAt = -1, last = null, graded = 0;
         for (let k = 0; k < o.frames.length; k++) {
             const f = o.frames[k];
             const cur = resolveJitterAwareCPU({ src: up(f.colour, RW), rw: RW, rh: RW, dw: DW, dh: DW, jitter: f.phase }).data;
@@ -119,13 +128,19 @@ else {
                 dis = disocclusionCPU({ motion: dil.motion, prevDepth: rec, w: DW, h: DW, threshold: o.threshold, nearerIsLess: true });
                 factor = historyFactorCPU({ disocclusion: dis.data, reactive: rx.data, shading: shade.data, n: DW * DW });
             }
-            hist = rectifiedAccumulateCPU({ current: cur, history: k ? hist : null, motion: dil.motion, factor, w: DW, h: DW, alpha: ALPHA, space: "ycocg" }).data;
+            // v4732: the locks, in render/temporalLock-selfcheck.mjs's order -- candidates, advance (killed by this frame's
+            // disocclusion), relaxation -- from the ring's mean on webgpu and this frame's luma on webgl2
+            const cand = o.lockFrom === "ring" ? lockCandidatesFromRing(st, { margin: 0.05 }) : newLocksCPU({ current: cur, w: DW, h: DW, margin: 0.05 });
+            advanceLocks(ls, { motion: dil.motion, disocclusion: dis ? dis.data : null, newLocks: cand.data, w: DW, h: DW, life: o.lockLife });
+            const relax = lockRelaxation(ls, { life: o.lockLife });
+            const accR = rectifiedAccumulateCPU({ current: cur, history: k ? hist : null, motion: dil.motion, factor, relax, w: DW, h: DW, alpha: ALPHA, space: "ycocg" });
+            hist = accR.data;
             rec = dil.depth;
-            const w = worst(up(f.history, DW), hist, DW * DW); if (w > wHist) { wHist = w; wAt = k; }
-            last = { shade, rx, dis, factor, hist };
+            if (f.history) { graded++; const w = worst(up(f.history, DW), hist, DW * DW); if (w > wHist) { wHist = w; wAt = k; } }
+            last = { shade, rx, dis, factor, hist, cand, relax, relaxed: accR.stats.relaxed };
         }
-        ok(`*** [${mode}] the DEVICE's chain is fsr.html's order on the CPU, frame by frame for ${o.frames.length} frames, the CPU carrying its OWN history -- worst ${wHist.toExponential(2)} (frame ${wAt}) ***`,
-           wHist < 1e-4, "a pass reading the wrong frame's record or history would drift here; the accumulate is a contraction, so f32 error does not grow");
+        ok(`*** [${mode}] the DEVICE's chain is fsr.html's order on the CPU, graded on ${graded} of ${o.frames.length} frames (every other one and the last), the CPU carrying its OWN history -- worst ${wHist.toExponential(2)} (frame ${wAt}) ***`,
+           wHist < 1e-4 && graded >= o.frames.length / 2, "a pass reading the wrong frame's record or history would drift here; the accumulate is a contraction, so f32 error does not grow");
         const lf = o.frames[o.frames.length - 1];
         const wDis = worst(ch(up(lf.dis, DW)), last.dis.data, DW * DW, 1), wRx = worst(ch(up(lf.rx, DW)), last.rx.data, DW * DW, 1);
         const wSh = worst(ch(up(lf.shade, DW)), last.shade.data, DW * DW, 1), wF = worst(ch(up(lf.factor, DW)), last.factor, DW * DW, 1);
@@ -133,6 +148,11 @@ else {
         ok(`*** [${mode}] and on the last frame all THREE masks are live and are the mirrors' -- disocclusion ${wDis} (${genuine} genuine), reactive ${wRx.toExponential(2)} (${last.rx.flagged} fired), shading ${wSh.toExponential(2)} (${shFired} fired), factor ${wF.toExponential(2)} ***`,
            wDis === 0 && wRx < 1e-4 && wSh < 1e-4 && wF < 1e-4 && genuine > 0 && last.rx.flagged > 0 && shFired > 0,
            `the ring is ${o.period * 2} slots and full after that many pushes, so its mask has pixels only on the run's last frames`);
+        const gC = ch(up(lf.cand, DW)); let candBad = 0; for (let i = 0; i < DW * DW; i++) if (gC[i] !== last.cand.data[i]) candBad++;
+        const wRx2 = worst(ch(up(lf.relax, DW)), last.relax, DW * DW, 1);
+        ok(`*** [${mode}] and the LOCKS -- from the ${o.lockFrom === "ring" ? "RING's mean" : "FRAME's luma"}, life ${o.lockLife} -- are the mirror's on the last frame: candidates ${candBad} wrong of ${last.cand.count} found, relaxation worst ${wRx2.toExponential(2)}, ${last.relaxed} pixels relaxed ***`,
+           candBad === 0 && wRx2 < 1e-6 && last.cand.count > 0 && last.relaxed > 0,
+           "the ring mode on webgpu and the frame mode on webgl2: the composition is backend-free, and each pass is graded on both backends in render/temporalLockTsl-selfcheck.mjs");
         const wOut = worst(up(lf.out, DW), rcasCPU(up(lf.history, DW), DW, DW, SHARP, false).data, DW * DW);
         ok(`  [${mode}] ...and the OUTPUT is RCAS of the accumulated history, worst ${wOut.toExponential(2)}`, wOut < 1e-5, `sharpness ${SHARP}, transfer none -- the chain runs on linear values`);
     }
@@ -155,8 +175,27 @@ else {
 // one's disocclusion read an unwritten record of zeros and discarded every pixel's history whatever hasHistory said,
 // so the driver now starts its record at the far plane and hasHistory is what decides frame one. D10 is here because
 // the CPU reads the reported phase: a driver that never advanced would agree with it perfectly.
+//
+// ---- v4732 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against fx/fsr/fsrTemporalTsl.mjs's locks; each also run against fx/fsr/fsrTemporalLocks-selfcheck.mjs (its column).
+//                                                                  here   locks gate
+//   D14 the locks advance through the UNDILATED field              -> 6      0
+//   D15 disocclusion does not kill a lock                          -> 6      0
+//   D16 the ring's candidates read the frame                       -> 3      0
+//   D17 the accumulate is not given the relax                      -> 4      6
+//   D18 the frame's candidates from the render-resolution colour   -> 3      6
+//   D19 the locks advance before this frame's disocclusion is drawn -> 4     0
+//   D20 the life the caller asked for ignored                      -> 0      4
+//   D21 the default is no locks                                    -> 0      8
+//   D22 the ring's mean not refreshed before its candidates        -> 3      2
+// Every one is red somewhere, and the two zeros here are by construction: this gate's mirror takes the life the driver
+// REPORTS and asks for its lock mode explicitly, so a driver that ignored the caller's life (D20) or defaulted to none
+// (D21) is consistent with itself -- the locks gate asks what the default IS. The locks gate's zeros are composition
+// errors that move a picture by less than its rows can see, which is what this gate is for. D21 first reddened the
+// locks gate by CRASHING it (reading the life of a lock state that did not exist); it now reads a missing one as null
+// and the default row says so -- 8 red rather than 1.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: whether the chain HELPS a three.js scene, frame against truth -- fsr.html measured its own content; " +
-    "HalfFloat targets, the driver's default, which this gate replaces with FloatType to grade the arithmetic; and the 2x ring, " +
-    "whose 64 slots at display size are why the driver ships with it off.");
+console.log("unchecked here: whether the chain HELPS a three.js scene, frame against truth -- fx/fsr/fsrTemporalQuality-selfcheck.mjs and " +
+    "fx/fsr/fsrTemporalLocks-selfcheck.mjs measure that; HalfFloat targets, the driver's default, which this gate replaces with FloatType " +
+    "to grade the arithmetic; and the 2x ring, whose 64 slots at display size are why the driver ships with it off.");
 process.exitCode = fails ? 1 : 0;

@@ -8032,6 +8032,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4732 -- THE 339th CLOSING: FSR2's lock life and clamp relaxation as TSL, on by default, and what they buy.
+    since414: Object.freeze({
+        at: "v4732", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrTemporalLocks-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLockTsl-selfcheck.mjs (lock life: the ridge test, both candidate sources, advanceLocks with every kill, the relaxation, the active mask and the relaxed accumulate)",
+                                "fx/fsr/fsrTemporalTsl-selfcheck.mjs (the locks in the composition, from the ring on webgpu and the frame on webgl2)"]),
+        verdict: "*** THE LOCK AND THE CLAMP RELAXATION -- CODE NO PAGE IN THIS TREE HAD EVER RUN -- NOW RUN ON A THREE.JS SCENE, AND " +
+                 "ON WIRES THINNER THAN A RENDER PIXEL THEY ARE WORTH 0.97 dB. *** Measured on the CPU first, from the device's own " +
+                 "renders: on fsr-three.html's scene REMOVING THE CLAMP ENTIRELY moves the still picture 0.013 dB, so v4728's finding " +
+                 "(the clamp takes half the gain on sub-pixel detail) has nothing to act on there; on seven wires 0.4 render pixels " +
+                 "wide, locks from the ring take the history from 16.838 to 17.932 dB, past no clamp at all (17.785). " +
+                 "render/temporalLockTsl.mjs ports ridgesCPU (the plateau walk, and the linear index's wrap across rows, kept " +
+                 "because the mirror has it), newLocksCPU, lumaMean and lumaInstability as ring passes, advanceLocks (reprojected " +
+                 "at the nearest texel, decayed, killed on invalid motion, disocclusion and instability), lockRelaxation and " +
+                 "activeMask, with makeLockLife holding the state; accumulateNode takes rectifiedAccumulateCPU's relax. Its gate " +
+                 "holds every one to the mirror exactly on both backends -- 0 ridge disagreements at three plateau bounds, lock " +
+                 "life worst 0 over 24 frames with 447 decayed lock-frames carried by the pan, 93 across exact texel ties, and every " +
+                 "kill populated. fx/fsr/fsrTemporalTsl.mjs gains lockFrom (\"frame\", \"ring\" or null) and lockLife, and the driver " +
+                 "the composition gate now mirrors carries them. fx/fsr/fsrTemporalLocks-selfcheck.mjs measures them through the " +
+                 "driver: +0.97 dB on still wires, +0.43 moving, -0.015 on a fast-turning knot with nothing thin; the DEFAULTS are " +
+                 "its rows' -- locks from the frame (no ring; most of what the ring's buy), life 8 (86% of what 32 buys on the " +
+                 "wires at a fraction of its cost on the knot). fsr-three.html's own figure moves 25.24 -> 25.27. The page gains a " +
+                 "locks control and a view with the relaxation in red. *** THIRTY-ONE SABOTAGES, EVERY ONE RED SOMEWHERE. *** " +
+                 "Three scored 0 RED FIRST and none was a blind spot of the port: an EQUIVALENT MUTANT (a vertical walk that leaves " +
+                 "the frame never comes back, so whether leaving is decisive cannot matter -- replaced by taking the out test away); " +
+                 "v4559's condemned round(t - 0.5), which differs from floor only on an exact tie a camera's field never lands on " +
+                 "(rows now move exactly half a texel a frame); and a first advance trusting its state, which read zeros because " +
+                 "both backends zero a new target (the state is now filled first). The tie band found a fact of its own: a vec4 " +
+                 "select nested in a vec4 select draws nothing on WebGL2. Two gates came near the 20 s cap and were brought back " +
+                 "under it: the lock gate's readbacks packed 12 -> 5 a frame (24 s -> 14), the composition gate's history read on " +
+                 "every other frame (19.3 s -> 16).",
+    }),
     // v4731 -- THE 338th CLOSING: the reactive mask, FSR2's chain over a three.js scene, and what it buys.
     since413: Object.freeze({
         at: "v4731", swept: 3, green: 3, red: 0,

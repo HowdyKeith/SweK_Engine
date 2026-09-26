@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/fx/fsr/fsrTemporalQuality-selfcheck.mjs -- v4731
+// WebGLEngine/fx/fsr/fsrTemporalQuality-selfcheck.mjs -- v4731, v4732
 //
 // WHETHER FSR2 HELPS A THREE.JS SCENE, MEASURED RATHER THAN SHOWN. fx/fsr/fsrTemporalTsl-selfcheck.mjs proves the
 // chain is fsr.html's chain; this asks what it buys. fsr-three.html's own scene -- the normal-shaded torus knot over
@@ -10,6 +10,10 @@
 //   FSR2       fx/fsr/fsrTemporalTsl.mjs after 32 jittered frames of a still camera -- every jitter phase at 2x once
 // PSNR is taken on [0, 1]-clamped values, which is what a display shows. The camera is still and the knot does not
 // turn: the question is what the ACCUMULATION recovers, and motion is what the other gates are for.
+//
+// v4732: the driver's default gained LOCKS from the frame, and this scene's FSR2 went from 25.24 dB to 25.27. That is
+// the size of what a lock can do where nothing is thinner than a render pixel -- the clamp costs this picture almost
+// nothing to begin with; fx/fsr/fsrTemporalLocks-selfcheck.mjs draws the wires where it costs a decibel.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

@@ -209,7 +209,8 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null }) {
 // fixed render/temporalResolveWgsl.mjs to floor(x + 0.5) and gave its gate a row at a phase with ties.
 //
 // Not carried, and said so: the resolve's CONFIDENCE buffer (nothing in the chain reads it) and the accumulate's
-// per-reason counters and `relax` input (fsr.html's chain passes relax null; the lock enters through the factor).
+// per-reason counters. The `relax` input was on this list until v4732 (fsr.html's chain passes relax null, and the
+// lock entered only through the factor); it is carried now, for render/temporalLockTsl.mjs's lock life.
 // ================================================================================================================
 export const RESOLVE_TSL_NEEDS = Object.freeze(["abs", "sin", "clamp", "floor", "max", "min", "vec3", "select"]);
 function needAll(TSL, names) { need(TSL); for (const n of names) if (TSL[n] === undefined) throw new Error(`render/temporalTsl: the TSL namespace has no ${n}`); }
@@ -261,8 +262,14 @@ function fromYCoCg(TSL, q) { const { vec3 } = TSL; const t = q.x.sub(q.z); retur
  * current frame IN YCoCg, and blend with alpha weighted by `factor` (a texture whose .x is the history factor, or
  * null for 1 everywhere). uniforms.alpha is the blend; uniforms.hasHistory is 0 on the first frame, where the output
  * is the current frame -- the mirror's `history === null`.
+ *
+ * `relax` (v4732) is rectifiedAccumulateCPU's: a texture whose .x in [0, 1] lerps the CLAMPED history back toward the
+ * unclamped one, per channel in YCoCg -- cl + (b - cl) * rx, the mirror's order. It is how a lock reaches the clamp;
+ * render/temporalLockTsl.mjs's makeLockLife writes it, and render/temporalLockTsl-selfcheck.mjs grades this input
+ * against the mirror, beside the lock that feeds it. null is the old node exactly, not a relax of 0 -- the gates
+ * that graded it before this input existed still grade the same expression.
  */
-export function accumulateNode(TSL, { current, history, motion, factor = null }, { w, h, alpha = 0.1 }) {
+export function accumulateNode(TSL, { current, history, motion, factor = null, relax = null }, { w, h, alpha = 0.1 }) {
     needAll(TSL, RESOLVE_TSL_NEEDS);
     const { Fn, float, int, vec3, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, max, min, select } = TSL;
     const u = { w: uniform(float(w)), h: uniform(float(h)), alpha: uniform(float(alpha)), hasHistory: uniform(float(0)) };
@@ -285,7 +292,11 @@ export function accumulateNode(TSL, { current, history, motion, factor = null },
             const s = toYCoCg(TSL, at(current, px.add(dx), py.add(dy)).xyz);
             lo.assign(min(lo, s)); hi.assign(max(hi, s));
         }
-        const rect = fromYCoCg(TSL, clamp(toYCoCg(TSL, hist), lo, hi));
+        let rect;
+        if (relax) {
+            const b = toYCoCg(TSL, hist).toVar(), cl = clamp(b, lo, hi).toVar(), rx = clamp(at(relax, px, py).x, 0.0, 1.0);
+            rect = fromYCoCg(TSL, cl.add(b.sub(cl).mul(rx)));
+        } else rect = fromYCoCg(TSL, clamp(toYCoCg(TSL, hist), lo, hi));
         const f = factor ? clamp(at(factor, px, py).x, 0.0, 1.0) : float(1.0);
         const a = float(1.0).sub(float(1.0).sub(u.alpha).mul(f));
         const blended = rect.mul(float(1.0).sub(a)).add(cur.mul(a));
