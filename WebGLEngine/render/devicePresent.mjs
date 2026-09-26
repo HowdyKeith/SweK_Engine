@@ -80,19 +80,13 @@ export async function presentCheck(canvas, backend, opts = {}) {
         const frA = await Promise.race([device.frame(draw, { read: true }), lostP.then(() => null)]);
         if (!frA) { out.state = "device-lost"; return out; }
         out.A = comparePixels(frA.pixels, want);
-        // v4680 -- WEBGPU ONLY: wait for an actual rendering step before reading what the compositor shows.
-        // Measured on real, non-headless hardware (a 1080 Ti, Chrome 153, no automation involved): without
-        // this wait, WebGPU's C came back 16384 of 16384 pixels wrong at worst=255 -- not a subtle mismatch,
-        // a completely different (likely still-cleared) buffer. WebGPU's canvas presentation lands at the
-        // browser's "update the rendering" step, not synchronously when device.frame()'s GPU work finishes;
-        // drawImage() called right after that awaited promise can run before the browser has actually
-        // composited the just-drawn frame, so it samples whatever was there BEFORE this present.
-        // *** SCOPED TO webgpu, NOT APPLIED UNCONDITIONALLY -- FIRST ATTEMPT REGRESSED WebGL2. *** Waiting
-        // two rAFs for BOTH backends made WebGL2's own C readback go 2048 of 2048 wrong too (measured on
-        // Linux): without preserveDrawingBuffer a canvas's buffer can be auto-cleared once nothing has
-        // redrawn it across a real paint, and WebGL2 was already correct at the ORIGINAL timing (no wait).
-        // So only WebGPU gets the wait; WebGL2's path is untouched from before this change.
-        if (backend === "webgpu") await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+        // v4680 -- TRIED AND DISPROVEN: waiting for a render step (two rAFs) before reading C, scoped to
+        // webgpu only. Measured on real hardware (a 1080 Ti, Chrome 153): the result was BYTE-IDENTICAL to
+        // no wait at all -- still 16384 of 16384 wrong at worst=255. A real timing gap would show SOME
+        // improvement from waiting two whole frames; getting the exact same failure regardless of wait
+        // length means this was never a task-boundary problem. Removed rather than left in place doing
+        // nothing: see the round note for what's actually being checked next (drawImage from a WebGPU
+        // canvas may not be seeing that canvas's content at all, independent of timing).
         // C: what the compositor is handed -- a 2D copy of the presented canvas, taken right after the frame
         try {
             const c2 = document.createElement("canvas"); c2.width = W; c2.height = H;
