@@ -35,6 +35,7 @@
       <option value="fsr" selected>FSR1 (EASU + RCAS)</option>
       <option value="bilinear">bilinear stretch</option>
       <option value="native">native resolution</option>
+      <option value="motion">motion vectors (debug)</option>
     </select></label>
     <label>scale <select id="scale">
       <option value="1.5">1.5x</option>
@@ -56,6 +57,7 @@
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
+import { makeMotionStage, glClip } from "./render/temporalTsl.mjs";
 
 const $ = (id) => document.getElementById(id);
 const DW = 960, DH = 540;
@@ -99,6 +101,25 @@ try {
     for (const id of ["sharp", "denoise"]) $(id).addEventListener("input", syncKnobs);
     build(); syncKnobs();
 
+    // v4727 -- THE MOTION FIELD THE TEMPORAL CHAIN WILL READ, SHOWN RATHER THAN DESCRIBED. The knot turns, so its
+    // pixels carry ITS motion and the floor only the camera's (still, here, so black-grey); red is +du, green +dv,
+    // at 60x so a pixel of motion on a 960-wide frame is visible. Blue marks where the field has no answer.
+    let motionStage = null, motionView = null;
+    const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const showMotion = async () => {
+        if (!motionStage) {
+            motionStage = makeMotionStage(THREE, TSL, { w: DW, h: DH, gl: glClip(THREE, renderer) });
+            const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+            m.fragmentNode = TSL.Fn(() => {
+                const v = TSL.textureLoad(motionStage.motion.texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+                return TSL.vec4(v.x.mul(60.0).add(0.5), v.y.mul(60.0).add(0.5), TSL.float(1.0).sub(v.z).mul(0.8), 1.0);
+            })();
+            motionView = new THREE.Scene(); motionView.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+        }
+        await motionStage.render(renderer, scene, camera);
+        renderer.setRenderTarget(null); await renderer.renderAsync(motionView, ortho);
+    };
+
     let last = performance.now(), avg = 0, t = 0;
     const frame = async () => {
         const now = performance.now(), dt = now - last; last = now;
@@ -108,9 +129,10 @@ try {
         const t0 = performance.now();
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
         else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
+        else if (mode === "motion") await showMotion();
         else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
         avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
-        const res = mode === "native" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
+        const res = mode === "native" || mode === "motion" ? `${DW}x${DH}` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`;
         stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
         requestAnimationFrame(frame);
     };

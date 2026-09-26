@@ -8032,6 +8032,34 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4727 -- THE 334th CLOSING: the temporal chain's inputs for a three.js scene.
+    since409: Object.freeze({
+        at: "v4727", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE TEMPORAL HALF FOR A THREE.JS SCENE BEGINS, BY THE TSL ROUTE, AND v4726's BACKLOG LINE SAYING IT NEEDED THE " +
+                 "PACKAGE'S ROUTE IS CORRECTED. *** Every temporal pass already has a CPU mirror in render/, so each is written as TSL " +
+                 "and held to it, one a round. render/temporalTsl.mjs is the INPUTS: applyJitter writes render/jitter.mjs's " +
+                 "jitterProjection into a three.js camera, negated -- the sense fsr.html settled -- and a smooth three.js scene " +
+                 "rendered at half size and resolved reads 6.60e-3 rms against the full render beside an unjittered floor of " +
+                 "5.30e-3, where jitterProjection's own sense reads 5.92e-2. The MOTION FIELD is (du, dv, valid, zPrev) at display " +
+                 "resolution in render/motionVectors.mjs's convention, written by a subclass of three's VelocityNode that carries each " +
+                 "OBJECT's previous matrix -- measured first: three's own velocity, mapped, agreed with motionVectorsCPU to 9.7e-5 UV " +
+                 "-- and completed on every undrawn pixel by motionVectorsCPU's arithmetic on the far plane, so a sky accumulates. " +
+                 "render/temporalTsl-selfcheck.mjs grades a static floor, a box that moves and turns, and a background on both " +
+                 "backends: the background to 4.77e-7 against motionVectorsCPU, every surface to 0.0075 of a display pixel against " +
+                 "render/objectMotion.mjs's objectMotionCPU, the box 3.46 px from camera-only motion, and a turnaround where every " +
+                 "pixel -- wall and sky -- was behind the previous eye and both field and reference mark all 1,024 invalid. " +
+                 "*** TWO THINGS ABOUT THREE, FOUND BY THIS ROUND: *** a NodeMaterial keeps NormalBlending into a render target, so a " +
+                 "data pass's fourth channel scales the other three (0.1, 0.2, 0.3, 0.4 reads back 0.04, 0.08, 0.12, 0.4) -- the " +
+                 "first run read every surface's `valid` as its zPrev -- and an MRT output reaches a target texture only by NAME, so " +
+                 "an unnamed count-2 target draws nothing at all. *** FOURTEEN SABOTAGES, FOURTEEN RED, *** two of them only after " +
+                 "the fixture grew a third frame and a turnaround, because with two frames an object's first record is its previous " +
+                 "one and no pixel was ever behind the eye. The typed bounds of the first draft (0.01 px, 1e-4 clip z) went red on " +
+                 "WebGL2 at exactly twice WebGPU's reading and are restated in the units the consumers read. fsr-three.html gains a " +
+                 "motion-vector view of the live scene, which is this module's caller.",
+    }),
     // v4726 -- THE 333rd CLOSING: FSR1 for a three.js scene, as TSL nodes held to the CPU reference.
     since408: Object.freeze({
         at: "v4726", swept: 1, green: 1, red: 0,
