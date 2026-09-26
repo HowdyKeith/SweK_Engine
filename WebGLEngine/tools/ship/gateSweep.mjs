@@ -8032,6 +8032,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4747 -- THE 354th CLOSING: pacing on a variable refresh, what generating costs, and a late frame on the device.
+    since429: Object.freeze({
+        at: "v4747", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Late-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (sections 6 to 8: the generation's cost, a variable refresh, and the pair the generator holds)"]),
+        verdict: "*** THE PACER ASKED FOR FRAMES NOBODY HOLDS, AND DROPPED EVERY REAL FRAME ONCE GENERATING TOOK ANY TIME. *** Two " +
+                 "faults, both found by giving the model what v4743 left out. A generation cost: v4743's queue cleared itself when a " +
+                 "new pair arrived, so a half-way frame that missed its refresh took the held real frame with it -- 30 new images " +
+                 "a second at the design case for 2 ms of cost; the queue now shows the newest image that may go up, a pair's real " +
+                 "frame after its own half-way frame or alone if that was dropped, and a generation too slow for its time falls " +
+                 "back to the real frames instead of freezing. And real render times on the device (fx/fsr/fsr3Late-selfcheck.mjs, " +
+                 "frame 7 five refreshes long): the timed policy was refused 12 times, because its line -- an interval, a render " +
+                 "and a quarter refresh behind -- sat in the pair before the newest after every new frame, 58 times in two seconds " +
+                 "at 30 frames a second on the CPU, and fx/fsr/fsr3Tsl.mjs holds the newest pair only. With pairs 'newest' (the " +
+                 "default) and no margin, 0 refused under every policy, and timed generation carries the late frame best: 10.70 " +
+                 "ms of judder against 17.15 for the half-way frame and 20.19 with none, its worst refresh 18.83 dB against 16.80 " +
+                 "and 15.92. A variable refresh (scheduleVrrCPU, 48 to 144 Hz) reverses v4743's finding on the hold: there it is " +
+                 "what spaces the frames, 0 judder at 24 to 45 frames a second against 2 to 7 for showing both as soon as they are " +
+                 "made; with each frame 5 ms either side of 33, a line with 5 ms in hand judders least (1.41). Twelve sabotages, " +
+                 "all red once three rows were added for the three that scored 0.",
+    }),
     // v4746 -- THE 353rd CLOSING: flicker between real and generated frames.
     since428: Object.freeze({
         at: "v4746", swept: 2, green: 2, red: 0,
