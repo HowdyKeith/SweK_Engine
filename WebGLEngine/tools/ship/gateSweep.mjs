@@ -8032,6 +8032,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4734 -- THE 341st CLOSING: three more round() ties, fixed, and a census so there is not a fifth.
+    since416: Object.freeze({
+        at: "v4734", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/shaderRound-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/frameInterpGPU-selfcheck.mjs (whole-pixel flow at t = 0.5 and 0.25: landings on a half pixel)",
+                                "render/holeFillGPU-selfcheck.mjs (a depth-side sample on a half pixel across a depth edge)",
+                                "render/opticalFlow-selfcheck.mjs (block origins on a half pixel: block 8 over five levels, block 12 over four)"]),
+        verdict: "*** THE AUDIT v4728 OWED FOUND ALL THREE, AND ONE WAS 79 PIXELS. *** WGSL's round() ties to EVEN and every " +
+                 "CPU mirror's Math.round ties UP; render/frameInterpWgsl.mjs, holeFillWgsl.mjs and opticalFlowWgsl.mjs rounded " +
+                 "with round(), and no device row had ever landed on a tie. A probe that did: frame interpolation at t = 0.5 with a " +
+                 "whole odd flow put 125 of 127 holes somewhere else on the device, pixels off by 0.79 (and t = 0.25 with a flow of " +
+                 "2, 62); optical flow at block 8 over five levels -- where a block's origin bx * 8 / 16 is a half for every odd " +
+                 "block -- differed on 44 of 512 components, one by 79 pixels, and at block 12 over four levels on 4, one by 18.8; " +
+                 "hole fill's depth side mode split 64 of 256 side codes, on a fixture that had to be FOUND (the tie decides only " +
+                 "when its two candidates straddle a depth edge and the floor is even). All three are floor(x + 0.5) now, v4728's " +
+                 "fix, and each device gate draws its tie with the split population derived from the case. " +
+                 "render/shaderRound-selfcheck.mjs scans the 186 files that ship shader source and asserts the round() calls it " +
+                 "finds EQUAL the kept list, each with a reason -- two: MPM's fixed-point quantiser (a continuous product, the tie " +
+                 "measure-zero and named in its own mirror, and ties-to-even the unbiased rule for a sum) and a JavaScript helper. " +
+                 "Its first draft counted ITSELF, spelling two of the markers it greps for. Ten sabotages, every one red somewhere; " +
+                 "the carried guess back to round() is 0 on the device because it is always whole -- arithmetic, not a blind spot " +
+                 "-- and the census holds it.",
+    }),
     // v4733 -- THE 340th CLOSING: FSR2's chain graded at the half precision it ships with.
     since415: Object.freeze({
         at: "v4733", swept: 2, green: 2, red: 0,

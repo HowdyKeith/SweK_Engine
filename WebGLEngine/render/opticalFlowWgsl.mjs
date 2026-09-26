@@ -38,11 +38,15 @@ fn sadAt(ax:i32, ay:i32, bx:i32, by:i32) -> f32 {
 fn search(@builtin(global_invocation_id) g:vec3<u32>) {
   if (g.x >= u.bw || g.y >= u.bh) { return; }
   let i = g.y * u.bw + g.x;
-  let ox = i32(round(f32(i32(g.x) * u.block) / f32(u.scale)));
-  let oy = i32(round(f32(i32(g.y) * u.block) / f32(u.scale)));
+  // *** v4734 -- floor(x + 0.5), NOT round(x). *** render/opticalFlow.mjs rounds with Math.round, ties UP; WGSL's
+  // round() ties to EVEN. The block origin bx * block / scale is a half pixel for every odd block once block / scale
+  // stops being whole -- block 8 at a fifth level, block 12 at a fourth -- and a search from a different origin finds
+  // a different vector: 44 of 512 flow components differed at block 8 over five levels, one by 79 pixels.
+  let ox = i32(floor(f32(i32(g.x) * u.block) / f32(u.scale) + 0.5));
+  let oy = i32(floor(f32(i32(g.y) * u.block) / f32(u.scale) + 0.5));
   // the guess carried down, at THIS level and in the SEARCH's sense (cur -> prev), so negated
-  let gx = i32(round(-flowIn[i * 2u] / f32(u.scale)));
-  let gy = i32(round(-flowIn[i * 2u + 1u] / f32(u.scale)));
+  let gx = i32(floor(-flowIn[i * 2u] / f32(u.scale) + 0.5));
+  let gy = i32(floor(-flowIn[i * 2u + 1u] / f32(u.scale) + 0.5));
 
   // SEEDED WITH THE GUESS. See the header: Infinity here is the defect v4673 shipped and repaired.
   var bdx = gx;

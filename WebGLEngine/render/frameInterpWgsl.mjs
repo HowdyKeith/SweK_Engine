@@ -66,7 +66,11 @@ fn landing(bx:u32, by:u32) -> vec2<i32> {
   var ax:f32; var ay:f32;
   if (u.indexedByPrev == 1u) { ax = u.t * vx;          ay = u.t * vy; }
   else                       { ax = -(1.0 - u.t) * vx; ay = -(1.0 - u.t) * vy; }
-  return vec2<i32>(i32(round(f32(bx * u.block) + ax)), i32(round(f32(by * u.block) + ay)));
+  // *** v4734 -- floor(x + 0.5), NOT round(x). *** round() ties to EVEN in WGSL and render/frameInterp.mjs's Math.round
+  // ties UP, and here the tie is ordinary: at t = 0.5 an odd whole-pixel flow lands every block on a half pixel. A
+  // flow of (3, -1) indexed by cur put 125 of 127 holes in different places on the two engines. v4728 found the same
+  // tie in the resolve and fixed it the same way (render/temporalResolveWgsl.mjs).
+  return vec2<i32>(i32(floor(f32(bx * u.block) + ax + 0.5)), i32(floor(f32(by * u.block) + ay + 0.5)));
 }
 fn declines(bx:u32, by:u32) -> bool {
   let i = by * u.bw + bx;

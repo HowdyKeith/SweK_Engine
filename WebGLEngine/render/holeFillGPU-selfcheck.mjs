@@ -34,7 +34,7 @@ const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
  * disocclusion shape v4678's slab produces and the one the side rule exists for.
  */
 function mkCase({ radius = 4, prefer = "farther", side = "derived", nearerIsLess = true,
-                  stripW = 4, occVec = 6, bgVec = 0, unreachable = false } = {}) {
+                  stripW = 4, occVec = 6, bgVec = 0, unreachable = false, prevStart = null, curStart = null } = {}) {
     const vec = new Float32Array(W * H * 2).fill(NaN);
     const hole = new Uint8Array(W * H);
     const zbuf = new Float32Array(W * H);
@@ -47,7 +47,8 @@ function mkCase({ radius = 4, prefer = "farther", side = "derived", nearerIsLess
         // A first draft set it after, so the strip itself -- the only place the side rule ever samples -- kept
         // the background's depth, both frames read clear, and the depth mode ABSTAINED on all 192 holes. A
         // sabotage inverting that mode's decision then scored 0 red, because the decision never ran.
-        if (x >= x0 - 2 && x < x1) depthPrev[i] = 0.2;
+        if (x >= (prevStart === null ? x0 - 2 : prevStart) && x < x1) depthPrev[i] = 0.2;
+        if (curStart !== null && x >= curStart && x < x1 + 2) depthCur[i] = 0.25;
         if (x >= x0 && x < x1) { hole[i] = 1; zbuf[i] = nearerIsLess ? Infinity : -Infinity; continue; }
         const occ = x >= x1;                        // the occluder is to the right of the strip
         vec[i * 2] = occ ? occVec : bgVec;
@@ -76,7 +77,7 @@ console.log("1. THE KERNEL, AND WHAT IT DECLINES TO BE");
        "were still holes from a NaN vector and a blend side -- a state inferred from two values, which is the " +
        "defect render/dilate.mjs recorded as every outcome writing the same float.");
     ok("*** and the depth fetch is NEAREST, not bilinear, which is the opposite of the colour path's choice ***",
-       /let xi = clampi\(i32\(round\(x\)\), 0, i32\(u\.w\) - 1\)/.test(FILL_WGSL),
+       /let xi = clampi\(i32\(floor\(x \+ 0\.5\)\), 0, i32\(u\.w\) - 1\)/.test(FILL_WGSL),   // v4734: Math.round's tie, not round()'s
        "a depth buffer at a silhouette holds two surfaces a long way apart in z and their average is a depth no " +
        "surface has. render/frameInterpWgsl.mjs filters COLOUR bilinearly for the opposite reason.");
     ok("...and only ONE growth rule is in the kernel, the one v4678 did not measure as a failure",
@@ -99,6 +100,12 @@ const CASES = {
     radius2: mkCase({ radius: 2, stripW: 7 }),
     reversed: mkCase({ nearerIsLess: false }),
     unreachable: mkCase({ unreachable: true, radius: 3 }),
+    // *** v4734 -- A DEPTH SAMPLE ON A HALF PIXEL, ACROSS A DEPTH EDGE. *** The depth side mode samples each frame's
+    // depth at x -/+ t * v. Every case above fills with a vector of 0 or 6, so at t = 0.5 the sample is whole and the
+    // kernel's round() -- ties to EVEN -- agreed with render/holeFill.mjs's Math.round -- ties UP. An odd background
+    // vector puts the sample on a half, and an occluder edge starting at column 19 puts the two candidates on
+    // different surfaces. Found by searching fixtures against the old kernel: 64 side codes differed here, 0 elsewhere.
+    depthTie: mkCase({ side: "depth", bgVec: 5, prevStart: 19, curStart: 20 }),
     // *** AN OCCLUDER THAT WRAPS THE HOLE, BECAUSE A FLAT ONE ON ONE SIDE CANNOT REACH THE TIE-BREAK. ***
     // v4678 needed a nine-pixel grid for exactly this on the CPU: when every occluder pixel lies on one side of
     // the strip, they all give the direction to the hole the same sign and dropping the spatial tie-break
@@ -222,6 +229,21 @@ console.log("\n2. *** EVERY SIDE MODE, EVERY FLAG, AND THE SIDE CODES MATCH PIXE
        rows.map(([k, x]) => `${k}: ${x.dev.filled}/${x.dev.abstained}`).join("; "));
 }
 
+console.log("\n2b. [v4734] *** A DEPTH SAMPLE ON A HALF PIXEL, WHICH round() AND Math.round BREAK DIFFERENTLY ***");
+{
+    const c = CASES.depthTie, x = cmp("depthTie");
+    // the samples the side rule takes that land on a half AND straddle a depth change -- derived from the case
+    let split = 0;
+    for (let i = 0; i < W * H; i++) { if (!c.hole[i]) continue; const px = i % W, v = x.cpu.vec[i * 2];
+        if (!Number.isFinite(v)) continue;
+        for (const [d, at] of [[c.depthPrev, px - c.t * v], [c.depthCur, px + (1 - c.t) * v]]) { const f = Math.floor(at);
+            if (at - f === 0.5 && f >= 0 && f + 1 < W && d[i - px + f] !== d[i - px + f + 1]) split++; } }
+    say(`depthTie: ${split} depth samples on a half pixel across a depth edge; sides ${JSON.stringify(Object.fromEntries([0, 1, 2].map((q) => [q, x.cpu.side.filter((v, j) => c.hole[j] && v === q).length])))}`);
+    ok("*** the device takes every hole's SIDE where the CPU does when the depth sample is a tie -- the fetch is floor(x + 0.5), Math.round ***",
+       split > 0 && x.sideDiff === 0 && x.holeDiff === 0 && x.worstVec < 1e-5,
+       `${x.sideDiff} side codes differ. Before v4734 the kernel had round(), and 64 of this fixture's 256 holes took a different side on the device.`);
+}
+
 console.log("\n3. A HOLE NO RADIUS CAN CROSS STAYS A HOLE, ON BOTH ENGINES");
 {
     const x = cmp("unreachable");
@@ -273,6 +295,12 @@ console.log("\n6. WHAT THE RUNNER REFUSES");
 }
 }
 
+// ---- v4734 SABOTAGE LOG ----------------------------------------------------------------------------------------
+//   T2 the depth fetch back to round()             -> 2 (section 2b, and section 1's reading of the fetch's form)
+//   T6 the depth fetch floored without the half    -> 2
+// The fixture that reaches the tie was FOUND, not designed: against the old kernel, odd background vectors with the
+// occluder's edge at columns 17, 18, 19 and 20 split 0, 0, 64 and 0 side codes -- the tie decides only when its two
+// candidate texels sit on different surfaces, and the ties-to-even rule goes DOWN only from an even floor.
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
 //
 // *** A CONTROL THAT CANNOT FAIL IS DECORATION, SO EVERY ROW ABOVE WAS BROKEN ON PURPOSE AND WATCHED. ***

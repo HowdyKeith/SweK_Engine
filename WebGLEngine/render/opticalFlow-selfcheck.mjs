@@ -254,7 +254,9 @@ else {
 // the same three cases section 3 measures, so the parity row is over content the CPU is KNOWN to get right
 // the device cases carry the SUBPIXEL flag explicitly, and the CPU comparison below uses the same
 // value: a parity row where one side refines and the other does not is not a parity row.
-const cases = [[3, -2, 1, true], [3, -2, 3, true], [9, -7, 3, false], [14, 11, 3, false]];
+// v4734: the last two put a block's ORIGIN on a half pixel -- bx * block / scale for odd bx once block / scale is not
+// whole, block 8 at a fifth level and block 12 at a fourth -- where WGSL's round() ties to even and Math.round up
+const cases = [[3, -2, 1, true, 8], [3, -2, 3, true, 8], [9, -7, 3, false, 8], [14, 11, 3, false, 8], [3, -2, 5, true, 8], [5, 3, 4, true, 12]];
 const r = await runInEngineOrigin({ engineRoot: ENG, args: {
         W, H, cases, frames: cases.map(([sx, sy]) => Array.from(shifted(sx, sy))),
         zero: Array.from(shifted(0, 0)), flatF: Array.from(flat()),
@@ -268,8 +270,8 @@ const r = await runInEngineOrigin({ engineRoot: ENG, args: {
     const prev = new Float32Array(a.zero);
     const out = [];
     for (let i = 0; i < a.cases.length; i++) {
-        const [, , L, sub] = a.cases[i];
-        const f = await g.flow({ cur: new Float32Array(a.frames[i]), prev, w: a.W, h: a.H, block: 8, searchRadius: 4, levels: L, subpixel: sub });
+        const [, , L, sub, block] = a.cases[i];
+        const f = await g.flow({ cur: new Float32Array(a.frames[i]), prev, w: a.W, h: a.H, block, searchRadius: 4, levels: L, subpixel: sub });
         out.push({ flow: Array.from(f.flow), conf: Array.from(f.conf), bw: f.bw, bh: f.bh });
     }
     const fl = await g.flow({ cur: new Float32Array(a.flatF), prev: new Float32Array(a.flatF), w: a.W, h: a.H, block: 8, searchRadius: 4, levels: 1, subpixel: false });
@@ -285,10 +287,13 @@ ok("the kernel ran on a real WebGPU device",
    r.ok && r.result && r.result.backend === "webgpu" && r.result.errs.length === 0,
    r.ok ? `${r.result && r.result.backend}; errors ${(r.result && r.result.errs || []).join(" | ")}` : (r.reason || (r.pageErrors || []).join("; ")));
 if (r.ok && r.result) {
-    let worstF = 0, worstC = 0, blockDiffs = 0, nb = 0;
+    let worstF = 0, worstC = 0, blockDiffs = 0, nb = 0, tieOrigins = 0;
     for (let i = 0; i < cases.length; i++) {
-        const [sx, sy, L, sub] = cases[i];
-        const c = opticalFlowCPU({ cur: shifted(sx, sy), prev: shifted(0, 0), w: W, h: H, block: 8, searchRadius: 4, levels: L, subpixel: sub });
+        const [sx, sy, L, sub, block] = cases[i];
+        const c = opticalFlowCPU({ cur: shifted(sx, sy), prev: shifted(0, 0), w: W, h: H, block, searchRadius: 4, levels: L, subpixel: sub });
+        // origins the two tie rules send to different pixels, at every level the search actually visits
+        for (let lv = 0; lv < c.levels; lv++) for (let b = 0; b < Math.max(c.bw, c.bh); b++) {
+            const v = (b * block) / (1 << lv), f = Math.floor(v); if (v - f === 0.5 && f % 2 === 0) tieOrigins++; }
         const d = r.result.out[i];
         for (let k = 0; k < c.bw * c.bh; k++) {
             nb++;
@@ -302,11 +307,13 @@ if (r.ok && r.result) {
         }
     }
     say("parity", `${blockDiffs} of ${nb} blocks differ; worst |gpu - cpu| flow ${worstF}, confidence ${worstC.toExponential(2)}`);
-    ok("!! *** the kernel picks the SAME VECTOR as opticalFlowCPU at every block, across four cases ***",
-       blockDiffs === 0 && worstC < 1e-5,
+    ok(`!! *** the kernel picks the SAME VECTOR as opticalFlowCPU at every block, across ${cases.length} cases -- two of them with ${tieOrigins} block origins on a half pixel ***`,
+       blockDiffs === 0 && worstC < 1e-5 && tieOrigins > 0,
        "f32 on the device against f64 in JS, through three sequential dispatches that each start from the " +
        "previous one's answer. A flow field is integers, so a single differing block is a different ANSWER " +
-       "and not a rounding difference -- there is no tolerance to hide behind here.");
+       "and not a rounding difference -- there is no tolerance to hide behind here. v4734: this row said 'every block' " +
+       "over four cases none of which put an origin on a half pixel; the kernel had round(), and at block 8 over five " +
+       "levels 44 of 512 components differed, one by 79 pixels. It is floor(x + 0.5) now, Math.round's tie.");
     ok("!! ...and the device keeps the seed-and-tie rule: a flat field reports no motion, not the search corner",
        r.result.flatFlow.every((v) => v === 0) && r.result.flatConf.every((v) => v === 0),
        "the defect v4673 found in its own CPU search -- `best` starting at Infinity, so the first candidate " +
@@ -331,6 +338,11 @@ console.log("unchecked here: SUB-PIXEL flow ARRIVED at v4675 and the DEVICE mirr
             "pyramids on the CPU, deliberately: a parity row over two device chains could not tell a flow " +
             "defect from a pyramid one, and the subject here is the SEARCH.");
 //
+// v4734 SABOTAGE LOG
+//   T3 the block origin back to round()            -> 1 (2 of 356 blocks, one 14.8 px off)
+//   T7 the origin floored without the half         -> 1
+//   T4 the carried guess back to round()           -> 0 here, 2 in render/shaderRound-selfcheck.mjs: the guess is a
+//      coarser level's whole answer, doubled, and never a tie. Changed for one rule in the kernel, held by the census.
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
 //   O1  the sense is not negated -- the field comes back backwards    4 RED.
 //   O2  the tie rule takes nearer-OR-EQUAL                            *** 0 RED AT FIRST ***, see below.

@@ -122,6 +122,11 @@ const CASES = {
     // them. This is v4686's own W4 lesson arriving at a different parameter.
     contestedQuarter: mkCase({ depthMode: "checker", t: 0.25,
                                vary: [[9, 8, 0], [10, -8, 0], [17, 0, 8], [25, 0, -8]] }),
+    // *** v4734 -- WHOLE-PIXEL FLOW, WHERE THE LANDING IS A HALF PIXEL. *** Every case above moves by 3.4 and -1.6, so
+    // t * flow never lands on a half and the kernel's round() -- ties to EVEN -- agreed with Math.round -- ties UP --
+    // on all of them. At t = 0.5 an odd whole-pixel flow lands every block on a half; at t = 0.25 a flow of 2 does.
+    tieHalf: mkCase({ shiftX: 3, shiftY: -1, depthMode: "checker", t: 0.5 }),
+    tieQuarter: mkCase({ shiftX: 2, shiftY: -2, depthMode: "checker", t: 0.25 }),
 };
 const cpu = {};
 for (const [k, c] of Object.entries(CASES)) cpu[k] = interpolateFrameCPU(c);
@@ -298,6 +303,24 @@ console.log("\n4. THE INDEXING AND THE ENDPOINTS, WHICH MIRROR EACH OTHER");
        "a cur-indexed block ENDS on its own footprint, so t = 1 is a copy on both engines");
 }
 
+console.log("\n4b. [v4734] *** A LANDING ON A HALF PIXEL, WHICH round() AND Math.round BREAK DIFFERENTLY ***");
+{
+    // how many block landings are exact halves that ties-to-even and ties-up send to DIFFERENT pixels -- derived from
+    // the case, so the row cannot pass on a fixture with none
+    const split = (k) => { const c = CASES[k]; let n = 0;
+        for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) { const i = by * bw + bx;
+            const ax = c.indexedBy === "prev" ? c.t * c.flow[i * 2] : -(1 - c.t) * c.flow[i * 2];
+            const ay = c.indexedBy === "prev" ? c.t * c.flow[i * 2 + 1] : -(1 - c.t) * c.flow[i * 2 + 1];
+            for (const v of [bx * B + ax, by * B + ay]) { const f = Math.floor(v); if (v - f === 0.5 && f % 2 === 0) n++; } }
+        return n; };
+    const a = cmp("tieHalf"), q = cmp("tieQuarter"), na = split("tieHalf"), nq = split("tieQuarter");
+    say(`flow (3, -1) at t = 0.5: ${na} landing coordinates split by the tie rule; flow (2, -2) at t = 0.25: ${nq}`);
+    ok("*** at whole-pixel flow the device puts every hole where the CPU does -- the landing is floor(x + 0.5), Math.round, not WGSL's round() ***",
+       na > 0 && nq > 0 && [a, q].every((v) => v.holeDiff === 0 && v.worstVec < 1e-4 && v.nanMis === 0 && v.worstFrame < 2e-6),
+       `mask differs on ${a.holeDiff} and ${q.holeDiff} pixels, worst |frame| ${Math.max(a.worstFrame, q.worstFrame).toExponential(2)}. ` +
+       "Before v4734 the kernel had round(): 125 of the first case's 127 holes were somewhere else on the device, and pixels were off by 0.79.");
+}
+
 console.log("\n5. A FIELD THAT DECLINES, AND NOT ONE NaN IN THE FRAME");
 {
     const d = cmp("declined");
@@ -404,6 +427,10 @@ console.log("\n8. *** THE JOINED CHAIN -- SPLAT, FILL, WARP AGAIN -- AGAINST ONE
 }
 }
 
+// ---- v4734 SABOTAGE LOG ----------------------------------------------------------------------------------------
+//   T1 the landing back to round()                 -> 1 (section 4b: 125 holes elsewhere before the fix)
+//   T5 the landing floored without the half        -> 21 (every case: floor(x) is not a rounding at all)
+// Both also red in render/shaderRound-selfcheck.mjs, the census of every round() in a shader.
 // ---- THE SABOTAGE LOG ------------------------------------------------------------------------------------
 //
 // *** A CONTROL THAT CANNOT FAIL IS DECORATION, SO EVERY ROW ABOVE WAS BROKEN ON PURPOSE AND WATCHED. ***

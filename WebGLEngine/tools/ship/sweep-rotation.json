@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-09-26T12:21:21.205Z",
+ "at": "2026-09-26T12:36:45.424Z",
  "poolAt": "2026-09-17T16:20:39.742Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -682,6 +682,20 @@
    "at": "2026-09-09T17:59:42.840Z"
   },
   {
+   "gate": "render/frameInterpGPU-selfcheck.mjs",
+   "ms": 5348,
+   "code": 0,
+   "priorMs": 4239,
+   "at": "2026-09-26T12:36:41.659Z"
+  },
+  {
+   "gate": "render/holeFillGPU-selfcheck.mjs",
+   "ms": 1882,
+   "code": 0,
+   "priorMs": 1695,
+   "at": "2026-09-26T12:36:43.676Z"
+  },
+  {
    "gate": "render/mossField-selfcheck.mjs",
    "ms": 29149,
    "code": 0,
@@ -689,10 +703,23 @@
    "at": "2026-09-09T17:59:42.840Z"
   },
   {
+   "gate": "render/opticalFlow-selfcheck.mjs",
+   "ms": 1612,
+   "code": 0,
+   "priorMs": 1516,
+   "at": "2026-09-26T12:36:45.424Z"
+  },
+  {
    "gate": "render/reactiveTsl-selfcheck.mjs",
    "ms": 2592,
    "code": 0,
    "at": "2026-09-26T09:17:49.866Z"
+  },
+  {
+   "gate": "render/shaderRound-selfcheck.mjs",
+   "ms": 175,
+   "code": 0,
+   "at": "2026-09-26T12:36:36.189Z"
   },
   {
    "gate": "render/temporalClipTsl-selfcheck.mjs",

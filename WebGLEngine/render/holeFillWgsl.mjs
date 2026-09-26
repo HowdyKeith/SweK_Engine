@@ -41,8 +41,10 @@ fn clampi(v:i32, lo:i32, hi:i32) -> i32 { return max(lo, min(hi, v)); }
 fn farther(a:f32, b:f32) -> bool { if (u.nearerIsLess == 1u) { return a > b; } return a < b; }
 /** NEAREST, not bilinear: a depth buffer at a silhouette holds two surfaces and their average is no surface. */
 fn depthAt(isCur:bool, x:f32, y:f32) -> f32 {
-  let xi = clampi(i32(round(x)), 0, i32(u.w) - 1);
-  let yi = clampi(i32(round(y)), 0, i32(u.h) - 1);
+  // v4734 -- floor(x + 0.5), render/holeFill.mjs's Math.round, not round(), which ties to EVEN: at t = 0.5 an odd
+  // vector samples a half pixel, and the two engines read different texels across a depth edge
+  let xi = clampi(i32(floor(x + 0.5)), 0, i32(u.w) - 1);
+  let yi = clampi(i32(floor(y + 0.5)), 0, i32(u.h) - 1);
   let i = u32(yi * i32(u.w) + xi);
   if (isCur) { return depthCur[i]; }
   return depthPrev[i];
