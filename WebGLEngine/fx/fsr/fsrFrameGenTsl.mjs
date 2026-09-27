@@ -72,6 +72,7 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * defaults, null for the vectors alone.
  * `camera` (v4750), given to generate with `flow`, is the camera's own motion (makeMotionStage({ camera: true })): the
  * reconciliation then judges a still surface in the world, so a shadow or a reflection under a pan is judged as one.
+ * `depthPrev` (v4751), given to generate, is the pair's OLDER depth, in place of the one this generator kept from its last call.
  * `ui` (v4745), given to generate, is the newer frame's UI as a premultiplied w x h texture: `prev` and `cur` are then the
  * frames WITHOUT it, and the generated frame gets it composited over, exactly (render/frameInterp.mjs's compositeUiCPU).
  */
@@ -114,7 +115,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
          * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
-        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, camera = null }, output = null, { t: at_ = null, again = false } = {}) {
+        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, camera = null, depthPrev = null }, output = null, { t: at_ = null, again = false } = {}) {
             if (ui) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
@@ -127,7 +128,10 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
                 if (!of) await draw(renderer, once("field|" + motion.uuid + "|" + depth.uuid, () => quad(flowFromMotionNode(TSL, motion, depth, { w, h }).node)), field);
                 await draw(renderer, copyNow, depthNow);
                 // the pair's older depth: the last pair's newer one, or this frame's own on the first call
-                await draw(renderer, once(generated === 0 ? "pair0" : "pair", () => quad(at(generated === 0 ? depthNow.texture : depthOld.texture))), depthPair);
+                // v4751: or the older depth the caller hands over -- a caller holding more than the newest pair (makeFsr3({ hold: 2 }))
+                // generates for either, and the history kept here is only ever the last call's
+                if (depthPrev) await draw(renderer, once("pairOf|" + depthPrev.uuid, () => quad(at(depthPrev))), depthPair);
+                else await draw(renderer, once(generated === 0 ? "pair0" : "pair", () => quad(at(generated === 0 ? depthNow.texture : depthOld.texture))), depthPair);
             }
             if (of && !again) {
                 // the colour's own motion, prev -> cur, and per block the one the two frames support better -- per pixel, the

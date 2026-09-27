@@ -278,8 +278,9 @@ try {
             camera.updateMatrixWorld();
             const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
             const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
-            paced = { key, N, v: 0, counts: { gen: 0, real: 0, hold: 0 }, pacer: makeFramePacer({ refresh: REFRESH, policy: pol, margin: 0 }),
-                      f3: makeFsr3(THREE, TSL, renderer, { fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
+            // v4751: the timed policy holds the TWO newest pairs, and generates from whichever its line is in
+            paced = { key, N, v: 0, counts: { gen: 0, real: 0, hold: 0 }, pacer: makeFramePacer({ refresh: REFRESH, policy: pol, margin: 0, pairs: pol === "timed" ? "two" : "newest" }),
+                      f3: makeFsr3(THREE, TSL, renderer, { hold: pol === "timed" ? 2 : 1, fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
                                                            frameGen: $("genflow").checked ? { flow: flowSetting() } : {} }) };
         }
         const P = paced, T = P.v * REFRESH;
@@ -288,7 +289,7 @@ try {
         // the pacer asks only for what the generator holds -- the pair of the last two real frames -- and a hold draws nothing:
         // the canvas keeps what it last showed
         const ui = $("genhud").checked ? await hudUi() : null;
-        if (s.kind === "gen" && s.k === f - 1) await P.f3.generate(null, { t: s.t, ui });
+        if (s.kind === "gen" && (s.k === f - 1 || (P.pacer.policy === "timed" && s.k === f - 2 && s.k >= 1))) await P.f3.generate(null, { t: s.t, ui, pair: s.k });
         else if (s.kind === "real" && (s.k === f - 1 || s.k === f - 2)) { if (ui) await P.f3.frameGen.composite(renderer, P.f3.targets.frames[s.k % 2].texture, ui, null); else await P.f3.show(s.k, null); }
         P.counts[s.kind === "gen" || s.kind === "real" ? s.kind : "hold"]++;
         P.v++;

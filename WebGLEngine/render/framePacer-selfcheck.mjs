@@ -160,7 +160,32 @@ console.log("\n8. v4747 -- ONLY THE PAIR THE GENERATOR HOLDS");
     ok(`  ...and that is why "newest" has no margin: with a quarter refresh the line judders ${nwm.slice(0, 4).map((m) => m.judder.toFixed(2)).join(", ")} ms at an even rate, every refresh after a new frame held on the older one`,
        nwm.slice(0, 4).every((m) => m.judder > 1), "a margin can only put the line where no pair is held");
     const refuseP = (() => { try { makeFramePacer({ refresh: R, pairs: "all" }); return "no throw"; } catch (e) { return e.message; } })();
-    ok("  ...and a pairs it does not have is refused", /pairs must be "newest" or "any"/.test(refuseP), refuseP);
+    ok("  ...and a pairs it does not have is refused", /pairs must be/.test(refuseP), refuseP);
+}
+
+console.log("\n9. v4751 -- HOLDING TWO PAIRS, AND MAKING FRAMES WHEN THEY ARRIVE");
+{
+    // frame 12 five refreshes long, the rest two
+    const late = Array(40).fill(1000 / 30); late[12] = 5 * R;
+    const cs = { "30": CASES["30"], "40": CASES["40"], "30+-5": CASES["30+-5"], late };
+    const run = (cn, g, o) => { const d = cs[cn], total = d.reduce((a, b) => a + b, 0); return pacingMetrics(scheduleCPU({ durations: d, refresh: R, policy: "timed", genCost: g, ...o }), { from: 400, to: total - 100 }); };
+    const M = {};
+    for (const g of [0, 4]) for (const cn of Object.keys(cs)) M[`${cn}@${g}`] = { newest: run(cn, g, {}), two: run(cn, g, { pairs: "two" }), any: run(cn, g, { pairs: "any" }), eager: run(cn, g, { pairs: "eager" }) };
+    for (const [k, m] of Object.entries(M)) say(`${k.padEnd(9)} judder: newest ${m.newest.judder.toFixed(2)}, two ${m.two.judder.toFixed(2)}, any ${m.any.judder.toFixed(2)}, eager ${m.eager.judder.toFixed(2)} ms`);
+    const keys = Object.keys(M);
+    ok(`*** holding the TWO newest pairs is as good as holding every pair, in all ${keys.length} cases -- the quarter refresh of margin kept -- and with a 4 ms generation it holds even rates at ${M["30@4"].two.judder.toFixed(2)} and ${M["40@4"].two.judder.toFixed(2)} ms where the newest pair alone reads ${M["30@4"].newest.judder.toFixed(2)} and ${M["40@4"].newest.judder.toFixed(2)} ***`,
+       keys.every((k) => Math.abs(M[k].two.judder - M[k].any.judder) < 1e-9) && M["30@4"].two.judder < 1e-6 && M["40@4"].two.judder < 1e-6 && M["30@4"].newest.judder > 1,
+       `and a late frame at ${M["late@0"].two.judder.toFixed(2)} ms against ${M["late@0"].newest.judder.toFixed(2)}, ${M["late@4"].two.judder.toFixed(2)} against ${M["late@4"].newest.judder.toFixed(2)} at 4 ms: a line an interval, a render and a margin behind needs the pair before the newest right after each frame arrives, and fx/fsr/fsr3Tsl.mjs's makeFsr3({ hold: 2 }) keeps it`);
+    ok(`  ...and making each pair's frames when the pair ARRIVES, the other way to have them, is not as good: ${M["late@4"].eager.judder.toFixed(2)} ms on the late frame at 4 ms, and ${M["30+-5@0"].eager.judder.toFixed(2)} with each frame 5 ms either side of 33, against ${M["late@4"].two.judder.toFixed(2)} and ${M["30+-5@0"].two.judder.toFixed(2)} holding two`,
+       M["late@4"].eager.judder > M["late@4"].two.judder && M["30+-5@0"].eager.judder > M["30+-5@0"].two.judder && M["30@4"].eager.judder < 1e-6,
+       "the plan is made with the lag as it was when the pair arrived; a frame that comes in late or uneven leaves it stale, and what was made is what is shown. It does as well at an even rate, where nothing goes stale");
+    // a line so far behind -- 40 ms of margin -- that it reaches THREE pairs back: "two" must stop at the older of the two it holds
+    const deep = (pairs) => { const sch = scheduleCPU({ durations: CASES["30"], refresh: R, policy: "timed", pairs, margin: 40 }); let n = 0, j = -1;
+        for (const x of sch.shown) { while (j + 1 < sch.frames.length && sch.frames[j + 1].ready <= x.time + 1e-6) j++; if (x.kind === "gen" && x.k < j - 1) n++; } return n; };
+    ok(`  ...and "two" asks for nothing older than the two pairs it holds even with a line 40 ms further behind, where "any" asks ${deep("any")} times for a pair three back`,
+       deep("two") === 0 && deep("any") > 0, "a pair three back is one makeFsr3({ hold: 2 }) has already let go");
+    const refuseP = (() => { try { makeFramePacer({ refresh: R, pairs: "three" }); return "no throw"; } catch (e) { return e.message; } })();
+    ok("  ...and a pairs it does not have is still refused", /pairs must be/.test(refuseP), refuseP);
 }
 
 // ---- v4743 SABOTAGE LOG ----------------------------------------------------------------------------------------
@@ -187,6 +212,12 @@ console.log("\n8. v4747 -- ONLY THE PAIR THE GENERATOR HOLDS");
 // *** P19, P20 AND P22 SCORED 0 FIRST. *** No case rendered faster than the display takes, no row read the display's own
 // repeats, and the margin row passed with no margin at all (2.01 is also under the hold's 3.07); each has a row now. P13 is
 // this gate's alone: the device gates generate at no cost, where an older pair's frame is never still waiting.
+// ---- v4751 SABOTAGE LOG ----------------------------------------------------------------------------------------
+//   H1 the two-pair clamp removed        -> 1 (the 40 ms line; 0 on every other schedule, where "two" and "any" are one)
+//   H2 "two" treated as the newest       -> 1, and 1 in fx/fsr/fsr3Hold-selfcheck.mjs
+//   H3 eager plans with no generation cost -> 1      H4 eager shows a planned image before it is made -> 1
+// *** H1 SCORED 0 ON THE DEVICE AND 0 HERE FIRST. *** "two" equalled "any" in all eight cases, because no line reached three
+// pairs back; the row with 40 ms of margin is what can see the clamp.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a real browser's frame timing, which fsr-three.html's paced view runs under and nothing here measures; a " +
     "driver's low-frame-rate compensation, which predicts the next frame where this model repeats at the ceiling; and a variable " +

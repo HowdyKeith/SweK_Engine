@@ -28,6 +28,12 @@
 // frame ready the moment it started, where it cannot happen; fx/fsr/fsr3Late-selfcheck.mjs, with real render times, read 12
 // refusals. So with "newest" the margin defaults to 0 -- any margin pushes the line into a pair nobody holds -- and a scene
 // time older than the newest pair shows its older frame. "any" is the model of a generator that keeps older pairs.
+// *** v4751: "two" -- the two newest pairs, which fx/fsr/fsr3Tsl.mjs's makeFsr3({ hold: 2 }) keeps -- is "any" in every case
+// measured, and keeps the quarter refresh of margin. With the generation costing 4 ms it holds even rates at 0 judder
+// where "newest" reads 1.6 to 2.0, and a late frame at 7.7 against 10.0. "eager" is the other answer, measured and not
+// taken: every refresh whose scene falls in a new pair planned when the pair arrives and made then -- a generator that
+// holds nothing old -- but the plan is made with the lag as it was, and a late or uneven frame finds it stale: 13.7 on the
+// late frame at 4 ms against 10.0 for "newest" (render/framePacer-selfcheck.mjs, section 9).
 // scheduleCPU drives them over a list of durations; pacingMetrics grades what it shows. makeFramePacer is the same policies
 // one refresh at a time, for a page that renders inside requestAnimationFrame. scheduleVrrCPU (v4747) is a display that
 // refreshes when it is told to.
@@ -51,13 +57,14 @@ export function makeFramePacer({ refresh, policy = "midpoint", smoothing = 0.25,
     if (!(refresh > 0)) throw new Error(`render/framePacer: refresh must be a positive number of ms -- got ${refresh}`);
     if (!PACE_POLICIES.includes(policy)) throw new Error(`render/framePacer: policy must be one of ${PACE_POLICIES.join(", ")} -- got ${JSON.stringify(policy)}`);
     if (!(smoothing > 0 && smoothing <= 1)) throw new Error(`render/framePacer: smoothing must be in (0, 1] -- got ${smoothing}`);
-    if (pairs !== "newest" && pairs !== "any") throw new Error(`render/framePacer: pairs must be "newest" or "any" -- got ${JSON.stringify(pairs)}`);
-    if (margin === null) margin = pairs === "newest" ? 0 : refresh / 4;
+    if (!["newest", "two", "any", "eager"].includes(pairs)) throw new Error(`render/framePacer: pairs must be "newest", "two", "any" or "eager" -- got ${JSON.stringify(pairs)}`);
+    if (margin === null) margin = pairs === "newest" ? 0 : refresh / 4;       // "two", "any" and "eager" keep the quarter refresh
     if (!(margin >= 0)) throw new Error(`render/framePacer: margin must be a non-negative number of ms -- got ${margin}`);
     if (!(genCost >= 0)) throw new Error(`render/framePacer: genCost must be a non-negative number of ms -- got ${genCost}`);
     const frames = [];                 // { k, start, ready }
     let queue = [];                    // asap / midpoint: images waiting, in order: { kind, k, t, scene, due }
     let last = null, interval = null, render = null, shownAt = -Infinity;
+    const planned = new Map();          // eager: refresh index -> { kind, k, t, scene, due }
     const ema = (old, v) => (old == null ? v : old + smoothing * (v - old));
     const sceneOf = (k, t) => (t === 1 ? frames[k].start : (1 - t) * frames[k - 1].start + t * frames[k].start);
     const show = (img, time) => { last = { ...img }; delete last.due; shownAt = time; return { ...last }; };
@@ -71,6 +78,18 @@ export function makeFramePacer({ refresh, policy = "midpoint", smoothing = 0.25,
             frames.push({ k, start, ready });
             if (k > 0) interval = ema(interval, start - frames[k - 1].start);
             render = ema(render, ready - start);
+            if (policy === "timed" && pairs === "eager" && k >= 1 && interval != null) {
+                // v4751, "eager": every refresh whose scene time falls in this pair, planned now -- with the lag as it is now --
+                // and made now, one after another, genCost each
+                const lag = interval + render + genCost + margin, a = frames[k - 1].start, b = start;
+                let n = Math.max(Math.ceil((ready - 1e-9) / refresh), Math.ceil((a + lag) / refresh - 1e-9)), i = 0;
+                for (; n * refresh - lag <= b + 1e-9; n++) {
+                    const sc = n * refresh - lag; if (sc <= a + 1e-9) continue;
+                    const t = (sc - a) / (b - a), T_SNAP = 1e-6;
+                    const img = t >= 1 - T_SNAP ? { kind: "real", k, t: 1, scene: b, due: ready } : { kind: "gen", k, t, scene: sc, due: ready + genCost * ++i };
+                    planned.set(n, img);
+                }
+            }
             if (policy === "asap" || policy === "midpoint") {
                 // a generated frame is made when it is shown (fsr-three.html's paced view, fx/fsr/fsr3Tsl.mjs's generate), and
                 // the generator holds the newest pair only: an older pair's that has not gone up never will. Its real frame
@@ -105,6 +124,12 @@ export function makeFramePacer({ refresh, policy = "midpoint", smoothing = 0.25,
                 if (j >= 0) { const img = queue[j]; queue = queue.slice(j + 1); return show(img, time); }
                 return last ? { ...last, kind: "hold" } : { kind: "hold", k: -1, t: 0, scene: null };
             }
+            // eager: the refresh's planned image, if it is made by now and does not go back
+            if (pairs === "eager" && frames.length >= 2 && interval != null) {
+                const n = Math.round(time / refresh), img = planned.get(n);
+                if (img && img.due <= time + EPS && !(last && last.scene != null && img.scene < last.scene)) { planned.delete(n); return show(img, time); }
+                return last ? { ...last, kind: "hold" } : { kind: "hold", k: -1, t: 0, scene: null };
+            }
             // timed: the scene time this refresh should show, on a line lagging the display by the latency the real frames need
             if (frames.length < 2 || interval == null) {
                 let j = frames.length - 1; while (j >= 0 && frames[j].ready > time + EPS) j--;
@@ -120,6 +145,7 @@ export function makeFramePacer({ refresh, policy = "midpoint", smoothing = 0.25,
             if (j < 0) return { kind: "hold", k: -1, t: 0, scene: null };
             if (scene >= frames[j].start) scene = frames[j].start;                      // cannot show past the newest ready frame
             if (pairs === "newest" && j >= 1 && scene < frames[j - 1].start) scene = frames[j - 1].start;   // nor before the pair it holds
+            if (pairs === "two" && j >= 2 && scene < frames[j - 2].start) scene = frames[j - 2].start;
             if (last && last.scene != null && scene < last.scene) scene = last.scene;   // nor go back
             let k = 1; while (k <= j && frames[k].start < scene) k++;
             if (k > j || scene <= frames[0].start) {

@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4751 -- THE 358th CLOSING: two pairs held, and frames made early measured and not taken.
+    since433: Object.freeze({
+        at: "v4751", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3Hold-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (section 9: two pairs, any, and frames made when their pair arrives)"]),
+        verdict: "*** MAKING THE FRAMES WHEN THEIR PAIR ARRIVES WAS THE PLAN, AND HOLDING TWO PAIRS IS WHAT IT WAS FOR. *** v4747 confined " +
+                 "the timed pacer to the pair the generator holds and took its margin away. Planning each pair's frames when it " +
+                 "arrives and making them then lets the pacer keep the margin -- but the plan is made with the lag as it was, and a " +
+                 "late or uneven frame finds it stale: 13.7 ms of judder on a late frame with a 4 ms generation, against 10.0 for " +
+                 "the newest pair. Holding the TWO newest pairs is what 'any' is in all eight cases measured: even rates at 0 with " +
+                 "the 4 ms generation where the newest pair reads 1.9 to 2.0, a late frame at 7.7 against 10.0. fx/fsr/fsr3Tsl.mjs's " +
+                 "makeFsr3({ hold: 2 }) keeps three frames and copies of each one's field and depth and generates for either pair " +
+                 "(generate({ pair })), the generator taking the pair's older depth handed over (depthPrev) instead of from its own " +
+                 "history; render/framePacer.mjs's pairs 'two' asks for either, with the quarter refresh of margin. On the device, " +
+                 "through the late frame: 8.80 ms of judder against 11.55 holding one, its worst refresh 20.07 dB against 19.15, 0 " +
+                 "refused, and 10 of its frames made from the older pair -- which the textures handed over prove are that pair's " +
+                 "own, since on a steadily turning knot no picture could. fsr-three.html's paced view holds two for timed pacing. " +
+                 "Nine sabotages, all red once an identity row and a deeper-lag row were added for the four that scored 0.",
+    }),
     // v4750 -- THE 357th CLOSING: a still surface judged in the world, not on the screen.
     since432: Object.freeze({
         at: "v4750", swept: 1, green: 1, red: 0,
