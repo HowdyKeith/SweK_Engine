@@ -101,10 +101,14 @@ export async function fetchLayer({ repos = REPOS.map((r) => r.repo), fetchImpl =
         for (let page = 1; page <= MAX_PAGES; page++) {
             const r = await get(`repos/${repo}/contributors?per_page=100&page=${page}`);
             if (r.limited) { limited = true; break; }
-            // *** v4688 -- A CONTRIBUTOR LIST GITHUB WOULD NOT GIVE IS NOT AN EMPTY ONE. *** The first rig pass recorded
-            // but0n/automaton with 0 contributors against 166 commits in its history: this loop broke on any non-ok
-            // answer and wrote the repository down as read. The status is kept now, beside the list, so "none" and
-            // "not given" are different records; a server error or no network leaves the repository pending.
+            // *** v4688 -- A CONTRIBUTOR LIST GITHUB WOULD NOT GIVE IS NOT AN EMPTY ONE. *** Refusals (403 "too large to list"),
+            // 204 and server errors are told apart here, and a refusal keeps its status beside an empty list.
+            // *** CORRECTED AT v4689: THE CASE THAT PROMPTED THIS WAS NOT ONE OF THEM. *** v4688's note said but0n/automaton's
+            // 0 contributors against 166 commits was a gap recorded as a fact. The record says pages: 1 -- GitHub ANSWERED,
+            // with an empty list (a 200, not a refusal). The likely reading: the endpoint lists only commit authors linked
+            // to an account, and none in this fork's history is -- likely, not shown, since `anon=1` would be the check and
+            // it lists names and addresses, which this module does not store. The handling stays because the other cases
+            // are real; the attribution was wrong.
             if (!r.body) { contributorsStatus = r.status; break; }
             pages++;
             for (const c of r.body) contributors.push(keep(c));

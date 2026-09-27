@@ -497,6 +497,16 @@ console.log("\n6. *** v4687 -- THE GITHUB LAYER: TAKEN WHERE GITHUB ANSWERS, DRI
         const fa = GH.forkAgreement(live), k = GH.keyComparison(live);
         report(`${GH.forkParents(live).length} fork(s) with a named upstream; the API's fork flag agrees with history's ownerShare-0 call on ${fa.agree.length}, disagrees on ${fa.disagree.length}` +
                (fa.disagree.length ? ": " + fa.disagree.map((d) => `${d.repo} (api ${d.api}, history ${d.history}, ownerShare ${d.ownerShare})`).join("; ") : ""));
+        // *** v4689 -- THE IDENTITY FINDING, ASSERTED AGAINST THE RECORD. *** traderGraph.mjs keyed people by name and by
+        // address hash and could merge neither of its two worst splits: Jamie Portsmouth holds two addresses (4d6f..., d858...)
+        // and stayed two traders; but0n's address hashes split him too (6fd9..., 7757...). A login is not self-declared, and
+        // each pair should collapse into ONE login covering both hashes' repositories.
+        const byId = new Map(T.TRADERS.map((t) => [t.id, t.repos]));
+        const covers = (login, ids) => { const lt = k.logins.find((t) => t.login === login);
+            return !!lt && ids.every((id) => (byId.get(id) || []).every((r) => lt.repos.includes(r))); };
+        ok("!! *** the LOGIN key merges what both git keys split: Jamie Portsmouth's two address hashes are one account, and so are but0n's ***",
+            covers("jamportz", ["4d6f1388d18f", "d85857717c81"]) && covers("but0n", ["6fd9a40466c0", "7757815b920e"]),
+            "jamportz spans every repository of both Portsmouth hashes; but0n every repository of both of his -- the split SPLIT_NAMES could only name, resolved by the one key git does not let an author choose");
         report(`traders crossing repositories: ${k.byEmailHash} by address hash, ${k.byLogin} by login` +
                (k.logins.length ? " -- " + k.logins.slice(0, 8).map((t) => `${t.login} (${t.repos.length})`).join(", ") : ""));
     }
