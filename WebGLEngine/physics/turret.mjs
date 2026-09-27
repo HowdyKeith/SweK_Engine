@@ -110,6 +110,12 @@ export function insideBox(p, pose, half, pad = 0) {
  * { owner, target, point, dir, ammo }, a building hit { owner, building, point, dir, ammo } -- the caller tells them apart by
  * which of `target`/`building` is present, never both.
  *
+ * v4681 -- A FALSY SLOT IN `buildings` IS A GONE BUILDING, NOT A MISSING ONE. A building a shell already toppled (world/
+ * crashDamage.mjs's shellInto, through the same city a car crash damages) has nothing left standing to hit, the way its
+ * box3d collider is parked rather than tested once brain/gunnerPolicy.mjs's turretTick sees it toppled -- so the caller
+ * hands stepShells the same list with that index nulled rather than removed, keeping every index the fixed rect it always
+ * named, and this loop skips a null slot instead of reading `.half` off of one.
+ *
  * *** THE EARLIEST SAMPLE WINS ACROSS BOTH LISTS, NOT WHICHEVER LIST IS CHECKED FIRST. *** Two loops over the same four
  * samples, cars then buildings, each one refusing to report a hit at a sample `k` no earlier hit already beat -- so a wall at
  * sample 1 blocks a car at sample 3 behind it, and a car at sample 1 is not overridden by a building the second loop would
@@ -132,6 +138,7 @@ export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.
         }
         for (let bi = 0; bi < buildings.length; bi++) {
             const bd = buildings[bi];
+            if (!bd) continue;
             for (let k = 1; k < hitK; k++) {
                 if (!insideBox(at(k), bd, bd.half, spec.shellRadius)) continue;
                 hit = { owner: s0.owner, building: bi, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };

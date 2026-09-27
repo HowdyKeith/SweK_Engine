@@ -33,6 +33,11 @@
 //   I  pursuerInfo forgetting BEHIND (any car in range is a pursuer)                      -> 2 red: the pursuerInfo row, the chase leg (5 drops).
 //   J  the adjudicator running the pursued leg twice and never the chase                 -> 2 red: 8 m/s refused, 28 m/s on both legs.
 //   K  the features dropping the slick tail (always 0, 0)                                -> 3 red: the tail row, the duel's drops, the race's drops.
+// SABOTAGE LOG -- v4681 (buildings, real damage through world/crashDamage.mjs), each against brain/gunnerPolicy.mjs, restored.
+//   L  the toppled-building null-out dropped (`live` always the raw `buildings`)          -> 1 red: section 7's "once toppled"
+//      row alone -- the shot still reads the wall as solid and reports a building hit instead of passing through, exactly
+//      the bug physics/turret-selfcheck.mjs's own sabotage G guards from the other side (a null slot dereferenced); this is
+//      the caller never producing the null slot at all.
 "use strict";
 import { initNode, mod } from "../physics/box3d/box3dNode.mjs";
 import { worldFromModule } from "../render/slugTicker.mjs";
@@ -163,7 +168,65 @@ console.log("\n6. THE RACE WITH GUNNERS: LOCKSTEP, DETERMINISTIC, REPLAYED FROM 
     const ordered = R.order.map((i) => R.results[i]);
     ok("the order is laps first, then metres", ordered.every((q, k) => k === 0 || ordered[k - 1].laps > q.laps || (ordered[k - 1].laps === q.laps && ordered[k - 1].metres + 1 >= q.metres)));
 }
-console.log("\n7. THE FRONT DOOR");
+console.log("\n7. BUILDINGS, v4681: A SHELL GOES THROUGH world/crashDamage.mjs'S CITY THE SAME WAY A CAR CRASH DOES");
+{
+    // v4680 gave stepShells a buildings list to stop a shell on; v4681 gave a building hit somewhere real to land, through
+    // the same city a car crash damages (world/crashDamage.mjs's shellInto), wired in as turretTick's new `cityCtx`. This
+    // coverage moved here from physics/spellAmmo-selfcheck.mjs's old section 6 -- pure applyBuildingHit()/buildingHash()
+    // tests on a flat tally that no longer exists -- because the function that changed is turretTick, not spellAmmo's book.
+    const RT = await import("../world/raceTrack.mjs"), { CityGen } = await import("../world/CityGen.js"), C = await import("../physics/raceCar.mjs"), CD = await import("../world/crashDamage.mjs");
+    const track = RT.generateTrack({ seed: 1 }), g = CD.crashWorld(track, CityGen); CD.buildingColliders(g, worldFrom());
+    const rect = g.rects[0], wallPos = [rect.x + rect.w / 2, 1, rect.z + rect.d / 2], buildings = g.rects.map((r) => C.buildingBox(r));
+    const HALF = [0.75, 0.35, 1.4], carPose = (pos) => ({ pos, quat: C.yawQuat(0), yaw: 0, vel: [0, 0, 0] });
+    const wireCars = [{ spec: { half: HALF } }, { spec: { half: HALF } }], wirePoses = [carPose([wallPos[0], 1, wallPos[2] - 15]), carPose([wallPos[0], 1, wallPos[2] + 15])];
+    const idleCmd = { yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 }, fireCmd = { ...idleCmd, fire: 1 };
+    const aimAtWall = (turret) => { const s = U.aimSolution(wirePoses[0], turret, wallPos, [0, 0, 0]); turret.yaw = s.yaw; turret.pitch = s.pitch; };
+
+    const wireTurrets = [U.createTurret(), U.createTurret()]; aimAtWall(wireTurrets[0]);
+    const wireShells = []; let wireEffects = [];
+    const hpBefore = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5).hp;
+    for (let t = 0; t < 60 && !wireEffects.length; t++) {
+        const tt = G.turretTick({}, wireCars, wireTurrets, wireShells, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null, buildings, g);
+        wireEffects = tt.effects;
+    }
+    const bAfter = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5);
+    report(`wall 0: ${rect.w}x${rect.d}x${rect.h} voxels, hp ${hpBefore} -> ${bAfter.hp}, state ${bAfter.state}, damageDealt ${wireTurrets[0].damageDealt}`);
+    // the scoreboard currency (damageDealt, 3 for spark) and the wall's real hit points are DELIBERATELY not the same number:
+    // 3 is the book's row, read once; hp lost is however many of THIS building's voxels blastRadius(3)'s ~1.2 m sphere
+    // actually carved at this exact point -- measured here at 2, not assumed, the same way world/crashDamage-selfcheck.mjs
+    // pins its own car-crash blast counts from a real run rather than from the speed lost.
+    ok("!! wired through turretTick: a wall on the aim solution takes the hit -- real hit points lost through world/CityGen.js's damageAt, damageDealt credited the book's row (spark, 3) regardless of how many voxels that carved, no impulse anywhere (world stub {})",
+        wireEffects.length === 1 && wireEffects[0].building === 0 && wireEffects[0].damage === 3 && wireTurrets[0].damageDealt === 3 && bAfter.hp === hpBefore - 2 && bAfter.hp < hpBefore, JSON.stringify(wireEffects));
+    ok("the car's own `hits` counter (hits landed on OTHER CARS) is not incremented by a building hit, and the far car took nothing", wireTurrets[0].hits === 0 && (wireTurrets[1].damageTaken || 0) === 0);
+
+    // demolish it outright (the city's own damageAt, not a dozen shots) and confirm the SAME buildings list no longer blocks a shot
+    g.city.damageAt(rect.x + 0.5, rect.z + 0.5, bAfter.hp, { x: 0, z: 1 });
+    const toppled = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5);
+    ok("!! demolished to zero hp outright, the city topples it", toppled.state === "toppled" && toppled.hp === 0, `hp ${toppled.hp}, state ${toppled.state}`);
+    const turrets2 = [U.createTurret(), U.createTurret()]; aimAtWall(turrets2[0]);
+    const shells2 = []; let effects2 = [];
+    for (let t = 0; t < 300; t++) {
+        const tt = G.turretTick({ impulse: () => {} }, wireCars, turrets2, shells2, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null, buildings, g);
+        effects2 = effects2.concat(tt.effects);
+        if (t > 0 && shells2.length === 0) break;
+    }
+    ok("!! once toppled, the SAME buildings list (same array, same index) no longer blocks the shot: no building effect this time",
+        effects2.filter((e) => e.building !== undefined).length === 0, JSON.stringify(effects2));
+
+    // the pre-existing shape -- buildings passed but no cityCtx -- still blocks a shot (the box is real geometry regardless
+    // of the real city's now-toppled state) but touches nothing and pushes no effect, exactly as before v4681
+    const turrets3 = [U.createTurret(), U.createTurret()]; aimAtWall(turrets3[0]);
+    const shells3 = []; let effects3 = [];
+    for (let t = 0; t < 60; t++) {
+        const tt = G.turretTick({}, wireCars, turrets3, shells3, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null, buildings);
+        effects3 = effects3.concat(tt.effects);
+        if (t > 0 && shells3.length === 0) break;
+    }
+    ok("...buildings without a cityCtx still blocks the shot (the box is solid regardless of the real city's state) but pushes no effect, exactly as before v4681",
+        effects3.length === 0 && shells3.length === 0, `${JSON.stringify(effects3)}, ${shells3.length} shells left`);
+    g.phys.destroy();
+}
+console.log("\n8. THE FRONT DOOR");
 {
     const L = G.reportLines();
     ok("reportLines names the shape, the reward (the burn), the knob and the wasm state", L.length === 4 && /11 -> 8 -> 5/.test(L[0]) && /141 weights/.test(L[1]) && /drop, ignite/.test(L[1]) && /on my fire/.test(L[2]) && /1 \/ speed/.test(L[2]) && /ready/.test(L[3]));

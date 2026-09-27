@@ -149,6 +149,37 @@ export function crashInto(g, i, pre, post, dv, ctx = {}, at = post.pos) {
     return rec;
 }
 
+/**
+ * v4681 -- the same wall, hit by a turret shell instead of a car (physics/turret.mjs's stepShells building event, brain/
+ * gunnerPolicy.mjs's turretTick). A shell already has the one thing crashInto had to raycast for: an exact point. So this
+ * is crashInto's body from the blast down, unchanged, keyed on a point + radius + a caller-picked direction instead of a
+ * raycast refined from a car's pre/post pose -- the same blastAt, the same crumble-beyond-the-blast bookkeeping, the same
+ * support collapse, the same rebar reveal, the same park-the-collider-on-topple. THE TWO ARE MEANT TO MOVE TOGETHER: a
+ * rule that changes what happens when a building takes a blast belongs in both, or the wall behaves differently depending
+ * on what hit it for a reason nobody chose.
+ */
+export function shellInto(g, i, point, radius, dir, ctx = {}) {
+    const rect = g.rects[i];
+    const b = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5), hpBefore = b ? b.hp : null, standingBefore = footprint(g.world, rect).solid;
+    const blast = blastAt(g.state, { debris: ctx.debris || null, city: g.city, groundY: CRASH.groundY + 1 }, point, radius);
+    const charged = blast.buildings.find((row) => row.building === b) || null;
+    let crumbled = 0, collapsed = false;
+    if (b && b.state !== "toppled") {
+        const standing = footprint(g.world, rect).solid, gone = standingBefore - standing - (charged ? charged.lost : 0);
+        if (gone > 0) { crumbled = gone; g.city.damageAt(rect.x + 0.5, rect.z + 0.5, gone, dir); }
+        if (b.state !== "toppled" && support(g.world, rect) < CRASH.support && b.hp > 0) { collapsed = true; g.city.damageAt(rect.x + 0.5, rect.z + 0.5, b.hp, dir); }
+    }
+    const rebar = b && b.state !== "toppled" ? revealRebar(g.world, blast.removed, rect) : 0;
+    const sync = syncDirty(g.state);
+    const toppled = !!(b && b.state === "toppled");
+    if (toppled && g.colliders && g.colliders[i] != null && !g.parked.has(i)) { g.phys.setTransform(g.colliders[i], CRASH.park.slice()); g.parked.add(i); }
+    const rec = { building: i, point, radius, removed: blast.removed.length, lost: charged ? charged.lost : 0, crumbled, collapsed,
+                  hpBefore, hp: b ? b.hp : null, maxHp: b ? b.maxHp : null, state: b ? b.state : null, toppled, rebar, debris: blast.debris,
+                  chunks: blast.sync.chunks.length + sync.chunks.length, ms: blast.ms };
+    g.impacts.push(rec);
+    return rec;
+}
+
 /** One step of the car, then the impact test on the speed it lost. */
 export function crashStep(g, car, surface, input, ctx = {}, dt = CAR.dt) {
     // stepCar's returned pose is the one its forces were computed FROM (the pose before the step), so the pose after is read
