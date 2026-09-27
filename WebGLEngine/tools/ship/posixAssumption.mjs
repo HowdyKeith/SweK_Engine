@@ -168,7 +168,12 @@ export const POSIX_AT_V4485 = Object.freeze({
     // UN-NORMALISED -- normalised rose 41 -> 43 and never rose 97 -> 103, both monotonic, which is the half of
     // the assertion that distinguishes a population growing from a repair coming undone. A fall in `normalised`
     // would have meant somebody removed a toPosix() and that is the case this record exists to catch.
-    separator: Object.freeze({ callers: 146, calls: 197, normalised: 43, never: 103 }),
+    // v4764 -- RE-TAKEN, under the SAME skip rule: 146/197/43/103 becomes 151/205/44/107. Five callers arrived since the
+    // merge -- among render/shaderRound-selfcheck.mjs, render/temporalLockGPU-selfcheck.mjs, tools/ship/constantRows.mjs,
+    // tools/ship/probe/hooks.mjs and tools/ship/runnerCallers.mjs, which reached 150, the band's edge, without a re-take -- and
+    // v4764's tools/ship/webgpuHarness.mjs, whose adapter log records a gate by its path relative to the engine root and
+    // normalises it (replace backslashes), took it past. NORMALISED ROSE 43 -> 44, that one; nothing was un-normalised.
+    separator: Object.freeze({ callers: 151, calls: 205, normalised: 44, never: 107 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

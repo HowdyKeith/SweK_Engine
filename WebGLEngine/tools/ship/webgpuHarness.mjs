@@ -839,7 +839,7 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
             SOFTWARE_HINTS.test([adapter.vendor, adapter.architecture, adapter.device, adapter.description].filter(Boolean).join(" "))) : null;
         // v4764: a real-hardware run (tools/ship/realGpuRun.mjs) sets SWEK_ADAPTER_LOG, and each call says what it ran on and how
         if (process.env.SWEK_ADAPTER_LOG) {
-            try { fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(root, path.resolve(process.argv[1] || "")).split(path.sep).join("/"), adapter, software, launchArgs: [...launchArgs] }) + "\n"); } catch {}
+            try { fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(root, path.resolve(process.argv[1] || "")).replace(/\\/g, "/"), adapter, software, launchArgs: [...launchArgs] }) + "\n"); } catch {}
         }
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes
