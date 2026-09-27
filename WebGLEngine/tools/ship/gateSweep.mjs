@@ -9314,6 +9314,38 @@ export const TRANSIENT_FIXTURES = Object.freeze([
     "tools/ship/zz-treeread-fixture-selfcheck.mjs",
 ]);
 
+/**
+ * *** v4681 -- AND THE SCRATCH DIRECTORIES THREE GATES MAKE INSIDE THE TREE, WHICH THE SAME KILL STRANDS. ***
+ *
+ * aiPresenceOrbPresent, ffmpegWasmBridge and unboundBuiltin each mkdtemp a DOT-prefixed directory under the
+ * engine root -- a browser page has to load the files same-origin, so os.tmpdir() will not do -- and remove it in
+ * a `finally`. The rig's v4680 verify found two stranded .sabotage-orbpresent-* directories: four .mjs files
+ * that took the census to 4318 and three gates red with it. treeRead now skips dot-directories, which ends the
+ * census half; this is the other half, so nothing else that walks the tree ever meets them. Prefixes are
+ * SPELLED, not globbed -- this deletes inside a source directory -- and each is a mkdtemp prefix, so the six
+ * random characters after it are the only thing matched.
+ */
+export const TRANSIENT_DIRS = Object.freeze([
+    ["tools/ship", ".sabotage-orbpresent-"],   // aiPresenceOrbPresent-selfcheck.mjs
+    ["tools/ship", ".ffwasm-gate-"],           // ffmpegWasmBridge-selfcheck.mjs
+    ["tools", ".ub-"],                         // unboundBuiltin-selfcheck.mjs
+]);
+
+/** Remove stranded TRANSIENT_DIRS under `root`. Only safe while no gate is running -- callers are verify's
+ *  pre-flight and the start of a sweep. Returns the relative paths removed, so the caller can name them. */
+export function reclaimScratchDirs(root = ENG) {
+    const gone = [];
+    for (const [dir, prefix] of TRANSIENT_DIRS) {
+        let names = [];
+        try { names = fs.readdirSync(path.join(root, dir), { withFileTypes: true }); } catch { continue; }
+        for (const e of names) {
+            if (!e.isDirectory() || !e.name.startsWith(prefix) || e.name.length !== prefix.length + 6) continue;
+            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir + "/" + e.name); } catch {}
+        }
+    }
+    return gone;
+}
+
 export function enumerateGates(root = ENG) {
     const out = [];
     const skip = new Set(["node_modules", ".git", ".claude", "vendor"]);

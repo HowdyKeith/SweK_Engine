@@ -183,8 +183,13 @@ console.log("\n2. *** BOTH SHAPES NODE HAS -- AND MEASURED, EITHER HANDLER ALONE
 console.log("\n3. *** IT SETS THE CODE RATHER THAN CALLING process.exit, FOR v4663's REASON ***");
 {
     const src = codeOnly(fs.readFileSync(MOD, "utf8"));
-    ok("*** reportThrows sets process.exitCode and never calls process.exit ***",
-        /process\.exitCode = 1/.test(src) && !/process\.exit\s*\(/.test(src),
+    // v4681: "never calls process.exit" became "calls it only from an UNREF'D backstop" -- see thrownRow.mjs.
+    // Asserted as that shape, not relaxed to "may call it": exactly one call, and it sits in a timer that is
+    // unref'd, so it can never keep a draining process alive or cut one short.
+    const exits = src.match(/process\.exit\s*\(/g) || [];
+    ok("*** reportThrows sets process.exitCode, and calls process.exit ONLY from an unref'd backstop timer ***",
+        /process\.exitCode = 1/.test(src) && exits.length === 1 &&
+        /setTimeout\(\s*\(\)\s*=>\s*process\.exit\([^)]*\)\s*,\s*\w+\s*\)\.unref\(\)/.test(src),
         "this handler runs in a process that may have a wasm module behind it, and v4663 measured what " +
         "exiting there does: V8's compiler pool is still working, and disposing the platform underneath it " +
         "trips win/async.c's UV_HANDLE_CLOSING assertion. A net that aborts the process is not a net");
@@ -195,6 +200,18 @@ console.log("\n3. *** IT SETS THE CODE RATHER THAN CALLING process.exit, FOR v46
         drained.status === 1 && /the loop kept running/.test(drained.stdout),
         "a timer scheduled before the throw still fires, and the process still leaves with 1. " +
         "process.exit() would have killed the timer and the pending flush with it");
+    // v4681 -- the case the backstop exists for, driven: a gate that throws with a LISTENING server open.
+    // Before the backstop this fixture never exited (the rig's atmosphere/perspectiveWarp hang, reproduced).
+    const t0 = Date.now();
+    const held = spawnSync(process.execPath, [(() => { const f = path.join(dir, "held" + FIXTURES++ + ".mjs");
+        fs.writeFileSync(f, NET + OK_LINE + 'import http from "node:http";\nreportThrows(\"held-selfcheck\", { backstopMs: 300 });\n' +
+            'const s = http.createServer(() => {}); s.listen(0, "127.0.0.1", () => { throw new Error("thrown with a server open"); });\n');
+        return f; })()], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 8000 });
+    const heldMs = Date.now() - t0;
+    ok("!! *** ...and a gate that throws with a SERVER STILL LISTENING exits 1 with its FAIL row instead of hanging to the cap ***",
+        held.status === 1 && /^ {2}FAIL/m.test(held.stdout || "") && heldMs < 6000,
+        `exit ${held.status}${held.signal ? " (" + held.signal + ")" : ""} after ${heldMs} ms -- the rig's two alone-timeouts were ` +
+        "this shape: the report printed, one Server held the loop, and the sweep's cap was what ended it");
 }
 
 // -----------------------------------------------------------------------------------------------------------

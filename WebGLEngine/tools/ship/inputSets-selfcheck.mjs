@@ -535,8 +535,10 @@ console.log("\n7. *** THE TWO MECHANISMS v4567 ADDED, EACH DRIVEN ON A FIXTURE T
     // to, which is the only lever that reaches it.
     const named = mk("__inputsets_named_fixture.mjs",
         'import { readFileSync, readdirSync } from "node:fs";\n' +
-        'readFileSync(new URL("../../main.js", import.meta.url).pathname);\n' +
-        'readdirSync(new URL("../../tools/ship", import.meta.url).pathname);\n');
+        // v4681: the URL itself, not .pathname -- on Windows that is "/C:/..." and the read threw before the probe
+        // could see anything (record.mjs's own header names the idiom).
+        'readFileSync(new URL("../../main.js", import.meta.url));\n' +
+        'readdirSync(new URL("../../tools/ship", import.meta.url));\n');
     const namedProbe = probeOne(named);
     rm(named);
     ok("*** a gate reading through a NAMED fs import is recorded -- the hole v4566 could only disqualify ***",

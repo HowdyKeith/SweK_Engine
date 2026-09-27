@@ -39,7 +39,7 @@ import { boxId } from "./hostScale.mjs";
 // the session removing from its own record.
 import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
-import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND } from "./gateSweep.mjs";
+import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs } from "./gateSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
@@ -489,6 +489,9 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
                                       serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false,
                                       onStage = null, log = (m) => console.log(m) } = {}) {
     const t00 = Date.now();
+    // v4681: a whole-tree sweep starts by reclaiming the in-tree scratch a previous killed run stranded (see
+    // gateSweep.TRANSIENT_DIRS). Not for a caller's own gate list -- those are fixtures in their own root.
+    if (!gates) { const gone = reclaimScratchDirs(root); if (gone.length) log(`[sweep] reclaimed ${gone.length} stranded gate scratch dir(s): ${gone.join(", ")}`); }
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
     // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.

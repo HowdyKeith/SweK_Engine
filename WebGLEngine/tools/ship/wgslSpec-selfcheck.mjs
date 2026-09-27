@@ -130,7 +130,9 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     let vendorRequiredLimits = 0, vendorFiles = 0;
     for (const f of walk(ENG)) {
         if (!/\.(js|mjs|html)$/.test(f)) continue;
-        const rel = path.relative(ENG, f);
+        // v4681: posix, or SELF never matches on Windows and the gate counts its own three files -- exactly the 3
+        // requiredLimits the rig reported.
+        const rel = path.relative(ENG, f).split(path.sep).join("/");
         if (SELF.includes(rel)) continue;
         const src = codeOnly(fs.readFileSync(f, "utf8"));
         const hits = (src.match(/requiredLimits/g) || []).length;

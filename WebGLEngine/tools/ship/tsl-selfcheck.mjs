@@ -98,8 +98,16 @@ else {
     if (r.ok && r.result.webgpu && r.result.webgl2) {
         const R = r.result;
         ok(`three ${R.revision} loads with ${R.tslExports} TSL exports`, R.revision === "185" && R.tslExports > 400);
+        // *** v4681 -- BLUE IS 0.5, AND 0.5 x 255 = 127.5 IS AN EXACT TIE. *** Float-to-UNORM8 conversion of a value
+        // that is not exactly representable may return EITHER nearest integer (Vulkan, "Conversion from
+        // Floating-Point to Normalized Fixed-Point"; D3D likewise allows the rounding tolerance). MEASURED: SwiftShader
+        // returns 128, and the rig's NVIDIA Pascal returns 127 on BOTH backends (v4680 rig verify) -- red, green,
+        // alpha and row order identical. So `=== 128` was one implementation's answer frozen as the spec's. The set
+        // below is not a widened tolerance: it is exactly the two values the conversion rule permits, and a 126 or a
+        // 129 is still red.
+        const tieOk = (v) => v === 127 || v === 128;
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
-            const gradientOk = o.row0 && o.row0[2] === 128 && o.row0right[2] === 128 && Math.abs(o.row0right[0] - 253) <= 2 && o.row0[0] <= 2;
+            const gradientOk = o.row0 && tieOk(o.row0[2]) && tieOk(o.row0right[2]) && Math.abs(o.row0right[0] - 253) <= 2 && o.row0[0] <= 2;
             ok(`*** ${b}: the ${b === "webgpu" ? "WebGPU" : "WebGL2"} backend really is that backend, and a TSL colour node renders the uv gradient (x across, 0.5 in blue) ***`, o.backend === b && gradientOk && (o.errs || []).length === 0, `row 0: ${o.row0 && o.row0.join(",")} .. ${o.row0right && o.row0right.join(",")}; errors ${(o.errs || []).length}`); }
         rowOrder = { webgpu: R.webgpu.row0[1] > 128 ? "top-first" : "bottom-first", webgl2: R.webgl2.row0[1] > 128 ? "top-first" : "bottom-first" };
         ok("MEASURED, not assumed: readRenderTargetPixelsAsync hands rows TOP-first on WebGPU and BOTTOM-first on WebGL2 (v = 1 at row 0 there, v = 0 here) -- a caller comparing the two flips one", rowOrder.webgpu === "top-first" && rowOrder.webgl2 === "bottom-first", `webgpu ${rowOrder.webgpu} (green ${R.webgpu.row0[1]}), webgl2 ${rowOrder.webgl2} (green ${R.webgl2.row0[1]})`);
@@ -121,10 +129,10 @@ else {
         {
             const c = R.webgpu.at32;
             const naiveRow1IsZero = c && c.naiveRow1 && c.naiveRow1.every((v) => v === 0);
-            const naiveRow0Ok = c && c.naiveRow0 && c.naiveRow0[2] === 128 && c.naiveRow0[3] === 255;
+            const naiveRow0Ok = c && c.naiveRow0 && tieOk(c.naiveRow0[2]) && c.naiveRow0[3] === 255;
             const rows = c && c.paddedRows;
             const paddedAllOk = rows && rows.length === 32 && rows.every((p, y) =>
-                p[2] === 128 && p[3] === 255 && (y === 0 || p[1] < rows[y - 1][1]));   // G strictly falls row over row -- a real, unbroken gradient
+                p[2] === rows[0][2] && tieOk(p[2]) && p[3] === 255 && (y === 0 || p[1] < rows[y - 1][1]));   // one device, one answer to the tie, on every row   // G strictly falls row over row -- a real, unbroken gradient
             const ok32 = !!c && c.errs === 0 && c.byteLen === 8064 && naiveRow0Ok && naiveRow1IsZero && paddedAllOk;
             ok("CONTROL: three@0.185.1's WebGPU readback at 32 px (a 128-byte row, not 256-aligned) raises no error, returns a 256-byte-per-row PADDED buffer (8064 bytes, not 4096) -- a width-strided read misreads every odd row as zero, and the SAME bytes at the true stride are a perfect gradient: not corruption, a stride the naive read does not know to expect",
                 ok32, c ? `errs ${c.errs}, byteLen ${c.byteLen}; naive row0 ${c.naiveRow0 && c.naiveRow0.join(",")} row1 ${c.naiveRow1 && c.naiveRow1.join(",")}; padded rows all-ok ${paddedAllOk}` : "no control ran");

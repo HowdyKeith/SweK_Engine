@@ -75,7 +75,7 @@ export function describeThrow(e) {
  * @param name     the gate's own name, for the verdict line
  * @param cleanup  optional, and worth passing whenever a browser or a server is open
  */
-export function reportThrows(name, { cleanup = null, log = console.log } = {}) {
+export function reportThrows(name, { cleanup = null, log = console.log, backstopMs = 5000 } = {}) {
     let fired = false;
     const emit = (kind) => (e) => {
         if (fired) return;                       // a cleanup that throws must not print a second verdict
@@ -84,6 +84,15 @@ export function reportThrows(name, { cleanup = null, log = console.log } = {}) {
         if (cleanup) { try { cleanup(); } catch { /* as above */ } }
         log(`\n${name}: 1 FAILED -- the gate did not finish, so the rows above it are all that ran`);
         process.exitCode = 1;
+        // *** v4681 -- AND A BACKSTOP, BECAUSE "LET THE LOOP DRAIN" ASSUMED THE LOOP COULD. *** On the rig
+        // atmosphere-selfcheck and perspectiveWarp-selfcheck threw in their browser sections, printed this row,
+        // and then never exited: each had an http server open that only its success path closed, so the loop
+        // never drained and the sweep killed them at the 20 s cap -- "timed out alone", with the FAIL row this
+        // net exists to deliver never read. Reproduced on Linux: one listening Server was the only live handle
+        // 8 s after the throw. The timer is UNREF'D, so it cannot keep a process alive and cannot fire in the
+        // case v4663 protects -- a loop that drains on its own exits first, with its code. It fires only when
+        // something else is holding the loop open five seconds after the report, which is a hang, not a drain.
+        setTimeout(() => process.exit(process.exitCode ?? 1), backstopMs).unref();
     };
     process.on("uncaughtException", emit("uncaught throw"));
     process.on("unhandledRejection", emit("unhandled rejection"));

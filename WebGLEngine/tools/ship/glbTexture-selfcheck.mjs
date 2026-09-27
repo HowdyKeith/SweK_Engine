@@ -361,7 +361,8 @@ function sourcesNaming(needle) {
             // entry on ensureThree.js quotes GLTFLoader's public API -- "setDRACOLoader/setKTX2Loader/..." --
             // while explaining a diff, and a raw scan reads that quote as a caller. Same fault the v4266 comment
             // fix exists for, one syntax further from a comment: a round's own prose becoming evidence against it.
-            if (p.endsWith("/tools/ship/nextRounds.mjs")) continue;
+            // v4681: compared on the posix relative path -- endsWith("/tools/...") never matched a Windows path.
+            if (path.relative(ROOT, p).split(path.sep).join("/") === "tools/ship/nextRounds.mjs") continue;
             const raw = fs.readFileSync(p, "utf8");
             if (!raw.includes(needle)) continue;
             // *** COMMENTS ARE STRIPPED, BECAUSE THIS ROUND'S OWN CHANGELOG NOTE BROKE THIS CHECK. *** The

@@ -52,6 +52,7 @@
 // use the thing you said you could not use" rather than "something broke".
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -108,7 +109,9 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
     const probe = (p) => {
         try {
             const body = execFileSync("curl", ["-s", "-m", "20", "https://api.github.com/" + p], { encoding: "utf8" });
-            const code = parseInt(execFileSync("curl", ["-s", "-m", "20", "-o", "/dev/null", "-w", "%{http_code}",
+            // v4681: os.devNull, not "/dev/null" -- on Windows curl cannot write to that path, exits 23, and every
+            // probe read -1. refusalStack.mjs recorded "Keith's rig reports -1 on all three" and blamed curl.
+            const code = parseInt(execFileSync("curl", ["-s", "-m", "20", "-o", os.devNull, "-w", "%{http_code}",
                                                         "https://api.github.com/" + p], { encoding: "utf8" }), 10);
             return { code, body, source: code === 200 ? null : T.refusalSource(body) };
         } catch { return { code: -1, body: "", source: null }; }
@@ -160,9 +163,17 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
     // *** A RUNNER REFUSAL IS NO VERDICT ABOUT GITHUB. *** v3201's distinction, applied to a network probe:
     // the old rows read a 403 as "GitHub still refuses", which is a claim this runner is not positioned to
     // make. What CAN be asserted from here is that the refusal is the sandbox's, and it is.
+    // *** v4681 -- ASSERTED OF THE REFUSALS THAT ARRIVED, NOT OF WHERE THIS GATE HAPPENS TO RUN. *** The row
+    // required exactly two runner refusals, which is a fact about the Claude sandbox's proxy: on the rig there
+    // is no proxy in front of GitHub, so it could never hold there however correct the tree was. What the row is
+    // FOR is attribution -- a refusal must not be read as GitHub's when a runner produced it -- so it is asserted
+    // of every refusal that came back, and a box with nothing in front of it REPORTS that instead of failing.
     const runnerRefusals = [user, repo].filter((r) => r.source === T.RUNNER);
+    const refused = [user, repo].filter((r) => r.code > 0 && r.code !== 200);
+    if (!refused.length) report("no refusal arrived on either public path -- nothing is in front of GitHub on this box, " +
+        "so there is no runner refusal to attribute (the sandbox refuses both; see the NOT CLAIMED note below)");
     ok("!! *** THE 403s COME FROM THE SANDBOX, NOT FROM GITHUB -- SO THEY SAY NOTHING ABOUT GITHUB ***",
-       runnerRefusals.length === 2,
+       refused.every((r) => r.source === T.RUNNER),
        `${runnerRefusals.length} of 2 public paths refused by the runner. users/but0n and repos/but0n/vixel ` +
        "are PUBLIC on GitHub; what answered was the proxy in front of it. NOT CLAIMED: that GitHub would " +
        "answer 200 -- nothing here can reach it unproxied, so the premise is UNSUPPORTED, not disproved.");

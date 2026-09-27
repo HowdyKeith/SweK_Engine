@@ -124,7 +124,16 @@ function walk(dir, out, skip) {
     for (const e of ents.sort((a, b) => a.name.localeCompare(b.name))) {
         const p = path.join(dir, e.name);
         if (skip.test(p)) continue;
-        if (e.isDirectory()) walk(p, out, skip);
+        // *** v4681 -- AND A DOT-PREFIXED DIRECTORY IS THE SAME RACE FROM THE OTHER SIDE. *** Three gates make their
+        // scratch INSIDE the tree because a browser page must load it same-origin -- aiPresenceOrbPresent's
+        // .sabotage-orbpresent-*, ffmpegWasmBridge's .ffwasm-gate-*, unboundBuiltin's tools/.ub-* -- and remove it
+        // in a `finally` that a cap kill skips. The rig's v4680 verify found two stranded .sabotage-orbpresent
+        // directories (four .mjs files) and the census read 4314 -> 4318 files, ES modules and closures +4, which
+        // took the drift pre-flight, recordDrift-selfcheck and runtimeGap-selfcheck red together. While such a
+        // gate is RUNNING the same files exist for seconds, so an eight-wide sweep could read them even without
+        // a kill. No tracked source file lives under a dot-directory in this tree (git ls-files), so every
+        // census this walker feeds reads the number it read before.
+        if (e.isDirectory()) { if (!e.name.startsWith(".")) walk(p, out, skip); continue; }
         // *** v4580 -- A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND FOUR GATES PLANT ONE WHILE THEY RUN. ***
         //
         // rigProgress's __rigprogress-fixture, gateActivity's __routeProbe, and gateMutation's __mutation-decoy

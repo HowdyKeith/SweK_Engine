@@ -37,8 +37,8 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 // BROWSER is declared FIRST and assigned at every launch site below: a cleanup that closes a handle
 // nothing ever put there is a control that cannot fire, and a gate that reports its own death and
 // then hangs on an open Chromium has traded one silent failure for another.
-let BROWSER = null;
-reportThrows("atmosphere-selfcheck", { cleanup: () => { try { BROWSER && BROWSER.close(); } catch {} } });
+let BROWSER = null, SRV = null;   // v4681: the server too -- the rig hung on it after a throw
+reportThrows("atmosphere-selfcheck", { cleanup: () => { try { BROWSER && BROWSER.close(); } catch {} try { SRV && (SRV.closeAllConnections?.(), SRV.close()); } catch {} } });
 const report = (m) => console.log("  ....  " + m);
 const P = A.EARTH;
 const rel = (a, b) => Math.abs(a - b) / Math.max(1e-30, Math.abs(b));
@@ -289,7 +289,7 @@ console.log("\n7. *** THE GLSL, ACTUALLY RUN -- the same arithmetic on a real We
                "asks whether the shader that ships agrees with it.");
     } else {
         const HARNESS = fs.readFileSync(path.join(ENG, "tools/ship/atmosphereHarness.html"), "utf8");
-        const srv = http.createServer((rq, rs) => {
+        const srv = SRV = http.createServer((rq, rs) => {
             if (rq.url.startsWith("/render/")) {
                 const p = path.join(ENG, rq.url);
                 if (fs.existsSync(p)) { rs.writeHead(200, { "content-type": "text/javascript" }); return rs.end(fs.readFileSync(p)); }

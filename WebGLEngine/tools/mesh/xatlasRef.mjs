@@ -232,7 +232,7 @@ function sphere(nu, nv) {
 export function inputHashes() {
     const h = {};
     for (const f of [path.join(SRC, "xatlas.cpp"), path.join(SRC, "xatlas.h"), CLI])
-        h[path.relative(ENG, f)] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
+        h[path.relative(ENG, f).split(path.sep).join("/")] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
     return h;
 }
 

@@ -76,8 +76,13 @@ console.log("\n3. *** THE THREE WALKERS THIS REPLACED SELECTED THE SAME FILES, A
 {
     TR.clear();
     const unified = TR.treePaths().slice().sort();
-    const byFrozen = TR.treeFiles(ENG, TR.SKIP_AGREE.frozenRecords).map((f) => f.path).sort();
-    const byDrift = TR.treeFiles(ENG, TR.SKIP_AGREE.recordDrift).map((f) => f.path).sort();
+    // *** v4681 -- NORMALISED DURING THE WALK, NOT AFTER IT. *** v4646 normalised the RESULTS, but the old rule
+    // /\/vendor\// is applied to each native path AS the walk descends, so on Windows it skipped nothing and 117
+    // vendor files were already in the selection before any rewrite -- red on every Windows run since. The
+    // question is whether the two authors' rules pick the same files, so each rule is shown the posix spelling.
+    const posix = (re) => ({ test: (p) => re.test(p.replace(/\\/g, "/")) });
+    const byFrozen = TR.treeFiles(ENG, posix(TR.SKIP_AGREE.frozenRecords)).map((f) => f.path).sort();
+    const byDrift = TR.treeFiles(ENG, posix(TR.SKIP_AGREE.recordDrift)).map((f) => f.path).sort();
     say(`unified ${unified.length}, frozenRecords' old rule ${byFrozen.length}, recordDrift's old rule ${byDrift.length}`);
     // *** THIS ROW SAID "BY COINCIDENCE RATHER THAN BY CONSTRUCTION" AND THE COINCIDENCE WAS THE PLATFORM. ***
     //
@@ -234,6 +239,34 @@ console.log("\n7. *** A TRANSIENT FIXTURE IS NOT A SOURCE FILE, AND THE RACE WAS
     ok("...and nothing permanent is being hidden: no tracked source file in the tree starts with `__`",
         TR.treePaths().every((q) => !path.basename(q).startsWith("__")),
         "so the counts every census recorded before this change are the counts it reads after it");
+}
+
+// ---- v4681 -- A DOT-PREFIXED DIRECTORY IS SCRATCH, AND A KILLED RUN LEAVES IT BEHIND ------------------------
+console.log("\n9. *** IN-TREE SCRATCH: THE WALK DOES NOT COUNT IT, AND THE SWEEP RECLAIMS WHAT A KILL STRANDED ***");
+{
+    const os = await import("node:os");
+    const GS = await import("./gateSweep.mjs");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "treeread-dot-"));
+    try {
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3"), { recursive: true });
+        fs.writeFileSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3", "aiPresenceOrbPresent.mjs"), "export const x = 1;\n");
+        fs.writeFileSync(path.join(root, "tools", "ship", "real.mjs"), "export const y = 2;\n");
+        // a decoy that must SURVIVE: same prefix, not a mkdtemp name (wrong length), so it is not ours to delete
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please"), { recursive: true });
+        TR.clear();
+        const seen = TR.treeFiles(root).map((f) => path.relative(root, f.path).split(path.sep).join("/"));
+        ok("!! *** the walk counts the real module and NOT the stranded scratch copy beside it ***",
+            seen.includes("tools/ship/real.mjs") && !seen.some((q) => q.includes(".sabotage-orbpresent-")),
+            seen.join(", ") + " -- the rig's census read four such files as source (4314 -> 4318) and took three gates red");
+        const gone = GS.reclaimScratchDirs(root);
+        ok("!! *** ...and the reclaim removes the stranded mkdtemp directory, and only that one ***",
+            gone.length === 1 && gone[0] === "tools/ship/.sabotage-orbpresent-a1B2c3" &&
+            !fs.existsSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3")) &&
+            fs.existsSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please")),
+            `removed [${gone.join(", ")}]; the same-prefix decoy that is not a mkdtemp name survives`);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); TR.clear(); }
+    ok("...and nothing tracked is hidden: no tracked source lives under a dot-directory, so no census moves",
+        TR.treePaths().length > 1000 && TR.treePaths().every((q) => !path.relative(ENG, q).split(path.sep).some((seg) => seg.startsWith("."))));
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

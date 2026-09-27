@@ -77,6 +77,11 @@ if (version) {
 //
 // It runs in-process rather than as a spawn so the cost is the check's and not a second node start.
 try {
+  // v4681 -- a killed run's in-tree scratch directories are reclaimed FIRST, because the drift pre-flight below
+  // counts source files and four stranded .mjs files were enough to take it red on the rig. Named, not silent.
+  const { reclaimScratchDirs } = await import("./gateSweep.mjs");
+  const reclaimed = reclaimScratchDirs();
+  if (reclaimed.length) console.log("[verify] NOTE  reclaimed " + reclaimed.length + " stranded gate scratch dir(s) a killed run left in the tree: " + reclaimed.join(", "));
   const RD = await import("./recordDrift.mjs");
   const { stale } = await RD.drift();
   check("derived records a new module invalidates are up to date (the drift pre-flight)",

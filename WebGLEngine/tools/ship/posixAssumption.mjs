@@ -83,9 +83,12 @@ const REL_RE = /path\.relative\(/g;
 // not see. The census moved 154 -> 159 callers with `normalised` flat at 54, which reads as five new
 // raw-separator sites; three of the arrivals are this line's own (exitBusy, deadlineLeak, declaredCost's gate)
 // and all three normalise, in this spelling. Recognising it moves `normalised` 54 -> 106 on the same 159
-// callers: FIFTY-TWO files had been counted as never normalising while doing it correctly. The census is
-// REPORTED, not asserted, for exactly this reason -- a file-level proxy -- and this is the proxy's largest
-// miss so far.
+// callers: fifty-two files move from `never` to `normalised`. *** CORRECTED AT v4681: I WROTE THAT ALL
+// FIFTY-TWO WERE "DOING IT CORRECTLY", AND AT LEAST TWO WERE NOT. *** The rule is FILE-level -- a file that
+// normalises ONE path counts as normalised -- and the rig's v4680 verify then found live separator bugs in two
+// files this idiom had just moved: glbTexture-selfcheck (an endsWith("/tools/...") exclusion) and
+// tools/ship/probe/record.mjs (startsWith("/")). What moved is the proxy's reading, not a count of correct files.
+// The census stays REPORTED, not asserted, for exactly this reason.
 const NORM_RE = new RegExp("toPosix|replace\\(/\\\\\\\\/g|split\\(path\\.sep\\)\\.join\\([\"'`]/[\"'`]\\)");
 
 /** Comment lines carry prose about these patterns; the code is what runs. */
