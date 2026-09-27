@@ -560,8 +560,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4746 -- 1828 -> 1830 for render/flicker-selfcheck.mjs and fx/fsr/fsrFlicker-selfcheck.mjs -- flicker between real and generated frames: the measure, and FSR3 against native frames.
     // v4747 -- 1830 -> 1831 for fx/fsr/fsr3Late-selfcheck.mjs -- a late real frame through FSR3 and the pacer on the device.
     // v4748 -- 1831 -> 1833 for render/flowCost-selfcheck.mjs and fx/fsr/fsrFlowCost-selfcheck.mjs -- what the optical flow reads, and the device's time held to it.
-    gates: 1833, usesOk: 1812, definesOk: 1804, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1705, condFirst: 91, unknownSignature: 16,
+    // v4750 -- 1833 -> 1834 for fx/fsr/fsrFrameGenWorld-selfcheck.mjs -- a still surface judged in the world, under a panning camera.
+    gates: 1834, usesOk: 1813, definesOk: 1805, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1706, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

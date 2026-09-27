@@ -82,7 +82,7 @@ else {
                 const cam = new THREE.PerspectiveCamera(50, 1, 0.5, 20);
                 const pose = (t) => { cam.position.set(0.3 * t, 0.2 + 0.1 * t, 4 - 0.4 * t); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
                     box.position.set(0.25 * t, 0.1 * t, 0); box.rotation.set(0.4 + 0.3 * t, 0.6 - 0.2 * t, 0.1 * t); box.updateMatrixWorld(); floor.updateMatrixWorld(); };
-                const st = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl });
+                const st = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl, camera: true });
                 const vpOf = () => Array.from(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements);
                 pose(0); await st.render(renderer, scene, cam);
                 o.hist0 = st.hasHistory;
@@ -96,6 +96,7 @@ else {
                 pose(2); await st.render(renderer, scene, cam);
                 o.vp2 = vpOf(); o.box2 = Array.from(box.matrixWorld.elements);
                 o.m1 = Array.from(await renderer.readRenderTargetPixelsAsync(st.motion, 0, 0, a.D, a.D));
+                o.c1 = Array.from(await renderer.readRenderTargetPixelsAsync(st.camera, 0, 0, a.D, a.D));
                 o.z1 = Array.from(await renderer.readRenderTargetPixelsAsync(st.depth, 0, 0, a.D, a.D));
                 // the TURNAROUND: the camera faces a wall that was BEHIND the previous eye -- every pixel, wall and
                 // sky, has no answer, and the reference says so too
@@ -196,6 +197,17 @@ else {
         let floorGap = 0; for (let i = 0; i < D * D; i++) if (ids[i] === 0) floorGap = Math.max(floorGap, Math.hypot(m1[i * 4] - cam[i * 4], m1[i * 4 + 1] - cam[i * 4 + 1]));
         ok(`  [${mode}] ...and it is the BOX's motion on the box: ${(boxGap * D).toFixed(2)} px away from camera-only motion there, ${(floorGap * D).toFixed(4)} px on the static floor`,
            boxGap * D > 1 && floorGap * D < 0.01, "a node that ignored the object's previous matrix would read camera-only motion on the box and pass the rows above only where nothing moves");
+
+        // v4750: the stage's CAMERA target -- the camera's own motion at every pixel -- is motionVectorsCPU on the device's depth,
+        // surfaces and sky alike; on the static floor it IS the motion, and on the box it is not
+        const c1 = up(o.c1, D); let wCam = 0, camValid = 0, floorSame = 0, boxOff = Infinity;
+        for (let i = 0; i < D * D; i++) { for (let c = 0; c < 3; c++) wCam = Math.max(wCam, Math.abs(c1[i * 4 + c] - cam[i * 4 + c])); if (c1[i * 4 + 2] === 1) camValid++;
+            const g = Math.hypot(m1[i * 4] - c1[i * 4], m1[i * 4 + 1] - c1[i * 4 + 1]) * D;
+            if (ids[i] === 0) floorSame = Math.max(floorSame, g); }
+        { let boxBig = 0; for (let i = 0; i < D * D; i++) if (ids[i] === 1 && Math.hypot(m1[i * 4] - c1[i * 4], m1[i * 4 + 1] - c1[i * 4 + 1]) * D > 0.05) boxBig++; boxOff = boxBig; }
+        ok(`*** [${mode}] v4750: the stage's camera target is motionVectorsCPU at EVERY pixel, to ${wCam.toExponential(2)} -- ${camValid} of ${D * D} valid -- and a still surface's vector is it: the floor within ${floorSame.toFixed(4)} px, while ${boxOff} of the box's ${nBox} pixels are more than 0.05 px from it ***`,
+           wCam < 1e-5 && camValid === D * D && floorSame < 0.05 && boxOff > nBox * 0.9,
+           "the far plane's completion, at each surface's own depth: where a world point there would have gone had only the camera moved. render/flowReconcile.mjs's world-still test reads it");
 
         // the turnaround: the reference, on the device's own depth, says which pixels have no answer
         const mT = up(o.mT, D), zT = up(o.zT, D), dT = new Float32Array(D * D);
@@ -382,6 +394,8 @@ if (!skip) {
 // every pixel of the moving run is valid -- sky included -- so accumulating through invalid motion changed nothing
 // anywhere. R5 reddens because the moving run's box is chromatic; on the still run's two-colour stripes an RGB box
 // and a YCoCg box clamp identically, measured.
+// v4750: the camera target's row -- W4 (the far plane's depth at every pixel) -> 2, W9 (never drawn) -> 1; logged with the rest
+// of v4750's in fx/fsr/fsrFrameGenWorld-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: SKINNED and MORPHED meshes, whose previous position three's positionPrevious carries and this gate " +
     "never draws; an ORTHOGRAPHIC camera's field; and every pass downstream of the field, which arrive one a round.");

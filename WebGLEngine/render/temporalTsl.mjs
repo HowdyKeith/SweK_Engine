@@ -162,8 +162,18 @@ export function motionCompleteNodes(THREE, TSL, motionTex, depthTex, { w, h, gl 
         const far = vec4(select(ok, pu.sub(uu), 0.0), select(ok, pv.sub(vv), 0.0), select(ok, 1.0, 0.0), select(ok, q.z.div(q.w), 0.0));
         return select(wd.lessThan(1.0), m, far);
     })();
+    // v4750: the CAMERA's motion at every pixel -- where a world point at this pixel's depth would have been had nothing but
+    // the camera moved; the far plane's arithmetic above, at the surface's own depth
+    const cameraNode = Fn(() => {
+        const d = clipOf(textureLoad(depthTex, texel()).x), uu = screenCoordinate.x.div(u.w), vv = screenCoordinate.y.div(u.h);
+        const p = u.invVPCur.mul(vec4(uu.mul(2.0).sub(1.0), float(1.0).sub(vv.mul(2.0)), d, 1.0));
+        const q = u.vpPrev.mul(vec4(p.x.div(p.w), p.y.div(p.w), p.z.div(p.w), 1.0));
+        const ok = p.w.notEqual(0.0).and(q.w.greaterThan(0.0));
+        const pu = q.x.div(q.w).add(1.0).mul(0.5), pv = float(1.0).sub(q.y.div(q.w)).mul(0.5);
+        return vec4(select(ok, pu.sub(uu), 0.0), select(ok, pv.sub(vv), 0.0), select(ok, 1.0, 0.0), 1.0);
+    })();
     const depthNode = Fn(() => vec4(clipOf(textureLoad(depthTex, texel()).x), 0.0, 0.0, 1.0))();
-    return { node, depthNode, uniforms: u };
+    return { node, depthNode, cameraNode, uniforms: u };
 }
 
 /**
@@ -171,7 +181,7 @@ export function motionCompleteNodes(THREE, TSL, motionTex, depthTex, { w, h, gl 
  * camera) into `surface` (rgba float + a depth texture), then the completion into `motion` and the clip depth into
  * `depth`. `render(renderer, scene, camera)` draws all three; the caller has restored the unjittered projection.
  */
-export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = false }) {
+export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = false, camera: withCamera = false }) {
     const T = type == null ? THREE.FloatType : type;
     const surface = new THREE.RenderTarget(w, h, { type: T, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     surface.depthTexture = new THREE.DepthTexture(w, h); surface.depthTexture.type = THREE.FloatType;
@@ -187,10 +197,12 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.depthTest = false; m.depthWrite = false; m.blending = THREE.NoBlending;
         const s = new THREE.Scene(); s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return { scene: s, material: m }; };
     const qM = quad(comp.node), qD = quad(comp.depthNode), ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    // v4750: `camera` -- the camera's own motion at every pixel, into `camera` (du, dv, valid, 1)
+    const cameraT = withCamera ? new THREE.RenderTarget(w, h, flat) : null, qC = withCamera ? quad(comp.cameraNode) : null;
     const prevP = new THREE.Matrix4(), prevV = new THREE.Matrix4(), vp = new THREE.Matrix4();
     let frames = 0;
     return {
-        surface, motion, depth, motionNode, uniforms: comp.uniforms,
+        surface, motion, depth, camera: cameraT, motionNode, uniforms: comp.uniforms,
         /** Whether the field just rendered carries a previous frame -- frame one's is every object against itself. */
         get hasHistory() { return frames > 1; },   // after a render: motionVectors.hasHistory's own rule
         async render(renderer, scene, camera, t = 0.5) {
@@ -217,11 +229,12 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             scene.overrideMaterial = prevOverride; scene.background = prevBg;
             renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
             renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
+            if (qC) { renderer.setRenderTarget(cameraT); await renderer.renderAsync(qC.scene, ortho); }
             renderer.setRenderTarget(prevTarget);
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;
         },
-        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); qM.material.dispose(); qD.material.dispose(); },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
     };
 }
 

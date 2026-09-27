@@ -34,7 +34,8 @@ import { SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowReconcile.mjs";
  * the application's motion field (du, dv, valid, _) and the NEWER frame's depth, and writes targets.field, w x h:
  * (vx, vy, depth, valid), the splat's input. And, by mode:
  *   "pixel"  (radius, the window's; margin 0.9 unless given, and marginStill 0.5 where the pixel's own vector is under
- *            stillPx) with `audit`, targets.pixel, w x h: (source, sadApp, sadFlow, 1) -- reconcilePixelsCPU
+ *            stillPx; v4750: measured against `camera`, the camera's own motion, when reconcile() is given one) with `audit`,
+ *            targets.pixel, w x h: (source, sadApp, sadFlow, 1) -- reconcilePixelsCPU
  *   "block"  (margin 0.05 unless given) targets.decision, bw x bh: (vx, vy, source, 1) -- reconcileFlowCPU's -- and with `audit`
  *            targets.app and .sad, bw x bh: (ax, ay, found, 1) and (sadApp, sadFlow, sadStill, 1); `nearerIsLess` is its
  */
@@ -121,6 +122,10 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
         const ox = x.sub(radius), oy = y.sub(radius);
         const f = textureLoad(I.flow, ivec2(int(floor(x.div(block))), int(floor(y.div(block))))), m = textureLoad(I.motion, at), d = textureLoad(I.depth, at).x;
         const ax = m.x.negate().mul(float(w)), ay = m.y.negate().mul(float(h));           // THE ONE NEGATION
+        // v4750: with `camera`, the vector is measured against the camera's own motion there -- a surface that stood still
+        // IN THE WORLD, whatever the camera did; without it, against zero, a surface that stood still on screen
+        const cm = I.camera ? textureLoad(I.camera, at) : null;
+        const rx = cm ? m.x.sub(cm.x).mul(float(w)) : ax, ry = cm ? m.y.sub(cm.y).mul(float(h)) : ay;
         const sadFlow = sadAt(I, ox, oy, ox.sub(f.x), oy.sub(f.y), k), sadApp = sadAt(I, ox, oy, ox.sub(ax), oy.sub(ay), k);
         // and only where the window, carried back along the flow, was inside `prev` -- evidence from past the frame's edge is
         // a comparison with the clamped edge (reconcilePixelsCPU's note)
@@ -129,7 +134,7 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
         // v4745: a surface that did not move on screen gets `marginStill` -- whatever moved there is shading (reconcilePixelsCPU)
         // the threshold as the float32 the mirror compares against, converted here rather than by the shader compiler's literal
         // parse (and not by name: render/shaderRound-selfcheck.mjs reads every round( in a TSL file as the shader's)
-        const still = ax.mul(ax).add(ay.mul(ay)).lessThan(new Float32Array([stillPx * stillPx])[0]);
+        const still = rx.mul(rx).add(ry.mul(ry)).lessThan(new Float32Array([stillPx * stillPx])[0]);
         const beat = seen.and(sadFlow.lessThan(sadApp.mul(select(still, float(1.0 - marginStill), float(1.0 - margin)))));   // STRICTLY: a tie is the application's
         const src = select(m.z.equal(0.0), float(SRC_FLOW_ONLY), select(beat, float(SRC_FLOW_BEAT), float(SRC_APP)));
         const isApp = select(src.equal(float(SRC_APP)), float(1.0), float(0.0));
@@ -138,7 +143,7 @@ export function makeFlowReconcile(THREE, TSL, { w, h, block = 8, margin = null, 
     })();
 
     const scenes = new Map();
-    const keyOf = (I) => [I.lumaCur, I.lumaPrev, I.flow, I.motion, I.depth].map((t) => t.uuid).join("|");
+    const keyOf = (I) => [I.lumaCur, I.lumaPrev, I.flow, I.motion, I.depth, I.camera].map((t) => (t ? t.uuid : "-")).join("|");
     return {
         bw, bh, block, margin, marginStill: mode === "pixel" ? marginStill : null, stillPx: mode === "pixel" ? stillPx : null, mode, targets,
         async reconcile(renderer, inputs) {

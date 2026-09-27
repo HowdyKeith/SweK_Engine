@@ -8032,6 +8032,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4750 -- THE 357th CLOSING: a still surface judged in the world, not on the screen.
+    since432: Object.freeze({
+        at: "v4750", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (the stage's camera target against motionVectorsCPU)",
+                                "render/flowReconcileTsl-selfcheck.mjs (the world test's three cases, exact on both backends)"]),
+        verdict: "*** A CAMERA THAT MOVES MADE EVERY SURFACE 'MOVING', AND v4745's GAIN ON SHADOWS AND REFLECTIONS WENT WITH IT. *** " +
+                 "The still-surface margin judged a pixel still when its vector was under 0.05 pixels -- on the screen, where a " +
+                 "pan moves everything. makeMotionStage({ camera: true }) now renders the camera's own motion at every pixel (the far " +
+                 "plane's completion at each surface's depth, motionVectorsCPU's to 4e-7 on both backends), and the reconciliation, " +
+                 "given it, judges a pixel still when its vector is within 0.05 pixels of THAT: a surface that did not move in the " +
+                 "world. Under a pan: the reflection +5.12 dB over the screen test, the textured shadow +2.37, the plain one +0.47, " +
+                 "and a textured floor whose vectors are exact +0.32; with the camera still the frame is identical to the bit. The " +
+                 "mirror and the TSL agree at every pixel; the generator takes `camera`, FSR3 asks FSR2's driver for it when the flow " +
+                 "is on, and the page hands it on. Nine sabotages, all red once the gate used one generator for both arms -- the " +
+                 "reconciliation's pass cache was keyed without the camera, which two generators could not show.",
+    }),
     // v4749 -- THE 356th CLOSING: three gaps the gates named, and one idea measured and not built.
     since431: Object.freeze({
         at: "v4749", swept: 0, green: 0, red: 0,

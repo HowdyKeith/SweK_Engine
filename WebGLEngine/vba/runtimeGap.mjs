@@ -337,7 +337,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4427,               // v4748: 4424 -> 4427 for render/flowCost.mjs and two gates -- the optical flow's reads counted, held to the mirror\nand to the device's time. Every row from the census.
+    files: 4428,               // v4750: 4427 -> 4428 for fx/fsr/fsrFrameGenWorld-selfcheck.mjs -- the reconciliation's still test in the world, with the\ncamera's own motion from the motion stage. Every row from the census.
+                               // v4748: 4424 -> 4427 for render/flowCost.mjs and two gates -- the optical flow's reads counted, held to the mirror\nand to the device's time. Every row from the census.
                                // v4747: 4423 -> 4424 for fx/fsr/fsr3Late-selfcheck.mjs -- a late real frame through FSR3 and the pacer on the device,\nwith the pacer confined to the pair the generator holds. Every row from the census.
                                // v4746: 4420 -> 4423 for render/flicker.mjs and two gates -- what a displayed sequence alternates that the scene does not,\nand frame generation graded by it. Every row from the census.
                                // v4745: 4419 -> 4420 for fx/fsr/fsrFrameGenScene-selfcheck.mjs -- shadows, a reflection and a HUD between two frames, the\nstill-surface margin and the UI composited. Every row from the census.
@@ -925,7 +926,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4127, closures: 3981, asyncAwait: 1616, typedArrays: 1195, promises: 381,
+    esModules: 4128, closures: 3982, asyncAwait: 1617, typedArrays: 1196, promises: 381,
     fetchXhr: 245, performanceNow: 230, raf: 121, webgl: 187, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

@@ -125,6 +125,13 @@ const PIX = {
     shaderLow: { ...CASES.shader, margin: 0.05, marginStill: 0.05, radius: 1 }, bothLow: { ...CASES.both, margin: 0.05, radius: 2 },
     jitteredLow: { ...CASES.jittered, margin: 0.05, radius: 0 }, flat: { ...CASES.flat, margin: 0, radius: 1 },
     invalid: { ...CASES.invalid, margin: 0.05, radius: 1 },
+    // v4750: the camera moved AND the texture slid (the wall stood still, its shading did not): on the screen test at 0.9, and
+    // with the camera's own motion given -- the wall's everywhere (every pixel still in the world), and a pixel off on the
+    // right half (moving there)
+    bothScreen: { ...CASES.both, margin: 0.9, radius: 1 },
+    bothWorld: { ...CASES.both, margin: 0.9, radius: 1, camera: CASES.both.motion },
+    bothHalf: { ...CASES.both, margin: 0.9, radius: 1, camera: (() => { const c = Float32Array.from(CASES.both.motion);
+        for (let y = 0; y < H; y++) for (let x = W >> 1; x < W; x++) c[(y * W + x) * 4] = Math.fround(c[(y * W + x) * 4] + 1 / W); return c; })() },
 };
 const cpuPix = {};
 for (const [k, c] of Object.entries(PIX)) cpuPix[k] = reconcilePixelsCPU(c);
@@ -160,7 +167,7 @@ else {
     const payloadPix = {};
     for (const [k, c] of Object.entries(PIX)) {
         const base = Object.keys(CASES).find((q) => CASES[q].cur === c.cur && CASES[q].motion === c.motion);
-        payloadPix[k] = { of: base, margin: c.margin, marginStill: c.marginStill ?? 0.5, stillPx: c.stillPx ?? 0.05, radius: c.radius };
+        payloadPix[k] = { of: base, margin: c.margin, marginStill: c.marginStill ?? 0.5, stillPx: c.stillPx ?? 0.05, radius: c.radius, camera: c.camera ? Array.from(c.camera) : null };
     }
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, B, payload, payloadPix }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
@@ -191,8 +198,10 @@ else {
                     const p = a.payload[q.of], key = "pix|" + q.margin + "|" + q.marginStill + "|" + q.stillPx + "|" + q.radius;
                     if (!recs.has(key)) recs.set(key, RT.makeFlowReconcile(THREE, T, { w: a.W, h: a.H, block: a.B, margin: q.margin, marginStill: q.marginStill, stillPx: q.stillPx, mode: "pixel", radius: q.radius, audit: true }));
                     const R = recs.get(key), cur = tex(p.cur, a.W, a.H), prev = tex(p.prev, a.W, a.H), flow = tex(p.flow, p.bw, p.bh), motion = tex(p.motion, a.W, a.H), depth = tex(p.depth, a.W, a.H);
+                    const camera = q.camera ? tex(q.camera, a.W, a.H) : null;
                     await pc.build(renderer, cur); await pp.build(renderer, prev);
-                    await R.reconcile(renderer, { lumaCur: pc.targets[0].texture, lumaPrev: pp.targets[0].texture, flow, motion, depth });
+                    await R.reconcile(renderer, { lumaCur: pc.targets[0].texture, lumaPrev: pp.targets[0].texture, flow, motion, depth, camera });
+                    if (camera) camera.dispose();
                     o.pix[k] = { field: await read(R.targets.field, a.W, a.H), pixel: await read(R.targets.pixel, a.W, a.H) };
                     for (const t of [cur, prev, flow, motion, depth]) t.dispose();
                 }
@@ -275,6 +284,17 @@ else {
     }
 }
 
+if (!skip) {
+    // v4750: with the camera's own motion the still test is in the WORLD -- on CPU numbers, which the census row above holds
+    // the device to at every pixel
+    const b = (k) => cpuPix[k].counts.flowBeat;
+    const half = (k) => { const x = cpuPix[k]; let l = 0, r = 0; for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) if (x.source[y * W + xx] === SRC_FLOW_BEAT) { if (xx < W >> 1) l++; else r++; } return [l, r]; };
+    const [sl, sr] = half("bothScreen"), [hl, hr] = half("bothHalf");
+    ok(`  v4750: the camera's own motion makes a wall that moved on screen still in the WORLD: with the camera moving and its texture sliding, the flow takes ${b("bothWorld")} pixels at the still margin where the screen test gives it ${b("bothScreen")} -- and with the camera's motion a pixel off on the right half, the left half is the world test's (${hl}) and the right the screen test's (${hr} against ${sr})`,
+       b("bothWorld") > b("bothScreen") && hl > sl && hr === sr,
+       "a pixel is judged still when its vector is within stillPx of the camera's own motion there; given none, of zero -- which is the screen test, unchanged");
+}
+
 // ---- v4741 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against render/flowReconcileTsl.mjs:
 //   R1  pixel: the in-frame rule removed               -> 2    R8  block: pixels past the frame counted       -> 0
@@ -301,6 +321,8 @@ else {
 // the generator gates render has enough pixels moving between the two to move a decibel; geometryAll's stillPx of 10 does
 // (the camera's 3.2-pixel vectors fall under 100 and not under 10). R16 is a report, read by the gate whose arms need it.
 
+// ---- v4750: the world test's cases -- W1 the mirror ignoring the camera's motion -> 3, W2 the TSL ignoring it -> 2, W3 added
+// rather than taken away -> 2; the rest of v4750's are logged in fx/fsr/fsrFrameGenWorld-selfcheck.mjs.
 // ---- v4749: THE FIXTURE MOVED TO 60 x 36 --------------------------------------------------------------------------
 // Every sabotage above re-run at the new size: R3-R7 and R9-R12 read what they read at 64 x 64, R1 and R2 (re-aimed at
 // v4745's line) 2 each, R8 and R13 still 0. One went to 0 on the move -- R15, the still test against stillPx rather than its

@@ -70,6 +70,8 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * `flow` (v4741) reconciles the vectors with an optical flow of the two frames first: { block, searchRadius, levels } for
  * render/opticalFlowTsl.mjs (and v4748's refineRadius) and { margin, marginStill, stillPx, mode, radius } for render/flowReconcileTsl.mjs, {} for their
  * defaults, null for the vectors alone.
+ * `camera` (v4750), given to generate with `flow`, is the camera's own motion (makeMotionStage({ camera: true })): the
+ * reconciliation then judges a still surface in the world, so a shadow or a reflection under a pan is judged as one.
  * `ui` (v4745), given to generate, is the newer frame's UI as a premultiplied w x h texture: `prev` and `cur` are then the
  * frames WITHOUT it, and the generated frame gets it composited over, exactly (render/frameInterp.mjs's compositeUiCPU).
  */
@@ -112,7 +114,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
          * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
-        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null }, output = null, { t: at_ = null, again = false } = {}) {
+        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, camera = null }, output = null, { t: at_ = null, again = false } = {}) {
             if (ui) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
@@ -132,7 +134,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
                 // application's own vector wherever its block kept it (render/flowReconcileTsl.mjs)
                 await of.flow(renderer, cur, prev);
                 await rec.reconcile(renderer, { lumaCur: of.pyramids.cur.targets[0].texture, lumaPrev: of.pyramids.prev.targets[0].texture,
-                                                flow: of.target.texture, motion, depth });
+                                                flow: of.target.texture, motion, depth, camera });
             }
             if (arc && !again) await draw(renderer, once("toT|" + toward.uuid, () => quad(toTNode(toward))), toT);
             await fi.splat(renderer, of ? rec.targets.field.texture : field.texture, arc ? toT.texture : null);

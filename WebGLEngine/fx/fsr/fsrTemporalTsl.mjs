@@ -60,7 +60,7 @@ import { rcasNode } from "./fsrTsl.mjs";
 export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeight, displayWidth, displayHeight, ratio = null,
                                                          threshold, alpha = 0.1, reactive = true, lock = false,
                                                          lockFrom = "frame", lockLife = 8, lockMargin = 0.05,
-                                                         sharpness = 0.5, rcas = true, type = null } = {}) {
+                                                         sharpness = 0.5, rcas = true, type = null, cameraMotion = false } = {}) {
     if (!(threshold > 0)) throw new Error("fx/fsr/fsrTemporalTsl: threshold must be a positive clip-z gap -- see clipGapThreshold in render/temporalClipTsl.mjs");
     if (![null, "frame", "ring"].includes(lockFrom)) throw new Error(`fx/fsr/fsrTemporalTsl: lockFrom must be null, "frame" or "ring" -- got ${JSON.stringify(lockFrom)}`);
     if (lockFrom === "ring" && !lock) throw new Error('fx/fsr/fsrTemporalTsl: lockFrom "ring" reads the lock ring, which is what lock: true builds -- pass it, or lockFrom "frame", which needs no ring');
@@ -76,7 +76,9 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
         shading: lock ? flat() : null, factor: flat(), history: [col(), col()],
         candidates: lockFrom ? flat() : null, lumaMean: lockFrom === "ring" ? flat() : null, relax: lockFrom ? flat() : null,
     };
-    const stage = makeMotionStage(THREE, TSL, { w: dw, h: dh, gl });
+    // v4750: `cameraMotion` also renders the camera's own motion (stage.camera) -- fx/fsr/fsr3Tsl.mjs asks for it when its
+    // generator reconciles with the optical flow, for the world-still test
+    const stage = makeMotionStage(THREE, TSL, { w: dw, h: dh, gl, camera: cameraMotion });
     t.motion = stage.motion; t.depth = stage.depth;
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const s = new THREE.Scene(); s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return s; };

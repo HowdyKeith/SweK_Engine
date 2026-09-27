@@ -274,7 +274,13 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * case measured is at least as good split as at 0.9 alone: reflection +6.08, textured shadow +1.24, the knot at 6x +0.90,
  * the scroll +0.70, both pans unchanged. The one thing it gives up: the scrolling wall's clear interior, +10.9 at 0.9 and
  * +3.9 split, where more of the wall takes a block's vector that is the knot's. The test is in SCREEN space, so a camera
- * that moves makes every surface "moving" and a shadow under a pan gets 0.9.
+ * that moves makes every surface "moving" and a shadow under a pan gets 0.9 -- unless the camera's own motion is given (v4750).
+ * *** v4750: STILL IN THE WORLD, WHEN THE CAMERA'S OWN MOTION IS GIVEN. *** The test above is on the SCREEN, and a camera that
+ * moves makes every surface move there: a shadow or a reflection under a pan got 0.9. `camera` is the motion a still world
+ * point at each pixel's depth would have had (render/temporalTsl.mjs's makeMotionStage({ camera: true })), and a pixel whose
+ * vector is within stillPx of it is a surface that did not move in the world. Under a pan (fx/fsr/fsrFrameGenWorld-selfcheck.mjs):
+ * reflection +5.1 dB over the screen test, textured shadow +2.4, plain shadow +0.5, and a textured floor whose vectors are
+ * exact +0.3; with the camera still the two tests are the same test.
  * *** AND ONLY THE PIXEL'S OWN BLOCK'S FLOW -- TRIED AGAINST ITS NEIGHBOURS' AT v4749, AND KEPT. *** A pixel near a block's
  * edge could take whichever of the 2 x 2 blocks nearest it explains its window best. Prototyped in the TSL and measured on
  * fx/fsr/fsrFrameGenFlow-selfcheck.mjs's and fx/fsr/fsrFrameGenScene-selfcheck.mjs's cases, it recovers much of what the
@@ -286,7 +292,7 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * vector blends an edge the pixel's exact vector moves whole (fx/fsr/fsrFrameGenArc-selfcheck.mjs's header).
  */
 export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motion, depth, radius = 1, margin = 0.9,
-                                    marginStill = 0.5, stillPx = 0.05 }) {
+                                    marginStill = 0.5, stillPx = 0.05, camera = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`reconcilePixelsCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
@@ -298,6 +304,7 @@ export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motio
     if (typeof stillPx !== "number" || !(stillPx >= 0)) throw new Error(`reconcilePixelsCPU: stillPx must be a non-negative number of pixels -- got ${stillPx}`);
     if (!motion || motion.length < w * h * 4) throw new Error("reconcilePixelsCPU: motion must be w*h*4 -- (du, dv, valid, zPrev)");
     if (!depth || depth.length < w * h) throw new Error("reconcilePixelsCPU: depth must be w*h");
+    if (camera && camera.length < w * h * 4) throw new Error("reconcilePixelsCPU: camera must be w*h*4 -- the camera's own motion, (du, dv, valid, _)");
     const A = luminancePyramidCPU({ src: cur, w, h }).mips[0], B = luminancePyramidCPU({ src: prev, w, h }).mips[0];
     const n = 2 * radius + 1;
     const field = new Float32Array(w * h * 4), source = new Int32Array(w * h);
@@ -315,7 +322,10 @@ export function reconcilePixelsCPU({ cur, prev, w, h, flow, bw, bh, block, motio
             const ax = -motion[j * 4] * w, ay = -motion[j * 4 + 1] * h;
             sadApp[j] = sadAt(A, B, w, h, ox, oy, ox - ax, oy - ay, n);
             // v4745: a surface that did not move on screen gets the smaller margin -- whatever moved there is shading
-            const m = Math.fround(ax * ax + ay * ay) < Math.fround(stillPx * stillPx) ? marginStill : margin;
+            // v4750: with `camera`, still IN THE WORLD -- the vector against the camera's own motion there, as the device takes
+            // it: the difference in f32, then times the size
+            const rx = camera ? Math.fround(Math.fround(motion[j * 4] - camera[j * 4]) * w) : ax, ry = camera ? Math.fround(Math.fround(motion[j * 4 + 1] - camera[j * 4 + 1]) * h) : ay;
+            const m = Math.fround(rx * rx + ry * ry) < Math.fround(stillPx * stillPx) ? marginStill : margin;
             if (seen && sadFlow[j] < sadApp[j] * (1 - m)) { source[j] = SRC_FLOW_BEAT; counts.flowBeat++; }
             else { source[j] = SRC_APP; counts.app++; vx = ax; vy = ay; }
         }

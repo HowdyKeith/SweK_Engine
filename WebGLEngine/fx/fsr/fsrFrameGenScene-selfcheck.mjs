@@ -205,6 +205,6 @@ console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a HUD that CHANGES between frames -- the composite lays the newer frame's over the generated one, so a " +
     "counter or a growing bar is shown half a frame early, as FSR3's is; UI that is not opaque over a moving scene, where the " +
     "HUD-less frames are what makes it right and nothing here grades a half-transparent panel; particles, which move and have " +
-    "no vectors of their own; and a shadow or a reflection under a moving CAMERA, where every surface moved on screen and the " +
-    "still-surface margin never applies -- render/flowReconcile.mjs's note says so.");
+    "no vectors of their own; and a shadow or a reflection under a moving CAMERA, where every surface moved on screen -- which " +
+    "fx/fsr/fsrFrameGenWorld-selfcheck.mjs grades with the camera's own motion given (v4750).");
 process.exitCode = fails ? 1 : 0;

@@ -32,7 +32,9 @@ import { makeFrameGen } from "./fsrFrameGenTsl.mjs";
  */
 export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field = "raw" } = {}) {
     if (field !== "raw" && field !== "dilated") throw new Error(`fx/fsr/fsr3Tsl: field must be "raw" or "dilated" -- got ${JSON.stringify(field)}`);
-    const up = makeFsrTemporal(THREE, TSL, renderer, fsr2);
+    // v4750: with the optical flow, FSR2's stage renders the camera's own motion too, and the reconciliation judges a still
+    // surface in the world (render/flowReconcile.mjs)
+    const up = makeFsrTemporal(THREE, TSL, renderer, { ...fsr2, cameraMotion: fsr2.cameraMotion ?? !!frameGen.flow });
     const dw = fsr2.displayWidth, dh = fsr2.displayHeight;
     const colType = fsr2.type == null ? THREE.HalfFloatType : fsr2.type;
     const frames2 = [0, 1].map(() => new THREE.RenderTarget(dw, dh, { type: colType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false }));
@@ -50,7 +52,7 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
     return {
         fsr2: up, frameGen: gen, field, targets: { frames: frames2 },
         get frames() { return frames; },
-        /** What the last generate() handed the generator: { prev, cur, motion, depth }, the textures themselves. */
+        /** What the last generate() handed the generator: { prev, cur, motion, depth } and (v4750, with the flow) camera, the textures themselves. */
         get lastInputs() { return lastInputs; },
         /** The next real frame: FSR2 into the newer target, shown at `output` if given. */
         async render(scene, camera, output = null) {
@@ -70,7 +72,8 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
             if (frames === 0) throw new Error("fx/fsr/fsr3Tsl: generate needs a real frame first -- call render");
             const cur = frames2[(frames - 1) % 2], prev = frames >= 2 ? frames2[frames % 2] : cur;
             const { motion, depth } = fieldOf();
-            lastInputs = { prev: prev.texture, cur: cur.texture, motion, depth };
+            const camera = up.stage.camera ? up.stage.camera.texture : null;
+            lastInputs = { prev: prev.texture, cur: cur.texture, motion, depth, ...(camera ? { camera } : {}) };
             await gen.generate(renderer, ui ? { ...lastInputs, ui } : lastInputs, output, { t, again: lastPair === frames });
             lastPair = frames;
             // one real frame in there is nothing to be between: the call above only primed the generator's older depth, and
