@@ -720,7 +720,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4681 -- asyncAwait 1540 -> 1541, and again NO FILE ARRIVED: treeRead-selfcheck's new section 9 awaits two
     // imports at top level. One row moved and eleven held.
     // v4687 -- world/traderGraphGithub.mjs: esModules +1, closures +1, asyncAwait +2 (it and traderGraph-selfcheck; see `files` above).
-    esModules: 4014, closures: 3881, asyncAwait: 1543, typedArrays: 1127, promises: 375,
+    // v4690 -- typedArrays 1127 -> 1128, and NO FILE ARRIVED: murmurKit-selfcheck's noise row decodes the probe's packed f32
+    // bits through a DataView over an ArrayBuffer. One row moved and eleven held.
+    esModules: 4014, closures: 3881, asyncAwait: 1543, typedArrays: 1128, promises: 375,
     // wasm 23 -> 24: this branch's tools/ship/wasmExitHook.cjs. A DUPLICATE KEY nearly hid it -- both
     // lines' capability rows survived the merge and the LATER one silently won, so the merged tree
     // would have carried main's 23 under a record claiming to describe the union. JS does not warn

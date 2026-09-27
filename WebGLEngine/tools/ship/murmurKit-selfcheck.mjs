@@ -313,7 +313,7 @@ const N = 16;   // the probe's lattice: 16x16 cells, one pixel each
 const probeRun = await renderThreeTslToPixels({
     engineRoot: ENG, moduleImportPath: "/render/murmurKitTsl.mjs",
     factoryName: "makeMurmurKitProbeTsl", factoryArgs: { mode: "hash", n: N }, width: N, height: N,
-    variants: [{ factoryArgs: { mode: "noise", n: N } }, { factoryArgs: { mode: "rail", n: N } },
+    variants: [{ factoryArgs: { mode: "noiseBits", n: N } }, { factoryArgs: { mode: "rail", n: N } },
                { factoryArgs: { mode: "railLight", n: N } },
                { factoryArgs: { mode: "surface", n: N } },
                { factoryArgs: { mode: "opalAbyss", n: N } },
@@ -362,18 +362,43 @@ sec("6. *** THE PAIR: THE REAL COMPILED SHADER AGAINST THE CPU REFERENCE, BIT FO
         // The noise probe is IN the gate and not behind a note pleading browser cost: when it sat outside,
         // two sabotages -- the gradient lattice offset and the quintic fade -- walked straight through the
         // hole, because every CPU-only row here is true under either.
+        //
+        // *** THE NOISE IS GRADED AS THE SHADER'S f32, NOT AS A BYTE -- v4690. *** Until v4689 the probe wrote the
+        // noise remapped to 0..1 through an 8-bit channel and this row asserted the bytes EQUAL. That compares two
+        // roundings, and Keith's rig (NVIDIA, D3D12) showed what that costs: at (5,5) the CPU's value is 129.51 of
+        // 255, the GPU's f32 a hair lower, and the two rounded to different bytes -- "1.00 of 255" from an error
+        // the byte could not measure, and a pass on this box that was the luck of where the lattice falls. The
+        // probe now packs the f32's bits big-endian across RGBA, as the hash row does, so the readback is lossless.
+        //
+        // *** THE BOUND IS DERIVED, NOT TUNED. *** f64 JS and f32 WGSL cannot agree bit for bit here -- the
+        // gradient is r*cos(a), r*sin(a), and WGSL's sin and cos are specified to an ABSOLUTE ERROR OF 2^-11
+        // (the spec states it over [-pi, pi]; a here spans [0, 2pi), so a driver outside that range is outside
+        // the spec too, and would read red here, which would be a finding). Each corner is dot(g, f - d) with
+        // every |f - d| component at most 1, and only x and y carry trig, so a corner is off by at most 2 * 2^-11.
+        // The trilinear quintic mix has convex weights, so it does not grow a corner error. The rest is f32
+        // rounding: the sqrt near a pole, where 1 - z*z is smallest at 6.1e-5 and its 2.4e-7 input error becomes
+        // 1.6e-5; the fade and the eight lerps, a few ulp each; the lattice point px*0.37 itself, 1 ulp. 2e-5
+        // covers those together. Both the measured worst and the bound are printed, so a device that sits near
+        // the bound is visible long before it crosses it.
+        const NOISE_F32_BOUND = 2 * 2 ** -11 + 2e-5;
         const rn = r.frames[1] ? { ok: true, pixels: r.frames[1] } : { ok: false };
         if (!rn.ok) ok("!! the kit's gradient noise matches a real GPU render", false, "second frame missing");
         else {
-            let worst = 0, worstAt = null;
+            const dv = new DataView(new ArrayBuffer(4));
+            const f32At = (x, y) => { const i = ((N - 1 - y) * N + x) * 4;
+                for (let k = 0; k < 4; k++) dv.setUint8(k, rn.pixels[i + k]); return dv.getFloat32(0, false); };
+            let worst = 0, worstAt = null, finite = 0;
             for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-                const got = rn.pixels[((N - 1 - y) * N + x) * 4] / 255;
-                const want = Math.min(1, Math.max(0, K.mhNoise3(x * 0.37, y * 0.29, 0.61) * 0.5 + 0.5));
-                const d = Math.abs(got - Math.round(want * 255) / 255);
-                if (d > worst) { worst = d; worstAt = `(${x},${y}) gpu=${got.toFixed(4)} cpu=${want.toFixed(4)}`; }
+                const got = f32At(x, y);
+                if (Number.isFinite(got)) finite++;
+                const want = K.mhNoise3(x * 0.37, y * 0.29, 0.61);
+                const d = Number.isFinite(got) ? Math.abs(got - want) : Infinity;
+                if (d > worst || worstAt === null) { worst = d; worstAt = `(${x},${y}) gpu=${got} cpu=${want}`; }
             }
-            ok("!! *** THE GRADIENT NOISE AGREES WITH THE COMPILED SHADER ON ALL 256 SAMPLES ***",
-                worst === 0, `worst |gpu - cpu| = ${(worst * 255).toFixed(2)} of 255${worstAt ? " at " + worstAt : ""}`);
+            ok("!! *** THE GRADIENT NOISE AGREES WITH THE COMPILED SHADER ON ALL 256 SAMPLES, AS FLOATS ***",
+                finite === N * N && worst <= NOISE_F32_BOUND,
+                `worst |gpu - cpu| = ${worst.toExponential(2)} against a derived bound of ${NOISE_F32_BOUND.toExponential(2)} ` +
+                `(${(worst * 127.5).toFixed(4)} of 255 once remapped to 0..1), at ${worstAt}; ${finite}/${N * N} finite`);
         }
     }
 }

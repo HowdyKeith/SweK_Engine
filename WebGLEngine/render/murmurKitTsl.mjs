@@ -713,7 +713,8 @@ export function makeMurmurKitTsl(TSL) {
  * wrong-shift error this kit's provenance note exists about.
  *
  * mode: "hash"  -> pixel (x,y) carries mhHash(x, y, 0) packed big-endian across RGBA.
- *       "noise" -> mhNoise3 over a fixed lattice, remapped to 0..1 in R (8-bit, so compared within quantisation).
+ *       "noiseBits" -> mhNoise3 over a fixed lattice, its f32 BITS packed big-endian across RGBA as the hash is
+ *                (v4690: it was a byte of the remapped value, and a byte comparison is a comparison of two roundings).
  *       "exit"  -> mhExit for a ray through the body, in R, scaled by 1/MH_EXIT_CAP.
  *       "live"  -> mh_live's voice in R and pace in G, over signal (x) by state (y).
  *       "state" -> mh_state's complete/sweep/settled/drive in RGBA, over tau (x) by state (y).
@@ -1020,12 +1021,23 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
             return vec4(clamp(st.complete, 0.0, 1.0), clamp(st.sweep, 0.0, 1.0),
                         clamp(st.settled, 0.0, 1.0), clamp(st.drive, 0.0, 1.0));
         }
-        if (mode === "noise") {
+        if (mode === "noiseBits") {
             // A lattice that deliberately straddles cell boundaries, where a wrong fade or a wrong gradient
             // shows up and a smooth interior would not.
+            //
+            // *** THE f32 ITSELF, NOT A ROUNDED BYTE OF IT -- v4690. *** Until now this wrote the noise remapped to
+            // 0..1 through an 8-bit channel, and the gate compared bytes. That is a comparison of two ROUNDINGS:
+            // on Keith's rig (NVIDIA, D3D12) the CPU's value at (5,5) sat at 129.5 of 255 and the GPU's f32,
+            // a hair below it, rounded the other way -- "1.00 of 255" from an error the byte could not show.
+            // The noise's bits are packed big-endian across RGBA exactly as the hash is, so the readback is
+            // lossless and the gate grades the shader's actual float against a stated error bound.
             const p = vec3(px.mul(0.37), py.mul(0.29), float(0.61));
-            const v = clamp(K.mhNoise3(p).mul(0.5).add(0.5), 0.0, 1.0);
-            return vec4(v, v, v, 1.0);
+            const h = TSL.floatBitsToUint(K.mhNoise3(p)).toVar();
+            const b0 = float(h.shiftRight(uint(24)).bitAnd(uint(255))).div(255.0);
+            const b1 = float(h.shiftRight(uint(16)).bitAnd(uint(255))).div(255.0);
+            const b2 = float(h.shiftRight(uint(8)).bitAnd(uint(255))).div(255.0);
+            const b3 = float(h.bitAnd(uint(255))).div(255.0);
+            return vec4(b0, b1, b2, b3);
         }
         // "exit": a ray entering the unit sphere at a known point and running along +z.
         const P = vec3(px.div(n).mul(1.6).sub(0.8), py.div(n).mul(1.6).sub(0.8), float(-0.5));
