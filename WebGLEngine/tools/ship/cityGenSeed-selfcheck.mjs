@@ -24,6 +24,15 @@
 //                                                                                      the tier-weights hold.
 //                   D  the seed not narrowed to u32 (this.seed = seed)               -> 1 red: the u32 hold (-1 and 7.9 recorded as given).
 //                   Each restored and the baseline re-run: 0 red.
+// SABOTAGE (v4681): E  cityHash's first draft folded `state` alongside `hp`; dropping the state fold           -> 0 red on every
+//                      row section 4 shipped with at the time -- damageAt's crumble/topple thresholds are a pure function of
+//                      hp / maxHp (fixed for a city's whole life), so two buildings at the same hp are always at the same
+//                      state, never two different ones a replay could disagree on. cityHash folds hp alone now; state was
+//                      measured history of that same number, not independent information, and a fold nothing here can turn
+//                      red is not a fold worth carrying into the replay hash race-brain.html keeps.
+//                   F  the hp fold dropped too (the loop body emptied)                                          -> 2 red: both
+//                      rows above that sabotage E left green, confirming hp is what the fold is actually testing rather than
+//                      both rows having been vacuously true.
 //
 // Run: node tools/ship/cityGenSeed-selfcheck.mjs      (~0.53 s)
 "use strict";
@@ -31,7 +40,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { CityGen } from "../../world/CityGen.js";
+import { CityGen, cityHash } from "../../world/CityGen.js";
 import { codeOnly } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -86,6 +95,21 @@ sec("3. THE FILE");
     const src = fs.readFileSync(path.join(ENG, "world/CityGen.js"), "utf8");
     // CODE only: the header now says in prose that every decision USED Math.random, and a raw scan would count the sentence (the v4266 rule)
     ok("no Math.random remains in world/CityGen.js's code (comments aside), and it imports rng from world/procPlanet.js", !/Math\.random/.test(codeOnly(src)) && /import \{ rng \} from "\.\/procPlanet\.js"/.test(src));
+}
+
+sec("4. cityHash, v4681: THE LOCKSTEP FOLD A SHELL THAT LANDED ON A DIFFERENT WALL MUST DISAGREE ON");
+{
+    // world/crashDamage.mjs's shellInto (a turret shell) and its own damageAt (a car crash) both mutate hp/state on this
+    // same `buildings` array through no path box3d's own state hash reaches -- brain/gunnerPolicy-selfcheck.mjs proves
+    // shellInto's wiring; this proves the fold race-brain.html folds into its replay hash actually moves when they do.
+    const fold = (h, v) => (Math.imul(h ^ v, 0x01000193) >>> 0);
+    const a = city(7), b = city(7);
+    ok("two untouched cities from the same seed fold the same", cityHash(0x811c9dc5, a.g, fold) === cityHash(0x811c9dc5, b.g, fold));
+    b.g.damageAt(b.g.buildings[0].x, b.g.buildings[0].z, 5, { x: 1, z: 0 });
+    ok("!! five hit points off ONE building (no voxel divergence needed) is enough to move the fold", b.g.buildings[0].hp === b.g.buildings[0].maxHp - 5 && cityHash(0x811c9dc5, a.g, fold) !== cityHash(0x811c9dc5, b.g, fold), `hp ${b.g.buildings[0].hp} of ${b.g.buildings[0].maxHp}`);
+    const c = city(7); c.g.damageAt(c.g.buildings[0].x, c.g.buildings[0].z, c.g.buildings[0].maxHp, { x: 1, z: 0 });
+    ok("!! toppled outright (hp 0), the fold differs from the untouched city and from the merely-damaged one -- hp is what moves it, and a sabotage dropping state from the fold (state is hp/maxHp's own deterministic function here, never independent) came back 0 red, so state is not folded at all",
+        c.g.buildings[0].state === "toppled" && cityHash(0x811c9dc5, c.g, fold) !== cityHash(0x811c9dc5, a.g, fold) && cityHash(0x811c9dc5, c.g, fold) !== cityHash(0x811c9dc5, b.g, fold));
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");

@@ -111,35 +111,15 @@ export function applyHit(hit, { world, cars, turrets, poses, slicks = null, t = 
 /** Is a car slowed at tick t? The throttle it may use. */
 export const throttleFactor = (turret, t) => (turret && turret.slowUntil > t ? AMMO.slowFactor : 1);
 
-// ---- buildings, v4680 ---------------------------------------------------------------------------------------------------
-// A building never moved and never will: no impulse (there is no body to push), no slow, no splash to a neighbouring
-// building (a wall a shell actually reached is one wall, not the whole block) -- just the book's damage number, on the one
-// building the shell's own hit test named. The state lives beside `rects`, not on the box3d body, the same way `turrets` is
-// state beside `cars`: a building's box is immutable geometry (physics/raceCar.mjs's buildingBox()) and this is what happened
-// to it, kept separately for the same reason a car's chassis and its damage tally are not one object.
-
-/** One damage record per building rect, in the same order rects/buildingBox produced them. */
-export function createBuildingState(rects) { return rects.map(() => ({ damageTaken: 0, hits: 0 })); }
-
-/**
- * A shell landed on a building: `hit` is turret.mjs's building event ({ owner, building, point, dir, ammo }). Reads the same
- * hitEffect() row a car hit reads -- so a cataclysm cracks a wall harder than a spark does, exactly as it hits a car harder --
- * and credits the firing turret's damageDealt the same way applyHit() does, so "damage dealt" on the HUD counts a wall the
- * same as a rival.
- */
-export function applyBuildingHit(hit, buildings, turrets) {
-    const name = hit.ammo || AMMO.plain, e = hitEffect(name, 0), b = buildings[hit.building];
-    b.damageTaken = (b.damageTaken || 0) + e.damage; b.hits = (b.hits || 0) + 1;
-    if (turrets && turrets[hit.owner]) turrets[hit.owner].damageDealt = (turrets[hit.owner].damageDealt || 0) + e.damage;
-    return { ...e, building: hit.building, owner: hit.owner };
-}
-
-/** The lockstep fold for the buildings: each one's damage and hit count, so a replay that landed a shell on a different wall
- *  disagrees with the log even though every car's own state came out the same. */
-export function buildingHash(h, buildings, fold) {
-    for (const b of buildings) { h = fold(h, Math.round((b.damageTaken || 0) * 1e3) | 0); h = fold(h, b.hits || 0); }
-    return h;
-}
+// ---- buildings, v4680, superseded v4681 ----------------------------------------------------------------------------------
+// A flat per-building damageTaken/hits tally lived here through v4680: no impulse (there is no body to push), no slow, no
+// splash to a neighbour -- just the book's damage number, credited nowhere but the HUD. v4681 gave a shell the SAME wall a
+// car crash already could (world/crashDamage.mjs's shellInto, through the city world/CityGen.js generates and race-brain.
+// html now keeps rather than discards): real hit points, real crumble and topple, a collider that parks so a car drives
+// the rubble. Two damage models on one wall depending on what hit it was a bug waiting to be asked about, not a feature, so
+// this file no longer keeps one: brain/gunnerPolicy.mjs's turretTick reads hitEffect() for the scoreboard currency (damage
+// dealt, the same number a car hit credits) and hands the point, a blastRadius(damage) and the shell's own direction to
+// shellInto for what actually happens to the wall. See world/CityGen.js's cityHash for the lockstep fold this used to do.
 
 // ---- the pickups ------------------------------------------------------------------------------------------------------------
 /** A point `s` metres along the closed centreline, and the unit normal (left) there. */
