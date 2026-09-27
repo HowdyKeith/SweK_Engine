@@ -84,6 +84,8 @@
     <label title="The generated-frame views: a HUD over the scene -- a crosshair and a bar across the knot, and panels at the edges. Its pixels stand still, and every motion vector under them is the scene's behind."><input id="genhud" type="checkbox"> gen: HUD</label>
     <label title="With the HUD: generate from HUD-less frames and lay the newer frame's HUD over the generated one, as FSR3 composes UI (fx/fsr/fsrFrameGenScene-selfcheck.mjs: the HUD exact, +4.9 dB on the whole frame under a pan). Off, the HUD is drawn into the frames and generated with the scene, and it is dragged with the knot. The FSR3 views always composite it: FSR2 renders the scene alone."><input id="genui" type="checkbox" checked> gen: composite the HUD</label>
     <label title="The HUD's marker slides along its bottom bar, a step each real frame. Composited, the HUD on a generated frame is drawn AT the time generated -- makeFrameGen's `ui` as a function of t -- so the marker is where it is then; off, it is the newer real frame's HUD, and the marker is half a frame ahead on every generated frame (fx/fsr/fsrFrameGenUi-selfcheck.mjs: 10 dB on its pixels against 72.8, +5.1 on the whole frame)."><input id="genuit" type="checkbox" checked> gen: HUD at the generated time</label>
+    <label title="v4766 -- the generated-frame views: the world the recent rounds took, in the scene -- a glass pane and additive sparks (v4760), a lens reading the frame behind it (v4765), a BatchedMesh and sprites (v4761), and 64 particles a compute pass moves (v4762). Off, the knot and the floor alone."><input id="genworld" type="checkbox"> gen: glass, sparks, a lens, particles</label>
+    <label title="v4766 -- with those: the glass and the sparks drawn at the generated time as a layer, and the lens drawn over the generated frame (render/translucentLayer.mjs; fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs and fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs: +2.5 to +41.7 dB on translucent pixels, +1.4 to +6.7 on a lens's). Off, they are drawn into the frames and generated as surfaces. A composited HUD is drawn into the same layer, over them."><input id="genlayer" type="checkbox" checked> gen: translucent things as a layer</label>
   </div>
   <div class="stat" id="stat">starting&hellip;</div>
 </div>
@@ -92,7 +94,8 @@
 import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
-import { makeMotionStage, glClip } from "./render/temporalTsl.mjs";
+import { makeMotionStage, glClip, makePreviousCopy } from "./render/temporalTsl.mjs";
+import { makeTranslucentLayer } from "./render/translucentLayer.mjs";
 import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/temporalClipTsl.mjs";
 import { makeLumaRing } from "./render/temporalLockTsl.mjs";
 import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
@@ -104,7 +107,10 @@ import { flowCostModel } from "./render/flowCost.mjs";
 import { jitterPhaseCount } from "./render/jitter.mjs";
 
 const $ = (id) => document.getElementById(id);
-const DW = 960, DH = 540;
+// v4766: the generated-frame switches can be set from the address: ?genworld=1&genlayer=0&genhud=1 ...
+{ const q = new URLSearchParams(location.search); for (const id of ["genworld", "genlayer", "genhud", "genui", "genuit", "genflow"]) if (q.has(id)) $(id).checked = q.get(id) !== "0"; }
+// v4766: ?size=WxH draws the page smaller -- a software renderer takes seconds a frame at 960 x 540 (tools/ship/fsrThreeWorld-selfcheck.mjs shoots 320 x 180)
+const [DW, DH] = (/^(\d{2,4})x(\d{2,4})$/.exec(new URLSearchParams(location.search).get("size") || "") || [0, 960, 540]).slice(1).map(Number);
 const stat = $("stat");
 try {
     const canvas = $("view");
@@ -122,6 +128,40 @@ try {
     const stripes = new THREE.MeshBasicNodeMaterial(), scrollU = TSL.uniform(0.0);   // v4740: the stripes can slide on a still floor
     stripes.colorNode = TSL.Fn(() => { const s = TSL.floor(TSL.uv().x.mul(48.0).add(TSL.uv().y.mul(9.0)).add(scrollU)).mod(2.0); return TSL.mix(TSL.vec3(0.05, 0.08, 0.14), TSL.vec3(0.95, 0.72, 0.3), s); })();
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), stripes); floor.rotation.x = -Math.PI / 2; floor.position.y = -1.3; scene.add(floor);
+
+    // v4766 -- THE WORLD THE RECENT ROUNDS TOOK, for "gen: glass, sparks, a lens, particles": a glass pane and additive sparks
+    // (translucent, v4760), a lens with a backdropNode (v4765), a BatchedMesh and sprites (v4761), and particles a compute pass
+    // moves (v4762). poseAt(time) poses every moving part, so a generated frame's layer can be drawn at ITS time
+    const world = new THREE.Group(); world.visible = false; scene.add(world);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.4), new THREE.MeshBasicNodeMaterial({ transparent: true, color: 0x8cc0ff, opacity: 0.35 })); glass.position.set(-1.75, 0.15, 0.9); world.add(glass);
+    const sparkMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    sparkMat.colorNode = TSL.Fn(() => { const d = TSL.uv().sub(0.5); return TSL.vec3(1.0, 0.6, 0.2).mul(TSL.exp(d.dot(d).div(-0.02))); })();
+    const sparks = Array.from({ length: 6 }, () => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), sparkMat); world.add(m); return m; });
+    const lensMat = new THREE.MeshBasicNodeMaterial();
+    lensMat.backdropNode = TSL.viewportSharedTexture(TSL.screenUV.add(TSL.vec2(TSL.sin(TSL.uv().y.mul(25.0)).mul(0.02), 0.0))).rgb.mul(TSL.vec3(0.7, 0.85, 1.0));
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), lensMat); lens.position.set(1.75, 0.2, 0.9); world.add(lens);
+    const batch = new THREE.BatchedMesh(3, 600, 1200, new THREE.MeshNormalNodeMaterial()); batch.frustumCulled = false; batch.perObjectFrustumCulled = false;
+    const shapes = [batch.addGeometry(new THREE.BoxGeometry(0.3, 0.3, 0.3)), batch.addGeometry(new THREE.SphereGeometry(0.2, 10, 8))], batchIds = [0, 1, 0].map((g) => batch.addInstance(shapes[g])); world.add(batch);
+    const bobbers = [0xff6688, 0x66ffaa, 0x88aaff].map((c) => { const s = new THREE.Sprite(new THREE.SpriteNodeMaterial({ color: c })); s.scale.set(0.18, 0.18, 1); world.add(s); return s; });
+    const M4 = new THREE.Matrix4(), Q4 = new THREE.Quaternion(), E4 = new THREE.Euler(), S4 = new THREE.Vector3(1, 1, 1), V4 = new THREE.Vector3();
+    const poseAt = (time) => {
+        knot.rotation.set(time * 0.4, time * 0.6, 0); knot.updateMatrixWorld();
+        sparks.forEach((m, i) => { const a = time * 1.3 + i * Math.PI / 3; m.position.set(Math.cos(a) * 1.35, 0.2 + Math.sin(a * 2) * 0.25, Math.sin(a) * 0.6 + 0.4); m.updateMatrixWorld(); });
+        batchIds.forEach((id, i) => { const a = time * 0.7 + i * 2.1; batch.setMatrixAt(id, M4.compose(V4.set(Math.cos(a) * 2.2, -1.1, Math.sin(a) * 0.9 - 0.3), Q4.setFromEuler(E4.set(time, time * 0.5 + i, 0)), S4)); });
+        bobbers.forEach((s, i) => { s.position.set(-0.6 + i * 0.6, 1.25 + Math.sin(time * 2 + i) * 0.12, 0.3); s.updateMatrixWorld(); });
+    };
+    // 64 particles a compute pass moves, drawn as ONE sprite of count 64 placed by the storage buffer and sized by scaleNode, a
+    // step each real frame; the material says where they were -- makePreviousCopy, stepped before the pass that moves them
+    const NP = 64, p0 = new Float32Array(NP * 3), v0 = new Float32Array(NP * 3);
+    for (let i = 0; i < NP; i++) { const a = i * 2.399963; p0.set([Math.cos(a) * (0.5 + (i % 7) * 0.12), 0.9 + (i % 5) * 0.05, Math.sin(a) * 0.4 + 0.8], i * 3); v0.set([-Math.sin(a) * 0.01, 0.003 * Math.cos(i), Math.cos(a) * 0.006], i * 3); }
+    const pPos = TSL.instancedArray(p0, "vec3"), pVel = TSL.instancedArray(v0, "vec3"), pPrev = makePreviousCopy(THREE, TSL, pPos, NP);
+    const pMove = TSL.Fn(() => { pPos.element(TSL.instanceIndex).addAssign(pVel.element(TSL.instanceIndex)); })().compute(NP);
+    const pMat = new THREE.SpriteNodeMaterial({ color: 0xffe6a0 }); pMat.positionNode = pPos.toAttribute(); pMat.scaleNode = TSL.float(0.05); pMat.userData.previousPositionNode = pPrev.node.toAttribute();
+    const motes = new THREE.Sprite(pMat); motes.count = NP; world.add(motes);
+    let moteSteps = 0, layerDraws = 0, overDraws = 0;   // counted, so the stat line says the wiring ran and not only that it is on
+    const stepMotes = async () => { await pPrev.step(renderer); await renderer.computeAsync(pMove); moteSteps++; };
+    let layerObj = null;
+    const layer = () => layerObj || (layerObj = makeTranslucentLayer(THREE, { w: DW, h: DH, type: THREE.HalfFloatType }));
 
     // the bilinear comparison is the driver's own renderBilinear: the same low-resolution frame, read through the
     // same coordinates as EASU (see bilinearNode's note on why not a sampled texture)
@@ -217,12 +257,26 @@ try {
         }
         const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
         const withHud = $("genhud").checked, composite = withHud && $("genui").checked;
-        renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
+        // v4766: the world, and -- "as a layer" -- the frames and the stage's pass drawn without what the layer and the lens draw
+        const withWorld = $("genworld").checked, asLayer = withWorld && $("genlayer").checked;
+        if (withWorld) await stepMotes();
+        const hideThem = () => (asLayer ? layer().hide(scene) : () => {});
+        let back = hideThem(); renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera); back();
         if (withHud && !composite) await hudInto(cur, g.k);
-        await motionStage.render(renderer, scene, camera);
+        back = hideThem(); await motionStage.render(renderer, scene, camera);
         if (withArc) await towardStage.render(renderer, scene, camera, 0.5);
+        back();
+        // the scene's time at a generated t between the last real frame and this one, for the layer and the lens
+        const tNow = t, tWas = g.tWas ?? t; g.tWas = t;
+        const sceneAt = (tt) => poseAt(tWas + (tNow - tWas) * tt);
+        const ui = asLayer ? async (tt) => {
+            sceneAt(tt); await layer().render(renderer, scene, camera); poseAt(tNow); layerDraws++;
+            if (composite) await hudInto(layer().target, $("genuit").checked ? g.k - 1 + tt : g.k);   // the HUD over the translucent things, in one layer
+            return layer().texture;
+        } : composite ? await hudBetween(g.k) : null;
+        const over = asLayer ? async (tt, frame) => { sceneAt(tt); const tex = await layer().renderOver(renderer, scene, camera, frame); poseAt(tNow); overDraws++; return tex; } : null;
         await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture,
-                                         toward: withArc ? towardStage.motion.texture : null, ui: composite ? await hudBetween(g.k) : null,
+                                         toward: withArc ? towardStage.motion.texture : null, ui, over,
                                          camera: withFlow ? motionStage.camera.texture : null }, null);
         g.k++;
     };
@@ -408,7 +462,7 @@ try {
         const genSpin = $("mode").value === "gen" || $("mode").value === "genholes" ? Number($("speed").value) : 1;
         if ($("spin").checked) t += genView ? genSpin / 60 : dt / 1000;
         if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
-        knot.rotation.set(t * 0.4, t * 0.6, 0);
+        world.visible = $("genworld").checked; poseAt(t);   // v4766: the knot and the world's moving parts
         const mode = $("mode").value, k = Number($("scale").value);
         const t0 = performance.now();
         if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
@@ -427,6 +481,7 @@ try {
             + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
             + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genflow").checked ? ` + optical flow${$("genflowcheap").checked ? ", refining within 2" : ""} (${(flowReads() / 1e6).toFixed(0)}M reads a generated frame)` : "")
             + ((mode === "gen" || mode === "genholes") ? `${$("genarc").checked && !$("genflow").checked ? " + arc" : ""}, spin ${$("speed").value}x` : "")
+            + ((mode === "gen" || mode === "genholes") && $("genworld").checked ? ` + world (${$("genlayer").checked ? "glass and sparks as a layer, the lens over the frame" : "all drawn as surfaces"}; ${moteSteps} particle steps, the layer drawn ${layerDraws} times, the lens over ${overDraws})` : "")
             + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genhud").checked ? ($("genui").checked || mode === "fsr3gen" || mode === "fsr3paced" ? ` + HUD composited${$("genuit").checked ? " at the generated time" : ", the newer frame's"}` : " + HUD in the frames") : "")
             + (mode === "fsr3paced" && paced && paced.pacer ? ` | real every ${paced.N}, ${paced.pacer.policy}: ${paced.counts.gen} generated, ${paced.counts.real} real, ${paced.counts.hold} held` : "")
             + (mode === "fsr3paced" ? liveLine() : "");

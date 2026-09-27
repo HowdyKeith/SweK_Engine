@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4766 -- THE 373rd CLOSING: the demo page shows what the recent rounds took -- and a page gate found red since v4756.
+    since448: Object.freeze({
+        at: "v4766", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrThreeWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/pageShot-selfcheck.mjs (the canvas sampled where the page lays it out; red since v4756, now green)"]),
+        verdict: "*** THE PAGE SHOWS IT, AND THE GATE THAT SHOOTS THE PAGE HAD BEEN READING TEXT. *** fsr-three.html's generated-frame " +
+                 "views gain a world -- glass and additive sparks, a lens with a backdropNode, a BatchedMesh, sprites, 64 particles a " +
+                 "compute pass moves -- and, as a layer, the frames and the motion stage's pass drawn without them, the layer drawn at " +
+                 "the generated time as `ui` with the HUD in it, and the lens as `over`; ?size= draws it small. Presented at 320 x 180 " +
+                 "it runs with no error and counts the particle steps, layer draws and lens draws it made. Shooting it found " +
+                 "tools/ship/pageShot-selfcheck.mjs red since v4756: a new control moved the canvas off the gate's fixed sample box, " +
+                 "its control row read the controls' text -- a 12-second gate the quick sweep does not run -- bisected, and fixed by " +
+                 "sampling the canvas where the page lays it out. Eight sabotages, none green.",
+    }),
     // v4765 -- THE 372nd CLOSING: refraction -- what reads the frame behind it, drawn over the frame.
     since447: Object.freeze({
         at: "v4765", swept: 1, green: 1, red: 0,

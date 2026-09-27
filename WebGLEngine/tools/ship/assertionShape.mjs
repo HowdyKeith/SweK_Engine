@@ -575,8 +575,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4763 -- 1846 -> 1847 for tools/ship/threeUpstream-selfcheck.mjs -- the three.js bug-report drafts, held to their reproductions.
     // v4764 -- 1847 -> 1848 for tools/ship/realGpuRun-selfcheck.mjs -- the FSR gates on a real GPU, and a report that names it.
     // v4765 -- 1848 -> 1849 for fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs -- what reads the frame behind it, drawn over the generated frame.
-    gates: 1849, usesOk: 1828, definesOk: 1820, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1721, condFirst: 91, unknownSignature: 16,
+    // v4766 -- 1849 -> 1850 for tools/ship/fsrThreeWorld-selfcheck.mjs -- the demo page showing what the recent rounds took, wired and presented.
+    gates: 1850, usesOk: 1829, definesOk: 1821, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1722, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

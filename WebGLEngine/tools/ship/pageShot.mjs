@@ -30,7 +30,7 @@ const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "te
  * where `png` is the file's bytes and `image` tools/ship/pngCoverage.mjs's decode of them ({ width, height, channels, data }).
  */
 export async function shootPage({ engineRoot = ENG, page, query = "", selects = [], waitMs = 8000, launchArgs = PRESENT_ARGS,
-                                  viewport = { width: 1000, height: 660 }, statusSelector = "#stat", startMs = 2500 } = {}) {
+                                  viewport = { width: 1000, height: 660 }, statusSelector = "#stat", startMs = 2500, boxSelector = null } = {}) {
     const root = path.resolve(engineRoot);
     const srv = http.createServer((q, s) => {
         const u = decodeURIComponent(String(q.url).split("?")[0]), f = path.join(root, u);
@@ -51,8 +51,11 @@ export async function shootPage({ engineRoot = ENG, page, query = "", selects = 
         for (const [sel, val] of selects) await tab.selectOption(sel, val);
         await tab.waitForTimeout(waitMs);
         const status = statusSelector ? await tab.textContent(statusSelector, { timeout: 120000 }).catch(() => null) : null;
+        // v4766: where an element IS on the page, so a gate samples it there and not at coordinates a layout change moves
+        const box = boxSelector ? await tab.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect();
+            return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; }, boxSelector).catch(() => null) : null;
         const png = await tab.screenshot({ timeout: 120000 });
-        return { status, errors, png, image: decodePNG(png) };
+        return { status, errors, png, image: decodePNG(png), box };
     } finally { await browser.close(); srv.close(); }
 }
 
