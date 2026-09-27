@@ -7,7 +7,7 @@
 // reach the display, and latency. The render rates are the ones a frame generator is asked to lift: 30 frames a second (half
 // the refresh, FSR3's design case), 40 and 45 (more than half), 24 and 20 (less), and 30 with each frame 5 ms either side.
 "use strict";
-import { makeFramePacer, scheduleCPU, scheduleVrrCPU, pacingMetrics, PACE_POLICIES } from "./framePacer.mjs";
+import { makeFramePacer, scheduleCPU, scheduleVrrCPU, pacingMetrics, PACE_POLICIES, refreshFromStamps, makeLivePacing } from "./framePacer.mjs";
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -186,6 +186,48 @@ console.log("\n9. v4751 -- HOLDING TWO PAIRS, AND MAKING FRAMES WHEN THEY ARRIVE
        deep("two") === 0 && deep("any") > 0, "a pair three back is one makeFsr3({ hold: 2 }) has already let go");
     const refuseP = (() => { try { makeFramePacer({ refresh: R, pairs: "three" }); return "no throw"; } catch (e) { return e.message; } })();
     ok("  ...and a pairs it does not have is still refused", /pairs must be/.test(refuseP), refuseP);
+}
+
+console.log("\n10. v4756 -- THE BROWSER'S OWN CLOCK: requestAnimationFrame's timestamps, not a grid");
+{
+    const refuse = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
+    const got = [refuse(() => refreshFromStamps([0, 16])), refuse(() => refreshFromStamps([0, 16, 16])), refuse(() => makeLivePacing({ keep: 0 })),
+                 refuse(() => { const L = makeLivePacing(); L.tick(10, null); L.tick(10, null); })];
+    ok("fewer than three timestamps, timestamps that do not increase, a log that keeps nothing, and a tick that goes back are refused", got.every((m) => m !== "no throw"), got.map((m) => m.slice(0, 40)).join(" | "));
+    // a 60 Hz display as a browser reports it: each stamp a little off, and every 37th callback a vsync missed
+    let sj = 11; const jr = () => (sj = (sj * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const browser = (hz, n, jitter, missEvery) => { const st = []; let t = 3.2; for (let i = 0; i < n; i++) { t += 1000 / hz * (missEvery && i % missEvery === missEvery - 1 ? 2 : 1); st.push(t + (jr() - 0.5) * 2 * jitter); } return st; };
+    const s60 = browser(60, 240, 0.4, 37), s144 = browser(144, 400, 0.3, 29), mean = (st) => (st[st.length - 1] - st[0]) / (st.length - 1);
+    const e60 = refreshFromStamps(s60), e144 = refreshFromStamps(s144);
+    ok(`*** the refresh from the browser's timestamps is the MEDIAN of their intervals: ${e60.toFixed(3)} ms at 60 Hz and ${e144.toFixed(3)} at 144, each stamp up to 0.4 ms off and a vsync missed every 37th and 29th -- where the mean reads ${mean(s60).toFixed(3)} and ${mean(s144).toFixed(3)} ***`,
+       Math.abs(e60 / (1000 / 60) - 1) < 0.005 && Math.abs(e144 / (1000 / 144) - 1) < 0.005 && mean(s60) / (1000 / 60) - 1 > 0.02 && mean(s144) / (1000 / 144) - 1 > 0.02,
+       "a missed vsync is an interval twice as long; the mean folds them into a slower display, and the pacer then holds real frames for the wrong interval");
+    // the live log against the model: on a grid, what is drawn at refresh n is on the display at n + 1
+    const drive = (stamps, durations, policy, o = {}) => {
+        const p = makeFramePacer({ refresh: refreshFromStamps(stamps.slice(0, 12)), policy, ...o }), L = makeLivePacing({ keep: 1e9 }), fr = [];
+        { let st = 0; for (let k = 0; k < durations.length; k++) { fr.push({ k, start: st, ready: st + durations[k] }); st += durations[k]; } }
+        let next = 0;
+        for (const time of stamps) {
+            while (next < fr.length && fr[next].ready <= time + 1e-6) { const f = fr[next++]; p.real(f.k, f.start, f.ready); L.real(f.k, f.start, f.ready); }
+            L.tick(time, p.at(time));
+        }
+        return L;
+    };
+    // 40 real frames a second, where midpoint pacing has judder of its own, and the stamps stopping before the frames do
+    const d40 = CASES["40"], total = d40.reduce((a, b) => a + b, 0), grid = Array.from({ length: Math.floor((total - 100) / R) }, (_, n) => n * R);
+    const sch = scheduleCPU({ durations: d40, refresh: R, policy: "midpoint" }), L = drive(grid, d40, "midpoint");
+    // the window's edges half a refresh from any image, so no float decides which side of an edge an image is on
+    const to = grid[grid.length - 1], ms = 1500 - R / 2, live = L.metrics(ms), model = pacingMetrics(sch, { from: to - ms - R, to: to - R / 2 });
+    ok(`*** the live log IS the model's schedule, one refresh later: on a 60 Hz grid, 40 real frames a second, midpoint pacing -- judder ${live.judder.toFixed(4)} against ${model.judder.toFixed(4)} ms, latency ${live.meanLatency.toFixed(2)} against ${model.meanLatency.toFixed(2)} + ${R.toFixed(2)} ***`,
+       Math.abs(live.judder - model.judder) < 1e-9 && live.judder > 1 && Math.abs(live.meanLatency - model.meanLatency - R) < 1e-9 && live.refreshes === model.refreshes,
+       "what a requestAnimationFrame callback draws is presented for the next one, so the log dates it at the next timestamp: every image a refresh later, the line the same");
+    // real frames every other refresh on the browser's own jittered clock, each rendering in 2 refreshes plus a little
+    const st = browser(60, 130, 0.8, 0), durs = Array.from({ length: 70 }, () => 2 * R + (jr() - 0.5) * 3);
+    const J = {}; for (const pol of ["none", "midpoint", "timed"]) { const Lp = drive(st, durs, pol); J[pol] = Lp.metrics(1500).judder; }
+    say(`on the browser's clock -- stamps up to 0.8 ms off, real frames 2 refreshes +-1.5 ms: judder none ${J.none.toFixed(2)}, midpoint ${J.midpoint.toFixed(2)}, timed ${J.timed.toFixed(2)} ms`);
+    ok(`  ...and a stamp that is not on a grid is still paced: timed ${J.timed.toFixed(2)} ms of judder against ${J.none.toFixed(2)} without generation`, J.timed < J.none / 2, "the pacer reads times, never a refresh index -- except the eager plan, which the pages do not use");
+    const Lk = makeLivePacing({ keep: 500 }); for (let i = 0; i < 300; i++) Lk.tick(i * R, { kind: "real", k: 0, t: 1, scene: 0 });
+    ok(`  ...and the live log keeps only its window: ${Lk.shown.length} images and ${Lk.stamps.length} stamps after 300 refreshes with keep 500 ms`, Lk.shown.length <= Math.ceil(500 / R) + 1 && Lk.stamps.length <= Math.ceil(500 / R) + 2, "a page runs for as long as it is open");
 }
 
 // ---- v4743 SABOTAGE LOG ----------------------------------------------------------------------------------------

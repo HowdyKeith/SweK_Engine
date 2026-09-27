@@ -262,3 +262,49 @@ export function pacingMetrics({ shown, frames }, { from = 0, to = Infinity, imag
     return { judder, slope, newPerSecond: span > 0 ? fresh / span : 0, repeats, refreshes: n,
              meanLatency: lat.reduce((a, v) => a + v, 0) / Math.max(1, lat.length), maxLatency: lat.length ? Math.max(...lat) : 0 };
 }
+
+/**
+ * v4756 -- THE BROWSER'S OWN CLOCK. The refresh interval from requestAnimationFrame's timestamps: the MEDIAN of their
+ * differences. A missed vsync is one interval of two refreshes among many, and a mean reads a few of them as a slower display.
+ */
+export function refreshFromStamps(stamps) {
+    if (!stamps || stamps.length < 3) throw new Error("render/framePacer: refreshFromStamps needs at least three timestamps");
+    const d = [];
+    for (let i = 1; i < stamps.length; i++) {
+        const x = stamps[i] - stamps[i - 1];
+        if (!(x > 0)) throw new Error(`render/framePacer: timestamps must increase -- got ${stamps[i - 1]} then ${stamps[i]}`);
+        d.push(x);
+    }
+    d.sort((a, b) => a - b); const m = d.length >> 1;
+    return d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2;
+}
+
+/**
+ * v4756 -- A LIVE LOG, for a page that paces by the browser's clock. Each requestAnimationFrame callback calls tick(stamp,
+ * drew) with its own timestamp and what the pacer had it draw; what a callback draws goes up for the NEXT one, so it is
+ * logged as shown at the next timestamp -- the display time pacingMetrics grades. real(k, start, ready) records real frame k
+ * as makeFramePacer takes it. metrics(ms) grades the last `ms` of display time; refresh() is refreshFromStamps over the
+ * stamps kept. Shown entries and stamps older than `keep` ms go; real frames stay, which pacingMetrics reads by k.
+ */
+export function makeLivePacing({ keep = 4000 } = {}) {
+    if (!(keep > 0)) throw new Error(`render/framePacer: keep must be a positive number of ms -- got ${keep}`);
+    const shown = [], frames = [], stamps = [];
+    let pending = null;
+    return {
+        shown, frames, stamps,
+        tick(stamp, drew) {
+            if (stamps.length && !(stamp > stamps[stamps.length - 1])) throw new Error(`render/framePacer: tick's timestamps must increase -- got ${stamps[stamps.length - 1]} then ${stamp}`);
+            if (pending) shown.push({ ...pending, time: stamp });
+            pending = drew ? { kind: drew.kind, k: drew.k, t: drew.t, scene: drew.scene } : null;
+            stamps.push(stamp);
+            while (stamps.length > 3 && stamps[0] < stamp - keep) stamps.shift();
+            while (shown.length && shown[0].time < stamp - keep) shown.shift();
+        },
+        real(k, start, ready) { frames[k] = { k, start, ready }; },
+        refresh() { return refreshFromStamps(stamps); },
+        metrics(ms = 2000, images = "all") {
+            const to = stamps[stamps.length - 1];
+            return pacingMetrics({ shown, frames }, { from: to - ms, to, images });
+        },
+    };
+}

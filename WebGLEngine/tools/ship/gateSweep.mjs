@@ -8032,6 +8032,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4756 -- THE 363rd CLOSING: pacing on the browser's own clock, and graded live.
+    since438: Object.freeze({
+        at: "v4756", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsr3LiveClock-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/framePacer-selfcheck.mjs (section 10: the refresh from timestamps, and the live log against the model)"]),
+        verdict: "*** EVERY PACING GATE RAN ON AN IDEAL REFRESH GRID, AND THE PAGE DID TOO. *** render/framePacer.mjs has " +
+                 "refreshFromStamps -- the refresh as the MEDIAN of requestAnimationFrame's intervals, 16.686 ms at 60 Hz where a " +
+                 "vsync missed every 37th callback puts the mean at 17.083 -- and makeLivePacing, a log that dates what a callback " +
+                 "draws at the NEXT callback's timestamp and grades the last seconds with pacingMetrics: on a grid it is the model's " +
+                 "schedule one refresh later, to the bit. fx/fsr/fsr3LiveClock-selfcheck.mjs runs FSR3 on requestAnimationFrame " +
+                 "itself, a real frame ready when the queue drains: the live reading is the log's, every frame on a browser " +
+                 "timestamp. Its first draft asked the pacer for the callback's own time, and the timed policy asked 5 times for " +
+                 "pairs FSR3 had let go -- the frame just rendered was not yet ready to the pacer and was already in FSR3's ring; " +
+                 "asked for the later of the next refresh and now, 0, and the timed policy's judder on this device 6.7 and 11.5 ms " +
+                 "where it read 78 and 89. fsr-three.html's paced view has 'pacing: the browser's clock', and prints the live " +
+                 "grading. Eight sabotages, all red once a row was written for the one that scored 0.",
+    }),
     // v4755 -- THE 362nd CLOSING: a UI that moves, drawn at the generated time, and one you can see through.
     since437: Object.freeze({
         at: "v4755", swept: 1, green: 1, red: 0,
