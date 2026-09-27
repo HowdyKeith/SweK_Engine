@@ -571,8 +571,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4759 -- 1841 -> 1842 for fx/fsr/fsrFlowStill-selfcheck.mjs -- standing still as a flow guess, in the generator.
     // v4760 -- 1842 -> 1844 for render/translucentLayer-selfcheck.mjs and fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs -- translucent things as a layer drawn at t.
     // v4761 -- 1844 -> 1845 for render/temporalTslZoo-selfcheck.mjs -- BatchedMesh, sprites, and meshes sharing one program through the motion stage.
-    gates: 1845, usesOk: 1824, definesOk: 1816, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1717, condFirst: 91, unknownSignature: 16,
+    // v4762 -- 1845 -> 1846 for render/temporalTslCompute-selfcheck.mjs -- particles a compute pass moves, through the motion stage.
+    gates: 1846, usesOk: 1825, definesOk: 1817, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1718, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

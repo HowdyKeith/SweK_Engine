@@ -61,7 +61,9 @@
 // frame carry none. Over 160 particles' pixels: instanced 14.76 dB, buffered 12.29, the flow taking the buffered ones to
 // 14.74 and the instanced to 16.88; and the particles drawn at the generated time over a frame generated WITHOUT them, through
 // `composite` as a HUD is, 18.65 either way (fx/fsr/fsrFrameGenParticles-selfcheck.mjs). That costs a particle draw each
-// generated frame, and it is the only answer here for particles the motion stage cannot follow.
+// generated frame, and it is the only answer here for particles the motion stage cannot follow. v4762: particles a COMPUTE pass
+// moves carry their motion when the material says where they were -- userData.previousPositionNode, a copy render/temporalTsl.mjs's
+// makePreviousCopy keeps (render/temporalTslCompute-selfcheck.mjs).
 //
 // *** TRANSLUCENT THINGS ARE A LAYER TOO, DRAWN AT t (v4760). *** A pixel under glass shows the glass and what is behind it,
 // and this generator splats one vector a pixel. render/temporalTsl.mjs's stage draws the glass as a surface -- what is behind

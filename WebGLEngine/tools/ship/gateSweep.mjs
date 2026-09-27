@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4762 -- THE 369th CLOSING: particles a compute pass moves -- the hook, and three's WebGL2 running only one system.
+    since444: Object.freeze({
+        at: "v4762", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslCompute-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the refusal row re-aimed from positionNode to rotationNode)"]),
+        verdict: "*** A POSITION A NODE WRITES WAS WHERE THE APPLICATION SAYS, AND NOWHERE ELSE CAN SAY IT. *** three draws a material's " +
+                 "positionNode and keeps no previous one: the stage took a displaced mesh's bare geometry as its last point, 11.57 px " +
+                 "off, and refused a sprite placed by a node. The material's userData.previousPositionNode is the whole local position " +
+                 "as it was, and makePreviousCopy keeps a storage buffer's last contents for it; none given, the node stands still. " +
+                 "Twenty-four compute particles drawn as one sprite of count 24 are 24 plain sprites to 5e-6 px, and toward t; as an " +
+                 "InstancedMesh, instance matrices; without the hook the whole 2 px is missing. A sprite sized by scaleNode is taken; " +
+                 "turned by rotationNode, refused. three's WebGL2 backend runs only the first particle system a renderer makes -- " +
+                 "measured, and each system here has a renderer of its own. Twelve sabotages, none green.",
+    }),
     // v4761 -- THE 368th CLOSING: the rest of the mesh zoo -- two kinds wrong, and two of v4757's wrong where programs are shared.
     since443: Object.freeze({
         at: "v4761", swept: 1, green: 1, red: 0,

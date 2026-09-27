@@ -161,7 +161,7 @@ else {
                 try { await st.render(renderer, sc, cam); if (after) { after(); await st.render(renderer, sc, cam); } return "drawn"; } catch (e) { return String(e.message); } finally { st.dispose(); } };
             o.refusals = {
                 points: await refused((sc) => { const s = new THREE.Sprite(new THREE.PointsNodeMaterial({ color: 0xffffff })); s.name = "dots"; sc.add(s); }),
-                placed: await refused((sc) => { const m = new THREE.SpriteNodeMaterial(); m.positionNode = T.vec3(0.1, 0, 0); const s = new THREE.Sprite(m); s.name = "placed"; sc.add(s); }),
+                turned: await refused((sc) => { const m = new THREE.SpriteNodeMaterial(); m.rotationNode = T.float(0.3); const s = new THREE.Sprite(m); s.name = "turned"; sc.add(s); }),
                 grown: await refused((sc) => { const b = new THREE.BatchedMesh(4, 100, 300, mat()); b.name = "crowd"; b.addInstance(b.addGeometry(new THREE.BoxGeometry(0.3, 0.3, 0.3))); sc.add(b);
                     return () => { b.setInstanceCount(64); }; }),
             };
@@ -194,8 +194,8 @@ else {
             ok(`  [${mode}] Points, a pixel each: ${o.points.moving} of ${o.points.colour} drawn, ${e(o.points.w)} px`, same(o.points) && o.points.moving === o.points.colour && o.points.colour === 12);
         }
         const rf = r.result.webgpu.refusals, named = (k, ...w) => typeof rf[k] === "string" && w.every((x) => rf[k].includes(x));
-        ok(`what the stage cannot follow is refused by name: a sprite drawn with a points material, one placed by positionNode, a BatchedMesh whose instances outgrew its matrices texture`,
-           named("points", '"dots"', "points material") && named("placed", '"placed"', "positionNode") && named("grown", '"crowd"', "re-made its matrices texture"), rf.grown);
+        ok(`what the stage cannot follow is refused by name: a sprite drawn with a points material, one turned by rotationNode, a BatchedMesh whose instances outgrew its matrices texture`,
+           named("points", '"dots"', "points material") && named("turned", '"turned"', "rotationNode") && named("grown", '"crowd"', "re-made its matrices texture"), rf.grown);
     }
 }
 
@@ -209,9 +209,9 @@ else {
 // sprites are off-centre and grow); Z19 their own materials not put back -> 2; Z23 the centre not per draw -> 2; Z24 the stage's
 // sprite drawn by three's vertex stage -> 2. Z20 the skin's per-draw buffer not filled -> 4; Z21 the bind matrices not per draw
 // -> 2 (red only since one mesh's bind matrix is not the identity); Z22 the morph's not filled -> 4. Z16 a points material,
-// Z17 positionNode, Z18 a re-made matrices texture not refused -> 1 each. Twenty-four, none green.
+// Z17 rotationNode (a positionNode until v4762 took it), Z18 a re-made matrices texture not refused -> 1 each. Twenty-four, none green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a sprite placed or turned by a node (positionNode, rotationNode, scaleNode) and sized points on a sprite -- " +
-    "refused, and the compute-driven particles they are for are the next round's; a sprite's alpha test, which the stage's sprite " +
+console.log("unchecked here: a sprite turned by rotationNode and sized points on a sprite -- refused; sprites placed and sized by " +
+    "nodes are render/temporalTslCompute-selfcheck.mjs's since v4762; a sprite's alpha test, which the stage's sprite " +
     "material does not carry; a BatchedMesh's per-instance visibility changing between frames; and geometry a BatchedMesh re-packs.");
 process.exitCode = fails ? 1 : 0;
