@@ -8032,6 +8032,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4752 -- THE 359th CLOSING: particles, and three's instanced velocity found broken on the way.
+    since434: Object.freeze({
+        at: "v4752", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenParticles-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTsl-selfcheck.mjs (two InstancedMeshes against three separate meshes, and through a toward stage, on both backends)"]),
+        verdict: "*** THE FIRST PROBE OF PARTICLES FOUND THE MOTION STAGE WRONG FOR EVERY INSTANCED MESH. *** three keeps an " +
+                 "InstancedMesh's previous instance matrices in an array it copies into before the draw and never uploads, so the " +
+                 "vertex stage read the matrices the material was built with: particles moving 5 pixels a frame carried vectors " +
+                 "of 103. render/temporalTsl.mjs's stage now keeps each instanced mesh's matrices from its own last draw, per mesh, " +
+                 "and under a toward stage each instance's pose at t; the field is three separate meshes' to 1.79e-7 on both " +
+                 "backends. Through the generator, 160 particles over a textured wall, graded on their pixels: instanced 14.76 dB, " +
+                 "the same quads written into one buffer each frame -- which carry no vectors -- 12.29, the flow taking those to " +
+                 "14.74 and the instanced to 16.88; and the particles drawn at the generated time over a frame generated without " +
+                 "them, through the generator's composite as a HUD is, 18.65 either way. Eight sabotages, all red; two more scored " +
+                 "0 and were dead lines -- three uploads a buffer node's array at every draw -- which are gone.",
+    }),
     // v4751 -- THE 358th CLOSING: two pairs held, and frames made early measured and not taken.
     since433: Object.freeze({
         at: "v4751", swept: 1, green: 1, red: 0,

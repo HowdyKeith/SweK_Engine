@@ -41,6 +41,14 @@
 // premultiplied, laid over the generated frame -- the HUD exactly, and +4.9 dB on the whole frame
 // (fx/fsr/fsrFrameGenScene-selfcheck.mjs).
 //
+// *** PARTICLES CARRY THEIR VECTORS ONLY AS INSTANCES, AND ARE BEST DRAWN AT THE GENERATED TIME (v4752). *** An InstancedMesh
+// carries each particle's motion -- since v4752 render/temporalTsl.mjs's stage keeps the previous instance matrices itself,
+// three's being the ones the material was built with (103 px on particles moving 5) -- and quads written into one buffer each
+// frame carry none. Over 160 particles' pixels: instanced 14.76 dB, buffered 12.29, the flow taking the buffered ones to
+// 14.74 and the instanced to 16.88; and the particles drawn at the generated time over a frame generated WITHOUT them, through
+// `composite` as a HUD is, 18.65 either way (fx/fsr/fsrFrameGenParticles-selfcheck.mjs). That costs a particle draw each
+// generated frame, and it is the only answer here for particles the motion stage cannot follow.
+//
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
 // turning at the rate it does between two real frames, where the chord and the arc agree to a fraction of a pixel.

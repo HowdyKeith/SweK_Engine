@@ -114,6 +114,26 @@ else {
                 o.ids = Array.from(await renderer.readRenderTargetPixelsAsync(ids, 0, 0, a.D, a.D));
                 floor.visible = true; scene.background = bg;
                 st.dispose();
+                // v4752: the SAME three boxes as instances and as three meshes, moving each its own way, through two stages: the
+                // fields must be one field. three's own previous instance matrices are the build-time ones
+                {
+                    const iscene = new THREE.Scene(), sscene = new THREE.Scene(), g = new THREE.BoxGeometry(0.6, 0.6, 0.6), mat = new THREE.MeshBasicNodeMaterial({ color: 0xff8800 });
+                    // two instanced meshes of one geometry and one material: boxes 0 and 1 in the first, box 2 in the second
+                    const imA = new THREE.InstancedMesh(g, mat, 2), imB = new THREE.InstancedMesh(g, mat, 1); iscene.add(imA); iscene.add(imB);
+                    const sep = [0, 1, 2].map(() => { const m = new THREE.Mesh(g, mat); sscene.add(m); return m; });
+                    const place = (t) => { const o3 = new THREE.Object3D();
+                        for (let i = 0; i < 3; i++) { o3.position.set(-0.9 + i * 0.9 + 0.12 * t * (i - 1), 0.15 * t * (i % 2 ? 1 : -1), 0); o3.rotation.set(0.3 * t * (i + 1), 0.2 * t, 0); o3.updateMatrix();
+                            (i < 2 ? imA : imB).setMatrixAt(i % 2, o3.matrix); sep[i].matrix.copy(o3.matrix); sep[i].matrixAutoUpdate = false; sep[i].updateMatrixWorld(true); }
+                        for (const im of [imA, imB]) { im.instanceMatrix.needsUpdate = true; im.updateMatrixWorld(); } };
+                    // and through two TOWARD stages at t = 0.3: each instance on its own arc, as each mesh is
+                    const si = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl }), ss = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl });
+                    const ti = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl, toward: true }), ts = TT.makeMotionStage(THREE, T, { w: a.D, h: a.D, gl, toward: true });
+                    cam.position.set(0, 0.2, 4); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+                    for (let t = 0; t < 3; t++) { place(t); await si.render(renderer, iscene, cam); await ss.render(renderer, sscene, cam);
+                        await ti.render(renderer, iscene, cam, 0.3); await ts.render(renderer, sscene, cam, 0.3); }
+                    for (const [k, st2] of [["instM", si], ["sepM", ss], ["instT", ti], ["sepT", ts]]) o[k] = Array.from(await renderer.readRenderTargetPixelsAsync(st2.motion, 0, 0, a.D, a.D));
+                    for (const st2 of [si, ss, ti, ts]) st2.dispose();
+                }
 
                 // ---- the jitter's sense: a smooth scene, rendered small and jittered, resolved, against the full render ----
                 const sm = new THREE.Scene();
@@ -208,6 +228,16 @@ else {
         ok(`*** [${mode}] v4750: the stage's camera target is motionVectorsCPU at EVERY pixel, to ${wCam.toExponential(2)} -- ${camValid} of ${D * D} valid -- and a still surface's vector is it: the floor within ${floorSame.toFixed(4)} px, while ${boxOff} of the box's ${nBox} pixels are more than 0.05 px from it ***`,
            wCam < 1e-5 && camValid === D * D && floorSame < 0.05 && boxOff > nBox * 0.9,
            "the far plane's completion, at each surface's own depth: where a world point there would have gone had only the camera moved. render/flowReconcile.mjs's world-still test reads it");
+
+        // v4752: an InstancedMesh's field is its instances' own motion, the same as three separate meshes'
+        { const same = (A, B) => { const im = up(A, D), sm = up(B, D); let w = 0, moving = 0, big = 0;
+              for (let i = 0; i < D * D; i++) { for (let c = 0; c < 4; c++) w = Math.max(w, Math.abs(im[i * 4 + c] - sm[i * 4 + c])); const v = Math.hypot(sm[i * 4], sm[i * 4 + 1]) * D; if (v > 0.5) moving++; big = Math.max(big, Math.hypot(im[i * 4], im[i * 4 + 1]) * D); }
+              return { w, moving, big }; };
+          const f = same(o.instM, o.sepM), g = same(o.instT, o.sepT);
+          ok(`*** [${mode}] v4752: InstancedMeshes carry each INSTANCE's motion -- two of one geometry and one material, the same field as three separate meshes to ${f.w.toExponential(2)}, over ${f.moving} pixels that moved, none faster than ${f.big.toFixed(2)} px ***`,
+             f.w < 1e-5 && f.moving > 80, "three keeps its previous instance matrices in an array it copies into before the draw and never uploads: at v4751 particles moving 3 pixels a frame read 103. The stage keeps its own, from its last draw");
+          ok(`  ...and through a TOWARD stage at t = 0.3, each instance on its own arc: the same field to ${g.w.toExponential(2)}, over ${g.moving} pixels, none past ${g.big.toFixed(2)} px`,
+             g.w < 1e-5 && g.moving > 40 && g.big < f.big * 0.8, "the generator's arc stage reads the same instance history, each matrix taken to its pose at t"); }
 
         // the turnaround: the reference, on the device's own depth, says which pixels have no answer
         const mT = up(o.mT, D), zT = up(o.zT, D), dT = new Float32Array(D * D);
@@ -396,6 +426,7 @@ if (!skip) {
 // and a YCoCg box clamp identically, measured.
 // v4750: the camera target's row -- W4 (the far plane's depth at every pixel) -> 2, W9 (never drawn) -> 1; logged with the rest
 // of v4750's in fx/fsr/fsrFrameGenWorld-selfcheck.mjs.
+// v4752: the instance rows -- logged with the rest of v4752's in fx/fsr/fsrFrameGenParticles-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: SKINNED and MORPHED meshes, whose previous position three's positionPrevious carries and this gate " +
     "never draws; an ORTHOGRAPHIC camera's field; and every pass downstream of the field, which arrive one a round.");

@@ -95,6 +95,23 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     const scratch = toward ? new THREE.Matrix4() : null;
     const { vec4, select, cameraProjectionMatrix, modelViewMatrix, positionLocal, positionPrevious } = TSL;
     const prev = new WeakMap();
+    // v4752: an InstancedMesh's previous instance matrices, kept HERE -- three copies them before the draw into an array it
+    // never uploads, so its own were the matrices as they were when the material was built. Per mesh: the matrices at the last
+    // draw of this pass, handed to the vertex stage as the previous ones through a buffer node
+    const instances = new WeakMap();
+    const instanceRecord = (object) => {
+        let r = instances.get(object);
+        if (!r) { const n = Math.max(object.instanceMatrix.count, 1), last = Float32Array.from(object.instanceMatrix.array.subarray(0, n * 16)), cur = Float32Array.from(last);
+            r = { n, last, cur, node: TSL.buffer(cur, "mat4", n) }; instances.set(object, r); }
+        return r;
+    };
+    // under `toward`, each instance's previous matrix is ITS pose at t between its last draw and this one, as the mesh's is
+    const ia = toward ? new THREE.Matrix4() : null, ib = toward ? new THREE.Matrix4() : null, it = toward ? new THREE.Matrix4() : null;
+    const instancesBefore = (object, r) => {
+        if (!toward) { r.cur.set(r.last); return; }
+        const now = object.instanceMatrix.array;
+        for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
+    };
     class MotionNode extends THREE.VelocityNode {
         constructor() { super(); this.nodeType = "vec4"; }
         setPreviousCamera(projection, view) {
@@ -106,14 +123,21 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
+            // the buffer node's array is uploaded at every draw -- three's Buffer binding reports itself changed each time
+            if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
         }
         updateAfter({ object }) {
             const m = prev.get(object);
             if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
+            if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
         }
-        setup() {
+        setup(builder) {
             const cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal);
-            const was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(positionPrevious);
+            // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
+            const object = builder && builder.object;
+            const before = object && object.isInstancedMesh
+                ? TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz : positionPrevious;
+            const was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(before);
             // uv = ((x + 1) / 2, (1 - y) / 2), so uvPrev - uvCurr = ((xp - xc) / 2, (yc - yp) / 2)
             const xc = cur.x.div(cur.w), yc = cur.y.div(cur.w), xp = was.x.div(was.w), yp = was.y.div(was.w);
             const ok = was.w.greaterThan(0.0);   // behind the previous eye: no answer, as motionVectorsCPU says
