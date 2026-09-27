@@ -259,7 +259,13 @@ const RESOLVED = resolveHeadlessShell();
  * replace the default (comma-separated; "none" means no flags) and the gate prints what it launched with. The
  * default is unchanged until a rig reading says which set to adopt: an override is an instrument, not a fix.
  */
-export const WEBGL_DEFAULT_ARGS = Object.freeze(["--use-gl=swiftshader"]);
+// *** v4684 -- ADOPTED FROM THE RIG'S READING. *** All four gates lost the context under --use-gl=swiftshader on
+// the rig and all four were GREEN there under each of three alternatives: --use-angle=swiftshader with
+// --enable-unsafe-swiftshader, --enable-unsafe-swiftshader alone, and no flags at all (the NVIDIA through ANGLE).
+// The first is the default because it names the SAME software renderer Linux runs -- so a pixel-exact row means
+// the same thing on both boxes -- and it is the spelling Chrome 141's own deprecation message asks for. "none"
+// passed too, and is not chosen: it would make these rows depend on whose GPU ran them.
+export const WEBGL_DEFAULT_ARGS = Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]);
 export function webglLaunchArgs(env = process.env) {
     const v = env.SWEK_GL_ARGS;
     if (v == null || v === "") return { args: [...WEBGL_DEFAULT_ARGS], overridden: false };

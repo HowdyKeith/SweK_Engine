@@ -318,8 +318,8 @@ console.log("\nTHE HARNESS GUARD THAT COULD NOT FIRE (found on the rig, after v4
     const PR = await import("./playwrightResolve.mjs");
     const d = PR.webglLaunchArgs({}), n = PR.webglLaunchArgs({ SWEK_GL_ARGS: "none" }),
           l = PR.webglLaunchArgs({ SWEK_GL_ARGS: " --use-angle=swiftshader , --enable-unsafe-swiftshader ," });
-    ok("!! the WebGL2 harness default is unchanged until a rig reading says otherwise, and says it was not overridden",
-        d.args.join(" ") === "--use-gl=swiftshader" && d.overridden === false, JSON.stringify(d));
+    ok("!! the WebGL2 harness default is the set the rig measured green -- SwiftShader, named the way Chrome 141 asks -- and says it was not overridden",
+        d.args.join(" ") === "--use-angle=swiftshader --enable-unsafe-swiftshader" && d.overridden === false, JSON.stringify(d));
     ok("...and SWEK_GL_ARGS=none means NO flags, and a list is split, trimmed and emptied of blanks",
         n.args.length === 0 && n.overridden && l.args.join("|") === "--use-angle=swiftshader|--enable-unsafe-swiftshader" && l.overridden,
         `none -> [${n.args}], list -> [${l.args.join(", ")}]`);
