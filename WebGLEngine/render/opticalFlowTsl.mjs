@@ -18,6 +18,11 @@
 // corner), walks the (2r + 1)^2 window keeping a candidate only on a STRICT improvement, refines to a sub-pixel vertex at
 // level 0 only, clamped to half a pixel, and reports how much better than standing still it did.
 //
+// v4753: `grid: "level"` -- each level its own grid of blocks in its own target, ceil(lw / block) x ceil(lh / block), each block
+// covering exactly the finer blocks below it; a block below the coarsest reads its PARENT's answer, at half its index, and
+// the parent's three neighbours on its own side, clamped to the parent grid, and searches around whichever of the four
+// scores best (render/opticalFlow.mjs's note says why). "block", the default, is v4740's search, bit for bit.
+//
 // *** EVERY ROUNDING IS floor(x + 0.5), Math.round, AND NOT round(). *** v4734 found render/opticalFlowWgsl.mjs's round()
 // tying to even at a block origin bx * block / scale that lands on a half -- 44 of 512 components, one by 79 pixels.
 "use strict";
@@ -69,19 +74,23 @@ export function makeLumaPyramid(THREE, TSL, { w, h, levels = Infinity }) {
  * opticalFlowCPU over two pyramids: flow(renderer, curPyr, prevPyr) writes `target` (bw x bh: fx, fy, conf, 1). The
  * pyramids must hold at least min(levels, their own) levels, which makeOpticalFlow's own pyramids do.
  */
-export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null }) {
+export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null, grid = "block" }) {
     requireTsl(TSL);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/opticalFlowTsl: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius)) throw new Error(`render/opticalFlowTsl: searchRadius must be a whole number of pixels, at least 1 -- got ${searchRadius}`);
     if (!(levels >= 1) || levels !== Math.floor(levels)) throw new Error(`render/opticalFlowTsl: levels must be a whole number, at least 1 -- got ${levels}`);
     if (refineRadius === null) refineRadius = searchRadius;
     if (!(refineRadius >= 1) || refineRadius !== Math.floor(refineRadius)) throw new Error(`render/opticalFlowTsl: refineRadius must be a whole number of pixels, at least 1 -- got ${refineRadius}`);
+    if (grid !== "block" && grid !== "level") throw new Error(`render/opticalFlowTsl: grid must be "block" or "level" -- got ${grid}`);
     const { Fn, Loop, float, int, vec4, ivec2, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
     const cur = makeLumaPyramid(THREE, TSL, { w, h, levels }), prev = makeLumaPyramid(THREE, TSL, { w, h, levels });
     const top = Math.min(levels, cur.levels) - 1;
-    const flat = () => new THREE.RenderTarget(bw, bh, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
-    const flows = [flat(), flat()];
+    const flat = (gw = bw, gh = bh) => new THREE.RenderTarget(gw, gh, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    // v4753: grid "level" -- each level its own grid, ceil(lw / block) x ceil(lh / block), in its own target; "block" keeps
+    // two targets at the finest grid and alternates them, every level searching every block
+    const lvl = grid === "level", gridOf = (L) => lvl ? [Math.ceil(cur.sizes[L][0] / block), Math.ceil(cur.sizes[L][1] / block)] : [bw, bh];
+    const flows = lvl ? Array.from({ length: top + 1 }, (_, L) => flat(...gridOf(L))) : [flat(), flat()];
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -108,11 +117,24 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
             });
             return s;
         };
-        const ox = floor(bx.mul(block).div(scale).add(0.5)), oy = floor(by.mul(block).div(scale).add(0.5));      // Math.round
-        const g = guessTex ? textureLoad(guessTex, ivec2(int(bx), int(by))) : vec4(0.0);
-        const gx = floor(g.x.negate().div(scale).add(0.5)), gy = floor(g.y.negate().div(scale).add(0.5));
-        const bdx = gx.toVar(), bdy = gy.toVar();
+        const ox = lvl ? bx.mul(block) : floor(bx.mul(block).div(scale).add(0.5)), oy = lvl ? by.mul(block) : floor(by.mul(block).div(scale).add(0.5));   // Math.round
+        // the guess: this block's own answer from the level above, or on the level grid its PARENT's -- (bx >> 1, by >> 1)
+        const guess = (gx0, gy0) => { const g = textureLoad(guessTex, ivec2(int(gx0), int(gy0))); return [floor(g.x.negate().div(scale).add(0.5)), floor(g.y.negate().div(scale).add(0.5))]; };
+        const px = floor(bx.mul(0.5)), py = floor(by.mul(0.5));
+        const [g0x, g0y] = guessTex ? (lvl ? guess(px, py) : guess(bx, by)) : [float(0.0), float(0.0)];
+        const gx = g0x.toVar(), gy = g0y.toVar();
         const best = sad(ox, oy, ox.add(gx), oy.add(gy)).toVar();                      // SEEDED with the guess's own score
+        if (lvl && guessTex) {
+            // the parent's three neighbours on this block's side, clamped to the parent grid, in the mirror's order, each kept
+            // only on a STRICT improvement
+            const [uw, uh] = gridOf(L + 1), sx = select(bx.sub(px.mul(2.0)).greaterThan(0.5), float(1.0), float(-1.0)), sy = select(by.sub(py.mul(2.0)).greaterThan(0.5), float(1.0), float(-1.0));
+            const qx = clamp(px.add(sx), 0.0, float(uw - 1)), qy = clamp(py.add(sy), 0.0, float(uh - 1));
+            for (const [cx0, cy0] of [[qx, py], [px, qy], [qx, qy]]) {
+                const [cx, cy] = guess(cx0, cy0), s = sad(ox, oy, ox.add(cx), oy.add(cy)), better = s.lessThan(best);
+                gx.assign(select(better, cx, gx)); gy.assign(select(better, cy, gy)); best.assign(select(better, s, best));
+            }
+        }
+        const bdx = gx.toVar(), bdy = gy.toVar();
         const w2 = 2 * R + 1;
         Loop({ start: int(0), end: int(w2 * w2), type: "int", condition: "<", name: "c" }, ({ c }) => {
             // y outer, x inner, as the mirror walks it: where candidates tie exactly -- content constant along a line, the
@@ -135,9 +157,11 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
     })();
     // the top level reads no guess; each level below reads the target the level above wrote
     const passes = [];
-    for (let L = top, k = 0; L >= 0; L--, k++) passes.push({ L, out: flows[k % 2], sc: quad(levelNode(L, L === top ? null : flows[(k + 1) % 2].texture)) });
+    for (let L = top, k = 0; L >= 0; L--, k++)
+        passes.push(lvl ? { L, out: flows[L], sc: quad(levelNode(L, L === top ? null : flows[L + 1].texture)) }
+                        : { L, out: flows[k % 2], sc: quad(levelNode(L, L === top ? null : flows[(k + 1) % 2].texture)) });
     return {
-        bw, bh, block, levels: top + 1, searchRadius, refineRadius, pyramids: { cur, prev },
+        bw, bh, block, levels: top + 1, searchRadius, refineRadius, grid, pyramids: { cur, prev },
         /** The target holding the finest level's answer. */
         get target() { return passes[passes.length - 1].out; },
         /** Build both pyramids from rgba textures and search. */

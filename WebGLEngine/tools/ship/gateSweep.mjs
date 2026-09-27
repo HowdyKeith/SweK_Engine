@@ -8032,6 +8032,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4753 -- THE 360th CLOSING: the optical flow with each level of its pyramid on its own block grid.
+    since435: Object.freeze({
+        at: "v4753", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowGrid-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (the level grid counted, its shifts found, and section 4: a zoom, a turn and two motions)",
+                                "render/opticalFlowTsl-selfcheck.mjs (six level-grid cases in the parity row, both backends)",
+                                "fx/fsr/fsrFlowCost-selfcheck.mjs (the level grid's device time against its reads)",
+                                "fx/fsr/fsrFrameGenFlow-selfcheck.mjs (the refinement row one-sided)"]),
+        verdict: "*** THE COARSE LEVELS WERE MEASURING THE WRONG PLACE, AND PAYING FOR EVERY FINE BLOCK TO DO IT. *** The search ran " +
+                 "every level on the finest level's block grid, each block's coarse patch anchored at its corner: at the coarsest " +
+                 "of three levels it covers 32 full-resolution pixels reaching 24 past the block, so it measured the motion 12 pixels " +
+                 "away. Measured on the mirror, with the patch centred a zoom's end-point error fell from 0.66 px to 0.15 -- and a " +
+                 "grid for each level, each block covering exactly the blocks below it, does the same for 46 % of the search's " +
+                 "reads. A block below the coarsest then shares its parent with three others, so it takes the best of its parent's " +
+                 "guess and the parent's three neighbours on its side: where two motions meet, 39 of 44 blocks right against 26 " +
+                 "on the block grid. render/opticalFlow.mjs and render/opticalFlowTsl.mjs have grid 'level', the same vector at " +
+                 "every block on both backends; render/flowCost.mjs counts it to the read and the device's time follows (48 % of " +
+                 "the time for 47 % of the reads). In the generator it is the default now: no case worse, +0.17 and +0.27 dB where " +
+                 "a texture scrolls behind the knot, 122M reads at 960 x 540 against 264M. Seventeen sabotages; the one that " +
+                 "scored 0 on every answer -- each level's target at the finest size -- changes only the cost, and the timing " +
+                 "gate reads it. A fourth level is cheap on this grid and loses a small fast square on both; that is a later round's.",
+    }),
     // v4752 -- THE 359th CLOSING: particles, and three's instanced velocity found broken on the way.
     since434: Object.freeze({
         at: "v4752", swept: 1, green: 1, red: 0,

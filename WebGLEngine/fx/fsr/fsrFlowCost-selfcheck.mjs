@@ -21,7 +21,8 @@ let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);
 const W = 256, H = 256, REP = 5;
-const SETTINGS = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 }, levels2: { levels: 2 } };
+const SETTINGS = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 }, levels2: { levels: 2 },
+                   level: { grid: "level" }, levelR2: { grid: "level", refineRadius: 2 } };   // v4753: each level its own grid
 
 console.log("\n1. ON THE DEVICE: the flow's time under five settings, against its reads");
 const skip = webgpuSkipReason();
@@ -71,8 +72,9 @@ else {
         ok(`*** the flow's time on the device follows its read count: every setting's share of the default's time within ${(worst * 100).toFixed(0)}% of its share of the reads -- ${rows.slice(1).map((x) => `${x.k} ${(x.tr * 100).toFixed(0)}% / ${(x.rr * 100).toFixed(0)}%`).join(", ")} ***`,
            worst < 0.2 && rows.every((x) => x.ms > 0), "the search is texture reads and nothing else, so on any device its time should scale with them; on this one it does, which is what the count is for where there is no GPU to time");
         say(`this device's proportions, reported and not asserted of the method: the flow ${o.flow.default.toFixed(0)} ms, generating a frame from the vectors alone ${o.generate.toFixed(0)} ms, rendering the scene ${o.scene.toFixed(1)} ms -- a CPU rasteriser pays for the splat's ${W * H} instanced quads what a GPU does not`);
-        ok(`  ...so the count can say what the page's flow costs a generated frame, where nothing times it: ${(flowCostModel({ w: 960, h: 540 }).total / 1e6).toFixed(0)}M at 960 x 540, ${(flowCostModel({ w: 960, h: 540, refineRadius: 2 }).total / 1e6).toFixed(0)}M refining within 2`,
-           flowCostModel({ w: 960, h: 540, refineRadius: 2 }).total < 0.6 * flowCostModel({ w: 960, h: 540 }).total, "fsr-three.html's frame-generation views print it when the flow is on");
+        const pg = (o) => flowCostModel({ w: 960, h: 540, grid: "level", ...o }).total;
+        ok(`  ...so the count can say what the page's flow costs a generated frame, where nothing times it: ${(pg({}) / 1e6).toFixed(0)}M at 960 x 540, ${(pg({ refineRadius: 2 }) / 1e6).toFixed(0)}M refining within 2 -- each level on its own grid, as the generator runs it since v4753 (${(flowCostModel({ w: 960, h: 540 }).total / 1e6).toFixed(0)}M on the block grid)`,
+           pg({ refineRadius: 2 }) < 0.6 * pg({}) && pg({}) < 0.6 * flowCostModel({ w: 960, h: 540 }).total, "fsr-three.html's frame-generation views print it when the flow is on");
     }
 }
 
@@ -80,6 +82,7 @@ else {
 // render/opticalFlowTsl.mjs ignoring the refinement radius (T4) -> 1 here -- every refining setting then takes the default's
 // time and not its reads' share -- and 2 in render/opticalFlowTsl-selfcheck.mjs, whose v4748 cases it no longer matches.
 // fx/fsr/fsrFrameGenTsl.mjs dropping `refineRadius` (G17) -> 1 in fx/fsr/fsrFrameGenFlow-selfcheck.mjs, whose arms row reads it.
+// v4753: the level grid's settings here are logged with the rest of v4753's in fx/fsr/fsrFlowGrid-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU, where the splat's cost against the flow's is not this device's -- nothing in this sandbox has one; " +
     "and the time of the reconciliation and the fill, which are a few reads a pixel and were not worth timing against the search.");

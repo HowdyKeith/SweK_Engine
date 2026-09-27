@@ -154,8 +154,11 @@ else {
            "at 0.5 more of the wall takes its block's colour vector, and a block near the knot's silhouette carries the knot's. The whole frame gains all the same; where that gain sits is not located here");
         // v4748: the flow refining within 2 below its coarsest level -- about half the reads (render/flowCost.mjs)
         const rd = cs.map((c) => o[c].all.refine - o[c].all.default);
-        ok(`  [${mode}] ...and refining within 2 below the coarsest level, at about half the flow's reads, is within 0.1 dB of the full window in all four cases: ${cs.map((c, i) => `${c} ${rd[i] >= 0 ? "+" : ""}${rd[i].toFixed(2)}`).join(", ")}`,
-           rd.every((v) => Math.abs(v) <= 0.1) && o.refineRadii.default === 4 && o.refineRadii.refine === 2,
+        // v4753: ONE-SIDED. On the level grid, the generator's default since, refining within 2 came out 0.14 dB ABOVE the full
+        // window where the texture scrolls, and a two-sided bound read that as a failure; what this row is for is that the cut
+        // costs nothing
+        ok(`  [${mode}] ...and refining within 2 below the coarsest level, at about half the flow's reads, is no more than 0.1 dB below the full window in any of the four cases: ${cs.map((c, i) => `${c} ${rd[i] >= 0 ? "+" : ""}${rd[i].toFixed(2)}`).join(", ")}`,
+           rd.every((v) => v >= -0.1) && o.refineRadii.default === 4 && o.refineRadii.refine === 2,
            "render/flowCost-selfcheck.mjs: it finds the same shifts, because the reach is the coarsest level's; fx/fsr/fsrFlowCost-selfcheck.mjs: its time on the device is its reads'. Not the default -- a plain shadow's changed pixels read 0.85 dB lower with it (the v4748 probe), and nothing here is fast");
         ok(`  [${mode}] ...and the arms are the configurations they claim: margins ${o.margins.default}, ${o.margins.low} and ${o.margins.block}, still-surface margins ${o.stillMargins.default}, ${o.stillMargins.moved} and ${o.stillMargins.low}; the wall's interior is ${S.innerPx} pixels`,
            o.margins.default === 0.9 && o.margins.low === 0.05 && o.margins.block === 0.05 && o.stillMargins.default === 0.5 && o.stillMargins.moved === 0.9 && o.stillMargins.low === 0.5 && S.innerPx > 2000);

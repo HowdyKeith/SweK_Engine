@@ -28,6 +28,13 @@
 // `flow: { refineRadius: 2 }` searches the whole window at the coarsest level only and refines below it: 56% of the reads,
 // the same shifts found (the reach is the coarsest level's), within 0.1 dB on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's
 // four cases. It is not the default: a plain shadow's changed pixels read 0.85 dB lower with it.
+// *** v4753: EACH LEVEL ITS OWN GRID, AND THAT IS THE DEFAULT. *** The search had run every level on the finest level's
+// grid, each block's coarse patch anchored at its corner and reaching 24 pixels past it -- so a coarse level measured motion
+// 12 pixels from the block, and paid for every finest block at every level. `grid: "level"` (render/opticalFlow.mjs) gives
+// each level a quarter of the blocks of the one below, each covering its own: 122M reads at 960 x 540 against 264M, 49M
+// refining within 2. On the mirror a zoom's end-point error falls from 0.40 px to 0.15 and a turn's from 0.49 to 0.17, and
+// where two motions meet 39 of 44 blocks are right against 26 (render/flowCost-selfcheck.mjs); in this generator the frame
+// is no worse on any case and better where a texture scrolls (fx/fsr/fsrFlowGrid-selfcheck.mjs).
 //
 // *** BETWEEN ALIASED FRAMES IT FLICKERS (v4746). *** A generated frame blends two frames, which anti-aliases what a
 // single-sample frame aliases, so between native frames the display alternates aliased and anti-aliased: under a pan over
@@ -76,8 +83,10 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * convention: uvPrev - uvCurr, and clip depth). The first call has no older depth and fills with the newer one's.
  * `fill` is makeFrameInterp's, the depth textures supplied here; null generates with the holes left at zero.
  * `flow` (v4741) reconciles the vectors with an optical flow of the two frames first: { block, searchRadius, levels } for
- * render/opticalFlowTsl.mjs (and v4748's refineRadius) and { margin, marginStill, stillPx, mode, radius } for render/flowReconcileTsl.mjs, {} for their
- * defaults, null for the vectors alone.
+ * render/opticalFlowTsl.mjs (and v4748's refineRadius, v4753's grid) and { margin, marginStill, stillPx, mode, radius } for
+ * render/flowReconcileTsl.mjs, {} for their defaults, null for the vectors alone. The grid here is "level" unless given --
+ * each level of the flow's pyramid its own block grid (v4753), 46 % of the search's reads and no worse a frame on any case
+ * fx/fsr/fsrFlowGrid-selfcheck.mjs measures; { grid: "block" } is the search as it was to v4752.
  * `camera` (v4750), given to generate with `flow`, is the camera's own motion (makeMotionStage({ camera: true })): the
  * reconciliation then judges a still surface in the world, so a shadow or a reflection under a pan is judged as one.
  * `depthPrev` (v4751), given to generate, is the pair's OLDER depth, in place of the one this generator kept from its last call.
@@ -99,7 +108,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
-    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null }) : null;
+    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level" }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
     // displacement to time t in pixels, and its validity

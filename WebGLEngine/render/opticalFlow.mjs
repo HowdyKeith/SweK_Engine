@@ -51,6 +51,12 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  *   conf   per block, in [0, 1]: how much better the winning match is than standing still. 0 means the
  *          block is as happy where it was, which is what a flat region reports and is not a failure
  *
+ * `grid` (v4753): "block", the default, searches every level on the finest level's block grid -- each block its own
+ * search at every level, its coarse patch anchored at the block's corner; "level" gives each level its own grid of
+ * `block`-pixel blocks, ceil(lw / block) x ceil(lh / block), each covering exactly the finer blocks below it, and each
+ * block below the coarsest takes the best of FOUR guesses -- its parent's and the parent's three neighbours on its own
+ * side -- before searching around it. See the note at the level loop.
+ *
  * `subpixel` defaults to true and exists so the refinement's worth is MEASURABLE rather than asserted --
  * the control-arm discipline this arc applies to every switchable thing on its page. Off, the field is
  * whole pixels, which is what v4673 shipped.
@@ -73,7 +79,7 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
-                                 subpixel = true, refineRadius = null, tally = null }) {
+                                 subpixel = true, refineRadius = null, grid = "block", tally = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -83,6 +89,8 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
         throw new Error(`opticalFlowCPU: refineRadius must be a whole number of pixels, at least 1 -- got ${refineRadius}`);
     if (!(levels >= 1) || levels !== Math.floor(levels))
         throw new Error(`opticalFlowCPU: levels must be a whole number, at least 1 -- got ${levels}`);
+    if (grid !== "block" && grid !== "level")
+        throw new Error(`opticalFlowCPU: grid must be "block" or "level" -- got ${grid}`);
     // *** THE PYRAMID IS render/luminancePyramid.mjs's, NOT A SECOND ONE. *** Its base level imports the
     // arc's `luma`, its edge handling is measured, and a matcher that built its own would be a third
     // definition of brightness in a pipeline that has spent rounds getting down to one.
@@ -93,19 +101,34 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
     const score = tally ? (a, b, lw, lh, ax, ay, bx, by, n) => { tally.scores++; tally.reads += 2 * n * n; return sad(a, b, lw, lh, ax, ay, bx, by, n); } : sad;
 
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
-    const flow = new Float32Array(bw * bh * 2);
-    const conf = new Float32Array(bw * bh);
+    let flow = new Float32Array(bw * bh * 2);
+    let conf = new Float32Array(bw * bh);
+
+    // *** v4753 -- grid "level": EACH LEVEL ITS OWN GRID, AND THE COARSE PATCH WHERE ITS BLOCKS ARE. *** On the "block"
+    // grid every finest-level block searches every level, its patch at level L anchored at the block's corner: at the
+    // coarsest of three levels it covers 32 full-resolution pixels from there, 24 of them right of and below the block.
+    // Where motion varies across the frame that patch measures motion 12 pixels away -- MEASURED on the mirror, a zoom of
+    // 8 % read an end-point error of 0.66 px, and 0.15 with the patch centred on its block. The "level" grid's blocks
+    // cover exactly the finer blocks below them, so the patch is where they are, and a coarse level has a quarter of the
+    // blocks of the one below: 45 % of the reads at three levels. A block below the coarsest then shares its parent with
+    // three others, so at a boundary its parent may be the other side's; it takes the best of its parent's guess and
+    // the parent's three neighbours on its own side, scored before the search -- three more scores a block, where a window
+    // is (2r + 1)^2 of them. render/opticalFlow-selfcheck.mjs and render/flowCost-selfcheck.mjs measure both grids.
+    let up = null, upW = 0, upH = 0;
 
     // coarse to fine: each level starts from the level above's answer, doubled
     for (let L = top; L >= 0; L--) {
         const [lw, lh] = P.sizes[L], a = P.mips[L], b = Q.mips[L];
         const scale = 1 << L;                        // full-res pixels per pixel at this level
-        for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
-            const i = by * bw + bx;
+        const lvl = grid === "level", gw = lvl ? Math.ceil(lw / block) : bw, gh = lvl ? Math.ceil(lh / block) : bh;
+        if (lvl) { flow = new Float32Array(gw * gh * 2); conf = new Float32Array(gw * gh); }
+        for (let by = 0; by < gh; by++) for (let bx = 0; bx < gw; bx++) {
+            const i = by * gw + bx;
             // the block's origin at THIS level
-            const ox = Math.round((bx * block) / scale), oy = Math.round((by * block) / scale);
+            const ox = lvl ? bx * block : Math.round((bx * block) / scale), oy = lvl ? by * block : Math.round((by * block) / scale);
             // the guess carried down, expressed at this level and in the SEARCH's sense (cur -> prev)
-            const gx = Math.round(-flow[i * 2] / scale), gy = Math.round(-flow[i * 2 + 1] / scale);
+            const guessAt = (f, j) => [Math.round(-f[j * 2] / scale), Math.round(-f[j * 2 + 1] / scale)];
+            let [gx, gy] = lvl ? (up ? guessAt(up, (by >> 1) * upW + (bx >> 1)) : [0, 0]) : guessAt(flow, i);
             // *** THE PATCH IS `block` PIXELS AT EVERY LEVEL, NOT `block / scale`. *** Shrinking it with the
             // mip is the obvious reading of "the same block, coarser" and it is wrong: at three levels a
             // block of 8 becomes 2x2, a 2x2 SAD on a smoothed field is nearly flat, the coarse level
@@ -122,9 +145,20 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // header claimed "a tie leaves the centre alone" while the code did the opposite. The gate row
             // written to check that claim is what found it: 0 blocks reporting no motion and 64 reporting
             // the corner. Seeding with the guess makes the sentence true.
-            let bdx = gx, bdy = gy, subx = 0, suby = 0;
-            if (tally && L !== top) tally.reads++;        // the guess, which the device reads from the level above's target
+            if (tally && L !== top) tally.reads += lvl ? 4 : 1;   // the guesses, which the device reads from the level above's target
             let best = score(a, b, lw, lh, ox, oy, ox + gx, oy + gy, n);
+            if (lvl && up) {
+                // the parent's three neighbours on this block's side, clamped to the parent grid, each kept only if STRICTLY better
+                const px = bx >> 1, py = by >> 1, sx = bx & 1 ? 1 : -1, sy = by & 1 ? 1 : -1;
+                let took = false;
+                for (const [qx, qy] of [[px + sx, py], [px, py + sy], [px + sx, py + sy]]) {
+                    const [cx, cy] = guessAt(up, clampi(qy, 0, upH - 1) * upW + clampi(qx, 0, upW - 1));
+                    const s = score(a, b, lw, lh, ox, oy, ox + cx, oy + cy, n);
+                    if (s < best) { best = s; gx = cx; gy = cy; took = true; }
+                }
+                if (took && tally) tally.neighbours = (tally.neighbours || 0) + 1;   // the blocks where a neighbour's guess won
+            }
+            let bdx = gx, bdy = gy, subx = 0, suby = 0;
             // v4748: the coarsest level searches `searchRadius`; the levels below refine the guess within `refineRadius`
             const r = L === top ? searchRadius : refineRadius;
             for (let dy = -r; dy <= r; dy++)
@@ -185,6 +219,7 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // still ~ best ~ 0 and reports 0, which is the truthful answer and not a failure.
             conf[i] = still > 1e-6 ? Math.max(0, Math.min(1, (still - best) / still)) : 0;
         }
+        up = flow; upW = gw; upH = gh;
     }
     return { flow, conf, bw, bh, block, levels: top + 1 };
 }

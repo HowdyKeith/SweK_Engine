@@ -4,7 +4,9 @@
 // render/flowCost.mjs's count of what the optical flow reads, held to the reads render/opticalFlow.mjs's mirror makes
 // (opticalFlowCPU's `tally`), and v4748's `refineRadius` held to what it is for: the levels below the coarsest refining
 // the guess within a smaller window, the coarsest still searching the whole one. Measured here on a smoothed texture shifted
-// by known amounts: which shifts each setting finds, against what it reads.
+// by known amounts: which shifts each setting finds, against what it reads. v4753's `grid: "level"` -- each level its own
+// block grid, each block below the coarsest taking the best of four guesses -- held to the same count, and measured where
+// the motion is not one shift: a zoom, a turn, and a square moving across a background moving the other way.
 "use strict";
 import { flowCostModel, pyramidSizes } from "./flowCost.mjs";
 import { opticalFlowCPU } from "./opticalFlow.mjs";
@@ -17,8 +19,9 @@ const threw = (fn) => { try { fn(); return "no throw"; } catch (e) { return e.me
 console.log("\n1. WHAT IT REFUSES");
 {
     const got = [threw(() => flowCostModel({ w: 0, h: 4 })), threw(() => flowCostModel({ w: 8, h: 8, block: 1 })), threw(() => flowCostModel({ w: 8, h: 8, refineRadius: 0 })),
-                 threw(() => flowCostModel({ w: 8, h: 8, levels: 1.5 })), threw(() => opticalFlowCPU({ cur: new Float32Array(256), prev: new Float32Array(256), w: 8, h: 8, refineRadius: 2.5 }))];
-    ok("an empty frame, a block under 2, and a radius or level count that is not a whole number are refused -- and opticalFlowCPU refuses a fractional refinement radius", got.every((m) => m !== "no throw"), got.map((m) => m.slice(0, 50)).join(" | "));
+                 threw(() => flowCostModel({ w: 8, h: 8, levels: 1.5 })), threw(() => opticalFlowCPU({ cur: new Float32Array(256), prev: new Float32Array(256), w: 8, h: 8, refineRadius: 2.5 })),
+                 threw(() => flowCostModel({ w: 8, h: 8, grid: "levels" })), threw(() => opticalFlowCPU({ cur: new Float32Array(256), prev: new Float32Array(256), w: 8, h: 8, grid: "coarse" }))];
+    ok("an empty frame, a block under 2, and a radius or level count that is not a whole number are refused -- and opticalFlowCPU refuses a fractional refinement radius; both refuse a grid that is not \"block\" or \"level\"", got.every((m) => m !== "no throw"), got.map((m) => m.slice(0, 50)).join(" | "));
 }
 
 console.log("\n2. THE COUNT IS THE MIRROR'S");
@@ -27,11 +30,12 @@ let sd = 7; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x
     // odd sizes, every level's size rounded up, a block that does not divide the frame, and each option
     const w = 61, h = 45, img = () => Float32Array.from({ length: w * h * 4 }, () => rnd());
     const rows = [];
-    for (const o of [{}, { refineRadius: 2 }, { refineRadius: 1 }, { searchRadius: 2, levels: 2 }, { block: 5, subpixel: false }, { levels: 6 }]) {
+    for (const o of [{}, { refineRadius: 2 }, { refineRadius: 1 }, { searchRadius: 2, levels: 2 }, { block: 5, subpixel: false }, { levels: 6 },
+                     { grid: "level" }, { grid: "level", refineRadius: 2 }, { grid: "level", block: 5, levels: 4, subpixel: false }, { grid: "level", levels: 6 }]) {
         const t = { scores: 0, reads: 0 }; opticalFlowCPU({ cur: img(), prev: img(), w, h, ...o, tally: t });
         const m = flowCostModel({ w, h, ...o }); rows.push({ o, t, m, same: t.reads === m.search && t.scores === m.perLevel.reduce((q, l) => q + l.blocks * l.scores, 0) });
     }
-    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under six settings: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
+    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under ten settings, four of them v4753's grid: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
        rows.every((r) => r.same), rows.filter((r) => !r.same).map((r) => `${JSON.stringify(r.o)}: mirror ${r.t.reads}, model ${r.m.search}`).join("; ") || "every score, and the guess each level below the coarsest reads");
     ok("  ...and its pyramid is opticalFlowTsl's: a level every halving, rounded up, capped", JSON.stringify(pyramidSizes(61, 45, 3)) === "[[61,45],[31,23],[16,12]]" && pyramidSizes(3, 1, 9).length === 3);
     const cur = img(), prev = img(), a = opticalFlowCPU({ cur, prev, w, h }), b = opticalFlowCPU({ cur, prev, w, h, refineRadius: 4 });
@@ -47,7 +51,7 @@ const frame = (sx) => { const b = new Float32Array(W * H * 4); for (let y = 0; y
 {
     // the share of interior blocks that return the shift to within 0.75 of a pixel
     const prev = frame(0), SHIFTS = [10, 14, 18], bw = Math.ceil(W / 8), found = {};
-    const SET = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 } };
+    const SET = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 }, level: { grid: "level" }, levelR2: { grid: "level", refineRadius: 2 } };
     for (const [nm, o] of Object.entries(SET)) {
         found[nm] = { cost: flowCostModel({ w: W, h: H, ...o }), at: {} };
         for (const s of SHIFTS) { const f = opticalFlowCPU({ cur: frame(s), prev, w: W, h: H, ...o }); let hit = 0, n = 0;
@@ -62,13 +66,61 @@ const frame = (sx) => { const b = new Float32Array(W * H * 4); for (let y = 0; y
     ok(`  ...where the SAME cut made by shrinking every window (${(share("radius2") * 100).toFixed(0)}% of the reads) stops finding it at 14 px: ${(F.radius2.at[14] * 100).toFixed(0)}% of blocks, against ${(F.default.at[14] * 100).toFixed(0)}%`,
        F.radius2.at[14] < 0.5 && F.default.at[14] > 0.9 && F.radius2.at[10] > 0.9, "the coarsest level's window is the reach; the reach by the sum over levels, 14 px here, is not what is found");
     ok(`  ...and the sum over levels is a bound, not what is found: the full window's is ${F.default.cost.reach} px, and 18 px is where it still works here`, F.default.cost.reach === 28 && F.refine2.cost.reach === 22);
+    ok(`*** v4753: each level on its OWN grid finds the same shifts -- ${SHIFTS.map((s) => `${s} px ${(F.level.at[s] * 100).toFixed(0)}%`).join(", ")} against ${SHIFTS.map((s) => `${(F.default.at[s] * 100).toFixed(0)}%`).join(", ")} -- for ${(share("level") * 100).toFixed(0)}% of the reads, and refining within 2 for ${(share("levelR2") * 100).toFixed(0)}% ***`,
+       SHIFTS.every((s) => F.level.at[s] >= F.default.at[s] - 0.01 && F.levelR2.at[s] >= F.default.at[s] - 0.01) && share("level") < 0.5 && share("levelR2") < 0.25,
+       "a coarse level has a quarter of the blocks of the level below it, where the block grid searched every finest block at every level");
 }
 
-console.log("\n4. AT THE SIZES THAT MATTER");
+console.log("\n4. v4753: WHERE THE MOTION IS NOT ONE SHIFT -- a zoom, a turn, and two motions");
+{
+    const bil = (x, y) => { const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, g = (i, j) => tex[(((j % TW) + TW) % TW) * TW + (((i % TW) + TW) % TW)];
+        return (g(x0, y0) * (1 - fx) + g(x0 + 1, y0) * fx) * (1 - fy) + (g(x0, y0 + 1) * (1 - fx) + g(x0 + 1, y0 + 1) * fx) * fy; };
+    const pic = (f) => { const b = new Float32Array(W * H * 4); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = f(x + 0.5, y + 0.5), i = (y * W + x) * 4; b[i] = b[i + 1] = b[i + 2] = v; b[i + 3] = 1; } return b; };
+    const GR = { block: {}, level: { grid: "level" } }, epe = {};
+    // the end-point error at each interior block's centre, against the warp's own displacement there
+    for (const [cn, ang, zoom] of [["zoom", 0, 1.08], ["turn", 6, 1.0]]) {
+        const th = ang * Math.PI / 180, cx = W / 2, cy = H / 2;
+        const back = (x, y) => { const dx = x - cx, dy = y - cy; return [(Math.cos(th) * dx + Math.sin(th) * dy) / zoom + cx, (-Math.sin(th) * dx + Math.cos(th) * dy) / zoom + cy]; };
+        const prev = pic((x, y) => bil(x + 100, y + 100)), cur = pic((x, y) => { const [u, v] = back(x, y); return bil(u + 100, v + 100); });
+        epe[cn] = {};
+        for (const [g, o] of Object.entries(GR)) { const f = opticalFlowCPU({ cur, prev, w: W, h: H, ...o }); let e = 0, n = 0;
+            for (let by = 1; by < f.bh - 1; by++) for (let bx = 1; bx < f.bw - 1; bx++) { const x = bx * 8 + 4, y = by * 8 + 4, [u, v] = back(x, y);
+                e += Math.hypot(f.flow[(by * f.bw + bx) * 2] - (x - u), f.flow[(by * f.bw + bx) * 2 + 1] - (y - v)); n++; }
+            epe[cn][g] = e / n; }
+        say(`${cn}: mean end-point error at the block centres -- block grid ${epe[cn].block.toFixed(3)} px, level grid ${epe[cn].level.toFixed(3)}`);
+    }
+    ok(`*** the level grid follows motion that varies across the frame: a zoom of 8 % read to ${epe.zoom.level.toFixed(3)} px at the block centres, against ${epe.zoom.block.toFixed(3)} on the block grid, and a turn of 6 degrees to ${epe.turn.level.toFixed(3)} against ${epe.turn.block.toFixed(3)} ***`,
+       epe.zoom.level < 0.25 && epe.turn.level < 0.25 && epe.zoom.block > 2 * epe.zoom.level && epe.turn.block > 2 * epe.turn.level,
+       "the block grid's coarse patch starts at its block's corner and reaches 24 pixels right of it and below at the coarsest level, so it measured the motion 12 pixels away; the level grid's covers its own blocks");
+    // two motions: a square of another texture moving (+10, +4) over the background moving (-5, 0); graded per block of
+    // one motion, split by whether it is within 16 pixels of the square's edge
+    const R0 = { x: 50, y: 24, w: 48, h: 40 }, FG = [10, 4], BG = [-5, 0], OFF = 257;
+    const inR = (x, y, [dx, dy]) => x >= R0.x + dx && x < R0.x + R0.w + dx && y >= R0.y + dy && y < R0.y + R0.h + dy;
+    const prev = pic((x, y) => inR(x, y, [0, 0]) ? bil(x + OFF, y + OFF) : bil(x + 100, y + 100));
+    const cur = pic((x, y) => inR(x, y, FG) ? bil(x + OFF - FG[0], y + OFF - FG[1]) : bil(x + 100 - BG[0], y + 100 - BG[1]));
+    const two = {};
+    for (const [g, o] of Object.entries(GR)) { const t = { scores: 0, reads: 0, neighbours: 0 }, f = opticalFlowCPU({ cur, prev, w: W, h: H, ...o, tally: t }), st = { inside: [0, 0], edge: [0, 0] };
+        for (let by = 1; by < f.bh - 1; by++) for (let bx = 1; bx < f.bw - 1; bx++) { let n = 0; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (inR(bx * 8 + x + 0.5, by * 8 + y + 0.5, FG)) n++;
+            if (n !== 0 && n !== 64) continue;
+            const cx = bx * 8 + 4, cy = by * 8 + 4, L = R0.x + FG[0], T = R0.y + FG[1], d = n ? Math.min(cx - L, L + R0.w - cx, cy - T, T + R0.h - cy) : Math.hypot(Math.max(L - cx, cx - L - R0.w, 0), Math.max(T - cy, cy - T - R0.h, 0));
+            const want = n ? FG : BG, k = d < 16 ? "edge" : "inside";
+            st[k][1]++; if (Math.hypot(f.flow[(by * f.bw + bx) * 2] - want[0], f.flow[(by * f.bw + bx) * 2 + 1] - want[1]) < 0.75) st[k][0]++; }
+        two[g] = { ...st, neighbours: t.neighbours };
+        say(`two motions, ${g} grid: ${st.inside[0]} of ${st.inside[1]} blocks away from the square's edge right, ${st.edge[0]} of ${st.edge[1]} within 16 pixels of it${o.grid ? `; a neighbour's guess taken at ${t.neighbours} blocks` : ""}`);
+    }
+    ok(`*** and where two motions meet it is right at more blocks, not fewer: ${two.level.edge[0]} of ${two.level.edge[1]} within 16 pixels of the square's edge against ${two.block.edge[0]}, and ${two.level.inside[0]} of ${two.level.inside[1]} away from it against ${two.block.inside[0]} ***`,
+       two.level.edge[0] >= two.block.edge[0] + 5 && two.level.inside[0] >= two.block.inside[0],
+       "a block whose parent straddles the edge takes its parent's neighbour on its own side, when that neighbour's guess explains it better");
+    ok(`  ...and the neighbours' guesses are taken: at ${two.level.neighbours} blocks of the levels below the coarsest, on two motions`,
+       two.level.neighbours > 5, "a population row -- what they are worth is the row above, which goes red with them sabotaged away (the log below)");
+}
+
+console.log("\n5. AT THE SIZES THAT MATTER");
 {
     const at = (w, h, o = {}) => flowCostModel({ w, h, ...o });
-    const page = at(960, 540), hd = at(1920, 1080), pageR = at(960, 540, { refineRadius: 2 });
+    const page = at(960, 540), hd = at(1920, 1080), pageR = at(960, 540, { refineRadius: 2 }), pageL = at(960, 540, { grid: "level" }), pageLR = at(960, 540, { grid: "level", refineRadius: 2 });
     say(`fsr-three.html, 960 x 540: search ${(page.search / 1e6).toFixed(0)}M reads, pyramids ${(page.pyramid / 1e6).toFixed(1)}M, reconciliation ${(page.reconcile / 1e6).toFixed(1)}M -- ${(pageR.search / 1e6).toFixed(0)}M refining within 2; 1920 x 1080: ${(hd.total / 1e6).toFixed(0)}M`);
+    say(`v4753, each level on its own grid at 960 x 540: search ${(pageL.search / 1e6).toFixed(0)}M, ${(pageLR.search / 1e6).toFixed(0)}M refining within 2`);
     ok(`the SEARCH is the flow's cost: ${(page.search / page.total * 100).toFixed(1)}% of its reads at 960 x 540, the pyramids and the reconciliation together ${((page.pyramid + page.reconcile) / page.total * 100).toFixed(1)}%`,
        page.search / page.total > 0.9, "over nine tenths: each block scores 84 to 88 candidates of 128 reads at every level, and the block grid is the same at every level");
 }
@@ -78,8 +130,9 @@ console.log("\n4. AT THE SIZES THAT MATTER");
 // at every level -> 1; K4 the refinement radius at the coarsest level too -> 2; K5 the reach by the search radius at every
 // level -> 1. Against render/opticalFlow.mjs, here and in render/opticalFlowTsl-selfcheck.mjs: O1 the refinement radius
 // ignored -> 1, 2; O2 the refinement at the coarsest level and the search below it -> 2, 2.
+// v4753: the level grid's sabotages, here and in render/opticalFlowTsl-selfcheck.mjs, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU's time, which reads are a model of and not a measure -- caches, the sampler and occupancy decide it; " +
     "fx/fsr/fsrFlowCost-selfcheck.mjs holds this device's time to the count's ratios. And motion larger than 18 pixels a frame, which " +
-    "no setting here finds and FSR3 meets with a larger pyramid.");
+    "no setting here finds and FSR3 meets with a larger pyramid -- which the level grid makes cheap, and which a later round measures.");
 process.exitCode = fails ? 1 : 0;

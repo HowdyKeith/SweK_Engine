@@ -88,9 +88,11 @@ console.log("\n2. THE FIVE THAT WERE CHANGED, AND WHAT THEY WERE CHANGED TO -- A
     ok("[v4734] a block's origin and the guess carried down are floor(x + 0.5)",
        has("render/opticalFlowWgsl.mjs", /let ox = i32\(floor\(f32\(i32\(g\.x\) \* u\.block\) \/ f32\(u\.scale\) \+ 0\.5\)\);/) &&
        has("render/opticalFlowWgsl.mjs", /let gx = i32\(floor\(-flowIn\[i \* 2u\] \/ f32\(u\.scale\) \+ 0\.5\)\);/));
+    // v4753: the origin on the block grid, and the guess -- now one helper every guess goes through, the parent's and its
+    // neighbours'; the level grid's origin is bx * block, a whole number with nothing to round
     ok("[v4740] ...and render/opticalFlowTsl.mjs's are too, written that way from the start",
-       has("render/opticalFlowTsl.mjs", /const ox = floor\(bx\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\), oy = floor\(by\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\);/) &&
-       has("render/opticalFlowTsl.mjs", /const gx = floor\(g\.x\.negate\(\)\.div\(scale\)\.add\(0\.5\)\), gy = floor\(g\.y\.negate\(\)\.div\(scale\)\.add\(0\.5\)\);/));
+       has("render/opticalFlowTsl.mjs", /const ox = lvl \? bx\.mul\(block\) : floor\(bx\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\), oy = lvl \? by\.mul\(block\) : floor\(by\.mul\(block\)\.div\(scale\)\.add\(0\.5\)\);/) &&
+       has("render/opticalFlowTsl.mjs", /return \[floor\(g\.x\.negate\(\)\.div\(scale\)\.add\(0\.5\)\), floor\(g\.y\.negate\(\)\.div\(scale\)\.add\(0\.5\)\)\];/));
 }
 
 // ---- v4734 SABOTAGE LOG ----------------------------------------------------------------------------------------
