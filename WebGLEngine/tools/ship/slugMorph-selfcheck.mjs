@@ -46,6 +46,7 @@ import { slugRender } from "../../text/slugEval.js";
 import { buildVertices } from "../../text/slugText.js";
 import { SlugFontDevice } from "../../render/slugDevice.mjs";
 import { contoursToPathD, polylineToContour, polygonArea, glyphMorph, packMorphed, dedupe } from "../../render/slugMorph.mjs";
+import { flatModel, SUBPIXEL_GRIDS } from "../../render/slugFill.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -146,22 +147,21 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 packed per frame through from
                 // the t = 0.5 frame against slugEval on the SAME morphed atlas, through the flat rasteriser model (orthographic rows, the flat gate's)
                 const atlas = packMorphed(m.at(0.5).contours, { logWidth: o.logWidth }); const e = atlas.glyphs.get(0);
                 const ent = o["entry0.5"]; ok(`  ${bk}: the atlas packed here at t = 0.5 is the atlas the page packed (same loc, bands, transform, curves)`, ent.loc[0] === e.loc[0] && ent.loc[1] === e.loc[1] && ent.curveCount === e.curveCount && ent.transform.every((v, i) => Math.abs(v - e.transform[i]) < 1e-6));
-                const bb = e.bbox, s = SIZE, [ox, oy] = ORIGIN; let over = 0, worst = 0, litK = 0;
-                let at = null;   // v4649 -- WHERE the worst pixel is, not just how far: see tools/ship/pixelWorst.mjs
-                const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * 16) / 16, sy: Math.round((oy - (ey * s + 0.5 * ny)) * 16) / 16, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
-                for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-                    const x = i + 0.5, y = j + 0.5; let acc = 0;
-                    for (const [a1, b1, c1] of [[0, 2, 3], [0, 1, 2]]) { const A = C[a1], B = C[b1], K = C[c1];
-                        const det = (B.sx - A.sx) * (K.sy - A.sy) - (K.sx - A.sx) * (B.sy - A.sy);
-                        const s1 = (B.sx - A.sx) * (y - A.sy) - (B.sy - A.sy) * (x - A.sx), s2 = (K.sx - B.sx) * (y - B.sy) - (K.sy - B.sy) * (x - B.sx), s3 = (A.sx - K.sx) * (y - K.sy) - (A.sy - K.sy) * (x - K.sx);
-                        if (!((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0))) continue;
-                        const dx = (k) => ((B[k] - A[k]) * (K.sy - A.sy) - (K[k] - A[k]) * (B.sy - A.sy)) / det, dy = (k) => ((K[k] - A[k]) * (B.sx - A.sx) - (B[k] - A[k]) * (K.sx - A.sx)) / det;
-                        const txdx = dx("tx"), txdy = dy("tx"), tydx = dx("ty"), tydy = dy("ty");
-                        const tx = A.tx + txdx * (x - A.sx) + txdy * (y - A.sy), ty = A.ty + tydx * (x - A.sx) + tydy * (y - A.sy);
-                        acc = slugRender(atlas, e, tx, ty, [Math.abs(txdx) + Math.abs(txdy), Math.abs(tydx) + Math.abs(tydy)]); break; }
-                    const want = Math.round(acc * 255), got = o.frames["t0.5"][(j * W + i) * 4], d = Math.abs(got - want); if (want > 5) litK++; if (d > TOL) over++;
-                    if (d > worst) { worst = d; at = { i, j, cov: acc, want, got }; }
-                }
+                // *** v4686 -- the shared flat model (render/slugFill.mjs), graded at each legal snap grid, and the one the device fits
+                // is NAMED. This was the third inline copy of that model, hard-wired to SwiftShader's 1/16 px; the rig's NVIDIA snaps at
+                // 1/256 and the t = 0.5 row read worst 15 over 205 pixels for the model, not the morph.
+                const gradeAt = (q) => { const texAt = flatModel(e.bbox, SIZE, ORIGIN, q); let over = 0, worst = 0, litK = 0, at = null;
+                    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+                        const t = texAt(i + 0.5, j + 0.5), acc = t ? slugRender(atlas, e, t.tx, t.ty, t.fw) : 0;
+                        const want = Math.round(acc * 255), got = o.frames["t0.5"][(j * W + i) * 4], d = Math.abs(got - want); if (want > 5) litK++; if (d > TOL) over++;
+                        if (d > worst) { worst = d; at = { i, j, cov: acc, want, got }; }
+                    }
+                    return { q, over, worst, litK, at }; };
+                const byGrid = SUBPIXEL_GRIDS.map(gradeAt), best = byGrid.reduce((m2, g) => (g.over < m2.over ? g : m2));
+                const { over, worst, litK, at } = best;
+                report(`${bk}: this device snaps vertices at 1/${best.q} px -- ` + byGrid.map((g) => `1/${g.q}: ${g.over} over`).join(", "));
+                ok(`  ${bk}: the snap is IDENTIFIED, not assumed -- the other legal grid misses on this frame`,
+                    SUBPIXEL_GRIDS.length > 1 && byGrid.filter((g) => g !== best).every((g) => g.over > best.over), byGrid.map((g) => `1/${g.q}: ${g.over}`).join(" vs "));
                 ok(`*** ${bk}: the t = 0.5 frame is within ${TOL} of 255 of slugEval on the morphed atlas through the rasteriser model (${litK} lit) -- the intermediate shape, self-intersections and all, is what Slug says it is ***`, over === 0 && litK > 300, `worst ${worst}, ${over} over; ${whereWorst(at)}`);
             }
             for (const key of ["t0", "t0.5", "t1"]) { let po = 0, pw = 0; for (let i = 0; i < W * H; i++) { const d = Math.abs(r.result.webgpu.frames[key][i * 4] - r.result.webgl2.frames[key][i * 4]); if (d > TOL) po++; if (d > pw) pw = d; }

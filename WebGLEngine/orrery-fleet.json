@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "bd45705a16eac88760ef5801ab4fbeae42e2d73a",
+ "head": "798ee13beb0dfed34da203de069b00556a11796b",
  "bodies": {
   "box3d": [
    {
@@ -242,17 +242,17 @@
    },
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
-    "bytes": 20828,
+    "bytes": 20784,
     "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
     "path": "tools/ship/slugMelt-selfcheck.mjs",
-    "bytes": 19512,
+    "bytes": 20849,
     "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
     "path": "tools/ship/slugMorph-selfcheck.mjs",
-    "bytes": 19162,
+    "bytes": 18857,
     "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
    },
    {
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3400618,
-    "sha": "f7f348b43e24882efe778353c00d0e319b205182"
+    "bytes": 3399492,
+    "sha": "7b239a21036faf5cbd2a5892f73eabb80e99c3ef"
    },
    {
     "path": "mpm3d.html",
@@ -783,7 +783,7 @@
    {
     "path": "tools/ship/treeRead-selfcheck.mjs",
     "bytes": 18762,
-    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
+    "sha": "7b239a21036faf5cbd2a5892f73eabb80e99c3ef"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",

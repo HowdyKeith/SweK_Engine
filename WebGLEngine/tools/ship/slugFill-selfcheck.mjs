@@ -45,7 +45,7 @@ import { buildVertices } from "../../text/slugText.js";
 import { slugShaderSource } from "../../text/slugShader.js";
 import { slugShaderWgsl } from "../../text/slugShaderWgsl.js";
 import { SlugFontDevice, SlugDeviceBatch, slugPipelineDesc } from "../../render/slugDevice.mjs";
-import { fillUv, nearestTexel, sampleFill, glyphRect, fireFill, fillKey } from "../../render/slugFill.mjs";
+import { fillUv, nearestTexel, sampleFill, glyphRect, fireFill, fillKey, flatModel, SUBPIXEL_GRIDS } from "../../render/slugFill.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -124,19 +124,12 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the fire inside an 8 against slugEval x the
         ok("*** both backends built the fill pipeline and drew the 8 plain and filled ***", r.ok && r.result && r.result.webgpu && r.result.webgl2 && !r.result.webgpu.error && !r.result.webgl2.error, r.ok ? ((r.result.webgpu && r.result.webgpu.error) || (r.result.webgl2 && r.result.webgl2.error) || "") : (r.reason || r.error || (r.pageErrors || []).join(" | ")).slice(0, 400));
         if (r.ok) {
             const nb = nullBackend(), fd = new SlugFontDevice(nb, font, " 8", { logWidth: r.result.webgl2.logWidth }), e = fd.entryFor(g8), fire = fireFill(FIRE), rect = glyphRect(e);
-            // the flat rasteriser model (orthographic rows: dilated corners snapped to 1/16 px, affine texcoords per triangle), as slugMorph's gate
-            const bb = e.bbox, s = SIZE, [ox, oy] = ORIGIN;
-            const C = [[bb.x0, bb.y0, -1, -1], [bb.x1, bb.y0, 1, -1], [bb.x1, bb.y1, 1, 1], [bb.x0, bb.y1, -1, 1]].map(([ex, ey, nx, ny]) => ({ sx: Math.round((ox + ex * s + 0.5 * nx) * 16) / 16, sy: Math.round((oy - (ey * s + 0.5 * ny)) * 16) / 16, tx: ex + 0.5 * nx / s, ty: ey + 0.5 * ny / s }));
-            const texAt = (x, y) => { for (const [a1, b1, c1] of [[0, 2, 3], [0, 1, 2]]) { const A = C[a1], B = C[b1], K = C[c1];
-                const det = (B.sx - A.sx) * (K.sy - A.sy) - (K.sx - A.sx) * (B.sy - A.sy);
-                const s1 = (B.sx - A.sx) * (y - A.sy) - (B.sy - A.sy) * (x - A.sx), s2 = (K.sx - B.sx) * (y - B.sy) - (K.sy - B.sy) * (x - B.sx), s3 = (A.sx - K.sx) * (y - K.sy) - (A.sy - K.sy) * (x - K.sx);
-                if (!((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0))) continue;
-                const dx = (k) => ((B[k] - A[k]) * (K.sy - A.sy) - (K[k] - A[k]) * (B.sy - A.sy)) / det, dy = (k) => ((K[k] - A[k]) * (B.sx - A.sx) - (B[k] - A[k]) * (K.sx - A.sx)) / det;
-                const txdx = dx("tx"), txdy = dy("tx"), tydx = dx("ty"), tydy = dy("ty");
-                return { tx: A.tx + txdx * (x - A.sx) + txdy * (y - A.sy), ty: A.ty + tydx * (x - A.sx) + tydy * (y - A.sy), fw: [Math.abs(txdx) + Math.abs(txdy), Math.abs(tydx) + Math.abs(tydy)] }; } return null; };
+            // the flat rasteriser model, shared with slugMelt/slugMorph (render/slugFill.mjs flatModel) -- v4686: at each legal snap grid
+            const bb = e.bbox;
             for (const bk of ["webgpu", "webgl2"]) {
                 const o = r.result[bk];
                 ok(`${bk}: the page's rectangle is the glyph's em bbox`, o.rect.every((v, i) => Math.abs(v - rect[i]) < 1e-9), o.rect.map((v) => v.toFixed(3)).join(","));
+                const grade = (texAt) => {
                 let worstP = 0, overP = 0, worstF = 0, overF = 0, litF = 0, exactF = 0, tinted = 0, boundary = 0;
                 // *** v4649 -- WHERE, NOT JUST HOW FAR. *** Keith's box reports "worst 16" and nothing else,
                 // and 16 of 255 against a CPU rasterisation model is not rounding -- it is a coverage rule,
@@ -162,6 +155,18 @@ sec("2. THE FRAME, ON BOTH BACKENDS: the fire inside an 8 against slugEval x the
                         if (matched) boundary++; else overF++;
                     }
                 }
+                return { worstP, overP, atP, worstF, overF, atF, litF, exactF, tinted, boundary };
+                };
+                // *** v4686 -- GRADED AT EACH LEGAL SNAP, AND THE ONE THE DEVICE FITS IS NAMED. *** Not a looser tolerance: the
+                // tolerance below is unchanged at every grid, and a device that fits NEITHER is red exactly as before.
+                const graded = SUBPIXEL_GRIDS.map((q) => ({ q, ...grade(flatModel(bb, SIZE, ORIGIN, q)) }));
+                const best = graded.reduce((m, g) => (g.overP + g.overF < m.overP + m.overF ? g : m));
+                let { worstP, overP, atP, worstF, overF, atF, litF, exactF, tinted, boundary } = best;
+                report(`${bk}: this device snaps vertices at 1/${best.q} px -- ` + graded.map((g) => `1/${g.q}: ${g.overP + g.overF} pixel(s) over`).join(", "));
+                ok(`  ${bk}: the snap is IDENTIFIED, not assumed -- the other legal grid misses on this frame`,
+                    SUBPIXEL_GRIDS.length > 1 && graded.filter((g) => g !== best).every((g) => g.overP + g.overF > best.overP + best.overF),
+                    graded.map((g) => `1/${g.q}: ${g.overP + g.overF}`).join(" vs ") + " -- if two grids fitted equally, naming one would be a guess");
+
                 ok(`  ${bk}: CONTROL -- the plain 8 is slugEval through the model within ${TOL} of 255 (the fill flag changed nothing for a plain pipeline)`,
                     overP === 0, `worst ${worstP}, ${overP} pixel(s) over ${TOL}; ${whereWorst(atP)}`);
                 report(`${bk}: ${exactF} of ${W * H} exact, ${boundary} texel-boundary neighbours (the key with the next texel over), ${overF} unexplained`);
