@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4760 -- THE 367th CLOSING: translucent things in the world -- no one field is right, so they are a layer drawn at t.
+    since442: Object.freeze({
+        at: "v4760", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/translucentLayer-selfcheck.mjs", "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A PIXEL UNDER GLASS HOLDS TWO MOTIONS, AND NO ONE FIELD IS RIGHT, SO THE GLASS IS NOT SPLATTED. *** The motion " +
+                 "stage draws a translucent thing as a surface of its own, and a pass without it -- a game's vectors -- drags it with " +
+                 "the background: drawn is ahead on four of six cases, skipped on two, and the flow sides with the background. " +
+                 "render/translucentLayer.mjs hides them from the frames and the stage's pass and draws them at the generated time, " +
+                 "the opaque scene depth-tested against, over transparent black; given to the generator as `ui`, a function of t, it " +
+                 "beats the best field on every case's translucent pixels, +2.5 to +41.7 dB, and over every frame. On a real frame the " +
+                 "layer over the frame without them IS the frame with them, to the bit where one thing covers and within one f32 " +
+                 "rounding where two panels overlap, on both backends. An additive material's alpha must leave the layer's alone -- " +
+                 "three's own factors put the sparks at 7.9 dB. Seventeen sabotages, none green.",
+    }),
     // v4759 -- THE 366th CLOSING: small things the flow's pyramid loses -- one kind found for a score, the other measured and left.
     since441: Object.freeze({
         at: "v4759", swept: 1, green: 1, red: 0,

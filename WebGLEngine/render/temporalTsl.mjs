@@ -36,6 +36,12 @@
 // camera is SET by the caller -- setPreviousCamera -- and each object's previous matrix is kept here, written after
 // the object is drawn in this pass and nowhere else.
 //
+// *** A TRANSLUCENT THING IS DRAWN HERE AS A SURFACE OF ITS OWN (v4760 measured it, and left it). *** The override draws every
+// object opaque, glass and sparks too, so the field under a pane is the pane's. Drawing the pass without them -- a game's
+// motion vectors -- gives what is behind, and drags the pane: which is less wrong turns on the content, drawn ahead on four of
+// fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs's six cases. Neither is right; render/translucentLayer.mjs is: hide them for this
+// pass (its hide(scene)) and lay them over each shown frame, drawn at its time.
+//
 // ---- THREE THINGS ABOUT THREE, MEASURED BEFORE OR BY A ROW --------------------------------------------------------
 //   * *** A DATA PASS MUST SET blending = NoBlending, OR ITS FOURTH CHANNEL SCALES THE OTHER THREE. *** A NodeMaterial
 //     is created with NormalBlending, and three keeps blending on for an OPAQUE material into a render target:

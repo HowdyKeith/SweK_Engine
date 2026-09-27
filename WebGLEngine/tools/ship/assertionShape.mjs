@@ -569,8 +569,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4757 -- 1839 -> 1840 for render/temporalTslMeshes-selfcheck.mjs -- skinned and morphed meshes and an orthographic camera through the motion stage.
     // v4758 -- 1840 -> 1841 for fx/fsr/fsrFlowSeed-selfcheck.mjs -- the optical flow seeded with the application's vectors, in the generator.
     // v4759 -- 1841 -> 1842 for fx/fsr/fsrFlowStill-selfcheck.mjs -- standing still as a flow guess, in the generator.
-    gates: 1842, usesOk: 1821, definesOk: 1813, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1714, condFirst: 91, unknownSignature: 16,
+    // v4760 -- 1842 -> 1844 for render/translucentLayer-selfcheck.mjs and fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs -- translucent things as a layer drawn at t.
+    gates: 1844, usesOk: 1823, definesOk: 1815, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1716, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

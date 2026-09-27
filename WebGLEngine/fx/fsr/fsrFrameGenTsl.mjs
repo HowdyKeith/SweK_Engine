@@ -63,6 +63,17 @@
 // `composite` as a HUD is, 18.65 either way (fx/fsr/fsrFrameGenParticles-selfcheck.mjs). That costs a particle draw each
 // generated frame, and it is the only answer here for particles the motion stage cannot follow.
 //
+// *** TRANSLUCENT THINGS ARE A LAYER TOO, DRAWN AT t (v4760). *** A pixel under glass shows the glass and what is behind it,
+// and this generator splats one vector a pixel. render/temporalTsl.mjs's stage draws the glass as a surface -- what is behind
+// is cross-faded in place -- and a pass without it drags the glass with the background; which is less wrong turns on the
+// content (drawn ahead on four of fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs's six cases, skipped on two) and the flow sides
+// with the background. render/translucentLayer.mjs hides them from the frames and the stage, and draws them at t, the opaque
+// scene depth-tested against, over transparent black: given as `ui`, a function of t, it beats the best field on every
+// case's translucent pixels -- +41.7 dB on a still pane over a moving wall, +30.2 over a fine one, +28.6 on additive sparks,
+// +4.4 behind a box sliding across, +4.0 and +2.5 on an etched pane, still and moving -- and over every frame. A real frame
+// composited so IS the frame drawn with them (render/translucentLayer-selfcheck.mjs). That costs a depth pass of the opaque
+// scene and a draw of the translucent things each generated frame.
+//
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
 // turning at the rate it does between two real frames, where the chord and the arc agree to a fraction of a pixel.
