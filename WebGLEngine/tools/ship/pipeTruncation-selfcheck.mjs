@@ -66,8 +66,12 @@ let lostOnExit = 0, lostOnCode = 0;
         lostOnExit = fA - pA; lostOnCode = fB - pB;
         report(`process.exit(1)       file ${fA}  pipe ${pA}  lost ${lostOnExit}`);
         report(`process.exitCode = 1  file ${fB}  pipe ${pB}  lost ${lostOnCode}`);
-        ok("*** process.exit() LOSES output through a pipe that survives to a file -- the two differ by more than a pipe buffer ***",
-            fA === fB && lostOnExit > 65536,
+        // v4766: the row said "by more than a pipe buffer" and asserted lostOnExit > 65536. HOW MUCH is lost is the machine's, not
+        // Node's: idle, 131,150 to 172,325 bytes of 244,000 over four runs; under the verify's load 43,249 and 50,081 -- below one
+        // buffer -- and the verify read the row red for it. What the row is for holds in every run: something is lost, and a
+        // gate's tail with it. That is asserted; the amount is reported.
+        ok("*** process.exit() LOSES output through a pipe that survives to a file ***",
+            fA === fB && lostOnExit > 0,
             `${lostOnExit} bytes of ${fA} never reached the reader. Both scripts print the identical ${fA} bytes; ` +
             "the only difference between them is the last line.");
         ok("  ...and process.exitCode loses NOTHING, so the repair is the line and not the volume",
