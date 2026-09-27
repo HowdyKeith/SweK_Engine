@@ -18,6 +18,9 @@
 //   E. the slow is never applied                                           -> 1 red: the frostbite row
 //   F. the hit reads the wrong row (ember for everything)                   -> 9 red: every hit row, the race, the duel's unchanged score
 //   G. the splash reaches only the car hit                                 -> 1 red: the quake splash row
+//   H. v4680, applyBuildingHit() reads AMMO.plain instead of `hit.ammo`      -> 2 red: the cataclysm-against-a-wall row (lands
+//      spark's 3 instead of 40) and the damageDealt credit row (both rows assert the literal 40, not a value derived at
+//      runtime, so a wrong damage number fails both places it is checked, not just one).
 // The gate's first run was red on the plain-shell pickup: the endless magazine (count Infinity) swallowed a pickup of spark, and the
 // design said a pickup is a magazine; a pickup of the plain spell is a finite one now (x10) that gives way to the endless one at zero.
 "use strict";
@@ -135,7 +138,53 @@ console.log("\n5. THE RACE WITH PICKUPS, AND THE DUEL WITHOUT THEM UNCHANGED");
     ok("!! the duel without pickups scores exactly as v4590's (13 of 15, 14.558): the damage bonus is only what the spells add beyond the plain shell", d0.hits === 13 && d0.shots === 15 && d0.damage === 39 && Math.abs(d0.score - 14.558) < 5e-4 && d0.pickups === 0);
     ok("...and with pickups the same gunner takes some, lands more damage and scores more", d1.pickups > 0 && d1.damage > d0.damage && d1.score > d0.score);
 }
-console.log("\n6. THE FRONT DOOR");
+console.log("\n6. BUILDINGS, v4680: THE SAME BOOK APPLIED TO A WALL INSTEAD OF A CHASSIS");
+// A building has no chassis to push, slow or splash onto its neighbours -- applyBuildingHit() is applyHit() with those three
+// removed, reading the identical hitEffect() row. Pure first (createBuildingState, applyBuildingHit, buildingHash alone,
+// no box3d), then turretTick's own wiring with a bare stub for `world`/`cars` -- a building hit never calls world.impulse,
+// so the stub is legitimate rather than a shortcut around box3d.
+{
+    const buildings = A.createBuildingState([{}, {}]), turrets = [U.createTurret(), U.createTurret()];
+    const hit = (owner, ammo) => A.applyBuildingHit({ owner, building: 0, point: [0, 0, 0], dir: [0, 0, 1], ammo }, buildings, turrets);
+    const spark = hit(0, "spark");
+    ok("!! a spark shell against a wall reads the book's row exactly as it does against a car: damage 3, no impulse field, no splash to wall 1",
+        spark.damage === 3 && spark.building === 0 && spark.owner === 0 && buildings[0].damageTaken === 3 && buildings[0].hits === 1 && buildings[1].damageTaken === 0,
+        JSON.stringify(spark));
+    const cata = hit(1, "cataclysm");
+    ok("!! a cataclysm shell against the SAME wall deals its own 40, not spark's 3 -- the ammo is read again, not reused from the first hit",
+        cata.damage === 40 && buildings[0].damageTaken === 43 && buildings[0].hits === 2, `wall 0 now at ${buildings[0].damageTaken}`);
+    ok("damageDealt is credited to whichever turret fired, the same field a car hit credits", turrets[0].damageDealt === 3 && turrets[1].damageDealt === 40);
+    const fold = (h, v) => (Math.imul(h ^ v, 0x01000193) >>> 0), untouched = () => A.createBuildingState([{}, {}]);
+    ok("!! the lockstep fold: two untouched building sets hash the same, and the one that took two hits does not",
+        A.buildingHash(0x811c9dc5, untouched(), fold) === A.buildingHash(0x811c9dc5, untouched(), fold) &&
+        A.buildingHash(0x811c9dc5, buildings, fold) !== A.buildingHash(0x811c9dc5, untouched(), fold));
+
+    // turretTick's wiring: a wall placed on the aim solution to a still car, fired once, stops the shell there instead.
+    const HALF = [0.75, 0.35, 1.4], carPose = (pos) => ({ pos, quat: C.yawQuat(0), yaw: 0, vel: [0, 0, 0] });
+    const wireCars = [{ spec: { half: HALF } }, { spec: { half: HALF } }], wirePoses = [carPose([0, 1, 0]), carPose([0, 1, 20])];
+    const wireTurrets = [U.createTurret(), U.createTurret()], wireSol = U.aimSolution(wirePoses[0], wireTurrets[0], wirePoses[1].pos, [0, 0, 0]);
+    wireTurrets[0].yaw = wireSol.yaw; wireTurrets[0].pitch = wireSol.pitch;
+    const wireShells = [], wireWall = [{ pos: [0, 1, 10], quat: [0, 0, 0, 1], half: [2, 3, 2] }], wireState = A.createBuildingState([{}]);
+    const idleCmd = { yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 }, fireCmd = { ...idleCmd, fire: 1 };
+    let wireEffects = [];
+    for (let t = 0; t < 60 && !wireEffects.length; t++) {
+        const tt = G.turretTick({}, wireCars, wireTurrets, wireShells, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null, wireWall, wireState);
+        wireEffects = tt.effects;
+    }
+    ok("!! wired through turretTick: a wall on the aim solution takes the hit meant for the car",
+        wireEffects.length === 1 && wireEffects[0].building === 0 && wireState[0].hits === 1 && (wireTurrets[1].damageTaken || 0) === 0, JSON.stringify(wireEffects));
+    ok("the car's own `hits` counter (hits landed on OTHER CARS) is not incremented by a building hit", wireTurrets[0].hits === 0);
+    // and the pre-existing shape -- no buildings argument at all -- still reaches the car, for raceWithGunners/duel and anything else that never passes one
+    const bareTurrets = [U.createTurret(), U.createTurret()], bareSol = U.aimSolution(wirePoses[0], bareTurrets[0], wirePoses[1].pos, [0, 0, 0]);
+    bareTurrets[0].yaw = bareSol.yaw; bareTurrets[0].pitch = bareSol.pitch;
+    const bareShells = []; let bareEffects = [];
+    for (let t = 0; t < 60 && !bareEffects.length; t++) {
+        const tt = G.turretTick({ impulse: () => {} }, wireCars, bareTurrets, bareShells, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null);
+        bareEffects = tt.effects;
+    }
+    ok("!! turretTick called the OLD way, no buildings argument at all, still reaches the car", bareEffects.length === 1 && bareEffects[0].car === 1, JSON.stringify(bareEffects));
+}
+console.log("\n7. THE FRONT DOOR");
 {
     const L = A.reportLines();
     ok("reportLines names the book, the magazine rule with every spell's count, and the pickups", L.length === 3 && /IS a spell of world\/spellBook\.mjs/.test(L[0]) && /cataclysm 40dmg r16 x1/.test(L[1]) && /every 24 m/.test(L[2]));
