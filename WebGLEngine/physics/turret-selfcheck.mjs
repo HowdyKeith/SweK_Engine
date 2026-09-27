@@ -28,6 +28,10 @@
 //      note above describes. The fourth row was ADDED for this sabotage, a synthetic shell with a one-step span deliberately
 //      forced past both a near car and a far wall in a single stepShells call; it reddens on the sabotage (wall reported hit,
 //      car not) and passes clean restored.
+//   G  v4681, the `if (!bd) continue;` guard over a null buildings[] slot removed -- NOT a red row: an uncaught
+//      TypeError ("Cannot read properties of null (reading 'half')") at the exact line the guard used to cover, the gate
+//      exiting on a stack trace rather than printing FAIL, which is the "it died rather than found something" shape this
+//      tree's own sweep has separately had to tell apart from a real red. Measured before writing the row, not assumed.
 "use strict";
 import * as U from "./turret.mjs";
 import * as B from "./ballistics.mjs";
@@ -128,6 +132,11 @@ console.log("\n4. THE SHELL FLIES AND THE SWEPT HIT TEST SEES IT");
     const offAxis = { pos: [8, 1, 10], quat: [0, 0, 0, 1], half: [1, 3, 1] };
     const missed = flyB(aimed([0, 1, 20]), [offAxis]);
     ok("a wall off the line of fire never intercepts a clean shot", missed.length === 1 && missed[0].target === 1);
+    // v4681 -- a building this round already toppled (world/crashDamage.mjs's shellInto) is a null slot, not a removed one:
+    // the caller keeps every index the fixed rect it always named, so a shell must skip a falsy entry rather than read
+    // `.half` off of one.
+    const gone = flyB(aimed([0, 1, 20]), [null]);
+    ok("!! a null slot -- a building this round already toppled -- is skipped, not dereferenced: the shot reaches the car behind it", gone.length === 1 && gone[0].target === 1 && gone[0].building === undefined, JSON.stringify(gone));
     // the race, forced into one tick: a synthetic shell whose one step spans 16 m, past a car at z=8 AND a wall at z=16 --
     // ordinary per-tick geometry (a ~0.47 m step) cannot put both inside one segment without the boxes already overlapping,
     // so this is built directly rather than fired and flown, to prove the EARLIER sample wins regardless of which list (cars

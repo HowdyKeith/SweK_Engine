@@ -48,6 +48,7 @@ import * as D from "./drivePolicy.mjs";
 import * as U from "../physics/turret.mjs";
 import * as S from "../physics/slick.mjs";
 import * as A from "../physics/spellAmmo.mjs";   // v4592 (task 81): the spellbook as ammunition, and the pickups
+import * as CD from "../world/crashDamage.mjs";   // v4681: a shell against a building is the same wall a car crash breaks
 import { worldFromModule } from "../render/slugTicker.mjs";
 
 // v4590 (task 79) -- two more features and two more outputs: the gunner sees whether a car is close BEHIND (the slick's target)
@@ -231,23 +232,38 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
 /**
  * One tick of every turret in a world of cars: the gunners' commands from the poses before the step, the mounts turned, the shells
  * fired and flown, hits turned into impulses on the target chassis; and, with a slick state, drops laid, ignitions lit, the fires
- * stepped and the burns tallied. Since v4680, `buildings` (physics/raceCar.mjs's buildingBox() per rect) and `buildingState`
- * (spellAmmo.createBuildingState()) give the same shells something solid to stop on besides a car -- omit either and buildings
- * are exactly as invisible to shells as they were before this round, which is what every OTHER caller of this function still
- * gets by not passing them. Returns the commands (for the log), the hit events, the burn events and the building effects.
+ * stepped and the burns tallied. Since v4680, `buildings` (physics/raceCar.mjs's buildingBox() per rect) gives the same shells
+ * something solid to stop on besides a car -- omit it and buildings are exactly as invisible to shells as they were before
+ * that round, which is what every OTHER caller of this function still gets by not passing it. Since v4681, `cityCtx`
+ * (world/crashDamage.mjs's crashWorld() + buildingColliders(), the same context a car crash damages) turns a building hit
+ * into a real one -- hit points, crumble, rebar, a topple that parks the collider -- through CD.shellInto; without it a
+ * building still blocks a shot (nothing passes through) but nothing happens to the wall, same as before that round.
+ * Returns the commands (for the log), the hit events, the burn events and the building effects.
  */
-export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null, buildings = null, buildingState = null) {
+export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null, buildings = null, cityCtx = null) {
     const fired = cmds.map((c, i) => U.stepTurret(turrets[i], c, C.CAR.dt));
     // v4592: a shell carries the spell its turret has loaded (spark, the plain shell, without a magazine); the pickups load the rest
     fired.forEach((f, i) => { if (f.fires) { const sh = U.fireShell(shells, poses[i], turrets[i], i, t); sh.ammo = turrets[i].ammo ? A.spendShell(turrets[i].ammo) : A.AMMO.plain; sh.ammoIndex = A.ammoIndex(sh.ammo); } });
     if (slicks) fired.forEach((f, i) => { if (f.drop && S.dropSlick(slicks, poses[i], i, t)) turrets[i].drops = (turrets[i].drops || 0) + 1; if (f.ignite) S.igniteSlick(slicks, i, t); });
     const targets = cars.map((car, i) => ({ index: i, pose: poses[i], half: car.spec.half }));
-    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec, buildings: buildings || [] });
+    // v4681 -- a building cityCtx's own city has already toppled is a null slot here, not a removed one: stepShells skips a
+    // falsy entry rather than dereference it, so a shell flies through where a wall used to stand, and every OTHER index
+    // still names the same rect it always did (physics/turret.mjs's stepShells doc, the same rule the caller must keep).
+    const live = cityCtx ? (buildings || []).map((bx, i) => { const r = cityCtx.rects[i], b = r && cityCtx.city.buildingAt(r.x + 0.5, r.z + 0.5); return b && b.state === "toppled" ? null : bx; }) : buildings;
+    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec, buildings: live || [] });
     // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target;
-    // a building hit is the same row with none of that (physics/spellAmmo.mjs's applyBuildingHit -- a wall has no chassis to push or slow)
+    // a building hit reads the same row for the scoreboard (physics/spellAmmo.mjs's hitEffect -- a wall has no chassis to push or slow) and, with
+    // a cityCtx, hands the point to world/crashDamage.mjs's shellInto for what actually happens to the wall
     const effects = [];
     for (const e of events) {
-        if (e.building !== undefined) { if (buildingState) effects.push(A.applyBuildingHit(e, buildingState, turrets)); }
+        if (e.building !== undefined) {
+            if (cityCtx) {
+                const eff = A.hitEffect(e.ammo || A.AMMO.plain, 0);
+                CD.shellInto(cityCtx, e.building, e.point, CD.blastRadius(eff.damage), { x: e.dir[0], z: e.dir[2] });
+                if (turrets[e.owner]) turrets[e.owner].damageDealt = (turrets[e.owner].damageDealt || 0) + eff.damage;
+                effects.push({ ...eff, building: e.building, owner: e.owner });
+            }
+        }
         else { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
     }
     const taken = pickups ? A.collectPickups(pickups, poses, turrets, t) : [];

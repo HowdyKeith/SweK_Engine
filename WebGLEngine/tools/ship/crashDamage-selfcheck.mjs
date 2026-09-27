@@ -50,6 +50,9 @@
 //   E  the world recorded at the origin with radius 1 again                       -> 2 red (the steel not on the picture: no world drawn)
 //   F  the charge counting the floor under the building                           -> 1 red (hp 149 for 160 standing)
 //   G  race-crash.html's line without the word rebar                              -> 1 red (the page line)
+//   H  v4681, shellInto's own park-on-topple line removed                          -> 1 red: section 6's "notices the
+//      ALREADY-toppled building" row alone -- the rest of section 6 does not touch it, and sections 1-5, 7-9 are
+//      crashInto's own copy of the line, untouched by this sabotage.
 //
 // Run: node tools/ship/crashDamage-selfcheck.mjs      (~9 s: five cities, three rams, two browsers)
 "use strict";
@@ -163,7 +166,37 @@ sec("5. THE COLLAPSE: 25 m/s takes the ground floor, CityGen topples it, the box
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("6. DETERMINISM: two fresh worlds, one fingerprint");
+sec("6. THE SAME WALL, HIT BY A SHELL INSTEAD OF A CAR (shellInto, v4681)");
+{
+    // brain/gunnerPolicy.mjs's turretTick calls this on a turret shell's building event instead of crashInto's car event --
+    // the same blastAt, the same crumble bookkeeping, the same support collapse, the same rebar reveal, the same park-on-
+    // topple. Held here directly, on the same kind of building sections 2 and 5 ram, rather than only through the turret's
+    // own wiring (brain/gunnerPolicy-selfcheck.mjs holds that; this holds shellInto itself, the function this file added).
+    const g = make(), rect = g.rects[RAM], b = bOf(g, RAM);
+    const point = D.contactPoint(rect, [rect.x + rect.w / 2, 1, rect.z - 5]), hpBefore = b.hp, standingBefore = D.footprint(g.world, rect).solid;
+    const imp = D.shellInto(g, RAM, point, D.blastRadius(9), { x: 0, z: 1 });
+    report(`a shot at this wall: ${imp.removed} removed (${imp.lost} charged, ${imp.crumbled} crumbled, collapsed ${imp.collapsed}), rebar ${imp.rebar}, hp ${hpBefore} -> ${b.hp}, state ${b.state}, toppled ${imp.toppled}`);
+    // imp.removed is every voxel the blast sphere cleared, this building's or not (the road under it, a neighbour's corner);
+    // imp.lost + imp.crumbled is what THIS building was charged, and is the only count its own footprint should shrink by
+    ok("*** a shell blasts the SAME way a car does: voxels removed, the building charged exactly what it lost -- no more, no less -- no impulse anywhere (a wall has no chassis to push) ***",
+        imp.removed > 0 && b.hp < hpBefore && !imp.collapsed && !imp.toppled && b.hp === hpBefore - imp.lost - imp.crumbled && D.footprint(g.world, rect).solid === standingBefore - imp.lost - imp.crumbled);
+    ok("  the cut reveals rebar the same way section 3 measures it", imp.rebar >= 0);
+
+    // some OTHER cause (a car, a neighbour's cascade -- here, forced directly) topples it; shellInto's NEXT call must notice
+    // the toppled state on its own and park the collider, not only when its own blast is what crossed zero -- section 5
+    // already holds the car path's OWN clean single-collapse topple all the way to a car driving through; this is narrower
+    // on purpose, because forcing a second demolition onto an already-cratered footprint piles rubble unevenly (measured: a
+    // relaunched car can still clip 2 leftover voxels at 4.5 m/s lost, which is CityGen's rotate-into-rubble placement
+    // reacting to the earlier crater, not a shellInto defect) -- what shellInto owns is noticing and parking, held directly.
+    g.city.damageAt(rect.x + 0.5, rect.z + 0.5, b.hp, { x: 0, z: 1 });
+    ok("demolished outright by something else, the city topples it", b.state === "toppled" && b.hp === 0 && g.parked.size === 0);
+    const after = D.shellInto(g, RAM, point, D.blastRadius(9), { x: 0, z: 1 });
+    ok("*** shellInto's next call notices the ALREADY-toppled building and parks the collider -- the box3d body a car or another shell would otherwise still test against ***",
+        after.toppled && after.removed === 0 && g.parked.has(RAM) && g.parked.size === 1, `parked ${g.parked.has(RAM)}`);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+sec("7. DETERMINISM: two fresh worlds, one fingerprint");
 let FP = null;
 {
     const a = runOnce(15), b = runOnce(15); FP = a.r.fingerprint;
@@ -173,7 +206,7 @@ let FP = null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("7. IN THE BROWSER ON BOTH BACKENDS: the crater, the steel and the debris on the picture");
+sec("8. IN THE BROWSER ON BOTH BACKENDS: the crater, the steel and the debris on the picture");
 const W = 256, H = 256;
 {
     const skip = webgpuSkipReason();
@@ -247,7 +280,7 @@ const W = 256, H = 256;
             const txt = (id) => { const el = d && d.getElementById(id); return el ? el.textContent : ""; };
             return { be: txt("be"), tick: txt("tick"), city: txt("city"), car: txt("car"), pageMs: performance.now() - pt };
         }` });
-        sec("8. THE PAGE: race-crash.html in its own browser, ramming on load");
+        sec("9. THE PAGE: race-crash.html in its own browser, ramming on load");
         if (!rp.ok) ok("the page loaded", false, rp.reason);
         else {
             const p = rp.result;
