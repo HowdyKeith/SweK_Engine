@@ -246,7 +246,8 @@ if (skip) {
             bad === 0,
             bad === 0 ? `${n * n} pixels, byte for byte, with no noise in the path` :
             `${bad} of ${n * n} pixels came back changed; first ${firstBad}. Every comparison below reads ` +
-            "these same bytes, so a colour-managed or dithered readback makes all of them disagree at once");
+            "these same bytes, so a colour-managed or dithered readback makes all of them disagree at once" +
+            ` [context ${probe.lost ? "LOST" : "live"}, glGetError ${probe.glErr}, renderer ${probe.renderer}]`);
     }
     const got = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, false), [origin, du, dv]);
     const raw = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, true), [origin, du, dv]);

@@ -203,10 +203,15 @@ const heldP = (name, measured, dir, compare) => {
     // DURABLE on any adapter: computing tan() in the shader is WORSE. The direction is the finding; the size
     // is the driver's, because WGSL bounds tan only to an absolute error near 2^-11.
     const dirRatio = plant.maxDir / clean.maxDir, relTRatio = plant.maxRelT / clean.maxRelT;
-    ok(dirRatio > 1 && relTRatio > 1,
-       "*** computing tan() in the shader is worse on BOTH measures, on any adapter ***",
-       `ray directions ${dirRatio.toFixed(1)}x worse, hit distances ${relTRatio.toFixed(1)}x. A per-frame ` +
-       "constant belongs in a uniform whatever the driver's tan happens to cost");
+    // *** v4681 -- "ON BOTH MEASURES, ON ANY ADAPTER" WAS TWO ADAPTERS' READING, AND THE THIRD REFUTED HALF OF IT. ***
+    // SwiftShader and Intel gen-9 were worse on both; the rig's NVIDIA Pascal read ray directions 1.2x worse and hit
+    // distances 1.0x -- its tan is good enough that the error washes out by the time a ray finds a surface. The
+    // DIRECTION half held on all three and stays universal. The hit-distance half is a magnitude, and this gate
+    // already holds magnitudes per adapter (relTRatio, the row below), so it is asserted there and not here.
+    ok(dirRatio > 1,
+       "*** computing tan() in the shader is worse on the ray directions, on any adapter ***",
+       `ray directions ${dirRatio.toFixed(1)}x worse (hit distances ${relTRatio.toFixed(1)}x, held per adapter below). ` +
+       "A per-frame constant belongs in a uniform whatever the driver's tan happens to cost");
     const vDir = heldP("dirRatio", dirRatio, "min");
     ok(vDir.ok, `  ...and BY HOW MUCH on the ray directions is this adapter's own number [${vDir.state}]`,
        `${e(plant.maxDir)} vs ${e(clean.maxDir)} -- ${dirRatio.toFixed(0)}x. ` + describe(vDir));
@@ -346,7 +351,8 @@ sec("9. THE RECORDS SAY WHAT THIS RUN SAYS");
         ? `  ----  adapter ${AKEY}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
         : `  ----  adapter ${AKEY}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file ` +
           `for this adapter, so those rows measured and reported rather than asserted. The durable row -- ` +
-          `tan() in the shader is worse on both measures -- still held. Re-run with --record ON THAT BOX.`);
+          `tan() in the shader is worse on the ray directions -- ${fails ? "is among the rows above; read them" : "held"}. ` +
+          `Re-run with --record ON THAT BOX.`);
     if (process.argv.includes("--record")) {
         const owed = VERDICTS.filter((v) => v.state === "OWED" && Number.isFinite(v.measured));
         if (!owed.length) { console.log(`  ----  --record: nothing OWED for ${AKEY}.`); }

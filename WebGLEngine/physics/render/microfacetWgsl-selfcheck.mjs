@@ -377,8 +377,17 @@ if (R) {
     // discriminates is a device whose trig is GOOD ENOUGH TO TRACK f64 and SwiftShader is not one. A row whose
     // refusal cannot be demonstrated where it runs is a row this tree does not count as covered.
     const floorHolds = (dev, cpu) => dev < cpu / 10;
-    ok(`  ...and refinement buys the DEVICE an order of magnitude less than it buys f64 -- the transcendental floor section 3 named`,
-        floorHolds(devFall, cpuFall) && cwCpu[2] < cwCpu[1] / 100,
+    // *** v4681 -- THE DEVICE THE COMMENT ABOVE WAITED FOR ARRIVED, AND IT IS AN ADAPTER FACT, NOT A LAW. *** The
+    // rig's NVIDIA Pascal fell 83.48x against f64's 131x over the same refinement: its sin and cos track f64 closely
+    // enough that there is no order-of-magnitude floor to find. The row refused, as designed -- and the refusal
+    // says the floor is a property of SwiftShader and gen-9, not of devices. What stays ASSERTED is the f64 half,
+    // which is the code's: refinement buys f64 two orders of magnitude. Whether THIS adapter has the floor is
+    // reported, with the named predicate (still driven by the fixture below) deciding which sentence is printed.
+    ok(`  ...and refinement buys f64 two orders of magnitude -- the half of section 3's claim that belongs to the code`,
+        cwCpu[2] < cwCpu[1] / 100,
+        `f64 falls ${cpuFall.toFixed(0)}x. On this adapter the device falls ${devFall.toFixed(2)}x: ` +
+        (floorHolds(devFall, cpuFall) ? "an order of magnitude short -- a transcendental floor, as on SwiftShader and gen-9. "
+                                     : "NOT an order of magnitude short -- this adapter's trig tracks f64, as NVIDIA Pascal's did at v4680. ") +
         `from ${COARSE_GRIDS[1]} to ${COARSE_GRIDS[2]} f64 falls ${cpuFall.toFixed(0)}x to ${cwCpu[2].toExponential(2)} and the device falls ${devFall.toFixed(2)}x -- ${cw[1].toExponential(2)} then ${cw[2].toExponential(2)}. The estimator converges and the device stops tracking it, which is the signature of a floor rather than of a converging estimator, and the same wall section 3 reached from the other side`);
     // ...and HOW FAR short is this adapter's own number, because that is the part that moved between two boxes.
     // *** THE COUNTERFACTUAL THIS BOX CANNOT PRODUCE, AS A FIXTURE. *** 131x is what f64 buys from the same

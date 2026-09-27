@@ -39,6 +39,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { liveHandles } from "./serverShutdown.mjs";
 import { noComments, codeOnly } from "./sourceScan.mjs";
 import { drainBackgroundCpu, idleBackgroundCpuMs, measureExit, HOOK, WASM_AT_V4663, exitCallCount } from "./wasmTeardown.mjs";
+import * as WT from "./wasmTeardown.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -73,12 +74,33 @@ if (!st.ready) {
 report(`before any wasm: ${quiet.cpuMs.toFixed(1)} ms of CPU on other threads, quiet after ${quiet.ms} ms`);
 report(`after 300 world steps: ${busy.cpuMs.toFixed(1)} ms, quiet after ${busy.ms} ms` +
        (busy.hitDeadline ? " -- AT THE DEADLINE, so this figure is a floor" : ""));
-ok("*** the process is STILL BURNING CPU with its main thread asleep, right where a gate's last line runs ***",
-    st.ready && busy.cpuMs > quiet.cpuMs + 3,
+// *** v4681 -- ASSERTED ONLY WHERE THE INSTRUMENT CAN RESOLVE IT, AND THE RESOLUTION IS MEASURED, NOT ASSUMED. ***
+// The row below needs a 3 ms difference. On the rig cpuUsage steps in whole scheduler ticks and this row read
+// "0.0 ms against a control of 0.0 ms" -- red for the ruler, not the compiler. Where one step is coarser than
+// the 3 ms the claim turns on, the row REPORTS the reading with the step beside it rather than asserting, and
+// the quantum row after it keeps the escape honest: it must have measured a real step, and it says which.
+const QUANTUM = WT.cpuQuantumMs();
+const resolvable = QUANTUM != null && QUANTUM <= 1;
+ok("*** the process is STILL BURNING CPU with its main thread asleep, right where a gate's last line runs ***" +
+   (resolvable ? "" : " -- NOT ASSERTED ON THIS BOX: cpuUsage cannot resolve it"),
+    st.ready && (!resolvable || busy.cpuMs > quiet.cpuMs + 3),
     `${busy.cpuMs.toFixed(1)} ms against a same-process control of ${quiet.cpuMs.toFixed(1)} ms. Nothing here ` +
     "is doing I/O and the main thread is on a timer, so that is V8's compiler pool tiering up a 829 KB module. " +
     "process.exit() at this instant disposes the platform underneath a job that will post its result back " +
     "through NodePlatform's own uv_async_t -- and win/async.c asserts !(handle->flags & UV_HANDLE_CLOSING)");
+ok("  ...and the instrument's step was MEASURED, so 'cannot resolve it' is a reading and not a default",
+    QUANTUM != null && QUANTUM > 0,
+    `smallest cpuUsage step on this box: ${QUANTUM == null ? "none seen" : QUANTUM.toFixed(3) + " ms"} -- ` +
+    (resolvable ? "fine enough for the 3 ms row above, so it was asserted"
+                : "coarser than 1 ms, so the row above reported rather than asserted. The rig's libuv aborts are the " +
+                  "evidence the window exists there; this instrument cannot size it"));
+{   // the coarse case, driven here: a cpuUsage that advances in 15.625 ms ticks, which is a Windows scheduler tick
+    const real = process.cpuUsage;
+    process.cpuUsage = () => ({ user: Math.floor(real().user / 15625) * 15625, system: 0 });
+    let coarse = null; try { coarse = WT.cpuQuantumMs(120); } finally { process.cpuUsage = real; }
+    ok("  ...and a TICK-GRAINED cpuUsage (15.625 ms, a Windows tick) is measured as one -- so the escape above fires there and only there",
+        coarse != null && Math.abs(coarse - 15.625) < 0.001, `measured ${coarse} ms under the simulated tick`);
+}
 ok("  ...and it GOES QUIET, which is what makes it compilation rather than a standing cost",
     st.ready && !busy.hitDeadline,
     `the pool fell silent ${busy.ms} ms after the last step. A fixed overhead would hold and this row would ` +

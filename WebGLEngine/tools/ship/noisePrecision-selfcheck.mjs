@@ -150,7 +150,8 @@ if (skip) {
             `${bad} of ${n * n} pixels came back changed; first ${firstBad}. The 24-bit value the rows below ` +
             "decode is packed ACROSS those bytes, so a colour-managed or dithered readback makes every one of " +
             "them disagree with every mirror at once -- which is what a worst deviation of 4.83 on a range of " +
-            "8 looks like. Read this row before reading those");
+            "8 looks like. Read this row before reading those" +
+            ` [context ${probe.lost ? "LOST" : "live"}, glGetError ${probe.glErr}, renderer ${probe.renderer}]`);   // v4681
     }
     const raw = await pg.evaluate(([o, u, v]) => window.__render(o, u, v, false, true), [O, U, V]);
     await b.close(); srv.close();

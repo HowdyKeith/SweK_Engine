@@ -254,9 +254,15 @@ if (R) {
     ok("  ...and the device reproduces the ordering, so this is the METHOD and not the machine",
         rs / rh > 5,
         `device Hammersley ${dh.toFixed(8)} (${rh.toExponential(2)}), device stratified ${ds.toFixed(8)} (${rs.toExponential(2)}) -- ${(rs / rh).toFixed(1)}x apart`);
-    ok("!! but the device CANNOT show the size of the gain, because its own f32 floor sits above the good pattern's residual",
-        rh > Math.abs(h[2] - ref) / ref * 10,
-        `the CPU separates the two patterns by a factor of ${(Math.abs(s[1] - ref) / Math.abs(h[2] - ref)).toFixed(0)} (${(Math.abs(h[2] - ref) / ref).toExponential(2)} against ${(Math.abs(s[1] - ref) / ref).toExponential(2)}); the device separates them by ${(rs / rh).toFixed(1)}, because summing ${NSAMP / LANES} f32 terms per lane costs ${rh.toExponential(2)} on its own and that is already larger than the CPU's Hammersley residual. THE PATTERN FINDING IS A CPU FINDING, CONFIRMED IN DIRECTION ON THE DEVICE AND NOT IN MAGNITUDE -- which is the opposite of v4408, where only the device could see the thing`);
+    // *** v4681 -- REPORTED, NOT ASSERTED: IT IS A FACT ABOUT THE ADAPTER'S f32 SUMMATION, NOT ABOUT THE SAMPLER. ***
+    // This row asserted that the device's own floor sits above the CPU's Hammersley residual, so the device "cannot
+    // show the size of the gain". True on SwiftShader; the rig's NVIDIA Pascal summed accurately enough to show it,
+    // and the row went red on a GOOD device. The sampler claim above -- the device reproduces the ORDERING -- held on
+    // both and stays asserted. Whether an adapter can also show the MAGNITUDE is printed, per adapter, below.
+    const floorHides = rh > Math.abs(h[2] - ref) / ref * 10;
+    report((floorHides ? "on this adapter the device CANNOT show the size of the gain, because its own f32 floor sits above the good pattern's residual"
+                       : "on this adapter the device's f32 floor sits BELOW that residual, so it shows the gain's size as well as its direction") + "  --  " +
+        `the CPU separates the two patterns by a factor of ${(Math.abs(s[1] - ref) / Math.abs(h[2] - ref)).toFixed(0)} (${(Math.abs(h[2] - ref) / ref).toExponential(2)} against ${(Math.abs(s[1] - ref) / ref).toExponential(2)}); the device separates them by ${(rs / rh).toFixed(1)}, because summing ${NSAMP / LANES} f32 terms per lane costs ${rh.toExponential(2)} on its own and that is already larger than the CPU's Hammersley residual. THE PATTERN FINDING IS A CPU FINDING, CONFIRMED IN DIRECTION ON THE DEVICE AND NOT IN MAGNITUDE -- which is the opposite of v4408, where only the device could see the thing`);   // (report, v4681)
 }
 
 console.log("\n6. WHAT THE SAMPLER BUYS, AND WHAT IT DOES NOT -- COUNTED SEPARATELY BECAUSE THEY ARE DIFFERENT THINGS");
@@ -437,8 +443,9 @@ if (R) {
     report(c.owed === 0
         ? `adapter ${AKEY}: all ${c.of} per-adapter reading(s) HELD against the record on file.`
         : `adapter ${AKEY}: ${c.owed} of ${c.of} per-adapter reading(s) OWED -- no reading on file for this ` +
-          `adapter, so those rows measured and reported rather than asserted. Every universal row above still ` +
-          `held. Re-run with --record ON THAT BOX to write them; do not type them in from this output.`);
+          `adapter, so those rows measured and reported rather than asserted. ` +
+          (fails ? `${fails} row(s) above did NOT hold -- read them. ` : `Every universal row above held. `) +
+          `Re-run with --record ON THAT BOX to write them; do not type them in from this output.`);
     // --record runs AFTER every row has reported, so the write cannot change this run's verdicts -- only the
     // next run's, on this same adapter.
     if (process.argv.includes("--record")) {

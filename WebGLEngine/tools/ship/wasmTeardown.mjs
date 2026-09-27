@@ -114,6 +114,24 @@ export function measureExit(gateRel, { capMs = 45000, cwd = ENG } = {}) {
  * spin is worse than one that reads low: the deadline is reported alongside the figure so a reading taken at
  * the ceiling is visible as one.
  */
+/**
+ * *** v4681 -- THE INSTRUMENT'S OWN RESOLUTION, BECAUSE ON WINDOWS IT CANNOT SEE WHAT THIS MODULE MEASURES. ***
+ * process.cpuUsage() is getrusage() on POSIX -- microsecond steps, measured 1 us here -- and GetProcessTimes()
+ * on Windows, which advances in whole scheduler ticks. The rig read 0.00 ms in forty consecutive idle 100 ms
+ * windows and the burning-CPU row read "0.0 ms against a control of 0.0 ms": not a quiet compiler, an instrument
+ * whose smallest step is larger than the thing measured. Spins for up to `spinMs` and returns the SMALLEST
+ * nonzero step it saw, in ms -- a reading of this box, so a row can say whether it is able to answer at all.
+ */
+export function cpuQuantumMs(spinMs = 200) {
+    let last = process.cpuUsage(), min = Infinity;
+    const t0 = Date.now();
+    while (Date.now() - t0 < spinMs) {
+        const u = process.cpuUsage(), step = (u.user + u.system) - (last.user + last.system);
+        if (step > 0) { if (step < min) min = step; last = u; }
+    }
+    return Number.isFinite(min) ? min / 1000 : null;
+}
+
 export async function drainBackgroundCpu({ sliceMs = 100, quietSlices = 2, deadlineMs = 1000 } = {}) {
     const t0 = Date.now();
     let total = 0, quiet = 0, slices = 0;

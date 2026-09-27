@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "1dc3d7dea17aa0730126ab0b7ad9fbb2aa9cff5d",
+ "head": "dcf499c9cfd86d94e34d09d91c3e25e990556171",
  "bodies": {
   "box3d": [
    {
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3402434,
-    "sha": "04c9f45006b981d4818deca0e0e2675f05b22650"
+    "bytes": 3400621,
+    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    },
    {
     "path": "mpm3d.html",
@@ -783,12 +783,12 @@
    {
     "path": "tools/ship/treeRead-selfcheck.mjs",
     "bytes": 19514,
-    "sha": "c00f2ec3ee87d270bc2361e7731c1da1c7d5a5e8"
+    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
     "bytes": 27329,
-    "sha": "85925bd438c78d222bef6fa257fa2fe10adb4e33"
+    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
@@ -910,7 +910,7 @@
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
     "bytes": 27329,
-    "sha": "85925bd438c78d222bef6fa257fa2fe10adb4e33"
+    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    },
    {
     "path": "tools/ship/tslIsing-selfcheck.mjs",
@@ -989,7 +989,7 @@
    {
     "path": "tools/mesh/xatlasRef.mjs",
     "bytes": 15087,
-    "sha": "6b1a06864eca14d41613a26ce224e4c239b0e611"
+    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    }
   ]
  }

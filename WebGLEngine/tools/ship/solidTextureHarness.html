@@ -9,6 +9,11 @@ import { FBM3_FN, CONCRETE_FN, TRIPLANAR_FN, CONCRETE } from "/render/solidTextu
 
 const N = 96;
 const gl = document.getElementById("c").getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
+// v4681 -- WHY a compile or link failed, not just its info log: the rig's v4680 run threw "Error: null" from
+// here, and WebGL returns null for an info log when the CONTEXT IS LOST. A lost context and a rejected shader
+// are different findings, so the message says which, and names the renderer read at load.
+const REN = (() => { try { const x = gl.getExtension("WEBGL_debug_renderer_info"); return String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch { return "unknown"; } })();
+const glWhy = (stage, log) => gl.isContextLost() ? `WEBGL CONTEXT LOST at ${stage} (renderer ${REN})` : `${stage} failed on ${REN}: ${log}`;
 
 const VS = `#version 300 es
 out vec2 vUV;
@@ -69,11 +74,11 @@ function compile(vs, fs) {
     for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
         const s = gl.createShader(t);
         gl.shaderSource(s, src); gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(glWhy("compile", gl.getShaderInfoLog(s)));
         gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(glWhy("link", gl.getProgramInfoLog(p)));
     return p;
 }
 
@@ -108,7 +113,7 @@ window.__render = (origin, du, dv, weathered, raw, probe) => {
     gl.bindVertexArray(null);
     const px = new Uint8Array(N * N * 4);
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    return { ok: true, px: [...px], n: N };
+    return { ok: true, px: [...px], n: N, lost: gl.isContextLost(), glErr: gl.getError(), renderer: REN };   // v4681: the state beside the bytes
 };
 
 // The GLSL text itself, so the gate can assert what it does NOT contain -- a sampler, a varying uv -- rather
