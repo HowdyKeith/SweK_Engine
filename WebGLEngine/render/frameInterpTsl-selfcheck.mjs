@@ -275,5 +275,5 @@ else {
 // v4744, the arc: A5-A11 in fx/fsr/fsrFrameGenArc-selfcheck.mjs's log redden the arc row here, two or three each.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the FILL (render/holeFill.mjs), which interpolateFrameCPU runs between the two when asked and this module does not " +
-    "yet carry; depths closer than the key's ~6e-8, which become ties; and a field on a real three.js scene, which the driver's gate draws.");
+    "yet carry; depths closer than the key's ~2.4e-7, which become ties -- measured at v4757 on real fields and noted in render/frameInterpTsl.mjs, 2 pixels of 16384 at a near/far ratio of 1e5 and none at the page's; and a field on a real three.js scene, which the driver's gate draws.");
 process.exitCode = fails ? 1 : 0;

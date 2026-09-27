@@ -142,7 +142,9 @@ else {
 // which is what it was for.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a fourth level, which the level grid makes cheap -- 47 % of the block grid's reads with three at 256 x 160, " +
-    "finding 36 pixels of shift at 92 % of blocks -- and which on BOTH grids loses a small square moving across a background: it is " +
-    "coarser than the square, and the square's own motion is outside the window its guess leaves (render/flowCost-selfcheck.mjs " +
-    "does not grade it, and fast motion is a later round's); and a GPU's time, where fx/fsr/fsrFlowCost-selfcheck.mjs holds only this device's.");
+    "finding 36 pixels of shift at 92 % of blocks of a smoothed random field -- and which on BOTH grids loses a small square moving " +
+    "across a background. v4757 measured it in this generator on the scrolling wall at 12, 24 and 36 pixels a frame: the same at 12 " +
+    "(+11.6 dB on the interior over the vectors, three levels or four), at 24 the shift found at 95 blocks of 256 against 65 and " +
+    "the frame no better (-0.2 dB), at 36 found at neither -- this wall's noise is fine, and averaged to a coarse level there is " +
+    "little left to match. Not built. And a GPU's time, where fx/fsr/fsrFlowCost-selfcheck.mjs holds only this device's.");
 process.exitCode = fails ? 1 : 0;

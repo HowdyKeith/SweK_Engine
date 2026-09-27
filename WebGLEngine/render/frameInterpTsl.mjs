@@ -18,9 +18,14 @@
 //
 // *** THE DEPTH KEY IS 0.5 + 0.25 d (0.5 - 0.25 d WHEN NEARER IS MORE), SO IT HOLDS CLIP z FROM EITHER CONVENTION. ***
 // Both of three's clip-z conventions ([0, 1] and [-1, 1]) land strictly inside (0, 1), below the cleared 1.0 that stands
-// for the CPU's Infinity. The scale is a power of two and exact; the 0.5 offset is not, and two depths closer together
-// than about 6e-8 become one key -- a tie the CPU would call a strict order. That is the precision of the key, stated;
-// depths outside (-2, 2) are outside its domain.
+// for the CPU's Infinity. The scale is a power of two and exact; the 0.5 offset is not: the key's step near 0.75 is 6e-8,
+// so two DEPTHS closer together than about 2.4e-7 -- four times that, through the 0.25 -- become one key, a tie the CPU
+// would call a strict order. That is the precision of the key, stated; depths outside (-2, 2) are outside its domain.
+// *** v4757: MEASURED ON REAL FIELDS, AND IT DECIDES ALMOST NOTHING. *** The CPU splat run twice over a device-rendered field
+// of knots turning at 128 x 128 -- once on the depths, once on the keys -- decides NO pixel differently with fsr-three.html's
+// camera (near 0.1, far 50) or with knots 25 to 50 units deep (far 400): two neighbouring pixels tie by the key and not by
+// depth in each. At a near/far ratio of 1e5 (0.01 to 1000) 6872 neighbour pairs tie, and 2 of 16384 pixels land differently,
+// by 2/255 at most -- the surfaces that tie are one surface, and which of two points on it wins is the same colour. Kept.
 //
 // *** THE LANDING IS floor(x + 0.5), Math.round, AND NOT round(). *** v4734 found render/frameInterpWgsl.mjs rounding the
 // same landing with WGSL's round(), which ties to even, and at t = 0.5 an odd whole-pixel flow lands every block on a

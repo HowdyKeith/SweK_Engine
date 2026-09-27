@@ -112,6 +112,71 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const now = object.instanceMatrix.array;
         for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
     };
+    // v4757: a SkinnedMesh's previous bone matrices and a morphed mesh's previous influences, kept HERE as the instance matrices
+    // are. three's skinning keeps its previous bone matrices only when the material asks for velocity and steps them once
+    // per render call -- this stage's own pass among them -- so a skinned mesh here carried NO motion; and it keeps no
+    // previous morph influences at all, so a morphed mesh's "previous" point was the unmorphed one. Per skeleton, the bone
+    // matrices at the last draw of this pass, stepped once a pass (a skeleton may skin several meshes); per mesh, the
+    // influences at its last draw; the targets from a float texture per geometry
+    const skins = new WeakMap(), morphs = new WeakMap(), morphTex = new WeakMap();
+    const skinRecord = (object) => {
+        const sk = object.skeleton; let r = skins.get(sk);
+        if (!r) { sk.update(); const n = sk.bones.length, last = Float32Array.from(sk.boneMatrices), cur = Float32Array.from(last);
+            r = { n, last, cur, node: TSL.buffer(cur, "mat4", n), frame: -1 }; skins.set(sk, r); }
+        return r;
+    };
+    const hasMorph = (object) => !!(object && object.geometry && object.geometry.morphAttributes && object.geometry.morphAttributes.position &&
+        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences);
+    const morphRecord = (object) => {
+        let r = morphs.get(object);
+        // the influences as vec4s, each in .x: a uniform array's elements must be 16 bytes apart, and an array of f32 is not
+        // valid WGSL there -- the first draft's pipeline failed and the mesh was not drawn at all
+        if (!r) { const n = object.geometry.morphAttributes.position.length, last = Float32Array.from(object.morphTargetInfluences.slice(0, n)), cur = new Float32Array(n * 4);
+            for (let i = 0; i < n; i++) cur[i * 4] = last[i];
+            r = { n, last, cur, node: TSL.buffer(cur, "vec4", n) }; morphs.set(object, r); }
+        return r;
+    };
+    // the targets of a geometry as one float texture, target t's vertex v at texel t * count + v, rows of up to 4096
+    const morphTargets = (geometry) => {
+        let m = morphTex.get(geometry);
+        if (!m) {
+            const targets = geometry.morphAttributes.position, count = geometry.attributes.position.count, n = targets.length, total = count * n;
+            const W = Math.min(4096, total), H = Math.ceil(total / W), data = new Float32Array(W * H * 4);
+            for (let t = 0; t < n; t++) for (let v = 0; v < count; v++) { const i = (t * count + v) * 4; data[i] = targets[t].getX(v); data[i + 1] = targets[t].getY(v); data[i + 2] = targets[t].getZ(v); }
+            const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType); tex.needsUpdate = true;
+            m = { tex, W, count, n }; morphTex.set(geometry, m);
+        }
+        return m;
+    };
+    const stepSkin = (object, r, frame) => {
+        // the CURRENT bone matrices, fresh for this draw: three updates a skeleton once per frame of ITS animation loop, so a
+        // pass drawn in the same browser frame as the last one skinned the mesh with the matrices it had then -- the current
+        // pose was the previous one, and a skinned mesh carried no motion at all
+        object.skeleton.update();
+        if (r.frame === frame) return;                                  // once a pass, however many meshes the skeleton skins
+        r.frame = frame;
+        if (!toward) { r.cur.set(r.last); return; }
+        const now = object.skeleton.boneMatrices;
+        for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
+    };
+    const stepMorph = (object, r) => {
+        for (let i = 0; i < r.n; i++) r.cur[i * 4] = toward ? r.last[i] + toward.t * (object.morphTargetInfluences[i] - r.last[i]) : r.last[i];
+    };
+    // the geometry's point as it was: morphed by the previous influences, then skinned by the previous bone matrices
+    const morphedBefore = (object, pos) => {
+        const g = object.geometry, r = morphRecord(object), { tex, W, count, n } = morphTargets(g);
+        const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
+        let sum = null, acc = null;
+        for (let t = 0; t < n; t++) { const w = r.node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
+        // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
+        return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+    };
+    const skinnedBefore = (object, pos) => {
+        const r = skinRecord(object), m = r.node, bind = TSL.uniform(object.bindMatrix), bindInv = TSL.uniform(object.bindMatrixInverse);
+        const si = TSL.attribute("skinIndex", "uvec4"), sw = TSL.attribute("skinWeight", "vec4"), v = bind.mul(vec4(pos, 1.0));
+        const s = m.element(si.x).mul(v).mul(sw.x).add(m.element(si.y).mul(v).mul(sw.y)).add(m.element(si.z).mul(v).mul(sw.z)).add(m.element(si.w).mul(v).mul(sw.w));
+        return bindInv.mul(s).xyz;
+    };
     class MotionNode extends THREE.VelocityNode {
         constructor() { super(); this.nodeType = "vec4"; }
         setPreviousCamera(projection, view) {
@@ -119,24 +184,36 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             this.previousCameraViewMatrix.value.copy(view);
         }
         // per object, BEFORE it is drawn: its matrix from the last time THIS pass drew it
-        update({ object }) {
+        update({ object, renderId }) {
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
             // the buffer node's array is uploaded at every draw -- three's Buffer binding reports itself changed each time
             if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
+            // three's renderId is its render call's -- frameId is its animation loop's, and several passes fall in one of those
+            if (object.isSkinnedMesh) stepSkin(object, skinRecord(object), renderId);
+            if (hasMorph(object)) stepMorph(object, morphRecord(object));
         }
         updateAfter({ object }) {
             const m = prev.get(object);
             if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
             if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
+            if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
+            if (hasMorph(object)) { const r = morphRecord(object); for (let i = 0; i < r.n; i++) r.last[i] = object.morphTargetInfluences[i]; }
         }
         setup(builder) {
             const cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal);
             // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
             const object = builder && builder.object;
-            const before = object && object.isInstancedMesh
-                ? TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz : positionPrevious;
+            let before = positionPrevious;
+            if (object && object.isInstancedMesh) before = TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            else if (object && (object.isSkinnedMesh || hasMorph(object))) {
+                // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
+                let p = TSL.positionGeometry;
+                if (hasMorph(object)) p = morphedBefore(object, p);
+                if (object.isSkinnedMesh) p = skinnedBefore(object, p);
+                before = TSL.varying(vec4(p, 1.0)).xyz;
+            }
             const was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(before);
             // uv = ((x + 1) / 2, (1 - y) / 2), so uvPrev - uvCurr = ((xp - xc) / 2, (yc - yp) / 2)
             const xc = cur.x.div(cur.w), yc = cur.y.div(cur.w), xp = was.x.div(was.w), yp = was.y.div(was.w);

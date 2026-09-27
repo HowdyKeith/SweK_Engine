@@ -428,6 +428,6 @@ if (!skip) {
 // of v4750's in fx/fsr/fsrFrameGenWorld-selfcheck.mjs.
 // v4752: the instance rows -- logged with the rest of v4752's in fx/fsr/fsrFrameGenParticles-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: SKINNED and MORPHED meshes, whose previous position three's positionPrevious carries and this gate " +
-    "never draws; an ORTHOGRAPHIC camera's field; and every pass downstream of the field, which arrive one a round.");
+console.log("unchecked here: every pass downstream of the field, which arrive one a round. SKINNED and MORPHED meshes and an " +
+    "ORTHOGRAPHIC camera were named here until v4757; render/temporalTslMeshes-selfcheck.mjs holds them, and found the first two wrong.");
 process.exitCode = fails ? 1 : 0;

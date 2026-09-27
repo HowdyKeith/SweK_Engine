@@ -8032,6 +8032,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4757 -- THE 364th CLOSING: skinned and morphed meshes found carrying the wrong motion, and three smaller items measured.
+    since439: Object.freeze({
+        at: "v4757", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** SKINNED MESHES CARRIED NO MOTION THROUGH THE MOTION STAGE, AND MORPHED ONES THE WHOLE MORPH. *** Held to rigid " +
+                 "meshes making the same motion: three updates a skeleton once per frame of its own animation loop, so a pass drawn " +
+                 "in the same browser frame skinned with the matrices it had then and the current pose was the previous one; and it " +
+                 "keeps no previous morph influences, so the previous point was the unmorphed one, 2.7 px wrong here. " +
+                 "render/temporalTsl.mjs's stage now updates each skeleton before its draw and keeps each skeleton's bone matrices " +
+                 "(stepped once a pass, keyed on three's renderId) and each mesh's influences from its last draw, morphing and skinning " +
+                 "the geometry with them for the previous point, and each on its arc through a toward stage: the rigid mesh's field to " +
+                 "under 1e-5 px on both backends, relative and absolute targets, two meshes on one skeleton. The first morph draft was " +
+                 "not drawn at all -- a uniform array of f32 is not WGSL. An orthographic camera was right already: motionVectorsCPU's " +
+                 "field to 2e-6 px. A fourth flow level was measured in the generator and not built: at 24 px of scroll a frame it " +
+                 "finds the shift at 95 blocks of 256 against 65 and the frame is no better, at 36 neither does. And the splat's depth " +
+                 "key, whose precision is 2.4e-7 in depth and not the 6e-8 its note said, decides no pixel differently from the depths " +
+                 "with the page's camera and 2 of 16384 at a near/far ratio of 1e5. Ten sabotages, all red.",
+    }),
     // v4756 -- THE 363rd CLOSING: pacing on the browser's own clock, and graded live.
     since438: Object.freeze({
         at: "v4756", swept: 1, green: 1, red: 0,
