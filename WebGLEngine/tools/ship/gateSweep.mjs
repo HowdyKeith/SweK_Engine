@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4763 -- THE 370th CLOSING: six three.js bug reports, drafted, each held to a reproduction -- and none posted.
+    since445: Object.freeze({
+        at: "v4763", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** WHAT THE MOTION STAGE WORKS AROUND IS THREE'S TO FIX, AND THE DRAFTS SAY SO WITH NUMBERS. *** Three's own velocity " +
+                 "node, on a plain mesh moving 5.612 px a frame, reads 1.871 on an InstancedMesh, a BatchedMesh and a morphed mesh " +
+                 "making the same motion -- the displacement from the bare geometry -- and -9.311 on a skinned one; its colour pass " +
+                 "draws a centred sprite after an off-centre one at the other's centre; its WebGL2 backend runs only the first " +
+                 "particle system a renderer makes. docs/upstream-three/ holds one draft each, with a standalone reproduction importing " +
+                 "r185 from a CDN; this gate runs each against the vendored r185 on both backends, holds the bug to it and the draft's " +
+                 "Observed block to what it prints. Causes are marked as readings of the source. Nothing is posted. Six sabotages " +
+                 "on the drafts, none green.",
+    }),
     // v4762 -- THE 369th CLOSING: particles a compute pass moves -- the hook, and three's WebGL2 running only one system.
     since444: Object.freeze({
         at: "v4762", swept: 1, green: 1, red: 0,
