@@ -93,9 +93,13 @@ process.exit(0);
 
     // A STEADY cost is a DIFFERENT animal and must not land on the same list. An unref'd interval burning CPU
     // every window gives win1 ~= win2, both high.
+    // *** v4686 -- BURNED BY THE CLOCK, NOT BY A LOOP COUNT. *** 300,000 square roots every 10 ms was ~15 ms of CPU
+    // per 300 ms window on the rig -- ONE Windows scheduler tick -- so its cpuUsage read "win1 0.0 AND win2 15.0",
+    // a tick or nothing, and the steady fixture looked like a burst. Five milliseconds of every ten is about half a
+    // core on ANY box, ~150 ms a window, several ticks above the floor wherever this runs.
     const STEADY = write("steady-selfcheck.mjs", `
 let sink = 0;
-const t = setInterval(() => { for (let j = 0; j < 300000; j++) sink += Math.sqrt(j % 977); }, 10);
+const t = setInterval(() => { const e = Date.now() + 5; while (Date.now() < e) sink++; }, 10);
 t.unref();
 console.log("steady");
 process.exit(0);
