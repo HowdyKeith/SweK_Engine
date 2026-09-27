@@ -564,8 +564,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4751 -- 1834 -> 1835 for fx/fsr/fsr3Hold-selfcheck.mjs -- FSR3 holding the two newest pairs through a late frame.
     // v4752 -- 1835 -> 1836 for fx/fsr/fsrFrameGenParticles-selfcheck.mjs -- particles through the generator, instanced and in one buffer.
     // v4753 -- 1836 -> 1837 for fx/fsr/fsrFlowGrid-selfcheck.mjs -- the optical flow with each level on its own block grid, in the generator.
-    gates: 1837, usesOk: 1816, definesOk: 1808, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1709, condFirst: 91, unknownSignature: 16,
+    // v4755 -- 1837 -> 1838 for fx/fsr/fsrFrameGenUi-selfcheck.mjs -- a translucent, moving UI over a generated frame.
+    gates: 1838, usesOk: 1817, definesOk: 1809, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1710, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -8032,6 +8032,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4755 -- THE 362nd CLOSING: a UI that moves, drawn at the generated time, and one you can see through.
+    since437: Object.freeze({
+        at: "v4755", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenUi-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE NEWER FRAME'S UI IS RIGHT FOR A UI THAT STANDS STILL, AND HALF A FRAME WRONG FOR ANYTHING IN IT THAT " +
+                 "MOVES. *** v4745 composited an opaque HUD that stood still, as FSR3 composes UI. Over the knot under a pan, with " +
+                 "two translucent panels, a translucent bar and a marker sliding 6 pixels a real frame: composited, the panels are " +
+                 "+4.6 dB over drawing them into the frames, and the same to the bit whichever frame's UI it is -- but the marker is " +
+                 "3 pixels ahead in the newer frame's UI and 3 behind in the older's, 10 dB on its pixels either way. " +
+                 "fx/fsr/fsrFrameGenTsl.mjs's `ui` may be a function of t now, called with the time being generated: the marker 72.8 " +
+                 "dB, the whole frame +5.1, for a UI draw each generated frame; fx/fsr/fsr3Tsl.mjs passes it through, and with one " +
+                 "real frame composites that frame with the UI at t = 1 without drawing one for the call that only primes. " +
+                 "fsr-three.html's HUD has a marker that slides, drawn at the generated time unless asked for the newer frame's -- " +
+                 "and its paced view had composited real frames from the wrong slot of the three-frame ring under the timed policy " +
+                 "since v4751. The first run read the marker as mostly the bar: three draws opaque before transparent. Seven " +
+                 "sabotages, all red.",
+    }),
     // v4754 -- THE 361st CLOSING: the nearest blocks' flows weighed again, and what they were for found already done.
     since436: Object.freeze({
         at: "v4754", swept: 0, green: 0, red: 0,

@@ -79,7 +79,8 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
          * otherwise. With one real frame so far it is that frame. A second call before the next real frame is a second frame
          * between the same two, and the generator is told so. `ui` (v4745) is the newer frame's UI, premultiplied, at display
          * size, composited over whatever is shown -- FSR2 renders the scene alone, so the frames are HUD-less as the generator
-         * then needs. `pair` (v4751, with hold 2) is the pair's NEWER real frame: the newest, frames - 1, by default, or the one
+         * then needs. v4755: or a function of the time generated, as makeFrameGen takes it -- the UI drawn at t; with one real
+         * frame so far, what is shown is that frame, and its UI is the function's at t = 1. `pair` (v4751, with hold 2) is the pair's NEWER real frame: the newest, frames - 1, by default, or the one
          * before it.
          */
         async generate(output = null, { t = null, ui = null, pair = null } = {}) {
@@ -92,11 +93,12 @@ export function makeFsr3(THREE, TSL, renderer, { fsr2 = {}, frameGen = {}, field
             if (kept) { const K = kept[p % N]; motion = K.motion.texture; depth = K.depth.texture; camera = K.camera ? K.camera.texture : null; if (p >= 1) depthPrev = kept[(p - 1) % N].depth.texture; }
             else { ({ motion, depth } = fieldOf()); camera = up.stage.camera ? up.stage.camera.texture : null; }
             lastInputs = { prev: prev.texture, cur: cur.texture, motion, depth, ...(camera ? { camera } : {}), ...(depthPrev ? { depthPrev } : {}) };
-            await gen.generate(renderer, ui ? { ...lastInputs, ui } : lastInputs, output, { t, again: lastPair === p });
+            // with one real frame the call below only primes the generator, and the UI goes over the frame shown after it
+            await gen.generate(renderer, ui && frames > 1 ? { ...lastInputs, ui } : lastInputs, output, { t, again: lastPair === p });
             lastPair = p;
             // one real frame in there is nothing to be between: the call above only primed the generator's older depth, and
             // what is shown is the frame itself
-            if (frames === 1) { if (ui) await gen.composite(renderer, frames2[0].texture, ui, output);
+            if (frames === 1) { if (ui) await gen.composite(renderer, frames2[0].texture, typeof ui === "function" ? await ui(1) : ui, output);
                 else { const keep = renderer.getRenderTarget(); renderer.setRenderTarget(output); await renderer.renderAsync(show[0], ortho); renderer.setRenderTarget(keep); } }
         },
         /** Show real frame k again at `output` -- one of the last hold + 1, which this holds. */

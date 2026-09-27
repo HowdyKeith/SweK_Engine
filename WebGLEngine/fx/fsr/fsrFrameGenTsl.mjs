@@ -48,6 +48,13 @@
 // premultiplied, laid over the generated frame -- the HUD exactly, and +4.9 dB on the whole frame
 // (fx/fsr/fsrFrameGenScene-selfcheck.mjs).
 //
+// *** A UI THAT MOVES IS DRAWN AT THE GENERATED TIME, AND A TRANSLUCENT ONE IS COMPOSITED (v4755). *** Composited over the
+// generated frame, a translucent panel is exact over whatever the scene behind it does: +4.6 dB on the panels' pixels over
+// drawing them into the frames. But the newer frame's UI puts anything in it that moves half a frame ahead, and the older
+// frame's half a frame behind -- a marker sliding 6 pixels a frame read 10 dB on its pixels either way. `ui` as a function of
+// t draws it where it is at t: 72.8 dB there, +5.1 on the whole frame (fx/fsr/fsrFrameGenUi-selfcheck.mjs). A UI draw each
+// generated frame is what that costs.
+//
 // *** PARTICLES CARRY THEIR VECTORS ONLY AS INSTANCES, AND ARE BEST DRAWN AT THE GENERATED TIME (v4752). *** An InstancedMesh
 // carries each particle's motion -- since v4752 render/temporalTsl.mjs's stage keeps the previous instance matrices itself,
 // three's being the ones the material was built with (103 px on particles moving 5) -- and quads written into one buffer each
@@ -92,6 +99,9 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * `depthPrev` (v4751), given to generate, is the pair's OLDER depth, in place of the one this generator kept from its last call.
  * `ui` (v4745), given to generate, is the newer frame's UI as a premultiplied w x h texture: `prev` and `cur` are then the
  * frames WITHOUT it, and the generated frame gets it composited over, exactly (render/frameInterp.mjs's compositeUiCPU).
+ * v4755: or a FUNCTION of the time being generated, t in [0, 1] between the pair, returning that texture (or a promise of
+ * it) -- the UI drawn AT t. Anything in a UI that moves is half a frame from where it should be in either real frame's UI;
+ * drawn at t it is where it is (fx/fsr/fsrFrameGenUi-selfcheck.mjs). Mapping t to the caller's own clock is the caller's.
  */
 export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null, arc = false } = {}) {
     if (arc && flow) throw new Error("fx/fsr/fsrFrameGenTsl: arc and flow are not combined -- the flow's vectors are chords, and a pixel the flow took has no displacement to time t");
@@ -133,6 +143,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
         async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, camera = null, depthPrev = null }, output = null, { t: at_ = null, again = false } = {}) {
+            if (typeof ui === "function") ui = await ui(at_ === null ? t : at_);        // v4755: the UI drawn at the time generated
             if (ui) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
