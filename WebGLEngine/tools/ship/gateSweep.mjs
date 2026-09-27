@@ -8032,6 +8032,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4765 -- THE 372nd CLOSING: refraction -- what reads the frame behind it, drawn over the frame.
+    since447: Object.freeze({
+        at: "v4765", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/translucentLayer-selfcheck.mjs (a backdropNode lens behind the panels, renderOver in the rebuilt frame, readsBackdrop, a refusal)"]),
+        verdict: "*** A LENS OVER BLACK SEES NOTHING, SO IT IS DRAWN OVER THE FRAME. *** three puts a backdropNode or transmission material " +
+                 "in its transparent list whatever its `transparent` says; the layer's isTranslucent did not, and such a lens went into " +
+                 "the generator's frames as a surface -- the worst arm on all six cases, 21 to 24 dB on its pixels. readsBackdrop finds " +
+                 "them, hide() hides them, and renderOver draws them at t over the frame -- copied in, the opaque scene's depth first -- " +
+                 "through the generator's new `over`, before `ui`. A real frame rebuilt so is the frame drawn with them, to the bit, " +
+                 "for a backdropNode and a lit transmission lens alike, on both backends; generated, it beats the best field on every " +
+                 "case, +1.4 to +6.7 dB, and is exact against the midpoint where what is behind stands still. Ten sabotages, none green.",
+    }),
     // v4764 -- THE 371st CLOSING: the FSR gates on a real GPU -- a command, a report that names the GPU, and a doc.
     since446: Object.freeze({
         at: "v4764", swept: 1, green: 1, red: 0,

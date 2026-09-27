@@ -20,7 +20,7 @@ node tools/ship/realGpuRun.mjs --out real-gpu-run.json
 - **macOS**: `--enable-unsafe-webgpu` (the default) reaches Metal.
 - `--only fsrFrameGen` runs just the gates whose path contains that text.
 
-On this box's SwiftShader the whole run took 8 min 25 s, all 39 gates green (exact 12, quality 24, timing 3); on a GPU it
+On this box's SwiftShader, at v4764, the whole run took 8 min 25 s, all 39 gates green (exact 12, quality 24, timing 3); on a GPU it
 should be shorter, which nobody here has measured. Nothing is sent anywhere; the report is a local JSON file.
 
 ## Read the report

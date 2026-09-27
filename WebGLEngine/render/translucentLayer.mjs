@@ -29,6 +29,15 @@
 // What costs what: each frame shown draws the opaque scene once more, depth only, and the translucent things -- the price a HUD
 // drawn at t pays, plus a geometry pass. The generator's frames are drawn WITHOUT them, which is the order a renderer draws in
 // anyway: opaque first.
+//
+// *** v4765: WHAT READS THE FRAME BEHIND IT IS DRAWN OVER THE FRAME, NOT OVER BLACK. *** A material with a backdropNode, or with
+// transmission, samples what three has drawn before it -- three puts it in its transparent list whatever its `transparent`
+// says, and isTranslucent did not, so such a lens went into the generator's frames as a surface: the worst arm on every case
+// fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs measures, 21 to 24 dB on its pixels. readsBackdrop finds them; hide(scene) hides them
+// with the translucent things; render() leaves them out (they write depth there, being surfaces); renderOver(frame) draws them at
+// the scene's time over the frame itself -- copied in texel for texel, the opaque scene's depth drawn first -- which is three's
+// own order: opaque, then what reads it. A real frame rebuilt so is the frame drawn with them, to the bit, on both backends;
+// through the generator's `over` it beats the best single field on every case, +1.4 to +6.7 dB on the lens's pixels.
 "use strict";
 
 const RENDERABLE = (o) => !!(o && (o.isMesh || o.isLine || o.isPoints || o.isSprite));
@@ -44,18 +53,37 @@ export function isTranslucent(object) {
 }
 
 /**
+ * v4765: whether a three.js object reads the frame behind it -- a material with a backdropNode, or transmission. three draws
+ * these after the opaque scene, sampling what is already drawn; over transparent black they have nothing to sample, so they
+ * are not a layer's: renderOver draws them over the frame itself.
+ */
+export function readsBackdrop(object) {
+    if (!RENDERABLE(object)) return false;
+    return materials(object).some((m) => (m.backdropNode && m.backdropNode.isNode) || m.transmission > 0 || (m.transmissionNode && m.transmissionNode.isNode));
+}
+
+/**
  * A layer of a scene's translucent things, w x h, premultiplied: target.texture is (rgb x a, a) over transparent black, to lay
  * over a frame drawn without them -- fx/fsr/fsrFrameGenTsl.mjs's `ui`, or its composite. `select(object)` chooses the things
  * (isTranslucent unless given). hide(scene) hides them and returns what puts back each one's own visibility; render(renderer,
  * scene, camera) draws them as the scene stands, the opaque rest depth-tested against, and leaves the renderer, the scene and
  * every material as it found them.
+ * v4765: things that read their backdrop (readsBackdrop) are never the layer's: hide(scene) hides them too, and
+ * renderOver(renderer, scene, camera, frame) draws them over `frame` -- a w x h texture, the generated frame or a real one drawn
+ * without them -- the opaque scene's depth first, and returns overTarget.texture: fx/fsr/fsrFrameGenTsl.mjs's `over`.
  */
 export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTranslucent } = {}) {
     if (!(w >= 1 && h >= 1) || w !== Math.floor(w) || h !== Math.floor(h)) throw new Error(`render/translucentLayer: w and h must be whole numbers of pixels -- got ${w} x ${h}`);
     if (typeof select !== "function") throw new Error("render/translucentLayer: select must be a function of an object");
     const target = new THREE.RenderTarget(w, h, { type: type == null ? THREE.FloatType : type, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const depthOnly = new THREE.MeshBasicNodeMaterial(); depthOnly.colorWrite = false;
-    const gather = (scene) => { const tr = [], op = []; scene.traverse((o) => { if (!RENDERABLE(o)) return; (select(o) ? tr : op).push(o); }); return { tr, op }; };
+    const gather = (scene) => { const tr = [], bd = [], op = []; scene.traverse((o) => { if (!RENDERABLE(o)) return; (readsBackdrop(o) ? bd : select(o) ? tr : op).push(o); }); return { tr, bd, op }; };
+    // v4765: the frame the backdrop readers are drawn over, copied in exactly (a texel a pixel), with a depth buffer of its own
+    const overTarget = new THREE.RenderTarget(w, h, { type: type == null ? THREE.FloatType : type, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    const L = THREE.TSL, ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), copies = new Map();
+    const copyOf = (tex) => { let sc = copies.get(tex); if (!sc) { const m = new THREE.NodeMaterial();
+        m.fragmentNode = L.textureLoad(tex, L.ivec2(L.int(L.screenCoordinate.x), L.int(L.screenCoordinate.y))); m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
+        sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); copies.set(tex, sc); } return sc; };
     const hideAll = (objs) => { const was = objs.map((o) => o.visible); for (const o of objs) o.visible = false; return () => objs.forEach((o, i) => { o.visible = was[i]; }); };
     const blendOf = (m) => {
         if (m.blending === THREE.NormalBlending || m.blending === THREE.AdditiveBlending) return m.blending;
@@ -76,11 +104,29 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
         return () => { for (const [m, v] of kept) FIELDS.forEach((f, i) => { m[f] = v[i]; }); };
     };
     return {
-        target, texture: target.texture,
-        /** Hide the scene's translucent things: the frames the generator is given and the motion stage's pass are drawn so. */
-        hide(scene) { return hideAll(gather(scene).tr); },
+        target, texture: target.texture, overTarget,
+        /** Hide the scene's translucent things and its backdrop readers: the generator's frames and the motion stage's pass are drawn so. */
+        hide(scene) { const { tr, bd } = gather(scene); return hideAll([...tr, ...bd]); },
+        async renderOver(renderer, scene, camera, frame) {
+            if (!frame || !frame.image || frame.image.width !== w || frame.image.height !== h)
+                throw new Error(`render/translucentLayer: renderOver's frame must be a ${w} x ${h} texture -- got ${frame && frame.image ? frame.image.width + " x " + frame.image.height : "no image"}`);
+            const { tr, bd, op } = gather(scene);
+            const keep = { target: renderer.getRenderTarget(), auto: renderer.autoClear, bg: scene.background, over: scene.overrideMaterial };
+            try {
+                // the frame, copied in; then what is opaque, depth only; then the backdrop readers, sampling the frame as it stands
+                renderer.setRenderTarget(overTarget); await renderer.renderAsync(copyOf(frame), ortho);
+                renderer.autoClear = false; scene.background = null;
+                let back = hideAll([...tr, ...bd]); scene.overrideMaterial = depthOnly;
+                try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
+                back = hideAll([...op, ...tr]);
+                try { await renderer.renderAsync(scene, camera); } finally { back(); }
+            } finally {
+                scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto; renderer.setRenderTarget(keep.target);
+            }
+            return overTarget.texture;
+        },
         async render(renderer, scene, camera) {
-            const { tr, op } = gather(scene);
+            const { tr, bd, op } = gather(scene);
             for (const o of tr) for (const m of materials(o)) { const b = blendOf(m);
                 if (typeof b === "string") throw new Error(`render/translucentLayer: ${label(o)}'s material blends by ${b} -- a layer over a frame carries only NormalBlending (over) and AdditiveBlending (adding)`); }
             const keep = { target: renderer.getRenderTarget(), color: new THREE.Color(), alpha: renderer.getClearAlpha(), auto: renderer.autoClear, bg: scene.background, over: scene.overrideMaterial };
@@ -88,17 +134,17 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
             renderer.setRenderTarget(target); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
             renderer.autoClear = false; scene.background = null;
             try {
-                // what is opaque, depth only: a translucent thing behind it is hidden by it
+                // what is opaque, depth only: a translucent thing behind it is hidden by it -- and a backdrop reader, a surface too
                 let back = hideAll(tr); scene.overrideMaterial = depthOnly;
                 try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
-                // the translucent things alone, over transparent black
-                back = hideAll(op); const undo = toLayer(tr);
+                // the translucent things alone, over transparent black -- never a backdrop reader, which renderOver draws
+                back = hideAll([...op, ...bd]); const undo = toLayer(tr);
                 try { await renderer.renderAsync(scene, camera); } finally { undo(); back(); }
             } finally {
                 scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto;
                 renderer.setClearColor(keep.color, keep.alpha); renderer.setRenderTarget(keep.target);
             }
         },
-        dispose() { target.dispose(); depthOnly.dispose(); },
+        dispose() { target.dispose(); overTarget.dispose(); depthOnly.dispose(); for (const sc of copies.values()) sc.children[0].material.dispose(); },
     };
 }

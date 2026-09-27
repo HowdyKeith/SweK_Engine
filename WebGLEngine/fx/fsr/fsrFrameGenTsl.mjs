@@ -76,6 +76,12 @@
 // composited so IS the frame drawn with them (render/translucentLayer-selfcheck.mjs). That costs a depth pass of the opaque
 // scene and a draw of the translucent things each generated frame.
 //
+// *** WHAT READS THE FRAME BEHIND IT IS DRAWN OVER THE GENERATED FRAME (v4765). *** A lens with a backdropNode or transmission
+// samples what is drawn before it; laid over transparent black it samples nothing. `over`, a function of (t, the generated frame)
+// returning a texture, is applied after generation and before `ui` -- render/translucentLayer.mjs's renderOver draws the lens at
+// t over the frame generated without it: +6.7 and +1.4 dB on a still lens's pixels (backdrop, transmission), +4.7 and +1.4 on a
+// moving one, exact against the midpoint where what is behind stands still (fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs).
+//
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
 // turning at the rate it does between two real frames, where the chord and the arc agree to a fraction of a pixel.
@@ -118,6 +124,8 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * v4755: or a FUNCTION of the time being generated, t in [0, 1] between the pair, returning that texture (or a promise of
  * it) -- the UI drawn AT t. Anything in a UI that moves is half a frame from where it should be in either real frame's UI;
  * drawn at t it is where it is (fx/fsr/fsrFrameGenUi-selfcheck.mjs). Mapping t to the caller's own clock is the caller's.
+ * `over` (v4765), given to generate, is a function of (t, the generated frame) returning a w x h texture that replaces it before
+ * `ui` is laid over -- render/translucentLayer.mjs's renderOver, for what reads the frame behind it.
  */
 export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null, arc = false } = {}) {
     if (arc && flow) throw new Error("fx/fsr/fsrFrameGenTsl: arc and flow are not combined -- the flow's vectors are chords, and a pixel the flow took has no displacement to time t");
@@ -158,8 +166,9 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
          * pair of the last call once more -- a second frame between the same two, as a pacer asks for when the display runs
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
-        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, camera = null, depthPrev = null }, output = null, { t: at_ = null, again = false } = {}) {
+        async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, over = null, camera = null, depthPrev = null }, output = null, { t: at_ = null, again = false } = {}) {
             if (typeof ui === "function") ui = await ui(at_ === null ? t : at_);        // v4755: the UI drawn at the time generated
+            if (over !== null && typeof over !== "function") throw new Error("fx/fsr/fsrFrameGenTsl: over must be a function of (t, the generated frame) returning a texture");
             if (ui) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
@@ -186,9 +195,13 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
             }
             if (arc && !again) await draw(renderer, once("toT|" + toward.uuid, () => quad(toTNode(toward))), toT);
             await fi.splat(renderer, of ? rec.targets.field.texture : field.texture, arc ? toT.texture : null);
-            if (ui && !targets.pre) targets.pre = flat();
-            await fi.gather(renderer, prev, cur, ui ? targets.pre : output);
-            if (ui) await composite(renderer, targets.pre.texture, ui, output);
+            if ((ui || over) && !targets.pre) targets.pre = flat();
+            await fi.gather(renderer, prev, cur, ui || over ? targets.pre : output);
+            // v4765: what reads the frame behind it, drawn over the generated frame at t -- before the UI, as three draws it
+            let base = ui || over ? targets.pre.texture : null;
+            if (over) { base = await over(at_ === null ? t : at_, base); sized(base); }
+            if (ui) await composite(renderer, base, ui, output);
+            else if (over) await draw(renderer, once("over|" + base.uuid, () => quad(at(base))), output);
             if (!again) await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next pair's older depth
             renderer.setRenderTarget(keep);
             generated++;
