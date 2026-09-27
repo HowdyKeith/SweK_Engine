@@ -313,5 +313,22 @@ console.log("\nTHE HARNESS GUARD THAT COULD NOT FIRE (found on the rig, after v4
        "ONE THAT WOULD HAVE CAUGHT IT -- a guard whose refusal is never driven is vacuity.mjs's cause one");
 }
 
+// v4683 -- the WebGL2 launch flags: one default, and an override that is parsed rather than trusted
+{
+    const PR = await import("./playwrightResolve.mjs");
+    const d = PR.webglLaunchArgs({}), n = PR.webglLaunchArgs({ SWEK_GL_ARGS: "none" }),
+          l = PR.webglLaunchArgs({ SWEK_GL_ARGS: " --use-angle=swiftshader , --enable-unsafe-swiftshader ," });
+    ok("!! the WebGL2 harness default is unchanged until a rig reading says otherwise, and says it was not overridden",
+        d.args.join(" ") === "--use-gl=swiftshader" && d.overridden === false, JSON.stringify(d));
+    ok("...and SWEK_GL_ARGS=none means NO flags, and a list is split, trimmed and emptied of blanks",
+        n.args.length === 0 && n.overridden && l.args.join("|") === "--use-angle=swiftshader|--enable-unsafe-swiftshader" && l.overridden,
+        `none -> [${n.args}], list -> [${l.args.join(", ")}]`);
+    ok("...and the four gates that lost their context on the rig take their flags from it, not from a literal",
+        ["atmosphere", "perspectiveWarp", "solidTexture", "noisePrecision"].every((g) => {
+            const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), g + "-selfcheck.mjs"), "utf8");
+            return /webglLaunchArgs\(\)/.test(src) && !/args:\s*\["--use-gl=swiftshader"\]/.test(src);
+        }));
+}
+
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

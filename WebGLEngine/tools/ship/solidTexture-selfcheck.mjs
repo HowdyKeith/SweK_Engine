@@ -24,7 +24,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as csg from "../../physics/mesh/meshCSG.mjs";
 import * as st from "../../render/solidTexture.mjs";
 import { snoise3 } from "../../shaders/ashimaNoise.mjs";
@@ -219,7 +219,9 @@ if (skip) {
     });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     const port = srv.address().port;
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const GL = webglLaunchArgs();   // v4683: one place, and the rig can measure alternatives
+    console.log(`  ----  headless shell launched with [${GL.args.join(" ")}]${GL.overridden ? " (SWEK_GL_ARGS override)" : ""}`);
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: GL.args });
     const pg = await b.newPage();
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 300)));

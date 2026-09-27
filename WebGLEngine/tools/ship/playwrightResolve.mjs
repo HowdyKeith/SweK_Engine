@@ -249,6 +249,24 @@ const RESOLVED = resolveHeadlessShell();
 // against the child process's PATH. So the browser is launched with the DXC-carrying directory prepended to
 // its PATH and finds the compiler where it already sits. No file moves, and the 96 gates still launch the
 // same binary they were calibrated against.
+/**
+ * *** v4683 -- THE WEBGL2 HARNESS FLAGS, IN ONE PLACE, WITH A NAMED OVERRIDE FOR MEASURING THEM. ***
+ * Four gates (atmosphere, perspectiveWarp, solidTexture, noisePrecision) launched the headless shell with a
+ * literal ["--use-gl=swiftshader"]. On the rig (Chrome 141, NVIDIA Pascal) all four LOST THEIR WEBGL2 CONTEXT at
+ * shader compile on ANGLE/Vulkan/SwiftShader -- named by v4682's harness messages -- while the same flag is green
+ * on Linux, and Chrome 141 itself logs that the automatic software-WebGL fallback is deprecated in favour of
+ * --enable-unsafe-swiftshader. Which flag set keeps the context is a reading of THAT box, so SWEK_GL_ARGS may
+ * replace the default (comma-separated; "none" means no flags) and the gate prints what it launched with. The
+ * default is unchanged until a rig reading says which set to adopt: an override is an instrument, not a fix.
+ */
+export const WEBGL_DEFAULT_ARGS = Object.freeze(["--use-gl=swiftshader"]);
+export function webglLaunchArgs(env = process.env) {
+    const v = env.SWEK_GL_ARGS;
+    if (v == null || v === "") return { args: [...WEBGL_DEFAULT_ARGS], overridden: false };
+    if (v === "none") return { args: [], overridden: true };
+    return { args: v.split(",").map((x) => x.trim()).filter(Boolean), overridden: true };
+}
+
 export const DXC_LEAVES = Object.freeze([
     path.join("chrome-win64", "dxil.dll"),
     path.join("chrome-win", "dxil.dll"),

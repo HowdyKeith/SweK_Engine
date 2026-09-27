@@ -94,9 +94,14 @@ ok("  ...and the instrument's step was MEASURED, so 'cannot resolve it' is a rea
     (resolvable ? "fine enough for the 3 ms row above, so it was asserted"
                 : "coarser than 1 ms, so the row above reported rather than asserted. The rig's libuv aborts are the " +
                   "evidence the window exists there; this instrument cannot size it"));
-{   // the coarse case, driven here: a cpuUsage that advances in 15.625 ms ticks, which is a Windows scheduler tick
+{   // the coarse case, driven here: a cpuUsage that advances in 15.625 ms ticks, which is a Windows scheduler tick.
+    // *** v4683 -- A CLOCK OF ITS OWN, NOT ONE DERIVED FROM THE REAL ONE. *** The v4682 fixture quantised the REAL
+    // user time, and on the rig it read "measured null": no step at all in 120 ms, because what the rig's spin
+    // accrues and where it books it is the very thing this instrument cannot see there. A fixture about the
+    // instrument must not depend on the instrument -- this one advances one tick every 40 reads, on any box.
     const real = process.cpuUsage;
-    process.cpuUsage = () => ({ user: Math.floor(real().user / 15625) * 15625, system: 0 });
+    let reads = 0;
+    process.cpuUsage = () => ({ user: Math.floor(reads++ / 40) * 15625, system: 0 });
     let coarse = null; try { coarse = WT.cpuQuantumMs(120); } finally { process.cpuUsage = real; }
     ok("  ...and a TICK-GRAINED cpuUsage (15.625 ms, a Windows tick) is measured as one -- so the escape above fires there and only there",
         coarse != null && Math.abs(coarse - 15.625) < 0.001, `measured ${coarse} ms under the simulated tick`);

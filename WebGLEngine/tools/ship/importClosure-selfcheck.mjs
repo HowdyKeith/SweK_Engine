@@ -6,6 +6,7 @@
 // in those files; what this adds is the evidence, and the bound on it.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ENG, analyse, shortfall, resolveSpec, OUTSIDE } from "./importClosure.mjs";
@@ -203,5 +204,28 @@ console.log("  ----  a gate that reads something no import mentions -- a path bu
 console.log("  ----  clock. The probe records those AS PATHS when they are read, which is why they are mostly");
 console.log("  ----  covered, and mostly is not a proof.");
 console.log("  ----  NOR THAT THE DEFAULT SHOULD CHANGE. quickSweep still skips nothing without --incremental.");
+sec("v4683. THE PER-FILE CACHE IS A SPEED-UP, NOT A SECOND ANSWER");
+{
+    const IC = await import("./importClosure.mjs");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "closure-cache-"));
+    try {
+        fs.writeFileSync(path.join(root, "g-selfcheck.mjs"), 'import "./a.mjs";\n');
+        fs.writeFileSync(path.join(root, "a.mjs"), 'import "./b.mjs";\n');
+        fs.writeFileSync(path.join(root, "b.mjs"), "export {};\n");
+        fs.writeFileSync(path.join(root, "c.mjs"), "export {};\n");
+        const first = [...IC.analyse("g-selfcheck.mjs", root).statics].sort().join(",");
+        fs.writeFileSync(path.join(root, "a.mjs"), 'import "./c.mjs";   // edited: a different import, a different size\n');
+        const second = [...IC.analyse("g-selfcheck.mjs", root).statics].sort().join(",");
+        ok("!! *** a file edited mid-process is RE-READ: the cache is validated on every visit, not trusted ***",
+           first === "a.mjs,b.mjs" && second === "a.mjs,c.mjs", `before [${first}], after the edit [${second}]`);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    const sample = gates.slice(0, 60);
+    const warm = sample.map((g) => { const a = IC.analyse(g); return [...a.statics].sort().join(",") + "|" + [...a.dynamic].sort().join(","); });
+    IC.clearClosureCache();
+    const cold = sample.map((g) => { const a = IC.analyse(g); return [...a.statics].sort().join(",") + "|" + [...a.dynamic].sort().join(","); });
+    ok("...and a COLD cache gives the same closure as a warm one for every gate sampled",
+       sample.length > 0 && warm.every((w, i) => w === cold[i]), `${sample.length} gates compared, static and dynamic halves both`);
+}
+
 if (fails) { console.log("\n[importClosure-selfcheck] FAILED " + fails); process.exit(1); }
 console.log("\n[importClosure-selfcheck] all passed");

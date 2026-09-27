@@ -14,7 +14,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as W from "../../render/perspectiveWarp.mjs";
 import * as EM from "../../render/effectMerge.mjs";
 import { mat3Inv, applyHomography, homographyDLT } from "../../vision/homography.mjs";
@@ -182,7 +182,9 @@ console.log("\n4. *** THE GLSL, ACTUALLY RUN -- against the CPU reference on a r
             rs.writeHead(200, { "content-type": "text/html" }); rs.end(HARNESS);
         }).listen(0);
         const port = srv.address().port;
-        const b = BROWSER = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const GL = webglLaunchArgs();   // v4683: one place, and the rig can measure alternatives
+        console.log(`  ----  headless shell launched with [${GL.args.join(" ")}]${GL.overridden ? " (SWEK_GL_ARGS override)" : ""}`);
+        const b = BROWSER = await chromium.launch({ executablePath: HEADLESS_SHELL, args: GL.args });
         const pg = await b.newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 300)));
