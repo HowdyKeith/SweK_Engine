@@ -15,7 +15,8 @@
 //   dollyScroll  the camera moving in, so the wall's motion grows from the centre out -- a zoom
 //   dollyFast    moving in twice as fast, the knot turning at six times the page's rate, the texture still
 // and three arms, each the generator with `flow`: { grid: "block" }, the search to v4752; {}, the level grid; and
-// { refineRadius: 2 } on it.
+// { refineRadius: 2 } on it. v4754 grades the scrolling cases on the wall's clear interior too: what v4745's still-surface
+// margin gave up there, and v4749 and v4754 tried the flows of the nearest blocks for, the grid gives back.
 // *** WEBGPU ONLY. *** render/opticalFlowTsl-selfcheck.mjs holds the level grid to the mirror at every block on both backends.
 "use strict";
 import path from "node:path";
@@ -65,7 +66,19 @@ else {
                     const t4 = await read(big, D * 4), truth = new Float32Array(D * D * 4);
                     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) for (let c = 0; c < 3; c++) { let s = 0;
                         for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++) s += t4[((y * 4 + sy) * D * 4 + x * 4 + sx) * 4 + c]; truth[(y * D + x) * 4 + c] = s / 16; }
-                    const psnr = (img) => { let q = 0; for (let i = 0; i < D * D; i++) for (let ch = 0; ch < 3; ch++) q += (cl(img[i * 4 + ch]) - cl(truth[i * 4 + ch])) ** 2; return 10 * Math.log10(1 / (q / (D * D * 3))); };
+                    const psnr = (img, m) => { let q = 0, n = 0; for (let i = 0; i < D * D; i++) { if (m && !m[i]) continue; n++; for (let ch = 0; ch < 3; ch++) q += (cl(img[i * 4 + ch]) - cl(truth[i * 4 + ch])) ** 2; } return 10 * Math.log10(1 / (q / (n * 3))); };
+                    // v4754: where the texture scrolls, the wall's clear interior -- the knot absent from both frames and six pixels
+                    // clear of it and of the frame's edge, fx/fsr/fsrFrameGenFlow-selfcheck.mjs's mask
+                    let inner = null;
+                    if (sc > 0) {
+                        wall.visible = false; const bg = scene.background; scene.background = new THREE.Color(0, 0, 0);
+                        setT(0); renderer.setRenderTarget(out2); await renderer.renderAsync(scene, cam); const k0 = await read(out2, D);
+                        setT(1); renderer.setRenderTarget(out2); await renderer.renderAsync(scene, cam); const k1 = await read(out2, D);
+                        wall.visible = true; scene.background = bg;
+                        const clear = Uint8Array.from({ length: D * D }, (_, i) => k0[i * 4] + k0[i * 4 + 1] + k0[i * 4 + 2] === 0 && k1[i * 4] + k1[i * 4 + 1] + k1[i * 4 + 2] === 0 ? 1 : 0);
+                        inner = Uint8Array.from({ length: D * D }, (_, i) => { const x = i % D, y = (i / D) | 0; if (x < 6 || y < 6 || x >= D - 6 || y >= D - 6) return 0;
+                            for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) if (!clear[(y + dy) * D + x + dx]) return 0; return 1; });
+                    }
                     const c = {};
                     for (const [an, g] of Object.entries(arms)) {
                         // primed with frame 0's own field, so the older depth is frame 0's, as it is in use
@@ -73,8 +86,9 @@ else {
                         await g.generate(renderer, { prev: A.texture, cur: A.texture, motion: stage.motion.texture, depth: stage.depth.texture, camera: stage.camera.texture }, out2);
                         setT(1); await stage.render(renderer, scene, cam);
                         await g.generate(renderer, { prev: A.texture, cur: B.texture, motion: stage.motion.texture, depth: stage.depth.texture, camera: stage.camera.texture }, out2);
-                        c[an] = psnr(await read(out2, D));
+                        const img = await read(out2, D); c[an] = psnr(img); if (inner) (c.wall ||= {})[an] = psnr(img, inner);
                     }
+                    if (inner) c.innerPx = inner.reduce((q, v) => q + v, 0);
                     o[cn] = c;
                 }
                 for (const g of Object.values(arms)) g.dispose(); stage.dispose(); for (const t of [A, B, out2, big]) t.dispose();
@@ -93,6 +107,10 @@ else {
         ok(`*** [webgpu] each level on its own grid makes no case worse and the scrolling ones better -- ${CASES.map((cn) => `${cn} ${d(o[cn].level, o[cn].block)}`).join(", ")} dB -- for ${(share({ grid: "level" }) * 100).toFixed(0)}% of the search's reads here ***`,
            CASES.every((cn) => o[cn].level >= o[cn].block - 0.03) && o.scroll.level - o.scroll.block >= 0.1 && o.panScroll.level - o.panScroll.block >= 0.1,
            "the block grid's coarse patch measured the motion 12 pixels from its block (render/flowCost-selfcheck.mjs's zoom, turn and two motions); here is what that cost a generated frame");
+        for (const cn of ["scroll", "panScroll", "dollyScroll"]) say(`${cn.padEnd(12)} the wall's clear interior (${o[cn].innerPx} px): block grid ${f(o[cn].wall.block)} dB, level grid ${f(o[cn].wall.level)} (${d(o[cn].wall.level, o[cn].wall.block)}), refining within 2 ${f(o[cn].wall.levelR2)}`);
+        ok(`*** [webgpu] v4754: and it gives back the scrolling wall's interior that the still-surface margin gave up -- ${["scroll", "panScroll", "dollyScroll"].map((cn) => `${cn} ${d(o[cn].wall.level, o[cn].wall.block)}`).join(", ")} dB over the block grid there ***`,
+           ["scroll", "panScroll"].every((cn) => o[cn].wall.level - o[cn].wall.block >= 2) && o.dollyScroll.wall.level >= o.dollyScroll.wall.block - 0.1,
+           "v4745's split margin cost the interior 7 dB on the block grid (+10.9 at 0.9, +3.9 split); v4749 went after it with the flows of the 2 x 2 nearest blocks and found them mixed, and v4754 measured them again on this grid (render/flowReconcile.mjs's note). The grid alone gives it back");
         ok(`  [webgpu] ...and refining within 2 on it is no worse than the block grid's full search on any case either -- ${CASES.map((cn) => `${cn} ${d(o[cn].levelR2, o[cn].block)}`).join(", ")} -- for ${(share({ grid: "level", refineRadius: 2 }) * 100).toFixed(0)}%`,
            CASES.every((cn) => o[cn].levelR2 >= o[cn].block - 0.05), "fsr-three.html's 'cheaper flow' is this");
     }
@@ -117,6 +135,8 @@ else {
 // clamped to the level's grid -- so every vector is the same. What it changes is the cost, and fx/fsr/fsrFlowCost-selfcheck.mjs
 // is where the cost is held to the reads: 1 red there, the level grid's time no longer its reads' share.
 // Against fx/fsr/fsrFrameGenTsl.mjs: G18 the flow on the block grid by default -> 2 here.
+// v4754: the interior row -- G18 -> 3 here with it (the level grid IS the block grid then, and gives nothing back). T5, the
+// level grid's origin the block grid's, leaves it green: the interior is the grid's per-level blocks, not where they start.
 // And fx/fsr/fsrFrameGenFlow-selfcheck.mjs's refinement row was TWO-SIDED -- within 0.1 dB of the full window -- and went red
 // with the level grid the default: refining within 2 came out 0.14 dB ABOVE it where the texture scrolls. It is one-sided now,
 // which is what it was for.

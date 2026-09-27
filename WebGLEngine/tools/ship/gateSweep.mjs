@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4754 -- THE 361st CLOSING: the nearest blocks' flows weighed again, and what they were for found already done.
+    since436: Object.freeze({
+        at: "v4754", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["fx/fsr/fsrFlowGrid-selfcheck.mjs (the scrolling wall's clear interior, on both grids)"]),
+        verdict: "*** TAKING THE NEAREST BLOCKS' FLOW WHERE THE VECTOR MOVED IS WORTH NOTHING, AND WHAT v4749 WANTED IT FOR THE GRID " +
+                 "HAD ALREADY DONE. *** v4749 measured a pixel choosing among the flows of the 2 x 2 blocks nearest it as mixed and " +
+                 "left it. On v4753's level grid, prototyped again in the TSL over eight cases: only where the pixel's vector moved, " +
+                 "every case within 0.02 dB -- the flow is seldom taken at 0.9 there -- and the moving ball's shadow's changed pixels " +
+                 "down 0.25 to 0.38; only where it stood still, the reflections +0.40 and +0.74 and the panned scroll -0.46; with a " +
+                 "margin, or chosen on a 5 x 5 window, the reflections still gain and the panned scroll still loses. Not built. What " +
+                 "v4749 went after -- the scrolling wall's interior, which v4745's still-surface margin gave up -- is back without it: " +
+                 "+8.5 and +17.3 dB over the block grid there, held in fx/fsr/fsrFlowGrid-selfcheck.mjs; " +
+                 "render/flowReconcile.mjs's note has every measurement.",
+    }),
     // v4753 -- THE 360th CLOSING: the optical flow with each level of its pyramid on its own block grid.
     since435: Object.freeze({
         at: "v4753", swept: 1, green: 1, red: 0,

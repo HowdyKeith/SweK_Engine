@@ -273,7 +273,9 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * so whatever moved there is shading -- a shadow, a reflection, a texture -- and the vector has nothing to protect. Every
  * case measured is at least as good split as at 0.9 alone: reflection +6.08, textured shadow +1.24, the knot at 6x +0.90,
  * the scroll +0.70, both pans unchanged. The one thing it gives up: the scrolling wall's clear interior, +10.9 at 0.9 and
- * +3.9 split, where more of the wall takes a block's vector that is the knot's. The test is in SCREEN space, so a camera
+ * +3.9 split, where more of the wall takes a block's vector that is the knot's. (v4754: with each level of the flow on its own
+ * grid, v4753's and the generator's default, +13.9 and +12.4 -- fx/fsr/fsrFrameGenFlow-selfcheck.mjs's readings -- and
+ * fx/fsr/fsrFlowGrid-selfcheck.mjs holds the interior at +8.5 and +17.3 dB over the block grid.) The test is in SCREEN space, so a camera
  * that moves makes every surface "moving" and a shadow under a pan gets 0.9 -- unless the camera's own motion is given (v4750).
  * *** v4750: STILL IN THE WORLD, WHEN THE CAMERA'S OWN MOTION IS GIVEN. *** The test above is on the SCREEN, and a camera that
  * moves makes every surface move there: a shadow or a reflection under a pan got 0.9. `camera` is the motion a still world
@@ -287,6 +289,21 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * still-surface margin gave up on the scrolling wall's interior (+5.2 and +6.8 dB) and gains on the HUD scene (+0.67) and the
  * reflection (+0.27) -- and costs the shadows' changed pixels 0.6 and 0.9 dB, and the scroll's whole frame 0.07. Mixed, and
  * three more window scores a pixel; not built, and the measurement is here for whoever weighs it again.
+ * *** v4754: WEIGHED AGAIN, ON THE LEVEL GRID, AND STILL NOT BUILT. *** Prototyped in the TSL and measured on eight cases --
+ * the scrolling wall with the knot at 6x, the same under a pan and with the wall still, the textured and plain shadows still
+ * and panned, the reflection still and panned -- dB over the default, whole frame / pixels that changed between the frames:
+ *   the nearest blocks' flows only where the pixel's vector MOVED     every case within 0.02; the shadows' changed pixels
+ *                                                                    -0.38 and -0.25 (the ball moved)
+ *   only where it stood STILL                                        reflections +0.40 and +0.74; the panned scroll -0.46,
+ *                                                                    the shadows -0.14 and -0.16 (changed -0.37, -0.72)
+ *   everywhere                                                       reflections +0.40 and +0.75; the panned scroll -0.47,
+ *                                                                    the shadows -0.27 and -0.21 (changed -0.72, -0.93)
+ *   everywhere, a neighbour taken only at half its own block's score  reflections -0.04 and +0.38, panned scroll -0.22
+ *   everywhere, chosen on a 5 x 5 window                             reflections +0.34 and +0.77, the scroll +0.09, the
+ *                                                                    panned scroll -0.20, the plain shadow's changed -0.48
+ * Where the vector moved the flow is seldom taken at 0.9 at all, so which block's flow it is changes nothing; where it stood
+ * still, the reflection gains and the panned scroll loses in every form tried. And what v4749 was after -- the wall's
+ * interior -- the grid gave back by itself (the note above).
  * *** NOT BECAUSE THE VECTOR IS A CHORD, WHICH THIS NOTE SAID UNTIL v4744. *** At 12x the half-way point is 0.05 pixels off
  * the chord's midpoint; what the low margin buys there is at the knot's silhouettes and self-occlusion edges, where a block
  * vector blends an edge the pixel's exact vector moves whole (fx/fsr/fsrFrameGenArc-selfcheck.mjs's header).
