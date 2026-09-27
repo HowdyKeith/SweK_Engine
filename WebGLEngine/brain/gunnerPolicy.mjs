@@ -115,18 +115,25 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
 /**
  * One tick of every turret in a world of cars: the gunners' commands from the poses before the step, the mounts turned, the shells
  * fired and flown, hits turned into impulses on the target chassis; and, with a slick state, drops laid, ignitions lit, the fires
- * stepped and the burns tallied. Returns the commands (for the log), the hit events and the burn events.
+ * stepped and the burns tallied. Since v4680, `buildings` (physics/raceCar.mjs's buildingBox() per rect) and `buildingState`
+ * (spellAmmo.createBuildingState()) give the same shells something solid to stop on besides a car -- omit either and buildings
+ * are exactly as invisible to shells as they were before this round, which is what every OTHER caller of this function still
+ * gets by not passing them. Returns the commands (for the log), the hit events, the burn events and the building effects.
  */
-export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null) {
+export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks = null, pickups = null, buildings = null, buildingState = null) {
     const fired = cmds.map((c, i) => U.stepTurret(turrets[i], c, C.CAR.dt));
     // v4592: a shell carries the spell its turret has loaded (spark, the plain shell, without a magazine); the pickups load the rest
     fired.forEach((f, i) => { if (f.fires) { const sh = U.fireShell(shells, poses[i], turrets[i], i, t); sh.ammo = turrets[i].ammo ? A.spendShell(turrets[i].ammo) : A.AMMO.plain; sh.ammoIndex = A.ammoIndex(sh.ammo); } });
     if (slicks) fired.forEach((f, i) => { if (f.drop && S.dropSlick(slicks, poses[i], i, t)) turrets[i].drops = (turrets[i].drops || 0) + 1; if (f.ignite) S.igniteSlick(slicks, i, t); });
     const targets = cars.map((car, i) => ({ index: i, pose: poses[i], half: car.spec.half }));
-    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec });
-    // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target
+    const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec, buildings: buildings || [] });
+    // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target;
+    // a building hit is the same row with none of that (physics/spellAmmo.mjs's applyBuildingHit -- a wall has no chassis to push or slow)
     const effects = [];
-    for (const e of events) { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
+    for (const e of events) {
+        if (e.building !== undefined) { if (buildingState) effects.push(A.applyBuildingHit(e, buildingState, turrets)); }
+        else { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
+    }
     const taken = pickups ? A.collectPickups(pickups, poses, turrets, t) : [];
     const burns = slicks ? S.stepSlicks(slicks, targets, t).events : [];
     for (const b of burns) {

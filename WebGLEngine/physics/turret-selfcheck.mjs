@@ -21,6 +21,13 @@
 //   FINDING, in the first draft of this gate: the hash row's extra fire command was placed at tick 77, inside the reload from
 //   the shot at tick 60, where the mount refuses it and the hash does not move -- the gate's own sabotage reached no branch.
 //   It fires at tick 50 now, and a second row holds that the refused one changes nothing, which is the reload working.
+//   F  v4680, buildings' own hit test given HIT_SAMPLES as its loop bound instead of the earlier-of-the-two-lists `hitK`
+//      (stepShells's guard against a farther list overwriting a nearer hit)  -> 0 red on the first three rows written for
+//      buildings (a wall in the path, no wall, an off-axis wall): none of them puts a car and a wall inside the SAME sampled
+//      segment, so the guard the sabotage removes is never exercised -- a 0-red sabotage, the same shape sabotage C's own
+//      note above describes. The fourth row was ADDED for this sabotage, a synthetic shell with a one-step span deliberately
+//      forced past both a near car and a far wall in a single stepShells call; it reddens on the sabotage (wall reported hit,
+//      car not) and passes clean restored.
 "use strict";
 import * as U from "./turret.mjs";
 import * as B from "./ballistics.mjs";
@@ -107,6 +114,27 @@ console.log("\n4. THE SHELL FLIES AND THE SWEPT HIT TEST SEES IT");
     let endpointOnly = false, sweptHit = false, k = 0;
     while (shP.length && k < 600) { const s0 = shP[0], s1 = B.stepShell(s0, DT, { gravity: U.TURRET.gravity }); if (U.insideBox([s1.x, s1.y, s1.z], plate, thin, U.TURRET.shellRadius)) endpointOnly = true; if (U.stepShells(shP, [{ index: 1, pose: plate, half: thin }], DT, { groundY: 0 }).length) sweptHit = true; k++; }
     ok("!! the hit test is SWEPT: a 4 cm plate is hit by the sampled segment where an end-of-tick point test steps over it", sweptHit && !endpointOnly, `swept ${sweptHit}, endpoint-only ${endpointOnly}`);
+    // v4680 -- A BUILDING IS THE THIRD THING A SHELL CAN MEET, WITH NO OWNER TO EXEMPT IT. physics/raceCar.mjs's
+    // buildingBox() gives a { pos, quat, half } shape that IS a target already, minus the `index`/owner check -- stepShells
+    // takes an optional `buildings` list and reports which of `target`/`building` it hit by which field is present.
+    const wall = { pos: [0, 1, 10], quat: [0, 0, 0, 1], half: [2, 3, 2] };
+    const carAt20 = () => [{ index: 1, pose: still([0, 1, 20]), half: HALF }];
+    const aimed = (targetPos) => { const tg = U.createTurret(), sol = U.aimSolution(pose, tg, targetPos, [0, 0, 0]); tg.yaw = sol.yaw; tg.pitch = sol.pitch; const sh = []; U.fireShell(sh, pose, tg, 0, 0); return sh; };
+    const flyB = (shells, buildings) => { let ev = [], k = 0; while (shells.length && k < 600) { ev = ev.concat(U.stepShells(shells, carAt20(), DT, { groundY: 0, buildings })); k++; } return ev; };
+    const blocked = flyB(aimed([0, 1, 20]), [wall]);
+    ok("!! a wall directly in the aimed path is hit instead of the car behind it: a building event, no target field", blocked.length === 1 && blocked[0].building === 0 && blocked[0].target === undefined, JSON.stringify(blocked));
+    const clear = flyB(aimed([0, 1, 20]), undefined);
+    ok("...the identical aimed shot with no buildings reaches the car exactly as it did before this option existed", clear.length === 1 && clear[0].target === 1 && clear[0].building === undefined, JSON.stringify(clear));
+    const offAxis = { pos: [8, 1, 10], quat: [0, 0, 0, 1], half: [1, 3, 1] };
+    const missed = flyB(aimed([0, 1, 20]), [offAxis]);
+    ok("a wall off the line of fire never intercepts a clean shot", missed.length === 1 && missed[0].target === 1);
+    // the race, forced into one tick: a synthetic shell whose one step spans 16 m, past a car at z=8 AND a wall at z=16 --
+    // ordinary per-tick geometry (a ~0.47 m step) cannot put both inside one segment without the boxes already overlapping,
+    // so this is built directly rather than fired and flown, to prove the EARLIER sample wins regardless of which list (cars
+    // checked first, buildings second) would otherwise have reported the farther one.
+    const raceShell = { x: 0, y: 1, z: 0, vx: 0, vy: 0, vz: 64, t: 0, owner: 0, ammo: "spark" };
+    const raceEv = U.stepShells([raceShell], [{ index: 1, pose: still([0, 1, 8]), half: HALF }], 0.25, { groundY: -1e9, buildings: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }] });
+    ok("!! forced into one step spanning both a near car and a far wall, the nearer car is hit and the wall is not", raceEv.length === 1 && raceEv[0].target === 1 && raceEv[0].building === undefined, JSON.stringify(raceEv));
 }
 console.log("\n5. THE LOCKSTEP HASH");
 {
