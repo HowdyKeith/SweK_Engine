@@ -32,13 +32,13 @@ let sd = 7; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x
     const rows = [];
     for (const o of [{}, { refineRadius: 2 }, { refineRadius: 1 }, { searchRadius: 2, levels: 2 }, { block: 5, subpixel: false }, { levels: 6 },
                      { grid: "level" }, { grid: "level", refineRadius: 2 }, { grid: "level", block: 5, levels: 4, subpixel: false }, { grid: "level", levels: 6 },
-                     { grid: "level", seed: true }, { seed: true, refineRadius: 2 }]) {
+                     { grid: "level", seed: true }, { seed: true, refineRadius: 2 }, { grid: "level", stillGuess: true }, { stillGuess: true, levels: 4 }]) {
         // v4758: a seed is the motion field, (du, dv, valid, _) -- half of it valid, so both of the device's paths are counted
         const seed = o.seed ? Float32Array.from({ length: w * h * 4 }, (_, i) => (i % 4 === 2 ? (i % 8 === 2 ? 1 : 0) : (rnd() - 0.5) * 0.2)) : null;
         const t = { scores: 0, reads: 0 }; opticalFlowCPU({ cur: img(), prev: img(), w, h, ...o, seed, tally: t });
         const m = flowCostModel({ w, h, ...o }); rows.push({ o, t, m, same: t.reads === m.search && t.scores === m.perLevel.reduce((q, l) => q + l.blocks * l.scores, 0) });
     }
-    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under twelve settings, four of them v4753's grid and two v4758's seed: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
+    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under fourteen settings, four of them v4753's grid, two v4758's seed and two v4759's standing still: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
        rows.every((r) => r.same), rows.filter((r) => !r.same).map((r) => `${JSON.stringify(r.o)}: mirror ${r.t.reads}, model ${r.m.search}`).join("; ") || "every score, and the guess each level below the coarsest reads");
     ok("  ...and its pyramid is opticalFlowTsl's: a level every halving, rounded up, capped", JSON.stringify(pyramidSizes(61, 45, 3)) === "[[61,45],[31,23],[16,12]]" && pyramidSizes(3, 1, 9).length === 3);
     const cur = img(), prev = img(), a = opticalFlowCPU({ cur, prev, w, h }), b = opticalFlowCPU({ cur, prev, w, h, refineRadius: 4 });
@@ -118,7 +118,45 @@ console.log("\n4. v4753: WHERE THE MOTION IS NOT ONE SHIFT -- a zoom, a turn, an
        two.level.neighbours > 5, "a population row -- what they are worth is the row above, which goes red with them sabotaged away (the log below)");
 }
 
-console.log("\n5. AT THE SIZES THAT MATTER");
+console.log("\n5. v4759: A SMALL THING THAT MOVES OTHERWISE THAN WHAT IS BEHIND IT");
+{
+    // a square of another texture, 16 or 24 px, over a background -- one of them moving, the other still -- graded on the blocks
+    // wholly inside the square, on the level grid at three levels, with standing still as a guess below the coarsest and without
+    const SW = 192, SH = 128, texB = new Float32Array(TW * TW);
+    { let s2 = 91; const r2 = () => (s2 = (s2 * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; const raw = Float32Array.from({ length: TW * TW }, () => r2());
+      for (let y = 0; y < TW; y++) for (let x = 0; x < TW; x++) { let a = 0; for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) a += raw[((y + j + TW) % TW) * TW + ((x + i + TW) % TW)]; texB[y * TW + x] = a / 25; } }
+    const at = (t, x, y) => t[((y % TW + TW) % TW) * TW + ((x % TW + TW) % TW)];
+    const pic = (f) => { const b = new Float32Array(SW * SH * 4); for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) { const v = f(x, y), i = (y * SW + x) * 4; b[i] = b[i + 1] = b[i + 2] = v; b[i + 3] = 1; } return b; };
+    const run = (size, fg, bg, o) => {
+        const inR = (x, y, [dx, dy]) => x >= 80 + dx && x < 80 + size + dx && y >= 48 + dy && y < 48 + size + dy;
+        const prev = pic((x, y) => inR(x, y, [0, 0]) ? at(texB, x + 300, y + 300) : at(tex, x + 100, y + 100));
+        const cur = pic((x, y) => inR(x, y, fg) ? at(texB, x + 300 - fg[0], y + 300 - fg[1]) : at(tex, x + 100 - bg[0], y + 100 - bg[1]));
+        const t = { scores: 0, reads: 0 }, f = opticalFlowCPU({ cur, prev, w: SW, h: SH, grid: "level", ...o, tally: t }); let k = 0, n = 0;
+        for (let by = 1; by < f.bh - 1; by++) for (let bx = 1; bx < f.bw - 1; bx++) { let c = 0; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (inR(bx * 8 + x, by * 8 + y, fg)) c++;
+            if (c !== 64) continue; n++; if (Math.hypot(f.flow[(by * f.bw + bx) * 2] - fg[0], f.flow[(by * f.bw + bx) * 2 + 1] - fg[1]) < 0.75) k++; }
+        return { k, n, reads: t.reads };
+    };
+    const R = {};
+    for (const size of [16, 24]) for (const [cn, fg, bg] of [["still over 16", [0, 0], [16, 0]], ["16 over still", [16, 4], [0, 0]]])
+        for (const [vn, o] of [["without", {}], ["with", { stillGuess: true }]]) R[`${size} ${cn} ${vn}`] = run(size, fg, bg, o);
+    for (const size of [16, 24]) for (const cn of ["still over 16", "16 over still"]) { const a = R[`${size} ${cn} without`], b = R[`${size} ${cn} with`];
+        say(`a ${size} px square ${cn.replace("over", "px over a background moving").replace("16 px over a background moving still", "moving 16 px over a still background").replace("still px over a background moving 16", "standing still over a background moving 16 px")}: ${a.k} of ${a.n} of its blocks right without, ${b.k} with, ${((b.reads / a.reads - 1) * 100).toFixed(1)} % more reads`); }
+    const A = (s, c, v) => R[`${s} ${c} ${v}`];
+    ok(`*** a small thing that STANDS STILL over a moving background is found with standing still as a guess below the coarsest level -- ${A(16, "still over 16", "with").k} of ${A(16, "still over 16", "with").n} blocks at 16 px and ${A(24, "still over 16", "with").k} of ${A(24, "still over 16", "with").n} at 24, against ${A(16, "still over 16", "without").k} and ${A(24, "still over 16", "without").k} -- for ${((A(16, "still over 16", "with").reads / A(16, "still over 16", "without").reads - 1) * 100).toFixed(1)} % more reads ***`,
+       A(16, "still over 16", "with").k === A(16, "still over 16", "with").n && A(24, "still over 16", "with").k === A(24, "still over 16", "with").n && A(16, "still over 16", "without").k === 0 && A(24, "still over 16", "without").k === 0,
+       "at the coarse levels its blocks are mostly background and take the background's 16 px; the windows below reach 12 px back from that, and standing still is 16 away");
+    ok(`  ...and one that MOVES 16 px over a still background is lost either way -- ${A(16, "16 over still", "with").k} and ${A(24, "16 over still", "with").k} of ${A(16, "16 over still", "with").n} and ${A(24, "16 over still", "with").n} blocks -- which only a window reaching 16 px at the level below the coarsest finds: +45 % of the reads at the same spacing, or at double spacing no more, and a zoom's error doubled (0.151 px to 0.350) -- measured on the mirror, not built`,
+       A(16, "16 over still", "with").k === 0 && A(24, "16 over still", "with").k === 0, "its own motion was measured by no block at the coarse levels, and standing still is not it");
+    // and where nothing is small, standing still changes nothing: the same shifts found, the same zoom
+    // and where nothing is small it changes only the blocks the content entered the frame at, which have no right answer
+    const prev = frame(0); let edgeOnly = true, changed = 0;
+    for (const s2 of [10, 14, 18]) { const a = opticalFlowCPU({ cur: frame(s2), prev, w: W, h: H, grid: "level" }), b = opticalFlowCPU({ cur: frame(s2), prev, w: W, h: H, grid: "level", stillGuess: true });
+        for (let q = 0; q < a.bw * a.bh; q++) if (a.flow[q * 2] !== b.flow[q * 2] || a.flow[q * 2 + 1] !== b.flow[q * 2 + 1]) { changed++; if (q % a.bw > Math.ceil(s2 / 8)) edgeOnly = false; } }
+    ok(`  ...and on the uniform shifts of section 3, 10 to 18 px, it changes ${changed} blocks, every one within the shift of the frame's left edge -- where the content came in from outside and no answer is right -- and none that section 3 grades`,
+       edgeOnly && changed > 0, "where a block's guess is right, standing still does not explain it better");
+}
+
+console.log("\n6. AT THE SIZES THAT MATTER");
 {
     const at = (w, h, o = {}) => flowCostModel({ w, h, ...o });
     const page = at(960, 540), hd = at(1920, 1080), pageR = at(960, 540, { refineRadius: 2 }), pageL = at(960, 540, { grid: "level" }), pageLR = at(960, 540, { grid: "level", refineRadius: 2 });
@@ -135,6 +173,7 @@ console.log("\n5. AT THE SIZES THAT MATTER");
 // ignored -> 1, 2; O2 the refinement at the coarsest level and the search below it -> 2, 2.
 // v4753: the level grid's sabotages, here and in render/opticalFlowTsl-selfcheck.mjs, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
 // v4758: the seed's sabotages are logged in fx/fsr/fsrFlowSeed-selfcheck.mjs.
+// v4759: standing still's are logged in fx/fsr/fsrFlowStill-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU's time, which reads are a model of and not a measure -- caches, the sampler and occupancy decide it; " +
     "fx/fsr/fsrFlowCost-selfcheck.mjs holds this device's time to the count's ratios. And motion larger than 18 pixels a frame, which " +

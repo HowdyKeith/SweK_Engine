@@ -8032,6 +8032,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4759 -- THE 366th CLOSING: small things the flow's pyramid loses -- one kind found for a score, the other measured and left.
+    since441: Object.freeze({
+        at: "v4759", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowStill-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (section 5: a small square moving otherwise than its background; standing still counted)",
+                                "render/opticalFlowTsl-selfcheck.mjs (two cases with standing still guessed, both backends)"]),
+        verdict: "*** A SMALL THING IS LOST AT THE COARSE LEVELS, AND ONLY THE STILL KIND IS CHEAP TO FIND. *** Its blocks there are mostly " +
+                 "background and take the background's motion; the windows below reach 12 px back. `stillGuess` scores standing " +
+                 "still as a guess at every level below the coarsest, for 1.1 % more reads: a still 16 or 24 px square over a " +
+                 "background moving 16 px goes from 0 of its blocks right to all of them, and a uniform shift changes only the blocks " +
+                 "the content entered the frame at. The same vector as the mirror at every block on both backends. A square MOVING " +
+                 "16 px over a still background is lost either way; a window reaching 16 px at the level below the coarsest finds it " +
+                 "for +45 % of the reads, or at double spacing for nothing more and a zoom's error doubled -- measured on the mirror " +
+                 "and not built. In the generator, on the case it is for where the vectors are wrong -- a still highlight on a moving " +
+                 "belt -- the flow already gives +9.41 and +2.77 dB on its pixels and standing still adds nothing, so it is an option " +
+                 "and not the default. Five sabotages red; four equivalent, the coarsest level's first guess being standing still.",
+    }),
     // v4758 -- THE 365th CLOSING: the optical flow seeded with the application's vectors -- built, exact, and not the default.
     since440: Object.freeze({
         at: "v4758", swept: 1, green: 1, red: 0,

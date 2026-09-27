@@ -16,6 +16,7 @@
 // v4753: `grid` "level" gives each level its own grid, ceil(lw / block) x ceil(lh / block) blocks, and each block below the
 // coarsest scores four guesses -- its parent's and three neighbours' -- reading all four from the level above.
 // v4758: `seed` scores one more guess at each coarsest block, the application's vector at its centre, read from the motion field.
+// v4759: `stillGuess` one more at every block below the coarsest, standing still -- a score and no read beyond the patch's.
 "use strict";
 
 /** The levels a pyramid for w x h builds, capped at `levels`: [[lw, lh], ...], level 0 first. */
@@ -32,7 +33,7 @@ export function pyramidSizes(w, h, levels) {
  * pyramid, reconcile, total, reach } -- reads counted as texture loads, reach in full-resolution pixels. `reconcileRadius`
  * is render/flowReconcileTsl.mjs's pixel window (1).
  */
-export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius = null, levels = 3, subpixel = true, reconcileRadius = 1, grid = "block", seed = false }) {
+export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius = null, levels = 3, subpixel = true, reconcileRadius = 1, grid = "block", seed = false, stillGuess = false }) {
     if (!(w >= 1 && h >= 1)) throw new Error(`render/flowCost: w and h must be at least 1 -- got ${w} x ${h}`);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/flowCost: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (grid !== "block" && grid !== "level") throw new Error(`render/flowCost: grid must be "block" or "level" -- got ${grid}`);
@@ -46,7 +47,7 @@ export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius 
     for (let L = top; L >= 0; L--) {
         const r = L === top ? searchRadius : refineRadius, guesses = lvl && L !== top ? 4 : L === top && seed ? 2 : 1;
         const blocks = lvl ? Math.ceil(sizes[L][0] / block) * Math.ceil(sizes[L][1] / block) : Math.ceil(w / block) * Math.ceil(h / block);
-        const scores = guesses + (2 * r + 1) ** 2 + 1 + (L === 0 && subpixel ? 4 : 0);   // the guess(es), the window, standing still, the vertex
+        const scores = guesses + (stillGuess && L !== top ? 1 : 0) + (2 * r + 1) ** 2 + 1 + (L === 0 && subpixel ? 4 : 0);   // the guess(es), v4759's standing still, the window, standing still, the vertex
         const reads = blocks * scores * patch + (L === top ? (seed ? blocks : 0) : blocks * guesses);   // each block's guesses from the level above, or the seed's
         perLevel.push({ L, radius: r, blocks, scores, reads });
         search += reads; reach += r * (1 << L);

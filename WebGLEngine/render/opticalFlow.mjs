@@ -63,6 +63,11 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * unseeded finds 0 %, for one more score a coarsest block. In frame generation it is an option and not the default
  * (fx/fsr/fsrFlowSeed-selfcheck.mjs says why).
  *
+ * `stillGuess` (v4759): every level below the coarsest also scores standing still as a guess, before its search. A small thing
+ * that stands still while what is behind it moves inherits the background's motion from the level above, and the windows
+ * below cannot come back from it: a 16 px still square over a background moving 16 px is found at 0 of 4 blocks without it
+ * and 4 of 4 with it, for one more score a block (render/flowCost-selfcheck.mjs).
+ *
  * `subpixel` defaults to true and exists so the refinement's worth is MEASURABLE rather than asserted --
  * the control-arm discipline this arc applies to every switchable thing on its page. Off, the field is
  * whole pixels, which is what v4673 shipped.
@@ -85,7 +90,7 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
-                                 subpixel = true, refineRadius = null, grid = "block", seed = null, tally = null }) {
+                                 subpixel = true, refineRadius = null, grid = "block", seed = null, stillGuess = false, tally = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -177,6 +182,11 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
                     if (s < best) { best = s; gx = cx; gy = cy; took = true; }
                 }
                 if (took && tally) tally.neighbours = (tally.neighbours || 0) + 1;   // the blocks where a neighbour's guess won
+            }
+            if (stillGuess && L !== top) {
+                // v4759: standing still, a guess of its own below the coarsest level -- kept only if STRICTLY better
+                const s = score(a, b, lw, lh, ox, oy, ox, oy, n);
+                if (s < best) { best = s; gx = 0; gy = 0; if (tally) tally.still = (tally.still || 0) + 1; }
             }
             let bdx = gx, bdy = gy, subx = 0, suby = 0;
             // v4748: the coarsest level searches `searchRadius`; the levels below refine the guess within `refineRadius`

@@ -568,8 +568,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4756 -- 1838 -> 1839 for fx/fsr/fsr3LiveClock-selfcheck.mjs -- FSR3 paced on requestAnimationFrame's own timestamps.
     // v4757 -- 1839 -> 1840 for render/temporalTslMeshes-selfcheck.mjs -- skinned and morphed meshes and an orthographic camera through the motion stage.
     // v4758 -- 1840 -> 1841 for fx/fsr/fsrFlowSeed-selfcheck.mjs -- the optical flow seeded with the application's vectors, in the generator.
-    gates: 1841, usesOk: 1820, definesOk: 1812, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1713, condFirst: 91, unknownSignature: 16,
+    // v4759 -- 1841 -> 1842 for fx/fsr/fsrFlowStill-selfcheck.mjs -- standing still as a flow guess, in the generator.
+    gates: 1842, usesOk: 1821, definesOk: 1813, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1714, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
