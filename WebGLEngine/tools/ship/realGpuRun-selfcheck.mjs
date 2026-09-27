@@ -56,7 +56,12 @@ else {
 }
 
 // ---- v4764 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against tools/ship/realGpuRun.mjs: R1 the render gates left out of the run -> 3; R2 dB read before the clock -> 1; R3 the
+// summary line counted as a failing row -> 1; R4 a software adapter never named -> 2; R5 the log not handed to the gates -> 3;
+// R6 measured lines not read -> 1. Against tools/ship/webgpuHarness.mjs: H1 the log never written -> 3; H2 SWEK_LAUNCH_ARGS
+// ignored -> 1; H3 a gate logged by its full path (the runner then finds no adapter for it) -> 3; H4 the flags not logged -> 1.
+// Ten, none green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a real GPU -- the run exists for one and this box has none; the whole run's length (about ten minutes " +
-    "on SwiftShader -- two gates here); and which Linux flags reach which GPU, which the doc offers as a first try, not a finding.");
+console.log("unchecked here: a real GPU -- the run exists for one and this box has none; the whole run, 8 min 25 s on SwiftShader, " +
+    "measured once and too long for a gate -- two gates here; and which Linux flags reach which GPU, which the doc offers as a first try, not a finding.");
 process.exitCode = fails ? 1 : 0;

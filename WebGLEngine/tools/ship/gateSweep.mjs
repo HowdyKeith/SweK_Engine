@@ -8032,6 +8032,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4764 -- THE 371st CLOSING: the FSR gates on a real GPU -- a command, a report that names the GPU, and a doc.
+    since446: Object.freeze({
+        at: "v4764", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** EVERY DEVICE ROW HERE IS SWIFTSHADER'S, AND NOW THE RUN THAT IS NOT CAN SAY SO. *** runInEngineOrigin logs each " +
+                 "call's adapter, software flag and launch flags under SWEK_ADAPTER_LOG and takes SWEK_LAUNCH_ARGS; " +
+                 "tools/ship/realGpuRun.mjs runs every fx/fsr, render/*Tsl* and translucent-layer gate (39) with the log on and writes " +
+                 "one report whose first line names the adapter -- or says, loudly, that it was software. Each gate is exact, quality " +
+                 "or timing by a stated rule (a clock read, a dB grade, neither): 12, 24 and 3. Run whole here: 39 green in 8 min 25 s, " +
+                 "on google swiftshader, and the report says it is not a real-hardware run. docs/real-hardware-fsr.md says how to " +
+                 "run it on Windows, Linux and macOS and what each kind of red means. Ten sabotages, none green.",
+    }),
     // v4763 -- THE 370th CLOSING: six three.js bug reports, drafted, each held to a reproduction -- and none posted.
     since445: Object.freeze({
         at: "v4763", swept: 1, green: 1, red: 0,
