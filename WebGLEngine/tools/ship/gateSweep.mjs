@@ -8032,6 +8032,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4767 -- THE 374th CLOSING: what the translucent layer costs, and a quad in place of a geometry pass.
+    since449: Object.freeze({
+        at: "v4767", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/translucentLayer-selfcheck.mjs (the depth option against the geometry pass, and an empty texel as the far plane, both backends)"]),
+        verdict: "*** THE LAYER HAD COST A REAL FRAME'S GEOMETRY EACH GENERATED FRAME. *** Its depth pass draws the opaque scene: 3.2 ms at " +
+                 "10,560 triangles and 203 at 1,056,000, where a real frame is 4.5 and 211 -- on SwiftShader, the growth the arithmetic's. " +
+                 "The generator already splats a depth at t; depthAt exposes it, a `ui` function is called after the splat, and the " +
+                 "layer's { depth } writes it with one quad: 3.5 to 3.8 ms at any size. On the translucent things' pixels the same dB; " +
+                 "the frame moves only at an occluder's edge, -0.29 and -0.81 dB. From the stage's own clip depth it is the geometry " +
+                 "pass's to the bit on both backends, an empty texel the far plane. fsr-three.html uses it. Six sabotages, one " +
+                 "equivalent, measured (the fill's depth against the splat's).",
+    }),
     // v4766 -- THE 373rd CLOSING: the demo page shows what the recent rounds took -- and a page gate found red since v4756.
     since448: Object.freeze({
         at: "v4766", swept: 1, green: 1, red: 0,

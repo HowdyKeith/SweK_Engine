@@ -270,11 +270,12 @@ try {
         const tNow = t, tWas = g.tWas ?? t; g.tWas = t;
         const sceneAt = (tt) => poseAt(tWas + (tNow - tWas) * tt);
         const ui = asLayer ? async (tt) => {
-            sceneAt(tt); await layer().render(renderer, scene, camera); poseAt(tNow); layerDraws++;
+            // v4767: the occluding depth from the generator's own splat -- one quad, where the scene's depth pass is a geometry pass
+            sceneAt(tt); await layer().render(renderer, scene, camera, { depth: g.fg.depthAt }); poseAt(tNow); layerDraws++;
             if (composite) await hudInto(layer().target, $("genuit").checked ? g.k - 1 + tt : g.k);   // the HUD over the translucent things, in one layer
             return layer().texture;
         } : composite ? await hudBetween(g.k) : null;
-        const over = asLayer ? async (tt, frame) => { sceneAt(tt); const tex = await layer().renderOver(renderer, scene, camera, frame); poseAt(tNow); overDraws++; return tex; } : null;
+        const over = asLayer ? async (tt, frame) => { sceneAt(tt); const tex = await layer().renderOver(renderer, scene, camera, frame, { depth: g.fg.depthAt }); poseAt(tNow); overDraws++; return tex; } : null;
         await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture,
                                          toward: withArc ? towardStage.motion.texture : null, ui, over,
                                          camera: withFlow ? motionStage.camera.texture : null }, null);

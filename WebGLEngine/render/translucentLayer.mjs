@@ -38,6 +38,14 @@
 // the scene's time over the frame itself -- copied in texel for texel, the opaque scene's depth drawn first -- which is three's
 // own order: opaque, then what reads it. A real frame rebuilt so is the frame drawn with them, to the bit, on both backends;
 // through the generator's `over` it beats the best single field on every case, +1.4 to +6.7 dB on the lens's pixels.
+//
+// *** v4767: THE OCCLUDING DEPTH NEED NOT BE A GEOMETRY PASS. *** render() and renderOver() draw the opaque scene depth-only first
+// -- a whole geometry pass each generated frame, as much as rendering a real frame on this device (203 ms against 211 at a
+// million triangles). `{ depth: tex }` writes it from a texture instead -- .z a clip depth, .w whether anything is there, the
+// far plane where not: fx/fsr/fsrFrameGenTsl.mjs's depthAt, the generator's own splat -- with one full-screen quad, 3.5 ms at
+// any size (fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs). On the translucent things' pixels it is the geometry pass's to the dB;
+// the frame moves only at an occluder's edge, -0.29 and -0.81 dB where a box slides in front. From the stage's own clip depth
+// it is the geometry pass's to the bit, on both backends.
 "use strict";
 
 const RENDERABLE = (o) => !!(o && (o.isMesh || o.isLine || o.isPoints || o.isSprite));
@@ -80,7 +88,20 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
     const gather = (scene) => { const tr = [], bd = [], op = []; scene.traverse((o) => { if (!RENDERABLE(o)) return; (readsBackdrop(o) ? bd : select(o) ? tr : op).push(o); }); return { tr, bd, op }; };
     // v4765: the frame the backdrop readers are drawn over, copied in exactly (a texel a pixel), with a depth buffer of its own
     const overTarget = new THREE.RenderTarget(w, h, { type: type == null ? THREE.FloatType : type, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    const L = THREE.TSL, ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), copies = new Map();
+    const L = THREE.TSL, ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), copies = new Map(), depthQuads = new Map();
+    // v4767: the occluding depth from a texture -- .z a clip depth, .w whether anything is there (render/frameInterpTsl.mjs's splat,
+    // fx/fsr/fsrFrameGenTsl.mjs's depthAt) -- written into the depth buffer by one full-screen quad, where nothing is there the far
+    // plane. It stands in for the depth pass of the opaque scene, which is a whole geometry pass
+    const depthQuad = (tex, gl) => { const key = tex.uuid + (gl ? "|gl" : ""); let sc = depthQuads.get(key); if (!sc) { const m = new THREE.NodeMaterial();
+        const v = L.textureLoad(tex, L.ivec2(L.int(L.screenCoordinate.x), L.int(L.screenCoordinate.y))), win = gl ? v.z.mul(0.5).add(0.5) : v.z;
+        m.fragmentNode = L.vec4(0.0, 0.0, 0.0, 0.0); m.depthNode = L.select(v.w.greaterThan(0.5), win, L.float(1.0));
+        m.colorWrite = false; m.depthTest = true; m.depthWrite = true; m.depthFunc = THREE.AlwaysDepth; m.blending = THREE.NoBlending;
+        sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); depthQuads.set(key, sc); } return sc; };
+    const occluders = async (renderer, scene, camera, hideThese, depth) => {
+        if (depth) { await renderer.renderAsync(depthQuad(depth, renderer.coordinateSystem === THREE.WebGLCoordinateSystem), ortho); return; }
+        const back = hideAll(hideThese); scene.overrideMaterial = depthOnly;
+        try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
+    };
     const copyOf = (tex) => { let sc = copies.get(tex); if (!sc) { const m = new THREE.NodeMaterial();
         m.fragmentNode = L.textureLoad(tex, L.ivec2(L.int(L.screenCoordinate.x), L.int(L.screenCoordinate.y))); m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); copies.set(tex, sc); } return sc; };
@@ -107,7 +128,7 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
         target, texture: target.texture, overTarget,
         /** Hide the scene's translucent things and its backdrop readers: the generator's frames and the motion stage's pass are drawn so. */
         hide(scene) { const { tr, bd } = gather(scene); return hideAll([...tr, ...bd]); },
-        async renderOver(renderer, scene, camera, frame) {
+        async renderOver(renderer, scene, camera, frame, { depth = null } = {}) {
             if (!frame || !frame.image || frame.image.width !== w || frame.image.height !== h)
                 throw new Error(`render/translucentLayer: renderOver's frame must be a ${w} x ${h} texture -- got ${frame && frame.image ? frame.image.width + " x " + frame.image.height : "no image"}`);
             const { tr, bd, op } = gather(scene);
@@ -116,16 +137,15 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
                 // the frame, copied in; then what is opaque, depth only; then the backdrop readers, sampling the frame as it stands
                 renderer.setRenderTarget(overTarget); await renderer.renderAsync(copyOf(frame), ortho);
                 renderer.autoClear = false; scene.background = null;
-                let back = hideAll([...tr, ...bd]); scene.overrideMaterial = depthOnly;
-                try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
-                back = hideAll([...op, ...tr]);
+                await occluders(renderer, scene, camera, [...tr, ...bd], depth);
+                const back = hideAll([...op, ...tr]);
                 try { await renderer.renderAsync(scene, camera); } finally { back(); }
             } finally {
                 scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto; renderer.setRenderTarget(keep.target);
             }
             return overTarget.texture;
         },
-        async render(renderer, scene, camera) {
+        async render(renderer, scene, camera, { depth = null } = {}) {
             const { tr, bd, op } = gather(scene);
             for (const o of tr) for (const m of materials(o)) { const b = blendOf(m);
                 if (typeof b === "string") throw new Error(`render/translucentLayer: ${label(o)}'s material blends by ${b} -- a layer over a frame carries only NormalBlending (over) and AdditiveBlending (adding)`); }
@@ -134,17 +154,17 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
             renderer.setRenderTarget(target); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
             renderer.autoClear = false; scene.background = null;
             try {
-                // what is opaque, depth only: a translucent thing behind it is hidden by it -- and a backdrop reader, a surface too
-                let back = hideAll(tr); scene.overrideMaterial = depthOnly;
-                try { await renderer.renderAsync(scene, camera); } finally { scene.overrideMaterial = null; back(); }
+                // what is opaque, depth only: a translucent thing behind it is hidden by it -- and a backdrop reader, a surface too;
+                // or (v4767) that depth from a texture, one quad in place of a geometry pass
+                await occluders(renderer, scene, camera, tr, depth);
                 // the translucent things alone, over transparent black -- never a backdrop reader, which renderOver draws
-                back = hideAll([...op, ...bd]); const undo = toLayer(tr);
+                const back = hideAll([...op, ...bd]); const undo = toLayer(tr);
                 try { await renderer.renderAsync(scene, camera); } finally { undo(); back(); }
             } finally {
                 scene.overrideMaterial = keep.over; scene.background = keep.bg; renderer.autoClear = keep.auto;
                 renderer.setClearColor(keep.color, keep.alpha); renderer.setRenderTarget(keep.target);
             }
         },
-        dispose() { target.dispose(); overTarget.dispose(); depthOnly.dispose(); for (const sc of copies.values()) sc.children[0].material.dispose(); },
+        dispose() { target.dispose(); overTarget.dispose(); depthOnly.dispose(); for (const sc of [...copies.values(), ...depthQuads.values()]) sc.children[0].material.dispose(); },
     };
 }

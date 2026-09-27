@@ -23,7 +23,7 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-        const TL = await import("/render/translucentLayer.mjs"); const FG = await import("/fx/fsr/fsrFrameGenTsl.mjs");
+        const TL = await import("/render/translucentLayer.mjs"); const TT = await import("/render/temporalTsl.mjs"); const FG = await import("/fx/fsr/fsrFrameGenTsl.mjs");
         const D = a.D, out = {};
         const FIELDS = ["blending", "blendSrc", "blendDst", "blendEquation", "blendSrcAlpha", "blendDstAlpha", "blendEquationAlpha"];
         for (const mode of ["webgpu", "webgl2"]) {
@@ -72,12 +72,29 @@ else {
                 renderer.setRenderTarget(park); const overTex = await layer.renderOver(renderer, scene, cam, without.texture); state.overKept = renderer.getRenderTarget() === park && renderer.autoClear === true && scene.background === bgColor;
                 await gen.composite(renderer, overTex, layer.texture, comp);
                 const W = await read(withT), L = await read(layer.target), C = await read(comp);
+                // v4767: the occluding depth from a TEXTURE -- the motion stage's own clip depth, in the splat's (_, _, z, valid) form --
+                // against the geometry pass: the same layer, on both backends (WebGL's clip z maps to window depth by half and a half)
+                const stage = TT.makeMotionStage(THREE, T, { w: D, h: D, gl });
+                { const back = layer.hide(scene); await stage.render(renderer, scene, cam); await stage.render(renderer, scene, cam); back(); }
+                const dz = tgt(), dm = new THREE.NodeMaterial(); dm.blending = THREE.NoBlending; dm.depthTest = false; dm.depthWrite = false;
+                dm.fragmentNode = T.vec4(0.0, 0.0, T.textureLoad(stage.depth.texture, T.ivec2(T.int(T.screenCoordinate.x), T.int(T.screenCoordinate.y))).x, 1.0);
+                const dsc = new THREE.Scene(); dsc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dm)); renderer.setRenderTarget(dz); await renderer.renderAsync(dsc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
+                await layer.render(renderer, scene, cam, { depth: dz.texture }); const Lq = await read(layer.target);
+                let dq = 0, nq = 0; for (let i = 0; i < D * D * 4; i++) { const e = Math.abs(Lq[i] - L[i]); if (e > 1e-6) nq++; dq = Math.max(dq, e); }
+                // ...and a pixel the texture says holds NOTHING (.w 0, .z 0) is the far plane, not the near one: an empty left third,
+                // where the spark is -- read as depth 0 it would hide the spark
+                const hm = new THREE.NodeMaterial(); hm.blending = THREE.NoBlending; hm.depthTest = false; hm.depthWrite = false;
+                hm.fragmentNode = T.select(T.screenCoordinate.x.lessThan(D / 3), T.vec4(0.0), T.textureLoad(dz.texture, T.ivec2(T.int(T.screenCoordinate.x), T.int(T.screenCoordinate.y))));
+                const hz = tgt(), hsc = new THREE.Scene(); hsc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), hm)); renderer.setRenderTarget(hz); await renderer.renderAsync(hsc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
+                await layer.render(renderer, scene, cam, { depth: hz.texture }); const Lh = await read(layer.target);
+                const holeSpark = Array.from(Lh.subarray(at.spark * 4, at.spark * 4 + 3)), sparkWas = Array.from(L.subarray(at.spark * 4, at.spark * 4 + 3));
+                stage.dispose(); dz.dispose(); hz.dispose();
                 // where two panels overlap -- the layer's alpha 0.35 + 0.5 x 0.65 -- and where one thing covers
                 let mx = 0, n = 0, mxOne = 0, nTwo = 0; for (let i = 0; i < D * D; i++) { const two = L[i * 4 + 3] > 0.6; if (two) nTwo++;
                     for (let c = 0; c < 3; c++) { const d = Math.abs(C[i * 4 + c] - W[i * 4 + c]); if (d > 0) n++; mx = Math.max(mx, d); if (!two) mxOne = Math.max(mxOne, d); } }
                 const pix = Object.fromEntries(Object.entries(at).map(([k, i]) => [k, Array.from(L.subarray(i * 4, i * 4 + 4))]));
                 let covered = 0; for (let i = 0; i < D * D; i++) if (L[i * 4 + 3] > 0) covered++;
-                const o = { maxDiff: mx, differ: n, maxOne: mxOne, twoPx: nTwo, pix, covered, state, hiddenWhile, openWhile, afterRestore };
+                const o = { depthTex: { dq, nq, holeSpark, sparkWas }, maxDiff: mx, differ: n, maxOne: mxOne, twoPx: nTwo, pix, covered, state, hiddenWhile, openWhile, afterRestore };
                 if (mode === "webgpu") {
                     // what a layer cannot carry, refused by the object's name
                     const refusals = {};
@@ -123,6 +140,11 @@ else {
             ok(`  [${mode}] hide() hides the translucent things and not the rest, and its restore keeps hidden what was: ${o.hiddenWhile.join()} / ${o.openWhile.join()} / ${o.afterRestore.join()}`,
                o.hiddenWhile.every((v) => v === false) && o.openWhile.every((v) => v === true) && o.afterRestore.join() === "true,true,true,true,false,true,true,true");
         }
+        for (const mode of ["webgpu", "webgl2"]) { const q = r.result[mode].depthTex;
+            ok(`  [${mode}] v4767: the layer occluded by a depth TEXTURE (the stage's clip depth) is the layer occluded by the geometry pass: ${q.nq} values differ, by at most ${q.dq.toExponential(2)}`,
+               q.nq === 0, "render(..., { depth }) -- one quad, clip depth to window depth as the backend has it");
+            ok(`  [${mode}] ...and where the texture holds nothing (.w 0) it is the far plane: the spark there is ${q.holeSpark.map((v) => v.toFixed(3)).join(", ")}, as it was ${q.sparkWas.map((v) => v.toFixed(3)).join(", ")}`,
+               q.holeSpark.every((v, i) => Math.abs(v - q.sparkWas[i]) < 1e-6) && q.sparkWas[0] > 0.3); }
         const g = r.result.webgpu, rf = g.refusals;
         ok(`isTranslucent takes meshes, points, lines and sprites whose materials are transparent: ${JSON.stringify(g.kinds).replace(/"/g, "")}`,
            g.kinds.group === false && g.kinds.opaque === false && g.kinds.glass && g.kinds.points && g.kinds.line && g.kinds.sprite);

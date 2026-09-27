@@ -81,6 +81,10 @@
 // returning a texture, is applied after generation and before `ui` -- render/translucentLayer.mjs's renderOver draws the lens at
 // t over the frame generated without it: +6.7 and +1.4 dB on a still lens's pixels (backdrop, transmission), +4.7 and +1.4 on a
 // moving one, exact against the midpoint where what is behind stands still (fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs).
+// v4767: the layer and the lens need the opaque scene's depth at t, and drawing it is a geometry pass as dear as a real frame.
+// depthAt is this generator's own splat -- the clip depth of what lands at each pixel -- and a `ui` function is now called after
+// the splat, so it can read it: render/translucentLayer.mjs's { depth: gen.depthAt }, one quad at any scene size, the same on
+// the translucent things' pixels (fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs).
 //
 // *** THE MOTION BETWEEN TWO FRAMES IS A STRAIGHT LINE HERE, AND THE SCENE'S IS NOT. *** A turning object's points move on
 // arcs; the flow is the chord, and the midpoint of a chord is not the midpoint of its arc. The gate measures the scene
@@ -158,6 +162,9 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     let generated = 0;
     return {
         interp: fi, targets, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec, arc,
+        /** v4767: the generated frame's own depth at t -- .z the clip depth of what landed at each pixel, .w whether anything did:
+         *  render/translucentLayer.mjs's `depth`, one quad where the opaque scene's depth pass is a geometry pass. Valid within a generate. */
+        get depthAt() { return (fill ? fi.targets.filled : fi.targets.vec).texture; },
         get generated() { return generated; },
         /** v4745: `ui`, premultiplied, over the w x h texture `src`, at `output` -- what generate does with its `ui`, for a real frame. */
         async composite(renderer, src, ui, output = null) { sized(ui); const keep = renderer.getRenderTarget(); await composite(renderer, src, ui, output); renderer.setRenderTarget(keep); },
@@ -167,9 +174,11 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
          * at more than twice the real frames' rate: the field, the flow and the depth history are the last call's.
          */
         async generate(renderer, { prev, cur, motion, depth, toward = null, ui = null, over = null, camera = null, depthPrev = null }, output = null, { t: at_ = null, again = false } = {}) {
-            if (typeof ui === "function") ui = await ui(at_ === null ? t : at_);        // v4755: the UI drawn at the time generated
+            // v4755: `ui` as a function of t is drawn at the time generated -- v4767: AFTER the splat, so it may read depthAt
+            const uiAt = typeof ui === "function" ? ui : null;
+            if (uiAt) ui = true;
             if (over !== null && typeof over !== "function") throw new Error("fx/fsr/fsrFrameGenTsl: over must be a function of (t, the generated frame) returning a texture");
-            if (ui) sized(ui);
+            if (ui && !uiAt) sized(ui);
             if (arc && !toward) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator needs `toward`, the displacement to time t -- a toward stage's motion");
             if (arc && at_ !== null && at_ !== t) throw new Error("fx/fsr/fsrFrameGenTsl: an arc generator's time is its toward stage's -- render that stage at the new t instead");
             const keep = renderer.getRenderTarget();
@@ -200,8 +209,9 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
             // v4765: what reads the frame behind it, drawn over the generated frame at t -- before the UI, as three draws it
             let base = ui || over ? targets.pre.texture : null;
             if (over) { base = await over(at_ === null ? t : at_, base); sized(base); }
+            if (uiAt) { ui = await uiAt(at_ === null ? t : at_); if (ui) sized(ui); }
             if (ui) await composite(renderer, base, ui, output);
-            else if (over) await draw(renderer, once("over|" + base.uuid, () => quad(at(base))), output);
+            else if (base) await draw(renderer, once("over|" + base.uuid, () => quad(at(base))), output);   // `over` without a UI, or a `ui` that drew none
             if (!again) await draw(renderer, once("keep", () => quad(at(depthNow.texture))), depthOld);   // the next pair's older depth
             renderer.setRenderTarget(keep);
             generated++;
