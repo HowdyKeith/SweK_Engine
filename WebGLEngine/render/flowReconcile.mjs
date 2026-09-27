@@ -275,6 +275,12 @@ export function reconciledPixelFieldCPU({ rc, motion, depth, w, h }) {
  * the scroll +0.70, both pans unchanged. The one thing it gives up: the scrolling wall's clear interior, +10.9 at 0.9 and
  * +3.9 split, where more of the wall takes a block's vector that is the knot's. The test is in SCREEN space, so a camera
  * that moves makes every surface "moving" and a shadow under a pan gets 0.9.
+ * *** AND ONLY THE PIXEL'S OWN BLOCK'S FLOW -- TRIED AGAINST ITS NEIGHBOURS' AT v4749, AND KEPT. *** A pixel near a block's
+ * edge could take whichever of the 2 x 2 blocks nearest it explains its window best. Prototyped in the TSL and measured on
+ * fx/fsr/fsrFrameGenFlow-selfcheck.mjs's and fx/fsr/fsrFrameGenScene-selfcheck.mjs's cases, it recovers much of what the
+ * still-surface margin gave up on the scrolling wall's interior (+5.2 and +6.8 dB) and gains on the HUD scene (+0.67) and the
+ * reflection (+0.27) -- and costs the shadows' changed pixels 0.6 and 0.9 dB, and the scroll's whole frame 0.07. Mixed, and
+ * three more window scores a pixel; not built, and the measurement is here for whoever weighs it again.
  * *** NOT BECAUSE THE VECTOR IS A CHORD, WHICH THIS NOTE SAID UNTIL v4744. *** At 12x the half-way point is 0.05 pixels off
  * the chord's midpoint; what the low margin buys there is at the knot's silhouettes and self-occlusion edges, where a block
  * vector blends an edge the pixel's exact vector moves whole (fx/fsr/fsrFrameGenArc-selfcheck.mjs's header).

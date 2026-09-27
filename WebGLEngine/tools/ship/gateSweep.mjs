@@ -8032,6 +8032,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4749 -- THE 356th CLOSING: three gaps the gates named, and one idea measured and not built.
+    since431: Object.freeze({
+        at: "v4749", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowReconcileTsl-selfcheck.mjs (its fixture 60 x 36: not a power of two, not a multiple of the block)",
+                                "fx/fsr/fsr3Tsl-selfcheck.mjs (FSR2's frames at half float, the page's default)"]),
+        verdict: "*** THE GAPS THE GATES NAMED WERE NOT FAULTS, AND NOW THEY ARE HELD. *** render/flowReconcileTsl-selfcheck.mjs said " +
+                 "every case was 64 wide and a width that is not a power of two might round -du * w differently on the device (f32) " +
+                 "and in the mirror (f64): at 60 x 36 -- not a power of two, not a multiple of the 8-pixel block, the page's shape -- " +
+                 "every pixel's source and field is the mirror's exactly on both backends, because the product of an f32 and a small " +
+                 "integer is exact in f64 and each side rounds it once. The fixture is 60 x 36 now; every sabotage re-run reads as it " +
+                 "did, but one, which went to 0 because the camera's vectors shrank under both thresholds it compared and was " +
+                 "re-aimed. makeFsr3's frames are half float by default, as fsr-three.html runs them, and every row graded float: " +
+                 "+0.001 to +0.002 dB against float on three cases, the knot at 12x held in the gate. And a pixel choosing among the " +
+                 "flows of the 2 x 2 blocks nearest it was prototyped and measured -- +5 to +7 dB on a scrolling wall's interior, +0.7 " +
+                 "on the HUD scene, and -0.6 to -0.9 on the shadows' changed pixels -- mixed, so not built; the measurement is in " +
+                 "render/flowReconcile.mjs's note.",
+    }),
     // v4748 -- THE 355th CLOSING: what the optical flow costs.
     since430: Object.freeze({
         at: "v4748", swept: 2, green: 2, red: 0,

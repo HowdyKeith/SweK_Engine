@@ -65,13 +65,15 @@ else {
                 const o = { cases: {} }, o2 = tgt(D);
                 const fsr2 = { renderWidth: a.RW, renderHeight: a.RW, displayWidth: D, displayHeight: D, threshold, type: THREE.FloatType };
                 // [spin, pan per frame, fields] -- the knot at the page's four times and twelve, and a camera panning at 4x
-                for (const [cn, sp, pn, fields] of [["spin4", 4, 0, ["raw", "dilated"]], ["spin12", 12, 0, ["raw"]], ["pan", 4, 0.08, ["raw", "dilated"]]]) {
+                for (const [cn, sp, pn, fields] of [["spin4", 4, 0, ["raw", "dilated"]], ["spin12", 12, 0, ["raw", "half"]], ["pan", 4, 0.08, ["raw", "dilated"]]]) {
                 spin = sp; pan = pn; o.cases[cn] = { psnr: {} }; const oc = o.cases[cn];
                 const mid = await ss(a.N - 1.5), last = await ss(a.N - 1);
                 const cl = (v) => Math.min(1, Math.max(0, v));
                 const psnr = (b, truth) => { let q = 0; for (let i = 0; i < D * D; i++) for (let c = 0; c < 3; c++) q += (cl(b[i * 4 + c]) - cl(truth[i * 4 + c])) ** 2; return 10 * Math.log10(1 / (q / (D * D * 3))); };
                 for (const field of fields) {
-                    const f3 = F3.makeFsr3(THREE, T, renderer, { fsr2, field });
+                    // v4749: "half" is the raw field on HALF-FLOAT frames -- makeFsr3's default, and what fsr-three.html runs -- on the
+                    // fastest case only: each arm is three seconds of this gate, and the v4749 probe read spin4 and the pan within 0.002 dB too
+                    const f3 = F3.makeFsr3(THREE, T, renderer, { fsr2: field === "half" ? { ...fsr2, type: THREE.HalfFloatType } : fsr2, field: field === "half" ? "raw" : field });
                     for (let k = 0; k < a.N; k++) {
                         setT(k); await f3.render(scene, cam, false);
                         // the generator is called after every real frame from the second on, as it would be in use: its fill
@@ -87,7 +89,7 @@ else {
                     // the generator was handed the pair in order and the field this arm names
                     const L = f3.lastInputs, T2 = f3.fsr2.targets;
                     (o.inputs = o.inputs || []).push(L.cur === f3.targets.frames[(a.N - 1) % 2].texture && L.prev === f3.targets.frames[a.N % 2].texture
-                        && L.motion === (field === "raw" ? T2.motion.texture : T2.dMotion.texture) && L.depth === T2.depth.texture);
+                        && L.motion === (field !== "dilated" ? T2.motion.texture : T2.dMotion.texture) && L.depth === T2.depth.texture);
                     if (field === "raw") {
                         const older = f3.targets.frames[a.N % 2], newer = f3.targets.frames[(a.N - 1) % 2];
                         oc.psnr.repeat = psnr(await read(older, D), mid);
@@ -158,12 +160,16 @@ else {
         ok(`  [${mode}] ...and against generating from NATIVE frames, which draws four times the pixels per real frame: ${all.map((p) => d(p.raw, p.native)).join(", ")} dB -- a gap that is NOT the real frames' own (${all.map((p) => d(p.upscaledLast, p.nativeLast)).join(", ")}), and the pan says why: the native generated frame reads ${f(C.pan.psnr.native)}, above the native real frame's ${f(C.pan.psnr.nativeLast)}`,
            C.pan.psnr.native > C.pan.psnr.nativeLast && all.every((p) => p.native > p.raw),
            "a frame made by blending two ALIASED frames, sampled a fraction of a pixel apart, is a two-sample anti-alias against a supersampled truth; FSR2's frames are already accumulated and have no such bonus to collect. The first draft asserted the gap would track the real frames' and was wrong under the pan");
+        // v4749: the page's frames are half float, and every row above graded float ones
+        const hd = C.spin12.psnr.half - C.spin12.psnr.raw;
+        ok(`  [${mode}] ...and FSR2's frames at HALF float -- makeFsr3's default, and fsr-three.html's -- generate the same frame: ${hd >= 0 ? "+" : ""}${hd.toFixed(3)} dB against float with the knot at 12x`,
+           Math.abs(hd) < 0.05, "the generator's own targets are float; what half precision costs the colour it reads is under a hundredth of a dB here");
         const dd = ["spin4", "pan"].map((k) => C[k].psnr.raw - C[k].psnr.dilated);
         ok(`  [${mode}] ...and which of FSR2's two fields it reads is a wash: raw against dilated ${dd.map((v) => (v >= 0 ? "+" : "") + v.toFixed(2)).join(" at 4x and ")} under the pan`,
            dd.every((v) => Math.abs(v) < 0.25),
            "the raw field is the default because it is the field as rendered; the dilation is FSR2's, for sampling a render-resolution history, and hands a silhouette's neighbours the nearer surface's vector -- neither helps nor hurts a splat by more than a tenth of a dB here");
         ok(`  [${mode}] ...and the generator is handed the older and the newer upscaled frame in that order, with the field its arm names (${o.inputs.filter(Boolean).length} of ${o.inputs.length} arms), and render() shows the frame it made (worst |difference| ${o.shownDiff})`,
-           o.inputs.every(Boolean) && o.inputs.length === 5 && o.shownDiff === 0, "the ping-pong's parity, which no quality row can see when two consecutive frames are nearly alike");
+           o.inputs.every(Boolean) && o.inputs.length === 6 && o.shownDiff === 0, "the ping-pong's parity, which no quality row can see when two consecutive frames are nearly alike");
         ok(`  [${mode}] ...and the generated frame draws NO scene (${o.sceneRenders} scene renders across its ${o.calls} calls): its field is FSR2's own (${o.fieldIsStage})`,
            o.sceneRenders === 0 && o.calls > 0 && o.fieldIsStage === true, "the motion stage FSR2 runs at display resolution is the generator's input; nothing is rendered twice");
         ok(`  [${mode}] ...and before two real frames it is honest: generate() before any refuses, and after one it is that frame, exactly (worst |difference| ${o.oneFrameDiff})`,
@@ -192,6 +198,10 @@ else {
 // real one by 3 dB, the blend acting as an anti-alias the upscaled frames had already had. The row reports that now.
 // WEBGPU ONLY: the first run read both backends within 0.16 dB of each other and took 25 s; every pass is held to its
 // mirror on both backends by its own gate.
+// ---- v4749 ------------------------------------------------------------------------------------------------------
+// The half-float row states an equivalence, and no mutation of this tree's own code reddens it: making the arm's frames float
+// again is the rig agreeing with itself (0, and correctly). What it guards is a half-precision fault in the chain -- a
+// target, a readback, a format three picks -- that the float rows would never see, on the frames the page actually runs.
 // ---- v4745 SABOTAGE LOG ----------------------------------------------------------------------------------------
 //   F8 the UI not handed to the generator                           -> 1, the harness: the composite's target was never made
 //   F9 one frame in, the frame shown without the UI                 -> 1

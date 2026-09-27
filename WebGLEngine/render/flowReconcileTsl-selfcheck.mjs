@@ -37,7 +37,12 @@ console.log("\n1. WITHOUT A DEVICE: the refusals, and the per-pixel rule on the 
 }
 
 // ---- render/flowReconcileGPU-selfcheck.mjs's rig: render/flowReconcile-selfcheck.mjs's wall ----
-const W = 64, H = 64, B = 8, TAN = Math.tan(0.5), ASP = 1, NEAR = 0.1, FAR = 100, DIST = 8;
+// *** 60 x 36 SINCE v4749: NOT A POWER OF TWO, AND NOT A MULTIPLE OF THE BLOCK. *** Until v4748 every case was 64 x 64, and
+// this gate named what that left out: a width where -du * w might round once in f32 on the device and once in f64 here. It
+// does not -- the motion is f32 and the width a small integer, so the product is exact in f64 and each side rounds it once,
+// to the same f32 -- and the only f32-against-f64 difference left is the scores', 1e-6 of a luma, which moved no decision.
+// fsr-three.html runs at 960 x 540, and the page's shape is the one the mirror is held at now.
+const W = 60, H = 36, B = 8, TAN = Math.tan(0.5), ASP = 1, NEAR = 0.1, FAR = 100, DIST = 8;
 const VP = (ex) => viewProj([ex, -DIST, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TAN, ASP, NEAR, FAR);
 const TWs = 256, tex = new Float32Array(TWs * TWs);
 {
@@ -116,7 +121,7 @@ for (const [k, c] of Object.entries(CASES)) { cpu[k] = reconcileFlowCPU(c); cpuF
 // only way its exact vectors reach the still branch
 const PIX = {
     geometry: { ...CASES.geometry, margin: 0.9, radius: 1 }, shader: { ...CASES.shader, margin: 0.9, marginStill: 0.9, radius: 1 },
-    shaderStill: { ...CASES.shader, margin: 0.9, radius: 1 }, geometryAll: { ...CASES.geometry, margin: 0.9, marginStill: 0.05, stillPx: 10, radius: 1 },
+    shaderStill: { ...CASES.shader, margin: 0.9, radius: 1 }, geometryAll: { ...CASES.geometry, margin: 0.9, marginStill: 0.05, stillPx: 4, radius: 1 },
     shaderLow: { ...CASES.shader, margin: 0.05, marginStill: 0.05, radius: 1 }, bothLow: { ...CASES.both, margin: 0.05, radius: 2 },
     jitteredLow: { ...CASES.jittered, margin: 0.05, radius: 0 }, flat: { ...CASES.flat, margin: 0, radius: 1 },
     invalid: { ...CASES.invalid, margin: 0.05, radius: 1 },
@@ -128,7 +133,7 @@ for (const [k, c] of Object.entries(PIX)) cpuPix[k] = reconcilePixelsCPU(c);
     // the per-pixel rule on the CPU, on a decision laid out by hand: the three sources in turn, every pixel its own vector
     // and depth, one in five invalid
     let sd = 5; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-    const bw = W / B, bh = H / B, rc = { bw, bh, block: B, source: new Int32Array(bw * bh), flow: new Float32Array(bw * bh * 2) };
+    const bw = Math.ceil(W / B), bh = Math.ceil(H / B), rc = { bw, bh, block: B, source: new Int32Array(bw * bh), flow: new Float32Array(bw * bh * 2) };
     for (let b = 0; b < bw * bh; b++) { rc.source[b] = [SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY][b % 3]; rc.flow[b * 2] = Math.fround(rnd() * 8 - 4); rc.flow[b * 2 + 1] = Math.fround(rnd() * 8 - 4); }
     const motion = new Float32Array(W * H * 4), depth = new Float32Array(W * H);
     for (let i = 0; i < W * H; i++) { motion[i * 4] = Math.fround((rnd() - 0.5) / 8); motion[i * 4 + 1] = Math.fround((rnd() - 0.5) / 8); motion[i * 4 + 2] = rnd() < 0.2 ? 0 : 1; depth[i] = Math.fround(rnd()); }
@@ -232,9 +237,9 @@ else {
             for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) { const i = y * W + xx, b = (y >> 3) * x.bw + (xx >> 3);
                 if (x.source[b] === SRC_APP && Math.fround(-c.motion[i * 4] * W) !== x.flow[b * 2]) n++; } return n; })();
         ok(`  [${mode}] ...and the PER-PIXEL field is reconciledPixelFieldCPU's at every pixel of all ${Object.keys(CASES).length} cases -- ${fieldD} components differ, ${own} of them pixels whose own vector is not their block's`,
-           fieldD === 0 && own > 3000, "the vector, the depth and the validity a frame generator splats");
+           fieldD === 0 && own > W * H / 2, "the vector, the depth and the validity a frame generator splats");
         const src = (k) => o[k].decision.filter((_, i) => i % 4 === 2);
-        ok(`  [${mode}] ...and the rules the census cannot show: flat grey at margin 0 is the application's at every block (${src("flat").filter((v) => v === SRC_APP).length} of 64); the margin moves the flow's share (${[["marginZero", 0], ["geometry", 0.05], ["marginWide", 0.2]].map(([k, m]) => `${m}: ${src(k).filter((v) => v === SRC_FLOW_BEAT).length}`).join(", ")}); the silhouette's two depth conventions pick different halves`,
+        ok(`  [${mode}] ...and the rules the census cannot show: flat grey at margin 0 is the application's at every block (${src("flat").filter((v) => v === SRC_APP).length} of ${src("flat").length}); the margin moves the flow's share (${[["marginZero", 0], ["geometry", 0.05], ["marginWide", 0.2]].map(([k, m]) => `${m}: ${src(k).filter((v) => v === SRC_FLOW_BEAT).length}`).join(", ")}); the silhouette's two depth conventions pick different halves`,
            src("flat").every((v) => v === SRC_APP) && src("marginZero").filter((v) => v === SRC_FLOW_BEAT).length > src("marginWide").filter((v) => v === SRC_FLOW_BEAT).length
            && o.nearer.app.some((v, i) => i % 4 === 0 && v !== o.farther.app[i]),
            "every candidate ties on flat content and the strict rule keeps the application; the nearest pixel of a straddling block is the near half's, the farthest the far half's");
@@ -264,7 +269,7 @@ else {
            srcD === 0 && fieldD === 0 && census[SRC_APP] > 0 && census[SRC_FLOW_BEAT] > 0 && census[SRC_FLOW_ONLY] > 0,
            `${srcD} sources and ${fieldD} field components differ; the scores agree to ${sadW.toExponential(2)}`);
         const beat = (k) => cpuPix[k].counts.flowBeat;
-        ok(`  [${mode}] ...and the per-pixel rules reach their populations: the margin moves the flow's share on the sliding texture (${beat("shaderLow")} pixels at 0.05, ${beat("shaderStill")} at the still surface's 0.5, ${beat("shader")} at 0.9), the camera scene's exact vectors reach the still margin only when counted as still (${beat("geometry")} beaten, ${beat("geometryAll")} with stillPx 10), flat grey at margin 0 is the application's everywhere (${cpuPix.flat.counts.app} of ${W * H}), and the slide's leading edge keeps the application where the flow's evidence left the frame (${edgeKept} of ${4 * (H - 16)} pixels in its first four columns, against ${(() => { let n = 0; const x = cpuPix.shaderLow; for (let y = 8; y < H - 8; y++) for (let xx = 8; xx < 12; xx++) if (x.source[y * W + xx] === SRC_APP) n++; return n; })()} four columns in)`,
+        ok(`  [${mode}] ...and the per-pixel rules reach their populations: the margin moves the flow's share on the sliding texture (${beat("shaderLow")} pixels at 0.05, ${beat("shaderStill")} at the still surface's 0.5, ${beat("shader")} at 0.9), the camera scene's exact vectors reach the still margin only when counted as still (${beat("geometry")} beaten, ${beat("geometryAll")} with stillPx 4, over the camera's 3-pixel vectors), flat grey at margin 0 is the application's everywhere (${cpuPix.flat.counts.app} of ${W * H}), and the slide's leading edge keeps the application where the flow's evidence left the frame (${edgeKept} of ${4 * (H - 16)} pixels in its first four columns, against ${(() => { let n = 0; const x = cpuPix.shaderLow; for (let y = 8; y < H - 8; y++) for (let xx = 8; xx < 12; xx++) if (x.source[y * W + xx] === SRC_APP) n++; return n; })()} four columns in)`,
            beat("shaderLow") > beat("shaderStill") && beat("shaderStill") > beat("shader") && beat("shader") > 0 && beat("geometry") === 0 && beat("geometryAll") > 0 && cpuPix.flat.counts.app === W * H && edgeKept === 4 * (H - 16) && sadW < 1e-3,
            "the incumbent keeps a pixel on a tie and wherever the challenger's window was read off the frame");
     }
@@ -296,8 +301,13 @@ else {
 // the generator gates render has enough pixels moving between the two to move a decibel; geometryAll's stillPx of 10 does
 // (the camera's 3.2-pixel vectors fall under 100 and not under 10). R16 is a report, read by the gate whose arms need it.
 
+// ---- v4749: THE FIXTURE MOVED TO 60 x 36 --------------------------------------------------------------------------
+// Every sabotage above re-run at the new size: R3-R7 and R9-R12 read what they read at 64 x 64, R1 and R2 (re-aimed at
+// v4745's line) 2 each, R8 and R13 still 0. One went to 0 on the move -- R15, the still test against stillPx rather than its
+// square -- because the camera's vectors are 3.0 pixels at 60 wide, under 10 and under 100 alike; geometryAll's stillPx is
+// 4 now, under 9 and not over 16, and R15 reads 2 again.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: what reconciling buys a generated frame, which fx/fsr/fsrFrameGenFlow-selfcheck.mjs measures against a frame " +
-    "rendered at the midpoint; and widths that are not a power of two, where -du * w rounds once in f32 and once in f64 and the application's " +
-    "vector is equal to f32 rather than exactly -- every case here is 64 wide.");
+    "rendered at the midpoint; and a score tie between the two candidates that f32 and f64 break differently -- none at 60 x 36, and " +
+    "nothing here builds one.");
 process.exitCode = fails ? 1 : 0;
