@@ -50,6 +50,15 @@ export function readLayer(root = ENG) {
     try { return JSON.parse(fs.readFileSync(path.join(root, RECORD_REL), "utf8")); } catch { return null; }
 }
 
+/**
+ * Was this repository READ -- a final answer, not a gap? A 404, or a contributor list that came back (pages > 0),
+ * or an explicit status GitHub gave instead of one. v4688: the first rig pass marked but0n/automaton complete with
+ * no pages and no status, which this refuses, so a resume re-reads it.
+ */
+export function isRead(entry) {
+    return !!(entry && entry.complete && (entry.status === 404 || entry.pages > 0 || typeof entry.contributorsStatus === "number"));
+}
+
 /** A contributor reduced to what is kept: [login, contributions, type]. Everything else GitHub returns is dropped. */
 export function keep(c) { return [String(c.login), Number(c.contributions) || 0, c.type === "Bot" ? "Bot" : "User"]; }
 
@@ -70,12 +79,13 @@ export async function fetchLayer({ repos = REPOS.map((r) => r.repo), fetchImpl =
         try { res = await fetchImpl(API + p, { headers }); }
         catch (e) { return { status: "network: " + String((e && (e.cause && e.cause.code)) || (e && e.message) || e).slice(0, 60) }; }   // unreachable: not a reading
         if (RATE_LIMITED(res)) return { limited: true };
+        if (res.status === 204) return { status: 204, body: [] };           // "no content": an empty list, and json() would throw
         if (!res.ok) return { status: res.status };
         return { status: res.status, body: await res.json() };
     };
     for (const repo of repos) {
         if (out.limited) { out.pending.push(repo); continue; }
-        if (out.repos[repo] && out.repos[repo].complete) continue;   // resumed: already read in full
+        if (isRead(out.repos[repo])) continue;   // resumed: already read in full
         const meta = await get("repos/" + repo);
         if (meta.limited) { out.limited = true; out.pending.push(repo); continue; }
         // A 404 is an answer (the repository is gone) and is recorded as one. Any other refusal -- a runner in front
@@ -87,21 +97,26 @@ export async function fetchLayer({ repos = REPOS.map((r) => r.repo), fetchImpl =
             log(`${repo}: HTTP ${meta.status}`); continue;
         }
         const contributors = [];
-        let pages = 0, truncated = false, limited = false;
+        let pages = 0, truncated = false, limited = false, contributorsStatus;
         for (let page = 1; page <= MAX_PAGES; page++) {
             const r = await get(`repos/${repo}/contributors?per_page=100&page=${page}`);
             if (r.limited) { limited = true; break; }
-            if (!r.body) break;
+            // *** v4688 -- A CONTRIBUTOR LIST GITHUB WOULD NOT GIVE IS NOT AN EMPTY ONE. *** The first rig pass recorded
+            // but0n/automaton with 0 contributors against 166 commits in its history: this loop broke on any non-ok
+            // answer and wrote the repository down as read. The status is kept now, beside the list, so "none" and
+            // "not given" are different records; a server error or no network leaves the repository pending.
+            if (!r.body) { contributorsStatus = r.status; break; }
             pages++;
             for (const c of r.body) contributors.push(keep(c));
             if (r.body.length < 100) break;
             if (page === MAX_PAGES) truncated = true;
         }
         if (limited) { out.limited = true; out.pending.push(repo); continue; }
+        if (pages === 0 && (typeof contributorsStatus !== "number" || contributorsStatus >= 500)) { out.pending.push(repo); log(`${repo}: contributors ${contributorsStatus} -- pending`); continue; }
         out.repos[repo] = {
             complete: true, fork: !!meta.body.fork,
             parent: meta.body.parent ? String(meta.body.parent.full_name) : null,
-            contributors, pages, truncated,
+            contributors, pages, truncated, ...(pages === 0 ? { contributorsStatus } : {}),
         };
         log(`${repo}: fork ${!!meta.body.fork}${meta.body.parent ? " of " + meta.body.parent.full_name : ""}, ${contributors.length} contributor(s)`);
     }
@@ -117,7 +132,7 @@ export function accountedFor(probePath, layer, axes = AXES, probeAxis = PROBE_AX
     if (!ax) return false;
     if (ax.declined) return true;
     const repo = (probePath.match(/^repos\/([^/]+\/[^/]+)/) || [])[1];
-    return !!(ax.usedBy && layer && repo && layer.repos && layer.repos[repo] && layer.repos[repo].complete);
+    return !!(ax.usedBy && layer && repo && layer.repos && isRead(layer.repos[repo]));
 }
 
 /** Forks and the upstream each was taken from -- the trade routes git history cannot see. */

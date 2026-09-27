@@ -449,11 +449,32 @@ console.log("\n6. *** v4687 -- THE GITHUB LAYER: TAKEN WHERE GITHUB ANSWERS, DRI
         `limited ${P.limited}, pending ${JSON.stringify(P.pending)}`);
     calls = 0; limitAt = Infinity;
     const R = await GH.fetchLayer({ repos: ["a/orig", "b/forked"], fetchImpl: fake, token: null, prior: P, now: () => "T2" });
+    {   // v4688 -- the rig's first pass: a contributor list GitHub would not give was written down as an empty one
+        const tooLarge = async (url) => { const p0 = url.replace(GH.API, "");
+            if (p0 === "repos/big/one") return res(200, { fork: false });
+            if (p0 === "repos/empty/one") return res(200, { fork: false });
+            if (p0.startsWith("repos/big/one/contributors")) return res(403, { message: "The history or contributor list is too large to list contributors for this repository via the API." }, "40");
+            if (p0.startsWith("repos/empty/one/contributors")) return res(204, null);
+            if (p0 === "repos/flaky/one") return res(200, { fork: false });
+            if (p0.startsWith("repos/flaky/one/contributors")) return res(502, { message: "Bad Gateway" });
+            return res(404, {}); };
+        const Z = await GH.fetchLayer({ repos: ["big/one", "empty/one", "flaky/one"], fetchImpl: tooLarge, token: null, now: () => "T" });
+        ok("!! *** a contributor list GitHub REFUSED is recorded as refused, an EMPTY one as empty, and a server error stays pending ***",
+            Z.repos["big/one"].contributorsStatus === 403 && Z.repos["big/one"].contributors.length === 0 &&
+            Z.repos["empty/one"].pages === 1 && Z.repos["empty/one"].contributors.length === 0 && !("contributorsStatus" in Z.repos["empty/one"]) &&
+            !Z.repos["flaky/one"] && Z.pending.includes("flaky/one"),
+            "the rig's first pass wrote but0n/automaton down as 0 contributors against 166 commits of history -- 'none' and 'not given' are different facts");
+        ok("...and an entry with no pages and no status -- the shape that pass wrote -- is NOT read, so a resume fetches it again",
+            GH.isRead({ complete: true, fork: true, contributors: [], pages: 0 }) === false &&
+            GH.isRead({ complete: true, contributors: [], pages: 0, contributorsStatus: 403 }) === true &&
+            GH.isRead({ complete: true, status: 404 }) === true);
+    }
     ok("...and the next pass RESUMES: what was read is kept, only the pending repository is fetched",
         R.pending.length === 0 && R.repos["b/forked"].complete && calls === 3, `${calls} request(s) on resume (one repository: its record and two pages)`);
 
     // The invitation row's predicate, on fixed inputs -- the row itself only runs where GitHub answers.
-    const lay = { repos: { "but0n/vixel": { complete: true } } }, half = { repos: { "but0n/vixel": { complete: false } } };
+    const lay = { repos: { "but0n/vixel": { complete: true, pages: 1, contributors: [["wwwtyro", 5, "User"]] } } },
+          half = { repos: { "but0n/vixel": { complete: true, pages: 0, contributors: [] } } };   // v4688: the shape the rig's first pass wrote
     ok("!! *** an open path is accounted for ONLY when its axis is declined, or used WITH the repository read in full ***",
         GH.accountedFor("users/but0n", null) === true && GH.accountedFor("repos/but0n/vixel", null) === false &&
         GH.accountedFor("repos/but0n/vixel", half) === false && GH.accountedFor("repos/but0n/vixel", lay) === true &&
@@ -470,6 +491,9 @@ console.log("\n6. *** v4687 -- THE GITHUB LAYER: TAKEN WHERE GITHUB ANSWERS, DRI
         ok("!! ...and no address, name or avatar is in it",
             !/@[A-Za-z0-9-]+\.[A-Za-z]|avatar_url|"name"/.test(JSON.stringify(live)) &&
             repos.every((r) => (live.repos[r].contributors || []).every((c) => Array.isArray(c) && c.length === 3)));
+        const unread = repos.filter((r) => !GH.isRead(live.repos[r]));
+        ok("...and every repository in it was READ -- a list GitHub did not give carries its status, never an empty list standing in for one",
+            unread.length === 0, unread.length ? "NOT READ (re-run the fetch; it resumes these): " + unread.join(", ") : `${repos.length} read`);
         const fa = GH.forkAgreement(live), k = GH.keyComparison(live);
         report(`${GH.forkParents(live).length} fork(s) with a named upstream; the API's fork flag agrees with history's ownerShare-0 call on ${fa.agree.length}, disagrees on ${fa.disagree.length}` +
                (fa.disagree.length ? ": " + fa.disagree.map((d) => `${d.repo} (api ${d.api}, history ${d.history}, ownerShare ${d.ownerShare})`).join("; ") : ""));
