@@ -65,6 +65,9 @@ const zero = shifted(0, 0);
 const twoMotions = (k) => img((x, y) => { const sx = 20 + 6 * k, sy = 18 + 3 * k, inSq = x >= sx && x < sx + 24 && y >= sy && y < sy + 24;
     const v = inSq ? smooth(x - 6 * k - 28, y - 3 * k - 28) : smooth(x + 3 * k, y); return [v, v, v]; });
 const two0 = twoMotions(0), two1 = twoMotions(1);
+// v4758: a seed -- render/temporalTsl.mjs's motion field, (du, dv, valid, 0) in uv, for content that moved (fx, fy) pixels
+// an invalid pixel carries a JUNK vector, (40, -30), so nothing but the validity keeps it out
+const seedField = (fx, fy, validAt) => img((x, y) => (validAt(x, y) ? [-fx / W, -fy / H, 1] : [-40 / W, 30 / H, 0]));
 // [name, cur, prev, block, levels, subpixel] -- the first six are v4674's device cases, the last two v4734's half-pixel origins
 const CASES = [
     ["(3, -2) one level", shifted(3, -2), zero, 8, 1, true], ["(3, -2) three levels", shifted(3, -2), zero, 8, 3, true],
@@ -80,6 +83,12 @@ const CASES = [
     ["(9, -7) three levels, level grid", shifted(9, -7), zero, 8, 3, true, null, "level"], ["(14, 11) three levels, level grid, refining within 2", shifted(14, 11), zero, 8, 3, false, 2, "level"],
     ["(5, 3) four levels, block 12, level grid", shifted(5, 3), zero, 12, 4, true, null, "level"], ["(3, -2) five levels, level grid", shifted(3, -2), zero, 8, 5, true, null, "level"],
     ["two motions, level grid", two1, two0, 8, 3, true, null, "level"], ["two motions, block grid", two1, two0, 8, 3, true],
+    // v4758: seeded with the application's field -- the last element the seed: (24, 1) is past three levels' reach here, and a
+    // camera's (21, 0) brings it in; and the seed invalid over the left half, where the search must do without it
+    ["(24, 1) seeded by (21, 0), level grid", shifted(24, 1), zero, 8, 3, true, null, "level", seedField(21, 0, () => true)],
+    ["(24, 1) seeded by (21, 0), block grid", shifted(24, 1), zero, 8, 3, true, null, "block", seedField(21, 0, () => true)],
+    // valid from x = 40, inside the coarsest level's second block (32 to 63): its centre, 48, is seeded and its corner is not
+    ["(24, 1) seeded on the right half only", shifted(24, 1), zero, 8, 3, true, null, "level", seedField(21, 0, (x) => x >= 40)],
 ];
 // *** TWO CASES ARE NOT IN THE PARITY ROW'S "EVERY BLOCK", AND THE FIXTURES ARE WHY. *** The METAMER is flat in the tree's luma
 // in exact arithmetic, so every candidate TIES and the vector is whichever rounding of 0.25r + 0.5g + 0.25b is lowest -- f64
@@ -89,7 +98,7 @@ const CASES = [
 // side of `<= 0.5` by one rounding. It is (4.7, -4) now, where the vertex is 0.2 past the clamp and the clamp decides.
 const NOT_PARITY = new Set(["metamer (3, 0)"]);
 const tallies = CASES.map(() => ({ scores: 0, reads: 0, neighbours: 0 }));
-const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block"], c) => opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius, grid, tally: tallies[c] }));
+const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null], c) => opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius, grid, seed, tally: tallies[c] }));
 const cpuPyr = luminancePyramidCPU({ src: pyrSrc, w: PW, h: PH });
 
 // the populations the parity row needs in order to see the refinement and its clamp at all
@@ -114,7 +123,7 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     // the distinct frames, sent once each
     const frames = [], index = new Map(), ref = (f) => { if (!index.has(f)) { index.set(f, frames.length); frames.push(Array.from(f)); } return index.get(f); };
-    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block"]) => ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius, grid }));
+    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null]) => ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius, grid, seed: seed ? ref(seed) : null }));
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, frames, cases, PW, PH, pyrSrc: Array.from(pyrSrc) }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const OF = await import("/render/opticalFlowTsl.mjs");
@@ -135,10 +144,10 @@ else {
                 o.pyrSizes = P.sizes; P.dispose(); ps.dispose();
                 const makers = new Map();
                 for (const c of a.cases) {
-                    const key = c.block + "|" + c.levels + "|" + c.subpixel + "|" + c.refineRadius + "|" + c.grid;
-                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel, refineRadius: c.refineRadius, grid: c.grid }));
+                    const key = c.block + "|" + c.levels + "|" + c.subpixel + "|" + c.refineRadius + "|" + c.grid + "|" + (c.seed !== null);
+                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel, refineRadius: c.refineRadius, grid: c.grid, seed: c.seed !== null }));
                     const F = makers.get(key);
-                    await F.flow(renderer, texs[c.cur], texs[c.prev]);
+                    await F.flow(renderer, texs[c.cur], texs[c.prev], c.seed !== null ? texs[c.seed] : null);
                     o.flow.push({ px: await read(F.target, F.bw, F.bh), bw: F.bw, bh: F.bh, levels: F.levels });
                 }
                 for (const F of makers.values()) F.dispose(); for (const t of texs) t.dispose();
@@ -194,6 +203,16 @@ else {
             ok(`  [${mode}] ...and v4753's level grid is among them where it is not the block grid: on two motions a neighbour's guess won at ${tallies[ti].neighbours || 0} blocks of the levels below the coarsest, and the two grids answer differently at ${differ2} of ${L.bw * L.bh} blocks`,
                (tallies[ti].neighbours || 0) > 0 && differ2 > 0, "each level its own target at its own grid, the parent read at half the block's index and its three neighbours on the block's side, clamped");
         }
+        {   // v4758: the seeded cases -- where the seed takes a shift past the reach, and where half of it is invalid
+            const cnt = (d, fx, fy) => { let k = 0; for (let q = 0; q < d.bw * d.bh; q++) if (Math.abs(d.px[q * 4] - fx) < 0.75 && Math.abs(d.px[q * 4 + 1] - fy) < 0.75) k++; return k; };
+            const S = at("(24, 1) seeded by (21, 0), level grid"), U = at("(9, -7) three levels, level grid"), half = at("(24, 1) seeded on the right half only");
+            // unseeded, on the mirror: the same frames without the seed
+            const plain = opticalFlowCPU({ cur: shifted(24, 1), prev: zero, w: W, h: H, levels: 3, grid: "level" });
+            let un = 0; for (let q = 0; q < plain.bw * plain.bh; q++) if (Math.abs(plain.flow[q * 2] - 24) < 0.75 && Math.abs(plain.flow[q * 2 + 1] - 1) < 0.75) un++;
+            ok(`  [${mode}] ...and v4758's seed is among them where it matters: a (24, 1) shift found at ${cnt(S, 24, 1)} of ${S.bw * S.bh} blocks seeded by (21, 0), and at ${un} unseeded -- and at ${cnt(half, 24, 1)} with the seed on the right half only`,
+               cnt(S, 24, 1) >= 35 && un === 0 && cnt(half, 24, 1) >= 35 && U,
+               "the coarsest level's second guess: the vector at the block's centre, taken only where it is valid and explains the block better than standing still. Half a seed does as well as all of it here: the level grid's neighbour guesses carry the seeded answer into the unseeded half. The blocks it misses see content from past the frame's edge");
+        }
         const flatD = at("flat"), stillD = at("still"), metaD = at("metamer (3, 0)");
         ok(`  [${mode}] ...and the rules the shifts cannot see hold on the device: a flat field reports NO motion and no confidence (not the window's corner), a still texture no confidence, and a metamer in the tree's luma nothing`,
            flatD.px.every((v, i) => i % 4 === 3 || v === 0) && stillD.px.every((v, i) => i % 4 !== 2 || v === 0) && metaD.px.every((v, i) => i % 4 !== 2 || v < 1e-6),
@@ -231,6 +250,7 @@ else {
 // And the first run was NaN on WebGPU: this gate's readback took the row pitch from the buffer's length, and a WebGPU
 // readback pads every row but the last to 256 bytes.
 // v4753: the level grid's sabotages, T1-T7 and the mirror's M1-M7, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
+// v4758: the seed's sabotages are logged in fx/fsr/fsrFlowSeed-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the field reconciled with the application's motion vectors, which is render/flowReconcile.mjs's and a " +
     "later round's; real content, where a rigid shift of a random field is the easiest case a block matcher ever sees; and " +

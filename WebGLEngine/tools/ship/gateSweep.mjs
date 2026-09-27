@@ -8032,6 +8032,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4758 -- THE 365th CLOSING: the optical flow seeded with the application's vectors -- built, exact, and not the default.
+    since440: Object.freeze({
+        at: "v4758", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowSeed-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/opticalFlowTsl-selfcheck.mjs (three seeded cases in the parity row, both backends)",
+                                "render/flowCost-selfcheck.mjs (the seed counted to the read)"]),
+        verdict: "*** THE SEED REACHES WHAT THE PYRAMID CANNOT, AND THE FRAMES DID NOT FOLLOW. *** render/opticalFlow.mjs and " +
+                 "render/opticalFlowTsl.mjs take `seed`, the application's motion field: the coarsest level scores the vector at each " +
+                 "block's centre as a second guess, the same vector as the mirror at every block on both backends. On the mirror a " +
+                 "camera's 20 to 40 px with 3 px of scroll on top goes from 0 to 11 % of blocks found to 100 %, for 0.1 % more reads. " +
+                 "In the generator under fast pans it is +0.47 dB on a reflection at 44 px and -0.24 and -0.63 on the scrolling wall " +
+                 "at 27 and 40 px, so `flow: { seed: true }` is an option and not the default. The first seeded call searched " +
+                 "unseeded -- its nodes were made while the pass was built, after the call had set the seed on the nodes that " +
+                 "existed; and three sabotages scored 0 until the fixture's invalid seed pixels carried a junk vector and its valid " +
+                 "region began inside a block. Found while measuring, and a later round's: the flow LOSES to the vectors at a 13 px " +
+                 "scrolling pan (27.61 dB against 31.36) and on a stretched, low texture (28.25 against 36.98).",
+    }),
     // v4757 -- THE 364th CLOSING: skinned and morphed meshes found carrying the wrong motion, and three smaller items measured.
     since439: Object.freeze({
         at: "v4757", swept: 1, green: 1, red: 0,

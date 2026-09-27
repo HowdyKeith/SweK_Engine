@@ -93,7 +93,9 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * render/opticalFlowTsl.mjs (and v4748's refineRadius, v4753's grid) and { margin, marginStill, stillPx, mode, radius } for
  * render/flowReconcileTsl.mjs, {} for their defaults, null for the vectors alone. The grid here is "level" unless given --
  * each level of the flow's pyramid its own block grid (v4753), 46 % of the search's reads and no worse a frame on any case
- * fx/fsr/fsrFlowGrid-selfcheck.mjs measures; { grid: "block" } is the search as it was to v4752.
+ * fx/fsr/fsrFlowGrid-selfcheck.mjs measures; { grid: "block" } is the search as it was to v4752. { seed: true } (v4758) seeds the
+ * flow's coarsest level with the motion field given to generate -- +0.47 dB on a reflection under a 44 px pan and -0.24 to -0.63
+ * on a scrolling wall under 27 and 40, so not the default (fx/fsr/fsrFlowSeed-selfcheck.mjs).
  * `camera` (v4750), given to generate with `flow`, is the camera's own motion (makeMotionStage({ camera: true })): the
  * reconciliation then judges a still surface in the world, so a shadow or a reflection under a pan is judged as one.
  * `depthPrev` (v4751), given to generate, is the pair's OLDER depth, in place of the one this generator kept from its last call.
@@ -118,7 +120,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
-    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level" }) : null;
+    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level", seed: !!flow.seed }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
     // displacement to time t in pixels, and its validity
@@ -164,7 +166,7 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
             if (of && !again) {
                 // the colour's own motion, prev -> cur, and per block the one the two frames support better -- per pixel, the
                 // application's own vector wherever its block kept it (render/flowReconcileTsl.mjs)
-                await of.flow(renderer, cur, prev);
+                await of.flow(renderer, cur, prev, of.seed ? motion : null);   // v4758: seeded with the application's own field
                 await rec.reconcile(renderer, { lumaCur: of.pyramids.cur.targets[0].texture, lumaPrev: of.pyramids.prev.targets[0].texture,
                                                 flow: of.target.texture, motion, depth, camera });
             }

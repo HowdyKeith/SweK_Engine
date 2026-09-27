@@ -31,11 +31,14 @@ let sd = 7; const rnd = () => (sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x
     const w = 61, h = 45, img = () => Float32Array.from({ length: w * h * 4 }, () => rnd());
     const rows = [];
     for (const o of [{}, { refineRadius: 2 }, { refineRadius: 1 }, { searchRadius: 2, levels: 2 }, { block: 5, subpixel: false }, { levels: 6 },
-                     { grid: "level" }, { grid: "level", refineRadius: 2 }, { grid: "level", block: 5, levels: 4, subpixel: false }, { grid: "level", levels: 6 }]) {
-        const t = { scores: 0, reads: 0 }; opticalFlowCPU({ cur: img(), prev: img(), w, h, ...o, tally: t });
+                     { grid: "level" }, { grid: "level", refineRadius: 2 }, { grid: "level", block: 5, levels: 4, subpixel: false }, { grid: "level", levels: 6 },
+                     { grid: "level", seed: true }, { seed: true, refineRadius: 2 }]) {
+        // v4758: a seed is the motion field, (du, dv, valid, _) -- half of it valid, so both of the device's paths are counted
+        const seed = o.seed ? Float32Array.from({ length: w * h * 4 }, (_, i) => (i % 4 === 2 ? (i % 8 === 2 ? 1 : 0) : (rnd() - 0.5) * 0.2)) : null;
+        const t = { scores: 0, reads: 0 }; opticalFlowCPU({ cur: img(), prev: img(), w, h, ...o, seed, tally: t });
         const m = flowCostModel({ w, h, ...o }); rows.push({ o, t, m, same: t.reads === m.search && t.scores === m.perLevel.reduce((q, l) => q + l.blocks * l.scores, 0) });
     }
-    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under ten settings, four of them v4753's grid: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
+    ok(`*** the model's reads are opticalFlowCPU's, to the read, at ${w} x ${h} under twelve settings, four of them v4753's grid and two v4758's seed: ${rows.map((r) => `${JSON.stringify(r.o).replace(/"/g, "")} ${(r.m.search / 1e6).toFixed(3)}M`).join(", ")} ***`,
        rows.every((r) => r.same), rows.filter((r) => !r.same).map((r) => `${JSON.stringify(r.o)}: mirror ${r.t.reads}, model ${r.m.search}`).join("; ") || "every score, and the guess each level below the coarsest reads");
     ok("  ...and its pyramid is opticalFlowTsl's: a level every halving, rounded up, capped", JSON.stringify(pyramidSizes(61, 45, 3)) === "[[61,45],[31,23],[16,12]]" && pyramidSizes(3, 1, 9).length === 3);
     const cur = img(), prev = img(), a = opticalFlowCPU({ cur, prev, w, h }), b = opticalFlowCPU({ cur, prev, w, h, refineRadius: 4 });
@@ -131,6 +134,7 @@ console.log("\n5. AT THE SIZES THAT MATTER");
 // level -> 1. Against render/opticalFlow.mjs, here and in render/opticalFlowTsl-selfcheck.mjs: O1 the refinement radius
 // ignored -> 1, 2; O2 the refinement at the coarsest level and the search below it -> 2, 2.
 // v4753: the level grid's sabotages, here and in render/opticalFlowTsl-selfcheck.mjs, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
+// v4758: the seed's sabotages are logged in fx/fsr/fsrFlowSeed-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU's time, which reads are a model of and not a measure -- caches, the sampler and occupancy decide it; " +
     "fx/fsr/fsrFlowCost-selfcheck.mjs holds this device's time to the count's ratios. And motion larger than 18 pixels a frame, which " +

@@ -57,6 +57,12 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * block below the coarsest takes the best of FOUR guesses -- its parent's and the parent's three neighbours on its own
  * side -- before searching around it. See the note at the level loop.
  *
+ * `seed` (v4758): the application's motion field, w*h*4 (du, dv, valid, _) in uv -- render/temporalTsl.mjs's convention. The
+ * coarsest level scores the vector at each block's centre as a second guess, taken where it is valid and explains the block
+ * STRICTLY better than standing still: a camera's 21 px, which three levels cannot reach, found at 100 % of blocks where
+ * unseeded finds 0 %, for one more score a coarsest block. In frame generation it is an option and not the default
+ * (fx/fsr/fsrFlowSeed-selfcheck.mjs says why).
+ *
  * `subpixel` defaults to true and exists so the refinement's worth is MEASURABLE rather than asserted --
  * the control-arm discipline this arc applies to every switchable thing on its page. Off, the field is
  * whole pixels, which is what v4673 shipped.
@@ -79,7 +85,7 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
-                                 subpixel = true, refineRadius = null, grid = "block", tally = null }) {
+                                 subpixel = true, refineRadius = null, grid = "block", seed = null, tally = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -91,6 +97,8 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
         throw new Error(`opticalFlowCPU: levels must be a whole number, at least 1 -- got ${levels}`);
     if (grid !== "block" && grid !== "level")
         throw new Error(`opticalFlowCPU: grid must be "block" or "level" -- got ${grid}`);
+    if (seed !== null && !(seed && seed.length >= w * h * 4))
+        throw new Error("opticalFlowCPU: seed must be w*h*4 -- the application's motion field, (du, dv, valid, _) in uv, render/temporalTsl.mjs's convention");
     // *** THE PYRAMID IS render/luminancePyramid.mjs's, NOT A SECOND ONE. *** Its base level imports the
     // arc's `luma`, its edge handling is measured, and a matcher that built its own would be a third
     // definition of brightness in a pipeline that has spent rounds getting down to one.
@@ -147,6 +155,18 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
             // the corner. Seeding with the guess makes the sentence true.
             if (tally && L !== top) tally.reads += lvl ? 4 : 1;   // the guesses, which the device reads from the level above's target
             let best = score(a, b, lw, lh, ox, oy, ox + gx, oy + gy, n);
+            if (seed && L === top) {
+                // v4758: the application's own vector at the block's centre, as a second guess at the coarsest level -- kept only if
+                // STRICTLY better than standing still. In the search's sense a vector (du, dv) is (du w, dv h) full-resolution
+                // pixels, the product in f32 as the device takes it, then at this level and rounded as every guess is
+                const cx = clampi(Math.floor((ox + block / 2) * scale), 0, w - 1), cy = clampi(Math.floor((oy + block / 2) * scale), 0, h - 1), j = cy * w + cx;
+                // scored whether or not the vector is valid, as the device does without branching; taken only if it is
+                if (tally) tally.reads++;
+                const valid = !!seed[j * 4 + 2];
+                const sx = valid ? Math.floor(Math.fround(seed[j * 4] * w) / scale + 0.5) : 0, sy = valid ? Math.floor(Math.fround(seed[j * 4 + 1] * h) / scale + 0.5) : 0;
+                const s = score(a, b, lw, lh, ox, oy, ox + sx, oy + sy, n);
+                if (valid && s < best) { best = s; gx = sx; gy = sy; if (tally) tally.seeded = (tally.seeded || 0) + 1; }
+            }
             if (lvl && up) {
                 // the parent's three neighbours on this block's side, clamped to the parent grid, each kept only if STRICTLY better
                 const px = bx >> 1, py = by >> 1, sx = bx & 1 ? 1 : -1, sy = by & 1 ? 1 : -1;

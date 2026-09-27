@@ -23,6 +23,9 @@
 // the parent's three neighbours on its own side, clamped to the parent grid, and searches around whichever of the four
 // scores best (render/opticalFlow.mjs's note says why). "block", the default, is v4740's search, bit for bit.
 //
+// v4758: `seed: true` -- the coarsest level also scores the application's vector at each block's centre, from the motion field
+// handed to flow(renderer, cur, prev, motion) (render/opticalFlow.mjs's `seed`).
+//
 // *** EVERY ROUNDING IS floor(x + 0.5), Math.round, AND NOT round(). *** v4734 found render/opticalFlowWgsl.mjs's round()
 // tying to even at a block origin bx * block / scale that lands on a half -- 44 of 512 components, one by 79 pixels.
 "use strict";
@@ -74,7 +77,7 @@ export function makeLumaPyramid(THREE, TSL, { w, h, levels = Infinity }) {
  * opticalFlowCPU over two pyramids: flow(renderer, curPyr, prevPyr) writes `target` (bw x bh: fx, fy, conf, 1). The
  * pyramids must hold at least min(levels, their own) levels, which makeOpticalFlow's own pyramids do.
  */
-export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null, grid = "block" }) {
+export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null, grid = "block", seed = false }) {
     requireTsl(TSL);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/opticalFlowTsl: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius)) throw new Error(`render/opticalFlowTsl: searchRadius must be a whole number of pixels, at least 1 -- got ${searchRadius}`);
@@ -91,6 +94,14 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
     // two targets at the finest grid and alternates them, every level searching every block
     const lvl = grid === "level", gridOf = (L) => lvl ? [Math.ceil(cur.sizes[L][0] / block), Math.ceil(cur.sizes[L][1] / block)] : [bw, bh];
     const flows = lvl ? Array.from({ length: top + 1 }, (_, L) => flat(...gridOf(L))) : [flat(), flat()];
+    // v4758: `seed` -- the application's motion field (render/temporalTsl.mjs's), handed to flow() each call; the coarsest level
+    // scores the vector at each block's centre as a second guess. Its loads are texture nodes whose value is set per call
+    // *** THE NODES ARE MADE WHEN THE PASS IS BUILT, WHICH IS DURING THE FIRST flow() -- after it has set the seed on the nodes
+    // that exist, which are none. *** So each is made with the seed of the call that builds it; the first draft made them with
+    // the placeholder, and the first seeded call searched unseeded
+    const seedNodes = [], seedHolder = seed ? new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType) : null;
+    let seedNow = seedHolder;
+    const seedAt = (x, y) => { const nd = textureLoad(seedNow, ivec2(int(x), int(y))); seedNodes.push(nd); return nd; };
     const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
         const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -134,6 +145,15 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
                 gx.assign(select(better, cx, gx)); gy.assign(select(better, cy, gy)); best.assign(select(better, s, best));
             }
         }
+        if (seed && L === top) {
+            // v4758: the application's own vector at the block's centre, in the search's sense (du w, dv h) and at this level,
+            // rounded as every guess is -- scored always, taken only where it is valid and STRICTLY better (opticalFlowCPU's)
+            const cx = clamp(floor(ox.add(block / 2).mul(scale)), 0.0, float(w - 1)), cy = clamp(floor(oy.add(block / 2).mul(scale)), 0.0, float(h - 1));
+            const m = seedAt(cx, cy), valid = m.z.notEqual(0.0);
+            const sx = select(valid, floor(m.x.mul(float(w)).div(scale).add(0.5)), float(0.0)), sy = select(valid, floor(m.y.mul(float(h)).div(scale).add(0.5)), float(0.0));
+            const s = sad(ox, oy, ox.add(sx), oy.add(sy)), better = valid.and(s.lessThan(best));
+            gx.assign(select(better, sx, gx)); gy.assign(select(better, sy, gy)); best.assign(select(better, s, best));
+        }
         const bdx = gx.toVar(), bdy = gy.toVar();
         const w2 = 2 * R + 1;
         Loop({ start: int(0), end: int(w2 * w2), type: "int", condition: "<", name: "c" }, ({ c }) => {
@@ -161,16 +181,17 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
         passes.push(lvl ? { L, out: flows[L], sc: quad(levelNode(L, L === top ? null : flows[L + 1].texture)) }
                         : { L, out: flows[k % 2], sc: quad(levelNode(L, L === top ? null : flows[(k + 1) % 2].texture)) });
     return {
-        bw, bh, block, levels: top + 1, searchRadius, refineRadius, grid, pyramids: { cur, prev },
+        bw, bh, block, levels: top + 1, searchRadius, refineRadius, grid, seed, pyramids: { cur, prev },
         /** The target holding the finest level's answer. */
         get target() { return passes[passes.length - 1].out; },
         /** Build both pyramids from rgba textures and search. */
-        async flow(renderer, curTex, prevTex) {
+        async flow(renderer, curTex, prevTex, seedTex = null) {
+            if (seed) { if (!seedTex) throw new Error("render/opticalFlowTsl: a seeded flow needs the motion field -- flow(renderer, cur, prev, motion)"); seedNow = seedTex; for (const nd of seedNodes) nd.value = seedTex; }
             await cur.build(renderer, curTex); await prev.build(renderer, prevTex);
             const keep = renderer.getRenderTarget();
             for (const p of passes) { renderer.setRenderTarget(p.out); await renderer.renderAsync(p.sc, ortho); }
             renderer.setRenderTarget(keep);
         },
-        dispose() { cur.dispose(); prev.dispose(); for (const f of flows) f.dispose(); },
+        dispose() { cur.dispose(); prev.dispose(); for (const f of flows) f.dispose(); if (seedHolder) seedHolder.dispose(); },
     };
 }
