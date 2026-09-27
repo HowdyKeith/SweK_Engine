@@ -784,7 +784,10 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
  *
  * Returns { ok, result, pageErrors, reason }. A thrown error inside the script is a RESULT with its message.
  */
-export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000, launchArgs = LAUNCH_ARGS }) {
+export async function runInEngineOrigin({ engineRoot, script, args = null, timeoutMs = 120000, launchArgs = null }) {
+    // v4764: a caller's own flags win; else SWEK_LAUNCH_ARGS, which docs/real-hardware-fsr.md hands a GPU owner whose browser
+    // falls back to software; else this platform's LAUNCH_ARGS
+    if (!launchArgs) launchArgs = process.env.SWEK_LAUNCH_ARGS ? process.env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : LAUNCH_ARGS;
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, result: null, pageErrors: [], adapter: null, software: null };
@@ -834,6 +837,10 @@ export async function runInEngineOrigin({ engineRoot, script, args = null, timeo
         }).catch(() => null);
         const software = adapter ? (adapter.isFallback === true ||
             SOFTWARE_HINTS.test([adapter.vendor, adapter.architecture, adapter.device, adapter.description].filter(Boolean).join(" "))) : null;
+        // v4764: a real-hardware run (tools/ship/realGpuRun.mjs) sets SWEK_ADAPTER_LOG, and each call says what it ran on and how
+        if (process.env.SWEK_ADAPTER_LOG) {
+            try { fs.appendFileSync(process.env.SWEK_ADAPTER_LOG, JSON.stringify({ gate: path.relative(root, path.resolve(process.argv[1] || "")).split(path.sep).join("/"), adapter, software, launchArgs: [...launchArgs] }) + "\n"); } catch {}
+        }
         // The script is compiled IN the page from its source text: page.evaluate with a string is an expression
         // in some Playwright versions and a callable in others, and a function that returns a function comes
         // back unserialisable as undefined. new Function makes the contract explicit.
