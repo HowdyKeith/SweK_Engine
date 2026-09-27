@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "798ee13beb0dfed34da203de069b00556a11796b",
+ "head": "14c8ae47eea5c92b18efe45017bc7d336249ed89",
  "bodies": {
   "box3d": [
    {
@@ -243,17 +243,17 @@
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
     "bytes": 20784,
-    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
+    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "tools/ship/slugMelt-selfcheck.mjs",
     "bytes": 20849,
-    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
+    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "tools/ship/slugMorph-selfcheck.mjs",
     "bytes": 18857,
-    "sha": "6fe62b77cb84ed92d9164c7f773223098449e64f"
+    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "tools/ship/slugNapalm-selfcheck.mjs",
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3399492,
-    "sha": "7b239a21036faf5cbd2a5892f73eabb80e99c3ef"
+    "bytes": 3400024,
+    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "mpm3d.html",

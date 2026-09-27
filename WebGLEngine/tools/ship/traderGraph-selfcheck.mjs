@@ -57,6 +57,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as T from "../../world/traderGraph.mjs";
+import * as GH from "../../world/traderGraphGithub.mjs";
 import { SWEEP as LICENCE } from "../../world/licenceSweep.mjs";
 import { stack, GATES, isOwnRepoPath, ownRepoOf, ENG as ENGX } from "./refusalStack.mjs";
 
@@ -211,11 +212,24 @@ console.log("\n2. *** WHOSE REFUSAL IS IT? RE-PROBED, AND THE BODY READ, NOT JUS
     // v4483's, while users/but0n and repos/but0n/vixel are 403 in both. v4481 asserted it OPEN and went red
     // when it shut; v4483 asserted it SHUT and goes red when it opens. THE SAME MISTAKE FROM BOTH SIDES, and
     // neither reading is a fact about this tree.
-    ok("!! *** NO AXIS IS OPEN OUTSIDE THIS SESSION'S OWN REPOSITORY -- an opening THERE is the red worth having ***",
-       s.openElsewhere.length === 0,
-       s.openElsewhere.length
-         ? "OPEN: " + s.openElsewhere.join(", ") + " -- GO AND USE IT: the graph can be built from richer "
-           + "data than git history and world/traderGraph.mjs should be revisited"
+    // *** v4687 -- THE INVITATION WAS TAKEN, SO THE ROW ASKS WHETHER EACH OPENING IS ACCOUNTED FOR. *** On the rig
+    // both probe paths answered and this row went red, as designed; Keith chose to build the graph from it. An open
+    // path is now accounted for when its axis (T.PROBE_AXIS) is USED -- usedBy set AND the GitHub layer's record
+    // present with that repository in it -- or DECLINED with a reason in T.AXES. Anything else is still the red
+    // worth having: an opening nobody has used or turned down.
+    const layer = GH.readLayer();
+    const accounted = (p0) => GH.accountedFor(p0, layer);
+    const unaccounted = s.openElsewhere.filter((p0) => !accounted(p0));
+    for (const p0 of s.openElsewhere.filter(accounted)) {
+        const ax = T.AXES.find((a) => a.axis === T.PROBE_AXIS[p0]);
+        report(`${p0} is OPEN here and accounted for -- ${ax.declined ? "DECLINED: " + ax.declined : "USED: " + ax.usedBy}`);
+    }
+    ok("!! *** NO AXIS IS OPEN OUTSIDE THIS SESSION'S OWN REPOSITORY UNLESS IT IS USED OR DECLINED -- an unaccounted opening is the red worth having ***",
+       unaccounted.length === 0,
+       unaccounted.length
+         ? "OPEN: " + unaccounted.join(", ") + " -- GO AND USE IT: " +
+           (unaccounted.some((p0) => /^repos\//.test(p0)) ? "run `node world/traderGraphGithub.mjs --fetch --write` on this box and commit " + GH.RECORD_REL
+                                                           : "the graph can be built from richer data than git history and world/traderGraph.mjs should be revisited")
          : `${s.refused.length} refused, ${s.distinctGates} distinct gates, own repo ${s.ownRepo || "(no remote)"}. `
            + "This is the direction the header states, and it no longer moves when the container does.");
     if (s.openOwnRepo.length)
@@ -391,6 +405,79 @@ console.log("\n5. *** THERE IS NO CORRECT IDENTITY KEY, AND THE MODULE USES TWO 
 // None went 0 RED. B is the one worth keeping and it is not really a sabotage: it re-enables a bug that
 // SHIPPED in the first version of this module and was found by the gate rather than by reading. A hashed
 // empty field is the shape to remember -- every future identity key in this tree can invent the same person.
+console.log("\n6. *** v4687 -- THE GITHUB LAYER: TAKEN WHERE GITHUB ANSWERS, DRIVEN HERE WHERE IT DOES NOT ***");
+{
+    // A fake GitHub, so every branch of fetchLayer runs with no network: one original, one fork with an upstream,
+    // a contributor list over one page, a bot, and a rate limit that must STOP the pass and leave the rest pending.
+    const res = (status, body, rem = "50") => ({ status, ok: status >= 200 && status < 300, headers: { get: (h) => (h === "x-ratelimit-remaining" ? rem : null) }, json: async () => body });
+    const person = (login, n, type = "User") => ({ login, contributions: n, type, avatar_url: "https://x/a.png", email: "someone@example.com", name: "Some Name" });
+    const bigPage = Array.from({ length: 100 }, (_, i) => person("u" + i, 1));
+    let calls = 0, limitAt = Infinity;
+    const fake = async (url) => {
+        calls++;
+        if (calls > limitAt) return res(403, { message: "API rate limit exceeded" }, "0");
+        const p0 = url.replace(GH.API, "");
+        if (p0 === "repos/a/orig") return res(200, { fork: false });
+        if (p0 === "repos/b/forked") return res(200, { fork: true, parent: { full_name: "up/stream" } });
+        if (p0 === "repos/c/refused") return res(403, { message: "GitHub access to this repository is not enabled for this session" }, "40");
+        if (p0.startsWith("repos/a/orig/contributors")) return res(200, [person("shared", 9), person("dependabot[bot]", 3, "Bot")]);
+        if (p0 === "repos/b/forked/contributors?per_page=100&page=1") return res(200, [person("shared", 2), ...bigPage.slice(0, 99), person("tail", 1)]);
+        if (p0 === "repos/b/forked/contributors?per_page=100&page=2") return res(200, [person("late", 4)]);
+        return res(404, { message: "Not Found" });
+    };
+    const L = await GH.fetchLayer({ repos: ["a/orig", "b/forked", "c/refused"], fetchImpl: fake, token: null, now: () => "T" });
+    ok("the fork flag and its upstream are read, and an original is an original",
+        L.repos["b/forked"].fork === true && L.repos["b/forked"].parent === "up/stream" && L.repos["a/orig"].fork === false && L.repos["a/orig"].parent === null,
+        JSON.stringify(GH.forkParents(L)));
+    ok("a full page of 100 is followed to the next, so a long contributor list is not silently cut at 100",
+        L.repos["b/forked"].pages === 2 && L.repos["b/forked"].contributors.some(([l]) => l === "late"), `${L.repos["b/forked"].contributors.length} read over ${L.repos["b/forked"].pages} pages`);
+    ok("!! *** NOTHING BUT login, count and type is kept -- the fake returns a name, an address and an avatar, and none survives ***",
+        !/@|Some Name|avatar|png/.test(JSON.stringify(L)) && L.repos["a/orig"].contributors.every((c) => c.length === 3),
+        JSON.stringify(L.repos["a/orig"].contributors));
+    ok("!! a refusal that is NOT a rate limit leaves the repository PENDING, never recorded as read",
+        !L.repos["c/refused"] && L.pending.includes("c/refused"), "a runner answering 403 to every path must not produce a record of 35 empty repositories");
+    const down = await GH.fetchLayer({ repos: ["a/orig"], fetchImpl: async () => { throw Object.assign(new Error("fetch failed"), { cause: { code: "ENOTFOUND" } }); }, token: null, now: () => "T" });
+    ok("...and a network that is not there at all leaves everything pending -- an unreachable API is not an empty one",
+        Object.keys(down.repos).length === 0 && down.pending.join() === "a/orig", JSON.stringify(down.pending));
+    const LT = GH.loginTraders(L);
+    ok("traders keyed by LOGIN cross repositories, and a bot is not a trader",
+        LT.length === 1 && LT[0].login === "shared" && LT[0].repos.join(",") === "a/orig,b/forked", JSON.stringify(LT));
+    calls = 0; limitAt = 3;
+    const P = await GH.fetchLayer({ repos: ["a/orig", "b/forked"], fetchImpl: fake, token: null, now: () => "T1" });
+    ok("!! *** a pass that meets the rate limit STOPS and lists the rest as pending -- a partial record never passes for a whole one ***",
+        P.limited === true && P.repos["a/orig"] && P.repos["a/orig"].complete && P.pending.includes("b/forked") && !P.repos["b/forked"],
+        `limited ${P.limited}, pending ${JSON.stringify(P.pending)}`);
+    calls = 0; limitAt = Infinity;
+    const R = await GH.fetchLayer({ repos: ["a/orig", "b/forked"], fetchImpl: fake, token: null, prior: P, now: () => "T2" });
+    ok("...and the next pass RESUMES: what was read is kept, only the pending repository is fetched",
+        R.pending.length === 0 && R.repos["b/forked"].complete && calls === 3, `${calls} request(s) on resume (one repository: its record and two pages)`);
+
+    // The invitation row's predicate, on fixed inputs -- the row itself only runs where GitHub answers.
+    const lay = { repos: { "but0n/vixel": { complete: true } } }, half = { repos: { "but0n/vixel": { complete: false } } };
+    ok("!! *** an open path is accounted for ONLY when its axis is declined, or used WITH the repository read in full ***",
+        GH.accountedFor("users/but0n", null) === true && GH.accountedFor("repos/but0n/vixel", null) === false &&
+        GH.accountedFor("repos/but0n/vixel", half) === false && GH.accountedFor("repos/but0n/vixel", lay) === true &&
+        GH.accountedFor("users/somebody-else", lay) === false,
+        "declined profile: yes; repository with no record, or a partial one: NO; with a full read: yes; a path no axis names: NO");
+
+    // The real record, where one exists. Taken on a box that reaches GitHub and committed; absent here until then.
+    const live = GH.readLayer();
+    if (!live) report(`no ${GH.RECORD_REL} yet -- the layer is OWED from a box that reaches GitHub: node world/traderGraphGithub.mjs --fetch --write`);
+    else {
+        const repos = Object.keys(live.repos), graphed = new Set(T.REPOS.map((r) => r.repo));
+        ok("!! the recorded layer covers ONLY the graphed repositories -- it does not follow anyone out of the project",
+            repos.every((r) => graphed.has(r)), `${repos.length} of ${graphed.size} read, ${live.pending.length} pending; taken ${live.at} (${live.via})`);
+        ok("!! ...and no address, name or avatar is in it",
+            !/@[A-Za-z0-9-]+\.[A-Za-z]|avatar_url|"name"/.test(JSON.stringify(live)) &&
+            repos.every((r) => (live.repos[r].contributors || []).every((c) => Array.isArray(c) && c.length === 3)));
+        const fa = GH.forkAgreement(live), k = GH.keyComparison(live);
+        report(`${GH.forkParents(live).length} fork(s) with a named upstream; the API's fork flag agrees with history's ownerShare-0 call on ${fa.agree.length}, disagrees on ${fa.disagree.length}` +
+               (fa.disagree.length ? ": " + fa.disagree.map((d) => `${d.repo} (api ${d.api}, history ${d.history}, ownerShare ${d.ownerShare})`).join("; ") : ""));
+        report(`traders crossing repositories: ${k.byEmailHash} by address hash, ${k.byLogin} by login` +
+               (k.logins.length ? " -- " + k.logins.slice(0, 8).map((t) => `${t.login} (${t.repos.length})`).join(", ") : ""));
+    }
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHETHER THESE PEOPLE HAVE ANY CONNECTION TO SweK. The graph covers the 35 " +
     "repositories the licence sweep already opened; it says who moves between THEM, which is a map of this " +
