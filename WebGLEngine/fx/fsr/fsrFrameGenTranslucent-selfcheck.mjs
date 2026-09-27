@@ -42,8 +42,12 @@ else {
                     for (let y = 0; y < n; y++) for (let x = 0; x < n * 4; x++) o[y * n * 4 + x] = px[y * s * 4 + x]; return o; };
                 const cl = (v) => Math.min(1, Math.max(0, v)), gl = TT.glClip(THREE, renderer);
                 const stage = TT.makeMotionStage(THREE, T, { w: D, h: D, gl, camera: true }), layer = TL.makeTranslucentLayer(THREE, { w: D, h: D });
-                const gv = FG.makeFrameGen(THREE, T, { w: D, h: D }), gf = FG.makeFrameGen(THREE, T, { w: D, h: D, flow: {} });
-                const A = tgt(D), B = tgt(D), A2 = tgt(D), B2 = tgt(D), o2 = tgt(D), big = tgt(D * 4);
+                // a generator an arm: the two arms on one stage pass are primed and generated together
+                const gen = { drawn: FG.makeFrameGen(THREE, T, { w: D, h: D }), flow: FG.makeFrameGen(THREE, T, { w: D, h: D, flow: {} }), skipped: FG.makeFrameGen(THREE, T, { w: D, h: D }), layered: FG.makeFrameGen(THREE, T, { w: D, h: D }) };
+                const A = tgt(D), B = tgt(D), A2 = tgt(D), B2 = tgt(D), o2 = tgt(D), big = tgt(D * 4), older = tgt(D);
+                // the pair's older depth, kept from the stage's pass at frame 0 and given as depthPrev (v4751) -- no priming generation
+                const cm0 = new THREE.NodeMaterial(); cm0.fragmentNode = T.textureLoad(stage.depth.texture, T.ivec2(T.int(T.screenCoordinate.x), T.int(T.screenCoordinate.y))); cm0.blending = THREE.NoBlending; cm0.depthTest = false; cm0.depthWrite = false;
+                const keepScene = new THREE.Scene(); keepScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), cm0)); const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
                 const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0, 5.2); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
                 const o = { pxPerFrame: 0.25 * D / (2 * 5.2 * Math.tan(20 * Math.PI / 180)) };
                 const cases = { glass: { bg: 0.25, pane: 0, kind: "plain", fq: 1.6 }, glassFine: { bg: 0.25, pane: 0, kind: "plain", fq: 6.4 }, etched: { bg: 0.25, pane: 0, kind: "etched", fq: 6.4 },
@@ -74,21 +78,22 @@ else {
                     const mk = Uint8Array.from({ length: D * D }, (_, i) => (Math.abs(truth1[i * 4] - nov[i * 4]) + Math.abs(truth1[i * 4 + 1] - nov[i * 4 + 1]) + Math.abs(truth1[i * 4 + 2] - nov[i * 4 + 2]) > 0.03 ? 1 : 0));
                     const ps = (img, tr, m) => { let q = 0, n = 0; for (let i = 0; i < D * D; i++) { if (m && !m[i]) continue; n++; for (let c = 0; c < 3; c++) q += (cl(img[i * 4 + c]) - cl(tr[i * 4 + c])) ** 2; } return 10 * Math.log10(1 / (q / (n * 3))); };
                     const c = { px: mk.reduce((q, v) => q + v, 0) };
-                    // the stage's pass without them (skipped, layered), the frames without them (layered)
-                    const arm = async (name, g, stageWithout, framesWithout) => {
+                    // one stage pass for the arms on the field drawn with them (drawn, flow), one for those on the field without them
+                    // (skipped, layered); the frames without them are the layered arm's alone
+                    for (const [stageWithout, names] of [[false, ["drawn", "flow"]], [true, ["skipped", "layered"]]]) {
                         const st = async (k) => { setT(k); const back = stageWithout ? layer.hide(scene) : null; await stage.render(renderer, scene, cam); if (back) back(); };
-                        const fa = framesWithout ? A2 : A, fb = framesWithout ? B2 : B, cm = g.reconcile ? stage.camera.texture : null;
-                        await st(-1); await st(0);
-                        await g.generate(renderer, { prev: fa.texture, cur: fa.texture, motion: stage.motion.texture, depth: stage.depth.texture, camera: cm }, o2);
+                        const fr = (n) => (n === "layered" ? [A2, B2] : [A, B]), cm = (g) => (g.reconcile ? stage.camera.texture : null);
+                        await st(0); renderer.setRenderTarget(older); await renderer.renderAsync(keepScene, ortho);
                         await st(1);
-                        const ui = framesWithout ? async (t) => { setT(t); await layer.render(renderer, scene, cam); return layer.texture; } : null;
-                        await g.generate(renderer, { prev: fa.texture, cur: fb.texture, motion: stage.motion.texture, depth: stage.depth.texture, camera: cm, ui }, o2);
-                        const img = await read(o2, D); c[name] = { all: ps(img, truth), see: ps(img, truth, mk), see1: ps(img, truth1, mk) };
-                    };
-                    await arm("drawn", gv, false, false); await arm("flow", gf, false, false); await arm("skipped", gv, true, false); await arm("layered", gv, true, true);
+                        for (const n of names) {
+                            const ui = n === "layered" ? async (t) => { setT(t); await layer.render(renderer, scene, cam); return layer.texture; } : null;
+                            await gen[n].generate(renderer, { prev: fr(n)[0].texture, cur: fr(n)[1].texture, motion: stage.motion.texture, depth: stage.depth.texture, depthPrev: older.texture, camera: cm(gen[n]), ui }, o2);
+                            const img = await read(o2, D); c[n] = { all: ps(img, truth), see: ps(img, truth, mk), see1: ps(img, truth1, mk) };
+                        }
+                    }
                     o[cn] = c;
                 }
-                gv.dispose(); gf.dispose(); stage.dispose(); layer.dispose(); for (const t of [A, B, A2, B2, o2, big]) t.dispose();
+                for (const g of Object.values(gen)) g.dispose(); stage.dispose(); layer.dispose(); for (const t of [A, B, A2, B2, o2, big, older]) t.dispose(); cm0.dispose();
                 out[mode] = o; renderer.dispose();
             } catch (err) { out[mode] = { err: String(err && err.stack || err).slice(0, 700) }; }
         }
