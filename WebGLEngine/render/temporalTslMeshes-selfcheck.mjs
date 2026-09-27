@@ -136,6 +136,7 @@ else {
 // And the first shared-skeleton fixture was the fixture's error, not the stage's: the bone was a child of one mesh, so its
 // matrix carried that mesh's offset. It is at the scene's root now.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: skinning with more than one bone a vertex -- every vertex here has one, weight 1, which the four-bone sum " +
-    "passes through; morph NORMALS, which a motion field does not read; a BatchedMesh; and a mesh both skinned and morphed at once.");
+console.log("unchecked here: morph NORMALS, which a motion field does not read. Skinning over several bones a vertex, a mesh both " +
+    "skinned and morphed, a BatchedMesh, and two meshes sharing one program -- named here until v4761 -- are " +
+    "render/temporalTslZoo-selfcheck.mjs's, which found the last wrong: the histories here were built into the program for its first mesh.");
 process.exitCode = fails ? 1 : 0;

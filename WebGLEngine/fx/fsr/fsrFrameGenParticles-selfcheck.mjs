@@ -145,7 +145,7 @@ else {
 // its value each draw both left every gate green: three's Buffer binding reports itself changed at every draw, and the value
 // was the same array. Both lines are gone.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: particles that are TRANSLUCENT -- additive sparks, alpha smoke -- which the motion stage draws as opaque, " +
-    "their vector over what shows through them; three's Points and Sprites; particles whose positions a compute pass writes, which " +
-    "carry nothing as the buffer's do; and a moving camera.");
+console.log("unchecked here: particles whose positions a compute pass writes, which carry nothing as the buffer's do; and a moving " +
+    "camera. TRANSLUCENT particles are render/translucentLayer.mjs's since v4760 (fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs), " +
+    "three's Points and Sprites render/temporalTslZoo-selfcheck.mjs's since v4761.");
 process.exitCode = fails ? 1 : 0;

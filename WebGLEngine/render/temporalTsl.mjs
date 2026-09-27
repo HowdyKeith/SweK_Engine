@@ -118,6 +118,44 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const now = object.instanceMatrix.array;
         for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
     };
+    // v4761: a BatchedMesh's previous instance matrices, kept HERE as an InstancedMesh's are. three applies each instance's matrix
+    // to the current point and NOT to positionPrevious, so the previous point was the bare geometry's -- off by the instance's
+    // whole placement, 32.7 px here. Per mesh: its matrices texture as it was at the last draw of this pass, a texture of the same
+    // size read by the same index (three's own: the draw's id through the indirect texture, four texels a matrix)
+    const batches = new WeakMap();
+    const batchRecord = (object) => {
+        const src = object._matricesTexture; let r = batches.get(object);
+        if (!r) { const last = Float32Array.from(src.image.data), cur = Float32Array.from(last);
+            const tex = new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType); tex.needsUpdate = true;
+            r = { src, last, cur, tex }; batches.set(object, r); }
+        else if (r.src !== src) throw new Error(`render/temporalTsl: ${object.name ? JSON.stringify(object.name) : "a BatchedMesh"} re-made its matrices texture (its instance count grew past it) -- the stage's history of it is at the old size; make a new stage`);
+        return r;
+    };
+    const batchBefore = (object, r) => {
+        if (!toward) r.cur.set(r.last);
+        else { const now = r.src.image.data;
+            // a slot no instance holds is all zeros, and has no pose to slerp
+            for (let i = 0; i < r.cur.length / 16; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16);
+                if (ia.determinant() === 0 || ib.determinant() === 0) { for (let k = 0; k < 16; k++) r.cur[i * 16 + k] = now[i * 16 + k]; }
+                else poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); } }
+        r.tex.needsUpdate = true;
+    };
+    // v4761: a Sprite faces the camera, and three builds that in its material's vertex stage -- the override draws a sprite as
+    // the flat quad it is in its geometry, and the field was that quad's (5.74 px off under a turned camera). makeMotionStage draws each sprite with a sprite material of its own carrying this node, and here
+    // each corner is placed as three places it, at this frame and at the last: the centre through the model-view matrix, the
+    // corner scaled by the model's x and y scale (and by depth where the size does not attenuate), turned by the material's
+    // rotation, whose last value is kept per sprite
+    const rotPrev = TSL.uniform(0.0), rotations = new WeakMap(), centreU = TSL.uniform(new THREE.Vector2(0.5, 0.5));
+    // ...and the centre from a per-draw uniform, NOT three's reference to the object: three builds that reference into a program
+    // every like sprite shares, so a centred sprite drawn after an off-centre one is drawn off-centre (render/temporalTslZoo-
+    // selfcheck.mjs measures it in three's own colour pass). The stage's sprite material draws with spriteClip as its vertexNode,
+    // so what it covers is each sprite where the application put it
+    const spriteCorner = (builder, mv, world, rot) => {
+        const aligned = TSL.positionGeometry.xy.sub(centreU.sub(0.5)), keep = builder.camera && builder.camera.isPerspectiveCamera && builder.material.sizeAttenuation === false;
+        let sc = TSL.vec2(world.mul(vec4(1.0, 0.0, 0.0, 0.0)).xyz.length(), world.mul(vec4(0.0, 1.0, 0.0, 0.0)).xyz.length()); if (keep) sc = sc.mul(mv.z.negate());
+        return vec4(mv.xy.add(TSL.rotate(aligned.mul(sc), rot)), mv.zw);
+    };
+    const spriteClip = (builder) => cameraProjectionMatrix.mul(spriteCorner(builder, modelViewMatrix.mul(vec4(0.0, 0.0, 0.0, 1.0)), TSL.modelWorldMatrix, TSL.float(TSL.materialRotation)));
     // v4757: a SkinnedMesh's previous bone matrices and a morphed mesh's previous influences, kept HERE as the instance matrices
     // are. three's skinning keeps its previous bone matrices only when the material asks for velocity and steps them once
     // per render call -- this stage's own pass among them -- so a skinned mesh here carried NO motion; and it keeps no
@@ -125,10 +163,20 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // matrices at the last draw of this pass, stepped once a pass (a skeleton may skin several meshes); per mesh, the
     // influences at its last draw; the targets from a float texture per geometry
     const skins = new WeakMap(), morphs = new WeakMap(), morphTex = new WeakMap();
+    // v4761: *** WHAT IS HELD PER OBJECT REACHES THE DRAW PER DRAW, AND IS NOT BUILT INTO THE PROGRAM. *** three keys a compiled
+    // program by the material's properties and the geometry's layout -- a skinned mesh by its bone COUNT -- so two skinned meshes
+    // of one layout, or two meshes of one morphed geometry, or any two sprites, are drawn by ONE program, and a buffer or a
+    // uniform built into it for the first object was read for both: the second skinned mesh 44.7 px off, the second morphed
+    // mesh 1.06 (render/temporalTslZoo-selfcheck.mjs). So these are one node per shape, filled in
+    // update() before each object's draw, as three fills previousModelWorldMatrix
+    const sharedBuffer = new Map();
+    const perDraw = (type, n) => { const k = type + n; let b = sharedBuffer.get(k);
+        if (!b) { const arr = new Float32Array(n * (type === "mat4" ? 16 : 4)); b = { arr, node: TSL.buffer(arr, type, n) }; sharedBuffer.set(k, b); } return b; };
+    const bindU = TSL.uniform(new THREE.Matrix4()), bindInvU = TSL.uniform(new THREE.Matrix4());
     const skinRecord = (object) => {
         const sk = object.skeleton; let r = skins.get(sk);
         if (!r) { sk.update(); const n = sk.bones.length, last = Float32Array.from(sk.boneMatrices), cur = Float32Array.from(last);
-            r = { n, last, cur, node: TSL.buffer(cur, "mat4", n), frame: -1 }; skins.set(sk, r); }
+            r = { n, last, cur, frame: -1 }; skins.set(sk, r); }
         return r;
     };
     const hasMorph = (object) => !!(object && object.geometry && object.geometry.morphAttributes && object.geometry.morphAttributes.position &&
@@ -139,7 +187,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         // valid WGSL there -- the first draft's pipeline failed and the mesh was not drawn at all
         if (!r) { const n = object.geometry.morphAttributes.position.length, last = Float32Array.from(object.morphTargetInfluences.slice(0, n)), cur = new Float32Array(n * 4);
             for (let i = 0; i < n; i++) cur[i * 4] = last[i];
-            r = { n, last, cur, node: TSL.buffer(cur, "vec4", n) }; morphs.set(object, r); }
+            r = { n, last, cur }; morphs.set(object, r); }
         return r;
     };
     // the targets of a geometry as one float texture, target t's vertex v at texel t * count + v, rows of up to 4096
@@ -173,18 +221,21 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const g = object.geometry, r = morphRecord(object), { tex, W, count, n } = morphTargets(g);
         const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
         let sum = null, acc = null;
-        for (let t = 0; t < n; t++) { const w = r.node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
+        const node = perDraw("vec4", n).node;
+        for (let t = 0; t < n; t++) { const w = node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
         // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
         return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
     };
     const skinnedBefore = (object, pos) => {
-        const r = skinRecord(object), m = r.node, bind = TSL.uniform(object.bindMatrix), bindInv = TSL.uniform(object.bindMatrixInverse);
+        const m = perDraw("mat4", object.skeleton.bones.length).node, bind = bindU, bindInv = bindInvU;
         const si = TSL.attribute("skinIndex", "uvec4"), sw = TSL.attribute("skinWeight", "vec4"), v = bind.mul(vec4(pos, 1.0));
         const s = m.element(si.x).mul(v).mul(sw.x).add(m.element(si.y).mul(v).mul(sw.y)).add(m.element(si.z).mul(v).mul(sw.z)).add(m.element(si.w).mul(v).mul(sw.w));
         return bindInv.mul(s).xyz;
     };
     class MotionNode extends THREE.VelocityNode {
         constructor() { super(); this.nodeType = "vec4"; }
+        /** v4761: a sprite's clip position as the stage draws it -- its sprite material's vertexNode. */
+        spriteVertex() { return TSL.Fn((_, builder) => spriteClip(builder))(); }
         setPreviousCamera(projection, view) {
             this.previousProjectionMatrix.value.copy(projection);
             this.previousCameraViewMatrix.value.copy(view);
@@ -196,23 +247,42 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
             // the buffer node's array is uploaded at every draw -- three's Buffer binding reports itself changed each time
             if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
+            if (object.isBatchedMesh) batchBefore(object, batchRecord(object));
+            if (object.isSprite) { const now = object.material.rotation, was = rotations.has(object) ? rotations.get(object) : now; rotPrev.value = toward ? was + toward.t * (now - was) : was; }
             // three's renderId is its render call's -- frameId is its animation loop's, and several passes fall in one of those
-            if (object.isSkinnedMesh) stepSkin(object, skinRecord(object), renderId);
-            if (hasMorph(object)) stepMorph(object, morphRecord(object));
+            if (object.isSkinnedMesh) { const r = skinRecord(object); stepSkin(object, r, renderId); perDraw("mat4", r.n).arr.set(r.cur);
+                bindU.value.copy(object.bindMatrix); bindInvU.value.copy(object.bindMatrixInverse); }
+            if (hasMorph(object)) { const r = morphRecord(object); stepMorph(object, r); perDraw("vec4", r.n).arr.set(r.cur); }
+            if (object.isSprite) centreU.value.copy(object.center);
         }
         updateAfter({ object }) {
             const m = prev.get(object);
             if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
             if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
+            if (object.isBatchedMesh) { const r = batchRecord(object); r.last.set(r.src.image.data); }
+            if (object.isSprite) rotations.set(object, object.material.rotation);
             if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
             if (hasMorph(object)) { const r = morphRecord(object); for (let i = 0; i < r.n; i++) r.last[i] = object.morphTargetInfluences[i]; }
         }
         setup(builder) {
-            const cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal);
+            let cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal), was = null;
             // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
             const object = builder && builder.object;
             let before = positionPrevious;
-            if (object && object.isInstancedMesh) before = TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            if (object && object.isSprite) {
+                // v4761: the corner as three's SpriteNodeMaterial places it, now and at the last draw
+                cur = TSL.varying(spriteClip(builder));
+                was = TSL.varying(this.previousProjectionMatrix.mul(spriteCorner(builder, this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(vec4(0.0, 0.0, 0.0, 1.0)), this.previousModelWorldMatrix, rotPrev)));
+            }
+            else if (object && object.isBatchedMesh) {
+                // v4761: the geometry through the instance's previous matrix, found as three finds the current one
+                const r = batchRecord(object), id = TSL.int(builder.getDrawIndex() === null ? TSL.instanceIndex : TSL.drawIndex), ind = object._indirectTexture;
+                const isz = TSL.int(TSL.textureSize(TSL.textureLoad(ind), 0).x), iid = TSL.int(TSL.textureLoad(ind, TSL.ivec2(id.mod(isz), id.div(isz))).x);
+                const msz = TSL.int(TSL.textureSize(TSL.textureLoad(r.tex), 0).x), j = iid.mul(4), x = j.mod(msz), y = j.div(msz);
+                const M = TSL.mat4(TSL.textureLoad(r.tex, TSL.ivec2(x, y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(3), y)));
+                before = TSL.varying(M.mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            }
+            else if (object && object.isInstancedMesh) before = TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
             else if (object && (object.isSkinnedMesh || hasMorph(object))) {
                 // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
                 let p = TSL.positionGeometry;
@@ -220,7 +290,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
                 if (object.isSkinnedMesh) p = skinnedBefore(object, p);
                 before = TSL.varying(vec4(p, 1.0)).xyz;
             }
-            const was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(before);
+            if (!was) was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(before);
             // uv = ((x + 1) / 2, (1 - y) / 2), so uvPrev - uvCurr = ((xp - xc) / 2, (yc - yp) / 2)
             const xc = cur.x.div(cur.w), yc = cur.y.div(cur.w), xp = was.x.div(was.w), yp = was.y.div(was.w);
             const ok = was.w.greaterThan(0.0);   // behind the previous eye: no answer, as motionVectorsCPU says
@@ -307,6 +377,20 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
     // v4750: `camera` -- the camera's own motion at every pixel, into `camera` (du, dv, valid, 1)
     const cameraT = withCamera ? new THREE.RenderTarget(w, h, flat) : null, qC = withCamera ? quad(comp.cameraNode) : null;
     const prevP = new THREE.Matrix4(), prevV = new THREE.Matrix4(), vp = new THREE.Matrix4();
+    // v4761: a sprite is drawn with a sprite material of the stage's carrying the motion node, one per material it had -- the
+    // override draws it as the flat quad its geometry is, and three's sprite material is what turns it to the camera
+    const spriteMats = new Map();
+    const spriteMaterial = (o) => {
+        const src = o.material, name = o.name ? JSON.stringify(o.name) : "a Sprite";
+        if (!src || Array.isArray(src) || src.isPointsNodeMaterial || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
+            throw new Error(`render/temporalTsl: ${name}'s material is not a sprite's -- a points material on a sprite sizes it in pixels, which the stage does not follow`);
+        for (const k of ["positionNode", "rotationNode", "scaleNode"]) if (src[k]) throw new Error(`render/temporalTsl: ${name}'s material sets ${k} -- a sprite placed by a node has no last pose the stage can keep`);
+        let m = spriteMats.get(src);
+        if (!m) { m = new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation }); m.fragmentNode = motionNode; m.blending = THREE.NoBlending;
+            m.transparent = false; m.depthTest = true; m.depthWrite = true; m.allowOverride = false; m.vertexNode = motionNode.spriteVertex(); spriteMats.set(src, m); }
+        m.rotation = src.rotation; m.side = src.side;
+        return m;
+    };
     let frames = 0;
     return {
         surface, motion, depth, camera: cameraT, motionNode, uniforms: comp.uniforms,
@@ -332,8 +416,11 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             scene.overrideMaterial = override; scene.background = null;
             // the draw clears depth to 1 on its own; the completion reads depth and not the cleared colour, so the
             // renderer's clear colour is left as the caller set it
-            renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
-            scene.overrideMaterial = prevOverride; scene.background = prevBg;
+            const swapped = [];
+            try {
+                scene.traverse((o) => { if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; } });
+                renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
+            } finally { for (const [o, m] of swapped) o.material = m; scene.overrideMaterial = prevOverride; scene.background = prevBg; }
             renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
             renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
             if (qC) { renderer.setRenderTarget(cameraT); await renderer.renderAsync(qC.scene, ortho); }
@@ -341,7 +428,7 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;
         },
-        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
     };
 }
 

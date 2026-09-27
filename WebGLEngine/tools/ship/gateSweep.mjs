@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4761 -- THE 368th CLOSING: the rest of the mesh zoo -- two kinds wrong, and two of v4757's wrong where programs are shared.
+    since443: Object.freeze({
+        at: "v4761", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslZoo-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE MOTION STAGE WAS WRONG ON A BATCHEDMESH, ON SPRITES, AND ON ANY TWO MESHES THREE DRAWS WITH ONE PROGRAM. *** A " +
+                 "BatchedMesh's previous point was the bare geometry's -- three applies the instance matrix to the current point only -- " +
+                 "32.7 px off; the stage keeps its matrices texture as it was and reads it by three's own index. A sprite was drawn " +
+                 "flat by the override, 5.74 px off; the stage draws each with a sprite material whose vertexNode places its corners. " +
+                 "Two skinned meshes of one layout on two skeletons read 44.7 px off and two meshes of one morphed geometry 1.06: three " +
+                 "keys a program by layout and bone count, and v4757's histories were built into it for the first mesh; they are " +
+                 "per-draw nodes now, filled before each draw. Multi-bone weights, skinned-and-morphed and Points were right and are " +
+                 "rows. three binds a sprite's centre the same way in its own colour pass -- measured, and for a report. Twenty-four " +
+                 "sabotages, none green, five only after the gate was made to see them.",
+    }),
     // v4760 -- THE 367th CLOSING: translucent things in the world -- no one field is right, so they are a layer drawn at t.
     since442: Object.freeze({
         at: "v4760", swept: 2, green: 2, red: 0,
