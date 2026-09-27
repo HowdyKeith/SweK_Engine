@@ -151,8 +151,10 @@ process.exitCode = 0;
     // THE REAL SITE, RE-MEASURED. This is the row that would have gone red before v4678.
     const cp = await DL.deadTail("tools/ship/cloneProvision-selfcheck.mjs", { capMs: 200000 });
     ok("!! *** and the gate that cost 53 s of dead time now has none ***",
-        cp.ok && cp.leaking === false && cp.workMs > 3000,
-        cp.ok ? `work=${cp.workMs}ms tail=${cp.tailMs}ms wall=${cp.wallMs}ms. BEFORE v4678: 7,100 ms of work and ` +
+        // v4685: exitCode 0 is the "it really did its work" guard, not workMs > 3000 -- the rig did the same work in
+        // 2,957 ms and this row went red for the box being FASTER. A speed floor is a reading of one machine.
+        cp.ok && cp.leaking === false && cp.exitCode === 0,
+        cp.ok ? `exit ${cp.exitCode}, work=${cp.workMs}ms tail=${cp.tailMs}ms wall=${cp.wallMs}ms. BEFORE v4678: 7,100 ms of work and ` +
                 "60,136 ms of wall clock. The work did not change; one clearTimeout and one unref did"
               : "UNKNOWN: " + cp.why);
 

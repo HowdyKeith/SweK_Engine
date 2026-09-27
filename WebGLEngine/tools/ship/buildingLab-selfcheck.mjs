@@ -101,8 +101,19 @@ sec("2. THE FRAME ON BOTH BACKENDS: the cull twin, the silhouette, the palette, 
                 // up to 4 of 19,200 pixels may differ away from a silhouette edge: the boxes are 0.08 apart, and a gap under a pixel wide sits
                 // where the GPU's edge arithmetic and the CPU ray disagree by less than a pixel with no silhouette transition next door (2 measured)
                 ok(`*** ${bk}: every placement survives the cull twin, and the frame's coverage is the CPU silhouette on more than 97% of pixels with the rest at edges (at most 4 elsewhere) ***`, u === base.count && disagree <= 4 && agree > W * H * 0.97 && covered > 1000);
-                const hues = new Set(); for (let p = 0; p < W * H; p++) if (lit(p)) hues.add(Math.round(px[p * 4] / Math.max(1, px[p * 4 + 1]) * 10));
-                ok(`  ${bk}: the palette is on the picture (${hues.size} distinct red-to-green ratios among lit pixels; corners, walls, stairs and roof caps face the camera)`, hues.size >= 4);
+                // *** v4685 -- A PALETTE ENTRY IS A SURFACE, NOT A PIXEL. *** This counted every distinct red-to-green
+                // ratio among lit pixels and asked for four -- "corners, walls, stairs and roof caps". Measured on the
+                // Linux frame: corner 2,025 px, wall 1,944, stairs 988, and the fourth "roof cap" bucket was ONE dim
+                // edge pixel; the eye sits level with the buildings and the caps do not face it. The rig's NVIDIA
+                // rasterised that edge differently, drew no such pixel, and the row went red with the picture right.
+                // A tint now counts only if it covers at least 1% of the lit pixels, and the claim is the three
+                // surfaces that do face the camera.
+                const hueCount = new Map(); let litN = 0;
+                for (let p = 0; p < W * H; p++) if (lit(p)) { litN++; const h = Math.round(px[p * 4] / Math.max(1, px[p * 4 + 1]) * 10); hueCount.set(h, (hueCount.get(h) || 0) + 1); }
+                const surfaces = [...hueCount].filter(([, n]) => n >= litN * 0.01);
+                ok(`  ${bk}: the palette is on the picture (${surfaces.length} tints each covering at least 1% of ${litN} lit pixels; corners, walls and stairs face the camera)`,
+                   surfaces.length >= 3, surfaces.sort((a, b) => b[1] - a[1]).map(([h, n]) => `ratio ${h / 10}: ${n} px`).join(", ") +
+                   (hueCount.size > surfaces.length ? ` -- plus ${hueCount.size - surfaces.length} stray ratio(s) on edge pixels, not counted` : ""));
                 const g2 = r.result[bk].frames[1].pixels; let same = 0, darker = 0, other = 0; for (let p = 0; p < W * H; p++) { const a = px[p * 4] + px[p * 4 + 1] + px[p * 4 + 2], c = g2[p * 4] + g2[p * 4 + 1] + g2[p * 4 + 2]; if (a === c) same++; else if (c < a) darker++; else other++; }
                 ok(`  ${bk}: with a front party wall the silhouette is unchanged and the front's pixels only get darker (the blank tint): ${darker} darker, ${other} brighter`, other < W * H * 0.002 && darker > 200);
             }

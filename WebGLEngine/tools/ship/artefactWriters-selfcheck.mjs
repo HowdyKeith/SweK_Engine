@@ -103,6 +103,20 @@ const SHIPPED_DETECTOR = /export const OUT\s*=\s*["']([^"']+)["']/;
         ok("!! " + t.label + " is IDEMPOTENT, measured by running it twice", r.ok,
            r.ok ? r.first + " -> " + r.second : (r.error || r.first + " -> " + r.second));
     }
+    // v4685 -- driven: a regenerator run by this gate must leave the tracked artefact byte-identical, because the
+    // rig's run left knowledge-index.json claiming a transient fixture as the 1776th gate.
+    {
+        const kiRow = always.find((t) => t.label === "Knowledge index");
+        const target = path.join(ENGINE, kiRow.artefact.replace(/^\//, ""));
+        const orig = fs.readFileSync(target);
+        fs.writeFileSync(target, Buffer.concat([orig, Buffer.from("\n")]));   // a state the regenerator will NOT reproduce
+        let r, after;
+        try { r = idempotent(kiRow.rel, kiRow.artefact); after = fs.readFileSync(target); }
+        finally { fs.writeFileSync(target, orig); }
+        ok("!! *** and the measurement PUTS BACK what it found -- a gate does not leave a tracked record rewritten ***",
+           r.ok && after.equals(Buffer.concat([orig, Buffer.from("\n")])),
+           "planted a byte the regenerator would remove; it was still there after two real runs, so the run restored it");
+    }
     ok("...so the dry-run rule keeps its teeth rather than being widened away", true,
        "the worry is a STALE artefact from an accidental run, and an artefact that is a pure function of the " +
        "tree cannot go stale that way -- a SWEEP declaring alwaysWrites would fail the check above");

@@ -118,10 +118,18 @@ console.log("\n3. *** WHAT IT COSTS, at the counts the renderers claim to handle
     }
     ok("the radix sort is faster at every size measured", rows.every((x) => x.r < x.o));
     const big = rows[rows.length - 1];
-    ok("*** at 500K splats the old sort misses a 60 fps frame and the new one makes it ***",
-        big.o > 16.7 && big.r < 16.7,
-        "comparison " + big.o.toFixed(1) + " ms (" + (1000 / big.o).toFixed(1) + " fps), radix " +
-        big.r.toFixed(1) + " ms (" + (1000 / big.r).toFixed(0) + " fps)");
+    // *** v4685 -- "MAKES A 60 fps FRAME" IS A CLAIM ABOUT A MACHINE, AND BOTH MACHINES REFUTED IT HALF THE TIME. ***
+    // The row asserted an absolute wall-clock bar, radix < 16.7 ms. Measured: 13.4-17.8 ms on the 4-core container
+    // (red two runs in six even at seven readings) and 17.5-19.6 ms on the rig, in the verify's serial phase. The
+    // v4264 note that wrote it recorded 14.43 ms -- a 14% margin on one box. What does not depend on the box is
+    // asserted: the old sort misses the frame by an order of magnitude, and the speedup row below (> 8x) is the
+    // claim this sort exists for. Whether THIS box's radix makes 60 fps is printed, not asserted.
+    ok("*** at 500K splats the old sort misses a 60 fps frame by an order of magnitude on any box this has run on ***",
+        big.o > 16.7 * 5,
+        "comparison " + big.o.toFixed(1) + " ms (" + (1000 / big.o).toFixed(1) + " fps)");
+    report("  radix on THIS box: " + big.r.toFixed(1) + " ms (" + (1000 / big.r).toFixed(0) + " fps) -- " +
+        (big.r < 16.7 ? "inside a 60 fps frame here" : "OUTSIDE a 60 fps frame here") +
+        ". A wall-clock bar is a reading of the machine, so it is reported; the speedup below is the claim");
     ok("  and the speedup is an order of magnitude, not a rounding difference", big.o / big.r > 8,
         (big.o / big.r).toFixed(1) + "x");
     report("timings are the BEST of 2-3 runs on this sandbox's CPU in Node, which flatters both sides " +

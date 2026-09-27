@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "292f0274ab81f2218723651b9359a0c1afcafd86",
+ "head": "bd45705a16eac88760ef5801ab4fbeae42e2d73a",
  "bodies": {
   "box3d": [
    {
@@ -455,8 +455,8 @@
    },
    {
     "path": "tools/roundhouse/magmapTaichiRun-selfcheck.mjs",
-    "bytes": 14006,
-    "sha": "7122d9b310a073bca8c491986b3ae23f6b6b49c4"
+    "bytes": 14209,
+    "sha": "8a3d08520227727903595df26695569b3155e137"
    }
   ],
   "three": [
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3398431,
-    "sha": "292f0274ab81f2218723651b9359a0c1afcafd86"
+    "bytes": 3400618,
+    "sha": "f7f348b43e24882efe778353c00d0e319b205182"
    },
    {
     "path": "mpm3d.html",
@@ -782,7 +782,7 @@
    },
    {
     "path": "tools/ship/treeRead-selfcheck.mjs",
-    "bytes": 19514,
+    "bytes": 18762,
     "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
    },
    {
@@ -864,8 +864,8 @@
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
-    "bytes": 46514,
-    "sha": "c5d89bfc82287a33e9f46097096e3965b09a7e57"
+    "bytes": 47220,
+    "sha": "9f969e13144b96269c1a9cfdad566a39e0b4a2a7"
    },
    {
     "path": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
@@ -904,8 +904,8 @@
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
-    "bytes": 19635,
-    "sha": "0dbe8d4159e996ff88f390f019eef612cde6307b"
+    "bytes": 22534,
+    "sha": "82a77f78f5526c14af8e96ae9c9a24eb6386ed21"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",

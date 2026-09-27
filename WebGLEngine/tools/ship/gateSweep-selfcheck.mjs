@@ -734,5 +734,29 @@ sec("THE TWO EXPORTS NO GATE NAMED, CLOSED BY ASSERTION (v4647q)");
     }
 }
 
+// ---- v4681 -- THE IN-TREE SCRATCH A KILLED RUN STRANDS, RECLAIMED BY NAME -------------------------------------
+{
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gatesweep-scratch-"));
+    try {
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3"), { recursive: true });
+        fs.writeFileSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-a1B2c3", "aiPresenceOrbPresent.mjs"), "export {};\n");
+        fs.mkdirSync(path.join(root, "tools", ".ub-Zz9Yy8"), { recursive: true });
+        // a decoy that must SURVIVE: same prefix, not a mkdtemp name (wrong length), so it is not ours to delete
+        fs.mkdirSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please"), { recursive: true });
+        const gone = GS.reclaimScratchDirs(root).sort();
+        ok(gone.join(",") === "tools/.ub-Zz9Yy8,tools/ship/.sabotage-orbpresent-a1B2c3" &&
+            fs.existsSync(path.join(root, "tools", "ship", ".sabotage-orbpresent-keepme-please")),
+            "!! *** reclaimScratchDirs removes the stranded mkdtemp directories, and only those ***",
+            `removed [${gone.join(", ")}]; the same-prefix decoy that is not a mkdtemp name survives -- the rig held two ` +
+            "stranded .sabotage-orbpresent directories whose four .mjs files took the census to 4318");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    const makers = { ".sabotage-orbpresent-": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
+                     ".ffwasm-gate-": "tools/ship/ffmpegWasmBridge-selfcheck.mjs", ".ub-": "tools/ship/unboundBuiltin-selfcheck.mjs" };
+    ok(GS.TRANSIENT_DIRS.length === 3 && GS.TRANSIENT_DIRS.every(([, p]) =>
+            makers[p] && fs.readFileSync(path.join(ENG_ROOT, makers[p]), "utf8").includes(JSON.stringify(p))),
+        "...and TRANSIENT_DIRS is the three in-tree mkdtemp prefixes, SPELLED, each one a name a gate really creates",
+        GS.TRANSIENT_DIRS.map(([d, p]) => d + "/" + p + "*").join(", "));
+}
+
 console.log(fails === 0 ? "\nALL GREEN" : `\n${fails} FAILED`);
 process.exit(fails ? 1 : 0);

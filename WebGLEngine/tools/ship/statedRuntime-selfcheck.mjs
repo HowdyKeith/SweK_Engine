@@ -151,20 +151,44 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
     // not something a 2 s gate re-measures, and an unmeasured candidate is an open question rather than a debt.
     const RUN_CAP_MS = 4000;
     const byGate = new Map(drifted.map((d) => [d.gate, d]));
+    // *** v4685 -- A HEADER IS ONE BOX'S MEASUREMENT, SO THE BOX RUNNING THIS ROW IS CALIBRATED FIRST. ***
+    // Headers are timed on the box that wrote them. The rig re-ran asciify in 964 ms against its 290 ms header and
+    // this row called the HEADER drifted -- but asciify runs in 350-390 ms here, so what the rig measured was the
+    // rig. The control is a gate this file already records as "header exact" (spacesimStart, 0.14 s): run on THIS
+    // box, its ratio is how much slower this box is, and a candidate is accused only past 2x THAT. Each run is the
+    // MINIMUM of two, the reading that rejects a scheduler hiccup (this file's own v4640 note timed three to five).
+    // A box faster than the header's never LOWERS the bar: k is floored at 1.
+    const minRun = (g) => {
+        let best = Infinity;
+        for (let i = 0; i < 2; i++) {
+            const t0 = Date.now();
+            try { execFileSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, stdio: "ignore", timeout: RUN_CAP_MS }); }
+            catch { /* a red gate still took the time it took; only the duration is wanted here */ }
+            best = Math.min(best, Date.now() - t0);
+        }
+        return best;
+    };
+    const CONTROL = "tools/ship/spacesimStart-selfcheck.mjs";
+    const ctlSrc = fs.readFileSync(path.join(ROOT, CONTROL), "utf8").split("\n").filter((l) => !/SUPERSEDED/.test(l)).join("\n");
+    const cm = ctlSrc.match(RX);
+    const ctlClaim = cm ? (/min/i.test(cm[2]) ? parseFloat(cm[1]) * 60000 : parseFloat(cm[1]) * 1000) : null;
+    const ctlMs = ctlClaim ? minRun(CONTROL) : null;
+    const k = ctlClaim ? Math.max(1, ctlMs / ctlClaim) : 1;
+    console.log(`  ----  box calibration: ${path.basename(CONTROL)} states ${ctlClaim} ms and ran ${ctlMs} ms here -- ` +
+        (k > 1 ? `this box is ${k.toFixed(2)}x slower than the box the headers were timed on, so drift is judged past ${(2 * k).toFixed(2)}x`
+               : "no slower than the headers' box, so the plain 2x bound applies"));
     const ran = [], unrunnable = [];
     for (const g of arrived) {
         const d = byGate.get(g);
         if (!d || d.claimMs > RUN_CAP_MS) { unrunnable.push(g); continue; }
-        const t0 = Date.now();
-        try { execFileSync(process.execPath, [path.join(ROOT, g)], { cwd: ROOT, stdio: "ignore", timeout: RUN_CAP_MS }); }
-        catch { /* a red gate still took the time it took; only the duration is wanted here */ }
-        ran.push({ gate: g, ms: Date.now() - t0, claimMs: d.claimMs, obs: d.obs });
+        ran.push({ gate: g, ms: minRun(g), claimMs: d.claimMs, obs: d.obs });
     }
     // The SAME two-part test the record join uses above: a ratio AND a gap wider than the header's own
-    // resolution, so this row cannot report the notation instead of the gate.
+    // resolution, so this row cannot report the notation instead of the gate -- with the ratio's upper bound
+    // scaled by the box.
     const reallyDrifted = ran.filter((r) => {
         const ratio = r.ms / r.claimMs;
-        return (ratio > 2 || ratio < 0.5) && Math.abs(r.ms - r.claimMs) >= HEADER_RESOLUTION_MS;
+        return (ratio > 2 * k || ratio < 0.5) && Math.abs(r.ms - r.claimMs) >= HEADER_RESOLUTION_MS * k;
     });
     for (const r of ran)
         console.log(`  ----  ${path.basename(r.gate).padEnd(32)} header ${String(Math.round(r.claimMs)).padStart(7)} ms   ` +

@@ -160,6 +160,14 @@ export function pagesReading(artefact) {
 export function idempotent(relPath, artefact, { timeoutMs = 120000 } = {}) {
     const target = path.join(ENGINE, artefact.replace(/^\//, ""));
     const hash = () => { try { return crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex").slice(0, 16); } catch { return null; } };
+    // *** v4685 -- THE REAL ARTEFACT IS PUT BACK, BECAUSE A GATE MUST NOT LEAVE A TRACKED RECORD REWRITTEN. ***
+    // This runs the real regenerator in the real tree, twice, and used to leave whatever it wrote. On the rig's
+    // v4684 verify it ran while gatesBridge-selfcheck had its zz-temp-fixture-selfcheck.mjs on disk for a few
+    // seconds, so knowledge-index.json was rewritten claiming 1776 gates and STAYED that way: staleness,
+    // instruments and recordDrift went red on a file no commit had touched. The measurement is unchanged --
+    // two runs, two hashes, compared -- and the bytes that were there before are restored whatever happens.
+    let before = null;
+    try { before = fs.readFileSync(target); } catch { before = null; }
     try {
         execFileSync(process.execPath, [path.join(ENGINE, relPath)], { cwd: ENGINE, timeout: timeoutMs, stdio: "ignore" });
         const a = hash();
@@ -167,6 +175,9 @@ export function idempotent(relPath, artefact, { timeoutMs = 120000 } = {}) {
         const b = hash();
         return { ok: a !== null && a === b, first: a, second: b };
     } catch (e) { return { ok: false, error: String(e && e.message).slice(0, 120) }; }
+    finally {
+        try { if (before !== null) fs.writeFileSync(target, before); else fs.rmSync(target, { force: true }); } catch {}
+    }
 }
 
 export function census() {
