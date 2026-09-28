@@ -47,9 +47,22 @@ offCentre 38.5, centredAfter 38.5, centredUnlike 31.5 (both backends)
 
 `centredAfter` equal to `centredUnlike` (31.5): a centred sprite drawn where a centred sprite is.
 
-## Where it seems to come from
+## Cause
 
-`SpriteNodeMaterial.setupPositionView` builds `reference('center', 'vec2', object)` for the object being built, and the render object's cache key (`getMaterialCacheKey`) holds nothing of that object -- so every like sprite shares the program, and with it the first sprite's `center`. The same shape would affect any node built with a reference to `builder.object` in a program shared across objects.
+Verified by the patch below. `SpriteNodeMaterial.setupPositionView` (`src/materials/nodes/SpriteNodeMaterial.js`) builds
+`reference( 'center', 'vec2', object )` -- a reference bound to the sprite being built, which it reads at every update
+(`ReferenceNode.setReference` takes the bound object over the one being drawn). The render object's cache key
+(`getMaterialCacheKey`) holds nothing of that sprite, so every like sprite shares the program, and with it the first sprite's
+`center`. The same shape would affect any node built with a reference to `builder.object` in a program shared across objects.
+
+## A patch
+
+[`patches/05-sprite-center-per-object.diff`](patches/05-sprite-center-per-object.diff), a diff against three's `src/` at the r185 tag. The reference is left unbound, so it reads the sprite being drawn. Applied to r185's build, the
+reproduction prints:
+
+<!-- patched:begin -->
+offCentre 38.5, centredAfter 31.5, centredUnlike 31.5 (both backends)
+<!-- patched:end -->
 
 ## A fix that works in an application
 

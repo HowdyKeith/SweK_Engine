@@ -3,7 +3,8 @@
 **three.js r185** (`three.webgpu.js`), `WebGPURenderer` on WebGPU and with `forceWebGL: true` -- measured in headless Chromium
 (SwiftShader). DRAFT, not posted.
 
-Rendering three's own `velocity` node for a `Mesh` whose relative morph target (+1 in x) has its influence changing by 0.3 a frame -- the same motion as the plain mesh -- reads the displacement from the unmorphed geometry.
+Reading three's `velocity` through MRT, one render per browser frame, for a `Mesh` whose relative morph target (+1 in x) has its
+influence changing by 0.3 a frame -- the same motion as the plain mesh -- reads the displacement from the unmorphed geometry.
 
 ## Reproduction
 
@@ -17,17 +18,20 @@ Save as an `.html` file and open it; it prints the numbers for both backends.
 <script type="module">
 import * as THREE from "three"; import * as T from "three/tsl";
 const report = (r) => { window.__result = r; document.getElementById("out").textContent = JSON.stringify(r, null, 1); };
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 const run = async (forceWebGL) => {
     const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
     const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL }); await renderer.init();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50); camera.position.set(0, 0, 5); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
-    const D = 64, target = new THREE.RenderTarget(D, D, { type: THREE.FloatType });
-    // draws three's own velocity node; returns its mean over the pixels drawn, in pixels, after three frames
-    const material = () => { const m = new THREE.MeshBasicNodeMaterial(); m.fragmentNode = T.vec4(T.velocity, 0.0, 1.0); m.blending = THREE.NoBlending; return m; };
+    // three's velocity through MRT, as it is meant to be read
+    const D = 64, target = new THREE.RenderTarget(D, D, { type: THREE.FloatType, count: 2 }); target.textures[0].name = "output"; target.textures[1].name = "velocity";
+    renderer.setMRT(T.mrt({ output: T.output, velocity: T.velocity }));
+    const material = () => { const m = new THREE.MeshBasicNodeMaterial(); m.blending = THREE.NoBlending; return m; };
+    // velocity's mean over the pixels drawn, in pixels, after three frames -- one render per browser frame
     const velocityOf = async (scene, step) => {
-        for (const k of [0, 1, 2]) { step(k); renderer.setRenderTarget(target); await renderer.renderAsync(scene, camera); }
-        const v = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D); let n = 0, x = 0;
-        for (let i = 0; i < D * D; i++) if (v[i * 4 + 3] > 0.5) { n++; x += v[i * 4] * D / 2; }
+        for (const k of [0, 1, 2]) { await frame(); step(k); renderer.setRenderTarget(target); await renderer.renderAsync(scene, camera); }
+        const c = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D, 0), v = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D, 1); let n = 0, x = 0;
+        for (let i = 0; i < D * D; i++) if (c[i * 4 + 3] > 0.5) { n++; x += v[i * 4] * D / 2; }
         return +(x / n).toFixed(3);
     };
     // the reference: a plain mesh moving 0.3 a frame -- three's velocity is right on it
@@ -54,9 +58,20 @@ plain 5.612, morphed 1.871 (px, both backends)
 
 `morphed` equal to `plain`.
 
-## Where it seems to come from
+## Cause
 
-Nothing keeps the previous morph influences, and `positionPrevious` is taken before morphing, so the previous point is the unmorphed one.
+Verified by the patch below. `morphReference()` (`src/nodes/accessors/Morph.js`) morphs `positionLocal` by the current
+influences; nothing keeps the influences of the last draw, and `positionPrevious` is left unmorphed: 1.871 px is the morphed
+point's distance from the unmorphed one at the third frame (influence 0.1).
+
+## A patch
+
+[`patches/03-morph-previous-influences.diff`](patches/03-morph-previous-influences.diff), a diff against three's `src/` at the r185 tag. When `needsPreviousData()`, the base and influences of the last draw are kept per mesh (swapped in the existing `OnObjectUpdate`) and `positionPrevious` is morphed by them. Per-instance morphs (`morphTexture` on an `InstancedMesh`) are left as they are. Applied to r185's build, the
+reproduction prints:
+
+<!-- patched:begin -->
+plain 5.612, morphed 5.612 (px, both backends)
+<!-- patched:end -->
 
 ## A fix that works in an application
 

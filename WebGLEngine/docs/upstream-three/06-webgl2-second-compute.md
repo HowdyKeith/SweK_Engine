@@ -44,10 +44,23 @@ webgpu moved [true, true]; webgl2 moved [true, false]
 
 both systems move on both backends.
 
-## Where it seems to come from
+## Cause
 
-The second system's kernel is the same code as the first's. If the WebGL backend caches the transform-feedback program by its code and keeps the first system's buffers bound to it, the second dispatch writes the first system's buffers. A reading, not a verified cause; the numbers are measured.
+Verified by the patch below. `Pipelines.getForCompute` (`src/renderers/common/Pipelines.js`) caches the compute stage by its
+shader code. On WebGL 2 the two systems' kernels compile to the same GLSL, so the second compute node gets the first's stage --
+and the stage carries the buffers it binds by transform feedback (`transforms`, `nodeAttributes`), which
+`WebGLBackend.createComputePipeline` binds: the second dispatch reads and writes the first system's buffers. On WebGPU the two
+kernels compile to different WGSL, so each has its own stage.
+
+## A patch
+
+[`patches/06-webgl2-compute-stage-per-buffers.diff`](patches/06-webgl2-compute-stage-per-buffers.diff), a diff against three's `src/` at the r185 tag. A stage that binds buffers by transform feedback is cached by its code and the ids of the attribute nodes it binds; other stages are cached by code as before. A released stage is dropped from the cache by the same key. Applied to r185's build, the
+reproduction prints:
+
+<!-- patched:begin -->
+webgpu moved [true, true]; webgl2 moved [true, true]
+<!-- patched:end -->
 
 ## A fix that works in an application
 
-SweK_Engine's motion stage (`render/temporalTsl.mjs`) keeps the buffers bound per dispatch, not per cached program; its gates hold the result to a reference on both backends.
+SweK_Engine's compute-particle gate (`render/temporalTslCompute-selfcheck.mjs`) gives each particle system a renderer of its own, so no stage is shared; it measures the bug on a shared renderer and goes red when three fixes it.

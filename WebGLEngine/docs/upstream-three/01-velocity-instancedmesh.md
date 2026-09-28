@@ -1,9 +1,11 @@
-# VelocityNode: an InstancedMesh's velocity ignores its previous instance matrix
+# VelocityNode: an InstancedMesh's previous instance matrix is its current one
 
 **three.js r185** (`three.webgpu.js`), `WebGPURenderer` on WebGPU and with `forceWebGL: true` -- measured in headless Chromium
 (SwiftShader). DRAFT, not posted.
 
-Rendering three's own `velocity` node (TSL) for an `InstancedMesh` whose instance moves 0.3 a frame reads the displacement from the **bare geometry**, not from the instance's previous placement. A plain `Mesh` making the same motion reads it right.
+Reading three's `velocity` through MRT, one render per browser frame, for an `InstancedMesh` whose instance moves 0.3 a frame
+reads no motion at all with one instance, and twice the motion with 1100 -- past the uniform buffer, where the matrices are drawn
+from an attribute. A plain `Mesh` making the same motion reads it right.
 
 ## Reproduction
 
@@ -17,25 +19,33 @@ Save as an `.html` file and open it; it prints the numbers for both backends.
 <script type="module">
 import * as THREE from "three"; import * as T from "three/tsl";
 const report = (r) => { window.__result = r; document.getElementById("out").textContent = JSON.stringify(r, null, 1); };
+const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 const run = async (forceWebGL) => {
     const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
     const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL }); await renderer.init();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50); camera.position.set(0, 0, 5); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
-    const D = 64, target = new THREE.RenderTarget(D, D, { type: THREE.FloatType });
-    // draws three's own velocity node; returns its mean over the pixels drawn, in pixels, after three frames
-    const material = () => { const m = new THREE.MeshBasicNodeMaterial(); m.fragmentNode = T.vec4(T.velocity, 0.0, 1.0); m.blending = THREE.NoBlending; return m; };
+    // three's velocity through MRT, as it is meant to be read
+    const D = 64, target = new THREE.RenderTarget(D, D, { type: THREE.FloatType, count: 2 }); target.textures[0].name = "output"; target.textures[1].name = "velocity";
+    renderer.setMRT(T.mrt({ output: T.output, velocity: T.velocity }));
+    const material = () => { const m = new THREE.MeshBasicNodeMaterial(); m.blending = THREE.NoBlending; return m; };
+    // velocity's mean over the pixels drawn, in pixels, after three frames -- one render per browser frame
     const velocityOf = async (scene, step) => {
-        for (const k of [0, 1, 2]) { step(k); renderer.setRenderTarget(target); await renderer.renderAsync(scene, camera); }
-        const v = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D); let n = 0, x = 0;
-        for (let i = 0; i < D * D; i++) if (v[i * 4 + 3] > 0.5) { n++; x += v[i * 4] * D / 2; }
+        for (const k of [0, 1, 2]) { await frame(); step(k); renderer.setRenderTarget(target); await renderer.renderAsync(scene, camera); }
+        const c = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D, 0), v = await renderer.readRenderTargetPixelsAsync(target, 0, 0, D, D, 1); let n = 0, x = 0;
+        for (let i = 0; i < D * D; i++) if (c[i * 4 + 3] > 0.5) { n++; x += v[i * 4] * D / 2; }
         return +(x / n).toFixed(3);
     };
     // the reference: a plain mesh moving 0.3 a frame -- three's velocity is right on it
     const plainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), material()), plainScene = new THREE.Scene(); plainScene.add(plainMesh);
     const plain = await velocityOf(plainScene, (k) => { plainMesh.position.x = -0.5 + 0.3 * k; plainMesh.updateMatrixWorld(); });
-    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), material(), 1), scene = new THREE.Scene(); scene.add(mesh); const M = new THREE.Matrix4();
-    const instanced = await velocityOf(scene, (k) => { mesh.setMatrixAt(0, M.makeTranslation(-0.5 + 0.3 * k, 0, 0)); mesh.instanceMatrix.needsUpdate = true; });
-    renderer.dispose(); return { plain, instanced };
+    // the same motion as instance 0 of an InstancedMesh: one instance, and 1100 -- past the uniform buffer, so the matrices are an attribute
+    const M = new THREE.Matrix4(), instancedOf = async (count) => {
+        const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), material(), count), scene = new THREE.Scene(); scene.add(mesh);
+        for (let i = 1; i < count; i++) mesh.setMatrixAt(i, M.makeScale(0, 0, 0));
+        return velocityOf(scene, (k) => { mesh.setMatrixAt(0, M.makeTranslation(-0.5 + 0.3 * k, 0, 0)); mesh.instanceMatrix.needsUpdate = true; });
+    };
+    const instanced = await instancedOf(1), many = await instancedOf(1100);
+    renderer.dispose(); return { plain, instanced, many };
 };
 report({ webgpu: await run(false), webgl2: await run(true) });
 </script>
@@ -45,16 +55,36 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 ## Observed
 
 <!-- observed:begin -->
-plain 5.612, instanced 1.871 (px, both backends)
+plain 5.612, instanced 0.000, many 11.224 (px, both backends)
 <!-- observed:end -->
 
 ## Expected
 
-`instanced` equal to `plain` (5.612 px).
+`instanced` and `many` equal to `plain`.
 
-## Where it seems to come from
+## Cause
 
-The instanced path (`instancedMesh()` in three.webgpu.js) registers `OnObjectUpdate` to copy `matrices.array` into `previousInstanceMatrix.array` before the draw. What reaches the GPU as the previous matrix reads like the identity: 1.871 px is exactly the current position's distance from the origin (x = 0.1 at the third frame), where 5.612 px is one frame's motion. This is a reading of the source, not a verified cause.
+Verified by the patch below. `instance()` (`src/nodes/accessors/Instance.js`) copies the current matrices into the previous ones
+in an `OnObjectUpdate`, which runs as the object is drawn -- after the application has set this frame's matrices:
+
+- within the uniform buffer (one instance here) the previous matrices the shader reads are this draw's own: 0 px;
+- past it (1100 instances) they are drawn from an `InstancedInterleavedBuffer` made over the copy's array, which nothing marks
+  for upload, so it keeps the matrices it was made with -- the first frame's: at the third frame, two frames' motion.
+
+And a buffer marked in `OnObjectUpdate` reaches the GPU a draw late: the draw's attributes are uploaded
+(`_geometries.updateForRender`) before its object events run (`_nodes.updateForRender`).
+
+## A patch
+
+[`patches/01-instance-previous-matrix.diff`](patches/01-instance-previous-matrix.diff), a diff against three's `src/` at the r185 tag. Each draw's matrices are kept and become the previous ones at the next draw, in an `OnBeforeObjectUpdate` so they are uploaded with it; the interleaved buffer made over them is marked for upload too. Applied to r185's build, the
+reproduction prints:
+
+<!-- patched:begin -->
+plain 5.612, instanced 5.612, many 5.612 (px, both backends)
+<!-- patched:end -->
+
+Drawn by the material itself rather than through MRT, the instanced mesh meets another bug first:
+[04](04-velocity-outside-mrt.md).
 
 ## A fix that works in an application
 

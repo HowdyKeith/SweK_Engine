@@ -1,0 +1,16 @@
+diff --git a/src/materials/nodes/SpriteNodeMaterial.js b/src/materials/nodes/SpriteNodeMaterial.js
+index e03f2c2..4bd4d94 100644
+--- a/src/materials/nodes/SpriteNodeMaterial.js
++++ b/src/materials/nodes/SpriteNodeMaterial.js
+@@ -132,7 +132,10 @@ class SpriteNodeMaterial extends NodeMaterial {
+ 
+ 		if ( object.center && object.center.isVector2 === true ) {
+ 
+-			const center = reference( 'center', 'vec2', object );
++			// the center of the sprite being drawn: sprites with like materials share one program, and a reference bound to
++			// the object that built it would read that sprite's center for every one of them
++
++			const center = reference( 'center', 'vec2' );
+ 
+ 			alignedPosition = alignedPosition.sub( center.sub( 0.5 ) );
+ 
