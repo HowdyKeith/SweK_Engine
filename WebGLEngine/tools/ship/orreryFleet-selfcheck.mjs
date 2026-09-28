@@ -369,6 +369,21 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
     const D = F.COMMIT_BELT_DRIFT_V4776;
+    // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
+    // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
+    // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
+    // and this is the gate that names both.
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4621, N = F.COMMIT_BELT_DRIFT_V4776;
+        const others = Object.keys(O.movedSince4475).filter((k) => k !== "three");
+        ok("!! the v4776 belt record is v4621's with ONE body extended, and v4621's own entry is unchanged",
+           others.every((k) => N.movedSince4475[k] === O.movedSince4475[k]) &&
+           N.movedSince4475.three.now.length === O.movedSince4475.three.now.length + 1 &&
+           N.movedSince4475.three.now.slice(1).every((h, i) => h === O.movedSince4475.three.now[i]) &&
+           N.arrivedSince4475 === O.arrivedSince4475 && O.at === "v4621" && N.at === "v4776",
+           `three: v4621 ends ${O.movedSince4475.three.now.join(" ")}, v4776 adds ${N.movedSince4475.three.now[0]} on ` +
+           `top; ${others.length} other moved bodies (${others.join(", ")}) identical by reference`);
+    }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still
     // "differs" by whatever the boundary swallowed: this read 0 unchanged of 15 and the true figure is 11.
