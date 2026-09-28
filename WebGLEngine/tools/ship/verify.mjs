@@ -638,6 +638,11 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     }
     check("quick sweep: no gate outside the red register is red", r.newRed.length === 0,
       r.newRed.length ? "NEW RED: " + r.newRed.map((n) => n.gate + " exit " + n.code).join(", ") + " -- fix it or register it in redCensus.mjs with a reason" : `${r.ran} gates, ${r.knownRed.length} known reds on record`);
+    // v4692 -- a gate capped ALONE says where it was when the cap fell, as a red says where it died.
+    for (const c of r.capped || []) {
+        console.log(`[verify]   capped  ${c.gate}  killed at ${c.ms} ms alone -- last output before the cap:`);
+        for (const l of (c.last && c.last.length ? c.last : ["(nothing on the tail: it printed nothing before the cap)"])) console.log(`[verify]      ${String(l).slice(0, 200)}`);
+    }
     check("quick sweep: nothing timed out alone under the cap", r.unmeasured.length === 0, r.unmeasured.join(", ") || "");
   } catch (e) { check("quick sweep ran", false, "COULD NOT RUN: " + String(e && e.message).slice(0, 120)); }
 }

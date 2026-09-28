@@ -922,6 +922,18 @@ sec("8h. WHAT A KILLED GATE LEAVES IS GONE BEFORE THE NEXT GATE RUNS (v4692)");
     ok(!fs.existsSync(planted) && sw.unmeasured.length === 1 && named.length >= 1,
        "*** a whole-tree sweep that caps a gate RECLAIMS what it planted, and says so, before anything else runs ***",
        `fixture ${fs.existsSync(planted) ? "STILL ON DISK" : "gone"}; ${sw.unmeasured.length} unmeasured; ${named.length} reclaim line(s): ${named[0] || "none"}`);
+
+    // The rig's v4691 verify capped deletionHarness and multigrid3dTiming -- 3 s each alone on that box -- and the
+    // log carried only their names. A capped gate's tail is now carried like a dead one's, so the next capture
+    // says where it was when the cap fell. The fixture announces a step and then hangs.
+    fs.writeFileSync(path.join(root, "tools", "ship", "stuck-selfcheck.mjs"),
+        'console.log("  PASS  step one");\nconsole.log("  ----  entering step two");\nsetTimeout(() => {}, 60000);\n');
+    const cp = await Q.runQuickSweep({ root, gates: ["tools/ship/stuck-selfcheck.mjs"], budgetMs: 60000, workers: 1, capMs: 1500,
+                                       write: false, serialSliceMs: 0, log: () => {} });
+    const c0 = (cp.capped || [])[0];
+    ok(cp.unmeasured.length === 1 && !!c0 && c0.gate === "tools/ship/stuck-selfcheck.mjs" && c0.last.some((l) => /entering step two/.test(l)),
+       "*** a gate capped ALONE carries what it printed last, so a timeout names where it stopped ***",
+       c0 ? `${c0.gate} at ${c0.ms} ms: ${JSON.stringify(c0.last)}` : `capped: ${JSON.stringify(cp.capped)}`);
     for (const d of [tmp, root]) try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
 }
 

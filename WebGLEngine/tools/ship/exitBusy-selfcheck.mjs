@@ -105,9 +105,14 @@ process.exit(0);
     // per 300 ms window on the rig -- ONE Windows scheduler tick -- so its cpuUsage read "win1 0.0 AND win2 15.0",
     // a tick or nothing, and the steady fixture looked like a burst. Five milliseconds of every ten is about half a
     // core on ANY box, ~50 ms of each 100 ms window (v4692: W above), several ticks above the floor wherever this runs.
+    // *** v4692 -- AND THAT WAS WRONG ON WINDOWS, WHICH READ "win1 0.0 AND win2 0.0" AT 100 ms WINDOWS. *** Windows
+    // charges CPU by SAMPLING at its 15.6 ms clock tick, and a 5 ms burn fired by a timer starts just after a tick
+    // and can end before the next one, so it is never charged at all; at 300 ms windows some bursts drifted across
+    // a tick and it passed. A burn LONGER than a tick must contain one, so 20 ms of every 25 is charged at least a
+    // tick per burst under sampling and ~80 ms a window under exact accounting -- over the floor either way.
     const STEADY = write("steady-selfcheck.mjs", `
 let sink = 0;
-const t = setInterval(() => { const e = Date.now() + 5; while (Date.now() < e) sink++; }, 10);
+const t = setInterval(() => { const e = Date.now() + 20; while (Date.now() < e) sink++; }, 25);
 t.unref();
 console.log("steady");
 process.exit(0);

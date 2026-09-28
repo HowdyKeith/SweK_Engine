@@ -389,9 +389,12 @@ export function selectGates(all, timings, budgetMs, { crossings = null, minCross
 
 /** Reconcile serial reds against the register: known (with the record that names them) versus new. */
 export function reconcile(rows, register = redRegister()) {
-    const known = [], fresh = [], unmeasured = [];
+    const known = [], fresh = [], unmeasured = [], capped = [];
     for (const r of rows) {
-        if (r.verdict === VERDICT.UNCONFIRMED) { unmeasured.push(r.gate); continue; }   // timed out alone: not a verdict
+        // timed out alone: not a verdict. v4692: but what it printed before the cap travels with it -- the rig's
+        // v4691 verify capped deletionHarness and multigrid3dTiming, which run in 3 s alone there, and all the
+        // log could say was their names.
+        if (r.verdict === VERDICT.UNCONFIRMED) { unmeasured.push(r.gate); capped.push({ gate: r.gate, ms: r.serialMs, last: deathTail(r.serialTail) }); continue; }
         if (r.verdict !== VERDICT.RED) continue;
         if (register.has(r.gate)) known.push({ gate: r.gate, record: register.get(r.gate), ms: r.serialMs });
         // *** v4647i -- NO `kind` FIELD HERE, AND THAT IS A MEASURED CORRECTION. *** The first draft stored
@@ -419,7 +422,7 @@ export function reconcile(rows, register = redRegister()) {
                          died: fail.length ? null : deathTail(r.serialTail) });
         }
     }
-    return { known, newRed: fresh, unmeasured };
+    return { known, newRed: fresh, unmeasured, capped };
 }
 
 // The convention every skipping gate in the tree already prints, and which selfchecks.mjs has read since v3941.
@@ -797,7 +800,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // reader to notice.
         knownRedSkipped: skipUnchanged
             ? (() => { const reg = redRegister(); return (sel.unchanged || []).filter((g) => reg.has(g)).length; })() : 0,
-        green, falseReds, falseRedList, falseRedSplit: falseRedSplit(falseRedList), knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, dropped,
+        green, falseReds, falseRedList, falseRedSplit: falseRedSplit(falseRedList), knownRed: rec.known, newRed: rec.newRed, unmeasured: rec.unmeasured, capped: rec.capped, dropped,
         // v4408: green gates whose PARALLEL time crossed the budget and were re-run alone before being filed,
         // and how many of those the serial reading brought back under. The second number is the starvation.
         budgetConfirmed: rows.filter((r) => r.from === "budget-confirm").length,

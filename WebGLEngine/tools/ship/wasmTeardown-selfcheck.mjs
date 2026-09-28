@@ -171,10 +171,15 @@ ${last}
         const a = run(A), b = run(B);
         report(`process.exit(1)      status ${a.status} in ${a.ms} ms      ` +
                `process.exitCode = 1  status ${b.status} in ${b.ms} ms`);
-        ok("*** setting the code gives the SAME status after the same wasm work, so the repair changes no verdict ***",
-            a.status === 1 && b.status === 1,
-            "both leave with 1. A gate's exit code is what the sweep reads, and swapping the line does not " +
-            "touch it -- what it changes is whether the process is still standing when it leaves");
+        // *** v4692 -- "BOTH LEAVE WITH 1" WAS LINUX'S READING, ASSERTED AS EVERY PLATFORM'S. *** Keith's rig failed this
+        // row: on Windows process.exit() after wasm work is the teardown race this gate exists for, and when it lands
+        // the forced exit's status is the crash, not 1. What the repair must never change is the VERDICT -- red stays
+        // red -- and what it must guarantee is that the repaired script leaves with exactly the code it set.
+        ok("*** setting the code gives the SAME VERDICT after the same wasm work, and exactly the code it set ***",
+            b.status === 1 && a.status !== 0 && a.status != null,
+            `process.exit(1) left with ${a.status}${a.status === 1 ? "" : " (the teardown race landed -- the crash this gate is about)"}, ` +
+            `process.exitCode = 1 with ${b.status}. A gate's exit code is what the sweep reads: both are red, and the ` +
+            "repaired one is red with its own code rather than the crash's");
         // *** AND IT DOES NOT HANG, WHICH IS THE ONE REAL RISK IN THE SWAP. *** process.exitCode does not stop
         // the process; it waits for the loop to drain. If a wasm gate held the loop open, the repair would turn
         // a crash into a cap kill, which is a worse trade.
