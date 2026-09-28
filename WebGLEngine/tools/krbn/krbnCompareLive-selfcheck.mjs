@@ -465,11 +465,23 @@ console.log("\n15. STEP 2: THE RIGGED .glb ITSELF, LOADED BACK INDEPENDENTLY AND
 {
     const RG = fs.readFileSync(path.join(ENG, "krbn-rigged.html"), "utf8");
     const RE = fs.readFileSync(path.join(ENG, "tools", "krbn", "riggedExport.js"), "utf8");
+    // v4776 -- THE ROW PINNED THE LITERAL '160', AND ce276dff RE-VENDORED THE PAIR TOGETHER. three went r160 ->
+    // 0.185.1 and GLTFExporter.js was replaced from the same npm tarball in the same commit (PROVENANCE.txt names
+    // it), so the pair is still matched; what broke was the number and where REVISION lives -- three.core.js since
+    // 0.185, which three.module.js re-exports. The row now reads the revision off the tree and asks PROVENANCE
+    // whether the exporter came with it, which is the property "the SAME revision" was always standing in for.
+    const T3 = path.join(ENG, "vendor", "three");
+    const revOf = (f) => { try { return (/REVISION = '(\d+)'/.exec(fs.readFileSync(path.join(T3, f), "utf8")) || [])[1]; } catch { return undefined; } };
+    const rev = revOf("three.core.js") || revOf("three.module.js");
+    const prov = fs.existsSync(path.join(T3, "PROVENANCE.txt")) ? fs.readFileSync(path.join(T3, "PROVENANCE.txt"), "utf8") : "";
+    const provRev = (/RE-VENDORED[^\n]*->\s*0\.(\d+)\.\d+/.exec(prov) || [])[1];
     ok("!! GLTFExporter is vendored, from the SAME three revision already in the tree",
-       fs.existsSync(path.join(ENG, "vendor", "three", "jsm", "exporters", "GLTFExporter.js")) &&
-       /REVISION = '160'/.test(fs.readFileSync(path.join(ENG, "vendor", "three", "three.module.js"), "utf8")) &&
-       fs.readFileSync(path.join(ENG, "vendor", "three", "jsm", "exporters", "GLTFExporter.js"), "utf8").length > 1000,
-       "a different revision's exporter against this tree's r160 loader is an unverified combination, not a matched pair");
+       fs.existsSync(path.join(T3, "jsm", "exporters", "GLTFExporter.js")) && !!rev &&
+       provRev === rev && /jsm\/exporters\/GLTFExporter\.js/.test(prov) &&
+       fs.readFileSync(path.join(T3, "jsm", "exporters", "GLTFExporter.js"), "utf8").length > 1000,
+       `three REVISION ${rev}; PROVENANCE's re-vendor names 0.${provRev} and ` +
+       `${/jsm\/exporters\/GLTFExporter\.js/.test(prov) ? "lists" : "does NOT list"} the exporter among the files replaced from ` +
+       "that tarball. A different revision's exporter against this tree's loader is an unverified combination, not a matched pair");
     ok("!! three's own LICENSE sits beside the vendored copy", fs.existsSync(path.join(ENG, "vendor", "three", "LICENSE")));
     ok("!! rigid (unskinned) parts get weight 1.0 to their owning bone -- not dropped, not left unweighted",
        /W\[0\] = 1;/.test(codeOnly(RE)) && /parent, hops = 0, idx = -1/.test(codeOnly(RE)),
