@@ -90,11 +90,14 @@ else {
                 const holeSpark = Array.from(Lh.subarray(at.spark * 4, at.spark * 4 + 3)), sparkWas = Array.from(L.subarray(at.spark * 4, at.spark * 4 + 3));
                 stage.dispose(); dz.dispose(); hz.dispose();
                 // where two panels overlap -- the layer's alpha 0.35 + 0.5 x 0.65 -- and where one thing covers
-                let mx = 0, n = 0, mxOne = 0, nTwo = 0; for (let i = 0; i < D * D; i++) { const two = L[i * 4 + 3] > 0.6; if (two) nTwo++;
-                    for (let c = 0; c < 3; c++) { const d = Math.abs(C[i * 4 + c] - W[i * 4 + c]); if (d > 0) n++; mx = Math.max(mx, d); if (!two) mxOne = Math.max(mxOne, d); } }
+                // v4776: the distance in float32 ULPS as well, read off the bits -- one rounding apart is one ulp, whatever the value
+                const CB = new Uint32Array(Float32Array.from(C).buffer), WB = new Uint32Array(Float32Array.from(W).buffer);
+                let mx = 0, n = 0, mxOne = 0, nTwo = 0, ulpOne = 0, nOne = 0; for (let i = 0; i < D * D; i++) { const two = L[i * 4 + 3] > 0.6; if (two) nTwo++;
+                    for (let c = 0; c < 3; c++) { const d = Math.abs(C[i * 4 + c] - W[i * 4 + c]); if (d > 0) n++; mx = Math.max(mx, d);
+                        if (!two) { mxOne = Math.max(mxOne, d); if (d > 0) nOne++; ulpOne = Math.max(ulpOne, Math.abs(CB[i * 4 + c] - WB[i * 4 + c])); } } }
                 const pix = Object.fromEntries(Object.entries(at).map(([k, i]) => [k, Array.from(L.subarray(i * 4, i * 4 + 4))]));
                 let covered = 0; for (let i = 0; i < D * D; i++) if (L[i * 4 + 3] > 0) covered++;
-                const o = { depthTex: { dq, nq, holeSpark, sparkWas }, maxDiff: mx, differ: n, maxOne: mxOne, twoPx: nTwo, pix, covered, state, hiddenWhile, openWhile, afterRestore };
+                const o = { depthTex: { dq, nq, holeSpark, sparkWas }, maxDiff: mx, differ: n, maxOne: mxOne, ulpOne, nOne, twoPx: nTwo, pix, covered, state, hiddenWhile, openWhile, afterRestore };
                 if (mode === "webgpu") {
                     // what a layer cannot carry, refused by the object's name
                     const refusals = {};
@@ -126,8 +129,17 @@ else {
         const f = (v) => v.toFixed(6);
         for (const mode of ["webgpu", "webgl2"]) {
             const o = r.result[mode], p = o.pix;
-            ok(`*** [${mode}] the frame drawn without them with the layer composited over it IS the frame drawn with them where one thing covers -- to the bit, ${o.covered - o.twoPx} pixels -- and within a rounding where two panels overlap: ${o.differ} channel values of ${D * D * 3} differ, by at most ${o.maxDiff.toExponential(2)} ***`,
-               o.maxOne === 0 && o.maxDiff <= 2 ** -23 && o.twoPx > 0, `a panel, a premultiplied panel, an additive spark and a premultiplied one, part of the panel behind a box, and a lens reading the frame behind it drawn over the frame first (renderOver); over two panels (${o.twoPx} pixels) the layer associates what the frame nests`);
+            // *** v4776 -- "TO THE BIT" WAS SWIFTSHADER'S, AND KEITH'S RIG MEASURED ONE ROUNDING. *** Where one thing covers,
+            // the direct draw is src*a + dst*(1-a) in the blend unit, and the layer is src*a STORED to a float target and
+            // then added to dst*(1-a) -- the same arithmetic with one more rounding in it, which a blender that fuses the
+            // multiply-add does not take. SwiftShader rounds both the same way and read 0; the rig's NVIDIA adapter read
+            // 1319 (webgpu) and 960 (webgl2) channel values off by at most 5.96e-8 -- 2^-24, ONE float32 ulp for a value
+            // in [0.5, 1). So the claim is now counted in ULPS off the bits: where one thing covers, within ONE rounding,
+            // which is exact on a box that does not fuse and one ulp on a box that does. A second ulp is not a rounding,
+            // and a wrong blend is thousands: SABOTAGED at v4776 by compositing with (1.0005 - a) in fsrFrameGenTsl.mjs's uiNode
+            // -> 9792 ulp, 47370 values off, RED on both backends; restored, 0 ulp here again.
+            ok(`*** [${mode}] the frame drawn without them with the layer composited over it IS the frame drawn with them where one thing covers -- within ONE float32 rounding (${o.ulpOne} ulp, ${o.nOne} values off), ${o.covered - o.twoPx} pixels -- and within a rounding where two panels overlap: ${o.differ} channel values of ${D * D * 3} differ, by at most ${o.maxDiff.toExponential(2)} ***`,
+               o.ulpOne <= 1 && o.maxDiff <= 2 ** -23 && o.twoPx > 0, `a panel, a premultiplied panel, an additive spark and a premultiplied one, part of the panel behind a box, and a lens reading the frame behind it drawn over the frame first (renderOver); over two panels (${o.twoPx} pixels) the layer associates what the frame nests. Exact (0 ulp) on a blender that rounds the product before adding, as SwiftShader does; 1 ulp on one that fuses them, as the rig's NVIDIA adapter does`);
             ok(`  [${mode}] its alpha is what each covers: the panel alone ${f(p.glassOnly[3])}, under each spark ${f(p.spark[3])} and ${f(p.spark2[3])} with the sparks' light ${f(p.spark[0])} and ${f(p.spark2[0])}`,
                Math.abs(p.glassOnly[3] - 0.35) < 1e-6 && p.spark[3] === 0 && p.spark2[3] === 0 && p.spark[0] > 0.3 && p.spark2[0] > 0.2,
                "an additive material covers nothing: its alpha is drawn Zero, One, and its colour's factors are three's own");
