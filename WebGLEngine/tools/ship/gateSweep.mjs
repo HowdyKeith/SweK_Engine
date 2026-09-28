@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4773 -- THE 380th CLOSING: the three.js patches on the paths their drafts' reproductions skip.
+    since455: Object.freeze({
+        at: "v4773", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** ONE PATCH WAS WRONG ON A PATH ITS REPRODUCTION NEVER TOOK, AND ONE ROW PASSED FOR THE WRONG REASON FIRST. *** Each " +
+                 "patch meets the paths its draft's reproduction does not take, on r185's build and patched, both backends. Reached: " +
+                 "instance matrices as a storage attribute written on the CPU (11.224 -> 5.612 px), three relative targets and absolute " +
+                 "ones, velocity drawn by a colorNode. Not reached, and said so: matrices a compute pass writes, per-instance morphs. " +
+                 "Patch 02 read a grown batch as right until the batch's material was updated after the growth -- without it three " +
+                 "itself draws a grown batch from its old texture, and the patch's copy, resized in place, was never uploaded: both " +
+                 "frozen a frame apart. With it the patch read 11.224; its copy is a new texture now, the last draw's matrices kept as " +
+                 "its first entries, 5.612. Ten sabotages red; one only once the morph influences never summed to 0. The hunk applier " +
+                 "is tools/ship/threePatch.mjs, shared with threeUpstream-selfcheck.",
+    }),
     // v4772 -- THE 379th CLOSING: the motion stage past 1024 instances.
     since454: Object.freeze({
         at: "v4772", swept: 1, green: 1, red: 0,

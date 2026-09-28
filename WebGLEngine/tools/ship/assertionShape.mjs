@@ -581,8 +581,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4769 -- 1852 -> 1853 for fx/fsr/fsrFrameGenReach-selfcheck.mjs -- where the flow lost to the vectors on pans: holes left black, and a fill that reaches 16.
     // v4770 -- 1853 -> 1854 for render/temporalTslNodes-selfcheck.mjs -- sprites turned by a node, sized points on a sprite, and a position node over skins and morphs.
     // v4772 -- 1854 -> 1855 for render/temporalTslMany-selfcheck.mjs -- the motion stage past 1024 instances: the previous matrices a texture.
-    gates: 1855, usesOk: 1834, definesOk: 1826, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1727, condFirst: 91, unknownSignature: 16,
+    // v4773 -- 1855 -> 1856 for tools/ship/threeUpstreamPaths-selfcheck.mjs -- the three.js patches on the paths their drafts' reproductions skip.
+    gates: 1856, usesOk: 1835, definesOk: 1827, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1728, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
