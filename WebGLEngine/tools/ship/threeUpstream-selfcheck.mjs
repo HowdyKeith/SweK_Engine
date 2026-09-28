@@ -203,6 +203,11 @@ if (!skip) { const was = results["stages r185"], r = results["stages patched"];
 // V1 the recorded r185 hash off by one digit -> 1; V2 the recorded patched hash off by one digit -> 1; V3 the import line left
 // in the applier's order (tools/ship/threePatch.mjs's normalImports doing nothing) -> 1; V4 patch 05 changed after the record, a
 // comment reworded -> 1, the staleness row alone, as it should be; V5 a draft importing 0.185.0 again -> 1. None green.
+// ---- v4775 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// W1 07's pose updated once a frame again -> 1; W2 08's sync once a frame again -> 3; W3 09's dynamic key given a constant ->
+// 3; W4 the bundler's hash -> hash$1 rename forgotten -> 5 (09's hunk not found, so its build is r185's); W5 a number of 08's
+// Observed block edited -> 2 (the block and the index line). None green. W1 first ran on no text at all: its line is in the
+// patch twice, once for skinning() and once for computeSkinning(), as 07's hunks were until given six lines of context.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's e2e tests, which need its examples and screenshots; " +
