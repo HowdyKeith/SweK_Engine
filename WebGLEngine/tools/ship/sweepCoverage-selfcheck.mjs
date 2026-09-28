@@ -1516,6 +1516,21 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
        "draft, and it reddened two rows that had nothing to do with the oscillation.");
 }
 
+// ---- v4726: THE LEDGER STAMPS THIS MODULE OWNS, NAMED BY THE GATE THAT SHARES ITS NAME ------------------------
+// v4725 put ledgerStamps and selectionKind here and graded them only in tools/ship/timingKind-selfcheck.mjs, so
+// definitionGates' tree-wide ratchet -- which asks THIS file to name them -- sat at 364 against a frozen 362 from
+// that commit on, unseen because it runs outside the quick sweep. timingKind keeps the fixtures that drive the
+// arrival rule; what belongs here is the ledger's own invariant, on the live file.
+{
+    const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
+    const at = Date.parse(led.at || ""), pool = Date.parse(led.poolAt || led.at || "");
+    const next = SC.ledgerStamps(led, "2099-01-01T00:00:00.000Z", SC.selectionKind({ gate: "any" }));
+    ok("v4726: the live rotation ledger's poolAt is not later than its at, and a named write keeps it",
+       Number.isFinite(at) && Number.isFinite(pool) && pool <= at && next.poolAt === (led.poolAt || led.at) &&
+       SC.ledgerStamps(led, "2099-01-01T00:00:00.000Z", SC.selectionKind({})).poolAt === "2099-01-01T00:00:00.000Z",
+       `at ${led.at}, poolAt ${led.poolAt || "(absent: reads at)"} -- only an unfiltered pool pass may move poolAt`);
+}
+
 REPORT.write();
 console.log(`\nsweepCoverage-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

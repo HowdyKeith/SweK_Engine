@@ -37,6 +37,13 @@ export class OnlineTrainer {
         this.batch = opts.batch ?? 16;
         this.bufferCap = opts.bufferCap ?? 512;
         this.rowTtlMs = opts.rowTtlMs ?? 15000;
+        // v4698 -- the minibatch sampler's source of uniform [0,1) draws. Math.random unless a caller passes
+        // one, so every live-brain caller is unchanged. MEASURED before this existed: two supervised runs
+        // given the same init seed shared 0 of 192 weights (worst |dW| 4.98), because the init was seeded
+        // and the sampling was not -- a "seed" that fixed half a run.
+        // The default looks Math.random up AT CALL TIME, not here: a gate that swaps Math.random after the
+        // trainer exists (tools/ship/aiHuntBrain-selfcheck.mjs does) must still reach the sampler.
+        this.rng = typeof opts.rng === "function" ? opts.rng : () => Math.random();
 
         this.rows = new Map();     // "id:name" -> { x: number[], ts }
         this.buffer = [];          // { x, r }
@@ -96,7 +103,7 @@ export class OnlineTrainer {
     step(W) {
         if (this.buffer.length < this.minBuffer) return false;
         for (let s = 0; s < this.batch; s++) {
-            const { x, r, w } = this.buffer[(Math.random() * this.buffer.length) | 0];
+            const { x, r, w } = this.buffer[(this.rng() * this.buffer.length) | 0];
             let z = 0;
             for (let i = 0; i < W.length; i++) z += W[i] * x[i];
             const p = 1 / (1 + Math.exp(-z));
@@ -196,7 +203,7 @@ export class MLPTrainer extends OnlineTrainer {
         const F = L1.nIn, H = L1.nOut;
         const lr = this.lr, l2 = this.l2;
         for (let s = 0; s < this.batch; s++) {
-            const { x, r, w } = this.buffer[(Math.random() * this.buffer.length) | 0];
+            const { x, r, w } = this.buffer[(this.rng() * this.buffer.length) | 0];
             const ipsW = w ?? 1;                       // v8 -- IPS weight
             // forward
             for (let o = 0; o < H; o++) {

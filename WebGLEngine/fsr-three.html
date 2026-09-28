@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="FSR on a three.js scene (TSL)">
+<meta name="demo:desc" content="A three.js WebGPURenderer scene rendered at reduced resolution and brought back up two ways, both written as TSL and graded against this tree's CPU references on both of three's backends: FSR1 (EASU then RCAS, one frame) and FSR2 (fsr.html's temporal chain -- jitter, motion, dilation, depth clip, reactive and lock masks, accumulation, RCAS). On this scene FSR2 is 2.4 dB closer to a supersampled render than FSR1. Compare against a bilinear stretch and the native render; debug views show the motion field and the masks.">
+<meta name="demo:category" content="fx">
+<title>FSR on a three.js scene</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #hud { padding:14px 16px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  select, input[type=checkbox] { accent-color:var(--cyan); background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:6px; font:12px ui-monospace, monospace; padding:3px 6px; }
+  input[type=range] { accent-color:var(--cyan); }
+  .stat { color:var(--dim); font-size:12px; }
+  .fail { color:#f08080; }
+  #view { display:block; margin:0 16px 20px; max-width:calc(100% - 32px); border:1px solid #14203a; border-radius:8px; background:#000; image-rendering:pixelated; }
+</style>
+</head>
+<body>
+<!--
+  v4726 -- FSR1 FOR A THREE.JS SCENE, WHERE A PERSON CAN LOOK AT IT. fx/fsr/fsrTsl.mjs is graded by
+  fx/fsr/fsrTsl-selfcheck.mjs against fx/fsr/fsr.js on SwiftShader, which is not a GPU and does not present a
+  canvas; this page is the caller that renders a moving scene through the three passes on the machine it is opened
+  on. Nothing here is measured or asserted -- the frame time in the readout is this browser's, and the picture is
+  for eyes.
+-->
+<div id="hud">
+  <h1>&#9673; FSR on a three.js scene &middot; TSL</h1>
+  <div class="row">
+    <label>mode <select id="mode">
+      <option value="fsr" selected>FSR1 (EASU + RCAS)</option>
+      <option value="bilinear">bilinear stretch</option>
+      <option value="fsr2">FSR2 (temporal: jitter, dilation, clip, masks, accumulate, RCAS)</option>
+      <option value="native">native resolution</option>
+      <option value="motion">motion vectors (debug)</option>
+      <option value="masks">clip + lock masks (debug)</option>
+      <option value="locks">FSR2 with its locks in red (debug)</option>
+      <option value="gen">generated frame, halfway between the last two, holes filled (debug)</option>
+      <option value="genholes">generated frame, halfway between the last two, holes black (debug)</option>
+      <option value="flow">optical flow, from the colour alone (debug)</option>
+      <option value="fsr3gen">FSR3: the frame generated between the last two FSR2 frames (debug)</option>
+      <option value="fsr3paced">FSR3 paced: real FSR2 frames every few refreshes, generated frames between</option>
+    </select></label>
+    <label>scale <select id="scale">
+      <option value="1.5">1.5x</option>
+      <option value="2" selected>2x</option>
+      <option value="3">3x</option>
+    </select></label>
+    <label>sharpness <input id="sharp" type="range" min="0" max="1" step="0.05" value="0.8"> <span id="sharpV">0.80</span></label>
+    <label><input id="denoise" type="checkbox"> denoise</label>
+    <label title="FSR2's lock stage as fsr.html runs it: a reprojected luma ring whose period must be the jitter's phase count. It keeps every luma, so it is large -- the figure is its float memory at this scale."><input id="lock" type="checkbox"> lock ring <span id="lockMB"></span></label>
+    <label title="Where FSR2 relaxes its neighbourhood clamp: pixels holding a feature thinner than a pixel, found by a ridge test on this frame's luma or on the lock ring's jitter-free mean, held for 8 frames. fx/fsr/fsrTemporalLocks-selfcheck.mjs measures what it buys.">locks <select id="lockFrom">
+      <option value="frame" selected>from the frame</option>
+      <option value="ring">from the ring (needs the lock ring)</option>
+      <option value="off">off</option>
+    </select></label>
+    <label>transfer <select id="transfer">
+      <option value="srgb" selected>srgb (EASU on perceptual values)</option>
+      <option value="none">none (EASU on linear values)</option>
+    </select></label>
+    <label><input id="spin" type="checkbox" checked> spin</label>
+    <label title="The floor's stripes slide along the floor, which does not move: its motion vectors stay zero and only the optical flow sees it -- the case FSR3 runs a flow for."><input id="scroll" type="checkbox"> scroll the floor's texture</label>
+    <label title="FSR3 paced: a real FSR2 frame every N refreshes, and render/framePacer.mjs choosing, at each refresh, a generated frame, a real one or neither.">pacing <select id="cadence">
+      <option value="2" selected>real every 2nd refresh</option>
+      <option value="3">real every 3rd refresh</option>
+    </select> <select id="policy">
+      <option value="midpoint" selected>FSR3's half-way frame</option>
+      <option value="timed">timed: a frame at each refresh's own time</option>
+    </select></label>
+    <label title="FSR3 paced on the BROWSER'S clock: each refresh is requestAnimationFrame's own timestamp, the scene is sampled at it, a real frame is ready when the GPU's queue has drained after it, and what a refresh draws counts as shown at the next one. The refresh is the median of the timestamps' intervals, and the stat line grades the last two seconds as they happened (render/framePacer.mjs's makeLivePacing). Off: an ideal 60 Hz grid, the scene a nominal frame a refresh."><input id="liveclock" type="checkbox"> pacing: the browser's clock</label>
+    <label title="The generated-frame views: splat with each pixel's displacement to its pose at the half-way time -- the arc a turning body follows -- instead of half its vector, the chord. It pays only where rotation is fast (fx/fsr/fsrFrameGenArc-selfcheck.mjs); not with the optical flow."><input id="genarc" type="checkbox"> gen: motion on the arc</label>
+    <label title="How fast the knot turns in the generated-frame views, in multiples of the page's rate: the arc is a hundredth of a pixel from the chord at 4x and pixels at 60x.">gen spin <select id="speed">
+      <option value="1" selected>1x</option>
+      <option value="4">4x</option>
+      <option value="30">30x</option>
+      <option value="60">60x</option>
+    </select></label>
+    <label title="The generated-frame views: reconcile the motion vectors with an optical flow of the two frames, per pixel -- the flow takes a pixel only by explaining it ten times better than its vector, or twice as well where the vector says the surface stood still (fx/fsr/fsrFrameGenFlow-selfcheck.mjs and fx/fsr/fsrFrameGenScene-selfcheck.mjs measure what that buys)."><input id="genflow" type="checkbox"> gen: + optical flow</label>
+    <label title="With the optical flow: search the whole window at the coarsest level only and refine within 2 pixels below it -- half the flow's reads (72M a frame against 145M at 960 x 540, each level on its own block grid since v4753), the same shifts found, no more than 0.1 dB below the full search on fx/fsr/fsrFrameGenFlow-selfcheck.mjs's cases (render/flowCost.mjs counts the reads, and the stat line prints them)."><input id="genflowcheap" type="checkbox"> gen: cheaper flow</label>
+    <label title="The generated-frame views: a HUD over the scene -- a crosshair and a bar across the knot, and panels at the edges. Its pixels stand still, and every motion vector under them is the scene's behind."><input id="genhud" type="checkbox"> gen: HUD</label>
+    <label title="With the HUD: generate from HUD-less frames and lay the newer frame's HUD over the generated one, as FSR3 composes UI (fx/fsr/fsrFrameGenScene-selfcheck.mjs: the HUD exact, +4.9 dB on the whole frame under a pan). Off, the HUD is drawn into the frames and generated with the scene, and it is dragged with the knot. The FSR3 views always composite it: FSR2 renders the scene alone."><input id="genui" type="checkbox" checked> gen: composite the HUD</label>
+    <label title="The HUD's marker slides along its bottom bar, a step each real frame. Composited, the HUD on a generated frame is drawn AT the time generated -- makeFrameGen's `ui` as a function of t -- so the marker is where it is then; off, it is the newer real frame's HUD, and the marker is half a frame ahead on every generated frame (fx/fsr/fsrFrameGenUi-selfcheck.mjs: 10 dB on its pixels against 72.8, +5.1 on the whole frame)."><input id="genuit" type="checkbox" checked> gen: HUD at the generated time</label>
+    <label title="v4766 -- the generated-frame views: the world the recent rounds took, in the scene -- a glass pane and additive sparks (v4760), a lens reading the frame behind it (v4765), a BatchedMesh and sprites (v4761), and 64 particles a compute pass moves (v4762). Off, the knot and the floor alone."><input id="genworld" type="checkbox"> gen: glass, sparks, a lens, particles</label>
+    <label title="v4766 -- with those: the glass and the sparks drawn at the generated time as a layer, and the lens drawn over the generated frame (render/translucentLayer.mjs; fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs and fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs: +2.5 to +41.7 dB on translucent pixels, +1.4 to +6.7 on a lens's). Off, they are drawn into the frames and generated as surfaces. A composited HUD is drawn into the same layer, over them."><input id="genlayer" type="checkbox" checked> gen: translucent things as a layer</label>
+  </div>
+  <div class="stat" id="stat">starting&hellip;</div>
+</div>
+<canvas id="view"></canvas>
+<script type="module">
+import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
+import * as TSL from "./vendor/three-webgpu/three.tsl.js";
+import { makeFsrSpatial } from "./fx/fsr/fsrTsl.mjs";
+import { makeMotionStage, glClip, makePreviousCopy } from "./render/temporalTsl.mjs";
+import { makeTranslucentLayer } from "./render/translucentLayer.mjs";
+import { dilateNodes, disocclusionNode, clipGapThreshold } from "./render/temporalClipTsl.mjs";
+import { makeLumaRing } from "./render/temporalLockTsl.mjs";
+import { makeFsrTemporal } from "./fx/fsr/fsrTemporalTsl.mjs";
+import { makeFrameGen } from "./fx/fsr/fsrFrameGenTsl.mjs";
+import { makeFsr3 } from "./fx/fsr/fsr3Tsl.mjs";
+import { makeFramePacer, makeLivePacing, refreshFromStamps } from "./render/framePacer.mjs";
+import { makeOpticalFlow } from "./render/opticalFlowTsl.mjs";
+import { flowCostModel } from "./render/flowCost.mjs";
+import { jitterPhaseCount } from "./render/jitter.mjs";
+
+const $ = (id) => document.getElementById(id);
+// v4766: the generated-frame switches can be set from the address: ?genworld=1&genlayer=0&genhud=1 ...
+{ const q = new URLSearchParams(location.search); for (const id of ["genworld", "genlayer", "genhud", "genui", "genuit", "genflow"]) if (q.has(id)) $(id).checked = q.get(id) !== "0"; }
+// v4766: ?size=WxH draws the page smaller -- a software renderer takes seconds a frame at 960 x 540 (tools/ship/fsrThreeWorld-selfcheck.mjs shoots 320 x 180)
+const [DW, DH] = (/^(\d{2,4})x(\d{2,4})$/.exec(new URLSearchParams(location.search).get("size") || "") || [0, 960, 540]).slice(1).map(Number);
+const stat = $("stat");
+try {
+    const canvas = $("view");
+    // ?backend=webgl2 asks three for its WebGL2 backend; the nodes compile to both, and the gate grades both
+    const forceWebGL = new URLSearchParams(location.search).get("backend") === "webgl2";
+    const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL });
+    await renderer.init();
+    renderer.setPixelRatio(1); renderer.setSize(DW, DH, false);   // the RCAS node reads screenCoordinate: the drawing buffer IS the display size
+    const backend = renderer.backend.isWebGPUBackend ? "WebGPU" : "WebGL2";
+
+    // a scene with the things an upscaler is judged on: thin high-contrast stripes, curved silhouettes, flat colour
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0.02, 0.03, 0.06);
+    const camera = new THREE.PerspectiveCamera(40, DW / DH, 0.1, 50); camera.position.set(0, 0.6, 5.2); camera.lookAt(0, 0, 0);
+    const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.9, 0.28, 220, 24), new THREE.MeshNormalNodeMaterial()); scene.add(knot);
+    const stripes = new THREE.MeshBasicNodeMaterial(), scrollU = TSL.uniform(0.0);   // v4740: the stripes can slide on a still floor
+    stripes.colorNode = TSL.Fn(() => { const s = TSL.floor(TSL.uv().x.mul(48.0).add(TSL.uv().y.mul(9.0)).add(scrollU)).mod(2.0); return TSL.mix(TSL.vec3(0.05, 0.08, 0.14), TSL.vec3(0.95, 0.72, 0.3), s); })();
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), stripes); floor.rotation.x = -Math.PI / 2; floor.position.y = -1.3; scene.add(floor);
+
+    // v4766 -- THE WORLD THE RECENT ROUNDS TOOK, for "gen: glass, sparks, a lens, particles": a glass pane and additive sparks
+    // (translucent, v4760), a lens with a backdropNode (v4765), a BatchedMesh and sprites (v4761), and particles a compute pass
+    // moves (v4762). poseAt(time) poses every moving part, so a generated frame's layer can be drawn at ITS time
+    const world = new THREE.Group(); world.visible = false; scene.add(world);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.4), new THREE.MeshBasicNodeMaterial({ transparent: true, color: 0x8cc0ff, opacity: 0.35 })); glass.position.set(-1.75, 0.15, 0.9); world.add(glass);
+    const sparkMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    sparkMat.colorNode = TSL.Fn(() => { const d = TSL.uv().sub(0.5); return TSL.vec3(1.0, 0.6, 0.2).mul(TSL.exp(d.dot(d).div(-0.02))); })();
+    const sparks = Array.from({ length: 6 }, () => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), sparkMat); world.add(m); return m; });
+    const lensMat = new THREE.MeshBasicNodeMaterial();
+    lensMat.backdropNode = TSL.viewportSharedTexture(TSL.screenUV.add(TSL.vec2(TSL.sin(TSL.uv().y.mul(25.0)).mul(0.02), 0.0))).rgb.mul(TSL.vec3(0.7, 0.85, 1.0));
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), lensMat); lens.position.set(1.75, 0.2, 0.9); world.add(lens);
+    const batch = new THREE.BatchedMesh(3, 600, 1200, new THREE.MeshNormalNodeMaterial()); batch.frustumCulled = false; batch.perObjectFrustumCulled = false;
+    const shapes = [batch.addGeometry(new THREE.BoxGeometry(0.3, 0.3, 0.3)), batch.addGeometry(new THREE.SphereGeometry(0.2, 10, 8))], batchIds = [0, 1, 0].map((g) => batch.addInstance(shapes[g])); world.add(batch);
+    const bobbers = [0xff6688, 0x66ffaa, 0x88aaff].map((c) => { const s = new THREE.Sprite(new THREE.SpriteNodeMaterial({ color: c })); s.scale.set(0.18, 0.18, 1); world.add(s); return s; });
+    const M4 = new THREE.Matrix4(), Q4 = new THREE.Quaternion(), E4 = new THREE.Euler(), S4 = new THREE.Vector3(1, 1, 1), V4 = new THREE.Vector3();
+    const poseAt = (time) => {
+        knot.rotation.set(time * 0.4, time * 0.6, 0); knot.updateMatrixWorld();
+        sparks.forEach((m, i) => { const a = time * 1.3 + i * Math.PI / 3; m.position.set(Math.cos(a) * 1.35, 0.2 + Math.sin(a * 2) * 0.25, Math.sin(a) * 0.6 + 0.4); m.updateMatrixWorld(); });
+        batchIds.forEach((id, i) => { const a = time * 0.7 + i * 2.1; batch.setMatrixAt(id, M4.compose(V4.set(Math.cos(a) * 2.2, -1.1, Math.sin(a) * 0.9 - 0.3), Q4.setFromEuler(E4.set(time, time * 0.5 + i, 0)), S4)); });
+        bobbers.forEach((s, i) => { s.position.set(-0.6 + i * 0.6, 1.25 + Math.sin(time * 2 + i) * 0.12, 0.3); s.updateMatrixWorld(); });
+    };
+    // 64 particles a compute pass moves, drawn as ONE sprite of count 64 placed by the storage buffer and sized by scaleNode, a
+    // step each real frame; the material says where they were -- makePreviousCopy, stepped before the pass that moves them
+    const NP = 64, p0 = new Float32Array(NP * 3), v0 = new Float32Array(NP * 3);
+    for (let i = 0; i < NP; i++) { const a = i * 2.399963; p0.set([Math.cos(a) * (0.5 + (i % 7) * 0.12), 0.9 + (i % 5) * 0.05, Math.sin(a) * 0.4 + 0.8], i * 3); v0.set([-Math.sin(a) * 0.01, 0.003 * Math.cos(i), Math.cos(a) * 0.006], i * 3); }
+    const pPos = TSL.instancedArray(p0, "vec3"), pVel = TSL.instancedArray(v0, "vec3"), pPrev = makePreviousCopy(THREE, TSL, pPos, NP);
+    const pMove = TSL.Fn(() => { pPos.element(TSL.instanceIndex).addAssign(pVel.element(TSL.instanceIndex)); })().compute(NP);
+    const pMat = new THREE.SpriteNodeMaterial({ color: 0xffe6a0 }); pMat.positionNode = pPos.toAttribute(); pMat.scaleNode = TSL.float(0.05); pMat.userData.previousPositionNode = pPrev.node.toAttribute();
+    const motes = new THREE.Sprite(pMat); motes.count = NP; world.add(motes);
+    let moteSteps = 0, layerDraws = 0, overDraws = 0;   // counted, so the stat line says the wiring ran and not only that it is on
+    const stepMotes = async () => { await pPrev.step(renderer); await renderer.computeAsync(pMove); moteSteps++; };
+    let layerObj = null;
+    const layer = () => layerObj || (layerObj = makeTranslucentLayer(THREE, { w: DW, h: DH, type: THREE.HalfFloatType }));
+
+    // the bilinear comparison is the driver's own renderBilinear: the same low-resolution frame, read through the
+    // same coordinates as EASU (see bilinearNode's note on why not a sampled texture)
+    let fsr = null, built = "";
+    const build = () => {
+        const k = Number($("scale").value), rw = Math.round(DW / k), rh = Math.round(DH / k);
+        const key = [k, $("transfer").value].join("|");
+        if (key === built) return;
+        if (fsr) fsr.dispose();
+        fsr = makeFsrSpatial(THREE, TSL, { renderWidth: rw, renderHeight: rh, displayWidth: DW, displayHeight: DH,
+                                           sharpness: Number($("sharp").value), denoise: $("denoise").checked, transfer: $("transfer").value });
+        built = key;
+    };
+    const syncKnobs = () => {
+        $("sharpV").textContent = Number($("sharp").value).toFixed(2);
+        if (!fsr) return;
+        fsr.rcas.uniforms.sharpness.value = Number($("sharp").value);
+        fsr.rcas.uniforms.denoise.value = $("denoise").checked ? 1 : 0;
+    };
+    for (const id of ["scale", "transfer"]) $(id).addEventListener("change", () => { build(); syncKnobs(); });
+    for (const id of ["sharp", "denoise"]) $(id).addEventListener("input", syncKnobs);
+    build(); syncKnobs();
+
+    // v4727 -- THE MOTION FIELD THE TEMPORAL CHAIN WILL READ, SHOWN RATHER THAN DESCRIBED. The knot turns, so its
+    // pixels carry ITS motion and the floor only the camera's (still, here, so black-grey); red is +du, green +dv,
+    // at 60x so a pixel of motion on a 960-wide frame is visible. Blue marks where the field has no answer.
+    let motionStage = null, motionView = null;
+    const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const showMotion = async () => {
+        if (!motionStage) {
+            motionStage = makeMotionStage(THREE, TSL, { w: DW, h: DH, gl: glClip(THREE, renderer), camera: true });   // v4750: the camera's own motion too
+            const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+            m.fragmentNode = TSL.Fn(() => {
+                const v = TSL.textureLoad(motionStage.motion.texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+                return TSL.vec4(v.x.mul(60.0).add(0.5), v.y.mul(60.0).add(0.5), TSL.float(1.0).sub(v.z).mul(0.8), 1.0);
+            })();
+            motionView = new THREE.Scene(); motionView.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+        }
+        await motionStage.render(renderer, scene, camera);
+        renderer.setRenderTarget(null); await renderer.renderAsync(motionView, ortho);
+    };
+
+    // v4736 -- A FRAME NOTHING RENDERED: render/frameInterpTsl.mjs, the first step of FSR3's frame generation on this
+    // scene. The last two native frames, and the scene's own motion field for the newer one turned into a per-pixel
+    // forward flow (flowFromMotionNode): every pixel is splatted to where its content was halfway between the two -- a
+    // depth-tested draw, the nearer surface winning -- and the frame is warped from both along it. What no pixel's
+    // motion reaches is a HOLE: the "holes black" view leaves it at zero, on purpose -- a hole filled silently is a hole
+    // nobody measures (render/frameInterp.mjs's rule) -- and v4737's view fills it (render/holeFillTsl.mjs): each hole takes
+    // the FARTHER vector near it, and the frame its content is visible in, by the derived rule.
+    // v4738: both views are fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen -- the driver fx/fsr/fsrFrameGen-selfcheck.mjs grades --
+    // with its default fill (the blend, which that gate measured paying on this knot) or none.
+    const gens = {};
+    // v4748: the flow's settings, and what they read a generated frame (render/flowCost.mjs)
+    // v4753: each level of the flow's pyramid its own block grid -- the generator's default, named here so the count agrees
+    const flowSetting = () => ({ grid: "level", ...($("genflowcheap").checked ? { refineRadius: 2 } : {}) });
+    const flowReads = () => flowCostModel({ w: DW, h: DH, ...flowSetting() }).total;
+    // v4745 -- A HUD, and FSR3'S UI COMPOSITION: drawn into the frames it is generated with the scene -- every vector under it is
+    // the knot's or the floor's -- and composited (makeFrameGen's `ui`) it is the HUD the newer frame drew, exactly, into a
+    // transparent target, premultiplied as the generator asks.
+    // v4755 -- AND A HUD THAT MOVES: a marker slides along the bottom bar, a step each REAL frame, on the HUD's own clock -- time
+    // in real frames. Composited with "gen: HUD at the generated time", a generated frame between real frames k - 1 and k gets
+    // the HUD drawn at k - 1 + t (`ui` as a function of t); without it, the newer frame's, and the marker half a frame ahead
+    const hud = new THREE.Scene();
+    { const hm = new THREE.MeshBasicNodeMaterial(); hm.colorNode = TSL.vec3(0.95, 0.9, 0.2);
+      for (const [x, y, w, h] of [[0, 0, 0.6, 0.012], [0, 0, 0.007, 0.1], [-0.72, 0.86, 0.4, 0.05], [0.7, 0.86, 0.3, 0.08], [0, -0.86, 0.9, 0.03]]) {
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), hm); m.position.set(x, y, 0); hud.add(m); } }
+    const hudMarker = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.09), new THREE.MeshBasicNodeMaterial({ color: 0x55ff88 })); hudMarker.position.set(0, -0.86, 0); hudMarker.renderOrder = 1; hud.add(hudMarker);   // over the bar it slides on
+    const hudAt = (time) => { hudMarker.position.x = -0.43 + 0.86 * ((time * 0.02) % 1 + 1) % 1; hudMarker.updateMatrixWorld(); };
+    let uiTarget = null;
+    const hudUi = async (time) => {
+        if (!uiTarget) uiTarget = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+        hudAt(time);
+        const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+        renderer.setRenderTarget(uiTarget); renderer.setClearColor(0x000000, 0); await renderer.clearAsync();
+        renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; renderer.setClearColor(cc, ca);
+        return uiTarget.texture;
+    };
+    // the HUD for the frame generated between real frames k - 1 and k: drawn at the time generated, or the newer frame's
+    const hudBetween = async (k) => ($("genuit").checked ? (tt) => hudUi(k - 1 + tt) : await hudUi(k));
+    const hudInto = async (target, time) => { hudAt(time); renderer.setRenderTarget(target); renderer.autoClear = false; await renderer.renderAsync(hud, ortho); renderer.autoClear = true; };
+    // v4741: and with the optical flow reconciled in, per pixel (render/flowReconcileTsl.mjs), when "gen: + optical flow" is on
+    // v4744: and on the arc, when "gen: motion on the arc" is on -- a toward stage (render/temporalTsl.mjs) renders each pixel's
+    // displacement to its pose half-way between the two frames, and the generator splats with that
+    let towardStage = null;
+    const showGen = async (filled) => {
+        const withFlow = $("genflow").checked, withArc = $("genarc").checked && !withFlow;
+        const key = (filled ? "filled" : "holes") + (withFlow ? "+flow" + ($("genflowcheap").checked ? "cheap" : "") : "") + (withArc ? "+arc" : ""); let gen = gens[key];
+        if (!motionStage) await showMotion();
+        if (withArc && !towardStage) towardStage = makeMotionStage(THREE, TSL, { w: DW, h: DH, gl: glClip(THREE, renderer), toward: true });
+        if (!gen) {
+            const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+            gen = gens[key] = { frames: [col(), col()], k: 0, fg: makeFrameGen(THREE, TSL, { w: DW, h: DH, ...(filled ? {} : { fill: null }), ...(withFlow ? { flow: flowSetting() } : {}), ...(withArc ? { arc: true } : {}) }) };
+        }
+        const g = gen, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
+        const withHud = $("genhud").checked, composite = withHud && $("genui").checked;
+        // v4766: the world, and -- "as a layer" -- the frames and the stage's pass drawn without what the layer and the lens draw
+        const withWorld = $("genworld").checked, asLayer = withWorld && $("genlayer").checked;
+        if (withWorld) await stepMotes();
+        const hideThem = () => (asLayer ? layer().hide(scene) : () => {});
+        let back = hideThem(); renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera); back();
+        if (withHud && !composite) await hudInto(cur, g.k);
+        back = hideThem(); await motionStage.render(renderer, scene, camera);
+        if (withArc) await towardStage.render(renderer, scene, camera, 0.5);
+        back();
+        // the scene's time at a generated t between the last real frame and this one, for the layer and the lens
+        const tNow = t, tWas = g.tWas ?? t; g.tWas = t;
+        const sceneAt = (tt) => poseAt(tWas + (tNow - tWas) * tt);
+        const ui = asLayer ? async (tt) => {
+            // v4767: the occluding depth from the generator's own splat -- one quad, where the scene's depth pass is a geometry pass
+            sceneAt(tt); await layer().render(renderer, scene, camera, { depth: g.fg.depthAt }); poseAt(tNow); layerDraws++;
+            if (composite) await hudInto(layer().target, $("genuit").checked ? g.k - 1 + tt : g.k);   // the HUD over the translucent things, in one layer
+            return layer().texture;
+        } : composite ? await hudBetween(g.k) : null;
+        const over = asLayer ? async (tt, frame) => { sceneAt(tt); const tex = await layer().renderOver(renderer, scene, camera, frame, { depth: g.fg.depthAt }); poseAt(tNow); overDraws++; return tex; } : null;
+        await g.fg.generate(renderer, { prev: g.k ? prev.texture : cur.texture, cur: cur.texture, motion: motionStage.motion.texture, depth: motionStage.depth.texture,
+                                         toward: withArc ? towardStage.motion.texture : null, ui, over,
+                                         camera: withFlow ? motionStage.camera.texture : null }, null);
+        g.k++;
+    };
+
+    // v4740 -- MOTION FROM THE COLOUR ALONE: render/opticalFlowTsl.mjs, FSR3's other field, of the last two native frames --
+    // a block matcher over a luma pyramid, 8-pixel blocks, three levels, +-4 at each. The colours are the motion view's for
+    // the same motion (the flow is the forward displacement, so it is negated into the motion field's uvPrev - uvCurr), and a
+    // block the matcher is not confident of fades to grey: flat colour, and a stripe's length, match anywhere. With the
+    // floor's texture scrolling, the motion view shows the floor still and this one shows it moving.
+    let flowDbg = null;
+    const showFlow = async () => {
+        if (!flowDbg) {
+            const col = () => new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+            const of = makeOpticalFlow(THREE, TSL, { w: DW, h: DH, block: 8, searchRadius: 4, levels: 3 });
+            const frames = [col(), col()], at = (t) => TSL.textureLoad(t, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+            const views = frames.map((fr) => { const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+                m.fragmentNode = TSL.Fn(() => {
+                    const f = TSL.textureLoad(of.target.texture, TSL.ivec2(TSL.int(TSL.screenCoordinate.x.div(8.0)), TSL.int(TSL.screenCoordinate.y.div(8.0))));
+                    const c = at(fr.texture), grey = c.x.add(c.y).add(c.z).mul(0.12);
+                    return TSL.vec4(f.x.negate().mul(60.0 / DW).mul(f.z).add(0.5), f.y.negate().mul(60.0 / DH).mul(f.z).add(0.5), grey, 1.0);
+                })();
+                const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; });
+            flowDbg = { of, frames, views, k: 0 };
+        }
+        const g = flowDbg, cur = g.frames[g.k % 2], prev = g.frames[(g.k + 1) % 2];
+        renderer.setRenderTarget(cur); await renderer.renderAsync(scene, camera);
+        await g.of.flow(renderer, cur.texture, g.k ? prev.texture : cur.texture);
+        renderer.setRenderTarget(null); await renderer.renderAsync(g.views[g.k % 2], ortho);
+        g.k++;
+    };
+
+    // v4742 -- FSR3: fx/fsr/fsr3Tsl.mjs, FSR2 at this scale and the frame between each two of its upscaled frames, made from
+    // the motion field FSR2 already renders at display resolution -- no scene is drawn for it. This view shows only the
+    // generated frames; "gen: + optical flow" reconciles the vectors with the colour's motion there as well.
+    let fsr3 = null, built3 = "";
+    const showFsr3 = async () => {
+        const k = Number($("scale").value), key = [k, $("genflow").checked, $("genflowcheap").checked].join("|");
+        if (key !== built3) {
+            if (fsr3) fsr3.dispose();
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+            fsr3 = makeFsr3(THREE, TSL, renderer, { fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
+                                                    frameGen: $("genflow").checked ? { flow: flowSetting() } : {} });
+            built3 = key;
+        }
+        await fsr3.render(scene, camera, false);
+        await fsr3.generate(null, $("genhud").checked ? { ui: await hudBetween(fsr3.frames - 1) } : {});
+    };
+
+    // v4743 -- FSR3 PACED: a real FSR2 frame every N refreshes -- the scene rendered at 1 / N of the display's rate -- and
+    // render/framePacer.mjs deciding at each refresh what is shown: the frame generated between the last two real ones (at
+    // t = 0.5, FSR3's, or at the time that refresh stands for, "timed"), a real one, or nothing new. render/framePacer-
+    // selfcheck.mjs measures the two: at every 2nd refresh they are the same; at every 3rd the half-way frame judders and the
+    // timed one does not. A real frame counts as ready the refresh it is rendered in, so the pacer's margin is 0 here.
+    let paced = null;
+    const REFRESH = 1000 / 60;
+    // v4756 -- ON THE BROWSER'S CLOCK ("pacing: the browser's clock"): each refresh is the requestAnimationFrame timestamp it
+    // was called with, and a real frame is ready when the GPU has finished it -- the queue drained after it is submitted.
+    // Twelve timestamps first, real frames shown as they come, to estimate the refresh (their intervals' median); then the
+    // pacer. What a callback draws goes up at the next, and render/framePacer.mjs's makeLivePacing logs it so and grades the
+    // last two seconds for the stat line.
+    const drained = async () => { const dev = renderer.backend && renderer.backend.device; if (dev && dev.queue) await dev.queue.onSubmittedWorkDone(); return performance.now(); };
+    const showPaced = async (stamp) => {
+        const live = $("liveclock").checked;
+        const k = Number($("scale").value), N = Number($("cadence").value), pol = $("policy").value, key = [k, N, pol, $("genflow").checked, $("genflowcheap").checked, live].join("|");
+        if (!paced || paced.key !== key) {
+            if (paced) paced.f3.dispose();
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+            // v4751: the timed policy holds the TWO newest pairs, and generates from whichever its line is in
+            const pacerFor = (refresh) => makeFramePacer({ refresh, policy: pol, margin: 0, pairs: pol === "timed" ? "two" : "newest" });
+            paced = { key, N, v: 0, counts: { gen: 0, real: 0, hold: 0 }, live: live ? makeLivePacing() : null, pacerFor, stamps: [], real: [],
+                      pacer: live ? null : pacerFor(REFRESH),
+                      f3: makeFsr3(THREE, TSL, renderer, { hold: pol === "timed" ? 2 : 1, fsr2: { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH, ratio: k, threshold },
+                                                           frameGen: $("genflow").checked ? { flow: flowSetting() } : {} }) };
+        }
+        const P = paced, T = live ? stamp : P.v * REFRESH;
+        if (live && !P.pacer) { P.stamps.push(T); if (P.stamps.length >= 12) { P.refresh = refreshFromStamps(P.stamps); P.pacer = P.pacerFor(P.refresh); for (const r of P.real) P.pacer.real(...r); } }
+        if (P.v % P.N === 0) { await P.f3.render(scene, camera, false); const ready = live ? await drained() : T, r = [P.v / P.N, T, ready];
+            if (P.pacer) P.pacer.real(...r); else P.real.push(r); if (P.live) P.live.real(...r); }
+        // before the pacer, on the browser's clock: the newest real frame, as it comes
+        if (!P.pacer) { const f0 = P.f3.frames; if (f0) await P.f3.show(f0 - 1, null); if (P.live) P.live.tick(T, f0 ? { kind: "real", k: f0 - 1, t: 1, scene: P.real[f0 - 1][1] } : null); P.v++; return; }
+        // on the browser's clock the pacer decides for the NEXT callback, when what is drawn now is on the display -- and by when
+        // the real frame just rendered is ready, which FSR3 has already taken in (fx/fsr/fsr3LiveClock-selfcheck.mjs)
+        // -- no sooner than now, which a render longer than a refresh puts later than T + the refresh
+        const s = P.pacer.at(live ? Math.max(T + P.refresh, performance.now()) : T), f = P.f3.frames;
+        // the pacer asks only for what the generator holds -- the pair of the last two real frames -- and a hold draws nothing:
+        // the canvas keeps what it last showed
+        const withHud = $("genhud").checked;
+        if (s.kind === "gen" && (s.k === f - 1 || (P.pacer.policy === "timed" && s.k === f - 2 && s.k >= 1))) await P.f3.generate(null, { t: s.t, ui: withHud ? await hudBetween(s.k) : null, pair: s.k });
+        else if (s.kind === "real" && (s.k === f - 1 || s.k === f - 2)) { if (withHud) await P.f3.frameGen.composite(renderer, P.f3.targets.frames[s.k % P.f3.targets.frames.length].texture, await hudUi(s.k), null); else await P.f3.show(s.k, null); }
+        P.counts[s.kind === "gen" || s.kind === "real" ? s.kind : "hold"]++;
+        if (P.live) P.live.tick(T, s.kind === "hold" && s.k < 0 ? null : s);
+        P.v++;
+    };
+    // the stat line's live grading: the last two seconds of display time, as makeLivePacing logged them
+    const liveLine = () => { if (!paced || !paced.live || !paced.pacer) return paced && paced.live ? " | the browser's clock: estimating the refresh" : "";
+        try { const m = paced.live.metrics(2000); return ` | the browser's clock: refresh ${paced.live.refresh().toFixed(2)} ms, judder ${m.judder.toFixed(2)} ms, ${m.newPerSecond.toFixed(1)} new images/s, latency ${m.meanLatency.toFixed(1)} ms over 2 s`; }
+        catch (e) { return " | the browser's clock: too few refreshes to grade yet"; } };
+
+    // v4730 -- THE DEPTH CLIP'S MASK AND THE LOCK RING'S, OF THE LIVE SCENE. Red: disocclusion -- where the
+    // knot uncovered what was behind it and the history there belongs to the knot. Green: the shading-shift mask
+    // from the reprojected luma ring -- where the LIGHT changed rather than the surface moved (the knot's normal
+    // shading turns with it). Blue: the frame, dimmed, for orientation. The ring here runs at the 1x period, 16 slots
+    // a pixel -- 66 MB at 960x540 in float -- where a 2x period's 64 slots would be 265 MB; that cost is the ring's
+    // design (render/temporalLock.mjs keeps every luma, FSR2 keeps a lock and a short history) and it is stated.
+    let maskDbg = null;
+    const showMasks = async () => {
+        if (!motionStage) await showMotion();   // builds the shared stage (and draws once, which the masks then replace)
+        if (!maskDbg) {
+            const flat = () => new THREE.RenderTarget(DW, DH, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+            const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
+                const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return sc; };
+            camera.updateMatrixWorld();
+            const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+            const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;   // the knot's front against the floor behind it
+            const dMot = flat(), rec = [flat(), flat()], mask = flat(), shade = flat(), current = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType });
+            const dil = dilateNodes(TSL, motionStage.depth.texture, motionStage.motion.texture, { w: DW, h: DH });
+            const ring = makeLumaRing(THREE, TSL, { w: DW, h: DH, period: 8, currentTex: current.texture, motionTex: dMot.texture });
+            const at = (t) => TSL.textureLoad(t, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+            const view = quad(TSL.Fn(() => { const c = at(current.texture); return TSL.vec4(at(mask.texture).x, at(shade.texture).x.mul(4.0), c.x.add(c.y).add(c.z).mul(0.08), 1.0); })());
+            maskDbg = { dMot, rec, mask, shade, current, ring, view, k: 0, scM: quad(dil.motionNode), scD: quad(dil.depthNode),
+                        scX: [0, 1].map((k) => quad(disocclusionNode(TSL, dMot.texture, rec[1 - k].texture, { w: DW, h: DH, threshold }).node)) };
+        }
+        const g = maskDbg, k = g.k % 2;
+        renderer.setRenderTarget(g.current); await renderer.renderAsync(scene, camera);
+        await motionStage.render(renderer, scene, camera);
+        renderer.setRenderTarget(g.dMot); await renderer.renderAsync(g.scM, ortho);
+        renderer.setRenderTarget(g.rec[k]); await renderer.renderAsync(g.scD, ortho);
+        renderer.setRenderTarget(g.mask); await renderer.renderAsync(g.scX[k], ortho);
+        await g.ring.push(renderer); await g.ring.shading(renderer, g.shade);
+        renderer.setRenderTarget(null); await renderer.renderAsync(g.view, ortho);
+        g.k++;
+    };
+
+    // v4731 -- FSR2 ON THIS SCENE: fx/fsr/fsrTemporalTsl.mjs, the chain fsr.html runs, composed over three.js. The
+    // camera here is still and the knot turns, so what accumulates is everything the knot is not, and the knot itself
+    // rides its own motion vectors. The threshold is a quarter of the clip-z gap between the knot's front and the floor
+    // behind it (clipGapThreshold). The lock ring is a switch because of its size; the label says what it costs.
+    let fsr2 = null, built2 = "";
+    const ringMB = (k) => { const w = DW, h = DH, per = jitterPhaseCount(k); return (2 * w * h * Math.ceil(2 * per / 4) * 16 + 2 * w * h * 16) / 1048576; };
+    // v4732: the locks. "ring" without the ring is refused by the driver, so the page falls back to the frame and says so.
+    let lockView = null;
+    const build2 = () => {
+        const k = Number($("scale").value), sel = $("lockFrom").value;
+        const lockFrom = sel === "off" ? null : sel === "ring" && !$("lock").checked ? "frame" : sel;
+        const key = [k, $("lock").checked, lockFrom].join("|");
+        $("lockMB").textContent = `(${ringMB(k).toFixed(0)} MB at ${k}x)`;
+        $("lockFrom").title = sel === "ring" && !$("lock").checked ? "the ring is off, so the locks come from the frame" : "";
+        if (key === built2 || ($("mode").value !== "fsr2" && $("mode").value !== "locks")) return;
+        if (fsr2) fsr2.dispose();
+        camera.updateMatrixWorld();
+        const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
+        const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
+        fsr2 = makeFsrTemporal(THREE, TSL, renderer, { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH,
+                                                       ratio: k, threshold, lock: $("lock").checked, lockFrom, sharpness: Number($("sharp").value) });
+        // the locks view: FSR2's output with the clamp relaxation laid over it in red
+        if (lockView) lockView.target.dispose();
+        const target = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType });
+        const at = (tex) => TSL.textureLoad(tex, TSL.ivec2(TSL.int(TSL.screenCoordinate.x), TSL.int(TSL.screenCoordinate.y)));
+        const relax = fsr2.targets.relax ? at(fsr2.targets.relax.texture).x : TSL.float(0.0);
+        const m = new THREE.NodeMaterial(); m.blending = THREE.NoBlending;
+        m.fragmentNode = TSL.vec4(TSL.mix(at(target.texture).xyz, TSL.vec3(1.0, 0.1, 0.1), relax.mul(0.8)), 1.0);
+        const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+        lockView = { target, sc };
+        built2 = key;
+    };
+    for (const id of ["scale", "lock", "mode", "lockFrom"]) $(id).addEventListener("change", build2);
+    $("sharp").addEventListener("input", () => { if (fsr2 && fsr2.uniforms.rcas) for (const u of fsr2.uniforms.rcas) u.sharpness.value = Number($("sharp").value); });
+    build2();
+
+    let last = performance.now(), avg = 0, t = 0;
+    const frame = async (stamp) => {
+        const now = performance.now(), dt = now - last; last = now;
+        // the frame-generation views step the scene ONE NOMINAL 60 Hz FRAME per drawn frame, not by the wall clock: what
+        // they interpolate is the motion between two consecutive frames, and on a slow device the wall clock turns that
+        // into a jump a hole fill of any radius cannot cross -- which is what the software renderer showed at v4737
+        // -- and the flow view, whose search reaches 16 pixels at three levels and no further (v4740)
+        // v4756: except the paced view on the browser's clock, whose scene runs on it
+        const genView = ["gen", "genholes", "flow", "fsr3gen", "fsr3paced"].includes($("mode").value) && !($("mode").value === "fsr3paced" && $("liveclock").checked);
+        const genSpin = $("mode").value === "gen" || $("mode").value === "genholes" ? Number($("speed").value) : 1;
+        if ($("spin").checked) t += genView ? genSpin / 60 : dt / 1000;
+        if ($("scroll").checked) scrollU.value += genView ? 0.15 : 9 * dt / 1000;
+        world.visible = $("genworld").checked; poseAt(t);   // v4766: the knot and the world's moving parts
+        const mode = $("mode").value, k = Number($("scale").value);
+        const t0 = performance.now();
+        if (mode === "fsr") await fsr.render(renderer, scene, camera, null);
+        else if (mode === "fsr2") { if (!fsr2) build2(); await fsr2.render(scene, camera, null); }
+        else if (mode === "locks") { if (!fsr2) build2(); await fsr2.render(scene, camera, lockView.target); renderer.setRenderTarget(null); await renderer.renderAsync(lockView.sc, ortho); }
+        else if (mode === "bilinear") await fsr.renderBilinear(renderer, scene, camera, null);
+        else if (mode === "motion") await showMotion();
+        else if (mode === "masks") await showMasks();
+        else if (mode === "gen" || mode === "genholes") await showGen(mode === "gen");
+        else if (mode === "flow") await showFlow();
+        else if (mode === "fsr3gen") await showFsr3();
+        else if (mode === "fsr3paced") await showPaced(stamp);
+        else { renderer.setRenderTarget(null); await renderer.renderAsync(scene, camera); }
+        avg = avg ? avg * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
+        const res = (mode === "native" || mode === "motion" || mode === "masks" || mode === "gen" || mode === "genholes" ? `${DW}x${DH}` : mode === "flow" ? `${DW}x${DH} in ${flowDbg.of.bw}x${flowDbg.of.bh} blocks of 8` : `${Math.round(DW / k)}x${Math.round(DH / k)} -> ${DW}x${DH}`)
+            + ((mode === "fsr2" || mode === "locks") && fsr2 ? ` | locks ${fsr2.lockFrom || "off"}` : "")
+            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genflow").checked ? ` + optical flow${$("genflowcheap").checked ? ", refining within 2" : ""} (${(flowReads() / 1e6).toFixed(0)}M reads a generated frame)` : "")
+            + ((mode === "gen" || mode === "genholes") ? `${$("genarc").checked && !$("genflow").checked ? " + arc" : ""}, spin ${$("speed").value}x` : "")
+            + ((mode === "gen" || mode === "genholes") && $("genworld").checked ? ` + world (${$("genlayer").checked ? "glass and sparks as a layer, the lens over the frame" : "all drawn as surfaces"}; ${moteSteps} particle steps, the layer drawn ${layerDraws} times, the lens over ${overDraws})` : "")
+            + ((mode === "gen" || mode === "genholes" || mode === "fsr3gen" || mode === "fsr3paced") && $("genhud").checked ? ($("genui").checked || mode === "fsr3gen" || mode === "fsr3paced" ? ` + HUD composited${$("genuit").checked ? " at the generated time" : ", the newer frame's"}` : " + HUD in the frames") : "")
+            + (mode === "fsr3paced" && paced && paced.pacer ? ` | real every ${paced.N}, ${paced.pacer.policy}: ${paced.counts.gen} generated, ${paced.counts.real} real, ${paced.counts.hold} held` : "")
+            + (mode === "fsr3paced" ? liveLine() : "");
+        stat.textContent = `three ${THREE.REVISION} on ${backend} | ${mode} | ${res} | ${avg.toFixed(2)} ms submitted per frame (CPU side, this browser)`;
+        requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+} catch (e) {
+    stat.innerHTML = `<span class="fail">could not start: ${String(e && e.message || e)}</span>`;
+}
+</script>
+<script type="module" src="/ui/originNotice.js"></script>
+</body>
+</html>

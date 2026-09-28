@@ -41,8 +41,12 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let aware = select(0.0, 1.0, (u.flags & FLAG_JITTER_AWARE) != 0u);
   let sx = uu * f32(u.rw) - 0.5 - aware * u.jx;
   let sy = vv * f32(u.rh) - 0.5 - aware * u.jy;
-  let bx = i32(round(sx));
-  let by = i32(round(sy));
+  // *** v4728 -- floor(x + 0.5), NOT round(x). *** round() ties to EVEN in WGSL and the CPU mirror's Math.round ties
+  // UP, and at a 2x upscale the jitter's base-2 phases are dyadic: phases 1 and 2 of 32 put a tie on every other
+  // column, where the two picked different 3x3 windows and differed by up to 0.0495. The device row graded SEQ[7]
+  // only, which has none. render/temporalLockWgsl.mjs met the same pair at v4553 and took floor for the same reason.
+  let bx = i32(floor(sx + 0.5));
+  let by = i32(floor(sy + 0.5));
 
   var wsum = 0.0;
   var csum = vec3<f32>(0.0);

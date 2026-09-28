@@ -38,7 +38,7 @@ import { boxId } from "./hostScale.mjs";
 // copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
 // the session removing from its own record.
 import { FAIL_LINE } from "./failLines.mjs";
-import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
+import { skippable, readRecordCached as readInputRecord } from "./inputSets.mjs";   // v4725: read once per process while unchanged
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES } from "./gateSweep.mjs";
 import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
 import { sweepStrays } from "./exitBusy.mjs";

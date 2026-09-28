@@ -417,8 +417,12 @@ export function repoHeightfield(entries, opts = {}) {
 // into a grid of pieces small enough to survive the cap rather than being handed over whole and silently lost.
 // The default region is ~240 voxels across, so 20,000 is about a third of the map; the split is computed in
 // unit-square terms against the caller's own region so it holds whatever region the stamp is given.
+// The fraction of the region either side of one lake piece may span. Exported (v4710) so the gate that checks the
+// splitter's contract reads the limit rather than restating it.
+export const LAKE_SPLIT_LIMIT = 0.30;
+
 function lakePolys(lakes, maxCells) {
-    const LIMIT = 0.30;                       // fraction of the region either side of a piece may span
+    const LIMIT = LAKE_SPLIT_LIMIT;
     const out = [];
     for (const l of lakes) {
         const { x, y, w, h } = l.rect;

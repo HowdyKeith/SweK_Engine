@@ -1,0 +1,646 @@
+// render/temporalTsl.mjs -- v4727 -- THE TEMPORAL CHAIN FOR A THREE.JS SCENE, AS TSL: its inputs first.
+//
+// fx/fsr/fsrTsl.mjs put a three.js scene through FSR1. The temporal half -- jitter, motion, dilation, depth clip,
+// locks, the reactive mask, the jitter-aware resolve and the rectified accumulate -- exists in render/ as CPU
+// references and gfx/device.js kernels, and fsr.html runs it every frame on pictures it draws itself. Nothing
+// could run it on a three.js scene, because gfx/device.js makes its own device. This module is the same chain
+// written as TSL, one pass at a time, each held to the CPU reference that pass already has
+// (render/temporalTsl-selfcheck.mjs). v4727 is the INPUTS: the jitter, and the motion field every later pass reads.
+//
+// ---- THE JITTER ------------------------------------------------------------------------------------------------
+// applyJitter writes render/jitter.mjs's jitterProjection into the camera, NEGATED -- the sense fsr.html settled at
+// v4638 (jitterProjection moves the IMAGE by +j, the resolve assumes the SAMPLE moved by +j). The gate renders a
+// three.js scene both ways and measures which one the resolve reconstructs.
+//
+// ---- THE MOTION FIELD ------------------------------------------------------------------------------------------
+// (du, dv, valid, zPrev) at DISPLAY resolution, in render/motionVectors.mjs's convention exactly: uvPrev - uvCurr in
+// UV units, uv (0,0) at the top-left, zPrev the clip-space z this surface would have had last frame. Two sources
+// write it, and the split is the point:
+//
+//   * SURFACES are written by a subclass of three's own VelocityNode, drawn as the override material of an
+//     unjittered, geometry-only pass. It carries each OBJECT's previous model matrix, so a spinning mesh moves in
+//     the field and not only the camera -- render/objectMotion.mjs's question, answered by the renderer that knows
+//     the matrices. three's node writes ndcCurrent - ndcPrevious; this one writes the tree's four channels.
+//   * THE BACKGROUND -- every pixel the pass did not draw -- is completed from depth: the far plane unprojected
+//     through the current camera and reprojected through the previous one, which is motionVectorsCPU's own
+//     arithmetic on a pixel whose depth is the far plane. A sky that stays invalid would never accumulate.
+//
+// *** DISPLAY RESOLUTION, UNJITTERED, AND THAT IS THIS TREE'S CHAIN RATHER THAN FSR2'S. *** FSR2 reads render-
+// resolution depth and motion and dilates them before sampling at display pixels. fsr.html's chain, whose CPU
+// references this module is held to, takes both at display resolution through the unjittered camera, so this does
+// the same: a second draw of the scene with a trivial fragment, at display size. That costs a geometry pass; it
+// buys a field every downstream reference can be graded against without an upsampling step nothing in render/ has.
+//
+// *** THE CAMERA'S HISTORY IS THE CHAIN'S, NOT THE NODE'S. *** three's VelocityNode keeps the previous camera per
+// frameId. This chain draws the same camera twice a frame (jittered colour, unjittered motion), so the previous
+// camera is SET by the caller -- setPreviousCamera -- and each object's previous matrix is kept here, written after
+// the object is drawn in this pass and nowhere else.
+//
+// *** A TRANSLUCENT THING IS DRAWN HERE AS A SURFACE OF ITS OWN (v4760 measured it, and left it). *** The override draws every
+// object opaque, glass and sparks too, so the field under a pane is the pane's. Drawing the pass without them -- a game's
+// motion vectors -- gives what is behind, and drags the pane: which is less wrong turns on the content, drawn ahead on four of
+// fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs's six cases. Neither is right; render/translucentLayer.mjs is: hide them for this
+// pass (its hide(scene)) and lay them over each shown frame, drawn at its time.
+//
+// ---- THREE THINGS ABOUT THREE, MEASURED BEFORE OR BY A ROW --------------------------------------------------------
+//   * *** A DATA PASS MUST SET blending = NoBlending, OR ITS FOURTH CHANNEL SCALES THE OTHER THREE. *** A NodeMaterial
+//     is created with NormalBlending, and three keeps blending on for an OPAQUE material into a render target:
+//     vec4(0.1, 0.2, 0.3, 0.4) into a cleared float target reads back (0.04, 0.08, 0.12, 0.4). The first run of
+//     this gate read every surface pixel's `valid` as its zPrev and its motion scaled by it -- off by a third of a
+//     pixel -- while the far-plane completion passed, because the far plane's zPrev is 1. fx/fsr/fsrTsl.mjs never
+//     met it: EASU and RCAS write alpha 1. Every material this module makes is NoBlending.
+//   * An MRT output reaches a RenderTarget texture ONLY BY NAME. mrt({ output, velocity }) into a count-2 target
+//     whose textures are unnamed draws NOTHING -- not the colour either -- on both backends, silently. Named
+//     "output" and "velocity" it draws. This module uses no MRT; the note is here for the next one that does.
+//   * Both backends store the same WINDOW depth in a depth texture. What differs is the clip range the camera's
+//     projection produces: [0, 1] for renderer.coordinateSystem === WebGPUCoordinateSystem, [-1, 1] for WebGL's.
+//     clipDepth maps one to the other, and every depth this chain hands a later pass is CLIP z, the unit
+//     motionVectorsCPU and disocclusionCPU are written in.
+"use strict";
+import { jitterProjection } from "./jitter.mjs";
+
+export const TEMPORAL_TSL_NEEDS = Object.freeze(["Fn", "float", "int", "vec2", "vec4", "ivec2", "uniform", "textureLoad",
+    "screenCoordinate", "select", "cameraProjectionMatrix", "modelViewMatrix", "positionLocal", "positionPrevious"]);
+
+function need(TSL) {
+    for (const n of TEMPORAL_TSL_NEEDS) if (TSL[n] === undefined) throw new Error(`render/temporalTsl: the TSL namespace has no ${n}`);
+}
+
+/**
+ * Jitter a three.js camera for THIS frame's colour render: `base` is its unjittered projection (a Matrix4 the
+ * caller keeps), (jx, jy) render/jitter.mjs's offset in render-resolution pixels. Writes the jittered projection and
+ * its inverse; call restoreProjection after the colour pass so the motion pass sees the unjittered one.
+ */
+export function applyJitter(camera, base, jx, jy, rw, rh) {
+    const j = jitterProjection(base.elements, -jx, -jy, rw, rh);   // NEGATED -- see the header
+    camera.projectionMatrix.fromArray(j);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    return j;
+}
+export function restoreProjection(camera, base) {
+    camera.projectionMatrix.copy(base);
+    camera.projectionMatrixInverse.copy(base).invert();
+}
+
+/** True when the renderer's projections produce clip z in [-1, 1] (WebGL's convention) rather than [0, 1]. */
+export function glClip(THREE, renderer) { return renderer.coordinateSystem === THREE.WebGLCoordinateSystem; }
+/** Window depth (what a depth texture holds, both backends) to clip z in the camera's convention. */
+export function clipDepth(windowDepth, gl) { return gl ? windowDepth * 2 - 1 : windowDepth; }
+
+/**
+ * The surface half of the motion field: an instance of a VelocityNode subclass whose output is the tree's
+ * (du, dv, valid, zPrev). Use it as the fragmentNode of an override material on an UNJITTERED camera.
+ * node.setPreviousCamera(projection, view) before each draw; the first draw of an object sees itself as its own
+ * previous (zero object motion), which is the first-frame rule the rest of the chain already keeps.
+ */
+export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
+    need(TSL);
+    if (typeof THREE.VelocityNode !== "function") throw new Error("render/temporalTsl: this three build exports no VelocityNode");
+    // v4744: `toward` ({ t }) makes the "previous" pose the one at time t between the last draw and this one -- the arc --
+    // so the field is each surface's displacement from THIS frame to time t, not to the last frame
+    const scratch = toward ? new THREE.Matrix4() : null;
+    const { vec4, select, cameraProjectionMatrix, modelViewMatrix, positionLocal, positionPrevious } = TSL;
+    const prev = new WeakMap();
+    // v4752: an InstancedMesh's previous instance matrices, kept HERE -- three copies them before the draw into an array it
+    // never uploads, so its own were the matrices as they were when the material was built. Per mesh: the matrices at the last
+    // draw of this pass, handed to the vertex stage as the previous ones.
+    // v4772: *** THROUGH A FLOAT TEXTURE, NOT A UNIFORM BUFFER: A UNIFORM BUFFER HOLDS 1024 MATRICES. *** They were a buffer node
+    // -- a uniform buffer, 64 bytes a matrix -- and both backends here allow 65536 bytes: past 1024 instances WebGPU refused the
+    // buffer and with it the stage's whole pass (every object's field lost, not the instanced mesh's alone), and WebGL2 said
+    // nothing and read a field 46.5 px wrong (render/temporalTslMany-selfcheck.mjs). three itself moves its own matrices to an
+    // attribute there. Here they are a texture, four texels a matrix, at most 512 matrices a row -- 2048 texels, the least
+    // MAX_TEXTURE_SIZE WebGL2 allows -- read by the instance's index as the batch's are; filled in update(), before the draw's
+    // textures are uploaded. Every InstancedMesh is drawn by a program of its own (three keys it by the mesh's uuid), so the
+    // texture built into it is the mesh's.
+    // every texture the node makes -- instances', batches' and morph targets' -- freed by disposeHistory() with the stage
+    const made = new Set(), keep = (tex) => { made.add(tex); return tex; };
+    const instances = new WeakMap(), MATS_A_ROW = 512;
+    const instanceRecord = (object) => {
+        let r = instances.get(object);
+        if (!r) { const n = Math.max(object.instanceMatrix.count, 1), last = Float32Array.from(object.instanceMatrix.array.subarray(0, n * 16));
+            const W = 4 * Math.min(n, MATS_A_ROW), H = Math.ceil(n / MATS_A_ROW), cur = new Float32Array(W * H * 4); cur.set(last);
+            const tex = keep(new THREE.DataTexture(cur, W, H, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
+            r = { n, last, cur, tex }; instances.set(object, r); }
+        return r;
+    };
+    // matrix i of a texture holding four texels a matrix, row after row: three's own layout for a batch's matrices
+    const matrixIn = (tex, i) => {
+        const w = TSL.int(TSL.textureSize(TSL.textureLoad(tex), 0).x), j = TSL.int(i).mul(4), x = j.mod(w), y = j.div(w);
+        return TSL.mat4(TSL.textureLoad(tex, TSL.ivec2(x, y)), TSL.textureLoad(tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(3), y)));
+    };
+    const instanceBefore = (object) => matrixIn(instanceRecord(object).tex, TSL.instanceIndex);
+    // under `toward`, each instance's previous matrix is ITS pose at t between its last draw and this one, as the mesh's is
+    const ia = toward ? new THREE.Matrix4() : null, ib = toward ? new THREE.Matrix4() : null, it = toward ? new THREE.Matrix4() : null;
+    const instancesBefore = (object, r) => {
+        r.tex.needsUpdate = true;
+        if (!toward) { r.cur.set(r.last); return; }
+        const now = object.instanceMatrix.array;
+        for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
+    };
+    // v4761: a BatchedMesh's previous instance matrices, kept HERE as an InstancedMesh's are. three applies each instance's matrix
+    // to the current point and NOT to positionPrevious, so the previous point was the bare geometry's -- off by the instance's
+    // whole placement, 32.7 px here. Per mesh: its matrices texture as it was at the last draw of this pass, a texture of the same
+    // size read by the same index (three's own: the draw's id through the indirect texture, four texels a matrix)
+    const batches = new WeakMap();
+    const batchRecord = (object) => {
+        const src = object._matricesTexture; let r = batches.get(object);
+        if (!r) { const last = Float32Array.from(src.image.data), cur = Float32Array.from(last);
+            const tex = keep(new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
+            r = { src, last, cur, tex }; batches.set(object, r); }
+        else if (r.src !== src) throw new Error(`render/temporalTsl: ${object.name ? JSON.stringify(object.name) : "a BatchedMesh"} re-made its matrices texture (its instance count grew past it) -- the stage's history of it is at the old size; make a new stage`);
+        return r;
+    };
+    const batchBefore = (object, r) => {
+        if (!toward) r.cur.set(r.last);
+        else { const now = r.src.image.data;
+            // a slot no instance holds is all zeros, and has no pose to slerp
+            for (let i = 0; i < r.cur.length / 16; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16);
+                if (ia.determinant() === 0 || ib.determinant() === 0) { for (let k = 0; k < 16; k++) r.cur[i * 16 + k] = now[i * 16 + k]; }
+                else poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); } }
+        r.tex.needsUpdate = true;
+    };
+    // v4761: a Sprite faces the camera, and three builds that in its material's vertex stage -- the override draws a sprite as
+    // the flat quad it is in its geometry, and the field was that quad's (5.74 px off under a turned camera). makeMotionStage draws each sprite with a sprite material of its own carrying this node, and here
+    // each corner is placed as three places it, at this frame and at the last: the centre through the model-view matrix, the
+    // corner scaled by the model's x and y scale (and by depth where the size does not attenuate), turned by the material's
+    // rotation, whose last value is kept per sprite
+    const rotPrev = TSL.uniform(0.0), rotations = new WeakMap(), centreU = TSL.uniform(new THREE.Vector2(0.5, 0.5));
+    // ...and the centre from a per-draw uniform, NOT three's reference to the object: three builds that reference into a program
+    // every like sprite shares, so a centred sprite drawn after an off-centre one is drawn off-centre (render/temporalTslZoo-
+    // selfcheck.mjs measures it in three's own colour pass). The stage's sprite material draws with spriteClip as its vertexNode,
+    // so what it covers is each sprite where the application put it
+    const spriteCorner = (builder, mv, world, rot) => {
+        const aligned = TSL.positionGeometry.xy.sub(centreU.sub(0.5)), keep = builder.camera && builder.camera.isPerspectiveCamera && builder.material.sizeAttenuation === false;
+        let sc = TSL.vec2(world.mul(vec4(1.0, 0.0, 0.0, 0.0)).xyz.length(), world.mul(vec4(0.0, 1.0, 0.0, 0.0)).xyz.length()); if (builder.material.scaleNode) sc = sc.mul(TSL.vec2(builder.material.scaleNode)); if (keep) sc = sc.mul(mv.z.negate());
+        return vec4(mv.xy.add(TSL.rotate(aligned.mul(sc), rot)), mv.zw);
+    };
+    // v4762: a sprite's centre is its material's positionNode where it has one -- a compute pass's particles -- and the origin
+    // where not; the last centre is the material's userData.previousPositionNode, or the positionNode itself, standing still
+    const centreNow = (builder) => (builder.material.positionNode ? vec4(TSL.vec3(builder.material.positionNode), 1.0) : vec4(0.0, 0.0, 0.0, 1.0));
+    // v4770: the rotation is the material's rotationNode where it has one -- three's SpriteNodeMaterial reads it in place of the
+    // rotation property -- and its last value the material's userData.previousRotationNode, or the node itself, standing still
+    const rotNow = (material) => (material.rotationNode ? TSL.float(material.rotationNode) : TSL.float(TSL.materialRotation));
+    const rotWas = (material) => { if (!material.rotationNode) return rotPrev;
+        const p = material.userData && material.userData.previousRotationNode, now = TSL.float(material.rotationNode);
+        return p ? (toward ? TSL.mix(TSL.float(p), now, towardU) : TSL.float(p)) : now; };
+    // v4770: *** A POINTS MATERIAL ON A SPRITE IS SIZED IN PIXELS, AND THREE PLACES IT OTHERWISE. *** PointsNodeMaterial's
+    // setupVertexSprite takes the centre through the camera and adds each corner in PIXELS about it: the size node (or the
+    // material's size) times the display's pixel ratio, attenuated by the centre's view depth where it attenuates, times the
+    // scale node, turned by the rotation node (never the rotation property), over half the viewport and times the clip w so the
+    // divide leaves it a pixel size. The stage places each corner so, now and at the last draw; the size is the one it has now
+    const sizeV = new THREE.Vector2(), halfH = TSL.uniform(1).onFrameUpdate(function ({ renderer }) { renderer.getSize(sizeV); this.value = 0.5 * sizeV.y; });
+    const pointCorner = (builder, mv, mvp, rot) => {
+        const m = builder.material; let ps = (m.sizeNode ? TSL.vec2(m.sizeNode) : TSL.materialPointSize).mul(TSL.screenDPR);
+        if (builder.camera && builder.camera.isPerspectiveCamera && m.sizeAttenuation === true) ps = ps.mul(halfH.div(mv.z.negate()));
+        if (m.scaleNode && m.scaleNode.isNode) ps = ps.mul(TSL.vec2(m.scaleNode));
+        let off = TSL.positionGeometry.xy; if (rot) off = TSL.rotate(off, rot);
+        off = off.mul(ps).div(TSL.viewportSize.div(2)).mul(mvp.w);
+        return mvp.add(vec4(off, 0.0, 0.0));
+    };
+    // a points material's centre is its positionNode, or the geometry's own point -- three's `positionNode || positionLocal`
+    const pointCentre = (material) => (material.positionNode ? vec4(TSL.vec3(material.positionNode), 1.0) : vec4(TSL.positionGeometry, 1.0));
+    const pointClip = (builder) => { const mv = modelViewMatrix.mul(pointCentre(builder.material));
+        return pointCorner(builder, mv, cameraProjectionMatrix.mul(mv), builder.material.rotationNode ? TSL.float(builder.material.rotationNode) : null); };
+    const spriteClip = (builder) => (builder.material.isPointsNodeMaterial ? pointClip(builder)
+        : cameraProjectionMatrix.mul(spriteCorner(builder, modelViewMatrix.mul(centreNow(builder)), TSL.modelWorldMatrix, rotNow(builder.material))));
+    // v4762: *** A POSITION A NODE WRITES -- A COMPUTE PASS'S PARTICLES -- IS WHERE THE NODE SAYS, AND WAS WHERE THE APPLICATION
+    // SAYS. *** three draws a material's positionNode as the local position and keeps no previous one: the stage had taken the
+    // bare geometry as the last point, so a positionNode that displaces carried its whole displacement as motion (11.57 px on
+    // render/temporalTslCompute-selfcheck.mjs's mesh), and it refused a sprite placed by a node. The last
+    // position is material.userData.previousPositionNode -- the WHOLE local position as it was, built from positionGeometry --
+    // or, where none is given, the positionNode itself: a node taken to stand still. makePreviousCopy keeps a storage buffer's
+    // last contents for it. Under toward, the last position at t is the line from it to the current one
+    const towardU = TSL.uniform(0.0);
+    // v4770: or a FUNCTION of the point as the stage keeps it -- the geometry through the previous instance matrix, skin and
+    // morph influences -- for a positionNode that displaces what three's instancing, skinning and morphing make: the application
+    // says how it displaced the point, and the stage has where the point was
+    const previousOf = (material, now, kept = null) => { let p = material && material.userData && material.userData.previousPositionNode;
+        if (typeof p === "function") p = p(kept || TSL.positionGeometry);
+        return p ? (toward ? TSL.mix(p, now, towardU) : p) : now; };
+    // v4757: a SkinnedMesh's previous bone matrices and a morphed mesh's previous influences, kept HERE as the instance matrices
+    // are. three's skinning keeps its previous bone matrices only when the material asks for velocity and steps them once
+    // per render call -- this stage's own pass among them -- so a skinned mesh here carried NO motion; and it keeps no
+    // previous morph influences at all, so a morphed mesh's "previous" point was the unmorphed one. Per skeleton, the bone
+    // matrices at the last draw of this pass, stepped once a pass (a skeleton may skin several meshes); per mesh, the
+    // influences at its last draw; the targets from a float texture per geometry
+    const skins = new WeakMap(), morphs = new WeakMap(), morphTex = new WeakMap();
+    // v4761: *** WHAT IS HELD PER OBJECT REACHES THE DRAW PER DRAW, AND IS NOT BUILT INTO THE PROGRAM. *** three keys a compiled
+    // program by the material's properties and the geometry's layout -- a skinned mesh by its bone COUNT -- so two skinned meshes
+    // of one layout, or two meshes of one morphed geometry, or any two sprites, are drawn by ONE program, and a buffer or a
+    // uniform built into it for the first object was read for both: the second skinned mesh 44.7 px off, the second morphed
+    // mesh 1.06 (render/temporalTslZoo-selfcheck.mjs). So these are one node per shape, filled in
+    // update() before each object's draw, as three fills previousModelWorldMatrix
+    const sharedBuffer = new Map();
+    const perDraw = (type, n) => { const k = type + n; let b = sharedBuffer.get(k);
+        if (!b) { const arr = new Float32Array(n * (type === "mat4" ? 16 : 4)); b = { arr, node: TSL.buffer(arr, type, n) }; sharedBuffer.set(k, b); } return b; };
+    const bindU = TSL.uniform(new THREE.Matrix4()), bindInvU = TSL.uniform(new THREE.Matrix4());
+    const skinRecord = (object) => {
+        const sk = object.skeleton; let r = skins.get(sk);
+        if (!r) { sk.update(); const n = sk.bones.length, last = Float32Array.from(sk.boneMatrices), cur = Float32Array.from(last);
+            r = { n, last, cur, frame: -1 }; skins.set(sk, r); }
+        return r;
+    };
+    const hasMorph = (object) => !!(object && object.geometry && object.geometry.morphAttributes && object.geometry.morphAttributes.position &&
+        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences);
+    const morphRecord = (object) => {
+        let r = morphs.get(object);
+        // the influences as vec4s, each in .x: a uniform array's elements must be 16 bytes apart, and an array of f32 is not
+        // valid WGSL there -- the first draft's pipeline failed and the mesh was not drawn at all
+        if (!r) { const n = object.geometry.morphAttributes.position.length, last = Float32Array.from(object.morphTargetInfluences.slice(0, n)), cur = new Float32Array(n * 4);
+            for (let i = 0; i < n; i++) cur[i * 4] = last[i];
+            r = { n, last, cur }; morphs.set(object, r); }
+        return r;
+    };
+    // the targets of a geometry as one float texture, target t's vertex v at texel t * count + v, rows of up to 4096
+    const morphTargets = (geometry) => {
+        let m = morphTex.get(geometry);
+        if (!m) {
+            const targets = geometry.morphAttributes.position, count = geometry.attributes.position.count, n = targets.length, total = count * n;
+            const W = Math.min(4096, total), H = Math.ceil(total / W), data = new Float32Array(W * H * 4);
+            for (let t = 0; t < n; t++) for (let v = 0; v < count; v++) { const i = (t * count + v) * 4; data[i] = targets[t].getX(v); data[i + 1] = targets[t].getY(v); data[i + 2] = targets[t].getZ(v); }
+            const tex = keep(new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
+            m = { tex, W, count, n }; morphTex.set(geometry, m);
+        }
+        return m;
+    };
+    const stepSkin = (object, r, frame) => {
+        // the CURRENT bone matrices, fresh for this draw: three updates a skeleton once per frame of ITS animation loop, so a
+        // pass drawn in the same browser frame as the last one skinned the mesh with the matrices it had then -- the current
+        // pose was the previous one, and a skinned mesh carried no motion at all
+        object.skeleton.update();
+        if (r.frame === frame) return;                                  // once a pass, however many meshes the skeleton skins
+        r.frame = frame;
+        if (!toward) { r.cur.set(r.last); return; }
+        const now = object.skeleton.boneMatrices;
+        for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
+    };
+    const stepMorph = (object, r) => {
+        for (let i = 0; i < r.n; i++) r.cur[i * 4] = toward ? r.last[i] + toward.t * (object.morphTargetInfluences[i] - r.last[i]) : r.last[i];
+    };
+    // the geometry's point as it was: morphed by the previous influences, then skinned by the previous bone matrices
+    const morphedBefore = (object, pos) => {
+        const g = object.geometry, r = morphRecord(object), { tex, W, count, n } = morphTargets(g);
+        const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
+        let sum = null, acc = null;
+        const node = perDraw("vec4", n).node;
+        for (let t = 0; t < n; t++) { const w = node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
+        // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
+        return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+    };
+    const skinnedBefore = (object, pos) => {
+        const m = perDraw("mat4", object.skeleton.bones.length).node, bind = bindU, bindInv = bindInvU;
+        const si = TSL.attribute("skinIndex", "uvec4"), sw = TSL.attribute("skinWeight", "vec4"), v = bind.mul(vec4(pos, 1.0));
+        const s = m.element(si.x).mul(v).mul(sw.x).add(m.element(si.y).mul(v).mul(sw.y)).add(m.element(si.z).mul(v).mul(sw.z)).add(m.element(si.w).mul(v).mul(sw.w));
+        return bindInv.mul(s).xyz;
+    };
+    class MotionNode extends THREE.VelocityNode {
+        constructor() { super(); this.nodeType = "vec4"; }
+        /** v4761: a sprite's clip position as the stage draws it -- its sprite material's vertexNode. */
+        spriteVertex() { return TSL.Fn((_, builder) => spriteClip(builder))(); }
+        /** v4772: frees every texture the node made for the histories it keeps; the stage's dispose() calls it. */
+        disposeHistory() { for (const tex of made) tex.dispose(); made.clear(); }
+        setPreviousCamera(projection, view) {
+            this.previousProjectionMatrix.value.copy(projection);
+            this.previousCameraViewMatrix.value.copy(view);
+        }
+        // per object, BEFORE it is drawn: its matrix from the last time THIS pass drew it
+        update({ object, renderId }) {
+            let m = prev.get(object);
+            if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
+            this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
+            // an instanced mesh's texture is marked for upload here, and uploaded with this draw's other bindings
+            if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
+            if (object.isBatchedMesh) batchBefore(object, batchRecord(object));
+            if (object.isSprite) { const now = object.material.rotation, was = rotations.has(object) ? rotations.get(object) : now; rotPrev.value = toward ? was + toward.t * (now - was) : was; }
+            // three's renderId is its render call's -- frameId is its animation loop's, and several passes fall in one of those
+            if (object.isSkinnedMesh) { const r = skinRecord(object); stepSkin(object, r, renderId); perDraw("mat4", r.n).arr.set(r.cur);
+                bindU.value.copy(object.bindMatrix); bindInvU.value.copy(object.bindMatrixInverse); }
+            if (hasMorph(object)) { const r = morphRecord(object); stepMorph(object, r); perDraw("vec4", r.n).arr.set(r.cur); }
+            if (object.isSprite) centreU.value.copy(object.center);
+            if (toward) towardU.value = toward.t;
+        }
+        updateAfter({ object }) {
+            const m = prev.get(object);
+            if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
+            if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
+            if (object.isBatchedMesh) { const r = batchRecord(object); r.last.set(r.src.image.data); }
+            if (object.isSprite) rotations.set(object, object.material.rotation);
+            if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
+            if (hasMorph(object)) { const r = morphRecord(object); for (let i = 0; i < r.n; i++) r.last[i] = object.morphTargetInfluences[i]; }
+        }
+        setup(builder) {
+            let cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal), was = null;
+            // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
+            const object = builder && builder.object;
+            let before = positionPrevious;
+            if (object && object.isSprite) {
+                // v4761: the corner as three's SpriteNodeMaterial places it, now and at the last draw
+                cur = TSL.varying(spriteClip(builder));
+                const mat = builder.material, pn = mat.positionNode;
+                if (mat.isPointsNodeMaterial) {
+                    // v4770: the centre where it was, the corner in pixels about it at the last draw's view depth and rotation
+                    const c0 = pn ? vec4(TSL.vec3(previousOf(mat, pn)), 1.0) : vec4(TSL.positionGeometry, 1.0), mv = this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(c0);
+                    was = TSL.varying(pointCorner(builder, mv, this.previousProjectionMatrix.mul(mv), mat.rotationNode ? rotWas(mat) : null));
+                } else {
+                    const c0 = pn ? vec4(TSL.vec3(previousOf(mat, pn)), 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+                    was = TSL.varying(this.previousProjectionMatrix.mul(spriteCorner(builder, this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(c0), this.previousModelWorldMatrix, rotWas(mat))));
+                }
+            }
+            else if (object && object.isBatchedMesh) {
+                // v4761: the geometry through the instance's previous matrix, found as three finds the current one
+                const r = batchRecord(object), id = TSL.int(builder.getDrawIndex() === null ? TSL.instanceIndex : TSL.drawIndex), ind = object._indirectTexture;
+                const isz = TSL.int(TSL.textureSize(TSL.textureLoad(ind), 0).x), iid = TSL.int(TSL.textureLoad(ind, TSL.ivec2(id.mod(isz), id.div(isz))).x);
+                before = TSL.varying(matrixIn(r.tex, iid).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            }
+            else if (object && builder.material.positionNode) {
+                // v4762: the override carries the object's positionNode; the last position is the application's, or the node's own.
+                // v4770: where the application's is a function, of the point the stage keeps -- instanced, skinned or morphed
+                const own = Array.isArray(object.material) ? null : object.material, fn = own && own.userData && typeof own.userData.previousPositionNode === "function";
+                let kept = null;
+                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
+                else if (fn && (object.isSkinnedMesh || hasMorph(object))) { let q = TSL.positionGeometry; if (hasMorph(object)) q = morphedBefore(object, q); if (object.isSkinnedMesh) q = skinnedBefore(object, q); kept = q; }
+                before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode, kept)));
+            }
+            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            else if (object && (object.isSkinnedMesh || hasMorph(object))) {
+                // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
+                let p = TSL.positionGeometry;
+                if (hasMorph(object)) p = morphedBefore(object, p);
+                if (object.isSkinnedMesh) p = skinnedBefore(object, p);
+                before = TSL.varying(vec4(p, 1.0)).xyz;
+            }
+            if (!was) was = this.previousProjectionMatrix.mul(this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix)).mul(before);
+            // uv = ((x + 1) / 2, (1 - y) / 2), so uvPrev - uvCurr = ((xp - xc) / 2, (yc - yp) / 2)
+            const xc = cur.x.div(cur.w), yc = cur.y.div(cur.w), xp = was.x.div(was.w), yp = was.y.div(was.w);
+            const ok = was.w.greaterThan(0.0);   // behind the previous eye: no answer, as motionVectorsCPU says
+            return vec4(select(ok, xp.sub(xc).mul(0.5), 0.0), select(ok, yc.sub(yp).mul(0.5), 0.0),
+                        select(ok, 1.0, 0.0), select(ok, was.z.div(was.w), 0.0));
+        }
+    }
+    return new MotionNode();
+}
+
+/**
+ * v4744: the rigid pose at time t between two world matrices -- translation and scale lerped, rotation slerped -- which is
+ * where a body turning at a steady rate between two frames is; a lerp of the matrices themselves would shrink it through
+ * the turn. `out` receives it.
+ */
+export function poseAt(THREE, a, b, t, out = new THREE.Matrix4()) {
+    const pa = new THREE.Vector3(), qa = new THREE.Quaternion(), sa = new THREE.Vector3(), pb = new THREE.Vector3(), qb = new THREE.Quaternion(), sb = new THREE.Vector3();
+    a.decompose(pa, qa, sa); b.decompose(pb, qb, sb);
+    return out.compose(pa.lerp(pb, t), qa.slerp(qb, t), sa.lerp(sb, t));
+}
+
+/**
+ * The completion pass: a fragment node over the surface pass's two outputs. Where the surface pass drew (window
+ * depth < 1) the motion is passed through; where it did not, the far plane is carried through motionVectorsCPU's
+ * arithmetic with the current INVERSE and previous FORWARD view-projections (uniforms.invVPCur / vpPrev, Matrix4s
+ * the caller fills each frame). Output vec4 (du, dv, valid, zPrev), and a second node, `depthNode`, gives the
+ * CLIP depth as vec4(z, 0, 0, 1) for the passes that read depth.
+ */
+export function motionCompleteNodes(THREE, TSL, motionTex, depthTex, { w, h, gl }) {
+    need(TSL);
+    const { Fn, float, int, vec4, ivec2, uniform, textureLoad, screenCoordinate, select } = TSL;
+    const u = { invVPCur: uniform(new THREE.Matrix4()), vpPrev: uniform(new THREE.Matrix4()),
+                w: uniform(float(w)), h: uniform(float(h)) };
+    const texel = () => ivec2(int(screenCoordinate.x), int(screenCoordinate.y));
+    const clipOf = (d) => (gl ? d.mul(2.0).sub(1.0) : d);
+    const node = Fn(() => {
+        const wd = textureLoad(depthTex, texel()).x;
+        const m = textureLoad(motionTex, texel());
+        const uu = screenCoordinate.x.div(u.w), vv = screenCoordinate.y.div(u.h);
+        const d = clipOf(wd);
+        const p = u.invVPCur.mul(vec4(uu.mul(2.0).sub(1.0), float(1.0).sub(vv.mul(2.0)), d, 1.0));
+        const world = vec4(p.x.div(p.w), p.y.div(p.w), p.z.div(p.w), 1.0);
+        const q = u.vpPrev.mul(world);
+        const ok = p.w.notEqual(0.0).and(q.w.greaterThan(0.0));
+        const pu = q.x.div(q.w).add(1.0).mul(0.5), pv = float(1.0).sub(q.y.div(q.w)).mul(0.5);
+        const far = vec4(select(ok, pu.sub(uu), 0.0), select(ok, pv.sub(vv), 0.0), select(ok, 1.0, 0.0), select(ok, q.z.div(q.w), 0.0));
+        return select(wd.lessThan(1.0), m, far);
+    })();
+    // v4750: the CAMERA's motion at every pixel -- where a world point at this pixel's depth would have been had nothing but
+    // the camera moved; the far plane's arithmetic above, at the surface's own depth
+    const cameraNode = Fn(() => {
+        const d = clipOf(textureLoad(depthTex, texel()).x), uu = screenCoordinate.x.div(u.w), vv = screenCoordinate.y.div(u.h);
+        const p = u.invVPCur.mul(vec4(uu.mul(2.0).sub(1.0), float(1.0).sub(vv.mul(2.0)), d, 1.0));
+        const q = u.vpPrev.mul(vec4(p.x.div(p.w), p.y.div(p.w), p.z.div(p.w), 1.0));
+        const ok = p.w.notEqual(0.0).and(q.w.greaterThan(0.0));
+        const pu = q.x.div(q.w).add(1.0).mul(0.5), pv = float(1.0).sub(q.y.div(q.w)).mul(0.5);
+        return vec4(select(ok, pu.sub(uu), 0.0), select(ok, pv.sub(vv), 0.0), select(ok, 1.0, 0.0), 1.0);
+    })();
+    const depthNode = Fn(() => vec4(clipOf(textureLoad(depthTex, texel()).x), 0.0, 0.0, 1.0))();
+    return { node, depthNode, cameraNode, uniforms: u };
+}
+
+/**
+ * The input stage of the chain for one frame, with its targets: the surface pass (override material, unjittered
+ * camera) into `surface` (rgba float + a depth texture), then the completion into `motion` and the clip depth into
+ * `depth`. `render(renderer, scene, camera)` draws all three; the caller has restored the unjittered projection.
+ */
+export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = false, camera: withCamera = false }) {
+    const T = type == null ? THREE.FloatType : type;
+    const surface = new THREE.RenderTarget(w, h, { type: T, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    surface.depthTexture = new THREE.DepthTexture(w, h); surface.depthTexture.type = THREE.FloatType;
+    const flat = { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false };
+    const motion = new THREE.RenderTarget(w, h, flat), depth = new THREE.RenderTarget(w, h, flat);
+    // v4744: a TOWARD stage renders each pixel's displacement to time t between the last frame and this one, on the arc:
+    // render(renderer, scene, camera, t). Its output's du, dv are uv(t) - uv(this frame) and its w the clip depth at t.
+    const towardState = toward ? { t: 0.5 } : null;
+    const motionNode = makeMotionNode(THREE, TSL, { toward: towardState });
+    const camA = toward ? new THREE.Matrix4() : null, camB = toward ? new THREE.Matrix4() : null, camT = toward ? new THREE.Matrix4() : null;
+    const override = new THREE.NodeMaterial(); override.fragmentNode = motionNode; override.blending = THREE.NoBlending;
+    const comp = motionCompleteNodes(THREE, TSL, surface.texture, surface.depthTexture, { w, h, gl });
+    const quad = (node) => { const m = new THREE.NodeMaterial(); m.fragmentNode = node; m.depthTest = false; m.depthWrite = false; m.blending = THREE.NoBlending;
+        const s = new THREE.Scene(); s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return { scene: s, material: m }; };
+    const qM = quad(comp.node), qD = quad(comp.depthNode), ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    // v4750: `camera` -- the camera's own motion at every pixel, into `camera` (du, dv, valid, 1)
+    const cameraT = withCamera ? new THREE.RenderTarget(w, h, flat) : null, qC = withCamera ? quad(comp.cameraNode) : null;
+    const prevP = new THREE.Matrix4(), prevV = new THREE.Matrix4(), vp = new THREE.Matrix4();
+    // v4761: a sprite is drawn with a sprite material of the stage's carrying the motion node, one per material it had -- the
+    // override draws it as the flat quad its geometry is, and three's sprite material is what turns it to the camera
+    const spriteMats = new Map();
+    // v4762: a positionNode over instancing, skinning or morphs replaces the local position the stage's histories build -- only
+    // the application can say where such a point was
+    const placedOver = (o) => {
+        const m = o.material; if (!m || Array.isArray(m) || !m.positionNode) return;
+        const p = m.userData && m.userData.previousPositionNode, name = o.name ? JSON.stringify(o.name) : "a " + o.type;
+        // v4770: a function of the kept point is the stage's to apply, and it keeps no point for a batch
+        if (typeof p === "function" && o.isBatchedMesh) throw new Error(`render/temporalTsl: ${name}'s material gives previousPositionNode as a function over a batch -- the stage keeps a batch's matrices, not its points; give the whole local position as it was`);
+        if (p) return;
+        if (o.isInstancedMesh || o.isSkinnedMesh || o.isBatchedMesh || (o.morphTargetInfluences && o.morphTargetInfluences.length))
+            throw new Error(`render/temporalTsl: ${name}'s material sets positionNode over its ${o.isInstancedMesh ? "instances" : o.isSkinnedMesh ? "skin" : o.isBatchedMesh ? "batch" : "morphs"} -- give material.userData.previousPositionNode: the whole local position as it was, or (v4770) a function of the point as the stage keeps it`);
+    };
+    const spriteMaterial = (o) => {
+        const src = o.material, name = o.name ? JSON.stringify(o.name) : "a Sprite";
+        if (!src || Array.isArray(src) || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
+            throw new Error(`render/temporalTsl: ${name}'s material is not a sprite's`);
+        // v4770: a points material (sized in pixels) and a rotation node are followed now -- see pointCorner and rotWas
+        let m = spriteMats.get(src);
+        if (!m) { m = src.isPointsNodeMaterial ? new THREE.PointsNodeMaterial({ sizeAttenuation: src.sizeAttenuation }) : new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation });
+            m.fragmentNode = motionNode; m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
+            m.transparent = false; m.depthTest = true; m.depthWrite = true; m.allowOverride = false; m.vertexNode = motionNode.spriteVertex(); spriteMats.set(src, m); }
+        m.rotation = src.rotation; m.side = src.side; m.positionNode = src.positionNode || null; m.scaleNode = src.scaleNode || null; m.rotationNode = src.rotationNode || null;
+        if (src.isPointsNodeMaterial) { m.size = src.size; m.sizeNode = src.sizeNode || null; }
+        m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
+        m.userData.previousRotationNode = (src.userData && src.userData.previousRotationNode) || null;
+        return m;
+    };
+    let frames = 0;
+    return {
+        surface, motion, depth, camera: cameraT, motionNode, uniforms: comp.uniforms,
+        /** Whether the field just rendered carries a previous frame -- frame one's is every object against itself. */
+        get hasHistory() { return frames > 1; },   // after a render: motionVectors.hasHistory's own rule
+        async render(renderer, scene, camera, t = 0.5) {
+            camera.updateMatrixWorld();
+            if (frames === 0) { prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse); }
+            const lastP = prevP.clone();
+            if (toward) {
+                if (!(t >= 0 && t <= 1)) throw new Error(`render/temporalTsl: a toward stage's t must be in [0, 1] -- got ${t}`);
+                towardState.t = t;
+                // the camera at time t: its world pose on the arc, its projection lerped
+                camA.copy(prevV).invert(); camB.copy(camera.matrixWorldInverse).invert();
+                prevV.copy(poseAt(THREE, camA, camB, t, camT)).invert();
+                for (let i = 0; i < 16; i++) prevP.elements[i] = lastP.elements[i] + t * (camera.projectionMatrix.elements[i] - lastP.elements[i]);
+            }
+            motionNode.setPreviousCamera(prevP, prevV);
+            vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+            comp.uniforms.invVPCur.value.copy(vp).invert();
+            comp.uniforms.vpPrev.value.multiplyMatrices(prevP, prevV);
+            const prevTarget = renderer.getRenderTarget(), prevOverride = scene.overrideMaterial, prevBg = scene.background;
+            scene.overrideMaterial = override; scene.background = null;
+            // the draw clears depth to 1 on its own; the completion reads depth and not the cleared colour, so the
+            // renderer's clear colour is left as the caller set it
+            const swapped = [];
+            try {
+                scene.traverse((o) => { if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; } else placedOver(o); });
+                renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
+            } finally { for (const [o, m] of swapped) o.material = m; scene.overrideMaterial = prevOverride; scene.background = prevBg; }
+            renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
+            renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
+            if (qC) { renderer.setRenderTarget(cameraT); await renderer.renderAsync(qC.scene, ortho); }
+            renderer.setRenderTarget(prevTarget);
+            prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
+            frames++;
+        },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
+    };
+}
+
+// ================================================================================================================
+// v4728 -- THE RESOLVE AND THE ACCUMULATE: render/temporalResolve.mjs's resolveJitterAwareCPU and
+// render/temporalReject.mjs's rectifiedAccumulateCPU, statement by statement, reading the way every node here reads
+// -- textureLoad at screenCoordinate -- so the gate can hold them to the byte-order of the mirrors.
+//
+// *** THE BASE TEXEL IS floor(x + 0.5), WHICH IS Math.round, AND THE WGSL KERNEL HAD round(). *** round() ties to
+// even in WGSL and GLSL; the mirror's Math.round ties up. At a 2x upscale jitter phases 1 and 2 of 32 land on exact
+// halves on every other column, and there the two pick different 3x3 windows -- 6.31e-2 apart on the device. v4728
+// fixed render/temporalResolveWgsl.mjs to floor(x + 0.5) and gave its gate a row at a phase with ties.
+//
+// Not carried, and said so: the resolve's CONFIDENCE buffer (nothing in the chain reads it) and the accumulate's
+// per-reason counters. The `relax` input was on this list until v4732 (fsr.html's chain passes relax null, and the
+// lock entered only through the factor); it is carried now, for render/temporalLockTsl.mjs's lock life.
+// ================================================================================================================
+export const RESOLVE_TSL_NEEDS = Object.freeze(["abs", "sin", "clamp", "floor", "max", "min", "vec3", "select"]);
+function needAll(TSL, names) { need(TSL); for (const n of names) if (TSL[n] === undefined) throw new Error(`render/temporalTsl: the TSL namespace has no ${n}`); }
+/** The name check every temporal TSL module shares: the inputs' names and the resolve's, refused BY NAME. */
+/**
+ * v4762: the last contents of a storage buffer a compute pass writes -- a particle system's positions -- for
+ * material.userData.previousPositionNode: `node` is a buffer of the same count and type, and step(renderer) copies the
+ * current contents into it. Call it once a frame BEFORE the pass that moves them, so it holds where they were at the last draw.
+ */
+export function makePreviousCopy(THREE, TSL, storage, count, type = "vec3") {
+    const node = TSL.instancedArray(count, type), copy = TSL.Fn(() => { node.element(TSL.instanceIndex).assign(storage.element(TSL.instanceIndex)); })().compute(count);
+    return { node, compute: copy, async step(renderer) { await renderer.computeAsync(copy); } };
+}
+
+export function requireTsl(TSL) { needAll(TSL, RESOLVE_TSL_NEEDS); }
+
+/** Lanczos2 as a node: lanczos2 in render/temporalResolve.mjs, including its 1e-4 and 2.0 guards. */
+function lanczos2Node(TSL, x) {
+    const { float, abs, sin, select } = TSL;
+    const ax = abs(x), px = ax.mul(Math.PI);
+    const v = float(2.0).mul(sin(px)).mul(sin(px.mul(0.5))).div(px.mul(px));
+    return select(ax.lessThan(1e-4), float(1.0), select(ax.greaterThanEqual(2.0), float(0.0), v));
+}
+
+/**
+ * The jitter-aware Lanczos2 resolve: one render-resolution frame (`tex`, rw x rh) to a display pixel, dered.
+ * uniforms.jx / jy are THIS frame's jitter in render/jitter.mjs's units -- the same numbers applyJitter was given.
+ */
+export function resolveNode(TSL, tex, { rw, rh, dw, dh }) {
+    needAll(TSL, RESOLVE_TSL_NEEDS);
+    const { Fn, float, int, vec3, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
+    const u = { rw: uniform(float(rw)), rh: uniform(float(rh)), dw: uniform(float(dw)), dh: uniform(float(dh)),
+                jx: uniform(float(0)), jy: uniform(float(0)) };
+    const node = Fn(() => {
+        const uu = screenCoordinate.x.div(u.dw), vv = screenCoordinate.y.div(u.dh);
+        const sx = uu.mul(u.rw).sub(0.5).sub(u.jx).toVar(), sy = vv.mul(u.rh).sub(0.5).sub(u.jy).toVar();
+        const bx = floor(sx.add(0.5)).toVar(), by = floor(sy.add(0.5)).toVar();   // Math.round -- see the note above
+        const wsum = float(0.0).toVar(), csum = vec3(0.0).toVar();
+        const lo = vec3(1e9).toVar(), hi = vec3(-1e9).toVar();
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const cx = clamp(bx.add(dx), 0.0, u.rw.sub(1.0)), cy = clamp(by.add(dy), 0.0, u.rh.sub(1.0));
+            const w = lanczos2Node(TSL, sx.sub(bx.add(dx))).mul(lanczos2Node(TSL, sy.sub(by.add(dy))));
+            const s = textureLoad(tex, ivec2(int(cx), int(cy))).xyz;
+            wsum.addAssign(w); csum.addAssign(s.mul(w));
+            lo.assign(min(lo, s)); hi.assign(max(hi, s));
+        }
+        const den = select(abs(wsum).greaterThan(1e-4), wsum, float(1e-4));
+        return vec4(clamp(csum.div(den), lo, hi), 1.0);
+    })();
+    return { node, uniforms: u };
+}
+
+/** RGB -> YCoCg and back, the lifting form render/temporalReject.mjs uses, in its order of operations. */
+function toYCoCg(TSL, c) { const { vec3 } = TSL; return vec3(c.x.mul(0.25).add(c.y.mul(0.5)).add(c.z.mul(0.25)), c.x.mul(0.5).sub(c.z.mul(0.5)), c.x.mul(-0.25).add(c.y.mul(0.5)).sub(c.z.mul(0.25))); }
+function fromYCoCg(TSL, q) { const { vec3 } = TSL; const t = q.x.sub(q.z); return vec3(t.add(q.y), q.x.add(q.z), t.sub(q.y)); }
+
+/**
+ * The rectified accumulate: reproject through `motion`, fetch the history bilinearly, clamp it to the 3x3 of the
+ * current frame IN YCoCg, and blend with alpha weighted by `factor` (a texture whose .x is the history factor, or
+ * null for 1 everywhere). uniforms.alpha is the blend; uniforms.hasHistory is 0 on the first frame, where the output
+ * is the current frame -- the mirror's `history === null`.
+ *
+ * `relax` (v4732) is rectifiedAccumulateCPU's: a texture whose .x in [0, 1] lerps the CLAMPED history back toward the
+ * unclamped one, per channel in YCoCg -- cl + (b - cl) * rx, the mirror's order. It is how a lock reaches the clamp;
+ * render/temporalLockTsl.mjs's makeLockLife writes it, and render/temporalLockTsl-selfcheck.mjs grades this input
+ * against the mirror, beside the lock that feeds it. null is the old node exactly, not a relax of 0 -- the gates
+ * that graded it before this input existed still grade the same expression.
+ */
+export function accumulateNode(TSL, { current, history, motion, factor = null, relax = null }, { w, h, alpha = 0.1 }) {
+    needAll(TSL, RESOLVE_TSL_NEEDS);
+    const { Fn, float, int, vec3, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, max, min, select } = TSL;
+    const u = { w: uniform(float(w)), h: uniform(float(h)), alpha: uniform(float(alpha)), hasHistory: uniform(float(0)) };
+    const node = Fn(() => {
+        const px = floor(screenCoordinate.x), py = floor(screenCoordinate.y);
+        const at = (tex, x, y) => textureLoad(tex, ivec2(int(clamp(x, 0.0, u.w.sub(1.0))), int(clamp(y, 0.0, u.h.sub(1.0)))));
+        const cur = at(current, px, py).xyz.toVar();
+        const m = at(motion, px, py).toVar();
+        const uu = screenCoordinate.x.div(u.w), vv = screenCoordinate.y.div(u.h);
+        const hu = uu.add(m.x), hv = vv.add(m.y);
+        // sampleBilinear3, in its order
+        const x = hu.mul(u.w).sub(0.5), y = hv.mul(u.h).sub(0.5);
+        const x0 = floor(x), y0 = floor(y), fx = x.sub(x0), fy = y.sub(y0);
+        const ifx = float(1.0).sub(fx), ify = float(1.0).sub(fy);
+        const hist = at(history, x0, y0).xyz.mul(ifx).mul(ify).add(at(history, x0.add(1.0), y0).xyz.mul(fx).mul(ify))
+            .add(at(history, x0, y0.add(1.0)).xyz.mul(ifx).mul(fy)).add(at(history, x0.add(1.0), y0.add(1.0)).xyz.mul(fx).mul(fy)).toVar();
+        // the box of the CURRENT frame's 3x3, in YCoCg
+        const lo = vec3(1e30).toVar(), hi = vec3(-1e30).toVar();
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const s = toYCoCg(TSL, at(current, px.add(dx), py.add(dy)).xyz);
+            lo.assign(min(lo, s)); hi.assign(max(hi, s));
+        }
+        let rect;
+        if (relax) {
+            const b = toYCoCg(TSL, hist).toVar(), cl = clamp(b, lo, hi).toVar(), rx = clamp(at(relax, px, py).x, 0.0, 1.0);
+            rect = fromYCoCg(TSL, cl.add(b.sub(cl).mul(rx)));
+        } else rect = fromYCoCg(TSL, clamp(toYCoCg(TSL, hist), lo, hi));
+        const f = factor ? clamp(at(factor, px, py).x, 0.0, 1.0) : float(1.0);
+        const a = float(1.0).sub(float(1.0).sub(u.alpha).mul(f));
+        const blended = rect.mul(float(1.0).sub(a)).add(cur.mul(a));
+        const take = u.hasHistory.lessThan(0.5).or(m.z.equal(0.0)).or(hu.lessThan(0.0)).or(hu.greaterThanEqual(1.0))
+            .or(hv.lessThan(0.0)).or(hv.greaterThanEqual(1.0));
+        return vec4(select(take, cur, blended), 1.0);
+    })();
+    return { node, uniforms: u };
+}

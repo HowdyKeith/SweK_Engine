@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 472,
+  "page": 473,
   "demo": 49,
   "builtin": 34
  },
@@ -1488,6 +1488,14 @@
    "display": "Frugon",
    "href": "/frugon.html",
    "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fsr-three.html",
+   "display": "Fsr Three",
+   "href": "/fsr-three.html",
+   "section": null,
    "collision": false
   },
   {

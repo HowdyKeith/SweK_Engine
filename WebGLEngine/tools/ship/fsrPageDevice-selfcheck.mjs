@@ -104,6 +104,24 @@ console.log("fsrPageDevice-selfcheck -- fsr.html on a real adapter, loaded as a 
                /counted on the device/.test(G.acc || "") && /reused \d+/.test(G.acc || "") &&
                !/not counted/.test(G.acc || ""),
                G.acc || "(empty)");
+            // *** v4649 -- THE 106 IS PINNED NOW, AND IT WAS NOT BEFORE. *** The row above asked only for
+            // genuine > 0. fsr.html's own prose quotes "106 genuine" and calls it a one-pixel sliver down the
+            // slab's trailing edge; four files repeat it. A number a page states in prose and no gate holds
+            // is a number free to drift, and the round that added a fourth camera is exactly the round with
+            // a reason to move it by accident.
+            // *** v4667 -- 106 BECAME 108 WHEN DILATION BECAME THE DEFAULT, AND THE OLD NUMBER STAYS
+            // WRITTEN DOWN. *** This gate drives the page at its defaults, so what it pins is whatever the
+            // page ships with; v4667 made FSR2's dilation pass the shipped path and the dolly's silhouette
+            // grew by the two pixels the neighbourhood search hands the foreground. The 106 is not wrong,
+            // it is the UNDILATED count, and it is still reachable on the page's control arm -- this row
+            // named it "documented" for three rounds and a reader meeting 108 with no history would
+            // reasonably think something broke.
+            ok("!! *** ...and the dolly's genuine count is the 108 this page's own prose quotes ***",
+               !!m && Number(m[1]) === 108,
+               `${m ? m[1] : "(none)"} against a documented 108 (106 before v4667 enabled dilation by ` +
+               "default; the control arm still reads 106). MEASURED FLAT across frames 2-6 on the dolly -- " +
+               "the same value every frame -- so this is a constant of that camera and not a sample.");
+
         }
     }
 }
@@ -116,7 +134,11 @@ console.log("\nunchecked here: the two OLDER cameras' GPU branches -- this drive
     "implementation and not real hardware, and no timing claim may be read off it; the PICTURE, which is " +
     "never compared here -- this gate reads the page's counters and its engine attribution, and the pictures " +
     "are held equal by render/temporalRejectGPU-selfcheck.mjs on a fixture; and everything fsrPage-selfcheck " +
-    "checks about the page as a SOURCE, which is deliberately not repeated here.");
+    "checks about the page as a SOURCE, which is deliberately not repeated here; and the OBJECT-MOTION camera, which is " +
+    "tools/ship/fsrPageObjects-selfcheck.mjs's -- split out at v4649 for the reason this file was itself " +
+    "split from fsrPage-selfcheck: driving a second camera to six frames took this gate from 2,448 ms to " +
+    "4,872, over the sweep's 3,000 ms membership threshold, and a gate outside the sweep is a gate nobody " +
+    "runs. Third split in this tree for that reason and the third taken BEFORE the addition landed.");
 //
 // SABOTAGE LOG -- each applied to the live tree, run, and restored.
 //   v4641  fsr.html: `if (rgpu)` forced false, so the runner is CONSTRUCTED and the page uses the CPU anyway

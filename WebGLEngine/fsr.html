@@ -39,12 +39,83 @@
       <option value="zone">zone plate (detail past Nyquist)</option>
       <option value="smooth">smooth (nothing to recover)</option>
       <option value="checker">pixel checker</option>
+      <option value="bars">bars (mid-frequency, oriented)</option>
+      <option value="edges">edges (sparse high frequency, flat interiors)</option>
+      <option value="noise">noise (broadband, no structure)</option>
+      <option value="ramp">ramp (smooth without oscillation)</option>
     </select>
     <select id="camera">
       <option value="static">camera: static</option>
       <option value="pan">camera: panning 0.75 px/frame</option>
       <option value="dolly">camera: dollying (perspective, two planes)</option>
+      <option value="objects">camera: dollying + the slab MOVES (object motion)</option>
     </select>
+    <select id="shading">
+      <option value="on">shading mask: ON</option>
+      <option value="off">shading mask: OFF (the control)</option>
+    </select>
+    <select id="reactive">
+      <option value="on">reactive mask: ON</option>
+      <option value="off">reactive mask: OFF (the control)</option>
+    </select>
+    <select id="rxsource">
+      <option value="derived">reactive mask from: the DERIVED heuristic (colour vs history)</option>
+      <option value="app">reactive mask from: the APPLICATION's declaration (FSR2's primary path)</option>
+    </select>
+    <select id="slabalpha">
+      <option value="1">slab: OPAQUE (every figure on this page is this arm)</option>
+      <option value="0.5">slab: TRANSLUCENT 0.5 -- colour but no depth, the reactive mask's case</option>
+      <option value="0.25">slab: TRANSLUCENT 0.25</option>
+    </select>
+    <select id="dilscope">
+      <option value="all">dilation feeds: the clip chain AND the reactive mask</option>
+      <option value="clip">dilation feeds: the CLIP CHAIN only (the mask reads raw motion)</option>
+    </select>
+    <select id="slabspeed">
+      <option value="1">slab speed: &times;1 (the default -- every figure on this page is this arm)</option>
+      <option value="2">slab speed: &times;2</option>
+      <option value="4">slab speed: &times;4</option>
+      <option value="8">slab speed: &times;8</option>
+    </select>
+    <select id="slabdir">
+      <option value="x">slab moves: ALONG x, with the dolly (the default -- every figure on this page is this arm)</option>
+      <option value="z">slab moves: VERTICALLY, across the dolly (v4711 -- new occlusion geometry)</option>
+    </select>
+    <select id="slabpath">
+      <option value="linear">slab path: STRAIGHT ON (the default -- every figure on this page is this arm; it leaves the view)</option>
+      <option value="sway">slab path: SWAY, reversing so it never leaves the view (v4718)</option>
+    </select>
+    <select id="gengate">
+      <option value="off">learned gate: OFF (the default -- every figure on this page predates it)</option>
+      <option value="cpu">learned gate: ON, on the CPU (v4691 weights, tau 0.5)</option>
+      <option value="cpu2">learned gate: ON, v4693 weights with the VALIDATION-chosen tau</option>
+      <option value="device">learned gate: ON, on the DEVICE (MLP_LAYER_WGSL through gfx/device.js)</option>
+      <option value="oracle">learned gate: ORACLE (control C1 -- uses the TRUE label, so it is not a prediction)</option>
+      <option value="never">learned gate: ALWAYS CROSS-FADE (control C2 -- the predictor that always declines)</option>
+    </select>
+    <select id="genengine">
+      <option value="cpu">reconcile on: the CPU (the default -- every figure on this page is this arm)</option>
+      <option value="device">reconcile on: the DEVICE (v4685's kernel, 0 of 64 blocks differ in its gate)</option>
+    </select>
+    <select id="gensource">
+      <option value="presented">generator input: PRESENTED frames (the default -- what a viewer sees)</option>
+      <option value="clean">generator input: CLEAN renders (isolates the accumulator, exploratory)</option>
+    </select>
+    <select id="genfield">
+      <option value="block">generator field: BLOCK 8 (the default -- v4681 and v4682 are this arm)</option>
+      <option value="pixel">generator field: PER-PIXEL (the application's own, where it is valid)</option>
+    </select>
+    <select id="genframe">
+      <option value="off">frame generation: OFF (the control -- every figure on this page is this arm)</option>
+      <option value="on">frame generation: ON (FSR3 -- generate the frame between two and grade it)</option>
+    </select>
+    <select id="dilate">
+      <option value="on">dilate depth+motion: ON (FSR2's early pass)</option>
+      <option value="off">dilate depth+motion: OFF (every figure on this page is this arm)</option>
+    </select>
+    <label>scene starts at frame
+      <input id="startframe" type="number" min="0" max="4096" step="1" value="0" style="width:5em">
+    </label>
     <select id="ratio">
       <option value="2">upscale 2&times;</option>
       <option value="1.5">upscale 1.5&times;</option>
@@ -57,6 +128,12 @@
   <div class="stat" id="engine">spatial engine: starting up</div>
   <div class="stat" id="accstat"></div>
   <div class="stat" id="disstat"></div>
+  <div class="stat" id="objstat"></div>
+  <div class="stat" id="lockstat"></div>
+  <div class="stat" id="reactstat"></div>
+  <div class="stat" id="splitstat"></div>
+  <div class="stat" id="dilstat"></div>
+  <div class="stat" id="genstat"></div>
   <div class="stat" id="over"></div>
 </div>
 <div class="panes">
@@ -131,7 +208,8 @@
   together. Depth alone is not the condition and perspective alone is not the condition.
   <br><br>
   So the dolly puts the pattern on two planes, four and eight units out, and walks the camera sideways. The
-  <i>disocclusion</i> line reads <b>106 genuine</b> &mdash; a one-pixel sliver down the slab&rsquo;s trailing
+  <i>disocclusion</i> line reads <b>108 genuine</b> &mdash; <b>106</b> before v4667 made FSR2&rsquo;s dilation
+  pass the shipped path, and still 106 on the page&rsquo;s control arm &mdash; a one-pixel sliver down the slab&rsquo;s trailing
   edge, 106 pixels tall &mdash; and <b>0 on every eighth frame</b>, which is not flakiness: the edge advances
   0.879 display pixels per frame, so in eight frames it crosses seven pixel boundaries and the depth buffer is
   nearest-sampled. The threshold is <i>derived</i> from the camera, a quarter of the near/far clip-z gap
@@ -166,7 +244,7 @@
   number.
 </div>
 <script type="module">
-import { makeJitterState, jitterCurrent, advanceJitter } from "./render/jitter.mjs";
+import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from "./render/jitter.mjs";
 import { resolveJitterAwareCPU } from "./render/temporalResolve.mjs";
 import { temporalAccumulateCPU } from "./render/temporalAccumulate.mjs";
 import { easuCPU, rcasCPU, bilinearCPU } from "./fx/fsr/fsr.js";
@@ -175,6 +253,11 @@ import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { FSRGPU, rangeOf } from "./fx/fsr/fsrGPU.js";
 import { TemporalGPU } from "./render/temporalGPU.mjs";
 import { MotionVectorsGPU, orthoPanVP } from "./render/motionVectorsGPU.mjs";
+import { ObjectMotionGPU } from "./render/objectMotionGPU.mjs";
+import { TemporalLockGPU } from "./render/temporalLockGPU.mjs";
+import { ReactiveGPU } from "./render/reactiveGPU.mjs";
+import { DilateGPU } from "./render/dilateGPU.mjs";
+import { buildObjectMatrices, objectMotionCPU } from "./render/objectMotion.mjs";
 import { TemporalRejectGPU } from "./render/temporalRejectGPU.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors.mjs";
 // *** v4638 -- THE PAGE GETS A SECOND CAMERA, AND IT IS THE TREE'S OWN. *** render/rasterProbe.js's viewProj is
@@ -185,20 +268,84 @@ import { motionVectorsCPU, mat4Invert, transform4 } from "./render/motionVectors
 import { viewProj } from "./render/rasterProbe.js";
 import { jitterProjection } from "./render/jitter.mjs";
 import { disocclusionCPU, historyFactorCPU, rectifiedAccumulateCPU } from "./render/temporalReject.mjs";
+// *** v4681 -- FSR3's FRAME GENERATION, WHICH EVERY GATE IN THAT ARC HAS CLOSED BY SAYING THIS PAGE DOES NOT
+// CALL. *** v4673 estimated motion from colour, v4674 mirrored it on the device, v4675 made it sub-pixel,
+// v4676 reconciled it with the application's field, v4677 turned a field into a frame, v4678 and v4679 filled
+// the holes, and v4680 found that three of those rounds had the field's indexing backwards. Every one of them
+// measured on a synthetic fixture. This is the first time any of it runs on a picture.
+import { opticalFlowCPU } from "./render/opticalFlow.mjs";
+import { reconcileFlowCPU } from "./render/flowReconcile.mjs";
+import { FlowReconcileGPU } from "./render/flowReconcileGPU.mjs";
+import { FrameInterpGPU } from "./render/frameInterpGPU.mjs";
+import { HoleFillGPU } from "./render/holeFillGPU.mjs";
+import { interpolateFrameCPU, crossFadeCPU } from "./render/frameInterp.mjs";
+import { features as gateFeatures, featuresV2 as gateFeaturesV2, labels as gateLabels } from "./render/genGate.mjs";
+import { applyScaler as gateScale, forward as gateForward, applyGate } from "./render/genGate.mjs";
+import { GenGateGPU } from "./render/genGateGPU.mjs";
+// v4704 -- what the arc FOUND. The learned arms are labelled, loaded and read out from this table, so a user
+// choosing one is told it is a refuted hypothesis kept as a record -- the verdicts had lived only in closings.
+import { armWeights, optionSuffix, readoutNote } from "./render/genGateVerdicts.mjs";
+import { frameOptionSuffix, frameNote, frameOffNote } from "./render/frameVerdicts.mjs";
+import { SLAB_DX, DOLLY, SLAB_PATHS, slabOffset } from "./render/slabPath.mjs";
 
 const D = 192;                                  // display resolution
 const $ = (id) => document.getElementById(id);
 const ctx = (id) => { const c = $(id); c.width = D; c.height = D; return c.getContext("2d"); };
 const cRef = ctx("cRef"), cBil = ctx("cBil"), cFsr = ctx("cFsr"), cTmp = ctx("cTmp");
 
+// *** v4697 -- SEVEN SCENES, AND THE FOUR NEW ONES WERE CHOSEN BEFORE ANYTHING WAS MEASURED ON THEM. ***
+// v4696 closed by saying a sound transfer test needs more than three scenes, because three folds were never a
+// distribution. Adding content AFTER seeing a result is how a scene set becomes a way of choosing an answer,
+// so these are picked on stated grounds and their properties are MEASURED by tools/ship/fsrContent-selfcheck
+// rather than asserted here. The axis this arc found is content spatial frequency; the three originals are
+// low (smooth), swept (zone) and Nyquist-dense (checker), and all three are isotropic or axis-symmetric.
+// The four additions open three axes the originals do not span:
+//
+//   bars      a mid-frequency ORIENTED grating -- the first anisotropic content here
+//   edges     piecewise-constant regions with sharp boundaries: SPARSE high frequency, where the checker's is
+//             dense. Most real content is this shape and none of the originals is
+//   noise     a band-limited stochastic field -- broadband with no structure, which separates "has high
+//             frequencies" from "has repeating structure"
+//   ramp      a linear gradient: the degenerate low end, smooth WITHOUT oscillation, which `smooth` has
+//
+// *** AND THE SILENT FALLBACK IS GONE. *** This function used to end in a bare `else` that produced the zone
+// plate, so any misspelled kind became `zone` without a word. In a transfer experiment that merges two folds
+// into one and the merge is invisible -- exactly the class of defect this arc has spent four rounds on. Every
+// kind is named, and an unknown one throws.
 function scene(u, v, kind) {
     const x = (u - 0.5) * 2, y = (v - 0.5) * 2;
     let s;
-    if (kind === "smooth")      s = 0.5 + 0.35 * Math.cos(2.5 * (x + y)) * Math.exp(-0.6 * (x * x + y * y));
+    if (kind === "smooth")       s = 0.5 + 0.35 * Math.cos(2.5 * (x + y)) * Math.exp(-0.6 * (x * x + y * y));
     else if (kind === "checker") s = ((Math.floor(u * D) + Math.floor(v * D)) & 1) ? 0.9 : 0.1;
-    else                         s = 0.5 + 0.5 * Math.cos(90 * (x * x + y * y));
+    else if (kind === "zone")    s = 0.5 + 0.5 * Math.cos(90 * (x * x + y * y));
+    else if (kind === "bars")    s = 0.5 + 0.45 * Math.cos(28 * (0.8 * x + 0.6 * y));
+    else if (kind === "edges") {
+        // Sparse high frequency: a few large constant plateaus, so the energy is at the BOUNDARIES and the
+        // interiors are flat. A deterministic hash on a coarse lattice, not noise -- the plateaus must be
+        // large enough that most blocks see no edge at all, which is what makes this different from `noise`.
+        const cx = Math.floor((u * 6.0)), cy = Math.floor((v * 6.0));
+        const h = Math.sin(cx * 12.9898 + cy * 78.233) * 43758.5453;
+        s = (h - Math.floor(h)) > 0.5 ? 0.85 : 0.15;
+    }
+    else if (kind === "noise") {
+        // Band-limited stochastic: a fixed sum of incommensurate sinusoids, which is broadband and repeatable
+        // without a PRNG. Deterministic matters -- the generator is sampled at sub-pixel positions by the
+        // warp, and a hash-per-pixel field would not be a continuous function to resample.
+        s = 0.5 + 0.12 * (Math.sin(11.3 * x + 4.1 * y) + Math.sin(7.7 * x - 9.2 * y)
+                        + Math.sin(17.1 * x + 13.9 * y) + Math.sin(23.3 * x - 19.7 * y));
+    }
+    else if (kind === "ramp")    s = 0.5 + 0.45 * x;
+    else throw new Error(`fsr.html scene(): unknown kind ${JSON.stringify(kind)} -- this used to fall through ` +
+        "to the zone plate, which silently merged a misspelled scene into an existing one");
     return [s, s * 0.8 + 0.1, 1 - s, 1];
 }
+
+// *** v4697 -- THE SAMPLER IS EXPOSED UNDER A NAMED DEBUG HANDLE, FOR THE SAME REASON __gateHarvest IS. ***
+// tools/ship/fsrContent-selfcheck.mjs measures what each scene IS, and it has to measure the function the
+// generator actually samples. Reimplementing seven formulas in the gate would create a second definition that
+// can drift from this one silently -- and a content census describing content the page does not draw is worse
+// than no census. The handle is read-only to the page's own behaviour: nothing here calls it.
+if (typeof window !== "undefined") window.__fsrScene = scene;
 
 // ---- THE PERSPECTIVE SCENE: TWO PLANES, WHICH IS THE SMALLEST THING THAT HAS PARALLAX ----------------------
 //
@@ -224,47 +371,192 @@ function scene(u, v, kind) {
 // coordinates, so the zone plate, the smooth field and the checker all still say what they say.
 const Y_NEAR = -4, Y_FAR = 0;                  // world y of the slab and the background; the eye sits at y = -8
 const SLAB_X = [-1.2, 1.2], SLAB_Z = [-1.2, 1.2];
-const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5), DOLLY = 0.02;   // world units per frame along +x
+const NEAR = 0.1, FAR = 100, TANFOV = Math.tan(0.5);   // DOLLY (world units per frame along +x) is render/slabPath.mjs's since v4718
 
 /** The dolly camera at frame f -- the basis render/jitter-selfcheck.mjs drives, looking down +y. */
 const dollyVP = (f) => viewProj([f * DOLLY, -8, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1], TANFOV, 1, NEAR, FAR);
 
+// *** v4649 -- THE SLAB CAN MOVE NOW, AND `sx` DEFAULTS TO ZERO SO THE THREE OLDER CAMERAS ARE UNTOUCHED. ***
+// Every sampler below threads a slab offset through; every existing caller passes none and gets exactly the
+// picture, depth and truth it got before. That is deliberate rather than tidy: this page's dolly numbers --
+// 106 genuine disocclusions, the 192-pixel offscreen column -- are quoted in its own prose and in four gates,
+// and a round that moved them while adding a feature would be indistinguishable from a round that broke them.
+// SLAB_DX (0.055 world units per frame, along +x, on the "objects" camera) is render/slabPath.mjs's since v4718, so the page
+// and the analysis that computes where the slab was cannot hold two different numbers.
+// *** v4682 -- A MULTIPLIER ON THAT, AND IT DEFAULTS TO 1 SO SLAB_DX STAYS THE PAGE'S NUMBER. ***
+// tools/ship/fsrPageGen-selfcheck.mjs closed by saying the page runs under 1.3 px of mean displacement -- the
+// regime where a cross-fade wins by construction -- and that one negative reading is not a curve. This is the
+// axis that turns it into one. At x1 every figure this page and its six gates quote is untouched by
+// construction, and tools/ship/fsrPage-selfcheck.mjs's 2.42 px DERIVATION is the x1 arm's.
+const slabSpeed = () => { const e = $("slabspeed"); return e ? Number(e.value) || 1 : 1; };
+// *** v4711 -- THE SLAB'S DIRECTION, A UNIT VECTOR IN (x, z). *** The offset stays the scalar `sx` every sampler already
+// threads; the three places that turn it into GEOMETRY -- hitBoth's bounds, patternUV, and the motion vectors' model
+// matrix -- multiply it by this. Along x the added terms are sx*0, exactly zero, so the default arm is bit-identical to
+// every figure before it; the three frame-level C12 re-harvests prove that rather than this comment asserting it.
+// Vertical motion runs ACROSS the dolly instead of with it, so it disoccludes the slab's horizontal edges: occlusion
+// geometry no earlier cell has had. Held in a variable, not read per call, because hitBoth runs once per pixel ray.
+const SLAB_DIRS = Object.freeze({ x: Object.freeze([1, 0]), z: Object.freeze([0, 1]) });
+let SLAB_DIR = SLAB_DIRS.x;
+const readSlabDir = () => { SLAB_DIR = SLAB_DIRS[($("slabdir") || { value: "x" }).value] || SLAB_DIRS.x; };
+// *** v4718 -- THE SLAB'S PATH. *** `linear` is every harvest before it: t * SLAB_DX * speed, the same expression and
+// association. `sway` reverses the slab so it never leaves the view -- render/slabPath.mjs says why, and computes both.
+// Every site that turns scene time into a slab offset calls slabAt, so the page and the analysis agree by construction.
+let SLAB_PATH = "linear";
+const readSlabPath = () => { const v = ($("slabpath") || { value: "linear" }).value; SLAB_PATH = SLAB_PATHS.includes(v) ? v : "linear"; };
+const slabAt = (t, speed) => slabOffset(t, speed, SLAB_PATH, SLAB_DIR[0]);
+// The two model matrices the "objects" camera needs, column-major to match render/rasterProbe.js's viewProj
+// and everything downstream of it. The background's is the identity ON PURPOSE and not as a placeholder: it
+// is what makes the background pixels a control rather than a second unknown.
+const IDENT4 = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+const translate4 = (tx, tz = 0) => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, 0, tz, 1]);
+
 /** Where this pixel's ray meets the scene: the slab if it covers it, the background otherwise. */
-function hit(inv, u, v) {
+/**
+ * *** v4669 -- THE SLAB CAN BE TRANSPARENT NOW, AND THAT IS THE CONTENT FSR2's REACTIVE MASK EXISTS FOR. ***
+ *
+ * Four rounds in a row said the same thing and could not act on it. v4665: "FSR2 ships the reactive mask for
+ * shader-animated and transparent content -- particles, foliage -- which this page does not have." v4666:
+ * "this page has no particles and no transparency; the measurement says what the mask is worth HERE."
+ * render/reactiveGPU-selfcheck.mjs has carried it since v4657. The mask was measured on content built to
+ * exercise OBJECT MOTION, and found to be worth +0.0059 dB once dilation fixed the silhouettes -- a null
+ * that says nothing about the case the feature was designed for, because the case was absent.
+ *
+ * *** A TRANSPARENT SURFACE CONTRIBUTES COLOUR AND NOT DEPTH, AND THAT ASYMMETRY IS THE WHOLE DEFECT. ***
+ * Alpha-blended geometry is drawn after the depth pass and does not write depth. So at a translucent slab
+ * pixel the depth buffer, the id buffer and therefore the MOTION VECTOR all describe the BACKGROUND, while
+ * the colour is a blend of two surfaces moving differently. Reprojecting that colour along the background's
+ * vector is wrong by construction -- no motion field can be right about it -- and a history that keeps it
+ * smears the slab. That is precisely what a reactive mask is for: it cannot fix the reprojection, it can
+ * only tell the accumulator to trust less of it.
+ *
+ * alpha 1 is the default and every expression below reduces to the one it replaced there, so this page's
+ * figures and its gates are untouched -- v4649's `sx` discipline, for the fourth time in this arc.
+ */
+const slabAlpha = () => { const a = parseFloat(($("slabalpha") || {}).value); return Number.isFinite(a) ? Math.min(1, Math.max(0, a)) : 1; };
+
+/** Where the ray meets each surface: the slab point when it covers this ray, and the background point always. */
+function hitBoth(inv, u, v, sx = 0) {
     const nx = 2 * u - 1, ny = 1 - 2 * v;
     const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
     const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
     const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
     const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
     const n = at(Y_NEAR);
-    const onSlab = n[0] >= SLAB_X[0] && n[0] <= SLAB_X[1] && n[2] >= SLAB_Z[0] && n[2] <= SLAB_Z[1];
-    return onSlab ? n : at(Y_FAR);
+    const ox = sx * SLAB_DIR[0], oz = sx * SLAB_DIR[1];
+    const onSlab = n[0] >= SLAB_X[0] + ox && n[0] <= SLAB_X[1] + ox && n[2] >= SLAB_Z[0] + oz && n[2] <= SLAB_Z[1] + oz;
+    return { near: onSlab ? n : null, far: at(Y_FAR) };
+}
+
+/**
+ * The GEOMETRY hit: what the depth and id buffers see. A translucent slab is not in it.
+ *
+ * `opaqueOnly` is the caller's and defaults to true, so every existing caller gets exactly the point it got
+ * before. renderDepth and renderIds pass the slab's alpha; the COLOUR samplers do not, because colour is the
+ * one thing a transparent surface does contribute.
+ */
+function hit(inv, u, v, sx = 0, alpha = 1) {
+    const nx = 2 * u - 1, ny = 1 - 2 * v;
+    const a = transform4(inv, nx, ny, -1, 1), b = transform4(inv, nx, ny, 1, 1);
+    const ax = a[0] / a[3], ay = a[1] / a[3], az = a[2] / a[3];
+    const bx = b[0] / b[3], by = b[1] / b[3], bz = b[2] / b[3];
+    const at = (py) => { const t = (py - ay) / (by - ay); return [ax + t * (bx - ax), py, az + t * (bz - az)]; };
+    const { near, far } = hitBoth(inv, u, v, sx);
+    // alpha 1 -- the default -- returns the slab exactly as this function always did. Below 1 the slab is
+    // not in the depth buffer at all, so the geometry here is the background's and so is its motion.
+    return (near && alpha >= 1) ? near : far;
+}
+
+/** The blended colour along a ray: the slab over the background, or just the background. */
+function shadeRay(inv, u, v, kind, sx = 0, alpha = 1) {
+    const { near, far } = hitBoth(inv, u, v, sx);
+    if (!near) { const [bu, bv] = patternUV(far, sx); return scene(bu, bv, kind); }
+    const [nu, nv] = patternUV(near, sx);
+    const s = scene(nu, nv, kind);
+    if (alpha >= 1) return s;                       // the expression every caller had before v4669
+    const [bu, bv] = patternUV(far, sx);
+    const b = scene(bu, bv, kind);
+    const out = [0, 0, 0, 0];
+    for (let c = 0; c < 4; c++) out[c] = alpha * s[c] + (1 - alpha) * b[c];
+    return out;
+}
+
+/**
+ * *** v4670 -- THE APPLICATION-SUPPLIED REACTIVE MASK, WHICH IS FSR2's ACTUAL DESIGN. ***
+ *
+ * render/reactive.mjs DERIVES reactivity: it compares the current frame against its reprojected history and
+ * reports where they disagree past a depth gate. That is FSR2's ffx_fsr2_autogen_reactive, the FALLBACK for
+ * content that will not tell the upscaler anything. The primary path in the API is a mask the APPLICATION
+ * hands over, because the application knows -- it drew the particles, it knows which pixels are a
+ * transparency and how much of one.
+ *
+ * render/reactiveGPU-selfcheck.mjs has asked for this since v4657: "whether an APPLICATION-supplied mask
+ * would beat this derived one, which is FSR2's actual design and needs content that knows which of its own
+ * pixels are particles". v4669 gave this page such content. This is the declaration.
+ *
+ * *** IT IS A DECLARATION AND NOT A SECOND DERIVATION, WHICH IS THE ENTIRE DISTINCTION. *** Nothing here
+ * looks at a colour, a history, or a depth. The slab's coverage is the same predicate hitBoth already
+ * computes for the geometry, and the value is the alpha the page was asked to draw it at. A mask that
+ * inferred transparency from the picture would be the derived mask again, wearing the word "application".
+ */
+function renderReactiveApp(vp, sx = 0, alpha = 1) {
+    const inv = mat4Invert(vp);
+    const out = new Float32Array(D * D);
+    if (alpha >= 1) return out;                 // an opaque scene declares nothing, and 0 is that statement
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        // 1 - alpha: how much of this pixel is NOT the surface the motion vector describes. At alpha 0.5 a
+        // slab pixel is half background -- which the vector is right about -- and half slab, which it is
+        // not. The mask's job is to say how much of the history to distrust, and that is the share.
+        if (hitBoth(inv, (x + 0.5) / D, (y + 0.5) / D, sx).near) out[y * D + x] = 1 - alpha;
+    }
+    return out;
+}
+
+/**
+ * *** THE ID BUFFER, AND IT IS ONE COMPARISON ON A VALUE THIS PAGE ALREADY HAD. ***
+ *
+ * render/objectMotion.mjs has wanted a per-pixel object id since v4646 and v4648 built a rasteriser to make
+ * one. This page needs neither: hit() returns the point where the ray met the scene, and its y says which
+ * surface that was -- patternUV has branched on exactly that comparison since the dolly camera was added.
+ * The identity was computed every frame and discarded on the next line. So the producer here is not a
+ * rasteriser, it is a `return`.
+ *
+ * 0 is the background and 1 is the slab, matching the order of the model tables in tick().
+ */
+function renderIds(vp, sx = 0, alpha = 1) {
+    const inv = mat4Invert(vp);
+    const ids = new Uint32Array(D * D);
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+        ids[y * D + x] = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx, alpha)[1] === Y_NEAR ? 1 : 0;
+    }
+    return ids;
 }
 
 /** The pattern's (u, v) for a world point on either plane -- each plane carries its own copy at its own scale. */
-const patternUV = (p) => p[1] === Y_NEAR
-    ? [(p[0] - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
+// The slab's pattern travels WITH the slab: subtracting sx keeps the texture fixed to the surface rather than
+// to the world. A slab that slid under a stationary texture would move in the depth and id buffers and stand
+// still in the picture, which is a scene no motion vector can be right about.
+const patternUV = (p, sx = 0) => p[1] === Y_NEAR
+    ? [(p[0] - sx * SLAB_DIR[0] - SLAB_X[0]) / (SLAB_X[1] - SLAB_X[0]), (p[2] - sx * SLAB_DIR[1] - SLAB_Z[0]) / (SLAB_Z[1] - SLAB_Z[0])]
     : [(p[0] + 6) / 12, (p[2] + 6) / 12];
 
 /** Colour at R x R through a (jittered) view-projection. */
-function renderPersp(R, vp, kind) {
+function renderPersp(R, vp, kind, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     if (!inv) throw new Error("fsr.html: the dolly camera is singular -- mat4Invert returns null, not a matrix");
     const out = new Float32Array(R * R * 4);
     for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-        const [pu, pv] = patternUV(hit(inv, (x + 0.5) / R, (y + 0.5) / R));
-        const px = scene(pu, pv, kind);
+        const px = shadeRay(inv, (x + 0.5) / R, (y + 0.5) / R, kind, sx, alpha);
         for (let c = 0; c < 4; c++) out[(y * R + x) * 4 + c] = px[c];
     }
     return out;
 }
 
 /** Clip-space z at D x D through the UNJITTERED camera -- what motionVectorsCPU and disocclusionCPU read. */
-function renderDepth(vp) {
+function renderDepth(vp, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     const d = new Float32Array(D * D);
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
-        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D);
+        const p = hit(inv, (x + 0.5) / D, (y + 0.5) / D, sx, alpha);
         const q = transform4(vp, p[0], p[1], p[2], 1);
         d[y * D + x] = q[2] / q[3];
     }
@@ -272,14 +564,13 @@ function renderDepth(vp) {
 }
 
 /** The 8x8 supersampled truth through the same camera, so the reference moves with it. */
-function truthPersp(vp, kind) {
+function truthPersp(vp, kind, sx = 0, alpha = 1) {
     const inv = mat4Invert(vp);
     const out = new Float32Array(D * D * 4), N = 8;
     for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
         const acc = [0, 0, 0, 0];
-        for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
-            const [pu, pv] = patternUV(hit(inv, (x + (sx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D));
-            const px = scene(pu, pv, kind);
+        for (let sy = 0; sy < N; sy++) for (let ssx = 0; ssx < N; ssx++) {
+            const px = shadeRay(inv, (x + (ssx + 0.5) / N) / D, (y + (sy + 0.5) / N) / D, kind, sx, alpha);
             for (let c = 0; c < 4; c++) acc[c] += px[c];
         }
         for (let c = 0; c < 4; c++) out[(y * D + x) * 4 + c] = acc[c] / (N * N);
@@ -332,6 +623,35 @@ const psnr = (a, b) => {
     return 10 * Math.log10(1 / (se / n));
 };
 
+/**
+ * *** v4663 -- THE SAME SQUARED ERROR psnr SUMS, SPLIT BY WHERE THE MASK FIRED. ***
+ *
+ * Every instrument this arc has built reports a PER-FRAME SCALAR: a PSNR, a count, a quantile. The harm
+ * v4658 found is a PER-PIXEL event -- the mask fires somewhere, the factor discards the history there, and
+ * those pixels get worse -- and no scalar can say WHERE. Three explanations have been spent correlating
+ * frame-level numbers against each other (the jitter at v4659, the wide/narrow split at v4660, the
+ * history's age at v4662); this asks a different question.
+ *
+ * `fired` is the set at or above 0.05, which is reactiveCPU's own reported figure and not a level invented
+ * here. The two sums add up to psnr's `se` exactly, by construction: same loop, same channels, one branch.
+ *
+ * *** THE PARTITION IS EACH ARM'S OWN MASK AND THAT IS NOT A FIXED SET ACROSS ARMS. *** The mask is computed
+ * from the current frame against the HISTORY, and the history is what the arms differ in, so the ON arm's
+ * fired set is not the OFF arm's. `nFired` is reported for exactly this reason: a reader comparing the two
+ * arms' sums has to be able to see whether the two partitions are even comparable, and nothing here pretends
+ * they are identical.
+ */
+const splitError = (a, b, mask) => {
+    let seFired = 0, seRest = 0, nFired = 0, nRest = 0;
+    for (let i = 0, px = 0; i < a.length; i += 4, px++) {
+        const hot = mask ? mask[px] >= 0.05 : false;
+        let d2 = 0;
+        for (let c = 0; c < 3; c++) { const d = a[i + c] - b[i + c]; d2 += d * d; }
+        if (hot) { seFired += d2; nFired++; } else { seRest += d2; nRest++; }
+    }
+    return { seFired, seRest, nFired, nRest };
+};
+
 function draw(c, buf) {
     const img = c.createImageData(D, D);
     for (let i = 0; i < D * D; i++) for (let ch = 0; ch < 3; ch++)
@@ -341,11 +661,34 @@ function draw(c, buf) {
 }
 
 let running = false, frame = 0, hist = null, jit = null, ref = null, R = 96, PAN = 0.75;
+// *** v4661 -- TWO CLOCKS, WHERE THERE WAS ONE DOING TWO JOBS. ***
+// `frame` counted the accumulations AND fixed the scene: sxCur = frame * SLAB_DX, dollyVP(frame),
+// dx = frame * PAN. reset() zeroed it, so the only way to get an EMPTY history was to also put the scene
+// back to its start, and the only way to reach scene time 54 was to carry 54 frames of history there. They
+// are perfectly confounded, and the open question from v4658 is exactly which of the two the harm follows:
+// over frames 3-53 the reactive mask loses on 14 of 51, over 54-98 on 3 of 45, and nothing in this page
+// could say whether that is the AGE OF THE HISTORY or WHERE THE SLAB HAS GOT TO.
+//
+// `frame` keeps its old meaning -- the number of accumulated frames, the history's age -- and every scene
+// site now reads sceneT() instead. AT startFrame = 0 THE TWO ARE THE SAME EXPRESSION, so every number this
+// page quotes and every gate that reads it is untouched; that is v4649's `sx` discipline, for the same
+// reason: a round that moved the existing figures while adding a control could not be told from a round
+// that broke them.
+let startFrame = 0;
+const sceneT = () => frame + startFrame;
+// The previous scene time, floored at the start: on the very first frame there is no previous, and prev ==
+// cur is what `Math.max(0, frame - 1)` gave before. At startFrame = 0 this IS that expression.
+const sceneTPrev = () => Math.max(startFrame, frame + startFrame - 1);
 // *** v4638 -- THE SECOND PIECE OF PER-FRAME STATE THE REJECT CHAIN NEEDS, AND THE ONE EASIEST TO FORGET. ***
 // disocclusionCPU compares the depth a surface WOULD have had last frame against the depth RECORDED then, so
 // the page has to keep last frame's depth buffer alongside last frame's colour. Null on the first frame for
 // the same reason `hist` is: there is no previous depth, and a zero-filled one would be believed.
 let prevDepth = null;
+// *** THE GENERATOR'S OWN HISTORY, AND IT IS NOT prevDepth. *** prevDepth is the DILATED record the clip test
+// compares against; the generator wants the plain per-pixel depth of the frame it is interpolating from, and
+// render/holeFill.mjs's disocclusion test would read a dilated silhouette as a surface that is not there.
+// Two histories because they answer two questions, which is the same reason `source` and `side` are arrays.
+let prevShown = null, prevDepthGen = null, prevRef = null;
 // The scene is flat: it is a function of (u, v) with no z at all, so every pixel sits on one plane and the
 // reprojection is a pure translation. Allocated once -- it never changes.
 const FLAT_DEPTH = new Float32Array(D * D);
@@ -376,7 +719,18 @@ const FLAT_DEPTH = new Float32Array(D * D);
 // to "not counted" the moment a reader opened it on an adapter -- exactly the regression v4591 had to undo for
 // the accumulate pass. Getting the number off the device needed a mainCounted entry point in each of the two
 // kernels, because the mask cannot distinguish a disocclusion from a reprojection that left the frame.
-let gpu = null, tgpu = null, mgpu = null, rgpu = null;
+let gpu = null, tgpu = null, mgpu = null, rgpu = null, ogpu = null, lgpu = null, xgpu = null, dgpu = null;
+// v4685 -- FSR3's reconciliation on the device. Constructed like the rest and DISPATCHED ONLY WHEN ASKED:
+// tools/ship/runnerCallers-selfcheck.mjs's own closing line records that it cannot tell an imported runner
+// from a dispatched one, so the switch below is what makes the difference visible in a readout.
+let frgpu = null, figpu = null, hfgpu = null;
+// v4691 -- the learned gate's device runner, and the weights it needs. Both are null until something asks:
+// the weights are fetched once on the first ON frame, and a page that never turns the gate on never fetches.
+let gggpu = null, gateW = null, gateWTried = null;
+// The lock ring lives across frames and belongs to one camera and one size, so it is torn
+// down whenever reset() changes either. A ring carried across a resolution change would be
+// read with the wrong stride and would look like content rather than like a mistake.
+let lockRing = null;
 async function initGPU() {
     const say = (t) => { $("engine").textContent = "spatial engine: " + t; };
     // *** v4637 -- THIS SAID "this browser exposes no WebGPU" AND THAT IS AN ATTRIBUTION, NOT A FACT. ***
@@ -399,6 +753,14 @@ async function initGPU() {
         try { tgpu = new TemporalGPU(dev); } catch { tgpu = null; }
         try { mgpu = new MotionVectorsGPU(dev); } catch { mgpu = null; }
         try { rgpu = new TemporalRejectGPU(dev); } catch { rgpu = null; }
+        try { ogpu = new ObjectMotionGPU(dev); } catch { ogpu = null; }
+        try { lgpu = new TemporalLockGPU(dev); } catch { lgpu = null; }
+        try { xgpu = new ReactiveGPU(dev); } catch { xgpu = null; }
+        try { dgpu = new DilateGPU(dev); } catch { dgpu = null; }
+        try { frgpu = new FlowReconcileGPU(dev); } catch { frgpu = null; }
+        try { figpu = new FrameInterpGPU(dev); } catch { figpu = null; }
+        try { hfgpu = new HoleFillGPU(dev); } catch { hfgpu = null; }
+        try { gggpu = new GenGateGPU(dev); } catch { gggpu = null; }
         const who = (dev.adapterInfo && (dev.adapterInfo.description || dev.adapterInfo.vendor)) || "webgpu";
         say(`WebGPU compute on ${who} -- EASU+RCAS, resolve+accumulate, the motion vectors` +
             (rgpu ? " and the reject chain (disocclusion, factor, rectify) on the dolly" : "") +
@@ -425,14 +787,45 @@ async function rcas(rgba, w, h, sharp) {
 
 async function reset() {
     const kind = $("scene").value, ratio = parseFloat($("ratio").value);
-    const dolly = $("camera").value === "dolly";
+    // "objects" IS the dolly camera -- same matrices, same projection, same threshold -- plus a slab that
+    // translates. Everything the dolly branch does, it does; what it adds is a second model matrix.
+    const dolly = $("camera").value === "dolly" || $("camera").value === "objects";
+    const objectsCam = $("camera").value === "objects";
     R = Math.max(8, Math.round(D / ratio));
     jit = makeJitterState(ratio); hist = null; frame = 0;
+    // *** AND THE JITTER PHASE GOES WITH THE SCENE, NOT WITH THE HISTORY, OR THE CONTROL IS A CONFOUND. ***
+    // The sequence is cyclic with period jitterPhaseCount(ratio) -- 32 at ratio 2 -- and the page advances it
+    // once per accumulated frame. A run starting the scene at 54 with a fresh jitter state would render scene
+    // time 54 through phase 0, where the original run rendered it through phase 54 % 32 = 22. The sub-pixel
+    // offset would differ, the rendered frame would differ, and every comparison between the two runs would
+    // be measuring the phase as well as the thing it meant to isolate. Set from the SCENE clock so the same
+    // scene time always gets the same offset.
+    // *** A NUMBER INPUT AND NOT A SELECT, AND THAT WAS MEASURED RATHER THAN PREFERRED. *** The first draft
+    // offered a <select> with four options. Assigning a value a select has no option for leaves its value
+    // EMPTY, so Number("") || 0 fell back to 0 and the control silently did nothing -- a crossover run asking
+    // for scene time 8 produced the scene's first four frames to the last decimal place, and would have been
+    // read as "starting later changes nothing". A control that accepts a value it cannot honour and says so
+    // nowhere is worse than no control. The clamp below is what a free input needs in exchange.
+    startFrame = Math.max(0, Math.min(4096, Math.round(Number($("startframe").value) || 0)));
+    jit.index = startFrame % jit.phaseCount;
+    if (lockRing && lgpu) { try { lgpu.destroyRing(lockRing); } catch {} }
+    lockRing = null;                             // see the declaration: a ring outlives a frame, not a reset
+    prevShown = null; prevDepthGen = null; prevRef = null;   // and the generator's pair, for the same reason
     prevDepth = null;                            // the depth history goes with the colour history, or frame 1
                                                  // compares this camera's depths against the last camera's
-    ref = dolly ? truthPersp(dollyVP(0), kind) : truth(kind, 0);
+    // *** THESE THREE READ THE SCENE CLOCK TOO, AND THEY DID NOT IN THE FIRST DRAFT OF THIS CHANGE. ***
+    // reset() draws the reference and the one unjittered frame for the SPATIAL panes. Written as dollyVP(0)
+    // they would show the scene at time zero while the temporal pane ran at time 54, so the three still
+    // panes and the moving one would be different scenes -- and dBil and dFsr would be scored against a
+    // truth the temporal pane never sees. At startFrame = 0 sceneT() is 0 and nothing moves.
+    // dx0 is in the SAME units the tick loop's `dx` uses, so the still panes and the moving one agree; on
+    // every camera but "pan" it is zero, and at startFrame = 0 it is zero on that one too.
+    readSlabDir(); readSlabPath();
+    const t0 = startFrame, sx0 = objectsCam ? slabAt(t0, slabSpeed()) : 0;
+    const dx0 = $("camera").value === "pan" ? t0 * PAN : 0;
+    ref = dolly ? truthPersp(dollyVP(t0), kind, sx0, slabAlpha()) : truth(kind, dx0);
     draw(cRef, ref);
-    const one = dolly ? renderPersp(R, dollyVP(0), kind) : render(R, 0, 0, kind, 0);
+    const one = dolly ? renderPersp(R, dollyVP(t0), kind, sx0, slabAlpha()) : render(R, 0, 0, kind, dx0);
     const bil = bilinearCPU(one, R, R, D, D).data;
     const F = await fsr1(one, R, R, D, D, parseFloat($("sharp").value));
     const fsr = F.data;
@@ -447,16 +840,29 @@ async function reset() {
     $("dFsr").textContent = psnr(fsr, ref).toFixed(2) + " dB";
     $("dTmp").textContent = "--";
     cTmp.clearRect(0, 0, D, D);
-    $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0`;
+    $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame 0` +
+        (startFrame ? `   |   scene time ${startFrame} (history EMPTY -- the two clocks are apart)` : "");
     $("accstat").textContent = "";
     $("disstat").textContent = "";
+    $("objstat").textContent = "";
+    $("lockstat").textContent = "";
 }
 
 async function tick() {
     if (!running) return;
     const kind = $("scene").value, cam = $("camera").value;
-    const panning = cam === "pan", dolly = cam === "dolly";
-    const dx = panning ? frame * PAN : 0;
+    const objects = cam === "objects";
+    const panning = cam === "pan", dolly = cam === "dolly" || objects;
+    // the slab's world x this frame and last -- zero on every camera but "objects", so the three older
+    // cameras take the same code path with the same numbers they always did
+    // the slab's alpha this frame. 1 on every camera but "objects", so the three older cameras cannot
+    // see this control at all -- the same guard sxCur carries, for the same reason.
+    const alphaCur = objects ? slabAlpha() : 1;
+    readSlabDir(); readSlabPath();               // v4711: live, like the speed below; v4718: the path too
+    const speed = slabSpeed();                   // v4682: 1 unless the control says otherwise
+    const sxCur = objects ? slabAt(sceneT(), speed) : 0;
+    const sxPrev = objects ? slabAt(sceneTPrev(), speed) : 0;
+    const dx = panning ? sceneT() * PAN : 0;
     const [jx, jy] = jitterCurrent(jit);
     // *** JITTERED FOR THE RENDER, UNJITTERED FOR THE MOTION -- the pairing render/jitter.mjs exists to enforce
     // and that this page has never exercised, because until now it jittered the SCENE SAMPLER and not a matrix.
@@ -480,10 +886,10 @@ async function tick() {
     // a reconstruction; negated it reads 1.0318e-3, which is the floor plus a quarter. Nothing in either module
     // is wrong -- the sentence they share does not say which way the offset points, and until this page there
     // was no caller of both to find out.
-    const vpCur = dolly ? dollyVP(frame) : null;
-    const vpPrev = dolly ? dollyVP(Math.max(0, frame - 1)) : null;
+    const vpCur = dolly ? dollyVP(sceneT()) : null;
+    const vpPrev = dolly ? dollyVP(sceneTPrev()) : null;
     const frameSrc = dolly
-        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind)
+        ? renderPersp(R, jitterProjection(vpCur, -jx, -jy, R, R), kind, sxCur, alphaCur)
         : render(R, jx, jy, kind, dx);
 
     // *** THE MOTION FIELD IS DERIVED NOW, AND THIS IS THE LINE THAT COST A ROUND. ***
@@ -504,21 +910,142 @@ async function tick() {
     // nothing about the picture changes here -- what changes is that the number is no longer a claim. A derived
     // field cannot get the sign wrong for free, and render/motionVectorsGPU-selfcheck.mjs drives the reversed
     // camera as a control so that exact mistake fails a row instead of costing a round.
-    const tCur = (panning ? frame : 0) * PAN / D, tPrev = (panning ? Math.max(0, frame - 1) : 0) * PAN / D;
+    const tCur = (panning ? sceneT() : 0) * PAN / D, tPrev = (panning ? sceneTPrev() : 0) * PAN / D;
     // The dolly builds its depth buffer first, because the motion field is a function OF it: motionVectorsCPU
     // unprojects each pixel through the current inverse and reprojects through the previous forward, and the
     // fourth channel it writes -- the depth this surface would have had last frame -- is the whole disocclusion
     // test. The two matrices are (current INVERSE, previous FORWARD) and swapping them gives motion of exactly
     // the right magnitude and the wrong sign, which an orthographic pan could not have shown.
-    const depth = dolly ? renderDepth(vpCur) : null;
+    const depth = dolly ? renderDepth(vpCur, sxCur, alphaCur) : null;
     // *** AND THE DOLLY'S MOTION COMES OFF THE DEVICE TOO, AS OF v4641. *** motion() is the general form and
     // pan() is the special case; the dolly needs the general one because its matrices are perspective.
-    const motion = dolly
+    //
+    // *** AND AS OF v4649 THERE IS A THIRD BRANCH, WHICH IS THE FIRST TIME THIS PAGE HAS HAD A MOTION VECTOR
+    // THAT IS NOT PURELY THE CAMERA'S. *** Every number this page has ever printed came from a scene where
+    // only the camera moved -- and on such a scene render/objectMotion.mjs is EXACTLY render/motionVectors.mjs,
+    // because every model matrix is the identity. v4646 measured the gap on a synthetic fixture (2.51 px) and
+    // v4648 on a rasterised one (4.22 px); neither was a frame anyone could look at. This is.
+    //
+    // The id buffer costs a function call: renderIds() is hit() again with its y compared to Y_NEAR, which is
+    // the comparison patternUV has made on every dolly frame since that camera existed.
+    const ids = objects ? renderIds(vpCur, sxCur, alphaCur) : null;
+    const objMats = objects ? buildObjectMatrices({
+        vpCur, vpPrev,
+        models:     [IDENT4, translate4(sxCur * SLAB_DIR[0], sxCur * SLAB_DIR[1])],     // 0 = background (never moves), 1 = the slab
+        prevModels: [IDENT4, translate4(sxPrev * SLAB_DIR[0], sxPrev * SLAB_DIR[1])],
+    }) : null;
+    const motion = objects
+        ? ogpu ? (await ogpu.motion({ depth, ids, w: D, h: D, invMVPCur: objMats.invMVPCur, mvpPrev: objMats.mvpPrev })).data
+               : objectMotionCPU({ depth, ids, w: D, h: D, invMVPCur: objMats.invMVPCur, mvpPrev: objMats.mvpPrev }).data
+        : dolly
         ? mgpu ? (await mgpu.motion(depth, D, D, mat4Invert(vpCur), vpPrev)).data
                : motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data
         : mgpu
             ? (await mgpu.pan({ depth: FLAT_DEPTH, w: D, h: D, tCur, tPrev })).data
             : motionVectorsCPU(FLAT_DEPTH, D, D, mat4Invert(orthoPanVP(tCur)), orthoPanVP(tPrev)).data;
+
+    // *** v4664 -- FSR2'S EARLIEST PASS, AND IT DEFAULTS TO OFF SO EVERY FIGURE ABOVE STILL MEANS WHAT IT
+    // SAID. *** FSR2 does not hand depth-clip and the locks raw per-pixel data: it DILATES first, each pixel
+    // taking the nearest depth in its 3x3 neighbourhood and the motion vector of whichever pixel that depth
+    // came from, so a silhouette edge reprojects with the FOREGROUND. This tree has never had that pass, and
+    // every consumer downstream -- disocclusionCPU, the lock ring, the reactive mask -- has read undilated
+    // data since it was written.
+    //
+    // OFF BY DEFAULT ON PURPOSE. This page's numbers are quoted in its own prose and pinned by five gates:
+    // 106 genuine disocclusions on the dolly, the 212/106 alternation on this camera, the reactive mask's
+    // 404 fired pixels. Dilation moves all of them. A round that changed them while adding a feature could
+    // not be told from a round that broke them -- v4649's `sx` discipline, and the reason the control is a
+    // switch rather than a rewrite.
+    //
+    // *** v4667 FLIPPED IT, AFTER v4665 MEASURED +1.80 dB. *** A pass worth that much, shipping off, is a
+    // pass nobody gets. Every figure above was RE-MEASURED rather than swapped, with the old value kept
+    // beside the new one: 106 genuine -> 108, the 212/106 alternation -> 216/108 (same 27/24 frame split),
+    // the mask's 404 fired pixels -> 363. The counts grow by the two to four pixels the neighbourhood
+    // search hands the foreground at each silhouette -- the same edges, correctly attributed, not larger
+    // errors. The OFF arm stays, because the control an effect was measured against is not scaffolding to
+    // be removed once the measurement is quoted.
+    //
+    // *** BOTH SIDES OF THE CLIP TEST MOVE TOGETHER OR NEITHER DOES. *** The dilated depth becomes next
+    // frame's prevDepth, so the test compares dilated zPrev against a dilated record. Feeding it dilated
+    // motion against an undilated record would compare the foreground's expectation with the background's
+    // history at every silhouette -- a disocclusion at every edge, every frame, which is the exact artefact
+    // this pass exists to remove.
+    // *** v4665 -- AND IT IS WORTH +1.80 dB, THE LARGEST EFFECT THIS PAGE HAS MEASURED. *** Fifty-one
+    // paired frames over scene 3-53, dilation attached and detached, everything else identical:
+    //
+    //     mean +1.7992 dB, sd 1.9086, 43 frames up and 8 DOWN; paired t = 6.73 (p = 7.9e-9),
+    //     sign test 43/51 (p = 3.4e-7). BOTH tests were required to clear, declared in advance.
+    //
+    // Against this page's other two switchable features: the shading mask is +0.117 dB and the reactive
+    // mask +0.400. Dilation is four and a half times the second and fifteen times the first -- what a
+    // missing STRUCTURAL pass looks like beside two refinements. It is not free: eight frames are worse,
+    // one by 2.43 dB, which is a larger single-frame loss than the reactive mask's worst.
+    //
+    // *** AND IT SUBSUMES MOST OF THE REACTIVE MASK ON THIS CONTENT. *** With dilation on, that mask is
+    // worth +0.0820 dB instead of +0.400 and harms 18 frames instead of 14. v4663 had localised its whole
+    // effect to the one percent of the picture at the slab's silhouette, and this pass rewrites exactly
+    // that population first. The mask is NOT therefore pointless: FSR2 ships it for shader-animated and
+    // transparent content -- particles, foliage -- which this page does not have and which dilation cannot
+    // help with at all. render/dilate-preregistration.md fixed the hypothesis and the statistics before
+    // the data existed, and declared that secondary in advance so it could not be found afterwards.
+    // *** v4666 -- WHICH CONSUMER THE GAIN CAME FROM, WHICH v4665 MEASURED AND COULD NOT SEPARATE. ***
+    // v4664 routed three consumers to the dilated field in ONE change: the clip chain (disocclusion, the
+    // rectify pass, and the depth RECORD kept for next frame), the lock ring, and the reactive mask. The
+    // +1.80 dB is their sum, and nothing in it says whether one of them carries all of it -- or whether
+    // one of them is losing while the others win.
+    //
+    // *** THE LOCK RING IS NOT IN THIS SWITCH, AND THAT IS A MEASUREMENT RATHER THAN AN OVERSIGHT. *** It
+    // feeds shadingShift, and the shading mask is OFF in every arm this page's dilation figures were taken
+    // on -- its ring is 2 x jitterPhaseCount slots and never fills inside scene 3-53 anyway, which v4662
+    // measured as identical to four decimals. Routing it would change nothing any arm here can see, and a
+    // control that cannot move its own number is decoration.
+    const dilateOn = $("dilate").value === "on";
+    const dilScope = $("dilscope").value;          // all | clip
+    //
+    // *** MEASURED, v4666: THE CLIP CHAIN CARRIES 96% OF THE +1.80 dB. ***
+    //
+    //     clip chain only vs baseline   +1.7231 dB   t 5.87 p 1.7e-7   sign 41/51 p 7.4e-6
+    //     both consumers  vs baseline   +1.7992 dB   t 6.73 p 7.9e-9   sign 43/51 p 3.4e-7
+    //     adding the mask to the clip   +0.0761 dB   t 1.38 p 8.7e-2   sign 29/50 p 1.6e-1
+    //
+    // Giving the reactive mask the dilated field as well clears NEITHER test -- 29 up against 21 down is
+    // close to a coin flip. v4664 routed all three consumers together; for the mask that choice was not
+    // justified by measurement, and now it has been measured. Not harmful, just not distinguishable from
+    // nothing here.
+    //
+    // And the mask's own value collapses once the CLIP CHAIN is dilated, whatever the mask itself reads:
+    // +0.4004 dB undilated, +0.0059 with dilation on the clip only, +0.0820 with it on the mask too. The
+    // mask was earning its keep by catching silhouette pixels the clip test mishandled; dilation makes
+    // the clip test handle them, and there is nothing left to catch. That is not a case for deleting it:
+    // FSR2 ships it for shader-animated and transparent content this page does not have.
+    let dilated = null, dilStat = null;
+    if (dolly && dilateOn && dgpu && depth) {
+        dilated = await dgpu.dilate({ depth, motion, w: D, h: D, nearerIsLess: true, counted: true });
+        dilStat = dilated.stats;
+    }
+    const motionUsed = dilated ? dilated.motion : motion;
+    const depthRecord = dilated ? dilated.depth : depth;
+
+    // *** WHAT THE OBJECT-AWARE PATH BOUGHT, IN PIXELS, ON THIS FRAME. *** The camera-only field is computed
+    // alongside -- it is the field this page would have used before v4649 -- and the two are differenced on
+    // the slab's pixels and on the background's separately. The background number is the control: object 0's
+    // model matrix is the identity, so the two paths are the same computation there and a non-zero reading
+    // means the id buffer is mislabelling rather than the object matrices working.
+    let objGap = null;
+    if (objects) {
+        const camOnly = motionVectorsCPU(depth, D, D, mat4Invert(vpCur), vpPrev).data;
+        // *** BOTH POPULATIONS ARE COUNTED, AND THAT IS A SABOTAGE FINDING. *** The first draft counted only
+        // the slab's pixels. A mutation labelling EVERY pixel as the slab then left `offSlab` at its initial
+        // zero -- the control read a perfect zero because it had visited nothing -- and only a disocclusion
+        // row elsewhere caught it. That is v4402's rule in its usual costume: an absence read as a pass. A
+        // maximum over an empty set is not a small number, it is no number, and it must not print as one.
+        let onSlab = 0, offSlab = 0, nSlab = 0, nBg = 0;
+        for (let i = 0; i < D * D; i++) {
+            const g = Math.hypot(camOnly[i * 4] - motion[i * 4], camOnly[i * 4 + 1] - motion[i * 4 + 1]);
+            if (ids[i] === 1) { nSlab++; onSlab = Math.max(onSlab, g); } else { nBg++; offSlab = Math.max(offSlab, g); }
+        }
+        objGap = { onSlab, offSlab, nSlab, nBg };
+    }
 
     // *** THE REJECT CHAIN, WHICH NOTHING OUTSIDE A GATE HAS EVER RUN. *** Three steps and the middle one is
     // the one that gets skipped: DISOCCLUSION writes 1 = "this history is WRONG", RECTIFY reads 1 = "history
@@ -538,6 +1065,209 @@ async function tick() {
     const dollyCurrent = dolly
         ? resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data
         : null;
+    // *** THE SHADING MASK, WHICH THE REJECT CHAIN HAS ACCEPTED SINCE v4594 AND NOTHING HAS EVER SUPPLIED. ***
+    //
+    // rejectAndAccumulate takes `reactive` and `shading` beside the disocclusion mask, and this page has
+    // passed null for both since the chain was wired. render/temporalRejectGPU.mjs's own closing line names
+    // that gap -- "nothing in this tree produces a reactive mask at all, and the shading one is
+    // render/temporalLock.mjs's" -- and v4647 gave temporalLock a runner while leaving it with no caller
+    // outside its gate. This is the caller, and the mask it makes is exactly the one the factor pass wants:
+    // SHADING_SHIFT compares the newer half of a luma ring against the older half, both spanning the same
+    // jitter phases so the jitter cancels exactly, and reports where the LIGHT on a surface changed rather
+    // than where the surface moved. History is wrong at those pixels for a reason motion cannot see.
+    //
+    // *** THE RING'S PERIOD IS THE JITTER'S PHASE COUNT AND MAY NOT BE CHOSEN FOR COST. *** The whole
+    // mechanism is that both halves span the same set of phases; a shorter ring would leave a residue of the
+    // jitter in the difference and report sampling as shading. That makes the ring 2*period slots per pixel,
+    // which is why it is built once and pushed rather than rebuilt, and why it is on THIS camera only.
+    // *** THE MASK HAS A SWITCH, BECAUSE A NUMBER NOBODY CAN RE-MEASURE IS A CLAIM. ***
+    //
+    // v4655 said whether the shading mask HELPS was not established, and it was right to: the effect is
+    // +0.117 dB and the frame-to-frame spread is 2.12, so unpaired it is EIGHTEEN TIMES smaller than the
+    // noise it sits in and no number of samples taken one way makes it visible.
+    //
+    // PAIRED it is unambiguous. Twenty-one frames past the ring's fill point, the same content and the same
+    // camera, with the mask attached and detached:
+    //
+    //     mean difference  +0.1171 dB      sd of the difference  0.0534
+    //     positive frames  21 of 21        sign-test p = 4.8e-7        t = 10.05
+    //
+    // Every frame improves, the smallest by 0.02 dB and the largest by 0.22. This switch is what made that
+    // measurable and is what makes it re-measurable on a rig: run to frame 66, record dTmp per frame, flip
+    // it, run again, and difference the two lists FRAME BY FRAME. Differencing the means instead throws the
+    // pairing away and hands back the 2.12 dB spread.
+    const shadingOn = $("shading").value !== "off";
+    // *** THE FACTOR PASS'S THIRD INPUT, WIRED AT v4657 AND PREVIOUSLY A BINDING WITH NO SOURCE. ***
+    // A pixel is reactive where the colour disagrees with its reprojected history AND the depth says the
+    // reprojection was sound. The depth gate is what keeps it from being a second disocclusion detector:
+    // where the surface really changed, the colour differs too, and firing there would multiply one reason
+    // into the factor twice. render/reactive.mjs's header has the full argument.
+    //
+    // It needs the same prevDepth the disocclusion test does, so it runs in the same branch and is null
+    // wherever that one is -- on frame one, and on any camera without a depth buffer.
+    // *** AND THE REACTIVE MASK HAS ITS OWN ARM, FOR v4656's REASON. *** That round measured the shading
+    // mask at +0.117 dB against a frame-to-frame spread of 2.12 -- eighteen times smaller than the noise it
+    // sits in, and invisible unless the two arms are differenced FRAME BY FRAME. A second mask with no
+    // switch would be a second claim nobody could check, so it gets the same treatment. Unlike the shading
+    // ring this one works from frame TWO, because it needs a previous depth and a history and nothing more.
+    //
+    // *** MEASURED AT v4658, AND IT IS A DIFFERENT KIND OF EFFECT FROM THE SHADING MASK'S. ***
+    //
+    //     mask        mean diff    sd of diff    frames up/down    t       sign test
+    //     shading     +0.117 dB      0.054         21 / 0        10.05     p = 4.8e-7
+    //     reactive    +0.400 dB      0.656         37 / 14        4.36      p = 1.8e-3
+    //
+    // The reactive mask helps MORE ON AVERAGE and far less RELIABLY: fourteen frames of fifty-one are worse
+    // with it than without, one by 1.22 dB. The shading mask never once loses. Both are real; only one is
+    // safe to turn on and forget.
+    //
+    // *** v4660 -- HOW MUCH IT HELPS DEPENDS ON THE WIDTH OF ITS OWN DEPTH-GATED SET, AND THAT WAS
+    // CONFIRMED BY A TEST DECLARED BEFORE THE DATA EXISTED. *** The readout below prints how many pixels the
+    // depth gate turned away; on this camera that count alternates between 106 and 212 every frame. Frames
+    // at the NARROW count gain more from the mask than frames at the WIDE one:
+    //
+    //     frames  3-53 (where the effect was FOUND)   narrow +0.586 dB   wide +0.235   difference 0.351
+    //     frames 54-98 (where it was CONFIRMED)       narrow +0.746 dB   wide +0.403   difference 0.343
+    //
+    // One-sided Welch on the second sample: t = 2.17, df 30.2, p = 0.019. The first sample's 0.056 was the
+    // best of EIGHT predictors tried and was worth nothing on its own -- render/reactive-preregistration.md
+    // fixed the hypothesis, the direction, the statistic and the frame range in a commit that contains no
+    // data, and git log is what makes that ordering checkable rather than asserted.
+    //
+    // *** v4662 -- AND THE HARM IS NOT THE HISTORY'S AGE EITHER, WHICH THE CONTROL ABOVE WAS BUILT TO
+    // ASK. *** With the scene clock split from the history's age (see startframe), the same scene window
+    // can be run on an accumulator that is EMPTY when it starts:
+    //
+    //     scene  3-53, history grown with it   14 of 51 harmed (27.5%)   mean +0.4004 dB
+    //     (all three rows were taken with dilation OFF, which was the default until v4667; on the shipped
+    //      path the mask's figure over this window is 18 of 51 and +0.0820 dB -- see v4666 below)
+    //     scene 54-98, history grown with it    3 of 45 harmed ( 6.7%)   mean +0.5862 dB
+    //     scene 54-98, history EMPTY at 54      0 of 45 harmed ( 0.0%)   mean +0.6371 dB
+    //
+    // The YOUNGEST history is harmed LEAST -- not once in forty-five frames -- and has the best mean of the
+    // three. One-sided Fisher's exact on the pre-declared comparison reads p = 1.000: the data point the
+    // other way. render/reactive-harm-preregistration.md fixed the hypothesis, its direction and the
+    // statistic in a commit containing no data.
+    //
+    // So THREE explanations for the harm are now spent: the jitter (refuted, wrong sign), the wide/narrow
+    // split (confirmed and beside the point), and the history's age (refuted). What is left is the scene
+    // window itself, and this page has not measured why. The shading mask is not it either -- cell A
+    // re-collected with shading OFF is identical to four decimals, because its ring needs 64 frames and
+    // that window never reaches age 64, so the mask is all zeros there by construction.
+    //
+    // *** v4663 -- AND THE HARM AND THE HELP ARE THE SAME MECHANISM, IN THE SAME 1% OF THE PICTURE. ***
+    // Three rounds correlated PER-FRAME SCALARS against each other and spent three explanations. The harm
+    // is a PER-PIXEL event, so the error was split by where the mask actually fired (the readout below).
+    // Over scene 3-53, both arms, the fired set averages 404 of 36,864 pixels -- ONE PERCENT:
+    //
+    //     on the 14 HARMED frames   d(SSE) fired +0.628   rest +0.085   -- 88% of the extra error in 1% of the picture
+    //     on the 37 HELPED frames   d(SSE) fired -2.308   rest +0.062   -- and essentially all of the saving
+    //
+    // *** RE-DERIVED AT v4667 ON THE SHIPPED PATH, AND HALF OF IT SURVIVED. *** With dilation on:
+    //     HARMED (18 frames)   fired +0.6996   rest +0.0831   -- 13 of 18 mostly inside; the harm is STILL
+    //                                                            a localised silhouette event
+    //     HELPED (33 frames)   fired -0.4083   rest -0.2343   -- only 18 of 33 mostly inside, and the whole
+    //                                                            effect is five times smaller
+    // The HELP is no longer localised. That follows from v4666 rather than contradicting it: dilation has
+    // already fixed the silhouette pixels the mask was earning its keep on, so what benefit remains is
+    // small and diffuse, while the part going the wrong way stays exactly where it always was.
+    //
+    // Per frame, not as a ratio of means: 11 of the 14 harmed frames put most of the extra error inside the
+    // fired region, and 32 of the 37 helped frames put most of the saving there. So the mask is NOT doing
+    // collateral damage somewhere else; it acts exactly where it fires, and in that tiny region it is a bet
+    // whose SIGN varies -- worth -2.3 when it is right and +0.6 when it is wrong, which is why the mean is
+    // positive and fourteen frames still lose.
+    //
+    // That reframes what the three refuted hypotheses were looking for. There may be no frame-level property
+    // that marks a harmed frame, because the harm is not a property of the frame: it is ~400 pixels going
+    // the wrong way. The residue is the three exceptions -- frame 43, the worst at -1.22 dB, puts 1.337 of
+    // its extra error OUTSIDE the fired set against 0.448 inside -- and those are unexplained.
+    //
+    // *** AND IT IS NOT AN EXPLANATION OF THE FOURTEEN HARMED FRAMES, WHICH IS WHAT THE SEARCH WAS FOR. ***
+    // Over frames 54-98 only THREE of 45 are harmed, worst -0.50 dB, while the wide/narrow difference stays
+    // the same size. So the split predicts how much the mask HELPS and not WHETHER IT HURTS, and v4658's
+    // defect is still open. The jitter hypothesis for it was refuted at v4659 (r = +0.17, wrong direction);
+    // render/reactive.mjs's header carries that measurement.
+    //
+    // *** AND THE FIRST SAMPLE WAS TOO SMALL, WHICH IS RECORDED BECAUSE EITHER ANSWER WOULD HAVE BEEN
+    // REPORTABLE. *** At twenty-one frames the mean read +0.293, the t-test cleared 0.05 (t = 2.49) and the
+    // SIGN TEST DID NOT (15/21, p = 0.08). Two tests, two verdicts, and a round could have quoted whichever
+    // it preferred. Fifty-one frames is what settled it, and both agree there.
+    const reactiveOn = $("reactive").value !== "off";
+    let reactiveMask = null, reactStat = null;
+    let shadingMask = null, lockStat = null;
+    if (objects && lgpu && dollyCurrent) {
+        const period = jitterPhaseCount(parseFloat($("ratio").value));
+        if (!lockRing) lockRing = lgpu.makeRing(D, D, period);
+        lgpu.pushRing(lockRing, { current: dollyCurrent, motion: motionUsed });
+        // scale is the luma range this page's content actually spans; strength 1 leaves the detector's own
+        // units alone. A detector normalised by something the page invented is one nobody can reason about,
+        // which is render/temporalLock.mjs's own rule about `scale` being the caller's.
+        shadingMask = (await lgpu.shadingShift(lockRing, { scale: 1, strength: 1 })).data;
+        // *** THE MASK IS EXACTLY ZERO UNTIL THE RING FILLS, AND THAT MUST BE SAID RATHER THAN LOOKED LIKE
+        // "NOTHING IS SHADING-SHIFTED". *** SHADING_SHIFT writes 0 at a pixel whose ring is not yet full --
+        // v4402's rule, an absence is not a pass -- and the ring is 2*period slots, so at ratio 2 it takes
+        // SIXTY-FOUR frames before a single pixel can report anything. A reader watching the first few
+        // frames would see a mask of zeros and conclude the detector found nothing; it has not looked yet.
+        // *** THE COUNT USED TO BE `> 0` AND THAT WAS NOT A MEASUREMENT. *** v4654 reported "36,862 of
+        // 36,864 pixels shading-shifted" and concluded the mask "marks very nearly EVERY pixel", making it a
+        // global damper rather than a selective one. THE THRESHOLD WAS ZERO. SHADING_SHIFT is a continuous
+        // detector -- clamp(strength * |newer - older| / scale, 0, 1) -- so on real content almost every
+        // pixel differs from its own history by SOMETHING, and counting floats above zero counts the
+        // arithmetic rather than the signal. A quantile says what a threshold cannot guess at.
+        const sorted = Float32Array.from(shadingMask).sort();
+        const q = (f) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+        let over = 0;
+        for (let i = 0; i < D * D; i++) if (shadingMask[i] >= 0.05) over++;   // 5% of the caller's scale
+        lockStat = { pushes: lockRing.pushes, need: lockRing.F,
+                     p50: q(0.50), p90: q(0.90), p99: q(0.99), peak: sorted[sorted.length - 1], over };
+    }
+    if (objects && xgpu && dollyCurrent && prevDepth && threshold) {
+        // scale 1 is this page's colour range; strength 1 leaves the detector's own units alone, which is
+        // render/reactive.mjs's rule about `scale` being the caller's.
+        // *** counted: true, BECAUSE NOTHING ABOUT THIS MASK IS RECOVERABLE FROM THE MASK. *** Every pixel
+        // the mask declined writes 0.0, and so does every pixel it examined and found in perfect agreement.
+        // Until v4659 this page computed the mask, switched it on and off, reported the PSNR it moved, and
+        // never once said what the mask DID -- while the shading mask beside it got quantiles in v4655 for
+        // exactly that reason. A control whose effect is measured and whose behaviour is not is half an
+        // instrument.
+        // *** THE MASK'S FIELD IS SCOPED SEPARATELY. *** At "clip" it reads the RAW motion while the chain
+        // reads the dilated one, so the two consumers can be told apart. The prevDepth it compares against
+        // IS still the dilated record: the record moves with the CHAIN, because the clip test is what it
+        // exists for. A mask reading raw motion against a dilated record is precisely what this arm
+        // measures, not an accident of the wiring.
+        const rxMotion = dilScope === "clip" ? motion : motionUsed;
+        const rx = await xgpu.reactive({ current: dollyCurrent, history: hist, motion: rxMotion, prevDepth,
+                                         w: D, h: D, threshold, nearerIsLess: true, scale: 1, strength: 1,
+                                         counted: true });
+        // *** WHICH MASK REACHES THE CHAIN, AND BOTH ARE COMPUTED EITHER WAY. *** The derived one is
+        // computed regardless so its counters keep reporting -- the readout below is the instrument v4659
+        // built and it should not go dark because a different mask is in use -- and because the two being
+        // side by side every frame is what makes them comparable at all.
+        // *** v4671 -- AND THE APP MASK'S ADVANTAGE DID NOT REPLICATE. IT INVERTED. ***
+    //
+    //                          frames 3-53 (v4670)      frames 54-98 (v4671)
+    //     DERIVED vs no mask    +0.6673  51 up / 0        +0.6456  45 up /  0
+    //     APP     vs no mask    +0.9024  48 up / 3        +0.1793  24 up / 20
+    //     APP vs DERIVED        +0.2351  28 up / 23       -0.4662   9 up / 36
+    //
+    // v4670 reported the application-supplied mask with the LARGER MEAN. On a fresh window that advantage
+    // is gone and the sign is reversed -- the derived mask wins 36 of 45 head to head. The RELIABLE half
+    // of v4670's claim survived and the headline half did not: 28/23 was already near a coin flip, and a
+    // near-coin-flip is precisely the statistic that does not replicate.
+    //
+    // The DERIVED mask, by contrast, reads +0.6673 then +0.6456 across two disjoint windows -- NINETY-SIX
+    // frames without one going the wrong way. Nothing else on this page has that record.
+    const rxSource = $("rxsource").value;
+        const appMask = alphaCur < 1 ? renderReactiveApp(vpCur, sxCur, alphaCur) : null;
+        reactiveMask = rxSource === "app" ? (appMask || rx.data) : rx.data;
+        // The same quantile treatment the shading mask takes, and for the same reason v4655 had to learn:
+        // this is a CONTINUOUS detector, so a count of pixels above ZERO counts the arithmetic.
+        const rsorted = Float32Array.from(reactiveMask).sort();
+        const rq = (f) => rsorted[Math.min(rsorted.length - 1, Math.floor(f * rsorted.length))];
+        reactStat = { ...rx.stats, p50: rq(0.50), p90: rq(0.90), p99: rq(0.99),
+                      peak: rsorted[rsorted.length - 1], n: D * D };
+    }
     if (dolly && prevDepth && threshold) {
         // nearerIsLess: true because rasterProbe.js's viewProj is GL-style forward-Z -- P[10] is
         // -(far+near)/(far-near) -- so a smaller clip z is nearer. Inverted it reports the exact complement,
@@ -547,14 +1277,16 @@ async function tick() {
             // this page would print "not counted" on an adapter and "106 genuine" on the CPU for the same
             // frame -- the exact regression v4591 had to undo for the accumulate pass.
             rejected = await rgpu.rejectAndAccumulate({
-                current: dollyCurrent, history: hist, motion, prevDepth, w: D, h: D, alpha, threshold,
+                current: dollyCurrent, history: hist, motion: motionUsed, prevDepth, w: D, h: D, alpha, threshold,
+                shading: shadingOn ? shadingMask : null,   // the switch above; null on every other camera
+                reactive: reactiveOn ? reactiveMask : null,   // the switch above; null on frame one
                 nearerIsLess: true, space: "ycocg", counted: true });
             // genuine = flagged - noHistory, and the SPLIT is why the counters exist: the mask writes the same
             // 1.0 for all three reasons, so no pass over it could have recovered this number.
             disStats = { genuine: rejected.disocStats.flagged - rejected.disocStats.noHistory,
                          noHistory: rejected.disocStats.noHistory, threshold, engine: "the device" };
         } else {
-            const dis = disocclusionCPU({ motion, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
+            const dis = disocclusionCPU({ motion: motionUsed, prevDepth, w: D, h: D, threshold, nearerIsLess: true });
             factor = historyFactorCPU({ disocclusion: dis.data, n: D * D });
             // flagged counts three different things and only one of them is a disocclusion; noHistory is the other
             // two (motion invalid, reprojected offscreen), so the genuine count is the difference.
@@ -575,20 +1307,32 @@ async function tick() {
     const acc = dolly
         ? rejected
         || rectifiedAccumulateCPU({ current: dollyCurrent,
-                                   history: hist, motion, factor, w: D, h: D, alpha, space: "ycocg" })
+                                   history: hist, motion: motionUsed, factor, w: D, h: D, alpha, space: "ycocg" })
         : tgpu
             ? await tgpu.resolveAndAccumulate({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy],
                                                 history: hist, motion, alpha, counted: true })
             : temporalAccumulateCPU({ current: resolveJitterAwareCPU({ src: frameSrc, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy] }).data,
                                       history: hist, motion, w: D, h: D, alpha });
     hist = acc.data; frame++; advanceJitter(jit);
-    if (dolly) prevDepth = depth;                // THIS frame's depth is next frame's recorded depth
+    // *** THE RECORD IS THE DILATED DEPTH WHEN THE PASS IS ON, OR THE TWO SIDES OF THE CLIP TEST DISAGREE
+    // BY CONSTRUCTION. *** motionUsed carries the foreground's zPrev at every silhouette; comparing that
+    // against an undilated record would read a disocclusion at every edge on every frame. Off, depthRecord
+    // IS depth and this line is the line it replaced.
+    if (dolly) prevDepth = depthRecord;          // THIS frame's depth is next frame's recorded depth
 
     if (panning) ref = truth(kind, dx);          // the truth moves with the camera
-    if (dolly) ref = truthPersp(vpCur, kind);    // ...and so does the dolly's, through the same matrix
+    // *** THE REFERENCE TAKES THE SLAB'S OFFSET TOO, AND OMITTING IT COST THIS ROUND ITS HEADLINE NUMBER. ***
+    // This line read truthPersp(vpCur, kind) when the objects camera was added -- the moving slab was rendered
+    // at its new position and scored against a truth that still held it at its old one. The PSNR then measures
+    // how far the slab has walked, so it DECAYS MONOTONICALLY whatever the motion vectors do: 30.94 dB at
+    // frame 2 falling to 19.56 by frame 10, while the plain dolly sat at a stable 38-41 through the same
+    // frames. Every comparison taken against that reference was measuring the mistake and not the method.
+    if (dolly) ref = truthPersp(vpCur, kind, sxCur, alphaCur);
     const shown = (await rcas(hist, D, D, parseFloat($("sharp").value))).data;
     draw(cTmp, shown);
     $("dTmp").textContent = psnr(shown, ref).toFixed(2) + " dB";
+    // The split is taken on EVERY frame the mask exists for, in both arms, so the two can be differenced.
+    const SE = reactiveMask ? splitError(shown, ref, reactiveMask) : null;
     $("metric").textContent = `render ${R}x${R} -> display ${D}x${D}   |   frame ${frame}   |   jitter ${jx.toFixed(3)}, ${jy.toFixed(3)}`;
     // *** NULL, NOT ZEROES. *** ACCUMULATE_WGSL counts nothing, so a device run has no counters to show. A
     // frame that reused nothing and a frame nobody counted must not print the same number.
@@ -611,12 +1355,312 @@ async function tick() {
             ? `disocclusion: ${disStats.genuine} genuine, ${disStats.noHistory} with no history at all (invalid or offscreen), threshold ${disStats.threshold.toFixed(5)} in clip z   -- counted on ${disStats.engine}`
             : threshold === null ? "disocclusion: the two planes are at the same clip depth -- no test is possible"
                                  : "disocclusion: no previous depth yet (frame 0 is not zero disocclusions, it is untestable)";
+    // *** WHAT THE OBJECT-AWARE PATH BOUGHT, ON THE FRAME IN FRONT OF YOU. *** Two numbers, and the second
+    // is the one that makes the first mean anything: the background's model matrix is the identity, so
+    // object-aware and camera-only are the same computation there and must agree to the round trip. A field
+    // that moved BOTH would be a mislabelled id buffer, not a working one.
+    // The lock ring's own state, beside the object line, because a mask that is zero for a reason and a mask
+    // that is zero because nothing happened are the same picture and must not be the same sentence.
+    $("lockstat").textContent = !objects ? ""
+        : lockStat
+            ? `shading mask [${shadingOn ? "ON" : "OFF -- control"}]: ring ${lockStat.pushes}/${lockStat.need} frames` +
+              (lockStat.pushes < lockStat.need
+                  ? ` -- NOT YET FILLED, so every pixel reads 0 and the factor pass is unchanged. The ring is `
+                    + `2 x jitterPhaseCount because both halves must span the same jitter phases; that is the `
+                    + `mechanism, not a warm-up that can be shortened.`
+                  : `: median ${lockStat.p50.toFixed(4)}, p90 ${lockStat.p90.toFixed(4)}, p99 ` +
+                `${lockStat.p99.toFixed(4)}, peak ${lockStat.peak.toFixed(3)}; ${lockStat.over} pixels at or ` +
+                `above 0.05. The QUANTILES are the reading -- a count of pixels above ZERO counts the ` +
+                `arithmetic, because this detector is continuous and nothing is ever exactly unchanged.`)
+            : "shading mask: not computed on this camera";
+    // *** WHAT THE REACTIVE MASK DID, WHICH THIS PAGE MEASURED THE EFFECT OF BEFORE IT COULD STATE. ***
+    // The three declines are separate because they are three different events and the middle name fits two
+    // of them: a DEPTH-GATED pixel has a sound history and was handed to the disocclusion mask on purpose,
+    // which is the gate working, while a collapse in `invalid` or `offscreen` is the reprojection failing.
+    // Read as one sum those want opposite reactions.
+    $("reactstat").textContent = !objects ? ""
+        : reactStat
+            ? `reactive mask [${reactiveOn ? "ON" : "OFF -- control"}]: examined ` +
+              `${reactStat.n - reactStat.noHistory} of ${reactStat.n} pixels, ${reactStat.flagged} of them ` +
+              `at or above 0.05; median ${reactStat.p50.toFixed(4)}, p90 ${reactStat.p90.toFixed(4)}, p99 ` +
+              `${reactStat.p99.toFixed(4)}, peak ${reactStat.peak.toFixed(3)}. Declined ${reactStat.noHistory}: ` +
+              `${reactStat.declinedInvalid} no motion, ${reactStat.declinedOffscreen} reprojected off the ` +
+              `frame, ${reactStat.declinedDepth} turned away by the DEPTH GATE -- and that last third is not ` +
+              `"no history" at all, it is this mask declining to report a disocclusion under another name. ` +
+              `COUNTED ON THE DEVICE as the branches are taken: every one of these pixels writes the same ` +
+              `0.0 to the mask that a pixel in perfect agreement writes, so no pass over it could recover ` +
+              `a single one of these numbers.`
+            : "reactive mask: not computed on this frame (it needs a previous depth and a positive threshold)";
+    // *** WHERE THE ERROR IS, NOT JUST HOW MUCH. *** Differencing these two sums between the mask's ON and
+    // OFF arms is what says whether the harm lands where the mask FIRED -- the mask doing it directly -- or
+    // somewhere else, which would mean the damage is to history that later frames needed and is a different
+    // story with a different fix. The sums are the same squared error the dB above is computed from.
+    $("splitstat").textContent = !objects ? ""
+        : SE
+            ? `error by region [reactive ${reactiveOn ? "ON" : "OFF -- control"}]: ` +
+              `fired ${SE.nFired} px, SSE ${SE.seFired.toExponential(3)} (mean ${(SE.seFired / Math.max(1, SE.nFired * 3)).toExponential(3)}); ` +
+              `rest ${SE.nRest} px, SSE ${SE.seRest.toExponential(3)} (mean ${(SE.seRest / Math.max(1, SE.nRest * 3)).toExponential(3)}). ` +
+              `The two sums ARE the dB above, split in one branch -- nothing is re-derived. THE PARTITION IS ` +
+              `THIS ARM'S OWN MASK: the mask reads the current frame against the HISTORY, which is what the ` +
+              `arms differ in, so the fired set is not the same set on both sides. The pixel counts are ` +
+              `printed so a reader can see whether the two partitions are comparable rather than assume it.`
+            : "error by region: no reactive mask on this frame, so there is nothing to split by";
+    // *** WHAT THE DILATION MOVED, COUNTED AS THE CHOICE IS MADE. *** On flat geometry a dilation that
+    // fired everywhere and one that fired nowhere produce the IDENTICAL depth and motion buffers, so no
+    // pass over the output could recover this -- the same reason the reactive mask's three declines needed
+    // atomics. `moved` comes from mainCounted; `source` carries which pixel each output came from.
+    $("dilstat").textContent = !dolly ? ""
+        : dilStat
+            ? `dilate [ON]: ${dilStat.moved} of ${D * D} pixels took a neighbour's depth and motion ` +
+              `(${(100 * dilStat.moved / (D * D)).toFixed(2)}%) -- the ring outside every silhouette in the ` +
+              `frame. Each one now carries the FOREGROUND's vector and the foreground's zPrev, and the ` +
+              `record kept for next frame is the dilated depth, so both sides of the clip test moved together.`
+            : dilateOn
+                ? "dilate: ON but not computed on this frame (it needs the adapter and a depth buffer)"
+                : `dilate [OFF -- the control]: every figure on this page and in its five gates was measured ` +
+                  `on this arm. FSR2 runs this pass BEFORE depth clip and the locks; this tree has never had ` +
+                  `it, and turning it on moves the disocclusion counts, the 212/106 alternation and the ` +
+                  `reactive mask's fired set. Whether it moves the PICTURE is a paired measurement.`;
+    // *** v4681 -- THE GENERATED FRAME, AND IT IS GRADED AGAINST ONE THAT WAS REALLY RENDERED. ***
+    //
+    // FSR3 inserts a frame between two PRESENTED frames, so the inputs here are `prevShown` and `shown` --
+    // after accumulation and after RCAS, which is what a viewer sees. The truth is truthPersp at scene time
+    // sceneT() - 0.5, which this page can simply draw: the scene is an analytic function of that number.
+    //
+    // *** THE INPUTS ARE ACCUMULATED AND THE TRUTH IS NOT, SO SOME OF THE ERROR BELOW IS THE ACCUMULATOR'S. ***
+    // That is not hidden and it is not corrected for: the CROSS-FADE control carries exactly the same
+    // handicap, since it is built from the same two presented frames, so the DIFFERENCE between them is the
+    // generator's and the absolute numbers are not. A reader who wants the generator alone wants
+    // render/frameInterp-selfcheck.mjs, where the inputs are clean renders.
+    //
+    // *** AND THE FIELD IS PASSED AS `indexedBy: "cur"`, WHICH IS THE ENTIRE POINT OF v4680. *** reconcile
+    // returns a CUR-indexed field; feeding this page's non-uniform motion to the v4677 assumption would be
+    // the 7.35 dB mistake that round measured, and it would look like a plausible frame.
+    let genStat = null;
+    // *** v4683 -- AND WHICH PAIR OF FRAMES IT INTERPOLATES BETWEEN, WHICH IS EXPLORATORY AND SAYS SO. ***
+    // Both earlier records note that the inputs are ACCUMULATED and the truth is a clean render, and both say
+    // the cross-fade carries the same handicap so the DIFFERENCE is fair. What neither could say is whether
+    // the accumulator is what the generator is losing to. `clean` interpolates between two REFERENCE renders
+    // instead -- the same frames the page already draws to compute its PSNR -- which removes the accumulator
+    // and the resolve and RCAS from the inputs while leaving everything else alone. It is not what a viewer
+    // sees and it is not what FSR3 does; it is a control for one variable.
+    const cleanSrc = $("gensource").value === "clean";
+    const genPrev = cleanSrc ? prevRef : prevShown, genCur = cleanSrc ? ref : shown;
+    if (dolly && $("genframe").value === "on" && genPrev && genCur && prevDepthGen && depth) {
+        const tG = 0.5;
+        const of = opticalFlowCPU({ cur: genCur, prev: genPrev, w: D, h: D, block: 8, searchRadius: 4, levels: 3 });
+        // *** v4685 -- THE RECONCILIATION CAN RUN ON THE DEVICE, AND IT DEFAULTS TO THE CPU. *** Its gate
+        // measures 0 of 64 blocks differing across eight cases, with the vectors agreeing to 1.9e-6 -- which is
+        // not zero, so the generated frame's last bits move and every figure v4681, v4682 and v4683 pinned was
+        // taken on the CPU arm. Default off for v4664's reason: a round that moved those while adding a feature
+        // could not be told from a round that broke them.
+        const onDevice = $("genengine").value === "device" && frgpu;
+        const rc = onDevice
+            ? await frgpu.reconcile({ cur: genCur, prev: genPrev, w: D, h: D, flow: of.flow,
+                                      bw: of.bw, bh: of.bh, block: of.block, motion: motionUsed, depth })
+            : reconcileFlowCPU({ cur: genCur, prev: genPrev, w: D, h: D, ...of, motion: motionUsed, depth });
+        // the block grid's nearest surface, which is what the splat's priority and the fill's `prefer` need
+        const dBlk = new Float32Array(of.bw * of.bh);
+        for (let by = 0; by < of.bh; by++) for (let bx = 0; bx < of.bw; bx++) {
+            let m = Infinity;
+            for (let y = by * of.block; y < Math.min(by * of.block + of.block, D); y++)
+                for (let x = bx * of.block; x < Math.min(bx * of.block + of.block, D); x++) m = Math.min(m, depth[y * D + x]);
+            dBlk[by * of.bw + bx] = m;
+        }
+        // *** v4683 -- THE FIELD'S RESOLUTION, WHICH IS THE LAST EXPLANATION LEFT FOR v4681's DEFICIT. ***
+        // render/holeFill-selfcheck.mjs measures 36.79 dB at block 1 and 31.48 at block 8 on a silhouette,
+        // against a cross-fade of 31.66 -- so at THIS page's block size the warp already loses on a fixture.
+        // The per-pixel arm takes the APPLICATION's own field, which is per-pixel and needs no search, and
+        // falls back to the containing block's reconciled vector wherever `valid` is 0. The SEARCH block is
+        // deliberately unchanged: v4673 measured that a small patch makes the matcher worse, so shrinking it
+        // would test the matcher instead of the grid.
+        const perPixel = $("genfield").value === "pixel";
+        let flowUse = rc.flow, bwUse = of.bw, bhUse = of.bh, blockUse = of.block, depthUse = dBlk;
+        if (perPixel) {
+            const fp = new Float32Array(D * D * 2);
+            for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+                const i = y * D + x;
+                if (motionUsed[i * 4 + 2]) {
+                    // THE ONE NEGATION, the same one render/flowReconcile.mjs performs: the application's
+                    // (du, dv) is cur -> prev in UV, and this generator's field is prev -> cur in pixels
+                    fp[i * 2] = -motionUsed[i * 4] * D;
+                    fp[i * 2 + 1] = -motionUsed[i * 4 + 1] * D;
+                } else {
+                    const b = Math.min(of.bh - 1, (y / of.block) | 0) * of.bw + Math.min(of.bw - 1, (x / of.block) | 0);
+                    fp[i * 2] = rc.flow[b * 2]; fp[i * 2 + 1] = rc.flow[b * 2 + 1];
+                }
+            }
+            flowUse = fp; bwUse = D; bhUse = D; blockUse = 1; depthUse = depth;
+        }
+        // *** v4686 -- THE WARP CAN RUN ON THE DEVICE TOO. *** At v4686 the device arm stopped here with its
+        // holes still in it, because render/holeFill.mjs had no kernel and render/frameInterpGPU.mjs took no
+        // `fill` at all; the readout said `filled 0` and the two arms differed by exactly one pass. v4687 closed
+        // that, below -- so the comparison the page prints is now between two arms running the SAME four passes,
+        // and the difference between them is the engine rather than the algorithm.
+        const interpArgs = { prev: genPrev, cur: genCur, w: D, h: D, flow: flowUse,
+                             bw: bwUse, bh: bhUse, block: blockUse, depthBlock: depthUse, indexedBy: "cur", t: tG };
+        let gen = (onDevice && figpu)
+            ? await figpu.interpolate(interpArgs)
+            : interpolateFrameCPU({ ...interpArgs,
+                fill: { side: "depth", depthPrev: prevDepthGen, depthCur: depth, radius: 8 } });
+        // *** v4687 -- AND THE DEVICE ARM NOW FILLS AND RE-WARPS, WHICH COSTS A READBACK IT SHOULD NOT NEED. ***
+        // The three kernels each agree with their CPU twin. Joining them into ONE pipeline needs eleven storage
+        // bindings against this adapter's ten -- render/holeFillGPU-selfcheck.mjs section 5 measures that -- so
+        // the warp's field comes back to the host, goes to the fill, and goes out again to be re-warped. Three
+        // dispatches, one fill, one more dispatch, and two round trips. The readout names where each pass ran
+        // rather than calling the whole thing "the device", because that is not what it is.
+        if (onDevice && figpu && hfgpu) {
+            const f = await hfgpu.fill({ vec: gen.vec, hole: gen.hole, zbuf: gen.zbuf, w: D, h: D,
+                radius: 8, side: "depth", depthPrev: prevDepthGen, depthCur: depth, t: tG });
+            const warped = await figpu.warpFrom({ prev: genPrev, cur: genCur, w: D, h: D,
+                vec: f.vec, side: f.side, hole: f.hole, t: tG });
+            gen = { ...gen, frame: warped.frame, hole: f.hole, holes: warped.holes,
+                    vec: f.vec, filled: f.filled, abstained: f.abstained };
+        }
+        const cf = crossFadeCPU({ prev: genPrev, cur: genCur, w: D, h: D, t: tG });
+        // *** ANY PIXEL THE FILLER STILL COULD NOT REACH IS CROSS-FADED, AND THE COUNT IS PRINTED. *** Leaving
+        // it at zero would put a black speck in the picture and a hole in the number, and both would be this
+        // page reporting a frame it did not generate as one it did.
+        const patched = Float32Array.from(gen.frame);
+        for (let j = 0; j < D * D; j++) if (gen.hole[j]) for (let c = 0; c < 4; c++) patched[j * 4 + c] = cf[j * 4 + c];
+        const tMid = sceneT() - tG;
+        const midRef = truthPersp(dollyVP(tMid), kind, objects ? slabAt(tMid, speed) : 0, alphaCur);
+        // *** HOW BIG THE MOTION IS, BECAUSE A COMPENSATION'S WORTH IS A FUNCTION OF IT AND THE FIXTURES RAN
+        // AT 3.2 AND 8.8 px. *** A field of nearly-zero vectors makes a cross-fade nearly right and gives
+        // block-resolution compensation nothing to win with while it still pays the block grid's error.
+        let magSum = 0, magMax = 0;
+        for (let i = 0; i < of.bw * of.bh; i++) {
+            const m = Math.hypot(rc.flow[i * 2], rc.flow[i * 2 + 1]);
+            magSum += m; magMax = Math.max(magMax, m);
+        }
+        // *** THE DISPLACEMENT IS ALWAYS THE BLOCK FIELD'S, IN BOTH ARMS. *** It is the axis v4682's curve is
+        // drawn against, and measuring it off a different field per arm would make the two arms' rows
+        // incomparable on the very number that indexes them.
+        // *** v4691 -- THE LEARNED GATE, AND EVERY ARM OF IT IS A CONTROL THE PRE-REGISTRATION NAMED. ***
+        // render/learned-preregistration.md fixed the hypothesis before any of this existed: a per-block
+        // predictor that decides where to trust the generator. `oracle` uses the TRUE label and is control C1
+        // -- if IT cannot win, the gating mechanism is broken and the hypothesis is untestable. `never` is
+        // control C2, the predictor that always declines, and it is what the network has to beat rather than
+        // merely beating ungated generation. The readout names which arm ran, because a gate whose arm cannot
+        // be read back is a number nobody can attribute.
+        const gateMode = ($("gengate") || { value: "off" }).value;
+        let gateKept = null, gateOf = null;
+        if (gateMode !== "off") {
+            const nb = of.bw * of.bh;
+            let keep = null;
+            if (gateMode === "never") { keep = new Uint8Array(nb); gateOf = "always cross-fade (C2)"; }
+            else if (gateMode === "oracle") {
+                // C1 -- THIS SEES THE ANSWER ON PURPOSE AND IS NOT A PREDICTION. It is here to say whether the
+                // decision is expressible at all, and the readout calls it an oracle so it can never be quoted
+                // as a learned result.
+                const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
+                keep = L.y; gateOf = "ORACLE (C1, sees the answer)";
+            } else {
+                // *** THE v2 FILE CARRIES ITS OWN THRESHOLD, AND THE PAGE OBEYS IT RATHER THAN 0.5. ***
+                // render/learned-calibration-preregistration.md section 4 fixed the rule that produced it;
+                // 0.5 was never chosen at all, which is the defect v4691 measured and this arm tests.
+                const wantV2 = gateMode === "cpu2";
+                if (gateWTried !== (wantV2 ? "v2" : "v1")) {
+                    gateWTried = wantV2 ? "v2" : "v1";
+                    // v4704: the path comes from the verdict table, so an arm and the verdict it is labelled with
+                    // cannot name different weights.
+                    const file = "./" + armWeights(gateMode);
+                    try { gateW = await (await fetch(file)).json(); } catch { gateW = null; }
+                }
+                if (gateW) {
+                    const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+                    const Z = gateScale(F, { mean: Float32Array.from(gateW.scaler.mean), sd: Float32Array.from(gateW.scaler.sd) });
+                    const layers = gateW.layers.map((L) => ({ ...L, W: Float32Array.from(L.W), b: Float32Array.from(L.b) }));
+                    let p;
+                    if (gateMode === "device" && gggpu) { p = await gggpu.forward(layers, Z, nb); gateOf = "the device"; }
+                    else { p = gateForward(layers, Z, nb); gateOf = gateMode === "cpu2" ? "the CPU, tau " + (gateW.tau || 0.5).toFixed(4) : "the CPU"; }
+                    const tau = typeof gateW.tau === "number" ? gateW.tau : 0.5;
+                    keep = new Uint8Array(nb);
+                    for (let i = 0; i < nb; i++) keep[i] = p[i] >= tau ? 1 : 0;
+                } else gateOf = "NO WEIGHTS -- render/genGate-weights.json did not load, so the gate did nothing";
+            }
+            if (keep) {
+                gateKept = keep.reduce((a2, b2) => a2 + b2, 0);
+                const gated = applyGate({ gen: patched, cf, keep, w: D, h: D, bw: of.bw, block: blockUse });
+                patched.set(gated);
+            }
+        }
+        // *** v4691 -- THE HARVEST HOOK, AND IT IS OFF UNLESS SOMETHING ASKS. *** The learned gate's training
+        // set is per-BLOCK, and nothing this page prints is per-block: the readout carries frame PSNRs. Rather
+        // than rebuild this page's scene machinery in a harness -- where it would be a copy that can drift from
+        // the thing being measured -- the harness sets `window.__gateHarvest` and this block fills it from the
+        // SAME locals the readout is computed from. render/genGate.mjs's features() is not given `midRef`;
+        // labels() is, and is a separate call, which is the separation the gate reads back off the signatures.
+        if (typeof window !== "undefined" && window.__gateHarvest) {
+            const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+            const L = gateLabels({ gen: patched, cf, truth: midRef, w: D, h: D, bw: of.bw, bh: of.bh, block: blockUse });
+            // *** BOTH FEATURE SETS, FROM ONE DRIVE. *** v4695's clause (b) compares them on IDENTICAL
+            // folds, so harvesting them separately would make the two runs differ by the drive as well as by
+            // the features -- and the page's own RNG and slab position advance per frame, so two drives are
+            // not the same data. One drive, two vectors, same blocks.
+            const F2 = gateFeaturesV2({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });
+            // v4705 -- AND THE FRAME'S OWN SCORE: generated and cross-faded PSNR against the rendered middle
+            // frame, the same two numbers the readout prints. render/frame-gate-preregistration.md asks a FRAME-level
+            // question, and every block cache before this carried only per-block labels, from which a frame's dB
+            // cannot be recovered.
+            window.__gateHarvest.push({ scene: kind, frame, tMid, x: Array.from(F), x2: Array.from(F2),
+                                        y: Array.from(L.y), base: L.base, genDb: psnr(patched, midRef), cfDb: psnr(cf, midRef) });
+        }
+        genStat = { gen: psnr(patched, midRef), cf: psnr(cf, midRef), hold: psnr(genPrev, midRef),
+                    left: gen.holes, filled: gen.filled, abst: gen.abstained, counts: rc.counts,
+                    blocks: of.bw * of.bh, tMid, meanMag: magSum / (of.bw * of.bh), maxMag: magMax,
+                    field: perPixel ? "per-pixel" : "block 8", cells: bwUse * bhUse,
+                    src: cleanSrc ? "clean renders" : "presented",
+                    engine: onDevice ? "the device" : "the CPU",
+                    warped: (onDevice && figpu) ? "the device" : "the CPU",
+                    fillEngine: (onDevice && figpu && hfgpu) ? "the device" : "the CPU",
+                    gateMode, gateOf, gateKept, gateBlocks: of.bw * of.bh };
+    }
+    $("genstat").textContent = !dolly ? ""
+        : genStat
+            ? `frame generation [ON, field ${genStat.field}, ${genStat.cells} cells, input ${genStat.src}, reconciled on ${genStat.engine}, warped on ${genStat.warped}, filled on ${genStat.fillEngine}${genStat.gateMode !== "off" ? `, GATE ${genStat.gateOf} kept ${genStat.gateKept} of ${genStat.gateBlocks} blocks` : ""}]: the frame at scene time ${genStat.tMid.toFixed(1)}, which nothing rendered, ` +
+              `scores ${genStat.gen.toFixed(2)} dB against a frame that WAS rendered -- the cross-fade of the same ` +
+              `two presented frames scores ${genStat.cf.toFixed(2)} dB, so motion compensation is worth ` +
+              `${(genStat.gen - genStat.cf >= 0 ? "+" : "") + (genStat.gen - genStat.cf).toFixed(2)} dB here, ` +
+              `and holding the previous frame scores ${genStat.hold.toFixed(2)} dB. THE MOTION IS ` +
+              `${genStat.meanMag.toFixed(2)} px mean and ${genStat.maxMag.toFixed(2)} px worst, against the ` +
+              `3.2 and 8.8 px the fixtures in render/frameInterp-selfcheck.mjs and render/holeFill-selfcheck.mjs run at. ` +
+              `The field: ${genStat.counts.app} of ${genStat.blocks} blocks took the application's vector, ` +
+              `${genStat.counts.flowBeat} the colour flow's on merit, ${genStat.counts.flowOnly} because the ` +
+              `application had none. ${genStat.filled} pixels were filled by the disocclusion test ` +
+              `(${genStat.abst} of them abstaining to a blend) and ${genStat.left} were still unreachable and are ` +
+              `cross-faded. BOTH inputs are accumulated frames and the truth is a clean render, so the absolute ` +
+              `numbers carry the accumulator's error too -- the DIFFERENCE is the generator's, because the ` +
+              `control is built from the same two frames.` + frameNote() + readoutNote(genStat.gateMode)
+            : $("genframe").value === "on"
+                ? "frame generation: ON but not computed on this frame (it needs a previous presented frame and a depth buffer -- frame 1 has neither)"
+                : `frame generation [OFF -- the control]: every upscaling figure on this page was measured on ` +
+                  `this arm. FSR3 inserts a frame between two presented ones; ` + frameOffNote();
+    $("objstat").textContent = !objects ? ""
+        : objGap
+            ? `object motion: camera-only is off by ${(objGap.onSlab * D).toFixed(2)} px on the slab's ` +
+              `${objGap.nSlab} pixels and by ${(objGap.offSlab * D).toExponential(1)} px on the background's ` +
+              `${objGap.nBg} -- the second is the control, and it is the identity model matrix agreeing with ` +
+              `itself   -- computed on ${ogpu ? "the device" : "the CPU"}`
+            : "object motion: no gap computed";
+    // *** THE GENERATOR'S HISTORY IS SET LAST, AND FROM `shown` RATHER THAN `hist`. *** What FSR3 interpolates
+    // between is what was PRESENTED, which on this page is post-RCAS. Recording `hist` instead would generate
+    // between two frames nobody saw.
+    prevShown = shown;
+    if (dolly) { prevDepthGen = depth; prevRef = ref; }
     requestAnimationFrame(tick);
 }
 
 $("run").onclick = () => { running = !running; $("run").textContent = running ? "Pause" : "Run"; if (running) tick(); };
 $("reset").onclick = () => { running = false; $("run").textContent = "Run"; reset(); };
-for (const id of ["scene", "camera", "ratio"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
+// v4704 -- each learned arm's label carries its hypothesis's verdict, appended from the table at load.
+// Guarded like every other lookup here: tools/ship/fsrPage-selfcheck.mjs runs this module against a stub DOM whose
+// elements carry no .options, and the unguarded first draft crashed it on import.
+{ const g = $("gengate"); if (g && g.options) for (const o of g.options) o.textContent += optionSuffix(o.value); }
+// v4713 -- and an option that exists only for a frame-level hypothesis carries that verdict, from render/frameVerdicts.mjs.
+// v4719 -- and the slab PATH, whose sway arm exists only for H14.
+for (const id of ["slabdir", "slabpath"]) { const g = $(id); if (g && g.options) for (const o of g.options) o.textContent += frameOptionSuffix(id, o.value); }
+for (const id of ["scene", "camera", "ratio", "startframe", "slabalpha", "slabspeed", "slabdir", "slabpath"]) $(id).onchange = () => { running = false; $("run").textContent = "Run"; reset(); };
 $("alpha").oninput = () => { $("av").textContent = parseFloat($("alpha").value).toFixed(2); };
 $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).toFixed(2); };
 await initGPU();

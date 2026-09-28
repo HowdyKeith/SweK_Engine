@@ -600,6 +600,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // NOT MOVE ARE THE READING: distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and
     // suspects at 0, so not one of the 62 invented a forty-second spelling of ok(). That is what this census
     // is for, and it is why the row compares all nine rather than the headline.
+    // *** RE-TAKEN AT THE MERGE OF origin/claude/exported-functions-mesh-render-exui0d INTO v4697, AND AGAIN
+    // NEITHER SIDE'S NUMBER WAS RIGHT -- the v4645 and v4667 lesson a third time. *** This line carried 1775;
+    // that branch carried 1856; the merged tree is the union and is neither. Both re-take histories are kept
+    // below because each records which gates moved which rows. READ THE LABELS WITH CARE: that branch never
+    // bumped ENGINE_VERSION, so its v4646-v4773 labels COLLIDE with this line's v4647-v4679 -- two different
+    // "v4647" notes about two different gates. They are that branch's round names, not this tree's versions.
+    // ---- this line (main, through v4697) ----
     // *** v4647 -- RE-DERIVED AFTER THIS SESSION'S OWN SIX GATES, AND THE SIGNATURE IS THE ONE ABOVE AGAIN. ***
     // adapterRecord, capsuleSettle, colliderFromGLB, dxcResolve, ensureDxc and failLines arrived across the
     // v4646-v4647 rounds. The same four rows move together by exactly 6 -- gates, usesOk, definesOk,
@@ -712,8 +719,156 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // by one each: gates, usesOk, definesOk, nameFirst. The other five held, as they have through every arrival.
     // v4679 -- RE-TAKEN 1774 -> 1775 for tools/ship/boxTimings-selfcheck.mjs. ONE gate, the same four rows by
     // one each, the other five unmoved -- the shape that says the patterns discriminate rather than track size.
-    gates: 1775, usesOk: 1754, definesOk: 1746, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1647, condFirst: 96, unknownSignature: 11,
+    // ---- the exported-functions-mesh-render branch (labels are that branch's, see above) ----
+    // ITS FOUR "HELD" ROWS ARE THE PRE-v4647e FIGURES (condFirst 91, unknownSignature 16) because that branch
+    // never had this line's `function ok(...)` repair to signatureOf; over the merged tree the repair applies
+    // to its gates too, and none of its 105 arrivals changed signature under it -- all read nameFirst either way.
+    // v4646 -- 1751 -> 1752 for render/objectMotionGPU-selfcheck.mjs, the arc's object-aware motion vectors.
+    // One gate, and the four rows that move together move by exactly one again -- gates, usesOk, definesOk,
+    // nameFirst -- while distinctDefinitions holds at 41, condFirst at 91, unknownSignature at 16 and suspects
+    // at 0. It is a gate under render/ rather than tools/ship/, which is where this census's walk has found
+    // most of its population, and it spells ok() the same way anyway: the shape is the tree's, not a folder's.
+    // v4647 -- 1752 -> 1753 for render/temporalLockGPU-selfcheck.mjs, the runner for the temporal arc's last
+    // six kernels. One gate, the same four rows moving by one, and the other four holding: distinctDefinitions
+    // 41, condFirst 91, unknownSignature 16, suspects 0. Two rounds running under render/ rather than
+    // tools/ship/ and no forty-second spelling of ok() either time.
+    // v4648 -- 1753 -> 1754 for render/visibilityGPU-selfcheck.mjs, the id buffer's producer. Third round
+    // running under render/ and the same four rows move by one while the other four hold, which is now the
+    // shape this census reports rather than a coincidence: distinctDefinitions 41, condFirst 91,
+    // unknownSignature 16, suspects 0.
+    // v4649 -- 1754 -> 1755 for tools/ship/fsrPageObjects-selfcheck.mjs, fsr.html's object-motion camera,
+    // split out of fsrPageDevice-selfcheck for the sweep budget. Same four rows by one; the other four hold.
+    // v4650 -- 1755 -> 1756 for render/edgeReveal-selfcheck.mjs, the explanation of v4649's alternation.
+    // Four rows by one, four hold. Fourth round running with that shape.
+    // v4651 -- 1756 -> 1757 for tools/ship/constantRows-selfcheck.mjs, the census of rows that cannot fail.
+    // Fifth round running with the same four rows moving by one. THIS ONE IS A SIBLING OF THIS FILE: both
+    // walk every gate and read its ok() calls -- this census asks what SHAPE the call has, that one asks
+    // whether its condition can be influenced by anything in the tree.
+    // v4654 -- 1757 -> 1758 for tools/ship/runnerCallers-selfcheck.mjs, the census of compute runners that
+    // only a gate imports. Sixth round running with the same four rows moving by one and the other four held.
+    // v4657 -- 1758 -> 1759 for render/reactiveGPU-selfcheck.mjs, the factor pass's third input.
+    // v4661 -- 1759 -> 1760 for tools/ship/fsrPageClocks-selfcheck.mjs, the scene clock and the history's age.
+    // v4664 -- 1760 -> 1761 for render/dilateGPU-selfcheck.mjs, FSR2's dilated depth and motion.
+    // v4673 -- 1763 -> 1764 for render/opticalFlow-selfcheck.mjs, FSR3's first pass.
+    // v4672 -- 1762 -> 1763 for tools/ship/fsr2Coverage-selfcheck.mjs, the FSR2 pass census.
+    // v4668 -- 1761 -> 1762 for render/luminancePyramid-selfcheck.mjs, FSR2's luminance pyramid. nameFirst
+    // bumped in the SAME edit this time, which it was not at v4661 or v4664.
+    // Seventh round running with the same four rows by one and the other four held -- and this round bumped
+    // THREE of the four on its first pass and shipped the fourth only because the gate went red on it.
+    // nameFirst is the one a hand-edit forgets: it is the shape count, not a gate count, so nothing about
+    // "I added one gate" reminds you of it. *** AND v4664 FORGOT IT AGAIN, THREE ROUNDS AFTER THIS
+    // SENTENCE WAS WRITTEN. *** Same field, same verify, same repair. Twice now the pre-flight passed and
+    // this row caught it, which is the division of labour working and is also the reason the sentence is
+    // not enough on its own. The pre-flight cannot see it either -- recordDrift compares four
+    // fields and this row compares all nine, which is exactly why that row says so in its own text.
+    // v4676 -- 1764 -> 1765 for render/flowReconcile-selfcheck.mjs, FSR3's reconciliation of the two motion
+    // fields. Eighth consecutive round with the same four rows moving by exactly one and the other four
+    // held. nameFirst bumped in the same edit, unprompted, which is the third round in a row it has been --
+    // so the note above has stopped describing the failure and started describing the habit that replaced it.
+    // v4677 -- 1765 -> 1766 for render/frameInterp-selfcheck.mjs, the first generated frame in this tree.
+    // Ninth round running with the same four rows by one and the other four held.
+    // v4678 -- 1766 -> 1767 for render/holeFill-selfcheck.mjs. Tenth round running with the same four rows
+    // by one and the other four held.
+    // v4681 -- 1767 -> 1768 for tools/ship/fsrPageGen-selfcheck.mjs, FSR3's frame generation on the page.
+    // Eleventh round running with the same four rows by one and the other four held.
+    // v4683 -- 1768 -> 1769 for tools/ship/fsrPageField-selfcheck.mjs, the fifth page gate. Twelfth round
+    // running with the same four rows by one and the other four held.
+    // v4684 -- 1769 -> 1771 for tools/ship/pairedStats-selfcheck.mjs and tools/ship/fsrPageConfirm-selfcheck.mjs.
+    // TWO gates in one round, so the four rows move by TWO and not by one -- the first time in thirteen rounds
+    // that the step is not exactly one, and it is stated here so the pattern's break is not read as a slip.
+    // v4685 -- 1771 -> 1772 for render/flowReconcileGPU-selfcheck.mjs, FSR3's reconciliation on the device.
+    // v4686 -- 1772 -> 1773 for render/frameInterpGPU-selfcheck.mjs, frame generation on the device.
+    // v4687 -- 1773 -> 1774 for render/holeFillGPU-selfcheck.mjs, the hole filler on the device. Fifteenth
+    // round running with the same four rows moving together; the only round that broke the pattern was v4684,
+    // which added two gates and moved them by two, and said so here rather than letting the step look like a slip.
+    // v4690 -- 1774 -> 1775 for render/genGate-selfcheck.mjs, the learned gate's apparatus. Sixteenth round
+    // running with the same four rows moving together.
+    // v4691 -- 1775 -> 1776 for tools/ship/genGateMeasure-selfcheck.mjs, the pre-registered held-out test.
+    // v4693 -- 1776 -> 1777 for tools/ship/genGateCalibrate-selfcheck.mjs, the operating-point test.
+    // v4696 -- 1777 -> 1778 for tools/ship/genGateTransfer-selfcheck.mjs, the round where a control fired.
+    // v4697 -- 1778 -> 1779 for tools/ship/fsrContent-selfcheck.mjs, the census of what fsr.html's seven scenes
+    // actually contain. Seventeenth round running with the same four rows moving together by one.
+    // v4698 -- 1779 -> 1780 for tools/ship/foldStats-selfcheck.mjs, the seven-fold statistic gated on synthetic
+    // data in its pre-registration's round. Eighteenth round running with the four rows moving together by one.
+    // v4699 -- 1780 -> 1781 for tools/ship/genGateFoldsMeasure-selfcheck.mjs, H4's measurement re-derived from its
+    // committed data. Nineteenth round running with the four rows moving together by one.
+    // v4701 -- 1781 -> 1782 for tools/ship/genGateAbsoluteMeasure-selfcheck.mjs, H5 re-derived from its committed
+    // data. (v4700 added no gate and held the four rows, so this is the twentieth round of the pattern, not the
+    // twenty-first.)
+    // v4702 -- 1782 -> 1783 for tools/ship/genGateRule-selfcheck.mjs, the parameter-free rule gated on synthetic frames.
+    // v4703 -- 1783 -> 1784 for tools/ship/genGateRuleMeasure-selfcheck.mjs, H6 re-derived from the two caches.
+    // v4704 -- 1784 -> 1785 for tools/ship/genGateVerdicts-selfcheck.mjs, the page's verdict table graded and driven.
+    // v4705 -- 1785 -> 1786 for tools/ship/frameGate-selfcheck.mjs, the frame-level question's statistic and harvest.
+    // v4706 -- 1786 -> 1787 for tools/ship/frameGateMeasure-selfcheck.mjs, H7 re-derived and C12 re-harvested.
+    // v4707 -- 1787 -> 1788 for tools/ship/frameHoles-selfcheck.mjs, H8's statistic on synthetic frames.
+    // v4708 -- 1788 -> 1789 for tools/ship/frameHolesMeasure-selfcheck.mjs, H8 re-derived and C12 re-harvested.
+    // v4709 -- 1789 -> 1790 for tools/ship/frameHoled-selfcheck.mjs, H9's statistic and C21, the ratio proven honoured.
+    // v4710 -- 1790 -> 1791 for tools/ship/frameHoledMeasure-selfcheck.mjs, H9 re-derived with C12 and C21 on its cells.
+    // v4711 -- 1791 -> 1792 for tools/ship/frameVertical-selfcheck.mjs, the slab's new direction proven and H10 declared.
+    // v4712 -- 1792 -> 1793 for tools/ship/frameVerticalMeasure-selfcheck.mjs, H10 re-derived with C12 and C22 on its cell.
+    // v4713 -- 1793 -> 1794 for tools/ship/frameVerdicts-selfcheck.mjs, H7-H10 as the page states them, graded and driven.
+    // v4714 -- 1794 -> 1795 for tools/ship/frameGain-selfcheck.mjs, H11's document, score and statistic, no declared data.
+    // v4715 -- 1795 -> 1796 for tools/ship/frameGainMeasure-selfcheck.mjs, H11 re-derived with C12 and C23 on both cells.
+    // v4716 -- 1796 -> 1797 for tools/ship/frameReverse-selfcheck.mjs, H12's and H13's document and statistic, no declared data.
+    // v4717 -- 1797 -> 1798 for tools/ship/frameReverseMeasure-selfcheck.mjs, H12 and H13 re-derived with C12 and C24.
+    // v4718 -- 1798 -> 1799 for tools/ship/frameSway-selfcheck.mjs, the page's new slab path proven and H14 declared on it.
+    // v4719 -- 1799 -> 1800 for tools/ship/frameSwayMeasure-selfcheck.mjs, H14 re-derived with C25, C26 and C12.
+    // v4720 -- 1800 -> 1801 for tools/ship/frameSwayRep-selfcheck.mjs, H15's document, statistic and C26, no declared data.
+    // v4721 -- 1801 -> 1802 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, H15 re-derived with C25, C26 and C12.
+    // v4722 -- 1802 -> 1803 for tools/ship/frameDisagree-selfcheck.mjs, H16's document, signal and qualifier, no declared data.
+    // v4723 -- 1803 -> 1804 for tools/ship/frameDisagreeMeasure-selfcheck.mjs, H16 re-derived with C25, C26 and C12.
+    // v4726 -- 1804 -> 1805 for fx/fsr/fsrTsl-selfcheck.mjs, FSR1 as TSL nodes held to fx/fsr/fsr.js on both of three's backends.
+    // v4727 -- 1805 -> 1806 for render/temporalTsl-selfcheck.mjs, the temporal chain's inputs for a three.js scene held to motionVectorsCPU and objectMotionCPU.
+    // v4730 -- 1806 -> 1808 for render/temporalClipTsl-selfcheck.mjs and render/temporalLockTsl-selfcheck.mjs, the depth clip and the lock ring split out of render/temporalTsl-selfcheck.mjs when it passed the 20 s cap.
+    // v4731 -- 1808 -> 1811 for render/reactiveTsl-selfcheck.mjs, fx/fsr/fsrTemporalTsl-selfcheck.mjs and fx/fsr/fsrTemporalQuality-selfcheck.mjs -- the reactive mask, FSR2's composition over three.js, and what it buys.
+    // v4732 -- 1811 -> 1812 for fx/fsr/fsrTemporalLocks-selfcheck.mjs -- what FSR2's lock life and clamp relaxation buy a three.js scene, measured through the driver on both backends.
+    // v4733 -- 1812 -> 1814 for fx/fsr/fsrTemporalHalf-selfcheck.mjs and fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs -- FSR2's chain at the half precision it ships with: the stall derived, the composition at half, and what half costs.
+    // v4734 -- 1814 -> 1815 for render/shaderRound-selfcheck.mjs -- every round() in a shipped shader, each with a verdict, after the fourth tie-to-even divergence.
+    // v4735 -- 1815 -> 1816 for fx/fsr/fsrTemporalLockGhost-selfcheck.mjs -- FSR2's default locks on a pixel-scale texture under a moving occluder: the ghost is real with the clamp alone, and both masks remove it.
+    // v4736 -- 1816 -> 1817 for render/frameInterpTsl-selfcheck.mjs -- FSR3's frame generation for a three.js scene begins: the splat as a depth-tested draw and the warp, held to interpolateFrameCPU exactly.
+    // v4737 -- 1817 -> 1818 for render/holeFillTsl-selfcheck.mjs -- the holes of a generated frame filled as TSL, fillHolesCPU exactly, and the whole splat-fill-warp against interpolateFrameCPU({ fill }).
+    // v4738 -- 1818 -> 1819 for fx/fsr/fsrFrameGen-selfcheck.mjs -- FSR3's frame generation driver on a three.js scene against a frame rendered at the midpoint, a cross-fade and a repeated frame.
+    // v4739 -- 1819 -> 1820 for tools/ship/pageShot-selfcheck.mjs -- a three.js page shot presented on WebGPU on this box, against the flags that lose the device.
+    // v4740 -- 1820 -> 1821 for render/opticalFlowTsl-selfcheck.mjs -- FSR3's optical flow for a three.js scene: the luma pyramid and the block matcher as TSL, the same vector as opticalFlowCPU at every graded block.
+    // v4741 -- 1821 -> 1823 for render/flowReconcileTsl-selfcheck.mjs and fx/fsr/fsrFrameGenFlow-selfcheck.mjs -- the reconciliation as TSL, per block and per pixel, and what it buys a generated frame.
+    // v4742 -- 1823 -> 1824 for fx/fsr/fsr3Tsl-selfcheck.mjs -- FSR3's frame generation on FSR2's upscaled frames, against a frame rendered at the midpoint.
+    // v4743 -- 1824 -> 1826 for render/framePacer-selfcheck.mjs and fx/fsr/fsr3Pacing-selfcheck.mjs -- when each frame is shown: FSR3's half-way frame against timed generation, in ms and in dB.
+    // v4744 -- 1826 -> 1827 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- motion on the arc for frame generation, and the chord-vs-arc error measured before it was built.
+    // v4745 -- 1827 -> 1828 for fx/fsr/fsrFrameGenScene-selfcheck.mjs -- shadows, a reflection and a HUD drawn by three.js, between two frames: the still-surface margin and FSR3's UI composition.
+    // v4746 -- 1828 -> 1830 for render/flicker-selfcheck.mjs and fx/fsr/fsrFlicker-selfcheck.mjs -- flicker between real and generated frames: the measure, and FSR3 against native frames.
+    // v4747 -- 1830 -> 1831 for fx/fsr/fsr3Late-selfcheck.mjs -- a late real frame through FSR3 and the pacer on the device.
+    // v4748 -- 1831 -> 1833 for render/flowCost-selfcheck.mjs and fx/fsr/fsrFlowCost-selfcheck.mjs -- what the optical flow reads, and the device's time held to it.
+    // v4750 -- 1833 -> 1834 for fx/fsr/fsrFrameGenWorld-selfcheck.mjs -- a still surface judged in the world, under a panning camera.
+    // v4751 -- 1834 -> 1835 for fx/fsr/fsr3Hold-selfcheck.mjs -- FSR3 holding the two newest pairs through a late frame.
+    // v4752 -- 1835 -> 1836 for fx/fsr/fsrFrameGenParticles-selfcheck.mjs -- particles through the generator, instanced and in one buffer.
+    // v4753 -- 1836 -> 1837 for fx/fsr/fsrFlowGrid-selfcheck.mjs -- the optical flow with each level on its own block grid, in the generator.
+    // v4755 -- 1837 -> 1838 for fx/fsr/fsrFrameGenUi-selfcheck.mjs -- a translucent, moving UI over a generated frame.
+    // v4756 -- 1838 -> 1839 for fx/fsr/fsr3LiveClock-selfcheck.mjs -- FSR3 paced on requestAnimationFrame's own timestamps.
+    // v4757 -- 1839 -> 1840 for render/temporalTslMeshes-selfcheck.mjs -- skinned and morphed meshes and an orthographic camera through the motion stage.
+    // v4758 -- 1840 -> 1841 for fx/fsr/fsrFlowSeed-selfcheck.mjs -- the optical flow seeded with the application's vectors, in the generator.
+    // v4759 -- 1841 -> 1842 for fx/fsr/fsrFlowStill-selfcheck.mjs -- standing still as a flow guess, in the generator.
+    // v4760 -- 1842 -> 1844 for render/translucentLayer-selfcheck.mjs and fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs -- translucent things as a layer drawn at t.
+    // v4761 -- 1844 -> 1845 for render/temporalTslZoo-selfcheck.mjs -- BatchedMesh, sprites, and meshes sharing one program through the motion stage.
+    // v4762 -- 1845 -> 1846 for render/temporalTslCompute-selfcheck.mjs -- particles a compute pass moves, through the motion stage.
+    // v4763 -- 1846 -> 1847 for tools/ship/threeUpstream-selfcheck.mjs -- the three.js bug-report drafts, held to their reproductions.
+    // v4764 -- 1847 -> 1848 for tools/ship/realGpuRun-selfcheck.mjs -- the FSR gates on a real GPU, and a report that names it.
+    // v4765 -- 1848 -> 1849 for fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs -- what reads the frame behind it, drawn over the generated frame.
+    // v4766 -- 1849 -> 1850 for tools/ship/fsrThreeWorld-selfcheck.mjs -- the demo page showing what the recent rounds took, wired and presented.
+    // v4767 -- 1850 -> 1851 for fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs -- what the translucent layer costs, and one quad in place of a geometry pass.
+    // v4768 -- 1851 -> 1852 for fx/fsr/fsrFlowRetry-selfcheck.mjs -- the flow's blocks the window did not explain, searched again wider.
+    // v4769 -- 1852 -> 1853 for fx/fsr/fsrFrameGenReach-selfcheck.mjs -- where the flow lost to the vectors on pans: holes left black, and a fill that reaches 16.
+    // v4770 -- 1853 -> 1854 for render/temporalTslNodes-selfcheck.mjs -- sprites turned by a node, sized points on a sprite, and a position node over skins and morphs.
+    // v4772 -- 1854 -> 1855 for render/temporalTslMany-selfcheck.mjs -- the motion stage past 1024 instances: the previous matrices a texture.
+    // v4773 -- 1855 -> 1856 for tools/ship/threeUpstreamPaths-selfcheck.mjs -- the three.js patches on the paths their drafts' reproductions skip.
+    // AT THE MERGE -- RE-DERIVED BY RUNNING census() OVER THE MERGED TREE, not by adding the two notes up,
+    // and the two agree exactly, which is the check: gates 1775 -> 1880, usesOk 1754 -> 1859, definesOk
+    // 1746 -> 1851, nameFirst 1647 -> 1752 -- this line's figures plus that branch's 105 gates (all new files,
+    // none overlapping this line's 24 since the merge base, every one nameFirst under the repaired
+    // signatureOf). The rows that did not move are this line's: distinctDefinitions 41, condFirst 96,
+    // unknownSignature 11, suspects 0. So that branch's 91/16 were the old classifier's reading, not a
+    // disagreement about the tree, and none of its hundred and five invented a forty-second spelling of ok().
+    gates: 1880, usesOk: 1859, definesOk: 1851, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1752, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

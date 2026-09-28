@@ -1,0 +1,46 @@
+diff --git a/src/nodes/accessors/Instance.js b/src/nodes/accessors/Instance.js
+index b89834b..a817adf 100644
+--- a/src/nodes/accessors/Instance.js
++++ b/src/nodes/accessors/Instance.js
+@@ -1,6 +1,6 @@
+ 
+ import { vec3, mat4, Fn } from '../tsl/TSLBase.js';
+-import { OnFrameUpdate, OnObjectUpdate } from '../utils/EventNode.js';
++import { OnFrameUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';
+ import { normalLocal, transformNormal } from './Normal.js';
+ import { positionLocal, positionPrevious } from './Position.js';
+ import { varyingProperty } from '../core/PropertyNode.js';
+@@ -93,6 +93,7 @@ function getPreviousInstance( instancedMesh, instanceMatrix, builder ) {
+ 
+ 		data = {
+ 			previousInstanceMatrix,
++			lastInstanceMatrix: new Float32Array( instanceMatrix.array ),
+ 			node: createInstanceMatrixNode( builder, previousInstanceMatrix )
+ 		};
+ 
+@@ -216,11 +217,23 @@ export const instance = /*@__PURE__*/ Fn( ( [ matrices, colors = null ], builder
+ 
+ 		const instancedMesh = builder.object;
+ 
+-		OnObjectUpdate( ( { object } ) => {
++		// before the draw, so the matrices are uploaded with it
++
++		OnBeforeObjectUpdate( ( { object } ) => {
+ 
+ 			const previousInstanceData = _previousInstanceMatrices.get( object );
+ 
+-			previousInstanceData.previousInstanceMatrix.array.set( matrices.array );
++			// the matrices of the last draw are this draw's previous ones; this draw's are kept for the next
++
++			previousInstanceData.previousInstanceMatrix.array.set( previousInstanceData.lastInstanceMatrix );
++			previousInstanceData.previousInstanceMatrix.needsUpdate = true;
++
++			// past the uniform buffer limit the matrices are drawn from an interleaved buffer, which must be uploaded too
++
++			const previousInterleaved = _matrixBuffers.get( previousInstanceData.previousInstanceMatrix );
++			if ( previousInterleaved !== undefined ) previousInterleaved.needsUpdate = true;
++
++			previousInstanceData.lastInstanceMatrix.set( matrices.array );
+ 
+ 		} );
+ 

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "595a1f28908943919ecc7ebe7e1461510ef50096",
+ "head": "915dbfb399e0c3ac52c55756fd48dd8cc9ad64c0",
  "bodies": {
   "box3d": [
    {
@@ -340,7 +340,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 868317,
+    "bytes": 868839,
     "sha": "1d654690b87918b721012a9651a2dbbcc2ce5222"
    },
    {
@@ -652,8 +652,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3398927,
-    "sha": "595a1f28908943919ecc7ebe7e1461510ef50096"
+    "bytes": 3399649,
+    "sha": "915dbfb399e0c3ac52c55756fd48dd8cc9ad64c0"
    },
    {
     "path": "mpm3d.html",
@@ -697,7 +697,7 @@
    },
    {
     "path": "server.html",
-    "bytes": 868317,
+    "bytes": 868839,
     "sha": "1d654690b87918b721012a9651a2dbbcc2ce5222"
    },
    {
@@ -792,7 +792,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 73911,
+    "bytes": 76153,
     "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
    },
    {
@@ -858,9 +858,229 @@
     "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
    },
    {
+    "path": "fsr-three.html",
+    "bytes": 47736,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsr3Hold-selfcheck.mjs",
+    "bytes": 14282,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsr3Late-selfcheck.mjs",
+    "bytes": 11205,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsr3LiveClock-selfcheck.mjs",
+    "bytes": 12498,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsr3Pacing-selfcheck.mjs",
+    "bytes": 13544,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsr3Tsl-selfcheck.mjs",
+    "bytes": 21874,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlicker-selfcheck.mjs",
+    "bytes": 15436,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlowCost-selfcheck.mjs",
+    "bytes": 8901,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
+    "bytes": 15750,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlowRetry-selfcheck.mjs",
+    "bytes": 22930,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlowSeed-selfcheck.mjs",
+    "bytes": 13611,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFlowStill-selfcheck.mjs",
+    "bytes": 10375,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGen-selfcheck.mjs",
+    "bytes": 13067,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenArc-selfcheck.mjs",
+    "bytes": 17933,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
+    "bytes": 13277,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenFlow-selfcheck.mjs",
+    "bytes": 21425,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
+    "bytes": 14122,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
+    "bytes": 15757,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
+    "bytes": 20876,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
+    "bytes": 22619,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs",
+    "bytes": 15409,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
+    "bytes": 15886,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
+    "bytes": 15471,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
+    "bytes": 14201,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
+    "bytes": 9922,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
+    "bytes": 12441,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalLocks-selfcheck.mjs",
+    "bytes": 11564,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
+    "bytes": 8755,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
+    "bytes": 20451,
+    "sha": null
+   },
+   {
+    "path": "fx/fsr/fsrTsl-selfcheck.mjs",
+    "bytes": 24684,
+    "sha": null
+   },
+   {
     "path": "orrery-gpu.html",
     "bytes": 49611,
     "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+   },
+   {
+    "path": "render/flowReconcileTsl-selfcheck.mjs",
+    "bytes": 31153,
+    "sha": null
+   },
+   {
+    "path": "render/frameInterpTsl-selfcheck.mjs",
+    "bytes": 24542,
+    "sha": null
+   },
+   {
+    "path": "render/holeFillTsl-selfcheck.mjs",
+    "bytes": 23268,
+    "sha": null
+   },
+   {
+    "path": "render/opticalFlowTsl-selfcheck.mjs",
+    "bytes": 31624,
+    "sha": null
+   },
+   {
+    "path": "render/reactiveTsl-selfcheck.mjs",
+    "bytes": 12747,
+    "sha": null
+   },
+   {
+    "path": "render/temporalClipTsl-selfcheck.mjs",
+    "bytes": 14629,
+    "sha": null
+   },
+   {
+    "path": "render/temporalLockTsl-selfcheck.mjs",
+    "bytes": 35670,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTsl-selfcheck.mjs",
+    "bytes": 45180,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTslCompute-selfcheck.mjs",
+    "bytes": 13350,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTslMany-selfcheck.mjs",
+    "bytes": 15505,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTslMeshes-selfcheck.mjs",
+    "bytes": 15142,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTslNodes-selfcheck.mjs",
+    "bytes": 19703,
+    "sha": null
+   },
+   {
+    "path": "render/temporalTslZoo-selfcheck.mjs",
+    "bytes": 26613,
+    "sha": null
+   },
+   {
+    "path": "render/translucentLayer-selfcheck.mjs",
+    "bytes": 21326,
+    "sha": null
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
@@ -901,6 +1121,11 @@
     "path": "tools/ship/slugTsl-selfcheck.mjs",
     "bytes": 20947,
     "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
+   },
+   {
+    "path": "tools/ship/threePatch.mjs",
+    "bytes": 5076,
+    "sha": null
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -944,7 +1169,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 73911,
+    "bytes": 76153,
     "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
    },
    {

@@ -134,6 +134,13 @@ let lostOnExit = 0, lostOnCode = 0;
         // Node that flushed on exit would make `lostOnExit` zero and fail this row; a Node that lost
         // everything would fail the next one. The magnitude is REPORTED, because it is a reading and not a
         // property.
+        //
+        // v4766 (the other branch, reached independently): the row said "by more than a pipe buffer" and asserted
+        // lostOnExit > 65536. HOW MUCH is lost is the machine's, not Node's: idle, 131,150 to 172,325 bytes of 244,000
+        // over four runs; under the verify's load 43,249 and 50,081 -- below one buffer -- and the verify read the row
+        // red for it. What the row is for holds in every run: something is lost, and a gate's tail with it. That is
+        // asserted; the amount is reported. Two sessions, two boxes, the same repair. The loaded readings land in
+        // the LOW mode above, which suggests (does not show) that the low mode is the busy-machine one.
         // *** THE PREMISE, ASSERTED SEPARATELY, BECAUSE SABOTAGE ND SHOWED IT WAS NOT. *** The whole
         // comparison rests on the two scripts writing the SAME bytes -- otherwise a difference between the
         // pipe readings says nothing about exit(). It was a clause inside the row below; deleting it and

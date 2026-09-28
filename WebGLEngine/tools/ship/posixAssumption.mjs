@@ -237,7 +237,19 @@ export const POSIX_AT_V4485 = Object.freeze({
     // becomes 159/216/106/53. The callers grew by five and the rule grew by one idiom, in one step, and the two
     // are separable: under the OLD rule the same tree reads 159/216/54/105, so the population moved +5/+9 with
     // nothing un-normalised, and the rule change alone moved 52 files from `never` to `normalised`.
-    separator: Object.freeze({ callers: 159, calls: 216, normalised: 106, never: 53 }),
+    // v4764 -- RE-TAKEN, under the SAME skip rule: 146/197/43/103 becomes 151/205/44/107. Five callers arrived since the
+    // merge -- among render/shaderRound-selfcheck.mjs, render/temporalLockGPU-selfcheck.mjs, tools/ship/constantRows.mjs,
+    // tools/ship/probe/hooks.mjs and tools/ship/runnerCallers.mjs, which reached 150, the band's edge, without a re-take -- and
+    // v4764's tools/ship/webgpuHarness.mjs, whose adapter log records a gate by its path relative to the engine root and
+    // normalises it (replace backslashes), took it past. NORMALISED ROSE 43 -> 44, that one; nothing was un-normalised.
+    // AT THE MERGE of the two re-takes above -- both taken from the same 146/197/43/103, so neither number is
+    // this tree's, and neither is "more right": each counted its own branch's arrivals. RE-TAKEN on the merged
+    // tree under v4680's rule and the gate's skip list: 166/227/113/53. Separable as before -- under the pre-v4680
+    // rule it reads 166/227/56/110, so v4764's webgpuHarness (normalising) and this side's five sit together and
+    // the idiom still accounts for 57 of `normalised`. Taken with every conflicted file keeping BOTH sides
+    // (temporalResolve-selfcheck, quickSweep, sweepCoverage-selfcheck from main; webgpuHarness from the other
+    // arc); a resolution that drops one of them moves this by one caller, and that is a re-take, not a widening.
+    separator: Object.freeze({ callers: 166, calls: 227, normalised: 113, never: 53 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

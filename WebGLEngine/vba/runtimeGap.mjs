@@ -337,6 +337,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
+    // *** v4776 -- RE-DERIVED AT THE MERGE OF THE exported-functions-mesh LINE (its commits labelled v4646-v4775,
+    // ENGINE_VERSION never bumped). Both lines re-took these rows over their own tree, so neither figure
+    // describes the union. Both histories are kept below; the live figures are re-derived over the merged tree. ***
+    // ---- this line (main, v4680-v4697) ----
     // v4647g -- RE-DERIVED: 4286 -> 4288 for tools/ship/cliArgs.mjs and its gate. THREE of the thirteen
     // rows moved and the shape is the point: ES modules +2 and closures +2 (both files are modules and
     // both hold arrow functions), but async/await only +1 -- the gate awaits an import, the parser does
@@ -373,8 +377,213 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4679 -- RE-DERIVED: TWO files arrived (tools/ship/boxTimings.mjs and its gate) and THREE of twelve rows
     // moved -- files +2, ES modules +2, closures +2. Nine held: no async/await, no Promises, no typed arrays and
     // no threading primitive, which is right for a pair that reads JSON records and spawns gates synchronously.
-    files: 4316,                              // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
+    // (superseded at the v4776 merge) files: 4316,                              // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
     // v4687 -- RE-DERIVED: world/traderGraphGithub.mjs arrived, one ES module using closures and await -- four rows moved (files, ES modules, closures, and async/await +2 -- the census counts FILES, and the second is tools/ship/traderGraph-selfcheck.mjs, which awaits the new module for the first time), eight held.  // v4660 -- RE-DERIVED: tools/ship/murmurIgniteFour-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3866 / 23 still rounds to 168).  // v4659 -- RE-DERIVED: tools/ship/murmurIgniteAxis-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3865 / 23 still rounds to 168).  // v4658 -- RE-DERIVED: tools/ship/murmurComplete-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3864 / 23 still rounds to 168).  // v4656 -- RE-DERIVED: tools/ship/murmurGesture-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3863 / 23 still rounds to 168).  // v4655 -- RE-DERIVED: tools/ship/murmurClock2-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3862 / 23 still rounds to 168).  // v4654 -- RE-DERIVED: tools/ship/murmurClock-selfcheck.mjs arrived, one ES module using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3861 / 23 still rounds to 167).  // v4653 -- RE-DERIVED: the two st.drive gates arrived, both ES modules using closures and await -- four rows moved, eight held, and closuresOverThreads did NOT move (3860 / 23 still rounds to 167).  // v4650 -- RE-DERIVED: tools/ship/murmurTempo-selfcheck.mjs arrived, one ES module using closures and one await (its render section) -- four rows moved, eight held, and closuresOverThreads did NOT move (3858 / 23 still rounds to 167).  // v4649r -- RE-DERIVED: tools/ship/pixelWorst.mjs arrived, one ES module with no closure, no await and no device call in it -- TWO rows moved and ten held. v4649 -- RE-DERIVED: tools/ship/fixtureLitter.mjs arrived, one ES module using closures and one await (a dynamic import in playwrightResolve-selfcheck at v4648r) -- four rows moved, eight held. v4647 -- RE-DERIVED after this session's own eleven files; see the note below. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // ---- the exported-functions-mesh line ----
+    // (superseded at the v4776 merge) files: 4453,               // v4775: no file added; Promises 384 -> 385, tools/ship/threeUpstream-selfcheck.mjs running its two pages
+                               // at once (Promise.all).
+                               // v4773: 4451 -> 4453 for tools/ship/threeUpstreamPaths-selfcheck.mjs (the patches on the paths their drafts'
+                               // reproductions skip) and tools/ship/threePatch.mjs (the hunk applier, moved out of threeUpstream-selfcheck).
+                               // v4772: 4450 -> 4451 for render/temporalTslMany-selfcheck.mjs -- the motion stage past 1024 instances, on both
+                               // backends (WebGL +1: it names WebGL2; requestAnimationFrame +1: it steps one browser frame at a time).
+                               // v4771: no file added; typedArrays 1214 -> 1215, tools/ship/threeUpstream-selfcheck.mjs allocating one now
+                               // (its stage row's Float32Array, on the patched three.js build).
+                               // v4770: 4449 -> 4450 for render/temporalTslNodes-selfcheck.mjs -- what the motion stage refused, followed, on both
+                               // backends (WebGL +1: it names the WebGL2 one). Every row from the census.
+                               // v4769: 4448 -> 4449 for fx/fsr/fsrFrameGenReach-selfcheck.mjs -- where the flow lost to the vectors on pans, and a
+                               // fill that reaches 16 (performance.now +1: it times the fill). Every row from the census.
+                               // v4768: 4447 -> 4448 for fx/fsr/fsrFlowRetry-selfcheck.mjs -- the flow's blocks the window did not explain, searched
+                               // again wider. Closures +2: the gate, and render/flowCost.mjs's first arrow (the retry's levels, filtered).
+                               // v4767: 4446 -> 4447 for fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs -- the translucent layer's depth from the generator,
+                               // not a geometry pass (performance.now +1: it times). Every row from the census.
+                               // v4766: 4445 -> 4446 for tools/ship/fsrThreeWorld-selfcheck.mjs -- fsr-three.html showing the translucent layer, the
+                               // lens, the batch, the sprites and the compute particles. Every row from the census.
+                               // v4765: 4444 -> 4445 for fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs -- lenses that read the frame behind them, drawn over
+                               // the generated frame (performance.now +1: it times its page). Every row from the census.
+                               // v4764: 4442 -> 4444 for tools/ship/realGpuRun.mjs and its selfcheck -- the FSR gates on a real GPU (performance.now
+                               // and requestAnimationFrame +1 each: the runner's sorting rule NAMES them). Every row from the census.
+                               // v4763: 4441 -> 4442 for tools/ship/threeUpstream-selfcheck.mjs -- the three.js bug-report drafts' reproductions, run
+                               // against the vendored r185 (WebGL +1: they name forceWebGL). Every row from the census.
+                               // v4762: 4440 -> 4441 for render/temporalTslCompute-selfcheck.mjs -- particles a compute pass moves, through the motion
+                               // stage, on both backends (WebGL +1: it names forceWebGL). Every row from the census.
+                               // v4761: 4439 -> 4440 for render/temporalTslZoo-selfcheck.mjs -- the rest of the mesh zoo through the motion stage, on both
+                               // backends (WebGL +1: it names forceWebGL). Every row from the census.
+                               // v4760: 4436 -> 4439 for render/translucentLayer.mjs, render/translucentLayer-selfcheck.mjs and fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs
+                               // -- translucent things as a layer drawn at the generated time (WebGL +1: the layer's gate names forceWebGL). Every row from the census.
+                               // v4759: 4435 -> 4436 for fx/fsr/fsrFlowStill-selfcheck.mjs -- standing still as a flow guess below the coarsest\nlevel, and a still highlight on a moving belt. Every row from the census.
+                               // v4758: 4434 -> 4435 for fx/fsr/fsrFlowSeed-selfcheck.mjs -- the optical flow seeded with the application's vectors\nunder fast pans. Every row from the census.
+                               // v4757: 4433 -> 4434 for render/temporalTslMeshes-selfcheck.mjs -- skinned and morphed meshes and an orthographic camera\nthrough the motion stage, on both backends (WebGL +1: it names forceWebGL). Every row from the census.
+                               // v4756: 4432 -> 4433 for fx/fsr/fsr3LiveClock-selfcheck.mjs -- FSR3 paced on the browser's own clock, the first gate in\nthe tree to drive a render loop from requestAnimationFrame (+2 rows there). Every row from the census.
+                               // v4755: 4431 -> 4432 for fx/fsr/fsrFrameGenUi-selfcheck.mjs -- a translucent, moving UI over a generated frame,\nand the UI drawn at the time generated. Every row from the census.
+                               // v4753: 4430 -> 4431 for fx/fsr/fsrFlowGrid-selfcheck.mjs -- the optical flow with each level of its pyramid on its\nown block grid, the generator's default. Every row from the census.
+                               // v4752: 4429 -> 4430 for fx/fsr/fsrFrameGenParticles-selfcheck.mjs -- particles through the generator: the motion stage's\nown instance history, and particles drawn at the generated time. Every row from the census.
+                               // v4751: 4428 -> 4429 for fx/fsr/fsr3Hold-selfcheck.mjs -- FSR3 holding two pairs, the pacer's line kept with its\nmargin. Every row from the census.
+                               // v4750: 4427 -> 4428 for fx/fsr/fsrFrameGenWorld-selfcheck.mjs -- the reconciliation's still test in the world, with the\ncamera's own motion from the motion stage. Every row from the census.
+                               // v4748: 4424 -> 4427 for render/flowCost.mjs and two gates -- the optical flow's reads counted, held to the mirror\nand to the device's time. Every row from the census.
+                               // v4747: 4423 -> 4424 for fx/fsr/fsr3Late-selfcheck.mjs -- a late real frame through FSR3 and the pacer on the device,\nwith the pacer confined to the pair the generator holds. Every row from the census.
+                               // v4746: 4420 -> 4423 for render/flicker.mjs and two gates -- what a displayed sequence alternates that the scene does not,\nand frame generation graded by it. Every row from the census.
+                               // v4745: 4419 -> 4420 for fx/fsr/fsrFrameGenScene-selfcheck.mjs -- shadows, a reflection and a HUD between two frames, the\nstill-surface margin and the UI composited. Every row from the census.
+                               // v4744: 4418 -> 4419 for fx/fsr/fsrFrameGenArc-selfcheck.mjs -- the toward stage and the arc generator, and the measurement that\ncorrected v4741. Every row from the census.
+                               // v4743: 4415 -> 4418 for render/framePacer.mjs and two gates -- a pacer for frame generation, four policies graded by judder,\nnew images and latency, and FSR3 driven by it on the device. Every row from the census.
+                               // v4742: 4413 -> 4415 for fx/fsr/fsr3Tsl.mjs and its gate -- FSR2 with frame generation between its upscaled frames, from\nthe field FSR2 already renders. Every row from the census.
+                               // v4741: 4410 -> 4413 for render/flowReconcileTsl.mjs and two gates -- the vectors reconciled with the optical flow, per block as the\nmirror and per pixel as measured. Every row from the census.
+                               // v4740: 4408 -> 4410 for render/opticalFlowTsl.mjs and its gate -- the optical flow as TSL: a luma pyramid built on the device and one\nsearch pass per level, nested Loops named. Every row from the census.
+                               // v4739: 4406 -> 4408 for tools/ship/pageShot.mjs and its gate -- WebGPU pages shot as presented, under PRESENT_ARGS: the device loss
+                               // Level 11 recorded was the launch flags. Every row from the census.
+                               // v4738: 4404 -> 4406 for fx/fsr/fsrFrameGenTsl.mjs and its gate -- the frame-generation driver: motion field to flow, splat, fill,
+                               // warp, and the older depth kept. Every row from the census.
+                               // v4737: 4402 -> 4404 for render/holeFillTsl.mjs and its gate -- the fill as a fragment gather, both preferences and all five side modes,
+                               // and the side-aware warp. Every row from the census.
+                               // v4736: 4400 -> 4402 for render/frameInterpTsl.mjs and its gate -- frame interpolation as TSL: one instanced quad per block,
+                               // depth-tested strictly, so the nearer block wins and a tie keeps the first writer. Every row from the census.
+                               // v4735: 4399 -> 4400 for fx/fsr/fsrTemporalLockGhost-selfcheck.mjs -- the case a lock is dangerous in, through the driver: a chequer
+                               // the lock detector reads as ridges everywhere, a box sliding across it. Every row from the census.
+                               // v4734: 4398 -> 4399 for render/shaderRound-selfcheck.mjs -- the census of round() in shipped shaders, after frameInterp, holeFill and
+                               // opticalFlow were found rounding ties to even against Math.round mirrors. Every row from the census.
+                               // v4733: 4396 -> 4398 for fx/fsr/fsrTemporalHalf-selfcheck.mjs and fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs -- the driver's default
+                               // HalfFloat targets graded at last: the chain against a mirror rounded where the device writes half, and against float. Every row from the census.
+                               // v4732: 4395 -> 4396 for fx/fsr/fsrTemporalLocks-selfcheck.mjs -- the gate that measures what the locks buy: wires thinner than
+                               // a render pixel, still and moving, and a knot with nothing thin. Every row from the census.
+                               // v4731: 4390 -> 4395 for render/reactiveTsl.mjs, fx/fsr/fsrTemporalTsl.mjs and three gates -- the reactive mask, the driver that
+                               // composes FSR2's chain over a three.js scene, and the gate that measures it against FSR1. Every row from the census.
+                               // v4730: 4386 -> 4390 for render/temporalClipTsl.mjs, render/temporalLockTsl.mjs and their two gates -- the depth clip and the lock ring,
+                               // split out of render/temporalTsl.mjs. Every row from the census.
+                               // v4727: 4384 -> 4386 for render/temporalTsl.mjs and its gate -- the temporal chain's inputs as TSL. ES modules,
+                               // closures and async/await by two, typed arrays by one, WebGL by one. Every row from the census.
+                               // v4726: 4382 -> 4384 for fx/fsr/fsrTsl.mjs and its gate -- FSR1 as TSL nodes. ES modules,
+                               // closures and async/await by two, typed arrays by one (the gate's float fixtures), and WebGL
+                               // by one: the module and its gate name three's WebGL2 backend. Every row from the census.
+                               // v4723: 4381 -> 4382 for tools/ship/frameDisagreeMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4722: 4379 -> 4381 for tools/ship/frameDisagree.mjs and its gate. async/await by one --
+                               // the runner's harvest; the gate drives no page. Every row from the census.
+                               // v4721: 4378 -> 4379 for tools/ship/frameSwayRepMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4720: 4376 -> 4378 for tools/ship/frameSwayRep.mjs and its gate. async/await by two --
+                               // the runner's harvest and the gate's x1 drives. Every row from the census.
+                               // v4719: 4375 -> 4376 for tools/ship/frameSwayMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4718: 4372 -> 4375 for render/slabPath.mjs, tools/ship/frameSway.mjs and its gate.
+                               // async/await by two -- the runner's harvest and the gate's x1 drives. The page's new
+                               // path option is .html and uncounted. Every row from the census.
+                               // v4717: 4371 -> 4372 for tools/ship/frameReverseMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4716: 4369 -> 4371 for tools/ship/frameReverse.mjs and its gate. async/await by one --
+                               // the runner's harvest; the gate drives no page. Every row from the census.
+                               // v4715: 4368 -> 4369 for tools/ship/frameGainMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4714: 4366 -> 4368 for tools/ship/frameGain.mjs and its gate. async/await by two --
+                               // the runner's harvest and the gate's x1 drives. Every row from the census.
+                               // v4713: 4364 -> 4366 for render/frameVerdicts.mjs and its gate. async/await by one and
+                               // Promises by one, both the gate's page drive; the page's edit is .html and uncounted.
+                               // Every row from the census.
+                               // v4712: 4363 -> 4364 for tools/ship/frameVerticalMeasure-selfcheck.mjs, the measurement
+                               // gates' shape: async/await by one for C12. Every row from the census.
+                               // v4711: 4361 -> 4363 for tools/ship/frameVertical.mjs and its gate. async/await moves by
+                               // two -- the runner's harvest and C22's page drives. The page's new slab direction is
+                               // .html and uncounted. Every row from the census.
+                               // v4710: 4360 -> 4361 for tools/ship/frameHoledMeasure-selfcheck.mjs, the shape of the
+                               // two measurement gates before it: async/await by one for C12. Every row from the census.
+                               // v4709: 4358 -> 4360 for tools/ship/frameHoled.mjs and its gate. async/await moves by
+                               // two -- the runner's harvest and the gate's C21, which drives the page twice to prove
+                               // the ratio is honoured. Every row from the census.
+                               // v4708: 4357 -> 4358 for tools/ship/frameHolesMeasure-selfcheck.mjs -- v4706's shape to
+                               // the row: async/await moves by one for C12's re-harvest. Every row from the census.
+                               // v4707: 4355 -> 4357 for tools/ship/frameHoles.mjs and its gate. async/await moves by
+                               // one, for the runner's harvest; the gate drives no page -- v4705's C18 already tied the
+                               // harvested dB to the readout. Every row from the census.
+                               // v4706: 4354 -> 4355 for tools/ship/frameGateMeasure-selfcheck.mjs. async/await moves
+                               // by one: C12 AWAITS a real re-harvest of the first declared cell rather than trusting the
+                               // cache. Every row from the census.
+                               // v4705: 4352 -> 4354 for tools/ship/frameGate.mjs and its gate -- the frame-level
+                               // pre-registration's statistic and runner. async/await moves by two (the runner's
+                               // harvest and the gate's page drive) and Promises by one (the gate's settle wait); the
+                               // .md and the fsr.html harvest field are uncounted. Every row from the census.
+                               // v4704: 4350 -> 4352 for render/genGateVerdicts.mjs and its gate. async/await and
+                               // Promises move by one each, for the gate's page drive -- it RUNS a learned arm to
+                               // read the readout a user would see. The module itself is browser-safe and names no
+                               // capability; fsr.html's edit is .html and uncounted. Every row from the census.
+                               // v4703: 4349 -> 4350 for tools/ship/genGateRuleMeasure-selfcheck.mjs. Typed arrays
+                               // move by one for its per-block score buffers; nothing awaits, because a rule needs no
+                               // page and no training. Every row from the census.
+                               // v4702: 4347 -> 4349 for tools/ship/genGateRule.mjs and its gate -- the parameter-free
+                               // rule. Typed arrays move by two (the score buffer and the gate's synthetic frames);
+                               // async/await and Promises hold, because neither file drives the page and the rule
+                               // needs no harvest. Every row from the census.
+                               // v4701: 4346 -> 4347 for tools/ship/genGateAbsoluteMeasure-selfcheck.mjs -- the same
+                               // shape as v4699's measurement gate to the row: ES modules and closures move, and
+                               // nothing else, because it reads committed data and drives nothing. Every row from
+                               // the census.
+                               // v4700: 4345 -> 4346 for tools/ship/genGateAbsolute.mjs, H5's runner -- a thin CLI over
+                               // v4698's. ONE file and NO gate: the round widened foldStats-selfcheck and
+                               // genGateFoldsMeasure-selfcheck rather than adding one, and its pre-registration is
+                               // .md. async/await moves for the CLI's page drive; closures hold, because it declares
+                               // none -- the loop it runs is genGateFolds.mjs's. Every row from the census.
+                               // v4699: 4344 -> 4345 for tools/ship/genGateFoldsMeasure-selfcheck.mjs. ONE file:
+                               // the measurement ran through v4698's runner as committed, and its data are a .json
+                               // and a .json.gz, which this walk does not count. Only ES modules and closures move --
+                               // no await (it reads committed data, never drives the page) and no typed-array name
+                               // (it borrows the runner's rows). Every row from the census.
+                               // v4698: 4341 -> 4344 for tools/ship/foldStats.mjs, tools/ship/genGateFolds.mjs and
+                               // tools/ship/foldStats-selfcheck.mjs -- the pre-registered statistic, its runner,
+                               // and their synthetic-data gate. THREE files; the pre-registration is .md and the
+                               // edits to brain/learn.js and the two older learned-gate tools add none. async/await
+                               // moves by ONE, not two: genGateFolds' harvestAll is async and the gate is not,
+                               // because nothing in it drives the page -- the whole point of the round. Promises
+                               // holds at 377 for the same reason. Every row from the census.
+                               // v4697: 4340 -> 4341 for tools/ship/fsrContent-selfcheck.mjs, the census of what
+                               // fsr.html's seven scenes contain. ONE file and not two: the round's other change
+                               // is to fsr.html itself, and this walk matches .js/.mjs/.cjs and not .html, so the
+                               // four new scenes and the removed silent fallback are invisible here. Six rows move
+                               // together -- ES modules, closures, async/await, typed arrays and Promises -- which
+                               // is the ordinary shape of a gate that awaits a page drive and reads Float64Array
+                               // back out of it. WebGL and WebGPU hold: the gate names neither, because the page
+                               // harness it borrows does the reaching. Every row from the census.
+                               // v4696: 4338 -> 4340 for tools/ship/genGateTransfer.mjs and its gate -- the
+                               // leave-one-scene-out comparison, and the control that stopped it. Promises does
+                               // NOT move: the gate reads a cached fold file rather than driving the page, which
+                               // is why it costs 419 ms where the other two measurement gates cost two minutes.
+                               // Every row from the census.
+                               // v4694: NO new file -- the round restored rows to an existing gate. Two rows
+                               // move anyway and both belong to render/genGate-selfcheck.mjs getting its C4
+                               // section back: async/await 1550 -> 1551 for the awaited device drive, and WebGL
+                               // 166 -> 167 for the refusal row that builds a webgl2 device to prove the runner
+                               // throws on it. Both had been counted at v4690 and were LOST when that round
+                               // removed the section; this is the census recording the repair rather than an
+                               // arrival. Every row from the census.
+                               // v4693: 4336 -> 4338 for tools/ship/genGateCalibrate.mjs and its gate -- the
+                               // three-way split's threshold, chosen on VALIDATION. Promises moves 375 -> 376 for
+                               // the calibration tool's page drive; the gate's own await is on the same harness.
+                               // Every row from the census.
+                               // v4691: 4333 -> 4336 for render/genGateGPU.mjs, tools/ship/genGateTrain.mjs and
+                               // tools/ship/genGateMeasure-selfcheck.mjs -- the device runner v4690 held back, the
+                               // harvest-and-train tool, and the pre-registered held-out measurement. PROMISES moves
+                               // 373 -> 375 for the first time in this arc: both new tools AWAIT a page drive, and
+                               // the census reads what a file's text names. WebGPU holds at 53 and WebGL at 166 --
+                               // the runner reaches the device through gfx/device.js and names neither backend
+                               // except in the refusal its gate exercises. Every row from the census.
+                               // v4690: 4331 -> 4333 for render/genGate.mjs and its gate -- the learned per-block
+                               // gate's apparatus, CPU side. TWO files and not three: render/genGateGPU.mjs was
+                               // built, measured at 5.96e-8 against the CPU twin, and then HELD BACK, because a
+                               // compute runner nothing outside a gate can construct would have forced this arc's
+                               // third widening of runnerCallers' ratchet in twelve rounds. It arrives with the
+                               // round that wires it. WebGL does NOT move here for the same reason -- the refusal
+                               // row that names the backend it declines travels with the runner.
+                               // Every row from the census. v4687: 4328 -> 4331 for render/holeFillWgsl.mjs, its runner and its gate -- the hole
+                               // filler on the device, and the last of FSR3's four passes to leave the CPU. WebGPU moves
+                               // 52 -> 53 for the first time in this arc, and it is worth saying why the other two rounds
+                               // did not: the runner names `navigator.gpu` only where it refuses a non-webgpu device, and
+                               // this gate is the one that also reads maxStorageBuffersPerShaderStage off the adapter to
+                               // do section 5's arithmetic. WebGL moves 165 -> 166 for the same refusal row the last two
+                               // rounds moved it for -- this arc names WebGL exactly when it proves it is not WebGL.
+                               // Every row taken from the census, after v4684 and v4685 each guessed and each was wrong.
+                               // v4686: 4325 -> 4328 for render/frameInterpWgsl.mjs, its runner and its gate -- frame
+                               // generation on the device. Every row taken from the census rather than predicted, after v4685 got two wrong. v4685: 4322 -> 4325 for render/flowReconcileWgsl.mjs, its runner and its gate -- FSR3's
+                               // reconciliation on the device. WebGL 163 -> 164 because a kernel gate mentions the backend it refuses,
+                               // which v4739's note calls a MENTION counted as a USE and is this census's own recorded limit. v4684: 4319 -> 4322 for tools/ship/pairedStats.mjs, its gate, and tools/ship/fsrPageConfirm-selfcheck.mjs. v4683: 4318 -> 4319 for tools/ship/fsrPageField-selfcheck.mjs. v4681: 4317 -> 4318 for tools/ship/fsrPageGen-selfcheck.mjs; fsr.html is not a .js or .mjs and is not counted. v4678: 4315 -> 4317 for render/holeFill.mjs and its gate. v4677: 4313 -> 4315 for render/frameInterp.mjs and its gate -- the first generated frame. v4676: 4311 -> 4313 for render/flowReconcile.mjs and its gate -- FSR3's reconciliation of the two motion fields. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
+    // v4776 -- the merged tree's own figures:
+    files: 4494,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
                           // RE-TAKEN TWICE IN TWO ROUNDS, and the second time only because the ship gate
@@ -681,6 +890,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // rounds re-froze the audit, so the recorded line is gone and the file stops matching. The count fell
     // because a defect was fixed. Verified at both ends rather than argued: main's register-audit.mjs matches
     // the pattern after stripComments and this tree's does not.
+    // *** v4776 -- RE-DERIVED AT THE MERGE OF THE exported-functions-mesh LINE (its commits labelled v4646-v4775,
+    // ENGINE_VERSION never bumped). Both lines re-took these rows over their own tree, so neither figure
+    // describes the union. Both histories are kept below; the live figures are re-derived over the merged tree. ***
+    // ---- this line (main, v4680-v4697) ----
     // *** v4647 -- RE-TAKEN AFTER THIS SESSION'S OWN ROUNDS, AND FIVE OF THIRTEEN MOVED. *** files
     // 4275 -> 4286 (eleven arrivals: six gates and five modules -- capsuleSettle, colliderFromGLB,
     // adapterRecord, ensureDxc, failLines and their gates, plus dxcResolve-selfcheck), ES modules
@@ -726,15 +939,141 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4691 -- tools/ship/textureInProbe.mjs: esModules +1, closures +1, asyncAwait +1 (see `files` above).
     // v4695 -- asyncAwait 1544 -> 1545, NO FILE ARRIVED: failLines' CLI moved into an async function (its --as-sweep imports quickSweep, which imports failLines, and a top-level await cannot finish that cycle).
     // v4696 -- asyncAwait 1545 -> 1546, NO FILE ARRIVED: exitBusy-selfcheck's steady fixture awaits its worker coming online (a timer-driven load is throttled in a windowless Windows process). threads held: the Worker is in a fixture string.
-    esModules: 4015, closures: 3882, asyncAwait: 1546, typedArrays: 1128, promises: 375,
+    // (superseded at the v4776 merge) esModules: 4015, closures: 3882, asyncAwait: 1546, typedArrays: 1128, promises: 375,
     // wasm 23 -> 24: this branch's tools/ship/wasmExitHook.cjs. A DUPLICATE KEY nearly hid it -- both
     // lines' capability rows survived the merge and the LATER one silently won, so the merged tree
     // would have carried main's 23 under a record claiming to describe the union. JS does not warn
     // on a repeated object key; the gate caught it because it re-derives every row rather than trusting.
-    fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 25, wasm: 24,
+    // (superseded at the v4776 merge) fetchXhr: 245, performanceNow: 229, raf: 121, webgl: 156, webgpu: 54, threads: 25, wasm: 24,
     // v4649r -- webgpu 53 -> 54: render/temporalResolve-selfcheck gained a navigator.gpu call when its
     // confidence bound was moved onto the per-adapter record. ONE row moved and eleven did not, which is
     // the shape that says the patterns discriminate rather than track the tree's size.
+    // ---- the exported-functions-mesh line ----
+    //
+    // *** v4646 -- RE-TAKEN, AND THE FOUR NEW FILES ARE NAMED RATHER THAN COUNTED, which is v4628's rule and
+    // the only reason its WebAssembly row took a minute instead of a round. *** Six of the thirteen moved:
+    // files 4275 -> 4279, ES modules 3975 -> 3979, closures 3844 -> 3846, async/await 1519 -> 1521, typed
+    // arrays 1123 -> 1126, WebGL 156 -> 157. The four, with what each one matches after stripComments:
+    //     render/objectMotion.mjs               ES modules, typed arrays
+    //     render/objectMotionWgsl.mjs           ES modules
+    //     render/objectMotionGPU.mjs            ES modules, closures, async/await, typed arrays
+    //     render/objectMotionGPU-selfcheck.mjs  ES modules, closures, async/await, typed arrays, WebGL
+    // Every one of the six deltas is accounted for by that list exactly -- 4 + 4 + 2 + 2 + 3 + 1 -- so the
+    // table is corroborated per file and not just re-typed from the pre-flight's diff.
+    //
+    // *** THE WebGL ROW IS THE INTERESTING ONE AND IT IS NOT AN ACCIDENT. *** Three of the four are WebGPU
+    // modules and none of them moves the webgpu row, for the sixth-plus round running and for v4641's reason:
+    // they reach the device through gfx/device.js and tools/ship/webgpuHarness.mjs, so no WebGPU API name
+    // appears in their text. The gate moves the WEBGL row because its last claim is a REFUSAL -- it builds a
+    // webgl2 device to prove objectMotionGPU throws on one, since there is no compute stage there -- and that
+    // backend name is a live string in code rather than prose. A census that stripped strings as well as
+    // comments would read this file as touching neither API, which is the sharpest illustration this table
+    // has of what it actually measures: text in code, not capability.
+    //
+    // *** v4647 -- RE-TAKEN, the two new files NAMED as v4628's rule asks. *** Six rows moved again:
+    // files 4279 -> 4281, ES modules 3979 -> 3981, closures 3846 -> 3848, async/await 1521 -> 1523, typed
+    // arrays 1126 -> 1128, WebGL 157 -> 158.
+    //     render/temporalLockGPU.mjs            ES modules, closures, async/await, typed arrays
+    //     render/temporalLockGPU-selfcheck.mjs  ES modules, closures, async/await, typed arrays, WebGL
+    // Every delta accounted for by that list exactly -- 2 + 2 + 2 + 2 + 2 + 1.
+    //
+    // AND IT IS THE SAME WebGL ROW AND THE SAME CAUSE AS v4646, which is the point of naming rather than
+    // counting: the pattern is visible across rounds. Both gates drive SIX and FIVE WebGPU kernels
+    // respectively and neither moves the webgpu row, because they reach the device through gfx/device.js and
+    // tools/ship/webgpuHarness.mjs and name no WebGPU API. Both move the WEBGL row, because each ends on a
+    // REFUSAL row that builds a webgl2 device to prove the runner throws on one -- a live string in code.
+    // Twice now, so it is not a quirk of one file: this table measures TEXT IN CODE, not capability, and the
+    // arc's WebGPU work registers here as WebGL every time it proves it is not WebGL.
+    //
+    // *** v4648 -- RE-TAKEN, four new files NAMED. *** files 4281 -> 4285, ES modules 3981 -> 3985, closures
+    // 3848 -> 3851, async/await 1523 -> 1525, typed arrays 1128 -> 1131, WebGL 158 -> 159.
+    //     render/visibility.mjs                 ES modules, closures, typed arrays
+    //     render/visibilityWgsl.mjs             ES modules
+    //     render/visibilityGPU.mjs              ES modules, closures, async/await, typed arrays
+    //     render/visibilityGPU-selfcheck.mjs    ES modules, closures, async/await, typed arrays, WebGL
+    // Every delta accounted for exactly -- 4 + 4 + 3 + 2 + 3 + 1.
+    //
+    // THIRD ROUND RUNNING THAT THE WebGL ROW MOVES AND THE WebGPU ROW DOES NOT, for the reason v4647 named:
+    // these are WebGPU modules that reach the device through gfx/device.js and name no WebGPU API, and each
+    // gate ends on a refusal row that builds a webgl2 device to prove the runner throws on one. Three rounds
+    // is a pattern rather than a quirk, and it says plainly what this table measures: TEXT IN CODE. A reader
+    // taking `webgpu: 52` as a count of this tree's WebGPU work would be wrong by the whole temporal arc.
+    //
+    // *** v4649 -- RE-TAKEN, ONE new file, and it BREAKS the pattern the last note called a pattern. ***
+    // files 4285 -> 4286, ES modules 3985 -> 3986, closures 3851 -> 3852, async/await 1525 -> 1526, and
+    // Promises 368 -> 369. WebGL does NOT move and neither does WebGPU.
+    //     tools/ship/fsrPageObjects-selfcheck.mjs   ES modules, closures, async/await, Promises
+    // Three rounds running the WebGL row moved, and v4648's note said that was a pattern rather than a quirk.
+    // It was -- but the cause was NARROWER than the note implied: it is the REFUSAL ROW, which builds a
+    // webgl2 device to prove a runner throws on one. This gate drives a PAGE and has no such row, so the
+    // WebGL row holds. The reading stands and is now better bounded: this table measures text in code, and
+    // the arc's WebGPU work registers as WebGL exactly when it proves it is not WebGL, not otherwise.
+    //
+    // *** v4650 -- RE-TAKEN, two new files, and only THREE rows move. *** files 4286 -> 4288, ES modules
+    // 3986 -> 3988, closures 3852 -> 3853.
+    //     render/edgeReveal.mjs             ES modules
+    //     render/edgeReveal-selfcheck.mjs   ES modules, closures
+    // The quietest round this table has recorded in a while, and the reason is worth a line: this pair is
+    // ARITHMETIC. No device, no adapter, no typed arrays, no async -- the gate is 53 ms and touches nothing
+    // but Math. The census reads that correctly, which is the one thing a text-matching table is good at.
+    //
+    // *** v4651 -- RE-TAKEN, two new files, three rows. *** files 4288 -> 4290, ES modules 3988 -> 3990,
+    // closures 3853 -> 3855.
+    //     tools/ship/constantRows.mjs             ES modules, closures
+    //     tools/ship/constantRows-selfcheck.mjs   ES modules, closures
+    // Second quiet round running, and for the same reason: this pair reads SOURCE TEXT. No device, no typed
+    // arrays, no async. Two rounds of that in a row is a useful reminder of what the headline `files` number
+    // is and is not -- it counts files, and the thirteen rows under it count which APIs their text names.
+    //
+    // *** v4652 -- ONE ROW MOVES AND NO FILE WAS ADDED: async/await 1526 -> 1527. *** The whole delta is
+    // tools/ship/constantRows.mjs gaining the word `async`, because isParsable's wrapper became
+    // `new Function("return (async () => (...))")` -- the repair that took that census's unresolved count
+    // from 957 to 59. `files` holds at 4290. This is the narrowest this table has ever moved and it is a
+    // useful demonstration of what it measures: not capability, not behaviour, but which API names a file's
+    // text contains. One word in one string literal, and the census is right to see it.
+    //
+    // *** v4654 -- THREE ROWS, TWO NEW FILES: files 4290 -> 4292, ES modules 3990 -> 3992, closures 3855 ->
+    // 3857. *** tools/ship/runnerCallers.mjs and its gate, both ES modules using closures as values and
+    // nothing else -- no device, no typed arrays, no async, because they read source text. THIRD QUIET ROUND
+    // RUNNING and the pattern is now worth naming: this session's instrument rounds move three rows and its
+    // RENDER rounds move six. The table is reading the difference between a file that parses source and a
+    // file that drives a GPU, which is exactly what a text census can see and the only thing it can.
+    //
+    // *** v4657 -- SIX ROWS, FOUR NEW FILES, and the WebGL row moves again for v4648's reason. *** files
+    // v4674 -- 4309 -> 4311, ES modules 4009 -> 4011, closures 3869 -> 3870, async/await 1534 -> 1536,
+    // typed arrays 1142 -> 1143, WebGL 162 -> 163, for render/opticalFlowWgsl.mjs and its runner.
+    // v4673 -- 4307 -> 4309, ES modules 4007 -> 4009, closures 3867 -> 3869, typed arrays 1140 -> 1142,
+    // for render/opticalFlow.mjs and its gate. async/await does NOT move: the matcher is synchronous and
+    // has no device mirror yet, which its own closing line names.
+    // v4672 -- 4305 -> 4307, ES modules 4005 -> 4007, closures 3865 -> 3867, for
+    // tools/ship/fsr2Coverage.mjs and its gate. async/await does NOT move: both are synchronous, which is
+    // unusual in this arc and is why the gate runs in 2 s rather than needing an adapter.
+    // v4668 -- 4301 -> 4305, ES modules 4001 -> 4005, closures 3863 -> 3865, async/await 1532 -> 1534,
+    // typed arrays 1137 -> 1140, WebGL 161 -> 162, for render/luminancePyramid.mjs, its kernel, its runner
+    // and its gate. Promises do NOT move, for the same reason as v4664: the four files await and none
+    // constructs one.
+    // v4664 -- 4297 -> 4301, ES modules 3997 -> 4001, closures 3861 -> 3863, async/await 1530 -> 1532,
+    // typed arrays 1134 -> 1137, WebGL 160 -> 161, for render/dilate.mjs, dilateWgsl, dilateGPU and its
+    // gate. Promises do NOT move: the four new files await, and none of them constructs a Promise.
+    // v4661 -- 4296 -> 4297, ES modules 3996 -> 3997, closures 3860 -> 3861, async/await 1529 -> 1530,
+    // Promises 369 -> 370, for tools/ship/fsrPageClocks-selfcheck.mjs. Typed arrays do NOT move: that gate
+    // reads strings off a page and counts integers, and never allocates one.
+    // 4292 -> 4296, ES modules 3992 -> 3996, closures 3857 -> 3860, async/await 1527 -> 1529, typed arrays
+    // 1131 -> 1134, WebGL 159 -> 160.
+    //     render/reactive.mjs                ES modules, closures, typed arrays
+    //     render/reactiveWgsl.mjs            ES modules
+    //     render/reactiveGPU.mjs             ES modules, closures, async/await, typed arrays
+    //     render/reactiveGPU-selfcheck.mjs   ES modules, closures, async/await, typed arrays, WebGL
+    // Every delta accounted for exactly -- 4 + 4 + 3 + 2 + 3 + 1 -- and it is the SAME SHAPE as v4646's and
+    // v4648's render rounds, to the row. Three WebGPU modules and a gate; webgpu holds at 52 because they
+    // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
+    // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
+    // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
+    // (superseded at the v4776 merge) esModules: 4153, closures: 4008, asyncAwait: 1639, typedArrays: 1216, promises: 385,
+    // (superseded at the v4776 merge) fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 53, threads: 23, wasm: 23,
+    // v4776 -- the merged tree's own figures:
+    esModules: 4193, closures: 4046, asyncAwait: 1666, typedArrays: 1221, promises: 392,
+    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

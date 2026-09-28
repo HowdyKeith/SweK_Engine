@@ -11,7 +11,8 @@
 // canvas the device PRESENTS to, and reads the result back three ways:
 //   A  the device's own canvas-mode readback (frame({ read: true }) with the canvas as the attachment);
 //   B  an OFFSCREEN frame with the same commands (frame({ offscreen: true, read: true })), the path every gate uses;
-//   C  a 2D canvas's drawImage() of the presented canvas, then getImageData(): what the COMPOSITOR is handed.
+//   C  a 2D canvas's drawImage() of the presented canvas, then getImageData(): what the COMPOSITOR is handed --
+//      taken in the same task as a frame submitted without a readback (v4739: after an awaited read it was a race).
 // Each is compared with the expectation and with the others; the result names every count. A device that is lost
 // on the presented pass is reported as that, by the message the browser gave, not as a crash.
 //
@@ -76,34 +77,34 @@ export async function presentCheck(canvas, backend, opts = {}) {
             pass.use(pipe); pass.uniform("viewProj", I); pass.vertices(right); pass.instances(inst); pass.draw(6, 1);
         };
         const want = expectedPattern(W, H);
-        // v4680 -- C MUST BE CAPTURED SYNCHRONOUSLY, BEFORE AWAITING A, NOT AFTER.
-        // Measured directly on real hardware (a 1080 Ti, Chrome 153), with a minimal page that draws a
-        // solid colour via WebGPU and repeatedly samples it through drawImage: a draw followed by an
-        // IMMEDIATE (same-task, no await at all) drawImage read is byte-correct EVERY time, including
-        // after redrawing; a drawImage read taken after ANY yield to the event loop -- even the lightest
-        // one, device.queue.onSubmittedWorkDone() -- reads back fully blank, EVERY time, with no recovery
-        // however long you then wait or how many times you redraw. device.lost never fires -- the device
-        // stays healthy throughout. So this was never about waiting long enough; it is strictly about
-        // which task the drawImage call runs in.
-        // device.frame() (gfx/device.js) is not async: it encodes the draw and calls gpu.queue.submit()
-        // SYNCHRONOUSLY before ever returning -- only the pixel-mapping tail that follows is a promise.
-        // So the fix is to capture C right after CALLING device.frame(), in the same task, before
-        // awaiting its result at all -- not after, as this used to.
-        const frAPromise = device.frame(draw, { read: true });
-        // C: what the compositor is handed -- a 2D copy of the presented canvas, captured in the same
-        // task as the call above, which is the only task in which drawImage sees real WebGPU content.
-        let cBytes = null, cErr = null;
+        // C: what the compositor is handed -- a 2D copy of the presented canvas, taken IN THE SAME TASK as a frame
+        // submitted without a readback. *** v4739: IT WAS TAKEN AFTER AWAITING A READ, AND ON WebGPU THAT IS A RACE. ***
+        // A WebGPU canvas's texture expires at the page's next rendering update, and a frame with `read: true` awaits a
+        // buffer map, which crosses tasks; the copy then read the pattern on some runs and TRANSPARENT BLACK on others --
+        // measured, the same call alternating. A frame without `read` submits synchronously (gfx/device.js), so the copy
+        // below is of that frame, before anything is awaited; A reads a second frame of the same commands.
+        // v4680 -- the same finding, measured directly on real hardware (a 1080 Ti, Chrome 153) with a minimal page that
+        // draws a solid colour via WebGPU and samples it through drawImage: an IMMEDIATE (same-task, no await at all) read
+        // is byte-correct EVERY time, including after redrawing; a read after ANY yield to the event loop -- even the
+        // lightest, device.queue.onSubmittedWorkDone() -- is fully blank EVERY time, however long you then wait or how many
+        // times you redraw, and device.lost never fires. So it was never about waiting long enough; it is strictly about
+        // which task drawImage runs in. (v4680 took C in the task of the `read: true` frame's CALL, before awaiting it --
+        // device.frame() submits synchronously either way; the merge keeps v4739's separate no-read frame, the shape
+        // tools/ship/devicePresent-selfcheck.mjs section 3 measured exact on WebGPU, three runs of three.)
+        let cPixels = null;
         try {
+            const pending = device.frame(draw);
             const c2 = document.createElement("canvas"); c2.width = W; c2.height = H;
             const ctx = c2.getContext("2d"); ctx.drawImage(canvas, 0, 0);
-            cBytes = new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer);
-        } catch (e) { cErr = "drawImage: " + e.message; }
-        // A: the presented canvas, read by the device in the same task it was drawn
-        const frA = await Promise.race([frAPromise, lostP.then(() => null)]);
+            cPixels = new Uint8Array(ctx.getImageData(0, 0, W, H).data.buffer);
+            out.C = comparePixels(cPixels, want);
+            if (pending && pending.then) await pending;
+        } catch (e) { out.C = { differing: -1, worst: 255, n: 0, reason: "drawImage: " + e.message }; }
+        // A: the presented canvas, read by the device
+        const frA = await Promise.race([device.frame(draw, { read: true }), lostP.then(() => null)]);
         if (!frA) { out.state = "device-lost"; return out; }
         out.A = comparePixels(frA.pixels, want);
-        if (cErr) out.C = { differing: -1, worst: 255, n: 0, reason: cErr };
-        else { out.C = comparePixels(cBytes, want); out.AC = comparePixels(frA.pixels, cBytes); }
+        if (cPixels) out.AC = comparePixels(frA.pixels, cPixels);
         // B: the offscreen path every gate uses, same commands
         const frB = await Promise.race([device.frame(draw, { offscreen: true, read: true }), lostP.then(() => null)]);
         if (!frB) { out.state = "device-lost"; return out; }

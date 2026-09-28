@@ -312,6 +312,22 @@ export function readSites(names, { root = ENG } = {}) {
     return out;
 }
 
+/** Which gates name which records: `src.includes(name)` for every pair, computed through the runs a name can live in. */
+export function guardianSearch(gateSrc, named) {
+    const names = [...named.keys()], memo = new Map();
+    const namesIn = (tok) => { let hit = memo.get(tok); if (!hit) { hit = names.filter((n) => tok.includes(n)); memo.set(tok, hit); } return hit; };
+    for (const [g, src] of gateSrc) {
+        const found = new Set();
+        for (const m of src.matchAll(/[A-Z0-9_]+/g)) if (/V\d{3}/.test(m[0])) for (const n of namesIn(m[0])) found.add(n);
+        for (const n of names) if (found.has(n)) named.get(n).push(g);
+    }
+}
+
+/** The pairwise search guardianSearch replaces, kept so the gate can hold the two equal. */
+export function guardianSearchNaive(gateSrc, named) {
+    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+}
+
 /**
  * *** `guardians: false` SKIPS THE GATE SCAN, AND IT IS THE SAME MOVE assertionShape MADE AT v4645. ***
  * The record COUNT costs a walk and a regex. WHO GUARDS each record costs the comment strip over every gate
@@ -363,7 +379,15 @@ export function census({ files = null, read = null, exclude = null, guardians: w
     const all = [];
     for (const f of mjs) for (const r of recordsIn(f, rd, cacheable))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
-    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    // v4715 -- THE SAME ANSWER WITHOUT ~270,000 SUBSTRING SEARCHES. Every gate source was searched for every record name,
+    // and that loop was the largest self-time in this census while recordReach demands 800 ms of headroom from it. A
+    // name is RECORD_RE's capture -- only [A-Z0-9_], and always holding V and three or four digits -- so wherever it
+    // occurs it sits inside one maximal [A-Z0-9_]+ run that also holds V\d{3}. Those runs are collected per gate and
+    // each distinct run is matched against the names once, tree-wide: `src.includes(name)` is true exactly when some
+    // collected run includes it. Measured once over the whole tree, census() came back byte-identical, 1,124 -> 899 ms;
+    // tools/ship/frozenRecords-selfcheck.mjs section 5 holds the two ways equal on every tenth live gate and on the
+    // edge cases, since the full pairwise pass would spend the headroom it bought.
+    guardianSearch(gateSrc, named);
     // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
     // The search above asks which gates NAME a record. Seven records failed it for a reason that is not a gap
     // in the tree: redCensus.mjs defines `RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...))`, so the
@@ -375,12 +399,21 @@ export function census({ files = null, read = null, exclude = null, guardians: w
     // one file: a transitive closure over the whole tree would start crediting a record with guardians that
     // never touch its value, which is how a coverage number becomes a story. The edge has to be visible in the
     // defining module's own text, which is the same standard the NAME search uses.
+    // v4718 -- WHICH FILES HOLD RECORDS IS KNOWN BEFORE ANY FILE IS STRIPPED. Both loops below stripped the comments out of all
+    // ~4,000 source files and only then asked whether the file defined a record -- a handful do -- so nearly every strip was
+    // thrown away, and on a slower host that alone took frozenRecords-selfcheck under recordReach's 800 ms of headroom. The
+    // question now comes first. The stripped text is read only for files with records, so the census is unchanged by
+    // construction, and it was measured byte-identical over the whole tree when this landed.
+    const byFile = new Map();
+    for (const x of all) { if (!byFile.has(x.f)) byFile.set(x.f, []); byFile.get(x.f).push(x.r.name); }
     for (const f of withGuardians ? mjs : []) {
         // *** THE STRIP MOVED BELOW THE TEST, AND THAT IS MOST OF THIS ROUND'S SAVING. *** It used to run
         // FIRST, on every one of the 4,289 files, and the very next line discards all but the handful that
         // declare two or more records -- so the comment strip was paid in full for files this loop then
         // refused to look at. Pure reordering: stripComments has no effect but its return value.
-        const here = all.filter((x) => x.f === f).map((x) => x.r.name);
+        // (v4664 and v4718 made this same move independently; the merge keeps v4718's byFile lookup, which
+        // also drops the per-file `all.filter` scan, and v4664's cached strip and `guardians: false` skip.)
+        const here = byFile.get(f) || [];
         if (here.length < 2) continue;
         const src = strippedOf(f, rd, cacheable);
         for (const r of here) {
@@ -411,7 +444,7 @@ export function census({ files = null, read = null, exclude = null, guardians: w
     for (const f of withGuardians ? mjs : []) {
         // Same reordering as the loop above, same reason: the strip was paid for every file in the tree and
         // this line throws away everything that declares no record at all.
-        const here = new Set(all.filter((x) => x.f === f).map((x) => x.r.name));
+        const here = new Set(byFile.get(f) || []);
         if (!here.size) continue;
         const src = strippedOf(f, rd, cacheable);
         const target = rel(f);

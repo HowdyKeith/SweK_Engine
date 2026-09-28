@@ -150,20 +150,31 @@ else {
         blind: resolveJitterAwareCPU({ src, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy], jitterAware: false, dering: true }),
         raw: resolveJitterAwareCPU({ src, rw: R, rh: R, dw: D, dh: D, jitter: [jx, jy], jitterAware: true, dering: false }),
     };
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { R, D, jx, jy, src: Array.from(src) }, script: `async (a) => {
+    // v4728 -- A PHASE WITH TIES, found rather than assumed: the first in the sequence whose base texel lands on an
+    // exact half somewhere on this grid. SEQ[7] has none, which is how a half-to-even round() in the kernel sat beside
+    // a half-up Math.round in the mirror without a row noticing.
+    const tieK = SEQ.findIndex(([x, y]) => { for (let p = 0; p < D; p++) { const s1 = (p + 0.5) / D * R - 0.5 - x, s2 = (p + 0.5) / D * R - 0.5 - y;
+        if (Math.abs(s1 - Math.floor(s1) - 0.5) === 0 || Math.abs(s2 - Math.floor(s2) - 0.5) === 0) return true; } return false; });
+    const [tjx, tjy] = SEQ[Math.max(0, tieK)];
+    let tieCount = 0; for (let p = 0; p < D; p++) { const s1 = (p + 0.5) / D * R - 0.5 - tjx, s2 = (p + 0.5) / D * R - 0.5 - tjy;
+        if (s1 - Math.floor(s1) === 0.5) tieCount++; if (s2 - Math.floor(s2) === 0.5) tieCount++; }
+    const tsrc = renderAt(tjx, tjy);
+    const CPU_TIE = resolveJitterAwareCPU({ src: tsrc, rw: R, rh: R, dw: D, dh: D, jitter: [tjx, tjy], jitterAware: true, dering: true });
+    const r = await runInEngineOrigin({ engineRoot: ENG, args: { R, D, jx, jy, src: Array.from(src), tjx, tjy, tsrc: Array.from(tsrc) }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const { RESOLVE_WGSL } = await import("/render/temporalResolveWgsl.mjs");
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
         const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
         const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
-        const src = dev.buffer({ data: new Float32Array(a.src), usage: ["storage"] });
+        let src = dev.buffer({ data: new Float32Array(a.src), usage: ["storage"] });
         const groups = Math.ceil(a.D / 8);
+        let JX = a.jx, JY = a.jy;
         const go = async (flags) => {
             const dst = dev.buffer({ data: new Float32Array(a.D * a.D * 4), usage: ["storage"] });
             const conf = dev.buffer({ data: new Float32Array(a.D * a.D), usage: ["storage"] });
             const ub = new ArrayBuffer(32);
             new Uint32Array(ub, 0, 4).set([a.R, a.R, a.D, a.D]);
-            new Float32Array(ub, 16, 2).set([a.jx, a.jy]);
+            new Float32Array(ub, 16, 2).set([JX, JY]);
             new Uint32Array(ub, 24, 2).set([flags, 0]);
             const u = dev.buffer({ data: new Uint32Array(ub), usage: "uniform" });
             const p = dev.compute({ wgsl: RESOLVE_WGSL });
@@ -176,7 +187,10 @@ else {
         let adapterInfo = null;
         try { const ad = await navigator.gpu.requestAdapter(); const i = (ad && ad.info) || {};
               adapterInfo = { vendor: i.vendor || null, architecture: i.architecture || null }; } catch { adapterInfo = null; }
-        return { aware: await go(3), blind: await go(2), raw: await go(1), errs, backend: dev.backend, adapterInfo };
+        const res = { aware: await go(3), blind: await go(2), raw: await go(1) };
+        src = dev.buffer({ data: new Float32Array(a.tsrc), usage: ["storage"] }); JX = a.tjx; JY = a.tjy;
+        res.tie = await go(3);
+        return { ...res, errs, backend: dev.backend, adapterInfo };
     }` });
     ok("the harness ran the kernel on a real WebGPU device", r.ok && r.result && r.result.backend === "webgpu" && r.result.errs.length === 0,
        r.ok ? `${r.result && r.result.backend}; errors ${(r.result && r.result.errs || []).join(" | ")}` : (r.reason || (r.pageErrors || []).join("; ")));
@@ -188,6 +202,9 @@ else {
         // against f64 is not going to be bit-identical and the number that matters is whether a viewer could see it
         ok(`*** the device's resolve is the CPU reference's on all three paths -- worst ${worst.toExponential(2)}, which is ${(worst / LSB).toExponential(1)} of an 8-bit LSB (jitter-aware ${wa.toExponential(2)}, jitter-blind ${wb.toExponential(2)}, undered ${wr.toExponential(2)}) ***`,
            worst < LSB / 50, `aware ${wa.toExponential(3)}, blind ${wb.toExponential(3)}, raw ${wr.toExponential(3)}; LSB ${LSB.toExponential(2)}`);
+        const wt = cmp(r.result.tie.out, CPU_TIE.data);
+        ok(`*** v4728: and at a phase with TIES -- SEQ[${tieK}], ${tieCount} half-texel landings on this grid -- the device's resolve is still the mirror's, worst ${wt.toExponential(2)} ***`,
+           tieK >= 0 && tieCount > 0 && wt < LSB / 50, `worst ${wt.toExponential(3)}; the kernel's round() read the other window at every tie and differed by up to 0.0495 at 2x`);
         let wc = 0; for (let i = 0; i < D * D; i++) wc = Math.max(wc, Math.abs(r.result.aware.conf[i] - CPU.aware.confidence[i]));
         const ADAPTER = (r.result && r.result.adapterInfo) || null;
         const RECORD = mergeRecords(DEVICE_AT_V4649, readReadings(GATE));

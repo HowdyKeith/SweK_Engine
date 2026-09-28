@@ -1,0 +1,91 @@
+diff --git a/src/nodes/accessors/Morph.js b/src/nodes/accessors/Morph.js
+index e9b9319..9173232 100644
+--- a/src/nodes/accessors/Morph.js
++++ b/src/nodes/accessors/Morph.js
+@@ -3,7 +3,7 @@ import { float, Fn, ivec2, int, If, uniform } from '../tsl/TSLBase.js';
+ import { Loop } from '../utils/LoopNode.js';
+ import { OnObjectUpdate } from '../utils/EventNode.js';
+ import { textureLoad } from './TextureNode.js';
+-import { positionLocal } from './Position.js';
++import { positionLocal, positionPrevious } from './Position.js';
+ import { normalLocal } from './Normal.js';
+ import { instanceIndex, vertexIndex } from '../core/IndexNode.js';
+ 
+@@ -182,7 +182,7 @@ function getEntry( geometry ) {
+  * @function
+  * @param {Mesh} mesh - The mesh.
+  */
+-export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
++export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ], builder ) => {
+ 
+ 	const { geometry } = mesh;
+ 
+@@ -267,6 +267,46 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+ 
+ 	} );
+ 
++	// the previous position, for motion vectors: morphed by the influences of the last draw, kept here
++
++	const perInstance = mesh.count > 1 && ( mesh.morphTexture !== null && mesh.morphTexture !== undefined );
++
++	if ( hasMorphPosition === true && builder.needsPreviousData() && perInstance === false && influences !== null ) {
++
++		if ( morphInfluenceData.previousInfluences === undefined ) {
++
++			morphInfluenceData.previousBase = uniform( 1 );
++			morphInfluenceData.previousInfluences = uniformArray( mesh.morphTargetInfluences.slice(), 'float' );
++			morphInfluenceData.lastBase = null;
++			morphInfluenceData.lastInfluences = null;
++
++		}
++
++		const { previousBase, previousInfluences } = morphInfluenceData;
++
++		positionPrevious.assign( positionPrevious.mul( previousBase ) );
++
++		Loop( morphTargetsCount, ( { i } ) => {
++
++			const influence = previousInfluences.element( i ).toVar();
++
++			If( influence.notEqual( 0 ), () => {
++
++				positionPrevious.assign( positionPrevious.add( getMorph( {
++					bufferMap,
++					influence,
++					stride,
++					width,
++					depth: i,
++					offset: int( 0 )
++				} ) ) );
++
++			} );
++
++		} );
++
++	}
++
+ 	// Update
+ 
+ 	OnObjectUpdate( ( { object } ) => {
+@@ -290,6 +330,21 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+ 
+ 		}
+ 
++		const data = morphInfluenceData;
++
++		if ( data.previousInfluences !== undefined ) {
++
++			// the last draw's influences are this draw's previous ones; this draw's are kept for the next
++
++			data.previousBase.value = data.lastBase === null ? base.value : data.lastBase;
++			data.previousInfluences.array = data.lastInfluences === null ? object.morphTargetInfluences.slice() : data.lastInfluences;
++			data.previousInfluences.update();
++
++			data.lastBase = base.value;
++			data.lastInfluences = object.morphTargetInfluences.slice();
++
++		}
++
+ 	} );
+ 
+ }, 'void' );
