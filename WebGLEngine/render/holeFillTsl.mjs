@@ -23,7 +23,7 @@
 // LOOP, not unrolled -- the unrolled first draft put 81 copies of its body in each shader and compiled for most of a minute.
 "use strict";
 import { requireTsl } from "./temporalTsl.mjs";
-import { SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
+import { SIDE_BLEND, SIDE_PREV, SIDE_CUR, MAX_REACH } from "./holeFill.mjs";
 
 export const FILL_SIDES = Object.freeze(["depth", "derived", "blend", "prev", "cur"]);
 export const MAX_FILL_RADIUS = 8;
@@ -34,15 +34,17 @@ export const MAX_FILL_RADIUS = 8;
  * uniforms.t is the time the side mode samples at.
  */
 export function fillHolesNodes(TSL, splatTex, { w, h, radius = 4, prefer = "farther", side = "derived", nearerIsLess = true,
-                                               depthPrev = null, depthCur = null, t = 0.5 }) {
+                                               depthPrev = null, depthCur = null, t = 0.5, reach = null }) {
     requireTsl(TSL);
     if (!Number.isInteger(radius) || radius < 1 || radius > MAX_FILL_RADIUS)
         throw new Error(`render/holeFillTsl: radius must be a whole number of pixels from 1 to ${MAX_FILL_RADIUS} -- the search reads (2r + 1)^2 taps a pixel; got ${radius}`);
+    if (reach !== null && (!Number.isInteger(reach) || reach <= radius || reach > MAX_REACH))
+        throw new Error(`render/holeFillTsl: reach must be a whole number of pixels past the radius (${radius}), at most ${MAX_REACH} -- got ${reach}`);
     if (prefer !== "farther" && prefer !== "nearer") throw new Error(`render/holeFillTsl: prefer must be "farther" or "nearer" -- got ${JSON.stringify(prefer)}`);
     if (!FILL_SIDES.includes(side)) throw new Error(`render/holeFillTsl: side must be one of ${FILL_SIDES.join(", ")} -- got ${JSON.stringify(side)}`);
     if (side === "depth" && (!depthPrev || !depthCur))
         throw new Error('render/holeFillTsl: side "depth" needs depthPrev and depthCur -- it is render/temporalReject.mjs\'s disocclusion comparison, and there is nothing to compare without them');
-    const { Fn, Loop, float, int, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, select } = TSL;
+    const { Fn, Loop, If, float, int, vec4, ivec2, uniform, textureLoad, screenCoordinate, clamp, floor, select } = TSL;
     const u = { w: uniform(float(w)), h: uniform(float(h)), t: uniform(float(t)) };
     // "farther" is the LARGER depth where nearer is less; a build-time choice, as it is a constant of the call
     const farther = (a, b) => (nearerIsLess ? a.greaterThan(b) : a.lessThan(b));
@@ -57,8 +59,11 @@ export function fillHolesNodes(TSL, splatTex, { w, h, radius = 4, prefer = "fart
         // ONE loop over the (2r + 1)^2 taps, row-major -- dy outer, dx inner, the mirror's scan order -- rather than the
         // taps unrolled: the first draft unrolled them, compiled 81 copies of the body into every fill shader, and the gate
         // spent 48 s compiling (render/holeFillTsl-selfcheck.mjs's log)
-        const n = 2 * radius + 1;
-        Loop({ start: int(0), end: int(n * n), type: "int", condition: "<" }, ({ i }) => {
+        // v4769: ONLY A HOLE SEARCHES. A pixel the splat landed on returns its own texel whatever the search finds, so the search
+        // is skipped there -- the fill's cost follows the holes, a few percent of a frame, and not the frame. And a hole with
+        // nothing within the radius searches again out to `reach`, in the same order by the same rules (fillHolesCPU's)
+        const walk = (r, name) => Loop({ start: int(0), end: int((2 * r + 1) * (2 * r + 1)), type: "int", condition: "<", name }, (lp) => {
+            const i = lp[name], n = 2 * r + 1, radius = r;
             const iy = i.div(n), ix = i.sub(iy.mul(n));
             const dx = float(ix.sub(radius)), dy = float(iy.sub(radius));
             const xx = x.add(dx), yy = y.add(dy);
@@ -75,6 +80,8 @@ export function fillHolesNodes(TSL, splatTex, { w, h, radius = 4, prefer = "fart
             ovx.assign(select(takeO, k.x, ovx)); ovy.assign(select(takeO, k.y, ovy));
             oFound.assign(select(cand, float(1.0), oFound));
         });
+        If(isHole, () => { walk(radius, "i"); });
+        if (reach !== null) If(isHole.and(bFound.lessThan(0.5)), () => { walk(reach, "j"); });
         const filled = isHole.and(bFound.greaterThan(0.5));
         // the side, for a pixel that was filled; a landed pixel is SIDE_BLEND, as fillHolesCPU leaves it
         let sideV, abst;

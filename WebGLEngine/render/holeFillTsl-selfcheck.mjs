@@ -12,7 +12,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
-import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
+import { MAX_REACH, fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
 import { interpolateFrameCPU } from "./frameInterp.mjs";
 import * as HF from "./holeFillTsl.mjs";
 
@@ -27,6 +27,9 @@ console.log("\n1. WITHOUT A DEVICE: the refusals");
     const refuse = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
     const a = refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, radius: HF.MAX_FILL_RADIUS + 1 }));
     ok(`fillHolesNodes refuses a radius past its bound (above ${HF.MAX_FILL_RADIUS})`, /radius must be a whole number of pixels from 1/.test(a), a);
+    // v4769: a reach not past the radius, past MAX_REACH, or fractional
+    const rr = [refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, radius: 4, reach: 4 })), refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, reach: MAX_REACH + 1 })), refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, reach: 8.5 }))];
+    ok(`  ...and (v4769) a reach that is not past the radius, past ${MAX_REACH} or fractional`, rr.every((m) => /reach must be a whole number of pixels past the radius/.test(m)), rr.map((m) => m.slice(0, 50)).join(" | "));
     const b = refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, side: "depth" }));
     ok("  ...the depth side mode without the two depths, as fillHolesCPU refuses it", /side "depth" needs depthPrev and depthCur/.test(b), b);
     const c = refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, prefer: "closer" })), d = refuse(() => HF.fillHolesNodes(full, null, { w: 8, h: 8, side: "left" }));
@@ -36,7 +39,7 @@ console.log("\n1. WITHOUT A DEVICE: the refusals");
 // ---- section 2's fixtures: render/holeFillGPU-selfcheck.mjs's strip, and the wrapped occluder ----
 const W = 48, H = 48;
 function mkCase({ radius = 4, prefer = "farther", side = "derived", nearerIsLess = true, stripW = 4, occVec = 6, bgVec = 0,
-                  unreachable = false, prevStart = null, curStart = null } = {}) {
+                  unreachable = false, prevStart = null, curStart = null, reach = null } = {}) {
     const vec = new Float32Array(W * H * 2).fill(NaN), hole = new Uint8Array(W * H), zbuf = new Float32Array(W * H);
     const depthPrev = new Float32Array(W * H).fill(0.9), depthCur = new Float32Array(W * H).fill(0.9);
     const x0 = 20, x1 = x0 + stripW;
@@ -50,13 +53,17 @@ function mkCase({ radius = 4, prefer = "farther", side = "derived", nearerIsLess
     }
     if (unreachable) for (let y = 0; y < H; y++) for (let x = 4; x < 44; x++) {
         const i = y * W + x; hole[i] = 1; zbuf[i] = nearerIsLess ? Infinity : -Infinity; vec[i * 2] = NaN; vec[i * 2 + 1] = NaN; }
-    return { vec, hole, zbuf, w: W, h: H, radius, prefer, side, nearerIsLess, depthPrev, depthCur, t: 0.5 };
+    return { vec, hole, zbuf, w: W, h: H, radius, prefer, side, nearerIsLess, depthPrev, depthCur, t: 0.5, reach };
 }
 const CASES = {
     derived: mkCase({ side: "derived" }), depth: mkCase({ side: "depth" }), blend: mkCase({ side: "blend" }),
     prevSide: mkCase({ side: "prev" }), curSide: mkCase({ side: "cur" }), nearer: mkCase({ prefer: "nearer" }),
     radius2: mkCase({ radius: 2, stripW: 7 }), reversed: mkCase({ nearerIsLess: false }), unreachable: mkCase({ unreachable: true, radius: 3 }),
     depthTie: mkCase({ side: "depth", bgVec: 5, prevStart: 19, curStart: 20 }),
+    // v4769: a strip 14 wide at radius 3, whose middle only the reach fills -- derived and depth -- and holes 40 wide at radius 3
+    // and a reach of 16, whose middle nothing fills
+    reachStrip: mkCase({ stripW: 14, radius: 3, reach: 8, side: "derived" }), reachDepth: mkCase({ stripW: 14, radius: 3, reach: 8, side: "depth" }),
+    reachFar: mkCase({ unreachable: true, radius: 3, reach: 16 }),
     // v4678's nine-by-nine wrapped occluder, set in a 16 x 16 frame so its rows read back unpadded on WebGPU; the radius-4
     // window about the hole at (4, 4) is the same 9 x 9 it was
     wrapped: (() => {
@@ -104,6 +111,8 @@ const INTERP = {
     derivedBlock8: mkInterp({ fill: { radius: 4, side: "derived" } }),
     depthPerPixel: mkInterp({ Wf: 32, Hf: 32, block: 1, perPixel: true, fill: { radius: 3, side: "depth" } }),
     nearerQuarter: mkInterp({ fill: { radius: 4, side: "derived", prefer: "nearer" }, t: 0.25 }),
+    // v4769: the square moves 11 px, so its disocclusion is 5.5 wide -- past a radius of 2, inside a reach of 8
+    reachBlock8: mkInterp({ fill: { radius: 2, reach: 8, side: "derived" } }),
 };
 const cpuI = {};
 for (const [k, c] of Object.entries(INTERP)) cpuI[k] = interpolateFrameCPU(c);
@@ -117,14 +126,14 @@ else {
         for (let i = 0; i < c.w * c.h; i++) { const land = c.hole[i] ? 0 : 1;
             splat[i * 4] = land ? c.vec[i * 2] : 0; splat[i * 4 + 1] = land ? c.vec[i * 2 + 1] : 0; splat[i * 4 + 2] = land ? c.zbuf[i] : 0; splat[i * 4 + 3] = land; }
         const d4 = (d) => { const o = new Array(c.w * c.h * 4).fill(0); for (let i = 0; i < c.w * c.h; i++) o[i * 4] = d[i]; return o; };
-        payload[k] = { w: c.w, h: c.h, radius: c.radius, prefer: c.prefer, side: c.side, nearerIsLess: c.nearerIsLess, t: c.t, splat, dp: d4(c.depthPrev), dc: d4(c.depthCur) };
+        payload[k] = { w: c.w, h: c.h, radius: c.radius, prefer: c.prefer, side: c.side, nearerIsLess: c.nearerIsLess, t: c.t, splat, dp: d4(c.depthPrev), dc: d4(c.depthCur), reach: c.reach ?? null };
     }
     for (const [k, c] of Object.entries(INTERP)) {
         const field = [];
         for (let i = 0; i < c.bw * c.bh; i++) field.push(c.flow[i * 2], c.flow[i * 2 + 1], c.depthBlock[i], 1);
         const d4 = (d) => { if (!d) return null; const o = new Array(c.w * c.h * 4).fill(0); for (let i = 0; i < c.w * c.h; i++) o[i * 4] = d[i]; return o; };
         payloadI[k] = { w: c.w, h: c.h, block: c.block, bw: c.bw, bh: c.bh, t: c.t, prev: Array.from(c.prev), cur: Array.from(c.cur), field,
-                        fill: { radius: c.fill.radius, side: c.fill.side, prefer: c.fill.prefer || "farther" }, dp: d4(c.fill.depthPrev), dc: d4(c.fill.depthCur) };
+                        fill: { radius: c.fill.radius, side: c.fill.side, prefer: c.fill.prefer || "farther", reach: c.fill.reach ?? null }, dp: d4(c.fill.depthPrev), dc: d4(c.fill.depthCur) };
     }
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { payload, payloadI }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
@@ -141,7 +150,7 @@ else {
                 const o = { fill: {}, interp: {} };
                 for (const [k, p] of Object.entries(a.payload)) {
                     const sp = tex(p.splat, p.w, p.h), dp = tex(p.dp, p.w, p.h), dc = tex(p.dc, p.w, p.h);
-                    const n = HF.fillHolesNodes(T, sp, { w: p.w, h: p.h, radius: p.radius, prefer: p.prefer, side: p.side, nearerIsLess: p.nearerIsLess, t: p.t, depthPrev: dp, depthCur: dc });
+                    const n = HF.fillHolesNodes(T, sp, { w: p.w, h: p.h, radius: p.radius, prefer: p.prefer, side: p.side, nearerIsLess: p.nearerIsLess, t: p.t, depthPrev: dp, depthCur: dc, reach: p.reach });
                     const rt = new THREE.RenderTarget(p.w, p.h, { type: THREE.FloatType, depthBuffer: false });
                     await draw(n.fieldNode, rt); const field = Array.from(await renderer.readRenderTargetPixelsAsync(rt, 0, 0, p.w, p.h));
                     await draw(n.sideNode, rt); const side = Array.from(await renderer.readRenderTargetPixelsAsync(rt, 0, 0, p.w, p.h));
@@ -194,6 +203,13 @@ else {
            byK.derived.x.abstained === 0 && byK.radius2.x.abstained > 0 && byK.radius2.x.abstained < byK.radius2.x.filled && sides("depthTie").has(SIDE_PREV) && sides("depthTie").has(SIDE_CUR)
            && Array.from(cpu.nearer.vec).some((v, i) => v !== cpu.derived.vec[i] && !Number.isNaN(v)) && byK.unreachable.x.hole.some((v) => v === 1),
            "each is a population a sabotage needs in order to be seen");
+        {   // v4769: the reach -- what it fills, what it leaves, and that it leaves what the radius filled alone
+            const plain = fillHolesCPU({ ...CASES.reachStrip, reach: null }), R = byK.reachStrip.x, F = byK.reachFar.x;
+            let same = true; for (let i = 0; i < W * H; i++) if (!plain.hole[i] && (plain.vec[i * 2] !== R.vec[i * 2] || plain.side[i] !== R.side[i])) same = false;
+            ok(`  [${mode}] ...and v4769's reach is among them where it matters: the 14-wide strip filled at ${R.filled} pixels with it, ${plain.filled} without -- ${R.reached} by the reach -- and every pixel the radius filled alone the same; 40-wide holes leave ${F.hole.reduce((q, v) => q + v, 0)} with a reach of 16`,
+               R.reached > 0 && R.filled > plain.filled && same && byK.reachDepth.x.reached > 0 && F.reached > 0 && F.hole.some((v) => v === 1),
+               "a hole the radius fills never sees the reach; one it does not searches out to the reach in the same order by the same rules");
+        }
     }
     console.log("\n3. ON THE DEVICE: splat, fill and warp together, against interpolateFrameCPU({ fill })");
     if (r.ok && r.result) for (const mode of ["webgpu", "webgl2"]) {

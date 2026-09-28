@@ -94,7 +94,7 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
     const vecT = new THREE.RenderTarget(w, h, { type: THREE.FloatType, depthTexture, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     const fillN = fill ? fillHolesNodes(TSL, vecT.texture, { w, h, nearerIsLess, t, radius: fill.radius === undefined ? 4 : fill.radius,
-        prefer: fill.prefer || "farther", side: fill.side || "derived", depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null }) : null;
+        prefer: fill.prefer || "farther", side: fill.side || "derived", depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null, reach: fill.reach ?? null }) : null;
     if (fillN) fillN.uniforms.t = u.t;   // one time for the splat, the fill's side test and the warp
     const filledT = fill ? flat() : null, sideT = fill ? flat() : null;
     const field = fill ? filledT : vecT;
@@ -102,7 +102,7 @@ export function makeFrameInterp(THREE, TSL, { w, h, block, indexedBy, nearerIsLe
     // landed pixel samples `prev` at, and the same fill over it; `field` then holds the offset it samples `cur` at
     const depthTexture2 = arc ? new THREE.DepthTexture(w, h) : null; if (arc) depthTexture2.type = THREE.FloatType;
     const vecT2 = arc ? new THREE.RenderTarget(w, h, { type: THREE.FloatType, depthTexture: depthTexture2, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }) : null;
-    const fillN2 = arc && fill ? fillHolesNodes(TSL, vecT2.texture, { w, h, nearerIsLess, t, radius: fill.radius === undefined ? 4 : fill.radius, prefer: fill.prefer || "farther", side: "blend" }) : null;
+    const fillN2 = arc && fill ? fillHolesNodes(TSL, vecT2.texture, { w, h, nearerIsLess, t, radius: fill.radius === undefined ? 4 : fill.radius, prefer: fill.prefer || "farther", side: "blend", reach: fill.reach ?? null }) : null;
     const filledT2 = fillN2 ? flat() : null;
     const field2 = arc ? (fill ? filledT2 : vecT2) : null;
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);

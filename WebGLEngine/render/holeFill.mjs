@@ -71,6 +71,9 @@ function depthAt(d, w, h, x, y) {
     return d[yc * w + xc];
 }
 
+/** v4769: the farthest a hole searches -- (2 * 16 + 1)^2 taps, paid only where nothing is within the radius */
+export const MAX_REACH = 16;
+
 export const SIDE_BLEND = 0;   // the symmetric (1-t)*prev + t*cur
 export const SIDE_PREV = 1;    // prev alone -- the hole is about to be covered
 export const SIDE_CUR = 2;     // cur alone -- the hole has been uncovered
@@ -89,18 +92,26 @@ export const SIDE_CUR = 2;     // cur alone -- the hole has been uncovered
  *   depthPrev, depthCur   w*h each, REQUIRED by side "depth" -- the two frames' own depth buffers
  *   t        where the generated frame sits, needed by side "depth" to know where to sample
  *
- * Returns { vec, hole, zbuf, side, filled, abstained }, all fresh:
+ *   reach    (v4769) null, or a whole number of pixels past `radius`, at most MAX_REACH: a hole with nothing within `radius`
+ *            searches again out to `reach`. A hole the radius fills is filled exactly as without it.
+ *
+ * Returns { vec, hole, zbuf, side, filled, abstained, reached }, all fresh:
  *   side       w*h Int8Array of SIDE_* codes; SIDE_BLEND outside the holes, so a consumer needs no second mask
  *   filled     how many pixels gained a vector
+ *   reached    (v4769) how many of them the radius did not reach and the reach did
  *   abstained  how many of those the derived side rule could not decide, and handed to the blend. It is the
  *              instrument: a rule that decided everything and a rule that decided nothing both produce a
  *              frame, and on this content the abstentions are the entire gap to a perfect answer.
  */
 export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neighbourhood",
                                prefer = "farther", side = "derived", nearerIsLess = true,
-                               depthPrev = null, depthCur = null, t = 0.5 }) {
+                               depthPrev = null, depthCur = null, t = 0.5, reach = null }) {
     if (!(radius >= 1) || radius !== Math.floor(radius))
         throw new Error(`fillHolesCPU: radius must be a whole number of pixels, at least 1 -- got ${radius}`);
+    // v4769: `reach` -- a hole with nothing within `radius` searches again out to `reach`; every hole `radius` fills is filled as it was
+    if (reach !== null && (!(reach > radius) || reach !== Math.floor(reach) || reach > MAX_REACH))
+        throw new Error(`fillHolesCPU: reach must be a whole number of pixels past the radius (${radius}), at most ${MAX_REACH} -- got ${reach}`);
+    if (reach !== null && growth !== "neighbourhood") throw new Error('fillHolesCPU: reach is the "neighbourhood" growth\'s -- a ring grows a pixel a pass, and its radius is already its reach');
     if (growth !== "neighbourhood" && growth !== "ring")
         throw new Error(`fillHolesCPU: growth must be "neighbourhood" or "ring" -- got ${JSON.stringify(growth)}`);
     if (prefer !== "farther" && prefer !== "nearer")
@@ -123,7 +134,7 @@ export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neig
     // "farther" wants the LARGER depth where nearer is less, and the smaller where it is more
     const farther = (a, b) => (nearerIsLess ? a > b : a < b);
     const wants = prefer === "farther" ? farther : (a, b) => farther(b, a);
-    let filled = 0, abstained = 0;
+    let filled = 0, abstained = 0, reached = 0;
 
     if (growth === "ring") {
         // *** THE SNAPSHOT IS WHAT MAKES A PASS A RING RATHER THAN A SCAN. *** Filling in place would let a
@@ -160,9 +171,12 @@ export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neig
             if (!was[j]) continue;
             let bj = -1, bz = 0;                       // the chosen (by `prefer`) vector's source
             let oj = -1, oz = 0, od = Infinity;        // the NEAREST-depth source: the occluder, for the side
-            for (let dy = -radius; dy <= radius; dy++) {
+            // v4769: the radius first, and only where it found nothing the reach -- the same scan, the same rules, a wider window
+            for (const r of reach === null ? [radius] : [radius, reach]) {
+            if (bj >= 0) break;
+            for (let dy = -r; dy <= r; dy++) {
                 const yy = y + dy; if (yy < 0 || yy >= h) continue;
-                for (let dx = -radius; dx <= radius; dx++) {
+                for (let dx = -r; dx <= r; dx++) {
                     const xx = x + dx; if (xx < 0 || xx >= w) continue;
                     const k = yy * w + xx; if (was[k]) continue;
                     if (bj < 0 || wants(Z[k], bz)) { bj = k; bz = Z[k]; }
@@ -172,9 +186,11 @@ export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neig
                     if (oj < 0 || farther(oz, Z[k]) || (Z[k] === oz && d2 < od)) { oj = k; oz = Z[k]; od = d2; }
                 }
             }
-            if (bj < 0) continue;                      // nothing within the radius; stays a hole
+            }
+            if (bj < 0) continue;                      // nothing within the radius (or the reach); stays a hole
             V[j * 2] = V[bj * 2]; V[j * 2 + 1] = V[bj * 2 + 1];
             Z[j] = bz; H[j] = 0; filled++;
+            if (reach !== null && Math.max(Math.abs(bj % w - x), Math.abs(((bj - bj % w) / w) - y)) > radius) reached++;
             if (side === "blend") { S[j] = SIDE_BLEND; continue; }
             if (side === "prev") { S[j] = SIDE_PREV; continue; }
             if (side === "cur") { S[j] = SIDE_CUR; continue; }
@@ -202,5 +218,5 @@ export function fillHolesCPU({ vec, hole, zbuf, w, h, radius = 4, growth = "neig
             else { S[j] = SIDE_BLEND; abstained++; }   // no signed answer -- see the header
         }
     }
-    return { vec: V, hole: H, zbuf: Z, side: S, filled, abstained };
+    return { vec: V, hole: H, zbuf: Z, side: S, filled, abstained, reached };
 }

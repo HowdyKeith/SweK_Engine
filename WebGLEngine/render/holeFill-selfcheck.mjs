@@ -369,6 +369,10 @@ console.log("\n9. WHAT IT REFUSES");
         ["a side it does not implement", { side: "both" }, /side must be/],
         ["*** a missing zbuf, rather than falling back to the scan order ***", { zbuf: null }, /zbuf must be w\*h/],
         ["a short vec", { vec: new Float32Array(W * H) }, /vec must be w\*h\*2/],
+        // v4769: the reach is a whole number of pixels past the radius, at most 16, and the neighbourhood growth's alone
+        ["a reach not past the radius", { radius: 4, reach: 4 }, /reach must be a whole number of pixels past the radius/],
+        ["a reach past 16", { reach: 17 }, /reach must be a whole number of pixels past the radius/],
+        ["a reach with the ring growth, whose radius is already its reach", { growth: "ring", reach: 8 }, /reach is the "neighbourhood" growth/],
     ]) {
         const m = threw(() => fillHolesCPU({ ...base(), ...patch }));
         ok(`${label} is refused`, pat.test(m || ""), m);

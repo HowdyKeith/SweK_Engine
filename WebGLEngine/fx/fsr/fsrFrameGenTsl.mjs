@@ -102,6 +102,16 @@
 // blend that is half right, and on a self-occluding surface both frames are partly right. So the default never commits;
 // `fill: { side: "depth" }` is there for content that translates. The fill itself is not optional in practice: holes left
 // at zero put the frame BELOW a plain cross-fade (fx/fsr/fsrFrameGen-selfcheck.mjs).
+//
+// *** AND A HOLE THE RADIUS DOES NOT REACH IS NOT LEFT AT ZERO: THE DEFAULT REACHES 16 (v4769). *** Under a pan, content comes in
+// at the frame's edge and a wall moving against a knot opens a gap behind it half the relative motion wide; past 4 px the fill
+// found nothing and the pixel stayed black -- 1,721 of 16,384 under a 24 px pan. That was what v4758 measured as the flow LOSING
+// to the vectors on a scrolling wall (28.25 dB against 36.98): the flow's vectors were the wall's true motion, and the gap
+// they opened was left black (fx/fsr/fsrFrameGenReach-selfcheck.mjs). render/holeFill.mjs's `reach` searches again only where the
+// radius found nothing, so every hole the radius fills is filled as it was: of the 21 gates that generate a frame, 18 read to
+// the bit what they read before, and the three that moved all rose -- fx/fsr/fsrFlowStill-selfcheck.mjs's belts 16.7 and 8.6 dB
+// over the frame, fx/fsr/fsrFlowSeed-selfcheck.mjs's fast pans 2.2 to 7.4. A radius of 8 in its place changed every hole and
+// lost where the radius already did well (a shadow's changed pixels -1.6 dB). `fill: { radius: 4, side: "blend" }` is v4768's.
 "use strict";
 import { makeFrameInterp, flowFromMotionNode } from "../../render/frameInterpTsl.mjs";
 import { makeOpticalFlow } from "../../render/opticalFlowTsl.mjs";
@@ -117,8 +127,9 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * render/flowReconcileTsl.mjs, {} for their defaults, null for the vectors alone. The grid here is "level" unless given --
  * each level of the flow's pyramid its own block grid (v4753), 46 % of the search's reads and no worse a frame on any case
  * fx/fsr/fsrFlowGrid-selfcheck.mjs measures; { grid: "block" } is the search as it was to v4752. { seed: true } (v4758) seeds the
- * flow's coarsest level with the motion field given to generate -- +0.47 dB on a reflection under a 44 px pan and -0.24 to -0.63
- * on a scrolling wall under 27 and 40, so not the default (fx/fsr/fsrFlowSeed-selfcheck.mjs). { stillGuess: true } (v4759) guesses
+ * flow's coarsest level with the motion field given to generate -- v4758 read +0.47 dB on a reflection under a 44 px pan and -0.24 to
+ * -0.63 on a scrolling wall under 27 and 40; with v4769's reach filling what those pans left black, +1.61, +0.27 and +3.58. Not the
+ * default: no round has measured it as one across the flow's gates (fx/fsr/fsrFlowSeed-selfcheck.mjs). { stillGuess: true } (v4759) guesses
  * standing still below the flow's coarsest level -- nothing in a generated frame measured here (fx/fsr/fsrFlowStill-selfcheck.mjs).
  * { retryRadius: 8 } (v4768) searches again, 8 px about its guess, at the flow's blocks below the coarsest that the window did not
  * explain: a textured square moving 16 px a frame over a still wall, which the flow loses, +12.06 dB on its pixels and +3.81 over the
@@ -135,7 +146,7 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * `over` (v4765), given to generate, is a function of (t, the generated frame) returning a w x h texture that replaces it before
  * `ui` is laid over -- render/translucentLayer.mjs's renderOver, for what reads the frame behind it.
  */
-export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, side: "blend" }, flow = null, arc = false } = {}) {
+export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, reach: 16, side: "blend" }, flow = null, arc = false } = {}) {
     if (arc && flow) throw new Error("fx/fsr/fsrFrameGenTsl: arc and flow are not combined -- the flow's vectors are chords, and a pixel the flow took has no displacement to time t");
     const flat = () => new THREE.RenderTarget(w, h, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     // depthOld: the newest depth seen, kept for the NEXT pair; depthPair: the older depth of the pair being generated, which
@@ -167,6 +178,8 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     let generated = 0;
     return {
         interp: fi, targets, uniforms: fi.uniforms, opticalFlow: of, reconcile: rec, arc,
+        /** v4769: the fill this generator was built with, as given or defaulted -- null for none */
+        fill: fill ? { radius: fill.radius ?? 4, reach: fill.reach ?? null, side: fill.side ?? "derived", prefer: fill.prefer ?? "farther" } : null,
         /** v4767: the generated frame's own depth at t -- .z the clip depth of what landed at each pixel, .w whether anything did:
          *  render/translucentLayer.mjs's `depth`, one quad where the opaque scene's depth pass is a geometry pass. Valid within a generate. */
         get depthAt() { return (fill ? fi.targets.filled : fi.targets.vec).texture; },

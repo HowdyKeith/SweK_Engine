@@ -228,7 +228,7 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
         if (toT) {
             const r2 = fillHolesCPU({ vec: vecPrev, hole: hole.slice(), zbuf: zbuf.slice(), w, h, nearerIsLess,
                                       radius: fill.radius === undefined ? 4 : fill.radius, growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
-                                      prefer: fill.prefer === undefined ? "farther" : fill.prefer, side: "blend", t });
+                                      prefer: fill.prefer === undefined ? "farther" : fill.prefer, side: "blend", t, reach: fill.reach ?? null });
             vecPrev.set(r2.vec);
         }
         const r = fillHolesCPU({ vec, hole, zbuf, w, h, nearerIsLess,
@@ -236,7 +236,7 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
                                  growth: fill.growth === undefined ? "neighbourhood" : fill.growth,
                                  prefer: fill.prefer === undefined ? "farther" : fill.prefer,
                                  side: fill.side === undefined ? "derived" : fill.side,
-                                 depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null, t });
+                                 depthPrev: fill.depthPrev || null, depthCur: fill.depthCur || null, t, reach: fill.reach ?? null });
         vec.set(r.vec); hole.set(r.hole); zbuf.set(r.zbuf);
         side = r.side; filledCount = r.filled; abstained = r.abstained;
     }

@@ -10,7 +10,11 @@
 //   reflection 44    the knot over a reflecting floor, the camera panning 0.9 a frame
 //   slow             the wall at the pan fx/fsr/fsrFrameGenFlow-selfcheck.mjs runs, 2 px -- where a seed has nothing to bring
 // three arms: the vectors alone, the flow as it is (flow: {}), and seeded (flow: { seed: true }); the camera's motion given.
-// *** THE SEED FINDS THE SHIFTS AND THE FRAMES DO NOT FOLLOW, SO IT IS NOT THE DEFAULT. ***
+// *** v4758 MEASURED THE SEED COSTING ON THE SCROLLING WALL, AND THE COST WAS THE FILL'S. *** Under pans this fast the generated
+// frame had pixels the fill's radius of 4 did not reach, left black: v4758 read -0.24 dB at 27 px and -0.63 at 40, and kept the
+// seed an option. v4769 gave the generator's fill a reach of 16 (fx/fsr/fsrFrameGenReach-selfcheck.mjs), and with the holes
+// filled the seed pays on all three fast pans. It is still not the default: the default is a measurement across every gate
+// that generates with the flow, which v4768 took for the retry and no round has taken for the seed.
 // *** WEBGPU ONLY. ***
 "use strict";
 import path from "node:path";
@@ -89,9 +93,9 @@ else {
         for (const cn of CASES) say(`${cn.padEnd(12)} vectors up to ${o[cn].maxVectorPx.toFixed(1)} px: the vectors ${f(o[cn].vectors)} dB, the flow ${f(o[cn].flow)}, seeded ${f(o[cn].seeded)} (${d(o[cn].seeded, o[cn].flow)})`);
         ok(`  [webgpu] the seed is asked for and nothing else changes it: ${JSON.stringify(o.seedFlags).replace(/"/g, "")} -- and at 2 px, where it has nothing to bring, the frame is the unseeded one's to ${Math.abs(o.slow.seeded - o.slow.flow).toExponential(1)} dB`,
            o.seedFlags.flow === false && o.seedFlags.seeded === true && Math.abs(o.slow.seeded - o.slow.flow) < 0.01, "a vector of 2 px is 0 or 1 at the coarsest level, a quarter of the size, and the search around it finds what it found around zero");
-        ok(`*** [webgpu] where the pan is fastest the seed pays on a reflection -- ${d(o.reflection44.seeded, o.reflection44.flow)} dB at ${o.reflection44.maxVectorPx.toFixed(0)} px -- and COSTS on the scrolling wall, ${d(o.scroll27.seeded, o.scroll27.flow)} at ${o.scroll27.maxVectorPx.toFixed(0)} px and ${d(o.scroll40.seeded, o.scroll40.flow)} at ${o.scroll40.maxVectorPx.toFixed(0)} ***`,
-           o.reflection44.seeded - o.reflection44.flow >= 0.2 && o.scroll27.seeded < o.scroll27.flow && o.scroll40.seeded < o.scroll40.flow,
-           "so `flow: { seed: true }` is there and is not the default: on the mirror it finds the shifts the pyramid cannot reach, and in these frames that is not what decides them -- what does was not measured here");
+        ok(`*** [webgpu] where the pan is fastest the seed pays -- on a reflection ${d(o.reflection44.seeded, o.reflection44.flow)} dB at ${o.reflection44.maxVectorPx.toFixed(0)} px, and on the scrolling wall ${d(o.scroll27.seeded, o.scroll27.flow)} at ${o.scroll27.maxVectorPx.toFixed(0)} px and ${d(o.scroll40.seeded, o.scroll40.flow)} at ${o.scroll40.maxVectorPx.toFixed(0)}, where v4758 read -0.24 and -0.63 ***`,
+           o.reflection44.seeded - o.reflection44.flow >= 0.5 && o.scroll27.seeded - o.scroll27.flow >= 0.1 && o.scroll40.seeded - o.scroll40.flow >= 1,
+           "v4758's cost on the wall was the pixels the fill left black under these pans; the generator's fill reaches 16 since v4769 and they are filled. At 40 px the unseeded flow is below the vectors alone -- the pyramid does not reach it -- and the seed brings the shift in. `flow: { seed: true }` is still an option: no round has measured it as the default across the flow's gates");
     }
 }
 
@@ -112,7 +116,8 @@ else {
 // first flow() -- after that call had set the seed on the nodes that existed, which were none. They are made with the
 // seed of the call that builds them now (T8 is the regression).
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: WHY the flow LOSES to the vectors at a 13 px pan with the texture scrolling -- 27.61 dB against 31.36, found " +
-    "while measuring this -- and on a wall whose texture is stretched to 40 units wide, 28.25 against 36.98 at 2 px, on either block " +
-    "grid: a low, anisotropic texture where the aperture problem lets a wrong shift explain the 3 x 3 window better. A later round's.");
+console.log("unchecked here: the seed as the generator's default, across every gate that generates with the flow -- v4768's measurement " +
+    "for the retry, not yet taken for the seed. v4758 left open why the flow LOST to the vectors on a pan over a scrolling wall stretched " +
+    "40 units wide, 28.25 dB against 36.98, guessing at the aperture problem; v4769 measured the flow's vectors RIGHT there and the loss " +
+    "the gap they opened left black (fx/fsr/fsrFrameGenReach-selfcheck.mjs).");
 process.exitCode = fails ? 1 : 0;
