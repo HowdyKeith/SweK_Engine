@@ -578,8 +578,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4766 -- 1849 -> 1850 for tools/ship/fsrThreeWorld-selfcheck.mjs -- the demo page showing what the recent rounds took, wired and presented.
     // v4767 -- 1850 -> 1851 for fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs -- what the translucent layer costs, and one quad in place of a geometry pass.
     // v4768 -- 1851 -> 1852 for fx/fsr/fsrFlowRetry-selfcheck.mjs -- the flow's blocks the window did not explain, searched again wider.
-    gates: 1852, usesOk: 1831, definesOk: 1823, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1724, condFirst: 91, unknownSignature: 16,
+    // v4769 -- 1852 -> 1853 for fx/fsr/fsrFrameGenReach-selfcheck.mjs -- where the flow lost to the vectors on pans: holes left black, and a fill that reaches 16.
+    gates: 1853, usesOk: 1832, definesOk: 1824, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1725, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

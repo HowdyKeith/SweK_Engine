@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4769 -- THE 376th CLOSING: where the flow lost to the vectors on pans -- holes left black, and a fill that reaches 16.
+    since451: Object.freeze({
+        at: "v4769", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFrameGenReach-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/holeFillTsl-selfcheck.mjs (the reach on three fixtures and a whole interpolation, both backends)", "render/holeFill-selfcheck.mjs (the reach's refusals)", "fx/fsr/fsrFlowSeed-selfcheck.mjs (its verdict re-measured with the holes filled)"]),
+        verdict: "*** v4758's LOSS WAS NOT THE APERTURE PROBLEM: THE FLOW WAS RIGHT, AND THE GAP IT OPENED WAS LEFT BLACK. *** On a wall " +
+                 "scrolling 8.4 px under a 1.2 px pan, four in five of the pixels the flow took carry the wall's true motion; moving the " +
+                 "wall 8 px against the knot opened a gap past the fill's radius of 4, and 81 pixels stayed black. The fill's `reach` " +
+                 "searches again only where the radius found nothing, so every hole it filled is filled as it was -- 18 of the 21 " +
+                 "generator gates read to the bit what they read -- and the default reaches 16: the flow's frame there 28.25 dB to " +
+                 "36.15, the 12 px pans +3.3 and +3.6 over the vectors, a 24 px pan's vectors +5.5, v4759's belts +16.7 over the frame. " +
+                 "v4758's seed, kept an option for costing on that wall, pays there now. A radius of 8 instead lost where 4 already " +
+                 "did well. The fill searches only at holes now: 3.6 ms with none against 51.7 with all. Fifteen sabotages, all red.",
+    }),
     // v4768 -- THE 375th CLOSING: the flow's blocks the window did not explain, searched again wider.
     since450: Object.freeze({
         at: "v4768", swept: 1, green: 1, red: 0,

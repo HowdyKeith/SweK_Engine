@@ -149,6 +149,19 @@ if (!skip) {
     }
 }
 
+// ---- v4769 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against render/holeFill.mjs, in render/holeFill-selfcheck.mjs and render/holeFillTsl-selfcheck.mjs (the parity rows, both
+// backends): H1 the reach never searched -> 0, 6; H2 the reach searched where the radius found -> 0, 2; H3 a reach not past the
+// radius not refused -> 1, 0; H4 the reached ones not counted -> 0, 2. *** H2 WAS SEEN BY ONE FIXTURE, THE WHOLE INTERPOLATION. ***
+// The 14-wide strip's pixels near one side are more than 8 px from the other, so a reach of 8 searched again there finds only
+// what the radius found; the moving square's disocclusion is narrow enough for both sides to be in reach.
+// Against render/holeFillTsl.mjs, in render/holeFillTsl-selfcheck.mjs and here: T1 every pixel searches -> 0, 1 -- the fill is
+// the same to the bit, and only this gate's time sees it (57.9 ms with no holes against 52.8 with all); T2 the reach never
+// walked -> 6, 2; T3 the reach walked where the radius found -> 2, 2; T4 the reach walked at the radius -> 6, 2; T5 the reach
+// not refused -> 1, 0. Against render/frameInterp.mjs: F1 the reach dropped -> 2 (render/holeFillTsl-selfcheck.mjs). Against
+// render/frameInterpTsl.mjs: F2 the reach dropped -> 2, 2. Against fx/fsr/fsrFrameGenTsl.mjs, here and in
+// fx/fsr/fsrFlowSeed-selfcheck.mjs: G1 the default reaching nothing -> 3, 1; G2 the default reaching 8 -> 3, 1 -- at 8 the
+// seed's gain on the scrolling wall is -0.02 and -0.08 dB, which is part of why the default is 16.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: what a reached hole is filled WITH -- the farthest vector within 16 px and the blend of both frames, which is " +
     "the radius's rule carried further and not a measured choice for gaps this wide; content entering at the frame's edge, which " +
