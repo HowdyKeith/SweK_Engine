@@ -589,3 +589,24 @@ export const COMMIT_BELT_DRIFT_V4621 = Object.freeze({
     bodiesNow: 20,
     notClaimed: COMMIT_BELT_DRIFT_V4535.notClaimed,
 });
+
+// *** v4776 -- three MOVED AGAIN, AND THE COMMIT THAT MOVED IT COULD NOT HAVE RECORDED ITSELF. ***
+// ce276dff re-vendored vendor/three from r160 to 0.185.1 and re-baked orrery.json in the same commit, so its belt
+// in orrery.json already carried the new hash while this record, written at v4621, still ended at b5fccadb. It is
+// the case COMMIT_BELT_DRIFT_V4621's own entry for b5fccadb names -- a real vendoring commit, a sixth commit on the
+// body -- and orreryFleet-selfcheck was red on it from 2026-09-14 on every full clone, unseen because the gate is
+// over the ship-time budget. The v4621 record is not rewritten: it is a claim about v4621 and stays true about it.
+export const COMMIT_BELT_DRIFT_V4776 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4621,
+    at: "v4776",
+    movedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4621.movedSince4475,
+        three: Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4621.movedSince4475.three.recorded,
+            now: Object.freeze(["ce276dff", ...COMMIT_BELT_DRIFT_V4621.movedSince4475.three.now]),
+            why: "\"Re-vendor vendor/three from r160 to 0.185.1\" (ce276dff) replaced the build and every vendored " +
+                 "jsm file from npm's three@0.185.1 tarball and added three.core.js and SkeletonUtils.js -- the " +
+                 "same kind of move as b5fccadb, so the body picks up a sixth commit",
+        }),
+    }),
+});
