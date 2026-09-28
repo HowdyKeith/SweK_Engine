@@ -111,7 +111,7 @@ else {
 // copies nothing left the WebGL2 page unable to build, which hid the rows -- not counted); C12 the centre not the positionNode
 // -> 4. Twelve, none green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a sprite turned by rotationNode (refused); a scaleNode or positionNode that CHANGES with no previous " +
-    "one given, which the stage takes to stand still and cannot tell from one that does; sized points (a PointsNodeMaterial on " +
-    "a Sprite), whose size is in pixels; and a positionNode over skinning or morphs, which the application must give whole.");
+console.log("unchecked here: a scaleNode or positionNode that CHANGES with no previous one given, which the stage takes to stand still " +
+    "and cannot tell from one that does. A sprite turned by rotationNode, sized points (a PointsNodeMaterial on a Sprite) and a " +
+    "positionNode over skinning or morphs given as a function of the point the stage keeps are render/temporalTslNodes-selfcheck.mjs's since v4770.");
 process.exitCode = fails ? 1 : 0;

@@ -159,9 +159,9 @@ else {
             // what the stage cannot follow, refused by the object's name
             const refused = async (build) => { const sc = new THREE.Scene(), st = TT.makeMotionStage(THREE, T, { w: D, h: D, gl }), after = build(sc);
                 try { await st.render(renderer, sc, cam); if (after) { after(); await st.render(renderer, sc, cam); } return "drawn"; } catch (e) { return String(e.message); } finally { st.dispose(); } };
+            // v4770: a sprite drawn with a points material and one turned by rotationNode were refused here; both are followed now
+            // (render/temporalTslNodes-selfcheck.mjs), and what is left is the batch that outgrew its matrices texture
             o.refusals = {
-                points: await refused((sc) => { const s = new THREE.Sprite(new THREE.PointsNodeMaterial({ color: 0xffffff })); s.name = "dots"; sc.add(s); }),
-                turned: await refused((sc) => { const m = new THREE.SpriteNodeMaterial(); m.rotationNode = T.float(0.3); const s = new THREE.Sprite(m); s.name = "turned"; sc.add(s); }),
                 grown: await refused((sc) => { const b = new THREE.BatchedMesh(4, 100, 300, mat()); b.name = "crowd"; b.addInstance(b.addGeometry(new THREE.BoxGeometry(0.3, 0.3, 0.3))); sc.add(b);
                     return () => { b.setInstanceCount(64); }; }),
             };
@@ -194,8 +194,8 @@ else {
             ok(`  [${mode}] Points, a pixel each: ${o.points.moving} of ${o.points.colour} drawn, ${e(o.points.w)} px`, same(o.points) && o.points.moving === o.points.colour && o.points.colour === 12);
         }
         const rf = r.result.webgpu.refusals, named = (k, ...w) => typeof rf[k] === "string" && w.every((x) => rf[k].includes(x));
-        ok(`what the stage cannot follow is refused by name: a sprite drawn with a points material, one turned by rotationNode, a BatchedMesh whose instances outgrew its matrices texture`,
-           named("points", '"dots"', "points material") && named("turned", '"turned"', "rotationNode") && named("grown", '"crowd"', "re-made its matrices texture"), rf.grown);
+        ok(`what the stage cannot follow is refused by name: a BatchedMesh whose instances outgrew its matrices texture (v4770 follows the points material and the rotationNode this row refused)`,
+           named("grown", '"crowd"', "re-made its matrices texture"), rf.grown);
     }
 }
 
@@ -210,8 +210,9 @@ else {
 // sprite drawn by three's vertex stage -> 2. Z20 the skin's per-draw buffer not filled -> 4; Z21 the bind matrices not per draw
 // -> 2 (red only since one mesh's bind matrix is not the identity); Z22 the morph's not filled -> 4. Z16 a points material,
 // Z17 rotationNode (a positionNode until v4762 took it), Z18 a re-made matrices texture not refused -> 1 each. Twenty-four, none green.
+// v4770 follows the points material and the rotation node Z16 and Z17 kept refused; their sabotages are render/temporalTslNodes-selfcheck.mjs's.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a sprite turned by rotationNode and sized points on a sprite -- refused; sprites placed and sized by " +
+console.log("unchecked here: a sprite turned by rotationNode and sized points on a sprite are render/temporalTslNodes-selfcheck.mjs's since v4770; sprites placed and sized by " +
     "nodes are render/temporalTslCompute-selfcheck.mjs's since v4762; a sprite's alpha test, which the stage's sprite " +
     "material does not carry; a BatchedMesh's per-instance visibility changing between frames; and geometry a BatchedMesh re-packs.");
 process.exitCode = fails ? 1 : 0;

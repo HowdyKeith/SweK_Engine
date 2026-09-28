@@ -158,7 +158,32 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // v4762: a sprite's centre is its material's positionNode where it has one -- a compute pass's particles -- and the origin
     // where not; the last centre is the material's userData.previousPositionNode, or the positionNode itself, standing still
     const centreNow = (builder) => (builder.material.positionNode ? vec4(TSL.vec3(builder.material.positionNode), 1.0) : vec4(0.0, 0.0, 0.0, 1.0));
-    const spriteClip = (builder) => cameraProjectionMatrix.mul(spriteCorner(builder, modelViewMatrix.mul(centreNow(builder)), TSL.modelWorldMatrix, TSL.float(TSL.materialRotation)));
+    // v4770: the rotation is the material's rotationNode where it has one -- three's SpriteNodeMaterial reads it in place of the
+    // rotation property -- and its last value the material's userData.previousRotationNode, or the node itself, standing still
+    const rotNow = (material) => (material.rotationNode ? TSL.float(material.rotationNode) : TSL.float(TSL.materialRotation));
+    const rotWas = (material) => { if (!material.rotationNode) return rotPrev;
+        const p = material.userData && material.userData.previousRotationNode, now = TSL.float(material.rotationNode);
+        return p ? (toward ? TSL.mix(TSL.float(p), now, towardU) : TSL.float(p)) : now; };
+    // v4770: *** A POINTS MATERIAL ON A SPRITE IS SIZED IN PIXELS, AND THREE PLACES IT OTHERWISE. *** PointsNodeMaterial's
+    // setupVertexSprite takes the centre through the camera and adds each corner in PIXELS about it: the size node (or the
+    // material's size) times the display's pixel ratio, attenuated by the centre's view depth where it attenuates, times the
+    // scale node, turned by the rotation node (never the rotation property), over half the viewport and times the clip w so the
+    // divide leaves it a pixel size. The stage places each corner so, now and at the last draw; the size is the one it has now
+    const sizeV = new THREE.Vector2(), halfH = TSL.uniform(1).onFrameUpdate(function ({ renderer }) { renderer.getSize(sizeV); this.value = 0.5 * sizeV.y; });
+    const pointCorner = (builder, mv, mvp, rot) => {
+        const m = builder.material; let ps = (m.sizeNode ? TSL.vec2(m.sizeNode) : TSL.materialPointSize).mul(TSL.screenDPR);
+        if (builder.camera && builder.camera.isPerspectiveCamera && m.sizeAttenuation === true) ps = ps.mul(halfH.div(mv.z.negate()));
+        if (m.scaleNode && m.scaleNode.isNode) ps = ps.mul(TSL.vec2(m.scaleNode));
+        let off = TSL.positionGeometry.xy; if (rot) off = TSL.rotate(off, rot);
+        off = off.mul(ps).div(TSL.viewportSize.div(2)).mul(mvp.w);
+        return mvp.add(vec4(off, 0.0, 0.0));
+    };
+    // a points material's centre is its positionNode, or the geometry's own point -- three's `positionNode || positionLocal`
+    const pointCentre = (material) => (material.positionNode ? vec4(TSL.vec3(material.positionNode), 1.0) : vec4(TSL.positionGeometry, 1.0));
+    const pointClip = (builder) => { const mv = modelViewMatrix.mul(pointCentre(builder.material));
+        return pointCorner(builder, mv, cameraProjectionMatrix.mul(mv), builder.material.rotationNode ? TSL.float(builder.material.rotationNode) : null); };
+    const spriteClip = (builder) => (builder.material.isPointsNodeMaterial ? pointClip(builder)
+        : cameraProjectionMatrix.mul(spriteCorner(builder, modelViewMatrix.mul(centreNow(builder)), TSL.modelWorldMatrix, rotNow(builder.material))));
     // v4762: *** A POSITION A NODE WRITES -- A COMPUTE PASS'S PARTICLES -- IS WHERE THE NODE SAYS, AND WAS WHERE THE APPLICATION
     // SAYS. *** three draws a material's positionNode as the local position and keeps no previous one: the stage had taken the
     // bare geometry as the last point, so a positionNode that displaces carried its whole displacement as motion (11.57 px on
@@ -167,7 +192,11 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // or, where none is given, the positionNode itself: a node taken to stand still. makePreviousCopy keeps a storage buffer's
     // last contents for it. Under toward, the last position at t is the line from it to the current one
     const towardU = TSL.uniform(0.0);
-    const previousOf = (material, now) => { const p = material && material.userData && material.userData.previousPositionNode;
+    // v4770: or a FUNCTION of the point as the stage keeps it -- the geometry through the previous instance matrix, skin and
+    // morph influences -- for a positionNode that displaces what three's instancing, skinning and morphing make: the application
+    // says how it displaced the point, and the stage has where the point was
+    const previousOf = (material, now, kept = null) => { let p = material && material.userData && material.userData.previousPositionNode;
+        if (typeof p === "function") p = p(kept || TSL.positionGeometry);
         return p ? (toward ? TSL.mix(p, now, towardU) : p) : now; };
     // v4757: a SkinnedMesh's previous bone matrices and a morphed mesh's previous influences, kept HERE as the instance matrices
     // are. three's skinning keeps its previous bone matrices only when the material asks for velocity and steps them once
@@ -286,8 +315,15 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             if (object && object.isSprite) {
                 // v4761: the corner as three's SpriteNodeMaterial places it, now and at the last draw
                 cur = TSL.varying(spriteClip(builder));
-                const pn = builder.material.positionNode, c0 = pn ? vec4(TSL.vec3(previousOf(builder.material, pn)), 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
-                was = TSL.varying(this.previousProjectionMatrix.mul(spriteCorner(builder, this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(c0), this.previousModelWorldMatrix, rotPrev)));
+                const mat = builder.material, pn = mat.positionNode;
+                if (mat.isPointsNodeMaterial) {
+                    // v4770: the centre where it was, the corner in pixels about it at the last draw's view depth and rotation
+                    const c0 = pn ? vec4(TSL.vec3(previousOf(mat, pn)), 1.0) : vec4(TSL.positionGeometry, 1.0), mv = this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(c0);
+                    was = TSL.varying(pointCorner(builder, mv, this.previousProjectionMatrix.mul(mv), mat.rotationNode ? rotWas(mat) : null));
+                } else {
+                    const c0 = pn ? vec4(TSL.vec3(previousOf(mat, pn)), 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+                    was = TSL.varying(this.previousProjectionMatrix.mul(spriteCorner(builder, this.previousCameraViewMatrix.mul(this.previousModelWorldMatrix).mul(c0), this.previousModelWorldMatrix, rotWas(mat))));
+                }
             }
             else if (object && object.isBatchedMesh) {
                 // v4761: the geometry through the instance's previous matrix, found as three finds the current one
@@ -298,9 +334,13 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
                 before = TSL.varying(M.mul(vec4(TSL.positionGeometry, 1.0))).xyz;
             }
             else if (object && builder.material.positionNode) {
-                // v4762: the override carries the object's positionNode; the last position is the application's, or the node's own
-                const own = Array.isArray(object.material) ? null : object.material;
-                before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode)));
+                // v4762: the override carries the object's positionNode; the last position is the application's, or the node's own.
+                // v4770: where the application's is a function, of the point the stage keeps -- instanced, skinned or morphed
+                const own = Array.isArray(object.material) ? null : object.material, fn = own && own.userData && typeof own.userData.previousPositionNode === "function";
+                let kept = null;
+                if (fn && object.isInstancedMesh) kept = instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
+                else if (fn && (object.isSkinnedMesh || hasMorph(object))) { let q = TSL.positionGeometry; if (hasMorph(object)) q = morphedBefore(object, q); if (object.isSkinnedMesh) q = skinnedBefore(object, q); kept = q; }
+                before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode, kept)));
             }
             else if (object && object.isInstancedMesh) before = TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
             else if (object && (object.isSkinnedMesh || hasMorph(object))) {
@@ -403,19 +443,27 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
     // v4762: a positionNode over instancing, skinning or morphs replaces the local position the stage's histories build -- only
     // the application can say where such a point was
     const placedOver = (o) => {
-        const m = o.material; if (!m || Array.isArray(m) || !m.positionNode || (m.userData && m.userData.previousPositionNode)) return;
+        const m = o.material; if (!m || Array.isArray(m) || !m.positionNode) return;
+        const p = m.userData && m.userData.previousPositionNode, name = o.name ? JSON.stringify(o.name) : "a " + o.type;
+        // v4770: a function of the kept point is the stage's to apply, and it keeps no point for a batch
+        if (typeof p === "function" && o.isBatchedMesh) throw new Error(`render/temporalTsl: ${name}'s material gives previousPositionNode as a function over a batch -- the stage keeps a batch's matrices, not its points; give the whole local position as it was`);
+        if (p) return;
         if (o.isInstancedMesh || o.isSkinnedMesh || o.isBatchedMesh || (o.morphTargetInfluences && o.morphTargetInfluences.length))
-            throw new Error(`render/temporalTsl: ${o.name ? JSON.stringify(o.name) : "a " + o.type}'s material sets positionNode over its ${o.isInstancedMesh ? "instances" : o.isSkinnedMesh ? "skin" : o.isBatchedMesh ? "batch" : "morphs"} -- give material.userData.previousPositionNode, the whole local position as it was`);
+            throw new Error(`render/temporalTsl: ${name}'s material sets positionNode over its ${o.isInstancedMesh ? "instances" : o.isSkinnedMesh ? "skin" : o.isBatchedMesh ? "batch" : "morphs"} -- give material.userData.previousPositionNode: the whole local position as it was, or (v4770) a function of the point as the stage keeps it`);
     };
     const spriteMaterial = (o) => {
         const src = o.material, name = o.name ? JSON.stringify(o.name) : "a Sprite";
-        if (!src || Array.isArray(src) || src.isPointsNodeMaterial || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
-            throw new Error(`render/temporalTsl: ${name}'s material is not a sprite's -- a points material on a sprite sizes it in pixels, which the stage does not follow`);
-        if (src.rotationNode) throw new Error(`render/temporalTsl: ${name}'s material sets rotationNode -- a sprite turned by a node has no last pose the stage can keep`);
+        if (!src || Array.isArray(src) || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
+            throw new Error(`render/temporalTsl: ${name}'s material is not a sprite's`);
+        // v4770: a points material (sized in pixels) and a rotation node are followed now -- see pointCorner and rotWas
         let m = spriteMats.get(src);
-        if (!m) { m = new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation }); m.fragmentNode = motionNode; m.blending = THREE.NoBlending;
+        if (!m) { m = src.isPointsNodeMaterial ? new THREE.PointsNodeMaterial({ sizeAttenuation: src.sizeAttenuation }) : new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation });
+            m.fragmentNode = motionNode; m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
             m.transparent = false; m.depthTest = true; m.depthWrite = true; m.allowOverride = false; m.vertexNode = motionNode.spriteVertex(); spriteMats.set(src, m); }
-        m.rotation = src.rotation; m.side = src.side; m.positionNode = src.positionNode || null; m.scaleNode = src.scaleNode || null; m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
+        m.rotation = src.rotation; m.side = src.side; m.positionNode = src.positionNode || null; m.scaleNode = src.scaleNode || null; m.rotationNode = src.rotationNode || null;
+        if (src.isPointsNodeMaterial) { m.size = src.size; m.sizeNode = src.sizeNode || null; }
+        m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
+        m.userData.previousRotationNode = (src.userData && src.userData.previousRotationNode) || null;
         return m;
     };
     let frames = 0;
