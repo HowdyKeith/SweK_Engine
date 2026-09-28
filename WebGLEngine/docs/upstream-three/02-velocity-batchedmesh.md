@@ -1,6 +1,6 @@
 # VelocityNode: a BatchedMesh's previous position never gets the instance's matrix
 
-**three.js r185** (`three.webgpu.js`), `WebGPURenderer` on WebGPU and with `forceWebGL: true` -- measured in headless Chromium
+**three.js r185, 0.185.1** (`three.webgpu.js`), `WebGPURenderer` on WebGPU and with `forceWebGL: true` -- measured in headless Chromium
 (SwiftShader). DRAFT, not posted.
 
 Reading three's `velocity` through MRT, one render per browser frame, for a `BatchedMesh` whose one instance moves 0.3 a frame
@@ -13,7 +13,7 @@ Save as an `.html` file and open it; it prints the numbers for both backends.
 <!-- repro:begin -->
 ```html
 <!doctype html><meta charset="utf-8"><title>repro</title>
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.webgpu.js", "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.tsl.js" } }</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.webgpu.js", "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.tsl.js" } }</script>
 <pre id="out">running...</pre>
 <script type="module">
 import * as THREE from "three"; import * as T from "three/tsl";

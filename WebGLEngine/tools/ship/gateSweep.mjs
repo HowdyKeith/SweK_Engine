@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4774 -- THE 381st CLOSING: NO new gate file -- the three.js patches through three's own build, lint and unit tests.
+    since456: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4774", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (the vendored build and the six patches held to hashes of three's own rollup builds; the drafts on 0.185.1)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE APPLIER MAKES WHAT THREE'S OWN BUILD MAKES, AND THE DRAFTS NAMED THE WRONG RELEASE. *** In a checkout of three's " +
+                 "r185 tag, npm run build is the vendored three.webgpu.js byte for byte. With the six patches applied by git apply it " +
+                 "is the gates' applied text but for the order of the names in its one import from three.core.js -- rollup lists them " +
+                 "by first use, and patch 02 uses three of them earlier. lint-core is clean; three's unit tests 1311, 1310 passed, 1 " +
+                 "todo, 0 failed, as for r185 unpatched -- and they touch none of the patched paths, which the README says. Both " +
+                 "builds' hashes are held, the patched one with that line's names sorted, so a changed patch reddens until three is " +
+                 "built again. Every draft's reproduction imported three 0.185.0 from the CDN; the vendored build, and every number, " +
+                 "is 0.185.1 -- they import 0.185.1 now. Five sabotages red.",
+    }),
     // v4773 -- THE 380th CLOSING: the three.js patches on the paths their drafts' reproductions skip.
     since455: Object.freeze({
         at: "v4773", swept: 1, green: 1, red: 0,

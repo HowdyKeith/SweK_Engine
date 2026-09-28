@@ -43,6 +43,17 @@ export function apply(diff, text) {
     return { text, found };
 }
 
+/**
+ * v4774: the build with its one import from three.core.js written in sorted order. three's rollup lists those names in the order
+ * the bundle first uses them, so a patch that uses one earlier moves it; the applier leaves the line as it was. With that line's
+ * names sorted, the applier's text and three's own build of the patched source are the same bytes (tools/ship/threeUpstream-
+ * selfcheck.mjs holds the hash of each).
+ */
+export function normalImports(text) {
+    return text.split("\n").map((l) => /^import \{ .* \} from '\.\/three\.core\.js';$/.test(l)
+        ? "import { " + l.slice("import { ".length, l.indexOf(" } from")).split(", ").sort().join(", ") + " } from './three.core.js';" : l).join("\n");
+}
+
 /** Each patch file's text, by its two-digit slot ("01" ...). */
 export function patchTexts(dir = PATCHES) {
     return Object.fromEntries((fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => /^\d\d-.*\.diff$/.test(f)).sort().map((f) => [f.slice(0, 2), fs.readFileSync(path.join(dir, f), "utf8")]));

@@ -18,7 +18,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { ENG, BUNDLE, apply, rootWithBuilds } from "./threePatch.mjs";
+import crypto from "node:crypto";
+import { ENG, BUNDLE, apply, normalImports, rootWithBuilds } from "./threePatch.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
@@ -75,7 +76,8 @@ const scripts = {};
 for (const f of files) {
     const html = between(text[f], "<!-- repro:begin -->\n```html\n", "```\n<!-- repro:end -->"), mod = html && between(html, '<script type="module">\n', "</script>");
     const importLine = 'import * as THREE from "three"; import * as T from "three/tsl";';
-    ok(`  ${f}: a standalone reproduction importing three r185 from the CDN, and nothing else`, !!mod && mod.startsWith(importLine) && html.includes("three@0.185.0/build/three.webgpu.js") && !/import\s/.test(mod.slice(importLine.length)));
+    ok(`  ${f}: a standalone reproduction importing three 0.185.1 (r185, the release vendored and measured here) from the CDN, and nothing else`,
+        !!mod && mod.startsWith(importLine) && html.includes("three@0.185.1/build/three.webgpu.js") && html.includes("three@0.185.1/build/three.tsl.js") && !/@0\.185\.0\//.test(html) && !/import\s/.test(mod.slice(importLine.length)));
     if (mod) scripts[f] = mod.slice(importLine.length).replace('document.getElementById("out").textContent = JSON.stringify(r, null, 1);', "");
 }
 
@@ -137,8 +139,19 @@ for (const [f, d] of Object.entries(DRAFTS)) {
     ok(`  ${d.patch}: a git diff of three's src/, ${a.found.length} hunk(s) that change the build, each found exactly once in it: [${a.found.join(", ")}]`,
         /^diff --git a\/src\//.test(diffs[f]) && a.found.length > 0 && a.found.every((n) => n === 1) && a.text !== bundle);
 }
+// v4774: WHAT THREE'S OWN TOOLS SAID, RECORDED. In a checkout of three's r185 tag (0.185.1), `npm ci` and `npm run build`: the
+// vendored build is three's rollup output byte for byte. With the six patches applied by `git apply`, `npm run build` again, and
+// the one line rollup orders by first use -- the names imported from three.core.js -- sorted: the same bytes as the six applied
+// here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed, 1 todo,
+// 0 failed, as for r185 unpatched. A patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", sixPatched: "f6ac74236c521b7e3fa4e07d57a01a0301acc6b61ca02748380dc4a4fb82ba88" });
+const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { let t = bundle, found = []; for (const f of Object.keys(DRAFTS)) { const a = apply(diffs[f], t); t = a.text; found = found.concat(a.found); }
-  ok(`  all six applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1)); }
+  ok(`  all six applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
+  ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
+      "recorded at v4774 from `npm run build` in a checkout of the tag");
+  ok(`*** all six applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
+      sha(normalImports(t)) === THREE_BUILT.sixPatched, "recorded at v4774 from `git apply` of the six and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];
@@ -168,9 +181,13 @@ if (!skip) { const was = results["stages r185"], r = results["stages patched"];
 // README is right: R1 is the case it is there for. Against the drafts: D1 a patched number edited by a thousandth -> 2; D2 a draft
 // not linking its patch -> 1; R1 the README's patched number edited -> 1; a seventh patch -> 1; v4763's U1-U3 re-run on the new
 // 04 -> 2, 14 (one reproduction's syntax error takes the shared page down, and section 1 names it), 2.
+// ---- v4774 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// V1 the recorded r185 hash off by one digit -> 1; V2 the recorded patched hash off by one digit -> 1; V3 the import line left
+// in the applier's order (tools/ship/threePatch.mjs's normalImports doing nothing) -> 1; V4 patch 05 changed after the record, a
+// comment reworded -> 1, the staleness row alone, as it should be; V5 a draft importing 0.185.0 again -> 1. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the reproductions against the CDN's own build, which a box with no network cannot load (they point at " +
-    "the vendored r185 here, the same revision); a real GPU; the patches built by three's own rollup and run under its unit tests " +
-    "and examples -- here they are applied to the built file, and each is tested only by its draft's reproduction; and whether " +
-    "three's maintainers would take them as they are.");
+console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
+    "0.185.1, which the recorded hash says is three's own build of it); three's e2e tests, which need its examples and screenshots; " +
+    "its unit tests beyond the record above -- they touch none of the paths the patches change; a real GPU; and whether three's " +
+    "maintainers would take the patches as they are.");
 process.exitCode = fails ? 1 : 0;

@@ -13,3 +13,18 @@ patch on the paths its reproduction does not take, and holds each draft's "paths
 - [VelocityNode drawn outside MRT: the previous positions are never built](04-velocity-outside-mrt.md) -- observed: plain 5.612, drawn 1.871, mrt 5.612, mrtSameFrame 0.000 (px, both backends); patched: plain 5.612, drawn 5.612, mrt 5.612, mrtSameFrame 0.000 (px, both backends)
 - [Sprite: `center` is taken from the first sprite that built a shared program](05-sprite-center-shared-program.md) -- observed: offCentre 38.5, centredAfter 38.5, centredUnlike 31.5 (both backends); patched: offCentre 38.5, centredAfter 31.5, centredUnlike 31.5 (both backends)
 - [WebGL2 backend: only the first particle system's compute runs](06-webgl2-second-compute.md) -- observed: webgpu moved [true, true]; webgl2 moved [true, false]; patched: webgpu moved [true, true]; webgl2 moved [true, true]
+
+## Checked with three's own tools (v4774)
+
+In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here and the one every number above was measured on:
+
+- `npm run build` of the tag, unpatched: `three.webgpu.js` and `three.core.js` are the vendored files byte for byte
+  (`three.tsl.js` differs only by the vendoring's one edit, its import of `three/webgpu` made relative).
+- The six patches applied with `git apply`, in order, all applying cleanly: `npm run lint-core` is clean, and `npm run build`
+  makes the same bytes the gates' applier makes from the vendored build, but for the order of the names in its one import from
+  `three.core.js` -- rollup lists them by first use, and patch 02 uses three of them earlier.
+- Three's unit tests (`test/unit`, run in headless Chromium with QUnit served locally): 1311 tests, 1310 passed, 1 todo,
+  0 failed -- the same as the unpatched tag. They exercise none of the paths the patches change.
+- Not run: three's e2e tests (`test/e2e`), which need its examples and screenshots.
+
+`tools/ship/threeUpstream-selfcheck.mjs` holds the hash of each build; a patch changed since makes the patched one stale.
