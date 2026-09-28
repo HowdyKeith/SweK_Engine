@@ -17,6 +17,11 @@
 // coarsest scores four guesses -- its parent's and three neighbours' -- reading all four from the level above.
 // v4758: `seed` scores one more guess at each coarsest block, the application's vector at its centre, read from the motion field.
 // v4759: `stillGuess` one more at every block below the coarsest, standing still -- a score and no read beyond the patch's.
+// v4768: `retryRadius` two more at every block below the coarsest, the block's texture energy -- its patch against itself a
+// pixel across and a pixel down -- and, at the blocks whose best was still more than `retryRatio` of it, a second window: every
+// second offset out to `retryRadius` outside the one already searched, and eight more about its winner where it won. Which
+// blocks retry is the frame's, not the setting's, so the model takes `retried` and `retryWon` -- opticalFlowCPU's tally counts
+// both -- and gives the most a retry can cost, every block below the coarsest retrying and winning, as `retry.bound`.
 "use strict";
 
 /** The levels a pyramid for w x h builds, capped at `levels`: [[lw, lh], ...], level 0 first. */
@@ -33,13 +38,17 @@ export function pyramidSizes(w, h, levels) {
  * pyramid, reconcile, total, reach } -- reads counted as texture loads, reach in full-resolution pixels. `reconcileRadius`
  * is render/flowReconcileTsl.mjs's pixel window (1).
  */
-export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius = null, levels = 3, subpixel = true, reconcileRadius = 1, grid = "block", seed = false, stillGuess = false }) {
+export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius = null, levels = 3, subpixel = true, reconcileRadius = 1, grid = "block", seed = false, stillGuess = false,
+                               retryRadius = null, retried = 0, retryWon = 0 }) {
     if (!(w >= 1 && h >= 1)) throw new Error(`render/flowCost: w and h must be at least 1 -- got ${w} x ${h}`);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/flowCost: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (grid !== "block" && grid !== "level") throw new Error(`render/flowCost: grid must be "block" or "level" -- got ${grid}`);
     if (refineRadius === null) refineRadius = searchRadius;
     for (const [k, v] of [["searchRadius", searchRadius], ["refineRadius", refineRadius], ["levels", levels]])
         if (!(v >= 1) || v !== Math.floor(v)) throw new Error(`render/flowCost: ${k} must be a whole number, at least 1 -- got ${v}`);
+    if (retryRadius !== null && (!(retryRadius >= 2) || retryRadius !== Math.floor(retryRadius) || retryRadius % 2 !== 0))
+        throw new Error(`render/flowCost: retryRadius must be an even whole number of pixels, at least 2 -- got ${retryRadius}`);
+    if (retryRadius === null && (retried || retryWon)) throw new Error("render/flowCost: retried blocks counted without a retryRadius");
     const sizes = pyramidSizes(w, h, levels), top = sizes.length - 1;
     const lvl = grid === "level", patch = 2 * block * block;
     const perLevel = [];
@@ -47,13 +56,20 @@ export function flowCostModel({ w, h, block = 8, searchRadius = 4, refineRadius 
     for (let L = top; L >= 0; L--) {
         const r = L === top ? searchRadius : refineRadius, guesses = lvl && L !== top ? 4 : L === top && seed ? 2 : 1;
         const blocks = lvl ? Math.ceil(sizes[L][0] / block) * Math.ceil(sizes[L][1] / block) : Math.ceil(w / block) * Math.ceil(h / block);
-        const scores = guesses + (stillGuess && L !== top ? 1 : 0) + (2 * r + 1) ** 2 + 1 + (L === 0 && subpixel ? 4 : 0);   // the guess(es), v4759's standing still, the window, standing still, the vertex
+        const energy = retryRadius !== null && L !== top ? 2 : 0;
+        const scores = guesses + (stillGuess && L !== top ? 1 : 0) + (2 * r + 1) ** 2 + energy + 1 + (L === 0 && subpixel ? 4 : 0);   // the guess(es), v4759's standing still, the window, v4768's energy, standing still, the vertex
         const reads = blocks * scores * patch + (L === top ? (seed ? blocks : 0) : blocks * guesses);   // each block's guesses from the level above, or the seed's
         perLevel.push({ L, radius: r, blocks, scores, reads });
         search += reads; reach += r * (1 << L);
     }
+    // v4768: the second window -- the even offsets of [-R, R] squared, less those inside the window already searched -- and the
+    // eight about its winner; each block below the coarsest searches about the same refinement radius, so each retry costs the same
+    const r2 = Math.floor(Math.min(retryRadius ?? 0, refineRadius) / 2), coarse = retryRadius === null ? 0 : (retryRadius + 1) ** 2 - (2 * r2 + 1) ** 2;
+    const below = perLevel.filter((l) => l.L !== top).reduce((q, l) => q + l.blocks, 0);
+    const retry = { coarse, refine: 8, scores: retried * coarse + retryWon * 8, reads: (retried * coarse + retryWon * 8) * patch, bound: below * (coarse + 8) * patch };
+    search += retry.reads;
     // both frames' pyramids: level 0 reads one colour texel a pixel, each level above reads four of the one below
     let pyramid = 0; for (let L = 0; L < sizes.length; L++) pyramid += 2 * sizes[L][0] * sizes[L][1] * (L === 0 ? 1 : 4);
     const win = (2 * reconcileRadius + 1) ** 2, reconcile = w * h * (2 * 2 * win + 4);   // two window scores, and the pixel's own loads
-    return { levels: sizes.length, perLevel, search, pyramid, reconcile, total: search + pyramid + reconcile, reach };
+    return { levels: sizes.length, perLevel, search, pyramid, reconcile, total: search + pyramid + reconcile, reach, retry };
 }

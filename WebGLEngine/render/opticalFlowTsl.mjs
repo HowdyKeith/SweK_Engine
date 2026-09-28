@@ -25,7 +25,8 @@
 //
 // v4758: `seed: true` -- the coarsest level also scores the application's vector at each block's centre, from the motion field
 // handed to flow(renderer, cur, prev, motion) (render/opticalFlow.mjs's `seed`). v4759: `stillGuess: true` -- every level below
-// the coarsest also scores standing still as a guess (render/opticalFlow.mjs's `stillGuess`).
+// the coarsest also scores standing still as a guess (render/opticalFlow.mjs's `stillGuess`). v4768: `retryRadius` -- a block below
+// the coarsest that its window did not explain searches again, wider (render/opticalFlow.mjs's `retryRadius` and `retryRatio`).
 //
 // *** EVERY ROUNDING IS floor(x + 0.5), Math.round, AND NOT round(). *** v4734 found render/opticalFlowWgsl.mjs's round()
 // tying to even at a block origin bx * block / scale that lands on a half -- 44 of 512 components, one by 79 pixels.
@@ -78,7 +79,10 @@ export function makeLumaPyramid(THREE, TSL, { w, h, levels = Infinity }) {
  * opticalFlowCPU over two pyramids: flow(renderer, curPyr, prevPyr) writes `target` (bw x bh: fx, fy, conf, 1). The
  * pyramids must hold at least min(levels, their own) levels, which makeOpticalFlow's own pyramids do.
  */
-export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null, grid = "block", seed = false, stillGuess = false }) {
+export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4, levels = 3, subpixel = true, refineRadius = null, grid = "block", seed = false, stillGuess = false, retryRadius = null, retryRatio = 0.3 }) {
+    if (retryRadius !== null && (!(retryRadius >= 2) || retryRadius !== Math.floor(retryRadius) || retryRadius % 2 !== 0))
+        throw new Error(`render/opticalFlowTsl: retryRadius must be an even whole number of pixels, at least 2 -- got ${retryRadius}`);
+    if (!(retryRatio > 0)) throw new Error(`render/opticalFlowTsl: retryRatio must be positive -- got ${retryRatio}`);
     requireTsl(TSL);
     if (!(block >= 2) || block !== Math.floor(block)) throw new Error(`render/opticalFlowTsl: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius)) throw new Error(`render/opticalFlowTsl: searchRadius must be a whole number of pixels, at least 1 -- got ${searchRadius}`);
@@ -86,7 +90,7 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
     if (refineRadius === null) refineRadius = searchRadius;
     if (!(refineRadius >= 1) || refineRadius !== Math.floor(refineRadius)) throw new Error(`render/opticalFlowTsl: refineRadius must be a whole number of pixels, at least 1 -- got ${refineRadius}`);
     if (grid !== "block" && grid !== "level") throw new Error(`render/opticalFlowTsl: grid must be "block" or "level" -- got ${grid}`);
-    const { Fn, Loop, float, int, vec4, ivec2, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
+    const { Fn, Loop, If, float, int, vec4, ivec2, textureLoad, screenCoordinate, clamp, floor, abs, max, min, select } = TSL;
     const bw = Math.ceil(w / block), bh = Math.ceil(h / block);
     const cur = makeLumaPyramid(THREE, TSL, { w, h, levels }), prev = makeLumaPyramid(THREE, TSL, { w, h, levels });
     const top = Math.min(levels, cur.levels) - 1;
@@ -121,14 +125,15 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
         // measured (0 red for each removed alone): the names, and the offsets made variables in the outer loop's own scope
         // (.toVar() below), so no expression of `c` is left to be emitted inside the inner one. Both are kept; the next
         // nested Loop this tree writes will have one of them or the other to forget.
-        const sad = (ax, ay, sx, sy) => {
+        const sadOf = (t1, t2, ax, ay, sx, sy) => {
             const s = float(0.0).toVar();
             Loop({ start: int(0), end: int(n * n), type: "int", condition: "<", name: "p" }, ({ p }) => {
                 const yy = float(p.div(n)), xx = float(p.sub(p.div(n).mul(n)));
-                s.addAssign(abs(lum(a, ax.add(xx), ay.add(yy)).sub(lum(b, sx.add(xx), sy.add(yy)))));
+                s.addAssign(abs(lum(t1, ax.add(xx), ay.add(yy)).sub(lum(t2, sx.add(xx), sy.add(yy)))));
             });
             return s;
         };
+        const sad = (ax, ay, sx, sy) => sadOf(a, b, ax, ay, sx, sy);
         const ox = lvl ? bx.mul(block) : floor(bx.mul(block).div(scale).add(0.5)), oy = lvl ? by.mul(block) : floor(by.mul(block).div(scale).add(0.5));   // Math.round
         // the guess: this block's own answer from the level above, or on the level grid its PARENT's -- (bx >> 1, by >> 1)
         const guess = (gx0, gy0) => { const g = textureLoad(guessTex, ivec2(int(gx0), int(gy0))); return [floor(g.x.negate().div(scale).add(0.5)), floor(g.y.negate().div(scale).add(0.5))]; };
@@ -170,6 +175,31 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
             const better = s.lessThan(best);                                            // STRICTLY: a tie leaves the guess
             bdx.assign(select(better, gx.add(dx), bdx)); bdy.assign(select(better, gy.add(dy), bdy)); best.assign(select(better, s, best));
         });
+        if (retryRadius !== null && L !== top) {
+            // v4768: a block the window did not explain searches again, wider (opticalFlowCPU's retry, in its order)
+            const e = sadOf(a, a, ox, oy, ox.add(1.0), oy).add(sadOf(a, a, ox, oy, ox, oy.add(1.0)));
+            If(e.greaterThan(0.0).and(best.greaterThan(e.mul(retryRatio))), () => {
+                const RR = retryRadius, m = RR + 1, cx = bdx.toVar(), cy = bdy.toVar();
+                Loop({ start: int(0), end: int(m * m), type: "int", condition: "<", name: "q" }, ({ q }) => {
+                    const dy = float(q.div(m)).mul(2.0).sub(RR).toVar(), dx = float(q.sub(q.div(m).mul(m))).mul(2.0).sub(RR).toVar();
+                    If(abs(dx).greaterThan(R).or(abs(dy).greaterThan(R)), () => {
+                        const s = sad(ox, oy, ox.add(gx).add(dx), oy.add(gy).add(dy)), better = s.lessThan(best);
+                        cx.assign(select(better, gx.add(dx), cx)); cy.assign(select(better, gy.add(dy), cy)); best.assign(select(better, s, best));
+                    });
+                });
+                If(cx.notEqual(bdx).or(cy.notEqual(bdy)), () => {
+                    const kx = cx.toVar(), ky = cy.toVar();
+                    Loop({ start: int(0), end: int(9), type: "int", condition: "<", name: "u" }, ({ u }) => {
+                        const dy = float(u.div(3)).sub(1.0).toVar(), dx = float(u.sub(u.div(3).mul(3))).sub(1.0).toVar();
+                        If(u.notEqual(4), () => {
+                            const s = sad(ox, oy, ox.add(kx).add(dx), oy.add(ky).add(dy)), better = s.lessThan(best);
+                            cx.assign(select(better, kx.add(dx), cx)); cy.assign(select(better, ky.add(dy), cy)); best.assign(select(better, s, best));
+                        });
+                    });
+                    bdx.assign(cx); bdy.assign(cy);
+                });
+            });
+        }
         let subx = float(0.0), suby = float(0.0);
         if (L === 0 && subpixel) {
             const px = (dx, dy) => sad(ox, oy, ox.add(bdx).add(dx), oy.add(bdy).add(dy));
@@ -187,7 +217,7 @@ export function makeOpticalFlow(THREE, TSL, { w, h, block = 8, searchRadius = 4,
         passes.push(lvl ? { L, out: flows[L], sc: quad(levelNode(L, L === top ? null : flows[L + 1].texture)) }
                         : { L, out: flows[k % 2], sc: quad(levelNode(L, L === top ? null : flows[(k + 1) % 2].texture)) });
     return {
-        bw, bh, block, levels: top + 1, searchRadius, refineRadius, grid, seed, stillGuess, pyramids: { cur, prev },
+        bw, bh, block, levels: top + 1, searchRadius, refineRadius, grid, seed, stillGuess, retryRadius, retryRatio, pyramids: { cur, prev },
         /** The target holding the finest level's answer. */
         get target() { return passes[passes.length - 1].out; },
         /** Build both pyramids from rgba textures and search. */

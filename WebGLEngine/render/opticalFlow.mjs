@@ -68,6 +68,14 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * below cannot come back from it: a 16 px still square over a background moving 16 px is found at 0 of 4 blocks without it
  * and 4 of 4 with it, for one more score a block (render/flowCost-selfcheck.mjs).
  *
+ * `retryRadius` (v4768), an even number of pixels: a block below the coarsest level that its window did not explain -- its best
+ * score still more than `retryRatio` (0.3) of its own texture energy -- searches again, every second offset out to `retryRadius`
+ * about its guess, and then the eight about the winner. A small thing MOVING over a still background is what the levels above
+ * lose: its coarse blocks are mostly background. Over 72 scenes -- four textures, three placements, three motions, 16 and 24 px
+ * squares -- 8 px of retry takes the squares' blocks from 56 of 236 right to 169, for 4 % more reads; a ratio of 0.5 left a coarse
+ * block that a wrong offset half-explained unretried, and its children searched about that offset (151). Reads: the block's
+ * energy is two scores, and the rest only where it retries (render/flowCost.mjs).
+ *
  * `subpixel` defaults to true and exists so the refinement's worth is MEASURABLE rather than asserted --
  * the control-arm discipline this arc applies to every switchable thing on its page. Off, the field is
  * whole pixels, which is what v4673 shipped.
@@ -90,7 +98,7 @@ function sad(a, b, w, h, ax, ay, bx, by, n) {
  * forces to agree with its own description will drift from it, which is exactly what happened here.
  */
 export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, levels = 3,
-                                 subpixel = true, refineRadius = null, grid = "block", seed = null, stillGuess = false, tally = null }) {
+                                 subpixel = true, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = 0.3, tally = null }) {
     if (!(block >= 2) || block !== Math.floor(block))
         throw new Error(`opticalFlowCPU: block must be a whole number of pixels, at least 2 -- got ${block}`);
     if (!(searchRadius >= 1) || searchRadius !== Math.floor(searchRadius))
@@ -102,6 +110,9 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
         throw new Error(`opticalFlowCPU: levels must be a whole number, at least 1 -- got ${levels}`);
     if (grid !== "block" && grid !== "level")
         throw new Error(`opticalFlowCPU: grid must be "block" or "level" -- got ${grid}`);
+    if (retryRadius !== null && (!(retryRadius >= 2) || retryRadius !== Math.floor(retryRadius) || retryRadius % 2 !== 0))
+        throw new Error(`opticalFlowCPU: retryRadius must be an even whole number of pixels, at least 2 -- got ${retryRadius}`);
+    if (!(retryRatio > 0)) throw new Error(`opticalFlowCPU: retryRatio must be positive -- got ${retryRatio}`);
     if (seed !== null && !(seed && seed.length >= w * h * 4))
         throw new Error("opticalFlowCPU: seed must be w*h*4 -- the application's motion field, (du, dv, valid, _) in uv, render/temporalTsl.mjs's convention");
     // *** THE PYRAMID IS render/luminancePyramid.mjs's, NOT A SECOND ONE. *** Its base level imports the
@@ -200,6 +211,38 @@ export function opticalFlowCPU({ cur, prev, w, h, block = 8, searchRadius = 4, l
                     // the loop happens to reach first would otherwise win everywhere.
                     if (s < best) { best = s; bdx = gx + dx; bdy = gy + dy; }
                 }
+            // *** v4768: A BLOCK THE WINDOW DID NOT EXPLAIN SEARCHES AGAIN, WIDER -- ONLY THAT BLOCK. *** Below the coarsest level
+            // a block is searched about its parent's answer, and a small thing moving otherwise than what is around it is not in
+            // its parent's answer (v4759: a square moving 16 px over a still background found by no block). Where the best score
+            // is still more than `retryRatio` of the block's own texture energy -- its score against itself moved a pixel across
+            // and a pixel down -- the block searches `retryRadius` about the guess, every second offset outside the window
+            // already searched, and then the eight about the winner: a wider window paid for by the blocks it is for.
+            // *** THE RETRY IS ABOUT THE GUESS, SO A BLOCK THAT DID NOT RETRY CAN STRAND ITS CHILDREN. *** The first draft's ratio
+            // was 0.5, and on one of the gate's textures a level-1 block half on the square found an offset that explained it to
+            // under half its energy -- wrong, (5, -6) -- and kept it; its children, wholly on the square, retried about (5, -6),
+            // and (16, 4) was past 8 px of it. At 0.3 the parent retries too. MEASURED over 72 scenes: 151 of 236 blocks at 0.5,
+            // 169 at 0.3 and at 0.2
+            if (retryRadius !== null && L !== top) {
+                const e = score(a, a, lw, lh, ox, oy, ox + 1, oy, n) + score(a, a, lw, lh, ox, oy, ox, oy + 1, n);
+                if (e > 0 && best > retryRatio * e) {
+                    if (tally) tally.retried = (tally.retried || 0) + 1;
+                    const R = retryRadius; let cx = bdx, cy = bdy;
+                    for (let dy = -R; dy <= R; dy += 2) for (let dx = -R; dx <= R; dx += 2) {
+                        if (Math.abs(dx) <= r && Math.abs(dy) <= r) continue;
+                        const s = score(a, b, lw, lh, ox, oy, ox + gx + dx, oy + gy + dy, n);
+                        if (s < best) { best = s; cx = gx + dx; cy = gy + dy; }
+                    }
+                    if (cx !== bdx || cy !== bdy) {
+                        const kx = cx, ky = cy;
+                        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                            if (!dx && !dy) continue;
+                            const s = score(a, b, lw, lh, ox, oy, ox + kx + dx, oy + ky + dy, n);
+                            if (s < best) { best = s; cx = kx + dx; cy = ky + dy; }
+                        }
+                        bdx = cx; bdy = cy; if (tally) tally.retryWon = (tally.retryWon || 0) + 1;
+                    }
+                }
+            }
             // *** v4675 -- SUB-PIXEL REFINEMENT, AND ONLY AT THE FINEST LEVEL. ***
             //
             // A whole-pixel field is unusable for frame generation: an interpolated frame placed on integer

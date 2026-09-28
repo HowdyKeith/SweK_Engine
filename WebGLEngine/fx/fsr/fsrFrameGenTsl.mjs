@@ -120,6 +120,10 @@ import { makeFlowReconcile } from "../../render/flowReconcileTsl.mjs";
  * flow's coarsest level with the motion field given to generate -- +0.47 dB on a reflection under a 44 px pan and -0.24 to -0.63
  * on a scrolling wall under 27 and 40, so not the default (fx/fsr/fsrFlowSeed-selfcheck.mjs). { stillGuess: true } (v4759) guesses
  * standing still below the flow's coarsest level -- nothing in a generated frame measured here (fx/fsr/fsrFlowStill-selfcheck.mjs).
+ * { retryRadius: 8 } (v4768) searches again, 8 px about its guess, at the flow's blocks below the coarsest that the window did not
+ * explain: a textured square moving 16 px a frame over a still wall, which the flow loses, +12.06 dB on its pixels and +3.81 over the
+ * frame -- and one block at a turning knot's edge made confidently wrong costs a scrolling wall's interior 10.75 dB, so not the
+ * default (fx/fsr/fsrFlowRetry-selfcheck.mjs). `retryRatio` is the flow's, 0.3 unless given.
  * `camera` (v4750), given to generate with `flow`, is the camera's own motion (makeMotionStage({ camera: true })): the
  * reconciliation then judges a still surface in the world, so a shadow or a reflection under a pan is judged as one.
  * `depthPrev` (v4751), given to generate, is the pair's OLDER depth, in place of the one this generator kept from its last call.
@@ -146,7 +150,8 @@ export function makeFrameGen(THREE, TSL, { w, h, t = 0.5, fill = { radius: 4, si
     const scenes = new Map();
     const once = (key, make) => { if (!scenes.has(key)) scenes.set(key, make()); return scenes.get(key); };
     const draw = async (renderer, sc, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(sc, ortho); };
-    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level", seed: !!flow.seed, stillGuess: !!flow.stillGuess }) : null;
+    const of = flow ? makeOpticalFlow(THREE, TSL, { w, h, block: flow.block ?? 8, searchRadius: flow.searchRadius ?? 4, levels: flow.levels ?? 3, refineRadius: flow.refineRadius ?? null, grid: flow.grid ?? "level", seed: !!flow.seed, stillGuess: !!flow.stillGuess,
+        retryRadius: flow.retryRadius ?? null, retryRatio: flow.retryRatio }) : null;
     const rec = flow ? makeFlowReconcile(THREE, TSL, { w, h, block: flow.block ?? 8, margin: flow.margin ?? null, marginStill: flow.marginStill ?? 0.5, stillPx: flow.stillPx ?? 0.05, mode: flow.mode ?? "pixel", radius: flow.radius ?? 1 }) : null;
     // v4744: the arc -- a toward stage's field (render/temporalTsl.mjs's makeMotionStage({ toward: true })), each pixel's
     // displacement to time t in pixels, and its validity

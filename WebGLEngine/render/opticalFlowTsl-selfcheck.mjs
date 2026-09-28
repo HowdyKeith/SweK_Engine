@@ -32,6 +32,10 @@ console.log("\n1. WITHOUT A DEVICE: the refusals");
     for (const a of [{ block: 1 }, { block: 8.5 }, { searchRadius: 0 }, { searchRadius: 1.5 }, { levels: 0 }, { levels: 2.5 }, { refineRadius: 0 }, { refineRadius: 1.5 }, { grid: "levels" }])
         try { OF.makeOpticalFlow({}, full, { w: 64, h: 64, ...a }); got.push("no throw"); } catch (e) { if (/must be a whole number|must be "block" or "level"/.test(e.message)) n++; got.push(e.message.slice(0, 60)); }
     ok("makeOpticalFlow refuses a fractional or too-small block, radius, level count or (v4748) refinement radius, and (v4753) a grid that is not \"block\" or \"level\", as opticalFlowCPU does", n === 9, `${n} of 9`);
+    let m = 0; const gm = [];
+    for (const a of [{ retryRadius: 3 }, { retryRadius: 0 }, { retryRadius: 7.5 }])
+        try { OF.makeOpticalFlow({}, full, { w: 64, h: 64, ...a }); gm.push("no throw"); } catch (e) { if (/retryRadius must be an even whole number/.test(e.message)) m++; gm.push(e.message.slice(0, 60)); }
+    ok("  ...and (v4768) a retry radius that is odd, under 2 or fractional -- the second window is walked every second pixel", m === 3, `${m} of 3`);
 }
 
 // ---- render/opticalFlow-selfcheck.mjs's fixtures ----
@@ -68,6 +72,10 @@ const two0 = twoMotions(0), two1 = twoMotions(1);
 // v4759: a 16 px square of another part of the field standing still at (24, 24) over the field moving (16, 0)
 const stillSquare = (k) => img((x, y) => { const inSq = x >= 24 && x < 40 && y >= 24 && y < 40; const v = inSq ? smooth(x - 28, y - 28) : smooth(x - 16 * k, y); return [v, v, v]; });
 const stillSq0 = stillSquare(0), stillSq1 = stillSquare(1);
+// v4768: a 16 px square of another part of the field moving (16, 4) over the field standing still, landing on one level-1 block
+const movingSquare = (k) => img((x, y) => { const sx = 16 + 16 * k, sy = 12 + 4 * k, inSq = x >= sx && x < sx + 16 && y >= sy && y < sy + 16;
+    const v = inSq ? smooth(x - 16 * k - 28, y - 4 * k - 28) : smooth(x, y); return [v, v, v]; });
+const movSq0 = movingSquare(0), movSq1 = movingSquare(1);
 // v4758: a seed -- render/temporalTsl.mjs's motion field, (du, dv, valid, 0) in uv, for content that moved (fx, fy) pixels
 // an invalid pixel carries a JUNK vector, (40, -30), so nothing but the validity keeps it out
 const seedField = (fx, fy, validAt) => img((x, y) => (validAt(x, y) ? [-fx / W, -fy / H, 1] : [-40 / W, 30 / H, 0]));
@@ -96,6 +104,12 @@ const CASES = [
     // over a background moving 16 px, on both grids
     ["still square over a moving background, standing still guessed", stillSq1, stillSq0, 8, 3, true, null, "level", null, true],
     ["still square over a moving background, block grid, standing still guessed", stillSq1, stillSq0, 8, 3, true, null, "block", null, true],
+    // v4768: the blocks the window did not explain searched again -- the element after standing still the retry's radius, and
+    // after it its ratio: the moving square it is for, on both grids; two motions; and a ratio that retries more, whole-pixel
+    ["square moving 16 px over a still field, retrying within 8", movSq1, movSq0, 8, 3, true, null, "level", null, false, 8],
+    ["square moving 16 px over a still field, block grid, retrying within 8", movSq1, movSq0, 8, 3, true, null, "block", null, false, 8],
+    ["two motions, level grid, retrying within 8 and standing still guessed", two1, two0, 8, 3, true, null, "level", null, true, 8],
+    ["(9, -7) three levels, level grid, retrying within 4 at 0.3", shifted(9, -7), zero, 8, 3, false, 2, "level", null, false, 4, 0.3],
 ];
 // *** TWO CASES ARE NOT IN THE PARITY ROW'S "EVERY BLOCK", AND THE FIXTURES ARE WHY. *** The METAMER is flat in the tree's luma
 // in exact arithmetic, so every candidate TIES and the vector is whichever rounding of 0.25r + 0.5g + 0.25b is lowest -- f64
@@ -105,7 +119,8 @@ const CASES = [
 // side of `<= 0.5` by one rounding. It is (4.7, -4) now, where the vertex is 0.2 past the clamp and the clamp decides.
 const NOT_PARITY = new Set(["metamer (3, 0)"]);
 const tallies = CASES.map(() => ({ scores: 0, reads: 0, neighbours: 0 }));
-const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false], c) => opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius, grid, seed, stillGuess, tally: tallies[c] }));
+const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = 0.5], c) =>
+    opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius, grid, seed, stillGuess, retryRadius, retryRatio, tally: tallies[c] }));
 const cpuPyr = luminancePyramidCPU({ src: pyrSrc, w: PW, h: PH });
 
 // the populations the parity row needs in order to see the refinement and its clamp at all
@@ -130,7 +145,8 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     // the distinct frames, sent once each
     const frames = [], index = new Map(), ref = (f) => { if (!index.has(f)) { index.set(f, frames.length); frames.push(Array.from(f)); } return index.get(f); };
-    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false]) => ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius, grid, seed: seed ? ref(seed) : null, stillGuess }));
+    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = 0.5]) =>
+        ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius, grid, seed: seed ? ref(seed) : null, stillGuess, retryRadius, retryRatio }));
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, frames, cases, PW, PH, pyrSrc: Array.from(pyrSrc) }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const OF = await import("/render/opticalFlowTsl.mjs");
@@ -151,8 +167,8 @@ else {
                 o.pyrSizes = P.sizes; P.dispose(); ps.dispose();
                 const makers = new Map();
                 for (const c of a.cases) {
-                    const key = c.block + "|" + c.levels + "|" + c.subpixel + "|" + c.refineRadius + "|" + c.grid + "|" + (c.seed !== null) + "|" + c.stillGuess;
-                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel, refineRadius: c.refineRadius, grid: c.grid, seed: c.seed !== null, stillGuess: c.stillGuess }));
+                    const key = c.block + "|" + c.levels + "|" + c.subpixel + "|" + c.refineRadius + "|" + c.grid + "|" + (c.seed !== null) + "|" + c.stillGuess + "|" + c.retryRadius + "|" + c.retryRatio;
+                    if (!makers.has(key)) makers.set(key, OF.makeOpticalFlow(THREE, T, { w: a.W, h: a.H, block: c.block, searchRadius: 4, levels: c.levels, subpixel: c.subpixel, refineRadius: c.refineRadius, grid: c.grid, seed: c.seed !== null, stillGuess: c.stillGuess, retryRadius: c.retryRadius, retryRatio: c.retryRatio }));
                     const F = makers.get(key);
                     await F.flow(renderer, texs[c.cur], texs[c.prev], c.seed !== null ? texs[c.seed] : null);
                     o.flow.push({ px: await read(F.target, F.bw, F.bh), bw: F.bw, bh: F.bh, levels: F.levels });
@@ -228,6 +244,17 @@ else {
             ok(`  [${mode}] ...and v4759's standing still is among them where it matters: the still square's 4 blocks right at ${got} with it and at ${was} without; standing still taken at ${tallies[ti].still || 0} blocks`,
                got === 4 && was === 0 && (tallies[ti].still || 0) > 0, "the one more score a block below the coarsest level, kept only on a STRICT improvement");
         }
+        {   // v4768: the retry -- the moving square's blocks, which no window reaches without it
+            const names = ["square moving 16 px over a still field, retrying within 8", "square moving 16 px over a still field, block grid, retrying within 8", "two motions, level grid, retrying within 8 and standing still guessed", "(9, -7) three levels, level grid, retrying within 4 at 0.3"];
+            const inSq = (q, bw) => { const bx = q % bw, by = (q / bw) | 0; return bx >= 4 && bx <= 5 && by >= 2 && by <= 3; };
+            const right = (px, q) => Math.abs(px[q * 4] - 16) < 0.75 && Math.abs(px[q * 4 + 1] - 4) < 0.75;
+            const L = at(names[0]), Bk = at(names[1]), plain = opticalFlowCPU({ cur: movSq1, prev: movSq0, w: W, h: H, levels: 3, grid: "level" });
+            let got = 0, gotB = 0, was = 0; for (let q = 0; q < L.bw * L.bh; q++) if (inSq(q, L.bw)) { if (right(L.px, q)) got++; if (right(Bk.px, q)) gotB++; if (Math.abs(plain.flow[q * 2] - 16) < 0.75 && Math.abs(plain.flow[q * 2 + 1] - 4) < 0.75) was++; }
+            const tl = names.map((nm) => tallies[CASES.findIndex((c) => c[0] === nm)]);
+            ok(`  [${mode}] ...and v4768's retry is among them where it matters: the moving square's 4 blocks right at ${got} on the level grid with it and at ${was} without -- ${gotB} on the block grid; blocks retried ${tl.map((t) => t.retried || 0).join(", ")} and won ${tl.map((t) => t.retryWon || 0).join(", ")} over its four cases`,
+               got === 4 && was === 0 && gotB > 0 && tl.every((t) => (t.retried || 0) > 0 && (t.retryWon || 0) > 0),
+               "the energy's two scores, the second window walked every second offset outside the first, and the eight about its winner, each kept only on a STRICT improvement -- in the mirror's order. The block grid's coarse patch starts at its block's corner (v4753), so its level-1 blocks are not the square's");
+        }
         const flatD = at("flat"), stillD = at("still"), metaD = at("metamer (3, 0)");
         ok(`  [${mode}] ...and the rules the shifts cannot see hold on the device: a flat field reports NO motion and no confidence (not the window's corner), a still texture no confidence, and a metamer in the tree's luma nothing`,
            flatD.px.every((v, i) => i % 4 === 3 || v === 0) && stillD.px.every((v, i) => i % 4 !== 2 || v === 0) && metaD.px.every((v, i) => i % 4 !== 2 || v < 1e-6),
@@ -267,6 +294,7 @@ else {
 // v4753: the level grid's sabotages, T1-T7 and the mirror's M1-M7, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
 // v4758: the seed's sabotages are logged in fx/fsr/fsrFlowSeed-selfcheck.mjs.
 // v4759: standing still's are logged in fx/fsr/fsrFlowStill-selfcheck.mjs.
+// v4768: the retry's are logged in fx/fsr/fsrFlowRetry-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the field reconciled with the application's motion vectors, which is render/flowReconcile.mjs's and a " +
     "later round's; real content, where a rigid shift of a random field is the easiest case a block matcher ever sees; and " +
