@@ -377,6 +377,10 @@ export function mountGithubPanel() {
                     "# ---- step 3: clone the repo beside this one, and verify THE CLONE -------------------",
                     "git clone --depth 1" + (branch ? " --branch " + branch : "") + " https://github.com/" + er + ".git " + cloneDir,
                     "cd " + cloneDir + "/WebGLEngine",
+                    // v4776 -- the provisioning step the chain runs (sourceChainBridge._provision) and this export left out:
+                    // a fresh clone has no Playwright, so without it every browser gate is red for the missing install --
+                    // 110 of them on Keith's rig the first time these commands were followed by hand.
+                    "cd tools/render-qa && npm install --no-audit --no-fund && cd ../..",
                     "node tools/ship/shipVerdict.mjs --version " + ver + " --markers \"SweK Dictate,/dictate/type\"",
                     "# must print: [ship] SHIP  --  stop here and do not publish if it does not",
                     "",
