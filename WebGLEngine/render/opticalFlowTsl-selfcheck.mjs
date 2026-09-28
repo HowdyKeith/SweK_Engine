@@ -105,11 +105,12 @@ const CASES = [
     ["still square over a moving background, standing still guessed", stillSq1, stillSq0, 8, 3, true, null, "level", null, true],
     ["still square over a moving background, block grid, standing still guessed", stillSq1, stillSq0, 8, 3, true, null, "block", null, true],
     // v4768: the blocks the window did not explain searched again -- the element after standing still the retry's radius, and
-    // after it its ratio: the moving square it is for, on both grids; two motions; and a ratio that retries more, whole-pixel
+    // after it its ratio, each module's own default (0.3) where it is left out: the moving square it is for, on both grids; two
+    // motions; and a ratio that retries less, whole-pixel
     ["square moving 16 px over a still field, retrying within 8", movSq1, movSq0, 8, 3, true, null, "level", null, false, 8],
     ["square moving 16 px over a still field, block grid, retrying within 8", movSq1, movSq0, 8, 3, true, null, "block", null, false, 8],
     ["two motions, level grid, retrying within 8 and standing still guessed", two1, two0, 8, 3, true, null, "level", null, true, 8],
-    ["(9, -7) three levels, level grid, retrying within 4 at 0.3", shifted(9, -7), zero, 8, 3, false, 2, "level", null, false, 4, 0.3],
+    ["(9, -7) three levels, level grid, retrying within 4 at 0.5", shifted(9, -7), zero, 8, 3, false, 2, "level", null, false, 4, 0.5],
 ];
 // *** TWO CASES ARE NOT IN THE PARITY ROW'S "EVERY BLOCK", AND THE FIXTURES ARE WHY. *** The METAMER is flat in the tree's luma
 // in exact arithmetic, so every candidate TIES and the vector is whichever rounding of 0.25r + 0.5g + 0.25b is lowest -- f64
@@ -119,7 +120,7 @@ const CASES = [
 // side of `<= 0.5` by one rounding. It is (4.7, -4) now, where the vertex is 0.2 past the clamp and the clamp decides.
 const NOT_PARITY = new Set(["metamer (3, 0)"]);
 const tallies = CASES.map(() => ({ scores: 0, reads: 0, neighbours: 0 }));
-const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = 0.5], c) =>
+const cpu = CASES.map(([, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = undefined], c) =>
     opticalFlowCPU({ cur, prev, w: W, h: H, block, searchRadius: 4, levels, subpixel, refineRadius, grid, seed, stillGuess, retryRadius, retryRatio, tally: tallies[c] }));
 const cpuPyr = luminancePyramidCPU({ src: pyrSrc, w: PW, h: PH });
 
@@ -145,7 +146,7 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     // the distinct frames, sent once each
     const frames = [], index = new Map(), ref = (f) => { if (!index.has(f)) { index.set(f, frames.length); frames.push(Array.from(f)); } return index.get(f); };
-    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = 0.5]) =>
+    const cases = CASES.map(([name, cur, prev, block, levels, subpixel, refineRadius = null, grid = "block", seed = null, stillGuess = false, retryRadius = null, retryRatio = undefined]) =>
         ({ name, cur: ref(cur), prev: ref(prev), block, levels, subpixel, refineRadius, grid, seed: seed ? ref(seed) : null, stillGuess, retryRadius, retryRatio }));
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { W, H, frames, cases, PW, PH, pyrSrc: Array.from(pyrSrc) }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
@@ -245,7 +246,7 @@ else {
                got === 4 && was === 0 && (tallies[ti].still || 0) > 0, "the one more score a block below the coarsest level, kept only on a STRICT improvement");
         }
         {   // v4768: the retry -- the moving square's blocks, which no window reaches without it
-            const names = ["square moving 16 px over a still field, retrying within 8", "square moving 16 px over a still field, block grid, retrying within 8", "two motions, level grid, retrying within 8 and standing still guessed", "(9, -7) three levels, level grid, retrying within 4 at 0.3"];
+            const names = ["square moving 16 px over a still field, retrying within 8", "square moving 16 px over a still field, block grid, retrying within 8", "two motions, level grid, retrying within 8 and standing still guessed", "(9, -7) three levels, level grid, retrying within 4 at 0.5"];
             const inSq = (q, bw) => { const bx = q % bw, by = (q / bw) | 0; return bx >= 4 && bx <= 5 && by >= 2 && by <= 3; };
             const right = (px, q) => Math.abs(px[q * 4] - 16) < 0.75 && Math.abs(px[q * 4 + 1] - 4) < 0.75;
             const L = at(names[0]), Bk = at(names[1]), plain = opticalFlowCPU({ cur: movSq1, prev: movSq0, w: W, h: H, levels: 3, grid: "level" });

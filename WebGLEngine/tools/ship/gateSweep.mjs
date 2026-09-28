@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4768 -- THE 375th CLOSING: the flow's blocks the window did not explain, searched again wider.
+    since450: Object.freeze({
+        at: "v4768", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["fx/fsr/fsrFlowRetry-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/flowCost-selfcheck.mjs (the retry counted to the read, and found on 72 scenes)", "render/opticalFlowTsl-selfcheck.mjs (four retry cases in the parity row, both backends)"]),
+        verdict: "*** A SMALL THING MOVING OVER A STILL BACKGROUND IS FOUND BY SEARCHING AGAIN WHERE THE WINDOW EXPLAINED NOTHING -- AND IT " +
+                 "IS NOT THE DEFAULT. *** retryRadius: a block below the coarsest level whose best score is still more than 0.3 of its " +
+                 "own texture energy searches 8 px about its guess, every second offset, and the eight about the winner. Over 72 " +
+                 "scenes on the mirror 169 of 236 square blocks right against 56, for 4 % more reads; the device the mirror's at " +
+                 "every block. In the generator a square in the wall's statistics moving 16 px: +12.06 dB on its pixels, +3.81 over " +
+                 "the frame. And on a wall scrolling behind a turning knot it makes one block at the knot's edge confidently wrong, " +
+                 "and the wall's interior loses 10.75 dB; retry the default and three flow gates go red. 0.3 because 0.5 left a " +
+                 "coarse block half on the square unretried. Twenty sabotages, two equivalent.",
+    }),
     // v4767 -- THE 374th CLOSING: what the translucent layer costs, and a quad in place of a geometry pass.
     since449: Object.freeze({
         at: "v4767", swept: 1, green: 1, red: 0,

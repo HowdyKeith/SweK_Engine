@@ -246,6 +246,7 @@ console.log("\n7. AT THE SIZES THAT MATTER");
 // v4753: the level grid's sabotages, here and in render/opticalFlowTsl-selfcheck.mjs, are logged in fx/fsr/fsrFlowGrid-selfcheck.mjs.
 // v4758: the seed's sabotages are logged in fx/fsr/fsrFlowSeed-selfcheck.mjs.
 // v4759: standing still's are logged in fx/fsr/fsrFlowStill-selfcheck.mjs.
+// v4768: the retry's are logged in fx/fsr/fsrFlowRetry-selfcheck.mjs.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU's time, which reads are a model of and not a measure -- caches, the sampler and occupancy decide it; " +
     "fx/fsr/fsrFlowCost-selfcheck.mjs holds this device's time to the count's ratios. And motion larger than 18 pixels a frame, which " +

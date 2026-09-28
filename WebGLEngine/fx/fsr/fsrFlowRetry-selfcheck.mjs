@@ -162,7 +162,23 @@ else {
 }
 
 // ---- v4768 SABOTAGE LOG ----------------------------------------------------------------------------------------
-// (filled in by the round's sabotages)
+// Against render/opticalFlow.mjs, in render/flowCost-selfcheck.mjs and render/opticalFlowTsl-selfcheck.mjs (the parity row, both
+// backends): V1 the retry never runs -> 4, 4; V2 the retry at the coarsest level too -> 1, 0 (the count); V3 the energy across
+// only, counted as two -> 0, 2; V4 the second window about standing still, not the guess -> 1, 2; V5 no eight about the winner
+// -> 1, 2; V6 the window already searched searched again -> 1, 0 (the count only: a candidate scored twice ties itself); V7 a tie
+// taken in the second window -> 0, 2; V8 the ratio 0.5 by default -> 4, 2.
+// Against render/opticalFlowTsl.mjs, in render/opticalFlowTsl-selfcheck.mjs: T1 the retry never runs -> 4; T2 the energy against
+// the older frame -> 4; T3 the second window about the window's winner, not the guess -> 4; T5 the ratio ignored -> 2; T7 the
+// retry's winner not kept -> 4. *** T4 AND T6 ARE EQUIVALENT, AND WHY. *** T4 walks the second window over the first one's edge
+// as well (>= for >), and T6 scores the eight's centre: every candidate either adds was scored already, and a score equal to
+// one already seen is never STRICTLY better than the best. They cost the device reads, which no gate times -- the mirror's V6 is
+// the same mutant, and there the count is what catches it.
+// *** THE PARITY CASES FIRST PASSED A RATIO OF 0.5 TO BOTH MODULES, SO NEITHER MODULE'S DEFAULT WAS COMPARED. *** V8 -- the
+// mirror's default back at 0.5 -- was 0 red in the parity row until the cases left the ratio out; they do now, and one case
+// gives 0.5, so both a default and a given ratio are held.
+// Against render/flowCost.mjs: K1 the energy not counted -> 1; K2 the second window counted whole -> 2; K3 the eight not counted
+// -> 1. Against fx/fsr/fsrFrameGenTsl.mjs, here: G1 the retry not asked for -> 3; G2 the ratio not passed -> 1, which a
+// generator built with a ratio that is not the default is here to see.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a 16 px square, which is a level-1 block's width -- found at half its placements on the mirror (render/flowCost-selfcheck.mjs, " +
     "section 6) and at none of this gate's; motion past 16 px a frame at level 1, which the retry does not reach; and what a frame's retries cost on a GPU, " +

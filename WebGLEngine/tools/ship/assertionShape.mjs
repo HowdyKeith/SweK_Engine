@@ -577,8 +577,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4765 -- 1848 -> 1849 for fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs -- what reads the frame behind it, drawn over the generated frame.
     // v4766 -- 1849 -> 1850 for tools/ship/fsrThreeWorld-selfcheck.mjs -- the demo page showing what the recent rounds took, wired and presented.
     // v4767 -- 1850 -> 1851 for fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs -- what the translucent layer costs, and one quad in place of a geometry pass.
-    gates: 1851, usesOk: 1830, definesOk: 1822, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1723, condFirst: 91, unknownSignature: 16,
+    // v4768 -- 1851 -> 1852 for fx/fsr/fsrFlowRetry-selfcheck.mjs -- the flow's blocks the window did not explain, searched again wider.
+    gates: 1852, usesOk: 1831, definesOk: 1823, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1724, condFirst: 91, unknownSignature: 16,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

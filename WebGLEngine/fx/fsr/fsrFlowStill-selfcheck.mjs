@@ -96,7 +96,6 @@ else {
 // Against render/flowCost.mjs: K10 standing still not counted -> 1. Against fx/fsr/fsrFrameGenTsl.mjs, here: G21 never asked
 // for -> 1.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: a small thing MOVING fast over a still background, which standing still does not find and only a window reaching " +
-    "16 px at the level below the coarsest does -- +45 % of the reads, or a zoom's error doubled spacing it out (render/flowCost-" +
-    "selfcheck.mjs, measured on the mirror and not built); and what limits the highlight's frame at 16 px of belt, 11.9 dB on its pixels.");
+console.log("unchecked here: what limits the highlight's frame at 16 px of belt, 11.9 dB on its pixels. A small thing MOVING fast over a " +
+    "still background, which standing still does not find, v4768 measured with the flow's retry: fx/fsr/fsrFlowRetry-selfcheck.mjs.");
 process.exitCode = fails ? 1 : 0;
