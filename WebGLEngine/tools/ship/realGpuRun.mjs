@@ -22,6 +22,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LAUNCH_ARGS } from "./webgpuHarness.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -79,7 +80,12 @@ export function runGates({ root = ENG, only = null, log = console.log } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
+    // v4776 -- parsed by cliArgs.mjs rather than read off argv: `--onyl fsr` used to run EVERY gate and say nothing,
+    // which on a real GPU is the longest run this tool makes. A mistyped option is refused with a did-you-mean.
+    const CLI = { values: { "--out": "path", "--only": "string" }, flags: [] };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("realGpuRun", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const arg = (k) => cli.values[k] ?? null;
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
     console.log(`\nthe FSR and frame-generation gates, with the harness logging each call's adapter (${process.platform})`);
     const report = runGates({ only: arg("--only") });

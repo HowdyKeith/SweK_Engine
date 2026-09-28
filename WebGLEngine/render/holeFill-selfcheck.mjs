@@ -18,7 +18,7 @@
 // this pass does has to beat that, and the first thing it tried did not.
 "use strict";
 import { interpolateFrameCPU, crossFadeCPU } from "./frameInterp.mjs";
-import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
+import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR, MAX_REACH } from "./holeFill.mjs";
 import { transform4 } from "./motionVectors.mjs";
 import { viewProj } from "./rasterProbe.js";
 
@@ -440,4 +440,16 @@ console.log("unchecked here: THE SIDE DECISION ON CONTENT THAT IS NOT A FLAT SLA
     "default is 6 dB wrong for an occluder moving 17.6 px, and the pass does not look at the field it was handed " +
     "to notice. ROTATION AND SCALE: an occluder that turns or approaches changes the hole's shape, and nothing " +
     "here has a hole that is not a straight strip. And fsr.html still calls none of it.");
+// v4776 -- the reach limit, at the limit. `reach` (v4769) lets a hole with nothing within `radius` search again; MAX_REACH
+// bounds that second search, and the bound is only a bound if the value itself is accepted and the next one refused.
+{
+    const w = 5, h = 5, n = w * h, vec = new Float32Array(n * 2), zb = new Float32Array(n).fill(0.9), hl = new Uint8Array(n);
+    hl[12] = 1;
+    const at = (reach) => { try { fillHolesCPU({ vec, hole: hl, zbuf: zb, w, h, radius: 1, reach }); return "ok"; } catch (e) { return String(e.message || e); } };
+    const atMax = at(MAX_REACH), over = at(MAX_REACH + 1);
+    ok("the reach limit holds at exactly MAX_REACH: that reach is accepted and one pixel more is refused BY NAME",
+       Number.isInteger(MAX_REACH) && MAX_REACH > 1 && atMax === "ok" && /at most/.test(over),
+       `MAX_REACH ${MAX_REACH}: reach ${MAX_REACH} -> ${atMax}; reach ${MAX_REACH + 1} -> ${over.slice(0, 90)}`);
+}
+
 process.exit(fails ? 1 : 0);

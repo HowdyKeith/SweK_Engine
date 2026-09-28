@@ -15,6 +15,7 @@
 // and the jitter's SENSE is measured the way fsr.html measured it: a smooth three.js scene rendered at half size,
 // resolved with render/temporalResolve.mjs, against the full-size render.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
@@ -427,6 +428,17 @@ if (!skip) {
 // v4750: the camera target's row -- W4 (the far plane's depth at every pixel) -> 2, W9 (never drawn) -> 1; logged with the rest
 // of v4750's in fx/fsr/fsrFrameGenWorld-selfcheck.mjs.
 // v4752: the instance rows -- logged with the rest of v4752's in fx/fsr/fsrFrameGenParticles-selfcheck.mjs.
+// v4776 -- makePreviousCopy is this module's and is graded in render/temporalTslCompute-selfcheck.mjs, inside a browser page
+// the static definition census cannot see into. So this gate names it, holds its shape, and holds that the grader really
+// calls it and keeps the sabotage that proved it (C11, a copy that wrote element 0 to every particle).
+{
+    const grader = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "temporalTslCompute-selfcheck.mjs"), "utf8");
+    ok("makePreviousCopy(THREE, TSL, storage, count, type) is exported, and its grader calls it and records the sabotage that went red",
+       typeof TT.makePreviousCopy === "function" && TT.makePreviousCopy.length === 4 &&
+       /TT\.makePreviousCopy\(/.test(grader) && /C11 makePreviousCopy/.test(grader),
+       "graded on a device in render/temporalTslCompute-selfcheck.mjs; four required arguments, `type` defaulting to vec3");
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: every pass downstream of the field, which arrive one a round. SKINNED and MORPHED meshes and an " +
     "ORTHOGRAPHIC camera were named here until v4757; render/temporalTslMeshes-selfcheck.mjs holds them, and found the first two wrong.");
