@@ -98,25 +98,31 @@ const SHIPPED_DETECTOR = /export const OUT\s*=\s*["']([^"']+)["']/;
     ok("exactly the three regenerators declare alwaysWrites, BY NAME rather than by count",
         alwaysLabels === "Engine catalog, Knowledge index, Page index",
         alwaysLabels + ". A count ratchet cannot see a swap; this one can.");
-    for (const t of always) {
-        const r = idempotent(t.rel, t.artefact);
-        ok("!! " + t.label + " is IDEMPOTENT, measured by running it twice", r.ok,
-           r.ok ? r.first + " -> " + r.second : (r.error || r.first + " -> " + r.second));
-    }
     // v4685 -- driven: a regenerator run by this gate must leave the tracked artefact byte-identical, because the
     // rig's run left knowledge-index.json claiming a transient fixture as the 1776th gate.
-    {
-        const kiRow = always.find((t) => t.label === "Knowledge index");
-        const target = path.join(ENGINE, kiRow.artefact.replace(/^\//, ""));
-        const orig = fs.readFileSync(target);
-        fs.writeFileSync(target, Buffer.concat([orig, Buffer.from("\n")]));   // a state the regenerator will NOT reproduce
-        let r, after;
-        try { r = idempotent(kiRow.rel, kiRow.artefact); after = fs.readFileSync(target); }
-        finally { fs.writeFileSync(target, orig); }
-        ok("!! *** and the measurement PUTS BACK what it found -- a gate does not leave a tracked record rewritten ***",
-           r.ok && after.equals(Buffer.concat([orig, Buffer.from("\n")])),
-           "planted a byte the regenerator would remove; it was still there after two real runs, so the run restored it");
-    }
+    // *** v4694 -- DRIVEN ON THE LOOP'S OWN RUNS, NOT ON TWO MORE. *** The restore row used to call idempotent() on
+    // the knowledge index a second time: two more runs of the slowest regenerator (688 ms each here), and the gate
+    // took 18.5 s alone on Keith's rig -- one reading under the sweep's 20 s cap, and capped in the v4691 verify.
+    // The byte is planted BEFORE the loop measures the knowledge index instead. Each run rewrites the whole file, so
+    // what was there before cannot change the two hashes being compared, and the byte still being there afterwards
+    // is the proof that the measurement put back what it found.
+    const kiRow = always.find((t) => t.label === "Knowledge index");
+    const target = path.join(ENGINE, kiRow.artefact.replace(/^\//, ""));
+    const orig = fs.readFileSync(target);
+    const planted = Buffer.concat([orig, Buffer.from("\n")]);   // a state the regenerator will NOT reproduce
+    let kiAfter = null;
+    try {
+        for (const t of always) {
+            if (t === kiRow) fs.writeFileSync(target, planted);
+            const r = idempotent(t.rel, t.artefact);
+            if (t === kiRow) kiAfter = fs.readFileSync(target);
+            ok("!! " + t.label + " is IDEMPOTENT, measured by running it twice", r.ok,
+               r.ok ? r.first + " -> " + r.second : (r.error || r.first + " -> " + r.second));
+        }
+    } finally { fs.writeFileSync(target, orig); }
+    ok("!! *** and the measurement PUTS BACK what it found -- a gate does not leave a tracked record rewritten ***",
+       !!kiAfter && kiAfter.equals(planted),
+       "planted a byte the regenerator would remove; it was still there after two real runs, so the run restored it");
     ok("...so the dry-run rule keeps its teeth rather than being widened away", true,
        "the worry is a STALE artefact from an accidental run, and an artefact that is a pure function of the " +
        "tree cannot go stale that way -- a SWEEP declaring alwaysWrites would fail the check above");
