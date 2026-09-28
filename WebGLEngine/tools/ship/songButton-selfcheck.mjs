@@ -59,7 +59,13 @@ sec("A. THE BUTTON, THE DEEP LINK, THE CHOOSER, AND THE FILE PATH ARE ALL IN THE
     ok(/window\.songTerrain\.chooser\(\)/.test(main) && /window\.songTerrain\.chooser = function/.test(main),
        "and the chooser is both defined and called from the deep link",
        "a picker needs a gesture; the chooser is where the gesture comes from");
-    ok(/o\.file \? await o\.file\.arrayBuffer\(\)/.test(main),
+    // v4776 -- THE ROW PINNED ONE SPELLING, AND cc229351 (2026-09-14) REWROTE THE TERNARY AS AN if/else WITH AN
+    // r.ok CHECK ON THE URL SIDE. Same property, different characters, and the gate sat red on both lines for two
+    // weeks because it is over the ship-time budget. The property is what is asserted now: a File's bytes come
+    // from the File, and fetch lives only on the other branch. Either spelling passes; `fetch(o.file...)` or a
+    // fetch reached with a File in hand does not.
+    ok(/o\.file \? await o\.file\.arrayBuffer\(\)/.test(main) ||
+       /if \(o\.file\) \{\s*bytes = await o\.file\.arrayBuffer\(\);\s*\}\s*else \{[^}]*fetch\(o\.url\)/.test(main),
        "*** load({file}) decodes the File's own bytes, not fetch(undefined) ***",
        "one decoder for URL and File: the bytes differ in where they came from, not in what they are");
     ok(/\?song= failed:/.test(main), "a failed deep-link load is warned, not swallowed");
