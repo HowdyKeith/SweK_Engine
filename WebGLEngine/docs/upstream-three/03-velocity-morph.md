@@ -73,6 +73,19 @@ reproduction prints:
 plain 5.612, morphed 5.612 (px, both backends)
 <!-- patched:end -->
 
+## Paths the reproduction does not take
+
+Several targets, absolute targets, and per-instance morphs, measured the same way, on r185's build and with the patch:
+
+<!-- paths:begin -->
+three relative targets, moving it in x and y: r185 14.801, 9.251, patched 5.551, 3.700 (px x, y, both backends)
+the same as absolute targets: r185 14.801, 9.251, patched 5.551, 3.700 (px x, y, both backends)
+per-instance morphs (an InstancedMesh's morphTexture): r185 1.871, patched 1.871 (px, both backends) -- not reached
+<!-- paths:end -->
+
+Per-instance morphs (`morphTexture` on an `InstancedMesh`) are left as they are: the patch morphs `positionPrevious` only
+where a mesh has one set of influences.
+
 ## A fix that works in an application
 
 SweK_Engine's motion stage (`render/temporalTsl.mjs`) keeps the influences as they were at the last draw, and `positionPrevious` morphed by them; its gates hold the result to a reference on both backends.

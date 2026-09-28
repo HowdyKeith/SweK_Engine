@@ -4,7 +4,8 @@ Found while building SweK_Engine's FSR3 frame generation on three.js r185 (v4752
 standalone reproduction that imports three from a CDN, the cause, and a patch against three's `src/` at the r185 tag
 (`patches/`, v4771). `tools/ship/threeUpstream-selfcheck.mjs` runs every reproduction against the vendored r185 on both backends
 and holds the numbers each draft states; then applies each draft's patch alone to a copy of r185's build, runs the reproduction
-on it, and holds the fix and the numbers the draft states for it. Posting them is the maintainer's call.
+on it, and holds the fix and the numbers the draft states for it; `tools/ship/threeUpstreamPaths-selfcheck.mjs` (v4773) runs each
+patch on the paths its reproduction does not take, and holds each draft's "paths" block. Posting them is the maintainer's call.
 
 - [VelocityNode: an InstancedMesh's previous instance matrix is its current one](01-velocity-instancedmesh.md) -- observed: plain 5.612, instanced 0.000, many 11.224 (px, both backends); patched: plain 5.612, instanced 5.612, many 5.612 (px, both backends)
 - [VelocityNode: a BatchedMesh's previous position never gets the instance's matrix](02-velocity-batchedmesh.md) -- observed: plain 5.612, batched 1.871 (px, both backends); patched: plain 5.612, batched 5.612 (px, both backends)

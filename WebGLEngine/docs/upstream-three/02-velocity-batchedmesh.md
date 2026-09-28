@@ -73,6 +73,19 @@ reproduction prints:
 plain 5.612, batched 5.612 (px, both backends)
 <!-- patched:end -->
 
+## Paths the reproduction does not take
+
+A batch grown by `setInstanceCount`, which re-makes its matrices texture, measured the same way, on r185's build and with the
+patch:
+
+<!-- paths:begin -->
+a batch grown by setInstanceCount, its material then updated: r185 1.871 then 7.482, patched 5.612 then 5.612 (px, both backends)
+<!-- paths:end -->
+
+The patch makes its copy again at the new size and keeps the last draw's matrices -- the layout is linear, so they are its
+first entries. three itself draws a grown batch from its old matrices texture until the batch's material is updated, which
+is a separate report; the material is updated here.
+
 ## A fix that works in an application
 
 SweK_Engine's motion stage (`render/temporalTsl.mjs`) keeps a copy of `_matricesTexture` as it was at the last draw, read by the same `indirectId`, applied to `positionPrevious`; its gates hold the result to a reference on both backends.

@@ -10,16 +10,16 @@
 // three's src/ at the r185 tag. Section 3 finds every hunk exactly once in the vendored build (the bundle is the source
 // concatenated: no import lines, no `export`, and one identifier the bundler renamed), applies the draft's patch alone to a copy,
 // runs the draft's reproduction on it, and holds (a) the fix -- the bug is gone on both backends -- and (b) the draft's "patched"
-// block to what it prints. All six are applied together too, each hunk still found once.
+// block to what it prints. All six are applied together too, each hunk still found once. v4773: the applier is
+// tools/ship/threePatch.mjs, shared with tools/ship/threeUpstreamPaths-selfcheck.mjs, which runs the patches on the paths these
+// reproductions do not take.
 // *** NOTHING HERE POSTS ANYTHING. *** Filing them is the maintainer's call.
 "use strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { ENG, BUNDLE, apply, rootWithBuilds } from "./threePatch.mjs";
 
-const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -79,27 +79,8 @@ for (const f of files) {
     if (mod) scripts[f] = mod.slice(importLine.length).replace('document.getElementById("out").textContent = JSON.stringify(r, null, 1);', "");
 }
 
-// the patches, applied to the vendored build as its text holds the source
-const BUNDLE = path.join(ENG, "vendor", "three-webgpu", "three.webgpu.js"), bundle = fs.readFileSync(BUNDLE, "utf8");
-// identifiers the bundler renamed where two modules declared the same name
-const RENAMED = { "src/materials/nodes/SpriteNodeMaterial.js": [["reference( '", "reference$1( '"]] };
-// a unified diff's hunks as the bundle holds them: context and removed lines are the old text, context and added the new
-const hunksOf = (diff) => {
-    const out = []; let file = null, cur = null;
-    for (const line of diff.split("\n")) {
-        if (line.startsWith("+++ ")) { file = line.slice(4).replace(/^b\//, ""); continue; }
-        if (line.startsWith("--- ") || line.startsWith("diff ") || line.startsWith("index ")) continue;
-        if (line.startsWith("@@")) { cur = { file, old: [], new: [] }; out.push(cur); continue; }
-        if (!cur || line.startsWith("\\")) continue;
-        if (line[0] === " " || line === "") { cur.old.push(line.slice(1)); cur.new.push(line.slice(1)); }
-        else if (line[0] === "-") cur.old.push(line.slice(1));
-        else if (line[0] === "+") cur.new.push(line.slice(1));
-    }
-    const bundled = (lines) => lines.filter((l) => !/^import\s/.test(l)).map((l) => l.replace(/^export (const|function|class|let) /, "$1 "));
-    const renamed = (f, t) => (RENAMED[f] || []).reduce((q, [x, y]) => q.split(x).join(y), t);
-    return out.map((h) => ({ file: h.file, old: renamed(h.file, bundled(h.old).join("\n")), new: renamed(h.file, bundled(h.new).join("\n")) })).filter((h) => h.old !== h.new);
-};
-const apply = (diff, text) => { const found = []; for (const h of hunksOf(diff)) { const n = text.split(h.old).length - 1; found.push(n); if (n === 1) text = text.replace(h.old, () => h.new); } return { text, found }; };
+// the patches, applied to the vendored build as its text holds the source (tools/ship/threePatch.mjs, v4773)
+const bundle = fs.readFileSync(BUNDLE, "utf8");
 const diffs = Object.fromEntries(Object.entries(DRAFTS).map(([f, d]) => [f, fs.existsSync(path.join(PATCHES, d.patch)) ? fs.readFileSync(path.join(PATCHES, d.patch), "utf8") : ""]));
 const applied = Object.fromEntries(Object.keys(DRAFTS).map((f) => [f, apply(diffs[f], bundle)]));
 
@@ -122,14 +103,8 @@ const RELEASE_DRAFT = "06-webgl2-second-compute.md", RELEASE = `const out = {};
     window.__result = out;`;
 let results = {};
 if (!skip) {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "three-patched-"));
+    const { root, dispose } = rootWithBuilds(Object.fromEntries(Object.keys(scripts).map((f) => [SLOT(f), applied[f].text])));
     try {
-        for (const e of fs.readdirSync(ENG)) fs.symlinkSync(path.join(ENG, e), path.join(root, e));
-        for (const f of Object.keys(scripts)) {
-            const dir = path.join(root, "three-patched", SLOT(f)); fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(path.join(dir, "three.webgpu.js"), applied[f].text);
-            for (const e of ["three.tsl.js", "three.core.js"]) fs.symlinkSync(path.join(ENG, "vendor", "three-webgpu", e), path.join(dir, e));
-        }
         const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]]]);
         if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE]);
         const r = await runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: {}, script: `async () => {
@@ -141,7 +116,7 @@ if (!skip) {
             return out;
         }` });
         results = r.ok ? r.result : Object.fromEntries(runs.map(([key]) => [key, { error: r.reason || (r.pageErrors || []).join("; ") }]));
-    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    } finally { dispose(); }
 }
 const ran = (res) => !!(res && res.webgpu && res.webgl2);
 

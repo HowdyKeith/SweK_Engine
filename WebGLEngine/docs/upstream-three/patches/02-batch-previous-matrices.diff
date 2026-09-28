@@ -1,8 +1,8 @@
 diff --git a/src/nodes/accessors/Batch.js b/src/nodes/accessors/Batch.js
-index ab62e98..0c58ec4 100644
+index ab62e98..07803f3 100644
 --- a/src/nodes/accessors/Batch.js
 +++ b/src/nodes/accessors/Batch.js
-@@ -1,12 +1,51 @@
+@@ -1,12 +1,50 @@
  
  import { normalLocal } from './Normal.js';
 -import { positionLocal } from './Position.js';
@@ -21,7 +21,9 @@ index ab62e98..0c58ec4 100644
 +
 +/**
 + * The batch's matrices as they were at its last draw, for motion vectors: a copy of its matrices
-+ * texture, read by the same index. Resized in place if the batch re-makes its texture.
++ * texture, read by the same index. A batch that grows re-makes its matrices texture; the copy is
++ * then made again at the new size, the matrices of the last draw kept (the layout is linear, so
++ * they are its first entries).
 + *
 + * @private
 + * @param {BatchedMesh} batchMesh - The batched mesh.
@@ -32,20 +34,17 @@ index ab62e98..0c58ec4 100644
 +	const source = batchMesh._matricesTexture;
 +	let data = _previousBatchMatrices.get( batchMesh );
 +
-+	if ( data === undefined ) {
++	if ( data === undefined || data.source !== source ) {
 +
-+		const texture = new DataTexture( new Float32Array( source.image.data ), source.image.width, source.image.height, RGBAFormat, FloatType );
++		const last = new Float32Array( source.image.data );
++
++		if ( data !== undefined ) last.set( data.last.subarray( 0, Math.min( data.last.length, last.length ) ) );
++
++		const texture = new DataTexture( new Float32Array( last ), source.image.width, source.image.height, RGBAFormat, FloatType );
 +		texture.needsUpdate = true;
 +
-+		data = { texture, last: new Float32Array( source.image.data ), source };
++		data = { texture, last, source };
 +		_previousBatchMatrices.set( batchMesh, data );
-+
-+	} else if ( data.source !== source ) {
-+
-+		data.texture.image = { data: new Float32Array( source.image.data ), width: source.image.width, height: source.image.height };
-+		data.texture.needsUpdate = true;
-+		data.last = new Float32Array( source.image.data );
-+		data.source = source;
 +
 +	}
 +
@@ -55,7 +54,7 @@ index ab62e98..0c58ec4 100644
  
  /**
   * TSL function that retrieves the batching color for a given instance ID from a colors texture.
-@@ -91,6 +130,35 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
+@@ -91,6 +129,35 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
  
  	positionLocal.assign( batchingMatrix.mul( positionLocal ) );
  

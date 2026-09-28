@@ -94,6 +94,14 @@ reproduction prints:
 plain 5.612, drawn 5.612, mrt 5.612, mrtSameFrame 0.000 (px, both backends)
 <!-- patched:end -->
 
+## Paths the reproduction does not take
+
+The velocity node drawn by the material's `colorNode`, not its `fragmentNode`, on r185's build and with the patch:
+
+<!-- paths:begin -->
+the velocity node drawn by the colorNode: r185 1.871, patched 5.612 (px, both backends)
+<!-- paths:end -->
+
 ## A fix that works in an application
 
 SweK_Engine's motion stage (`render/temporalTsl.mjs`) keeps the previous bone matrices per skeleton at its last draw, and the skeleton updated before each draw that asks for velocity; its gates hold the result to a reference on both backends.

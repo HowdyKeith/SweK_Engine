@@ -86,6 +86,20 @@ plain 5.612, instanced 5.612, many 5.612 (px, both backends)
 Drawn by the material itself rather than through MRT, the instanced mesh meets another bug first:
 [04](04-velocity-outside-mrt.md).
 
+## Paths the reproduction does not take
+
+The matrices as a `StorageInstancedBufferAttribute` -- written on the CPU, and written by a compute pass -- measured the
+same way (velocity through MRT, one render per browser frame), on r185's build and with the patch:
+
+<!-- paths:begin -->
+storage matrices written on the CPU: r185 11.224, patched 5.612 (px, WebGPU); WebGL2 draws the mesh in neither
+storage matrices written by a compute pass: r185 1.496, patched 1.496 (px, WebGPU) -- not reached; WebGL2 throws in both
+<!-- paths:end -->
+
+A compute pass writes the matrices on the GPU, and the patch copies the CPU array, so it does not reach them: their previous
+matrices would need a copy made on the GPU before the pass runs. On WebGL 2 neither build draws an `InstancedMesh` whose
+matrices are a storage attribute.
+
 ## A fix that works in an application
 
 SweK_Engine's motion stage (`render/temporalTsl.mjs`) keeps the object's instance matrices as they were at its last draw (kept after the draw, e.g. in `updateAfter`), uploaded as the previous ones; its gates hold the result to a reference on both backends.
