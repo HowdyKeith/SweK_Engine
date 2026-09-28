@@ -276,7 +276,16 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
     // DERIVED: redCensus.standingReds() reads the sweep record's `codes` table. 29 against 2, and each one is RUN
     // -- 25.1 s at eight-wide, measured, and no gate in the set writes to the tree (git status compared before
     // and after). The membership can only be read from a record; the VERDICT is always a live run.
-    const pop = standingReds();
+    // *** v4776 -- A DRIVER IS NOT DRIVEN, AND THIS GATE IS ONE. *** The v4776 rotation recorded this gate red (exit 1 at
+    // 103 s, its ratchet's slack), so standingReds() put it in its own population, and each run started another copy of
+    // itself -- which started another. Found as a load average of 26 on a 4-core box with two orphaned trees still
+    // spawning after five minutes. Any red gate that itself calls driveReds() is the same loop one step removed, so
+    // the rule is by capability, not by name: a gate that drives reds is left out of the population and named.
+    const pop0 = standingReds();
+    const drives = (rel) => { try { return /\bdriveReds\s*\(/.test(fs.readFileSync(path.join(ENG, rel), "utf8")); } catch { return false; } };
+    const drivers = pop0.reds.filter(drives);
+    const pop = { ...pop0, reds: pop0.reds.filter((r) => !drivers.includes(r)) };
+    if (drivers.length) say("left out of the population, because they drive reds themselves", drivers.join(", "));
     const drivenAll = await driveReds(pop.reds);
     const live = drivenAll.filter((r) => r.code !== 0);
     const recovered = drivenAll.filter((r) => r.code === 0);
@@ -377,7 +386,10 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
     // at zero: 14 bare lines across 11 gates is other gates' debt and which ones get repaired is Keith's call,
     // one at a time. A ratchet set to today's number fails the moment a fifteenth is written, which is the half
     // that matters -- the existing 14 are visible, sized, and named below.
-    const BARE_AT_V4587 = 14;
+    // v4776 -- LOWERED 14 -> 2, as the row below asks once the debt is paid: at v4776 the population read from the sweep
+    // record is 23 gates recorded exit 1, 13 of them still red when driven, and only 2 of their FAIL lines are bare. The
+    // v4680-v4697 rounds repaired most of the reds that carried them. The name stays for its history; the value is today's.
+    const BARE_AT_V4587 = 2;
     ok("!! *** no NEW failure line arrives with nothing in it to act on ***",
         bare.length <= BARE_AT_V4587,
         `${bare.length} FAIL line(s) carry no command, no number and no named file in the detail, against a ` +

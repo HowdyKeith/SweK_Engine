@@ -1005,18 +1005,34 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
        "THE PASS BOUGHT NOTHING IS A NAME VANISHING, *** and that is what `lost` catches.");
     const gates = enumerateGates(ENG), c = SC.census(gates, t);
     const outside = c.over.length + c.killed.length;
+    // *** v4776 -- "IT CAN ONLY SHRINK" WAS WRONG, AND THE BUCKET SAID SO AT 142. *** The ceiling below used to be
+    // `c.killed.length <= 140` over the WHOLE tree, on the reasoning that nothing puts a gate back into a bucket
+    // it was re-timed out of. Two things put gates in that the reasoning never counted. BIRTHS: 22 of the 142
+    // did not exist at e6455e52, the commit that froze the v4565 record -- twenty frame-generation gates from the
+    // exported-functions line (finished green alone at 21..158 s), kernelReach and redAction. GROWTH: redCensus
+    // and budgetExile existed then and were under the cap, and they read the whole tree, so they cost more every
+    // round the tree grows. The same row sat red on the other line at 155 and nothing saw it, because this gate
+    // is over the budget and no ship-time sweep runs it. The ceiling now holds only on the population it was drawn
+    // from -- the gates v4568's pass named -- and what it was protecting against is asserted for everything else:
+    // a gate may ENTER the bucket only on a reading that FINISHED (census's `graded` side), never on a starved or
+    // killed one. That is the v4568 witness's failure -- placementRender filed at the cap and running in 51 ms --
+    // and it is the only way into the bucket that says nothing true about the gate.
+    const drawnFrom = new Set(SC.KILLED_PASS_V4568.passGates);
+    const entrants = c.killed.filter((g) => !drawnFrom.has(g));
+    const entrantsUnmeasured = entrants.filter((g) => !c.graded.includes(g));
+    const fromPopulation = c.killed.length - entrants.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       // *** `killed` WAS PINNED TO 140 AND v4568 MOVED IT, which is the door working rather than a drift.
-       // While the bucket had no way out its size was a constant and pinning it was right; now 35 gates have
-       // beaten the cap that exiled them and left it. It can only SHRINK -- nothing puts a gate back into a
-       // bucket it was re-timed out of -- so that is what is checked, with the v4565 figure as the ceiling.
-       outside <= R.outsideTheSweep.before && c.killed.length <= R.remaining.killedUnreachable &&
+       outside <= R.outsideTheSweep.before && fromPopulation <= R.remaining.killedUnreachable &&
+       entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
        `${outside} of ${gates.length} gates (${(100 * outside / gates.length).toFixed(1)}%) are outside it now, ` +
        `against ${R.outsideTheSweep.before} (${R.outsideTheSweep.beforePct}%) before the pass. The killed ` +
-       `bucket reads ${c.killed.length} against the ${R.remaining.killedUnreachable} v4565 recorded as ` +
-       "unreachable -- v4568 opened that door and 35 gates walked out of it. The record's own " +
+       `bucket reads ${c.killed.length}: ${fromPopulation} from the ${drawnFrom.size} v4568's pass named, against ` +
+       `the ${R.remaining.killedUnreachable} v4565 recorded as unreachable, and ${entrants.length} that entered ` +
+       `since, ${entrants.length - entrantsUnmeasured.length} of them on a FINISHED reading` +
+       (entrantsUnmeasured.length ? ` and ${entrantsUnmeasured.length} on NO VERDICT -- ${entrantsUnmeasured.join(", ")}` : "") +
+       ". v4568 opened that door and 35 gates walked out of it. The record's own " +
        `arithmetic closes: ${R.pool.overBefore} over - ${R.returnees} returned - ${R.hitTheCap} capped = ` +
        `${R.pool.overAfter}, and the ${R.hitTheCap} capped are what took killed from ${R.pool.killedBefore} to ` +
        `${R.pool.killedAfter}.`);

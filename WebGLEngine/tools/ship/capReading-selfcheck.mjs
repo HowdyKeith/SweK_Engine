@@ -219,6 +219,19 @@ export const LET_FINISH_V4573 = Object.freeze({
                  "2.2% from the median of the three, so the filed number is sound and the TABLE is the stale " +
                  "one. Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
         }),
+        // v4776 -- the merge's --killed rotation let two more of the seventeen finish, both faster than the table. The
+        // first confirming runs read 20-30 s and corroborated nothing: two orphaned redAction-selfcheck trees were
+        // loading the box to 26 on four cores. With them killed, three runs each on a quiet box:
+        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", table: 15880, now: 13503,
+            runs: Object.freeze([13690, 13736, 13585]),
+            why: "15,880 at the cap pass; 13,503 filed by the v4776 rotation; 13,585-13,736 across three quiet runs, " +
+                 "median 1.4% from the filed reading. The gate got faster; the table is kept as what it cost then.",
+        }),
+        Object.freeze({ gate: "physics/render/transmission-selfcheck.mjs", table: 21060, now: 18797,
+            runs: Object.freeze([18214, 18848, 18115]),
+            why: "21,060 at the cap pass; 18,797 filed by the v4776 rotation; 18,115-18,848 across three quiet runs, " +
+                 "median 3.1% from the filed reading. Moved, confirmed, and the historical number kept.",
+        }),
     ]);
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise
     // "named in the record" would be a way to excuse any number at all, which is the exemption-list shape
@@ -295,8 +308,15 @@ export const LET_FINISH_V4573 = Object.freeze({
         "contradict the filed reading refuse; no filed reading at all refuses. Sabotage YD replaced `moved` " +
         "with `disagreed` in the partition and nothing went red, because today the two sets are equal");
 
-    ok("!! ...and the 10% bound is at this population's NOISE FLOOR, which is why one reading cannot move a record",
-        MOVED_AT_V4647L.every((e) => (Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs) > 0.05),
+    // v4776 -- *** THE ROW SAID EVERY ENTRY'S SPREAD EXCEEDS 5%, AND THE TWO ENTRIES THIS ROUND ADDED REFUTE IT. ***
+    // It was written when the roll held eulerGpu alone-ish, and read "the population's floor" off that one gate.
+    // loopTrace's three quiet-box runs spread 1.1% and transmission's 4.0%: the floor is PER GATE, not one
+    // number for the population. What the 10% bound needs is narrower and still true -- it is ONE bound for
+    // every gate, so it has to clear the NOISIEST gate's spread, and the noisiest (eulerGpu, 9.7%) sits right
+    // under it. That is the claim graded now: the widest within-minute spread in the roll is past 5%.
+    const spread = (e) => (Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs);
+    ok("!! ...and the 10% bound is at the NOISIEST gate's floor, which is why one reading cannot move a record",
+        Math.max(...MOVED_AT_V4647L.map(spread)) > 0.05,
         MOVED_AT_V4647L.map((e) => `${path.basename(e.gate)} spread ` +
             `${(((Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs)) * 100).toFixed(1)}% in one minute`).join("; ") +
             ". The 3% this row's tolerance was argued from was a sample of TWO agreeing readings, and one of " +

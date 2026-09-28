@@ -199,12 +199,16 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // exit codes rather than counting FAIL lines.
     const SELF_REL = path.relative(ENG, fileURLToPath(import.meta.url)).split(path.sep).join("/");
     const nr = census(ENG, null, { exclude: (g) => g === SELF_REL }).noRecord;
-    ok("!! *** every gate with no recorded timing is NAMED, and the list is bounded rather than reported ***",
-        nr.length <= 4 && nr.every((r) => typeof r.declaredMs === "number" && r.declaredMs > 0),
+    // *** v4776 -- TIGHTENED TO ZERO, AS THE ROW BELOW IT ASKED. *** The v4776 merge's full sweep and --killed rotation
+    // gave every declaring gate a reading, so noRecord emptied and the control row ("not vacuous today") went red, which
+    // its own text called good news and answered with this instruction: delete it and tighten this bound to zero, do not
+    // leave both. A new declaring gate now owes the shared record a reading before it ships, not a place in a slack of four.
+    ok("!! *** every gate with no recorded timing is NAMED, and there are none ***",
+        nr.length === 0 && nr.every((r) => typeof r.declaredMs === "number" && r.declaredMs > 0),
         nr.length
             ? `${nr.length}: ` + nr.map((r) => `${r.gate} declares ${(r.declaredMs / 1000).toFixed(1)}s`).join("; ") +
               ". A gate added on a box that cannot write sweep-timings.json has no reading through no fault of " +
-              "its own; FOUR is the bound because that is more rounds of new gates than should ever be waiting"
+              "its own -- time it on the box that owns the record (the sweep, or the rotation's --gate) before shipping"
             : "none -- every declaring gate has a recorded reading to be compared against");
 
     ok("...and each one's declaration is a MEASUREMENT, not the placeholder the header format allows",
@@ -212,13 +216,6 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4676's leak, so it " +
         "has to be a number somebody took rather than a round guess");
 
-    // THE CONTROL: this row would be vacuous if noRecord were empty, and it is not empty today -- but it will
-    // be one day, and a row that passes because a list is empty is the defect two sections above.
-    ok("...and the assertion is not vacuous today, which is stated rather than assumed",
-        nr.length > 0,
-        `noRecord holds ${nr.length}. IF THIS ROW EVER GOES RED IT IS GOOD NEWS -- it means every declaring ` +
-        "gate has a reading -- and the row above should then be re-read as a bound on an empty set, which is " +
-        "not a check. Delete this row and tighten that one to zero when that happens; do not leave both");
 }
 
 console.log(fails ? `\ndeclaredCost-selfcheck: ${fails} FAILED` : "\ndeclaredCost-selfcheck: all checks pass");
