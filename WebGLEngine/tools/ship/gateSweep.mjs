@@ -8041,8 +8041,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         verdict: "*** THE MOTION STAGE BROKE PAST 1024 INSTANCES, AND NO GATE DREW MORE THAN 160. *** Its previous instance matrices were " +
                  "a uniform buffer, 64 bytes a matrix, and both backends here allow 65536 bytes. Past that WebGPU refused the buffer and " +
                  "with it the stage's whole pass -- a plain sphere in the same scene lost its field too -- and WebGL2 said nothing and " +
-                 "read a field 46.5 px wrong. They are a float texture now, four texels a matrix, 512 a row: the field is six separate " +
-                 "meshes' to 6e-5 px at 1024, 1025 and 10000 instances on both backends, and through the toward stage. And three's own " +
+                 "read a field 46.5 px wrong. They are a float texture now, four texels a matrix, 512 a row: the field is the separate " +
+                 "meshes' to 1.4e-5 px at 1024, 1025 and 10000 instances on both backends, and through the toward stage. And three's own " +
                  "matrices past that limit are an interleaved attribute synced once a browser frame, after the draw's upload check: the " +
                  "third render of a program in one frame draws the second's -- held as three's behaviour. Eight sabotages red, one " +
                  "equivalent; one red only once the population had boxes either side of the texture's first row.",
