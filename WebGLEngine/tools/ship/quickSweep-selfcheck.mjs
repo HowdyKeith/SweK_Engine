@@ -934,6 +934,30 @@ sec("8h. WHAT A KILLED GATE LEAVES IS GONE BEFORE THE NEXT GATE RUNS (v4692)");
     ok(cp.unmeasured.length === 1 && !!c0 && c0.gate === "tools/ship/stuck-selfcheck.mjs" && c0.last.some((l) => /entering step two/.test(l)),
        "*** a gate capped ALONE carries what it printed last, so a timeout names where it stopped ***",
        c0 ? `${c0.gate} at ${c0.ms} ms: ${JSON.stringify(c0.last)}` : `capped: ${JSON.stringify(cp.capped)}`);
+
+    // v4695 -- the rig's v4694 verify called exitBusy "NO FAILING ROW: it died" because its row came early and its
+    // closing report filled the 4 KB tail. The fixture fails on its first line and then prints 10 KB.
+    fs.writeFileSync(path.join(root, "tools", "ship", "early-selfcheck.mjs"),
+        'console.log("  FAIL  the row that used to fall out of the tail");\nfor (let i = 0; i < 200; i++) console.log("  ----  " + "x".repeat(50));\nprocess.exit(1);\n');
+    const one = await Q.runAlone("tools/ship/early-selfcheck.mjs", 20000, root);
+    const er = await Q.runQuickSweep({ root, gates: ["tools/ship/early-selfcheck.mjs"], budgetMs: 60000, workers: 1, capMs: 20000,
+                                       write: false, serialSliceMs: 0, log: () => {} });
+    const n0 = er.newRed[0];
+    ok(one.tail.indexOf("fall out of the tail") < 0 && one.fails.length === 1 && !!n0 && (n0.fail || []).some((l) => /fall out of the tail/.test(l)) && !n0.died,
+       "*** a failing row printed BEFORE 4 KB of output is still the row the verify prints, not 'it died' ***",
+       `tail holds it: ${one.tail.indexOf("fall out of the tail") >= 0}; streamed: ${JSON.stringify(one.fails)}; reported: ${JSON.stringify(n0 && n0.fail)}`);
+
+    // v4695 -- the Windows launch. Detached on win32 meant no console, so each child a gate started built its own:
+    // deletionHarness read 3.5 s attached and was capped at 20 s in two rig verifies. Driven on the platform
+    // argument, since only a win32 box can run the launch itself.
+    const W = Q.sweepLaunch({}, "win32"), Wc = Q.sweepLaunch({ SWEK_SWEEP_DETACHED: "1" }, "win32"), P = Q.sweepLaunch({}, "linux");
+    ok(!W.detached && W.windowsHide && W.treeKill === "taskkill" && Wc.detached && !Wc.windowsHide && Wc.treeKill === "group" &&
+       P.detached && P.treeKill === "group",
+       "*** on win32 a gate starts ATTACHED with a hidden console and is killed as a tree; POSIX keeps its group ***",
+       `win32 ${JSON.stringify(W)}; win32 with SWEK_SWEEP_DETACHED=1 (the old launch, for the A/B) ${JSON.stringify(Wc)}; linux ${JSON.stringify(P)}`);
+    ok(Q.KILL_CONFIRM_MS >= 1000 && Q.KILL_CONFIRM_MS < Q.DEFAULTS.capMs,
+       "  ...and a cap kill that never produces an exit is given up on in less than one more cap, not waited on forever",
+       `KILL_CONFIRM_MS ${Q.KILL_CONFIRM_MS} against the ${Q.DEFAULTS.capMs} ms cap -- both kill paths are fire-and-forget, so without it a kill that did not land held the sweep on one gate for good`);
     for (const d of [tmp, root]) try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
 }
 

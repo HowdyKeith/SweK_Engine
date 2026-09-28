@@ -195,56 +195,75 @@ export function describe(rows, since = null) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-    const from = arg("--from", null), gatesArg = arg("--gates", null);
-    const timeoutMs = Number(arg("--timeout-s", 120)) * 1000;
-    let gates = [];
-    if (from) {
-        let text = "";
-        try { text = fs.readFileSync(path.isAbsolute(from) ? from : path.join(ENG, from), "utf8"); }
-        catch (e) { console.error(`[failLines] cannot read ${from}: ${e.message}`); process.exit(2); }
-        gates = gatesFromVerify(text).map((g) => g.gate);
-        if (!gates.length) { console.error(`[failLines] ${from} carries no "NEW RED:" list -- nothing to run`); process.exit(2); }
-    } else if (gatesArg) {
-        gates = gatesArg.split(",").map((s) => s.trim()).filter(Boolean);
-    } else {
-        console.error("[failLines] give --from <verify output> or --gates a,b,c"); process.exit(2);
-    }
-    console.log(`[failLines] ${gates.length} gate(s), run ONE AT A TIME (see this file's header for why)`);
-    const rows = [];
-    for (const g of gates) {
-        const r = runOne(g, { timeoutMs });
-        rows.push(r);
-        process.stderr.write(`[failLines] ${rows.length}/${gates.length}  ${r.verdict.padEnd(7)} ${g}  ${r.fails} row(s)  ${r.ms} ms\n`);
-    }
-    // The log's own mtime is when the sweep finished writing it; HEAD's commit date is when the tree last
-    // moved. Nothing else here can tell a fix from contention.
-    const stampNow = treeStamp();
-    let sweptAtMs = null;
-    if (from) { try { sweptAtMs = fs.statSync(path.isAbsolute(from) ? from : path.join(ENG, from)).mtimeMs; } catch {} }
-    const headAtMs = stampNow.committedAt ? Date.parse(stampNow.committedAt) : null;
-    console.log(describe(rows, { sweptAtMs, headAtMs, headCommit: stampNow.commit }));
-    if (process.argv.includes("--write")) {
-        const stamp = stampNow;
-        const REPO = path.resolve(ENG, "..");
-        const out = path.join(REPO, captureFile());
-        fs.mkdirSync(path.dirname(out), { recursive: true });
-        const payload = { generatedFrom: "tools/ship/failLines.mjs", at: new Date().toISOString(),
-                          platform: process.platform, box: boxId(), tree: stamp,
-                          sweptFrom: from ? { log: path.basename(from),
-                                              writtenAt: sweptAtMs ? new Date(sweptAtMs).toISOString() : null,
-                                              treeMovedSince: !!(sweptAtMs && headAtMs && headAtMs > sweptAtMs) } : null,
-                          summary: summarise(rows), gates: rows };
-        fs.writeFileSync(out, JSON.stringify(payload, null, 1) + "\n");
-        const st = stamp;
-        console.log(`[failLines] wrote ${captureFile()} for ${boxId()} at ${st.commit || "an unknown commit"}` +
-                    `${st.dirty ? " (WORKING TREE DIRTY -- these reds include uncommitted changes)" : ""} -- ` +
-                    `commit it FROM THIS BOX and the reds can be compared against another machine's by ` +
-                    `assertion rather than by exit code`);
-    } else {
-        console.log("[failLines] nothing written; pass --write to record this run");
-    }
-    // The tool's own exit says whether IT worked, not whether the gates did: a diagnosis run that fails
-    // because it found failures cannot be used in a pipeline.
-    process.exit(0);
+    // v4695 -- inside an async function, not top-level await: --as-sweep imports quickSweep.mjs, which imports
+    // FAIL_LINE from THIS file, and a module still evaluating a top-level await can never finish linking that
+    // cycle ("unsettled top-level await"). Returning from evaluation first lets the import resolve.
+    (async () => {
+        const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
+        const from = arg("--from", null), gatesArg = arg("--gates", null);
+        const timeoutMs = Number(arg("--timeout-s", 120)) * 1000;
+        let gates = [];
+        if (from) {
+            let text = "";
+            try { text = fs.readFileSync(path.isAbsolute(from) ? from : path.join(ENG, from), "utf8"); }
+            catch (e) { console.error(`[failLines] cannot read ${from}: ${e.message}`); process.exit(2); }
+            gates = gatesFromVerify(text).map((g) => g.gate);
+            if (!gates.length) { console.error(`[failLines] ${from} carries no "NEW RED:" list -- nothing to run`); process.exit(2); }
+        } else if (gatesArg) {
+            gates = gatesArg.split(",").map((s) => s.trim()).filter(Boolean);
+        } else {
+            console.error("[failLines] give --from <verify output> or --gates a,b,c"); process.exit(2);
+        }
+        console.log(`[failLines] ${gates.length} gate(s), run ONE AT A TIME (see this file's header for why)`);
+        // v4695 -- --as-sweep runs each gate through the SWEEP's own launcher (quickSweep.runAlone), not spawnSync. The
+        // rig's v4694 verify capped deletionHarness at 20 s where this tool read 3.5 s, and the difference between the two
+        // was how the gate was started. With SWEK_SWEEP_DETACHED=1 the sweep's pre-v4695 Windows launch is used, so one
+        // box can read both and the cause is measured rather than inferred.
+        const asSweep = process.argv.includes("--as-sweep");
+        const Q = asSweep ? await import("./quickSweep.mjs") : null;
+        if (asSweep) console.log(`[failLines] launched as the sweep launches: ${JSON.stringify(Q.sweepLaunch())}`);
+        const sweepRow = async (g) => {
+            const a = await Q.runAlone(g, timeoutMs, ENG);
+            const lines = a.fails || [];
+            const verdict = a.timedOut ? "TIMEOUT" : a.code === 0 ? (lines.length ? "ODD" : "GREEN") : (lines.length ? "RED" : "CRASHED");
+            const died = verdict === "CRASHED" || verdict === "TIMEOUT" ? Q.deathTail(a.tail, { max: 4 }) : null;
+            return { gate: g, exit: a.code, ms: a.ms, fails: lines.length, lines, verdict, ...(died && died.length ? { died } : {}) };
+        };
+        const rows = [];
+        for (const g of gates) {
+            const r = asSweep ? await sweepRow(g) : runOne(g, { timeoutMs });
+            rows.push(r);
+            process.stderr.write(`[failLines] ${rows.length}/${gates.length}  ${r.verdict.padEnd(7)} ${g}  ${r.fails} row(s)  ${r.ms} ms\n`);
+        }
+        // The log's own mtime is when the sweep finished writing it; HEAD's commit date is when the tree last
+        // moved. Nothing else here can tell a fix from contention.
+        const stampNow = treeStamp();
+        let sweptAtMs = null;
+        if (from) { try { sweptAtMs = fs.statSync(path.isAbsolute(from) ? from : path.join(ENG, from)).mtimeMs; } catch {} }
+        const headAtMs = stampNow.committedAt ? Date.parse(stampNow.committedAt) : null;
+        console.log(describe(rows, { sweptAtMs, headAtMs, headCommit: stampNow.commit }));
+        if (process.argv.includes("--write")) {
+            const stamp = stampNow;
+            const REPO = path.resolve(ENG, "..");
+            const out = path.join(REPO, captureFile());
+            fs.mkdirSync(path.dirname(out), { recursive: true });
+            const payload = { generatedFrom: "tools/ship/failLines.mjs", at: new Date().toISOString(),
+                              platform: process.platform, box: boxId(), tree: stamp,
+                              sweptFrom: from ? { log: path.basename(from),
+                                                  writtenAt: sweptAtMs ? new Date(sweptAtMs).toISOString() : null,
+                                                  treeMovedSince: !!(sweptAtMs && headAtMs && headAtMs > sweptAtMs) } : null,
+                              summary: summarise(rows), gates: rows };
+            fs.writeFileSync(out, JSON.stringify(payload, null, 1) + "\n");
+            const st = stamp;
+            console.log(`[failLines] wrote ${captureFile()} for ${boxId()} at ${st.commit || "an unknown commit"}` +
+                        `${st.dirty ? " (WORKING TREE DIRTY -- these reds include uncommitted changes)" : ""} -- ` +
+                        `commit it FROM THIS BOX and the reds can be compared against another machine's by ` +
+                        `assertion rather than by exit code`);
+        } else {
+            console.log("[failLines] nothing written; pass --write to record this run");
+        }
+        // The tool's own exit says whether IT worked, not whether the gates did: a diagnosis run that fails
+        // because it found failures cannot be used in a pipeline.
+        process.exit(0);
+    })();
 }

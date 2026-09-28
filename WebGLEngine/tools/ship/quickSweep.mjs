@@ -415,7 +415,8 @@ export function reconcile(rows, register = redRegister()) {
         // alone, so the evidence existed for the length of one process and was discarded. A whole round
         // went into inferring the cause from concurrent copies and got it wrong twice.
         else {
-            const fail = failLinesOf(r.serialTail);
+            // v4695: the streamed lines when the run carried them, the tail's otherwise (a saved run from before).
+            const fail = r.serialFails && r.serialFails.length ? failLinesOf(r.serialFails.join("\n")) : failLinesOf(r.serialTail);
             // A gate with no failing row did not FIND anything -- it DIED. What it printed last is the only
             // thing anybody on another box has to go on, so it travels with the verdict.
             fresh.push({ gate: r.gate, code: r.serialCode, ms: r.serialMs, fail,
@@ -457,20 +458,76 @@ const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
 // `detached: true` makes the child a process-GROUP leader, and a negative pid signals the whole group -- so
 // a gate's children die with it. The fallback is the old single-process kill, because a group kill can fail
 // if the child never got as far as forming a group, and a cap that throws instead of killing is worse.
+//
+// *** v4695 -- AND ON WINDOWS `detached` WAS WHAT MADE GATES SLOW, AND IT BOUGHT NOTHING THERE. *** On win32 libuv
+// runs a detached child as DETACHED_PROCESS: it has NO console. Every console program such a gate starts then
+// gets a console of its own, created per child, because node's spawn defaults windowsHide to false. Keith's rig:
+// deletionHarness-selfcheck -- which runs `node --check` once per character of a 36-character string -- took
+// 3.5 s under failLines (spawnSync, attached) and was CAPPED at 20 s in the v4691 AND v4694 verifies, both times
+// right after the row before that survey; rigRunner, which also spawns, was capped with it. The group kill
+// `detached` exists for is POSIX-only -- process.kill(-pid) throws on Windows and the fallback killed the gate
+// alone -- so on win32 the gate is now started ATTACHED with windowsHide (a hidden console its children share),
+// and the cap kills the whole tree with `taskkill /T /F`, which is what ai-bridge/processBridge.js already does.
+// SWEK_SWEEP_DETACHED=1 restores the old launch, for the A/B that confirms it: `failLines --as-sweep`.
+/** How long a cap kill has to produce an exit before the sweep stops waiting for one (v4695). */
+export const KILL_CONFIRM_MS = 10000;
+
+export function sweepLaunch(env = process.env, platform = process.platform) {
+    const win = platform === "win32" && env.SWEK_SWEEP_DETACHED !== "1";
+    return { detached: !win, windowsHide: win, treeKill: win ? "taskkill" : "group" };
+}
+
+function killTree(p, how) {
+    if (how === "taskkill") {
+        try {
+            const k = spawn("taskkill", ["/PID", String(p.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+            k.on("error", () => { try { p.kill("SIGKILL"); } catch {} });
+        } catch { try { p.kill("SIGKILL"); } catch {} }
+        return;
+    }
+    try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
+}
+
+/** One gate, alone, the way the sweep runs it. Exported as `runAlone` so failLines --as-sweep can reproduce it. */
 function runOneAsync(rel, capMs, root) {
     return new Promise((resolve) => {
         const t0 = Date.now();
-        const p = spawn(process.execPath, [rel], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: true });
+        const L = sweepLaunch();
+        const p = spawn(process.execPath, [rel], { cwd: root, stdio: ["ignore", "pipe", "pipe"], detached: L.detached, windowsHide: L.windowsHide });
         let tail = "";
-        const keep = (d) => { tail = (tail + d).slice(-4096); };
-        p.stdout.on("data", keep); p.stderr.on("data", keep);
+        // *** v4695 -- FAIL LINES ARE COLLECTED AS THEY STREAM PAST, NOT DUG OUT OF THE LAST 4 KB. *** A gate whose
+        // failing row comes early and whose closing report is long -- exitBusy's "unchecked here" paragraph -- left
+        // the row outside the tail, and the verify called it "NO FAILING ROW: it died" when it had found something.
+        // It happened to exitBusy in the v4694 verify and to others before it. Lines are split per stream so the
+        // two cannot splice, and the list is bounded; the tail is kept for what a gate printed before it died.
+        const fails = [];
+        const liner = () => { let carry = ""; return (d, end = false) => {
+            carry += String(d); const parts = carry.split(/\r?\n/); carry = end ? "" : parts.pop();
+            if (carry.length > 65536) carry = carry.slice(-65536);
+            for (const l of parts) if (FAIL_LINE.test(l) && fails.length < 40) fails.push(l.trimEnd().slice(0, 300));
+        }; };
+        const outL = liner(), errL = liner();
+        p.stdout.on("data", (d) => { tail = (tail + d).slice(-4096); outL(d); });
+        p.stderr.on("data", (d) => { tail = (tail + d).slice(-4096); errL(d); });
+        // taskkill ends the tree with exit code 1 and NO signal, so the cap is recorded here rather than read off `sig`.
+        // *** AND THE KILL IS RE-CHECKED (boundaryLint's KILL_NOT_VERIFIED, v4695). *** Both kill paths are fire-and-
+        // forget; if neither lands, `exit` never fires and the whole sweep waits on one gate forever. So a cap kill
+        // not followed by an exit within KILL_CONFIRM_MS resolves as capped with killUnconfirmed, and lets go of the
+        // child's pipes so the sweep's own loop is not held open by it.
+        let capped = false, settled = false, backstop = null;
+        const done = (v) => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(backstop); resolve(v); };
         const timer = setTimeout(() => {
-            try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} }
+            capped = true; killTree(p, L.treeKill);
+            backstop = setTimeout(() => {
+                try { p.stdout.destroy(); p.stderr.destroy(); p.unref(); } catch {}
+                done({ code: 124, ms: Date.now() - t0, timedOut: true, skipped: false, tail, fails, killUnconfirmed: true });
+            }, KILL_CONFIRM_MS);
         }, capMs);
-        p.on("exit", (code, sig) => { clearTimeout(timer); const ms = Date.now() - t0; resolve({ code: sig ? 124 : (code ?? 1), ms, timedOut: !!sig || ms >= capMs, skipped: SKIP_LINE.test(tail), tail }); });
-        p.on("error", () => { clearTimeout(timer); resolve({ code: 1, ms: Date.now() - t0, timedOut: false, skipped: false, tail: "" }); });
+        p.on("exit", (code, sig) => { outL("", true); errL("", true); const ms = Date.now() - t0; done({ code: sig || capped ? 124 : (code ?? 1), ms, timedOut: !!sig || capped || ms >= capMs, skipped: SKIP_LINE.test(tail), tail, fails }); });
+        p.on("error", () => done({ code: 1, ms: Date.now() - t0, timedOut: false, skipped: false, tail: "", fails: [] }));
     });
 }
+export const runAlone = runOneAsync;
 
 /**
  * The whole thing. Phase 1 in parallel, phase 2 serial for every phase-1 red, classify(), reconcile(), and
@@ -592,7 +649,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         if (p2.code !== 0) reclaim(rel);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
-        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut, serialTail: p2.tail });
+        rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut, serialTail: p2.tail, serialFails: p2.fails });
     }
     // *** AND A SLICE OF THE TREE IS RE-RUN ALONE, SO THE FILE ACCUMULATES COSTS AND NOT ONLY SAMPLES. ***
     // Phase 2 above already leaves an uncontended reading for every red and every budget crosser; this
