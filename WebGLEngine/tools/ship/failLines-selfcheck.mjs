@@ -12,8 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp,
-         CAPTURE_DIR, captureFile } from "./failLines.mjs";
+import { FAIL_LINE, gatesFromVerify, runOne, summarise, describe, treeStamp, CAPTURE_DIR, captureFile, budgetIsOwn } from "./failLines.mjs";
 import { ENG } from "./gateSweep.mjs";
 
 let fails = 0;
@@ -245,6 +244,11 @@ console.log("\n7. *** WHERE A CAPTURE GOES, WHICH TOOK TWO SEPARATE FAILURES TO 
         /a row that says what is wrong/.test(describe([f])) && !/NO FAILING ROW/.test(describe([f])),
         "the two verdicts have to read differently or the distinction is decoration");
 }
+
+// v4695 -- its limit is declared, and says why it is not the sweep's.
+ok("failLines declares its own limit (budgetIsOwn), names the flag that sets it, and says why the sweep's cap is not it",
+   typeof budgetIsOwn === "string" && /--timeout-s/.test(budgetIsOwn) && /20 s cap/.test(budgetIsOwn),
+   String(budgetIsOwn).slice(0, 140));
 
 console.log(`\nfailLines-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

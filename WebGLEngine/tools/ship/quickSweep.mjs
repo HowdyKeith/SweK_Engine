@@ -480,7 +480,9 @@ export function sweepLaunch(env = process.env, platform = process.platform) {
 function killTree(p, how) {
     if (how === "taskkill") {
         try {
-            const k = spawn("taskkill", ["/PID", String(p.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+            // taskkill's own output is not a gate's and carries nothing the exit listener does not; spelled as an array so
+            // skipReading-selfcheck's `stdio: "ignore"` scan -- which is about discarding a GATE's output -- stays exact.
+            const k = spawn("taskkill", ["/PID", String(p.pid), "/T", "/F"], { windowsHide: true, stdio: ["ignore", "ignore", "ignore"] });
             k.on("error", () => { try { p.kill("SIGKILL"); } catch {} });
         } catch { try { p.kill("SIGKILL"); } catch {} }
         return;

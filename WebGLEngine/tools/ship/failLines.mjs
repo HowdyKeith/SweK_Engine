@@ -87,6 +87,16 @@ export function gatesFromVerify(text) {
  *   CRASHED  exit non-zero and NO failing row -- the gate died, and whatever it was checking is UNKNOWN
  *   ODD      exit 0 with failing rows -- a gate that prints FAIL and returns success, which is its own bug
  */
+/**
+ * Declared for tools/ship/runnerBudget-selfcheck.mjs, which counts this file as a runner since v4695's --as-sweep made
+ * it hand quickSweep a gate. Its limit is its OWN on purpose: this tool exists to read the failing rows of gates that
+ * went red or ran out of time in a sweep, so its default (120 s, --timeout-s) sits far ABOVE the sweep's 20 s cap and
+ * above gateBudget's per-gate figures. Borrowing either would turn the slow red it was asked about back into a
+ * timeout, and a timeout carries no failing row -- the one thing it is run to recover.
+ */
+export const budgetIsOwn = "failLines re-runs a sweep's reds and cap kills to read their rows, so its --timeout-s (default 120 s) is " +
+    "deliberately above the sweep's 20 s cap and gateBudget's per-gate numbers: a borrowed limit would reproduce the timeout it is asked to see past";
+
 export function runOne(rel, { root = ENG, timeoutMs = 120000, spawn = spawnSync } = {}) {
     const t0 = Date.now();
     const r = spawn(process.execPath, [path.join(root, rel)],
