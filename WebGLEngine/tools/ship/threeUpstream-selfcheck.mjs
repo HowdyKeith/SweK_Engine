@@ -51,6 +51,21 @@ const DRAFTS = {
         bug: (r) => ["offCentre", "centredAfter", "centredUnlike"].every((k) => same(r, k)) && r.webgpu.centredAfter === r.webgpu.offCentre && Math.abs(r.webgpu.centredUnlike - r.webgpu.offCentre) > 3,
         fixed: (r) => ["offCentre", "centredAfter", "centredUnlike"].every((k) => same(r, k)) && r.webgpu.centredAfter === r.webgpu.centredUnlike && Math.abs(r.webgpu.centredUnlike - r.webgpu.offCentre) > 3,
         observed: (r) => `offCentre ${r.webgpu.offCentre}, centredAfter ${r.webgpu.centredAfter}, centredUnlike ${r.webgpu.centredUnlike} (both backends)` },
+    // v4775: a render is not a frame. 07 -- the pose follows the bones once a browser frame (and by hand, where it is); 08 -- past
+    // the uniform buffer, the third render of a frame draws the second's matrices (and marked dynamic, where it is); 09 -- a batch
+    // grown by setInstanceCount is drawn from its old matrices texture (and its material updated, it moves)
+    "07-skinned-pose-once-a-frame.md": { patch: "07-skinned-pose-every-render.diff",
+        bug: (r) => all(r) && r.webgpu.sameFrame && r.webgpu.plain.every((n) => n > 50) && r.webgpu.skinned[0] === 0 && r.webgpu.skinned[1] > 50 && r.webgpu.skinnedUpdated.every((n) => n > 50),
+        fixed: (r) => all(r) && r.webgpu.sameFrame && r.webgpu.skinned.every((n) => n > 50),
+        observed: (r) => `plain [${r.webgpu.plain.join(", ")}], skinned [${r.webgpu.skinned.join(", ")}], skinnedUpdated [${r.webgpu.skinnedUpdated.join(", ")}] -- pixels left and right of the centre; the renders in one browser frame: ${r.webgpu.sameFrame} (both backends)` },
+    "08-instanced-large-third-render.md": { patch: "08-instanced-sync-before-upload.diff",
+        bug: (r) => all(r) && r.webgpu.sameFrame && r.webgpu.one.every((n) => n > 50) && r.webgpu.many[0] === 0 && r.webgpu.many[1] > 50 && r.webgpu.many[2] > 50 && r.webgpu.manyDynamic.every((n) => n > 50),
+        fixed: (r) => all(r) && r.webgpu.sameFrame && r.webgpu.many.every((n) => n > 50),
+        observed: (r) => `one [${r.webgpu.one.join(", ")}], many [${r.webgpu.many.join(", ")}], manyDynamic [${r.webgpu.manyDynamic.join(", ")}] -- pixels in the left, middle and right thirds; the renders in one browser frame: ${r.webgpu.sameFrame} (both backends)` },
+    "09-batched-grown-old-texture.md": { patch: "09-batched-texture-in-dynamic-key.diff",
+        bug: (r) => { const g = r.webgpu.grown, u = r.webgpu.grownMaterialUpdated; return all(r) && g[2] === g[1] && g[3] === g[1] && g[4] === g[1] && u.every((x, i) => i === 0 || x > u[i - 1]); },
+        fixed: (r) => all(r) && r.webgpu.grown.every((x, i, g) => i === 0 || x > g[i - 1]),
+        observed: (r) => `grown [${r.webgpu.grown.join(", ")}], grownMaterialUpdated [${r.webgpu.grownMaterialUpdated.join(", ")}] -- the centre x of each frame's pixels, the batch grown before the third (both backends)` },
     "06-webgl2-second-compute.md": { patch: "06-webgl2-compute-stage-per-buffers.diff",
         bug: (r) => r.webgpu.moved.join() === "true,true" && r.webgl2.moved.join() === "true,false",
         fixed: (r) => r.webgpu.moved.join() === "true,true" && r.webgl2.moved.join() === "true,true",
@@ -109,15 +124,17 @@ if (!skip) {
     try {
         const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]]]);
         if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE]);
-        const r = await runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: {}, script: `async () => {
+        // two pages at once -- r185's runs and the patched builds' -- each a browser of its own
+        const page = (list) => runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: {}, script: `async () => {
             const out = {};
-            ${runs.map(([key, dir, code]) => `try {
+            ${list.map(([key, dir, code]) => `try {
                 const THREE = await import("${dir}/three.webgpu.js"), T = await import("${dir}/three.tsl.js"); window.__result = undefined;
                 await (async () => { ${code} })(); out[${JSON.stringify(key)}] = window.__result;
             } catch (e) { out[${JSON.stringify(key)}] = { error: String((e && e.message) || e) }; }`).join("\n            ")}
             return out;
-        }` });
-        results = r.ok ? r.result : Object.fromEntries(runs.map(([key]) => [key, { error: r.reason || (r.pageErrors || []).join("; ") }]));
+        }` }).then((r) => (r.ok ? r.result : Object.fromEntries(list.map(([key]) => [key, { error: r.reason || (r.pageErrors || []).join("; ") }]))));
+        const [was, now] = await Promise.all([page(runs.filter(([, dir]) => dir.startsWith("/vendor/"))), page(runs.filter(([, dir]) => !dir.startsWith("/vendor/")))]);
+        results = { ...was, ...now };
     } finally { dispose(); }
 }
 const ran = (res) => !!(res && res.webgpu && res.webgl2);
@@ -140,18 +157,19 @@ for (const [f, d] of Object.entries(DRAFTS)) {
         /^diff --git a\/src\//.test(diffs[f]) && a.found.length > 0 && a.found.every((n) => n === 1) && a.text !== bundle);
 }
 // v4774: WHAT THREE'S OWN TOOLS SAID, RECORDED. In a checkout of three's r185 tag (0.185.1), `npm ci` and `npm run build`: the
-// vendored build is three's rollup output byte for byte. With the six patches applied by `git apply`, `npm run build` again, and
-// the one line rollup orders by first use -- the names imported from three.core.js -- sorted: the same bytes as the six applied
-// here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed, 1 todo,
-// 0 failed, as for r185 unpatched. A patch changed since makes the second hash stale: build three again, and record it.
-const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", sixPatched: "f6ac74236c521b7e3fa4e07d57a01a0301acc6b61ca02748380dc4a4fb82ba88" });
+// vendored build is three's rollup output byte for byte. With the patches applied by `git apply`, `npm run build` again, and
+// the one line rollup orders by first use -- the names imported from three.core.js -- sorted: the same bytes as the patches
+// applied here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed,
+// 1 todo, 0 failed, as for r185 unpatched. v4775 recorded it again for all nine: 08 changes the same import line of Instance.js
+// as 01, so it was merged by hand. A patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "3afebc0c2e3d3024324e5145fd4c0faa7d1865eea3adc6054cb2000f00a983f4" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { let t = bundle, found = []; for (const f of Object.keys(DRAFTS)) { const a = apply(diffs[f], t); t = a.text; found = found.concat(a.found); }
-  ok(`  all six applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
+  ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
-  ok(`*** all six applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
-      sha(normalImports(t)) === THREE_BUILT.sixPatched, "recorded at v4774 from `git apply` of the six and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
+  ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
+      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4775 from `git apply` of the nine (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];

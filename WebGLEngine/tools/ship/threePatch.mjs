@@ -17,7 +17,10 @@ export const PATCHES = path.join(ENG, "docs", "upstream-three", "patches");
 export const BUNDLE = path.join(ENG, "vendor", "three-webgpu", "three.webgpu.js");
 
 /** Identifiers the bundler renamed where two modules declared the same name, per source file. */
-export const RENAMED = Object.freeze({ "src/materials/nodes/SpriteNodeMaterial.js": [["reference( '", "reference$1( '"]] });
+export const RENAMED = Object.freeze({
+    "src/materials/nodes/SpriteNodeMaterial.js": [["reference( '", "reference$1( '"]],
+    "src/renderers/common/RenderObject.js": [["hash( ", "hash$1( "]],
+});
 
 /** A unified diff's hunks as the build holds them: context and removed lines are the old text, context and added the new. */
 export function hunksOf(diff) {

@@ -13,6 +13,9 @@ patch on the paths its reproduction does not take, and holds each draft's "paths
 - [VelocityNode drawn outside MRT: the previous positions are never built](04-velocity-outside-mrt.md) -- observed: plain 5.612, drawn 1.871, mrt 5.612, mrtSameFrame 0.000 (px, both backends); patched: plain 5.612, drawn 5.612, mrt 5.612, mrtSameFrame 0.000 (px, both backends)
 - [Sprite: `center` is taken from the first sprite that built a shared program](05-sprite-center-shared-program.md) -- observed: offCentre 38.5, centredAfter 38.5, centredUnlike 31.5 (both backends); patched: offCentre 38.5, centredAfter 31.5, centredUnlike 31.5 (both backends)
 - [WebGL2 backend: only the first particle system's compute runs](06-webgl2-second-compute.md) -- observed: webgpu moved [true, true]; webgl2 moved [true, false]; patched: webgpu moved [true, true]; webgl2 moved [true, true]
+- [SkinnedMesh: the pose follows the bones once per browser frame](07-skinned-pose-once-a-frame.md) -- observed: plain [142, 142], skinned [0, 142], skinnedUpdated [142, 142] -- pixels left and right of the centre; the renders in one browser frame: true (both backends); patched: plain [142, 142], skinned [142, 142], skinnedUpdated [142, 142] -- pixels left and right of the centre; the renders in one browser frame: true (both backends)
+- [InstancedMesh past the uniform buffer: the third render in a browser frame draws the second's matrices](08-instanced-large-third-render.md) -- observed: one [142, 144, 142], many [0, 144, 142], manyDynamic [142, 144, 142] -- pixels in the left, middle and right thirds; the renders in one browser frame: true (both backends); patched: one [142, 144, 142], many [142, 144, 142], manyDynamic [142, 144, 142] -- pixels in the left, middle and right thirds; the renders in one browser frame: true (both backends)
+- [BatchedMesh: grown by setInstanceCount, it is drawn from its old matrices texture](09-batched-grown-old-texture.md) -- observed: grown [22.4, 28, 28, 28, 28], grownMaterialUpdated [22.4, 28, 33, 39, 44.5] -- the centre x of each frame's pixels, the batch grown before the third (both backends); patched: grown [22.4, 28, 33, 39, 44.5], grownMaterialUpdated [22.4, 28, 33, 39, 44.5] -- the centre x of each frame's pixels, the batch grown before the third (both backends)
 
 ## Checked with three's own tools (v4774)
 
@@ -20,11 +23,13 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
 
 - `npm run build` of the tag, unpatched: `three.webgpu.js` and `three.core.js` are the vendored files byte for byte
   (`three.tsl.js` differs only by the vendoring's one edit, its import of `three/webgpu` made relative).
-- The six patches applied with `git apply`, in order, all applying cleanly: `npm run lint-core` is clean, and `npm run build`
-  makes the same bytes the gates' applier makes from the vendored build, but for the order of the names in its one import from
-  `three.core.js` -- rollup lists them by first use, and patch 02 uses three of them earlier.
+- The patches applied with `git apply`, in order -- all nine since v4775; 08 changes the same import line of `Instance.js` as
+  01, and that line was merged by hand, to `import { OnBeforeObjectUpdate } from '../utils/EventNode.js';` --
+  `npm run lint-core` is clean, and `npm run build` makes the same bytes the gates' applier makes from the vendored build, but
+  for the order of the names in its one import from `three.core.js`: rollup lists them by first use, and patch 02 uses three of
+  them earlier.
 - Three's unit tests (`test/unit`, run in headless Chromium with QUnit served locally): 1311 tests, 1310 passed, 1 todo,
-  0 failed -- the same as the unpatched tag. They exercise none of the paths the patches change.
+  0 failed, with the six and with the nine -- the same as the unpatched tag. They exercise none of the paths the patches change.
 - Not run: three's e2e tests (`test/e2e`), which need its examples and screenshots.
 
 `tools/ship/threeUpstream-selfcheck.mjs` holds the hash of each build; a patch changed since makes the patched one stale.

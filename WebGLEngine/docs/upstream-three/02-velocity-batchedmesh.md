@@ -84,7 +84,7 @@ a batch grown by setInstanceCount, its material then updated: r185 1.871 then 7.
 
 The patch makes its copy again at the new size and keeps the last draw's matrices -- the layout is linear, so they are its
 first entries. three itself draws a grown batch from its old matrices texture until the batch's material is updated, which
-is a separate report; the material is updated here.
+is a separate report, [09](09-batched-grown-old-texture.md); the material is updated here.
 
 ## A fix that works in an application
 

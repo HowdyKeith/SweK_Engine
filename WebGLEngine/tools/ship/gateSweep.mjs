@@ -8032,6 +8032,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4775 -- THE 382nd CLOSING: NO new gate file -- three more three.js drafts: a render is not a frame.
+    since457: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4775", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (drafts 07-09 with their patches; r185's and the patched runs in two pages at once; the nine-patch build recorded)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE BUGS IN THREE ITSELF, EACH A RENDER TAKEN FOR A FRAME OR A STALE KEY. *** 07: a SkinnedMesh rendered twice " +
+                 "in one browser frame, its bone moved between, is drawn in the first render's pose -- skeleton.update() runs once per " +
+                 "frameId; patched, the pose follows each render while the previous bones still step once a frame. 08: an InstancedMesh " +
+                 "past the uniform buffer draws its third render in a frame from the second's matrices -- the interleaved buffer's " +
+                 "version is synced once a frame, after the upload check; patched, before each draw. 09: a BatchedMesh grown by " +
+                 "setInstanceCount is drawn from its old matrices texture -- found by v4773's growth row -- because the render object " +
+                 "compares its full key only when the material or the dynamic key changes; patched, the batch's texture is in the " +
+                 "dynamic key. Each reproduction uses public API alone. The nine patches through three's build again (08's import line, " +
+                 "shared with 01, merged by hand): the applier's bytes, lint clean, unit tests as unpatched. One more bundler rename " +
+                 "found (hash -> hash$1 in RenderObject.js), and 07's hunks needed six lines of context to be unique.",
+    }),
     // v4774 -- THE 381st CLOSING: NO new gate file -- the three.js patches through three's own build, lint and unit tests.
     since456: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
