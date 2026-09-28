@@ -1,10 +1,10 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-09-28T18:58:39.328Z",
+ "at": "2026-09-28T19:04:36.833Z",
  "poolAt": "2026-09-22T18:55:53.815Z",
  "budgetMs": 3000,
- "lastRun": 25,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -1891,6 +1891,55 @@
    "code": 0,
    "priorMs": 20058,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/ship/frameDisagreeMeasure-selfcheck.mjs",
+   "ms": 48687,
+   "code": 0,
+   "priorMs": 20038,
+   "at": "2026-09-28T19:00:30.472Z"
+  },
+  {
+   "gate": "tools/ship/frameGain-selfcheck.mjs",
+   "ms": 29533,
+   "code": 0,
+   "priorMs": 20067,
+   "at": "2026-09-28T19:01:00.183Z"
+  },
+  {
+   "gate": "tools/ship/frameGainMeasure-selfcheck.mjs",
+   "ms": 46782,
+   "code": 0,
+   "priorMs": 20061,
+   "at": "2026-09-28T19:01:47.141Z"
+  },
+  {
+   "gate": "tools/ship/frameGateMeasure-selfcheck.mjs",
+   "ms": 41383,
+   "code": 0,
+   "priorMs": 20042,
+   "at": "2026-09-28T19:02:28.695Z"
+  },
+  {
+   "gate": "tools/ship/frameHoledMeasure-selfcheck.mjs",
+   "ms": 40541,
+   "code": 0,
+   "priorMs": 20049,
+   "at": "2026-09-28T19:03:09.452Z"
+  },
+  {
+   "gate": "tools/ship/frameHolesMeasure-selfcheck.mjs",
+   "ms": 41059,
+   "code": 0,
+   "priorMs": 20035,
+   "at": "2026-09-28T19:03:50.668Z"
+  },
+  {
+   "gate": "tools/ship/frameReverseMeasure-selfcheck.mjs",
+   "ms": 45995,
+   "code": 0,
+   "priorMs": 20056,
+   "at": "2026-09-28T19:04:36.833Z"
   },
   {
    "gate": "tools/ship/frameSwayRep-selfcheck.mjs",
