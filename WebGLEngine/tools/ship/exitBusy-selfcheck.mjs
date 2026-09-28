@@ -21,6 +21,14 @@ import path from "node:path";
 import * as EB from "./exitBusy.mjs";
 import { fileURLToPath } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// *** v4692 -- THE SYNTHETIC FIXTURES ARE READ OVER 100 ms WINDOWS, NOT THE CENSUS'S 300. *** Eight measure() calls
+// at three 300 ms windows each were ~10.2 of this gate's 10.5 s here, all of it fixed waiting, and on Keith's rig,
+// where each child also starts slower, the gate was killed at the sweep's 20 s cap in the v4691 verify. classify()
+// is window-free -- a 5 ms floor and a 5x ratio -- and every fixture below clears it at any window: the burst is
+// ~1.2 s of queued work, the steady burner is half a core (~50 ms of every 100 ms window, three Windows 15.6 ms
+// ticks over the floor), the quiet one reads ~0. The census of REAL gates keeps measure()'s 300 ms default: there
+// the window IS the question, how much teardown work lands within it.
+const W = 100;
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -70,8 +78,8 @@ process.exit(0);
 `);
     const QUIET = write("quiet-selfcheck.mjs", 'console.log("nothing queued");\nprocess.exit(0);\n');
 
-    const b = EB.measure(BUSY, { cwd: TMP, capMs: 60000 });
-    const q = EB.measure(QUIET, { cwd: TMP, capMs: 60000 });
+    const b = EB.measure(BUSY, { cwd: TMP, capMs: 60000, windowMs: W });
+    const q = EB.measure(QUIET, { cwd: TMP, capMs: 60000, windowMs: W });
     report(`busy  win1=${b.ok ? b.win1Ms.toFixed(1) : "?"} win2=${b.ok ? b.win2Ms.toFixed(1) : "?"} parked=${b.ok ? b.parkedMs.toFixed(1) : "?"}`);
     report(`quiet win1=${q.ok ? q.win1Ms.toFixed(1) : "?"} win2=${q.ok ? q.win2Ms.toFixed(1) : "?"} parked=${q.ok ? q.parkedMs.toFixed(1) : "?"}`);
 
@@ -96,7 +104,7 @@ process.exit(0);
     // *** v4686 -- BURNED BY THE CLOCK, NOT BY A LOOP COUNT. *** 300,000 square roots every 10 ms was ~15 ms of CPU
     // per 300 ms window on the rig -- ONE Windows scheduler tick -- so its cpuUsage read "win1 0.0 AND win2 15.0",
     // a tick or nothing, and the steady fixture looked like a burst. Five milliseconds of every ten is about half a
-    // core on ANY box, ~150 ms a window, several ticks above the floor wherever this runs.
+    // core on ANY box, ~50 ms of each 100 ms window (v4692: W above), several ticks above the floor wherever this runs.
     const STEADY = write("steady-selfcheck.mjs", `
 let sink = 0;
 const t = setInterval(() => { const e = Date.now() + 5; while (Date.now() < e) sink++; }, 10);
@@ -104,7 +112,7 @@ t.unref();
 console.log("steady");
 process.exit(0);
 `);
-    const st = EB.measure(STEADY, { cwd: TMP, capMs: 60000 });
+    const st = EB.measure(STEADY, { cwd: TMP, capMs: 60000, windowMs: W });
     report(`steady win1=${st.ok ? st.win1Ms.toFixed(1) : "?"} win2=${st.ok ? st.win2Ms.toFixed(1) : "?"}`);
     ok("!! ...and a STEADY cost is classified apart from a burst rather than swept in with it",
         st.ok && st.win1Ms >= EB.FLOOR_MS && EB.classify(st) === "steady",
@@ -115,7 +123,7 @@ process.exit(0);
 
     // The verdict travels. A screen that reported every gate green would be worse than no screen.
     const RED = write("red-selfcheck.mjs", 'console.log("failing on purpose");\nprocess.exit(7);\n');
-    const r7 = EB.measure(RED, { cwd: TMP, capMs: 60000 });
+    const r7 = EB.measure(RED, { cwd: TMP, capMs: 60000, windowMs: W });
     ok("!! *** the patched copy exits with the GATE'S verdict, not the probe's ***",
         r7.ok && r7.exitCode === 7, `exit ${r7.ok ? r7.exitCode : "?"} -- the copy is a measurement of the gate, so ` +
         "it has to be able to come back red");
@@ -166,7 +174,7 @@ console.log("\n2b. *** THE PROBE IS A STRING THIS FILE BUILDS, SO IT IS GRADED A
         `const extra = fs.readdirSync(here).filter((f) => f.endsWith(${JSON.stringify(EB.COPY_SUFFIX)}));\n` +
         'console.log(extra.length ? "  FAIL  a stray copy: " + extra.join(", ") : "  PASS  nothing beside me");\n' +
         'process.exit(extra.length ? 1 : 0);\n');
-    const m = EB.measure(WALK, { cwd: TMP, capMs: 20000, withBaseline: true });
+    const m = EB.measure(WALK, { cwd: TMP, capMs: 20000, withBaseline: true, windowMs: W });
     ok("!! *** and `perturbed` FIRES ON THE CASE IT EXISTS FOR: a gate that walks its directory is green alone and red under the probe ***",
         m.ok && m.baseExitCode === 0 && m.exitCode !== 0 && m.perturbed === true,
         m.ok ? `baseline exit ${m.baseExitCode}, under the probe ${m.exitCode} -- it finds the copy and adjudicates it. ` +
@@ -180,11 +188,11 @@ console.log("\n2b. *** THE PROBE IS A STRING THIS FILE BUILDS, SO IT IS GRADED A
         wcRow ? "0.5 / 12.2 / 17.7 ms over three runs -- bimodal, marked uncertain, counted as evidence for nothing"
               : "no wiringClaims row found in exit-busy-census.json");
     ok("...and it does NOT fire on a gate the probe leaves alone, so it is not always true",
-        (() => { const g = EB.measure(GREEN, { cwd: TMP, capMs: 20000, withBaseline: true });
+        (() => { const g = EB.measure(GREEN, { cwd: TMP, capMs: 20000, withBaseline: true, windowMs: W });
                  return g.ok && g.perturbed === false; })(),
         "a flag that is set for every row names nothing");
     ok("...and it is undefined rather than false when no baseline was asked for, because UNASKED is not UNPERTURBED",
-        EB.measure(GREEN, { cwd: TMP, capMs: 20000 }).perturbed === undefined);
+        EB.measure(GREEN, { cwd: TMP, capMs: 20000, windowMs: W }).perturbed === undefined);
 }
 
 // ---- 3. A MISSING READING IS UNKNOWN, NEVER QUIET -----------------------------------------------------------
@@ -197,7 +205,7 @@ console.log("\n3. *** THE ABSENCE OF A NUMBER IS NOT A NUMBER ***");
     // A timer is what actually holds the loop open, so the await never settles and the cap is what ends it.
     const PRE = write("prehang-selfcheck.mjs",
         'setInterval(() => {}, 50);\nawait new Promise(() => {});\nprocess.exit(0);\n');
-    const h = EB.measure(PRE, { cwd: TMP, capMs: 2500 });
+    const h = EB.measure(PRE, { cwd: TMP, capMs: 1000 })   // v4692: 2500 -> 1000; a hang is killed at any cap;
     ok("!! *** a gate killed at the cap is UNKNOWN and its reason names the cap ***",
         h.ok === false && /cap/.test(h.why || ""), `${h.why} -- v4663's own notes are about a screen that turned a ` +
         "missing measurement into a clean bill, and classify() returns 'unknown' for this row rather than 'quiet'");

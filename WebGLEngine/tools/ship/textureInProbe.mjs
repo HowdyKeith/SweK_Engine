@@ -67,8 +67,12 @@ if (childMode) {
     mark("all calls returned; exiting");
     exitCleanly(0);
 } else {
-    const i = process.argv.indexOf("--repeat");
-    const repeat = i > 0 ? Math.max(1, Number(process.argv[i + 1]) || 1) : 1;
+    // v4692 -- parsed by cliArgs.mjs, not read off process.argv: `--repat 3` used to run once and say nothing.
+    const { parseArgs, refusalLines } = await import("./cliArgs.mjs");
+    const CLI = { values: { "--repeat": "number" }, flags: [] };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("textureInProbe", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const repeat = Math.floor(cli.values["--repeat"] || 1);
     console.log(`textureInProbe -- ${process.platform}/${process.arch}, node ${process.version}, ${repeat} run(s) per mode\n`);
     for (const mode of MODES) for (let k = 0; k < repeat; k++) {
         const t0 = Date.now();

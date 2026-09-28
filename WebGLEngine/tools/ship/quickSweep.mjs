@@ -39,7 +39,9 @@ import { boxId } from "./hostScale.mjs";
 // the session removing from its own record.
 import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecord as readInputRecord } from "./inputSets.mjs";
-import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs } from "./gateSweep.mjs";
+import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES } from "./gateSweep.mjs";
+import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
+import { sweepStrays } from "./exitBusy.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
 
@@ -472,6 +474,37 @@ function runOneAsync(rel, capMs, root) {
  * the timings file rewritten with what was seen. `onProgress(done, total)` is optional.
  */
 /**
+ * *** v4692 -- WHAT A KILLED GATE LEAVES IS RECLAIMED BEFORE THE NEXT GATE RUNS, NOT BEFORE THE NEXT SWEEP. ***
+ * Keith's v4691 rig verify capped four gates at 20 s in phase 2 -- artefactWriters, deletionHarness, exitBusy,
+ * multigrid3dTiming -- and a cap kill runs no cleanup: fixtures planted in the tree stay there. Every gate after
+ * them that walks the tree then met the leftovers, and gatesBridge went red on exactly that shape: its bridge
+ * walk (which skips `__` fixtures) read 1777 and its plain walk 1778, where this box reads 1776 for both. The
+ * same pair of numbers came back from the v4684 run. Everything that reclaims already existed, each run only at
+ * the START of the next sweep or gate: TRANSIENT_DIRS and TRANSIENT_FIXTURES (gateSweep), the `__` fixtures
+ * (fixtureLitter) and exitBusy's probe copies. This runs all four at the two points where NO gate is running:
+ * after phase 1's workers have all returned, and after each serial run that did not exit 0 -- a cap kill or a
+ * native crash (0xC0000005 runs no handler either). Deleting while a gate runs would pull a live fixture out
+ * from under it, which is why it is never called from phase 1. `root` is a parameter so the gate drives it on a
+ * scratch tree; the names it will delete are spelled by the four owners, not globbed here.
+ */
+export function reclaimStrandedFixtures(root = ENG) {
+    const gone = [...reclaimScratchDirs(root)];
+    for (const rel of TRANSIENT_FIXTURES) {
+        const p = path.join(root, rel);
+        try { if (fs.existsSync(p)) { fs.unlinkSync(p); gone.push(rel); } } catch {}
+    }
+    for (const dir of FIXTURE_DIRS) {
+        let names = [];
+        try { names = fs.readdirSync(path.join(root, dir)); } catch { continue; }
+        for (const nm of names.filter((x) => x.startsWith(FIXTURE_PREFIX))) {
+            try { fs.unlinkSync(path.join(root, dir, nm)); gone.push(dir + "/" + nm); } catch {}
+        }
+    }
+    for (const q of sweepStrays(root)) gone.push(path.relative(root, q).split(path.sep).join("/"));
+    return gone;
+}
+
+/**
  * *** THE SKIP IS OPT-IN FOR CALLERS AND ON BY DEFAULT ONLY AT THE COMMAND LINE, AND v4574 GOT THAT BACKWARDS
  * FIRST. *** Arming meant flipping this default to true, which armed it for EVERY programmatic caller at once
  * -- and there are nine, all of them fixtures driving the sweep to watch what it does, plus budgetExile
@@ -510,6 +543,13 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         }
     }
     await Promise.all(Array.from({ length: Math.max(1, workers) }, worker));
+    // v4692: nothing is running now, so what phase 1's cap kills stranded goes before phase 2 re-runs anything.
+    const reclaim = (after) => {
+        if (gates) return;   // a caller's own list lives in its own root, as for the scratch-dir reclaim above
+        const gone = reclaimStrandedFixtures(root);
+        if (gone.length) log(`[sweep] reclaimed ${gone.length} file(s) left by ${after}: ${gone.join(", ")}`);
+    };
+    reclaim("phase 1's killed runs");
     // phase 2: every candidate alone, at the same cap (a gate under budget has no business needing more)
     //
     // *** v4680 -- PHASE 2 WAS SILENT, AND A RUN THAT DIED IN IT LEFT A LOG THAT COULD NOT SAY SO. *** Keith's
@@ -540,11 +580,13 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             // is filed, which is the same two-phase discipline reds have had since v4297, applied to timings.
             if (p1.ms > budgetMs) {
                 const conf = await runOneAsync(rel, capMs, root);
+                if (conf.code !== 0) reclaim(rel);
                 rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, serialMs: conf.ms, serialCode: conf.code, parallelSkipped: p1.skipped, serialSkipped: conf.skipped, from: "budget-confirm", serialTimedOut: conf.timedOut, parallelTimedOut: p1.timedOut });
             } else rows.push({ gate: rel, verdict: VERDICT.GREEN, parallelMs: p1.ms, parallelTimedOut: p1.timedOut, parallelSkipped: p1.skipped });
             continue;
         }
         const p2 = await runOneAsync(rel, capMs, root);
+        if (p2.code !== 0) reclaim(rel);
         const serial = { code: p2.code, ms: p2.ms, timedOut: p2.timedOut };
         const c = classify(parallel, serial);   // { verdict, from, note } -- gateSweep's rule, not a copy of it
         rows.push({ gate: rel, verdict: c.verdict, from: c.from, parallelMs: p1.ms, serialMs: p2.ms, serialCode: p2.code, parallelSkipped: p1.skipped, serialSkipped: p2.skipped, serialTimedOut: p2.timedOut, parallelTimedOut: p1.timedOut, serialTail: p2.tail });
@@ -581,6 +623,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
             if (Date.now() >= until) break;
             stage({ stage: "slice", done: sliced + 1, total: owed.length, gate: rel });
             const one = await runOneAsync(rel, capMs, root);
+            if (one.code !== 0) reclaim(rel);
             serial[rel] = one.ms; serialAt[rel] = sliceStamp; ring(rel, one.ms); sliced++;
         }
     }

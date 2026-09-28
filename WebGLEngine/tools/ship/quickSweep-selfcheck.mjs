@@ -888,6 +888,43 @@ sec("8g. WHAT THE RED GATE SAID, CARRIED INTO THE REPORT (v4648)");
        row ? `fail: ${JSON.stringify(row.fail)}` : "no newRed row came back at all");
 }
 
+sec("8h. WHAT A KILLED GATE LEAVES IS GONE BEFORE THE NEXT GATE RUNS (v4692)");
+{
+    // Keith's v4691 rig verify: four gates capped in phase 2, and gatesBridge -- run after three of them -- read
+    // 1777 gates by its bridge walk and 1778 by its plain one, against 1776 for both here: fixtures the killed
+    // runs planted, met by every gate that walked the tree after them. Two rows. The first plants one of every
+    // kind the four owners name BESIDE a look-alike that must survive, because this deletes in source
+    // directories and a reclaim that took the neighbour would be worse than the litter. The second drives a
+    // whole-tree sweep on a scratch root whose one gate plants a `__` fixture and then hangs past the cap.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qs-reclaim-"));
+    const put = (rel, body = "") => { fs.mkdirSync(path.dirname(path.join(tmp, rel)), { recursive: true }); fs.writeFileSync(path.join(tmp, rel), body); };
+    const litter = ["tools/ship/zz-temp-fixture-selfcheck.mjs", "tools/ship/__inputsets_probe.mjs", "physics/__mutation-decoy-selfcheck.mjs",
+                    "render/fooBar-selfcheck.__exitbusy.mjs", "tools/ship/.sabotage-orbpresent-Ab12Cd/copy.mjs"];
+    const keep = ["tools/ship/real-selfcheck.mjs", "tools/ship/zz-other-selfcheck.mjs", "render/__notAFixtureDir.mjs",
+                  "tools/ship/.sabotage-orbpresent-TooLongName/copy.mjs", "render/fooBar-selfcheck.mjs"];
+    for (const f of [...litter, ...keep]) put(f, "export {};\n");
+    const gone = Q.reclaimStrandedFixtures(tmp);
+    const left = (f) => fs.existsSync(path.join(tmp, f));
+    ok(litter.every((f) => !left(f)) && keep.every(left),
+       "*** reclaimStrandedFixtures removes every kind a killed gate strands, and NOTHING beside them ***",
+       `removed ${gone.length}: ${gone.join(", ")}; kept ${keep.filter(left).length} of ${keep.length} look-alikes ` +
+       `(a real gate, an unlisted zz- name, a __ file outside the fixture dirs, a scratch dir of the wrong length, the gate a copy was made of)`);
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "qs-reclaim-sweep-"));
+    const planted = path.join(root, "tools", "ship", "__planted-fixture-selfcheck.mjs");
+    fs.mkdirSync(path.dirname(planted), { recursive: true });
+    fs.writeFileSync(path.join(root, "tools", "ship", "planter-selfcheck.mjs"),
+        `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(planted)}, "process.exit(1);\\n");\nsetTimeout(() => {}, 60000);\n`);
+    const said = [];
+    const sw = await Q.runQuickSweep({ root, budgetMs: 60000, workers: 1, capMs: 1500, write: false, serialSliceMs: 0,
+                                       log: (m) => said.push(m) });
+    const named = said.filter((m) => /reclaimed .*__planted-fixture-selfcheck\.mjs/.test(m));
+    ok(!fs.existsSync(planted) && sw.unmeasured.length === 1 && named.length >= 1,
+       "*** a whole-tree sweep that caps a gate RECLAIMS what it planted, and says so, before anything else runs ***",
+       `fixture ${fs.existsSync(planted) ? "STILL ON DISK" : "gone"}; ${sw.unmeasured.length} unmeasured; ${named.length} reclaim line(s): ${named[0] || "none"}`);
+    for (const d of [tmp, root]) try { fs.rmSync(d, { recursive: true, force: true }); } catch {}
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the gates over the budget THE ROTATION HAS NOT REACHED YET. v4408 answered the older " +
     "version of this line -- that a regression in a 40-second gate is found by the full sweep and by nothing at " +
