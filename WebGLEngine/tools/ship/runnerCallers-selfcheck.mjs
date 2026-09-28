@@ -49,6 +49,15 @@ ok("!! *** the arc's five wired runners are NOT in the gate-only list, so the li
     "render/objectMotionGPU.mjs", "render/temporalLockGPU.mjs"]
        .every((f) => !R.gateOnly.some((g) => g.file === f)),
    "fsr.html imports all five. A census that named every runner would be a list of runners, not a finding.");
+// v4776 -- THE CENSUS RETURNED `render\temporalLockGPU.mjs` ON WINDOWS, and the row below read "imported by undefined"
+// on Keith's rig the first time the rig ran it (it was only ever run on Linux, where path.relative's output and the
+// "render/..." literals are the same string). The census now joins with "/" on every platform. This row is VACUOUS
+// on a POSIX box -- no path there can carry a backslash -- and it is the row that fails first on Windows if the join
+// goes away, which is the box the defect lives on.
+ok("!! every name the census returns uses forward slashes, on every platform",
+   R.runners.every((r) => !r.file.includes("\\") && r.by.every((b) => !b.includes("\\"))),
+   `${R.runners.length} runner names and ${R.runners.reduce((s, r) => s + r.by.length, 0)} importer names checked on ` +
+   `${process.platform}${process.platform === "win32" ? "" : " -- vacuous here; the row is for win32"}`);
 ok("!! ...and temporalLockGPU left the list IN THE ROUND THAT ADDED THIS FILE",
    R.runners.some((r) => r.file === "render/temporalLockGPU.mjs" && r.production > 0)
    && R.runners.find((r) => r.file === "render/temporalLockGPU.mjs").by.includes("fsr.html"),

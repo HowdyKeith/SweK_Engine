@@ -73,6 +73,11 @@ export function importsModule(text, base, pre = null) {
  * from nowhere, and a census that merged them would let the second hide inside the first.
  */
 export function runnerCallers(root) {
+    // v4776 -- FORWARD SLASHES, ON EVERY PLATFORM. path.relative returns `render\\temporalLockGPU.mjs` on Windows, so
+    // every name this census returned failed to match the "render/..." paths its own gate and fsr2Coverage compare
+    // against, and the rig read "imported by undefined" the first time it ran this file. Found by Keith's v4776
+    // verify: this census was only ever run on Linux, where the two spellings are the same string.
+    const rel = (p) => path.relative(root, p).split(path.sep).join("/");
     const files = walkSource(root);
     const text = new Map(files.map((f) => [f, fs.readFileSync(f, "utf8")]));
     // *** TWO SUBSTRING PRE-FILTERS, AND BOTH ARE SOUND RATHER THAN APPROXIMATE. *** codeOnly and
@@ -99,9 +104,9 @@ export function runnerCallers(root) {
             if (g === f) continue;
             if (!text.get(g).includes(base)) continue;        // sound: noComments only removes characters
             if (!importsModule(text.get(g), base, strip(g))) continue;
-            if (isGate(g)) gates++; else { production++; by.push(path.relative(root, g)); }
+            if (isGate(g)) gates++; else { production++; by.push(rel(g)); }
         }
-        runners.push({ file: path.relative(root, f), gates, production, by });
+        runners.push({ file: rel(f), gates, production, by });
     }
     return {
         runners,

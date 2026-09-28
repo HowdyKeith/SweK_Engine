@@ -6,7 +6,7 @@
 // v4685 mirrored the reconciliation, v4686 the warp, and this the fill. All three now have kernels that agree
 // with their CPU twins. *** THE END-TO-END DEVICE CHAIN DOES NOT EXIST, AND THE REASON IS ARITHMETIC. *** Joining
 // them means one pipeline holding the warp's inputs AND the fill's: prev, cur, flow, depthBlock, key, owner,
-// packed, packed2, frameOut, depthPrev, depthCur -- eleven storage bindings against this adapter's limit of ten,
+// packed, packed2, frameOut, depthPrev, depthCur -- eleven storage bindings against SwiftShader's limit of ten (Keith's rig reports sixteen -- v4776),
 // and eight on the default WebGPU limits every other adapter is allowed to report. So a caller still moves data
 // between the three passes, each of which is verified. That is a real limit with a number, not a to-do.
 //
@@ -17,7 +17,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
-import { validateWgsl } from "./wgslSpec.mjs";
+import { validateWgsl, DEFAULT_LIMITS } from "./wgslSpec.mjs";
 import { FILL_WGSL, FILL_STRIDE } from "./holeFillWgsl.mjs";
 import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
 
@@ -270,11 +270,20 @@ console.log("\n4. THE OCCLUDER THAT WRAPS THE HOLE, WHICH A ONE-SIDED FIXTURE CA
 
 console.log("\n5. *** WHY THE THREE PASSES ARE NOT ONE PIPELINE, WITH THE ARITHMETIC ***");
 {
-    ok("*** joining the warp and the fill needs ELEVEN storage bindings and this adapter allows ten ***",
-       r.result.maxStorage < 11,
-       `this adapter reports maxStorageBuffersPerShaderStage ${r.result.maxStorage}; the WebGPU default every adapter may report is 8. ` +
-       `A joined pipeline holds prev, cur, flow, depthBlock, key, owner, packed, packed2, frameOut, depthPrev and depthCur -- eleven. ` +
-       `So a caller moves data between the three verified passes, and this is a limit with a number rather than a to-do.`);
+    // v4776 -- THE ROW ASSERTED ONE ADAPTER'S LIMIT AS THE REASON, AND THE RIG'S ADAPTER DISAGREED. It read "this adapter
+    // allows ten" and asserted maxStorage < 11: true of SwiftShader, which reports 10, and false on Keith's rig, whose
+    // adapter reports 16 and would hold a joined pipeline. The design reason was never this adapter -- it is that a
+    // pipeline needing eleven bindings is REFUSED by every adapter that reports only the spec's guaranteed default, so
+    // splitting is what makes the pass portable. That is asserted now, against render/wgslSpec.mjs's DEFAULT_LIMITS,
+    // and the adapter's own limit is reported beside it, including when it would have fitted.
+    const JOINED = ["prev", "cur", "flow", "depthBlock", "key", "owner", "packed", "packed2", "frameOut", "depthPrev", "depthCur"];
+    const floor = DEFAULT_LIMITS.maxStorageBuffersPerShaderStage;
+    ok(`*** joining the warp and the fill needs ${JOINED.length} storage bindings and the spec guarantees ${floor} ***`,
+       JOINED.length > floor && floor === 8,
+       `a joined pipeline holds ${JOINED.join(", ")} -- ${JOINED.length}, over the ${floor} every adapter must support, so it ` +
+       `would be refused wherever only the default is reported. THIS adapter reports maxStorageBuffersPerShaderStage ` +
+       `${r.result.maxStorage}, so ${r.result.maxStorage >= JOINED.length ? "here a join WOULD fit -- the split is for portability, not for this box" : "here it would not fit either"}. ` +
+       `A caller moves data between the three verified passes, and this is a limit with a number rather than a to-do.`);
     ok("...and the fill needs ONE dispatch where the warp needed three, which is a property of the algorithms",
        (FILL_WGSL.match(new RegExp(String.fromCharCode(64) + "compute", "g")) || []).length === 1,
        "the neighbourhood rule reads only the ORIGINAL mask and writes only its own slot, so no device can disagree " +
@@ -332,7 +341,7 @@ console.log(`\nholeFillGPU-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}
 console.log("unchecked here: THE CHAIN END TO END, which is render/frameInterpGPU-selfcheck.mjs section 8's " +
     "subject and not this file's -- this gate says the fill agrees with its CPU twin, and that one says the " +
     "three runners wired together agree with interpolateFrameCPU({ fill }). AND THE HOST IS STILL IN BETWEEN: " +
-    "section 5 measures why -- eleven storage bindings against this adapter's ten -- so the field crosses back " +
+    "section 5 measures why -- eleven storage bindings against the eight the spec guarantees (SwiftShader here reports ten, Keith's rig sixteen) -- so the field crosses back " +
     "twice per generated frame and NOTHING MEASURES WHAT THAT COSTS. RING DILATION is refused rather than " +
     "mirrored, so v4678's 3.6 dB figure stays a CPU measurement. NO TIMING CLAIM: SwiftShader, again. AND THE " +
     "CONTENT IS SYNTHETIC: a straight strip of holes with an occluder on one side is the shape v4678's slab " +
