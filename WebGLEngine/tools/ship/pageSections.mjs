@@ -672,6 +672,11 @@ export const UNPLACED = new Map([
     ["fsr.html", "has an adapter path since v4588-v4593 so it belongs in the WebGPU drawer, which is at " +
                  "MAX_PER_PANEL, as is the techniques drawer it used to sit in; placing it means evicting " +
                  "something and that is a drawer decision, not a merge's"],
+    // v4776-merge -- its three.js sibling arrived from the same line, linked from server.html beside it and in
+    // neither list. It is a WebGPURenderer page, so it wants the same full drawer for the same reason; filed with
+    // fsr.html so that whichever drawer decision places one can place both.
+    ["fsr-three.html", "fsr.html's three.js sibling (WebGPURenderer, FSR1/FSR2 in TSL); it belongs where fsr.html " +
+                       "goes, and that drawer is at MAX_PER_PANEL -- the same drawer decision, not a merge's"],
     // *** v4314 -- ELEVEN OF THE TWELVE PAGES pageReach CALLED BORN-INVISIBLE, PLUS ONE OF MY OWN. ***
     //
     // They are linked from server.html now, which is what pageReach was asking for. They are ALSO here,

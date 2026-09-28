@@ -3,9 +3,9 @@
  "ticks": 400,
  "dt": 0.25,
  "today": "2026-09-01",
- "hash": "0322b336",
+ "hash": "37739d8c",
  "tick": 400,
  "engine": "node v22.22.2 (V8)",
- "written": "2026-09-14T04:42:47.631Z",
+ "written": "2026-09-28T20:05:38.699Z",
  "note": "the state hash of a fresh git economy (history on) after 400 quarter-day ticks from seed 7; another browser that prints the same string has run the same integers"
 }

@@ -1565,7 +1565,9 @@ async function tick() {
                     // v4704: the path comes from the verdict table, so an arm and the verdict it is labelled with
                     // cannot name different weights.
                     const file = "./" + armWeights(gateMode);
-                    try { gateW = await (await fetch(file)).json(); } catch { gateW = null; }
+                    // v4776: status checked before the body is parsed -- a 404 whose body happens to be JSON would
+                    // otherwise be read as weights (boundaryLint's UNCHECKED_JSON_BODY).
+                    try { const r = await fetch(file); if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`); gateW = await r.json(); } catch { gateW = null; }
                 }
                 if (gateW) {
                     const F = gateFeatures({ cur: genCur, w: D, h: D, rc, hole: gen.hole, depthBlock: depthUse, block: blockUse });

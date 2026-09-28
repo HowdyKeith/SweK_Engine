@@ -133,10 +133,34 @@ const rows = real.map((k) => ({ k, g: G.timings[k], s: S.timings[k], r: ratioOf(
     // corrected every one of them, so the live figure is zero and a row asserting `> 0` reddens the day the
     // work is done. Recorded high-water mark, live number may only fall.
     const GATE_HIGHER_V4576 = 9;
-    report(`v4576 measured ${GATE_HIGHER_V4576} disagreements where gate-timings was the larger; ${gateHigher} remain after v4577 and v4578 corrected them`);
+    // *** v4776 -- THE MARK WENT 7 -> 10, AND THE THREE THAT ARRIVED WERE ASKED RATHER THAN EXCUSED. ***
+    // loopTarget, loopAccept and loopTrace had only ever held CAPPED sweep readings, which this comparison drops;
+    // v4776's serial rotation timed them to completion and they entered it, each reading about half its
+    // gate-timings entry. Those entries date from the v3851 suite run (4f01db54, 2026-08-19) and carry no kind,
+    // box or stamp. The gates are unchanged since; the lexer they share (sourceScan.mjs) was rewritten at v4031
+    // and v4085, which is the one thing that could have made them faster. So v3851's OWN CODE was checked out and
+    // run three times each on the box that took the sweep reading. It reads what HEAD reads, not what the record
+    // says: the code did not get faster, the v3851 reading was that run's conditions. gate-timings.json's writer
+    // refuses filtered runs by design (selfchecks.mjs: "a filtered run is not a small full run"), so the entry is
+    // not hand-edited here. It is NAMED, and excused only while the runs still corroborate the sweep's reading
+    // and still refute the record's -- the same rule capReading's MOVED_AT_V4647L holds a moved reading to.
+    const STALE_AT_V3851 = Object.freeze([
+        Object.freeze({ gate: "tools/ship/loopTarget-selfcheck.mjs", v3851CodeRuns: Object.freeze([11759, 11720, 11951]) }),
+        Object.freeze({ gate: "tools/ship/loopAccept-selfcheck.mjs", v3851CodeRuns: Object.freeze([16966, 16989, 16370]) }),
+        Object.freeze({ gate: "tools/ship/loopTrace-selfcheck.mjs", v3851CodeRuns: Object.freeze([14796, 14053, 13611]) }),
+    ]);
+    const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const explained = (x) => STALE_AT_V3851.some((e) => e.gate === x.k && e.v3851CodeRuns.length >= 3 &&
+        Math.abs(med(e.v3851CodeRuns) - x.s) / x.s <= 0.10 && x.g >= 1.5 * med(e.v3851CodeRuns));
+    const againstGrain = cmp.filter((x) => x.r >= 2 && x.g > x.s);
+    const unexplained = againstGrain.filter((x) => !explained(x));
+    report(`v4576 measured ${GATE_HIGHER_V4576} disagreements where gate-timings was the larger; ${gateHigher} now, ` +
+        `${gateHigher - unexplained.length} of them explained by v3851's own code re-run on this box (STALE_AT_V3851)`);
     ok(`  and the ones running the other way -- where the OLDER full-suite record is the larger, which neither growth nor load explains -- RATCHET DOWN from v4576's ${GATE_HIGHER_V4576}`,
-        gateHigher <= GATE_HIGHER_V4576,
-        cmp.filter((x) => x.r >= 2 && x.g > x.s).map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
+        unexplained.length <= GATE_HIGHER_V4576,
+        unexplained.map((x) => `${path.basename(x.k)} ${x.g}>${x.s}`).join(", ") +
+            (againstGrain.length > unexplained.length ? `; EXPLAINED, not counted: ` + againstGrain.filter(explained)
+                .map((x) => `${path.basename(x.k)} ${x.g}>${x.s} (v3851 code here: median ${med(STALE_AT_V3851.find((e) => e.gate === x.k).v3851CodeRuns)})`).join(", ") : "") +
             ` -- ${cmp.length} of ${rows.length} comparisons are alone-against-alone; the rest set a LOADED reading beside a serial one`);
     // *** AND "OVERWHELMINGLY" IS QUANTIFIED IN A SECOND ROW, BECAUSE A THRESHOLD CANNOT POLICE ITSELF. ***
     // v4647o: that is now the row carrying the strength, since the bar above is a direction rather than a

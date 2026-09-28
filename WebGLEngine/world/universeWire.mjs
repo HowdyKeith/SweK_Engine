@@ -216,8 +216,19 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             control: "on today's tree, reverting `three`'s file list and PROVENANCE.txt bytes to their " +
                      "pre-b5fccadb values gives f4cf12e5 -- EXACTLY the previous key, so this move is that " +
                      "body's files and nothing else" }),
+        // *** v4776 -- A FIFTH MOVE, AND IT SHIPPED PAST THIS GATE THE WAY unseenBecause SAYS THE FIRST ONES DID. ***
+        // ce276dff re-vendored three and re-baked orrery.json in the same commit, with no entry here. The gate is over
+        // the ship-time budget, so no verify ran it: it was red at v4697 when v4697 shipped, and red on the other
+        // line, and it surfaced at the v4776 merge only because every gate reading the timing records was run by hand.
+        Object.freeze({ version: "v4776", commit: "ce276dff", hash: "37739d8c", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "vendor/three was re-vendored from r160 to 0.185.1: `three`'s file list went from 22 files to 24 " +
+                   "and its cargo, at max(1, bytes/4096) per file, from 582 tons to 810. v4416's mechanism a fourth " +
+                   "time. Its top-level `bytes` moved too (2,396,670 to 3,344,827) and reaches nothing, as recorded",
+            control: "on today's tree, reverting ONLY `three`'s `files` to cc229351's value gives 0322b336 -- exactly " +
+                     "the previous key -- and reverting only its `bytes` leaves 37739d8c" }),
     ]),
-    current: "0322b336",
+    current: "37739d8c",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
