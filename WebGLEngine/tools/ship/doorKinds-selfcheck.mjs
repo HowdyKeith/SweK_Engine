@@ -112,11 +112,14 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     // THEN REFUSED, on evidence in the tool's own header (runs the whole gate tree once, the cost class of
     // verify.mjs, against a 180s per-press cap). 2 at v3610 -> 3 here; rewritten to the new count rather than
     // widened to keep the old one, per this file's own rule two lines above.
-    ok("the refusals carry evidence rather than preference", Object.keys(MEASURED_V3608.refusedWithAReason).length === 3 &&
-       (kinds.refused || 0) === 3,
+    // v4776 -- 3 -> 4, rewritten rather than widened: genGateAbsolute.mjs, READ THEN REFUSED on its own pre-
+    // registration's terms (the design's re-run control is one fold reproduced bit for bit, not the whole design).
+    ok("the refusals carry evidence rather than preference", Object.keys(MEASURED_V3608.refusedWithAReason).length === 4 &&
+       (kinds.refused || 0) === 4,
        "removeCluster: v3202's sweep deleted 61 LIVE modules, so a one-click mass deletion is the wrong shape " +
        "-- a measurement outranks a preference. recordInputs.mjs: runs the whole gate tree once, the same cost " +
-       "class as verify.mjs, against a 180s per-press cap");
+       "class as verify.mjs, against a 180s per-press cap. genGateAbsolute.mjs: a pre-registered test's runner, " +
+       "already run; its re-run control is C12, one fold bit for bit, not a button for the whole design");
     // ANTIDOTE FIRED A THIRD TIME: orreryAuthorScan.mjs got a REAL DOOR (a reportingTools row, dry-run by " +
     // default like orreryBake beside it) and LEFT the owed list; verifyLicenceTexts.mjs and wgslDeviceLimits.mjs
     // ARRIVED on it, each for the reason physics/backend-qa-check.mjs is already there -- a real, stated
