@@ -211,6 +211,31 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
 }
 
 // ---------------------------------------------------------------------------------------------------------
+sec("4b. ONE DAWN INSTANCE PER PROCESS, BECAUSE A FINALIZED ONE KILLED THE NEXT CALL -- v4691");
+// ---------------------------------------------------------------------------------------------------------
+{
+    // bloomFusedTexture-selfcheck exited 0xC0000005 on Keith's rig every run, in its fifth native call. Each call
+    // used to create a Dawn instance and drop it; V8 finalizing those in the middle of a later call's read-back
+    // is the crash, and tools/ship/textureInProbe.mjs reproduces it here by forcing the collection after each of
+    // that gate's calls. The probe runs twice: as the harness is (one shared instance), and with
+    // SWEK_GPU_INSTANCE_PER_CALL=1 restoring the per-call instance, which must crash -- a fix nobody has watched
+    // the absence of fail is not known to do anything. Only a non-zero exit is asserted for the control: SIGSEGV
+    // and SIGABRT both occur, as they do for EXIT_HAZARD, and a hang killed at the 10 s cap reads as one too. Each
+    // child takes under a second here; the cap keeps a hang inside the sweep's 20 s alone-cap.
+    const probe = path.join(HERE, "textureInProbe.mjs");
+    const runProbe = (perCall) => spawnSync(process.execPath, ["--expose-gc", probe], { encoding: "utf8", timeout: 10000,
+        env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+    const lastMark = (r) => (String(r.stderr || "").match(/^@@ .*$/gm) || ["(no marker)"]).pop().slice(3);
+    const shared = runProbe(false), perCall = runProbe(true);
+    ok(shared.status === 0 && /all calls returned/.test(lastMark(shared)),
+       "*** the gate's five calls with a forced collection after each COMPLETE, on the shared instance ***",
+       `status=${shared.status} signal=${shared.signal}; last step: ${lastMark(shared)}`);
+    ok(perCall.status !== 0,
+       "*** and the SAME run with an instance per call CRASHES, so the shared instance is the fix and not luck ***",
+       `status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`);
+}
+
+// ---------------------------------------------------------------------------------------------------------
 sec("5. NOW THE TIMING, WHICH IS OVERHEAD AND NOT GPU WORK");
 // ---------------------------------------------------------------------------------------------------------
 {

@@ -301,6 +301,33 @@ export function storageWords(data) {
     return new Uint32Array(out.buffer);
 }
 
+/**
+ * *** v4691 -- ONE DAWN INSTANCE PER PROCESS, NOT ONE PER CALL. *** Both helpers used to call mod.create([]) on
+ * every run and drop the instance when they returned, so a process that made several calls carried several
+ * unreachable instances, each torn down whenever V8 happened to FINALIZE it -- possibly while a later call's
+ * device was mid-read-back. That is bloomFusedTexture-selfcheck on Keith's rig: 0xC0000005 (access violation)
+ * every run, in section 3, its fifth native call and the one that fills 4,096 texels -- enough allocation to
+ * trigger a collection by itself. This box never crashed in the gate, but tools/ship/textureInProbe.mjs forces
+ * the collection after each of the gate's calls (its `order-gc` mode) and reproduces it: SIGSEGV or SIGABRT
+ * ("The futex facility returned an unexpected error code") in the texture-input call's map read-back.
+ * MEASURED, five runs each in that mode: per-call instances 5 of 5 crashed; destroying every resource AND the
+ * device before returning, instances still per call, 5 of 5 crashed -- so the live device is not what the
+ * finalizer breaks; one shared instance, 0 of 5, with or without that teardown, which is why there is none.
+ *
+ * Keeping the instance reachable is not EXIT_HAZARD's shape: that is a DEVICE reachable at exit. Adapters and
+ * devices stay per call and function-local, so harnessIsSafeByConstruction still holds, and a natural exit with
+ * the cached instance alive returned 0 in 5 of 5 here.
+ *
+ * SWEK_GPU_INSTANCE_PER_CALL=1 restores the old per-call instance. It exists for one reader: headlessGpu-selfcheck's
+ * section 4b runs the probe both ways, so the shared instance is watched preventing the crash, not assumed to.
+ */
+const INSTANCES = new Map();
+function instanceFor(mod) {
+    if (process.env.SWEK_GPU_INSTANCE_PER_CALL === "1") return mod.create([]);
+    if (!INSTANCES.has(mod)) INSTANCES.set(mod, mod.create([]));
+    return INSTANCES.get(mod);
+}
+
 export async function runWgslComputeNative({ code, entryPoint = "main", outCount, uniforms = null,
                                              workgroups = 1, compileOnly = false, requireFn = null,
                                              inputs = null, outInit = null, texture = null,
@@ -311,7 +338,7 @@ export async function runWgslComputeNative({ code, entryPoint = "main", outCount
     const { mod, from } = resolveWebgpu(requireFn);
 
     try {
-        const gpu = mod.create([]);
+        const gpu = instanceFor(mod);
         const adapter = await gpu.requestAdapter();
         if (!adapter) return { ok: false, skipped: false, reason: "requestAdapter() returned null with ICD " + icd.path, values: [], errors: [] };
         const info = adapter.info || {};
@@ -466,26 +493,32 @@ export const paddedBytesPerRow = (n, format) =>
 export async function runWgslComputeToTextureNative({ code, entryPoint = "main", n = 64,
                                                       format = "rgba16float", uniforms = null,
                                                       workgroups = 1, inputTexel = null,
-                                                      requireFn = null } = {}) {
+                                                      requireFn = null, trace = null } = {}) {
     const skip = headlessGpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, pixels: null };
     const icd = configureVulkanIcd();
     const { mod, from } = resolveWebgpu(requireFn);
+    // v4691 -- `trace` names each native step BEFORE it is taken, so a process that dies inside Dawn says where.
+    // tools/ship/textureInProbe.mjs passes one that writes synchronously; a buffered line is lost in a native crash.
+    const step = (s) => { if (trace) trace(s); };
 
     try {
-        const gpu = mod.create([]);
+        step("create instance");
+        const gpu = instanceFor(mod);
         const adapter = await gpu.requestAdapter();
         if (!adapter) return { ok: false, skipped: false, reason: "requestAdapter() returned null with ICD " + icd.path, pixels: null };
         const info = adapter.info || {};
         const meta = { from, icd: icd.path,
                        adapter: { vendor: info.vendor || null, architecture: info.architecture || null,
                                   description: info.description || null } };
+        step("request device");
         const dev = await adapter.requestDevice();
         const G = mod.globals || globalThis;
         const TU = G.GPUTextureUsage || globalThis.GPUTextureUsage;
         const BU = G.GPUBufferUsage || globalThis.GPUBufferUsage;
         const MM = G.GPUMapMode || globalThis.GPUMapMode;
 
+        step("compile shader");
         const shader = dev.createShaderModule({ code });
         const ci = await shader.getCompilationInfo();
         const errors = ci.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
@@ -498,13 +531,16 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
 
         const entries = [{ binding: 0, resource: tex.createView() }];
         if (inputTexel) {
+            step("fill input texels");
             const u = new Uint16Array(n * n * 4);
             for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
                 const p = inputTexel(x, y, n);
                 for (let c = 0; c < 4; c++) u[(y * n + x) * 4 + c] = doubleToHalf(p[c]);
             }
+            step("create input texture");
             const src = dev.createTexture({ size: [n, n], format: "rgba16float",
                 usage: TU.TEXTURE_BINDING | TU.COPY_DST });
+            step("upload input texture");
             dev.queue.writeTexture({ texture: src }, u, { bytesPerRow: n * 8 }, [n, n]);
             entries.push({ binding: 2, resource: src.createView() });
         }
@@ -525,13 +561,17 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
         // agreeing because neither did anything is v4402's fault sitting inside the instrument this tree
         // uses to prove parity.
         dev.pushErrorScope("validation");
+        step("create pipeline");
         const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: shader, entryPoint } });
+        step("create bind group");
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
+        step("encode and submit");
         const enc = dev.createCommandEncoder();
         const cp = enc.beginComputePass();
         cp.setPipeline(pipe); cp.setBindGroup(0, bind); cp.dispatchWorkgroups(...(Array.isArray(workgroups) ? workgroups : [workgroups])); cp.end();
         enc.copyTextureToBuffer({ texture: tex }, { buffer: readBuf, bytesPerRow }, [n, n]);
         dev.queue.submit([enc.finish()]);
+        step("wait for validation");
         const validation = await dev.popErrorScope();
         if (validation) {
             tex.destroy(); readBuf.destroy();
@@ -539,10 +579,13 @@ export async function runWgslComputeToTextureNative({ code, entryPoint = "main",
                      reason: "the device REJECTED this run -- an empty read-back is not a measurement",
                      errors: [String(validation.message || validation).slice(0, 300)] };
         }
+        step("map read-back");
         await readBuf.mapAsync(MM.READ);
         const raw = new Uint8Array(readBuf.getMappedRange()).slice();
         readBuf.unmap();
+        step("destroy");
         tex.destroy(); readBuf.destroy();
+        step("decode");
 
         // ROW BY ROW. Reading the padding as pixels shears the image, which reads as a shader defect.
         const px = new Float32Array(n * n * 4);
