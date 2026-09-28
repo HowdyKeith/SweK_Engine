@@ -725,7 +725,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // bits through a DataView over an ArrayBuffer. One row moved and eleven held.
     // v4691 -- tools/ship/textureInProbe.mjs: esModules +1, closures +1, asyncAwait +1 (see `files` above).
     // v4695 -- asyncAwait 1544 -> 1545, NO FILE ARRIVED: failLines' CLI moved into an async function (its --as-sweep imports quickSweep, which imports failLines, and a top-level await cannot finish that cycle).
-    esModules: 4015, closures: 3882, asyncAwait: 1545, typedArrays: 1128, promises: 375,
+    // v4696 -- asyncAwait 1545 -> 1546, NO FILE ARRIVED: exitBusy-selfcheck's steady fixture awaits its worker coming online (a timer-driven load is throttled in a windowless Windows process). threads held: the Worker is in a fixture string.
+    esModules: 4015, closures: 3882, asyncAwait: 1546, typedArrays: 1128, promises: 375,
     // wasm 23 -> 24: this branch's tools/ship/wasmExitHook.cjs. A DUPLICATE KEY nearly hid it -- both
     // lines' capability rows survived the merge and the LATER one silently won, so the merged tree
     // would have carried main's 23 under a record claiming to describe the union. JS does not warn

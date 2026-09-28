@@ -110,10 +110,18 @@ process.exit(0);
     // and can end before the next one, so it is never charged at all; at 300 ms windows some bursts drifted across
     // a tick and it passed. A burn LONGER than a tick must contain one, so 20 ms of every 25 is charged at least a
     // tick per burst under sampling and ~80 ms a window under exact accounting -- over the floor either way.
+    // *** v4696 -- AND THEN WINDOWS THROTTLED THE TIMER ITSELF. *** Run the way the sweep runs it -- no console
+    // window, as a background process -- the 20-of-25 ms burner read "win1 16.0 AND win2 0.0" on Keith's rig under
+    // BOTH sweep launches (failLines --as-sweep, with and without SWEK_SWEEP_DETACHED), and passed under plain
+    // failLines. A windowless process's timers are coalesced, so a load DRIVEN BY A TIMER is not steady there. The
+    // load now comes from a worker thread spinning without any timer: process.cpuUsage() counts every thread, so
+    // both windows read the same continuous cost on any platform and any launch, and the worker is unref'd so the
+    // probe's own exit still ends the process.
     const STEADY = write("steady-selfcheck.mjs", `
-let sink = 0;
-const t = setInterval(() => { const e = Date.now() + 20; while (Date.now() < e) sink++; }, 25);
-t.unref();
+import { Worker } from "node:worker_threads";
+const w = new Worker("let sink = 0; for (;;) sink++;", { eval: true });
+await new Promise((r) => w.once("online", r));   // BEFORE unref: an unref'd worker would let this await exit 13
+w.unref();
 console.log("steady");
 process.exit(0);
 `);
