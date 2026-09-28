@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "915dbfb399e0c3ac52c55756fd48dd8cc9ad64c0",
+ "head": "be5b3abccea3d562e95ef138a58002a0a6a1f07c",
  "bodies": {
   "box3d": [
    {
@@ -341,7 +341,7 @@
    {
     "path": "server.html",
     "bytes": 868839,
-    "sha": "1d654690b87918b721012a9651a2dbbcc2ce5222"
+    "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -420,8 +420,8 @@
    },
    {
     "path": "tools/krbn/krbnCompareLive-selfcheck.mjs",
-    "bytes": 54534,
-    "sha": "027f8c02e1a02af868ed197a62eaaf6edd3dd6c4"
+    "bytes": 55737,
+    "sha": "f28ec56330c6460641991acc9d68feb34275b2e5"
    },
    {
     "path": "tools/krbnVendor-selfcheck.mjs",
@@ -652,7 +652,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3399649,
+    "bytes": 3402951,
     "sha": "915dbfb399e0c3ac52c55756fd48dd8cc9ad64c0"
    },
    {
@@ -698,7 +698,7 @@
    {
     "path": "server.html",
     "bytes": 868839,
-    "sha": "1d654690b87918b721012a9651a2dbbcc2ce5222"
+    "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
    },
    {
     "path": "shipavatar.html",
@@ -742,8 +742,8 @@
    },
    {
     "path": "tools/krbn/krbnCompareLive-selfcheck.mjs",
-    "bytes": 54534,
-    "sha": "027f8c02e1a02af868ed197a62eaaf6edd3dd6c4"
+    "bytes": 55737,
+    "sha": "f28ec56330c6460641991acc9d68feb34275b2e5"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -793,7 +793,7 @@
    {
     "path": "tools/ship/webgpuHarness.mjs",
     "bytes": 76153,
-    "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
+    "sha": "bb47e2b1fa9c90af9008306e3c6a2b87181b1877"
    },
    {
     "path": "toroidal-wave.html",
@@ -860,152 +860,152 @@
    {
     "path": "fsr-three.html",
     "bytes": 47736,
-    "sha": null
+    "sha": "47807238e171e699e1e0df49bd51ca6d1238eedc"
    },
    {
     "path": "fx/fsr/fsr3Hold-selfcheck.mjs",
     "bytes": 14282,
-    "sha": null
+    "sha": "41ca9d7b3f52d91c1e389d8695dc5afa1472e023"
    },
    {
     "path": "fx/fsr/fsr3Late-selfcheck.mjs",
     "bytes": 11205,
-    "sha": null
+    "sha": "49fefc70e6a0a0c7dcdbf05ccfdddbebeb85da79"
    },
    {
     "path": "fx/fsr/fsr3LiveClock-selfcheck.mjs",
     "bytes": 12498,
-    "sha": null
+    "sha": "6a896d80a74ca53a654d37e77690ac6bc718c796"
    },
    {
     "path": "fx/fsr/fsr3Pacing-selfcheck.mjs",
     "bytes": 13544,
-    "sha": null
+    "sha": "03534416375a7df68e8a63f1163c1b8d9a6ff4de"
    },
    {
     "path": "fx/fsr/fsr3Tsl-selfcheck.mjs",
     "bytes": 21874,
-    "sha": null
+    "sha": "2269cecad488e6e125a39b6af6351aecaad9d1d8"
    },
    {
     "path": "fx/fsr/fsrFlicker-selfcheck.mjs",
     "bytes": 15436,
-    "sha": null
+    "sha": "54dc748fc1b0477801654c48386c57bc246d0bfe"
    },
    {
     "path": "fx/fsr/fsrFlowCost-selfcheck.mjs",
-    "bytes": 8901,
-    "sha": null
+    "bytes": 11265,
+    "sha": "be5b3abccea3d562e95ef138a58002a0a6a1f07c"
    },
    {
     "path": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
     "bytes": 15750,
-    "sha": null
+    "sha": "ddca4f702d759c31d8b01e4054dc9b964f232b70"
    },
    {
     "path": "fx/fsr/fsrFlowRetry-selfcheck.mjs",
     "bytes": 22930,
-    "sha": null
+    "sha": "e842def7193e52414741909c7f5886bcac6ee009"
    },
    {
     "path": "fx/fsr/fsrFlowSeed-selfcheck.mjs",
     "bytes": 13611,
-    "sha": null
+    "sha": "b633c6a0dfd08d6742b342d3958fb236a833b2cd"
    },
    {
     "path": "fx/fsr/fsrFlowStill-selfcheck.mjs",
     "bytes": 10375,
-    "sha": null
+    "sha": "e842def7193e52414741909c7f5886bcac6ee009"
    },
    {
     "path": "fx/fsr/fsrFrameGen-selfcheck.mjs",
     "bytes": 13067,
-    "sha": null
+    "sha": "d764427d695604709048240703c9a8ad476b9d66"
    },
    {
     "path": "fx/fsr/fsrFrameGenArc-selfcheck.mjs",
     "bytes": 17933,
-    "sha": null
+    "sha": "0ba4f079a9268a7669b1db0431bcf8c947a42406"
    },
    {
     "path": "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
     "bytes": 13277,
-    "sha": null
+    "sha": "ee32810c5c6ab20ed14dd83ab15f47a95a16170f"
    },
    {
     "path": "fx/fsr/fsrFrameGenFlow-selfcheck.mjs",
     "bytes": 21425,
-    "sha": null
+    "sha": "cfebc7fe84cdbb5bb5c122045f84246f29319039"
    },
    {
     "path": "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
     "bytes": 14122,
-    "sha": null
+    "sha": "47807238e171e699e1e0df49bd51ca6d1238eedc"
    },
    {
     "path": "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
     "bytes": 15757,
-    "sha": null
+    "sha": "aff92c43bf31183f8bcc48cd2f910a7c78f96e6b"
    },
    {
     "path": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
     "bytes": 20876,
-    "sha": null
+    "sha": "35f06e67d041635cc22b9d6b331389227f38dbc5"
    },
    {
     "path": "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
     "bytes": 22619,
-    "sha": null
+    "sha": "da88c2f714023db3a9192aa1a59cd7dcb60fa024"
    },
    {
     "path": "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs",
     "bytes": 15409,
-    "sha": null
+    "sha": "4b3e4ff7b735e73a785a7042971edddc60481a79"
    },
    {
     "path": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
     "bytes": 15886,
-    "sha": null
+    "sha": "f1a36603e9e84c2dcbeeaef2da31dfaee3f2bc2f"
    },
    {
     "path": "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
     "bytes": 15471,
-    "sha": null
+    "sha": "da88c2f714023db3a9192aa1a59cd7dcb60fa024"
    },
    {
     "path": "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
     "bytes": 14201,
-    "sha": null
+    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
    },
    {
     "path": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
     "bytes": 9922,
-    "sha": null
+    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
    },
    {
     "path": "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
     "bytes": 12441,
-    "sha": null
+    "sha": "1479d4fa41b7f59a3e177e553cd1737baa6133df"
    },
    {
     "path": "fx/fsr/fsrTemporalLocks-selfcheck.mjs",
     "bytes": 11564,
-    "sha": null
+    "sha": "1479d4fa41b7f59a3e177e553cd1737baa6133df"
    },
    {
     "path": "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
     "bytes": 8755,
-    "sha": null
+    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
    },
    {
     "path": "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
     "bytes": 20451,
-    "sha": null
+    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
    },
    {
     "path": "fx/fsr/fsrTsl-selfcheck.mjs",
     "bytes": 24684,
-    "sha": null
+    "sha": "91bf5e52ac236b74eaa1f17aeebd6e7bb2187e6e"
    },
    {
     "path": "orrery-gpu.html",
@@ -1015,72 +1015,72 @@
    {
     "path": "render/flowReconcileTsl-selfcheck.mjs",
     "bytes": 31153,
-    "sha": null
+    "sha": "da88c2f714023db3a9192aa1a59cd7dcb60fa024"
    },
    {
     "path": "render/frameInterpTsl-selfcheck.mjs",
     "bytes": 24542,
-    "sha": null
+    "sha": "ddca4f702d759c31d8b01e4054dc9b964f232b70"
    },
    {
     "path": "render/holeFillTsl-selfcheck.mjs",
     "bytes": 23268,
-    "sha": null
+    "sha": "b633c6a0dfd08d6742b342d3958fb236a833b2cd"
    },
    {
     "path": "render/opticalFlowTsl-selfcheck.mjs",
     "bytes": 31624,
-    "sha": null
+    "sha": "e842def7193e52414741909c7f5886bcac6ee009"
    },
    {
     "path": "render/reactiveTsl-selfcheck.mjs",
     "bytes": 12747,
-    "sha": null
+    "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
    },
    {
     "path": "render/temporalClipTsl-selfcheck.mjs",
     "bytes": 14629,
-    "sha": null
+    "sha": "d8cd5872e8d09b71741f1f78bb9b7872125aed07"
    },
    {
     "path": "render/temporalLockTsl-selfcheck.mjs",
     "bytes": 35670,
-    "sha": null
+    "sha": "324ef0c7dc04dd311ced78163cf8909e022dcd92"
    },
    {
     "path": "render/temporalTsl-selfcheck.mjs",
-    "bytes": 45180,
-    "sha": null
+    "bytes": 46135,
+    "sha": "79b92373c5ea3d067c9c44fd341f66dfaca6995d"
    },
    {
     "path": "render/temporalTslCompute-selfcheck.mjs",
     "bytes": 13350,
-    "sha": null
+    "sha": "9a9e88ae7b8beee664de7ab2f90fac14791c4bca"
    },
    {
     "path": "render/temporalTslMany-selfcheck.mjs",
     "bytes": 15505,
-    "sha": null
+    "sha": "f37bac2d19eef51da22a9a7ac73778c37a0e021a"
    },
    {
     "path": "render/temporalTslMeshes-selfcheck.mjs",
     "bytes": 15142,
-    "sha": null
+    "sha": "aff92c43bf31183f8bcc48cd2f910a7c78f96e6b"
    },
    {
     "path": "render/temporalTslNodes-selfcheck.mjs",
     "bytes": 19703,
-    "sha": null
+    "sha": "1829db7e8e49e3949b41ab4ea48787d5fc25a4af"
    },
    {
     "path": "render/temporalTslZoo-selfcheck.mjs",
     "bytes": 26613,
-    "sha": null
+    "sha": "9a9e88ae7b8beee664de7ab2f90fac14791c4bca"
    },
    {
     "path": "render/translucentLayer-selfcheck.mjs",
     "bytes": 21326,
-    "sha": null
+    "sha": "47807238e171e699e1e0df49bd51ca6d1238eedc"
    },
    {
     "path": "tools/ship/aiPresenceOrb-selfcheck.mjs",
@@ -1125,7 +1125,7 @@
    {
     "path": "tools/ship/threePatch.mjs",
     "bytes": 5076,
-    "sha": null
+    "sha": "28dfd29ec97b285edafe468b6e6aa49110335f2e"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -1170,7 +1170,7 @@
    {
     "path": "tools/ship/webgpuHarness.mjs",
     "bytes": 76153,
-    "sha": "69e5f823af8508073367c25a636fe43a18a323f6"
+    "sha": "bb47e2b1fa9c90af9008306e3c6a2b87181b1877"
    },
    {
     "path": "tsl-probe.html",
