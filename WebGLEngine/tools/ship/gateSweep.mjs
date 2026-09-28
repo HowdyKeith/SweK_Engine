@@ -8032,6 +8032,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4771 -- THE 378th CLOSING: NO new gate file -- a patch for each three.js draft, held by the draft's own reproduction.
+    since453: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4771", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 3: a patch per draft, each hunk found once in r185's build, each reproduction run on it; the index held to the drafts)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** EACH OF THE SIX CAUSES IS VERIFIED BY ITS PATCH NOW, AND TWO WERE NOT WHAT THE DRAFTS SAID. *** Each draft carries a " +
+                 "diff against three's src/ at r185; the gate applies it alone to a copy of the vendored build and runs the draft's " +
+                 "reproduction on it, and the bug is gone on both backends. The instanced mesh's previous matrices were its current ones, " +
+                 "not the identity, and past the uniform buffer they were never uploaded at all -- a case v4763 did not draw, twice the " +
+                 "motion. The skinned mesh's -9.311 was two things: velocity drawn outside MRT builds no previous position for any mesh " +
+                 "(the fourth draft now, patched), and three renders in one browser frame, since a skeleton steps once per frameId (named " +
+                 "and left). The WebGL2 compute patch's release path, which no reproduction took, is held by a row of its own after its " +
+                 "sabotage went green. Nothing posted.",
+    }),
     // v4770 -- THE 377th CLOSING: what the motion stage refused, followed.
     since452: Object.freeze({
         at: "v4770", swept: 1, green: 1, red: 0,

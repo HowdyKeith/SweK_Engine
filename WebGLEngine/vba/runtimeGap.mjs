@@ -337,7 +337,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    files: 4450,               // v4770: 4449 -> 4450 for render/temporalTslNodes-selfcheck.mjs -- what the motion stage refused, followed, on both
+    files: 4450,               // v4771: no file added; typedArrays 1214 -> 1215, tools/ship/threeUpstream-selfcheck.mjs allocating one now
+                               // (its stage row's Float32Array, on the patched three.js build).
+                               // v4770: 4449 -> 4450 for render/temporalTslNodes-selfcheck.mjs -- what the motion stage refused, followed, on both
                                // backends (WebGL +1: it names the WebGL2 one). Every row from the census.
                                // v4769: 4448 -> 4449 for fx/fsr/fsrFrameGenReach-selfcheck.mjs -- where the flow lost to the vectors on pans, and a
                                // fill that reaches 16 (performance.now +1: it times the fill). Every row from the census.
@@ -956,7 +958,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // reach the device through gfx/device.js, and WebGL moves by one because the gate ends on a refusal row
     // that builds a webgl2 device to prove the runner throws on it. The table reads what a file's text
     // NAMES, and this arc names WebGL exactly when it proves it is not WebGL.
-    esModules: 4150, closures: 4005, asyncAwait: 1637, typedArrays: 1214, promises: 382,
+    esModules: 4150, closures: 4005, asyncAwait: 1637, typedArrays: 1215, promises: 382,
     fetchXhr: 245, performanceNow: 235, raf: 124, webgl: 193, webgpu: 53, threads: 23, wasm: 23,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

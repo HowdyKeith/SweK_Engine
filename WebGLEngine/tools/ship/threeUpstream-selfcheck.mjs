@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/threeUpstream-selfcheck.mjs -- v4763
+// WebGLEngine/tools/ship/threeUpstream-selfcheck.mjs -- v4763, v4771
 //
 // THE THREE.JS BUG REPORTS IN docs/upstream-three/ ARE DRAFTS, AND WHAT THEY SAY IS HELD HERE. Each draft carries a minimal
 // standalone reproduction that imports three from a CDN; this gate lifts each one out of its draft, points its imports at the
