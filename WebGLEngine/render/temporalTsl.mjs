@@ -103,17 +103,36 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     const prev = new WeakMap();
     // v4752: an InstancedMesh's previous instance matrices, kept HERE -- three copies them before the draw into an array it
     // never uploads, so its own were the matrices as they were when the material was built. Per mesh: the matrices at the last
-    // draw of this pass, handed to the vertex stage as the previous ones through a buffer node
-    const instances = new WeakMap();
+    // draw of this pass, handed to the vertex stage as the previous ones.
+    // v4772: *** THROUGH A FLOAT TEXTURE, NOT A UNIFORM BUFFER: A UNIFORM BUFFER HOLDS 1024 MATRICES. *** They were a buffer node
+    // -- a uniform buffer, 64 bytes a matrix -- and both backends here allow 65536 bytes: past 1024 instances WebGPU refused the
+    // buffer and with it the stage's whole pass (every object's field lost, not the instanced mesh's alone), and WebGL2 said
+    // nothing and read a field 46.5 px wrong (render/temporalTslMany-selfcheck.mjs). three itself moves its own matrices to an
+    // attribute there. Here they are a texture, four texels a matrix, at most 512 matrices a row -- 2048 texels, the least
+    // MAX_TEXTURE_SIZE WebGL2 allows -- read by the instance's index as the batch's are; filled in update(), before the draw's
+    // textures are uploaded. Every InstancedMesh is drawn by a program of its own (three keys it by the mesh's uuid), so the
+    // texture built into it is the mesh's.
+    // every texture the node makes -- instances', batches' and morph targets' -- freed by disposeHistory() with the stage
+    const made = new Set(), keep = (tex) => { made.add(tex); return tex; };
+    const instances = new WeakMap(), MATS_A_ROW = 512;
     const instanceRecord = (object) => {
         let r = instances.get(object);
-        if (!r) { const n = Math.max(object.instanceMatrix.count, 1), last = Float32Array.from(object.instanceMatrix.array.subarray(0, n * 16)), cur = Float32Array.from(last);
-            r = { n, last, cur, node: TSL.buffer(cur, "mat4", n) }; instances.set(object, r); }
+        if (!r) { const n = Math.max(object.instanceMatrix.count, 1), last = Float32Array.from(object.instanceMatrix.array.subarray(0, n * 16));
+            const W = 4 * Math.min(n, MATS_A_ROW), H = Math.ceil(n / MATS_A_ROW), cur = new Float32Array(W * H * 4); cur.set(last);
+            const tex = keep(new THREE.DataTexture(cur, W, H, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
+            r = { n, last, cur, tex }; instances.set(object, r); }
         return r;
     };
+    // matrix i of a texture holding four texels a matrix, row after row: three's own layout for a batch's matrices
+    const matrixIn = (tex, i) => {
+        const w = TSL.int(TSL.textureSize(TSL.textureLoad(tex), 0).x), j = TSL.int(i).mul(4), x = j.mod(w), y = j.div(w);
+        return TSL.mat4(TSL.textureLoad(tex, TSL.ivec2(x, y)), TSL.textureLoad(tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(3), y)));
+    };
+    const instanceBefore = (object) => matrixIn(instanceRecord(object).tex, TSL.instanceIndex);
     // under `toward`, each instance's previous matrix is ITS pose at t between its last draw and this one, as the mesh's is
     const ia = toward ? new THREE.Matrix4() : null, ib = toward ? new THREE.Matrix4() : null, it = toward ? new THREE.Matrix4() : null;
     const instancesBefore = (object, r) => {
+        r.tex.needsUpdate = true;
         if (!toward) { r.cur.set(r.last); return; }
         const now = object.instanceMatrix.array;
         for (let i = 0; i < r.n; i++) { ia.fromArray(r.last, i * 16); ib.fromArray(now, i * 16); poseAt(THREE, ia, ib, toward.t, it).toArray(r.cur, i * 16); }
@@ -126,7 +145,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     const batchRecord = (object) => {
         const src = object._matricesTexture; let r = batches.get(object);
         if (!r) { const last = Float32Array.from(src.image.data), cur = Float32Array.from(last);
-            const tex = new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType); tex.needsUpdate = true;
+            const tex = keep(new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
             r = { src, last, cur, tex }; batches.set(object, r); }
         else if (r.src !== src) throw new Error(`render/temporalTsl: ${object.name ? JSON.stringify(object.name) : "a BatchedMesh"} re-made its matrices texture (its instance count grew past it) -- the stage's history of it is at the old size; make a new stage`);
         return r;
@@ -239,7 +258,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             const targets = geometry.morphAttributes.position, count = geometry.attributes.position.count, n = targets.length, total = count * n;
             const W = Math.min(4096, total), H = Math.ceil(total / W), data = new Float32Array(W * H * 4);
             for (let t = 0; t < n; t++) for (let v = 0; v < count; v++) { const i = (t * count + v) * 4; data[i] = targets[t].getX(v); data[i + 1] = targets[t].getY(v); data[i + 2] = targets[t].getZ(v); }
-            const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType); tex.needsUpdate = true;
+            const tex = keep(new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
             m = { tex, W, count, n }; morphTex.set(geometry, m);
         }
         return m;
@@ -278,6 +297,8 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         constructor() { super(); this.nodeType = "vec4"; }
         /** v4761: a sprite's clip position as the stage draws it -- its sprite material's vertexNode. */
         spriteVertex() { return TSL.Fn((_, builder) => spriteClip(builder))(); }
+        /** v4772: frees every texture the node made for the histories it keeps; the stage's dispose() calls it. */
+        disposeHistory() { for (const tex of made) tex.dispose(); made.clear(); }
         setPreviousCamera(projection, view) {
             this.previousProjectionMatrix.value.copy(projection);
             this.previousCameraViewMatrix.value.copy(view);
@@ -287,7 +308,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
-            // the buffer node's array is uploaded at every draw -- three's Buffer binding reports itself changed each time
+            // an instanced mesh's texture is marked for upload here, and uploaded with this draw's other bindings
             if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
             if (object.isBatchedMesh) batchBefore(object, batchRecord(object));
             if (object.isSprite) { const now = object.material.rotation, was = rotations.has(object) ? rotations.get(object) : now; rotPrev.value = toward ? was + toward.t * (now - was) : was; }
@@ -329,20 +350,18 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
                 // v4761: the geometry through the instance's previous matrix, found as three finds the current one
                 const r = batchRecord(object), id = TSL.int(builder.getDrawIndex() === null ? TSL.instanceIndex : TSL.drawIndex), ind = object._indirectTexture;
                 const isz = TSL.int(TSL.textureSize(TSL.textureLoad(ind), 0).x), iid = TSL.int(TSL.textureLoad(ind, TSL.ivec2(id.mod(isz), id.div(isz))).x);
-                const msz = TSL.int(TSL.textureSize(TSL.textureLoad(r.tex), 0).x), j = iid.mul(4), x = j.mod(msz), y = j.div(msz);
-                const M = TSL.mat4(TSL.textureLoad(r.tex, TSL.ivec2(x, y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(r.tex, TSL.ivec2(x.add(3), y)));
-                before = TSL.varying(M.mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+                before = TSL.varying(matrixIn(r.tex, iid).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
             }
             else if (object && builder.material.positionNode) {
                 // v4762: the override carries the object's positionNode; the last position is the application's, or the node's own.
                 // v4770: where the application's is a function, of the point the stage keeps -- instanced, skinned or morphed
                 const own = Array.isArray(object.material) ? null : object.material, fn = own && own.userData && typeof own.userData.previousPositionNode === "function";
                 let kept = null;
-                if (fn && object.isInstancedMesh) kept = instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
+                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
                 else if (fn && (object.isSkinnedMesh || hasMorph(object))) { let q = TSL.positionGeometry; if (hasMorph(object)) q = morphedBefore(object, q); if (object.isSkinnedMesh) q = skinnedBefore(object, q); kept = q; }
                 before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode, kept)));
             }
-            else if (object && object.isInstancedMesh) before = TSL.varying(instanceRecord(object).node.element(TSL.instanceIndex).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
             else if (object && (object.isSkinnedMesh || hasMorph(object))) {
                 // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
                 let p = TSL.positionGeometry;
@@ -503,7 +522,7 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;
         },
-        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
     };
 }
 
