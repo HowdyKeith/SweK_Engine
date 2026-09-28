@@ -8032,6 +8032,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4770 -- THE 377th CLOSING: what the motion stage refused, followed.
+    since452: Object.freeze({
+        at: "v4770", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslNodes-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THREE THINGS THE STAGE THREW ON, FOLLOWED, EACH TO A REFERENCE IT ALREADY GETS RIGHT, ON BOTH BACKENDS. *** A sprite " +
+                 "turned by a rotation node -- its last angle userData.previousRotationNode -- reads the rotation property's field to the " +
+                 "bit. Sized points on a sprite (PointsNodeMaterial, sized in pixels) are placed as three's points material places them, " +
+                 "the centre through the camera and each corner pixels about it: the field covers exactly the pixels three draws and is " +
+                 "the CPU's corners' to 1.8e-3 px at a pixel ratio of 2, turning and attenuated. And userData.previousPositionNode may be " +
+                 "a function of the point the stage keeps, so a position node displacing a morph, an instance or a skin reads the object " +
+                 "moved instead to 1e-5 px. Sixteen sabotages, three of them seen only once the gate drew at a pixel ratio of 2, turned its " +
+                 "points and read a material's size.",
+    }),
     // v4769 -- THE 376th CLOSING: where the flow lost to the vectors on pans -- holes left black, and a fill that reaches 16.
     since451: Object.freeze({
         at: "v4769", swept: 1, green: 1, red: 0,

@@ -60,20 +60,25 @@ else {
           const S = mk(true); S.sc.children.forEach((s) => { s.material.userData.previousRotationNode = null; });
           const H = mk(false); o.turnedStill = cmp(await fieldOf(S.sc, S.step), await fieldOf(H.sc, (k) => H.step(2))); }
         // 2. SIZED POINTS ON A SPRITE: six, placed by a positionNode and sized in pixels by a sizeNode, their last centres a second array
+        // at a pixel ratio of 2, which three multiplies a point's size by: at 1 the stage could forget it and read the same
+        renderer.setPixelRatio(2);
         for (const [cn, atten] of [["points", false], ["pointsAttenuated", true]]) {
-            const n = 6, now = [], was = [], sizes = []; for (let i = 0; i < n; i++) { now.push(new THREE.Vector3()); was.push(new THREE.Vector3()); sizes.push(5 + 2 * i); }
+            const n = 6, now = [], was = [], sizes = []; for (let i = 0; i < n; i++) { now.push(new THREE.Vector3()); was.push(new THREE.Vector3()); sizes.push(3 + i); }
             const posU = T.uniformArray(now, "vec3"), prevU = T.uniformArray(was, "vec3"), sizeU = T.uniformArray(sizes, "float");
-            const m = new THREE.PointsNodeMaterial({ color: 0xffffff, sizeAttenuation: atten }); m.positionNode = posU.element(T.instanceIndex); m.sizeNode = sizeU.element(T.instanceIndex);
-            m.userData.previousPositionNode = prevU.element(T.instanceIndex); if (atten) m.sizeNode = sizeU.element(T.instanceIndex).mul(0.06);
+            const m = new THREE.PointsNodeMaterial({ color: 0xffffff, sizeAttenuation: atten }); m.positionNode = posU.element(T.instanceIndex);
+            m.userData.previousPositionNode = prevU.element(T.instanceIndex);
+            // in pixels: a size node each and a rotation node turning, its last angle given; attenuated: the material's size, one for all
+            const angle = T.uniform(0), angle0 = T.uniform(0), SIZE = 0.35;
+            if (atten) m.size = SIZE; else { m.sizeNode = sizeU.element(T.instanceIndex); m.rotationNode = angle; m.userData.previousRotationNode = angle0; }
             const sp = new THREE.Sprite(m); sp.count = n; const sc = new THREE.Scene(); sc.add(sp);
             const at = (i, k) => new THREE.Vector3(-1.2 + (i % 3) * 1.2 + 0.15 * k, -0.5 + Math.floor(i / 3) * 1.0 + 0.1 * k, (i % 2 ? 0.4 : -0.3) * k);
-            const step = (k) => { for (let i = 0; i < n; i++) { now[i].copy(at(i, k)); was[i].copy(at(i, k - 1)); } };
+            const step = (k) => { for (let i = 0; i < n; i++) { now[i].copy(at(i, k)); was[i].copy(at(i, k - 1)); } angle.value = 0.35 * k; angle0.value = 0.35 * (k - 1); };
             // the corners three's points material makes: the centre through the camera, each corner size px (attenuated: x half the
             // canvas height over the view depth) about it, over half the viewport, times the clip w; then back to the world at the centre's depth
             const corners = (k) => { const out = [], v = new THREE.Vector4(), inv = new THREE.Matrix4().copy(cam.projectionMatrixInverse);
                 for (let i = 0; i < n; i++) { const c = at(i, k), mv = c.clone().applyMatrix4(cam.matrixWorldInverse), clip = new THREE.Vector4(mv.x, mv.y, mv.z, 1).applyMatrix4(cam.projectionMatrix);
-                    const ps = (atten ? sizes[i] * 0.06 * (D / 2) / -mv.z : sizes[i]) * renderer.getPixelRatio();
-                    for (const [ax, ay] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
+                    const ps = (atten ? SIZE * (D / 2) / -mv.z : sizes[i]) * renderer.getPixelRatio(), a = atten ? 0 : 0.35 * k, co = Math.cos(a), sn = Math.sin(a);
+                    for (const [bx, by] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) { const ax = co * bx - sn * by, ay = sn * bx + co * by;
                         v.set(clip.x + ax * ps / (D / 2) * clip.w, clip.y + ay * ps / (D / 2) * clip.w, clip.z, clip.w).applyMatrix4(inv); v.divideScalar(v.w);
                         const wpt = new THREE.Vector3(v.x, v.y, v.z).applyMatrix4(cam.matrixWorld); out.push(wpt.x, wpt.y, wpt.z); } }
                 return Float32Array.from(out); };
@@ -83,6 +88,7 @@ else {
             const R = await fieldOf(rs, (k) => { ref.morphTargetInfluences[0] = k === 2 ? 1 : 0; });
             let colour = 0; for (let i = 0; i < D * D; i++) if (Cc[i * 4] > 0.5) colour++; o[cn] = { colour, ...cmp(F, R) };
         }
+        renderer.setPixelRatio(1);
         // 3. DISPLACED OVER MORPHS AND INSTANCES, the last position a function of the kept point: against the object moved instead
         { const off = T.uniform(new THREE.Vector3()), offPrev = T.uniform(new THREE.Vector3()), d = (k) => new THREE.Vector3(0.25 * k, -0.1 * k, 0.15 * k);
           // a morphed plane: the influence moves and the positionNode displaces -- against the influence moving and the mesh moved
@@ -124,10 +130,10 @@ else {
            "three's sprite material reads the rotation node in place of the property; the stage places each corner turned by it, and at the last draw by material.userData.previousRotationNode");
         ok(`  [${mode}] ...and one given no last angle stands still, as a positionNode given no last position does: ${o.turnedStill.moving} pixels move, as the property held at its angle`,
            same(o.turnedStill) && o.turnedStill.w === 0 && o.turnedStill.moving === 0, "the node itself is the last angle where none is given");
-        for (const [cn, what] of [["points", "sized in pixels"], ["pointsAttenuated", "attenuated with depth"]])
+        for (const [cn, what] of [["points", "sized in pixels by a size node and turning by a rotation node"], ["pointsAttenuated", "the material's size, attenuated with depth"]])
             ok(`${cn === "points" ? "***" : " "} [${mode}] SIZED POINTS ON A SPRITE, ${what}: the field covers exactly the ${o[cn].colour} pixels three's points material draws and is the CPU's corners' to ${e(o[cn].w)} px, the largest ${o[cn].big.toFixed(2)} px${cn === "points" ? " -- the stage refused them ***" : ""}`,
-               same(o[cn]) && o[cn].moving === o[cn].colour && o[cn].w < 1e-3 && o[cn].moving > (cn === "points" ? 400 : 60),
-               "PointsNodeMaterial's own placement: the centre through the camera, each corner its size in pixels about it -- times the pixel ratio, attenuated by half the canvas height over the view depth -- over half the viewport, times the clip w; at the last draw from material.userData.previousPositionNode");
+               same(o[cn]) && o[cn].moving === o[cn].colour && o[cn].w < 2e-3 && o[cn].moving > (cn === "points" ? 400 : 60),
+               "PointsNodeMaterial's own placement, at a pixel ratio of 2: the centre through the camera, each corner its size in pixels about it -- times the pixel ratio, attenuated by half the canvas height over the view depth, turned by the rotation node -- over half the viewport, times the clip w; at the last draw from material.userData.previousPositionNode and previousRotationNode. The turning points' 1.8e-3 px is the rotation's sine and cosine in f32 on the device against f64 on the CPU, render/temporalTslZoo-selfcheck.mjs's bound for its turning sprites");
         ok(`*** [${mode}] A POSITION NODE DISPLACING WHAT THREE MORPHS AND INSTANCES, the last position a function of the point the stage keeps: the object moved instead to ${e(o.morphed.w)} and ${e(o.instanced.w)} px over ${o.morphed.moving} and ${o.instanced.moving} pixels; over a skin, the identity the plain skin's to ${e(o.skinned.w)} ***`,
            same(o.morphed) && same(o.instanced) && same(o.skinned) && o.morphed.w < 1e-3 && o.instanced.w < 1e-3 && o.skinned.w < 1e-3 && o.morphed.moving > 300 && o.instanced.moving > 100 && o.skinned.moving > 200,
            "material.userData.previousPositionNode = (p) => p.add(offsetBefore): p is the geometry through the previous influences, bone matrices or instance matrix -- the application says how it displaced the point, the stage has where the point was");
@@ -135,7 +141,17 @@ else {
     }
 }
 // ---- v4770 SABOTAGE LOG ----------------------------------------------------------------------------------------
-// (filled in by the round's sabotages)
+// Against render/temporalTsl.mjs, here (and render/temporalTslZoo-selfcheck.mjs, 0 on every one: its sprites are the property's):
+// N1 the rotation node not read now -> 4; N2 the last angle not read -> 4; N3 a node's last angle the property's -> 6; N4 the pixel
+// ratio forgotten -> 4; N5 attenuation ignored -> 2; N6 attenuated by the full canvas height -> 2; N7 a point's last centre its
+// centre now -> 4; N8 its last corner at this frame's rotation -> 2; N9 its corner not times the clip w -> 4; N10 a points
+// material drawn as a sprite's -> 4; N11 the material's size not copied -> 2; N12 the rotation node not copied -> 4; N13 the last
+// angle not copied -> 4; N14 the function given the bare geometry -> 2; N15 the kept instance point through this frame's matrix
+// -> 2; N16 a function over a batch not refused -> 2. Sixteen, none green.
+// *** THREE OF THEM WERE GREEN ON THE FIRST DRAFT OF THIS GATE, WHICH HAD NO POPULATION FOR THEM. *** It ran at a pixel ratio of 1,
+// where forgetting it (N4) reads the same; its points did not turn (N8); and every one had a size node, so the material's size
+// (N11) was never read. The points are drawn at a pixel ratio of 2 now, the pixel-sized ones turn, and the attenuated ones take
+// the material's size.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a size node that CHANGES, whose last value the stage does not keep -- a point is taken to have its size now at " +
     "the last draw too; points drawn by THREE.Points, one pixel each in three's WebGPU renderer and render/temporalTslZoo-selfcheck.mjs's; " +
