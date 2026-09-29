@@ -14,6 +14,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -88,6 +89,9 @@ else {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), mean = (x) => x.reduce((p, q) => p + q, 0) / x.length;
         const P = ["none", "midpoint", "timed"], m = Object.fromEntries(P.map((p) => [p, { mean: mean(o[p].per), worst: Math.min(...o[p].per), judder: o[p].judder }]));
         for (const p of P) say(`${p.padEnd(8)} ${o[p].kinds}  judder ${f(m[p].judder)} ms, ${f(m[p].mean)} dB a refresh, worst ${f(m[p].worst)}; generated ${o[p].gens.join(" ") || "none"}`);
+        gateReport("fx/fsr/fsr3Late-selfcheck.mjs").table("each policy around a real frame five refreshes late",
+            ["policy", "judder ms", "dB a refresh", "worst refresh dB", "refused", "sent back"],
+            P.map((p) => [p, m[p].judder, m[p].mean, m[p].worst, o[p].refused, o[p].back])).write();
         ok(`*** [webgpu] with frame ${LATE} five refreshes long, the pacer asks the device for nothing it does not hold and never sends the scene back: ${P.map((p) => `${p} ${o[p].refused} refused, ${o[p].back} back`).join("; ")} ***`,
            P.every((p) => o[p].refused === 0 && o[p].back === 0),
            "fx/fsr/fsr3Tsl.mjs makes a frame when it is shown and holds the newest pair. Under v4743's pacer the timed policy was refused 12 times here: its line, an interval, a render and a quarter refresh behind, sat in the pair before the newest after every new frame (render/framePacer.mjs, pairs \"newest\")");

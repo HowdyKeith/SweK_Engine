@@ -81,6 +81,12 @@ export function gateReport(gateRelPath) {
     const tables = [], notes = [], skipped = [];
     return {
         table(title, columns, rows, note = null) {
+            // v4780 -- a non-finite number is stored as its name. JSON has no Infinity or NaN and writes null,
+            // which reaches the page as an empty cell; a PSNR of two identical images is Infinity, and the
+            // FSR gates' tables hold such rows. renderedNumbers() already exempts exactly these two names.
+            // A null -- a statistic not computed, such as a rank correlation over a constant -- is stored as
+            // "none" for the same reason: an empty cell is a value the page cannot show.
+            rows = rows.map((r) => r.map((v) => (v == null ? "none" : typeof v === "number" && !Number.isFinite(v) ? String(v) : v)));
             tables.push({ title, columns, rows, note });
             return this;
         },

@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
 import { flowCostModel } from "../../render/flowCost.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -68,6 +69,10 @@ else {
         const o = r.result.webgpu, model = Object.fromEntries(Object.entries(SETTINGS).map(([k, s]) => [k, flowCostModel({ w: W, h: H, ...s })]));
         const rows = Object.keys(SETTINGS).map((k) => ({ k, ms: o.flow[k], reads: model[k].search + model[k].pyramid, tr: o.flow[k] / o.flow.default, rr: (model[k].search + model[k].pyramid) / (model.default.search + model.default.pyramid) }));
         for (const x of rows) say(`${x.k.padEnd(8)} ${x.ms.toFixed(1)} ms, ${(x.reads / 1e6).toFixed(1)}M reads -- ${(x.tr * 100).toFixed(0)}% of the default's time, ${(x.rr * 100).toFixed(0)}% of its reads; reach by the sum ${model[x.k].reach} px`);
+        gateReport("fx/fsr/fsrFlowCost-selfcheck.mjs").table("the flow's time on the device against its reads, by setting",
+            ["setting", "ms", "reads", "share of the default's time", "share of its reads", "reach px"],
+            rows.map((x) => [x.k, x.ms, x.reads, x.tr, x.rr, model[x.k].reach]),
+            "this device's time; the read counts are render/flowCost.mjs's model").write();
         // *** v4776 -- THE MODEL WAS PROPORTIONAL AND THE DEVICE IS AFFINE, AND THE CHEAPEST SETTING IS WHERE THAT SHOWS. ***
         // This row held each setting's share of the default's TIME to its share of the READS within 20%, which assumes
         // time = a * reads with nothing else. Found red at the v4776 merge, and it is not noise: nine alone runs on a

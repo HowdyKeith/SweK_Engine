@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url";
 import { declared, readDoc } from "./foldStats.mjs";
 import { PREREG_H7, CACHE_H7, RESULT_H7, FRAME_KEYS, frameRow, sceneSummary, h7 } from "./frameGate.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameGateMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -63,6 +65,8 @@ const H = h7(per, d);
     for (const sp of d.speeds) {
         say(`x${sp}: scene / mean frame laplacian / mean genDb-cfDb / frames generation won / within rho -- ` +
             d.scenes.map((s) => `${s} ${per[sp][s].lap.toFixed(4)}/${per[sp][s].adv.toFixed(3)}/${per[sp][s].wins}of${per[sp][s].n}/${per[sp][s].rho.toFixed(2)}`).join("  "));
+            REPORT.table(`H7 per scene at x${sp}: does a frame's detail decide it`, ["scene", "mean frame laplacian", "mean genDb - cfDb", "frames generation won", "frames", "within rho"],
+                d.scenes.map((s) => [s, per[sp][s].lap, per[sp][s].adv, per[sp][s].wins, per[sp][s].n, per[sp][s].rho]));
         const c = H.cells[sp];
         ok(`*** x${sp} (a) ACROSS fails: rho ${c.across.rho.toFixed(4)}, exact p ${c.across.p.toFixed(4)} -- the 0.7143 it needed is far off ***`,
            !c.across.cleared && c.across.rho < 0.7143 && c.across.p > d.alpha);
@@ -96,6 +100,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "tracking is not separable here, and no mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeGateMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: anything beyond seven synthetic scenes at two speeds; a frame gate's value in dB; whether ANY other " +
             "frame-level signal separates the mixed scenes -- that would owe its own document.");

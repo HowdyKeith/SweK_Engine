@@ -13,6 +13,8 @@ import { CACHE_H7 } from "./frameGate.mjs";
 import { RESULT_H11, cellOf } from "./frameGain.mjs";
 import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, reverseSummary, reverse } from "./frameReverse.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameReverseMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -69,6 +71,8 @@ const mean$ = (c, key) => mean(d.scenes.map((s) => per[c][s][key]));
     ok("*** the recomputed H12 and H13 are the recorded ones ***", J(H.h12) === J(R.h12) && J(H.h13) === J(R.h13));
     for (const c of d.cells) say(`${c}: scene raw rho / partial given frame / gain~clock / advantage~clock / wins -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${signed(p.rho)}/${signed(p.partial)}/${signed(p.rGainClock)}/${signed(p.rAdvClock)}/${p.wins}`; }).join("  "));
+        REPORT.table("per scene: raw rho, partial given frame, gain and advantage against the clock", ["cell", "scene", "raw rho", "partial given frame", "gain~clock", "advantage~clock", "wins"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.rho, p.partial, p.rGainClock, p.rAdvClock, p.wins]; })));
     // H12 FAILS BY THE PRICE THE DOCUMENT NAMED: one cell clears, the other stops at 6 of 7 with the named scene against it.
     const [cx, cz] = d.cells, against = (c) => d.scenes.filter((s) => d.direction * per[c][s].rho < 0);
     // v4717 -- READ THROUGH ONE CELL THAT MAY NOT EXIST. A sabotage that made the forward cell clear left `fails` empty, and the
@@ -119,6 +123,7 @@ console.log("\n4. *** SECONDARIES AND WHAT THE CLOCK TOOK -- REPORTED, NEVER PRO
         "The partial removes a MONOTONE trend and nothing else; no mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeReverseMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: a window in which the slab does not leave the view, which is the design that would separate the clock from the " +
             "signal rather than partial it out; why zone runs against the rest; a frame gate's value in dB.");

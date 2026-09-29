@@ -15,6 +15,8 @@ import { RULE_KEYS, declared, readDoc, foldMean } from "./foldStats.mjs";
 import { PREREG_H6, RESULT_H6, CELLS, ruleScore, loadCell, sceneAucs, h6 } from "./genGateRule.mjs";
 import { jointRows } from "./genGateFolds.mjs";
 import { N_FEATURES, N_FEATURES_V2, auc } from "../../render/genGate.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateRuleMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -55,6 +57,7 @@ const H = h6(per, d);
        J(per) === J(R.per) && J(H) === J(R.h6));
     for (const sp of d.speeds) {
         say(`x${sp}: ` + d.scenes.map((s) => `${s} ${per[sp][s].auc.toFixed(3)}`).join("  "));
+        REPORT.table(`H6 at x${sp}: the declared rule's AUC per scene`, ["scene", "AUC"], d.scenes.map((s) => [s, per[sp][s].auc]));
         const c = H.cells[sp], below = d.scenes.filter((s) => per[sp][s].auc < 0.5);
         ok(`*** x${sp} FAILS: the score is BELOW chance on ${below.length} scenes of 7, and its mean is negative ***`,
            c.reportable && !c.cleared && c.test.sign.up === 2 && c.test.t.mean < 0 && below.length === 5,
@@ -75,6 +78,7 @@ console.log("\n3. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
     for (const sp of d.speeds) {
         const rule = d.scenes.map((s) => per[sp][s].auc), v1 = d.scenes.map((s) => foldMean(learned[sp].results[s].V1)), v2 = d.scenes.map((s) => foldMean(learned[sp].results[s].V2));
         say(`S20 x${sp}: scene / rule / learned V1 / learned V2 -- ` + d.scenes.map((s, i) => `${s} ${rule[i].toFixed(3)}/${v1[i].toFixed(3)}/${v2[i].toFixed(3)}`).join("  "));
+        REPORT.table(`S20 at x${sp}: the rule beside the learned arms, reported and not promoted`, ["scene", "rule AUC", "learned V1 AUC", "learned V2 AUC"], d.scenes.map((s, i) => [s, rule[i], v1[i], v2[i]]));
         say(`S20b x${sp}: Spearman rho across the seven scenes, rule AUC against learned V1 ${spearman(rule, v1).toFixed(3)}, against V2 ${spearman(rule, v2).toFixed(3)}. ` +
             "Negative means the scenes the rule ranks backwards are the ones the learned sets ranked forwards. A description over seven points.");
     }
@@ -108,6 +112,7 @@ console.log("\n3. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
     }
 }
 
+REPORT.write();
 console.log(`\ngenGateRuleMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: THE NEGATED SCORE, WHICH IS NOT TESTED; ANYTHING IN dB; anything beyond seven synthetic scenes at two speeds.");
 process.exit(fails ? 1 : 0);

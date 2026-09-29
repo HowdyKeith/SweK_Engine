@@ -15,6 +15,8 @@ import { CACHE_H11, RESULT_H11, cellOf } from "./frameGain.mjs";
 import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, slabBlocks, nonTurnRows, swaySummary, h14 } from "./frameSway.mjs";
 import { slabOffset } from "../../render/slabPath.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameSwayMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -96,6 +98,8 @@ const h11Cell = (c) => R11.declared.cells.find((q) => cellOf(q).speed === cellOf
     ok("*** the recomputed H14 is the recorded one ***", J(H) === J(R.h14));
     for (const c of d.cells) say(`${c} ${d.path}: scene raw rho / partial given frame / gain~clock / advantage~clock / turn frames out -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${signed(p.rho)}/${signed(p.partial)}/${signed(p.rGainClock)}/${signed(p.rAdvClock)}/${p.turns}`; }).join("  "));
+        REPORT.table("H14 per scene: the sway", ["cell", "scene", "raw rho", "partial given frame", "gain~clock", "advantage~clock", "turn frames out"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.rho, p.partial, p.rGainClock, p.rAdvClock, p.turns]; })));
     const fails = d.cells.filter((c) => !H.cells[c].cleared), clears = d.cells.filter((c) => H.cells[c].cleared);
     const f0 = fails.length === 1 ? H.cells[fails[0]] : null, c0 = clears.length === 1 ? H.cells[clears[0]] : null;
     const against = f0 ? d.scenes.filter((s) => d.direction * per[fails[0]][s].rho < 0) : [];
@@ -135,6 +139,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "It clears on forward motion and misses vertically by one scene. No mechanism is claimed, and no threshold is fixed.");
 }
 
+REPORT.write();
 console.log(`\nframeSwayMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: frames at a turn, which are excluded and not studied; why bars runs against the rest vertically; " +
             "a frame gate's value in dB.");

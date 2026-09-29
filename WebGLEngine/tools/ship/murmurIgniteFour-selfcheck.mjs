@@ -29,6 +29,8 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies, interiorMeanLight } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurIgniteFour-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -260,6 +262,7 @@ sec("5. *** AND IT REACHES PIXELS: fathom and geode still were not flashing at a
         });
         for (const r of R)
             say(`${r.s.padEnd(7)} ${r.d.pct.toFixed(1)}% of bytes move, worst ${String(r.d.mx).padStart(3)}   interior x${(r.hi / r.lo).toFixed(2)}   (at v4659: x${WAS[r.s].toFixed(2)})`);
+            REPORT.table("four species at the peak", ["species", "% of bytes moved", "worst channel", "interior ratio", "interior ratio at v4659"], R.map((r) => [r.s, r.d.pct, r.d.mx, r.hi / r.lo, WAS[r.s]]));
         ok("!! *** ALL FOUR MOVE, AND fathom AND geode GO FROM x1.000 -- NOTHING AT ALL -- TO x4.03 AND x4.90 ***",
             R.every((r) => r.d.pct > 3 && r.d.mx > 20) &&
             R.every((r) => r.hi / r.lo > WAS[r.s] * 1.05),
@@ -273,6 +276,7 @@ sec("5. *** AND IT REACHES PIXELS: fathom and geode still were not flashing at a
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the last four of murmur's per-species ignition figures, which are four shapes " +
     "and not one -- a von Mises going ROUND aura's ribbons, a sequence of triangular windows lighting " +

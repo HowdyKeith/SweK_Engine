@@ -35,6 +35,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { FRAME_VERDICTS, FRAME_MEASURED } from "../../render/frameVerdicts.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/fsrPageGen-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -135,6 +137,8 @@ const rows = [];
     }
     for (const x of rows)
         say(`frame ${x.f}: scene time ${x.t} -- generated ${x.gen.toFixed(2)}, cross-fade ${x.cf.toFixed(2)}, hold-previous ${x.hold.toFixed(2)} dB;  motion ${x.mean.toFixed(2)} px mean, ${x.max.toFixed(2)} worst;  ${x.app} application blocks, ${x.flow} flow`);
+        REPORT.table("fsr.html's generated frames against the cross-fade and holding the previous", ["frame", "scene time", "generated dB", "cross-fade dB", "hold-previous dB", "motion mean px", "motion worst px", "application blocks", "flow blocks"],
+            rows.map((x) => [x.f, x.t, x.gen, x.cf, x.hold, x.mean, x.max, x.app, x.flow]));
     ok("every generated frame reports all five of its numbers, so none of the rows below is reading a blank",
        rows.length === UPTO - 1 && rows.every((x) => [x.t, x.gen, x.cf, x.hold, x.mean, x.max].every(Number.isFinite)),
        `${rows.length} frames parsed, every field finite`);
@@ -197,6 +201,8 @@ console.log("\n4. v4682 -- *** THE PRE-REGISTERED SPEED CURVE, AND ITS PRIMARY H
                               left: rs.map((x) => x.left) }));
     for (const c of curve)
         say(`speed x${c.sp}: delta ${c.d.map((v) => v.toFixed(2)).join(", ")} dB  (mean ${avg(c.d).toFixed(3)}, ${c.d.filter((v) => v > 0).length} of ${c.d.length} up);  displacement ${c.disp.toFixed(2)} px mean;  unreachable ${c.left.join(",")}`);
+        REPORT.table("generated minus cross-fade, by the page's speed", ["speed", "frame 1 dB", "frame 2 dB", "frame 3 dB", "frame 4 dB", "mean dB", "frames up", "displacement mean px"],
+            curve.map((c) => [+c.sp, ...[0, 1, 2, 3].map((i) => c.d[i]), avg(c.d), c.d.filter((v) => v > 0).length, c.disp]));
     const last = curve[curve.length - 1];
     ok("*** H1 REFUTED: there is NO speed among the four at which the generated frame beats the cross-fade -- 0 of 4 frames up at EVERY setting ***",
        curve.every((c) => c.d.every((v) => v < 0)),
@@ -295,6 +301,7 @@ console.log("\n4. v4682 -- *** THE PRE-REGISTERED SPEED CURVE, AND ITS PRIMARY H
 // what a frame generator is judged on. A slab-speed control would change that and does not exist; the closing
 // line names it.
 
+REPORT.write();
 console.log(`\nfsrPageGen-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 // v4713 -- THIS NOTE SAID A SLAB-SPEED CONTROL "DOES NOT EXIST" FOR THIRTY-ONE ROUNDS WHILE SECTION 3 DROVE IT. It was
 // written at v4681; v4682 added the control and the curve above and left the note alone, and "a paired test ... is a

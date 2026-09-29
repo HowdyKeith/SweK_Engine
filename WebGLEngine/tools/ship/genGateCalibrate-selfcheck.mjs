@@ -16,6 +16,8 @@ import { pairedBoth } from "./pairedStats.mjs";
 import { rateMatch, auc, N_FEATURES as NF } from "../../render/genGate.mjs";
 import { flatten, calibrate, writeV2 } from "./genGateCalibrate.mjs";
 import { TRAIN_ONLY, VALIDATE_ON, HELD_OUT, WEIGHTS_V2 } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateCalibrate-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -228,6 +230,8 @@ const parse = (arm) => r.result[arm].seen.map((g, i) => ({
 const A = Object.fromEntries(ARMS.map((g) => [g, parse(g)]));
 for (const g of ARMS) say(`${g.padEnd(7)}: mean gen ${avg(A[g].map((x) => x.gen)).toFixed(4)} dB` +
     (A[g][0] && A[g][0].of ? `, gate ${A[g][0].of}, kept ${avg(A[g].map((x) => x.kept)).toFixed(1)} of ${A[g][0].blocks}` : ""));
+REPORT.table("H2: each arm's mean generated dB over the held-out frames", ["arm", "frames", "mean gen dB", "gate", "mean blocks kept", "blocks"],
+    ARMS.map((g) => [g, A[g].length, avg(A[g].map((x) => x.gen)), (A[g][0] && A[g][0].of) || "none", A[g][0] && A[g][0].of ? avg(A[g].map((x) => x.kept)) : "none", (A[g][0] && A[g][0].blocks) || "none"]));
 
 const dOracle = A.oracle.map((x, i) => x.gen - A.off[i].gen), sOracle = pairedBoth(dOracle);
 ok("*** C1 carried forward: the ORACLE still beats ungated generation, so the rig is the rig ***",
@@ -307,6 +311,7 @@ say(`S8 (the confound this round introduced): weights are fitted on ${TRAIN_ONLY
 // gate then kept essentially NOTHING on the held-out scene and the row PASSED over it. A detector aimed at
 // one end of a range is not a detector. It is two-sided now, with fixtures at both ends.
 
+REPORT.write();
 console.log(`\ngenGateCalibrate-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: WHETHER A DIFFERENT FEATURE SET WOULD TRANSFER -- this round moved the operating " +
     "point and nothing else, by design, so that a result could be attributed to the operating point and " +

@@ -15,6 +15,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -97,6 +99,8 @@ else {
     if (r.ok && r.result && r.result.cost && r.result.cost.N100) {
         const { cost: c, q } = r.result, f = (v) => v.toFixed(1), d = (x) => (x >= 0 ? "+" : "") + x.toFixed(2);
         for (const n of ["N1", "N100"]) say(`${c[n].tris} triangles: a real frame ${f(c[n].realFrame)} ms, the layer with the geometry pass ${f(c[n].geometry)} ms, with the generator's depth ${f(c[n].depthAt)} ms`);
+        REPORT.table("the translucent layer's cost against a real frame, this device's ms", ["triangles", "real frame ms", "layer, geometry pass ms", "layer, generator's depth ms"],
+            ["N1", "N100"].map((n) => [c[n].tris, c[n].realFrame, c[n].geometry, c[n].depthAt]));
         ok(`*** the layer's geometry pass grows with the scene as a real frame does -- ${f(c.N1.geometry)} to ${f(c.N100.geometry)} ms, a real frame ${f(c.N1.realFrame)} to ${f(c.N100.realFrame)} -- and with the generator's depth it does not: ${f(c.N1.depthAt)} to ${f(c.N100.depthAt)} ms ***`,
            c.N100.geometry > 10 * c.N1.geometry && c.N100.geometry > 0.5 * c.N100.realFrame && c.N100.depthAt < 2 * c.N1.depthAt + 1 && c.N100.depthAt < 0.1 * c.N100.geometry,
            "a hundredfold scene, and one quad against a pass over a million triangles -- SwiftShader's milliseconds, the ratio the arithmetic's");
@@ -116,6 +120,7 @@ else {
 // fx/fsr/fsrFrameGenTsl.mjs, here: C6 `ui` called before the splat, so depthAt is empty -> 1. *** C5 -- depthAt the splat
 // before the fill -- IS EQUIVALENT HERE, measured: *** the four figures read the same to the hundredth (glass 34.4 dB and -0.29,
 // a lens 29.5 and -0.81); the fill changes only the holes, and the box's holes lie where it hides the pane either way.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a real GPU's times -- the run in docs/real-hardware-fsr.md times this gate with the rest; a translucent thing " +
     "in front of a surface the splat did not reach (a hole the fill left), where the generated depth is the far plane; and the " +

@@ -38,6 +38,8 @@ import { INSTRUMENTS } from "../../physics/instruments.mjs";
 import * as L from "../../physics/labScenes.mjs";
 import * as P from "../../physics/proposers.mjs";
 import * as K from "../../physics/knobRegistry.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/labHome-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -146,10 +148,12 @@ sec("E. *** THE PAGE IN A BROWSER WITH NO BRIDGE: IT LOADS, PAINTS THE PRESETS, 
             const p = r.result;
             ok("the page loaded, and with no bridge it says the bridge is unreachable rather than inventing a registry", /bridge not reachable/.test(p.door), p.door.slice(0, 120));
             ok(`the presets band painted every curated preset (${p.presets}), all disabled, each with its sources line`, p.presets === PRESETS.length && p.enabled === 0 && /not assessed|not run/.test(p.firstSrc) && p.initiateDisabled === true, `${p.presets} presets, ${p.enabled} enabled, in ${p.ms.toFixed(0)} ms`);
+            REPORT.table("the lab home page with no bridge", ["curated presets", "presets painted", "presets enabled", "load ms"], [[PRESETS.length, p.presets, p.enabled, p.ms]]);
         }
     }
 }
 
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nall checks pass");
 for (const l of H.reportLines()) console.log("  " + l);
 // v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's

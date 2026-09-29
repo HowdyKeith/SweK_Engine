@@ -69,6 +69,8 @@ const SC = fs.readFileSync(path.join(HERE, "selfchecks.mjs"), "utf8");
 const RC = fs.readFileSync(path.join(HERE, "redCensus.mjs"), "utf8");
 import * as RCmod from "./redCensus.mjs";
 import * as SR from "./sweepRotation.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/skipReading-selfcheck.mjs");
 
 // The convention, written once here and compared against BOTH runners rather than restated in each row.
 const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
@@ -192,6 +194,8 @@ console.log("\n2. *** THE SWEEP COULD NOT SEE A SKIP, AND THAT WAS A DELIBERATE 
     const perGate = (c.captureMs - c.ignoreMs) / c.gates;
     say("eight gates, ignore / capture", `${c.ignoreMs} ms / ${c.captureMs} ms = ${(c.captureMs / c.ignoreMs).toFixed(3)}x`);
     say("per-gate overhead, and over a full sweep", `${perGate.toFixed(1)} ms -> ${(perGate * 1642 / 1000).toFixed(1)} s`);
+    REPORT.table("the cost of capturing a gate's output, eight gates three times each way (frozen at v4582)", ["gates", "ignore ms", "capture ms", "per-gate overhead ms", "sampled gates faster captured"],
+        [[c.gates, c.ignoreMs, c.captureMs, perGate, c.faster]]);
     ok("*** the cost of seeing is within noise, and it is stated as within noise rather than as a number ***",
         perGate < 5 && c.faster >= 1,
         `${perGate.toFixed(1)} ms a gate, and ${c.faster} of the ${c.gates} sampled gates came out FASTER captured ` +
@@ -228,6 +232,8 @@ console.log("\n3. *** THE CENSUS, DRIVEN BY RUNNING THE GATES RATHER THAN BY REA
     });
     for (const c of CENSUS_V4582.contaminated)
         say(c.gate.split("/").pop().padEnd(34), `sweep held ${c.sweepWas} ms against a ${c.skipMs} ms skip -- ${(c.sweepWas / c.skipMs).toFixed(1)}x`);
+        REPORT.table("sweep readings that were a skip, not a run", ["gate", "sweep held ms", "skip ms", "ratio"],
+            CENSUS_V4582.contaminated.map((c) => [c.gate, c.sweepWas, c.skipMs, c.sweepWas / c.skipMs]));
 
     ok("*** 22 gates in the tree can decline to run, 4 decline on this box, and 3 of those held a code-0 sweep reading ***",
         CENSUS_V4582.skippable === 22 && CENSUS_V4582.skipHere === 4 && CENSUS_V4582.contaminated.length === 3,
@@ -356,5 +362,6 @@ function runTail(rel) {
     return String(r.stdout || "") + String(r.stderr || "");
 }
 
+REPORT.write();
 console.log(fails ? `\nskipReading-selfcheck: ${fails} FAILED` : "\nskipReading-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

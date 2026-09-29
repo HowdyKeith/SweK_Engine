@@ -40,6 +40,8 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies, interiorMeanLight } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurIgniteAxis-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -58,6 +60,7 @@ sec("1. *** THE IGNITION IS THE GESTURE, TIGHTER -- three species where both fig
     const pairs = [["arc", A.arc], ["flux", A.flux], ["prism", A.prism]];
     for (const [s, c] of pairs)
         say(`${s.padEnd(6)} gesture width ${c.gestureW.toFixed(2)}, ignition width ${c.width.toFixed(2)} -- ${(100 * (1 - c.width / c.gestureW)).toFixed(1)}% tighter`);
+        REPORT.table("ignition width against the gesture pulse's", ["species", "gesture width", "ignition width"], pairs.map(([s, c]) => [s, c.gestureW, c.width]));
     say(`helix   has no gesture pulse to compare and carries the table's only FLAT term, ${A.helix.flat}`);
     ok("!! *** EVERY IGNITION FRONT IS TIGHTER THAN THE SAME SPECIES' GESTURE FRONT, all three of them ***",
         pairs.every(([, c]) => c.width < c.gestureW && c.width > 0.7 * c.gestureW) &&
@@ -162,6 +165,7 @@ sec("4. *** AND IT REACHES PIXELS: two of the four still were not flashing at al
         });
         for (const r of R)
             say(`${r.s.padEnd(6)} ${r.d.pct.toFixed(1)}% of bytes move, worst ${String(r.d.mx).padStart(3)}   interior x${(r.hi / r.lo).toFixed(2)}   (at v4658: x${WAS[r.s].toFixed(2)})`);
+            REPORT.table("the ignition's axis at the peak", ["species", "% of bytes moved", "worst channel", "interior ratio", "interior ratio at v4658"], R.map((r) => [r.s, r.d.pct, r.d.mx, r.hi / r.lo, WAS[r.s]]));
         ok("!! *** ALL FOUR BRIGHTEN, AND prism AND helix GO FROM x1.000 -- NOTHING AT ALL -- TO x2.08 AND x2.93 ***",
             R.every((r) => r.d.pct > 3 && r.d.mx > 40) &&
             R.every((r) => r.hi / r.lo > WAS[r.s] * 1.05),
@@ -175,6 +179,7 @@ sec("4. *** AND IT REACHES PIXELS: two of the four still were not flashing at al
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the four species whose SUCCESS is a gaussian travelling along a coordinate of " +
     "their own -- arc's angle, flux's length, prism's beams, helix's height -- which is one shape with five " +

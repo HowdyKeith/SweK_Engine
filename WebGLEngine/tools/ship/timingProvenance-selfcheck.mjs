@@ -63,6 +63,8 @@ import { TIMING_KIND } from "./gateBudget.mjs";
 import { boxId, hostFacts } from "./hostScale.mjs";
 import { noComments, proseHas } from "./sourceScan.mjs";
 import { hostFingerprint } from "../roundhouse/androidRunner.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/timingProvenance-selfcheck.mjs");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -216,6 +218,8 @@ console.log("\n4. *** THE ROUND'S OWN PREMISE, MEASURED AND REFUSED ***");
     const p = SERIAL_PROBE_V4580;
     const ratio = p.sumOfPerGateMs / p.wallMs;
     say("89 gates, sum of per-gate ms / wall clock", `${p.sumOfPerGateMs} / ${p.wallMs} = ${ratio.toFixed(3)}x`);
+    REPORT.table("the serial probe (frozen at v4580)", ["selected", "passing", "failing", "sum of per-gate ms", "wall ms", "ratio"],
+        [[p.selected, p.passing, p.failing, p.sumOfPerGateMs, p.wallMs, ratio]]);
 
     // THE SIGNATURE. Under a pool of W workers the per-gate times sum to about W x the wall clock; under a
     // serial loop they sum to slightly UNDER it, the gap being the parent's own work between spawns.
@@ -493,6 +497,8 @@ console.log("\n10. *** A COMPLETED RUN IS STILL ONE COLD SAMPLE, AND THIS ROUND'
         (Math.max(b.runner, b.median) / Math.min(b.runner, b.median)) - (Math.max(a.runner, a.median) / Math.min(a.runner, a.median)))[0];
     for (const x of SAMPLE_VS_MEDIAN_V4580)
         say(x.gate.split("/").pop().padEnd(34), `runner ${String(x.runner).padStart(5)}   median ${String(x.median).padStart(5)} (${x.runs})`);
+        REPORT.table("one runner sample against the median of three (frozen at v4580)", ["gate", "runner ms", "median ms", "runs ms"],
+            SAMPLE_VS_MEDIAN_V4580.map((x) => [x.gate, x.runner, x.median, x.runs]));
 
     ok("*** one of the four runner samples is 12x out, and three are sound ***",
         off.length === 1 && worst.gate.endsWith("spacesimStart-selfcheck.mjs") &&
@@ -526,5 +532,6 @@ console.log("\n10. *** A COMPLETED RUN IS STILL ONE COLD SAMPLE, AND THIS ROUND'
         "same entry. THE INSTRUCTION ASSUMES THE RECORD IS THE FRESH HALF, and one time in four it is not.");
 }
 
+REPORT.write();
 console.log(fails ? `\ntimingProvenance-selfcheck: ${fails} FAILED` : "\ntimingProvenance-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

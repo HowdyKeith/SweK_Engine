@@ -16,6 +16,8 @@ import { slabBlocks, nonTurnRows, RESULT_H14 } from "./frameSway.mjs";
 import { reversalsNear } from "./frameSwayRep.mjs";
 import { PREREG_H16, CACHE_H16, RESULT_H16, DIS_KEYS, disagreeSummary, h16 } from "./frameDisagree.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameDisagreeMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -81,6 +83,8 @@ const gainOnSway = (c) => { const q = R14.declared.cells.find((x) => cellOf(x).s
     ok("*** the recomputed H16 is the recorded one ***", J(H) === J(R.h16));
     for (const c of d.cells) say(`${c} ${d.path}: scene signal / rho with advantage / rho with H11's gain / partial given frame -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${p.signal.toFixed(3)}/${signed(p.rho)}/${signed(p.withGain)}/${signed(p.partial)}`; }).join("  "));
+        REPORT.table("H16 per scene: the two motion estimates disagreeing", ["cell", "scene", "scene signal", "rho with advantage", "rho with H11's gain", "partial given frame"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.signal, p.rho, p.withGain, p.partial]; })));
     ok("*** the qualifier holds: the signal is DISTINCT from H11's gain -- so whatever H16 says, it says about a different signal ***",
        H.distinct && H.meanAbsWithGain <= d.distinctMax, `mean |rho| with gain ${H.meanAbsWithGain.toFixed(3)} against a ceiling of ${d.distinctMax}`);
     ok("*** H16 IS NOT SUPPORTED: neither cell clears ***",
@@ -105,6 +109,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "qualifier measured that -- and within a scene it barely orders which frames generation wins. No mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeDisagreeMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: why the colour flow wins where it wins; a threshold, and a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);

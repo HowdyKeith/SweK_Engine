@@ -30,6 +30,8 @@ import { reconcileFlowCPU, SRC_APP, SRC_FLOW_BEAT, SRC_FLOW_ONLY } from "./flowR
 import { opticalFlowCPU } from "./opticalFlow.mjs";
 import { motionVectorsCPU, mat4Invert, transform4 } from "./motionVectors.mjs";
 import { viewProj } from "./rasterProbe.js";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/flowReconcileGPU-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -217,6 +219,9 @@ console.log("\n2. *** EVERY BLOCK PICKS THE SAME SOURCE, ON CONTENT WHERE THE TW
         say(`${k.padEnd(9)} ${x.n} blocks: source differs on ${x.srcDiff};  worst |flow| ${x.flowWorst.toExponential(2)} px, ` +
             `|appFlow| ${x.appWorst.toExponential(2)}, |sad| ${x.sadWorst.toExponential(2)};  ` +
             `CPU census app ${x.cpu.counts.app}/flow ${x.cpu.counts.flowBeat}/only ${x.cpu.counts.flowOnly}, device ${x.dev.counts.app}/${x.dev.counts.flowBeat}/${x.dev.counts.flowOnly}`);
+            REPORT.table("the device's reconciliation against the CPU's, block by block", ["case", "blocks", "source differs", "worst |flow| px", "worst |appFlow| px", "worst |sad|",
+                "CPU: app", "CPU: flow beat", "CPU: flow only", "device: app", "device: flow beat", "device: flow only"],
+                rows.map(([k, x]) => [k, x.n, x.srcDiff, x.flowWorst, x.appWorst, x.sadWorst, x.cpu.counts.app, x.cpu.counts.flowBeat, x.cpu.counts.flowOnly, x.dev.counts.app, x.dev.counts.flowBeat, x.dev.counts.flowOnly]));
     ok("*** the device picks the SAME SOURCE at every block of every case -- a decision has no tolerance to hide behind ***",
        rows.every(([, x]) => x.srcDiff === 0),
        rows.map(([k, x]) => `${k}: ${x.srcDiff} of ${x.n} differ`).join("; ") +
@@ -337,6 +342,7 @@ console.log("\n7. WHAT THE RUNNER REFUSES, ON THE DEVICE");
 // in the line it was matching. A script reporting 0 red without checking its edit landed is measuring nothing --
 // the same trap v4684's log records, two rounds running.
 
+REPORT.write();
 console.log(`\nflowReconcileGPU-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: THE COLOUR FLOW, which is an INPUT and is computed on the CPU on purpose -- " +
     "render/opticalFlowGPU.mjs already mirrors the search, and chaining the two would leave a parity row unable " +

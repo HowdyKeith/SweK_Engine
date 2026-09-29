@@ -12,6 +12,8 @@ import { declared, readDoc } from "./foldStats.mjs";
 import { holeRow, CACHE_H8 } from "./frameHoles.mjs";
 import { PREREG_H9, CACHE_H9, RESULT_H9, HOLED_KEYS, holedContrast, h9 } from "./frameHoled.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameHoledMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -64,6 +66,8 @@ const H = h9(per, d);
     ok("*** the recomputed H9 is the recorded one ***", J(H) === J(R.h9));
     for (const q of d.ratios) say(`${q}x: scene / holed frames at mean advantage / clean frames at mean / contrast (clean minus holed) -- ` +
         d.scenes.map((s) => `${s} ${per[q][s].nHoled}@${per[q][s].holedAdv.toFixed(3)}/${per[q][s].nClean}@${per[q][s].cleanAdv.toFixed(3)}/${per[q][s].contrast.toFixed(3)}`).join("  "));
+        REPORT.table("holed frames against clean ones, per scene", ["ratio", "scene", "holed frames", "holed: mean advantage dB", "clean frames", "clean: mean advantage dB", "contrast, clean minus holed"],
+            d.ratios.flatMap((q) => d.scenes.map((s) => [q, s, per[q][s].nHoled, per[q][s].holedAdv, per[q][s].nClean, per[q][s].cleanAdv, per[q][s].contrast])));
     const c15 = H.cells["1.5"], c3 = H.cells["3"];
     const rev = d.scenes.filter((s) => per["1.5"][s].contrast <= 0);
     ok("*** at 1.5x the t-test clears and the EXACT SIGN TEST DOES NOT: 6 of 7 is 8/128 -- and the one scene against it is checker ***",
@@ -99,6 +103,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         ". A description over three cells, the first of which chose the signal; no test is run on it.");
 }
 
+REPORT.write();
 console.log(`\nframeHoledMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: H9, which is not supported; why checker differs; any geometry but this camera path; a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);
