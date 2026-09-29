@@ -1,0 +1,70 @@
+{
+ "gate": "render/flowReconcileGPU-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the device's reconciliation against the CPU's, block by block",
+   "columns": [
+    "case",
+    "blocks",
+    "source differs",
+    "worst |flow| px",
+    "worst |appFlow| px",
+    "worst |sad|",
+    "CPU: app",
+    "CPU: flow beat",
+    "CPU: flow only",
+    "device: app",
+    "device: flow beat",
+    "device: flow only"
+   ],
+   "rows": [
+    [
+     "geometry",
+     64,
+     0,
+     0,
+     8.344650268554688e-7,
+     0.0000011920928955078125,
+     62,
+     2,
+     0,
+     62,
+     2,
+     0
+    ],
+    [
+     "shader",
+     64,
+     0,
+     0,
+     0.000001430511474609375,
+     0.0000023543834686279297,
+     0,
+     64,
+     0,
+     0,
+     64,
+     0
+    ],
+    [
+     "both",
+     64,
+     0,
+     0,
+     0.0000019073486328125,
+     0.0000036954879760742188,
+     0,
+     64,
+     0,
+     0,
+     64,
+     0
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
