@@ -1,0 +1,32 @@
+{
+ "gate": "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the translucent layer's cost against a real frame, this device's ms",
+   "columns": [
+    "triangles",
+    "real frame ms",
+    "layer, geometry pass ms",
+    "layer, generator's depth ms"
+   ],
+   "rows": [
+    [
+     10560,
+     5.899999999906868,
+     5.699999999720603,
+     3.5
+    ],
+    [
+     1056000,
+     436.5,
+     324.60000000009313,
+     4.2999999998137355
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

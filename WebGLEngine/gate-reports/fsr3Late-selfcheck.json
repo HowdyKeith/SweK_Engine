@@ -1,0 +1,46 @@
+{
+ "gate": "fx/fsr/fsr3Late-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "each policy around a real frame five refreshes late",
+   "columns": [
+    "policy",
+    "judder ms",
+    "dB a refresh",
+    "worst refresh dB",
+    "refused",
+    "sent back"
+   ],
+   "rows": [
+    [
+     "none",
+     20.19476257150298,
+     20.57258130038431,
+     15.920023308996106,
+     0,
+     0
+    ],
+    [
+     "midpoint",
+     17.1516470221276,
+     20.999586194278113,
+     16.796689041533355,
+     0,
+     0
+    ],
+    [
+     "timed",
+     10.704887201828392,
+     21.720543232540532,
+     18.825822520641506,
+     0,
+     0
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

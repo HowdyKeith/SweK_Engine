@@ -1,0 +1,104 @@
+{
+ "gate": "fx/fsr/fsrFlowRetry-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "a small square moving fast over a still wall: dB by motion source",
+   "columns": [
+    "case",
+    "square px",
+    "square: vectors",
+    "square: flow",
+    "square: retrying",
+    "where it was, is and will be: vectors",
+    "...flow",
+    "...retrying",
+    "frame: vectors",
+    "frame: flow",
+    "frame: retrying",
+    "blocks right: flow",
+    "blocks right: retrying"
+   ],
+   "rows": [
+    [
+     "16 px",
+     576,
+     20.750958202434184,
+     20.68738482456737,
+     32.74257396578203,
+     22.081126445539493,
+     21.927854524549236,
+     26.09515180004017,
+     34.08529186138502,
+     33.910773299328945,
+     37.718997061595736,
+     "0/9",
+     "9/9"
+    ],
+    [
+     "12 px",
+     576,
+     20.145308193666143,
+     20.331164196376935,
+     22.875750279277515,
+     21.7395145208746,
+     21.848477175983106,
+     23.56516865578049,
+     33.81415744867034,
+     33.905528328194336,
+     35.55789171790532,
+     "0/4",
+     "4/4"
+    ],
+    [
+     "16 px bright",
+     576,
+     16.625099585908927,
+     35.54900862443779,
+     35.54900862443779,
+     17.72236120370882,
+     23.93891712104773,
+     23.9688563925829,
+     29.74994968014096,
+     35.1534802879589,
+     35.08597630802039,
+     "9/9",
+     "9/9"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "why it is not the default: a wall scrolling behind a turning knot",
+   "columns": [
+    "arm",
+    "frame dB",
+    "wall interior dB",
+    "wall interior px",
+    "blocks changed",
+    "blocks"
+   ],
+   "rows": [
+    [
+     "the flow",
+     34.26786328180833,
+     53.470939344379296,
+     4224,
+     0,
+     256
+    ],
+    [
+     "retrying",
+     34.11154547320659,
+     42.72255489973956,
+     4224,
+     1,
+     256
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
