@@ -867,8 +867,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // signatureOf). The rows that did not move are this line's: distinctDefinitions 41, condFirst 96,
     // unknownSignature 11, suspects 0. So that branch's 91/16 were the old classifier's reading, not a
     // disagreement about the tree, and none of its hundred and five invented a forty-second spelling of ok().
-    gates: 1880, usesOk: 1859, definesOk: 1851, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1752, condFirst: 96, unknownSignature: 11,
+    // v4779 -- 1880 -> 1881 for render/temporalTslCoverage-selfcheck.mjs -- the motion field where three draws: cut-outs, back faces, hidden, culled, grown.
+    gates: 1881, usesOk: 1860, definesOk: 1852, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1753, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

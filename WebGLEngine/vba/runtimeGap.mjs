@@ -583,7 +583,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
                                // which v4739's note calls a MENTION counted as a USE and is this census's own recorded limit. v4684: 4319 -> 4322 for tools/ship/pairedStats.mjs, its gate, and tools/ship/fsrPageConfirm-selfcheck.mjs. v4683: 4318 -> 4319 for tools/ship/fsrPageField-selfcheck.mjs. v4681: 4317 -> 4318 for tools/ship/fsrPageGen-selfcheck.mjs; fsr.html is not a .js or .mjs and is not counted. v4678: 4315 -> 4317 for render/holeFill.mjs and its gate. v4677: 4313 -> 4315 for render/frameInterp.mjs and its gate -- the first generated frame. v4676: 4311 -> 4313 for render/flowReconcile.mjs and its gate -- FSR3's reconciliation of the two motion fields. v4645 -- RE-DERIVED AT THE main MERGE over the merged tree. RE-DERIVED AT THE main MERGE: 4169 on this branch, 4172 on main, 4260 merged -- LESS than the sum, which is why it is run
     // v4776 -- the merged tree's own figures:
     // v4776 -- then 4494 -> 4495 in the same round: tools/rig/run-trader-github.mjs, the trader graph's rig job (one ES module, one closure).
-    files: 4495,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4779 -- 4495 -> 4496 for render/temporalTslCoverage-selfcheck.mjs.
+    files: 4496,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1073,8 +1074,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (superseded at the v4776 merge) esModules: 4153, closures: 4008, asyncAwait: 1639, typedArrays: 1216, promises: 385,
     // (superseded at the v4776 merge) fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 53, threads: 23, wasm: 23,
     // v4776 -- the merged tree's own figures:
-    esModules: 4194, closures: 4047, asyncAwait: 1666, typedArrays: 1221, promises: 392,
-    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // v4779 -- render/temporalTslCoverage-selfcheck.mjs: one ES module with closures, await, typed arrays, and forceWebGL -- five rows moved by one, seven held.
+    esModules: 4195, closures: 4048, asyncAwait: 1667, typedArrays: 1222, promises: 392,
+    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 196, webgpu: 55, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

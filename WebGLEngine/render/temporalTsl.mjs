@@ -147,7 +147,6 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         if (!r) { const last = Float32Array.from(src.image.data), cur = Float32Array.from(last);
             const tex = keep(new THREE.DataTexture(cur, src.image.width, src.image.height, THREE.RGBAFormat, THREE.FloatType)); tex.needsUpdate = true;
             r = { src, last, cur, tex }; batches.set(object, r); }
-        else if (r.src !== src) throw new Error(`render/temporalTsl: ${object.name ? JSON.stringify(object.name) : "a BatchedMesh"} re-made its matrices texture (its instance count grew past it) -- the stage's history of it is at the old size; make a new stage`);
         return r;
     };
     const batchBefore = (object, r) => {
@@ -293,8 +292,31 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const s = m.element(si.x).mul(v).mul(sw.x).add(m.element(si.y).mul(v).mul(sw.y)).add(m.element(si.z).mul(v).mul(sw.z)).add(m.element(si.w).mul(v).mul(sw.w));
         return bindInv.mul(s).xyz;
     };
+    // v4776: the objects this pass drew, so the ones it did not -- hidden, or culled -- keep their present pose (endPass)
+    const drawn = new Set();
     class MotionNode extends THREE.VelocityNode {
         constructor() { super(); this.nodeType = "vec4"; }
+        /**
+         * v4776: *** A BATCH THAT GROWS IS FOLLOWED, NOT REFUSED. *** setInstanceCount past its matrices texture re-makes it; the
+         * batch's history is made again at the new size, the last draw's matrices kept -- the layout is linear, so they are its
+         * first entries. True if it grew: the stage then has the material that draws it rebuilt, as three needs its own to be.
+         */
+        regrow(object) {
+            const r = batches.get(object); if (!r || r.src === object._matricesTexture) return false;
+            batches.delete(object); const n = batchRecord(object), k = Math.min(r.last.length, n.last.length);
+            n.last.set(r.last.subarray(0, k)); n.cur.set(n.last); n.tex.needsUpdate = true; return true;
+        }
+        /**
+         * v4776: *** AN OBJECT THE PASS DID NOT DRAW KEEPS ITS PRESENT POSE AS ITS LAST. *** Hidden, or outside the frustum, it had
+         * kept the pose it was last DRAWN at, so when it was drawn again its motion was everything since -- every frame it spent
+         * away. Now it is the last frame's, as a batch's hidden instance's already was.
+         */
+        endPass(scene) {
+            scene.traverse((o) => { if (drawn.has(o) || !(o.isMesh || o.isSprite || o.isPoints || o.isLine)) return;
+                if (o.isSkinnedMesh) o.skeleton.update();
+                o.updateMatrixWorld(); this.updateAfter({ object: o }); });
+            drawn.clear();
+        }
         /** v4761: a sprite's clip position as the stage draws it -- its sprite material's vertexNode. */
         spriteVertex() { return TSL.Fn((_, builder) => spriteClip(builder))(); }
         /** v4772: frees every texture the node made for the histories it keeps; the stage's dispose() calls it. */
@@ -305,6 +327,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         }
         // per object, BEFORE it is drawn: its matrix from the last time THIS pass drew it
         update({ object, renderId }) {
+            drawn.add(object);
             let m = prev.get(object);
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
@@ -470,6 +493,27 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
         if (o.isInstancedMesh || o.isSkinnedMesh || o.isBatchedMesh || (o.morphTargetInfluences && o.morphTargetInfluences.length))
             throw new Error(`render/temporalTsl: ${name}'s material sets positionNode over its ${o.isInstancedMesh ? "instances" : o.isSkinnedMesh ? "skin" : o.isBatchedMesh ? "batch" : "morphs"} -- give material.userData.previousPositionNode: the whole local position as it was, or (v4770) a function of the point as the stage keeps it`);
     };
+    // v4776: *** A MATERIAL THAT CUTS -- AN ALPHA TEST OR HASH -- DISCARDS WHAT THE COLOUR PASS DISCARDS, AND ONE THAT SHOWS ITS
+    // BACK SHOWS IT. *** The motion node as a fragmentNode skips three's diffuse setup, and with it the test: the field covered
+    // the clear half of a cut-out as well (812 pixels where three draws 406). And the override draws front faces only -- three
+    // copies a material's alpha test onto an override, not its side. Such a mesh is drawn with a material of the stage's that
+    // carries the motion node as its OUTPUT: three's diffuse setup runs first -- map, alpha map, colour, opacity, the test --
+    // and discards as the colour pass does; the side, displacement and position node are the object's
+    const cuts = (m) => !!m && !Array.isArray(m) && (m.alphaTest > 0 || !!m.alphaHash || !!(m.alphaTestNode && m.alphaTestNode.isNode));
+    const alphaFrom = (m, src) => { m.map = src.map || null; m.alphaMap = src.alphaMap || null; if (src.color && m.color) m.color.copy(src.color);
+        m.opacity = src.opacity; m.alphaTest = src.alphaTest || 0; m.alphaHash = !!src.alphaHash;
+        m.colorNode = src.colorNode || null; m.opacityNode = src.opacityNode || null; m.alphaTestNode = src.alphaTestNode || null; };
+    const ownMats = new Map();
+    const needsOwn = (m) => cuts(m) || (!!m && !Array.isArray(m) && m.side !== undefined && m.side !== THREE.FrontSide);
+    const ownMaterial = (o) => {
+        const src = o.material; let m = ownMats.get(src);
+        if (!m) { m = new THREE.MeshBasicNodeMaterial(); m.outputNode = motionNode; m.blending = THREE.NoBlending; m.transparent = false;
+            m.depthTest = true; m.depthWrite = true; m.allowOverride = false; ownMats.set(src, m); }
+        alphaFrom(m, src); m.side = src.side;
+        m.displacementMap = src.displacementMap || null; m.displacementScale = src.displacementScale ?? 1; m.displacementBias = src.displacementBias ?? 0;
+        m.positionNode = src.positionNode || null; m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
+        return m;
+    };
     const spriteMaterial = (o) => {
         const src = o.material, name = o.name ? JSON.stringify(o.name) : "a Sprite";
         if (!src || Array.isArray(src) || !(src.isSpriteNodeMaterial || src.isSpriteMaterial))
@@ -477,8 +521,11 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
         // v4770: a points material (sized in pixels) and a rotation node are followed now -- see pointCorner and rotWas
         let m = spriteMats.get(src);
         if (!m) { m = src.isPointsNodeMaterial ? new THREE.PointsNodeMaterial({ sizeAttenuation: src.sizeAttenuation }) : new THREE.SpriteNodeMaterial({ sizeAttenuation: src.sizeAttenuation });
-            m.fragmentNode = motionNode; m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
+            // v4776: a sprite that cuts carries the motion node as its output, so three's test discards what it discards
+            if (cuts(src)) m.outputNode = motionNode; else m.fragmentNode = motionNode;
+            m.blending = THREE.NoBlending; if (src.isPointsNodeMaterial) m.alphaToCoverage = false;
             m.transparent = false; m.depthTest = true; m.depthWrite = true; m.allowOverride = false; m.vertexNode = motionNode.spriteVertex(); spriteMats.set(src, m); }
+        if (cuts(src)) alphaFrom(m, src);
         m.rotation = src.rotation; m.side = src.side; m.positionNode = src.positionNode || null; m.scaleNode = src.scaleNode || null; m.rotationNode = src.rotationNode || null;
         if (src.isPointsNodeMaterial) { m.size = src.size; m.sizeNode = src.sizeNode || null; }
         m.userData.previousPositionNode = (src.userData && src.userData.previousPositionNode) || null;
@@ -512,8 +559,12 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             // renderer's clear colour is left as the caller set it
             const swapped = [];
             try {
-                scene.traverse((o) => { if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; } else placedOver(o); });
+                scene.traverse((o) => {
+                    if (o.isBatchedMesh && motionNode.regrow(o)) override.needsUpdate = true;
+                    if (o.isSprite) { const m = spriteMaterial(o); swapped.push([o, o.material]); o.material = m; }
+                    else { placedOver(o); if (o.isMesh && needsOwn(o.material)) { const m = ownMaterial(o); swapped.push([o, o.material]); o.material = m; } } });
                 renderer.setRenderTarget(surface); await renderer.renderAsync(scene, camera);
+                motionNode.endPass(scene);
             } finally { for (const [o, m] of swapped) o.material = m; scene.overrideMaterial = prevOverride; scene.background = prevBg; }
             renderer.setRenderTarget(motion); await renderer.renderAsync(qM.scene, ortho);
             renderer.setRenderTarget(depth); await renderer.renderAsync(qD.scene, ortho);
@@ -522,7 +573,7 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
             prevP.copy(camera.projectionMatrix); prevV.copy(camera.matrixWorldInverse);
             frames++;
         },
-        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
+        dispose() { surface.dispose(); motion.dispose(); depth.dispose(); override.dispose(); motionNode.disposeHistory(); for (const m of spriteMats.values()) m.dispose(); for (const m of ownMats.values()) m.dispose(); qM.material.dispose(); qD.material.dispose(); if (qC) { cameraT.dispose(); qC.material.dispose(); } },
     };
 }
 

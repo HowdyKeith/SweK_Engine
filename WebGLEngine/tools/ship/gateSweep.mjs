@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4779 -- THE 383rd CLOSING: the motion field where three draws and nowhere else -- the mesh zoo's gaps.
+    since476: Object.freeze({
+        at: "v4779", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslCoverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the grown batch it refused by name is drawn now)"]),
+        verdict: "*** THE FIELD COVERED PIXELS THREE NEVER DREW AND MISSED PIXELS IT DID. *** An alpha-tested sprite or mesh: motion " +
+                 "on 812 pixels against the 406 its colour pass draws -- a fragmentNode skips three's diffuse and alphaTest setup, " +
+                 "an outputNode keeps it. A double-sided plane shown from behind: no motion at all on its 576 -- three copies " +
+                 "alphaTest and alphaMap to an override material, not side. A plain mesh hidden for a frame read 4.72 px wrong when " +
+                 "shown again, and a box entering from outside the frustum read none: an object not drawn never stepped its previous " +
+                 "matrix. A batch grown by setInstanceCount, which the stage refused by name, is followed now, its last matrices kept. " +
+                 "Each is held against three's own colour pass or against the same motion drawn plainly, 406 = 406, 576 = 576, 0 px, " +
+                 "7e-6 px, both backends; a re-packed batch and a batch's per-instance visibility were already right and are rows. " +
+                 "Nine sabotages red.",
+    }),
     // v4775 -- THE 382nd CLOSING: NO new gate file -- three more three.js drafts: a render is not a frame.
     since457: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

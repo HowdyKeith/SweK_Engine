@@ -194,8 +194,9 @@ else {
             ok(`  [${mode}] Points, a pixel each: ${o.points.moving} of ${o.points.colour} drawn, ${e(o.points.w)} px`, same(o.points) && o.points.moving === o.points.colour && o.points.colour === 12);
         }
         const rf = r.result.webgpu.refusals, named = (k, ...w) => typeof rf[k] === "string" && w.every((x) => rf[k].includes(x));
-        ok(`what the stage cannot follow is refused by name: a BatchedMesh whose instances outgrew its matrices texture (v4770 follows the points material and the rotationNode this row refused)`,
-           named("grown", '"crowd"', "re-made its matrices texture"), rf.grown);
+        // v4779: the batch that outgrew its matrices texture is followed now (render/temporalTslCoverage-selfcheck.mjs holds it
+        // against plain meshes), so nothing this row named is refused: it holds that the stage draws it rather than throwing
+        ok(`the batch this row refused by name until v4779 -- one whose instances outgrew its matrices texture -- is drawn now`, rf.grown === "drawn", rf.grown);
     }
 }
 
@@ -213,6 +214,6 @@ else {
 // v4770 follows the points material and the rotation node Z16 and Z17 kept refused; their sabotages are render/temporalTslNodes-selfcheck.mjs's.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a sprite turned by rotationNode and sized points on a sprite are render/temporalTslNodes-selfcheck.mjs's since v4770; sprites placed and sized by " +
-    "nodes are render/temporalTslCompute-selfcheck.mjs's since v4762; a sprite's alpha test, which the stage's sprite " +
-    "material does not carry; a BatchedMesh's per-instance visibility changing between frames; and geometry a BatchedMesh re-packs.");
+    "nodes are render/temporalTslCompute-selfcheck.mjs's since v4762; a sprite's alpha test, a BatchedMesh's per-instance visibility " +
+    "changing between frames, geometry a BatchedMesh re-packs and a batch that grows are render/temporalTslCoverage-selfcheck.mjs's since v4779.");
 process.exitCode = fails ? 1 : 0;
