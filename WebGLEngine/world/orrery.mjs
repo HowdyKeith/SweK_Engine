@@ -42,6 +42,7 @@
 // end up describing different universes; importing the function is how they cannot.
 import { period as keplerPeriod } from "../physics/orbits/kepler.js";
 import { seedFor, seedProvenance } from "./orrerySeed.mjs";   // v4189 -- the commit that brought a body in is its planet seed
+import { VENDORED, GRANT, needsGrant } from "./vendoredLicences.mjs";   // v4778 -- the grants no filename can show; see licenceFor
 
 /** A body's relationship to SweK. Frozen so a caller can compare against these rather than retype them. */
 export const CAPTURED = "captured";
@@ -81,7 +82,7 @@ export function isLicenceFile(name) {
  * Returns { found, path } -- the PATH matters, because "nested three levels down under one sub-package" is a
  * different quality of evidence from "at the root", and a person auditing this should see which they have.
  */
-export function licenceFor(paths) {
+export function licenceFor(paths, name = null) {
     const list = (paths || []).filter((p) => typeof p === "string");
     // a root-level licence is the strongest evidence, so it wins over a nested one
     const root = list.find((p) => !p.includes("/") && isLicenceFile(p));
@@ -91,7 +92,30 @@ export function licenceFor(paths) {
         nested.sort((a, b) => a.split("/").length - b.split("/").length);
         return { found: true, path: nested[0], depth: nested[0].split("/").length - 1 };
     }
+    // *** v4778 -- THE FOURTH MISS, AND NO WIDER PATTERN FIXES IT. *** The rtx line vendored two bodies whose grant
+    // is not in a file named for a licence at all: mikktspace's zlib text is the comment at the top of
+    // mikktspace.h (upstream carries no LICENSE), and male-cns's CC-BY-4.0 is the licence line of its
+    // PROVENANCE.md. Both read UNPAPERED here while world/vendoredLicences.mjs, which read the files, declared
+    // them -- the census-by-filename mistake that module's own header describes. Widening LICENCE_NAME to match
+    // "provenance" or ".h" would paper every body with a README-shaped note, so instead a body the register
+    // declares IN_HEADER or NAMED_OTHER is papered by THAT declaration, and only when the file it names is
+    // actually in the body: a declaration pointing at a file that is not there is still no provenance.
+    const declared = declaredGrantFile(name, list);
+    if (declared) return { found: true, path: declared, depth: declared.split("/").length - 1 };
     return { found: false, path: null, depth: -1 };
+}
+
+/**
+ * The file world/vendoredLicences.mjs names as body `name`'s grant when no filename shows one (IN_HEADER or
+ * NAMED_OTHER), or null -- and null too when that file is not among `paths`. Exported because it is ONE rule:
+ * world/orreryAuthor.mjs reads the same file for the holder, as it imports isLicenceFile, and a second copy of
+ * this lookup, missing there, is how two CAPTURED bodies read `none` at the rtx merge (see attributionFor).
+ */
+export function declaredGrantFile(name, paths) {
+    if (!name) return null;
+    const e = VENDORED.find((x) => x.path === "vendor/" + name && needsGrant(x)
+        && (x.grant === GRANT.IN_HEADER || x.grant === GRANT.NAMED_OTHER));
+    return e && (paths || []).includes(e.file) ? e.file : null;
 }
 
 /**
@@ -164,7 +188,7 @@ export function buildOrrery(bodies = [], opts = {}) {
         // page looked fine; it was simply accusing twelve properly licensed dependencies of having no licence.
         const paths = Array.isArray(b.paths) ? b.paths
                     : Array.isArray(b.files) ? b.files.map((f) => (f && f.path) || "") : [];
-        const lic = b.reached ? { found: false, path: null, depth: -1 } : licenceFor(paths);
+        const lic = b.reached ? { found: false, path: null, depth: -1 } : licenceFor(paths, b.name);
         const state = b.reached ? REACHED : (lic.found ? CAPTURED : UNPAPERED);
         const arrived = b.arrived ? new Date(b.arrived + "T00:00:00Z") : null;
         // *** FLOOR, NOT ROUND, AND THE DIFFERENCE IS VISIBLE. *** "Days since it arrived" is 0 all through

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d888077eeecd057b1ff73d6e5bc32243be72b415",
+ "head": "4af9e8ec3327ae4c52a156e6181bee000b803977",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1487967,
-    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
+    "bytes": 1493527,
+    "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -311,7 +311,7 @@
    },
    {
     "path": "tools/ship/orrery-selfcheck.mjs",
-    "bytes": 15592,
+    "bytes": 16811,
     "sha": "3bd5a528b23c52c6770af1b850c069bbe33a78e5"
    }
   ],
@@ -330,8 +330,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1487967,
-    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
+    "bytes": 1493527,
+    "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
     "path": "clients.html",
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 868839,
-    "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
+    "bytes": 874107,
+    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -350,8 +350,8 @@
    },
    {
     "path": "tools/ship/vendoredLicences-selfcheck.mjs",
-    "bytes": 14055,
-    "sha": "6431d225b8181ae2d9eb3c3c6c158843b1683a0d"
+    "bytes": 14516,
+    "sha": "c4267f29f8eed0a2889c5eddf3bf4cc375cf82df"
    }
   ],
   "jolt": [
@@ -367,6 +367,16 @@
    }
   ],
   "kenney-city": [
+   {
+    "path": "rtx-viewer.html",
+    "bytes": 15443,
+    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+   },
+   {
+    "path": "tools/ship/rtViewer-selfcheck.mjs",
+    "bytes": 126906,
+    "sha": "b684a04dd2b6e6b24cf92165ea3cc90eddafc6d2"
+   },
    {
     "path": "world/kenneyKit.mjs",
     "bytes": 21884,
@@ -429,6 +439,55 @@
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    }
   ],
+  "male-cns": [
+   {
+    "path": "brain/gunnerPolicy-selfcheck.mjs",
+    "bytes": 27356,
+    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+   },
+   {
+    "path": "fly-connectome.html",
+    "bytes": 21283,
+    "sha": "802a72ee7a839074f4e416284c4ecfdac938962e"
+   },
+   {
+    "path": "tools/bakeGfcTopology.mjs",
+    "bytes": 5199,
+    "sha": "8a7bc6c4d2a0467a65c22198fae276725f70c4d0"
+   },
+   {
+    "path": "tools/maleCnsBake.mjs",
+    "bytes": 4329,
+    "sha": "46cc1d5c67c2adc6cd937124cb8f65eac41cfddc"
+   },
+   {
+    "path": "tools/maleCnsLoader-selfcheck.mjs",
+    "bytes": 13439,
+    "sha": "802a72ee7a839074f4e416284c4ecfdac938962e"
+   },
+   {
+    "path": "tools/ship/drivePolicy-selfcheck.mjs",
+    "bytes": 37142,
+    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+   },
+   {
+    "path": "tools/ship/flyConnectomePage-selfcheck.mjs",
+    "bytes": 21101,
+    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+   },
+   {
+    "path": "tools/ship/pilotPolicy-selfcheck.mjs",
+    "bytes": 25096,
+    "sha": "9680980498e9a4aaff72bfd4fd33ee2f8192071a"
+   }
+  ],
+  "mikktspace": [
+   {
+    "path": "tools/mesh/mikktRef.mjs",
+    "bytes": 14318,
+    "sha": "9d6c904e6a46c424d679d5637f9ba59f1ce12fa7"
+   }
+  ],
   "morphicons": [
    {
     "path": "render/slugMorph.mjs",
@@ -467,8 +526,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1487967,
-    "sha": "e6aaaa93d0aa3c8152d75811714cc86b0ecfd093"
+    "bytes": 1493527,
+    "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
     "path": "aquarelle.html",
@@ -497,8 +556,8 @@
    },
    {
     "path": "battleship3d.html",
-    "bytes": 55019,
-    "sha": "da0664aca46b17045570e9fe798f782e7650e21d"
+    "bytes": 55076,
+    "sha": "f21cfb089b75d5163f10c5f3286e7903c5650192"
    },
    {
     "path": "blob-selfie.html",
@@ -541,14 +600,24 @@
     "sha": "66db97c45b5286d98d1c018506effca552f05a23"
    },
    {
+    "path": "es-aircraft.html",
+    "bytes": 16263,
+    "sha": "3d467420bb8c3fa9596e5f68e82356141589db34"
+   },
+   {
     "path": "es-box3d-3d.html",
     "bytes": 13429,
     "sha": "a564e66ca47f2ff4519aa8955ec0985370ebaf63"
    },
    {
+    "path": "es-box3d-6dof.html",
+    "bytes": 19728,
+    "sha": "07d59133f904eaa9a7a5dd7ce74b64f663189836"
+   },
+   {
     "path": "es-box3d-fly3d.html",
-    "bytes": 88473,
-    "sha": "a564e66ca47f2ff4519aa8955ec0985370ebaf63"
+    "bytes": 100430,
+    "sha": "9680980498e9a4aaff72bfd4fd33ee2f8192071a"
    },
    {
     "path": "ev/esShipModels.js",
@@ -567,8 +636,8 @@
    },
    {
     "path": "face/robotFaceAvatar.js",
-    "bytes": 112513,
-    "sha": "6dfaf2c4ed4e84b51f0b0537d7e215e02716af86"
+    "bytes": 112695,
+    "sha": "ed8fcc2f9df0910635db4a19afd1464b0959707b"
    },
    {
     "path": "fire-demo.html",
@@ -607,8 +676,8 @@
    },
    {
     "path": "gpu/gpuAssetLoader.js",
-    "bytes": 96300,
-    "sha": "5fc21a72b394395f5fdbe7c79bed00982d52c341"
+    "bytes": 97073,
+    "sha": "d32c8312a20624d9c5925547c818f095d71d8d4e"
    },
    {
     "path": "graph_viewer.html",
@@ -652,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3405982,
-    "sha": "d73ba891cd903cf15af9bd83b19f44818b14e9e4"
+    "bytes": 3429399,
+    "sha": "6e96f8e284b97a19f37b757ac3297002b6057633"
    },
    {
     "path": "mpm3d.html",
@@ -697,8 +766,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 868839,
-    "sha": "060a99334f7c830b36779a04b91157b063a7ab07"
+    "bytes": 874107,
+    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
    },
    {
     "path": "shipavatar.html",
@@ -767,7 +836,7 @@
    },
    {
     "path": "tools/ship/fbxIngest-selfcheck.mjs",
-    "bytes": 56695,
+    "bytes": 105144,
     "sha": "fa8a6c7d4f57021b30063e2e03b9d2a7314e1ab3"
    },
    {
@@ -792,7 +861,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 76153,
+    "bytes": 77289,
     "sha": "bb47e2b1fa9c90af9008306e3c6a2b87181b1877"
    },
    {
@@ -807,8 +876,8 @@
    },
    {
     "path": "universal-viewer.html",
-    "bytes": 100927,
-    "sha": "678a74f1bee36cd10c323d887a7e88d108f0df3d"
+    "bytes": 100978,
+    "sha": "f21cfb089b75d5163f10c5f3286e7903c5650192"
    },
    {
     "path": "uvtt.html",
@@ -1098,6 +1167,11 @@
     "sha": "18ea73eb1f323342a2909c351aee386dec744af4"
    },
    {
+    "path": "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+    "bytes": 25027,
+    "sha": "568cc1eb87d9a1ba57088897de662df9619b86b5"
+   },
+   {
     "path": "tools/ship/carveGpu-selfcheck.mjs",
     "bytes": 20639,
     "sha": "52d94d962f84f15a9a0ac8941e8db848faf2f7f1"
@@ -1169,7 +1243,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 76153,
+    "bytes": 77289,
     "sha": "bb47e2b1fa9c90af9008306e3c6a2b87181b1877"
    },
    {

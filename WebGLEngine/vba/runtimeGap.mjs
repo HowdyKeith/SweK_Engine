@@ -1077,7 +1077,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (superseded at the v4778 merge) esModules: 4194, closures: 4047, asyncAwait: 1666, typedArrays: 1221, promises: 392,
     // (superseded at the v4778 merge) fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
     // v4778 -- the rtx merge's figures, re-derived: eight rows moved, five held (raf, WebGL, WebGPU, threads, WebAssembly).
-    esModules: 4276, closures: 4121, asyncAwait: 1704, typedArrays: 1258, promises: 399,
+    // v4778 -- closures 4121 -> 4125, typed arrays 1258 -> 1261 at the rtx merge: the reportLines() the six
+    // BVH-CSG modules grew for their instruments rows. Closures from bvhPairOverlap, meshBoolean, triClip and
+    // triTriIntersect; typed arrays from meshPointClassify, triClip and triTriIntersect. No new file.
+    esModules: 4276, closures: 4125, asyncAwait: 1704, typedArrays: 1261, promises: 399,
     fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

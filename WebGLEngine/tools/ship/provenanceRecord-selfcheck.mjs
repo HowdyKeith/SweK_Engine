@@ -50,14 +50,28 @@ const NO_UPSTREAM_AT_V4416 = Object.freeze([
                  // and no URL exists in the tree. The record says so rather than constructing one from the name.
     "krbn",      // LICENSE names "Krbn contributors" and the directory holds nothing else.
 ]);
+// v4778 -- A RECORD WHOSE UPSTREAM IS NOT A GITHUB REPOSITORY, WHICH THE ROW BELOW HAD NO WORD FOR. vendor/male-cns
+// arrived with the rtx line carrying a PROVENANCE.md that names its source -- neuprint.janelia.org, dataset male-cns:v1.0,
+// fetched 2026-09-21T13:46:26Z -- and the row read it as having NO upstream, because it asked for a GitHub OWNER and a
+// connectome server has none. Filing it with the four above would have raised a list that may only shrink, and it would
+// have been false: the body records where it came from. So "no upstream" is now "no URL recorded", and a recorded URL
+// with no GitHub owner is its own class, named here by the same rule.
+const NON_GITHUB_UPSTREAM_AT_V4778 = Object.freeze([
+    "male-cns",  // PROVENANCE.md: Janelia FlyEM's male-cns connectome through the Neuprint server, not a repository.
+]);
 
 console.log("\n1. every body either records where it came from, or is named here with why");
 {
-    const missing = FRESH.bodies.filter((b) => !b.upstream || !b.upstream.owner).map((b) => b.name);
+    const missing = FRESH.bodies.filter((b) => !b.upstream || !b.upstream.url).map((b) => b.name);
+    const offGithub = FRESH.bodies.filter((b) => b.upstream && b.upstream.url && !b.upstream.owner).map((b) => b.name);
+    ok("!! a body whose record names a URL with no GitHub owner is named too, and only those",
+        offGithub.join(",") === NON_GITHUB_UPSTREAM_AT_V4778.join(","),
+        `${offGithub.join(", ") || "none"} against ${NON_GITHUB_UPSTREAM_AT_V4778.join(", ")} -- ` +
+        FRESH.bodies.filter((b) => offGithub.includes(b.name)).map((b) => b.name + " -> " + b.upstream.url).join(", "));
     const surprise = missing.filter((n) => !NO_UPSTREAM_AT_V4416.includes(n));
     ok("!! *** no body lacks an upstream except the four named above ***", surprise.length === 0,
         surprise.length ? "UNNAMED: " + surprise.join(", ") + " -- record it or add it here WITH THE REASON"
-                        : `${missing.length} without an owner, all four named: ${missing.join(", ")}`);
+                        : `${missing.length} without an upstream, all four named: ${missing.join(", ")}`);
     const fixed = NO_UPSTREAM_AT_V4416.filter((n) => !missing.includes(n));
     ok("...and the list may only SHRINK -- a name that gained a record is removed, not left standing",
         fixed.length === 0, fixed.length ? "NOW RECORDED, take them off the list: " + fixed.join(", ")
@@ -141,7 +155,11 @@ console.log("\n4. every record names evidence, not just an answer");
     // ENCODING, NOT BY READING: 8 frames 64x64 -> 1364 bytes, magic GIF89a" is the strongest evidence in the
     // whole set: it ran the artifact. Two more widenings, found the same way as the other five, by looking at
     // the row that failed instead of at the count.
-    const PINNED = /\b(commit|tag|version)\b\s*[|:]|@?\b\d+\.\d+\.\d+\b|\b[0-9a-f]{40}\b/i;
+    // v4778 -- and a DATASET pinned by name and version, `male-cns:v1.0`, which is how a connectome server tags what it
+    // served: vendor/male-cns's record pins that and its fetch time, and says what it did not re-confirm (the licence
+    // version beyond the server's declaration), in prose none of the patterns below had read. The eighth widening, found
+    // the way the others were, by the row that failed.
+    const PINNED = /\b(commit|tag|version)\b\s*[|:]|@?\b\d+\.\d+\.\d+\b|\b[0-9a-f]{40}\b|\b[\w-]+:v\d+\.\d+\b/i;
     const ARGUED = /EVIDENCE|NOT ESTABLISHED|NO CODE|records it as|VERIFIED/;
     const weak = recs.filter((b) => {
         const t = fs.readFileSync(path.join(ENG, "vendor", b.name, b.upstreamFile), "utf8");

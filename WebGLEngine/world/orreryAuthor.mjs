@@ -24,7 +24,7 @@
 //   unread     -- a licence exists and this could not parse it. Separated from `none` on purpose: an absence
 //                 read as a skip is an absence read as a pass, and "we did not look" is not "nothing is there".
 "use strict";
-import { isLicenceFile } from "./orrery.mjs";
+import { isLicenceFile, declaredGrantFile } from "./orrery.mjs";
 
 export const KINDS = Object.freeze(["person", "collective", "disclaimed", "prose", "none", "unread"]);
 export const ATTRIBUTED = Object.freeze(["person", "collective"]);
@@ -44,9 +44,12 @@ const COLLECTIVE = /\b(authors|contributors|team|project|foundation|inc|corp|cor
 export function holderFrom(text) {
     const lines = String(text || "").split("\n");
     for (const raw of lines) {
-        const m = COPYRIGHT.exec(raw);
+        // v4778 -- a grant IN A SOURCE HEADER puts its copyright line inside a comment: mikktspace.h's reads
+        // ` *  Copyright (C) 2011 by Morten S. Mikkelsen`. The comment's leader is stripped before the match and a
+        // leading "by" after it; re-baked with both, no body already in orrery-authors.json changed its row.
+        const m = COPYRIGHT.exec(raw.replace(/^\s*(?:\/\*+|\*+|\/\/+)(?=\s)/, ""));
         if (!m) continue;
-        let who = (m[2] || "").replace(/[.,;]+$/, "").replace(/\s*all rights reserved\.?$/i, "").trim();
+        let who = (m[2] || "").replace(/^by\s+/i, "").replace(/[.,;]+$/, "").replace(/\s*all rights reserved\.?$/i, "").trim();
         // The OFL's copyright line carries boilerplate after the holder -- `IBM Corp. with Reserved Font Name
         // "Plex"` is one holder and one font-name clause, and keeping the clause would put a font name in an
         // author's title. Trimmed at the clause, not at a fixed length.
@@ -139,7 +142,17 @@ export function attributionFor(name, paths, read) {
     // header records happening THREE TIMES in one session before it widened LICENCE_NAME to match the word
     // anywhere in the filename. Writing a second copy of a scan the tree had already fixed reproduced the bug
     // it was fixed for. One rule, imported.
-    const licences = (paths || []).filter((p) => isLicenceFile(p.split("/").pop()));
+    // v4778 -- AND THE SAME MISTAKE A FIFTH TIME, BY THE ROUND THAT FIXED THE FOURTH. licenceFor learned to read
+    // world/vendoredLicences.mjs's IN_HEADER / NAMED_OTHER grants, so mikktspace (zlib, in mikktspace.h) and
+    // male-cns (CC-BY-4.0, in PROVENANCE.md) turned CAPTURED there, while this kept its filename-only list and
+    // filed both as `none` -- no licence at all. Section 2 of the gate asks exactly that question and did not
+    // see it, because it asked licenceFor without the body's name. The declared file is read here as the
+    // licence, by the same exported rule and only when no filename shows one: mikktspace then reads as a person
+    // off its header's copyright line, and male-cns as `disclaimed`, because its grant line names no holder --
+    // the Source line credits Janelia FlyEM in prose, and this scan draws an author from a copyright line only.
+    const named = (paths || []).filter((p) => isLicenceFile(p.split("/").pop()));
+    const declared = named.length ? null : declaredGrantFile(name, paths);
+    const licences = declared ? [declared] : named;
 // *** FOUR NARROW PATTERNS IN ONE FUNCTION, EACH FOUND BY WIDENING THE ONE BEFORE. ***
     // v4415 replaced its own licence regex with orrery.mjs's isLicenceFile after falsely accusing vendor/fonts,
     // wrote a paragraph about it, and left `provenance|readme\.md$` standing two lines down -- so PROVENANCE.txt

@@ -153,3 +153,29 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     const hi = t1max <= t2max ? { t: t1max, P: P1max } : { t: t2max, P: P2max };
     return { status: "intersect", p0: lo.P, p1: hi.P };
 }
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module: its instruments row
+// is what gives the BVH-CSG line a way in (physicsReach counted six of its modules with no door at all). The
+// bench calls reportLines() with NO argument, so the no-argument case has to BE a measurement: the gate's own
+// hand-derived pair, and one pair for each of the three other answers this function can give, so all four
+// statuses are on the page. A REPORT, NOT A VERDICT -- triTriIntersect-selfcheck.mjs is what exits nonzero.
+export function reportLines() {
+    const T = (...v) => new Float64Array(v.flat());
+    const A = [0, 0, 0], B = [4, 0, 0], C = [0, 4, 0];
+    const fmt = (p) => p.map((x) => +x.toFixed(9)).join(",");
+    const show = (r) => r.status === "intersect" ? "intersect  (" + fmt(r.p0) + ") - (" + fmt(r.p1) + ")" : r.status;
+    const cases = [
+        ["T2 in the x=1 plane (hand-derived: (1,0,0)-(1,2,0))", [[1, -1, -1], [1, -1, 3], [1, 3, -1]]],
+        ["the same T2 moved +10 in y, both planes still straddled", [[1, 9, -1], [1, 9, 3], [1, 13, -1]]],
+        ["a triangle lying in T1's own plane", [[1, 1, 0], [3, 1, 0], [1, 3, 0]]],
+        ["a triangle sharing T1's edge (0,0,0)-(4,0,0)", [A, B, [2, 0, -3]]],
+    ];
+    const out = ["[triTriIntersect] triangle against triangle, one pair at a time (Moller 1997, as structure)",
+                 "  T1 = (0,0,0),(4,0,0),(0,4,0) in the z=0 plane, against:"];
+    for (const [label, tri] of cases) out.push("    " + label.padEnd(58) + show(triTriIntersect(T(A, B, C), 0, T(...tri), 0)));
+    out.push("  arguments swapped on the first pair:  " + show(triTriIntersect(T(...cases[0][1]), 0, T(A, B, C), 0)));
+    out.push("  coplanar and degenerate are REPORTED, not resolved -- this module's own header says why");
+    return out;
+}

@@ -283,10 +283,17 @@ export const MEASURED_RUNS = Object.freeze({
     // other three exited 1 at 65133, 65069 and 65007 ms on the gate's own real-time rows (the tick counter
     // reached 28-31 in its window; fleet hp did not drop) and are NOT rows, because a failing run is not a
     // completion -- though all seven landed within 126 ms of each other, the cost being the page's fixed waits.
+    // *** v4778, SAME ROUND -- THOSE FOUR ROWS (65078, 65051, 65022, 65041) ARE REPLACED, NOT APPENDED TO, BECAUSE
+    // THE GATE THEY TIMED IS GONE. *** Its 65 s was its fight window riding a 60 s ceiling every time (the window's
+    // target was unreachable inside one battle; the gate's own header has the cause). The window now follows one
+    // battle to its end, so the cost fell by twenty times; appending would have kept a 65 s basis for a 3.7 s gate,
+    // a budget no run of it can approach. Seven runs alone after the fix, `date +%s%3N` around the process, load
+    // average 1.9 to 2.3, ALL SEVEN EXIT 0 and all seven are the rows.
     "tools/ship/rigidBody6dofPage-selfcheck.mjs": Object.freeze({
-        observedHere: true, at: "v4778",
-        runs: Object.freeze([{ ms: 65078, code: 0 }, { ms: 65051, code: 0 }, { ms: 65022, code: 0 },
-                             { ms: 65041, code: 0 }]),
+        observedHere: true, at: "v4778 (after the fight-window fix)",
+        runs: Object.freeze([{ ms: 3235, code: 0 }, { ms: 3540, code: 0 }, { ms: 3700, code: 0 },
+                             { ms: 3225, code: 0 }, { ms: 3457, code: 0 }, { ms: 3288, code: 0 },
+                             { ms: 3375, code: 0 }]),
     }),
 });
 
@@ -411,6 +418,9 @@ export const MEASURED = {
     // *** v4778 -- MEASURED AFTER ARRIVAL, NOT AT BIRTH. *** tools/ship/rigidBody6dofPage-selfcheck.mjs came in with the rtx merge
     // with no evidence of its cost: it boots es-box3d-6dof.html in one browser and watches a fight in real time, so the quick
     // sweep's 20 s kill takes it every time (a 124, which says nothing). FOUR RUNS ALONE THAT EXITED 0, the rows in MEASURED_RUNS.
+    // v4778 -- 65078 -> 3700 in the same round: the gate's fight window was fixed to follow one battle instead of riding a 60 s
+    // ceiling, and SEVEN RUNS ALONE, ALL EXIT 0, replaced the four (MEASURED_RUNS' comment says why replaced, not appended). Still
+    // over the quick sweep's 3 s budget, so the entry stays.
     "tools/ship/rigidBody6dofPage-selfcheck.mjs": slowestRun("tools/ship/rigidBody6dofPage-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed

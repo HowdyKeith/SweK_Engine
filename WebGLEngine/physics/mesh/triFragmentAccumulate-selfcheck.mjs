@@ -132,7 +132,7 @@
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { groupCandidatesByTriA, accumulateFragments, accumulateFragmentsFromBVH } from "./triFragmentAccumulate.mjs";
+import { groupCandidatesByTriA, accumulateFragments, accumulateFragmentsFromBVH, reportLines } from "./triFragmentAccumulate.mjs";
 import { triTriIntersect } from "./triTriIntersect.mjs";
 import * as CSG from "./meshCSG.mjs";   // round 8: fixture shapes only (boxPolys, jaggedBlob, toTriangleBuffer)
 
@@ -851,6 +851,23 @@ const candBp = groupCandidatesByTriA(pairsBp).get(TRI_A);
         strip(accumulateFragments(hugeA, 0, hugeB, [0], { gateByIntersection: true, indexMinPlanes: 0 })) ===
         strip(accumulateFragments(hugeA, 0, hugeB, [0], { gateByIntersection: true, spatialIndex: false })),
         "indexed and plain agree");
+}
+
+// v4778 -- THE FRONT DOOR. triFragmentAccumulate.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines(), t = L.join("\n");
+    // 1e-12 is the report's own print resolution (toFixed(12)), not a tolerance on the module.
+    const areas = [...t.matchAll(/area (\S+) of 0\.5\s+inside (\S+)\s+\(by hand: (\S+)\)/g)];
+    ok("reportLines prints both boxes with area conserved and the inside area equal to the hand value to 1e-12",
+        /triFragmentAccumulate/.test(L[0]) && areas.length === 2 &&
+        areas.every((m) => Math.abs(+m[1] - 0.5) < 1e-12 && Math.abs(+m[2] - +m[3]) < 1e-12),
+        areas.map((m) => "inside " + m[2] + " vs " + m[3]).join(" | "));
+    ok("...with 8 side planes deduped to 4 on both, and the diagonal box's 4 degenerate clips all resolved",
+        (t.match(/planes 4 \(4 duplicates collapsed\)/g) || []).length === 2 && /degenerate clips 4, unresolved 0/.test(t));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`triFragmentAccumulate-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

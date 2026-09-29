@@ -226,6 +226,7 @@
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
+import { MeshBVH } from "../../mesh/meshBVH.mjs";   // reportLines() only, which builds its own operands
 
 function readTri(tris, t) {
     const o = t * 9;
@@ -401,4 +402,49 @@ export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
     const capped = classifiedA.stats.capped || classifiedB.stats.capped;
     return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped,
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
+}
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module (physicsReach counted
+// it among six BVH-CSG modules with no door at all). The bench calls reportLines() with NO argument, so the
+// no-argument case IS a measurement: the gate's own two box pairs through all three ops, each volume read by
+// the divergence theorem over the output triangles and set beside the interval-overlap answer for two
+// axis-aligned boxes, which needs no code -- the corner box of section 1 and the general-position box of
+// section 2. A REPORT, NOT A VERDICT -- meshBoolean-selfcheck.mjs is what exits nonzero, and it grades against
+// meshCSG.mjs's BSP as well as by hand.
+export function reportLines() {
+    const box = ([cx, cy, cz], [hx, hy, hz]) => {
+        const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]
+            .map(([x, y, z]) => [cx + x * hx, cy + y * hy, cz + z * hz]);
+        const F = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,2,6],[1,6,5]];
+        return new Float64Array(F.flatMap((f) => f.flatMap((v) => V[v])));
+    };
+    const vol = (t) => {
+        let v = 0;
+        for (let o = 0; o < t.length; o += 9)
+            v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) +
+                 t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]);
+        return v / 6;
+    };
+    const overlap = (c1, h1, c2, h2) => [0, 1, 2].reduce((p, i) =>
+        p * Math.max(0, Math.min(c1[i] + h1[i], c2[i] + h2[i]) - Math.max(c1[i] - h1[i], c2[i] - h2[i])), 1);
+    const out = ["[meshBoolean] whole-mesh union / subtract / intersect over the BVH-CSG pieces",
+                 "  A is the box [-1,1]^3, volume 8. Each volume below is read from the output triangles."];
+    for (const [label, Bc, Bh] of [["B = [0.5,1.5]^3, a corner overlap", [1, 1, 1], [0.5, 0.5, 0.5]],
+                                   ["B centred (1,0.3,0.2), half-extents (0.8,0.6,0.5)", [1, 0.3, 0.2], [0.8, 0.6, 0.5]]]) {
+        const tA = box([0, 0, 0], [1, 1, 1]), tB = box(Bc, Bh);
+        const bA = new MeshBVH(tA), bB = new MeshBVH(tB);
+        const I = overlap([0, 0, 0], [1, 1, 1], Bc, Bh), VB = 8 * Bh[0] * Bh[1] * Bh[2];
+        out.push("  " + label + ":");
+        for (const [op, hand] of [["union", 8 + VB - I], ["subtract", 8 - I], ["intersect", I]]) {
+            const r = meshBoolean(tA, bA, tB, bB, op);
+            const v = vol(r.tris);
+            out.push("    " + op.padEnd(10) + "volume " + v.toFixed(12) + "   by hand " + hand.toFixed(12) +
+                     "   |diff| " + Math.abs(v - hand).toExponential(1) + "   " + r.triCount + " triangles" +
+                     (r.ambiguousTriIndices.length ? ", " + r.ambiguousTriIndices.length + " ambiguous" : "") + (r.capped ? ", CAPPED" : ""));
+        }
+    }
+    out.push("  NOT WATERTIGHT: the output is not snapped or welded; the header and the gate measure its unmatched edges");
+    return out;
 }

@@ -1403,6 +1403,46 @@
    ]
   },
   {
+   "name": "male-cns",
+   "arrived": "2026-09-21",
+   "sha": "46cc1d5c67c2adc6cd937124cb8f65eac41cfddc",
+   "bytes": 4337635,
+   "files": [
+    {
+     "path": "epg-compass-circuit.json",
+     "bytes": 2643101
+    },
+    {
+     "path": "giant-fiber-circuit.json",
+     "bytes": 1690281
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 4253
+    }
+   ]
+  },
+  {
+   "name": "mikktspace",
+   "arrived": "2026-09-23",
+   "sha": "9d6c904e6a46c424d679d5637f9ba59f1ce12fa7",
+   "bytes": 68630,
+   "files": [
+    {
+     "path": "mikktspace.c",
+     "bytes": 57439
+    },
+    {
+     "path": "mikktspace.h",
+     "bytes": 8209
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 2982
+    }
+   ]
+  },
+  {
    "name": "morphicons",
    "arrived": "2026-09-06",
    "sha": "891cc90f02dacc7263daa04a4864a84966342e1d",

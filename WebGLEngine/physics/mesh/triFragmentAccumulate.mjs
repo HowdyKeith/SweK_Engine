@@ -205,6 +205,7 @@
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { trianglePlane, clipTriangleByPlane } from "./triClip.mjs";
 import { triTriIntersect } from "./triTriIntersect.mjs";
+import { MeshBVH } from "../../mesh/meshBVH.mjs";   // reportLines() only, which builds its own two trees
 
 const EPS = 1e-9;
 // Plane-identity dedup tolerance: cos(angle-between-normals) > 1-PLANE_EPS AND |offset difference| < PLANE_EPS.
@@ -651,4 +652,45 @@ export function accumulateFragmentsFromBVH(bvhA, bvhB, triA, opts = {}) {
     const candidateTriBs = [];
     for (const [ta, tb] of pairs) if (ta === triA) candidateTriBs.push(tb);
     return accumulateFragments(bvhA.tris, triA, bvhB.tris, candidateTriBs, opts);
+}
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module (physicsReach counted
+// it among six BVH-CSG modules with no door at all). The bench calls reportLines() with NO argument, so the
+// no-argument case IS a measurement: the gate's own fixture -- the unit cube's +z-face triangle
+// (0,0,1),(1,1,1),(1,0,1), area 0.5, cut by every side face of a box standing through it -- once for the
+// literal box whose corners sit exactly on that triangle's diagonal (the case that exercises degenerate
+// resolution) and once for a narrower box that misses the diagonal. The inside area is checkable by hand, 0.08
+// and 0.06, and is read here by a plain box test on each fragment's centroid, not by the module. A REPORT, NOT
+// A VERDICT -- triFragmentAccumulate-selfcheck.mjs is what exits nonzero.
+export function reportLines() {
+    const box = (x0, x1, y0, y1, z0, z1) => {
+        const V = [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+        const F = [[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,5,1],[0,4,5],[3,2,6],[3,6,7],[0,7,3],[0,4,7],[1,2,6],[1,6,5]];
+        return new Float64Array(F.flatMap((f) => f.flatMap((v) => V[v])));
+    };
+    const area = ([a, b, c]) => {
+        const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        return 0.5 * Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
+    };
+    const cubeA = new MeshBVH(box(0, 1, 0, 1, 0, 1));
+    const out = ["[triFragmentAccumulate] one triangle cut by every plane that can reach it",
+                 "  subject  the unit cube's triangle (0,0,1),(1,1,1),(1,0,1), area 0.5, against a box standing through it"];
+    for (const [label, b, hand] of [["box [0.3,0.7]x[0.3,0.7]", [0.3, 0.7, 0.3, 0.7], 0.08],
+                                    ["box [0.3,0.7]x[0.35,0.65]", [0.3, 0.7, 0.35, 0.65], 0.06]]) {
+        const [bx0, bx1, by0, by1] = b;
+        const r = accumulateFragmentsFromBVH(cubeA, new MeshBVH(box(bx0, bx1, by0, by1, 0.5, 1.5)), 2);
+        let sum = 0, inside = 0;
+        for (const f of r.fragments) {
+            const a = area(f.tri); sum += a;
+            const cx = (f.tri[0][0] + f.tri[1][0] + f.tri[2][0]) / 3, cy = (f.tri[0][1] + f.tri[1][1] + f.tri[2][1]) / 3;
+            if (cx > bx0 && cx < bx1 && cy > by0 && cy < by1) inside += a;
+        }
+        out.push("  " + label + " (z 0.5 to 1.5):");
+        out.push("    planes " + r.planeCount + " (" + r.duplicatePlanesCollapsed + " duplicates collapsed)   fragments " +
+                 r.fragments.length + "   degenerate clips " + r.degenerateFallbacks + ", unresolved " + r.unresolvedCount);
+        out.push("    area " + sum.toFixed(12) + " of 0.5   inside " + inside.toFixed(12) + "   (by hand: " + hand + ")");
+    }
+    return out;
 }

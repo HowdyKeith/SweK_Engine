@@ -50,7 +50,7 @@
 //
 // Run: node physics/mesh/triTriIntersect-selfcheck.mjs
 "use strict";
-import { triTriIntersect } from "./triTriIntersect.mjs";
+import { triTriIntersect, reportLines } from "./triTriIntersect.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -303,6 +303,19 @@ function lcg(seed) { let s = seed; return () => { s = (s * 1103515245 + 12345) &
     const r = triTriIntersect(buf(A,B,C), 0, zeroArea, 0);
     ok("!! a zero-area (colinear-vertex) input triangle is reported degenerate, not NaN/throw",
         r.status === "degenerate", JSON.stringify(r));
+}
+
+// v4778 -- THE FRONT DOOR. triTriIntersect.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines();
+    ok("reportLines prints the hand-derived segment, both argument orders, and all four statuses",
+        /triTriIntersect/.test(L[0]) && /intersect\s+\(1,0,0\) - \(1,2,0\)$/.test(L[2]) && /none$/.test(L[3]) &&
+        /coplanar$/.test(L[4]) && /degenerate$/.test(L[5]) && /swapped.*intersect\s+\(1,0,0\) - \(1,2,0\)$/.test(L[6]),
+        L.slice(2, 7).map((l) => l.trim().split(/\s{2,}/).pop()).join(" | "));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`triTriIntersect-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

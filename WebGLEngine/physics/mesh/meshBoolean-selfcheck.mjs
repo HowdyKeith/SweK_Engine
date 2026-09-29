@@ -123,7 +123,7 @@ import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS, reportLines } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 
 let fails = 0;
@@ -643,6 +643,22 @@ console.log("\n14. *** ROUND 7 REVIEW FIXES: THE PLANE-DEDUP ROOF, AND accOpts T
         dU.triCount === d0.triCount && dU.stats.a.gateTested === d0.stats.a.gateTested && dU.stats.a.gateTested > 0,
         "default tris=" + d0.triCount + " gateTested=" + d0.stats.a.gateTested + "; with undefined/null keys tris=" +
         dU.triCount + " gateTested=" + dU.stats.a.gateTested);
+}
+
+// v4778 -- THE FRONT DOOR. meshBoolean.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines();
+    // 1e-12 is the report's own print resolution (toFixed(12)); section 4 above holds the volumes to 3.6e-15.
+    const rows = L.filter((l) => /by hand/.test(l)).map((l) => l.match(/^\s+(\w+)\s+volume (\S+)\s+by hand (\S+)/));
+    ok("reportLines prints all three ops on both box pairs, each volume within 1e-12 of the interval-overlap answer",
+        /meshBoolean/.test(L[0]) && rows.length === 6 && rows.every((m) => m && Math.abs(+m[2] - +m[3]) < 1e-12),
+        rows.map((m) => m ? m[1] + " " + (+m[2]).toFixed(6) : "UNPARSED").join(" | "));
+    ok("...with no fragment budget capped, and the NOT WATERTIGHT limit stated on the page",
+        L.every((l) => !/CAPPED/.test(l)) && L.some((l) => /NOT WATERTIGHT/.test(l)));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

@@ -66,6 +66,9 @@ console.log("\n1. a copyright line says one of six things, and the fixtures are 
         ["Copyright (c) 2026 Krbn contributors", "collective", "Krbn contributors"],
         ["Copyright (c) 2020 The Author", "disclaimed", null],
         ["Copyright 2019 Some One. All rights reserved.", "person", "Some One"],
+        // v4778 -- a grant in a C header: the comment's leader and the "by" are not part of the holder (vendor/mikktspace)
+        [" *  Copyright (C) 2011 by Morten S. Mikkelsen", "person", "Morten S. Mikkelsen"],
+        ["// Copyright (c) 2026 Krbn contributors", "collective", "Krbn contributors"],
     ];
     const wrong = [];
     for (const [line, kind, who] of cases) {
@@ -100,9 +103,13 @@ console.log("\n2. the six kinds PARTITION the bodies, and nothing is dropped");
     // INDEPENDENT reader: world/orrery.mjs has decided CAPTURED vs UNPAPERED since v4185, and a body it calls
     // CAPTURED cannot be `none` here. Two readers of one question disagreeing is the signal; one reader with a
     // plausible answer is not.
+    // v4778 -- AND IT MUST ASK THE QUESTION THE WAY THE ORRERY DOES, WITH THE BODY'S NAME. licenceFor papers a body
+    // from world/vendoredLicences.mjs's register only when told which body it is, and buildOrrery tells it; this
+    // row did not, so when mikktspace and male-cns turned CAPTURED by that register and stayed `none` here, the
+    // two readers disagreed and this row passed. Measured: without the name 0 disagree, with it the two bodies.
     const OJ = JSON.parse(fs.readFileSync(path.join(ENG, "orrery.json"), "utf8"));
     const disagree = FRESH.bodies.filter((b) => b.kind === "none" &&
-        licenceFor((OJ.bodies.find((x) => x.name === b.name) || {}).files?.map((f) => f.path) || []).found);
+        licenceFor((OJ.bodies.find((x) => x.name === b.name) || {}).files?.map((f) => f.path) || [], b.name).found);
     ok("!! *** no body world/orrery.mjs calls CAPTURED is reported here as having no licence at all ***",
         disagree.length === 0,
         disagree.length ? disagree.map((b) => b.name).join(", ") + " -- ONE OF THE TWO READERS IS WRONG, and a " +

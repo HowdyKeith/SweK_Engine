@@ -227,18 +227,30 @@ export const KEY_DRIFT_V4460 = Object.freeze({
                    "time. Its top-level `bytes` moved too (2,396,670 to 3,344,827) and reaches nothing, as recorded",
             control: "on today's tree, reverting ONLY `three`'s `files` to cc229351's value gives 0322b336 -- exactly " +
                      "the previous key -- and reverting only its `bytes` leaves 37739d8c" }),
+        // *** v4778 -- TWO BODIES AT ONCE, BROUGHT BY A MERGE, AND OWED HERE BEFORE THE KEY WAS RE-BAKED. *** The rtx
+        // line vendored vendor/male-cns (46cc1d5c, its second circuit at bb162233) and vendor/mikktspace (9d6c904e)
+        // and never re-baked orrery.json, so the merge carried neither body; the re-bake at the merge added both.
+        Object.freeze({ version: "v4778", commit: "888f776d", hash: "1719b169", file: "orrery.json",
+            field: "bodies", bodiesTouched: 2,
+            cause: "the rtx merge brought two new directories under vendor/ -- male-cns, the Janelia FlyEM " +
+                   "connectome data for the fly-connectome demo, and mikktspace, the C reference that grades " +
+                   "physics/mesh/mikktSpace.mjs -- and each is a new BODY with its own orbit, stock and prices. " +
+                   "v4504's field, for two bodies. Both are CAPTURED now where the filename search had called them " +
+                   "unpapered, and that state reaches nothing: forcing both back to unpapered leaves 1719b169",
+            control: "on today's tree, dropping both bodies gives 37739d8c -- exactly the previous key -- and " +
+                     "dropping male-cns alone gives daf22678, mikktspace alone 43eeee4b" }),
     ]),
-    current: "37739d8c",
+    current: "1719b169",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 20, movedTheHash: 0,
-        note: "against `arrived`, the same probe on the same 20 bodies: 20 of 20 moved the hash. 18 at " +
-              "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535 and the probe is " +
-              "re-run rather than the count adjusted" }),
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 22, movedTheHash: 0,
+        note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
+              "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
+              "made it 22 at v4778, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in
@@ -252,10 +264,11 @@ export const KEY_DRIFT_V4460 = Object.freeze({
     }),
     // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
     // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
-    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 20, movedTheHash: 0,
+    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 22, movedTheHash: 0,
         note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates. 15 at v4460; " +
-              "every arrival since (kenney-city/-racing, morphicons, xatlas, draco-encoder) also defines " +
-              "`bytes`, so re-run against today's 20 bodies rather than left at the old count" }),
+              "every arrival since (kenney-city/-racing, morphicons, xatlas, draco-encoder, and at v4778 " +
+              "male-cns and mikktspace) also defines `bytes`, so re-run against today's 22 bodies rather " +
+              "than left at the old count" }),
     staleFor: 42,             // shipped changelog entries strictly after v4416 up to v4459, COUNTED not subtracted
     // The gate reads the file and compares. Writing is behind --write, and the default mode is asserted to
     // have left the bytes alone -- v3698's rule, the one claimCheck states about itself: A LOOP THAT BOTH

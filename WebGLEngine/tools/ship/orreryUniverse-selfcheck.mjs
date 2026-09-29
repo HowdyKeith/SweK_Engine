@@ -92,7 +92,7 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
     ok("the correction moved exactly the record that was wrong and left the others alone",
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjakel").length === 0 &&
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjake").length === 1 &&
-        AUTH.counts.withUpstream === 16,   // 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md); 15 at v4560 (xatlas, whose PROVENANCE.txt names jpcy/xatlas); 16 now (draco-encoder, vendored for Task 53 with a PROVENANCE.txt naming google/draco -- measured directly from orrery-authors.json's re-bake, not guessed)
+        AUTH.counts.withUpstream === 17,   // v4778 -- 16 -> 17 at the rtx merge: mikktspace, whose PROVENANCE.txt names mmikk/MikkTSpace (male-cns names neuprint.janelia.org, no owner). 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md); 15 at v4560 (xatlas, whose PROVENANCE.txt names jpcy/xatlas); 16 now (draco-encoder, vendored for Task 53 with a PROVENANCE.txt naming google/draco -- measured directly from orrery-authors.json's re-bake, not guessed)
         "gifenc's git:// URL and htmx's LICENSE-blob URL say more about where the bytes came from than a repo " +
         "root does, so a canonical URL is synthesised ONLY when the vote overrides the first URL's owner");
     ok("and the vendored text was NOT edited -- the stray L is still in the file, as measured",
@@ -140,8 +140,10 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
     // vendor/draco-encoder (Task 53) is the second such body: its PROVENANCE.txt names google/draco, and
     // orrery-universe.json -- fetched once, offline from here -- has no row for that owner/repo either. The
     // count moved from 1 to 2 rather than the row silently passing as "unmeasured, so not checked".
-    const UNMEASURED_NAMES = new Set(["morphicons", "draco-encoder"]);
-    ok("!! a body whose upstream has no universe row is UNMEASURED, held to two (morphicons, draco-encoder), not filed as unexplained",
+    // v4778 -- and mikktspace a third, arriving with the rtx line: PROVENANCE.txt names mmikk/MikkTSpace and the universe
+    // file has no row for it. Named here and counted, as draco-encoder was, rather than passing as "unmeasured, so not checked".
+    const UNMEASURED_NAMES = new Set(["morphicons", "draco-encoder", "mikktspace"]);
+    ok("!! a body whose upstream has no universe row is UNMEASURED, held to three (morphicons, draco-encoder, mikktspace), not filed as unexplained",
         tally.unmeasured === U.MEASURED_AT_V4432.languageUnmeasured && verdicts.filter((v) => v.verdict === "unmeasured").every((v) => UNMEASURED_NAMES.has(v.name)),
         `${tally.unmeasured}: ${verdicts.filter((v) => v.verdict === "unmeasured").map((v) => v.name).join(", ") || "none"} -- the universe file has ${UNI.bodies.length} rows`);
     // Racing city 0 -- a FOURTH mechanism: vendor/kenney-racing and vendor/kenney-city are models and textures only (.glb, .png),

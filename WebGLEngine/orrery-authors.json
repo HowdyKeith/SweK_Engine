@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-15",
+ "built": "2026-09-29",
  "bodies": [
   {
    "name": "box3d",
@@ -198,6 +198,38 @@
    "alsoHolders": [],
    "upstream": null,
    "bytes": 940443
+  },
+  {
+   "name": "male-cns",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "PROVENANCE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://neuprint.janelia.org",
+    "owner": null,
+    "repo": null
+   },
+   "bytes": 4337635
+  },
+  {
+   "name": "mikktspace",
+   "kind": "person",
+   "who": "Morten S. Mikkelsen",
+   "line": "*  Copyright (C) 2011 by Morten S. Mikkelsen",
+   "licenceFile": "mikktspace.h",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/mmikk/MikkTSpace",
+    "owner": "mmikk",
+    "repo": "MikkTSpace"
+   },
+   "bytes": 68630
   },
   {
    "name": "morphicons",
@@ -424,6 +456,14 @@
    "bytes": 119532
   },
   {
+   "author": "Morten S. Mikkelsen",
+   "kind": "person",
+   "bodies": [
+    "mikktspace"
+   ],
+   "bytes": 68630
+  },
+  {
    "author": "Guillermo",
    "kind": "person",
    "bodies": [
@@ -466,18 +506,23 @@
    "name": "keyhunt",
    "kind": "prose",
    "licenceFile": "ATTRIBUTION.txt"
+  },
+  {
+   "name": "male-cns",
+   "kind": "disclaimed",
+   "licenceFile": "PROVENANCE.md"
   }
  ],
  "counts": {
-  "bodies": 20,
-  "attributed": 18,
-  "authors": 16,
-  "covered": 18,
-  "missing": 2,
-  "withUpstream": 16,
-  "person": 14,
+  "bodies": 22,
+  "attributed": 19,
+  "authors": 17,
+  "covered": 19,
+  "missing": 3,
+  "withUpstream": 17,
+  "person": 15,
   "collective": 4,
-  "disclaimed": 1,
+  "disclaimed": 2,
   "prose": 1,
   "none": 0,
   "unread": 0

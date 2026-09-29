@@ -74,7 +74,7 @@
 //
 // Run: node physics/mesh/triClip-selfcheck.mjs
 "use strict";
-import { clipTriangleByPlane, clipTriangleByTriPlane, trianglePlane } from "./triClip.mjs";
+import { clipTriangleByPlane, clipTriangleByTriPlane, trianglePlane, reportLines } from "./triClip.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -331,6 +331,21 @@ for (const [seed, N, half] of [[999, 300, 5], [31337, 300, 10]]) {
         for (const v of r.back) for (const vv of v) { if (sideOf(vv,n,d) > 1e-6) { allOk = false; console.log("  (seed "+seed+" case "+i+": BACK SIDE MISMATCH)"); } }
     }
     ok(`!! randomized stress (seed ${seed}, ${N} cases, ${clippedCount} clipped): area+winding+containment+side all hold`, allOk);
+}
+
+// v4778 -- THE FRONT DOOR. triClip.mjs grew a no-argument reportLines() at the rtx merge so instrument-bench.html
+// can serve it (physics/instruments.mjs, the BVH-CSG rows). A report is not a verdict, but an export no gate
+// names is what definitionGates counts, so this section reads the report's own hand-checkable numbers back.
+console.log("\nTHE FRONT DOOR");
+{
+    const L = reportLines(), t = L.join("\n");
+    ok("reportLines prints the hand-derived clip: 4.5 in front, 3.5 behind, 8 of 8, none wound against the original",
+        /triClip/.test(L[0]) && /status\s+clipped/.test(t) && /front\s+1 triangle\(s\), area 4\.5 /.test(t) &&
+        /back\s+2 triangle\(s\), area 3\.5 /.test(t) && /sum\s+8 of 8;.*against the original: 0$/m.test(t),
+        L.slice(3, 6).map((l) => l.trim()).join(" | "));
+    ok("...and the scale-free plane and the 1e-9 band read back as the gate above measured them",
+        /normal 1e6 long: an identical result/.test(t) && /within 1e-9 of the plane: degenerate/.test(t));
+    ok("...and no report line stringifies a missing field as the literal word \"undefined\"", L.every((l) => !/\bundefined\b/.test(l)));
 }
 
 console.log(`triClip-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

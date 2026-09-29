@@ -107,7 +107,7 @@
 //   yet a general CSG boolean output.
 "use strict";
 
-import { rayTriangle } from "../../mesh/meshBVH.mjs";
+import { rayTriangle, MeshBVH } from "../../mesh/meshBVH.mjs";   // MeshBVH: reportLines() builds its own subject
 
 const EPS = 1e-9;
 // See this file's own header for how these were measured, not guessed: a relative-to-t weld tolerance with an
@@ -227,4 +227,33 @@ export function pointInMesh(bvh, px, py, pz, opts = {}) {
         agreement: dirs.length ? Math.max(insideVotes, outsideVotes) / dirs.length : 0,
         perDirection,
     };
+}
+
+// ---- THE FRONT DOOR (v4778) ---------------------------------------------------------------------------------
+//
+// The v3327 split, grown at the rtx merge so instrument-bench.html can serve this module (physicsReach counted
+// it among six BVH-CSG modules with no door at all). The bench calls reportLines() with NO argument, so the
+// no-argument case IS a measurement: the gate's own unit cube and its six hand-placed points, each with the
+// vote across the five default directions, and then the reason welding exists -- a ray straight up +z from
+// the centre crosses the top face exactly on the diagonal both of its triangles share, so it registers TWO
+// raw hits for ONE crossing, and bare parity would call the centre of a cube outside. A REPORT, NOT A
+// VERDICT -- meshPointClassify-selfcheck.mjs is what exits nonzero.
+export function reportLines() {
+    const V = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+    const F = [[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,5,1],[0,4,5],[3,2,6],[3,6,7],[0,7,3],[0,4,7],[1,2,6],[1,6,5]];
+    const cube = new MeshBVH(new Float64Array(F.flatMap((f) => f.flatMap((v) => V[v]))));
+    const out = ["[meshPointClassify] inside or outside, by counting ray crossings in five directions",
+                 "  subject  the unit cube [0,1]^3 as 12 triangles; the true answer is 0 < x,y,z < 1"];
+    for (const [label, p] of [["centre", [0.5, 0.5, 0.5]], ["far outside", [5, 5, 5]],
+                              ["just outside the +x face", [1.5, 0.5, 0.5]], ["just inside the +x face", [0.9, 0.5, 0.5]],
+                              ["outside near the origin corner", [-0.5, -0.5, -0.5]], ["inside near the origin corner", [0.1, 0.1, 0.1]]]) {
+        const r = pointInMesh(cube, ...p);
+        out.push("    " + label.padEnd(32) + (r.inside ? "inside " : "outside") + "   votes " + r.votes.inside + "-" +
+                 r.votes.outside + "   agreement " + r.agreement);
+    }
+    const up = pointInMesh(cube, 0.5, 0.5, 0.5, { dirs: [[0, 0, 1]] }).perDirection[0];
+    out.push("  the centre, one ray along +z through the top face's shared diagonal:");
+    out.push("    raw hits " + up.rawHits + " (bare parity: " + (up.rawHits % 2 ? "inside" : "OUTSIDE") + ")   welded crossings " +
+             up.crossings + " (" + (up.inside ? "inside" : "OUTSIDE") + ")");
+    return out;
 }
