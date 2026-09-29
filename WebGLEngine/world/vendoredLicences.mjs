@@ -130,6 +130,25 @@ export const VENDORED = Object.freeze([
             "is what says it was read rather than assumed, and world/licenceSweep.mjs records the hash for " +
             "exactly that reason. Only the two source files and the licence were taken: no models, no build " +
             "script, no thirdparty tree. vendor/xatlas/PROVENANCE.txt carries the evidence commands." },
+    // v4778 -- TWO BODIES THE rtx LINE VENDORED WITHOUT A LINE HERE, found by this gate at the merge. Each grant was read
+    // off the files in this tree, not remembered: the zlib text at the top of both MikkTSpace sources, and the licence
+    // line of male-cns's PROVENANCE.md, which records what the Neuprint server declares and says in the same breath that
+    // the declaration was not re-confirmed against Janelia's own terms. That caveat is carried below, not dropped.
+    { path: "vendor/male-cns",  kind: KIND.THIRD_PARTY, spdx: "CC-BY-4.0", grant: GRANT.NAMED_OTHER,  file: "PROVENANCE.md",
+      upstream: "https://neuprint.janelia.org (Janelia FlyEM male-cns connectome)", pin: "male-cns:v1.0, fetched 2026-09-21T13:46:26Z",
+      note: "*** DATA, NOT CODE, AND THE GRANT IS A SERVER'S DECLARATION RECORDED IN PROVENANCE.md. *** Two baked " +
+            "circuits (the 34-neuron Giant Fiber Circuit and the 50-neuron EPG compass) from a Neuprint fetch the " +
+            "maintainer ran on their own machine. PROVENANCE.md states CC-BY-4.0 'as declared by the Neuprint server' " +
+            "and that the version was not independently re-confirmed against Janelia's publication terms -- verify " +
+            "before any redistribution wider than this repo's demo use. CC-BY asks for attribution, which that " +
+            "file carries." },
+    { path: "vendor/mikktspace", kind: KIND.THIRD_PARTY, spdx: "Zlib",     grant: GRANT.IN_HEADER,    file: "mikktspace.h",
+      upstream: "https://github.com/mmikk/MikkTSpace", pin: "3e895b49d05ea07e4c2133156cfa94369e19e409",
+      note: "*** A REFERENCE ORACLE LIKE xatlas, AND PAPERED IN THE HEADER LIKE ui/vendor. *** (C) 2011 Morten S. " +
+            "Mikkelsen, zlib; the upstream repository carries no LICENSE file and the grant is the comment at the " +
+            "top of mikktspace.c and mikktspace.h, verbatim. tools/mesh/mikktRef.mjs compiles the two files with " +
+            "g++ to grade physics/mesh/mikktSpace.mjs; nothing the engine ships loads them. PROVENANCE.txt beside " +
+            "them carries the pin and both sha256 digests." },
     { path: "ui/vendor",        kind: KIND.THIRD_PARTY, spdx: "MIT",       grant: GRANT.IN_HEADER,    file: "qrcode.mjs",
       upstream: "qrcode-generator, Kazuhiko Arase, 2009",
       note: "*** AND A SECOND vendor/ DIRECTORY ENTIRELY, which a census pointed at the top-level one misses. " +
