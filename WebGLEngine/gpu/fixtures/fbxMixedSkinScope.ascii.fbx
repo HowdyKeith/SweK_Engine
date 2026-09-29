@@ -1,0 +1,241 @@
+; SweK_Engine fbxIngest-selfcheck fixture -- hand-authored, original content, ASCII FBX 7.4.
+; Not derived from any third-party asset -- written for this repository, zero licensing question.
+; The same 2-bone skinned quad as fbxAnim.ascii.fbx (root at the origin, child offset (0,1,0), quad skinned
+; with no blending), but BOTH bones now animate INDEPENDENTLY (root 0->90 degrees about X, child ALSO 0->90
+; degrees about Y -- a second, separate rotation curve, its own axis, so a mesh that merely inherited root's
+; motion would visibly differ from one that correctly tracks child's own combined motion), plus TWO plain,
+; unskinned secondary meshes: "propMesh" (a small quad offset far from the rig) with NO parent-Model
+; connection, so FBXLoader attaches it directly to the scene root -- unrelated to any bone; and "attachMesh"
+; (a small unit quad) WITH a parent-Model connection to "child" -- a genuine bone attachment, e.g. a held
+; item meant to track a wrist. Exercises normalizeFbxGroup()'s v5 mixed-skin-scope fix two ways: propMesh
+; must stay exactly where authored (not drag with root's rotation, the v4 bug); attachMesh must track CHILD's
+; own combined motion (root's rotation composed with child's own separate rotation) -- an adversarial review
+; of the v5 fix's first draft named this second case as the more discriminating, not-yet-tested scenario,
+; since a mesh that was still (incorrectly) bound to joint 0 alone would move differently from one correctly
+; following its real parent bone whenever that bone has motion of its own beyond what it inherits from root.
+
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "SweK_Engine fbxMixedSkinScope-selfcheck fixture"
+}
+GlobalSettings:  {
+}
+Objects:  {
+	Geometry: 1000000, "Geometry::fixtureMesh", "Mesh" {
+		Vertices: *12 {
+			a: 0,0,0,2,0,0,0,2,0,2,2,0
+		}
+		PolygonVertexIndex: *6 {
+			a: 0,1,-3,1,3,-3
+		}
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: *18 {
+				a: 0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1
+			}
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			UV: *12 {
+				a: 0,0,1,0,0,1,1,0,1,1,0,1
+			}
+		}
+	}
+	Geometry: 1100000, "Geometry::propMesh", "Mesh" {
+		Vertices: *12 {
+			a: 10,0,0,12,0,0,10,2,0,12,2,0
+		}
+		PolygonVertexIndex: *6 {
+			a: 0,1,-3,1,3,-3
+		}
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: *18 {
+				a: 0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1
+			}
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			UV: *12 {
+				a: 0,0,1,0,0,1,1,0,1,1,0,1
+			}
+		}
+	}
+	Geometry: 1200000, "Geometry::attachMesh", "Mesh" {
+		Vertices: *12 {
+			a: 0,0,0,1,0,0,0,1,0,1,1,0
+		}
+		PolygonVertexIndex: *6 {
+			a: 0,1,-3,1,3,-3
+		}
+		GeometryVersion: 124
+		LayerElementNormal: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			Normals: *18 {
+				a: 0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1
+			}
+		}
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "Direct"
+			UV: *12 {
+				a: 0,0,1,0,0,1,1,0,1,1,0,1
+			}
+		}
+	}
+	Model: 2000000, "Model::fixtureMesh", "Mesh" {
+		Version: 232
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Model: 2050000, "Model::propMesh", "Mesh" {
+		Version: 232
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Model: 2300000, "Model::attachMesh", "Mesh" {
+		Version: 232
+		Shading: T
+		Culling: "CullingOff"
+	}
+	Model: 2100000, "Model::root", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+	}
+	Model: 2200000, "Model::child", "LimbNode" {
+		Version: 232
+		Shading: Y
+		Culling: "CullingOff"
+		Properties70:  {
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,1,0
+		}
+	}
+	Deformer: 5000000, "Deformer::", "Skin" {
+		Version: 101
+		Link_DeformAcuracy: 50
+	}
+	Deformer: 5000001, "Deformer::", "Cluster" {
+		Version: 100
+		Indexes: *2 {
+			a: 0,1
+		}
+		Weights: *2 {
+			a: 1,1
+		}
+		TransformLink: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1
+		}
+	}
+	Deformer: 5000002, "Deformer::", "Cluster" {
+		Version: 100
+		Indexes: *2 {
+			a: 2,3
+		}
+		Weights: *2 {
+			a: 1,1
+		}
+		TransformLink: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1
+		}
+	}
+	AnimationStack: 6000000, "AnimStack::TestClip", "" {
+	}
+	AnimationLayer: 6000001, "AnimLayer::BaseLayer", "" {
+	}
+	AnimationCurveNode: 6000010, "AnimCurveNode::R", "" {
+	}
+	AnimationCurve: 6000011, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,90
+		}
+	}
+	AnimationCurve: 6000012, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurve: 6000013, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurveNode: 6000020, "AnimCurveNode::R", "" {
+	}
+	AnimationCurve: 6000021, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+	AnimationCurve: 6000022, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,90
+		}
+	}
+	AnimationCurve: 6000023, "AnimCurve::", "" {
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 0,0
+		}
+	}
+}
+Connections:  {
+	C: "OO",1000000,2000000
+	C: "OO",1100000,2050000
+	C: "OO",1200000,2300000
+	C: "OO",2300000,2200000
+	C: "OO",5000000,1000000
+	C: "OO",5000001,5000000
+	C: "OO",5000002,5000000
+	C: "OO",2100000,5000001
+	C: "OO",2200000,5000002
+	C: "OO",2200000,2100000
+	C: "OO",6000010,6000001
+	C: "OO",6000001,6000000
+	C: "OO",6000020,6000001
+	C: "OP",6000011,6000010,"d|X"
+	C: "OP",6000012,6000010,"d|Y"
+	C: "OP",6000013,6000010,"d|Z"
+	C: "OP",6000010,2100000,"Lcl Rotation"
+	C: "OP",6000021,6000020,"d|X"
+	C: "OP",6000022,6000020,"d|Y"
+	C: "OP",6000023,6000020,"d|Z"
+	C: "OP",6000020,2200000,"Lcl Rotation"
+}

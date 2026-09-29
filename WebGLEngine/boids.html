@@ -173,6 +173,7 @@ console.log("[boids.html] started with", NUM_BOIDS, "boids");
         } catch (e) {}
     }
     window.addEventListener("message", (e) => {
+        if (e.origin !== window.location.origin) return;
         const d = e.data;
         if (!d || typeof d !== "object") return;
         if (d.type === "demo:set") {

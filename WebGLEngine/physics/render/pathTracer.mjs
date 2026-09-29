@@ -25,6 +25,9 @@
 import { rng, cosineSampleHemisphere, createCoordinateSystem, toWorld } from "./furnace.mjs";
 import { raySphere } from "./occlusion.mjs";
 import { sampleCone, conePdf, capHalfAngle } from "./nee.mjs";
+// RTX round 4 -- the CPU reference gains eyes for a triangle mesh (mesh/meshBVH.mjs's own raycastFirst and
+// triNormal), so a concave BVH scene has an independent estimator to be held to statistically. See intersect().
+import { triNormal } from "../../mesh/meshBVH.mjs";
 // v3493 -- THE THREE MODULES THAT WERE GRADED AND UNCALLED. microfacet (v3490), fresnel (v3491) and
 // energyCompensation (v3492) each shipped with an exact key and NO CONSUMER, which is v3473's nee.mjs shape
 // three times over. This is the round that gives them one.
@@ -56,10 +59,26 @@ const cmul = (a, b) => [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
 const cscale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const cadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 
-/** Nearest hit among the spheres, or null. Uses v3469's intersection -- the one with the `t > 0` test. */
-export function intersect(orig, dir, spheres) {
+/**
+ * Nearest hit among the scene's entries, or null. Uses v3469's intersection -- the one with the `t > 0` test --
+ * for a sphere, and, since RTX round 4, mesh/meshBVH.mjs's own raycastFirst() for an entry that carries `.bvh`
+ * (a MeshBVH instance) instead of `.centre`/`.radius`. THE MESH BRANCH REUSES THE SAME `hit.sphere` SHAPE A
+ * SPHERE HIT ALREADY RETURNS -- {t, P, N, sphere} -- so trace() below, which only ever reads hit.P/hit.N and
+ * material fields off hit.sphere, needs NO changes at all to shade a mesh entry: the mesh's own scene object
+ * (carrying `.albedo` and no `.centre`/`.radius`/`.emit`) simply becomes `sphere` for the rest of the path. The
+ * normal comes from mesh/meshBVH.mjs's triNormal() -- the SAME cross(e1,e2) formula rtPipeline.mjs's WGSL
+ * rtTriNormal() computes on the device, not a second derivation of it.
+ */
+export function intersect(orig, dir, scene) {
     let best = null;
-    for (const s of spheres) {
+    for (const s of scene) {
+        if (s.bvh) {
+            const hit = s.bvh.raycastFirst(orig[0], orig[1], orig[2], dir[0], dir[1], dir[2]);
+            if (hit && (best === null || hit.t < best.t)) {
+                best = { t: hit.t, P: hit.point, N: triNormal(s.bvh.tris, hit.tri * 9), sphere: s };
+            }
+            continue;
+        }
         const t = raySphere(orig, dir, s.centre, s.radius);
         if (t !== null && (best === null || t < best.t)) {
             const P = add(orig, mul(dir, t));
@@ -480,6 +499,19 @@ export function render(scene, { w = 48, h = 48, spp = 64, seed = 1, eye = [0, 0,
     const nStrat = Math.round(Math.sqrt(spp));
     if ((strat || pathStrat) && nStrat * nStrat !== spp)
         throw new Error("pathTracer: strat needs a square spp, got " + spp + " (nearest square " + nStrat * nStrat + ")");
+    // RTX round 4 -- A MESH ENTRY WITH NO ALBEDO OR WITH emit SET FAILS LOUD HERE INSTEAD OF LATE AND UNLABELLED.
+    // Without this, a missing `.albedo` throws a bare "Cannot read properties of undefined" deep inside alb()/cmul()
+    // on the FIRST bounce that reaches it, and `.emit` on a mesh entry reaches the NEE cone-sampling code (written
+    // for a spherical light's centre/radius, `capHalfAngle`/`conePdf`) and throws there instead -- both real
+    // crashes, neither naming what was actually wrong. Refused up front, the same discipline sceneFromSbt already
+    // uses for a record it cannot express: a mesh emitter is a geometry this tracer's NEE has no light-sampling
+    // shape for, not (yet) a material question, and intersect()'s own mesh branch was built for the concave-cavity
+    // round only -- extending it to emitters is a round of its own.
+    for (const s of scene) {
+        if (!s.bvh) continue;
+        if (s.emit) throw new Error("pathTracer: a mesh scene entry cannot emit -- NEE's cone sampling has no shape for a mesh light, only a spherical one");
+        if (s.albedo === undefined) throw new Error("pathTracer: a mesh scene entry needs an albedo");
+    }
     const CH = rgb ? 3 : 1;
     const out = new Float64Array(R.w * R.h * CH);
     for (let y = R.y0; y < R.y0 + R.h; y++) {

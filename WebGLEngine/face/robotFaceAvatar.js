@@ -415,6 +415,7 @@ try {
 // Also listen for a postMessage from the PIP that delivers a blob URL
 // after the user drops a .glb on the PIP panel.
 window.addEventListener("message", (e) => {
+    if (e.origin !== window.location.origin) return;   // m.url is fetched below -- an off-origin sender could point it anywhere
     const m = e?.data;
     if (m?.type === "kpop:loadGlb" && typeof m.url === "string") {
         customGlbUrl = m.url;
@@ -2196,6 +2197,7 @@ function reanchorMouthFromBoundary(fraction, elapsedMs) {
 // react to messages whose voice matches. Allows the engine's
 // kpop.speak({Voice}) to drive two separate PIP avatars side by side.
 window.addEventListener("message", (e) => {
+    if (e.origin !== window.location.origin) return;
     const m = e?.data;
     if (!m || typeof m !== "object" || !m.type) return;
     if (_myVoice && m.voice && m.voice !== _myVoice) return;

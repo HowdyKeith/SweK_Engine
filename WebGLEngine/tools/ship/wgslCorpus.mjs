@@ -77,6 +77,9 @@ import * as FM from "../../render/fleetMask.mjs";
 // v4464 -- the two physics producers the census named for a hundred and seventy rounds without a corpus entry, and text/
 import * as G from "../../physics/render/pathTracerGpu.mjs";
 import * as R from "../../physics/render/rtPipeline.mjs";
+// RTX round 3 -- the present path's two new kernels, and rtPipeline's own bvh probes, unaccounted since the round
+// that added them (crossBackend-selfcheck named all four the first time it ran after -- see the entries below).
+import * as RTV from "../../render/rtViewer.mjs";
 import { slugShaderWgsl, slugProbeWgsl, slugDilateProbeWgsl, PROBE_BINDINGS, DILATE_PROBE_BINDINGS } from "../../text/slugShaderWgsl.js";
 import { parseFont } from "../../text/slugFont.js";
 import { packAtlas, packGlyphLoc, packGlyphFlags } from "../../text/slugAtlas.js";
@@ -656,6 +659,90 @@ export function corpus() {
                                                 R.sbtRecord({ centre: [1.2, 0, 0], radius: 0.6, albedo: 0.25, hit: "mirror" })],
                                                { spp: 16, view: R.VIEW, eps: 1e-4 }),
                   workgroups: Math.ceil(R.VIEW.w * R.VIEW.h / 64) } },
+        // *** RTX ROUND 3 -- FOUR MORE, FOUND BY THE SAME CENSUS THE v4464 NOTE ABOVE DESCRIBES. *** bvhProbeWgsl
+        // and bvhShadeProbeWgsl shipped in the two rounds before this one (the BVH and shading rounds) with their
+        // own gate (physics/render/rtPipeline-selfcheck.mjs, index-based bindings via runWgslCompute -- see that
+        // file's own header on why that is a DIFFERENT claim from this corpus's) and no corpus entry; render/
+        // rtViewer.mjs's accumulateWgsl and presentWgsl are this round's own two kernels. All four fit signatures
+        // this corpus already knows how to drive -- confirmed against the last committed state before this round
+        // (git stash -u, not assumed): bvhProbeWgsl/bvhShadeProbeWgsl were ALREADY unaccounted on the pushed
+        // branch; this round's own two additions would only have made the same gap wider.
+        { id: "rtPipeline.bvhProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "the BVH traversal alone, over a fixed 8-ray sweep of a unit cube -- t and the hit triangle, no shading; graded against mesh/meshBVH.mjs's own raycastFirst() by rtPipeline-selfcheck.mjs's index-based harness, here for the second backend's compiler AND numbers on the same rays",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const bvh = R.bvhBuffersFromMesh(positions, indices);
+              const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
+                                             -5, -5, -5, 1, 1, 1, 10, 10, 10, 1, 1, 1, 2, 2, -5, 0, 0, 1, 0.9, 0.9, -5, 0, 0, 1]);
+              const rayCount = rays.length / 6;
+              return { code: R.bvhProbeWgsl(rayCount), outCount: rayCount * 2, workgroups: Math.ceil(rayCount / 64),
+                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
+          })() },
+        { id: "rtPipeline.bvhShadeProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "the interpolated vertex colour at each ray's hit point, over the same cube with a hand-designed per-vertex gradient -- graded against meshBVH.mjs's independent baryAt() by rtPipeline-selfcheck.mjs; here for the second backend",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const colors = positions.map((_, i) => [i / 7, 1 - i / 7, 0.5]);
+              const bvh = R.bvhBuffersFromMesh(positions, indices, { colors });
+              const rays = new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
+                                             -3, -3, -3, 1, 1, 1, 3, -3, -3, -1, 1, 1, 3, 3, -3, -1, -1, 1, -3, 3, -3, 1, -1, 1]);
+              const rayCount = rays.length / 6;
+              return { code: R.bvhShadeProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
+                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
+          })() },
+        // *** RTX ROUND 4 -- THE THIRD PROBE, AND THE FIX THE FIRST TWO WERE MISSING. *** bvhProbeWgsl and
+        // bvhShadeProbeWgsl above used to take no ray count at all: @workgroup_size(64) always launches 64
+        // invocations, and every existing caller (here included -- 8 rays, both entries above) supplied fewer,
+        // so the excess threads read past `rays` and WROTE past `outBuf`. WebGPU clamps an out-of-range STORE
+        // into the buffer rather than fault, which piled every excess write onto the LAST real ray's own slot --
+        // physics/render/rtPipeline-selfcheck.mjs's 32-ray sweep had this invisibly wrong for two rounds, masked
+        // because the corrupted answer happened to land on a triangle sharing two vertices with the true one,
+        // which its own "genuine shared-edge tie" tolerance (written for an honest case) absorbed without
+        // complaint. Fixed at the source: all three probes now take a required `rayCount`, baked as a WGSL
+        // const, guarding `if (gid.x >= RAY_COUNT) { return; }` before touching either buffer -- see
+        // bvhProbeWgsl's own header in physics/render/rtPipeline.mjs for the measurement that found it.
+        { id: "rtPipeline.bvhMaterialProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "the multi-material SBT offset, alone: bvhMatIdx[bvhHitTri] into bvhSbt, one ray straight at each of the cube's 12 triangle centroids (not the 8-ray sweep the other two probes share, which lands on shared edges/vertices and resolves to only 4 distinct triangles -- a centroid ray is inside its OWN triangle by construction, so all 12 are distinctly exercised) -- graded against the caller's own materialIndex/records arrays by rtPipeline-selfcheck.mjs; here for the second backend",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const materialIndex = indices.map((_, i) => i % 2);
+              const bvh = R.bvhBuffersFromMesh(positions, indices, { materialIndex });
+              const sbtBuf = R.meshSbtBuffer([{ hit: "lambertian", albedo: 0.9 }, { hit: "lambertian", albedo: 0.1 }], { rgb: true });
+              const rays = [];
+              for (const [a, b, c] of indices) {
+                  const cx = (positions[a][0] + positions[b][0] + positions[c][0]) / 3;
+                  const cy = (positions[a][1] + positions[b][1] + positions[c][1]) / 3;
+                  const cz = (positions[a][2] + positions[b][2] + positions[c][2]) / 3;
+                  const ox = cx * 5, oy = cy * 5, oz = cz * 5, dx = -ox, dy = -oy, dz = -oz, l = Math.hypot(dx, dy, dz);
+                  rays.push(ox, oy, oz, dx / l, dy / l, dz / l);
+              }
+              const rayF32 = new Float32Array(rays);
+              const rayCount = rayF32.length / 6;
+              return { code: R.bvhMaterialProbeWgsl(rayCount), outCount: rayCount * 3, workgroups: Math.ceil(rayCount / 64),
+                       inputs: [...R.bvhInputs(bvh), { binding: 6, data: rayF32 }, { binding: R.BVH_BINDINGS.meshSbt, data: sbtBuf }] };
+          })() },
+        // RTX round 7 -- envProbeWgsl's own texture input, the same reason CAPTURED_PREFILTER_WGSL above is
+        // compile-only rather than dispatched: this corpus's browser-side runner has no `texture` binding (see
+        // this file's own v4580 import comment), only tools/ship/headlessGpu.mjs's runWgslComputeNative does --
+        // and that is exactly where physics/render/rtPipeline-selfcheck.mjs's own section 12 already dispatches
+        // it, numerically, against sampleCapturedCubemap. compileOnly here only proves the SECOND backend's
+        // compiler accepts the WGSL, which is still real coverage: a syntax or binding-layout mistake this
+        // corpus's tint/naga pair disagrees on would still be caught.
+        { id: "rtPipeline.envProbeWgsl", from: "physics/render/rtPipeline.mjs", compileOnly: true,
+          why: "dirToFaceW plus the manual-bilinear texture fetch, standalone -- graded numerically (native only) by rtPipeline-selfcheck.mjs's own section 12 against specularProbeCapture.sampleCapturedCubemap; here for the second backend's compiler",
+          opts: { code: R.envProbeWgsl(8, 16), compileOnly: true, outCount: 0 } },
+        // accumulateWgsl works IN PLACE on binding 0 (outInit is the running mean's PRIOR value) -- the same
+        // convention xpbdWgsl.solveWgsl already established in this corpus.
+        { id: "rtViewer.accumulateWgsl", from: "render/rtViewer.mjs",
+          why: "the present path's running-mean update, accumBuf += (frameBuf-accumBuf)/n -- pure elementwise arithmetic, no control flow to disagree about, but the first corpus entry outside physics/xpbd to exercise outInit",
+          opts: { code: RTV.accumulateWgsl(4), outCount: 4, workgroups: 1, outInit: new Float32Array([10, 0, -5, 100]),
+                  uniforms: new Float32Array([4, 0, 0, 0]), inputs: [{ binding: 2, data: new Float32Array([2, 2, 2, 2]) }] } },
+        { id: "rtViewer.presentWgsl", from: "render/rtViewer.mjs", compileOnly: true,
+          why: "the present path's fullscreen-triangle vs+fs pair, reading accumBuf directly as a storage buffer rather than a texture -- a render pair, like badTv.FRAGMENT_WGSL and litSphere.LIT_WGSL, which this compute-only corpus compiles but does not dispatch; tools/ship/rtViewer-selfcheck.mjs draws and reads it back on the real device",
+          opts: { code: RTV.presentWgsl(4, 2), compileOnly: true, outCount: 0 } },
         // *** v4464 -- text/ JOINS THE CENSUS. *** The Slug twin (v4457) lived outside the corpus roots, so its
         // three runnable modules were nobody's cross-backend claim. The render module compiles on both; the two
         // probes RUN on both, and the coverage probe is the corpus's first entry with read-only storage inputs.

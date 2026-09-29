@@ -34,6 +34,12 @@ import { getOverride } from "../gpu/assetOverrides.js";
 import { VOXEL } from "../world/voxelFormat.js";   // round 128 — crater carving
 import { makeKaijuRivalry } from "./KaijuRivalry.js";   // round 287
 import { makeKingPack } from "./KingPack.js";            // round 287
+// Task board #89 -- real per-chunk collision geometry for a voxel world, corrects the exact bug
+// world/surfaceProbe.mjs measured (a terrain-height oracle up to 17 voxels off the real voxel surface) and
+// adds lateral wall/overhang awareness _terrainTop below never had, since it only ever answered a height.
+import { hasVoxels } from "../world/surfaceProbe.mjs";
+import { makeWorldColliderBVH } from "../world/worldColliderBVH.mjs";
+import { depenetrateCapsule, probeGround } from "../physics/character/capsuleCollide.mjs";
 
 // Round 52 - skeletal animation clip mapping for kaiju FSM states.
 // Standard glTF rig clip names: rigs ship with "idle"/"walk"/"attack"/
@@ -81,6 +87,18 @@ function clipForKaijuState(kind, state) {
 const SPAWN_RATE_PER_S      = 1 / 60;
 const MAX_KAIJU              = 6;     // v3: bumped from 4 so duels are likely
 const DEBRIS_BURSTS_ON_SPAWN = 3;
+
+// Task board #91 -- real integrated fall/gravity for ground kaiju, _resolveGroundKaijuPosition below.
+// KAIJU_GRAVITY matches simulation/BotManager.js's own BOT_GRAVITY (18): gravity is a world constant and does
+// not scale with a creature's own radius/height, so the same number applies to a kaiju as to a patrol bot.
+// MAX_FALL_S and MAX_FALL_UNITS are the safety net -- two independent caps (time and distance, so a frame
+// hitch that inflates one tick's delta still trips the other) that force a fall back to the height oracle
+// rather than let it continue indefinitely. Neither is tuned against a live rig (none is available in this
+// sandbox); both are generous relative to any real terrain drop this game can produce -- a fall covers
+// roughly 0.5*18*3^2 = 81 units in MAX_FALL_S alone, well past MAX_FALL_UNITS on its own.
+const KAIJU_GRAVITY   = 18;
+const MAX_FALL_S       = 3;
+const MAX_FALL_UNITS   = 150;
 
 export class KaijuManager {
     constructor(opts = {}) {
@@ -297,7 +315,7 @@ export class KaijuManager {
                             // stand height, so keeping it put the body where the walk had not chosen to be:
                             // frames-inside-rock went UP, 1.59% to 3.63%, once the drive started answering.
                         } else {
-                            k.position.y = gy;
+                            this._resolveGroundKaijuPosition(k, gy, delta);
                         }
                         // v516 — splash + trailing wake when a kaiju wades or
                         // swims through water (terrain top at/below the sea, or a
@@ -2430,6 +2448,152 @@ export class KaijuManager {
         const result = {};
         for (const k of baseKinds) result[k] = true;
         return result;
+    }
+
+    // Task board #89 -- the world's real per-chunk collision geometry, when it has one. Cached against world
+    // object identity, the same shape BotManager.js's own _groundOracle() (task #85) already uses: a world
+    // swap rebuilds it, nothing else does. hasVoxels(w) is the SAME guard surfaceProbe.mjs's own standHeightAt
+    // dispatch already uses -- a world with no voxel grid (no chunks Map, no isAir) gets null here and every
+    // ground kaiju falls straight through to _terrainTop's plain answer, unaffected by any of this.
+    _kaijuColliderBVH() {
+        const w = this.world;
+        if (!hasVoxels(w)) return null;
+        if (this._colliderFor !== w) {
+            this._colliderFor = w;
+            this._collider = makeWorldColliderBVH(w);
+        }
+        return this._collider;
+    }
+
+    // A kaiju's capsule size for collision purposes. config.radius is the SAME size proxy Kaiju.js's own
+    // stride computation already reads (Kaiju.js: `(this.config?.radius ?? 1.5) * 1.6`) -- reused rather than
+    // a second, independently-chosen size constant. config.scale and absorbScale are the two multipliers
+    // KaijuManager.js's own render-scale line already combines (see the absorb-scale sync above: `(k.config?.
+    // scale || 1) * (k.absorbScale || 1)`). Height is 4x radius, a plain creature aspect ratio -- not measured
+    // against a real rig's bounding box (no browser here to check one), so a kaiju's true silhouette may clip
+    // this capsule's ends slightly; the ground/wall resolution below is still correct for whatever the capsule
+    // itself contains, and refining the aspect ratio against a real asset is future polish, not a correctness
+    // gap in the collision math.
+    _kaijuCapsuleRadius(k) {
+        return (k.config?.radius ?? 1.5) * (k.config?.scale || 1) * (k.absorbScale || 1);
+    }
+
+    /**
+     * Task board #89 -- the ground-kind position correction: `gy` (from _terrainTop, already computed by the
+     * caller) is corrected against the REAL voxel surface when this world has a collider, then a bounded
+     * lateral nudge pushes the kaiju's capsule out of anything it newly overlaps (a wall, an overhang) -- the
+     * "real capsule collision" gap this task existed to close, not just a more accurate height snap. Mutates
+     * k.position directly, the same style _terrainTop's own callers already use.
+     *
+     * *** TASK BOARD #91 -- REAL INTEGRATED GRAVITY, WITH THE SAME SAFETY GUARANTEE #89 ORIGINALLY STATED FOR
+     * HAVING NONE. *** #89's own header used to say no velocity state was introduced "on purpose", because an
+     * unmeshed chunk at the streaming edge must never leave a kaiju falling forever. That constraint is kept,
+     * not relaxed: k._airborne/_vy/_fallAccumS/_fallStartY are a BOUNDED state machine, not an open-ended one.
+     * A kaiju is snapped straight to the surface (today's #89 behaviour, byte-for-byte) whenever it is already
+     * within GROUND_SNAP_EPS of one and was not already falling -- the common case, flat/rolling ground, is
+     * completely unchanged. Only once the surface has genuinely dropped out from under it (a real ledge) does
+     * it switch to integrating KAIJU_GRAVITY, and even then TWO independent caps -- MAX_FALL_S wall-clock and
+     * MAX_FALL_UNITS distance-fallen -- force a snap back to `gy` (the ORIGINAL #89/#90 fallback, unchanged)
+     * if landing hasn't happened by then. No real terrain drop in this game approaches either cap; only an
+     * unmeshed chunk or a genuine bug would, and that is exactly the case #89 already had to handle safely.
+     * KAIJU_GRAVITY reuses BotManager.js's own BOT_GRAVITY value (18) -- gravity does not scale with a
+     * creature's size, so the same world constant applies regardless of a kaiju's own radius/height.
+     *
+     * *** WHAT IS NOT CLAIMED: THE FEEL. *** Fall speed, the exact epsilon and caps below are reasonable
+     * defaults, not tuned against a running game on a real rig (none is available in this sandbox). What IS
+     * proven, headlessly, against hand-built geometry: the integration matches free-fall kinematics tick for
+     * tick, a fall always terminates (lands or hits a cap) rather than continuing indefinitely, and every
+     * fallback path degrades to exactly #89's own prior behaviour.
+     */
+    _resolveGroundKaijuPosition(k, gy, delta) {
+        // *** ADVERSARIAL-REVIEW FIX (task #91, post-commit 9ee11ebe). *** `delta` reaches here from main.js's
+        // own frame-time computation (`dt = Math.min((t-last)/1000, 0.1)`), which has NO lower bound and NO
+        // NaN guard -- a timestamp-ordering hiccup (e.g. switching between window.rAF and XRSession.rAF as
+        // clock sources) can hand this a negative or non-finite value. Both safety-net caps below are plain
+        // numeric comparisons, and NaN compares false against every one of them -- once `k._fallAccumS` or
+        // `k.position.y` goes NaN it silently and PERMANENTLY defeats the "a fall always terminates" guarantee
+        // this whole method exists to provide, exactly the same failure class already found and fixed once
+        // this task (the uninitialized-`_fallAccumS` bug, see the SABOTAGE LOG). A negative delta is a
+        // separate hole: a sign-oscillating +dt/-dt sequence returns k._vy and k._fallAccumS to ~exactly
+        // their pre-pair values every pair (only k.position.y drifts, by G*dt^2 per pair), defeating both caps
+        // for an arbitrarily long real-time span without ever tripping either one. Clamp once, here, rather
+        // than trust every call site to have done it already.
+        if (!Number.isFinite(delta) || delta < 0) delta = 0;
+
+        const bvh = this._kaijuColliderBVH();
+        k._hazard = 0;
+        if (!bvh) {
+            k.position.y = gy;
+            k._airborne = false; k._vy = 0; k._fallAccumS = 0; k._fallStartY = undefined;
+            return;
+        }
+        const radius = this._kaijuCapsuleRadius(k);
+        const height = radius * 4;
+        const hit = probeGround([k.position.x, gy + radius * 4 + 8, k.position.z], radius, bvh, { maxDist: radius * 8 + 40 });
+        const surfaceY = hit ? hit.point[1] : gy;
+
+        // A resting capsule's own probeGround/depenetrateCapsule readings carry ordinary float noise (the same
+        // reason capsuleCollide.mjs's own CONTACT_SKIN exists); GROUND_SNAP_EPS is generous relative to that --
+        // large enough that flat-ground noise never falsely reads as "fell off a ledge", not so large that a
+        // real short drop gets silently snapped instead of falling.
+        const GROUND_SNAP_EPS = radius * 0.5;
+        const gap = k.position.y - surfaceY;   // positive: feet sit above the found surface
+
+        if (!k._airborne && gap <= GROUND_SNAP_EPS) {
+            k.position.y = surfaceY;
+            k._airborne = false; k._vy = 0; k._fallAccumS = 0; k._fallStartY = undefined;
+        } else {
+            if (!k._airborne) { k._airborne = true; k._fallStartY = k.position.y; k._vy = k._vy || 0; k._fallAccumS = 0; }
+            k._vy -= KAIJU_GRAVITY * delta;
+            k.position.y += k._vy * delta;
+            k._fallAccumS += delta;
+
+            if (k._fallAccumS > MAX_FALL_S || (k._fallStartY - k.position.y) > MAX_FALL_UNITS) {
+                // *** THE SAFETY NET. *** Nothing has been found to land on for longer, or farther, than any
+                // real terrain drop in this game should take -- fall back to _terrainTop's own safe answer,
+                // exactly #89's original fallback, rather than let the fall continue indefinitely.
+                k.position.y = gy;
+                k._airborne = false; k._vy = 0; k._fallAccumS = 0; k._fallStartY = undefined;
+            } else if (k.position.y <= surfaceY) {
+                k.position.y = surfaceY;
+                k._airborne = false; k._vy = 0; k._fallAccumS = 0; k._fallStartY = undefined;
+            }
+        }
+
+        const yBeforeDepen = k.position.y;
+        const r = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, height, bvh, { iterations: 2 });
+        k.position.x = r.pos[0]; k.position.y = r.pos[1]; k.position.z = r.pos[2];
+        // *** ADVERSARIAL-REVIEW FIX (task #91, post-commit 9ee11ebe). *** depenetrateCapsule can push
+        // k.position.y UP (any contact normal with a positive Y component -- an overhang, a corner), entirely
+        // independent of the gravity integration above. Left uncorrected, that upward push silently SHRINKS
+        // `k._fallStartY - k.position.y` every tick it happens (the push moves position.y closer to
+        // fallStartY), eroding MAX_FALL_UNITS's guarantee via geometry the distance cap was never meant to be
+        // sensitive to. Nudging fallStartY UP by the exact same amount keeps the GAP -- and so the cap's
+        // measurement of genuine gravitational fall -- identical to what it was right after gravity's own
+        // integration step, before depenetration touched it: (fallStartY+push) - (position.y+push) ==
+        // fallStartY - position.y, pre-push. (Subtracting here instead would double the erosion, not cancel
+        // it -- push moves position.y closer to fallStartY by `push`; matching that with -= moves fallStartY
+        // closer to position.y too, shrinking the gap by 2*push instead of holding it steady.) Guarded on
+        // k._airborne: if the fall/cap logic above already landed this tick, _fallStartY is already reset to
+        // undefined and there is nothing to correct.
+        if (k._airborne && k.position.y > yBeforeDepen) k._fallStartY += (k.position.y - yBeforeDepen);
+        // *** A SEPARATE SINGLE-ITERATION PROBE, NOT r.contacts FROM THE POSITION SOLVE ABOVE. *** A first
+        // draft read hazard straight off `r` (the iterations:2 call), on the theory that any contacts
+        // beyond the expected one floor touch meant a wall pressing in. This file's own gate caught it
+        // red-handed: a kaiju standing in open air, nothing else nearby, still read hazard=0.5, because
+        // depenetrateCapsule's SECOND iteration re-touches the SAME already-resolved floor triangle (it
+        // is still within `radius + CONTACT_SKIN` after the first pass settles it there) and counts it as
+        // a second contact -- an iteration-count artifact, not a second surface. One iteration's own
+        // single DEEPEST contact cannot double-count anything: `grounded` true means the nearest thing in
+        // range is floor-like (the ordinary case); found a contact but NOT grounded means the nearest
+        // thing is a wall/overhang outranking the floor -- real lateral pressure; no contact at all means
+        // nothing is holding this kaiju up here. Slightly coarser than a true per-triangle wall count (a
+        // wall that loses to a still-closer floor on this one pass reads as 0, not partial), but never a
+        // false alarm for a kaiju standing in the open, which a fed-forward decision feature cannot afford.
+        // Airborne (mid-fall) already reads hazard=1 through this same probe -- unstable footing is exactly
+        // what falling is, so no separate case is needed for it.
+        const probe = depenetrateCapsule([k.position.x, k.position.y, k.position.z], radius, height, bvh, { iterations: 1 });
+        k._hazard = (probe.contacts === 0 || !probe.grounded) ? 1 : 0;
     }
 
     // Scan from y=60 downward for the first non-air voxel — terrain

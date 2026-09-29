@@ -35,8 +35,13 @@ const read = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
 // anything re-took this census. The row that catches it is section 6's, and it is the reason that row exists:
 // "a new controller landing with its own gravity and nobody re-taking this census". It went red on both boxes
 // the first time a full verify was run.
-export const MODULES = Object.freeze(["capsuleGround.mjs", "capsuleMove.mjs", "capsuleSettle.mjs",
-                                      "fallBody.mjs", "groundProbe.mjs", "kinematic.js", "terrainWalk.mjs"]);
+// v4778 -- 7 -> 9 at the rtx merge: capsuleCollide.mjs (depenetrateCapsule, probeGround -- the capsule-vs-BVH port,
+// task board #80) and capsuleCollideTsl.mjs (its GPU twin). Neither integrates gravity; callers do. Both carry
+// GROUND_SUPPORT_NORMAL_Y = 0.5, which is capsuleSettle's side of GROUND_LIMIT_AT_V4647's disagreement -- three
+// modules now read "supported" at a 60-degree face and one (capsuleGround) at 45, and the record below still
+// holds: the two numbers are different contracts, never compared, and that is recorded rather than reconciled.
+export const MODULES = Object.freeze(["capsuleCollide.mjs", "capsuleCollideTsl.mjs", "capsuleGround.mjs", "capsuleMove.mjs",
+                                      "capsuleSettle.mjs", "fallBody.mjs", "groundProbe.mjs", "kinematic.js", "terrainWalk.mjs"]);
 
 // *** AND THE ARRIVAL BROUGHT A SEVENTH QUANTITY WITH IT, WHICH IS THE THING THE COUNT CANNOT SEE. ***
 // section 6's own prose says so: "It cannot tell you that a listed module grew a SEVENTH quantity, which is
@@ -73,6 +78,12 @@ export const SITES = Object.freeze([
       re: /this\._gravity\s*=\s*(-?[\d.]+)\s*;/, sign: "magnitude, subtracted" },
     { q: "gravity", who: "fallBody", ships: true, file: "physics/character/fallBody.mjs", sym: "GRAVITY",
       re: /export const GRAVITY\s*=\s*(-?[\d.]+)\s*;/, sign: "signed, added" },
+    // v4778 -- the rtx merge's bot capsule path (BotManager._stepBotCapsule) integrates gravity inline at 18 -- the
+    // PLAYER's figure -- while every other bot path falls through fallBody at 20. A running body reads it whenever a
+    // world carries a collider BVH, so it ships. Recorded as the disagreement it is, not reconciled: which number the
+    // bots should have is a physics decision, not a merge's.
+    { q: "gravity", who: "botCapsule", ships: true, file: "simulation/BotManager.js", sym: "BOT_GRAVITY",
+      re: /const BOT_GRAVITY\s*=\s*(-?[\d.]+)\s*;/, sign: "magnitude, subtracted" },
     { q: "gravity", who: "kinematic", ships: false, file: "physics/character/kinematic.js", sym: "stepCharacter default",
       re: /stepCharacter\(\{[^}]*?gravity\s*=\s*(-?[\d.]+)/s, sign: "signed, added" },
     { q: "terminal", who: "fallBody", ships: true, file: "physics/character/fallBody.mjs", sym: "TERMINAL",
@@ -154,10 +165,10 @@ export function characterModules() {
  */
 export const AGREEMENT_AT_V4547 = Object.freeze({
     at: "v4547",
-    sites: 19,
+    sites: 20,           // v4778 -- 19 -> 20: gravity:botCapsule (the rtx merge's bot capsule path)
     quantities: 6,
-    shippingSites: 12,
-    modules: 7,   // v4647 -- capsuleSettle.mjs; see MODULES above and the seventh quantity it brought
+    shippingSites: 13,   // v4778 -- 12 -> 13: the same site, read by any bot in a world with a collider BVH
+    modules: 9,   // v4647 -- capsuleSettle.mjs; see MODULES above and the seventh quantity it brought. v4778 -- 7 -> 9, capsuleCollide and its TSL twin (the rtx merge)
     // *** THE COUNTS ABOVE CANNOT CATCH A NUMBER MOVING, AND THE SABOTAGE BATTERY IS WHAT SAID SO. ***
     // Moving terrainWalk's NON-shipping snapDown default from 0.5 left the whole census green, because
     // every verdict here is about SHIPPING values and that default ships to nobody. It is still a number
@@ -165,6 +176,7 @@ export const AGREEMENT_AT_V4547 = Object.freeze({
     // rounds have been about. Every site's value is pinned here and compared per site in section 1.
     siteValues: Object.freeze({
         "gravity:player": 18,
+        "gravity:botCapsule": 18,   // v4778 -- the rtx merge's bot capsule path; see its SITES entry
         "gravity:fallBody": -20,
         "gravity:kinematic": -20,
         "terminal:fallBody": -55,

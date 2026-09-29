@@ -16,6 +16,8 @@ import { buildViewProj } from "./buildViewProj.js";
 import { standHeightAt, DEFAULT_BODY } from "../world/surfaceProbe.mjs";
 // v4548 -- the gated fall, rather than a third and fourth copy of it. See _fallSurface.
 import { fallStep } from "../physics/character/fallBody.mjs";
+import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
+import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
 
 /**
  * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
@@ -676,6 +678,13 @@ export class Camera {
         this._fpSprintSpeed = 9;
         this._fpJumpVel = 7.5;
         this._gravity = 18;             // m/s² downward in FP mode
+        this._fpMaxSlopeDeg = 50;       // Round #13 -- walkable limit for the non-voxel ground oracle below
+        this._capsuleRadius = 0.4;      // Round #13 Stage B (task board #80) -- capsule-vs-BVH collision size
+        this._capsuleHeight = 1.8;      // close to _eyeHeight (1.7): eyes sit near the top of the capsule
+        this.viewMode = "first";        // Round #13 Stage C (task board #81) -- "first" | "third", fp mode only
+        this._thirdPersonDistance = 4.5;
+        this._thirdPersonHeight = 1.2;
+        this._thirdPersonSkin = 0.3;    // stop this far short of a wall/ground hit, not exactly on it
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -718,6 +727,11 @@ export class Camera {
         // WASD/Space/Shift work whether or not pointer-lock is engaged.
         this._move(dt);
 
+        // Round #13 Stage C (task board #81) -- in third-person, the RENDER eye sits behind this.position,
+        // which stays the physics anchor _move* writes exactly as it does in first person. Everything below
+        // (shake, FOV kick) applies identically on top of whichever eye this resolves to.
+        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye() : this.position;
+
         // Round 28 — shake offset. Random-jitter the position passed to
         // buildViewProj so the matrix is shaken without mutating the
         // logical camera position.
@@ -734,9 +748,14 @@ export class Camera {
         // The same idiom this function already uses for _fovSprint ten lines below, and BotManager's
         // _displayYaw one axis over: a render-only value eased toward an authoritative one.
         this._stepRenderEye(dt);
-        let camX = this.position.x;
+        let camX = eye.x;
         let camY = this._eyeRenderY;
-        let camZ = this.position.z;
+        let camZ = eye.z;
+        // Third person (task board #81): the smoothed eye rides on the same pivot. The ease is a render-only
+        // vertical offset from the body, so the camera behind the player keeps _thirdPersonEye()'s boom and
+        // does not stair-step at a lip either. In first person eye IS this.position and camY stays exactly
+        // _eyeRenderY.
+        if (eye !== this.position) camY += eye.y - this.position.y;
         if (this._shakeUntilT && t < this._shakeUntilT) {
             const remain = (this._shakeUntilT - t) / Math.max(1, this._shakeDuration);
             const amp = this._shakeAmp * remain;
@@ -1298,6 +1317,185 @@ export class Camera {
         this.position.z += mz * step;
     }
 
+    // Round #13 Stage B (task board #80) — the world's full triangle-mesh collider, when it has one. Unlike
+    // _terrainGroundOracle()'s height function, a BVH here means walls, ceilings and moving platforms are
+    // real geometry a capsule can be pushed out of, not just a surface to stand on. No caching needed:
+    // this is a direct property read, not a closure to build.
+    _capsuleWorldBVH() {
+        const w = this.world;
+        return (w && w.colliderBVH) ? w.colliderBVH : null;
+    }
+
+    // physics/character/capsuleCollide.mjs's depenetrateCapsule is the port (task board #80); this is the
+    // live-input wiring for it, the same relationship _moveFPTerrain has to terrainWalk.mjs's ground oracle.
+    // Unlike the height-field ground oracle, a BVH collider covers walls and ceilings too, so there is no
+    // separate horizontal-collision step here: depenetrateCapsule resolves horizontal AND vertical
+    // penetration together, which is the entire reason to use a capsule instead of a height function.
+    _moveFPCapsule(dt, mx, mz, horizLen, speed, bvh) {
+        // v4778 (the rtx merge) -- this path arrived integrating gravity itself (fpVelY decremented by gravity times dt),
+        // against v4548's rule that camera.js integrates no gravity of its own; cameraFall's pattern missed it only
+        // because the line began with `if`. fallStep with NO surface is the same semi-implicit Euler step bit for bit
+        // (vy + (-g)*dt is vy - g*dt exactly) and never lands, so grounding stays depenetrateCapsule's to decide.
+        if (!this._fpOnGround) {
+            this._fpVelY = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                vy: this._fpVelY, surfaceUnder: () => null, dt, gravity: -this._gravity, terminal: -Infinity }).vy;
+        }
+        const feet = [
+            this.position.x + mx * speed * dt,
+            this.position.y - this._eyeHeight + this._fpVelY * dt,
+            this.position.z + mz * speed * dt,
+        ];
+        const r = depenetrateCapsule(feet, this._capsuleRadius, this._capsuleHeight, bvh);
+        this.position.x = r.pos[0];
+        this.position.y = r.pos[1] + this._eyeHeight;
+        this.position.z = r.pos[2];
+        this._fpOnGround = r.grounded;
+        if (r.grounded) this._fpVelY = 0;
+        if (this.keys.has("Space") && this._fpOnGround) {
+            this._fpVelY = this._fpJumpVel;
+            this._fpOnGround = false;
+        }
+        this.velocity.x = mx * speed;
+        this.velocity.y = this._fpVelY;
+        this.velocity.z = mz * speed;
+    }
+
+    // Round #13 Stage C (task board #81) — first/third person, fp mode only. A discrete on-press toggle,
+    // not a held movement key, so it belongs in main.js's own keydown dispatcher (same place KeyQ/B/C/G/E/X
+    // already live for "fp" mode) rather than in consumesKey()/MOVEMENT_KEYS above, which govern the navPad's
+    // held-key guard and nothing else.
+    toggleViewMode() {
+        this.viewMode = this.viewMode === "third" ? "first" : "third";
+        return this.viewMode;
+    }
+
+    // The third-person RENDER eye. this.position stays the physics anchor every _move* method above writes
+    // exactly as it does in first person -- only update()'s view matrix reads this, and only in third person.
+    // Pulls the eye IN (never up and around) when something is in the way, using whichever collision data the
+    // world already offers: a real raycast against the Stage B capsule collider when one exists (so the eye
+    // cannot end up on the far side of a wall behind the player), or the same terrain-sightline-sampling
+    // technique _moveOrbit already uses for a voxel world, for the identical reason stated there. Neither is
+    // available (a bare terrain-ground-oracle world, or no world at all) leaves the eye unclamped -- a real,
+    // named limitation, not a silent one.
+    _thirdPersonEye() {
+        const cp = Math.cos(this.pitch);
+        const bx = -Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch), bz = Math.cos(this.yaw) * cp;   // -forward
+        const pivot = this.position;
+        let dist = this._thirdPersonDistance;
+
+        const bvh = this._capsuleWorldBVH();
+        if (bvh) {
+            const hit = bvh.raycastFirst(pivot.x, pivot.y, pivot.z, bx, by, bz, dist);
+            if (hit && hit.t < dist) dist = Math.max(0, hit.t - this._thirdPersonSkin);
+        } else if (this.world?.voxelAt) {
+            const samples = 4;
+            for (let i = 1; i <= samples; i++) {
+                const t = (dist * i) / samples;
+                const topY = this._terrainTopAtBilinear(pivot.x + bx * t, pivot.z + bz * t);
+                if (pivot.y + by * t + this._thirdPersonHeight < topY + 0.5) { dist = Math.max(0, t - this._thirdPersonSkin); break; }
+            }
+        }
+        return { x: pivot.x + bx * dist, y: pivot.y + by * dist + this._thirdPersonHeight, z: pivot.z + bz * dist };
+    }
+
+    // Round #13 Stage C (task board #81) — "drive walk/run/jump animation clips... from the controller's
+    // movement state" is two halves: deriving the STATE, and driving CLIPS with it. This is the first half,
+    // and it needs no bookkeeping of its own -- _fpOnGround, _fpVelY, velocity and _sprinting are already
+    // written identically by every one of the three movement paths above (voxel, terrain oracle, capsule), so
+    // this reads the same regardless of which one resolved the current frame. No visible player avatar exists
+    // in this engine yet for the second half to attach clips to (fpsShooter is view-only, no body mesh) --
+    // this is the state this engine does not yet have anything wired to consume, named rather than guessed at.
+    movementAnimState() {
+        if (this.mode !== "fp") return "idle";
+        if (!this._fpOnGround) return this._fpVelY > 0 ? "jump" : "fall";
+        const horiz = Math.hypot(this.velocity.x, this.velocity.z);
+        if (horiz < 0.05) return "idle";
+        return this._sprinting ? "run" : "walk";
+    }
+
+    // Round #13 (task board) Stage A — the ground oracle terrainWalk.mjs needs, for the FP modes when
+    // the world exposes no voxelAt at all. simulation/BotManager.js's own _groundOracle() does the same
+    // thing for AI movement and is the reason this shape (cache against world identity, build once) is
+    // copied rather than invented: rebuilding the closure every frame would be the expensive part of an
+    // otherwise cheap query. Returns null for a voxel world (this.world.voxelAt truthy) so the existing
+    // _canStandAt / _terrainTopAtBilinear path below is completely untouched -- this is additive, not a
+    // replacement, and the two live voxel FP demos (fps, fp_control) never take this branch.
+    _terrainGroundOracle() {
+        const w = this.world;
+        if (!w || w.voxelAt) return null;
+        if (this._terrainGroundFor !== w) {
+            this._terrainGroundFor = w;
+            if (w.groundBVH) this._terrainGround = meshGround(w.groundBVH);
+            else if (typeof w._heightAt === "function") this._terrainGround = autoGround((x, z) => w._heightAt(x, z));
+            else this._terrainGround = null;
+        }
+        return this._terrainGround;
+    }
+
+    // The non-voxel counterpart of _moveFP's horizontal+vertical block below: same inputs (mx/mz already
+    // the clamped WASD/analog wish, speed already gated by sprint), but the ground comes from terrainWalk's
+    // oracle instead of a voxel-column scan. Kept as a SEPARATE method rather than threaded into the voxel
+    // branch: the two disagree at every point that matters -- a slope limit tested on the surface normal
+    // vs. a step-height auto-climb, a contour-slide refusal vs. an axis-independent wall-slide -- and
+    // merging them would risk exactly what terrainWalk.mjs's own header warns against, a walkability
+    // verdict that quietly depends on which branch happened to run.
+    //
+    // *** THIS IS A GROUND CONTROLLER, NOT A FULL ONE, BY THE SAME SCOPE LIMIT terrainWalk.mjs STATES. ***
+    // The airborne branch below has no wall collision at all -- capsule-vs-arbitrary-geometry depenetration
+    // (walls, ceilings, moving platforms) is tracked separately (task board #80) and is explicitly not
+    // started here, same as it is not started in terrainWalk.mjs itself.
+    _moveFPTerrain(dt, mx, mz, horizLen, speed, ground) {
+        if (this._fpOnGround) {
+            const feetY = this.position.y - this._eyeHeight;
+            const r = stepTerrainFan({
+                pos: [this.position.x, feetY, this.position.z], ground,
+                wish: horizLen > 1e-9 ? [mx, mz] : [0, 0],
+                dt, speed, maxSlopeDeg: this._fpMaxSlopeDeg, convention: SURFACE,
+                stepHeight: 1.2, snapDown: 1.5,
+            });
+            this.position.x = r.pos[0];
+            this.position.z = r.pos[2];
+            if (r.airborne) {
+                this._fpOnGround = false;
+                this._fpVelY = 0;
+                this._fpFallStartTime = performance.now();
+            } else {
+                this.position.y = r.pos[1] + this._eyeHeight;
+            }
+            if (this.keys.has("Space") && this._fpOnGround) {
+                this._fpVelY = this._fpJumpVel;
+                this._fpOnGround = false;
+            }
+        } else {
+            // Airborne -- the same gated fall _moveFP's voxel path uses (physics/character/fallBody.mjs's
+            // fallStep, v4548), with the camera's own gravity and absent terminal passed through unchanged;
+            // only the surface oracle differs, since the ground height comes from terrainWalk's oracle rather
+            // than a voxel scan. A height field has one surface per column, so it is the surface at or below
+            // the body; no ground at all reads as 0, as this branch always did.
+            this.position.x += mx * speed * dt;
+            this.position.z += mz * speed * dt;
+            const surfaceUnder = (x, z) => { const g = ground(x, z); return g ? g.y : 0; };
+            const r = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
+                                 vy: this._fpVelY, surfaceUnder,
+                                 dt, gravity: -this._gravity, terminal: -Infinity });
+            let feetY = r.pos[1], vy = r.vy, landed = r.landed;
+            // fallStep probes the surface only on the way DOWN. A height field has one surface per column,
+            // so a body still RISING below it (a jump sprinted up a walkable slope that climbs faster than
+            // the jump) is inside the terrain; this branch always landed it there, on every airborne frame,
+            // and still does. On the way down this is a no-op: fallStep already landed anything at or below.
+            if (!landed) {
+                const s = surfaceUnder(this.position.x, this.position.z);
+                if (feetY <= s) { feetY = s; vy = 0; landed = true; }
+            }
+            this.position.y = feetY + this._eyeHeight;
+            this._fpVelY = vy;
+            if (landed) this._fpOnGround = true;
+        }
+        this.velocity.x = mx * speed;
+        this.velocity.y = this._fpVelY;
+        this.velocity.z = mz * speed;
+    }
+
     // Round 28 — first-person walking with gravity, terrain following,
     // 1-voxel auto-step, jump. Uses world.voxelAt for terrain queries.
     _moveFP(dt) {
@@ -1332,6 +1530,26 @@ export class Camera {
         if (this.playerEnergy) this.playerEnergy.setSprinting(isSprinting && horizLen > 0);
         this._sprinting = isSprinting && horizLen > 0;   // Round 31 — drives the sprint FOV widen
         const speed = isSprinting ? this._fpSprintSpeed : this._fpWalkSpeed;
+
+        // Round #13 Stage B (task board #80) -- a world exposing a real triangle-mesh collider (walls,
+        // ceilings, moving platforms, not just a ground height) takes priority over both the height-field
+        // oracle below and the voxel path: capsule-vs-BVH depenetration is the most general of the three
+        // and subsumes what the other two answer for the geometry it is given.
+        const capsuleBVH = this._capsuleWorldBVH();
+        if (capsuleBVH) {
+            this._moveFPCapsule(dt, mx, mz, horizLen, speed, capsuleBVH);
+            return;
+        }
+
+        // Round #13 Stage A -- a world with no voxelAt at all (a pure heightfield/mesh world -- splat-
+        // derived collision, imported terrain) walks through physics/character/terrainWalk.mjs's oracle
+        // instead of the voxel-column scan below, which returns 0/true unconditionally when voxelAt is
+        // absent and would otherwise let a non-voxel world's FP camera fall through to open air.
+        const terrainGround = this._terrainGroundOracle();
+        if (terrainGround) {
+            this._moveFPTerrain(dt, mx, mz, horizLen, speed, terrainGround);
+            return;
+        }
 
         // Try horizontal move with collision check
         const newX = this.position.x + mx * speed * dt;

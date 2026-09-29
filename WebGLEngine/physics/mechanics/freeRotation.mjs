@@ -62,12 +62,17 @@
 // LINEAR ONLY, so neither backend will report w. The comparison is a separate round and it needs a decision
 // this file has no business making. What IS reported here, measured from the tree rather than asserted, is the
 // shape of the gap -- see contractGap().
+//
+// GUARDED (this tree's established idiom -- see physics/stabilityMeter.mjs's own v3900/v3951 notes and
+// tools/ship/browserSafety-selfcheck.mjs, the gate that exists because of exactly this bug -- and now
+// physics/mechanics/rigidBody6dof.mjs, whose own gate names this same fix): this module is a dependency of
+// rigidBody6dof.mjs, which es-box3d-6dof.html loads in a real browser, and `node:fs`/`node:path`/`node:url` at
+// module top level are resolved before a single line of this file runs -- a browser calls that a CORS failure,
+// not a caught exception, and the WHOLE module (and everything that imports it) fails to load. This file's own
+// fs/path usage is confined to contractGap(), a Node-only diagnostic that reads source files off disk to report
+// what the box3d/jolt backends currently expose about rotation -- nothing rigidBody6dof.mjs or any page calls
+// it for. The imports move INSIDE that one function, dynamically, so a browser never evaluates them.
 "use strict";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Principal moments of a uniform rectangular block from its HALF-extents. Sorted ascending. */
 export function boxInertia({ m = 1, hx = 1, hy = 2, hz = 3 } = {}) {
@@ -227,7 +232,11 @@ export function measureGrowth({ I, axis, Omega = 1, eps = 1e-9, skipBelow = 1e-7
  * THE GAP, MEASURED FROM THE TREE RATHER THAN ASSERTED -- so the follow-on round starts from a reading.
  * Reports what the two backends can and cannot be asked about rotation today.
  */
-export function contractGap() {
+export async function contractGap() {
+    const fs = (await import("node:fs")).default;
+    const path = (await import("node:path")).default;
+    const { fileURLToPath } = await import("node:url");
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return ""; } };
     const shim = read("physics/box3d/box3d_shim.c");
     const b3 = read("physics/box3d/box3dLoader.js"), jolt = read("physics/jolt/joltLoader.js");
@@ -311,7 +320,7 @@ export const MEASURED_V3562 = {
 };
 
 // ---- FRONT DOOR -------------------------------------------------------------------------------------------------
-export function reportLines() {
+export async function reportLines() {
     const L = [];
     const I = boxInertia({ m: 1, hx: 1, hy: 2, hz: 3 });
     const mid = intermediateAxis(I);
@@ -340,7 +349,7 @@ export function reportLines() {
     L.push("  BETTER THAN THE ONE THAT KEEPS IT, AND NEVER FLIPS. Every conservation key rates it superior.");
     L.push("  Only the stability rate tells them apart. ***");
     L.push("");
-    const g = contractGap();
+    const g = await contractGap();
     L.push("  THE BACKEND GAP, read from the tree (this round changes none of it):");
     L.push("    addShip builds a CUBE .......................... " + (g.shipIsCube ? "yes -- THREE EQUAL MOMENTS, the one" : "no"));
     L.push("      inertia tensor for which this effect CANNOT happen. The fixture excludes the phenomenon.");
@@ -354,7 +363,10 @@ export function reportLines() {
     return L;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    for (const l of reportLines()) console.log(l);
-    process.exit(0);
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+        for (const l of await reportLines()) console.log(l);
+        process.exit(0);
+    }
 }

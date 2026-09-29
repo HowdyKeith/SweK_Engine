@@ -20,6 +20,14 @@
 // cos 45 = 0.7071, and GROUND_AT_V4543 freezes that 45 along with radius 0.4, height 1.8 and stepUp 0.5. A
 // slope of 55 degrees is walkable under one rule and refused by the other. This gate asks MAIN's modules, so
 // the surface it certifies is walkable by the body this tree actually ships.
+//
+// *** AFTER THE BRANCH MERGE, capsuleCollide.mjs IS IN THE TREE ANYWAY, WITH SHIPPING CALLERS. *** main.js
+// imports its carryOnPlatform(), and world/controllerLabWorld.mjs, worldColliderBVH.mjs, platformCarryWorld
+// .mjs and splatWalkWorld.mjs all drive it. So section 4 asks BOTH authorities: main's rows first and
+// unchanged, then the branch's own two rows (depenetrateCapsule + probeGround) as section 4b, because no
+// other gate proves a GLB-sourced collider is walkable by the capsule those callers use. The slope
+// disagreement above does not arise on this fixture -- a flat floor's normal-y of 1 passes both 0.5 and
+// cos 45 -- so the two halves cannot contradict each other here; this gate does not settle which rule wins.
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -30,6 +38,7 @@ const { writeSceneGlb } = await import(pathToFileURL(path.join(ENG, "tools", "ex
 const { GLBParser } = await import(pathToFileURL(path.join(ENG, "gpu", "GLBParser.js")).href);
 const { capsuleOf, depenetrate } = await import(pathToFileURL(path.join(ENG, "physics", "character", "capsuleMove.mjs")).href);
 const { capsuleGround } = await import(pathToFileURL(path.join(ENG, "physics", "character", "capsuleGround.mjs")).href);
+const { depenetrateCapsule, probeGround } = await import(pathToFileURL(path.join(ENG, "physics", "character", "capsuleCollide.mjs")).href);
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -99,7 +108,7 @@ console.log("\n3. A BAD INPUT FAILS LOUDLY, NOT WITH A SILENT EMPTY COLLIDER");
     ok("  a parsed-looking object missing positions/indices also throws", threw2);
 }
 
-console.log("\n4. THE RESULTING COLLIDER IS A REAL, WALKABLE SURFACE FOR THE BODY THIS TREE SHIPS");
+console.log("\n4. THE RESULTING COLLIDER IS A REAL, WALKABLE SURFACE FOR BOTH CAPSULES THIS TREE SHIPS");
 {
     // A big flat floor -- large enough for a capsule (radius 0.4) to rest on comfortably away from the edges.
     const floor = {
@@ -135,6 +144,17 @@ console.log("\n4. THE RESULTING COLLIDER IS A REAL, WALKABLE SURFACE FOR THE BOD
     const found = g(0, 0, 1);
     ok("  and the ground oracle finds the same floor from above",
        !!found && Math.abs(found.y - 0) < 1e-6, found ? `y=${found.y.toFixed(4)} n=[${found.n.map((v) => v.toFixed(2)).join(",")}]` : "null");
+
+    // 4b. The same floor, asked of physics/character/capsuleCollide.mjs (task #80), the branch's capsule
+    // that main.js's platform carry and the world/*World.mjs labs drive. depenetrateCapsule returns a NEW
+    // position rather than mutating, and reports `grounded` from the resolved contact's normal.
+    const embedded = depenetrateCapsule([0, -0.1, 0], 0.4, 1.8, colliderBVH);
+    ok("!! *** capsuleCollide's capsule embedded into the same GLB-sourced floor is pushed back out and grounded ***",
+       embedded.grounded === true && Math.abs(embedded.pos[1] - 0) < 1e-6, `settled y=${embedded.pos[1].toFixed(4)}`);
+
+    const probe = probeGround([0, 1, 0], 0.4, colliderBVH);
+    ok("  and capsuleCollide's probeGround finds the same floor from above",
+       !!probe && probe.standable !== false, probe ? `dist=${probe.dist.toFixed(3)}` : "null");
 }
 
 console.log();

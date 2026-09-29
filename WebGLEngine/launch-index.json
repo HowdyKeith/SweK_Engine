@@ -21,9 +21,9 @@
   }
  },
  "counts": {
-  "page": 473,
+  "page": 477,
   "demo": 49,
-  "builtin": 34
+  "builtin": 37
  },
  "entries": [
   {
@@ -1164,6 +1164,14 @@
   },
   {
    "kind": "page",
+   "id": "es-aircraft.html",
+   "display": "Es Aircraft",
+   "href": "/es-aircraft.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-away-mission.html",
    "display": "Es Away Mission",
    "href": "/es-away-mission.html",
@@ -1176,6 +1184,14 @@
    "display": "Es Box3d 3d",
    "href": "/es-box3d-3d.html",
    "section": "Game: Endless Sky",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-box3d-6dof.html",
+   "display": "Es Box3d 6dof",
+   "href": "/es-box3d-6dof.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1440,6 +1456,14 @@
    "display": "Fluid Webgpu",
    "href": "/fluid-webgpu.html",
    "section": "WebGPU",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fly-connectome.html",
+   "display": "Fly Connectome",
+   "href": "/fly-connectome.html",
+   "section": null,
    "collision": false
   },
   {
@@ -2871,6 +2895,14 @@
    "id": "rps.html",
    "display": "Rps",
    "href": "/rps.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rtx-viewer.html",
+   "display": "Rtx Viewer",
+   "href": "/rtx-viewer.html",
    "section": null,
    "collision": false
   },
@@ -4359,6 +4391,30 @@
    "id": "fp_control",
    "display": "First Person CONTROL — Your World (Round 31)",
    "href": "/?go=fp_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "controller_lab",
+   "display": "CONTROLLER LAB — Non Voxel Terrain + Capsule Collision",
+   "href": "/?go=controller_lab",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_walk",
+   "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
+   "href": "/?go=splat_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "platform_carry",
+   "display": "PLATFORM CARRY — Moving/Rotating Platform, Real CarryOnPlatform()",
+   "href": "/?go=platform_carry",
    "section": null,
    "collision": false
   },

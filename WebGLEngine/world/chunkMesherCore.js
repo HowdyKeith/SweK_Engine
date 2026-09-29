@@ -12,6 +12,8 @@
 //   verts:  3 floats per vertex, world-space (already offset by cx*S, cz*S)
 //   cols:   3 floats per vertex, RGB 0..1 (from palette by voxel id)
 //   aos:    1 float per vertex, 0=darkest 1=full ambient (corner AO)
+//   matIds: 1 int per TRIANGLE (not per vertex -- round 17, additive), the same absolute voxel id `cols`'
+//           own PALETTE lookup already used for that triangle's two shared vertices -- see emitQuad below.
 //   Each quad emits 6 vertices (2 triangles)
 
 export const PALETTE = (() => {
@@ -367,7 +369,7 @@ function greedy(mask, w, h, emit) {
 
 // Push 6 vertices (2 tris) for a quad. Uses cornerAO at each of the 4
 // corners. Sign of code determines winding + face direction.
-function emitQuad(verts, cols, aos, local, neighbors, S, H, cx, cz, d, u, v, slice, i, j, w, h, code, skipWater) {
+function emitQuad(verts, cols, aos, matIds, local, neighbors, S, H, cx, cz, d, u, v, slice, i, j, w, h, code, skipWater) {
     const A = _A, B = _B, C = _C, D = _D;
     const dPos = slice + 1;
     A[d] = dPos; B[d] = dPos; C[d] = dPos; D[d] = dPos;
@@ -424,17 +426,22 @@ function emitQuad(verts, cols, aos, local, neighbors, S, H, cx, cz, d, u, v, sli
     for (let k = 0; k < 6; k++) {
         cols.push(col[0], col[1], col[2]);
     }
+    // Round 17 -- one entry per TRIANGLE (not per vertex, unlike cols above): a quad is always 2 triangles, and
+    // both share the SAME voxel id -- physics/render/rtPipeline.mjs's own materialIndex contract is one integer
+    // per triangle, so this pushes exactly 2, not 6.
+    matIds.push(absCode, absCode);
 }
 
 // Main entry. Args:
 //   { voxels, neighbors, size, height, cx, cz, skipWater }
 // Returns:
-//   { verts: Float32Array, cols: Float32Array, aos: Float32Array }
+//   { verts: Float32Array, cols: Float32Array, aos: Float32Array, matIds: Int32Array }
 export function meshChunk(args) {
     const { voxels, neighbors, size: S, height: H, cx, cz, skipWater } = args;
     const verts = [];
     const cols = [];
     const aos = [];
+    const matIds = [];
     const dims = [S, H, S];
 
     for (let d = 0; d < 3; d++) {
@@ -476,7 +483,7 @@ export function meshChunk(args) {
                 }
             }
             greedy(mask, maskW, maskH, (i, j, w, h, code) => {
-                emitQuad(verts, cols, aos, voxels, neighbors, S, H, cx, cz, d, u, v, slice, i, j, w, h, code, skipWater);
+                emitQuad(verts, cols, aos, matIds, voxels, neighbors, S, H, cx, cz, d, u, v, slice, i, j, w, h, code, skipWater);
             });
         }
     }
@@ -490,6 +497,7 @@ export function meshChunk(args) {
         verts: new Float32Array(verts),
         cols:  new Float32Array(cols),
         aos:   new Float32Array(aos),
+        matIds: new Int32Array(matIds),
         slopeVerts:   slopes.verts,
         slopeNormals: slopes.normals,
         slopeCols:    slopes.cols,

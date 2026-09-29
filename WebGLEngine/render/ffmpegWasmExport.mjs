@@ -21,6 +21,35 @@
 // This is a SECOND road to the same destination, not a replacement for the first -- pick whichever platform
 // you're actually on.
 //
+// *** A THIRD ROAD WAS CHECKED AND RULED OUT: THE BROWSER'S OWN NATIVE WebCodecs VideoEncoder. *** media/
+// afDecode.js's own header already measured, decode-side, that this engine's Chromium has no H.264 --
+// "avc1 is unsupported for both encode and decode, while vp8 and vp09 are supported both ways" -- but that
+// measurement only ever exercised VideoDecoder.isConfigSupported(); this module is the one that would
+// actually benefit from a native ENCODE path (skip ffmpeg.wasm's ~30 MB fetch and its Worker entirely), so
+// the encode side was measured separately rather than assumed to match. Same box this session's own
+// server-side @napi-rs/webcodecs work ran on: the pre-installed headless Chromium (Chrome/141.0.7390.37),
+// driven via puppeteer-core against a REAL page served over http://127.0.0.1 -- a genuine secure context,
+// unlike a data: URL, which reports isSecureContext:false and was the first, wrong thing tried; WebCodecs
+// requires a secure context, so testing against the wrong kind of URL silently reports VideoEncoder itself
+// as undefined, not merely "unsupported", which looks identical to "this build has no WebCodecs at all"
+// unless you know to check isSecureContext first.
+//
+// VideoEncoder.isConfigSupported() result, three real avc1 profile/level strings against a genuine 640x480
+// config: avc1.42001f (baseline), avc1.4d0028 (main), avc1.640028 (high) -- ALL THREE supported:false. The
+// same box's vp8/vp09.00.10.08/av01.0.04M.08 configs all came back supported:true, matching afDecode.js's
+// own decode-side vp8/vp09 result exactly -- this is the SAME missing-proprietary-codec gap afDecode.js
+// already documented, now confirmed on the encode side too, not a different or newer restriction.
+//
+// NET: there is no "prefer native WebCodecs, fall back to ffmpeg.wasm" road worth building for H.264 on
+// this class of browser build -- native avc1 encode is unconditionally absent here, so the fallback would
+// always be taken, and there is no way to test the native-success path in this sandbox at all (it would
+// need an actual licensed Chrome/Edge build, which ships H.264 unlike the open-source Chromium project;
+// none is available here to verify against). Shipping an unexercised native-encode code path behind a gate
+// that can never fire in this environment would be exactly the kind of "verified" claim this session's own
+// discipline exists to rule out. If a future round has access to a real licensed browser build, this is
+// the specific measurement to re-run before writing that code, not something to assume from Chrome's
+// desktop reputation for supporting H.264 generally.
+//
 // USAGE: POST /ffwasm/install once (ai-bridge/ffmpegWasmBridge.js -- a real ~30 MB one-time WASM fetch, cached
 // locally forever after), confirm with ffmpegWasmReady(), then transcodeWebmToH264Mp4(webmBytes) runs the exact
 // command above and hands back real bytes. See ui/canvasRecorder.js's swekRecord.exportH264() for the wired-up

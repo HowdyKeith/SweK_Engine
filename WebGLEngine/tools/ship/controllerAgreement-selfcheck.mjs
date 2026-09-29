@@ -218,10 +218,15 @@ console.log("\n5. AN ABSENCE IS NOT A SITE, AND THE FIRST DRAFT OF THIS CENSUS C
     // land" is an integration of a vertical velocity followed by a clamp to a probed surface, and camera.js
     // had TWO of them -- _moveFP's airborne branch and _moveKaijuDrive's six lines -- beside fallBody's and
     // kinematic's. It now has NONE: both call fallStep. The shape is searched for rather than described.
-    const integrations = (camSrc.match(/^\s*this\._(?:fpVelY|kaijuDriveVelY)\s*[-+]=\s*this\._gravity/gm) || []);
+    const integrations = (camSrc.match(/this\._(?:fpVelY|kaijuDriveVelY)\s*[-+]=\s*this\._gravity/g) || []);
     const fallStepCalls = (camSrc.match(/fallStep\(\{/g) || []);
-    ok("!! *** camera.js INTEGRATES NO GRAVITY OF ITS OWN ANY MORE: TWO COPIES OUT, TWO CALLS IN ***",
-        integrations.length === 0 && fallStepCalls.length === 2 &&
+    // v4778 -- 2 -> 4 CALLS AT THE RTX MERGE, AND THE PATTERN ABOVE NOW MATCHES ANYWHERE ON A LINE. The merge brought two
+    // more fall paths into camera.js: _moveFPTerrain (non-voxel height-field worlds, task #13) and _moveFPCapsule
+    // (collider-BVH worlds, task #80). The terrain path was routed through fallStep at the merge; the capsule path
+    // arrived integrating gravity inline behind an `if`, which the old line-start pattern could not see. Both now
+    // call fallStep with the camera's gravity and terminal -Infinity, so the rule holds: four calls, zero copies.
+    ok("!! *** camera.js INTEGRATES NO GRAVITY OF ITS OWN ANY MORE: TWO COPIES OUT, EVERY FALL PATH A CALL ***",
+        integrations.length === 0 && fallStepCalls.length === 4 &&
         /Math\.max\(terminal,/.test(fbSrc) && /import \{ fallStep \}/.test(camSrc),
         integrations.length + " gravity integrations left in camera.js and " + fallStepCalls.length +
         " calls to fallStep. Before v4548 it was 2 and 0. fallBody is the one that clamps with " +

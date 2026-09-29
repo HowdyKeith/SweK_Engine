@@ -6816,6 +6816,13 @@ if (typeof window !== "undefined") {
 
 // ---- Their original imports (unchanged) ------------------------------
 import { Camera }         from "./camera/camera.js";
+import { VOXEL }          from "./world/voxelFormat.js";
+import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
+import { buildSplatWalkWorld, cloudToParsedSplats, SPAWN as SPLAT_WALK_SPAWN } from "./world/splatWalkWorld.mjs";   // task board #83's live demo
+import { platformWorldAt, ferryTransformAt, turntableTransformAt, onDeck, platformCarryVoxelColumns,
+         FERRY, TURNTABLE, SPAWN as PLATFORM_CARRY_SPAWN, RESPAWN_Y as PLATFORM_CARRY_RESPAWN_Y } from "./world/platformCarryWorld.mjs";   // task board #84's live demo
+import { carryOnPlatform } from "./physics/character/capsuleCollide.mjs";
+import { slabCloud } from "./physics/splat/splatMesh.mjs";
 import * as reproParams  from "./engine/reproParams.js";   // v1986 — ?seed/?cam/?preset deterministic repro
 import { makeGamepadInput } from "./input/gamepadInput.js";   // v1409 — XInput / gamepad
 import { VoxelWorld }     from "./world/world.js";
@@ -16696,6 +16703,7 @@ const DEMO_MODES = [
             "DEMO STARTS IN AUTOPLAY — the AI plays until you press a key or click",
             "WASD — move (FP camera ground-locked + collision)",
             "Mouse — aim (click canvas to engage pointer-lock)",
+            "V — toggle first/third person",
             "Click or Space — fire (HIT_RANGE=50, HIT_RADIUS=2.5)",
             "R — reload (1.5s, magazine of 30)",
             "Walk into health/ammo pickups to collect",
@@ -16756,6 +16764,7 @@ const DEMO_MODES = [
             "Q — fire current weapon · 1–8 — select weapon",
             "Shift — sprint (drains the bar) · C — hold for energy shield",
             "E — ally with a nearby civ · G — bounty shop when near an ally",
+            "V — toggle first/third person",
             "The energy bar recharges when you're not spending; fully spent = brief lockout",
             "ESC — exit back to the camera",
         ],
@@ -16766,6 +16775,328 @@ const DEMO_MODES = [
         },
         stop() { try { fpsShooter.stop(); } catch {} },
         tick() { /* fpsShooter.tick runs in the main render loop */ },
+    },
+    {
+        // Task board #13's live demo. Everything else that walks in first person in this array (fps,
+        // fp_control) does it on the SAME global voxel world through fpsShooter -- none of them exercise
+        // physics/character/capsuleCollide.mjs (task #80) or terrainWalk.mjs (task #13 Stage A) at all,
+        // because voxel worlds never take those code paths (camera.js's own _capsuleWorldBVH()/
+        // _terrainGroundOracle() both return null whenever world.voxelAt exists). This demo hands the
+        // camera a world with NO voxelAt and a colliderBVH instead, so walking it actually runs the new
+        // code -- see world/controllerLabWorld.mjs's own header for why the visible voxels and the
+        // invisible collider are two separate things built from the same numbers.
+        //
+        // Task board #85 -- two patrol bots now spawn into the SAME colliderBVH the player walks, via
+        // simulation/BotManager.js's own new _botCapsuleBVH()/_stepBotCapsule() dispatch (mirroring
+        // camera.js's _capsuleWorldBVH(), task #80). Every other bot in this engine still walks the global
+        // world/world.js voxel world via _heightAt, completely unaffected -- botManager.world is swapped to
+        // this demo's own collider only for its own duration and restored in stop().
+        id: "controller_lab",
+        autoplay: false,
+        label: "CONTROLLER LAB — non-voxel terrain + capsule collision",
+        terrain: true,       // keep the voxel visuals rendered
+        isolation: "quiet",  // a controlled space, no ambient sim competing for attention
+        hint: "task #13's ground-oracle + capsule-collision work, live: a ramp you can climb, one you can't, a wall corner, and a block that needs a jump",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision, a non-voxel world) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "Walk up the gentle ramp ahead; the steep one beside it refuses you -- same rule, same GROUND_SUPPORT_NORMAL_Y",
+            "The L-shaped wall to your left blocks you and lets you slide around the corner",
+            "The low block needs a jump -- walking into it alone does not get you on top",
+            "Two patrol bots (task #85) navigate the SAME L-corner wall -- watch them route around it, not walk through it",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            world.regenerate();
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            world.flatten({ floorY: 0 });
+            for (const [x, y, z] of controllerLabVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const { colliderBVH } = buildControllerLabWorld();
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = CONTROLLER_LAB_SPAWN.x;
+            camera.position.z = CONTROLLER_LAB_SPAWN.z;
+            camera.position.y = CONTROLLER_LAB_SPAWN.y + camera._eyeHeight;
+            camera.yaw = CONTROLLER_LAB_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            // Task #85 -- spawned near the L-corner's own inside pocket so their default random patrol
+            // (patrolTargetX/Z, +-8 units from spawn) has a real chance of needing to route around it.
+            window._controllerLabPrevBotWorld = botManager.world;
+            botManager.world = { colliderBVH };
+            window._controllerLabBotIds = [
+                botManager.spawn({ x: -14, z: -14, kind: "bot_grunt" })?.entityId,
+                botManager.spawn({ x: -12, z: -16, kind: "bot_grunt" })?.entityId,
+            ].filter((id) => id != null);
+
+            const hud = document.createElement("div");
+            hud.id = "controllerLabHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._controllerLabHud = hud;
+
+            // No fpsShooter here (it is voxel-coupled -- carve/place, weapons, dungeon spawning, none of
+            // which this demo wants), so ESC-exits-fp is this demo's own responsibility, scoped to itself
+            // and removed in stop() rather than left as a dangling global listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._controllerLabEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._controllerLabEscHandler) window.removeEventListener("keydown", window._controllerLabEscHandler); } catch {}
+            window._controllerLabEscHandler = null;
+            try { window._controllerLabHud?.remove(); } catch {}
+            window._controllerLabHud = null;
+            // Task #85 -- explicit despawn (belt+suspenders: main.js's own _hardResetEntities already clears
+            // window.bots on every demo switch) and restore botManager.world so every other bot goes back to
+            // navigating the real, persistent voxel world via _heightAt, exactly as before this round.
+            for (const id of (window._controllerLabBotIds || [])) {
+                try { if (botManager.bots.has(id)) botManager._onBotKilled(id); } catch {}
+            }
+            window._controllerLabBotIds = null;
+            botManager.world = window._controllerLabPrevBotWorld ?? world;
+            window._controllerLabPrevBotWorld = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._controllerLabHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // Task board #83. The SAME cloud buildSplatWalkWorld() rasterises into this demo's own collider (task
+        // #80's capsule-vs-BVH, via camera.js's task #13 Stage B path) is ALSO what gets rendered here, through
+        // render/SplatRenderer.js's real Gaussian-splat pipeline (gpu/SplatScene.js's splatScene singleton,
+        // already drawn every frame regardless of which demo is active) via this module's own
+        // cloudToParsedSplats() bridge -- not a voxel stand-in built from the same numbers (CONTROLLER LAB's
+        // approach, task #82), the literal same point cloud, walkable and visible because it is one dataset.
+        //
+        // No `terrain: true` here (unlike controller_lab) -- there is no voxel visual to keep, and omitting it
+        // already gives a clean, empty stage (main.js's own _applyIsolation: no terrain -> "clean" -- hides the
+        // voxel world/water/grass/kaiju/civ meshes, same effect controller_lab gets from `isolation: "quiet"`,
+        // for free) so the splat shell is the only geometry in view.
+        id: "splat_walk",
+        autoplay: false,
+        label: "SPLAT WALK — walking a live Gaussian-splat scene with capsule collision",
+        hint: "task #83: a hollow sphere of Gaussian splats, walked with the same capsule collision as CONTROLLER LAB -- the collider comes from rasterising the SAME cloud that gets rendered",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision against a splat-derived surface) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "You spawn falling a few units above the floor -- gravity settles you onto the real (slightly bumpy) rasterised surface",
+            "Walk toward the wall: the curved shell behaves like any other wall until the local slope gets too steep to stand on, then you slide back down",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            const { colliderBVH, cloud } = buildSplatWalkWorld();
+            splatScene.loadParsed(cloudToParsedSplats(cloud), "splatWalk", "splatWalkDemo");
+
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = SPLAT_WALK_SPAWN.x;
+            camera.position.z = SPLAT_WALK_SPAWN.z;
+            // this module's own SPAWN.y is the camera's EYE height directly (not a feet height + eyeHeight the
+            // way CONTROLLER_LAB_SPAWN is) -- matching exactly what tools/ship/splatWalkWorld-selfcheck.mjs's
+            // own freshCamera() already drives and verifies falls + settles correctly, rather than introducing
+            // an untested offset by analogy to a different demo's convention.
+            camera.position.y = SPLAT_WALK_SPAWN.y;
+            camera.yaw = SPLAT_WALK_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = false;   // spawns mid-air on purpose -- see world/splatWalkWorld.mjs's own header
+            camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "splatWalkHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._splatWalkHud = hud;
+
+            // Same reasoning as controller_lab: no fpsShooter here, so ESC-exits-fp is this demo's own
+            // responsibility, scoped to itself and removed in stop() rather than left as a dangling listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._splatWalkEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._splatWalkEscHandler) window.removeEventListener("keydown", window._splatWalkEscHandler); } catch {}
+            window._splatWalkEscHandler = null;
+            try { window._splatWalkHud?.remove(); } catch {}
+            window._splatWalkHud = null;
+            try { splatScene.removeLayer("splatWalkDemo"); } catch {}
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._splatWalkHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // Task board #84. physics/character/capsuleCollide.mjs's carryOnPlatform() (task #80) has been gated
+        // and correct since it shipped, and called from nowhere -- this demo is the live caller. A ferry
+        // TRANSLATES across a gap, a turntable ROTATES in place; carryOnPlatform's own distinguishing feature
+        // over "just add the platform's position delta" is the rotation half, which a translate-only demo
+        // would never actually exercise. camera.js and capsuleCollide.mjs are both UNMODIFIED by this demo
+        // (see capsuleCollide.mjs's own two-line qConj/qRotate export, the only change either file needed) --
+        // the carry itself runs entirely in this tick(), the same "thin main.js wiring over a gated world
+        // module" shape as controller_lab and splat_walk.
+        id: "platform_carry",
+        autoplay: false,
+        label: "PLATFORM CARRY — moving/rotating platform, real carryOnPlatform()",
+        hint: "task #84: cross a gap on a ferry, then stand on a spinning turntable -- both driven by capsuleCollide.mjs's own carryOnPlatform(), not a hand-waved position copy",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint · V — toggle first/third person",
+            "Walk onto the ferry while it is docked, then STAND STILL -- it carries you across the gap",
+            "Past the gap, a rotating turntable sweeps you around it if you stand off-centre and hold still",
+            "Falling into the gap resets you back to the start pad",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            // world.js's own flatten(): floorY >= 0 blanket-fills ONE layer across every chunk, including
+            // under the gap -- exactly the solid-looking-but-not-standable-on floor this demo must not have,
+            // since camera.setWorld({colliderBVH}) makes the voxel terrain physically irrelevant regardless of
+            // what is drawn there. floorY: -1 skips that fill and leaves a clean, fully empty world instead.
+            world.flatten({ floorY: -1 });
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            for (const [x, y, z] of platformCarryVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const w = platformWorldAt(0);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = PLATFORM_CARRY_SPAWN.x;
+            camera.position.z = PLATFORM_CARRY_SPAWN.z;
+            camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;   // SPAWN.y is the start pad's own flat surface (feet), unlike splat_walk's eye-height convention -- the pad's exact height is known, not something to fall and settle onto.
+            camera.yaw = PLATFORM_CARRY_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            // The ferry and turntable move and rotate, so (unlike the static pads' voxel stand-in) their
+            // visual is a splatWalkWorld.mjs-style splat deck: loaded once, repositioned every tick() via the
+            // renderer's own per-layer setPosition/setRotation rather than rebuilt -- see world/
+            // platformCarryWorld.mjs's own header for why the collider (no per-instance transform) and the
+            // visual (one) use two different techniques for the same moving geometry.
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: FERRY.halfExtents, n: 400 }), { colorLow: [130, 190, 235], colorHigh: [130, 190, 235] }), "platformCarryFerry", "platformCarryFerry");
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: TURNTABLE.halfExtents, n: 600 }), { colorLow: [235, 165, 110], colorHigh: [235, 165, 110] }), "platformCarryTurntable", "platformCarryTurntable");
+            splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+            splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+
+            window._platformCarryState = { time: 0, ferryXform: w.ferryXform, turntableXform: w.turntableXform };
+
+            const hud = document.createElement("div");
+            hud.id = "platformCarryHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._platformCarryHud = hud;
+
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._platformCarryEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._platformCarryEscHandler) window.removeEventListener("keydown", window._platformCarryEscHandler); } catch {}
+            window._platformCarryEscHandler = null;
+            try { window._platformCarryHud?.remove(); } catch {}
+            window._platformCarryHud = null;
+            try { splatScene.removeLayer("platformCarryFerry"); } catch {}
+            try { splatScene.removeLayer("platformCarryTurntable"); } catch {}
+            window._platformCarryState = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick(dt) {
+            const st = window._platformCarryState;
+            if (!st) return;
+
+            // The carry itself: while grounded, is the rider's own FEET within either platform's own PREVIOUS
+            // (last-resolved-against) footprint? If so, shift them by that platform's frame-to-frame delta
+            // BEFORE this frame's own gravity/input pass (already run earlier in the frame by camera.update())
+            // gets a chance to integrate on top of it next frame -- the same order tools/ship/
+            // platformCarryWorld-selfcheck.mjs's own stepWorld() helper already verified end to end.
+            if (camera._fpOnGround) {
+                const feet = [camera.position.x, camera.position.y - camera._eyeHeight, camera.position.z];
+                let xform = null;
+                if (onDeck(feet, st.ferryXform, FERRY.halfExtents)) xform = st.ferryXform;
+                else if (onDeck(feet, st.turntableXform, TURNTABLE.halfExtents)) xform = st.turntableXform;
+                if (xform) {
+                    const nextXform = xform === st.ferryXform ? ferryTransformAt(st.time + dt) : turntableTransformAt(st.time + dt);
+                    const carried = carryOnPlatform(feet, xform, nextXform);
+                    camera.position.x = carried[0];
+                    camera.position.y = carried[1] + camera._eyeHeight;
+                    camera.position.z = carried[2];
+                }
+            }
+
+            st.time += dt;
+            const w = platformWorldAt(st.time);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            st.ferryXform = w.ferryXform;
+            st.turntableXform = w.turntableXform;
+            try {
+                splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+                splatScene.setRotation(w.ferryXform.q[3], w.ferryXform.q[0], w.ferryXform.q[1], w.ferryXform.q[2], "platformCarryFerry");
+                splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+                splatScene.setRotation(w.turntableXform.q[3], w.turntableXform.q[0], w.turntableXform.q[1], w.turntableXform.q[2], "platformCarryTurntable");
+            } catch {}
+
+            // Fell into the gap -- back to the start pad, same "don't strand the player" safety controller_lab
+            // and splat_walk don't need (neither has a bottomless gap) but this demo's whole premise does.
+            if (camera.position.y - camera._eyeHeight < PLATFORM_CARRY_RESPAWN_Y) {
+                camera.position.x = PLATFORM_CARRY_SPAWN.x;
+                camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;
+                camera.position.z = PLATFORM_CARRY_SPAWN.z;
+                camera._fpVelY = 0;
+                camera._fpOnGround = true;
+            }
+
+            const hud = window._platformCarryHud;
+            if (hud && camera.mode === "fp") {
+                const state = camera.movementAnimState();
+                const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+                hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+            }
+        },
     },
     {
         // Round 220 — Voice Commander promoted to builtin. Demonstrates
@@ -27935,6 +28266,10 @@ ogreScenario._onWaveSpawned = (waveNumber, arena) => {
     _ogreTurretIds = ids || [];
     console.log(`[OgreArena] wave ${waveNumber}: ${_ogreTurretIds.length} turrets deployed`);
 };
+// Task #85 -- the raw manager, not just the wrapped window.bots API below: lets a caller (console, or a
+// live Playwright test) read an individual bot's own x/y/z/vy/onGround, matching how window.splatScene and
+// window.rigSystem already expose their own internals rather than only a curated subset.
+window._botManager = botManager;
 window.bots = {
     spawnAtPlayer: (opts) => botManager.spawnAtPlayer(opts || {}),
     spawn: (opts) => botManager.spawn(opts || {}),
@@ -29603,6 +29938,10 @@ window.addEventListener("keydown", (e) => {
     } else if (e.code === "KeyX" && camera.mode === "fp" && !e.repeat) {
         // Round 40 — emergency eject + nuclear self-destruct
         ejectSequence.trigger();
+    } else if (e.code === "KeyV" && camera.mode === "fp" && !e.repeat) {
+        // Round #13 Stage C (task board #81) — toggle first/third person.
+        const mode = camera.toggleViewMode();
+        window.toast?.show?.({ text: mode === "third" ? "Third-person" : "First-person", color: "#9cf", durationMs: 1500 });
     }
 });
 
@@ -30182,6 +30521,14 @@ function loop(t, xrFrame) {
                                              emphMode: k._emphMode === true,   // v19 -- rate-emphasis semantics (OGRE only)
                                              tier: k.absorbTier ?? 0, king: !!k.becameKing,
                                              x: k.position.x, z: k.position.z,
+                                             // Task board #90 -- real capsule-collision pressure at this kaiju's
+                                             // own live position, set every tick by KaijuManager.js's
+                                             // _resolveGroundKaijuPosition against the real per-chunk terrain
+                                             // collider (task #89). Undefined for a flying/swimming kind, or any
+                                             // kaiju that hasn't ticked through that path yet -- 0 (no hazard)
+                                             // is the same "nothing to report" default every other optional
+                                             // roster field on this object already gets.
+                                             hazard: k._hazard ?? 0,
                                              tx, tz, attacks: atks, packSize, tgtKid, tspd });
                         }
                     }
