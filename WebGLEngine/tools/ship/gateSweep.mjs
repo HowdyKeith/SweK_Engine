@@ -8739,7 +8739,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "writes it as null, which the page shows as an empty cell -- table() stores a non-finite number as its name and a missing " +
                  "one as \"none\"; object keys are strings, so three reports stored \"20\" and \"1.5\" as text until they were numbers " +
                  "again; and a one-row table with a numeric first column is plotted as a single point, so those three lead with a name. " +
-                 "fsrFlowCost read 21% against its 20% band beside three other device gates and 15% alone. Four sabotages red.",
+                 "fsrFlowCost read 21% against its 20% band beside three other device gates and 15% alone. Four sabotages red. " +
+                 "AND THE SECOND VERIFY FOUND recordReach's budget margin at 794 ms against an 800 ms floor: frozenRecords-selfcheck is " +
+                 "O(tree), and readSites' cheap reject scanned every source once per record name -- 847 ms of its 2,100. One regex of " +
+                 "the 77 names keeps the same 125 files in 38 ms, and the gate runs in 1,350; a pre-filter that drops names reddens " +
+                 "recordReach's control.",
     }),
     // v4779 -- THE 383rd CLOSING: the motion field where three draws and nowhere else -- the mesh zoo's gaps.
     since476: Object.freeze({

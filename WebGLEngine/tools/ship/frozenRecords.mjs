@@ -293,10 +293,14 @@ export function readSites(names, { root = ENG } = {}) {
     const want = [...names];
     const out = new Map(want.map((n) => [n, []]));
     if (!want.length) return out;
+    // v4780 -- the cheap reject is ONE regex of every name, not one includes() per name: the same substring test,
+    // the same 125 files kept of 4,496, in 38 ms against 847. Asked about v4487's 77 records, the per-name scan
+    // was 40% of frozenRecords-selfcheck's time and took recordReach's budget margin under its 800 ms floor.
+    const anyName = new RegExp(want.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
     for (const f of sources(root)) {
         if (!/\.(mjs|js|cjs)$/.test(f)) continue;
         let src = TR.textOf(f);
-        if (!want.some((n) => src.includes(n))) continue;         // cheap reject before the expensive work
+        if (!anyName.test(src)) continue;                          // cheap reject before the expensive work
         src = stripComments(src);
         RECORD_RE.lastIndex = 0;
         let m;
