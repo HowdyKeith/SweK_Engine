@@ -45,6 +45,16 @@ const raw = fs.readFileSync(PAGE, "utf8");
 const src = noComments(raw);
 const sm = /<script type="module">([\s\S]*?)<\/script>/.exec(raw);
 const code = sm ? sm[1].replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "") : "";
+// v4778 -- THE PAGE'S OWN SHADER TEXT, READ OUT OF THE PAGE AND HANDED TO SECTIONS 5 AND 5b. Until the merge
+// both sections carried a retyped copy of the pipeline, so "the same shaders" above was true only while
+// nobody edited the page, and carrying both languages put this gate in render/backendParity.mjs's census as
+// a gfx/device.js consumer of its own -- the shape v4459 and v4688 repaired at the cause rather than by
+// listing the gate. Taken by name from the page's module script; the gate spells no shader of its own.
+// SABOTAGE v4778: the page's fragment made to return the clear colour -> 4 red (this row, the blank-frame
+// row, the four-colours row, the near-white row). Against the retyped copies the same edit could not reach
+// a pixel. Reverted.
+const pageShader = (name) => { const m = new RegExp("const " + name + " = `([\\s\\S]*?)`;").exec(sm ? sm[1] : ""); return m ? m[1] : ""; };
+const SHADERS = { wgsl: pageShader("WGSL"), vertex: pageShader("GLSL_VERTEX"), fragment: pageShader("GLSL_FRAGMENT") };
 
 console.log("flyConnectomePage-selfcheck -- does the front door actually draw the circuit, and does the picker work?\n");
 
@@ -55,6 +65,9 @@ console.log("1. *** THE PAGE EXISTS, DECLARES ITSELF, AND PARSES ***");
     ok("it is a module script", /<script type="module">/.test(src));
     ok("!! and this gate actually extracted that script body", code.length > 1500, code.length + " chars extracted");
     ok("the inline script is balanced", (src.match(/<script/g) || []).length === (src.match(/<\/script>/g) || []).length);
+    ok("!! and its three shader texts were read out of it, for section 5 to draw with",
+        Object.values(SHADERS).every((s) => s.length > 40) && /U\.color/.test(SHADERS.wgsl) && /viewProj/.test(SHADERS.vertex),
+        Object.entries(SHADERS).map(([k, s]) => `${k} ${s.length} chars`).join(", "));
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +173,7 @@ console.log("\n4. *** THE REAL BROWSER: THE PAGE (DOM) AND THE PIPELINE (PIXELS)
 
         // ---- 5. THE PIPELINE, RENDERED OFFSCREEN (see the header comment for why not the live canvas) -----
         console.log("\n5. *** THE SAME PIPELINE, RENDERED OFFSCREEN, ACTUALLY DRAWS THE FOUR GFC COLORS ***");
-        const pixelResult = await pg.evaluate(async () => {
+        const pixelResult = await pg.evaluate(async (S) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { maleCnsBounds, maleCnsNeuronMeshes } = await import("/render/maleCnsLoader.mjs");
             const { perspective, lookAt, multiply } = await import("/render/gpuDriven.mjs");
@@ -175,24 +188,8 @@ console.log("\n4. *** THE REAL BROWSER: THE PAGE (DOM) AND THE PIPELINE (PIXELS)
             const bounds = maleCnsBounds(data);
             const neurons = maleCnsNeuronMeshes(data, bounds);
 
-            const WGSL = `struct Uniforms { viewProj: mat4x4<f32>, color: vec4<f32> };
-@group(0) @binding(0) var<uniform> U: Uniforms;
-struct VO { @builtin(position) pos: vec4<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>) -> VO { var o: VO; o.pos = U.viewProj * vec4<f32>(p, 1.0); return o; }
-@fragment fn fs() -> @location(0) vec4<f32> { return U.color; }`;
-            const GLSL_VERTEX = `#version 300 es
-precision highp float;
-in vec3 p;
-uniform mat4 viewProj;
-void main() { gl_Position = viewProj * vec4(p, 1.0); }`;
-            const GLSL_FRAGMENT = `#version 300 es
-precision highp float;
-uniform vec4 color;
-out vec4 fragColor;
-void main() { fragColor = color; }`;
-
             const pipe = device.pipeline({
-                shaders: { wgsl: WGSL, glsl: { vertex: GLSL_VERTEX, fragment: GLSL_FRAGMENT } },
+                shaders: { wgsl: S.wgsl, glsl: { vertex: S.vertex, fragment: S.fragment } },
                 attributes: [{ name: "p", size: 3, offset: 0 }], stride: 12,
                 uniforms: [{ name: "viewProj", type: "mat4" }, { name: "color", type: "vec4" }],
                 topology: "line-list",
@@ -232,7 +229,7 @@ void main() { fragColor = color; }`;
                 backend: device.backend, totalPixels: px.length / 4, nonBg, pipeError: pipe.error,
                 foundGFC1: near(EXPECTED.GFC1), foundGFC2: near(EXPECTED.GFC2), foundGFC3: near(EXPECTED.GFC3), foundGFC4: near(EXPECTED.GFC4),
             };
-        });
+        }, SHADERS);
 
         ok("!! the offscreen device is a real backend, not the recording null stub", pixelResult.backend !== "null" && pixelResult.backend !== undefined, String(pixelResult.backend));
         ok("!! the pipeline compiled with no error", !pixelResult.pipeError, String(pixelResult.pipeError));
@@ -243,7 +240,7 @@ void main() { fragColor = color; }`;
 
         // ---- 5b. THE GUNNER REPLAY'S ACTIVATION COLORING, OFFSCREEN, THE SAME WAY -------------------------
         console.log("\n5b. *** THE GUNNER REPLAY'S REAL ACTIVATIONS ALSO REACH REAL PIXELS ***");
-        const actPixels = await pg.evaluate(async () => {
+        const actPixels = await pg.evaluate(async (S) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { maleCnsBounds, maleCnsNeuronMeshes, colorForType, activationColor } = await import("/render/maleCnsLoader.mjs");
             const { perspective, lookAt, multiply } = await import("/render/gpuDriven.mjs");
@@ -262,23 +259,8 @@ void main() { fragColor = color; }`;
             let bestTick = 0, bestVal = -1;
             trace.ticks.forEach((tk, t) => { const m = Math.max(...tk.hidden); if (m > bestVal) { bestVal = m; bestTick = t; } });
 
-            const WGSL = `struct Uniforms { viewProj: mat4x4<f32>, color: vec4<f32> };
-@group(0) @binding(0) var<uniform> U: Uniforms;
-struct VO { @builtin(position) pos: vec4<f32> };
-@vertex fn vs(@location(0) p: vec3<f32>) -> VO { var o: VO; o.pos = U.viewProj * vec4<f32>(p, 1.0); return o; }
-@fragment fn fs() -> @location(0) vec4<f32> { return U.color; }`;
-            const GLSL_VERTEX = `#version 300 es
-precision highp float;
-in vec3 p;
-uniform mat4 viewProj;
-void main() { gl_Position = viewProj * vec4(p, 1.0); }`;
-            const GLSL_FRAGMENT = `#version 300 es
-precision highp float;
-uniform vec4 color;
-out vec4 fragColor;
-void main() { fragColor = color; }`;
             const pipe = device.pipeline({
-                shaders: { wgsl: WGSL, glsl: { vertex: GLSL_VERTEX, fragment: GLSL_FRAGMENT } },
+                shaders: { wgsl: S.wgsl, glsl: { vertex: S.vertex, fragment: S.fragment } },
                 attributes: [{ name: "p", size: 3, offset: 0 }], stride: 12,
                 uniforms: [{ name: "viewProj", type: "mat4" }, { name: "color", type: "vec4" }],
                 topology: "line-list",
@@ -308,7 +290,7 @@ void main() { fragColor = color; }`;
             let nearWhite = 0;
             for (let i = 0; i < px.length; i += 4) if (px[i] > 220 && px[i + 1] > 220 && px[i + 2] > 220) nearWhite++;
             return { bestTick, bestVal, nearWhite, totalPixels: px.length / 4, pipeError: pipe.error };
-        });
+        }, SHADERS);
         ok("!! the offscreen pipeline compiled with the activation-colored draw call too", !actPixels.pipeError, String(actPixels.pipeError));
         ok("!! *** THE TRAINED TRACE'S BRIGHTEST RECORDED MOMENT ACTUALLY PAINTS NEAR-WHITE PIXELS -- THE ACTIVATION REACHES THE GPU, NOT JUST A JS VARIABLE ***",
             actPixels.nearWhite > 0, `tick ${actPixels.bestTick} (max activation ${actPixels.bestVal}): ${actPixels.nearWhite} of ${actPixels.totalPixels} pixels near-white`);

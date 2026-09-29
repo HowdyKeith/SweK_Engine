@@ -177,6 +177,89 @@ const say = (m) => console.log("  ----  " + m);
         "WGSL has no function pointers and neither does WebRTX -- both compile the dispatch to a switch. " +
         "What makes it a table is that the INDEX comes out of a buffer, so adding a geometry never edits " +
         "the traversal");
+    // v4778 -- MEASURED_AT_V4418 was an export no gate named. Its three stage fields are the list above, read
+    // back: a record that says "four of five, any-hit missing" beside a list that says otherwise is a claim.
+    const m = R.MEASURED_AT_V4418;
+    ok("MEASURED_AT_V4418's stage fields are the STAGES list above, read back rather than restated",
+        m.stagesTotal === R.STAGES.length && m.stagesPresentInV4417Monolith === impl.length &&
+        R.STAGES.find((s) => !s.implemented)?.id === m.missing,
+        `${m.stagesPresentInV4417Monolith} of ${m.stagesTotal}, missing ${m.missing}; the list reads ${impl.length} of ` +
+        `${R.STAGES.length}. Naming the fifth stage is the day this row must be re-taken, on purpose`);
+}
+
+// ---- 1b. THE UNIFORM BLOCK'S SLOT MAP AND THE BINDING INDICES -- CPU ONLY, SO THEY RUN ON EVERY BOX -----------
+// v4778 -- five exports arrived with the rtx line that no gate named: albedoVec3 and the four slot/binding
+// constants below. MAX_GEOMETRY, unnamed on main since before the merge, is graded with them because the map
+// cannot be checked without it. Each is a number the WGSL and the packer must agree on, and a collision is
+// silent on the GPU: two options writing one vec4 do not fail to compile, the later one wins. So the map is
+// graded as a map -- every slot distinct and inside the 24-vec4 block the WGSL declares -- and each constant is
+// graded where it is WRITTEN (pipelineUniforms) against where it is READ (the generated WGSL).
+// SABOTAGED at v4778 on a scratch copy of rtPipeline.mjs, this section only, each restored: MESH_META_SLOT 20 -> 19,
+// albedoVec3 without its slice, ENV_BINDING 10 -> 9, the msTable meta written at ENV_META_SLOT, nodeCount and
+// triCount swapped in the mesh meta -> 1 red each, by name; MAX_GEOMETRY 4 -> 5 -> 2 red (the map and the refusal).
+// Counted in THIS section. On a box with an adapter the msTable one also turns section 14's six msComp agreement
+// rows red (re-run at v4778 on this box: 7 in all) -- the GPU saw it too; this row is the one that says where.
+{
+    const src = R.pipelineWgsl({});
+    const GEO = +(src.match(/const GEO_BASE : i32 = (\d+);/) || [])[1];
+    const SBT = +(src.match(/const SBT_BASE : i32 = (\d+);/) || [])[1];
+    const BLOCK = +(src.match(/var<uniform> U : array<vec4<f32>, (\d+)>/) || [])[1];
+    const slots = [0, 1, 2, 3, 4];                                            // eye, fwd, view, right, camUp
+    for (let i = 0; i < R.MAX_GEOMETRY; i++) slots.push(GEO + i, SBT + i);
+    slots.push(R.MESH_META_SLOT, R.MESH_SBT_SLOT, R.ENV_META_SLOT, R.MS_TABLE_SLOT);
+    ok("!! every uniform slot is distinct and inside the block the WGSL declares -- MAX_GEOMETRY included",
+        BLOCK === 24 && slots.every((s) => Number.isInteger(s) && s >= 0 && s < BLOCK) && new Set(slots).size === slots.length,
+        `${slots.length} slots in a ${BLOCK}-vec4 block: geometry ${GEO}..${GEO + R.MAX_GEOMETRY - 1}, SBT ` +
+        `${SBT}..${SBT + R.MAX_GEOMETRY - 1}, mesh ${R.MESH_META_SLOT}/${R.MESH_SBT_SLOT}, env ${R.ENV_META_SLOT}, ` +
+        `msTable ${R.MS_TABLE_SLOT}. A fifth geometry would write SBT slot ${SBT + R.MAX_GEOMETRY}, which is ` +
+        "MESH_META's, and the refusal below is the only thing that keeps it out");
+    ok("pipelineUniforms refuses MAX_GEOMETRY + 1 records and packs MAX_GEOMETRY",
+        (() => { try { R.pipelineUniforms(Array.from({ length: R.MAX_GEOMETRY + 1 }, () => R.sbtRecord({}))); return false; }
+                 catch (e) { return /at most 4 geometries/.test(e.message); } })() &&
+        R.pipelineUniforms(Array.from({ length: R.MAX_GEOMETRY }, () => R.sbtRecord({}))).length === BLOCK * 4,
+        "a bound checked at the packer, because the WGSL has no way to notice");
+
+    const slot = (U, s) => [...U.subarray(s * 4, s * 4 + 4)];
+    const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    const uMesh = R.pipelineUniforms([], { bvh: { nodeCount: 5, triCount: 12, hit: "lambertian", albedo: 0.5 } });
+    ok("MESH_META_SLOT: the packer writes [hasMesh, nodeCount, triCount, 0] there and the bvh WGSL reads it there",
+        same(slot(uMesh, R.MESH_META_SLOT), [1, 5, 12, 0]) &&
+        R.pipelineWgsl({ bvh: true }).includes(`const MESH_META : i32 = ${R.MESH_META_SLOT};`),
+        `U[${R.MESH_META_SLOT}] = [${slot(uMesh, R.MESH_META_SLOT)}]`);
+    const uEnv = R.pipelineUniforms([], { envMap: { width: 48, height: 8 } });
+    ok("ENV_META_SLOT: the packer writes [atlasWidth, faceSize, 0, 0] there and the envMap WGSL reads it there",
+        same(slot(uEnv, R.ENV_META_SLOT), [48, 8, 0, 0]) &&
+        R.pipelineWgsl({ envMap: true }).includes(`const ENV_META : i32 = ${R.ENV_META_SLOT};`) &&
+        same(slot(uEnv, R.MESH_META_SLOT), [0, 0, 0, 0]),
+        `U[${R.ENV_META_SLOT}] = [${slot(uEnv, R.ENV_META_SLOT)}], and the mesh slot beside it stays zero, which ` +
+        "is what tells the WGSL there is no mesh");
+    const T = buildTable(0.5, { K: 12 });
+    const uMs = R.pipelineUniforms([R.sbtRecord({ hit: "microfacet", roughness: 0.5, msTable: T })], { microfacet: "bsdf", msComp: true });
+    ok("MS_TABLE_SLOT: the packer writes [K, Eavg] there and the msComp WGSL reads both from there",
+        same(slot(uMs, R.MS_TABLE_SLOT), [T.K, Math.fround(T.Eavg), 0, 0]) &&
+        R.pipelineWgsl({ microfacet: "bsdf", msComp: true }).includes(`U[${R.MS_TABLE_SLOT}].x`) &&
+        R.pipelineWgsl({ microfacet: "bsdf", msComp: true }).includes(`U[${R.MS_TABLE_SLOT}].y`),
+        `U[${R.MS_TABLE_SLOT}] = [${slot(uMs, R.MS_TABLE_SLOT).map((v) => +v.toFixed(6))}] for K=${T.K}`);
+
+    const bindings = [0, 1, 6, ...Object.values(R.BVH_BINDINGS), R.ENV_BINDING, R.MS_TABLE_BINDING];   // 6 = the probes' rays
+    ok("ENV_BINDING: distinct from every other binding, declared there by the WGSL, and envMapTexture's default",
+        new Set(bindings).size === bindings.length &&
+        R.pipelineWgsl({ envMap: true }).includes(`@binding(${R.ENV_BINDING}) var tAtlas`) &&
+        R.envMapTexture({ width: 1, height: 1, data: null }).binding === R.ENV_BINDING,
+        `bindings ${bindings.join(", ")}: an atlas bound on a storage buffer's index is a device validation error ` +
+        "with no word in it about which option collided");
+
+    const g = R.albedoVec3(0.25), tri = [0.25, 0.5, 0.75, 9], t = R.albedoVec3(tri);
+    t[0] = -1;
+    ok("albedoVec3 broadcasts a scalar, cuts a longer array to three, and hands back a copy",
+        same(g, [0.25, 0.25, 0.25]) && same(R.albedoVec3(tri), [0.25, 0.5, 0.75]) && tri[0] === 0.25,
+        "pathTracer.mjs's col() shape; a copy because the SBT packer spreads it and a caller's array must not move");
+    const uRgb = R.pipelineUniforms([R.sbtRecord({ albedo: [0.25, 0.5, 0.75] })], { rgb: true });
+    const uScalar = R.pipelineUniforms([R.sbtRecord({ albedo: [0.25, 0.5, 0.75] })], {});
+    ok("...and it is what the rgb SBT record carries, where the scalar record keeps the first channel only",
+        same(slot(uRgb, SBT), [R.HIT_SHADERS.lambertian, ...R.albedoVec3([0.25, 0.5, 0.75])]) &&
+        same(slot(uScalar, SBT), [R.HIT_SHADERS.lambertian, 0.25, 0, 0]),
+        `rgb [${slot(uRgb, SBT)}], scalar [${slot(uScalar, SBT)}]`);
 }
 
 const skip = webgpuSkipReason();
@@ -554,6 +637,32 @@ const rec = R.sbtRecord;
         }),
         "the exact regression this section's header describes: a mesh whose normals point inward renders " +
         "near-black instead of failing loudly, so this is checked by name rather than left to be noticed again");
+
+    // v4778 -- MEASURED_SHADING_ROUND was an export no gate named, so the record could drift from what this
+    // section measures without anything noticing. Each field is held to the reading taken above. The integer
+    // fields are exact; maxDelta is one adapter's f32 rounding and is held to within one f32 ulp at 1.0 of the
+    // recorded 1.176e-7, the unit a colour in [0,1] is stored in. windingBugFound is re-derived: the cube with
+    // every triangle turned back to the pre-fix winding must read inward on exactly the recorded count.
+    // READ at v4778 through this box's webgpuHarness: 0 of 1728, 24 of 24, 0, max 1.176e-7, 12 of 12 -- the record,
+    // every field. SABOTAGED on a scratch copy, restored: maxDelta recorded as 5e-7 -> this row red, alone.
+    const S = R.MEASURED_SHADING_ROUND, W = S.windingBugFound;
+    const inward = shadeIndices.map(([a, b, c]) => [a, c, b]).filter(([a, b, c]) => {
+        const A = positions[a], B = positions[b], C = positions[c];
+        const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+        const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        return n[0] * (A[0] + B[0] + C[0]) + n[1] * (A[1] + B[1] + C[1]) + n[2] * (A[2] + B[2] + C[2]) < 0;
+    }).length;
+    ok("MEASURED_SHADING_ROUND is what this section measured, field by field",
+        rgbBad === S.rgbSpheresStillExact.differing && rgbCpu.length === S.rgbSpheresStillExact.of &&
+        shadeChecked === S.vertexColourVsBaryAt.raysHit && shadeRayCount === S.vertexColourVsBaryAt.of &&
+        shadeBad === S.vertexColourVsBaryAt.disagree &&
+        Math.abs(maxShadeDelta - S.vertexColourVsBaryAt.maxDelta) <= 2 ** -23 &&
+        W.of === shadeIndices.length && inward === W.trianglesAffected,
+        `rgb ${rgbBad} of ${rgbCpu.length} (recorded ${S.rgbSpheresStillExact.differing} of ${S.rgbSpheresStillExact.of}); ` +
+        `vertex colour ${shadeChecked} of ${shadeRayCount} hit, ${shadeBad} disagree, max ${maxShadeDelta.toExponential(3)} ` +
+        `(recorded ${S.vertexColourVsBaryAt.raysHit}/${S.vertexColourVsBaryAt.of}, ${S.vertexColourVsBaryAt.disagree}, ` +
+        `${S.vertexColourVsBaryAt.maxDelta}); rewound cube ${inward} of ${shadeIndices.length} inward ` +
+        `(recorded ${W.trianglesAffected} of ${W.of})`);
 }
 
 // ---- 8. MULTI-MATERIAL: THE SBT OFFSET, PER TRIANGLE, WITHIN ONE BLAS -----------------------------------------

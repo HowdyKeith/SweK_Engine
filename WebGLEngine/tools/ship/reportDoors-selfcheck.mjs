@@ -73,7 +73,7 @@ import { gateReport } from "./gateReport.mjs";
 import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
          CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565,
-         NO_GATE_V4540, NO_GATE_V4587, UNGATED_ANYWHERE_V4565,
+         NO_GATE_V4540, NO_GATE_V4587, NO_GATE_V4778, UNGATED_ANYWHERE_V4565,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -291,7 +291,8 @@ console.log("\n6. who provides the convention and cannot check it");
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
        `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458, ` +
        `${NO_GATE_V4531.length} at v4531, ${NO_GATE_V4565.length} at v4565, ${NO_GATE_V4540.length} at ` +
-       `v4540 and ${NO_GATE_V4587.length} at v4587 -- the v4540 one arriving through a MERGE rather than ` +
+       `v4540, ${NO_GATE_V4587.length} at v4587 and ${NO_GATE_V4778.length} at v4778 -- the v4540 and v4778 ` +
+       "ones arriving through a MERGE rather than " +
        "through the round that wrote it, which is the case a per-branch ratchet cannot see and a union one " +
        "can. They are LISTED so that " +
        "adding a member without a gate fails here " +

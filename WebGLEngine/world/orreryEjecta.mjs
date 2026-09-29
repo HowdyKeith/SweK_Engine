@@ -298,6 +298,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // substring anywhere, so the rule saw NO dependant at all: the same invisibility as path.join, one level up.
     "kenney-city": Object.freeze([
         "world/kenneyKit.mjs",
+        // v4778 -- the rtx line, merged: rtx-viewer.html fetches /vendor/kenney-city/models/pavement.glb as its
+        // default scene and its gate reads the same file off disk to trace it. Two genuine readers; that line
+        // never re-took this record, so the merge does.
+        "rtx-viewer.html",
+        "tools/ship/rtViewer-selfcheck.mjs",
     ]),
     "kenney-racing": Object.freeze([
         "world/kenneyKit.mjs",
@@ -370,6 +375,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "cosmic-web.html",
         "es-box3d-3d.html",
         "es-box3d-fly3d.html",
+        // v4778 -- the rtx line, merged: its two 6DOF pages import three.module.js and OrbitControls through an
+        // importmap, the same shape as the es-box3d pages beside them. Two arrivals, none gone.
+        "es-aircraft.html",
+        "es-box3d-6dof.html",
         "ev/esShipModels.js",
         "ev/spriteHull.js",
         "eve.html",
@@ -514,6 +523,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/temporalTslZoo-selfcheck.mjs",
         "render/translucentLayer-selfcheck.mjs",
         "tools/ship/threePatch.mjs",
+        // v4778 -- the rtx line, merged: the batched GPU capsule kernel's gate imports three.webgpu.js and
+        // three.tsl.js to run physics/character/capsuleCollideTsl.mjs, like the TSL rows above. One arrival.
+        "tools/ship/capsuleCollideTsl-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",
@@ -529,6 +541,28 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // grade this tree's own unwrapper against the recorded numbers, which is why the record is hash-pinned.
     "xatlas": Object.freeze([
         "tools/mesh/xatlasRef.mjs",
+    ]),
+    // v4778 -- two bodies arrived with the rtx line and no entry, which importPosition-selfcheck's "every vendored
+    // body has an entry" row turned red on. Both lists are dependantsOf() over engineSources() at the merge, run,
+    // not typed. vendor/male-cns (Janelia's connectome circuits, baked JSON): 8 dependants; the substring rule
+    // sees 10, and the three it wrongly keeps (es-box3d-fly3d.html, race-brain.html, server.html) name the body
+    // inside a sentence -- a citation, a comment, a record -- while tools/bakeGfcTopology.mjs is a `joined`
+    // (path.join(ROOT, "vendor", "male-cns", ...)) the substring rule never saw.
+    "male-cns": Object.freeze([
+        "brain/gunnerPolicy-selfcheck.mjs",
+        "fly-connectome.html",
+        "tools/bakeGfcTopology.mjs",
+        "tools/maleCnsBake.mjs",
+        "tools/maleCnsLoader-selfcheck.mjs",
+        "tools/ship/drivePolicy-selfcheck.mjs",
+        "tools/ship/flyConnectomePage-selfcheck.mjs",
+        "tools/ship/pilotPolicy-selfcheck.mjs",
+    ]),
+    // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
+    // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the
+    // v4410 case this record exists for, and the positional rule's `joined` kind is what finds it.
+    "mikktspace": Object.freeze([
+        "tools/mesh/mikktRef.mjs",
     ]),
 });
 

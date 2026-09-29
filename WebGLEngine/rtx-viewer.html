@@ -30,6 +30,7 @@
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
 import { requestDevice } from "/gfx/device.js";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { loadMeshBvh, loadCityBvh, makeRtSession, orbitEye, dragOrbit, dollyOrbit } from "/render/rtViewer.mjs";
 
 const cvs = document.getElementById("c"), beEl = document.getElementById("be"), subEl = document.getElementById("sub");
@@ -113,7 +114,12 @@ function loop() {
 
 async function main() {
     if (!navigator.gpu) {
-        return fail("navigator.gpu is not available in this browser -- the ray-tracing kernel is a compute " +
+        // v4778 -- ask the probe before naming a cause: over a LAN address the browser HAS WebGPU and withholds
+        // it from an insecure origin, and "not available in this browser" sent the reader to the wrong fix.
+        const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+        showOriginBanner(p);
+        const cause = p.reason === "insecure-origin" ? p.message : "navigator.gpu is not available in this browser";
+        return fail(cause + " -- the ray-tracing kernel is a compute " +
             "shader, and WebGL2 (this tree's other backend) has no compute stage to fall back to.");
     }
     try { device = await requestDevice(cvs, { backend: "webgpu" }); }

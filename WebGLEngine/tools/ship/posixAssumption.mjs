@@ -249,7 +249,14 @@ export const POSIX_AT_V4485 = Object.freeze({
     // the idiom still accounts for 57 of `normalised`. Taken with every conflicted file keeping BOTH sides
     // (temporalResolve-selfcheck, quickSweep, sweepCoverage-selfcheck from main; webgpuHarness from the other
     // arc); a resolution that drops one of them moves this by one caller, and that is a re-take, not a widening.
-    separator: Object.freeze({ callers: 166, calls: 227, normalised: 113, never: 53 }),
+    // v4778 -- 166/227/113/53 -> 171/236/115/56 at the rtx merge, under the same rule and skip list, measured
+    // on the merged tree and on main just before it (888f776d^1) and the two diffed file by file. Main alone
+    // had already moved to 166/226/114/52: tools/ship/runnerCallers.mjs went from two raw calls to one
+    // normalising call in v4776's post-merge pass, a repair. The rtx line brought five callers and ten calls --
+    // tools/bakeConnectomeTopology.mjs (normalises), tools/bakeGfcTopology.mjs, tools/bakeGunnerTrace.mjs,
+    // tools/maleCnsBake.mjs and tools/mesh/mikktRef.mjs (do not). NOTHING WAS UN-NORMALISED; the five are one
+    // past the band's +/- 4, which is why this is a re-take and not a tolerance.
+    separator: Object.freeze({ callers: 171, calls: 236, normalised: 115, never: 56 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

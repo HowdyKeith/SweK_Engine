@@ -134,7 +134,7 @@ import { render as renderCpu } from "./pathTracer.mjs";
 // first caller to import this module from inside a browser page rather than from Node.
 import { LCG } from "./lcgConstants.mjs";
 import { VIEW, MAX_DEPTH, EPS, notExactInF32, dyadic, powerOfTwo } from "./pathTracerGpu.mjs";
-import { MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
+import { MeshBVH, trianglesFrom, baryAt } from "../../mesh/meshBVH.mjs";   // baryAt: the shade probe's twin (PROBES, below)
 // RTX round 7 -- dirToFaceW is imported VERBATIM (a JS string constant, not hand-retyped) because it is
 // non-trivial branching logic this tree already shares this way: specularProbeCapture.mjs's own CAPTURED_ENV_WGSL
 // imports it from here too, rather than retyping it a fourth time. sampleCapturedCubemap is the CPU oracle for
@@ -1878,10 +1878,64 @@ export const MEASURED_MATERIALS_ROUND = Object.freeze({
 // v4468 -- the probe manifest (docs/GPU-KERNEL-CONTRACT.md): a two-record LAMBERTIAN table (the CPU tracer has no
 // mirror), the twin delegated to pathTracer.mjs, tolerance zero on dyadic albedos. The corpus's mirror entry is the
 // cross-backend claim; this one is the CPU claim.
+// The BVH probes' fixture -- the unit cube, its rays and its per-vertex gradient exactly as tools/ship/wgslCorpus.mjs
+// drives them, so the manifest and the corpus run the same kernel on the same data.
+const PROBE_CUBE = (() => {
+    const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+    const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+    const centroids = [];
+    for (const [a, b, c] of indices) {
+        const o = [0, 1, 2].map((k) => (positions[a][k] + positions[b][k] + positions[c][k]) / 3 * 5), l = Math.hypot(...o);
+        centroids.push(...o, -o[0] / l, -o[1] / l, -o[2] / l);
+    }
+    return Object.freeze({ positions, indices, colors: positions.map((_, i) => [i / 7, 1 - i / 7, 0.5]),
+        materialIndex: indices.map((_, i) => i % 2), records: [{ hit: "lambertian", albedo: 0.9 }, { hit: "lambertian", albedo: 0.1 }],
+        sweep: new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
+                                 -5, -5, -5, 1, 1, 1, 10, 10, 10, 1, 1, 1, 2, 2, -5, 0, 0, 1, 0.9, 0.9, -5, 0, 0, 1]),
+        shadeSweep: new Float32Array([0, 0, -5, 0, 0, 1, 0, 0, 5, 0, 0, -1, 5, 0, 0, -1, 0, 0, 0, 5, 0, 0, -1, 0,
+                                      -3, -3, -3, 1, 1, 1, 3, -3, -3, -1, 1, 1, 3, 3, -3, -1, -1, 1, -3, 3, -3, 1, -1, 1]),
+        centroids: new Float32Array(centroids) });
+})();
 const PROBE_SBT = Object.freeze([sbtRecord({ centre: [-1.2, 0, 0], radius: 0.6, albedo: 0.5 }), sbtRecord({ centre: [1.2, 0, 0], radius: 0.6, albedo: 0.25 })]);
 export const PROBES = Object.freeze([Object.freeze({
     id: "rtPipeline.pipelineWgsl", code: () => pipelineWgsl({}), entryPoint: "main",
     args: Object.freeze({ sbt: PROBE_SBT, spp: 16, view: VIEW, eps: 1e-4 }),
     pack: (a) => pipelineUniforms(a.sbt, a), cpu: (a) => Float32Array.from(renderSbtCpu(a.sbt, a)), outCount: VIEW.w * VIEW.h, workgroups: Math.ceil(VIEW.w * VIEW.h / 64), tol: 0,
     key: () => ({ exact: tablePreconditions(PROBE_SBT, 16).exact, stages: STAGES.length }),
-})]);
+}),
+    // v4778 -- THE THREE BVH PROBES, ARRIVED WITH THE RTX LINE WITH CORPUS ENTRIES AND NO MANIFEST ENTRY, which is
+    // the census row probeConvention-selfcheck exists to turn red. Each runs the corpus's own fixture (the unit
+    // cube, the same rays) against a CPU twin that is NOT the kernel: mesh/meshBVH.mjs's raycastFirst() for the
+    // hit, its independent baryAt() for the colour, and the caller's own materialIndex/records for the lookup.
+    // MEASURED at v4778 on Dawn: all three 16/16, 24/24 and 36/36 exact. The shade and material probes are
+    // held to 0 on that; the traversal names its gate instead, because its first ray lands on the diagonal
+    // two triangles share, and which of the two a ray on an edge reports is a tie rtPipeline-selfcheck grades
+    // as a tie -- exact today is a measurement, not a claim.
+    Object.freeze({ id: "rtPipeline.bvhProbeWgsl", code: (a) => bvhProbeWgsl(a.rays.length / 6), entryPoint: "main",
+        args: Object.freeze({ bvh: bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices), rays: PROBE_CUBE.sweep }),
+        pack: () => null, inputs: (a) => [...bvhInputs(a.bvh), { binding: 6, data: a.rays }],
+        outCount: (a) => a.rays.length / 3, workgroups: (a) => Math.ceil(a.rays.length / 6 / 64),
+        cpu: (a) => { const n = a.rays.length / 6, out = new Float32Array(2 * n);
+            for (let i = 0; i < n; i++) { const h = a.bvh.bvh.raycastFirst(...a.rays.subarray(6 * i, 6 * i + 6)); out[2 * i] = h ? h.t : -1; out[2 * i + 1] = h ? h.tri : -1; }
+            return out; },
+        graded: "physics/render/rtPipeline-selfcheck.mjs -- a ray on an edge two triangles share may report either; that gate grades the tie as a tie",
+        key: () => ({ rays: PROBE_CUBE.sweep.length / 6, tris: PROBE_CUBE.indices.length }) }),
+    Object.freeze({ id: "rtPipeline.bvhShadeProbeWgsl", code: (a) => bvhShadeProbeWgsl(a.rays.length / 6), entryPoint: "main",
+        args: Object.freeze({ bvh: bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices, { colors: PROBE_CUBE.colors }), rays: PROBE_CUBE.shadeSweep }),
+        pack: () => null, inputs: (a) => [...bvhInputs(a.bvh), { binding: 6, data: a.rays }],
+        outCount: (a) => a.rays.length / 2, workgroups: (a) => Math.ceil(a.rays.length / 6 / 64), tol: 0,
+        cpu: (a) => { const n = a.rays.length / 6, out = new Float32Array(3 * n).fill(-1), C = PROBE_CUBE.colors;
+            for (let i = 0; i < n; i++) { const h = a.bvh.bvh.raycastFirst(...a.rays.subarray(6 * i, 6 * i + 6)); if (!h) continue;
+                const w = baryAt(a.bvh.bvh.tris, h.tri * 9, h.point[0], h.point[1], h.point[2]), v = PROBE_CUBE.indices[h.tri];
+                for (let k = 0; k < 3; k++) out[3 * i + k] = w[0] * C[v[0]][k] + w[1] * C[v[1]][k] + w[2] * C[v[2]][k]; }
+            return out; },
+        key: () => ({ rays: PROBE_CUBE.shadeSweep.length / 6, colours: PROBE_CUBE.colors.length }) }),
+    Object.freeze({ id: "rtPipeline.bvhMaterialProbeWgsl", code: (a) => bvhMaterialProbeWgsl(a.rays.length / 6), entryPoint: "main",
+        args: Object.freeze({ bvh: bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices, { materialIndex: PROBE_CUBE.materialIndex }),
+            sbt: meshSbtBuffer(PROBE_CUBE.records, { rgb: true }), rays: PROBE_CUBE.centroids }),
+        pack: () => null, inputs: (a) => [...bvhInputs(a.bvh), { binding: 6, data: a.rays }, { binding: BVH_BINDINGS.meshSbt, data: a.sbt }],
+        outCount: (a) => a.rays.length / 2, workgroups: (a) => Math.ceil(a.rays.length / 6 / 64), tol: 0,
+        cpu: () => { const out = new Float32Array(3 * PROBE_CUBE.indices.length);
+            PROBE_CUBE.materialIndex.forEach((m, t) => out.fill(PROBE_CUBE.records[m].albedo, 3 * t, 3 * t + 3)); return out; },
+        key: () => ({ tris: PROBE_CUBE.indices.length, records: PROBE_CUBE.records.length }) }),
+]);

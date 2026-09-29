@@ -278,6 +278,16 @@ export const MEASURED_RUNS = Object.freeze({
         runs: Object.freeze([{ ms: 9114, code: 0 }, { ms: 9404, code: 0 }, { ms: 9009, code: 0 },
                              { ms: 11565, code: 0 }]),
     }),
+    // Run here at v4778, seven times one after another, `date +%s%3N` around the process (the first with %N),
+    // on a box other sessions were also using (load average 2.1 to 3.1). FOUR EXITED 0 AND ARE THE ROWS. The
+    // other three exited 1 at 65133, 65069 and 65007 ms on the gate's own real-time rows (the tick counter
+    // reached 28-31 in its window; fleet hp did not drop) and are NOT rows, because a failing run is not a
+    // completion -- though all seven landed within 126 ms of each other, the cost being the page's fixed waits.
+    "tools/ship/rigidBody6dofPage-selfcheck.mjs": Object.freeze({
+        observedHere: true, at: "v4778",
+        runs: Object.freeze([{ ms: 65078, code: 0 }, { ms: 65051, code: 0 }, { ms: 65022, code: 0 },
+                             { ms: 65041, code: 0 }]),
+    }),
 });
 
 /**
@@ -398,6 +408,10 @@ export const MEASURED = {
     // speeds on box3d, and opens two browsers (both backends with five read-backs each, then the page). Over the quick sweep's 3 s
     // budget by three times. THREE RUNS ALONE, ALL EXIT 0, the rows in MEASURED_RUNS.
     "tools/ship/crashDamage-selfcheck.mjs": slowestRun("tools/ship/crashDamage-selfcheck.mjs"),
+    // *** v4778 -- MEASURED AFTER ARRIVAL, NOT AT BIRTH. *** tools/ship/rigidBody6dofPage-selfcheck.mjs came in with the rtx merge
+    // with no evidence of its cost: it boots es-box3d-6dof.html in one browser and watches a fight in real time, so the quick
+    // sweep's 20 s kill takes it every time (a 124, which says nothing). FOUR RUNS ALONE THAT EXITED 0, the rows in MEASURED_RUNS.
+    "tools/ship/rigidBody6dofPage-selfcheck.mjs": slowestRun("tools/ship/rigidBody6dofPage-selfcheck.mjs"),
     // *** v4173 -- MEASURED TO COMPLETION FOR THE FIRST TIME, WHICH UNRESOLVED'S OWN HEADER INSTRUCTS. ***
     // 1140363 ms, EXIT 0, all checks passing -- 87 devices, 306 modes, every one built. It had been listed
     // as "exceeded a 150s cap at v3924" ever since, on the 309 s DEFAULT.

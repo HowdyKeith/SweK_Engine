@@ -238,11 +238,16 @@ console.log("\n4. THE CONTRACT, AND THE READ THAT WAS UNGUARDED UNTIL THIS ROUND
     // check red on the very sentence explaining why the literal must not appear. Tenth instance. The rule is
     // not "assemble the markers in code" -- it is that a file grading a marker may not contain it anywhere,
     // prose included.)
-    ok("*** and NOTHING outside those two consumes it ***",
-        new Set(importers).size <= DEVICE_CONTRACT.consumers.length,
-        [...new Set(importers)].join(" ") || "none beyond the demos");
-    report("a 117-line abstraction whose promise is portability, with two demo consumers and no production " +
-        "one. The orrery becoming its first is the round this measurement was taken for.");
+    // v4778 -- the rtx merge brought a third, and a gate that read as a fourth until it stopped retyping the
+    // page's shaders. The row now asks BY NAME: it compared a count against the list's length, so a consumer
+    // swapped for another would have passed. See DEVICE_CONTRACT.
+    ok(`*** and NOTHING outside those ${DEVICE_CONTRACT.consumers.length} consumes it ***`,
+        [...new Set(importers)].every((f) => DEVICE_CONTRACT.consumers.includes(f)),
+        [...new Set(importers)].filter((f) => !DEVICE_CONTRACT.consumers.includes(f)).join(" ") ||
+            [...new Set(importers)].join(" ") || "none beyond the demos");
+    report("an abstraction whose promise is portability, with two demo consumers until v4778 and no production " +
+        "one; fly-connectome.html is the first page whose subject is not the device. The orrery becoming one " +
+        "is the round this measurement was taken for.");
 }
 
 console.log("\n5. PAIRS DELIBERATELY CARRIED ACROSS, WHICH THE `both` COUNT CANNOT SEE");

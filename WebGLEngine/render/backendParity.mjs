@@ -127,7 +127,13 @@ export const DEVICE_CONTRACT = Object.freeze({
     // The failure is not graceful: webgpuBackend does createShaderModule({ code: d.shaders.wgsl }) with no
     // guard, so a GLSL-only pipeline reaches the GPU as `undefined` rather than as a refusal a caller can read.
     unguardedRead: "d.shaders.wgsl",
-    consumers: Object.freeze(["gfx-device.html", "nebula-device.html"]),
+    // v4778 -- 2 -> 3 at the rtx merge, and the first that is not a demo of the device itself: fly-connectome.html
+    // draws the male-cns circuit through requestDevice and one dual-language pipeline. Its gate,
+    // tools/ship/flyConnectomePage-selfcheck.mjs, arrived carrying a RETYPED copy of that pipeline in both
+    // languages and so read as a fourth consumer. That was repaired at the cause, as v4459 and v4688 did: the
+    // gate now reads the page's own shader text out of the page and hands it to the offscreen render, so it
+    // carries no shader, leaves this census, and grades the page's pipeline rather than a copy of it.
+    consumers: Object.freeze(["gfx-device.html", "nebula-device.html", "fly-connectome.html"]),
 });
 
 /**
@@ -253,8 +259,22 @@ export const PARITY_BASELINE = Object.freeze({
     //   tools/ship/kernelReach-selfcheck.mjs, tools/ship/temporalCorpus.mjs.
     // The last three are GATES and a CORPUS bearing shader text, counted rather than exempted -- v4392's rule,
     // which this file has now applied four times and which is most of the WGSL this tree owns.
-    glslBearing: 158,
-    glslDirective: 140,  // raw WebGL2 -- the file writes its own version header
+    //
+    // v4778 -- glslBearing 158 -> 161, glslDirective 140 -> 143, wgslBearing 106 -> 108, both 23 -> 24, glslOnly
+    // 135 -> 137, wgslOnly 83 -> 84 at the rtx merge. classify() run over the merged tree and over main's parent
+    // of the merge, and the two lists diffed by name -- not the rtx line's own history added up, which never
+    // re-took this record after it branched from main. Four files arrived (five language slots) and none left:
+    //   both (and so GLSL-directive and WGSL): fly-connectome.html -- its line-list pipeline in both languages
+    //     for gfx/device.js
+    //   GLSL-only, directive: ui/precisionProbe.mjs (the device precision probe, WebGL2 by design) and its gate
+    //     tools/ship/precisionProbe-selfcheck.mjs
+    //   WGSL-only: render/rtViewer.mjs, the path tracer's accumulate kernel and present pass -- the present
+    //     fragment reads a storage buffer directly, which WebGL2 has no form of, so there is no GLSL half
+    // A fifth, tools/ship/flyConnectomePage-selfcheck.mjs, arrived carrying a retyped copy of the page's pipeline
+    // and was taken OUT rather than counted -- see DEVICE_CONTRACT.consumers; it now draws with the page's text.
+    // glslFramework does not move: nothing that arrived leans on three.js to prepend the header.
+    glslBearing: 161,
+    glslDirective: 143,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -317,14 +337,14 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 106,
-    both: 23,            // +2 over the last-recorded 21: fae26dbf's specularProbeLit.mjs and specularProbeLit-selfcheck.mjs
-    glslOnly: 135,
-    wgslOnly: 83,
+    wgslBearing: 108,
+    both: 24,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
+    glslOnly: 137,
+    wgslOnly: 84,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),
-    bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html"]),
+    bothPages: Object.freeze(["gfx-device.html", "nebula-device.html", "wormhole-jump.html", "fly-connectome.html"]),   // v4778: +fly-connectome.html
     wgslRawVsCode: Object.freeze({ raw: 54, code: 51 }),
 });
 

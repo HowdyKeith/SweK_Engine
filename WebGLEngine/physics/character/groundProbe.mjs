@@ -181,7 +181,12 @@ export const PROBE_AT_V4539 = Object.freeze({
     columnsIdentical: true,     // [5, 0] and [5, 0] -- the proof that no downward rule separates them
     roofY: 5,
     stepTestFires: true,        // the STEP test, not the slope test the entry's wording points at
-    meshGroundShippingCallers: 0,
+    // v4778 -- 0 -> 1 at the rtx merge: camera/camera.js imports meshGround for the FP camera's non-voxel
+    // terrain walk (task board #13 Stage A), and builds one only when a world carries `groundBVH`. NO WORLD
+    // IN THE TREE SETS THAT FIELD today, so the import is live and the call is dormant -- counted, because
+    // this census counts imports, and said, because the day a world sets it the camera walks on the
+    // bodyless oracle this file measured reading a bridge as a wall.
+    meshGroundShippingCallers: 1,
     // *** BOTH OF THESE ARE NOW CORRECT ANSWERS TO DIFFERENT QUESTIONS, AND THAT IS THE v4542 REPAIR. ***
     // The 21 was standHeightAt's answer for a body standing at y = 1, and it was wrong because the function
     // had nowhere to put the body. It is now what the BODYLESS call returns -- "which surface does this

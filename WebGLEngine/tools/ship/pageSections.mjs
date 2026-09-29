@@ -656,6 +656,22 @@ export const MAX_PER_PANEL = 15;
  * look identical, and the second one gets placed by a guess.
  */
 export const UNPLACED = new Map([
+    // v4778-merge -- FOUR PAGES FROM THE rtx LINE, linked from server.html and in neither list. The rtx line
+    // branched long before this register asked for a decision per page, so none of the four arrived with one.
+    // Each has a plausible drawer by subject, and plausible is the word: that is the guess this map exists to
+    // stop, so they wait here for Keith rather than being placed by a merge.
+    ["es-box3d-6dof.html", "the Newtonian 6DOF substrate's first page (rigidBody6dof, autopilot6dof); by subject it " +
+                           "sits beside the es-box3d pages in Game: Endless Sky, but it is a physics-substrate " +
+                           "page rather than an Endless Sky one and which of those it is filed as is Keith's call"],
+    ["es-aircraft.html", "aerodynamic flight on the same 6DOF substrate (aeroSurface, aircraftAssembly, " +
+                         "autopilotAircraft); it has no Endless Sky content at all despite its es- prefix, and no " +
+                         "flight or vehicle drawer exists -- naming one is Keith's decision, not a merge's"],
+    ["fly-connectome.html", "a front door for Janelia's male-cns connectome (34 traced Giant Fiber neurons); server.html groups it " +
+                            "with the five physics front doors, but no drawer is about neurons or connectomes and " +
+                            "choosing one is a judgement about what the drawer is for"],
+    ["rtx-viewer.html", "the rtx line's present path (rtPipeline BVH trace, rtViewer accumulate, WebGPU only); by " +
+                        "machinery it wants the WebGPU drawer, which is at MAX_PER_PANEL -- the same drawer " +
+                        "decision fsr.html and fsr-three.html are waiting on below"],
     // *** v4623-merge -- fsr.html, AND THE SENTENCE THIS FILE USED TO CARRY FOR IT IS NOW FALSE. ***
     //
     // It was placed in the techniques drawer with the reason "It is NOT in the WebGPU drawer beside anime4k
