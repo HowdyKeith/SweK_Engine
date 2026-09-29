@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "ea94af8c31409998e3f41d0f9aad88e842b320ff",
+ "head": "3202ebe70a3424c29d7474ece15b5937de1d3ad1",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -53,7 +53,7 @@
   },
   {
    "name": "Triangle",
-   "hits": 16
+   "hits": 18
   }
  ],
  "registerSources": 57
