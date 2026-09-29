@@ -508,6 +508,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/temporalLockTsl-selfcheck.mjs",
         "render/temporalTsl-selfcheck.mjs",
         "render/temporalTslCompute-selfcheck.mjs",
+        "render/temporalTslCoverage-selfcheck.mjs",
         "render/temporalTslMany-selfcheck.mjs",
         "render/temporalTslMeshes-selfcheck.mjs",
         "render/temporalTslNodes-selfcheck.mjs",

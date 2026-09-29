@@ -152,12 +152,18 @@ console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***")
     const live = BT.coverage(BT.ENG);
     report(`live: ${live.records.length} record(s), ${live.entries.size} gates covered, ` +
         `${live.localCount} measured on this box (${live.thisBox}), ${live.foreignCount} elsewhere`);
-    ok("!! the shared record is present and is NOT this box's, which is the whole situation",
-        live.records.some((r) => r.kind === "shared") &&
-        live.records.find((r) => r.kind === "shared").host !== live.thisBox,
-        `shared record belongs to ${live.records.find((r) => r.kind === "shared").host}; this box is ` +
-        `${live.thisBox}. Neither the rig nor this container can write it, which is why coverage had to stop ` +
-        "being asked of it");
+    // *** v4779 -- THIS ROW ASSERTED ONE BOX'S SITUATION AS THE DESIGN, AND WENT RED ON THE BOX THAT OWNS THE
+    // FILE. *** It read "the shared record is NOT this box's" -- true on the rig and on a new container, false on
+    // a container whose fingerprint is the owner's, which is what linux-x64-4c-16096mb-142c0d is: four cores and
+    // 16 GB hash alike. The design fact is the ATTRIBUTION: the shared record names a host, and this box's
+    // readings count as its own exactly when that host is this box -- whichever box this is.
+    const shared = live.records.find((r) => r.kind === "shared");
+    const sharedMine = !!shared && [...live.entries.values()].filter((e) => e.from === shared.file).every((e) => e.mine === (shared.host === live.thisBox));
+    ok("!! the shared record is present, names its host, and counts as this box's exactly when that host is this box",
+        !!shared && typeof shared.host === "string" && shared.host.length > 0 && sharedMine,
+        shared ? `shared record belongs to ${shared.host}; this box is ${live.thisBox} -- ` +
+            (shared.host === live.thisBox ? "the owner, so its readings are this box's own" :
+             "not the owner, so neither writes it and coverage had to stop being asked of it") : "no shared record");
     ok("!! *** and the BUDGET still reads the shared file alone -- stated, not quietly fixed ***",
         /costOf/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")) &&
         !/boxTimings/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")),

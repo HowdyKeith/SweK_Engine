@@ -8728,7 +8728,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         at: "v4779", swept: 1, green: 1, red: 0,
         added: Object.freeze(["render/temporalTslCoverage-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
-        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the grown batch it refused by name is drawn now)"]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the grown batch it refused by name is drawn now)",
+                               "tools/ship/boxTimings-selfcheck.mjs (the shared record's owner is asserted as attribution, not as never this box -- red on the box that owns it)"]),
         verdict: "*** THE FIELD COVERED PIXELS THREE NEVER DREW AND MISSED PIXELS IT DID. *** An alpha-tested sprite or mesh: motion " +
                  "on 812 pixels against the 406 its colour pass draws -- a fragmentNode skips three's diffuse and alphaTest setup, " +
                  "an outputNode keeps it. A double-sided plane shown from behind: no motion at all on its 576 -- three copies " +
