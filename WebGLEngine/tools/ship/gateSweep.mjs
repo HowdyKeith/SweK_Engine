@@ -8075,6 +8075,65 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    since476: Object.freeze({
+        at: "v4778", swept: 45, green: 45, red: 0,
+        added: Object.freeze([
+            "brain/autopilot6dof-selfcheck.mjs",
+            "brain/autopilotAircraft-selfcheck.mjs",
+            "brain/fleetAssign-selfcheck.mjs",
+            "physics/mechanics/aeroSurface-selfcheck.mjs",
+            "physics/mechanics/aircraftAssembly-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dof-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
+            "physics/mesh/bvhPairOverlap-selfcheck.mjs",
+            "physics/mesh/meshBoolean-selfcheck.mjs",
+            "physics/mesh/meshBooleanBlast-selfcheck.mjs",
+            "physics/mesh/meshPointClassify-selfcheck.mjs",
+            "physics/mesh/triClip-selfcheck.mjs",
+            "physics/mesh/triFragmentAccumulate-selfcheck.mjs",
+            "physics/mesh/triTriIntersect-selfcheck.mjs",
+            "physics/obbManifold-selfcheck.mjs",
+            "tools/gunnerTraceDemo-selfcheck.mjs",
+            "tools/maleCnsLoader-selfcheck.mjs",
+            "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs",
+            "tools/ship/aggroHazardFeature-selfcheck.mjs",
+            "tools/ship/aircraftPage-selfcheck.mjs",
+            "tools/ship/botCapsuleNav-selfcheck.mjs",
+            "tools/ship/cameraCapsuleWalk-selfcheck.mjs",
+            "tools/ship/cameraTerrainWalk-selfcheck.mjs",
+            "tools/ship/cameraViewMode-selfcheck.mjs",
+            "tools/ship/capsuleCollide-selfcheck.mjs",
+            "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+            "tools/ship/capsuleHazardPolicy-selfcheck.mjs",
+            "tools/ship/cityChunkScene-selfcheck.mjs",
+            "tools/ship/controllerLabWorld-selfcheck.mjs",
+            "tools/ship/flyConnectomePage-selfcheck.mjs",
+            "tools/ship/gltfConformance-selfcheck.mjs",
+            "tools/ship/kaijuGroundCollider-selfcheck.mjs",
+            "tools/ship/mikktSpace-selfcheck.mjs",
+            "tools/ship/peerBrain-selfcheck.mjs",
+            "tools/ship/peerBrainFleet-selfcheck.mjs",
+            "tools/ship/pilotPolicy-selfcheck.mjs",
+            "tools/ship/platformCarryWorld-selfcheck.mjs",
+            "tools/ship/precisionProbe-selfcheck.mjs",
+            "tools/ship/qrBridge-selfcheck.mjs",
+            "tools/ship/rigidBody6dofPage-selfcheck.mjs",
+            "tools/ship/rtViewer-selfcheck.mjs",
+            "tools/ship/splatWalkWorld-selfcheck.mjs",
+            "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+            "tools/ship/worldColliderBVH-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the rtx line's forty-five, merged at v4778 -- it never wrote closings, so this one names them all. Swept " +
+                 "three-way on the merged tree: 43 green at once. TWO ARRIVED RED AND ARE GREEN AT THE CLOSE, which is why " +
+                 "redOnArrival is empty rather than hiding them: qrBridge and webcodecsFramesToMp4 need @napi-rs/canvas " +
+                 "(and webcodecs), optionalDependencies of ai-bridge/ that nothing on the verify route installs; one " +
+                 "asserted the module was present and one died with MODULE_NOT_FOUND. With the modules installed both are " +
+                 "green; without them they now SKIP BY NAME and say 'NOT a pass'. Slowest: rigidBody6dofPage at 65 s, " +
+                 "gunnerTraceDemo 19 s, peerBrainFleet 16 s -- over the ship-time budget, so they join the pool no verify runs.",
+    }),
     since475: Object.freeze({
         at: "v4679", swept: 1, green: 1, red: 0,
         added: Object.freeze([

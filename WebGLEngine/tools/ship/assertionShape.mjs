@@ -867,8 +867,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // signatureOf). The rows that did not move are this line's: distinctDefinitions 41, condFirst 96,
     // unknownSignature 11, suspects 0. So that branch's 91/16 were the old classifier's reading, not a
     // disagreement about the tree, and none of its hundred and five invented a forty-second spelling of ok().
-    gates: 1880, usesOk: 1859, definesOk: 1851, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1752, condFirst: 96, unknownSignature: 11,
+    // v4778 -- AT THE RTX MERGE, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE: gates 1880 -> 1925, usesOk
+    // 1859 -> 1904, definesOk 1851 -> 1896 -- that line's 45 gates, all new files. nameFirst 1752 -> 1796 (+44) and
+    // condFirst 96 -> 97 (+1): tools/ship/gltfConformance-selfcheck.mjs defines `ok = (c, m)` and calls it that way
+    // throughout, so it is the forty-second distinct spelling (41 -> 42) and it is self-consistent, which is what the
+    // suspects row (still 0) asks. unknownSignature holds at 11.
+    gates: 1925, usesOk: 1904, definesOk: 1896, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1796, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
