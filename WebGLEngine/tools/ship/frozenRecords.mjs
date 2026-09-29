@@ -84,7 +84,10 @@ export const RECORD_RE = /export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Obj
 // out of the same memo rather than off the disk, so census() costs one walk however many times it is called.
 export function sources(dir = ENG) { return TR.treePaths(dir); }
 
-const rel = (p) => path.relative(ENG, p).split(path.sep).join("/");
+// v4778: memoised. It is a pure function of the path (ENG is fixed), and census() asks it of all 4,581 files per call
+// for the exclude filter alone -- path.relative resolves both sides every time, ~15 ms a census on the merged tree.
+const _rel = new Map();
+const rel = (p) => { let r = _rel.get(p); if (r === undefined) { r = path.relative(ENG, p).split(path.sep).join("/"); _rel.set(p, r); } return r; };
 
 /**
  * *** v4536 -- A RECORD'S BODY IS THE RECORD, NOT THE NEXT 6,000 CHARACTERS OF THE FILE. ***
@@ -143,7 +146,10 @@ export function recordBody(src, start) {
         }
         if (c === "(") depth++;
         else if (c === ")") depth--;
-        if (!/\s/.test(c)) prev = c;
+        // v4778: ASCII answered by char code, anything wider still asked of /\s/ -- the same set, without a regex
+        // call per character of 1.9 MB of record bodies.
+        const k = src.charCodeAt(i);
+        if (!(k < 128 ? k === 32 || (k >= 9 && k <= 13) : /\s/.test(c))) prev = c;
         i++;
     }
     return { body: src.slice(start, i), end: i, balanced: depth === 0 };
@@ -204,6 +210,9 @@ function recordsIn(f, read, cacheable = true) {
     const out = [];
     RECORD_RE.lastIndex = 0;
     let m;
+    // v4778: RECORD_RE cannot match without the literal below, and 388 of the merged tree's 4,581 files hold it, so the
+    // rest skip the regex: 56 ms of RECORD_RE over 70 MB became a 29 ms substring test plus the regex over 388 files.
+    if (src.includes(" = Object.freeze("))
     while ((m = RECORD_RE.exec(src))) {
         // v4536: m.index, not a fresh indexOf from the top of the file -- the match already knows where it
         // is, and searching again for a name that appears earlier in prose would find the prose.
@@ -293,10 +302,20 @@ export function readSites(names, { root = ENG } = {}) {
     const want = [...names];
     const out = new Map(want.map((n) => [n, []]));
     if (!want.length) return out;
+    // *** v4778 -- THE CHEAP REJECT WAS THE EXPENSIVE PART. *** It read `want.some((n) => src.includes(n))`: 77 names
+    // (frozenRecords-selfcheck hands in SWEEP_COMMIT_RECORD_NAMES) times 4,581 files and 70 MB, and a file that names
+    // none of them -- nearly all of them -- paid all 77 scans. MEASURED on the merged tree: 1,018 ms, the largest
+    // self-time in frozenRecords-selfcheck, which read 2,424 ms against the 2,200 recordReach's margin row allows.
+    // ONE regex alternating the same literals asks the same question in one pass -- it matches exactly when some
+    // name is a substring -- and took 64 ms over the same files, admitting the same 126. And an ANCHOR goes first: each
+    // name's first `V<digit>`, or the whole name if it has none, so every name contains its anchor and a file holding
+    // no anchor holds no name. The 77 share one anchor, `V4`; checking it first took the reject to 20 ms.
+    const anyName = new RegExp(want.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+    const anchors = [...new Set(want.map((n) => (/V\d/.exec(n) || [n])[0]))];
     for (const f of sources(root)) {
         if (!/\.(mjs|js|cjs)$/.test(f)) continue;
         let src = TR.textOf(f);
-        if (!want.some((n) => src.includes(n))) continue;         // cheap reject before the expensive work
+        if (!anchors.some((a) => src.includes(a)) || !anyName.test(src)) continue;   // cheap reject before the expensive work
         src = stripComments(src);
         RECORD_RE.lastIndex = 0;
         let m;
@@ -329,9 +348,32 @@ export function guardianSearch(gateSrc, named) {
     const namesIn = (tok) => { let hit = memo.get(tok); if (!hit) { hit = names.filter((n) => tok.includes(n)); memo.set(tok, hit); } return hit; };
     for (const [g, src] of gateSrc) {
         const found = new Set();
-        for (const m of src.matchAll(/[A-Z0-9_]+/g)) if (/V\d{3}/.test(m[0])) for (const n of namesIn(m[0])) found.add(n);
+        for (const run of vRuns(src)) for (const n of namesIn(run)) found.add(n);
         for (const n of names) if (found.has(n)) named.get(n).push(g);
     }
+}
+
+// *** v4778 -- THE RUNS ARE FOUND FROM THE V, NOT BY LISTING EVERY RUN AND KEEPING THE FEW WITH A V IN THEM. ***
+// guardianSearch read `src.matchAll(/[A-Z0-9_]+/g)` and tested each match for V\d{3}. MEASURED on the merged tree:
+// 874,489 matches over the 1,925 gate sources -- every capital, every digit, every underscore run, each one a match
+// array for the collector -- to keep 275 distinct runs. That was ~180 ms a census, and frozenRecords-selfcheck takes
+// two. So the search seeks V\d{3} and widens each hit to the edges of the [A-Z0-9_]+ run it sits in: the same
+// maximal runs, the same set (a run holding two hits is taken once, the scan resuming at its end), and only the
+// runs that can hold a name are ever built. Section 5 of the gate holds this against the pairwise search.
+const V3 = /V\d{3}/g;
+const inRun = (c) => (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95;     // [A-Z0-9_]
+function vRuns(src) {
+    const out = [];
+    V3.lastIndex = 0;
+    let m;
+    while ((m = V3.exec(src))) {
+        let a = m.index, b = m.index + 4;
+        while (a > 0 && inRun(src.charCodeAt(a - 1))) a--;
+        while (b < src.length && inRun(src.charCodeAt(b))) b++;
+        out.push(src.slice(a, b));
+        V3.lastIndex = b;
+    }
+    return out;
 }
 
 /** The pairwise search guardianSearch replaces, kept so the gate can hold the two equal. */

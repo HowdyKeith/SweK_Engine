@@ -91,12 +91,59 @@ function expandRecurrent(Wrec) {
 }
 
 /**
+ * layersOf(), memoised per weight vector. After the rtx merge (v4778) tools/gunnerTraceDemo-selfcheck.mjs took 16.8-20+ s
+ * alone and was killed at the sweep's 20 s cap; its --cpu-prof put 30 % of the run in the two expandRecurrent()s
+ * (this file's and brain/drivePolicy.mjs's; 30.3 % and 30.8 % in two review re-takes, the garbage collector under 3 %
+ * in both, not the 11 % one first profile read): forward() rebuilt and
+ * threw away the whole HIDDEN x HIDDEN matrix, four subarray views and the layer objects on EVERY tick of every duel,
+ * for a weight vector that does not change within a duel. The memo is keyed on the vector object AND checked against
+ * a snapshot of its REC_EDGES recurrent weights, so a caller that edits a vector in place still gets a fresh expansion
+ * (a REC_EDGES compare, not a reallocation); the encoder and decoder are live views of the vector either way. The
+ * returned list and its matrices are shared between calls and, as they always were in practice, read-only to callers.
+ * A recurrent weight's sign of zero never reaches the matrix (1 + -0 = 1, +0 + -0 = +0), so the snapshot's === is exact.
+ * The entry also keeps the matrix's nonzero columns per row, ascending, for forward()'s maskedStep() below.
+ */
+const LAYERS_MEMO = new WeakMap(), REC_OFFSET = FEATURES * HIDDEN + HIDDEN;
+function memoOf(w) {
+    const m = LAYERS_MEMO.get(w);
+    if (m) { let k = 0; while (k < REC_EDGES && m.snap[k] === w[REC_OFFSET + k]) k++; if (k === REC_EDGES) return m; }
+    const layers = splitLayers(w), rec = layers[1], rowStart = new Int32Array(HIDDEN + 1), cols = [];
+    for (let o = 0; o < HIDDEN; o++) { rowStart[o] = cols.length; for (let k = 0; k < HIDDEN; k++) if (rec.W[o * HIDDEN + k] !== 0) cols.push(k); }
+    rowStart[HIDDEN] = cols.length;
+    const entry = { snap: Float32Array.from(w.subarray(REC_OFFSET, REC_OFFSET + REC_EDGES)), layers, rec, rowStart, cols: Int32Array.from(cols) };
+    LAYERS_MEMO.set(w, entry);
+    return entry;
+}
+
+/**
+ * One recurrent step, relu(Wm @ h), over the matrix's nonzero entries only -- the SAME float32 values mlpLayerCpu returns,
+ * not an approximation of them. Measured after the layersOf() memo: the dense 3 x HIDDEN x HIDDEN relaxation was still the
+ * largest self time in tools/gunnerTraceDemo-selfcheck.mjs, and most of it multiplied the structural zeros. Why dropping
+ * them is exact: mlpLayerCpu walks k upward with f(acc + f(x[k] * W[k])); for a FINITE x[k] a zero weight contributes
+ * f(x[k] * 0) = +-0, and adding +-0 leaves a nonzero f32 acc unchanged and can only flip the sign of a zero one. Visiting
+ * the nonzero columns in the same ascending order therefore reaches the same acc up to the sign of zero, and the relu
+ * (f(max(acc, 0)), max(-0, 0) = +0) erases that. A NON-finite x[k] is exactly where it is not exact -- Infinity * 0 = NaN,
+ * the contamination expandRecurrent()'s comment describes -- so any non-finite input takes mlpLayerCpu's dense path.
+ */
+function maskedStep(layer, rowStart, cols, x) {
+    for (let k = 0; k < HIDDEN; k++) if (!Number.isFinite(x[k])) return mlpLayerCpu(layer, x, 1);
+    const f = Math.fround, W = layer.W, y = new Float32Array(HIDDEN);
+    for (let o = 0; o < HIDDEN; o++) {
+        const woff = o * HIDDEN; let acc = f(layer.b[o]);
+        for (let j = rowStart[o]; j < rowStart[o + 1]; j++) { const k = cols[j]; acc = f(acc + f(f(x[k]) * f(W[woff + k]))); }
+        y[o] = f(Math.max(acc, 0));
+    }
+    return y;
+}
+
+/**
  * Split a flat weight vector into the sequence mlpLayerCpu applies in order: the encoder (11 -> 34, dense,
  * relu), REC_STEPS weight-tied copies of the connectome-masked recurrent layer (34 -> 34, relu), and the
  * decoder (34 -> 5, none). forward() below and render/carViews.mjs's activationsOf() both walk this same
  * array rather than assuming a fixed depth, so either can grow or shrink REC_STEPS with no second edit.
  */
-export function layersOf(w) {
+export function layersOf(w) { return memoOf(w).layers; }
+function splitLayers(w) {
     let o = 0;
     const Win = w.subarray(o, o += FEATURES * HIDDEN), bin = w.subarray(o, o += HIDDEN);
     const Wrec = w.subarray(o, o += REC_EDGES);
@@ -112,9 +159,9 @@ export function layersOf(w) {
 /** The forward pass: features -> [yaw rate, pitch rate, fire, drop, ignite] in [-1, 1], through the encoder, the
  *  connectome-masked recurrent core, and the decoder; a trigger is honoured when its output is positive. */
 export function forward(w, x) {
-    const layers = layersOf(w);
+    const { layers, rec, rowStart, cols } = memoOf(w);
     let h = Float32Array.from(x);
-    for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+    for (let i = 0; i < layers.length - 1; i++) h = layers[i] === rec ? maskedStep(rec, rowStart, cols, h) : mlpLayerCpu(layers[i], h, 1);
     const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
     return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2]), Math.tanh(y[3]), Math.tanh(y[4])];
 }
