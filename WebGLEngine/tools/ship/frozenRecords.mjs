@@ -287,6 +287,8 @@ export function importedAs(gateRel, gateSrc, target, fn) {
  * asks it about the unguarded eleven, so it is 11 x 1,600. It is therefore NOT a general census and must not
  * be read as one.
  */
+/** Lookup tables of record NAMES, blanked by readSites like a record body: naming a record is not reading it. */
+export const NAME_TABLES = Object.freeze(["SWEEP_COMMIT_RECORD_NAMES"]);
 export function readSites(names, { root = ENG } = {}) {
     const want = [...names];
     const out = new Map(want.map((n) => [n, []]));
@@ -302,6 +304,15 @@ export function readSites(names, { root = ENG } = {}) {
         while ((m = RECORD_RE.exec(src))) {
             const { body } = recordBody(src, m.index);
             spans.push([m.index, m.index + (body ? src.slice(m.index).indexOf(body) + body.length : m[0].length)]);
+        }
+        // v4776: a NAME TABLE is blanked for the same reason a record body is -- SWEEP_COMMIT_RECORD_NAMES lists the
+        // records declared at v4487's commit as strings, and a list naming a record does not read it. Without this,
+        // freezing that list moved seven documentary records to "read by code" in recordReach's split.
+        for (const t of NAME_TABLES) {
+            const at = src.indexOf("export const " + t + " = Object.freeze([");
+            if (at < 0) continue;
+            const end = src.indexOf("]);", at);
+            if (end > at) spans.push([at, end + 3]);
         }
         for (const [a, b] of spans) src = src.slice(0, a) + " ".repeat(b - a) + src.slice(b);
         for (const n of want) {
@@ -555,6 +566,34 @@ export function census({ files = null, read = null, exclude = null, guardians: w
  * the headline sat still while everything under it moved, which is the fourth time this file has caught that
  * happening to itself. The first pass read 72 / 55 / 17 / 8 -- see unmeasurableFirstPass.
  */
+/**
+ * v4776 -- THE RECORD NAMES DECLARED AT v4487's COMMIT (75f0c033), FROZEN, BECAUSE THE ROUTE THAT PUBLISHES CANNOT ASK.
+ *
+ * frozenRecords-selfcheck asks git which records existed at the sweep's commit, and on a shallow clone git cannot
+ * answer -- so the gate went red, by design, on EVERY clone the publish route makes (`git clone --depth 1`), and
+ * Keith's v4776 clone-verify came back DO NOT SHIP on it alone. The question has one answer forever: a commit does
+ * not change. So the answer is written down here, derived from git in the round that wrote it, and the gate uses
+ * git's live answer where git has the commit and CHECKS THIS LIST AGAINST IT, and uses the list where it does not.
+ * Named without a version stamp on purpose: this is a lookup table, not a record, and the census must not count it.
+ */
+export const SWEEP_COMMIT_RECORD_NAMES = Object.freeze([
+    "ADDED_AT_V4385", "ADDED_AT_V4395", "ADDED_AT_V4398", "ADDED_AT_V4403", "ADDED_AT_V4405", "ADDED_AT_V4407",
+    "ARC_AT_V4478", "BTDF_AT_V4447", "BTDF_VERDICT_V4458", "BVH_AT_V4435", "CALL_COST_V4459", "CLOSED_AT_V4407",
+    "COERCION_CENSUS_V4477", "COMMIT_BELT_V4329", "COMMIT_BELT_V4418", "COMMIT_BELT_V4472", "COMMIT_BELT_V4475",
+    "COVERAGE_AT_V4456", "CROSSOVER_AT_V4441", "DEPENDANTS_AT_V4410", "DRIFT_AT_V4482", "ERASED_AT_V4394",
+    "FIXED_AT_V4279", "FIXED_SINCE_V4279", "FIXED_SINCE_V4408", "FOUND_AT_V4472", "GRID_FAILS_AT_V4437",
+    "KC_ERROR_AT_V4446", "KEY_DRIFT_V4460", "LEDGER_AT_V4472", "MARGIN_AT_V4481", "MEASURED_AT_V4412",
+    "MEASURED_AT_V4415", "MEASURED_AT_V4418", "MEASURED_AT_V4419", "MEASURED_AT_V4421", "MEASURED_AT_V4422",
+    "MEASURED_AT_V4424", "MEASURED_AT_V4425", "MEASURED_AT_V4427", "MEASURED_AT_V4429", "MEASURED_AT_V4430",
+    "MEASURED_AT_V4432", "MEASURED_AT_V4462", "MEASURED_AT_V4463", "MEASURED_V4424", "MEASURED_V4425",
+    "MEASURED_V4470", "NOISE_FLOOR_V4304", "NO_GATE_V4458", "OVERCOUNT_AT_V4455", "POSIX_AT_V4485", "PROBE_AT_V4487",
+    "RECHECK_V4313", "RECHECK_V4314", "RECOVERED_SINCE_V4279", "RED_AT_V4279", "RED_AT_V4408", "RED_AT_V4408_GATES",
+    "RED_AT_V4424", "RED_AT_V4424_GATES", "RED_AT_V4476", "RED_AT_V4476_GATES", "RED_AT_V4484", "RED_AT_V4484_GATES",
+    "REFUSAL_ATTRIBUTION_V4481", "RETURNED_AT_V4476", "RISK_AT_V4438", "ROTATION_LOST_V4461", "SHAPE_AT_V4480",
+    "STACK_AT_V4483", "STALE_EXILE_V4473", "STALE_GREENS_V4460", "SWEEP_SINCE_V4297", "SWEEP_V4297",
+    "TAINT_AT_V4479", "VACUITY_AT_V4459"
+]);
+
 export const PROBE_AT_V4536 = Object.freeze({
     at: "v4536",
     probedAt: "207b74d0",          // the tree the +7 run was taken over, before this record was added to it

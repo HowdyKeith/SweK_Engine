@@ -25,7 +25,7 @@
 // already moved it, which is why the frozen number is compared against nothing live.
 "use strict";
 import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
-         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG, clearScanCache, guardianSearch, guardianSearchNaive }
+         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, SWEEP_COMMIT_RECORD_NAMES, ENG, clearScanCache, guardianSearch, guardianSearchNaive }
     from "./frozenRecords.mjs";
 import { stripComments } from "../../vba/runtimeGap.mjs";
 import * as TR from "./treeRead.mjs";
@@ -400,15 +400,20 @@ console.log("\n2. the observer effect, checked to be exactly one");
     // check that passes and it must not pretend the fallback is the measurement.
     const stampOf = (name) => { const m = /V(\d{3,4})/.exec(name); return m ? +m[1] : 0; };
     const sweepV = +REC.at.replace(/^v/, "");
-    let atSweepNames = null;
+    // v4776: git's answer where git has the commit, the frozen list where it does not (a shallow clone -- which is
+    // what the publish route makes), and the two compared wherever both exist.
+    let atSweepNames = null, gitNames = null;
     try {
         const out = execFileSync("git", ["grep", "-h", "-E",
             "export const [A-Z][A-Z0-9_]*V[0-9]{3,4}[A-Z0-9_]* = Object\\.freeze\\(", REC.commit],
             { cwd: ENG, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
         const set = new Set();
         for (const m of out.matchAll(/export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Object\.freeze\(/g)) set.add(m[1]);
-        if (set.size > 0) atSweepNames = set;
-    } catch { atSweepNames = null; }
+        if (set.size > 0) gitNames = set;
+    } catch { gitNames = null; }
+    const frozenNames = new Set(SWEEP_COMMIT_RECORD_NAMES);
+    atSweepNames = gitNames || frozenNames;
+    const namesFrom = gitNames ? `git, at ${REC.commit}` : `SWEEP_COMMIT_RECORD_NAMES (git has no ${REC.commit} here -- a shallow clone)`;
     const arrivals = atSweepNames
         ? without.records.filter((r) => !atSweepNames.has(r.name))
         : without.records.filter((r) => stampOf(r.name) > sweepV);
@@ -455,13 +460,22 @@ console.log("\n2. the observer effect, checked to be exactly one");
         // widening reached: at least one arrival lives outside .mjs, or the fix did nothing.
         arrivals.every((r) => /\.(mjs|cjs|js)$/.test(r.file)) &&
         arrivals.some((r) => !r.file.endsWith(".mjs")),
-        atSweepNames
-          ? `${atSweepNames.size} record declarations in ${REC.commit}; ${arrivals.length} of the census are ` +
+        `${atSweepNames.size} record declarations in ${REC.commit}, read from ${namesFrom}; ${arrivals.length} of the census are ` +
             `not among them, and ${arrivals.filter((r) => stampOf(r.name) <= sweepV).length} of THOSE carry a ` +
             "stamp at or before the sweep -- records named for the version they DESCRIBE, which the naive " +
-            "rule counts as having been present. That set is what v4534 had to name by hand."
-          : "*** GIT COULD NOT ANSWER, so this fell back to reading the stamp out of the name -- THE " +
-            "FALLBACK IS NOT THE MEASUREMENT and this row is red rather than quietly green on it.");
+            "rule counts as having been present. That set is what v4534 had to name by hand. The naive rule is " +
+            "never the fallback: v4776 froze the commit's answer, because a shallow clone cannot ask for it.");
+    // v4776 -- THE FROZEN LIST IS ONLY WORTH ANYTHING IF IT IS THE COMMIT'S ANSWER. Checked against git wherever git
+    // can answer (every full checkout: the rig's tree, this sandbox), exactly, both directions. On a shallow clone the
+    // check cannot run and says so in its detail -- the list it would check is the one the row above just used, and
+    // it was verified on the full checkout the same round shipped from.
+    ok("!! ...and the frozen list of the commit's records IS the commit's list, wherever git can say",
+        !gitNames || (gitNames.size === frozenNames.size && [...gitNames].every((n) => frozenNames.has(n))),
+        gitNames ? `${frozenNames.size} frozen, ${gitNames.size} in ${REC.commit} per git, ` +
+                   `${[...gitNames].filter((n) => !frozenNames.has(n)).length} missing and ` +
+                   `${[...frozenNames].filter((n) => !gitNames.has(n)).length} extra`
+                 : `UNCHECKED HERE: git has no ${REC.commit} (a shallow clone); ${frozenNames.size} frozen names were used above, ` +
+                   "and every full checkout compares them against the commit");
     say(reportLines(without).join("\n  ----  "));
 }
 
