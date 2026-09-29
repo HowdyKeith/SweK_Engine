@@ -58,6 +58,10 @@ const Q = requireAiBridge(path.join(ENG, "ai-bridge", "qrBridge.js"));
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+// v4778: an optional dependency's absence is SKIPPED BY NAME and counted -- never a pass, never a crash.
+const skipped = [];
+const skip = (what) => { skipped.push(what); console.log("  SKIP  " + what + " -- needs @napi-rs/canvas (an optionalDependency of ai-bridge/)"); };
+const HAVE_CANVAS = Q.status().available === true;
 console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 3\n");
 
 // ---- 1. STATUS MATCHES THE SIBLING BRIDGE SHAPE --------------------------------------------------------
@@ -68,13 +72,17 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
         !!st && st.ok === true && typeof st.platform === "string" && typeof st.arch === "string" &&
         typeof st.available === "boolean" && typeof st.tool === "string" && typeof st.note === "string",
         JSON.stringify(st));
-    ok("!! @napi-rs/canvas is actually available on THIS box (an optionalDependency already installed for canvasBridge.js's own spike)",
-        st.available === true && st.tool === "@napi-rs/canvas",
-        "a box without it degrades honestly instead -- see section 5 below");
+    // v4778 (the rtx merge) -- THIS ROW ASSERTED THE ENVIRONMENT, AND THE PUBLISH ROUTE'S CLONE DOES NOT HAVE IT.
+    // @napi-rs/canvas is an OPTIONAL dependency of ai-bridge/, installed by `npm install` there and by nothing the
+    // verify route runs, so on a fresh clone -- and on this sandbox -- the gate died at this row in 66 ms. The rows
+    // that RENDER need the module; the rest do not. Where it is absent, the rendering sections are SKIPPED BY NAME
+    // (placementRender's jsdom precedent) and counted in the closing line, never passed.
+    if (st.available) ok("!! @napi-rs/canvas is available on THIS box, so every section below runs", st.tool === "@napi-rs/canvas");
+    else skip("1b. @napi-rs/canvas is NOT installed on this box -- `cd ai-bridge && npm install` runs the rendering sections");
 }
 
 // ---- 2. renderQrPng() ON A REAL URL, VERIFIED FROM OUTSIDE qrBridge.js -----------------------------------
-{
+if (HAVE_CANVAS) {
     console.log("\n2. renderQrPng() ON A REAL URL -- VERIFIED FROM OUTSIDE qrBridge.js, NOT JUST 'DID NOT THROW'");
     const url = "https://example-tunnel.trycloudflare.com/fabric.html";
     const r = await Q.renderQrPng(url);
@@ -145,7 +153,7 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
     } else {
         console.log("  (skipping the rest of section 2 -- nothing to independently verify against a failed render)");
     }
-}
+} else skip("2. renderQrPng() on a real URL");
 
 // ---- 2b. _verifyPixels() ITSELF, UNIT-TESTED WITH SYNTHETIC INPUT (positive AND negative controls) --------
 //
@@ -185,7 +193,7 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
 }
 
 // ---- 3. BAD INPUT IS REJECTED CLEANLY -- NO UNCAUGHT THROW ------------------------------------------------
-{
+if (HAVE_CANVAS) {
     console.log("\n3. BAD INPUT IS REJECTED CLEANLY -- NO UNCAUGHT THROW");
     const empty = await Q.renderQrPng("");
     ok("empty data -> {ok:false}, not a throw", empty && empty.ok === false, empty.error);
@@ -200,7 +208,7 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
     const atMax = await Q.renderQrPng("x".repeat(Q.MAX_DATA_LEN));
     ok("...and exactly AT the bound still renders (the guard is 'over', not 'at or over')",
         atMax && atMax.ok === true, atMax.ok ? (atMax.moduleCount + " modules") : atMax.error);
-}
+} else skip("3. bad input rejected cleanly (its at-the-bound row renders)");
 
 // ---- 4. SABOTAGE: THE LENGTH-BOUND CHECK, REVERTED -------------------------------------------------------
 //
@@ -208,7 +216,7 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
 // deleted immediately -- the shipped ai-bridge/qrBridge.js on disk is never touched by this section. The
 // scratch file lives inside ai-bridge/ itself (not the OS temp dir) so its own relative
 // `import("../ui/vendor/qrcode.mjs")` still resolves against the real tree.
-{
+if (HAVE_CANVAS) {
     console.log("\n4. SABOTAGE: THE LENGTH-BOUND CHECK, REVERTED (scratch copy -- the shipped file is untouched)");
     const realSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "qrBridge.js"), "utf8");
     const target = 'if (str.length > MAX_DATA_LEN)';
@@ -240,7 +248,7 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
     } finally {
         try { fs.unlinkSync(scratchPath); } catch {}
     }
-}
+} else skip("4. the length-bound sabotage (it renders to prove the guard)");
 
 // ---- 5. GRACEFUL DEGRADE WHEN @napi-rs/canvas IS UNAVAILABLE ----------------------------------------------
 //
@@ -310,4 +318,6 @@ console.log("qrBridge-selfcheck -- the local QR render behind fabric.html's HOP 
 }
 
 console.log(fails ? `\nqrBridge-selfcheck: ${fails} FAILED` : "\nqrBridge-selfcheck: all checks pass");
+if (skipped.length) console.log(`unchecked here: ${skipped.length} section(s) SKIPPED because @napi-rs/canvas is not installed -- ` +
+    "NOT a pass for them. `cd ai-bridge && npm install` (it is an optionalDependency there) runs the whole gate.");
 process.exit(fails ? 1 : 0);

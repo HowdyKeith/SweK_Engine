@@ -100,10 +100,24 @@ const require_ = createRequire(import.meta.url);
 // own location has no node_modules chain that reaches them.
 const requireAiBridge = createRequire(path.join(ENG, "ai-bridge", "webcodecsBridge.js"));
 const WC = requireAiBridge(path.join(ENG, "ai-bridge", "webcodecsBridge.js"));
-const canvasMod = requireAiBridge("@napi-rs/canvas");
+// v4778 (the rtx merge) -- THIS WAS AN UNGUARDED require(), AND THE MODULE IS OPTIONAL. @napi-rs/canvas and
+// @napi-rs/webcodecs are optionalDependencies of ai-bridge/, installed by `npm install` there and by nothing the
+// verify route runs, so on a fresh clone -- and on this sandbox -- the gate died with MODULE_NOT_FOUND in 87 ms
+// instead of reporting. Every section below encodes real frames and needs both, so without them the gate SKIPS
+// BY NAME (placementRender's jsdom precedent) and says it is not a pass; with them it runs whole.
+let canvasMod = null, haveWebcodecs = false;
+try { canvasMod = requireAiBridge("@napi-rs/canvas"); } catch {}
+try { requireAiBridge.resolve("@napi-rs/webcodecs"); haveWebcodecs = true; } catch {}
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+if (!canvasMod || !haveWebcodecs) {
+    const missing = [!canvasMod && "@napi-rs/canvas", !haveWebcodecs && "@napi-rs/webcodecs"].filter(Boolean).join(" and ");
+    console.log(`  SKIP  the whole gate -- ${missing} not installed on this box (optionalDependencies of ai-bridge/)`);
+    console.log("\nwebcodecsFramesToMp4-selfcheck: SKIPPED");
+    console.log("unchecked here: EVERYTHING -- every section encodes real frames. NOT a pass. `cd ai-bridge && npm install` runs it.");
+    process.exit(0);
+}
 
 // *** ADVERSARIAL-REVIEW FIX (round 2's own review pass). *** An independent review run of this gate hit
 // a rare, non-reproducible flake (1 of 6 runs) where a native-addon cold-load hiccup somewhere in this
