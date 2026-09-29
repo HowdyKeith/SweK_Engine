@@ -1,0 +1,56 @@
+{
+ "gate": "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "a still surface judged on screen against in the world",
+   "columns": [
+    "case",
+    "screen dB",
+    "world dB",
+    "still in the world px",
+    "pixels"
+   ],
+   "rows": [
+    [
+     "reflectionStill",
+     37.47930334314329,
+     37.47930334314329,
+     15435,
+     16384
+    ],
+    [
+     "reflectionPan",
+     32.53556425802182,
+     37.92984271386627,
+     15433,
+     16384
+    ],
+    [
+     "shadowTexturedPan",
+     36.29249561622072,
+     38.659265566202365,
+     15570,
+     16384
+    ],
+    [
+     "shadowPlainPan",
+     34.20568676923795,
+     34.6731001263234,
+     15570,
+     16384
+    ],
+    [
+     "floorPan",
+     38.96776892761704,
+     39.28327085028617,
+     15150,
+     16384
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

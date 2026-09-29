@@ -218,8 +218,8 @@ console.log("\n4. *** THE ROUND'S OWN PREMISE, MEASURED AND REFUSED ***");
     const p = SERIAL_PROBE_V4580;
     const ratio = p.sumOfPerGateMs / p.wallMs;
     say("89 gates, sum of per-gate ms / wall clock", `${p.sumOfPerGateMs} / ${p.wallMs} = ${ratio.toFixed(3)}x`);
-    REPORT.table("the serial probe (frozen at v4580)", ["selected", "passing", "failing", "sum of per-gate ms", "wall ms", "ratio"],
-        [[p.selected, p.passing, p.failing, p.sumOfPerGateMs, p.wallMs, ratio]]);
+    REPORT.table("the serial probe (frozen at v4580)", ["probe", "selected", "passing", "failing", "sum of per-gate ms", "wall ms", "ratio"],
+        [["serial probe at v4580", p.selected, p.passing, p.failing, p.sumOfPerGateMs, p.wallMs, ratio]]);
 
     // THE SIGNATURE. Under a pool of W workers the per-gate times sum to about W x the wall clock; under a
     // serial loop they sum to slightly UNDER it, the gap being the parent's own work between spawns.

@@ -1,0 +1,60 @@
+{
+ "gate": "tools/ship/skipReading-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the cost of capturing a gate's output, eight gates three times each way (frozen at v4582)",
+   "columns": [
+    "probe",
+    "gates",
+    "ignore ms",
+    "capture ms",
+    "per-gate overhead ms",
+    "sampled gates faster captured"
+   ],
+   "rows": [
+    [
+     "capture cost at v4582",
+     8,
+     635,
+     646,
+     1.375,
+     2
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "sweep readings that were a skip, not a run",
+   "columns": [
+    "gate",
+    "sweep held ms",
+    "skip ms",
+    "ratio"
+   ],
+   "rows": [
+    [
+     "render/holoAgree-selfcheck.mjs",
+     164,
+     69,
+     2.3768115942028984
+    ],
+    [
+     "render/holoPicture-selfcheck.mjs",
+     234,
+     69,
+     3.391304347826087
+    ],
+    [
+     "tools/ship/pageFxOverlay-selfcheck.mjs",
+     175,
+     49,
+     3.5714285714285716
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

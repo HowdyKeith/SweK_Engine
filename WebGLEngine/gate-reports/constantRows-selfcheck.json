@@ -1,0 +1,29 @@
+{
+ "gate": "tools/ship/constantRows-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the obvious predicate against this file's",
+   "columns": [
+    "predicate",
+    "flagged",
+    "conditions scanned"
+   ],
+   "rows": [
+    [
+     "loose",
+     23722,
+     30798
+    ],
+    [
+     "this file's rows",
+     11,
+     31004
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

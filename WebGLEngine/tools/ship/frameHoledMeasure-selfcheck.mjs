@@ -67,7 +67,7 @@ const H = h9(per, d);
     for (const q of d.ratios) say(`${q}x: scene / holed frames at mean advantage / clean frames at mean / contrast (clean minus holed) -- ` +
         d.scenes.map((s) => `${s} ${per[q][s].nHoled}@${per[q][s].holedAdv.toFixed(3)}/${per[q][s].nClean}@${per[q][s].cleanAdv.toFixed(3)}/${per[q][s].contrast.toFixed(3)}`).join("  "));
         REPORT.table("holed frames against clean ones, per scene", ["ratio", "scene", "holed frames", "holed: mean advantage dB", "clean frames", "clean: mean advantage dB", "contrast, clean minus holed"],
-            d.ratios.flatMap((q) => d.scenes.map((s) => [q, s, per[q][s].nHoled, per[q][s].holedAdv, per[q][s].nClean, per[q][s].cleanAdv, per[q][s].contrast])));
+            d.ratios.flatMap((q) => d.scenes.map((s) => [Number(q), s, per[q][s].nHoled, per[q][s].holedAdv, per[q][s].nClean, per[q][s].cleanAdv, per[q][s].contrast])));
     const c15 = H.cells["1.5"], c3 = H.cells["3"];
     const rev = d.scenes.filter((s) => per["1.5"][s].contrast <= 0);
     ok("*** at 1.5x the t-test clears and the EXACT SIGN TEST DOES NOT: 6 of 7 is 8/128 -- and the one scene against it is checker ***",

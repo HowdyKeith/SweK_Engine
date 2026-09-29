@@ -194,8 +194,8 @@ console.log("\n2. *** THE SWEEP COULD NOT SEE A SKIP, AND THAT WAS A DELIBERATE 
     const perGate = (c.captureMs - c.ignoreMs) / c.gates;
     say("eight gates, ignore / capture", `${c.ignoreMs} ms / ${c.captureMs} ms = ${(c.captureMs / c.ignoreMs).toFixed(3)}x`);
     say("per-gate overhead, and over a full sweep", `${perGate.toFixed(1)} ms -> ${(perGate * 1642 / 1000).toFixed(1)} s`);
-    REPORT.table("the cost of capturing a gate's output, eight gates three times each way (frozen at v4582)", ["gates", "ignore ms", "capture ms", "per-gate overhead ms", "sampled gates faster captured"],
-        [[c.gates, c.ignoreMs, c.captureMs, perGate, c.faster]]);
+    REPORT.table("the cost of capturing a gate's output, eight gates three times each way (frozen at v4582)", ["probe", "gates", "ignore ms", "capture ms", "per-gate overhead ms", "sampled gates faster captured"],
+        [["capture cost at v4582", c.gates, c.ignoreMs, c.captureMs, perGate, c.faster]]);
     ok("*** the cost of seeing is within noise, and it is stated as within noise rather than as a number ***",
         perGate < 5 && c.faster >= 1,
         `${perGate.toFixed(1)} ms a gate, and ${c.faster} of the ${c.gates} sampled gates came out FASTER captured ` +

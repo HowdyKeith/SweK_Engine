@@ -1,0 +1,68 @@
+{
+ "gate": "tools/ship/timingProvenance-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the serial probe (frozen at v4580)",
+   "columns": [
+    "probe",
+    "selected",
+    "passing",
+    "failing",
+    "sum of per-gate ms",
+    "wall ms",
+    "ratio"
+   ],
+   "rows": [
+    [
+     "serial probe at v4580",
+     89,
+     86,
+     3,
+     30525,
+     51259,
+     0.5955051795782204
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "one runner sample against the median of three (frozen at v4580)",
+   "columns": [
+    "gate",
+    "runner ms",
+    "median ms",
+    "runs ms"
+   ],
+   "rows": [
+    [
+     "physics/render/principled-selfcheck.mjs",
+     1523,
+     1552,
+     "1530/1563/1552"
+    ],
+    [
+     "tools/roundhouse/hmcGpu-selfcheck.mjs",
+     241,
+     204,
+     "210/199/204"
+    ],
+    [
+     "tools/ship/avatarMorph-selfcheck.mjs",
+     99,
+     105,
+     "102/105/108"
+    ],
+    [
+     "tools/ship/spacesimStart-selfcheck.mjs",
+     1486,
+     124,
+     "128/124/123"
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

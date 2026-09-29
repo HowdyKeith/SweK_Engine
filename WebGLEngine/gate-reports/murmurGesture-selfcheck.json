@@ -1,0 +1,58 @@
+{
+ "gate": "tools/ship/murmurGesture-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "gesture slots: murmur against the repair",
+   "columns": [
+    "species",
+    "frames",
+    "murmur: jumps > 1",
+    "murmur: worst jump",
+    "murmur: env step",
+    "murmur: re-seeded mid-gesture",
+    "repaired: jumps > 1",
+    "repaired: worst jump",
+    "repaired: env step"
+   ],
+   "rows": [
+    [
+     "tempest",
+     1673,
+     16,
+     21,
+     0.9950179439614929,
+     1,
+     0,
+     1,
+     0.03991768024239065
+    ],
+    [
+     "abyss",
+     1673,
+     28,
+     5,
+     0.9996483372553505,
+     9,
+     0,
+     1,
+     0.058464153844980826
+    ],
+    [
+     "still",
+     1673,
+     49,
+     4,
+     0.9988868380431779,
+     4,
+     0,
+     1,
+     0.09290415918504269
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

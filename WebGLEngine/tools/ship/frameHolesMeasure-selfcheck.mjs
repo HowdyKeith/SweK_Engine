@@ -59,7 +59,7 @@ const H = h8(per, d);
     for (const sp of d.speeds) say(`x${sp}: scene / mean hole fraction / frames with any hole / mean genDb-cfDb / within rho -- ` +
         d.scenes.map((s) => `${s} ${per[sp][s].holes.toFixed(5)}/${cache[sp][s].map(holeRow).filter((f) => f.holes > 0).length}of${per[sp][s].n}/${per[sp][s].adv.toFixed(3)}/${per[sp][s].rho === null ? "none" : per[sp][s].rho.toFixed(2)}`).join("  "));
         REPORT.table("hole fraction against generation's advantage, per scene", ["speed", "scene", "mean hole fraction", "frames with any hole", "frames", "mean genDb - cfDb", "within rho"],
-            d.speeds.flatMap((sp) => d.scenes.map((s) => [sp, s, per[sp][s].holes, cache[sp][s].map(holeRow).filter((f) => f.holes > 0).length, per[sp][s].n, per[sp][s].adv, per[sp][s].rho])));
+            d.speeds.flatMap((sp) => d.scenes.map((s) => [Number(sp), s, per[sp][s].holes, cache[sp][s].map(holeRow).filter((f) => f.holes > 0).length, per[sp][s].n, per[sp][s].adv, per[sp][s].rho])));
     const x1 = H.cells["1"], noHoles = d.scenes.filter((s) => cache["1"][s].every((r) => holeRow(r).holes === 0));
     ok("*** x1 CANNOT ANSWER: the splat leaves no hole in any frame of six scenes, one scene is usable, five were needed ***",
        !x1.reportable && x1.usable.length === 1 && noHoles.length === 6,

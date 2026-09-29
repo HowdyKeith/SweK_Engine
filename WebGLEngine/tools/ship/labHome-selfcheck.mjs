@@ -148,7 +148,7 @@ sec("E. *** THE PAGE IN A BROWSER WITH NO BRIDGE: IT LOADS, PAINTS THE PRESETS, 
             const p = r.result;
             ok("the page loaded, and with no bridge it says the bridge is unreachable rather than inventing a registry", /bridge not reachable/.test(p.door), p.door.slice(0, 120));
             ok(`the presets band painted every curated preset (${p.presets}), all disabled, each with its sources line`, p.presets === PRESETS.length && p.enabled === 0 && /not assessed|not run/.test(p.firstSrc) && p.initiateDisabled === true, `${p.presets} presets, ${p.enabled} enabled, in ${p.ms.toFixed(0)} ms`);
-            REPORT.table("the lab home page with no bridge", ["curated presets", "presets painted", "presets enabled", "load ms"], [[PRESETS.length, p.presets, p.enabled, p.ms]]);
+            REPORT.table("the lab home page with no bridge", ["page", "curated presets", "presets painted", "presets enabled", "load ms"], [["lab home, no bridge", PRESETS.length, p.presets, p.enabled, p.ms]]);
         }
     }
 }

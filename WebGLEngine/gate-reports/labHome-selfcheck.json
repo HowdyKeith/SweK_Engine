@@ -1,0 +1,28 @@
+{
+ "gate": "tools/ship/labHome-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "the lab home page with no bridge",
+   "columns": [
+    "page",
+    "curated presets",
+    "presets painted",
+    "presets enabled",
+    "load ms"
+   ],
+   "rows": [
+    [
+     "lab home, no bridge",
+     25,
+     25,
+     0,
+     203.79999999981374
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

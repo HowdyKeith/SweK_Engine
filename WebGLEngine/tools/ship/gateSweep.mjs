@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
+    since477: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened fifty-six.
+        at: "v4780", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateReport-selfcheck.mjs (a non-finite or missing cell stored as its name; the arrivals row green)",
+                                "55 gates that print tables now emit them: 41 fx/fsr, render and genGate/frame*Measure gates of this line, 14 murmur and ship gates"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A STANDING RED NO VERIFY SAW: 55 GATES PRINTED TABLES AND EMITTED NO REPORT. *** gateReport-selfcheck's arrivals row " +
+                 "names every gate outside its frozen v4399 list that argues in numbers and writes nothing a second reader can open; it " +
+                 "sits over the sweep's budget, so no verify ran it, and it had grown to 55 -- 41 of them this line's FSR, frame-generation " +
+                 "and genGate gates. Each now puts the table it already prints into a report, the numbers as numbers: 86 gates emit, 69 " +
+                 "argue and do not, exactly the frozen list. Three things the wiring found: a PSNR of identical images is Infinity and JSON " +
+                 "writes it as null, which the page shows as an empty cell -- table() stores a non-finite number as its name and a missing " +
+                 "one as \"none\"; object keys are strings, so three reports stored \"20\" and \"1.5\" as text until they were numbers " +
+                 "again; and a one-row table with a numeric first column is plotted as a single point, so those three lead with a name. " +
+                 "fsrFlowCost read 21% against its 20% band beside three other device gates and 15% alone. Four sabotages red.",
+    }),
     // v4779 -- THE 383rd CLOSING: the motion field where three draws and nowhere else -- the mesh zoo's gaps.
     since476: Object.freeze({
         at: "v4779", swept: 1, green: 1, red: 0,

@@ -1,0 +1,64 @@
+{
+ "gate": "tools/ship/genGateTransfer-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "C9: held-out AUC per fold, reported because declared and not promoted",
+   "columns": [
+    "arm",
+    "held-out fold",
+    "AUC"
+   ],
+   "rows": [
+    [
+     "v2",
+     "smooth",
+     0.5325172135059733
+    ],
+    [
+     "v2",
+     "zone",
+     0.5128292152957366
+    ],
+    [
+     "v2",
+     "checker",
+     0.5585222713816079
+    ],
+    [
+     "v1",
+     "smooth",
+     0.4438232153186262
+    ],
+    [
+     "v1",
+     "zone",
+     0.46792563475059035
+    ],
+    [
+     "v1",
+     "checker",
+     0.6458833303697302
+    ],
+    [
+     "shuffled",
+     "smooth",
+     0.4570954747505176
+    ],
+    [
+     "shuffled",
+     "zone",
+     0.48151678961652566
+    ],
+    [
+     "shuffled",
+     "checker",
+     0.5448892404665306
+    ]
+   ],
+   "note": "the pooled AUC is not usable -- section 1"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

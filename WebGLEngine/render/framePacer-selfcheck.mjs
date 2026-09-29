@@ -10,6 +10,7 @@
 import { makeFramePacer, scheduleCPU, scheduleVrrCPU, pacingMetrics, PACE_POLICIES, refreshFromStamps, makeLivePacing } from "./framePacer.mjs";
 import { gateReport } from "../tools/ship/gateReport.mjs";
 const REPORT = gateReport("render/framePacer-selfcheck.mjs");
+const fpsOf = (k) => (Number.isFinite(+k) ? +k : k);   // "30" is a number in a report; "30+-5" stays a name
 
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
@@ -42,7 +43,7 @@ for (const [cn, d] of Object.entries(CASES)) {
 console.log("\n2. THE DESIGN CASE: 30 REAL FRAMES A SECOND ON A 60 Hz DISPLAY");
 for (const [cn, m] of Object.entries(M)) say(`${cn.padEnd(5)} fps  ` + PACE_POLICIES.map((p) => `${p} judder ${m[p].judder.toFixed(2)} ms, ${m[p].newPerSecond.toFixed(1)} new/s, latency ${m[p].meanLatency.toFixed(1)} (${m[p].maxLatency.toFixed(1)})`).join(" | "));
 REPORT.table("each policy on a 60 Hz display, by real frame rate", ["real fps", "policy", "judder ms", "new images a second", "mean latency ms", "worst latency ms"],
-    Object.entries(M).flatMap(([cn, m]) => PACE_POLICIES.map((p) => [cn, p, m[p].judder, m[p].newPerSecond, m[p].meanLatency, m[p].maxLatency])));
+    Object.entries(M).flatMap(([cn, m]) => PACE_POLICIES.map((p) => [fpsOf(cn), p, m[p].judder, m[p].newPerSecond, m[p].meanLatency, m[p].maxLatency])));
 {
     const m = M["30"];
     ok(`*** without generation every image is shown twice -- ${m.none.newPerSecond.toFixed(1)} new a second and ${m.none.judder.toFixed(2)} ms of judder, a staircase; with it, ${m.midpoint.newPerSecond.toFixed(1)} and ${m.midpoint.judder.toFixed(2)} ***`,
@@ -159,9 +160,9 @@ console.log("\n8. v4747 -- ONLY THE PAIR THE GENERATOR HOLDS");
     const any = cs.map((c) => run(c, { pairs: "any" })), nw = cs.map((c) => run(c, {})), nwm = cs.map((c) => run(c, { margin: R / 4 }));
     say(`timed, frames rendered back to back: ${cs.map((c, i) => `${c}: any ${any[i].older} older, judder ${any[i].judder.toFixed(2)}; newest ${nw[i].older}, ${nw[i].judder.toFixed(2)}; newest with a quarter refresh of margin ${nwm[i].judder.toFixed(2)}`).join(" | ")}`);
     REPORT.table("each policy on a variable refresh, 48 to 144 Hz", ["real fps", "policy", "judder ms", "new images a second", "mean latency ms"],
-        Object.entries(V).flatMap(([cn, v]) => Object.entries(v).map(([k, m]) => [cn, k, m.judder, m.newPerSecond, m.meanLatency])));
+        Object.entries(V).flatMap(([cn, v]) => Object.entries(v).map(([k, m]) => [fpsOf(cn), k, m.judder, m.newPerSecond, m.meanLatency])));
     REPORT.table("timed, frames rendered back to back: which pairs it may draw from", ["real fps", "any pair: older", "any pair: judder ms", "newest: older", "newest: judder ms", "newest, quarter-refresh margin: judder ms"],
-        cs.map((c, i) => [c, any[i].older, any[i].judder, nw[i].older, nw[i].judder, nwm[i].judder]));
+        cs.map((c, i) => [fpsOf(c), any[i].older, any[i].judder, nw[i].older, nw[i].judder, nwm[i].judder]));
     ok(`*** v4743's timed generation asked for frames the generator no longer holds -- ${any.map((m) => m.older).join(", ")} times at 24, 30, 40, 45 and 30 +-5 frames a second -- and now asks for none, at the same judder at an even rate (${nw.slice(0, 4).map((m) => m.judder.toFixed(2)).join(", ")}) ***`,
        any.every((m) => m.older > 0) && nw.every((m) => m.older === 0) && nw.slice(0, 4).every((m) => m.judder < 1e-6) && nw[4].judder < 3,
        "with frames rendered back to back the line is an interval, a render and a margin behind, and a quarter refresh of margin put the refresh after each new frame in the pair before it. fx/fsr/fsr3Pacing-selfcheck.mjs had every frame ready the moment it started, where that cannot happen; fx/fsr/fsr3Late-selfcheck.mjs refused 12 requests on the device");

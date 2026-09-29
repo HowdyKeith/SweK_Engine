@@ -1,0 +1,93 @@
+{
+ "gate": "render/opticalFlow-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "whole-pixel shifts found, by pyramid depth",
+   "columns": [
+    "shift x",
+    "shift y",
+    "levels",
+    "blocks exact",
+    "confident blocks"
+   ],
+   "rows": [
+    [
+     3,
+     -2,
+     1,
+     64,
+     64
+    ],
+    [
+     3,
+     -2,
+     3,
+     59,
+     64
+    ],
+    [
+     9,
+     -7,
+     1,
+     0,
+     50
+    ],
+    [
+     9,
+     -7,
+     3,
+     34,
+     55
+    ],
+    [
+     14,
+     11,
+     1,
+     0,
+     55
+    ],
+    [
+     14,
+     11,
+     3,
+     33,
+     52
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "fractional shifts: mean error, whole-pixel against refined",
+   "columns": [
+    "shift x",
+    "shift y",
+    "whole-pixel px",
+    "refined px"
+   ],
+   "rows": [
+    [
+     3.5,
+     -2,
+     0.5,
+     0.072213591997401
+    ],
+    [
+     2.25,
+     1.75,
+     0.3535533905932734,
+     0.19678425136345565
+    ],
+    [
+     3.4,
+     -1.6,
+     0.5851135287171825,
+     0.21885031339324773
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

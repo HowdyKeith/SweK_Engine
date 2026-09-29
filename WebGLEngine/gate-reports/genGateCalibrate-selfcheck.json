@@ -1,0 +1,54 @@
+{
+ "gate": "tools/ship/genGateCalibrate-selfcheck.mjs",
+ "at": "2026-09-29",
+ "tables": [
+  {
+   "title": "H2: each arm's mean generated dB over the held-out frames",
+   "columns": [
+    "arm",
+    "frames",
+    "mean gen dB",
+    "gate",
+    "mean blocks kept",
+    "blocks"
+   ],
+   "rows": [
+    [
+     "off",
+     33,
+     11.999999999999998,
+     "none",
+     "none",
+     "none"
+    ],
+    [
+     "cpu2",
+     33,
+     11.979696969696967,
+     "the CPU, tau 0.3667",
+     0.030303030303030304,
+     576
+    ],
+    [
+     "oracle",
+     33,
+     12.319090909090907,
+     "ORACLE (C1, sees the answer)",
+     437.6060606060606,
+     576
+    ],
+    [
+     "never",
+     33,
+     11.979696969696967,
+     "always cross-fade (C2)",
+     0,
+     576
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
