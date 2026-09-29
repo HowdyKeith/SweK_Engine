@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import * as BT from "./boxTimings.mjs";
 import { boxId } from "./hostScale.mjs";
+import { ownerOf, RECORD_HANDOVERS } from "./quickSweep.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -152,15 +153,23 @@ console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***")
     const live = BT.coverage(BT.ENG);
     report(`live: ${live.records.length} record(s), ${live.entries.size} gates covered, ` +
         `${live.localCount} measured on this box (${live.thisBox}), ${live.foreignCount} elsewhere`);
-    ok("!! the shared record is present and is NOT this box's, which is the whole situation",
-        live.records.some((r) => r.kind === "shared") &&
-        live.records.find((r) => r.kind === "shared").host !== live.thisBox,
-        `shared record belongs to ${live.records.find((r) => r.kind === "shared").host}; this box is ` +
-        `${live.thisBox}. Neither the rig nor this container can write it, which is why coverage had to stop ` +
-        "being asked of it");
+    // *** v4778 -- THIS ROW SAID "NEITHER THE RIG NOR THIS CONTAINER CAN WRITE IT", AND AT v4778 THAT BECAME
+    // THE BLOCKER RATHER THAN THE SITUATION. *** The owner container retired, and three gates that read the
+    // rotation could no longer be satisfied by any box. Keith handed the record to the rig (quickSweep.mjs's
+    // RECORD_HANDOVERS). So the row now asks the question that decides whether anyone CAN write it: does the
+    // record's owner, after handovers, resolve to the box the last handover named? A sabotage that empties the
+    // handover list leaves the owner a retired container and turns this red.
+    const shared = live.records.find((r) => r.kind === "shared");
+    const owner = shared ? ownerOf(shared.host) : null, last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
+    ok("!! the shared record is present and its owner, after handovers, is a box that can still write it",
+        !!shared && !!last && owner === last.to,
+        `shared record names ${shared && shared.host}; its owner is ${owner}; this box is ${live.thisBox}` +
+        (owner === live.thisBox ? " and writes it" : ", so it writes its own file") + ". Coverage still reads " +
+        "every box's record, which is why it had to stop being asked of this one");
     ok("!! *** and the BUDGET still reads the shared file alone -- stated, not quietly fixed ***",
         /costOf/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")) &&
-        !/boxTimings/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")),
+        // v4778: an IMPORT, not the word -- quickSweep's handover note cites this module's header in a comment
+        !/^\s*import[^;]*["']\.\/boxTimings\.mjs["']/m.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")),
         "quickSweep does not import this module. On the rig that means gate SELECTION is still computed from a " +
         "foreign box's numbers -- 91 of 1,409 read over budget there for that reason. Task #87, and it changes " +
         "which gates run, so it is not smuggled into a round about a staleness row");

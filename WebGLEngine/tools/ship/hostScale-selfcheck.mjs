@@ -16,7 +16,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { hostScale, scaled, recordRun, boxId, hostFacts, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
-import { timingsTarget, LOCAL_TIMINGS, DEFAULTS } from "./quickSweep.mjs";
+import { timingsTarget, LOCAL_TIMINGS, DEFAULTS, RECORD_HANDOVERS, ownerOf } from "./quickSweep.mjs";
 import { ENG as ROOT } from "./gateSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
@@ -316,6 +316,32 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
        theirs.why);
     ok("  ...and the refusal names BOTH boxes, because 'wrong machine' is not a thing anybody can act on",
        theirs.why.includes("win32-x64-16c-32000mb-abcdef") && theirs.why.includes(ME));
+    // *** v4778 -- A HANDOVER MOVES THE RIGHT TO WRITE, AND NOTHING ELSE. *** The owner box retired with a container
+    // restart; RECORD_HANDOVERS says who writes next. Driven on fixed names, so the rows mean the same on every box.
+    // SABOTAGED at v4778: RECORD_HANDOVERS emptied -> the live-handover row here and boxTimings' owner row both red,
+    // by name; the first draft let a retired box that named itself keep writing, and the refused-owner row caught it.
+    {
+        const H = [{ at: "vX", from: "old-box", to: "new-box" }, { at: "vY", from: "new-box", to: "third-box" }];
+        const took = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H.slice(0, 1) });
+        const left = timingsTarget({ host: "old-box" }, { id: "old-box", handovers: H.slice(0, 1) });
+        const other = timingsTarget({ host: "old-box" }, { id: "stranger", handovers: H.slice(0, 1) });
+        const chain = timingsTarget({ host: "old-box" }, { id: "third-box", handovers: H });
+        const middle = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H });
+        ok("!! *** a HANDOVER lets the named box write the shared file, and says it was handed over ***",
+           took.file === DEFAULTS.timingsFile && !took.foreign && took.host === "new-box" && /handed/.test(took.why),
+           took.why);
+        ok("!! ...and the box that handed it on is REFUSED like any stranger -- two owners is the defect",
+           left.foreign && left.file === LOCAL_TIMINGS && other.foreign && other.why.includes("new-box"),
+           left.why);
+        ok("  ...and a chain is followed to its end, so a later handover appends rather than edits",
+           !chain.foreign && middle.foreign, `third-box ${chain.foreign ? "refused" : "owns"}, new-box ` +
+           `${middle.foreign ? "refused" : "owns"}`);
+        ok("!! *** the live handover names the retired sandbox and the rig, and was decided rather than assumed ***",
+           RECORD_HANDOVERS.length >= 1 && RECORD_HANDOVERS.every((h) => h.at && h.from && h.to && h.decidedBy &&
+               h.evidence && h.from !== h.to) &&
+           ownerOf("linux-x64-4c-16096mb-142c0d") === "win32-x64-12c-32678mb-b70b27",
+           RECORD_HANDOVERS.map((h) => `${h.at}: ${h.from} -> ${h.to} (${h.decidedBy})`).join("; "));
+    }
     ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
        /\.local\.json$/.test(LOCAL_TIMINGS),
        "host-timings.local.json, vba-archive.local.json, services.local.json -- and .gitignore carries it, so " +

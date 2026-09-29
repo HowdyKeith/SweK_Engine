@@ -237,13 +237,60 @@ export const LOCAL_TIMINGS = "tools/ship/sweep-timings.local.json";
  * write it. That is right rather than convenient: the numbers in it were produced by whichever box has been
  * running the sweep, and that is the box about to write.
  */
-export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, id = boxId() } = {}) {
+export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, id = boxId(),
+                                        handovers = RECORD_HANDOVERS } = {}) {
     const was = prior && prior.host;
     if (!was) return { file, host: id, foreign: false, why: `no box was named in the record; ${id} adopts it` };
-    if (was === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    const owner = ownerOf(was, handovers);
+    // the handover is asked FIRST: a box that handed the record on names itself in `host` until the new owner
+    // writes, and reading that as ownership would make two owners -- the hostScale-selfcheck row caught it
+    if (was === id && owner === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    if (owner === id) {
+        const h = handovers.find((x) => x.to === id);
+        return { file, host: id, foreign: false,
+                 why: `the record names ${was}, which handed it to this box (${id}) at ${h ? h.at : "?"}` };
+    }
     return { file: local, host: id, foreign: true,
-             why: `the record belongs to ${was} and this box is ${id} -- writing ${local} instead, because two ` +
-                  `machines' runtimes in one set of fields is not a record, it is whichever ran last` };
+             why: `the record belongs to ${owner}${owner !== was ? ` (handed over from ${was})` : ""} and this box ` +
+                  `is ${id} -- writing ${local} instead, because two machines' runtimes in one set of fields is ` +
+                  `not a record, it is whichever ran last` };
+}
+
+// *** v4778 -- THE OWNER BOX RETIRED, SO OWNERSHIP MOVES BY A DATED RECORD, NEVER BY EDITING `host`. ***
+//
+// boxTimings.mjs's v4679 header saw this coming: the record's host is "a LINUX 4-core container ... ephemeral
+// and gone, and a new one hashes differently because boxId() includes an md5 of the CPU model". At v4778 it
+// happened. The container restarted mid-round as linux-x64-4c-16096mb-420793, the shared record still named
+// linux-x64-4c-16096mb-142c0d, and every writer here refused it -- correctly -- so the rotation that
+// capReading, sweepCoverage and recordReach read could no longer be recorded by anyone, on any box.
+//
+// The one-line fix, rewriting `host` to the new box, is the thing v4647 exists to forbid: it would file one
+// machine's runtimes under another's name. A handover is different in kind -- it says WHO may write next and
+// leaves every existing entry attributed to the box that measured it (each carries its own `at`). Keith chose
+// the rig as the new owner at v4778, because it is the only box that persists: a sandbox changes silicon on
+// every restart, so handing the record to one would strand it again at the next. Every other box, the retired
+// one included, keeps writing its own file.
+//
+// The chain is followed, so a later handover appends a row rather than editing this one, and a box that has
+// handed the record on is refused like any stranger -- two owners is the defect, not a convenience.
+export const RECORD_HANDOVERS = Object.freeze([
+    Object.freeze({ at: "v4778", from: "linux-x64-4c-16096mb-142c0d", to: "win32-x64-12c-32678mb-b70b27",
+        decidedBy: "Keith",
+        evidence: "142c0d is the host of every sandbox reading from v4647 to the post-merge full sweep of " +
+                  "2026-09-29T03:33Z; the container restarted at about 15:20Z and came back as 420793. The rig's " +
+                  "id is read off its own v4777 clone verify, where it reports itself 13 times." }),
+]);
+
+/** The box that may write a record whose `host` reads `host`, after following every handover. */
+export function ownerOf(host, handovers = RECORD_HANDOVERS) {
+    let h = host;
+    const seen = new Set();
+    for (;;) {
+        const next = handovers.find((x) => x.from === h);
+        if (!next || seen.has(h)) return h;
+        seen.add(h);
+        h = next.to;
+    }
 }
 
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
