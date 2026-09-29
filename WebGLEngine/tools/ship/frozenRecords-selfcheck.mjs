@@ -25,7 +25,7 @@
 // already moved it, which is why the frozen number is compared against nothing live.
 "use strict";
 import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
-         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, SWEEP_COMMIT_RECORD_NAMES, ENG, clearScanCache, guardianSearch, guardianSearchNaive }
+         PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, SWEEP_COMMIT_RECORD_NAMES, NAME_TABLES, readSites, ENG, clearScanCache, guardianSearch, guardianSearchNaive }
     from "./frozenRecords.mjs";
 import { stripComments } from "../../vba/runtimeGap.mjs";
 import * as TR from "./treeRead.mjs";
@@ -469,6 +469,22 @@ console.log("\n2. the observer effect, checked to be exactly one");
     // can answer (every full checkout: the rig's tree, this sandbox), exactly, both directions. On a shallow clone the
     // check cannot run and says so in its detail -- the list it would check is the one the row above just used, and
     // it was verified on the full checkout the same round shipped from.
+    // v4776 -- AND THE LIST IS A MENTION, NOT A READ. readSites blanks every table NAME_TABLES names; without that, the 77
+    // names above moved seven documentary records to "read by code" in recordReach. Driven on the table's own file:
+    // for every listed name, frozenRecords.mjs may count as a reader only where the name appears OUTSIDE the table.
+    {
+        const tableFile = path.join(ENG, "tools", "ship", "frozenRecords.mjs");
+        const raw = fs.readFileSync(tableFile, "utf8");
+        const at = raw.indexOf("export const SWEEP_COMMIT_RECORD_NAMES = Object.freeze(["), end = raw.indexOf("]);", at);
+        const outside = raw.slice(0, at) + raw.slice(end + 3);
+        const sites = readSites(SWEEP_COMMIT_RECORD_NAMES);
+        const wrong = SWEEP_COMMIT_RECORD_NAMES.filter((n) => (sites.get(n) || []).includes("tools/ship/frozenRecords.mjs") &&
+            !new RegExp("\\b" + n + "\\b").test(stripComments(outside)));
+        ok("!! ...and readSites does not count the frozen list as reading the records it lists (NAME_TABLES)",
+            NAME_TABLES.includes("SWEEP_COMMIT_RECORD_NAMES") && at > 0 && end > at && wrong.length === 0,
+            `${SWEEP_COMMIT_RECORD_NAMES.length} names checked; ${wrong.length} credited to frozenRecords.mjs by the table alone` +
+            (wrong.length ? ` -- ${wrong.slice(0, 5).join(", ")}` : ""));
+    }
     ok("!! ...and the frozen list of the commit's records IS the commit's list, wherever git can say",
         !gitNames || (gitNames.size === frozenNames.size && [...gitNames].every((n) => frozenNames.has(n))),
         gitNames ? `${frozenNames.size} frozen, ${gitNames.size} in ${REC.commit} per git, ` +
