@@ -199,6 +199,18 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          (capsuleGround, capsuleMove, capsuleSettle, fallBody, groundProbe); and
     //          simulation/OceanPopulation. GROWTH ONLY, IN AREAS THAT ARE LIVE WORK. Re-recorded with
     //          --write AFTER compare() had been read, never before.
+    //   558 -> v4778 -- 542 -> 558 at the rtx merge: the sixteen physics modules the rtx line
+    //          (claude/shader-porting-swek-ozgvb0) built. compare(), read BEFORE writing, reports GREW, 16
+    //          ADDED, 0 REMOVED, reconciles:true, totals splitting physics/mesh +7, physics/mechanics +5,
+    //          physics/character +2, physics +1, physics/render +1 -- the BVH-CSG arc (bvhPairOverlap,
+    //          triTriIntersect, triClip, meshPointClassify, triFragmentAccumulate, meshBoolean) and
+    //          mesh/mikktSpace; the 6DOF and flight arc (mechanics/rigidBody6dof, rigidBody6dofCollision,
+    //          rigidBody6dofWeapon, aeroSurface, aircraftAssembly) and physics/obbManifold.js;
+    //          character/capsuleCollide and capsuleCollideTsl; render/lcgConstants. ATTRIBUTED, NOT ASSUMED:
+    //          a git archive of 978d26e3 (main before the merge) measures 542 and UNCHANGED against the
+    //          record, every one of the sixteen is absent there and present at the rtx tip ea420f4b, and
+    //          HEAD's population is exactly 978d26e3's union the rtx tip's -- nothing the post-merge fix
+    //          commits added, nothing lost. Re-recorded with --write AFTER compare() had been read.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so

@@ -31,7 +31,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -40,50 +40,59 @@ function argVal(flag) {
     return i === -1 ? null : process.argv[i + 1];
 }
 
-const inArg = argVal("--in"), outArg = argVal("--out"), circuitName = argVal("--circuit-name") || "circuit";
-const includeTypesArg = argVal("--include-types");
-if (!inArg || !outArg) {
-    console.error("bakeConnectomeTopology: --in <vendored json> and --out <brain/*Topology.mjs> are required");
-    process.exit(1);
-}
-const IN_PATH = path.resolve(ROOT, inArg);
-const OUT_PATH = path.resolve(ROOT, outArg);
-const includeTypes = includeTypesArg ? new Set(includeTypesArg.split(",").map((s) => s.trim())) : null;
+// v4778 -- A BAKE RUN BY HAND, AND NOW SAID SO WHERE tools/ship/orphanScan.mjs CAN READ IT. This file was all
+// top-level statements, and every `export` in it is TEXT of the module it writes (the template below) -- so the
+// scan took it for a module, found no importer (brain/epgTopology.mjs names it in a comment, and comments are not
+// reachability) and reported it as a new orphan at the rtx merge. It is not one: brain/drivePolicy.mjs imports
+// what it bakes, and it is reached by a person typing the Run: line above. A main
+// guard is the entry-point mark orphanScan's rule 4 reads and the one this tree's CLIs carry
+// (tools/render-qa/traceAscii.mjs, tools/shedding-settle.mjs), in the pathToFileURL form the Windows path law
+// asks for. Importing this file now does nothing, where it used to process.exit(1) on the missing --in.
+function bake() {
+    const inArg = argVal("--in"), outArg = argVal("--out"), circuitName = argVal("--circuit-name") || "circuit";
+    const includeTypesArg = argVal("--include-types");
+    if (!inArg || !outArg) {
+        console.error("bakeConnectomeTopology: --in <vendored json> and --out <brain/*Topology.mjs> are required");
+        process.exit(1);
+    }
+    const IN_PATH = path.resolve(ROOT, inArg);
+    const OUT_PATH = path.resolve(ROOT, outArg);
+    const includeTypes = includeTypesArg ? new Set(includeTypesArg.split(",").map((s) => s.trim())) : null;
 
-const data = JSON.parse(fs.readFileSync(IN_PATH, "utf8"));
-const neurons = includeTypes ? data.neurons.filter((n) => includeTypes.has(n.type)) : data.neurons;
-if (neurons.length === 0) throw new Error(`bakeConnectomeTopology: --include-types ${includeTypesArg} matched no neurons in ${inArg}`);
-const indexOf = new Map(neurons.map((n, i) => [n.bodyId, i]));
-// Every bodyId the vendored file itself knows about, filtered or not -- distinguishes a LEGITIMATE --include-types
-// exclusion (a real neuron, just not one this bake keeps a slot for) from a bodyId the file never vendored AT ALL,
-// which tools/bakeGfcTopology.mjs (the original this tool was generalized from) hard-fails on and this one, before
-// this fix, silently lumped into the same "dropped" counter as a type exclusion -- found by adversarial review: a
-// synthetic edge to a bodyId outside the vendored neuron set entirely produced 0 red here, where the original threw
-// immediately. A future circuit's fetch-script bug producing a genuinely dangling bodyId deserves the same loud
-// failure the original gave it, not a silent line in a counter indistinguishable from an expected exclusion.
-const allBodyIds = new Set(data.neurons.map((n) => n.bodyId));
+    const data = JSON.parse(fs.readFileSync(IN_PATH, "utf8"));
+    const neurons = includeTypes ? data.neurons.filter((n) => includeTypes.has(n.type)) : data.neurons;
+    if (neurons.length === 0) throw new Error(`bakeConnectomeTopology: --include-types ${includeTypesArg} matched no neurons in ${inArg}`);
+    const indexOf = new Map(neurons.map((n, i) => [n.bodyId, i]));
+    // Every bodyId the vendored file itself knows about, filtered or not -- distinguishes a LEGITIMATE --include-types
+    // exclusion (a real neuron, just not one this bake keeps a slot for) from a bodyId the file never vendored AT ALL,
+    // which tools/bakeGfcTopology.mjs (the original this tool was generalized from) hard-fails on and this one, before
+    // this fix, silently lumped into the same "dropped" counter as a type exclusion -- found by adversarial review: a
+    // synthetic edge to a bodyId outside the vendored neuron set entirely produced 0 red here, where the original threw
+    // immediately. A future circuit's fetch-script bug producing a genuinely dangling bodyId deserves the same loud
+    // failure the original gave it, not a silent line in a counter indistinguishable from an expected exclusion.
+    const allBodyIds = new Set(data.neurons.map((n) => n.bodyId));
 
-// Two things this bake deliberately does NOT re-derive, mirroring tools/bakeGfcTopology.mjs's own header:
-// (1) the from/to direction is trusted as-is from the vendored file, which trusts it from the raw Neuprint
-//     fetch's own [from, to] pair (Neuprint's :ConnectsTo semantics, per PROVENANCE.md) -- an untestable
-//     trust boundary, not a defect.
-// (2) each edge's real Neuprint synapse .weight (aggregated connection strength) is thrown away here --
-//     only which pairs are wired survives into EDGES, not how strongly. A policy's own ES trains its own
-//     weight for each real edge on top of the real topology, so a fixed biological strength would only
-//     fight the search, not inform it. What is real here is the WIRING, not the weights.
-const edgeSet = new Set();
-const edges = [];
-let droppedOutsideInclude = 0;
-for (const [from, to] of data.edges) {
-    if (!allBodyIds.has(from) || !allBodyIds.has(to)) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} references a bodyId outside ${inArg}'s own neuron set entirely -- not merely excluded by --include-types, genuinely dangling`);
-    const fromIdx = indexOf.get(from), toIdx = indexOf.get(to);
-    if (fromIdx === undefined || toIdx === undefined) { droppedOutsideInclude++; continue; }   // a real neuron, legitimately excluded by --include-types
-    if (fromIdx === toIdx) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} is a self-loop -- the recurrent core's identity term already covers self-persistence, and this bake has never seen one in the real data, so treat it as a surprise, not a case to silently absorb`);
-    const key = toIdx * neurons.length + fromIdx;
-    if (!edgeSet.has(key)) { edgeSet.add(key); edges.push([toIdx, fromIdx]); }
-}
+    // Two things this bake deliberately does NOT re-derive, mirroring tools/bakeGfcTopology.mjs's own header:
+    // (1) the from/to direction is trusted as-is from the vendored file, which trusts it from the raw Neuprint
+    //     fetch's own [from, to] pair (Neuprint's :ConnectsTo semantics, per PROVENANCE.md) -- an untestable
+    //     trust boundary, not a defect.
+    // (2) each edge's real Neuprint synapse .weight (aggregated connection strength) is thrown away here --
+    //     only which pairs are wired survives into EDGES, not how strongly. A policy's own ES trains its own
+    //     weight for each real edge on top of the real topology, so a fixed biological strength would only
+    //     fight the search, not inform it. What is real here is the WIRING, not the weights.
+    const edgeSet = new Set();
+    const edges = [];
+    let droppedOutsideInclude = 0;
+    for (const [from, to] of data.edges) {
+        if (!allBodyIds.has(from) || !allBodyIds.has(to)) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} references a bodyId outside ${inArg}'s own neuron set entirely -- not merely excluded by --include-types, genuinely dangling`);
+        const fromIdx = indexOf.get(from), toIdx = indexOf.get(to);
+        if (fromIdx === undefined || toIdx === undefined) { droppedOutsideInclude++; continue; }   // a real neuron, legitimately excluded by --include-types
+        if (fromIdx === toIdx) throw new Error(`bakeConnectomeTopology: edge ${from}->${to} is a self-loop -- the recurrent core's identity term already covers self-persistence, and this bake has never seen one in the real data, so treat it as a surprise, not a case to silently absorb`);
+        const key = toIdx * neurons.length + fromIdx;
+        if (!edgeSet.has(key)) { edgeSet.add(key); edges.push([toIdx, fromIdx]); }
+    }
 
-const body = `// WebGLEngine/${path.relative(ROOT, OUT_PATH).replace(/\\/g, "/")}
+    const body = `// WebGLEngine/${path.relative(ROOT, OUT_PATH).replace(/\\/g, "/")}
 //
 // BAKED by tools/bakeConnectomeTopology.mjs from ${path.relative(ROOT, IN_PATH).replace(/\\/g, "/")} -- do not hand-edit.
 // Source: Janelia FlyEM's male-cns connectome (dataset ${JSON.stringify(data.dataset)}), ${circuitName}.
@@ -105,9 +114,12 @@ export const EDGES = Object.freeze([
 ]);
 `;
 
-if (process.argv.includes("--write")) {
-    fs.writeFileSync(OUT_PATH, body);
-    console.log(`[bakeConnectomeTopology] wrote ${path.relative(ROOT, OUT_PATH)}: ${neurons.length} neurons, ${edges.length} edges (${droppedOutsideInclude} raw edges dropped for referencing a neuron outside --include-types)`);
-} else {
-    console.log(`[bakeConnectomeTopology] dry run: ${neurons.length} neurons, ${edges.length} edges, ${droppedOutsideInclude} dropped (pass --write to write ${path.relative(ROOT, OUT_PATH)})`);
+    if (process.argv.includes("--write")) {
+        fs.writeFileSync(OUT_PATH, body);
+        console.log(`[bakeConnectomeTopology] wrote ${path.relative(ROOT, OUT_PATH)}: ${neurons.length} neurons, ${edges.length} edges (${droppedOutsideInclude} raw edges dropped for referencing a neuron outside --include-types)`);
+    } else {
+        console.log(`[bakeConnectomeTopology] dry run: ${neurons.length} neurons, ${edges.length} edges, ${droppedOutsideInclude} dropped (pass --write to write ${path.relative(ROOT, OUT_PATH)})`);
+    }
 }
+
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) bake();

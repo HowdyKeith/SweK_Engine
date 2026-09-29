@@ -26,6 +26,10 @@
 //          Scoped as written: 0 in scope, 0 missed. The first draft of this module convicted it anyway, by
 //          running scan() tree-wide where gradeClaim() exists -- absenceScope's own item 1, committed
 //          inside the check written to apply it.
+//          *** v4778 -- NO LONGER HOLDS, AND IT SHOULD NOT. *** The rtx line CLOSED that entry by teaching
+//          gpu/GLBParser.js the accessor kind, so its row flipped to `built` at the merge -- the move the
+//          conductor-Fresnel rows made at v4538 for the same reason. 1 in scope and 18 out of scope,
+//          measured at the merge.
 //
 //   HOLDS  glb-export-conformance, on the reference validator it says the tree does not carry. 0 code.
 //
@@ -37,10 +41,18 @@
 //          a fragment shader -- which is the very architecture that entry calls foreign to this tree. Not
 //          denials, not mentions, not out of scope. Sixteen files of the thing the claim says is not there.
 //
-// *** THAT ENTRY IS NOT IN THIS TREE AND THE GATE CANNOT READ IT. *** It lives on the branch
-// origin/claude/shader-porting-swek-ozgvb0 and is absent from origin/main and from here, so it is recorded
-// in this header as the finding that prompted the round and is NOT one of the graded rows below. A gate
+// *** AT v4537 THAT ENTRY WAS NOT IN THIS TREE AND THE GATE COULD NOT READ IT. *** It lived on the branch
+// origin/claude/shader-porting-swek-ozgvb0 and was absent from origin/main and from here, so it was recorded
+// in this header as the finding that prompted the round and was NOT one of the graded rows below. A gate
 // that graded a file on another branch would be a gate whose subject can change without this tree moving.
+//
+// *** v4778 -- IT IS HERE NOW, AND CLOSED, SO IT IS GRADED. *** The sentence arrived at v4637 (the sentence
+// floor's note below records it), and the rtx merge brought that line's rewrite of the entry: CLOSED,
+// superseded by physics/render/rtPipeline.mjs's WebGPU ray-tracing pipeline and rtx-viewer.html, the old
+// grounds kept as history. The rewrite still did not say the grounds were false when written, so v4778 added
+// that to the entry, naming the voxel pass and the octree shader above. Its row below grades the corrected
+// entry -- `built`, on the name of the pipeline's hit stage -- and the CONTROL stays beside it, because a
+// row that asserts presence cannot also be the row this register is watched convicting.
 //
 // ---- WHY THE REGISTER IS A LIST, WHICH IS NORMALLY THIS TREE'S COMPLAINT --------------------------------
 //
@@ -83,9 +95,16 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 export const CLAIMS = Object.freeze([
     Object.freeze({
         id: "gltf-conformance-fixtures", frag: Object.freeze(["spar", "se"]), searched: Object.freeze(["gpu"]),
-        says: "the entry says that accessor kind has zero occurrences in the parser",
+        expect: "built",
+        says: "the entry SAID that accessor kind had zero occurrences in the parser, and it is CLOSED -- the " +
+              "other line built it, so this row now asserts the code is THERE (v4778)",
         why: "the scope is one directory and the term is a format feature. Tree-wide the token is mostly " +
-             "linear algebra, which is what makes the scope load-bearing rather than decorative.",
+             "linear algebra, which is what makes the scope load-bearing rather than decorative. *** v4778 -- " +
+             "FLIPPED FROM absent TO built AT THE rtx MERGE, the move the conductor-Fresnel rows made at " +
+             "v4538. *** The rtx line closed the entry by teaching gpu/GLBParser.js the accessor kind, gated by " +
+             "tools/ship/gltfConformance-selfcheck.mjs. The scope still carries weight in THIS direction: 18 " +
+             "code files outside gpu/ carry the token, so graded tree-wide the row would read built with the " +
+             "parser's code deleted. It no longer carries weight in sabotage D's -- see the selfcheck's list.",
     }),
     Object.freeze({
         id: "glb-export-conformance", frag: Object.freeze(["gltf-", "validator"]),
@@ -126,14 +145,31 @@ export const CLAIMS = Object.freeze([
         why: "as above. The row is kept rather than deleted: a claim that has flipped is evidence about the " +
              "tree, and a pair whose two halves now agree still says something a single row could not.",
     }),
+    Object.freeze({
+        // v4778 -- the entry the header's FAILS row is about, graded now that it is in this tree. The needle is
+        // joined for the same reason as every other: the pipeline stage it names is not spelt in this file.
+        id: "gpu-pathtracer-render-mode", frag: Object.freeze(["closest", "Hit"]), expect: "built",
+        says: "the entry's grounds were that the tree had no GPU path tracer as a rendering feature, and it " +
+              "is CLOSED -- superseded by the rtx line's WebGPU ray-tracing pipeline and its live viewer, and " +
+              "corrected at v4778 to say so -- so this row asserts the pipeline's hit-stage code is THERE",
+        why: "the stage name the entry itself cites for that pipeline, from the Vulkan ray-tracing model it " +
+             "took its shape from: one code file tree-wide at the merge, physics/render/rtPipeline.mjs, and " +
+             "no scope because the entry's claim had none. This is the row the v4637 note on the sentence " +
+             "floor said registering the live entry would be. It is `built` and not `absent` because the " +
+             "entry now says what the tree has; the conviction stays with the CONTROL below.",
+    }),
     // *** THE CONTROL, AND IT MUST FAIL. *** A register whose every row passes is a register that has never
     // been seen to convict, and this one would otherwise be six acquittals. This row restates the claim that
     // prompted the round -- the off-branch entry's "this tree has NOTHING like it as a rendering feature" --
     // against a term this tree really carries, so the same code that acquits six claims is watched
     // convicting a seventh. It is not a fixture inflating its own census: the files it finds are a shipped
     // WebGL2 fragment-shader renderer and an octree shader that predate this module by hundreds of rounds.
+    // v4778: the entry is in this tree and graded above as `built`, and its text now cites this row's files as
+    // the reason its grounds were false. This row is unchanged in what it measures; only its name stopped
+    // calling the entry off-branch.
     Object.freeze({
-        id: "CONTROL -- the off-branch entry's claim, restated", frag: Object.freeze(["ray", "march"]),
+        id: "CONTROL -- gpu-pathtracer-render-mode's original grounds, restated",
+        frag: Object.freeze(["ray", "march"]),
         mustFail: true,
         says: "that this tree has nothing resembling a marched-ray rendering feature",
         why: "the round's own finding, kept as a row that goes red if it ever stops being findable.",
@@ -196,8 +232,12 @@ export function claimSentences({ root = ENG } = {}) {
  * reading of this tree at v4537; the sentence count is the ratchet's floor.
  */
 export const BACKLOG_AT_V4537 = Object.freeze({
-    claims: 7,            // six live backlog claims and one control that must convict
-    holding: 6,           // v4538: now "as expected" -- five absences that hold, one CLOSED entry whose
+    // v4778 -- 7/6/1 -> 8/7/1 at the rtx merge: gpu-pathtracer-render-mode registered as a `built` row now
+    // that the entry is in this tree, and gltf-conformance-fixtures flipped absent -> built because the rtx
+    // line closed it. Seven live rows, all as expected: three absences that hold, and four rows on three
+    // CLOSED entries whose absence is expected to be GONE (the conductor-Fresnel pair is two rows).
+    claims: 8,            // seven live backlog claims and one control that must convict
+    holding: 7,           // v4538: now "as expected" -- five absences that hold, one CLOSED entry whose
                           // absence is expected to be GONE. See the `expect` note in grade().
     failing: 1,           // the control, and a run where this is 0 is a register that cannot convict
     // *** v4637 -- RAISED 8 -> 9, AND THE TRIPWIRE'S OWN RULE IS THAT A RISE FORCES SOMEBODY TO LOOK. ***
@@ -218,9 +258,25 @@ export const BACKLOG_AT_V4537 = Object.freeze({
     // convicting, and swapping the simulation for the real thing on the round the real thing arrives would
     // leave nothing to prove the convicting code still runs. Registering the live entry as a claim beside it
     // is a round with a measurement in it, not a floor bump.
-    sentenceFloor: 9,
+    //
+    // *** v4778 -- 9 -> 11 at the rtx merge. Looked again, by diffing claimSentences()'s sentences at 978d26e3
+    // against the merged tree. *** Two rewritten in place and still counted, one for one: gltf-conformance-
+    // fixtures' sentence went to the past tense when the rtx line closed it (graded above as built), and (3)
+    // became "This entry originally proposed ... on the grounds that this tree had nothing like it" when the
+    // same line closed gpu-pathtracer-render-mode (graded above as built; v4778's correction to that entry
+    // was written so as not to add a third). Two ARRIVED, both from rtx rounds, and neither can be graded:
+    //
+    //   (4) splat-walking-demo: "...stop() cleanly removed the HUD and disposed the splat layer (confirmed
+    //       absent from window.splatScene.list() afterward)..." -- an observation of a live object list in a
+    //       booted browser session, not a claim about the source. There is no token whose absence it asserts.
+    //   (5) bvh-csg-speed-vs-manifold-tradeoff: "meshBoolean remains gated but unused -- nothing in the tree
+    //       calls it." About a CALLER, like (1). The module's name is in CODE in three files at the merge --
+    //       the module and its two gates -- so a token scan reads present whether or not the claim is true.
+    sentenceFloor: 11,
     // The conviction that prompted the round is NOT in the six above: it is on another branch. Recorded
     // here as a number so a later round can see it moved, and named in the header as unreachable from here.
+    // v4778: both kept as the v4537 reading. The entry is in this tree and graded; the control row still
+    // measures the same 16 files the second number recorded.
     offBranchConvicted: 1,
     offBranchMissedFiles: 16,
     gradeClaimCallSitesBeforeThisRound: 1,

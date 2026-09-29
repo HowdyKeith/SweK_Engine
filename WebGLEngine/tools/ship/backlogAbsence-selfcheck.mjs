@@ -30,6 +30,16 @@
 //                                                               instrument stops honouring the scope its
 //                                                               author wrote, which is the whole difference
 //                                                               between gradeClaim and a grep.
+//      *** v4778 -- NOW 0 RED, measured at the rtx merge by grading every claim with its scope dropped. *** The
+//      claim that held was gltf-conformance-fixtures, and the rtx line closed it, so its row is `built`: with
+//      the scope gone its 18 out-of-scope files read as present and a built row PASSES on them. The scope still
+//      decides that row in the other direction -- tree-wide it would read built with the parser's code deleted
+//      -- but no sabotage here drives that, and no live row now needs the scope to pass. Restoring D needs a
+//      live SCOPED absence claim, and choosing its term is the person's job absenceScope's header names. The
+//      one scoped sentence left ungraded is the deformable tet mesh "across physics/, fx/ and world/"; the
+//      camel-case token for it is in code in three files at the merge, physics/mesh/tetReconstruct.mjs -- a
+//      reconstruction study's mesh and not a deformable body -- and the two selfchecks that import it, so the
+//      obvious term would convict it on a word, which is the call to make.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -58,11 +68,13 @@ console.log("\n1. *** THE BACKLOG'S OWN ABSENCE CLAIMS, GRADED BY THE INSTRUMENT
         (broken.length ? ". *** WRONG WAY ROUND: *** " + broken.map((b) => b.id + " (" + b.term + ") expects " +
             b.expect + " and " + (b.holds ? "still holds" : "no longer holds") + " -- " +
             b.files.slice(0, 3).join(", ")).join("; ")
-        : ". *** AND THE ACQUITTALS ARE THE ARGUMENT FOR WIRING THIS, NOT THE CONVICTIONS: *** one of them is " +
-          "an entry whose token returns TWELVE code files tree-wide and would read as refuted by a plain grep. " +
-          "Every one of the twelve is outside the single directory its author scoped the claim to -- the same " +
-          "word names a matrix layout in math/solverFit.mjs. gradeClaim separates OUT OF SCOPE from IN SCOPE " +
-          "AND MISSED, which a grep cannot, and that distinction is the whole reason this file is not a grep."));
+        : ". *** THE ARGUMENT FOR WIRING THIS WAS AN ACQUITTAL, AND AT v4778 IT BECAME A `built` ROW: *** the " +
+          "entry whose token returned TWELVE code files tree-wide, every one outside the single directory its " +
+          "author scoped the claim to -- the same word names a matrix layout in math/solverFit.mjs -- was " +
+          "closed by the rtx line, which taught the parser that accessor kind. The scope still decides that " +
+          "row: " + ((live.find((r) => r.id === "gltf-conformance-fixtures") || {}).outOfScope) + " code " +
+          "files outside it carry the token today, so graded tree-wide it would read built with the parser's " +
+          "code deleted. gradeClaim separates OUT OF SCOPE from IN SCOPE AND MISSED, which a grep cannot."));
     for (const r of live) report(r.id + " / " + r.term + ": expects " + r.expect + ", " +
         (r.holds ? "absent" : "present") + ", " + r.inScope + " in scope, " + r.missed + " missed, " +
         r.outOfScope + " out of scope");
@@ -82,15 +94,17 @@ console.log("\n2. *** AND IT CONVICTS, WHICH SIX ACQUITTALS ON THEIR OWN WOULD N
         control.length === 1 && !control[0].holds && control[0].missed > 0,
         control.length + " control claim, " + (control[0] ? control[0].missed + " code file(s) IN SCOPE AND " +
         "MISSED: " + control[0].files.slice(0, 4).join(", ") : "MISSING") + ". *** THIS IS THE CLAIM THE ROUND " +
-        "STARTED FROM, RESTATED AGAINST A TOKEN THIS TREE REALLY CARRIES. *** An entry on another branch says " +
-        "this tree has nothing resembling a GPU path tracer as a rendering feature; the files above are a " +
-        "shipped WebGL2 fullscreen fragment shader stepping a ray per pixel through a 3D texture of the real " +
-        "generated world, and an octree shader that descends an acceleration structure encoded into a texture " +
+        "STARTED FROM, RESTATED AGAINST A TOKEN THIS TREE REALLY CARRIES. *** An entry that was then on another " +
+        "branch said this tree has nothing resembling a GPU path tracer as a rendering feature; the files above " +
+        "are a shipped WebGL2 fullscreen fragment shader stepping a ray per pixel through a 3D texture of the " +
+        "real generated world, and an octree shader that descends an acceleration structure encoded into a texture " +
         "-- the very architecture that entry calls foreign here. They predate this module by hundreds of " +
         "rounds, so this row is a measurement and not a fixture grading its own plant.");
-    report("the entry itself is NOT graded: it lives on origin/claude/shader-porting-swek-ozgvb0 and is on " +
-           "neither main nor here. A gate whose subject sits on another branch is a gate that can go red " +
-           "without this tree moving, so the finding is recorded in prose and the CONTROL carries the check.");
+    report("v4778 -- the entry itself IS graded now, in section 1, as a `built` row: it arrived in this tree at " +
+           "v4637, the rtx merge brought its closing, and v4778 corrected it to say its grounds were false when " +
+           "written, citing the files above. At v4537 it was on another branch and a gate whose subject sits " +
+           "there can go red without this tree moving, so the CONTROL carried the check -- and still does, " +
+           "because a row asserting presence cannot be the one this register is watched convicting.");
 }
 
 // =============================================================================================================
@@ -174,5 +188,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "every absence claim that is about a WANT or a CALLER rather than a token, which is most of them and " +
     "which no scanner can grade; the 475 pages carrying 5.09 MB of script that absenceScope's file set does " +
     "not include, measured this round and found to flip NO term tested, so it is recorded as a gap with no " +
-    "demonstrated cost rather than as a defect; and the off-branch entry itself, which no gate here can read.");
+    "demonstrated cost rather than as a defect; and, since v4778, whether honouring a claim's SCOPE is what " +
+    "makes any live row pass -- none does now, so sabotage D reads 0 red (see the header).");
 process.exit(fails ? 1 : 0);
