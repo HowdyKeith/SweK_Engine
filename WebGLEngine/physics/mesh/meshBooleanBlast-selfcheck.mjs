@@ -21,7 +21,7 @@
 // ORACLES, NONE OF THEM meshBoolean.mjs's OWN CODE:
 //   - meshCSG.mjs's BSP subtract()/blast() on the same inputs, and its exact divergence-theorem volume().
 //   - THE SAME CHAIN AT 1000x SCALE, for BOTH methods. Every absolute tolerance in either pipeline (meshCSG's
-//     EPS=1e-5, triClip's and triTriIntersect's EPS) becomes relatively a million times smaller there, so where
+//     EPS -- 1e-5 until round 10, 1e-8 since -- triClip's and triTriIntersect's EPS) becomes relatively a million times smaller there, so where
 //     two structurally different algorithms agree at 1000x, that value (divided by 1e9) is the truth at 1x to
 //     well beyond either method's own rounding. Section 3 uses it to decide WHICH method is right where they
 //     disagree at 1x -- rather than assuming the older one is.
@@ -195,8 +195,10 @@ const B1 = bspChain(1), G1 = boolChain(1);
         const d = Math.abs(G1.vols[k] - B1.vols[k]);
         if (d > worst) { worst = d; worstK = k + 1; }
     }
-    ok("!! every one of twelve chained shots agrees with the BSP's volume to 1e-6 (section 3 says which one is right)",
-        worst < 1e-6, "worst |diff| " + worst.toExponential(2) + " at shot " + worstK + " of volumes ~" + B1.vols[SHOTS - 1].toFixed(3));
+    // Round 10: this bound was 1e-6 because meshCSG's EPS=1e-5 put the BSP 5.7e-9 relative off (section 3). At
+    // EPS=1e-8 the two agree to 8.65e-11 absolute (4.3e-12 relative) on shot 11, so it is 1e-9 now, from measurement.
+    ok("!! every one of twelve chained shots agrees with the BSP's volume to 1e-9 (round 10: 1e-6 while the BSP's EPS was 1e-5)",
+        worst < 1e-9, "worst |diff| " + worst.toExponential(2) + " at shot " + worstK + " of volumes ~" + B1.vols[SHOTS - 1].toFixed(3));
     ok("!! the chain never hit the fragment cap and never produced an ambiguous or unresolved fragment",
         !G1.capped && G1.amb === 0 && G1.unresolved === 0,
         "capped=" + G1.capped + " ambiguous=" + G1.amb + " unresolved=" + G1.unresolved);
@@ -229,10 +231,11 @@ console.log("\n3. *** WHERE THEY DISAGREE AT 1x, THE 1000x RUN SAYS WHO IS RIGHT
     // draft's 3.34e-12 was jaggedBlob's absolute pole offset, not meshBoolean).
     ok("!! *** meshBoolean at 1x matches the 1000x reference to 1e-11 relative on every shot ***",
         gVsTruth < 1e-11, "worst " + gVsTruth.toExponential(2));
-    info("MEASURED, not asserted (it is meshCSG.mjs's number, not this file's): the BSP at 1x departs from the same " +
-         "reference by up to " + bVsTruth.toExponential(2) + " relative (shot " + bWorstK + "). The round-7 review " +
-         "confirmed the cause on a COPY of meshCSG.mjs: EPS=1e-5 -> 5.7e-9, EPS=1e-6 -> 3.3e-12 (the fixture floor " +
-         "of that run). That is why section 2's agreement is 1e-6 rather than 1e-12");
+    // ROUND 10: printed-only while it was meshCSG.mjs's unexplained drift; asserted now that round 10 changed that
+    // file's EPS for it (1e-5 -> 1e-8), and this gate holds the only independent reference the BSP meets.
+    ok("!! *** ROUND 10: THE BSP AT 1x MATCHES THE SAME REFERENCE TO 1e-11 RELATIVE (5.71e-9 at its old EPS=1e-5) ***",
+        bVsTruth < 1e-11, "worst " + bVsTruth.toExponential(2) + " (shot " + bWorstK + "); the round-7 review found the " +
+        "cause on a copy of meshCSG.mjs, round 10 swept EPS 1e-5..1e-9 and chose 1e-8 (meshCSG.mjs's EPS comment)");
 }
 
 // =============================================================================================================
@@ -310,10 +313,11 @@ console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: WHO IS WATERTIGHT, AND 
         " (raw, before settle: " + rawP.unmatched + ")");
     const weldOnly = M.watertight(M.weldTJunctions(M.snapVertices(polysFromBuf(P1.buf), { tol: 1e-9 }).polys).polys);
     info("plane path: weld WITHOUT settle's coplanar merge leaves " + weldOnly.unmatched + " unmatched edges (measured 4 at round 7)");
-    info("MEASURED, not asserted here (meshCSG-selfcheck.mjs section 5 asserts it): the BSP's own twelve-blast wall " +
-         "through the SAME settle() keeps " + wb.unmatched + " unmatched edges of " + wb.edges + ". The round-7 review " +
+    ok("!! ROUND 10: the BSP's own twelve-blast wall through the same settle() is watertight too (15 unmatched at EPS=1e-5)",
+        wb.ok && wb.unmatched === 0, wb.unmatched + " of " + wb.edges);
+    info("the BSP's twelve-blast wall through the SAME settle(): " + wb.unmatched + " unmatched edges of " + wb.edges + ". The round-7 review " +
          "ran the chain on a COPY of meshCSG.mjs with only EPS changed -- 1e-5: 15 unmatched; 1e-6, 1e-7, 1e-8: 0 -- so " +
-         "that is meshCSG's constant, not the BSP method (backlog #25, round 10 of this arc). Watertight here means at " +
+         "that was meshCSG's constant, not the BSP method, and round 10 changed it (backlog #25). Watertight here means at " +
          "THIS scale: settle()'s tolerances are absolute, and the arrangement's snap (1e-9) is absolute too. settle() " +
          "timings: plane path " + spMs.toFixed(0) + " ms, BSP " + sbMs.toFixed(0) + " ms");
 }
@@ -337,7 +341,8 @@ console.log("\n6. *** MILLIMETRE SCALE: THE REGIME meshCSG's OWN HEADER CALLS RE
     ok("!! at 0.001x meshBoolean stays within 1e-12 relative of the reference on four chained shots",
         gWorst < 1e-12 && !Gmm.capped, "worst " + gWorst.toExponential(2) + ", capped=" + Gmm.capped);
     info("MEASURED, not asserted (meshCSG.mjs's number): the BSP at 0.001x departs by up to " + bWorst.toExponential(2) +
-         " relative -- EPS=1e-5 is 1% of a millimetre-scale blob's own facet size. meshBoolean has absolute " +
+         " relative -- 3.25e-3 at its old EPS=1e-5, which was 1% of a millimetre-scale blob's facet size; 1e-8 is " +
+         "1e-5 of it (round 10). Still absolute, so still wrong far enough down. meshBoolean has absolute " +
          "tolerances of its own (1e-9 plane dedup, triClip's EPS): the round-7 reviews measured it failing too below " +
          "~1e-4 scale -- up to 34% of volume at 1e-6..7e-5, on the gated and ungated paths alike");
 }
@@ -402,10 +407,24 @@ console.log("\n8. *** ROUND 9: WHAT SEGMENT-BOUNDED CUTTING DOES TO THE COUNTS T
                         ", |dV| " + r.dv.toExponential(1)).join("; "));
     ok("!! ...and every one of those outputs is watertight raw",
         rows.every((r) => M.watertight(polysFromBuf(r.ar.tris)).unmatched === 0));
+    // ROUND 10: THE GUARD ON meshCSG's EPS. The coarse twelve-blast chain cannot tell EPS=1e-6 from 1e-8 (both at the
+    // floor, both 0 cracks), and the choice of 1e-8 was made on finer blobs. Subdiv 32 is the cheapest that
+    // separates: the BSP there reads 6.2e-11 off the arrangement with 8 open edges after settle at 1e-6, 1e-15 and 0
+    // at 1e-7 and 1e-8 (-3.4e-10 and 22 at 1e-5). What NOTHING in a gate separates is 1e-7 from 1e-8: that takes
+    // subdiv 128 (0 open edges at 1e-8, 5 at 1e-7; 8.5e-14 against 6.1e-12), about 13 s a run -- measured by hand,
+    // in meshCSG.mjs's EPS comment, not asserted.
+    {
+        const r32 = rows[2], W = WALL(), B = M.jaggedBlob([0, 0, 0], 1.0, 32, 12345);
+        const bsp = M.subtract(W, B), rel = (M.volume(bsp) - volBuf(r32.ar.tris)) / volBuf(r32.ar.tris);
+        const open = M.watertight(M.settle(bsp).polys).unmatched;
+        ok("!! ROUND 10: at subdiv 32 the BSP matches the arrangement to 1e-13 and settles with no open edge (EPS <= 1e-7)",
+            Math.abs(rel) < 1e-13 && open === 0, "relative " + rel.toExponential(2) + ", open after settle " + open +
+            " (at EPS=1e-6: 6.2e-11 and 8; at 1e-5: -3.4e-10 and 22)");
+    }
     info("timings (printed, not asserted): " + rows.map((r) => "n=" + r.n + " arrangement " + r.aMs.toFixed(0) + " ms / plane " +
          r.pMs.toFixed(0) + " ms").join("; ") + ". Round 9 by hand, one machine, one blast: n=64 0.80 s (plane 7.3 s, BSP 2.4 s " +
          "contended / 1.7 s round 8); n=96 1.7 s (plane 45.7 s, BSP 5.7 s); n=128 3.9 s, uncapped (plane capped and wrong " +
-         "at round 8, 129.5 s; BSP 12.6 s, 5.6e-7 relative off the 1000x reference, which the arrangement meets to 1.9e-14)");
+         "at round 8, 129.5 s; BSP 12.6 s, 5.6e-7 relative off the 1000x reference at EPS=1e-5, 8.5e-14 at round 10's 1e-8, which the arrangement meets to 1.9e-14)");
 }
 
 console.log(`\nmeshBooleanBlast-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

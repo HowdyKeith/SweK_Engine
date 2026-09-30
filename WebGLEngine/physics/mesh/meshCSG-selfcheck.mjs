@@ -242,7 +242,7 @@ console.log("\n4. *** 'GAP-FREE' IS TWO DIFFERENT CLAIMS AND ONLY ONE OF THEM WA
 }
 
 // =============================================================================================================
-console.log("\n5. *** TWELVE BLASTS: WHERE IT HOLDS, WHERE IT DOES NOT, AND THREE REFUTED EXPLANATIONS ***");
+console.log("\n5. *** TWELVE BLASTS: THREE REFUTED EXPLANATIONS, AND THE FOURTH, WHICH WAS EPS (ROUND 10) ***");
 let TWELVE_CUT = null, TWELVE_SETTLED = null;   // shared with section 8; re-cutting them costs 1.1 s
 {
     M.resetSplitStats();
@@ -278,12 +278,17 @@ let TWELVE_CUT = null, TWELVE_SETTLED = null;   // shared with section 8; re-cut
     // ---- WHAT ACTUALLY SURVIVES, BOUNDED RATHER THAN EXPLAINED -------------------------------------------
     const settled = M.settle(wall);
     const c = edgeCensus(settled.polys);
-    ok("!! *** AND OVER TWELVE BLASTS IT DOES NOT REACH 100%, AND THIS GATE SAYS SO RATHER THAN ROUNDING ***",
-        c.gap > 0 && c.gap < c.edges * 0.005,
-        c.gap + " uncovered edges of " + c.edges + " (" + (100 * c.gap / c.edges).toFixed(3) + "%), worst " +
-        "missing length " + c.worstGap.toExponential(2) + " on a wall spanning 8. These are REAL cracks, not " +
-        "T-junctions. Cause unknown: not sliver dropping (0 measured), not weld tolerance (identical from " +
-        "1e-9 to 1e-7), not vertex spelling (snapVertices closes none at any tolerance from 1e-12 to 1e-6).");
+    // *** ROUND 10 OF THE BVH-CSG ARC: THE CAUSE, FOUND, AND THIS CHECK TURNED ROUND. *** Until then it asserted
+    // that cracks EXIST (15 of 12,847 at EPS=1e-5: gap > 0 and under 0.5%), "cause unknown", three explanations
+    // refuted above and beside it. The fourth, measured on a copy with only EPS changed: 1e-5 -> 15, 1e-6, 1e-7,
+    // 1e-8, 1e-9 -> 0 (meshCSG.mjs's EPS comment has the sweep). A vertex within EPS of a plane is rounded onto it,
+    // and at 1e-5 that rounding left hairlines the weld could not sew. EPS is 1e-8 now (finer blobs than this
+    // chain decided between 1e-6 and 1e-8 -- see that comment) and the gate says ZERO.
+    ok("!! *** TWELVE BLASTS, SETTLED: ZERO UNCOVERED EDGES -- the 15 'cause unknown' cracks were EPS=1e-5 (round 10) ***",
+        c.gap === 0 && c.edges > 10000,
+        c.gap + " uncovered edges of " + c.edges + " (15 of 12,847 at EPS=1e-5; the census counts an unmatched edge " +
+        "as a crack only if nothing covers it, so T-junctions are not in this number). Not sliver dropping (0), not " +
+        "weld tolerance, not vertex spelling -- the three refuted above -- but the plane-classification EPS itself");
     ok("!! ...while the VOLUME is untouched by every one of snap, merge and weld",
         Math.abs(M.volume(settled.polys) - cutStats.vol) < 1e-6,
         "settled " + M.volume(settled.polys).toFixed(9) + " vs cut " + cutStats.vol.toFixed(9) +
@@ -483,8 +488,9 @@ console.log("\n9. *** THE DEGENERATE CONTACTS: EIGHT CASES A FORMAL PROPERTY LIS
     // cancels. It does not: four crossings is still EVEN, and parity is blind to that exactly as volume is.
     // What parity actually adds is that it is UNSIGNED and LOCAL where volume is signed and global -- a
     // missing face and a face wound the wrong way both leave a ray crossing an odd number of times, while
-    // their volume error can be arbitrarily small or cancel against another. On this mesh that is the
-    // sharpest available statement about the 15 uncovered edges: they are hairlines, not missing faces.
+    // their volume error can be arbitrarily small or cancel against another. At EPS=1e-5 that was the sharpest
+    // available statement about the 15 uncovered edges: hairlines, not missing faces. Round 10 (EPS 1e-8) closed
+    // them; the row stays because it still grades the multiplicity and still discriminates (the planted hole).
     const T = M.toTriangles(TWELVE_SETTLED);
     let rng = 12345; const rnd = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
     let odd = 0, N = 100, crossings = 0;
@@ -511,24 +517,159 @@ console.log("\n9. *** THE DEGENERATE CONTACTS: EIGHT CASES A FORMAL PROPERTY LIS
         "behind it because it is UNSIGNED and LOCAL: a dropped face or one wound the wrong way makes a ray " +
         "cross oddly however small its area, where the volume it costs can be a rounding error or can cancel " +
         "against another face entirely. NOT claimed: that this sees a doubled shell -- two copies is an even " +
-        "number of crossings and parity is as blind to it as volume is. What it does say here is that the 15 " +
-        "uncovered edges are hairlines rather than missing faces: " + (N - odd) + " of " + N + " rays across " +
+        "number of crossings and parity is as blind to it as volume is. What it said at EPS=1e-5 was that the 15 " +
+        "uncovered edges were hairlines rather than missing faces (round 10 closed them): " + (N - odd) + " of " + N + " rays across " +
         "the wall's whole cross-section cross evenly. (A face-sized hole, planted by making settle() drop one " +
         "polygon, reads 5 of 100 odd -- so the row discriminates rather than reporting a constant.)");
 }
 
+// =============================================================================================================
+console.log("\n10. *** EPS (ROUND 10 OF THE BVH-CSG ARC): WHAT A PLANE TOLERANCE COSTS, ON EACH SIDE OF IT ***");
+{
+    // EPS went 1e-5 -> 1e-8 (meshCSG.mjs's EPS comment has the sweep). The risk named before the change was that a
+    // tighter tolerance reopens near-degenerate contacts -- faces a hair apart that 1e-5 had called coplanar. So
+    // section 9's eight contacts are SHIFTED here by d = 1e-9..2e-5, both signs, along each axis: 432 runs, the
+    // same interval oracle. What EPS means, stated as the two checks it implies: a shift BEYOND EPS is cut
+    // exactly; a shift WITHIN it is rounded flush, costing (contact area) x d and no more. The largest contact is
+    // the wall's own top, 8 x 6 = 48.
+    const overlap = (c1, h1, c2, h2) => {
+        let v = 1;
+        for (let i = 0; i < 3; i++) { const lo = Math.max(c1[i] - h1[i], c2[i] - h2[i]), hi = Math.min(c1[i] + h1[i], c2[i] + h2[i]); v *= Math.max(0, hi - lo); }
+        return v;
+    };
+    const WC = [0, 0, 0], WH = [4, 3, 0.3], A = WALL(), VA = M.volume(A);
+    const cases = [[[4.5, 0, 0.8], [0.5, 0.4, 0.5]], [[4.5, 0, 0.8], [0.5, 4.0, 0.5]], [[0, 0, 0.8], [1, 1, 0.5]], [[4, 0, 0.8], [1, 1, 0.5]],
+                   [[0, 0, 0], [1, 1, 0.3]], [[0, 0, 0], [9, 9, 9]], [[0, 0, 0], [4, 3, 0.3]], [[0, 0, 0.8], [0.5, 0.5, 0.5]]];
+    let beyond = 0, beyondN = 0, within = 0, withinN = 0, notExact = 0;
+    for (const [c, h] of cases) for (const d of [1e-9, 1e-8, 1e-7, 5e-7, 1e-6, 2e-6, 5e-6, 1e-5, 2e-5]) for (const sg of [1, -1]) for (let ax = 0; ax < 3; ax++) {
+        const c2 = c.slice(); c2[ax] += sg * d;
+        const B = M.boxPolys(c2, h), exp = overlap(WC, WH, c2, h);
+        const e = Math.max(Math.abs(M.volume(M.subtract(A, B)) - (VA - exp)), Math.abs(M.volume(M.intersect(A, B)) - exp));
+        if (e > 1e-9) notExact++;
+        if (d > M.EPS) { beyondN++; beyond = Math.max(beyond, e); } else { withinN++; within = Math.max(within, e / d); }
+    }
+    ok("!! *** A CONTACT SHIFTED BEYOND EPS IS CUT EXACTLY: " + beyondN + " runs to 1e-12 ***", beyond < 1e-12,
+        "worst " + beyond.toExponential(2) + " (measured 4.3e-14). At EPS=1e-5 the shifts of 1e-8..1e-5 were still " +
+        "inside the tolerance and rounded flush: cases off by more than 1e-9 went 80 -> 22 of 432 at 1e-8, none worse");
+    ok("!! ...and one shifted WITHIN it costs at most (contact area) x d -- rounding flush, not breaking",
+        // 48 is reached exactly (the wall's whole top rounded flush); at d = 1e-9 the volumes' own rounding (~4e-15 on
+        // 28.8) is 4e-6 of the error, so the bound carries that, not slack.
+        within <= 48 * (1 + 1e-5) && within > 1, "worst error / d = " + within.toFixed(6) + " over " + withinN +
+        " runs (bound 48, the wall's top face; " + notExact + " of 432 runs off by more than 1e-9, all of them this)");
+
+    // A cutter whose top face is TILTED by slope s about the line x = x0 on the wall's top face: it removes
+    // 2.4 - |s| (1 + x0)^2 exactly (x, y in [-1,1]; z from -0.3 to min(0.3, 0.3 + s(x - x0))).
+    const tilted = (s, x0) => M.boxPolys([0, 0, -0.2], [1, 1, 0.5]).map((p) => {
+        const vs = p.vs.map((q) => (q[2] > 0.29 ? [q[0], q[1], 0.3 + s * (q[0] - x0)] : q));
+        return { vs, pl: M.planeOf(vs) };
+    });
+    const tiltErr = (s, x0) => {
+        const B = tilted(s, x0), exp = 2.4 - Math.abs(s) * (1 + x0) ** 2, dif = M.subtract(A, B);
+        return { e: Math.max(Math.abs(M.volume(dif) - (VA - exp)), Math.abs(M.volume(M.intersect(A, B)) - exp)), open: !M.watertight(M.settle(dif).polys).ok };
+    };
+    // At EPS=1e-5 a tilt of exactly 1e-5 about the centre OPENED the wall: the cap between the two tops lost,
+    // 0.2 of volume (a third of the missing cap's area times its height). At 1e-8 that geometry is exact.
+    const t5 = [tiltErr(1e-5, 0), tiltErr(-1e-5, 0)];
+    ok("!! a top face tilted by exactly 1e-5 -- 0.2 wrong and OPEN at EPS=1e-5 -- is exact and closed now",
+        t5.every((r) => r.e < 1e-12 && !r.open), t5.map((r) => r.e.toExponential(2) + (r.open ? " OPEN" : "")).join(", "));
+
+    // *** KNOWN, NOT FIXED BY ANY CONSTANT: TWO NEARLY PARALLEL FACES ~EPS APART. *** Each mesh measures the other
+    // against its own plane. Tilt the cutter's top by s = 2e-8 about x0 = 0.5: its corner at x=1 sits s(1-x0) = 1e-8
+    // above the wall's plane, and the wall's vertex there sits 1e-8 x cos(theta) below the cutter's. A few ulps
+    // either way, one is FRONT and the other COPLANAR, each mesh calls the other's piece outside, and the cap between
+    // them is dropped. At 1e-5 the band sat at s = 1e-5 (above); at 1e-6 near 2e-6 (36 of 201 slopes within 1e-10
+    // relative); at 1e-8 here, 4 of 601 within 3e-7. Pinned by VOLUME only: at features this small meshCSG's
+    // watertight() key (1e-6) merges vertices 1e-8 apart, and it reads "open" on exact results beside the band too.
+    const band = tiltErr(2e-8 * (1 + 3e-9), 0.5), clear = tiltErr(2e-8 * (1 - 2e-9), 0.5);
+    console.log("  KNOWN  two faces ~EPS apart, tilted 2e-8 about x0=0.5: error " + band.e.toExponential(3) +
+        "; 5e-9 relative away the same fixture reads " + clear.e.toExponential(2) + " (its corner within EPS, rounded " +
+        "flush: the ordinary cost) -- the boundary hazard EPS moves and narrows but does not remove");
+    // Just below the band the corner at x=1 sits s(1-x0) = 1e-8 x (1 - 2e-9) above the wall's plane -- within EPS as
+    // seen from BOTH meshes, so both call it coplanar, consistently, and it is rounded flush like any sub-EPS contact.
+    ok("   ...pinned: inside the band the cap is lost (0.1); 5e-9 relative outside it, the sub-EPS bound holds",
+        Math.abs(band.e - 0.1) < 1e-3 && clear.e < 48 * 2e-8,
+        "inside " + band.e.toExponential(3) + ", outside " + clear.e.toExponential(2));
+}
+
+// =============================================================================================================
+// SABOTAGE LOG, ROUND 10 -- each applied to the real meshCSG.mjs, this gate / meshBooleanBlast-selfcheck /
+// meshBoolean-selfcheck run, file restored in a `finally` and md5 verified. Reds:
+//   E1 EPS back to 1e-5              -> 3 / 4 / 0  (section 5's zero, the 1e-5 tilt, the band pin)
+//   E2 EPS = 1e-6 (the arc's notes)  -> 1 / 1 / 0  (the band pin, incidental; meshBooleanBlast's subdiv-32 guard)
+//   E3 EPS = 1e-7                    -> 1 / 0 / 0  (the band pin only, incidentally: NOTHING in a gate measures what
+//                                                   separates 1e-7 from 1e-8 -- subdiv 128, ~13 s a run -- stated there)
+//   E4 EPS = 1e-9                    -> 3 / 0 / 0  (section 5's zero, the weld's degenerate-fan count, the band pin:
+//                                                   the noise floor meshCSG.mjs's EPS comment names, seen by this gate)
+//   E5 EPS = 1e-10                   -> 4 / 0 / 0  (section 5, the weld's fan count, section 10's within-EPS bound, the band)
+//   L1 whole-wall subtract() in place of the localisation -> 10 / 0 (both section-11 pins among them)
+// meshBoolean-selfcheck goes 0 red on every one: it uses meshCSG.mjs for fixtures and a BSP oracle on boxes, where
+// EPS does not bind. (An L1 that only bypassed the BVH `select` went 0/0/0 -- the fallback AABB test is the same
+// partition -- and was replaced by the real substitution above.)
+console.log("\n11. *** KNOWN, NOT FIXED: blast()'s LOCALISATION CLASSIFIES THE BLOB AGAINST A PATCH, NOT THE SOLID ***");
+{
+    // Found by round 10's EPS sweep over destructible.html's slider range: rows whose error did not move with EPS.
+    // subtractLocal() is exact about the wall polygons it leaves alone, but keeps or drops the BLOB's surface by a
+    // BSP of the near patch -- an open surface -- not by the solid (meshCSG.mjs's subtractLocal() comment has the
+    // numbers). Both cases pinned here against subtract() on the same inputs, which is exact and agrees with
+    // meshBoolean's arrangement to 1e-10 at 1x and 1000x. THE OBVIOUS FIX IS NOT FREE, MEASURED: replacing the
+    // localisation with a whole-wall subtract() (sabotage L1 above) turns both pins red, as it should, and
+    // also 8 other checks -- the speed and size localising exists for, and the twelve-blast wall no longer settles
+    // clean at EPS=1e-8 (uncovered edges, a reflex polygon, 4,200 degenerate fan triangles after the weld). A real fix
+    // classifies the blob against the whole solid and keeps cutting only the near patch.
+    // (1) destructible.html centres blasts on the mid-plane (z = 0) of a wall 0.7 thick. A blob of radius 0.2 there
+    // touches no face: `near` is empty and blast() returns the wall unchanged.
+    const HALF = [4, 3, 0.35], W = M.boxPolys([0, 0, 0], HALF), V0 = M.volume(W);
+    let nothing = 0, cavity = 0;
+    for (let k = 0; k < 5; k++) {
+        const blob = M.jaggedBlob([k - 2, 0.5 * k - 1, 0], 0.2, 8, 500 + k, { rough: 0.6, floor: 0.4 });
+        const vb = M.volume(M.blast(W, blob, { select: M.bvhSelect(W).select }).polys), vs = M.volume(M.subtract(W, blob));
+        if (Math.abs(vb - V0) < 1e-12 && vs < V0 - 1e-4) nothing++;
+        cavity = Math.max(cavity, V0 - vs);
+    }
+    console.log("  KNOWN  a blast wholly inside the wall (radius 0.2 on the mid-plane, where destructible.html puts it): " +
+        "blast() removed NOTHING in " + nothing + " of 5; subtract() cuts a cavity of up to " + cavity.toExponential(2));
+    ok("   ...pinned: all 5 remove nothing through blast() and a real cavity through subtract()", nothing === 5 && cavity > 1e-3,
+        nothing + " of 5; cavity up to " + cavity.toExponential(2));
+    // (2) a blob that DOES reach a face (the localisation touches 140 polygons) but overlaps an earlier cavity: the
+    // near patch's planes misclassify interior space it reaches. Two shots, found by a seeded search over 3,000 random
+    // two-shot pairs for one where shot 2 reaches a face and departs while shot 1 is exact (5 found). The first
+    // version of this row replayed a seven-shot chain (radius 1.4, 14 facets; departs at shot 7 by 7.3e-4) and cost
+    // 32.6 s of this gate's 43.8 s; this one costs ~70 ms and reads the same at EPS 1e-5, 1e-6 and 1e-8.
+    const two = [{ c: [-1.619, -1.348, 0.035], r: 1.168, sub: 6, seed: 387382, rough: 0.478 },
+                 { c: [-1.43, -1.512, -0.053], r: 0.782, sub: 5, seed: 958318, rough: 0.747 }];
+    let wl = M.boxPolys([0, 0, 0], HALF), ws = M.boxPolys([0, 0, 0], HALF);
+    const gaps = [], touched = [];
+    for (const t of two) {
+        const blob = M.jaggedBlob(t.c, t.r, t.sub, t.seed, { rough: t.rough, floor: 1 - t.rough });
+        const b = M.blast(wl, blob, { select: M.bvhSelect(wl).select });
+        wl = b.polys; ws = M.subtract(ws, blob);
+        gaps.push(M.volume(wl) - M.volume(ws)); touched.push(b.stats.touched);
+    }
+    console.log("  KNOWN  two overlapping blasts, the second reaching a face (" + touched[1] + " polygons touched): blast() is exact on " +
+        "shot 1 (" + gaps[0].toExponential(1) + ") and departs from subtract() on shot 2 by " + gaps[1].toExponential(4) +
+        " -- not EPS (the same at 1e-5, 1e-6 and 1e-8)");
+    ok("   ...pinned: shot 1 exact, shot 2 off by 4.24e-3 with the near patch non-empty",
+        Math.abs(gaps[0]) < 1e-12 && Math.abs(gaps[1] + 4.2398e-3) < 1e-6 && touched[1] > 0,
+        "shot 1 " + gaps[0].toExponential(2) + ", shot 2 " + gaps[1].toExponential(4) + ", touched " + touched[1]);
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nunchecked here: whether a blasted wall LOOKS like concrete, and whether the 0.1% of unsewn edges is " +
-    "ever visible -- it would take a rasterised A/B at a known resolution to say, and nothing in this gate " +
-    "renders. What IS checked: that A - B and A AND B tile A to 1e-13; that the localised path is the same " +
+    "\nunchecked here: whether a blasted wall LOOKS like concrete -- it would take a rasterised A/B at a known " +
+    "resolution to say, and nothing in this gate renders (the 0.1% of unsewn edges that question used to be about " +
+    "is 0 since round 10). What IS checked: that A - B and A AND B tile A to 1e-13; that the localised path is the same " +
     "SOLID and a smaller MESH; that the BVH query is conservative in the only safe direction; that one blast " +
-    "settles to 100.0% matched edges; and that twelve do not, with three proposed causes measured and refused. " +
+    "settles to 100.0% matched edges; and that twelve do too since round 10 of the BVH-CSG arc -- the 15 uncovered " +
+    "edges were EPS=1e-5, three other proposed causes having been measured and refused first. " +
     "\nADDED BY THE v4542 AUDIT AGAINST A FORMAL CSG PROPERTY LIST: that the weld makes 1,637 of 7,665 fan " +
     "triangles that cover nothing and dropping them changes the surface by exactly zero; that four " +
     "instruments here read a degenerate polygon as clean, one of them scoring it a watertight surface; that " +
     "eight degenerate CONTACTS -- flush faces, a corner on an edge, a cutter identical to the solid -- are " +
     "all exact against an interval oracle and settle to watertight; and that 100 rays cross the twelve-blast " +
-    "solid evenly, which says the 15 uncovered edges are hairlines rather than missing faces. STILL " +
+    "solid evenly (which, at EPS=1e-5, said the 15 uncovered edges were hairlines rather than missing faces). " +
+    "\nADDED AT ROUND 10 OF THE BVH-CSG ARC: EPS 1e-5 -> 1e-8, near-flush contacts shifted either side of it (exact " +
+    "beyond, at most area x d within, none worse than before) and the tilted-face boundary band pinned as KNOWN " +
+    "(section 10); and blast()'s localisation found classifying the blob against an open patch -- a blast wholly " +
+    "inside the wall removes nothing, a chained one departs from subtract() -- pinned as KNOWN, NOT FIXED (section 11). STILL " +
     "UNCHECKED by that audit: self-intersection away from shared edges, which needs a pairwise triangle test " +
     "this gate does not have, and doubled shells, which neither the volume nor the parity can see.");
 process.exit(fails ? 1 : 0);

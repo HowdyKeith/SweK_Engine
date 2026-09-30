@@ -231,8 +231,8 @@
 // option (accOpts, the fragment cap, the gate, the index) applies only there; the arrangement has no cap.
 // What it changes, measured (triArrangement.mjs's header has the table): one blast at subdiv 64 in 0.80 s against
 // the plane path's 7.3 s and the BSP's 2.4 s; subdiv 128 in 3.9 s, uncapped and right (the plane path capped and
-// came back wrong; the BSP 12.6 s and 5.6e-7 relative off the 1000x reference); classifications per blob triangle
-// flat at ~1.2; volumes equal to the plane path's to 5.0e-13 wherever the plane path is uncapped; and THE RAW
+// came back wrong; the BSP 12.6 s and 5.6e-7 relative off the 1000x reference at its EPS of the time, 1e-5 --
+// 8.5e-14 since round 10 set it to 1e-8); classifications per blob triangle flat at ~1.2; volumes equal to the plane path's to 5.0e-13 wherever the plane path is uncapped; and THE RAW
 // OUTPUT IS WATERTIGHT -- A's and B's seam vertices are the same points, computed once by triTriIntersect, so gap
 // (2) of round 6 ("A's and B's independently-clipped cut boundaries do NOT produce bit-coincident seam vertices")
 // is closed on this path: 22 of 22 bit-identical on the primary fixture, 0 unmatched edges on every general-

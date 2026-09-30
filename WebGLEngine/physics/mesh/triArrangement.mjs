@@ -63,8 +63,8 @@
 // path wherever the plane path is uncapped -- worst 5.0e-13 at n=96 (1.8e-14 relative; 3.8e-13 at 64, 1.5e-13 at
 // 32). At n=128, where only the BSP is left to compare, the two disagree by 1.5e-5 -- and at 1000x scale the BSP
 // and the arrangement agree to 1e-15 relative, the arrangement at 1x meets that reference to 1.9e-14, the BSP at
-// 1x misses it by 5.6e-7 (its EPS=1e-5; round 10 of this arc). WHERE THE TIME GOES NOW (n=128): arranging 3.35 s,
-// classifying 0.48 s -- the opposite of round 8's profile. One wall triangle carries 2,735 segments and takes
+// 1x missed it by 5.6e-7 at its EPS of the time, 1e-5 (round 10 of this arc set 1e-8, and it meets it to
+// 8.5e-14). WHERE THE TIME GOES NOW (n=128): arranging 3.35 s, classifying 0.48 s -- the opposite of round 8's profile. One wall triangle carries 2,735 segments and takes
 // 733 ms: steps 3 and 4 are brute force (snapping O(V) per vertex, crossings O(k^2), vertex-on-edge O(V x E)).
 // A grid over triA's plane is the next piece if a larger workload needs it; not built.
 //

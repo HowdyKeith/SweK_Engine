@@ -66,8 +66,48 @@
 
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 
-/** Plane classification epsilon. A vertex within EPS of a plane is ON it, not in front or behind. */
-export const EPS = 1e-5;
+/**
+ * Plane classification epsilon. A vertex within EPS of a plane is ON it, not in front or behind.
+ *
+ * *** 1e-8 SINCE ROUND 10 OF THE BVH-CSG ARC (it was 1e-5). *** EPS is a LENGTH: a vertex up to EPS from a plane is
+ * rounded onto it, so a cutter that penetrates a face by d < EPS is cut as if flush and the volume is off by
+ * (contact area) x d. At 1e-5 that was the cause of the twelve-blast cracks this file's gate had carried as "cause
+ * unknown", and of a drift nobody had attributed. Every row below changes ONLY EPS, on copies of this file; the
+ * reference is the arrangement path (physics/mesh/triArrangement.mjs) at 1000x scale, which meshBooleanBlast-
+ * selfcheck section 3 licenses:
+ *                                     1e-5        1e-6        1e-7        1e-8        1e-9
+ *   twelve blasts, subdiv 8   error   5.71e-9     1.75e-12    1.75e-12    1.75e-12    1.75e-12  (fixture floor)
+ *                             open    15          0           0           0           0         (after settle)
+ *   one blast, subdiv 64      error   4.1e-9      4.8e-10     3.9e-14     3.9e-14     4.0e-14
+ *                             open    125         29          2           2           4
+ *   one blast, subdiv 128     error   5.6e-7      5.7e-8      6.1e-12     8.5e-14     8.5e-14
+ *                             open    1,078       116         5           0           2
+ *   twelve blasts, splits             37,708      37,726      37,727      37,727      37,806
+ * ("open" = watertight()'s unmatched edges after settle(); on the chain they are the same 15 the gate's uncovered-
+ * edge census counts as cracks, on the single blasts they are not yet split into cracks and T-junctions.)
+ * THE ERROR IS A FUNCTION OF EPS OVER FEATURE SIZE: 1e-5 at 1x and 1e-8 at 0.001x both read exactly 5.71e-9, and
+ * a subdiv-128 blob's facets are sixteen times finer than subdiv 8's -- so a constant that is enough for the coarse
+ * chain (1e-6 was: the BVH-CSG arc's round-9 notes proposed it from that chain alone) is 10x short at subdiv 128.
+ * 1e-8 is the largest value at the floor with the fewest open edges on every workload; 1e-9 is where rounding noise
+ * starts (79 extra splits on the chain and more open edges at 64 and 128), identically with the wall at the origin,
+ * at (1000, -2000, 500) and at (1e5, 5e4, -2e4) -- so the margin to the noise is a decade, and it does not shrink
+ * with world position. It does with model SCALE: below ~1e-3 scale 1e-8 is again large against the geometry, and
+ * a relative EPS is the arc's round-11 subject. Across destructible.html's own slider range (radius 0.2-1.4,
+ * facets 4-14, jaggedness 0.6-0.9, twelve shots) open edges went 608 -> 68 and the worst EPS-limited drift 4.7e-8 ->
+ * 1.3e-11; what remains there is NOT EPS -- see blast()'s KNOWN paragraph below.
+ * NEAR-FLUSH CONTACTS DID NOT REOPEN, the risk named before the change: the eight degenerate-contact fixtures of the
+ * gate's section 9, each shifted by +-1e-9..2e-5 along each axis (432 cases, exact interval-overlap oracle): off by
+ * more than 1e-9 went 80 -> 22, the worst 2.4e-4 -> 4.8e-7 (both exactly 48 x d, the wall's top rounded flush),
+ * and no case got worse. A shift beyond EPS is exact (4.3e-14). Gate section 10.
+ * *** WHAT NO CONSTANT FIXES: TWO NEARLY PARALLEL FACES ~EPS APART. *** Each mesh measures the other against ITS OWN
+ * plane, so a vertex of B can sit just beyond EPS of A's plane while the matching vertex of A sits just within EPS
+ * of B's (tilted) plane: B's piece is FRONT, A's is COPLANAR, each is outside the other, and the cap between them
+ * is lost -- 0.1..0.2 units of volume on a unit fixture. At 1e-5 a cutter whose top face is tilted by exactly
+ * 1e-5 about the wall's top edge line lost it (0.2); at 1e-8 that geometry is exact, and the hazard sits in a
+ * band a few ulps wide near slope 2e-8 about an off-centre axis (4 of 601 slopes within 3e-7 relative). It moves
+ * with EPS and narrows; it is not removed. Pinned in the gate's section 10, not claimed fixed.
+ */
+export const EPS = 1e-8;
 
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -90,7 +130,8 @@ const COPLANAR = 0, FRONT = 1, BACK = 2, SPANNING = 3;
  * end up with no partner and NO COVERAGE either -- a real hole, not a T-junction, and tolerance-insensitive
  * (identical at weld tolerances from 1e-9 to 1e-7, and worse if loosened). This counter is what let that be
  * attributed rather than guessed at, and it is exported so the gate can assert the rate rather than the
- * absence.
+ * absence. (Round 10 of the BVH-CSG arc: the counter read 0 drops all along; the 20 edges were EPS=1e-5's
+ * rounding, and at 1e-8 they are 0 -- see EPS above.)
  */
 export const SPLIT_STATS = { splits: 0, dropped: 0 };
 export const resetSplitStats = () => { SPLIT_STATS.splits = 0; SPLIT_STATS.dropped = 0; };
@@ -474,8 +515,9 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
  * mergeCoplanar MAKES THIS WORSE, from 24.8% to 55.8%, because a merged face has long edges that its
  * neighbours are still subdivided against. So the order is snap -> merge -> weld, and weld is last.
  *
- * *** ON ONE BLAST THIS REACHES 100.0%: EVERY EDGE MATCHED, ZERO T-JUNCTIONS, ZERO GAPS. OVER TWELVE IT DOES
- * NOT, AND THE REASON IS NOT KNOWN. *** 15 of 12,847 directed edges (0.12%) survive settle() on a wall that
+ * *** ON ONE BLAST THIS REACHES 100.0%: EVERY EDGE MATCHED, ZERO T-JUNCTIONS, ZERO GAPS. OVER TWELVE IT DID
+ * NOT, AND THE REASON WAS NOT KNOWN UNTIL ROUND 10 OF THE BVH-CSG ARC: IT WAS EPS. *** (What follows is the record
+ * as it stood at EPS=1e-5, kept because the three refutations are still true.) 15 of 12,847 directed edges (0.12%) survive settle() on a wall that
  * has taken twelve overlapping blasts, and they are UNCOVERED -- real cracks, not T-junctions. Three
  * explanations were proposed and all three were MEASURED AND REFUTED:
  *
@@ -491,12 +533,22 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
  * merge and weld, and A - B plus A AND B reconstruct A to 9.7e-14. So the solid is right and a hairline of
  * its surface is not sewn. That is written down as an open limit with its measurements rather than rounded
  * off, because a gate that asserted "watertight" here would be asserting something false.
+ *
+ * *** ROUND 10: THE FOURTH EXPLANATION, MEASURED TRUE. *** EPS -- a vertex within 1e-5 of a plane was rounded
+ * onto it. The chain rerun on a copy with ONLY EPS changed: 1e-5 -> 15 uncovered after settle (20 in the
+ * weld-only census above), 1e-6 / 1e-7 / 1e-8 / 1e-9 -> 0 and 0. EPS is 1e-8 (the finer blobs decided that --
+ * see EPS) and the gate asserts zero. The
+ * volume moved with it, from 20.112588161 to 20.112588046 (1.15e-7), onto the 1000x reference to 1.75e-12
+ * relative, where 20.112588161 had been 5.71e-9 off it: "to the last digit across snap, merge and weld" was
+ * true, and was a statement about those three passes, not about the cut.
  */
 export function weldTJunctions(polys, { tol = 1e-7, quantum = 1e-9, maxRounds = 4 } = {}) {
     // *** THIS LOOP IS DEFENSIVE AND THE MEASUREMENT SAYS SO, AGAINST WHAT I WROTE HERE FIRST. *** The first
     // version of this comment claimed one pass was not enough and that iterating was what closed the last
-    // edges. It is not: on a twelve-blast wall the pass inserts 2,853 vertices and leaves 53 edges unmatched
-    // at maxRounds 1, 2, 4 AND 8 -- identical, because the second pass inserts nothing at all. The argument
+    // edges. It is not: on a twelve-blast wall (settle's snap + merge first) the pass inserts 2,853 vertices and
+    // leaves 15 edges unmatched at maxRounds 1, 2, 4 AND 8 -- identical, because the second pass inserts nothing
+    // at all. (Re-measured at round 10 of the BVH-CSG arc: this comment said 53, a count that no longer matched
+    // the code at EPS=1e-5 either. At EPS=1e-8: 2,865 inserted, 0 unmatched, again identical at 1, 2, 4 and 8.) The argument
     // for iterating is still sound in principle (inserting a vertex makes two shorter edges, and a vertex
     // outside the old span can fall inside a new one) but it has never once fired here. Kept as a guard,
     // labelled as one, and NOT counted as a check -- sabotaging it back to a single pass changes no number
@@ -586,6 +638,24 @@ const boxesMeet = (a, lo, hi) => a.lo[0] <= hi[0] && a.hi[0] >= lo[0] && a.lo[1]
  * be touched by B, so leaving it alone is not an approximation. `select` is the hook the BVH plugs into --
  * pass one and it decides which polygons are near; pass none and the AABB test above is used directly, which
  * is what makes this file testable without an acceleration structure present.
+ *
+ * *** KNOWN, FOUND AT ROUND 10 OF THE BVH-CSG ARC, NOT FIXED: THAT ARGUMENT COVERS A's POLYGONS AND NOT B's. ***
+ * Leaving the far polygons alone IS exact. But subtract(near, B) then builds a BSP from `near` -- an OPEN patch of
+ * A -- and B's surface is kept or dropped by where that patch's planes say it is, not by where A's solid is:
+ *   - a blob wholly INSIDE the solid meets no polygon, `near` is empty, and the cavity is never cut. destructible.html
+ *     centres every blast on the wall's mid-plane (z = 0, half-thickness 0.35), so at blast radius 0.20..0.35 --
+ *     4 of its slider's 25 positions -- Hit removes NOTHING: 20 of 20 first shots at each radius, where subtract()
+ *     cuts the cavity (up to 0.068 of volume). From radius 0.4 the first shot is exact.
+ *   - where `near` is non-empty, B can reach interior space the patch's planes misclassify: on a twelve-shot chain
+ *     (radius 1.4, 14 facets, jaggedness 0.6, centres z = 0 / +-0.1) blast() departs from subtract() at shot 7 by
+ *     7.3e-4 and at shot 11 by a further 1.8e-3, while subtract() and the arrangement path agree to 1e-10 at every
+ *     shot, at 1x and 1000x. It is not EPS: shot 7 departs by 7.3094e-4 at 1e-6, 1e-7 and 1e-8 and by 7.3109e-4 at
+ *     1e-5 (where EPS's own drift also moves shots 5 and 6 by 2.8e-7).
+ *   - the same with two shots, cheaply: a blob reaching a face (140 polygons touched) over an earlier cavity departs
+ *     by 4.24e-3 on shot 2, shot 1 exact (the gate's pin).
+ * A fix has to classify B against the WHOLE solid (a point-in-solid test against A, or a BVH of A's triangles as
+ * meshPointClassify.mjs does) rather than against the patch -- a design decision, left for its own round. Pinned
+ * in meshCSG-selfcheck.mjs section 11 so it cannot be mistaken for fixed.
  */
 export function subtractLocal(A, B, { select = null } = {}) {
     const { lo, hi } = polysAABB(B);
