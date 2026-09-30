@@ -54,15 +54,15 @@ function triBounds(tris, t, out) {
     out[0] = x0; out[1] = y0; out[2] = z0; out[3] = x1; out[4] = y1; out[5] = z1;
 }
 
-function boxesOverlap(a, b) {
-    return !(a[3] < b[0] || a[0] > b[3] || a[4] < b[1] || a[1] > b[4] || a[5] < b[2] || a[2] > b[5]);
+function boxesOverlap(a, b, pad = 0) {
+    return !(a[3] + pad < b[0] || a[0] > b[3] + pad || a[4] + pad < b[1] || a[1] > b[4] + pad || a[5] + pad < b[2] || a[2] > b[5] + pad);
 }
 
-function nodeBoxesOverlap(bvhA, na, bvhB, nb) {
+function nodeBoxesOverlap(bvhA, na, bvhB, nb, pad = 0) {
     const oa = na * 6, ob = nb * 6;
-    return !(bvhA.bounds[oa + 3] < bvhB.bounds[ob] || bvhA.bounds[oa] > bvhB.bounds[ob + 3] ||
-              bvhA.bounds[oa + 4] < bvhB.bounds[ob + 1] || bvhA.bounds[oa + 1] > bvhB.bounds[ob + 4] ||
-              bvhA.bounds[oa + 5] < bvhB.bounds[ob + 2] || bvhA.bounds[oa + 2] > bvhB.bounds[ob + 5]);
+    return !(bvhA.bounds[oa + 3] + pad < bvhB.bounds[ob] || bvhA.bounds[oa] > bvhB.bounds[ob + 3] + pad ||
+              bvhA.bounds[oa + 4] + pad < bvhB.bounds[ob + 1] || bvhA.bounds[oa + 1] > bvhB.bounds[ob + 4] + pad ||
+              bvhA.bounds[oa + 5] + pad < bvhB.bounds[ob + 2] || bvhA.bounds[oa + 2] > bvhB.bounds[ob + 5] + pad);
 }
 
 function boxArea(bvh, n) {
@@ -86,9 +86,12 @@ function boxArea(bvh, n) {
  *
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhA
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
+ * @param {number} [pad=0]  BVH-CSG round 12: boxes closer than `pad` count as overlapping. 0 is the exact
+ *   predicate this file was written with; meshBoolean passes a small pad so two faces meant to be flush, which
+ *   boxPolys-style `c - h` arithmetic can leave 5.55e-17 apart, still meet (see meshBoolean.mjs's ROUND 12).
  * @returns {number[][]} array of [triIndexA, triIndexB]
  */
-export function pairOverlap(bvhA, bvhB) {
+export function pairOverlap(bvhA, bvhB, pad = 0) {
     const pairs = [];
     if (!bvhA.count || !bvhB.count) return pairs;
     const boxA = new Float64Array(6), boxB = new Float64Array(6);
@@ -96,7 +99,7 @@ export function pairOverlap(bvhA, bvhB) {
                              // MeshBVH#raycastFirst's own plain-number stack convention in the same file
     while (stack.length) {
         const nb = stack.pop(), na = stack.pop();
-        if (!nodeBoxesOverlap(bvhA, na, bvhB, nb)) continue;
+        if (!nodeBoxesOverlap(bvhA, na, bvhB, nb, pad)) continue;
         const leftA = bvhA.meta[na * 3], leftB = bvhB.meta[nb * 3];
         const aLeaf = leftA < 0, bLeaf = leftB < 0;
         if (aLeaf && bLeaf) {
@@ -108,7 +111,7 @@ export function pairOverlap(bvhA, bvhB) {
                 for (let j = sb; j < sb + cb; j++) {
                     const triB = bvhB.order[j];
                     triBounds(bvhB.tris, triB, boxB);
-                    if (boxesOverlap(boxA, boxB)) pairs.push([triA, triB]);
+                    if (boxesOverlap(boxA, boxB, pad)) pairs.push([triA, triB]);
                 }
             }
         } else if (aLeaf) {

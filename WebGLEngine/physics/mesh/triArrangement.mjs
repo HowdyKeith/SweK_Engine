@@ -111,7 +111,7 @@
 //     key, which reads them as a T-junction: 2 unmatched edges on shots 7..11 of the twelve-blast chain, 0 at 12.
 //   - COPLANAR AND DEGENERATE CONTACTS go to the plane path whole, with the plane path's known flush-contact
 //     gaps (meshBoolean.mjs header; round 12). The flush rod in meshBoolean-selfcheck section 15 is one: open,
-//     its cap missing, identical on both paths.
+//     its cap missing, identical on both paths. [ROUND 12: resolved when opts.contacts is set -- below.]
 //   - ONE LABEL PER FACE RESTS ON STEP 5 AND ON THE CANDIDATE LIST. A face is classified once only because no
 //     segment crosses it -- gate section 2 checks exactly that on 200 random cases, and section 3 audits
 //     per-face against per-triangle labels (1,120 triangles, 0 disagree) -- but a B-triangle missing from the
@@ -119,12 +119,34 @@
 //     a whole face, where the plane path would have mislabelled one fragment. meshBoolean.mjs says so too.
 //   - meshCSG's settle() MAKES THIS OUTPUT WORSE: its coplanar merge opens edges its weld cannot all close (3
 //     left on the twelve-blast chain, from 0 raw). The output needs no settle; meshBooleanBlast section 5.
+//
+// *** ROUND 12: opts.contacts (meshBoolean passes it; every other caller gets round 9's behaviour, pair for pair). ***
+//   - A pair triTriIntersect calls "coplanar" or "degenerate" is resolved by triContact.mjs instead of refusing the
+//     triangle: a DEGENERATE pair gives a segment (onPlane when it is a whole edge lying in triA's plane); a COPLANAR
+//     one gives no cut but goes on a list, and each face whose sample lies in or ON THE EDGE of one of those
+//     triangles is labelled `on` = its orientation. The test is INCLUSIVE because a sample can land exactly on the
+//     edge two same-facing coplanar triangles share (a box face's diagonal: flush-box fuzz case 78, 4.7e-2 off
+//     while it was strict). The region's rim needs no cut from here -- B is closed, and the triangle past the rim
+//     leaves the plane, so its contact is a segment. (Clipping the coplanar triangles' edges in was built, measured
+//     redundant once the test was inclusive -- 1,350 box runs unchanged, 33 more fallbacks on rotated copies -- and
+//     removed.)
+//   - opts.sidePoints: points to put on triA's sides -- meshBoolean's edge-conformity pass gives each triangle the
+//     splits its neighbour made on their shared edge; `sideVerts` in the result is what this triangle made.
+//   - Thin cycles (|area| <= snap x perimeter) are DROPPED and counted (stats.droppedThin), not refused: a face tilted
+//     1e-9..2e-9 past the contact tolerance encloses one. Its area is inside the face-sum tolerance.
+//   - Step 5 no longer refuses at once. Repeated to a fixed point: a DANGLING on-plane contact is pruned (B touching
+//     triA's plane along an edge ends where B leaves it); a CORNER left with one edge -- a contact point just past
+//     snap from it but within snap of both its sides -- has that edge contracted into it; a chain end within JOIN x
+//     snap (8e-9) of triA's boundary is joined to it (stats.joined, joinedMax -- the distance moved). What still
+//     dangles is refused as before. Without the join, the rotated-copy family falls back 357 times, not 87.
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
 import { triTriIntersect } from "./triTriIntersect.mjs";
+import { contactPair } from "./triContact.mjs";
 
 export const SNAP_EPS = 1e-9;
+const JOIN = 8;   // round 12, contacts: a dangling chain end within JOIN x snap of triA's boundary is joined to it
 const AREA_REL = 1e-9;
 
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -181,7 +203,8 @@ const refuse = (reason, extra = {}) => ({ status: "fallback", reason, ...extra }
  * The planar arrangement of triangle `triA` (in `trisA`) cut by the intersection SEGMENTS of `candidateTriBs`
  * (indices into `trisB`) -- not by their planes. See this file's header.
  *
- * @param {{snapEps?:number}} [opts]
+ * @param {{snapEps?:number, contacts?:boolean}} [opts]  contacts (round 12): resolve the pairs triTriIntersect()
+ *   calls "coplanar" or "degenerate" with triContact.mjs instead of refusing the triangle; faces then carry `on`.
  * @returns one of
  *   {status:"untouched"}  -- no candidate crosses triA: triA is one face (the caller classifies it whole)
  *   {status:"ok", faces:{tris:number[][][], sample:number[], area:number, holes:number}[], stats:object}
@@ -195,19 +218,32 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // ---- 1. the segments (round 2's triTriIntersect), refusing whatever it leaves unresolved -------------------
     const segs = [];
     const seen = new Set();
-    let pointContacts = 0;
+    const coplanar = [];          // round 12: {U (triB's corners), orient}
+    let pointContacts = 0, contactSegs = 0;
     for (const triB of candidateTriBs || []) {
         if (seen.has(triB)) continue;
         seen.add(triB);
         if (!boxesMeet(tb, box3(readTri(trisB, triB), 0))) continue;
         const r = triTriIntersect(trisA, triA, trisB, triB);
         if (r.status === "none") continue;
-        if (r.status !== "intersect") return refuse(r.status, { triB });
-        const d = sub(r.p1, r.p0);
+        let p0, p1, onPlane = false;
+        if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; }
+        else if (opts.contacts) {
+            // coplanar/degenerate: resolved here (triContact.mjs)
+            const U = readTri(trisB, triB), c = contactPair(T, U);
+            if (c.kind === "none" || c.kind === "point") continue;
+            if (c.kind === "coplanar") { coplanar.push({ U, orient: c.orient, triB }); continue; }
+            p0 = c.p0; p1 = c.p1; onPlane = c.onPlane; contactSegs++;
+        } else return refuse(r.status, { triB });
+        const d = sub(p1, p0);
         if (Math.hypot(d[0], d[1], d[2]) <= snap) { pointContacts++; continue; }
-        segs.push({ p0: r.p0, p1: r.p1, triB });
+        segs.push({ p0, p1, triB, onPlane });
     }
-    if (segs.length === 0) return { status: "untouched", pointContacts };
+    // Round 12: points the triangle ACROSS one of triA's sides put on that side (meshBoolean's second pass). Without
+    // them the two disagree along their shared edge -- a T-junction: a B edge crossing A's face exactly on the diagonal
+    // two A-triangles share gives one of them a segment ending there and the other only a point contact, dropped.
+    const sidePoints = opts.sidePoints || [];
+    if (segs.length === 0 && coplanar.length === 0 && sidePoints.length === 0) return { status: "untouched", pointContacts };
 
     // ---- 2. a 2D frame on triA's plane: drop the dominant normal axis, local origin at T[0], mirrored if needed so
     // that triA itself runs counter-clockwise (faces are then found counter-clockwise and wound like triA) ----------
@@ -236,10 +272,20 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     if (!(areaT > 0)) return refuse("degenerate triangle");
 
     const edges = [[0, 1], [1, 2], [2, 0]];
+    const touch = [false, false, false];   // round 12: an edge that is only an on-plane contact may be pruned
+    for (const p of sidePoints) addVertex(p, "side point");
     for (const s of segs) {
         const a = addVertex(s.p0, "segment"), b = addVertex(s.p1, "segment");
-        if (a !== b) edges.push([a, b]);
+        if (a !== b) { edges.push([a, b]); touch.push(!!s.onPlane); }
     }
+    // Round 12: a coplanar B-triangle adds NO cut of its own. The RIM of B's coplanar region is cut anyway -- B is
+    // closed, so the triangle beyond it leaves the plane and its contact is a segment -- and the edges INSIDE the
+    // region (a box face's diagonal) need no cut, because the ON test (step 7) is inclusive: a sample on the edge two
+    // same-facing coplanar triangles share is on both. Built first with those edges clipped in as well, which was
+    // needed only while the ON test was strict (flush-box fuzz case 78: a sample exactly on the other box's diagonal
+    // failed both triangles' tests -- 4.7e-2 off, 5 cracks); inclusive, the clipping changed no box result over 1,350
+    // runs and cost 33 extra fallbacks on the rotated-copy family, and was removed.
+
 
     // ---- 3. proper crossings between edges (a manifold, non-self-intersecting B gives none; counted) -----------
     // Registering the crossing on both edges here is REDUNDANT on every fixture gated: step 4 re-finds it within
@@ -278,6 +324,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         }
     }
     const adj = V2.map(() => new Set());
+    const touchKey = new Set(), plainKey = new Set();
     for (let e = 0; e < edges.length; e++) {
         const [a, b] = edges[e];
         const A = V2[a], dx = V2[b][0] - A[0], dy = V2[b][1] - A[1];
@@ -285,14 +332,91 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
             .sort((p, q) => p.t - q.t).map((p) => p.v);
         let prev = a;
         for (const v of [...chain, b]) {
-            if (v !== prev) { adj[prev].add(v); adj[v].add(prev); }
+            if (v !== prev) {
+                adj[prev].add(v); adj[v].add(prev);
+                const K = touch[e] ? touchKey : plainKey;
+                K.add(prev + "," + v); K.add(v + "," + prev);
+            }
             prev = v;
         }
     }
 
     // ---- 5. a vertex of degree 1 is a segment chain that stops inside triA: B's surface would cross the face it
-    // sits in, so no face could be classified by one point. Refused, not pruned. --------------------------------
-    for (let v = 0; v < V2.length; v++) if (adj[v].size === 1) return refuse("dangling");
+    // sits in, so no face could be classified by one point. Refused, not pruned -- EXCEPT (round 12, contacts) a
+    // chain made only of on-plane contacts: B's edge lying in triA's plane with B on one side touches triA without
+    // crossing it, and ends where B leaves the plane. Those are pruned, one end at a time, and counted. ------------
+    let pruned = 0, contracted = 0, joined = 0, joinedMax = 0;
+    for (let pass = 0; opts.contacts && pass < 8; pass++) {
+        const before = pruned + contracted + joined;
+        // A contact point just outside snap of one of triA's corners can still lie within snap of BOTH sides that meet
+        // there (at 45 degrees, anything up to 2.6 x snap from the corner): both sides split at it and the corner is
+        // left with one edge. Measured at a face tilted 1e-9 (1.4e-9 from the corner). That edge is contracted into
+        // the corner -- the corner stays where it is, every neighbour of the point is joined to it -- and counted.
+        for (let v = 0; v < 3; v++) {
+            if (adj[v].size !== 1) continue;
+            const u = [...adj[v]][0];
+            if (u < 3 || Math.hypot(V2[u][0] - V2[v][0], V2[u][1] - V2[v][1]) > 4 * snap) continue;
+            for (const x of adj[u]) {
+                adj[x].delete(u);
+                if (x !== v) { adj[x].add(v); adj[v].add(x); plainKey.add(x + "," + v); plainKey.add(v + "," + x); }
+            }
+            adj[u].clear(); contracted++;
+        }
+        let again = true;
+        while (again) {
+            again = false;
+            for (let v = 0; v < V2.length; v++) {
+                if (adj[v].size !== 1) continue;
+                const w = [...adj[v]][0];
+                if (!touchKey.has(v + "," + w) || plainKey.has(v + "," + w)) continue;
+                adj[v].delete(w); adj[w].delete(v); pruned++; again = true;
+            }
+        }
+        // A crossing chain that ends just short of triA's boundary: at a near-coincidence (a copy of the mesh rotated
+        // 1e-8 -- every edge 1e-9..1e-8 from its twin) one triangle's side is snapped whole into the other's plane
+        // while the twin's crossing points stay a few 1e-9 off it, and the chain stops 5e-9 short of a corner. An end
+        // within JOIN x snap of the boundary is joined to it -- contracted into the corner, or moved onto the side --
+        // and the distance moved is recorded (stats.joined, stats.joinedMax).
+        for (let v = 3; v < V2.length; v++) {
+            if (adj[v].size !== 1) continue;
+            let best = null;
+            for (let k = 0; k < 3; k++) {
+                const dc = Math.hypot(V2[v][0] - V2[k][0], V2[v][1] - V2[k][1]);
+                if (dc <= JOIN * snap && (!best || dc < best.d)) best = { d: dc, corner: k };
+            }
+            if (!best) for (let k = 0; k < 3; k++) {
+                const r = segDist(V2[v], V2[k], V2[(k + 1) % 3]);
+                if (r.d <= JOIN * snap && r.t > 0 && r.t < 1 && (!best || r.d < best.d)) best = { d: r.d, side: k, t: r.t };
+            }
+            if (!best) continue;
+            joined++; joinedMax = Math.max(joinedMax, best.d);
+            if (best.corner !== undefined) {
+                const c = best.corner;
+                for (const x of adj[v]) { adj[x].delete(v); if (x !== c) { adj[x].add(c); adj[c].add(x); plainKey.add(x + "," + c); plainKey.add(c + "," + x); } }
+                adj[v].clear();
+                continue;
+            }
+            // move v onto side k and splice it into whichever piece of that side it now lies on
+            const k = best.side, P = V2[k], Q = V2[(k + 1) % 3], t = best.t;
+            V2[v] = [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t];
+            const P3 = V3[k], Q3 = V3[(k + 1) % 3];
+            V3[v] = [P3[0] + (Q3[0] - P3[0]) * t, P3[1] + (Q3[1] - P3[1]) * t, P3[2] + (Q3[2] - P3[2]) * t];
+            for (let p = 0; p < V2.length; p++) for (const q of adj[p]) {
+                if (p === v || q === v) continue;
+                const r = segDist(V2[v], V2[p], V2[q]);
+                if (r.d <= snap && r.t > 0 && r.t < 1 && segDist(V2[p], P, Q).d <= snap && segDist(V2[q], P, Q).d <= snap) {
+                    adj[p].delete(q); adj[q].delete(p);
+                    for (const x of [p, q]) { adj[x].add(v); adj[v].add(x); plainKey.add(x + "," + v); plainKey.add(v + "," + x); }
+                    p = V2.length; break;
+                }
+            }
+        }
+        if (pruned + contracted + joined === before) break;
+    }
+    for (let v = 0; v < V2.length; v++) if (adj[v].size === 1) {
+        if (opts.debug) return refuse("dangling", { v, V3, kind, edges: [...adj.entries()].map(([i, st]) => [i, [...st]]), touch, edgesRaw: edges });
+        return refuse("dangling");
+    }
 
     // ---- 6. faces: next(u->v) = v->w, w the neighbour of v clockwise-next after u; faces lie to the left --------
     const order = adj.map((s, v) => [...s].sort((p, q) =>
@@ -331,10 +455,16 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     const tolA = snap * perim({ vs: [0, 1, 2] }) + AREA_REL * areaT;
     // A cycle is degenerate when it is thinner than the snap distance -- |area| <= snap x perimeter -- not when it
     // is small against triA: a spike tip grazing a wall face encloses a genuine loop of area ~1e-9 (measured, n=64).
-    const thin = cycles.filter((c) => Math.abs(c.area) <= snap * perim(c));
-    if (thin.length) return refuse("zero-area cycle", { thin: thin.length });
-    const pos = cycles.filter((c) => c.area > 0);
-    const neg = cycles.filter((c) => c.area < 0);
+    const isThin = (c) => Math.abs(c.area) <= snap * perim(c);
+    const thin = cycles.filter(isThin);
+    // Round 12 (contacts): a cycle thinner than snap is below what the arrangement resolves -- two contacts 1e-9 to
+    // 2e-9 apart (a face tilted just past CONTACT_EPS) enclose one -- so it is DROPPED, counted, not refused: its area
+    // is at most snap x its perimeter, inside the face-sum tolerance below. The outside is never thin (triA is not).
+    if (thin.length && !opts.contacts) return refuse("zero-area cycle", { thin: thin.length });
+    const live = opts.contacts ? cycles.filter((c) => !isThin(c)) : cycles;
+    const droppedThin = cycles.length - live.length;
+    const pos = live.filter((c) => c.area > 0);
+    const neg = live.filter((c) => c.area < 0);
     // the outer face: the one negative cycle around triA's own boundary, of area -area(triA)
     const outerIdx = neg.findIndex((c) => c.vs.includes(0));
     if (outerIdx < 0 || Math.abs(neg[outerIdx].area + areaT) > tolA) return refuse("outer face");
@@ -363,7 +493,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // Earcut sees only the corners, and each absorbed run is put back by fanning the one triangle that owns that
     // edge from its opposite vertex. Every vertex comes back, so the face still meets its neighbours edge for edge.
     const out = [];
-    let absorbedTotal = 0;
+    let absorbedTotal = 0, onConflicts = 0;
     for (const f of faces) {
         const want = f.area + f.holes.reduce((s, h) => s + h.area, 0);
         const absorbed = new Map();          // "p,q" (a surviving ring edge) -> the vertices strictly between, in order
@@ -430,12 +560,37 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         const tris = T3.map(([a, b, c]) => [V3[a], V3[b], V3[c]]);
         const t = tris[best];
         const sample = [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3, (t[0][2] + t[1][2] + t[2][2]) / 3];
-        out.push({ tris, sample, area: want, holes: f.holes.length });
+        // round 12: is the face ON a coplanar B-triangle? Its sample is interior to the face, and the face is bounded
+        // by that triangle's edges, so it is either well inside the triangle's projection or well outside it.
+        let on = 0;
+        if (coplanar.length) {
+            const q = to2(sample);
+            for (const c of coplanar) {
+                const Q2 = c.U.map(to2);
+                // INCLUSIVE: a sample on the edge two coplanar B-triangles share (a box face's diagonal) is on both --
+                // they face the same way. The rim of B's coplanar region is always a face boundary, never under a sample.
+                const s0 = triArea2(Q2[0], Q2[1], q), s1 = triArea2(Q2[1], Q2[2], q), s2 = triArea2(Q2[2], Q2[0], q);
+                const e = snap * Math.max(Math.hypot(Q2[1][0] - Q2[0][0], Q2[1][1] - Q2[0][1]), Math.hypot(Q2[2][0] - Q2[1][0], Q2[2][1] - Q2[1][1]), Math.hypot(Q2[0][0] - Q2[2][0], Q2[0][1] - Q2[2][1]));
+                if ((s0 >= -e && s1 >= -e && s2 >= -e) || (s0 <= e && s1 <= e && s2 <= e)) {
+                    if (on && on !== c.orient) onConflicts++;
+                    on = on || c.orient;
+                }
+            }
+        }
+        out.push({ tris, sample, area: want, holes: f.holes.length, on });
     }
+    // round 12: the vertices on each of triA's sides, for meshBoolean's edge-conformity pass
+    const sideVerts = [0, 1, 2].map((k) => V2.map((q, v) => v).filter((v) => {
+        if (v < 3 || adj[v].size === 0) return false;
+        const r = segDist(V2[v], V2[k], V2[(k + 1) % 3]);
+        return r.d <= snap && r.t > 0 && r.t < 1;
+    }).map((v) => V3[v]));
     return {
         status: "ok",
         faces: out,
+        sideVerts,
         stats: { segments: segs.length, vertices: V2.length, crossings, pointContacts, absorbed: absorbedTotal,
-                 faceCount: out.length, holeCount: holes.length },
+                 faceCount: out.length, holeCount: holes.length, coplanar: coplanar.length, contactSegs,
+                 pruned, contracted, joined, joinedMax, onConflicts, droppedThin },
     };
 }

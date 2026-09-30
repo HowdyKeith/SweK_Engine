@@ -72,6 +72,7 @@
 // difference. "Keep" is not merely the safer-sounding default here, it is the only one that isn't badly wrong.
 //
 // A REAL, MEASURED, UNRESOLVED GAP THIS ROUND FOUND AND DID NOT FIX: TOUCHING / ZERO-VOLUME CONTACTS.
+// [ROUND 12: FIXED -- the tiebreak named below was built; see the ROUND 12 paragraph. Kept as round 6 wrote it.]
 // meshCSG-selfcheck.mjs's own section 9 ("the degenerate contacts") has 8 hand-oracled WALL-vs-cutter
 // fixtures with an independent axis-interval-overlap volume oracle. Run through this file's own subtract()
 // path (see the gate's own "degenerate contacts" section, which reproduces this directly): 5 of 8 match the
@@ -153,6 +154,7 @@
 //   contact gap below (a measurably-wrong but plausible-looking volume) -- an empty mesh can read as
 //   "correctly nothing to do" rather than "the op string was wrong". Fixed with an explicit validation guard
 //   at the top of assembleBoolean() that throws on any op outside the three recognized literals.
+//   [ROUND 12: FIXED -- an operand thinner than CONTACT_EPS on average is an empty solid; ROUND 12 paragraph.]
 //   (2) LEFT UNRESOLVED, A NEW MANIFESTATION OF THE SAME ROOT CAUSE AS THE TOUCHING-CONTACT GAP ABOVE -- A
 //   DEGENERATE (ZERO-VOLUME) OPERAND EMBEDDED IN THE OTHER MESH'S INTERIOR YIELDS A WRONG-SIGN, NON-NOISE
 //   VOLUME ERROR. Probed with A = a zero-volume flat rectangle (M.boxPolys([0,0,0],[0,1,1]), one half-extent
@@ -239,6 +241,7 @@
 // position run gated (meshBoolean-selfcheck section 15, meshBooleanBlast-selfcheck sections 5 and 8). It is NOT
 // closed where a triangle falls back, and it does not touch the flush/touching-contact, zero-volume-operand,
 // near-flush-tilt, rotated-copy or scale gaps named above: those triangles are refused and take the plane path.
+// [ROUND 11 answered scale, ROUND 12 the rest except a band of rotated copies -- see those paragraphs.]
 // *** THE CAVEAT PER-FACE CLASSIFICATION BRINGS: *** a face gets one label because no segment crosses it, and that
 // holds only if every B-triangle that meets triA is in its candidate list. bvhPairOverlap.mjs's conservative-
 // superset contract says it is; if it ever were not, the arrangement would mislabel a WHOLE FACE where the plane
@@ -275,6 +278,60 @@
 // the ratio instead of falling off a cliff: 1.4e-13 at 1:1e5, 9.9e-13 at 2e5, 2.3e-12 at 5e5, 3.2e-12 at 1e6,
 // 1.9e-11 at 1e7. (3) meshCSG.mjs (the BSP, what the engine runs) keeps its absolute EPS and settle tolerances;
 // this round does not touch it.
+//
+// *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER. *** The four gaps the arc's notes listed -- flush faces, a
+// face tilted near-flush (-0.12 against ~0), a zero-volume operand (the wrong sign), a blob minus its copy rotated
+// slightly (up to -1.43) -- had one cause: a piece lying on the other surface was classified by rays cast from a
+// point ON that surface, with no tiebreak. Measured first, against exact oracles (interval overlap for boxes, s/2
+// for a wedge, the first-order swept volume for a rotation), with round 11's code:
+//   1,350 flush-box runs (corners on a 1/4 grid; as built, rotated 0.7 rad about z, shifted 0.1; 3 ops): 656 wrong
+//     or open, worst 0.43 -- the BSP right on all of them. Two of the three "flush" fixtures had NO candidate pair
+//     at all: 0.8 - 0.5 is 5.55e-17 above 0.3 and the broad phase is exact.
+//   B on the unit box with its bottom tilted by slope s about an edge: 0.33 off for s <= 3e-10, open edges at every
+//     s <= 1e-4. An operand with itself: 7.5e-2 off (box), 0.29 (blob). The rotated copy: 0.15..0.2 at 1e-12..1e-9.
+// WHAT WAS BUILT (contacts on by default; opts.contacts:false is round 11's pipeline, kept as every gate's control):
+//   (1) the broad phase padded by MESH_BOOLEAN_NEAR (1e-8), so flush faces meet.
+//   (2) physics/mesh/triContact.mjs resolves the pairs triTriIntersect refuses. COPLANAR (one triangle within
+//       CONTACT_EPS = 1e-9 of the other's plane): the part of triA the other covers is labelled ON, +1 when the two
+//       outward normals agree, -1 when they oppose. DEGENERATE (a vertex within 1e-9 of the other's plane): a segment,
+//       distances snapped exactly as triTriIntersect snaps them. Canonical in the pair's order, so A's arrangement and
+//       B's get the same points bit for bit (triContact-selfcheck: 9,461 refused pairs).
+//   (3) ON fragments by orientation -- the BSP's coplanar-front/back rule: A's copy is kept for union and intersect
+//       when same-facing, for subtract when opposite-facing; B's copy never (keepA/bKeepAndFlip).
+//   (4) a face within MESH_BOOLEAN_NEAR of the other surface is sided locally (nearSide): the nearest triangle's
+//       plane, or at an edge or vertex the angle-weighted pseudo-normal -- pointInMesh drops hits nearer than 1e-9 and
+//       welds hits within 1e-9, so rays from there are not an answer.
+//   (5) an operand thinner than CONTACT_EPS on average (2 x volume / area) is an empty solid, and the regularised
+//       answer needs no classification (isEmptySolid; the result says which in `emptyOperand`).
+//   (6) EDGE CONFORMITY: every triangle is arranged, then any triangle missing a split its neighbour made on their
+//       shared edge is arranged again with the neighbour's point on that side. A B edge crossing A's face exactly on
+//       the diagonal two A-triangles share gave one a segment ending there and the other only a point contact: a
+//       T-junction, 23 of 450 grid runs (round 11 identical). Only MISSING splits are injected -- a second vertex a
+//       few 1e-9 from an existing one only made a sliver on the twelve-blast chain.
+//   (7) in triArrangement.mjs (its ROUND 12 paragraph): sub-snap cycles dropped, chain ends within 8 snap of the
+//       boundary joined, a corner left with one edge contracted, dangling on-plane contacts pruned -- all counted.
+// AFTER: all 1,350 flush-box runs exact to 3.6e-15 with no fallback, no ambiguous fragment, no crack (an edge whose
+//   two directions disagree at the 1e-6 census key; an edge used twice each way is two solids meeting on a line,
+//   non-manifold and correct, and is counted separately). The three KNOWN fixtures of round 6 and its zero-volume
+//   sheet exact, the flush rod exact about any point and watertight (28 unmatched before), the tilt within
+//   s/2 <= 5e-10 inside the contact band and 1e-12 beyond, 36 zero-volume runs exact, box and blob with themselves
+//   exact and closed, rotated copies at 1e-12..3e-10 and 1e-7..1e-6 within 3e-9 of the oracle. General position is
+//   untouched: meshBooleanBlast, triArrangement, meshCSG, triFragmentAccumulate, meshPointClassify and
+//   bvhPairOverlap's gates print what they printed at round 11, line for line, the twelve-blast chain included.
+//   It is not free there: the chain takes 503 ms against 441 with contacts:false (median of 7 paired runs, +14%) --
+//   +28% until nearSide skipped, by box, the candidates farther than MESH_BOOLEAN_NEAR (no output changed).
+// FOUND BY THIS ROUND'S OWN RUNS: the ON test must be INCLUSIVE -- a face's sample landed exactly on the other box's
+//   diagonal (fuzz case 78: 4.7e-2 off, 5 cracks) and failed both of its triangles' strict tests. Answered first by
+//   clipping the coplanar triangles' edges in, then at the root; the clipping was then measured redundant (no box
+//   result changed over 1,350 runs, 33 fewer fallbacks on the rotated copies) and removed.
+// KNOWN, MEASURED, NOT FIXED: A COPY ROTATED BY 1e-9..3e-8 RAD. Twin triangles 1e-9..1e-8 apart straddle the contact
+//   tolerance. Snapping a near-parallel pair's distances to zero moves its crossing line by ~1e-9/theta -- a
+//   triangle's width at theta = 1e-8 -- and a face sided one way on A while its twin is sided the other way on B
+//   costs a CONE of volume (area x radius / 3), not a sliver: worst 2.8e-2 (round 11: 0.2), pinned in the gate. A
+//   smaller distance snap (1e-10..1e-12), with or without a separate coplanar threshold (1e-9..1e-7), moved the band
+//   or widened it and was not kept: per-pair tolerances cannot be made consistent for two copies of a surface a few
+//   1e-9 apart. That needs snap rounding or exact predicates. Also not handled: a zero-thickness FIN on a real solid
+//   (only a wholly empty operand is recognised), and meshCSG.mjs's BSP -- what the engine runs -- is unchanged.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -282,6 +339,49 @@ import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumul
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle } from "./triArrangement.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
+import { closestOnTriangle, angleAt, CONTACT_EPS } from "./triContact.mjs";
+
+/** Round 12: the broad phase's pad, and the distance under which a face is sided locally rather than by rays. */
+export const MESH_BOOLEAN_NEAR = 1e-8;
+
+// Round 12: which side of the other mesh a face sample lies on, when it lies within MESH_BOOLEAN_NEAR of it.
+// pointInMesh() drops hits nearer than 1e-9 and welds hits within 1e-9 of each other, so a sample that close is
+// not a question for rays. Every triangle within the pad is in `cands` (the broad phase was padded by it). The
+// nearest one decides by the side of its plane -- but only when the nearest point is inside its face; at an edge
+// or a vertex the plane of one triangle does not say which side, and the rays are asked after all.
+export function nearSide(sample, trisOther, cands) {
+    let best = null;
+    const all = [];
+    const N = MESH_BOOLEAN_NEAR, sx = sample[0], sy = sample[1], sz = sample[2];
+    for (const tb of cands) {
+        const o = tb * 9;
+        // a candidate whose box is farther than N cannot hold the nearest point within N -- most of them, skipped
+        // before the closest-point computation (without this, contacts cost the twelve-blast chain ~28%)
+        const x0 = trisOther[o], x1 = trisOther[o + 3], x2 = trisOther[o + 6];
+        if (sx < Math.min(x0, x1, x2) - N || sx > Math.max(x0, x1, x2) + N) continue;
+        const y0 = trisOther[o + 1], y1 = trisOther[o + 4], y2 = trisOther[o + 7];
+        if (sy < Math.min(y0, y1, y2) - N || sy > Math.max(y0, y1, y2) + N) continue;
+        const z0 = trisOther[o + 2], z1 = trisOther[o + 5], z2 = trisOther[o + 8];
+        if (sz < Math.min(z0, z1, z2) - N || sz > Math.max(z0, z1, z2) + N) continue;
+        const T = [[trisOther[o], trisOther[o + 1], trisOther[o + 2]], [trisOther[o + 3], trisOther[o + 4], trisOther[o + 5]],
+                   [trisOther[o + 6], trisOther[o + 7], trisOther[o + 8]]];
+        const r = closestOnTriangle(sample, T[0], T[1], T[2]);
+        r.T = T; all.push(r);
+        if (!best || r.d2 < best.d2) best = r;
+    }
+    if (!best || best.d2 > MESH_BOOLEAN_NEAR * MESH_BOOLEAN_NEAR) return null;
+    if (best.region === "face") return best.planeDist === 0 ? { edge: true } : { inside: best.planeDist < 0 };
+    // at an edge or a vertex: the angle-weighted pseudo-normal of every triangle meeting at the closest point
+    const tol = 1e-12, q = best.q, pn = [0, 0, 0];
+    for (const r of all) {
+        const dq = [r.q[0] - q[0], r.q[1] - q[1], r.q[2] - q[2]];
+        if (dq[0] * dq[0] + dq[1] * dq[1] + dq[2] * dq[2] > tol * tol) continue;
+        const w = angleAt(q, r.T[0], r.T[1], r.T[2], tol);
+        pn[0] += w * r.n[0]; pn[1] += w * r.n[1]; pn[2] += w * r.n[2];
+    }
+    const side = (sample[0] - q[0]) * pn[0] + (sample[1] - q[1]) * pn[1] + (sample[2] - q[2]) * pn[2];
+    return side === 0 ? { edge: true } : { inside: side < 0, pseudo: true };
+}
 
 function readTri(tris, t) {
     const o = t * 9;
@@ -311,12 +411,15 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhSelf  built over trisSelf
  * @param {Float64Array|Float32Array} trisOther
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhOther  built over trisOther
- * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number,
+ *   contacts?:boolean}} [opts]
+ *   contacts (round 12, default true): padded broad phase, contacts resolved, ON faces, local siding near the other
+ *   surface, the edge-conformity pass -- see the header. false is round 11's classification exactly.
  *   cutting (round 9): "arrangement" (default, MESH_BOOLEAN_DEFAULT_CUTTING) or "plane"; anything else throws.
  *   accOpts defaults to {gateByIntersection:true, maxFragments:MESH_BOOLEAN_MAX_FRAGMENTS} since round 7 --
  *   NOT triFragmentAccumulate.mjs's own defaults; defined caller keys override, undefined/null ones do not.
  *   It governs the plane path only (all of it under cutting:"plane"; fallen-back triangles otherwise).
- * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean}[], stats:{triCount:number,
+ * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean, on?:number, src?:number}[], stats:{triCount:number,
  *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number,
  *   gateSkipped:number, gateTested:number, examined:number, cutting:string, classifications:number,
  *   arrangedTris:number, arrangementFaces:number, untouchedTris:number, fallbackTris:number,
@@ -324,10 +427,15 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  *   classifications: pointInMesh() calls, on either path. arrangedTris / arrangementFaces: triangles the
  *   arrangement cut, and the faces it made of them. untouchedTris: triangles with candidates none of which
  *   crosses them (classified whole). fallbackTris / fallbackReasons: refused, and taken by the plane path.
+ *   Round 12: a fragment's `on` is +1/-1 when it lies ON the other surface (same-/opposite-facing) and is kept by
+ *   orientation, 0 otherwise; `src` is its source triangle. onFaces, nearSided (nearPseudo of them at an edge or
+ *   vertex), nearEdge (sided by rays after all), rearranged / injected (the edge-conformity pass).
  */
 export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther, opts = {}) {
     const agreementThreshold = opts.agreementThreshold ?? 1;
-    const pairs = pairOverlap(bvhSelf, bvhOther);
+    // Round 12: contacts on by default -- see the header. false is the round-11 pipeline, pair for pair.
+    const contacts = opts.contacts !== false;
+    const pairs = pairOverlap(bvhSelf, bvhOther, contacts ? MESH_BOOLEAN_NEAR : 0);
     const byTri = groupCandidatesByTriA(pairs);
     const triCount = trisSelf.length / 9;
     const fragments = [];
@@ -347,11 +455,76 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         throw new Error('meshBoolean: unrecognized cutting "' + cutting + '" (expected "arrangement" or "plane")');
     }
     let classifications = 0, arrangedTris = 0, arrangementFaces = 0, untouchedTris = 0, fallbackTris = 0;
+    let onFaces = 0, nearSided = 0, nearPseudo = 0, nearEdge = 0;
     const fallbackReasons = {};
+    // a face or whole triangle's label: ON the other surface (round 12, from the arrangement), sided locally when
+    // within MESH_BOOLEAN_NEAR of it, else by rays
+    const classify = (s, cands, on) => {
+        classifications++;
+        if (on) { onFaces++; return { inside: false, ambiguous: false, on }; }
+        if (contacts && cands) {
+            const n = nearSide(s, trisOther, cands);
+            if (n && !n.edge) { nearSided++; if (n.pseudo) nearPseudo++; return { inside: n.inside, ambiguous: false, on: 0 }; }
+            if (n) nearEdge++;
+        }
+        const cls = pointInMesh(bvhOther, s[0], s[1], s[2], opts.pointInMeshOpts);
+        return { inside: cls.inside, ambiguous: cls.agreement < agreementThreshold, on: 0 };
+    };
+
+    // Round 12: EDGE CONFORMITY. Every triangle is arranged first; then a triangle missing a point that the triangle
+    // across one of its sides put on their shared edge is arranged again with that point (the neighbour's exact
+    // coordinates) on its side. Two triangles sharing an edge then split it at the same points: no T-junction where
+    // B's surface reaches an A-edge -- a B edge crossing A's face exactly on the diagonal two A-triangles share gives
+    // one a segment ending there and the other only a point contact (flush-box fuzz: 3 unmatched edges on 23 of 450
+    // runs before; round 11 identical).
+    const arrs = new Array(triCount);
+    let rearranged = 0, injected = 0;
+    if (cutting === "arrangement" && contacts) {
+        for (let t = 0; t < triCount; t++) {
+            const cands = byTri.get(t);
+            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { contacts });
+        }
+        const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
+        const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
+        const byEdge = new Map();
+        for (let t = 0; t < triCount; t++) {
+            const arr = arrs[t];
+            if (!arr || arr.status !== "ok") continue;
+            for (let k = 0; k < 3; k++) if (arr.sideVerts[k].length) {
+                const key = edgeKey(t, k);
+                if (!byEdge.has(key)) byEdge.set(key, []);
+                byEdge.get(key).push({ t, pts: arr.sideVerts[k] });
+            }
+        }
+        // a neighbour's point counts as present when one of this triangle's own side vertices is within 8 x snap of it:
+        // injecting a second vertex a few 1e-9 from an existing one only makes a sliver (measured on the twelve-blast
+        // chain: 1e-6-census non-manifold edges 0 -> 2 and a fallback at shot 12). Only a MISSING split is injected.
+        const SNAP2 = 64e-18;
+        for (let t = 0; t < triCount; t++) {
+            if (arrs[t] && arrs[t].status === "fallback") continue;
+            const need = [];
+            for (let k = 0; k < 3; k++) {
+                const list = byEdge.get(edgeKey(t, k));
+                if (!list) continue;
+                const own = arrs[t] && arrs[t].status === "ok" ? arrs[t].sideVerts[k] : [];
+                for (const { t: u, pts } of list) {
+                    if (u === t) continue;
+                    for (const p of pts) {
+                        const have = own.some((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2) ||
+                                     need.some((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2);
+                        if (!have) need.push(p);
+                    }
+                }
+            }
+            if (!need.length) continue;
+            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { contacts, sidePoints: need });
+            rearranged++; injected += need.length;
+        }
+    }
 
     for (let t = 0; t < triCount; t++) {
         const cands = byTri.get(t);
-        if (!cands || cands.length === 0) {
+        if ((!cands || cands.length === 0) && !arrs[t]) {
             // See this file's own header: structurally guaranteed equivalent to running accumulateFragments()
             // on an empty candidate list, taken as an explicit early return for auditability.
             emptyCandidateShortcuts++;
@@ -363,27 +536,23 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrangeTriangle(trisSelf, t, trisOther, cands);
+            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { contacts });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
                 const c = centroid(tri);
-                const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
-                classifications++;
-                fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
+                const cls = classify(c, cands, 0);
+                fragments.push({ tri, inside: cls.inside, ambiguous: cls.ambiguous, on: 0, src: t });
                 continue;
             }
             if (arr.status === "ok") {
                 arrangedTris++;
                 for (const face of arr.faces) {
                     arrangementFaces++;
-                    const s = face.sample;
-                    const cls = pointInMesh(bvhOther, s[0], s[1], s[2], opts.pointInMeshOpts);
-                    classifications++;
-                    const ambiguous = cls.agreement < agreementThreshold;
+                    const cls = classify(face.sample, cands, face.on);
                     for (const tri of face.tris) {
                         accumulatedFragments++;
-                        fragments.push({ tri, inside: cls.inside, ambiguous });
+                        fragments.push({ tri, inside: cls.inside, ambiguous: cls.ambiguous, on: cls.on, src: t });
                     }
                 }
                 continue;
@@ -408,13 +577,21 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     }
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
                                  gateSkipped, gateTested, examined, cutting, classifications, arrangedTris,
-                                 arrangementFaces, untouchedTris, fallbackTris, fallbackReasons } };
+                                 arrangementFaces, untouchedTris, fallbackTris, fallbackReasons, onFaces, nearSided,
+                                 nearPseudo, nearEdge, rearranged, injected } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
 // cross-check against meshCSG.mjs's own subtract()/union()/intersect(). Never averaged or softened: exactly
 // these six (op, bucket) combinations keep a fragment, and subtract's B_in bucket is the only one flipped.
-function keepA(op, inside) {
+// Round 12: a fragment ON the other surface (on = +1, the outward normals agree; -1, they oppose) is decided by
+// orientation, not position -- the rule meshCSG.mjs's BSP applies to its COPLANAR-front/back buckets. The two
+// copies of such a piece are one surface; A's copy is kept or dropped, B's is always dropped:
+//   union:     same -> keep A's (one boundary, both interiors behind it);  opposite -> drop (interior both sides)
+//   intersect: same -> keep A's;                                             opposite -> drop (empty both sides)
+//   subtract:  same -> drop (A-B empty both sides);                          opposite -> keep A's (B is beyond it)
+function keepA(op, inside, on = 0) {
+    if (on) return on > 0 ? op !== "subtract" : op === "subtract";
     return (op === "union" && !inside) || (op === "subtract" && !inside) || (op === "intersect" && inside);
 }
 const VALID_OPS = new Set(["union", "subtract", "intersect"]);
@@ -431,7 +608,8 @@ const VALID_OPS = new Set(["union", "subtract", "intersect"]);
 export const MESH_BOOLEAN_MAX_FRAGMENTS = 65536;
 /** Round 9: segment-bounded cutting (triArrangement.mjs) by default; "plane" is round 8's path. See the header. */
 export const MESH_BOOLEAN_DEFAULT_CUTTING = "arrangement";
-function bKeepAndFlip(op, inside) {
+function bKeepAndFlip(op, inside, on = 0) {
+    if (on) return null;
     if (op === "union") return inside ? null : { flip: false };
     if (op === "subtract") return inside ? { flip: true } : null;
     if (op === "intersect") return inside ? { flip: false } : null;
@@ -459,12 +637,12 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
     }
     const outTris = [], ambiguousTriIndices = [];
     for (const f of classifiedA.fragments) {
-        if (!keepA(op, f.inside)) continue;
+        if (!keepA(op, f.inside, f.on)) continue;
         outTris.push(f.tri);
         if (f.ambiguous) ambiguousTriIndices.push(outTris.length - 1);
     }
     for (const f of classifiedB.fragments) {
-        const decision = bKeepAndFlip(op, f.inside);
+        const decision = bKeepAndFlip(op, f.inside, f.on);
         if (!decision) continue;
         outTris.push(decision.flip ? flipWinding(f.tri) : f.tri);
         if (f.ambiguous) ambiguousTriIndices.push(outTris.length - 1);
@@ -485,14 +663,17 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
  * @param {"union"|"subtract"|"intersect"} op
  * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number,
- *   normalize?:boolean}} [opts]
+ *   normalize?:boolean, contacts?:boolean}} [opts]
  *   see classifyMeshAgainstOther(); cutting defaults to "arrangement" since round 9. normalize (round 11, default
  *   true): bring the operands into MESH_BOOLEAN_SCALE_BAND by an exact power of two first; false runs them at the
  *   scale given -- kept for the gates' 1000x reference runs, which exist to be computed a DIFFERENT way. When it
- *   rescales, bvhA and bvhB are not used (BVHs are rebuilt over the scaled operands).
+ *   rescales, bvhA and bvhB are not used (BVHs are rebuilt over the scaled operands). contacts (round 12, default
+ *   true): resolve contacts and label ON fragments, see the header; false is round 11's pipeline, pair for pair.
  * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], capped:boolean,
  *   stats:{a:object,b:object}, scaleExponent:number}}
  *   scaleExponent: the k the operands were divided by 2^k with (0: in the band, or normalize:false).
+ *   emptyOperand (round 12, only when set): "a", "b" or "both" -- that operand is an empty solid (thinner than
+ *   CONTACT_EPS on average) and the result is the regularised one, with no classification run.
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.
  *   capped: true if EITHER side hit the per-triangle fragment cap. Treat a capped result as unreliable: cuts
  *     may have been left unapplied (it is not CERTAINLY wrong -- the cap can also trip exactly as the last
@@ -561,7 +742,47 @@ function scaleTris(tris, f) {
     return out;
 }
 
+// Round 12: an operand thinner than CONTACT_EPS on average (2 x volume / area) encloses nothing, and a boolean with
+// an empty solid has a regularised answer that needs no classification: a zero-thickness sheet's two coincident,
+// opposite faces lie on each other, and no orientation rule can keep one without the other. Measured before this:
+// a flat rectangle on a box face came back 0.33 off, the section-13 one 0.17 with the wrong sign.
+function volumeAndArea(tris) {
+    let v = 0, a = 0;
+    for (let i = 0; i < tris.length; i += 9) {
+        const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];
+        const ux = tris[i + 3] - ax, uy = tris[i + 4] - ay, uz = tris[i + 5] - az;
+        const wx = tris[i + 6] - ax, wy = tris[i + 7] - ay, wz = tris[i + 8] - az;
+        const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+        v += ax * nx + ay * ny + az * nz;
+        a += Math.hypot(nx, ny, nz);
+    }
+    return { volume: v / 6, area: a / 2 };
+}
+export function isEmptySolid(tris) {
+    const { volume, area } = volumeAndArea(tris);
+    return area === 0 || Math.abs(volume) <= CONTACT_EPS * area / 2;
+}
+function emptyStats(tris, empty) {
+    return { triCount: tris.length / 9, emptyOperand: empty, emptyCandidateShortcuts: 0, accumulatedFragments: 0,
+             capped: false, unresolvedCount: 0, gateSkipped: 0, gateTested: 0, examined: 0, cutting: "none",
+             classifications: 0, arrangedTris: 0, arrangementFaces: 0, untouchedTris: 0, fallbackTris: 0,
+             fallbackReasons: {}, onFaces: 0, nearSided: 0, nearPseudo: 0, nearEdge: 0, rearranged: 0, injected: 0 };
+}
+
 function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
+    if (opts.contacts !== false) {
+        const eA = isEmptySolid(trisA), eB = isEmptySolid(trisB);
+        if (eA || eB) {
+            // this path never reaches assembleBoolean(), whose guard round 6's review added: the same guard, here only
+            // (a copy at the top of this function would make that one untestable -- the gate's sabotage F)
+            if (!VALID_OPS.has(op)) throw new Error('meshBoolean: unrecognized op "' + op + '" (expected "union", "subtract", or "intersect")');
+            // union: the other operand; A - B: A, unless A is the empty one; A & B: empty
+            const keep = op === "union" ? (eA ? (eB ? null : trisB) : trisA) : op === "subtract" ? (eA ? null : trisA) : null;
+            const tris = keep ? Float64Array.from(keep) : new Float64Array(0);
+            return { tris, triCount: tris.length / 9, ambiguousTriIndices: [], capped: false,
+                     stats: { a: emptyStats(trisA, eA), b: emptyStats(trisB, eB) }, emptyOperand: eA ? (eB ? "both" : "a") : "b" };
+        }
+    }
     const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, opts);
     const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, opts);
     const { tris, ambiguousTriIndices } = assembleBoolean(classifiedA, classifiedB, op);

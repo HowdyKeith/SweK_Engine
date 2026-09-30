@@ -456,6 +456,7 @@ console.log("unchecked here, named honestly: ONE workload family (a box wall, 22
     "settle() now makes the default's output WORSE (3 unmatched from 0), which section 5 prints; each shot rebuilds " +
     "both BVHs from scratch; meshBoolean normalises scale (round 11) but not offset -- 6.2e-9 relative with 225 " +
     "fallbacks for a unit pair 1e8 from the origin -- and the BSP normalises neither; the touching-" +
-    "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand gaps meshBoolean.mjs's header " +
-    "names are untouched by the gate; and timings are printed for one machine, never asserted.");
+    "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand cases (round 12 fixed all but " +
+    "a band of the last) are gated in meshBoolean-selfcheck sections 8, 13 and 17, not here -- this workload never " +
+    "reaches them, and its output is line for line what round 11 printed; and timings are printed for one machine, never asserted.");
 process.exit(fails ? 1 : 0);

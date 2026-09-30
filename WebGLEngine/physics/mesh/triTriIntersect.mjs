@@ -35,6 +35,8 @@
 //   same wall, a mesh authored with coincident seams -- will not get a resolved segment from THIS function
 //   for that specific triangle pair; a future round needs to handle it (perturbation, exact predicates, or a
 //   dedicated coincident-boundary path), named here rather than silently risking a wrong answer today.
+//   [BVH-CSG ROUND 12: that path is physics/mesh/triContact.mjs, which triArrangement.mjs asks about exactly the
+//   pairs this function reports coplanar or degenerate. This function is unchanged.]
 //
 // WHAT THIS DOES NOT DO: build on physics/mesh/bvhPairOverlap.mjs at all (it operates on an EXPLICIT pair of
 // triangle indices, one per caller-supplied buffer -- wiring pairOverlap()'s own candidate list into this
