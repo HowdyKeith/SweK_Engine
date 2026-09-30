@@ -26,13 +26,18 @@ export const EPS = 1e-9;
  * Ray against one triangle. Returns the ray parameter t, or null.
  * `tris` is a flat buffer, `i` the index of this triangle's first float.
  */
-export function rayTriangle(ox, oy, oz, dx, dy, dz, tris, i, eps = EPS) {
+export function rayTriangle(ox, oy, oz, dx, dy, dz, tris, i, eps = EPS, detRel = undefined) {
     const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];
     const e1x = tris[i + 3] - ax, e1y = tris[i + 4] - ay, e1z = tris[i + 5] - az;
     const e2x = tris[i + 6] - ax, e2y = tris[i + 7] - ay, e2z = tris[i + 8] - az;
     const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
     const det = e1x * px + e1y * py + e1z * pz;
-    if (det > -eps && det < eps) return null;                 // ray parallel to the triangle's plane
+    // det is an AREA (|e1||e2| x the sine of their angle x the cosine of the ray's angle to the normal), and `eps` is
+    // a length: the default test rejects every triangle with edges under ~sqrt(eps) whatever the ray's angle. A caller
+    // passing `detRel` gets the dimensionless test instead -- parallel iff |det| <= detRel x |e1| x |e2| -- see
+    // physics/mesh/meshPointClassify.mjs (BVH-CSG round 11), the one caller that needs it. The default is unchanged.
+    if (detRel === undefined) { if (det > -eps && det < eps) return null; }   // ray parallel to the triangle's plane
+    else if (det * det <= detRel * detRel * (e1x * e1x + e1y * e1y + e1z * e1z) * (e2x * e2x + e2y * e2y + e2z * e2z)) return null;
     const inv = 1 / det;
     const tx = ox - ax, ty = oy - ay, tz = oz - az;
     const u = (tx * px + ty * py + tz * pz) * inv;

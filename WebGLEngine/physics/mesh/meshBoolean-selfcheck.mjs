@@ -721,7 +721,7 @@ console.log("\n15. *** ROUND 9: SEGMENT-BOUNDED CUTTING (triArrangement.mjs) AGA
         cases.push(["rot" + i, M.boxPolys([0, 0, 0], [1, 1, 1]), rot(M.boxPolys(c, [0.3 + r() * 0.7, 0.3 + r() * 0.7, 0.3 + r() * 0.7]), r() * 6, r() * 6, r() * 6, c)]);
     }
     for (let k = 0; k < 3; k++) cases.push(["blob" + k, M.jaggedBlob([0, 0, 0], 1, 8, 100 + k), M.jaggedBlob([0.5 * k - 0.5, 0.2, 0.1], 0.9, 8, 500 + k)]);
-    let worstPlane = 0, worstBsp = 0, worstRef = 0, worstRefAgree = 0, open = 0, falls = 0, runs = 0;
+    let worstPlane = 0, worstBsp = 0, worstRef = 0, worstRefAgree = 0, refK = 0, open = 0, falls = 0, runs = 0;
     let clsArr = 0, clsPlane = 0, trisArr = 0, trisPlane = 0;
     for (const [name, PA, PB] of cases) {
         const bufA = M.toTriangleBuffer(PA), bufB = M.toTriangleBuffer(PB), bA = new MeshBVH(bufA), bB = new MeshBVH(bufB);
@@ -735,8 +735,12 @@ console.log("\n15. *** ROUND 9: SEGMENT-BOUNDED CUTTING (triArrangement.mjs) AGA
             const ra = meshBoolean(bufA, bA, bufB, bB, op), rp = meshBoolean(bufA, bA, bufB, bB, op, { cutting: "plane" });
             const va = volAbout(ra.tris, [0, 0, 0]), vp = volAbout(rp.tris, [0, 0, 0]);
             if (blob) {
-                const ref = volAbout(meshBoolean(bufA3, bA3, bufB3, bB3, op).tris, [0, 0, 0]) / 1e9;
-                const refP = volAbout(meshBoolean(bufA3, bA3, bufB3, bB3, op, { cutting: "plane" }).tris, [0, 0, 0]) / 1e9;
+                // normalize:false -- round 11 made meshBoolean() scale-invariant, and a 1000x run is a reference only
+                // with its absolute tolerances left a million times smaller (meshBooleanBlast-selfcheck section 3)
+                const r3 = meshBoolean(bufA3, bA3, bufB3, bB3, op, { normalize: false });
+                const r3P = meshBoolean(bufA3, bA3, bufB3, bB3, op, { cutting: "plane", normalize: false });
+                const ref = volAbout(r3.tris, [0, 0, 0]) / 1e9, refP = volAbout(r3P.tris, [0, 0, 0]) / 1e9;
+                refK = Math.max(refK, Math.abs(r3.scaleExponent), Math.abs(r3P.scaleExponent));
                 worstRef = Math.max(worstRef, Math.abs(va - ref));
                 worstRefAgree = Math.max(worstRefAgree, Math.abs(ref - refP));
             } else {
@@ -752,7 +756,8 @@ console.log("\n15. *** ROUND 9: SEGMENT-BOUNDED CUTTING (triArrangement.mjs) AGA
     ok("!! 48 rotated-box runs (16 boxes x 3 ops): the arrangement matches the plane path to 1e-13 and meshCSG's BSP to 1e-12",
         worstPlane < 1e-13 && worstBsp < 1e-12, "worst |diff| plane " + worstPlane.toExponential(2) + ", BSP " + worstBsp.toExponential(2));
     ok("!! 9 blob-pair runs: at 1000x the arrangement and the plane path agree to 1e-13 -- that value is the reference",
-        worstRefAgree < 1e-13, "worst |diff| at 1000x " + worstRefAgree.toExponential(2));
+        worstRefAgree < 1e-13 && refK === 0, "worst |diff| at 1000x " + worstRefAgree.toExponential(2) +
+        ", reference scale exponent " + refK + " (0: really run at 1000x; round 11's step would make it 8)");
     ok("!! ...and the arrangement at 1x is within 3e-12 of it (both paths share ~1e-12 of absolute-tolerance error at 1x)",
         worstRef < 3e-12, "worst |diff| " + worstRef.toExponential(2) + " (measured 1.0e-12, blob pair 1)");
     ok("!! all " + runs + " runs: no fallback to the plane path, and every raw output WATERTIGHT (zero unmatched edges, no weld)",
@@ -799,6 +804,85 @@ console.log("\n15. *** ROUND 9: SEGMENT-BOUNDED CUTTING (triArrangement.mjs) AGA
     let threw = false;
     try { meshBoolean(PRIMARY.bufA, PRIMARY.bvhA, PRIMARY.bufB, PRIMARY.bvhB, "subtract", { cutting: "segments" }); } catch { threw = true; }
     ok("   an unrecognized `cutting` throws rather than silently choosing a path", threw);
+}
+
+// =============================================================================================================
+console.log("\n16. *** ROUND 11: SCALE -- EVERY TOLERANCE IS A LENGTH, SO THE OPERANDS ARE BROUGHT TO THE TOLERANCES ***");
+{
+    // meshBoolean() divides both operands by the power of two that puts their joint extent in [1, 16)
+    // (MESH_BOOLEAN_SCALE_BAND), runs, and multiplies back -- exact both ways. Before round 11, measured over 28
+    // runs per scale: 1e-6 and 1e-5 up to 115% of volume wrong with 303 fallbacks and 3,365 open edges, 1e-4 19%
+    // wrong, 1e6 271 open edges; after, every scale 1e-6..1e6 matched its own scale-1 result to 5.9e-15, no fallback,
+    // no open edge. Every fixture in sections 1-15 lies in the band, so its exponent is 0 and nothing there changed
+    // (their full output compared line for line against round 10b's: identical).
+    const volAt = (buf, o = [0, 0, 0]) => {
+        let v = 0;
+        for (let i = 0; i < buf.length; i += 9) {
+            const a = [buf[i] - o[0], buf[i + 1] - o[1], buf[i + 2] - o[2]], b = [buf[i + 3] - o[0], buf[i + 4] - o[1], buf[i + 5] - o[2]];
+            const c = [buf[i + 6] - o[0], buf[i + 7] - o[1], buf[i + 8] - o[2]];
+            v += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+        }
+        return v / 6;
+    };
+    const tf = (P, k, o = [0, 0, 0]) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * k + o[0], v[1] * k + o[1], v[2] * k + o[2]]); return { vs, pl: M.planeOf(vs) }; });
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const blobA = M.jaggedBlob([0, 0, 0], 1, 8, 101), blobB = M.jaggedBlob([0, 0.2, 0.1], 0.9, 8, 501);
+    const boxA = M.boxPolys([0, 0, 0], [1, 1, 1]), boxB = M.boxPolys([0.3, -0.2, 0.1], [0.6, 0.7, 0.5]).map((p) => {
+        const c = Math.cos(0.7), sn = Math.sin(0.7), vs = p.vs.map((v) => [v[0] * c - v[1] * sn, v[0] * sn + v[1] * c, v[2]]);
+        return { vs, pl: M.planeOf(vs) };
+    });
+    const pairs = [["blob pair", blobA, blobB], ["rotated box", boxA, boxB]];
+    let worst = 0, fb = 0, open = 0;
+    for (const [, PA, PB] of pairs) {
+        const v1 = volAt(run(PA, PB, "subtract").tris);
+        for (const k of [1e-6, 1e-3, 1e3, 1e6]) {
+            const r = run(tf(PA, k), tf(PB, k), "subtract");
+            worst = Math.max(worst, Math.abs(volAt(r.tris) / k ** 3 - v1) / v1);
+            fb += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+            open += M.watertight(wrapAsPolys(r.tris), 1e-6 * k).unmatched;
+        }
+    }
+    ok("!! *** A BLOB PAIR AND A ROTATED BOX AT 1e-6, 1e-3, 1e3 AND 1e6: THE SCALE-1 VOLUME TO 1e-13, NO FALLBACK, NO OPEN EDGE ***",
+        worst < 1e-13 && fb === 0 && open === 0, "worst relative " + worst.toExponential(2) + ", fallbacks " + fb + ", unmatched edges (census scaled) " + open);
+    // control: the same 1e-6 run with the step switched off is still wrong. Not by the pre-round 115% -- that figure
+    // included the ray-test bug fixed below, which hurt the raw path too -- but measured at 2.0e-5 with 29 fallbacks,
+    // ten orders of magnitude above the normalized run. The bound asks for wrong AND falling back, not for a size.
+    const raw = run(tf(blobA, 1e-6), tf(blobB, 1e-6), "subtract", { normalize: false }), v1b = volAt(run(blobA, blobB, "subtract").tris);
+    const rawErr = Math.abs(volAt(raw.tris) / 1e-18 - v1b) / v1b, rawFb = raw.stats.a.fallbackTris + raw.stats.b.fallbackTris;
+    ok("   ...and with normalize:false the same 1e-6 blob pair is still wrong and still falls back -- the step, not luck, is what fixed it",
+        rawErr > 1e-9 && rawFb > 0 && raw.scaleExponent === 0, "relative " + rawErr.toExponential(2) + " off, " + rawFb + " fallbacks, exponent " + raw.scaleExponent);
+
+    // EXACT: the output at 2^-20 IS the output of the in-band run it was mapped to, times 2^k, bit for bit. The blob
+    // pair spans ~2, so 2^-20 maps by k = -19 to scale 1/2, not 1: the guarantee is against the scale-1/2 run. That
+    // it ALSO equals the scale-1 output x 2^-20 is a fact about this fixture (no tolerance fires between 1/2 and 1),
+    // not a property of the step, so it is printed, not gated.
+    const f = 2 ** -20, e = run(tf(blobA, f), tf(blobB, f), "subtract"), g = f * 2 ** -e.scaleExponent;
+    const same = (u, m) => u.tris.length === e.tris.length && u.tris.every((x, i) => e.tris[i] === x * m);
+    const inBand = run(tf(blobA, g), tf(blobB, g), "subtract"), unit = run(blobA, blobB, "subtract");
+    ok("!! at scale 2^-20 the output is the in-band run's output x 2^k, bit for bit (a power of two scales every operation exactly)",
+        e.scaleExponent !== 0 && inBand.scaleExponent === 0 && same(inBand, 2 ** e.scaleExponent),
+        "exponent " + e.scaleExponent + " (ran at scale " + g + "), identical: " + same(inBand, 2 ** e.scaleExponent) +
+        "; also identical to scale 1 x 2^-20 on this fixture: " + same(unit, f));
+    const ext = [1e-100, 1e100].map((k) => { const r = run(tf(blobA, k), tf(blobB, k), "subtract"); const b = new Float64Array(r.tris.length); for (let i = 0; i < b.length; i++) b[i] = r.tris[i] / k; return Math.abs(volAt(b) - v1b) / v1b; });
+    ok("   ...and at 1e-100 and 1e100 the same to 1e-13 (measured in scale-1 units; subnormals, below ~1e-290, are not claimed)",
+        ext.every((x) => x < 1e-13), ext.map((x) => x.toExponential(2)).join(", "));
+
+    // WHAT THE STEP EXPOSED, AND ROUND 11 FIXED: a small cutter on a big wall. Normalising to the JOINT extent put a
+    // 0.01-unit cutter on a 2000-unit wall at 7.8e-5 units, and pointInMesh's rays passed straight through its
+    // triangles: mesh/meshBVH.mjs's rayTriangle() called a ray parallel when |det| < eps, and det is an area. The cut
+    // face read outside, its cap was dropped, and the volume came back 6.5% off -- for every cutter smaller than
+    // 1/2e5 of the wall, a cliff, not a slope. The classifier's test is dimensionless now (meshPointClassify.mjs's
+    // RAY_PARALLEL_REL); what is left grows smoothly: 1.4e-13 at 1:1e5, 3.2e-12 at 1:1e6, 1.9e-11 at 1:1e7.
+    const unitBlob = M.jaggedBlob([0, 0, 0], 1, 8, 777);
+    const eU = volAt(run(unitBlob, M.boxPolys([0, 0, -5.123], [10, 10, 5]), "intersect").tris);
+    const cliff = [2e5, 1e6].map((ratio) => {
+        const W = 1000, c = 2 * W / ratio, top = W / 10, C = [0, 0, top + 0.123 * c];
+        const r = run(M.boxPolys([0, 0, 0], [W, W, top]), tf(unitBlob, c, C), "intersect");
+        return { ratio, err: Math.abs(volAt(r.tris, C) - eU * c ** 3) / (eU * c ** 3), tris: r.triCount };
+    });
+    ok("!! a cutter 1/200,000 and 1/1,000,000 the size of the wall it cuts: the cap is kept and the volume right to 1e-10",
+        cliff.every((x) => x.err < 1e-10), cliff.map((x) => "1:" + x.ratio.toExponential(0) + " " + x.err.toExponential(2) + " (" + x.tris + " triangles)").join(", ") +
+        " -- 6.5% off and 135 triangles each before the ray test became dimensionless");
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

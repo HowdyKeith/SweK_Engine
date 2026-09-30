@@ -216,7 +216,7 @@
 //   full-plane cuts, and the per-fragment classification it drives, remain; triFragmentAccumulate.mjs's ROUND 8
 //   paragraph has the profile and the corrected attribution. (b) SCALE: absolute tolerances (1e-9 plane dedup, triClip's EPS,
 //   pointInMesh's) make results wrong below ~1e-4 scale -- up to 34% of volume at 1e-6..7e-5 -- gated and
-//   ungated alike; and at coordinates ~1e8 the gate can skip a pair whose overlap is ~4 ULP (5 of 60 far-offset
+//   ungated alike [ROUND 11: fixed for uniform scale, see its paragraph below; not for offsets]; and at coordinates ~1e8 the gate can skip a pair whose overlap is ~4 ULP (5 of 60 far-offset
 //   fuzz cases, <=9.1e-9 relative volume). (c) PRE-EXISTING GAPS the gate neither causes nor fixes: two unit
 //   boxes with one face tilted 1e-10..3e-9 rad about an edge, intersected, return -0.12 against a true ~1e-10
 //   (the touching-contact family above, but with genuinely overlapping faces); a blob minus the same blob
@@ -245,12 +245,43 @@
 // path mislabelled one fragment -- a larger error from the same missed pair. triArrangement-selfcheck.mjs gates
 // no-segment-crosses-a-triangle on 200 random cases and audits per-face against per-triangle labels (1,120
 // triangles, 0 disagree); neither can see a candidate the broad phase never produced.
+//
+// *** ROUND 11: SCALE. EVERY TOLERANCE IN THIS PIPELINE IS AN ABSOLUTE LENGTH, SO THE OPERANDS ARE BROUGHT TO THEM. ***
+// triTriIntersect's, triArrangement's snap, triClip's EPS, triFragmentAccumulate's plane dedup, pointInMesh's
+// ray/weld tolerances: all lengths, all tuned on fixtures whose joint extent is 1..16. Before this round, measured
+// over 28 runs per scale (blob pairs, rotated boxes, a needle; each graded against its own scale-1 result): 1e-6 and
+// 1e-5 up to 115% of volume wrong (1e-6: 303 fallbacks and 3,365 open edges; 1e-5: 632 ambiguous fragments kept),
+// 1e-4 19% wrong with 5,448 ambiguous, 1e2..1e4 4.9e-13 but 12 open edges, 1e6 one fallback and 271 open edges.
+// meshBoolean() now divides both operands by 2^k, the power of two that puts their joint extent in [1, 16)
+// (MESH_BOOLEAN_SCALE_BAND), rebuilds the two BVHs, runs, and multiplies the output by 2^k -- both scalings exact.
+// After: every scale 1e-6..1e6 matches its scale-1 result to 5.9e-15, with 0 fallbacks, 0 ambiguous and 0 open
+// edges; 1e-100 and 1e100 to 1.5e-15. Inside the band k is 0 and nothing runs: every gate's output from rounds 1-10b
+// (meshBoolean, triArrangement, meshBooleanBlast, meshPointClassify, meshCSG, triFragmentAccumulate) was compared
+// line for line with round 10b's and is identical. opts.normalize:false runs the operands as given; the gates' 1000x
+// reference runs use it, because a reference computed the same way as the thing it checks is no reference.
+// A REAL BUG THE STEP EXPOSED, FIXED HERE: mesh/meshBVH.mjs's rayTriangle() rejected a hit as parallel when
+// |det| < eps, and det is an AREA (|e1 x e2|-scaled), so any triangle much smaller than eps^(1/2) was invisible to
+// rays at every angle. Normalising a 2000-unit wall with a 0.01-unit cutter put the cutter at 7.8e-5 units; the rays
+// went straight through it, its cap read outside and was dropped, and the volume came back 6.5% off, 135 triangles
+// instead of 174 -- for every cutter smaller than 1/2e5 of the wall, a cliff. pointInMesh now asks the dimensionless
+// question (det^2 <= RAY_PARALLEL_REL^2 |e1|^2 |e2|^2, RAY_PARALLEL_REL = 1e-9, meshPointClassify.mjs); rayTriangle's
+// other callers keep the old test (its detRel argument is optional). It helped the unnormalised path as well: the
+// same 1e-6 blob pair with normalize:false is now 2.0e-5 off with 29 fallbacks (it was part of the 115%).
+// NAMED, NOT FIXED: (1) OFFSETS -- the step scales, it does not translate. A unit-size pair at distance d from the
+// origin: 9.1e-13 relative at 1e5, 2.0e-11 at 1e6, 1.1e-10 with 1 fallback and 10 open edges at 1e7, 6.2e-9 with 225
+// fallbacks and 1,115 open edges at 1e8. Translating by a representable offset is not exact the way a power of two
+// is, so it is a design question, not a one-liner. (2) MIXED SIZES -- the band is chosen for the JOINT extent, so a
+// small feature on a big part is normalised to a small size. With the ray test fixed the error grows smoothly with
+// the ratio instead of falling off a cliff: 1.4e-13 at 1:1e5, 9.9e-13 at 2e5, 2.3e-12 at 5e5, 3.2e-12 at 1e6,
+// 1.9e-11 at 1e7. (3) meshCSG.mjs (the BSP, what the engine runs) keeps its absolute EPS and settle tolerances;
+// this round does not touch it.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle } from "./triArrangement.mjs";
+import { MeshBVH } from "../../mesh/meshBVH.mjs";
 
 function readTri(tris, t) {
     const o = t * 9;
@@ -453,10 +484,15 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  * @param {Float64Array|Float32Array} trisB
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
  * @param {"union"|"subtract"|"intersect"} op
- * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
- *   see classifyMeshAgainstOther(); cutting defaults to "arrangement" since round 9.
+ * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number,
+ *   normalize?:boolean}} [opts]
+ *   see classifyMeshAgainstOther(); cutting defaults to "arrangement" since round 9. normalize (round 11, default
+ *   true): bring the operands into MESH_BOOLEAN_SCALE_BAND by an exact power of two first; false runs them at the
+ *   scale given -- kept for the gates' 1000x reference runs, which exist to be computed a DIFFERENT way. When it
+ *   rescales, bvhA and bvhB are not used (BVHs are rebuilt over the scaled operands).
  * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], capped:boolean,
- *   stats:{a:object,b:object}}}
+ *   stats:{a:object,b:object}, scaleExponent:number}}
+ *   scaleExponent: the k the operands were divided by 2^k with (0: in the band, or normalize:false).
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.
  *   capped: true if EITHER side hit the per-triangle fragment cap. Treat a capped result as unreliable: cuts
  *     may have been left unapplied (it is not CERTAINLY wrong -- the cap can also trip exactly as the last
@@ -464,6 +500,68 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  *     while the volume came back 0.74% off.
  */
 export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
+    // ROUND 11: every tolerance downstream is an absolute length, tuned where the extent is 1..16. Outside that band
+    // the operands are brought into it by an EXACT power of two and the result is sent back by the inverse -- see
+    // MESH_BOOLEAN_SCALE_BAND and scaleExponent() below. Inside it (every fixture before round 11) k is 0 and
+    // nothing here runs: the result is bit for bit what it was.
+    const k = opts.normalize === false ? 0 : scaleExponent(trisA, trisB);
+    if (k !== 0) {
+        const down = 2 ** -k, up = 2 ** k;
+        const A = scaleTris(trisA, down), B = scaleTris(trisB, down);
+        const r = meshBooleanCore(A, new MeshBVH(A), B, new MeshBVH(B), op, opts);
+        r.tris = scaleTris(r.tris, up);
+        r.scaleExponent = k;
+        return r;
+    }
+    const r = meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts);
+    r.scaleExponent = 0;
+    return r;
+}
+
+/**
+ * ROUND 11: the band of combined extents (the larger side of A's and B's joint bounding box) the absolute
+ * tolerances in triTriIntersect, triArrangement, triClip, triFragmentAccumulate and meshPointClassify were measured
+ * in: [2^0, 2^4). Every fixture of rounds 1-10 falls inside it (unit cubes span 2, meshCSG's wall 8).
+ * WHERE IT SITS IS A CHOICE INSIDE A WINDOW, NOT A TUNED POINT -- measured by moving it: [-3, 1] and [-6, -2] pass
+ * every gate (the sabotage that was meant to catch a wrong band went 0 red, which is how this was found); [-10, -6]
+ * fails (a 1:2e5 cutter comes back 6.5e-4 off), [4, 8] fails (8.3e-14 on the scale sweep), [10, 14] and
+ * [-20, -16] fail more. [0, 4] is where every earlier round's fixtures already were, so it changes none of them.
+ */
+export const MESH_BOOLEAN_SCALE_BAND = [0, 4];
+
+/**
+ * The power of two meshBoolean() divides both operands by: 0 when their joint extent is already in
+ * [2^MESH_BOOLEAN_SCALE_BAND[0], 2^MESH_BOOLEAN_SCALE_BAND[1]); otherwise the smallest shift that brings it there.
+ * A power of two because multiplying by one is EXACT in binary floating point: the operands the pipeline sees are
+ * exactly the input's image at 2^-k, and the output handed back is exactly 2^k times what the pipeline returned on
+ * them -- no rounding is added by the step itself. The pipeline's answer is the one it gives at band scale, which is
+ * the point: its absolute tolerances mean what they were tuned to mean. (meshBoolean-selfcheck section 16 gates the
+ * bit-for-bit identity against the in-band run.) The band's edges are as precise as Math.log2, so an extent within an
+ * ULP of a power of two may land one step either side; both are in or at the band. Not exact through subnormals:
+ * extents below ~1e-290 or above ~1e290 are not handled, named rather than guarded. NOT a translation: a small part
+ * far from the origin keeps its large coordinates, and the tolerances then fight their ULP (this file's header).
+ */
+export function scaleExponent(trisA, trisB) {
+    let lo0 = Infinity, lo1 = Infinity, lo2 = Infinity, hi0 = -Infinity, hi1 = -Infinity, hi2 = -Infinity;
+    for (const t of [trisA, trisB]) for (let i = 0; i < t.length; i += 3) {
+        const x = t[i], y = t[i + 1], z = t[i + 2];
+        if (x < lo0) lo0 = x; if (x > hi0) hi0 = x;
+        if (y < lo1) lo1 = y; if (y > hi1) hi1 = y;
+        if (z < lo2) lo2 = z; if (z > hi2) hi2 = z;
+    }
+    const span = Math.max(hi0 - lo0, hi1 - lo1, hi2 - lo2);
+    if (!(span > 0) || !Number.isFinite(span)) return 0;
+    const e = Math.floor(Math.log2(span));
+    const [bLo, bHi] = MESH_BOOLEAN_SCALE_BAND;
+    return e < bLo ? e - bLo : (e >= bHi ? e - (bHi - 1) : 0);
+}
+function scaleTris(tris, f) {
+    const out = new Float64Array(tris.length);
+    for (let i = 0; i < tris.length; i++) out[i] = tris[i] * f;
+    return out;
+}
+
+function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, opts);
     const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, opts);
     const { tris, ambiguousTriIndices } = assembleBoolean(classifiedA, classifiedB, op);

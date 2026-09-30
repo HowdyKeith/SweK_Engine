@@ -120,7 +120,7 @@ function bspChain(S) {
     return { polys: P, vols, ms };
 }
 function boolChain(S, shots = SHOTS, opts) {
-    let buf = M.toTriangleBuffer(WALL(S)); const vols = []; let ms = 0, capped = false, amb = 0, unresolved = 0;
+    let buf = M.toTriangleBuffer(WALL(S)); const vols = []; let ms = 0, capped = false, amb = 0, unresolved = 0, kMax = 0;
     for (let k = 1; k <= shots; k++) {
         const t = now();
         const r = boolSubtract(buf, BLOB(k, S), opts);
@@ -129,8 +129,9 @@ function boolChain(S, shots = SHOTS, opts) {
         capped = capped || r.stats.a.capped || r.stats.b.capped;
         amb += r.ambiguousTriIndices.length;
         unresolved += r.stats.a.unresolvedCount + r.stats.b.unresolvedCount;
+        kMax = Math.max(kMax, Math.abs(r.scaleExponent));   // round 11: 0 on every shot iff nothing was rescaled
     }
-    return { buf, vols, ms, capped, amb, unresolved };
+    return { buf, vols, ms, capped, amb, unresolved, kMax };
 }
 
 // =============================================================================================================
@@ -213,7 +214,11 @@ const B1 = bspChain(1), G1 = boolChain(1);
 console.log("\n3. *** WHERE THEY DISAGREE AT 1x, THE 1000x RUN SAYS WHO IS RIGHT ***");
 {
     const S = 1000, S3 = S * S * S;
-    const B1000 = bspChain(S), G1000 = boolChain(S);
+    // Round 11: meshBoolean() now brings any operand pair into its tolerance band by an exact power of two, so at
+    // 1000x it would compute what it computes at 1x -- scale-invariance is the point of that round, and it would
+    // make this reference no reference at all. The reference is the pipeline with that step OFF, by name: there its
+    // absolute tolerances really are a million times smaller relatively, which is what licenses it.
+    const B1000 = bspChain(S), G1000 = boolChain(S, SHOTS, { normalize: false });
     let agree1000 = 0, gVsTruth = 0, bVsTruth = 0, bWorstK = -1;
     for (let k = 0; k < SHOTS; k++) {
         const truth = G1000.vols[k] / S3;
@@ -227,6 +232,10 @@ console.log("\n3. *** WHERE THEY DISAGREE AT 1x, THE 1000x RUN SAYS WHO IS RIGHT
     // million times smaller relatively) is what licenses calling it the reference.
     ok("!! at 1000x scale the two methods agree to 1e-11 relative on every shot -- that value is the reference",
         agree1000 < 1e-11, "worst relative disagreement at 1000x " + agree1000.toExponential(2));
+    // Without this the reference could silently start normalising (drop the option above) and every row here would
+    // stay green: it would then be meshBoolean at ~2x checking meshBoolean at 1x, with the same tolerances.
+    ok("   ...and the reference ran at 1000x, not rescaled into meshBoolean's band (scale exponent 0 on every shot)",
+        G1000.kMax === 0, "largest |exponent| " + G1000.kMax + " (9 with normalisation on)");
     // Threshold from measurement: 8.4e-13 once the fixture scales exactly (see WALL/BLOB above -- the first
     // draft's 3.34e-12 was jaggedBlob's absolute pole offset, not meshBoolean).
     ok("!! *** meshBoolean at 1x matches the 1000x reference to 1e-11 relative on every shot ***",
@@ -318,7 +327,8 @@ console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: WHO IS WATERTIGHT, AND 
     info("the BSP's twelve-blast wall through the SAME settle(): " + wb.unmatched + " unmatched edges of " + wb.edges + ". The round-7 review " +
          "ran the chain on a COPY of meshCSG.mjs with only EPS changed -- 1e-5: 15 unmatched; 1e-6, 1e-7, 1e-8: 0 -- so " +
          "that was meshCSG's constant, not the BSP method, and round 10 changed it (backlog #25). Watertight here means at " +
-         "THIS scale: settle()'s tolerances are absolute, and the arrangement's snap (1e-9) is absolute too. settle() " +
+         "THIS scale: settle()'s tolerances are absolute; the arrangement's snap (1e-9) is too, but since round 11 " +
+         "meshBoolean() applies it at a normalised scale, where settle() does not. settle() " +
          "timings: plane path " + spMs.toFixed(0) + " ms, BSP " + sbMs.toFixed(0) + " ms");
 }
 
@@ -326,12 +336,15 @@ console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: WHO IS WATERTIGHT, AND 
 console.log("\n6. *** MILLIMETRE SCALE: THE REGIME meshCSG's OWN HEADER CALLS REAL ***");
 {
     // meshCSG.mjs and triTriIntersect.mjs both name millimetre-scale meshes as expected input. Four chained
-    // shots at 0.001x, against the section-3 reference scaled down.
+    // shots at 0.001x, against the section-3 reference scaled down. Since round 11 meshBoolean() runs these at
+    // 2^7 x 0.001 (the joint extent is 8e-3 -- boxPolys takes half-extents -- so k = -7, measured on all four
+    // shots): what this measures is that the step round-trips, on the
+    // workload; meshBoolean-selfcheck section 16 is where the step's own claims are gated.
     const S = 0.001, S3 = S * S * S, N = 4;
     const Gmm = boolChain(S, N), Bmm = { vols: [] };
     let P = WALL(S);
     for (let k = 1; k <= N; k++) { P = M.blast(P, BLOB(k, S), { select: M.bvhSelect(P).select }).polys; Bmm.vols.push(M.volume(P)); }
-    const ref = boolChain(1000, N).vols.map((v) => v / 1e9);
+    const refRun = boolChain(1000, N, { normalize: false }), ref = refRun.vols.map((v) => v / 1e9);   // as in section 3
     let gWorst = 0, bWorst = 0;
     for (let k = 0; k < N; k++) {
         gWorst = Math.max(gWorst, Math.abs(Gmm.vols[k] / S3 - ref[k]) / ref[k]);
@@ -339,12 +352,15 @@ console.log("\n6. *** MILLIMETRE SCALE: THE REGIME meshCSG's OWN HEADER CALLS RE
     }
     // Was "within 1e-8" at a measured 2.07e-9 -- all of it jaggedBlob's unscaled pole offset (see WALL/BLOB).
     ok("!! at 0.001x meshBoolean stays within 1e-12 relative of the reference on four chained shots",
-        gWorst < 1e-12 && !Gmm.capped, "worst " + gWorst.toExponential(2) + ", capped=" + Gmm.capped);
+        gWorst < 1e-12 && !Gmm.capped && refRun.kMax === 0, "worst " + gWorst.toExponential(2) + ", capped=" + Gmm.capped +
+        ", reference exponent " + refRun.kMax + ", this run's " + Gmm.kMax);
     info("MEASURED, not asserted (meshCSG.mjs's number): the BSP at 0.001x departs by up to " + bWorst.toExponential(2) +
          " relative -- 3.25e-3 at its old EPS=1e-5, which was 1% of a millimetre-scale blob's facet size; 1e-8 is " +
-         "1e-5 of it (round 10). Still absolute, so still wrong far enough down. meshBoolean has absolute " +
-         "tolerances of its own (1e-9 plane dedup, triClip's EPS): the round-7 reviews measured it failing too below " +
-         "~1e-4 scale -- up to 34% of volume at 1e-6..7e-5, on the gated and ungated paths alike");
+         "1e-5 of it (round 10). Still absolute, so still wrong far enough down. meshBoolean's tolerances are " +
+         "absolute too (1e-9 plane dedup, triClip's EPS, the arrangement's snap) and the round-7 reviews measured it " +
+         "up to 34% of volume off at 1e-6..7e-5; round 11 normalises its operands by an exact power of two first, so " +
+         "at every scale 1e-6..1e6 it now matches its own scale-1 result to 5.9e-15 (meshBoolean-selfcheck section 16). " +
+         "Not fixed: a part far from the origin (offsets are not normalised) and a feature tiny against its part");
 }
 
 // =============================================================================================================
@@ -438,7 +454,8 @@ console.log("unchecked here, named honestly: ONE workload family (a box wall, 22
     "(733 ms for one wall triangle with 2,735 segments at 128), not classification; section 5's watertight claim is " +
     "at 1x, with an absolute 1e-9 snap, and holds only for triangles the arrangement does not refuse; meshCSG's " +
     "settle() now makes the default's output WORSE (3 unmatched from 0), which section 5 prints; each shot rebuilds " +
-    "both BVHs from scratch; below ~1e-4 scale meshBoolean is wrong too (its own absolute tolerances); the touching-" +
+    "both BVHs from scratch; meshBoolean normalises scale (round 11) but not offset -- 6.2e-9 relative with 225 " +
+    "fallbacks for a unit pair 1e8 from the origin -- and the BSP normalises neither; the touching-" +
     "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand gaps meshBoolean.mjs's header " +
     "names are untouched by the gate; and timings are printed for one machine, never asserted.");
 process.exit(fails ? 1 : 0);

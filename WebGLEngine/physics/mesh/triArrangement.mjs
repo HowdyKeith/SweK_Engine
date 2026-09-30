@@ -103,7 +103,10 @@
 //
 // KNOWN AND NOT FIXED HERE:
 //   - ABSOLUTE SNAP. 1e-9 is a length, like every tolerance in this arc: below ~1e-4 scale it is no longer small
-//     against the geometry (round 11: scale-relative tolerances). Two vertices 1.07e-9 apart -- jaggedBlob's
+//     against the geometry. ROUND 11 answered that for uniform scale in meshBoolean(), which hands this file
+//     operands whose joint extent is in [1, 16); it did not for a part far from the origin (coordinates, not extent,
+//     set the ULP) or for a feature tiny against its part (meshBoolean.mjs's ROUND 11 paragraph has both measured).
+//     A caller of arrangeTriangle() other than meshBoolean() gets no normalisation. Two vertices 1.07e-9 apart -- jaggedBlob's
 //     north pole is offset by an absolute 1e-9 -- stay distinct here and coincide under meshCSG's 1e-6 census
 //     key, which reads them as a T-junction: 2 unmatched edges on shots 7..11 of the twelve-blast chain, 0 at 12.
 //   - COPLANAR AND DEGENERATE CONTACTS go to the plane path whole, with the plane path's known flush-contact
