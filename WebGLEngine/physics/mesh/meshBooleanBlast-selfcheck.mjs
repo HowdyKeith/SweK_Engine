@@ -415,7 +415,8 @@ console.log("\n8. *** ROUND 9: WHAT SEGMENT-BOUNDED CUTTING DOES TO THE COUNTS T
     ok("!! classifications per blob triangle stay flat as the blob refines (arrangement), under 1.5 at n=16 and 32",
         per[1] < 1.5 && per[2] < 1.5 && per[2] <= per[1] + 0.05,
         rows.map((r, i) => "n=" + r.n + " " + r.clsA + "/" + r.blob + " = " + per[i].toFixed(2)).join(", ") +
-        " (measured 1.47 / 1.25 / 1.20; 1.18 at 48 and 64, 1.17 at 128)");
+        " (measured 0.98 / 0.78 / 0.73 since round 13, whose exact shortcut classifies a wall triangle outside the blob's " +
+        "box with no rays; round 9's 1.47 / 1.25 / 1.20, 1.18 at 48 and 64, 1.17 at 128, counted those)");
     ok("!! ...under half the plane path's at every size, in fewer triangles, same volume to 1e-12, never capped, no fallback",
         rows.every((r) => r.clsA * 2 < r.clsP && r.ar.triCount < r.pl.triCount && r.dv < 1e-12 && !r.ar.capped &&
                           r.ar.stats.a.fallbackTris + r.ar.stats.b.fallbackTris === 0),

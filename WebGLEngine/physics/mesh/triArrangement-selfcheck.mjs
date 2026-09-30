@@ -413,5 +413,38 @@ console.log("\n5. *** THE REFUSAL CENSUS ***");
          KNOWN.filter((r) => !reached.has(r)).join(", "));
 }
 
+console.log("\n6. *** ROUND 13: A SLIVER'S SIDE POINT GOES ON THE SIDE IT CAME FROM, NOT THE NEAREST ONE ***");
+{
+    // A sliver (height <= 8 snap over its longest side) bypasses the planar arrangement (sliverFace), and the points
+    // meshBoolean's edge-conformity pass hands it -- a neighbour's split of a shared edge -- must land on THAT edge.
+    // Near a sharp tip the two long sides are closer together than rounding at wall-size coordinates, so the nearest
+    // side is a coin toss there. Measured before this row: 2,888 of 20,000 such points went on the wrong side by
+    // distance alone. The page workload hands a sliver only 2 side points in 21 chains, both on their nearest side,
+    // so no end-to-end gate can see this -- this row does. Slivers 2e-10..3.2e-9 high, 0.2..2.2 long, anywhere in
+    // destructible.html's wall, turned every way; the point 2e-9 x len .. 2e-3 x len from the sharp corner.
+    let s0 = 12345; const r = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
+    let n = 0, wrong = 0, bareWrong = 0, notSliver = 0;
+    for (let trial = 0; trial < 2000; trial++) {
+        const h = 2e-10 + r() * 3e-9, len = 0.2 + r() * 2, s = Math.exp(Math.log(2e-9 / len) + r() * Math.log(1e6));
+        const O = [(r() * 2 - 1) * 4, (r() * 2 - 1) * 3, (r() * 2 - 1) * 0.35], a = r() * 6.283, b = r() * 3.1416;
+        const u = [Math.cos(a) * Math.sin(b), Math.sin(a) * Math.sin(b), Math.cos(b)];
+        let v = [-u[1], u[0], 0]; const vl = Math.hypot(...v) || 1; v = v.map((x) => x / vl);
+        const P = (x, y) => [O[0] + u[0] * x + v[0] * y, O[1] + u[1] * x + v[1] * y, O[2] + u[2] * x + v[2] * y];
+        const Tr = [P(0, 0), P(len, 0), P(len, h)], A = Float64Array.from(Tr.flat());
+        const side = r() < 0.5 ? 0 : 2;          // the two long sides, meeting at the sharp corner Tr[0]
+        const p = side === 2 ? Tr[2].map((c, k) => c + (Tr[0][k] - c) * (1 - s)) : Tr[0].map((c, k) => c + (Tr[1][k] - c) * s);
+        const given = arrangeTriangle(A, 0, new Float64Array(0), [], { contacts: true, sidePoints: [{ p, side }] });
+        const bare = arrangeTriangle(A, 0, new Float64Array(0), [], { contacts: true, sidePoints: [p] });
+        if (given.status !== "ok" || !given.stats.sliver) { notSliver++; continue; }
+        n++;
+        const got = given.sideVerts.findIndex((l) => l.length), gotBare = bare.sideVerts.findIndex((l) => l.length);
+        if (got !== side) wrong++;
+        if (gotBare >= 0 && gotBare !== side) bareWrong++;
+    }
+    ok("!! a side point near a sliver's sharp corner lands on the side it was given (2,000 slivers at wall scale)",
+        n === 2000 && wrong === 0, n + " slivers, " + wrong + " on the wrong side; " + notSliver + " not taken as slivers");
+    info("control: the same points given without a side (nearest side wins) -- " + bareWrong + " of " + n + " on the wrong side");
+}
+
 console.log(`\ntriArrangement-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 process.exit(fails ? 1 : 0);

@@ -332,6 +332,24 @@
 //   or widened it and was not kept: per-pair tolerances cannot be made consistent for two copies of a surface a few
 //   1e-9 apart. That needs snap rounding or exact predicates. Also not handled: a zero-thickness FIN on a real solid
 //   (only a wholly empty operand is recognised), and meshCSG.mjs's BSP -- what the engine runs -- is unchanged.
+//
+// *** ROUND 13: BEHIND A FLAG IN THE ENGINE. *** physics/mesh/blastEngine.mjs puts this file behind the one call
+// that cuts a mesh in the engine (destructible.html's blast), in blast()'s contract: polygons with an exact plane and
+// a SKIN/CUT tag. What this file gained for it:
+//   (1) PROVENANCE: the result's `from` names, per output triangle, the input triangle it is a piece of (i >= 0 for
+//       trisA's i, -(i + 1) for trisB's). Every fragment carries its source through the arrangement, the sliver
+//       path, the plane path and the shortcuts. Checked geometrically (section 18 of the gate): on 9 op x fixture
+//       runs every output vertex lies on the named triangle, worst 7.0e-16 x size, and faces its way.
+//   (2) THE OUTSIDE-BOX SHORTCUT: a triangle with no candidate that lies wholly outside the other mesh's root box is
+//       outside it -- exact, no rays. On the page's 20 five-shot chains it takes 70,986 of 75,420 wall triangles
+//       (94%) and the chains 1,977 ms against 2,202 (median of 3).
+//   (3) EDGE CONFORMITY, PER SIDE: the second pass now says which side of the triangle an injected point is on, and
+//       a point counts as already present only when it is on THAT side. A sliver's two long sides lie within snap of
+//       each other, and both mistakes -- the point put on the nearer side, the duplicate test run across sides --
+//       left 4 cracks on the page gate's 30-shot chain (seed 107, a needle 1.7e-9 wide).
+// The page's workload found two more arrangement defects (triArrangement.mjs's ROUND 13 paragraph). After all of it:
+// on 20 five-shot chains and one of thirty, this file and the BSP cut the same solid to 6.7e-12 relative, with no
+// fallback and no crack at the 1e-6 census (blastEngine-selfcheck).
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -400,6 +418,15 @@ function centroid(tri) {
 }
 // Swap two vertices: negates the winding/normal. Matches meshCSG.mjs's own `p.vs.reverse()` convention for a
 // 3-vertex ring (reversing [a,b,c] gives [c,b,a], the same cyclic orientation flip as this swap).
+// bounds: a MeshBVH's node boxes, root first (lo x,y,z then hi x,y,z)
+function outsideBox(tri, bounds) {
+    for (let a = 0; a < 3; a++) {
+        const lo = bounds[a], hi = bounds[a + 3];
+        if (tri[0][a] < lo && tri[1][a] < lo && tri[2][a] < lo) return true;
+        if (tri[0][a] > hi && tri[1][a] > hi && tri[2][a] > hi) return true;
+    }
+    return false;
+}
 function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
 
 /**
@@ -455,7 +482,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         throw new Error('meshBoolean: unrecognized cutting "' + cutting + '" (expected "arrangement" or "plane")');
     }
     let classifications = 0, arrangedTris = 0, arrangementFaces = 0, untouchedTris = 0, fallbackTris = 0;
-    let onFaces = 0, nearSided = 0, nearPseudo = 0, nearEdge = 0;
+    let onFaces = 0, nearSided = 0, nearPseudo = 0, nearEdge = 0, outsideBoxShortcuts = 0;
     const fallbackReasons = {};
     // a face or whole triangle's label: ON the other surface (round 12, from the arrangement), sided locally when
     // within MESH_BOOLEAN_NEAR of it, else by rays
@@ -511,8 +538,8 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                     if (u === t) continue;
                     for (const p of pts) {
                         const have = own.some((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2) ||
-                                     need.some((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2);
-                        if (!have) need.push(p);
+                                     need.some(({ p: q, side }) => side === k && (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2);
+                        if (!have) need.push({ p, side: k });   // the side it belongs on: a sliver cannot tell by distance
                     }
                 }
             }
@@ -529,10 +556,18 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             // on an empty candidate list, taken as an explicit early return for auditability.
             emptyCandidateShortcuts++;
             const tri = readTri(trisSelf, t);
+            // Round 13: a triangle wholly outside the other mesh's bounding box is outside that (closed) mesh -- no rays.
+            // Exact, and most of a big wall under a small blast: the page's 30-shot chains classify ~12,000 wall
+            // triangles per shot this way.
+            if (contacts && bvhOther.count && outsideBox(tri, bvhOther.bounds)) {
+                outsideBoxShortcuts++;
+                fragments.push({ tri, inside: false, ambiguous: false, src: t });
+                continue;
+            }
             const c = centroid(tri);
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
             classifications++;
-            fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
+            fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold, src: t });
             continue;
         }
         if (cutting === "arrangement") {
@@ -572,13 +607,13 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
             classifications++;
             const ambiguous = !!frag.lowConfidence || cls.agreement < agreementThreshold;
-            fragments.push({ tri: frag.tri, inside: cls.inside, ambiguous });
+            fragments.push({ tri: frag.tri, inside: cls.inside, ambiguous, src: t });
         }
     }
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
                                  gateSkipped, gateTested, examined, cutting, classifications, arrangedTris,
                                  arrangementFaces, untouchedTris, fallbackTris, fallbackReasons, onFaces, nearSided,
-                                 nearPseudo, nearEdge, rearranged, injected } };
+                                 nearPseudo, nearEdge, rearranged, injected, outsideBoxShortcuts } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
@@ -635,19 +670,19 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
     if (!VALID_OPS.has(op)) {
         throw new Error('meshBoolean: unrecognized op "' + op + '" (expected "union", "subtract", or "intersect")');
     }
-    const outTris = [], ambiguousTriIndices = [];
+    const outTris = [], ambiguousTriIndices = [], from = [];
     for (const f of classifiedA.fragments) {
         if (!keepA(op, f.inside, f.on)) continue;
-        outTris.push(f.tri);
+        outTris.push(f.tri); from.push(f.src ?? -0x7fffffff);
         if (f.ambiguous) ambiguousTriIndices.push(outTris.length - 1);
     }
     for (const f of classifiedB.fragments) {
         const decision = bKeepAndFlip(op, f.inside, f.on);
         if (!decision) continue;
-        outTris.push(decision.flip ? flipWinding(f.tri) : f.tri);
+        outTris.push(decision.flip ? flipWinding(f.tri) : f.tri); from.push(f.src === undefined ? -0x7fffffff : -(f.src + 1));
         if (f.ambiguous) ambiguousTriIndices.push(outTris.length - 1);
     }
-    return { tris: outTris, ambiguousTriIndices };
+    return { tris: outTris, ambiguousTriIndices, from };
 }
 
 /**
@@ -674,6 +709,8 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  *   scaleExponent: the k the operands were divided by 2^k with (0: in the band, or normalize:false).
  *   emptyOperand (round 12, only when set): "a", "b" or "both" -- that operand is an empty solid (thinner than
  *   CONTACT_EPS on average) and the result is the regularised one, with no classification run.
+ *   from (round 13): per output triangle, the input triangle it is a piece of -- i >= 0 for trisA's triangle i,
+ *   -(i + 1) for trisB's (flipped under subtract). blastEngine.mjs carries SKIN/CUT tags and exact planes by it.
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.
  *   capped: true if EITHER side hit the per-triangle fragment cap. Treat a capped result as unreliable: cuts
  *     may have been left unapplied (it is not CERTAINLY wrong -- the cap can also trip exactly as the last
@@ -778,19 +815,20 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
             if (!VALID_OPS.has(op)) throw new Error('meshBoolean: unrecognized op "' + op + '" (expected "union", "subtract", or "intersect")');
             // union: the other operand; A - B: A, unless A is the empty one; A & B: empty
             const keep = op === "union" ? (eA ? (eB ? null : trisB) : trisA) : op === "subtract" ? (eA ? null : trisA) : null;
-            const tris = keep ? Float64Array.from(keep) : new Float64Array(0);
-            return { tris, triCount: tris.length / 9, ambiguousTriIndices: [], capped: false,
+            const tris = keep ? Float64Array.from(keep) : new Float64Array(0), n = tris.length / 9;
+            const from = Int32Array.from({ length: n }, (_, i) => (keep === trisA ? i : -(i + 1)));
+            return { tris, triCount: n, ambiguousTriIndices: [], capped: false, from,
                      stats: { a: emptyStats(trisA, eA), b: emptyStats(trisB, eB) }, emptyOperand: eA ? (eB ? "both" : "a") : "b" };
         }
     }
     const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, opts);
     const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, opts);
-    const { tris, ambiguousTriIndices } = assembleBoolean(classifiedA, classifiedB, op);
+    const { tris, ambiguousTriIndices, from } = assembleBoolean(classifiedA, classifiedB, op);
     const buf = new Float64Array(tris.length * 9);
     for (let i = 0; i < tris.length; i++) {
         for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = tris[i][v][c];
     }
     const capped = classifiedA.stats.capped || classifiedB.stats.capped;
-    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped,
+    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped, from: Int32Array.from(from),
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }

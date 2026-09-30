@@ -165,6 +165,7 @@ import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumul
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
+import { closestOnTriangle } from "./triContact.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -883,7 +884,8 @@ console.log("\n16. *** ROUND 11: SCALE -- EVERY TOLERANCE IS A LENGTH, SO THE OP
     // control: the same 1e-6 run with the step switched off is still wrong. Not by the pre-round 115% -- that figure
     // included the ray-test bug fixed below, which hurt the raw path too -- but measured at 2.0e-5 with 29 fallbacks
     // at round 11, 1.5e-5 with none since round 12 (at 1e-6 scale every pair is inside the 1e-9 contact tolerance,
-    // and round 12 resolves those instead of refusing them): still ten orders of magnitude above the normalized run.
+    // and round 12 resolves those instead of refusing them), 2.1e-5 since round 13 (at that scale most triangles are
+    // narrower than 8e-9 and take the sliver path): still ten orders of magnitude above the normalized run.
     const raw = run(tf(blobA, 1e-6), tf(blobB, 1e-6), "subtract", { normalize: false }), v1b = volAt(run(blobA, blobB, "subtract").tris);
     const rawErr = Math.abs(volAt(raw.tris) / 1e-18 - v1b) / v1b, rawFb = raw.stats.a.fallbackTris + raw.stats.b.fallbackTris;
     ok("   ...and with normalize:false the same 1e-6 blob pair is still wrong -- the step, not luck, is what fixed it",
@@ -1090,6 +1092,45 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             " -- twin triangles 1e-9..1e-8 apart, straddling the 1e-9 contact tolerance: a face sided one way on A and its twin the other way on B costs a cone of volume, not a sliver. meshBoolean.mjs's ROUND 12 paragraph.");
         ok("   (KNOWN, pinned) the band's worst stays within 2.5x its measured 2.8e-2 -- a regression alarm, not a correctness claim",
             bandWorst < 2.5 * 2.8e-2, "worst " + bandWorst.toExponential(2));
+    }
+}
+
+console.log("\n18. *** ROUND 13: PROVENANCE -- EVERY OUTPUT TRIANGLE NAMES THE INPUT TRIANGLE IT IS A PIECE OF ***");
+{
+    // blastEngine.mjs gives a piece of the wall its source polygon's plane and tag, and a piece of the blob the blob
+    // polygon's plane turned round, by `from` alone -- so `from` is checked here geometrically, not by the adapter's
+    // results: every vertex of an output triangle lies on the triangle `from` names (within 1e-9 of the operands'
+    // size), and it faces that triangle's way (turned round for B under subtract). Jagged blobs, whose neighbouring
+    // triangles are rarely coplanar, so an index off by one lands on a triangle the piece does not lie on.
+    const tri = (buf, i) => [[buf[i * 9], buf[i * 9 + 1], buf[i * 9 + 2]], [buf[i * 9 + 3], buf[i * 9 + 4], buf[i * 9 + 5]], [buf[i * 9 + 6], buf[i * 9 + 7], buf[i * 9 + 8]]];
+    const nrm = (t) => { const u = [0, 1, 2].map((c) => t[1][c] - t[0][c]), w = [0, 1, 2].map((c) => t[2][c] - t[0][c]); return [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; };
+    const cases = [
+        ["blob - blob", M.jaggedBlob([0, 0, 0], 1, 8, 101), M.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 501), 1],
+        ["box - blob (flush-free)", M.boxPolys([0, 0, 0], [1.2, 0.9, 0.35]), M.jaggedBlob([0.3, -0.2, 0], 0.7, 10, 7), 1],
+        ["blob - blob at scale 1e3 (normalised)", M.jaggedBlob([0, 0, 0], 1e3, 8, 102), M.jaggedBlob([300, 200, 100], 900, 8, 502), 1e3],
+    ];
+    for (const [name, PA, PB, s] of cases) for (const op of ["union", "subtract", "intersect"]) {
+        const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB);
+        const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op);
+        let unknown = 0, off = 0, facing = 0, worst = 0, fromA = 0, fromB = 0;
+        const nA = A.length / 9, nB = B.length / 9;
+        for (let i = 0; i < r.triCount; i++) {
+            const f = r.from[i];
+            if (!(f >= 0 && f < nA) && !(f < 0 && -f - 1 < nB)) { unknown++; continue; }
+            const S = f >= 0 ? tri(A, f) : tri(B, -f - 1), T = tri(r.tris, i);
+            if (f >= 0) fromA++; else fromB++;
+            let d = 0;
+            for (const v of T) d = Math.max(d, Math.sqrt(closestOnTriangle(v, S[0], S[1], S[2]).d2));
+            worst = Math.max(worst, d / s);
+            if (d > 1e-9 * s) off++;
+            const nT = nrm(T), nS = nrm(S), c = nT[0] * nS[0] + nT[1] * nS[1] + nT[2] * nS[2];
+            const want = f < 0 && op === "subtract" ? -1 : 1;
+            if (Math.hypot(...nT) > 1e-12 * s * s && c * want <= 0) facing++;
+        }
+        ok("!! " + name + ", " + op + ": every triangle's `from` names a triangle it lies on and faces with",
+            r.from.length === r.triCount && unknown === 0 && off === 0 && facing === 0 && fromA > 0 && fromB > 0,
+            r.triCount + " triangles (" + fromA + " from A, " + fromB + " from B), " + unknown + " without, " + off + " off their source, " +
+            facing + " facing wrong; worst distance " + worst.toExponential(1) + " x size");
     }
 }
 

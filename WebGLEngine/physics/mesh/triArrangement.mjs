@@ -139,6 +139,21 @@
 //     snap from it but within snap of both its sides -- has that edge contracted into it; a chain end within JOIN x
 //     snap (8e-9) of triA's boundary is joined to it (stats.joined, joinedMax -- the distance moved). What still
 //     dangles is refused as before. Without the join, the rotated-copy family falls back 357 times, not 87.
+//
+// *** ROUND 13: THE PAGE'S WORKLOAD (blastEngine-selfcheck -- destructible.html's blasts, chained). *** Round 9's
+// chain never reached two defects, each a refusal whose plane-path fragments then opened ~400 edges. Both fixes are
+// contacts-only:
+//   - "lost edge": Earcut ran a DIAGONAL through face vertices lying on it (collinear, from earlier shots), and the
+//     fan lost the edges to them. A diagonal is now split at every face vertex within snap of it, fanned from the
+//     opposite corner (stats.splitEdges). Only diagonals -- ring edges are left alone: splitting them too added 6
+//     fallbacks on round 12's rotated-copy family (87 -> 93).
+//   - "outer face": a SLIVER -- height <= JOIN x snap over its longest side, e.g. 3e-9 wide, fed back from an earlier
+//     shot -- has no planar arrangement worth the name. sliverFace() bypasses it: every segment end and side point
+//     goes on a side, a segment whose ends are on different sides is a chord, the outline is cut along the chords
+//     and each piece fanned from its centroid and classified there (its `on` by the inclusive test).
+//   - opts.sidePoints may now be {p, side}: a point goes on the side it is given. Near a sliver's sharp corner the
+//     two long sides are closer together than rounding at wall-size coordinates, and by distance alone 292 of 2,000
+//     such points (section 6 of the gate) went on the wrong side. A bare point still goes on the nearest.
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
@@ -199,6 +214,78 @@ function pointInPoly(q, poly) {
 
 const refuse = (reason, extra = {}) => ({ status: "fallback", reason, ...extra });
 
+// Round 13 (contacts): a SLIVER is not arranged. Its outline is its corners with every segment end and every injected
+// side point put on its nearest side (dropped within snap of a corner, merged within snap of each other). A segment
+// crosses a sliver from one long side to the other, so each is a CHORD between two outline vertices: the outline is
+// cut along every chord, and each piece is fanned from its own centroid -- strictly inside a convex piece, so every
+// fan triangle has positive area however thin -- and classified there. (The planar arrangement merged side points
+// ACROSS the sliver, 3e-9 wide, under its 1e-9 snap and could not close the outline; keeping the sliver whole instead
+// left 4 cracks where the blob's surface crossed it.)
+function sliverFace(T, e, L, segs, sidePoints, coplanar, snap, pointContacts) {
+    const onSide = [[], [], []];
+    // put q on its nearest side; returns the vertex it became (an existing one within snap), or null near a corner
+    const place = (q, only = -1) => {
+        let best = null;
+        for (let k = 0; k < 3; k++) {
+            if (only >= 0 && k !== only) continue;
+            const A0 = T[k], d = e[k], w = sub(q, A0), t = (w[0] * d[0] + w[1] * d[1] + w[2] * d[2]) / (L[k] * L[k]);
+            if (!(t * L[k] > snap && (1 - t) * L[k] > snap)) continue;
+            const f = [w[0] - d[0] * t, w[1] - d[1] * t, w[2] - d[2] * t], dist = Math.hypot(f[0], f[1], f[2]);
+            if (!best || dist < best.dist) best = { dist, k, t };
+        }
+        if (!best) return null;
+        const old = onSide[best.k].find((o) => Math.abs(o.t - best.t) * L[best.k] <= snap);
+        if (old) return old;
+        const d = e[best.k], A0 = T[best.k];
+        const o = { t: best.t, k: best.k, p: [A0[0] + d[0] * best.t, A0[1] + d[1] * best.t, A0[2] + d[2] * best.t] };
+        onSide[best.k].push(o);
+        return o;
+    };
+    const chords = [];
+    for (const sg of segs) { const a = place(sg.p0), b = place(sg.p1); if (a && b && a.k !== b.k) chords.push([a, b]); }
+    // an injected point goes on the side it came from: a sliver's two long sides are within snap of each other, and
+    // by distance alone it lands on the wrong one (seed 107 of the page gate: 4 cracks, one needle 1.7e-9 wide)
+    for (const sp of sidePoints) place(sp.p, sp.side);
+    const ring = [];
+    for (let k = 0; k < 3; k++) { ring.push({ p: T[k] }); for (const o of onSide[k].sort((x, y) => x.t - y.t)) ring.push(o); }
+    // cut the outline along each chord (a segment across the sliver, side to side): a polygon holding both ends
+    // splits in two at them. The outline is convex and every piece stays so.
+    let polys = [ring];
+    for (const [a, b] of chords) {
+        const next = [];
+        for (const P of polys) {
+            const i = P.indexOf(a), j = P.indexOf(b);
+            if (i < 0 || j < 0 || Math.abs(i - j) === 1 || Math.abs(i - j) === P.length - 1) { next.push(P); continue; }
+            const [u, v] = i < j ? [i, j] : [j, i];
+            next.push(P.slice(u, v + 1), [...P.slice(v), ...P.slice(0, u + 1)]);
+        }
+        polys = next;
+    }
+    const nA = cross(e[0], sub(T[2], T[0])), faces = [];
+    for (const P of polys) {
+        const vs = P.map((o) => o.p), c = [0, 0, 0];
+        for (const v of vs) { c[0] += v[0] / vs.length; c[1] += v[1] / vs.length; c[2] += v[2] / vs.length; }
+        const tris = vs.map((v, i) => [c, v, vs[(i + 1) % vs.length]]);
+        let on = 0;
+        for (const cp of coplanar) if (inTriangle3(c, cp.U, snap)) { on = cp.orient; break; }
+        let area = 0;
+        for (const t of tris) { const m = cross(sub(t[1], t[0]), sub(t[2], t[0])); area += (m[0] * nA[0] + m[1] * nA[1] + m[2] * nA[2]) / Math.hypot(nA[0], nA[1], nA[2]) / 2; }
+        faces.push({ tris, sample: c, area, holes: 0, on });
+    }
+    return { status: "ok", faces, sideVerts: onSide.map((l) => l.map((o) => o.p)),
+             stats: { segments: segs.length, sliver: true, chords: chords.length, pieces: polys.length, pointContacts } };
+}
+// q in (or on the edge of) triangle U, measured in U's own plane
+function inTriangle3(q, U, snap) {
+    const n = cross(sub(U[1], U[0]), sub(U[2], U[0])), L = Math.hypot(n[0], n[1], n[2]);
+    if (!(L > 0)) return false;
+    for (let k = 0; k < 3; k++) {
+        const a = U[k], b = U[(k + 1) % 3], m = cross(sub(b, a), sub(q, a));
+        if ((m[0] * n[0] + m[1] * n[1] + m[2] * n[2]) / L < -snap * Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])) return false;
+    }
+    return true;
+}
+
 /**
  * The planar arrangement of triangle `triA` (in `trisA`) cut by the intersection SEGMENTS of `candidateTriBs`
  * (indices into `trisB`) -- not by their planes. See this file's header.
@@ -242,7 +329,18 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // Round 12: points the triangle ACROSS one of triA's sides put on that side (meshBoolean's second pass). Without
     // them the two disagree along their shared edge -- a T-junction: a B edge crossing A's face exactly on the diagonal
     // two A-triangles share gives one of them a segment ending there and the other only a point contact, dropped.
-    const sidePoints = opts.sidePoints || [];
+    // each {p, side} (meshBoolean's pass 2 says which side of triA the point belongs on) or a bare point
+    const sidePoints = (opts.sidePoints || []).map((x) => (Array.isArray(x) ? { p: x, side: -1 } : x));
+    // Round 13 (contacts): a SLIVER -- triA no taller than JOIN x snap -- is below what the arrangement resolves: a
+    // segment across it is shorter than the snapping its ends get, and the area checks cannot hold (destructible's
+    // workload: a 0.15 x 3.1e-9 output triangle of an earlier shot, fed back as triA, refused 'outer face' and its
+    // plane-path fragments opened 416 edges). It takes no cut: each segment end is put on its nearest side instead,
+    // so the sliver splits where its neighbours do and stays one face, classified whole.
+    if (opts.contacts && (segs.length || sidePoints.length)) {
+        const e = [sub(T[1], T[0]), sub(T[2], T[1]), sub(T[0], T[2])];
+        const L = e.map((v) => Math.hypot(v[0], v[1], v[2])), cr = cross(e[0], sub(T[2], T[0]));
+        if (Math.hypot(cr[0], cr[1], cr[2]) / Math.max(L[0], L[1], L[2]) <= JOIN * snap) return sliverFace(T, e, L, segs, sidePoints, coplanar, snap, pointContacts);
+    }
     if (segs.length === 0 && coplanar.length === 0 && sidePoints.length === 0) return { status: "untouched", pointContacts };
 
     // ---- 2. a 2D frame on triA's plane: drop the dominant normal axis, local origin at T[0], mirrored if needed so
@@ -273,7 +371,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
 
     const edges = [[0, 1], [1, 2], [2, 0]];
     const touch = [false, false, false];   // round 12: an edge that is only an on-plane contact may be pruned
-    for (const p of sidePoints) addVertex(p, "side point");
+    for (const sp of sidePoints) addVertex(sp.p, "side point");
     for (const s of segs) {
         const a = addVertex(s.p0, "segment"), b = addVertex(s.p1, "segment");
         if (a !== b) { edges.push([a, b]); touch.push(!!s.onPlane); }
@@ -493,7 +591,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // Earcut sees only the corners, and each absorbed run is put back by fanning the one triangle that owns that
     // edge from its opposite vertex. Every vertex comes back, so the face still meets its neighbours edge for edge.
     const out = [];
-    let absorbedTotal = 0, onConflicts = 0;
+    let absorbedTotal = 0, onConflicts = 0, splitEdges = 0;
     for (const f of faces) {
         const want = f.area + f.holes.reduce((s, h) => s + h.area, 0);
         const absorbed = new Map();          // "p,q" (a surviving ring edge) -> the vertices strictly between, in order
@@ -538,6 +636,38 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         }
         const tolF = snap * (perim(f) + f.holes.reduce((s, h) => s + perim(h), 0)) + AREA_REL * areaT;
         if (T3.length === 0 || Math.abs(got - want) > tolF) return refuse("earcut", { got, want });
+        // Round 13 (contacts): Earcut can run ONE triangle edge straight through other face vertices lying on its line
+        // -- a hole whose edge is collinear with a stretch of the outer ring: destructible.html's workload, a blob
+        // edge on the same line as a wall seam -- and the ring edge those vertices bound is then in no triangle
+        // ("lost edge", 2 of the page's 23 test chains). Such an edge is split at every face vertex on it, the
+        // triangle fanned from its opposite corner, until none is left. Every piece keeps positive area.
+        if (opts.contacts) {
+            const faceV = [...new Set(flat)];
+            // only Earcut's own diagonals: a RING edge is the face's boundary as simplified, and the absorbed run it
+            // carries is put back below -- splitting one of those at a surviving vertex within snap of it made the
+            // fan-back lose it (6 more fallbacks on the rotated-copy family before this was restricted)
+            const ringEdge = new Set();
+            for (const r of rings) for (let m = 0; m < r.length; m++) { const u = r[m], v = r[(m + 1) % r.length]; ringEdge.add(u + "," + v); ringEdge.add(v + "," + u); }
+            for (let pass = 0, again = true; again && pass < 16; pass++) {
+                again = false;
+                for (let ti = 0; ti < T3.length && !again; ti++) for (let k = 0; k < 3 && !again; k++) {
+                    const a = T3[ti][k], b = T3[ti][(k + 1) % 3], c = T3[ti][(k + 2) % 3];
+                    if (ringEdge.has(a + "," + b)) continue;
+                    const on = [];
+                    for (const v of faceV) {
+                        if (v === a || v === b || v === c) continue;
+                        const r = segDist(V2[v], V2[a], V2[b]);
+                        if (r.d <= snap && r.t > 0 && r.t < 1) on.push([r.t, v]);
+                    }
+                    if (!on.length) continue;
+                    on.sort((x, y) => x[0] - y[0]);
+                    const chain = [a, ...on.map((x) => x[1]), b], fan = [];
+                    for (let m = 0; m + 1 < chain.length; m++) fan.push([chain[m], chain[m + 1], c]);
+                    T3.splice(ti, 1, ...fan);
+                    splitEdges++; again = true;
+                }
+            }
+        }
         // put each absorbed run back: the triangle holding directed ring edge p->q becomes a fan from its third vertex
         for (const [key, run] of absorbed) {
             const [p, q] = key.split(",").map(Number);
@@ -545,7 +675,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
             for (let ti = 0; ti < T3.length && hit < 0; ti++) for (let k = 0; k < 3; k++) {
                 if (T3[ti][k] === p && T3[ti][(k + 1) % 3] === q) { hit = ti; e = k; break; }
             }
-            if (hit < 0) return refuse("lost edge");
+            if (hit < 0) return refuse("lost edge", opts.debug ? { p, q, run, rings, T3, V2, face: f.vs, holes: f.holes.map((h) => h.vs) } : {});
             const r = T3[hit][(e + 2) % 3], chain = [p, ...run, q], fan = [];
             for (let k = 0; k + 1 < chain.length; k++) fan.push([chain[k], chain[k + 1], r]);
             T3.splice(hit, 1, ...fan);
@@ -591,6 +721,6 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         sideVerts,
         stats: { segments: segs.length, vertices: V2.length, crossings, pointContacts, absorbed: absorbedTotal,
                  faceCount: out.length, holeCount: holes.length, coplanar: coplanar.length, contactSegs,
-                 pruned, contracted, joined, joinedMax, onConflicts, droppedThin },
+                 pruned, contracted, joined, joinedMax, onConflicts, droppedThin, splitEdges },
     };
 }

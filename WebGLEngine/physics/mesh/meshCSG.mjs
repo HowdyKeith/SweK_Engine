@@ -240,16 +240,26 @@ const clonePolys = (ps) => ps.map((p) => ({ vs: p.vs.map((v) => v.slice()), pl: 
  * no texture coordinates, because nothing unwrapped a surface that had not been made yet.
  *
  * Tagging costs one string per polygon and is checkable by construction: every polygon tagged CUT must lie
- * on one of B's planes, and no polygon tagged SKIN may.
+ * on one of B's planes, and no polygon tagged SKIN may. Over a CHAIN of blasts, "B" is every blob so far: A's
+ * polygons keep the tag they arrived with (keepTag), so a face cut by shot 1 is still CUT after shot 2 splits it.
  */
 export const SKIN = "skin";      // came from A: the surface that was always on the outside
 export const CUT  = "cut";       // came from B: the face the boolean created
 
 const tag = (ps, src) => ps.map((p) => ({ ...p, src }));
+// A's side KEEPS a tag it already has. A wall that has been blasted before carries CUT faces from earlier shots, and
+// re-tagging it SKIN wholesale (as subtract() and subtractLocal() did until BVH-CSG round 13) turned every earlier cut
+// face near the new blast back into skin: after a second overlapping blast, 953 polygons with 3.85 units of area, all
+// lying on the first blob's surface, came back SKIN. A polygon with no tag is original surface.
+const keepTag = (ps) => ps.map((p) => ({ ...p, src: p.src ?? SKIN }));
+// ...and a far polygon that passes through untouched is tagged too, if it has no tag yet -- copied only then, so from a
+// wall's second shot on nothing is copied. Before round 13 an untagged original face stayed untagged through blast(),
+// and a caller filtering `p.src === SKIN` (uvUnwrap's `only`) did not see it.
+const bareSkin = (ps) => ps.map((p) => (p.src ? p : { ...p, src: SKIN }));
 
 /** A - B. The polygons of A that lie outside B, plus the polygons of B that lie inside A, facing inward. */
 export function subtract(A, B) {
-    const a = new Node(clonePolys(tag(A, SKIN))), b = new Node(clonePolys(tag(B, CUT)));
+    const a = new Node(clonePolys(keepTag(A))), b = new Node(clonePolys(tag(B, CUT)));
     a.invert(); a.clipTo(b); b.clipTo(a); b.invert(); b.clipTo(a); b.invert();
     a.build(b.allPolygons()); a.invert();
     return a.allPolygons();
@@ -368,12 +378,14 @@ export function mergeCoplanar(polys, { quantum = 1e-6, maxRounds = 8 } = {}) {
     const convexAt = (u, v, w, n) => dot3(cross3(sub3(v, u), sub3(w, v)), n) >= -1e-9;
     const collinear = (u, v, w) => Math.hypot(...cross3(sub3(v, u), sub3(w, v))) < 1e-9;
 
-    let cur = polys.map((p) => ({ vs: p.vs.slice(), pl: p.pl }));
+    let cur = polys.map((p) => ({ vs: p.vs.slice(), pl: p.pl, src: p.src }));
     let merged = 0;
     for (let round = 0; round < maxRounds; round++) {
         const groups = new Map();
         cur.forEach((p, i) => {
-            const k = planeKey(p.pl);
+            // BVH-CSG round 13: by tag as well -- a SKIN face and a CUT face are never one polygon (they are not
+            // coplanar-adjacent on any blast this tree makes, and if they were, which tag would the merge carry?)
+            const k = planeKey(p.pl) + "|" + p.src;
             if (!groups.has(k)) groups.set(k, []);
             groups.get(k).push(i);
         });
@@ -435,7 +447,7 @@ export function mergeCoplanar(polys, { quantum = 1e-6, maxRounds = 8 } = {}) {
                         });
                         if (cleaned.length < 3) continue;
                         dead.add(i); dead.add(j);
-                        out.push({ vs: cleaned, pl: P.pl });
+                        out.push({ vs: cleaned, pl: P.pl, src: P.src });
                         merged++; did++; done = true;
                         break;
                     }
@@ -494,7 +506,7 @@ export function snapVertices(polys, { tol = 1e-9 } = {}) {
             vs.push(r);
         }
         while (vs.length > 1 && vs[0][0] === vs[vs.length - 1][0] && vs[0][1] === vs[vs.length - 1][1] && vs[0][2] === vs[vs.length - 1][2]) vs.pop();
-        return { vs, pl: p.pl };
+        return { vs, pl: p.pl, src: p.src };
     }).filter((p) => p.vs.length >= 3);
     return { polys: out, moved, vertices: reps.length };
 }
@@ -630,9 +642,9 @@ function weldPass(polys, tol, quantum) {
             on.sort((m, n) => m[0] - n[0]);
             for (const [, v] of on) { vs.push(v); inserted++; }
         }
-        return { vs, pl: p.pl };
+        return { vs, pl: p.pl, src: p.src };
     });
-    const out = moves.size ? woven.map((p) => ({ vs: p.vs.map((v) => moves.get(key(v)) || v), pl: p.pl })) : woven;
+    const out = moves.size ? woven.map((p) => ({ vs: p.vs.map((v) => moves.get(key(v)) || v), pl: p.pl, src: p.src })) : woven;
     return { polys: out, inserted, moved: moves.size, maxMove };
 }
 
@@ -702,11 +714,11 @@ export function subtractLocal(A, B, { select = null, bvh = null } = {}) {
     }
     // B's box misses A's box entirely: nothing of B can be inside A, and nothing of A is touched.
     const ab = polysAABB(A);
-    if (!A.length || !boxesMeet(ab, lo, hi)) return { polys: A.slice(), far: A.slice(), cut: [], touched: 0, skipped: A.length, reclassified: 0 };
+    if (!A.length || !boxesMeet(ab, lo, hi)) { const all = bareSkin(A); return { polys: all, far: all.slice(), cut: [], touched: 0, skipped: A.length, reclassified: 0 }; }
 
     // A's side, exactly as subtract(): the near patch keeps what lies outside B -- B is closed, so its BSP is
     // an exact solid and this step was always right.
-    const a = new Node(clonePolys(tag(near, SKIN))), b = new Node(clonePolys(tag(B, CUT)));
+    const a = new Node(clonePolys(keepTag(near))), b = new Node(clonePolys(tag(B, CUT)));
     a.invert(); a.clipTo(b);
 
     // B's side, which is what was wrong (see this function's KNOWN paragraph, now FIXED): split B by the near
@@ -746,7 +758,8 @@ export function subtractLocal(A, B, { select = null, bvh = null } = {}) {
     // blob). So the two sides are concatenated instead: A's in its own orientation, B's turned to face the cavity.
     a.invert();
     const cut = a.allPolygons().concat(keep.map(inv));
-    return { polys: far.concat(cut), far, cut, touched: near.length, skipped: far.length, reclassified, ambiguous };
+    const farT = bareSkin(far);
+    return { polys: farT.concat(cut), far: farT, cut, touched: near.length, skipped: far.length, reclassified, ambiguous };
 }
 
 /**

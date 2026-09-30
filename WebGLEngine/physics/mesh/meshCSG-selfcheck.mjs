@@ -727,6 +727,80 @@ console.log("\n11. *** blast()'s LOCALISATION: FOUND AT ROUND 10, FIXED AT ROUND
         "); 6 blobs flattened flush with the top, worst |blast - subtract| " + flush.toExponential(2));
 }
 
+console.log("\n12. *** THE SKIN/CUT TAG OVER A CHAIN OF BLASTS (BVH-CSG ROUND 13) ***");
+{
+    // v4243's tag is checkable by construction -- a CUT face lies on a blob's plane, a SKIN face on the wall's --
+    // and solidTexture-selfcheck checks it for ONE subtract. Over a chain it was wrong: subtract() and subtractLocal()
+    // tagged A's side SKIN wholesale, so a face cut by one shot came back SKIN once the next shot came near it -- after
+    // a second overlapping blast, 953 polygons with 3.85 units of area, all on the first blob's surface (the page's
+    // radius-0.8 blasts). Both now keep a tag A's polygons already carry.
+    const H = [4, 3, 0.35];
+    const onPlane = (p, pl) => p.vs.every((v) => Math.abs(v[0] * pl.n[0] + v[1] * pl.n[1] + v[2] * pl.n[2] - pl.w) < 1e-7);
+    const wallPlanes = M.boxPolys([0, 0, 0], H).map((p) => p.pl);
+    const blobs = [M.jaggedBlob([0, 0, 0], 0.8, 8, 1), M.jaggedBlob([0.5, 0.2, 0], 0.8, 8, 2), M.jaggedBlob([0.3, -0.4, 0.1], 0.6, 8, 3),
+                   M.jaggedBlob([-0.2, 0.3, 0], 0.7, 10, 4, { rough: 0.3, floor: 0.7 })];
+    for (const [name, step] of [["blast()", (w, b) => M.blast(w, b, { select: M.bvhSelect(w).select }).polys], ["subtract()", (w, b) => M.subtract(w, b)]]) {
+        let wall = M.boxPolys([0, 0, 0], H);
+        const cutPlanes = [];
+        let skinOff = 0, cutStray = 0, total = 0;
+        for (const b of blobs) {
+            wall = step(wall, b);
+            for (const p of b) cutPlanes.push(p.pl);
+        }
+        for (const p of wall) {
+            total++;
+            if (p.src === M.SKIN && !wallPlanes.some((pl) => onPlane(p, pl))) skinOff++;
+            if (p.src === M.CUT && (!cutPlanes.some((pl) => onPlane(p, pl)) || wallPlanes.some((pl) => onPlane(p, pl)))) cutStray++;
+        }
+        const tagged = wall.every((p) => p.src === M.SKIN || p.src === M.CUT);
+        ok("!! " + name + ", four overlapping blasts: every SKIN polygon on the wall's own planes, every CUT one on a blob's and off the wall's",
+            tagged && skinOff === 0 && cutStray === 0, total + " polygons: SKIN off the wall " + skinOff + ", CUT astray " + cutStray + ", all tagged " + tagged);
+    }
+    // ...and through settle(), which the page runs when the shooting stops and then lets it start again. snapVertices,
+    // mergeCoplanar and weldTJunctions each built { vs, pl } and dropped the tag: one press of Settle left every
+    // polygon untagged (6,226 of 6,226 on ten page blasts), and the next blast called all of it SKIN.
+    {
+        let wall = M.boxPolys([0, 0, 0], H);
+        const cutPlanes = [];
+        for (const b of blobs.slice(0, 2)) { wall = M.blast(wall, b, { select: M.bvhSelect(wall).select }).polys; for (const p of b) cutPlanes.push(p.pl); }
+        const cutBefore = wall.filter((p) => p.src === M.CUT).length;
+        const st = M.settle(wall).polys;
+        const untagged = st.filter((p) => p.src !== M.SKIN && p.src !== M.CUT).length;
+        for (const b of blobs.slice(2)) { wall = M.blast(st, b, { select: M.bvhSelect(st).select }).polys; for (const p of b) cutPlanes.push(p.pl); }
+        let bad = 0;
+        for (const p of wall) {
+            if (p.src === M.SKIN ? !wallPlanes.some((pl) => onPlane(p, pl)) : p.src === M.CUT ? !cutPlanes.some((pl) => onPlane(p, pl)) : true) bad++;
+        }
+        ok("!! settle() keeps every tag (and merges only faces of one tag), and blasting on after it keeps the invariant",
+            untagged === 0 && st.some((p) => p.src === M.CUT) && bad === 0,
+            "after settle " + untagged + " untagged of " + st.length + " (" + cutBefore + " CUT before); after two more blasts " + bad + " astray of " + wall.length);
+    }
+    // mergeCoplanar's tag key, by hand. On a box wall under subtract, no CUT face can lie on a wall plane (the
+    // coplanar rule drops the blob's copy there; blastEngine-selfcheck asserts it on 21 page chains), so the page never
+    // offers it a SKIN and a CUT face to join -- the key is for any other polygon soup settle() is given. Here is one:
+    // a box whose front face is two coplanar quads sharing an edge, the right-hand one CUT. Without the key they merge
+    // into one polygon carrying the left one's tag, and the CUT area is gone.
+    {
+        const box = M.boxPolys([0, 0, 0], [1, 1, 1]);
+        const front = box.find((p) => p.pl.n[2] > 0.5), rest = box.filter((p) => p !== front);
+        const [x0, x1] = [-1, 1], y = [-1, 1], z = 1;
+        const left = { vs: [[x0, y[0], z], [0, y[0], z], [0, y[1], z], [x0, y[1], z]], pl: front.pl, src: M.SKIN };
+        const right = { vs: [[0, y[0], z], [x1, y[0], z], [x1, y[1], z], [0, y[1], z]], pl: front.pl, src: M.CUT };
+        const area = (ps, tag) => ps.filter((p) => p.src === tag).reduce((a, p) => {
+            let nx = 0, ny = 0, nz = 0;
+            for (let i = 1; i + 1 < p.vs.length; i++) {
+                const u = p.vs[i].map((c, k) => c - p.vs[0][k]), w = p.vs[i + 1].map((c, k) => c - p.vs[0][k]);
+                nx += u[1] * w[2] - u[2] * w[1]; ny += u[2] * w[0] - u[0] * w[2]; nz += u[0] * w[1] - u[1] * w[0];
+            }
+            return a + Math.hypot(nx, ny, nz) / 2;
+        }, 0);
+        const st = M.settle([...rest.map((p) => ({ ...p, src: M.SKIN })), left, right]).polys;
+        ok("!! settle() never merges a SKIN face with a CUT face on the same plane (by hand: a front face half CUT)",
+            Math.abs(area(st, M.CUT) - 2) < 1e-12 && Math.abs(area(st, M.SKIN) - 22) < 1e-12,
+            "CUT area " + area(st, M.CUT) + " (2 in), SKIN " + area(st, M.SKIN) + " (22 in), " + st.length + " polygons");
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: whether a blasted wall LOOKS like concrete -- it would take a rasterised A/B at a known " +
     "resolution to say, and nothing in this gate renders (the 0.1% of unsewn edges that question used to be about " +

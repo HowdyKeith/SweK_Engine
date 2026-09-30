@@ -46,11 +46,19 @@
       <label>radius <input id="r" type="range" min="20" max="140" step="5" value="80"><span id="rv">0.80</span></label>
       <label>jaggedness <input id="j" type="range" min="0" max="90" step="5" value="60"><span id="jv">0.60</span></label>
       <label>facets <input id="s" type="range" min="4" max="14" step="1" value="8"><span id="sv">8</span></label>
+      <label>engine <select id="engine">
+        <option value="bsp">BSP -- meshCSG blast() (default)</option>
+        <option value="bvh">BVH -- meshBoolean (behind a flag)</option>
+      </select></label>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button id="hit">blast</button><button id="settle">settle</button><button id="reset">reset</button>
       </div>
       <p class="note">Blast cuts. <b>Settle</b> snaps, merges the coplanar waste and welds every T-junction —
          a whole-mesh pass that belongs where the shooting stops, not in the frame loop.</p>
+      <p class="note">The <b>engine</b> flag (or <code>?csg=bvh</code>) sends the blast through
+         <code>physics/mesh/meshBoolean.mjs</code> instead, via <code>physics/mesh/blastEngine.mjs</code>: the same
+         solid and the same SKIN/CUT tags, cut along the actual intersection segments, closed without settle, in
+         triangles. BSP stays the default.</p>
     </div>
 
     <div class="panel">
@@ -69,12 +77,15 @@
 
 <script type="module">
 import * as CSG from "./physics/mesh/meshCSG.mjs";
+import { blastWith, BLAST_ENGINES, DEFAULT_BLAST_ENGINE } from "./physics/mesh/blastEngine.mjs";
 
 const cv = document.getElementById("view"), g = cv.getContext("2d");
 const $ = (id) => document.getElementById(id);
 const HALF = [4, 3, 0.35];
 let wall = CSG.boxPolys([0, 0, 0], HALF);
-let seed = 1, shots = 0, lastMs = 0, settled = false;
+let seed = 1, shots = 0, lastMs = 0, settled = false, lastStats = null;
+const asked = new URLSearchParams(location.search).get("csg");
+$("engine").value = BLAST_ENGINES.includes(asked) ? asked : DEFAULT_BLAST_ENGINE;
 const V0 = CSG.volume(wall);
 let yaw = 0.7, pitch = -0.35, drag = null;
 
@@ -130,6 +141,7 @@ function show() {
         "unmatched     " + c.unmatched + "  (" + (100 * c.unmatched / Math.max(1, c.edges)).toFixed(2) + "%)\n" +
         "volume        " + v.toFixed(6) + "  of " + V0.toFixed(6) + "\n" +
         "removed       " + (100 * (1 - v / V0)).toFixed(2) + "%\n" +
+        "engine        " + $("engine").value + (lastStats && lastStats.engine === "bvh" ? "  (fallbacks " + lastStats.fallbackTris + ")" : "") + "\n" +
         "last op       " + lastMs.toFixed(1) + " ms";
 }
 
@@ -138,9 +150,11 @@ $("hit").onclick = () => {
     // put the blast on the face, somewhere it will actually bite
     const c = [(Math.random() * 2 - 1) * (HALF[0] - r), (Math.random() * 2 - 1) * (HALF[1] - r), 0];
     const blob = CSG.jaggedBlob(c, r, sub, seed++, { rough, floor: 1 - rough });
-    const { select } = CSG.bvhSelect(wall);
+    const engine = $("engine").value;
+    const select = engine === "bsp" ? CSG.bvhSelect(wall).select : null;
     const t0 = performance.now();
-    wall = CSG.blast(wall, blob, { select }).polys;
+    const cut = blastWith(engine, wall, blob, { select });
+    wall = cut.polys; lastStats = cut.stats;
     lastMs = performance.now() - t0;
     shots++; settled = false; draw(); show();
 };
@@ -150,6 +164,7 @@ $("settle").onclick = () => {
     lastMs = performance.now() - t0;
     settled = true; draw(); show();
 };
+$("engine").onchange = () => show();
 $("reset").onclick = () => {
     wall = CSG.boxPolys([0, 0, 0], HALF); shots = 0; lastMs = 0; settled = false; draw(); show();
 };
