@@ -59,6 +59,16 @@
 // logged in triFragmentAccumulate-selfcheck.mjs's header (final, post-review file). Here: I4c (query range one
 // cell short) 8, I5 (order broken) 1 -- section 7's buffer comparison -- I8 (one cell) 1, section 7's work count;
 // I2 and I3 crash this gate (exit 1) rather than name a red.
+// ROUND 9: meshBoolean's default is now segment-bounded cutting (physics/mesh/triArrangement.mjs). Sections 1 and 7
+// test the PLANE path's gate, its round-6 behaviour and its spatial index, so they ask for cutting:"plane" by name
+// (on the new default they went red for testing nothing: gateSkipped 0, examined 0); section 1 gained the
+// arrangement's own line. Sections 2, 3, 4 and 6 run the arrangement unchanged and pass unchanged -- the chain,
+// the 1000x reference, both membership oracles, millimetre scale. SECTION 5's CLAIM WAS REWRITTEN, not relaxed:
+// round 7 asserted watertight AFTER meshCSG's settle(), true of the plane path, whose raw output is not; the
+// arrangement is watertight RAW (0 unmatched, weld inserts nothing), and settle()'s coplanar merge opens 3 edges
+// its weld cannot close -- so settle is printed for it and asserted for the plane path, by name. Section 8 is new:
+// counts, not times, across subdiv 8/16/32. The round-7/8 sabotage counts above were measured on the plane path
+// as the default and are historical; the round-9 files' sabotages are logged in triArrangement-selfcheck.mjs.
 // A PROCESS MISTAKE, DISCLOSED: the first runner had no `finally`; S1 timed out on this gate and the crash left
 // triFragmentAccumulate.mjs sabotaged on disk. Caught by an md5 check before anything else ran; restored.
 "use strict";
@@ -109,11 +119,11 @@ function bspChain(S) {
     }
     return { polys: P, vols, ms };
 }
-function boolChain(S, shots = SHOTS) {
+function boolChain(S, shots = SHOTS, opts) {
     let buf = M.toTriangleBuffer(WALL(S)); const vols = []; let ms = 0, capped = false, amb = 0, unresolved = 0;
     for (let k = 1; k <= shots; k++) {
         const t = now();
-        const r = boolSubtract(buf, BLOB(k, S));
+        const r = boolSubtract(buf, BLOB(k, S), opts);
         ms += now() - t;
         buf = r.tris; vols.push(volBuf(buf));
         capped = capped || r.stats.a.capped || r.stats.b.capped;
@@ -132,9 +142,11 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
     const bufA = M.toTriangleBuffer(A), bufB = M.toTriangleBuffer(B);
     const bvhA = new MeshBVH(bufA), bvhB = new MeshBVH(bufB);
 
-    t = now(); const g = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract"); const gMs = now() - t;
+    // Round 9: the default is now the arrangement (triArrangement.mjs); this section is about the PLANE path's
+    // gate, round 7's fix, so it asks for that path by name. The arrangement's own line follows the plane path's.
+    t = now(); const g = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane" }); const gMs = now() - t;
     const gVol = volBuf(g.tris);
-    ok("!! *** DEFAULT (GATED) meshBoolean MATCHES THE BSP VOLUME ON meshCSG's OWN SINGLE-BLAST FIXTURE ***",
+    ok("!! *** GATED PLANE-PATH meshBoolean MATCHES THE BSP VOLUME ON meshCSG's OWN SINGLE-BLAST FIXTURE ***",
         Math.abs(gVol - oracle) < 1e-9 && !g.stats.a.capped && !g.stats.b.capped,
         "volume " + gVol + " vs BSP " + oracle + " (diff " + (gVol - oracle).toExponential(2) + "), capped=" +
         g.stats.a.capped + "/" + g.stats.b.capped);
@@ -145,7 +157,7 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
     // Round 6's path exactly: ungated AND triFragmentAccumulate.mjs's own default cap of 256 (meshBoolean's own
     // default cap is now MESH_BOOLEAN_MAX_FRAGMENTS -- the first draft of this check passed only
     // gateByIntersection:false, silently got the new cap, and went red for reproducing nothing).
-    const r6 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: false, maxFragments: 256 } });
+    const r6 = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane", accOpts: { gateByIntersection: false, maxFragments: 256 } });
     const r6Vol = volBuf(r6.tris);
     ok("!! *** ROUND 6's UNGATED PATH, REPRODUCED: HITS THE DEFAULT CAP AND COMES BACK MATERIALLY WRONG ***",
         r6.stats.a.capped === true && Math.abs(r6Vol - oracle) > 0.1,
@@ -153,13 +165,20 @@ console.log("\n1. *** ONE BLAST: ROUND 6 WAS WRONG HERE, ROUND 7 IS EXACT, AND W
         (r6Vol - oracle).toFixed(4) + " (" + (100 * (r6Vol - oracle) / oracle).toFixed(2) + "%), measured 0.2012 at round 7");
 
     t = now();
-    const r6u = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { accOpts: { gateByIntersection: false, maxFragments: 1e6 } });
+    const r6u = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract", { cutting: "plane", accOpts: { gateByIntersection: false, maxFragments: 1e6 } });
     const r6uMs = now() - t;
     const r6uVol = volBuf(r6u.tris);
     ok("!! ...and UNCAPPED it is exact but manufactures the full plane arrangement -- over 20x the triangles",
         !r6u.stats.a.capped && Math.abs(r6uVol - oracle) < 1e-9 && r6u.triCount > 20 * g.triCount,
         "ungated uncapped " + r6u.triCount + " triangles vs gated " + g.triCount + " (measured 18,129 vs 473), volume diff " +
         (r6uVol - oracle).toExponential(2));
+    t = now(); const ar = meshBoolean(bufA, bvhA, bufB, bvhB, "subtract"); const arMs = now() - t;
+    const arVol = volBuf(ar.tris);
+    ok("!! *** ROUND 9: THE DEFAULT (ARRANGEMENT) MATCHES THE BSP TOO, IN FEWER TRIANGLES THAN THE GATED PLANE PATH ***",
+        Math.abs(arVol - oracle) < 1e-9 && ar.triCount < g.triCount && ar.stats.a.fallbackTris + ar.stats.b.fallbackTris === 0,
+        "volume diff " + (arVol - oracle).toExponential(2) + "; " + ar.triCount + " triangles vs gated plane " + g.triCount +
+        " (measured 280 vs 473); fallbacks " + (ar.stats.a.fallbackTris + ar.stats.b.fallbackTris));
+    info("arrangement " + arMs.toFixed(1) + " ms (printed, not asserted)");
     const bspTris = M.toTriangles(bsp).length;
     ok("   gated meshBoolean emits fewer triangles than the BSP for the same blast",
         g.triCount < bspTris, "gated " + g.triCount + " vs BSP " + bsp.length + " polygons = " + bspTris + " triangles");
@@ -254,34 +273,49 @@ console.log("\n4. *** A MEMBERSHIP ORACLE THAT NEVER READS EITHER RESULT MESH **
 }
 
 // =============================================================================================================
-console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: AFTER meshCSG's OWN settle(), WHO IS WATERTIGHT ***");
+console.log("\n5. *** THE MANIFOLD HALF OF THE QUESTION: WHO IS WATERTIGHT, AND WHAT meshCSG's settle() DOES TO IT ***");
 {
+    // ROUND 9 REWROTE THIS SECTION'S CLAIM. Round 7 asserted that meshBoolean's twelve-blast wall is watertight
+    // AFTER meshCSG's settle() (snap + coplanar merge + T-junction weld) -- true of the plane path, whose raw
+    // output is not watertight at all. The arrangement (the default since round 9) is watertight RAW: each seam
+    // vertex is computed once, by triTriIntersect, and kept as computed by both meshes' arrangements. Measured on
+    // the chain below: raw 0 unmatched, snap(1e-9) + weld 0 with nothing to insert -- and settle() 3, all of it
+    // settle's coplanar merge (3,493 merges open 299 edges; its weld closes all but 3). So settle() is now
+    // printed here, not asserted: it is meshCSG's machinery for the plane path's output, and it makes this
+    // output worse, not better.
     const rawG = M.watertight(polysFromBuf(G1.buf));
+    const snapped = M.snapVertices(polysFromBuf(G1.buf), { tol: 1e-9 });
+    const welded = M.weldTJunctions(snapped.polys);
+    const wWeld = M.watertight(welded.polys);
+    ok("!! *** ROUND 9: meshBoolean's twelve-blast wall is WATERTIGHT RAW -- zero unmatched edges, no snap, no weld ***",
+        rawG.ok && rawG.unmatched === 0, "unmatched " + rawG.unmatched + " of " + rawG.edges);
+    ok("   ...and has no T-junction for a weld to find: snap(1e-9) + weldTJunctions inserts nothing and leaves zero",
+        wWeld.unmatched === 0 && welded.inserted === 0, "unmatched " + wWeld.unmatched + ", weld inserted " + welded.inserted);
     let t = now(); const sg = M.settle(polysFromBuf(G1.buf)); const sgMs = now() - t;
-    t = now(); const sb = M.settle(B1.polys); const sbMs = now() - t;
-    const wg = M.watertight(sg.polys), wb = M.watertight(sb.polys);
-    ok("!! *** meshBoolean's twelve-blast wall, through meshCSG's own settle(), is WATERTIGHT: zero unmatched edges ***",
-        wg.ok && wg.unmatched === 0, "unmatched " + wg.unmatched + " of " + wg.edges + " (raw, before settle: " +
-        rawG.unmatched + " -- T-junctions, which settle's merge + weld together close; the weld alone does not)");
-    // settle() DOES move meshBoolean's solid, by 2.9e-8 (1.4e-9 relative), and all of it is mergeCoplanar()'s --
-    // traced step by step at round 7: snap 4.4e-11, merge 2.88e-8, weld +0. The first draft asserted 1e-9 and
-    // went red. The bound here is meshCSG-selfcheck.mjs section 5's OWN settle-volume contract (1e-6), applied
-    // to both inputs alike, and the merge is load-bearing for the watertight claim above: weld alone, with no
-    // merge, leaves 4 unmatched edges -- printed below, measured live.
+    const wg = M.watertight(sg.polys);
     const dv = M.volume(sg.polys) - G1.vols[SHOTS - 1];
-    ok("   ...and settle moved its solid by less than meshCSG's own settle contract (1e-6)", Math.abs(dv) < 1e-6,
-        "moved " + dv.toExponential(2) + " (" + M.volume(sg.polys) + " vs " + G1.vols[SHOTS - 1] + ")");
-    const weldOnly = M.watertight(M.weldTJunctions(M.snapVertices(polysFromBuf(G1.buf), { tol: 1e-9 }).polys).polys);
-    info("weld WITHOUT settle's coplanar merge leaves " + weldOnly.unmatched + " unmatched edges (measured 4 at round 7) -- " +
-         "the zero above needs settle() whole");
-    info("MEASURED, not asserted here (meshCSG-selfcheck.mjs section 5 asserts it, as 'cause unknown'): the BSP's own " +
-         "twelve-blast wall through the SAME settle() keeps " + wb.unmatched + " unmatched edges of " + wb.edges +
-         ". *** THE CAUSE IS KNOWN NOW, AND IT NARROWS THIS SECTION'S CLAIM: *** the round-7 review ran the same chain on " +
-         "a COPY of meshCSG.mjs with only EPS changed -- 1e-5: 15 unmatched; 1e-6, 1e-7, 1e-8: 0. So meshBoolean's zero " +
-         "above beats meshCSG AT ITS CURRENT CONSTANT, not the BSP method. And both results depend on scale: settle()'s " +
-         "snap/merge/weld tolerances are absolute, and at 0.001x the same review measured 1,455 unmatched (meshBoolean) " +
-         "vs 4,001 (BSP) after settle -- watertight here means watertight at THIS scale. settle() timings: meshBoolean's " +
-         "wall " + sgMs.toFixed(0) + " ms, BSP's " + sbMs.toFixed(0) + " ms");
+    ok("   settle() still moves the solid by less than meshCSG's own settle contract (1e-6)", Math.abs(dv) < 1e-6,
+        "moved " + dv.toExponential(2));
+    info("MEASURED, not asserted: through meshCSG's settle() the same wall has " + wg.unmatched + " unmatched edges of " +
+         wg.edges + " (measured 3 at round 9) -- opened by settle's coplanar merge, not present before it. settle " + sgMs.toFixed(0) + " ms");
+
+    // The plane path, kept reachable by option: round 7's claim, still true of it, still gated.
+    const P1 = boolChain(1, SHOTS, { cutting: "plane" });
+    const rawP = M.watertight(polysFromBuf(P1.buf));
+    t = now(); const sp = M.settle(polysFromBuf(P1.buf)); const spMs = now() - t;
+    t = now(); const sb = M.settle(B1.polys); const sbMs = now() - t;
+    const wp = M.watertight(sp.polys), wb = M.watertight(sb.polys);
+    ok("!! the PLANE path's twelve-blast wall, through meshCSG's own settle(), is watertight (round 7's claim, now by name)",
+        wp.ok && wp.unmatched === 0 && rawP.unmatched > 0, "after settle " + wp.unmatched + " of " + wp.edges +
+        " (raw, before settle: " + rawP.unmatched + ")");
+    const weldOnly = M.watertight(M.weldTJunctions(M.snapVertices(polysFromBuf(P1.buf), { tol: 1e-9 }).polys).polys);
+    info("plane path: weld WITHOUT settle's coplanar merge leaves " + weldOnly.unmatched + " unmatched edges (measured 4 at round 7)");
+    info("MEASURED, not asserted here (meshCSG-selfcheck.mjs section 5 asserts it): the BSP's own twelve-blast wall " +
+         "through the SAME settle() keeps " + wb.unmatched + " unmatched edges of " + wb.edges + ". The round-7 review " +
+         "ran the chain on a COPY of meshCSG.mjs with only EPS changed -- 1e-5: 15 unmatched; 1e-6, 1e-7, 1e-8: 0 -- so " +
+         "that is meshCSG's constant, not the BSP method (backlog #25, round 10 of this arc). Watertight here means at " +
+         "THIS scale: settle()'s tolerances are absolute, and the arrangement's snap (1e-9) is absolute too. settle() " +
+         "timings: plane path " + spMs.toFixed(0) + " ms, BSP " + sbMs.toFixed(0) + " ms");
 }
 
 // =============================================================================================================
@@ -316,8 +350,9 @@ console.log("\n7. *** ROUND 8: THE SPATIAL INDEX CHANGES WHO IS ASKED, NOT WHAT 
     // buffer, compared float by float, and the index's work against the plain loop's scan.
     const A = M.toTriangleBuffer(WALL()), B = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, 16, 12345));
     const bA = new MeshBVH(A), bB = new MeshBVH(B);
-    let t = now(); const ix = meshBoolean(A, bA, B, bB, "subtract"); const ixMs = now() - t;
-    t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { accOpts: { spatialIndex: false } }); const plMs = now() - t;
+    // Round 9: the index belongs to the plane path, so both runs ask for it by name.
+    let t = now(); const ix = meshBoolean(A, bA, B, bB, "subtract", { cutting: "plane" }); const ixMs = now() - t;
+    t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { cutting: "plane", accOpts: { spatialIndex: false } }); const plMs = now() - t;
     let same = ix.tris.length === pl.tris.length;
     for (let i = 0; same && i < ix.tris.length; i++) if (ix.tris[i] !== pl.tris[i]) same = false;
     ok("!! indexed and plain-loop meshBoolean produce the SAME output buffer, float for float (subdiv-16 blast)",
@@ -337,15 +372,53 @@ console.log("\n7. *** ROUND 8: THE SPATIAL INDEX CHANGES WHO IS ASKED, NOT WHAT 
          "triFragmentAccumulate.mjs's ROUND 8 paragraph for why neither is the whole scaling fix");
 }
 
+// =============================================================================================================
+console.log("\n8. *** ROUND 9: WHAT SEGMENT-BOUNDED CUTTING DOES TO THE COUNTS THAT GREW -- COUNTS ASSERTED, TIMES PRINTED ***");
+{
+    // Round 8's profile named two costs that grew with how finely the blob is tessellated: fragments (a cut ran a
+    // member's whole PLANE across the fragment) and classifications (five rays per fragment). The arrangement
+    // cuts along the actual segments and classifies once per FACE. Asserted here on n = 8, 16, 32 (cheap enough
+    // for a gate); n = 48..128 were measured by hand at round 9 and are in triArrangement.mjs's header.
+    const A = M.toTriangleBuffer(WALL()), bA = new MeshBVH(A);
+    const rows = [];
+    for (const n of [8, 16, 32]) {
+        const B = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1.0, n, 12345)), bB = new MeshBVH(B);
+        let t = now(); const ar = meshBoolean(A, bA, B, bB, "subtract"); const aMs = now() - t;
+        t = now(); const pl = meshBoolean(A, bA, B, bB, "subtract", { cutting: "plane" }); const pMs = now() - t;
+        rows.push({ n, blob: B.length / 9, ar, pl, aMs, pMs,
+                    clsA: ar.stats.a.classifications + ar.stats.b.classifications,
+                    clsP: pl.stats.a.classifications + pl.stats.b.classifications,
+                    dv: Math.abs(volBuf(ar.tris) - volBuf(pl.tris)) });
+    }
+    const per = rows.map((r) => r.clsA / r.blob);
+    ok("!! classifications per blob triangle stay flat as the blob refines (arrangement), under 1.5 at n=16 and 32",
+        per[1] < 1.5 && per[2] < 1.5 && per[2] <= per[1] + 0.05,
+        rows.map((r, i) => "n=" + r.n + " " + r.clsA + "/" + r.blob + " = " + per[i].toFixed(2)).join(", ") +
+        " (measured 1.47 / 1.25 / 1.20; 1.18 at 48 and 64, 1.17 at 128)");
+    ok("!! ...under half the plane path's at every size, in fewer triangles, same volume to 1e-12, never capped, no fallback",
+        rows.every((r) => r.clsA * 2 < r.clsP && r.ar.triCount < r.pl.triCount && r.dv < 1e-12 && !r.ar.capped &&
+                          r.ar.stats.a.fallbackTris + r.ar.stats.b.fallbackTris === 0),
+        rows.map((r) => "n=" + r.n + ": cls " + r.clsA + " vs " + r.clsP + ", tris " + r.ar.triCount + " vs " + r.pl.triCount +
+                        ", |dV| " + r.dv.toExponential(1)).join("; "));
+    ok("!! ...and every one of those outputs is watertight raw",
+        rows.every((r) => M.watertight(polysFromBuf(r.ar.tris)).unmatched === 0));
+    info("timings (printed, not asserted): " + rows.map((r) => "n=" + r.n + " arrangement " + r.aMs.toFixed(0) + " ms / plane " +
+         r.pMs.toFixed(0) + " ms").join("; ") + ". Round 9 by hand, one machine, one blast: n=64 0.80 s (plane 7.3 s, BSP 2.4 s " +
+         "contended / 1.7 s round 8); n=96 1.7 s (plane 45.7 s, BSP 5.7 s); n=128 3.9 s, uncapped (plane capped and wrong " +
+         "at round 8, 129.5 s; BSP 12.6 s, 5.6e-7 relative off the 1000x reference, which the arrangement meets to 1.9e-14)");
+}
+
 console.log(`\nmeshBooleanBlast-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: ONE workload family (a box wall, 224-triangle jagged blobs, subtract " +
     "only) -- the round-7 integration review ran union/intersect on wall-vs-blob and blob-vs-blob by hand (12 of 12 " +
-    "within 7.7e-11 of their own 1000x runs) but no gate does; THIS WORKLOAD FLATTERS meshBoolean ON SPEED: the same " +
-    "review measured it 7x slower than the BSP at a 16,128-triangle blob and 7.1 minutes, capped, at 65,024; round 8 " +
-    "(box precondition + spatial index) took subdiv 64 from 10.7 s to 7.1 s against the BSP's 1.7 s, but fragment count " +
-    "and per-fragment classification still scale badly and n=128 still caps (see triFragmentAccumulate.mjs), so " +
-    "'faster than the BSP' holds for inputs this size, not in general; the watertight win in section 5 is over meshCSG's current EPS and at 1x only; meshBoolean's " +
-    "raw output is NOT watertight without meshCSG's settle() and this round adds no weld of its own; each shot rebuilds " +
+    "within 7.7e-11 of their own 1000x runs), and meshBoolean-selfcheck section 15 now gates blob pairs for all three " +
+    "ops against their own 1000x runs, but no gate here does; SPEED: the plane path was 7x slower than the BSP at a " +
+    "16,128-triangle blob and capped at 65,024; round 9's arrangement (the default) did subdiv 64 in 0.80 s against " +
+    "the BSP's 2.4 s and 128 in 3.9 s against 12.6 s, uncapped -- measured by hand on one machine, printed in section " +
+    "8, never asserted, and on this ONE workload family; its cost is now the arrangement's own brute-force steps " +
+    "(733 ms for one wall triangle with 2,735 segments at 128), not classification; section 5's watertight claim is " +
+    "at 1x, with an absolute 1e-9 snap, and holds only for triangles the arrangement does not refuse; meshCSG's " +
+    "settle() now makes the default's output WORSE (3 unmatched from 0), which section 5 prints; each shot rebuilds " +
     "both BVHs from scratch; below ~1e-4 scale meshBoolean is wrong too (its own absolute tolerances); the touching-" +
     "contact, degenerate-operand, near-flush-tilt and near-identical-rotated-operand gaps meshBoolean.mjs's header " +
     "names are untouched by the gate; and timings are printed for one machine, never asserted.");

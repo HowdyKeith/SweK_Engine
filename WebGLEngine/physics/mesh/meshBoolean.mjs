@@ -221,11 +221,36 @@
 //   boxes with one face tilted 1e-10..3e-9 rad about an edge, intersected, return -0.12 against a true ~1e-10
 //   (the touching-contact family above, but with genuinely overlapping faces); a blob minus the same blob
 //   rotated by 1e-12..1e-6 returns up to -1.43 with non-closed output.
+//
+// *** ROUND 9: SEGMENT-BOUNDED CUTTING IS THE DEFAULT (opts.cutting, MESH_BOOLEAN_DEFAULT_CUTTING = "arrangement"). ***
+// Each triangle with candidates goes to physics/mesh/triArrangement.mjs, which cuts it along the actual
+// intersection segments (not their planes) into faces, and each FACE is classified once, at its largest
+// triangle's centroid; every triangle of the face takes that label. A triangle the arrangement refuses (in
+// practice a coplanar or degenerate contact) goes to the plane path above, unchanged -- per triangle, counted in
+// stats.fallbackTris / stats.fallbackReasons. cutting:"plane" keeps the round-8 path whole, and every plane-path
+// option (accOpts, the fragment cap, the gate, the index) applies only there; the arrangement has no cap.
+// What it changes, measured (triArrangement.mjs's header has the table): one blast at subdiv 64 in 0.80 s against
+// the plane path's 7.3 s and the BSP's 2.4 s; subdiv 128 in 3.9 s, uncapped and right (the plane path capped and
+// came back wrong; the BSP 12.6 s and 5.6e-7 relative off the 1000x reference); classifications per blob triangle
+// flat at ~1.2; volumes equal to the plane path's to 5.0e-13 wherever the plane path is uncapped; and THE RAW
+// OUTPUT IS WATERTIGHT -- A's and B's seam vertices are the same points, computed once by triTriIntersect, so gap
+// (2) of round 6 ("A's and B's independently-clipped cut boundaries do NOT produce bit-coincident seam vertices")
+// is closed on this path: 22 of 22 bit-identical on the primary fixture, 0 unmatched edges on every general-
+// position run gated (meshBoolean-selfcheck section 15, meshBooleanBlast-selfcheck sections 5 and 8). It is NOT
+// closed where a triangle falls back, and it does not touch the flush/touching-contact, zero-volume-operand,
+// near-flush-tilt, rotated-copy or scale gaps named above: those triangles are refused and take the plane path.
+// *** THE CAVEAT PER-FACE CLASSIFICATION BRINGS: *** a face gets one label because no segment crosses it, and that
+// holds only if every B-triangle that meets triA is in its candidate list. bvhPairOverlap.mjs's conservative-
+// superset contract says it is; if it ever were not, the arrangement would mislabel a WHOLE FACE where the plane
+// path mislabelled one fragment -- a larger error from the same missed pair. triArrangement-selfcheck.mjs gates
+// no-segment-crosses-a-triangle on 200 random cases and audits per-face against per-triangle labels (1,120
+// triangles, 0 disagree); neither can see a candidate the broad phase never produced.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
+import { arrangeTriangle } from "./triArrangement.mjs";
 
 function readTri(tris, t) {
     const o = t * 9;
@@ -255,12 +280,19 @@ function flipWinding(tri) { return [tri[0], tri[2], tri[1]]; }
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhSelf  built over trisSelf
  * @param {Float64Array|Float32Array} trisOther
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhOther  built over trisOther
- * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ *   cutting (round 9): "arrangement" (default, MESH_BOOLEAN_DEFAULT_CUTTING) or "plane"; anything else throws.
  *   accOpts defaults to {gateByIntersection:true, maxFragments:MESH_BOOLEAN_MAX_FRAGMENTS} since round 7 --
  *   NOT triFragmentAccumulate.mjs's own defaults; defined caller keys override, undefined/null ones do not.
+ *   It governs the plane path only (all of it under cutting:"plane"; fallen-back triangles otherwise).
  * @returns {{fragments:{tri:number[][], inside:boolean, ambiguous:boolean}[], stats:{triCount:number,
  *   emptyCandidateShortcuts:number, accumulatedFragments:number, capped:boolean, unresolvedCount:number,
- *   gateSkipped:number, gateTested:number, examined:number}}}
+ *   gateSkipped:number, gateTested:number, examined:number, cutting:string, classifications:number,
+ *   arrangedTris:number, arrangementFaces:number, untouchedTris:number, fallbackTris:number,
+ *   fallbackReasons:Object<string,number>}}}
+ *   classifications: pointInMesh() calls, on either path. arrangedTris / arrangementFaces: triangles the
+ *   arrangement cut, and the faces it made of them. untouchedTris: triangles with candidates none of which
+ *   crosses them (classified whole). fallbackTris / fallbackReasons: refused, and taken by the plane path.
  */
 export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther, opts = {}) {
     const agreementThreshold = opts.agreementThreshold ?? 1;
@@ -279,6 +311,12 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     // off. A value that is present but not a real override is now ignored rather than obeyed.
     const accOpts = { gateByIntersection: true, maxFragments: MESH_BOOLEAN_MAX_FRAGMENTS };
     for (const [k, v] of Object.entries(opts.accOpts || {})) if (v !== undefined && v !== null) accOpts[k] = v;
+    const cutting = opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING;
+    if (cutting !== "arrangement" && cutting !== "plane") {
+        throw new Error('meshBoolean: unrecognized cutting "' + cutting + '" (expected "arrangement" or "plane")');
+    }
+    let classifications = 0, arrangedTris = 0, arrangementFaces = 0, untouchedTris = 0, fallbackTris = 0;
+    const fallbackReasons = {};
 
     for (let t = 0; t < triCount; t++) {
         const cands = byTri.get(t);
@@ -289,8 +327,38 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             const tri = readTri(trisSelf, t);
             const c = centroid(tri);
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
+            classifications++;
             fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
             continue;
+        }
+        if (cutting === "arrangement") {
+            const arr = arrangeTriangle(trisSelf, t, trisOther, cands);
+            if (arr.status === "untouched") {
+                untouchedTris++;
+                const tri = readTri(trisSelf, t);
+                const c = centroid(tri);
+                const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
+                classifications++;
+                fragments.push({ tri, inside: cls.inside, ambiguous: cls.agreement < agreementThreshold });
+                continue;
+            }
+            if (arr.status === "ok") {
+                arrangedTris++;
+                for (const face of arr.faces) {
+                    arrangementFaces++;
+                    const s = face.sample;
+                    const cls = pointInMesh(bvhOther, s[0], s[1], s[2], opts.pointInMeshOpts);
+                    classifications++;
+                    const ambiguous = cls.agreement < agreementThreshold;
+                    for (const tri of face.tris) {
+                        accumulatedFragments++;
+                        fragments.push({ tri, inside: cls.inside, ambiguous });
+                    }
+                }
+                continue;
+            }
+            fallbackTris++;
+            fallbackReasons[arr.reason] = (fallbackReasons[arr.reason] || 0) + 1;
         }
         const acc = accumulateFragments(trisSelf, t, trisOther, cands, accOpts);
         if (acc.capped) capped = true;
@@ -302,12 +370,14 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             accumulatedFragments++;
             const c = centroid(frag.tri);
             const cls = pointInMesh(bvhOther, c[0], c[1], c[2], opts.pointInMeshOpts);
+            classifications++;
             const ambiguous = !!frag.lowConfidence || cls.agreement < agreementThreshold;
             fragments.push({ tri: frag.tri, inside: cls.inside, ambiguous });
         }
     }
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
-                                 gateSkipped, gateTested, examined } };
+                                 gateSkipped, gateTested, examined, cutting, classifications, arrangedTris,
+                                 arrangementFaces, untouchedTris, fallbackTris, fallbackReasons } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
@@ -328,6 +398,8 @@ const VALID_OPS = new Set(["union", "subtract", "intersect"]);
  * cap with every cut applied; an adversarial review measured that false alarm on a 9-fragment fixture.)
  */
 export const MESH_BOOLEAN_MAX_FRAGMENTS = 65536;
+/** Round 9: segment-bounded cutting (triArrangement.mjs) by default; "plane" is round 8's path. See the header. */
+export const MESH_BOOLEAN_DEFAULT_CUTTING = "arrangement";
 function bKeepAndFlip(op, inside) {
     if (op === "union") return inside ? null : { flip: false };
     if (op === "subtract") return inside ? { flip: true } : null;
@@ -381,7 +453,8 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  * @param {Float64Array|Float32Array} trisB
  * @param {import("../../mesh/meshBVH.mjs").MeshBVH} bvhB
  * @param {"union"|"subtract"|"intersect"} op
- * @param {{accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ * @param {{cutting?:"arrangement"|"plane", accOpts?:object, pointInMeshOpts?:object, agreementThreshold?:number}} [opts]
+ *   see classifyMeshAgainstOther(); cutting defaults to "arrangement" since round 9.
  * @returns {{tris:Float64Array, triCount:number, ambiguousTriIndices:number[], capped:boolean,
  *   stats:{a:object,b:object}}}
  *   tris: flat 9-floats-per-triangle buffer, the same layout mesh/meshBVH.mjs's MeshBVH constructor takes.

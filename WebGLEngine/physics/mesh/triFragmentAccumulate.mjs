@@ -185,6 +185,10 @@
 // (2) CLASSIFICATION: pointInMesh() fires five full rays per fragment -- about 5.8 s of 6.9 s at 64. Both scale
 // with fragment count, so the next piece is SEGMENT-BOUNDED CUTTING -- a planar arrangement of the actual
 // intersection segments inside triA, one classification per face -- not a better index.
+// *** ROUND 9 BUILT IT: physics/mesh/triArrangement.mjs, meshBoolean.mjs's default since. *** Subdiv 64 0.80 s (this
+// module's path 7.3 s), 128 3.9 s uncapped, one classification per face, raw output watertight. This module is
+// now the per-triangle fallback for what the arrangement refuses (coplanar/degenerate contacts) and the whole path
+// under meshBoolean's cutting:"plane"; nothing in it changed.
 // TRIED AND REJECTED, WITH NUMBERS: an adaptive quadtree over triA (cut by axis-aligned mid-planes until each
 // cell holds few members, then cut members per cell, so lines stop at cell borders). jaggedBlob's spikes make
 // member boxes ~0.4 units wide with ~25 covering a common point at subdiv 32, so no cell size separates them:
