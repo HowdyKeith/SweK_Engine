@@ -8732,7 +8732,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                                 "tools/ship/graveyard-selfcheck.mjs (157 s to 2.9: the index, and the directory test once per directory)",
                                 "tools/ship/referenceKind-selfcheck.mjs (175 s to 3.1, the same two fixes)",
                                 "tools/ship/sweepCoverage-selfcheck.mjs (a returnee judged by the median of its last three alone readings)",
-                                "tools/ship/verify.mjs (the two orphan ratchets as named ship steps)"]),
+                                "tools/ship/verify.mjs (the two orphan ratchets as named ship steps)",
+                                "tools/ship/headlessGpu-selfcheck.mjs (the hazard child that hangs instead of crashing is killed at 10 s)"]),
         redOnArrival: Object.freeze([]),
         verdict: "*** THE REASON NO VERIFY SAW THE ORPHAN RATCHETS WAS TWO QUADRATIC LOOPS. *** moduleRefs' referenceGraph asked " +
                  "includes(basename) of every file for every unreferenced module -- 2,798 modules, 5,087 files, 90 MB, 107 s -- and " +
@@ -8746,7 +8747,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "sweep picks gates by a timing record a foreign box cannot refresh, so verify now runs both censuses as " +
                  "steps whatever any record says. sweepCoverage's 12-of-22 row flipped on headlessGpu reading 11,890 ms alone " +
                  "once between 2,722 and 2,659; a returnee is judged by the median of its last three alone readings, as " +
-                 "quickSweep's own ring is. Three sabotages red.",
+                 "quickSweep's own ring is. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND WHERE headlessGpu's 11,890 ms CAME FROM: killed at the 20 s cap alone, in section 4. " +
+                 "The child that exits still holding a WebGPU device -- the hazard the gate proves -- ended SIGABRT 8 times, " +
+                 "SIGSEGV 6 and HUNG once in 15, under a 180 s timeout; one gate run in 20 sat past the cap. A hang is the same " +
+                 "not-clean exit, so that child alone is killed at 10 s: 30 runs green, the worst 13.3 s, and an exitCleanly() " +
+                 "in its place reddens two rows.",
     }),
     // v4781 -- THE 385th CLOSING: NO new gate file -- the two orphan ratchets the v4776 merge landed over unmeasured.
     since478: Object.freeze({

@@ -180,10 +180,15 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
         const r = await HG.runWgslComputeNative({ code: ${JSON.stringify(CODE)}, outCount: 3,
             uniforms: new Float32Array(64), workgroups: 1 });
         console.log("WORK_OK:" + r.ok);`;
-    const run = (body, tail) => spawnSync(process.execPath, ["--input-type=module", "-e", body + "\n" + tail],
-                                          { encoding: "utf8", timeout: 180000 });
+    const run = (body, tail, timeout = 180000) => spawnSync(process.execPath, ["--input-type=module", "-e", body + "\n" + tail],
+                                          { encoding: "utf8", timeout });
 
-    const held = run(holds, "/* exit naturally, still holding the device */");
+    // v4782 -- THE HAZARD SOMETIMES HANGS INSTEAD OF CRASHING. Measured: of 15 runs of the held child, 8 ended SIGABRT,
+    // 6 SIGSEGV and 1 never exited -- and with this run's 180 s timeout the gate sat past the sweep's 20 s cap, which is
+    // what verify reported as "timed out alone" and what the 11,890 ms reading in the timing record was. A hang is the
+    // same hazard (the process does not exit cleanly after correct work), so this child alone is killed at 10 s and a
+    // kill reads as not-zero, as a crash does. The clean and harness children keep 180 s: they must exit 0.
+    const held = run(holds, "/* exit naturally, still holding the device */", 10000);
     const heldClean = run(holds, "HG.exitCleanly(0);");
     const local = run(harness, "/* exit naturally; the harness released its device */");
 
@@ -194,7 +199,7 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
     // reason having nothing to do with what it is testing. The claim that matters is that it does NOT exit 0.
     ok(held.status !== 0,
        "*** and a REACHABLE DEVICE at exit CRASHES the process, after a correct result ***",
-       `status=${held.status} signal=${held.signal} -- the signal varies (SIGABRT and SIGSEGV both seen); the non-zero exit does not`);
+       `status=${held.status} signal=${held.signal}${held.error && held.error.code === "ETIMEDOUT" ? " (hung; killed at 10 s)" : ""} -- the ending varies (SIGABRT, SIGSEGV and a hang all seen); the not-clean exit does not`);
     ok(/WORK_OK:true/.test(heldClean.stdout) && heldClean.status === 0,
        "*** exitCleanly() ends that same shape with status 0 ***",
        `status=${heldClean.status} signal=${heldClean.signal}`);
