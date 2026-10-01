@@ -66,7 +66,7 @@ point's distance from the unmorphed one at the third frame (influence 0.1).
 
 ## A patch
 
-[`patches/03-morph-previous-influences.diff`](patches/03-morph-previous-influences.diff), a diff against three's `src/` at the r185 tag. When `needsPreviousData()`, the base and influences of the last draw are kept per mesh (swapped in the existing `OnObjectUpdate`) and `positionPrevious` is morphed by them. Per-instance morphs (`morphTexture` on an `InstancedMesh`) are read the same way from a copy of the morph texture as it was at the last draw, each instance from its own row. Applied to r185's build, the
+[`patches/03-morph-previous-influences.diff`](patches/03-morph-previous-influences.diff), a diff against three's `src/` at the r185 tag. When `needsPreviousData()`, the base and influences of the last draw are kept per mesh (swapped in the existing `OnObjectUpdate`) and `positionPrevious` is morphed by them. Per-instance morphs (`morphTexture` on an `InstancedMesh`) are read the same way from a copy of the morph texture as it was at the last draw, each instance from its own row -- its base from column 0 of that row, which is [13](13-instanced-morph-absolute-and-mesh-level.md)'s subject for the current position. Applied to r185's build, the
 reproduction prints:
 
 <!-- patched:begin -->

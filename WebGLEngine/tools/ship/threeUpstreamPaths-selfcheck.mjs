@@ -289,8 +289,9 @@ if (res) {
 // is this draw's -> 0.000; B4 the copy never marked for upload -> 5.633; B5 the branch never taken -> -2.770, r185's. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
-    "patch here changes that; many morph targets past the uniform buffer; per-instance influences over absolute targets, or beside " +
-    "a mesh-level morphTargetInfluences, which r185 throws on; computeSkinning's absolute positions in 07's case -- r185 " +
+    "patch here changes that; many morph targets past the uniform buffer; the VELOCITY of per-instance influences over absolute " +
+    "targets, or beside a mesh-level morphTargetInfluences -- r185 throws on both (draft 13), and patch 03 reads the previous " +
+    "base from column 0 for it, unmeasured here; computeSkinning's absolute positions in 07's case -- r185 " +
     "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2 (drafts 10 and 11), " +
     "so only the step between two computes is read there; and a real GPU.");
 process.exitCode = fails ? 1 : 0;

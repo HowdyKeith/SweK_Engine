@@ -86,6 +86,11 @@ const DRAFTS = {
         bug: (r) => r.webgpu.withCount === "1 2 3 4 5 6" && r.webgpu.withoutCount === "1 2 3 4 5 6" && r.webgl2.withCount === "1 2 3 4 5 6" && r.webgl2.withoutCount === "0 0 0 0 0 0",
         fixed: (r) => [r.webgpu, r.webgl2].every((b) => b.withCount === "1 2 3 4 5 6" && b.withoutCount === "1 2 3 4 5 6"),
         observed: (r) => `webgpu: withCount ${r.webgpu.withCount}, withoutCount ${r.webgpu.withoutCount}; webgl2: withCount ${r.webgl2.withCount}, withoutCount ${r.webgl2.withoutCount} -- the x of each element the compute copied` },
+    // v4793: per-instance morphs beside absolute targets or a mesh-level array, which r185 throws on (seen at v4784)
+    "13-instanced-morph-absolute-and-mesh-level.md": { patch: "13-morph-per-instance-base.diff",
+        bug: (r) => all(r) && r.webgpu.relative === "16.0/12 0.0/12" && ["absolute", "relative+mesh", "absolute+mesh"].every((k) => String(r.webgpu[k]).startsWith("throws")),
+        fixed: (r) => all(r) && ["relative", "absolute", "relative+mesh", "absolute+mesh"].every((k) => r.webgpu[k] === "16.0/12 0.0/12"),
+        observed: (r) => `${["relative", "absolute", "relative+mesh", "absolute+mesh"].map((k) => `${k} ${r.webgpu[k]}`).join("; ")} -- each instance's centre x/width in pixels (both backends)` },
 };
 const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
 
@@ -180,15 +185,15 @@ for (const [f, d] of Object.entries(DRAFTS)) {
 // applied here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed,
 // 1 todo, 0 failed, as for r185 unpatched. v4775 recorded it again for all nine: 08 changes the same import line of Instance.js
 // as 01, so it was merged by hand. v4786 recorded it again after 07 moved to the render, and v4788 after 03 reached per-instance
-// morphs, v4790 with 10 and 11 added, and v4792 with 12: lint clean each time. A patch changed since makes the second hash stale: build three again, and record it.
-const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "c73982c3dd995e04c1f450dd76303db57444d7504a28ff3f236b107aa3a54bfc" });
+// morphs, v4790 with 10 and 11 added, v4792 with 12, and v4793 with 13 and 03 reading the per-instance base: lint clean each time. A patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "fbd626da2c0513ec5cc84e2175ec0339ff14b042fef14835b0716efb8fe2dc20" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { const t = allNine.text, found = allNine.found;
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
   ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
-      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4792 from `git apply` of the twelve (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
+      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4793 from `git apply` of the thirteen (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];

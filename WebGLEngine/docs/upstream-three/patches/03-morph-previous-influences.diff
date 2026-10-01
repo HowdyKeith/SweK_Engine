@@ -29,7 +29,7 @@ index e9b9319..9892c59 100644
  
  	const { geometry } = mesh;
  
-@@ -267,6 +268,85 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+@@ -267,6 +268,87 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
  
  	} );
  
@@ -89,7 +89,9 @@ index e9b9319..9892c59 100644
 +
 +		const { previousMorphTexture } = morphInfluenceData;
 +
-+		positionPrevious.assign( positionPrevious.mul( base ) );
++		// the base too: a column of its own in each instance's row, 1 less the influences' sum where the targets are absolute
++
++		positionPrevious.assign( positionPrevious.mul( textureLoad( previousMorphTexture, ivec2( int( 0 ), int( instanceIndex ) ) ).r ) );
 +
 +		Loop( morphTargetsCount, ( { i } ) => {
 +
@@ -115,7 +117,7 @@ index e9b9319..9892c59 100644
  	// Update
  
  	OnObjectUpdate( ( { object } ) => {
-@@ -290,6 +370,32 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+@@ -290,6 +372,32 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
  
  		}
  
