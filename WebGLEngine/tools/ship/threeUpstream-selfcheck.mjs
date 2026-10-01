@@ -81,6 +81,11 @@ const DRAFTS = {
         bug: (r) => r.webgpu.storageBuffer === 8 && r.webgpu.instancedArray === 8 && r.webgl2.storageBuffer === 1 && r.webgl2.instancedArray === 8,
         fixed: (r) => [r.webgpu, r.webgl2].every((b) => b.storageBuffer === 8 && b.instancedArray === 8),
         observed: (r) => `webgpu: storageBuffer ${r.webgpu.storageBuffer}, instancedArray ${r.webgpu.instancedArray}; webgl2: storageBuffer ${r.webgl2.storageBuffer}, instancedArray ${r.webgl2.instancedArray} -- the distinct points the compute wrote, of a box's 8 corners` },
+    // v4792: the WebGL2 compute that never linked, found at v4790 while probing draft 11
+    "12-webgl2-storage-without-count.md": { patch: "12-storage-hash-own-slot.diff",
+        bug: (r) => r.webgpu.withCount === "1 2 3 4 5 6" && r.webgpu.withoutCount === "1 2 3 4 5 6" && r.webgl2.withCount === "1 2 3 4 5 6" && r.webgl2.withoutCount === "0 0 0 0 0 0",
+        fixed: (r) => [r.webgpu, r.webgl2].every((b) => b.withCount === "1 2 3 4 5 6" && b.withoutCount === "1 2 3 4 5 6"),
+        observed: (r) => `webgpu: withCount ${r.webgpu.withCount}, withoutCount ${r.webgpu.withoutCount}; webgl2: withCount ${r.webgl2.withCount}, withoutCount ${r.webgl2.withoutCount} -- the x of each element the compute copied` },
 };
 const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
 
@@ -175,15 +180,15 @@ for (const [f, d] of Object.entries(DRAFTS)) {
 // applied here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed,
 // 1 todo, 0 failed, as for r185 unpatched. v4775 recorded it again for all nine: 08 changes the same import line of Instance.js
 // as 01, so it was merged by hand. v4786 recorded it again after 07 moved to the render, and v4788 after 03 reached per-instance
-// morphs, and v4790 with 10 and 11 added: lint clean each time. A patch changed since makes the second hash stale: build three again, and record it.
-const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "54962de6fce080f84f7c2c248e2fdae1f1b57d7aaf0a014d7c61ce3b463f0c4f" });
+// morphs, v4790 with 10 and 11 added, and v4792 with 12: lint clean each time. A patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "c73982c3dd995e04c1f450dd76303db57444d7504a28ff3f236b107aa3a54bfc" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { const t = allNine.text, found = allNine.found;
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
   ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
-      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4790 from `git apply` of the eleven (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
+      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4792 from `git apply` of the twelve (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];
