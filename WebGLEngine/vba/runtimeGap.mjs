@@ -1076,7 +1076,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4776 -- the merged tree's own figures:
     // v4779 -- render/temporalTslCoverage-selfcheck.mjs: one ES module with closures, await, typed arrays, and forceWebGL -- five rows moved by one, seven held.
     esModules: 4195, closures: 4048, asyncAwait: 1667, typedArrays: 1222, promises: 392,
-    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 196, webgpu: 55, threads: 25, wasm: 24,
+    // v4791 -- tools/ship/threeUpstream-selfcheck.mjs now asks navigator.gpu for an adapter itself (raw WebGPU, no three): webgpu 55 -> 56.
+    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

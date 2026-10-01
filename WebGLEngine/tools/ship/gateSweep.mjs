@@ -8723,6 +8723,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4791 -- THE 395th CLOSING: NO new gate file -- whose the e2e's seven 3D-texture failures are.
+    since488: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4791", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: the seven '2D view of a 3D texture' failures, re-measured in raw WebGPU as this browser's)",
+            "tools/ship/recordDrift-selfcheck.mjs (the masking witness asks which record coverage reads for the gate, not whether a local one holds it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** SEVEN OF THE e2e's ELEVEN FAILURES WERE LEFT UNASSIGNED, AND THEY ARE NOT THREE'S. *** The error names a 2D view " +
+                 "of a 3D texture, but no view is asked for in JS: wrapping createView found none, and the failing call is " +
+                 "queue.writeTexture -- three uploading a 3D texture a slice at a time, a valid call. Taken apart in raw WebGPU with no " +
+                 "three at all: this Chromium (141.0.7390.37) fails ANY writeTexture into a 3D texture with RENDER_ATTACHMENT usage, " +
+                 "every format and size tried, on a view it makes itself, and the same write without that usage succeeds. Three asks " +
+                 "for RENDER_ATTACHMENT on its 3D textures, which WebGPU allows. Held as a live row that goes red when a browser fixes " +
+                 "it, so the e2e is run again to see those seven pass. Two sabotages red. AND THE SESSION MOVED BOX UNDER IT: the " +
+                 "CPU model now hashes to 142c0d, the shared timings record's owner, and recordDrift went red at HEAD -- its " +
+                 "masking witness asked whether any local record HELD the gate, while coverage reads the first record that " +
+                 "times it unless a later one is this box's. It asks which record coverage reads now; on this box that is the " +
+                 "shared one, its own, so the witness has nothing to show here and says so by passing vacuously, as it does " +
+                 "with one record. runtimeGap's WebGPU row 55 -> 56 for the raw probe.",
+    }),
     // v4790 -- THE 394th CLOSING: NO new gate file -- drafts 10 and 11, computeSkinning's two r185 bugs.
     since487: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

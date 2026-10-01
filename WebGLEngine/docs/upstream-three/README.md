@@ -38,7 +38,8 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
   [`e2e/puppeteer-local.diff`](e2e/puppeteer-local.diff) -- three's runner with this box's flags for presenting WebGPU on
   SwiftShader, and the workaround this tree's harness installs for its Chromium rejecting three's string `swizzle` -- recorded in
   [`e2e/v4789.json`](e2e/v4789.json) for the nine and [`e2e/v4790.json`](e2e/v4790.json) for all eleven: 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with the patches, each
-  for the same reason (seven a 2D view of a 3D texture, which WebGPU refused here; two a fetch that failed here; one video,
+  for the same reason (seven a 2D view of a 3D texture -- since v4791 known to be this Chromium's (141): it fails any `writeTexture` into a 3D
+  texture with `RENDER_ATTACHMENT` usage in raw WebGPU, three or no three, on a view it makes itself; two a fetch that failed here; one video,
   `RAF is not defined`; one XR layers example 0.4% of its pixels off); 185 of the 187 screenshots the same bytes, and the
   other two vary between runs of one build, whichever build it is. The WebGL examples load `three.module.js`, which no patch changes.
 

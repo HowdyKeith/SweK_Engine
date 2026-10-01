@@ -233,6 +233,26 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
             rec.builds.r185 === THREE_BUILT.r185 && rec.builds.allPatched === THREE_BUILT.allPatched, "a patch changed since the record makes it stale: run three's e2e again, and record it");
         ok("  the README states it as the record does", index.includes(`${rec.examples} WebGPU examples, ${rec.passed} passed and the same ${failed.length} failed`) &&
             index.includes(`${rec.screenshotsIdentical} of the ${rec.examples} screenshots`) && index.includes(`](e2e/${recName})`), `the record is e2e/${recName}`);
+        // v4791: WHOSE ARE THE SEVEN "2D view of a 3D texture" FAILURES. Not three's: three uploads a 3D texture a slice at a
+        // time with queue.writeTexture, a valid call, and no view is asked for in JS -- the view is the browser's own. This
+        // Chromium (141) fails ANY writeTexture into a 3D texture that has RENDER_ATTACHMENT usage, three or no three, and the
+        // same write without that usage succeeds. Re-measured here in raw WebGPU, so a browser that fixes it turns this red, and
+        // the e2e has to be run again to see whether those seven pass.
+        const VIEW3D = /TextureViewDimension::e2D\) of the texture view is not compatible with the dimension \(TextureDimension::e3D/;
+        const seven = failed.filter((n) => VIEW3D.test(rec.failed[n]) || /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension \(TextureViewDimension::e2D\) of the t/.test(rec.failed[n]));
+        let raw = null;
+        if (!skip) { const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 120000, args: {}, script: `async () => {
+            const device = await (await navigator.gpu.requestAdapter()).requestDevice(), U = GPUTextureUsage, out = { chrome: (navigator.userAgent.match(/Chrome\\/([\\d.]+)/) || [])[1] };
+            for (const [k, usage] of [["withRender", U.COPY_DST | U.TEXTURE_BINDING | U.RENDER_ATTACHMENT], ["without", U.COPY_DST | U.TEXTURE_BINDING]]) {
+                device.pushErrorScope("validation");
+                const tex = device.createTexture({ size: [64, 64, 4], dimension: "3d", format: "r8unorm", usage });
+                device.queue.writeTexture({ texture: tex, origin: [0, 0, 1] }, new Uint8Array(64 * 64), { bytesPerRow: 64 }, [64, 64, 1]);
+                const e = await device.popErrorScope(); tex.destroy(); out[k] = e ? e.message.split("\\n")[0].slice(0, 300) : "ok"; }
+            return out; }` }); raw = r.ok ? r.result : { err: r.reason }; }
+        ok(`*** the record's ${seven.length} "2D view of a 3D texture" failures are this browser's, not three's: raw WebGPU, no three, in Chrome ${raw && raw.chrome}: a writeTexture into a 3D texture with RENDER_ATTACHMENT usage -> "${raw && String(raw.withRender).slice(0, 60)}...", without that usage -> ${raw && raw.without} ***`,
+            seven.length === 7 && !!raw && VIEW3D.test(String(raw.withRender)) && raw.without === "ok",
+            seven.length === 7 && !!raw && VIEW3D.test(String(raw.withRender)) && raw.without === "ok" ? "when a browser fixes it this goes red: run three's e2e again and see whether those examples pass"
+                : `counted ${seven.length}; raw ${JSON.stringify(raw)}`);
     }
 }
 
@@ -279,6 +299,10 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
 // -> 5, and 10 with all of them among them -- 10's reproduction writes an instancedArray, drawn instanced, where gl_VertexID is
 // 0, which is why the patch takes the sum; X6 a number of 10's Observed block edited -> 2. In threeUpstreamPaths: X4 patch 11's
 // invocationLocalIndex hunk reverted -> 2. None green.
+// ---- v4791 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Y1 the raw write's texture made without RENDER_ATTACHMENT, a browser that no longer fails it -> 1; Y2 the failure's pattern
+// matching e3D for e2D -> 1. Both green until the browser's message was read whole: cut at 100 characters, it stopped short of
+// the words the pattern needs, and the row was red on a browser that does fail. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +

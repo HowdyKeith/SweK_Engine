@@ -219,8 +219,16 @@ console.log("\n2. handed a stale record, each check names it");
     ok("...while the untouched records are clean, so neither is simply always true",
         (await checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
     ok("!! ...and the planted hole is NOT masked when only the shared record is sabotaged and a local record exists -- which is WHY the rows above sabotage every record",
-        world.length < 2 || world.some((r) => r.kind !== "shared" && (r.rec.at || {})[rel]) === false ||
-        (await checks({ timings: { ...t, at: Object.fromEntries(Object.entries(t.at).filter(([k]) => k !== rel)) }, only: "sweep timings" }))
+        // v4791: A LOCAL RECORD MASKS THE HOLE ONLY WHERE COVERAGE READS THAT RECORD FOR THIS GATE. coverageOf takes, per
+        // gate, the first record that times it unless a later one is THIS box's -- so a local record that merely HOLDS
+        // the gate masks nothing when the shared record is read first. The row asked "does any non-shared record hold
+        // it", and went red at HEAD on a box whose CPU model made it the shared record's owner (142c0d), where the shared
+        // entry is this box's own and wins. It asks now which record coverage actually reads, and sabotages the shared
+        // entry inside the full record set rather than through `timings`.
+        world.length < 2 || (() => { const e = BT.coverageOf(world).entries.get(rel), from = e && world.find((r) => r.file === e.from);
+            return !from || from.kind === "shared" || !e.at; })() ||
+        (await checks({ records: world.map((r) => r.kind !== "shared" ? r : { ...r, rec: { ...r.rec,
+            at: Object.fromEntries(Object.entries(r.rec.at || {}).filter(([k]) => k !== rel)) } }), only: "sweep timings" }))
             .find((c) => c.name === "sweep timings").stale === false,
         "the v4679 shape of this row, kept as a witness to the masking rather than as the test");
 }
