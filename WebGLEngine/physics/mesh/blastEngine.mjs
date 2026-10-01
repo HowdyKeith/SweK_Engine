@@ -130,7 +130,13 @@ export function finishPieces(pieces, { weld = FINISH_WELD_SNAPS * SNAP, merge = 
     });
     const R = P.map((_, i) => rep.get(find(i)));
     let welded = 0, maxMove = 0, dropped = 0;
-    R.forEach((r, i) => { if (r !== i) { welded++; maxMove = Math.max(maxMove, len3(sub3(P[i], P[r]))); } });
+    const moves = { ulp: 0, subSnap: 0, overSnap: 0 };   // round 16: what the weld still finds, by size
+    R.forEach((r, i) => {
+        if (r === i) return;
+        const d = len3(sub3(P[i], P[r]));
+        welded++; maxMove = Math.max(maxMove, d);
+        if (d <= 1e-14 * Math.max(1, weld / (FINISH_WELD_SNAPS * SNAP))) moves.ulp++; else if (d <= weld / FINISH_WELD_SNAPS) moves.subSnap++; else moves.overSnap++;
+    });
     let G = [];
     F.forEach((f, pi) => {
         const g = [];
@@ -175,7 +181,7 @@ export function finishPieces(pieces, { weld = FINISH_WELD_SNAPS * SNAP, merge = 
     }
     const polys = G.map((g) => (g.tris ? { vs: g.ids.map((i) => P[i]), pl: g.pl, src: g.src, tris: g.tris.map((t) => t.map((i) => P[i])) }
                                        : { vs: g.ids.map((i) => P[i]), pl: g.pl, src: g.src }));
-    return { polys, stats: { pieces: pieces.length, welded, maxMove, pairs, refused, dropped, merged, ms: Date.now() - t0 } };
+    return { polys, stats: { pieces: pieces.length, welded, moves, maxMove, pairs, refused, dropped, merged, ms: Date.now() - t0 } };
 }
 
 /**
@@ -241,7 +247,7 @@ export function blastBVH(polys, blob, { finish = true, ...opts } = {}) {
     const fin = finishPieces(pieces,
                              { weld: FINISH_WELD_SNAPS * SNAP * 2 ** (r.scaleExponent || 0) });
     Object.assign(stats, { kept: kept.length, finished: fin.polys.length, welded: fin.stats.welded, maxMove: fin.stats.maxMove,
-                           weldRefused: fin.stats.refused, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,
+                           weldRefused: fin.stats.refused, weldMoves: fin.stats.moves, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,
                            ms: Date.now() - t0 });
     return { polys: kept.concat(fin.polys), stats };
 }

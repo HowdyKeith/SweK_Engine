@@ -158,12 +158,27 @@
 //           fix and its gate section exist to catch.
 //
 // Run: node physics/mesh/meshBoolean-selfcheck.mjs
+// SABOTAGE LOG (BVH-CSG round 16) -- triTriIntersect.mjs, triArrangement.mjs, meshBoolean.mjs; five gates (triTriIntersect /
+// triArrangement / THIS / meshBooleanBlast / blastEngine), each on the real file, restored in a `finally`, md5 verified.
+// 11 of 11 red on the final files:
+//   H1  a crossing interpolated from the lone end again          -> 1 / 0 / 0 / 0 / 3
+//   H2  normals scaled by the reciprocal again                   -> 0 / 1 / 2 / 0 / 0
+//   H3  the seam consensus off by default                        -> 0 / 0 / 1 / 0 / 1
+//   H4  the arrangement ignores canon                            -> 0 / 0 / 1 / 0 / 1
+//   H5  the consensus joins two input vertices                   -> 0 / 0 / 1 / 0 / 0   (0 on the first battery;
+//   H6  the representative ignores input vertices                -> 0 / 0 / 1 / 0 / 0    section 19's by-hand rows)
+//   H7  the B side reads the pair results in A's order           -> 0 / 0 / 21 / 13 / 10
+//   H8  near-parallel pruning off                                -> 0 / 0 / 1 / 0 / 0
+//   H9  fins not cancelled by default                            -> 0 / 0 / 1 / 0 / 0
+//   H10 a same-winding duplicate cancelled as a fin              -> 0 / 0 / 1 / 0 / 0   (0 first; by-hand row added)
+//   H11 `from` not remapped after cancelling (B side)            -> 0 / 0 / 1 / 0 / 0   (0 first: the fin was LAST in
+//       its operand, so cancelling it renumbered nothing; the fixture now puts it first and checks every `from`)
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 import { closestOnTriangle } from "./triContact.mjs";
 
@@ -1092,8 +1107,10 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             outside.every(([, w]) => w < 3e-9), outside.map(([t, w, f, ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1) + " (" + f + " fb)").join(", "));
         console.log("  ..... fallback triangles by angle, inside the band: " + inside.map(([t, , f, ax]) => ax + " " + t.toExponential(0) + ": " + f).join(", "));
         const fbAll = [...outside, ...inside].reduce((n, [, , f]) => n + f, 0);
-        ok("   the rotated family's plane-path fallbacks stay at or under the 87 measured -- 357 without triArrangement's join of chain ends stopping short of the boundary",
-            fbAll <= 87, fbAll + " fallback triangles over 54 runs");
+        // round 16: 87 -> 33, by a dangling chain of seam segments from a NEAR-PARALLEL pair being pruned instead of refusing
+        // the triangle (triArrangement's ROUND 16 note: 84 -> 39), and the seam consensus (39 -> 33)
+        ok("   the rotated family's plane-path fallbacks stay at or under the 33 measured -- 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
+            fbAll <= 33, fbAll + " fallback triangles over 54 runs");
         const bandWorst = Math.max(...inside.map(([, w]) => w));
         console.log("  KNOWN  rotated by 1e-9..3e-8 rad, about z and about (1,2,3): " + inside.map(([t, w, , ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1)).join(", ") +
             " -- twin triangles 1e-9..1e-8 apart, straddling the 1e-9 contact tolerance: a face sided one way on A and its twin the other way on B costs a cone of volume, not a sliver. meshBoolean.mjs's ROUND 12 paragraph.");
@@ -1139,6 +1156,80 @@ console.log("\n18. *** ROUND 13: PROVENANCE -- EVERY OUTPUT TRIANGLE NAMES THE I
             r.triCount + " triangles (" + fromA + " from A, " + fromB + " from B), " + unknown + " without, " + off + " off their source, " +
             facing + " facing wrong; worst distance " + worst.toExponential(1) + " x size");
     }
+}
+
+console.log("\n19. *** ROUND 16: A ZERO-THICKNESS FIN, AND THE SEAM AGREED BEFORE CUTTING ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const vol = (r) => { const t = r.tris; let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // (a) A ZERO-THICKNESS FIN: the box [-1,1]^3 with a sheet standing on its top face (x = 0.2, z 1..1.8, |y| <= 0.6)
+    // -- two faces on the same vertices, wound opposite ways -- the top face split along its base so every edge is used
+    // equally both ways. It has no volume, so every op must give exactly what the plain box (split the same way) gives.
+    // Measured before round 16: 5.2e-2 off with B through the fin, 1.8e-2 with B BESIDE it, not touching (rays crossing
+    // the sheet hit its two faces at one point, which pointInMesh welds into one hit, and the parity flips).
+    const P = (vs) => ({ vs, pl: M.planeOf(vs) }), x0 = 0.2;
+    const finBox = (fin, exact = true) => {
+        const box = M.boxPolys([0, 0, 0], [1, 1, 1]).filter((p) => !(p.pl.n[2] > 0.5)).map((p) => {
+            if (Math.abs(p.pl.n[1]) < 0.5) return p;
+            const vs = []; for (let i = 0; i < p.vs.length; i++) { const u = p.vs[i], v = p.vs[(i + 1) % p.vs.length]; vs.push(u); if (u[2] === 1 && v[2] === 1) vs.push([x0, u[1], 1]); }
+            return { vs, pl: p.pl };
+        });
+        const top = [P([[-1, -1, 1], [x0, -1, 1], [x0, -0.6, 1], [x0, 0.6, 1], [x0, 1, 1], [-1, 1, 1]]), P([[x0, -1, 1], [1, -1, 1], [1, 1, 1], [x0, 1, 1], [x0, 0.6, 1], [x0, -0.6, 1]])];
+        if (!fin) return [...box, ...top];
+        const a = [x0, -0.6, 1], b = [x0, 0.6, 1], c = [x0, 0.6, 1.8], d = [x0, -0.6, 1.8];
+        // the fin FIRST: cancelling it renumbers every triangle after it, so `from` must be remapped to be right
+        return [P([a, b, c, d]), exact ? P([a, d, c, b]) : P([d, c, b, a]), ...box, ...top];   // exact: the same two triangles, reversed
+    };
+    const Bs = [M.boxPolys([0.2, 0, 1.3], [0.5, 0.3, 0.4]), M.boxPolys([0.6, 0, 0.5], [0.3, 0.3, 0.8]), M.boxPolys([3, 0, 0], [0.5, 0.5, 0.5])];
+    let worst = 0, worst0 = 0, worstOther = 0, runs = 0, cancelled = 0, offSource = 0;
+    for (const B of Bs) for (const op of OPS) for (const finIsA of [true, false]) {
+        const pair = (F) => (finIsA ? [F, B] : [B, F]);
+        const truth = vol(run(...pair(finBox(false)), op));
+        const r = run(...pair(finBox(true)), op);
+        worst = Math.max(worst, Math.abs(vol(r) - truth)); cancelled += (r.stats.a.finsCancelled || 0) + (r.stats.b.finsCancelled || 0);
+        // `from` names the CALLER's triangles after a cancel: every output triangle lies on the one it names
+        const [PA, PB] = pair(finBox(true)), TA = M.toTriangleBuffer(PA), TB = M.toTriangleBuffer(PB);
+        for (let i = 0; i < r.triCount; i++) {
+            const f = r.from[i], src = f >= 0 ? TA : TB, k = f >= 0 ? f : -f - 1;
+            if (k * 9 >= src.length) { offSource++; continue; }
+            const S = [0, 1, 2].map((c) => [src[k * 9 + c * 3], src[k * 9 + c * 3 + 1], src[k * 9 + c * 3 + 2]]);
+            for (let c = 0; c < 3; c++) if (closestOnTriangle([r.tris[i * 9 + c * 3], r.tris[i * 9 + c * 3 + 1], r.tris[i * 9 + c * 3 + 2]], S[0], S[1], S[2]).d2 > 1e-24) { offSource++; break; }
+        }
+        worst0 = Math.max(worst0, Math.abs(vol(run(...pair(finBox(true)), op, { cancelFins: false })) - truth));
+        worstOther = Math.max(worstOther, Math.abs(vol(run(...pair(finBox(true, false)), op)) - truth));
+        runs++;
+    }
+    ok("!! a zero-thickness fin (its two faces the same triangles reversed): " + runs + " runs (3 B's, 3 ops, fin as A and as B) exactly what the plain box gives",
+        worst < 1e-12 && cancelled === 4 * runs && offSource === 0, "worst |err| " + worst.toExponential(2) + ", fin triangles cancelled " + cancelled + " (two quads: 2 reversed pairs a run), output triangles off the source `from` names " + offSource);
+    ok("   control: cancelFins:false leaves the fin in and is wrong (pointInMesh's welded hits)", worst0 > 1e-2, "worst |err| " + worst0.toExponential(2));
+    console.log("  KNOWN  a fin whose two faces are triangulated DIFFERENTLY (each quad fanned from a different corner) is not cancelled -- that needs the operand arranged against itself: worst |err| " + worstOther.toExponential(2));
+    // (b) THE PAIR CACHE IS TRANSPARENT: where the seam consensus joins nothing, the arrangements reading meshBoolean's
+    // pair results give the very bits they gave computing every pair themselves
+    let same = true, joinedNone = true;
+    for (const [PA, PB] of [[M.boxPolys([0, 0, 0], [1, 1, 1]), M.boxPolys([0.31, 0.27, 0.19], [0.7, 0.8, 0.9])], [M.jaggedBlob([0, 0, 0], 1, 8, 101), M.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 501)]]) for (const op of OPS) {
+        const r = run(PA, PB, op), r0 = run(PA, PB, op, { seamConsensus: false });
+        joinedNone = joinedNone && seamConsensus.last.joined === 0;
+        same = same && r.tris.length === r0.tris.length && r.tris.every((x, i) => x === r0.tris[i]);
+    }
+    ok("   the pair results meshBoolean shares with both arrangements change nothing where the consensus joins nothing (a box pair, a blob pair, 3 ops: bit for bit)",
+        same && joinedNone, "identical " + same + ", consensus joined nothing on all " + joinedNone);
+    // (c) BY HAND -- no workload here puts an input vertex in a seam cluster or a same-winding duplicate in an operand,
+    // so the rules are held directly. joinSeamEnds: an input vertex never moves, two are never one point, a chain of
+    // short segments is one point (its smallest, when no input vertex is in it).
+    const v = [1, 1, 1], q = [1 - 5e-10, 1, 1], w = [1 + 5e-10, 1, 1];
+    const j1 = joinSeamEnds([{ p0: v, p1: q, c0: true, c1: false }]);
+    const j2 = joinSeamEnds([{ p0: v, p1: w, c0: true, c1: true }]);
+    const j3 = joinSeamEnds([{ p0: w, p1: v, c0: false, c1: false }, { p0: v, p1: q, c0: false, c1: false }]);
+    ok("   by hand: a short seam segment from an input vertex joins ONTO it (though the other end is smaller); two input vertices are never joined; a chain is one point",
+        j1.canon && j1.canon(q) === v && j1.canon(v) === v && j2.canon === null && j2.stats.refused === 1 && j3.canon && j3.canon(w) === q && j3.canon(v) === q,
+        "onto the vertex " + (j1.canon && j1.canon(q) === v) + ", vertices kept apart " + (j2.canon === null) + ", chain to its smallest " + (j3.canon && j3.canon(w) === q));
+    // reverseTwins: the same triangle twice wound opposite ways (from any starting corner) cancels; twice the SAME way
+    // is a doubled face, not a fin, and stays
+    const T = [0, 0, 0, 1, 0, 0, 0, 1, 0], Tr = [1, 0, 0, 0, 0, 0, 0, 1, 0], Tr2 = [0, 1, 0, 1, 0, 0, 0, 0, 0], Tsame = [1, 0, 0, 0, 1, 0, 0, 0, 0];
+    const k1 = reverseTwins(Float64Array.from([...T, ...Tr])), k2 = reverseTwins(Float64Array.from([...T, ...Tr2])), k3 = reverseTwins(Float64Array.from([...T, ...Tsame]));
+    ok("   by hand: a triangle and itself reversed cancel, from either starting corner; the same triangle twice with the same winding does not",
+        k1 && k1.length === 0 && k2 && k2.length === 0 && k3 === null, "reversed " + (k1 && k1.length) + " kept, rotated-reversed " + (k2 && k2.length) + " kept, same winding " + (k3 === null ? "untouched" : "cancelled"));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

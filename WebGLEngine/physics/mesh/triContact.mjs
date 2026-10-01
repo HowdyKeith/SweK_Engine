@@ -47,7 +47,7 @@ function planeDists(tri, other) {
     return { n, d };
 }
 // where edge (a,b) crosses the plane, the edge taken in canonical order so both triangles sharing it get one point
-function edgeCross(a, b, da, db) {
+export function edgeCross(a, b, da, db) {
     if (cmpV(a, b) > 0) { [a, b] = [b, a]; [da, db] = [db, da]; }
     const t = da / (da - db);
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];

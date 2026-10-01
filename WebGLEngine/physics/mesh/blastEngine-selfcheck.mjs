@@ -21,6 +21,8 @@
 //      the BVH settle -- a merge -- to opening no edge.
 //   6. A SHOT'S COST (round 15) -- the same wall with and without the conformity scan restricted, and what a pin-prick
 //      on the 30-shot wall touches: its neighbourhood, not the wall.
+//   7. THE SEAM AGREED BEFORE CUTTING (round 16) -- what the finishing weld still finds, by size, with the consensus off
+//      as control.
 //
 // SABOTAGE LOG (round 13) -- each applied to the real file, four gates run (THIS / meshCSG-selfcheck /
 // meshBoolean-selfcheck / triArrangement-selfcheck), the file restored in a `finally` and md5 verified. Reds on the
@@ -451,6 +453,25 @@ console.log("\n6. *** ROUND 15: WHAT A SHOT COSTS ON A BIG WALL -- THE SAME OUTP
         "conformity scan " + s.conformScanned + " triangles, pieces built " + s.piecesBuilt + ", polygons kept " + s.kept + " of " + last.length);
     const t = []; for (let i = 0; i < 5; i++) { const t0 = performance.now(); blastWith("bvh", last, pin); t.push(performance.now() - t0); }
     report("that pin-prick: " + t.sort((x, y) => x - y)[2].toFixed(1) + " ms (median of 5), printed, not asserted. Round 15 measured one inside the wall (no face cut) at 71.5 ms before, 25.7 ms after: conformity 33.4 -> 2.6, BVH build 21.8 -> 12.4, pieces and finishing 6.4 -> ~2");
+}
+
+console.log("\n7. *** ROUND 16: WHAT THE FINISHING WELD STILL FINDS, NOW THE ARRANGEMENTS AGREE ON THE SEAM FIRST ***");
+{
+    // Round 14's weld closes after the fact what the arrangements leave apart. Round 16 makes them agree before cutting
+    // where the disagreement was theirs alone: a crossing on a shared edge is one point (triTriIntersect, canonical), and
+    // a seam segment no longer than snap is one point for every arrangement (meshBoolean's seamConsensus) -- the ends
+    // of 11 of round 14's 20 gaps. The weld's moves by size, on section 2's 21 chains, with the consensus off as control.
+    const tally = (opts) => {
+        const t = { ulp: 0, subSnap: 0, overSnap: 0 };
+        const chains = []; for (let seed = 1; seed <= 20; seed++) chains.push(pageBlasts(seed, 5)); chains.push(pageBlasts(107, 30));
+        for (const blobs of chains) { let w = M.boxPolys([0, 0, 0], HALF); for (const b of blobs) { const r = blastWith("bvh", w, b, opts); w = r.polys; for (const k in t) t[k] += r.stats.weldMoves[k]; } }
+        return t;
+    };
+    const on = tally({}), off = tally({ seamConsensus: false });
+    ok("!! the weld moves NO vertex by more than an ULP and up to snap any more -- those were sub-snap seam segments, now one point before cutting",
+        on.subSnap === 0 && off.subSnap > 0 && on.ulp < off.ulp,
+        "sub-snap moves " + on.subSnap + " (consensus off: " + off.subSnap + "); ULP-level " + on.ulp + " (" + off.ulp + "); beyond snap " + on.overSnap + " (" + off.overSnap + ")");
+    report("KNOWN, left to the weld: the " + on.overSnap + " moves beyond snap join two seam ends 1.2e-9..7e-9 apart, each the end of a triTriIntersect segment of a different pair (measured; why the two pairs end apart is not traced). Merging such ends before cutting (all within 8 snaps that share a triangle) closed 37 of 65 on 99 chains -- and wrecked the rotated-copy family (its band 2.8e-2 -> 1e-1, outside it 1.4e-9 -> 1.1e-4), whose twin surfaces are dense with genuinely distinct points that close. Tried and not kept.");
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

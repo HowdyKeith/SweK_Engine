@@ -305,6 +305,31 @@ function lcg(seed) { let s = seed; return () => { s = (s * 1103515245 + 12345) &
         r.status === "degenerate", JSON.stringify(r));
 }
 
+
+console.log("\n*** BVH-CSG ROUND 16: A CROSSING ON A SHARED EDGE IS ONE POINT, FROM EITHER PAIR ***");
+{
+    // The seam's vertex where it crosses an edge two triangles share is computed in BOTH pairs. It was interpolated
+    // from whichever end of the edge sat alone on its side of the other plane -- and each pair can see a different end
+    // alone -- so the two came out an ULP or more apart: measured with round 15's file, 691 of these 1,838 random
+    // configurations disagreed (round 14's weld then moved 12,376 vertices an ULP on the page's 99 chains). It is now
+    // triContact.mjs's edgeCross, the edge in canonical order, with the normals divided as triContact divides them.
+    let s0 = 16; const rr = () => { s0 = (s0 * 1664525 + 1013904223) >>> 0; return s0 / 4294967296; };
+    const Pt = () => [rr() * 2 - 1, rr() * 2 - 1, rr() * 2 - 1];
+    let cases = 0, same = 0;
+    for (let k = 0; k < 20000; k++) {
+        const p = Pt(), q = Pt(), a = Pt(), b = Pt(), u = Pt(), v = Pt(), w = Pt();
+        const A = Float64Array.from([...p, ...q, ...a, ...q, ...p, ...b]), B = Float64Array.from([...u, ...v, ...w]);
+        const r1 = triTriIntersect(A, 0, B, 0), r2 = triTriIntersect(A, 1, B, 0);
+        if (r1.status !== "intersect" || r2.status !== "intersect") continue;
+        let best = null;
+        for (const x of [r1.p0, r1.p1]) for (const y of [r2.p0, r2.p1]) { const d = Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); if (!best || d < best.d) best = { d, x, y }; }
+        if (best.d > 1e-9) continue;               // the seam does not cross the shared edge inside B
+        cases++;
+        if (best.x[0] === best.y[0] && best.x[1] === best.y[1] && best.x[2] === best.y[2]) same++;
+    }
+    ok("!! two triangles sharing an edge, a third crossing it: both pairs put the crossing at the SAME point, bit for bit",
+        cases > 1000 && same === cases, same + " of " + cases + " identical (round 15's file: 1,147 of 1,838)");
+}
 console.log(`triTriIntersect-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: coplanar and degenerate (vertex-on-plane) triangle pairs are " +
     "DETECTED but not RESOLVED -- this module's own header states that scope boundary and why. Also " +
@@ -321,5 +346,7 @@ console.log("unchecked here, named honestly: coplanar and degenerate (vertex-on-
     "coordinates around 1e13 and above (not reproduced below roughly 1e9-1e10) -- an extreme regime this " +
     "gate does not test and this module does not guard against. Left unresolved rather than papered over: a " +
     "real fix needs a coordinate-magnitude-relative epsilon or a floating-origin scheme upstream, neither " +
+
+
     "attempted here.");
 process.exit(fails ? 1 : 0);

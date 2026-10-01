@@ -46,7 +46,17 @@
 // whether the two functions' own assumptions actually line up for that future integration: trisA and trisB
 // must already share ONE coordinate frame -- no relative transform is applied, exactly the same constraint
 // bvhPairOverlap.mjs's own header names for the same reason.
+//
+// *** BVH-CSG ROUND 16: A SEAM CROSSING IS A FUNCTION OF (EDGE, PLANE) ALONE. *** Where the seam crosses an edge two
+// triangles share, both pairs compute the crossing. It was interpolated from whichever end of the edge sat alone on its
+// side of the other plane, and the normals were scaled by a reciprocal where triContact.mjs divides -- so two pairs, or
+// this file and triContact, put one crossing in two places: measured with round 15's file, 691 of 1,838 random shared-edge
+// configurations disagreed (this file's gate, ROUND 16 section), and round 14's finishing weld moved 12,376 vertices by
+// an ULP on the page's 99 chains. The crossing is now triContact's edgeCross, the edge in canonical order, with the
+// normals divided: 1,838 of 1,838 identical, and the weld's ULP moves 12,376 -> 711.
 "use strict";
+
+import { edgeCross } from "./triContact.mjs";
 
 const EPS = 1e-9;
 
@@ -72,8 +82,11 @@ function computeInterval(p0, p1, p2, d0, d1, d2, axis) {
     if (d0 * d1 > 0) { iso = p2; o1 = p0; o2 = p1; diso = d2; do1 = d0; do2 = d1; }
     else if (d0 * d2 > 0) { iso = p1; o1 = p0; o2 = p2; diso = d1; do1 = d0; do2 = d2; }
     else { iso = p0; o1 = p1; o2 = p2; diso = d0; do1 = d1; do2 = d2; }
-    const Pa = add(iso, scale(sub(o1, iso), diso / (diso - do1)));
-    const Pb = add(iso, scale(sub(o2, iso), diso / (diso - do2)));
+    // BVH-CSG ROUND 16: the crossing of an edge with the other plane is triContact.mjs's edgeCross -- the edge taken in
+    // canonical order -- so it is a function of (edge, plane) alone: every pair that shares the edge, through either
+    // file, gets the same point bit for bit (it was interpolated from whichever end sat alone, an ULP apart)
+    const Pa = edgeCross(iso, o1, diso, do1);
+    const Pb = edgeCross(iso, o2, diso, do2);
     return { Pa, Pb, ta: Pa[axis], tb: Pb[axis] };
 }
 
@@ -109,7 +122,7 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     let n1 = cross(e1, e2);
     const n1len = Math.hypot(n1[0], n1[1], n1[2]);
     if (n1len < 1e-300) return { status: "degenerate" };   // triangle A itself has ~zero area
-    n1 = scale(n1, 1 / n1len);
+    n1 = [n1[0] / n1len, n1[1] / n1len, n1[2] / n1len];   // round 16: as triContact.mjs's planeDists divides
     const d1c = -dot(n1, v0);
     let du0 = dot(n1, u0) + d1c, du1 = dot(n1, u1) + d1c, du2 = dot(n1, u2) + d1c;
     if (Math.abs(du0) < EPS) du0 = 0;
@@ -122,7 +135,7 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     let n2 = cross(f1, f2);
     const n2len = Math.hypot(n2[0], n2[1], n2[2]);
     if (n2len < 1e-300) return { status: "degenerate" };   // triangle B itself has ~zero area
-    n2 = scale(n2, 1 / n2len);
+    n2 = [n2[0] / n2len, n2[1] / n2len, n2[2] / n2len];
     const d2c = -dot(n2, u0);
     let dv0 = dot(n2, v0) + d2c, dv1 = dot(n2, v1) + d2c, dv2 = dot(n2, v2) + d2c;
     if (Math.abs(dv0) < EPS) dv0 = 0;

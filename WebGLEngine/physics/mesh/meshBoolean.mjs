@@ -363,14 +363,41 @@
 // the BVH's SHAPE (candidate order -> arrangement order): a differently shaped tree changed the bits of 53 of 62
 // blasts, never the solid (same triangle count, volume within 1e-15). So reusing the last shot's tree -- half of the
 // remaining fixed cost -- would trade away the bit-for-bit guarantee.
+//
+// *** ROUND 16: THE SEAM AGREED BEFORE CUTTING -- WHERE THE DISAGREEMENT WAS THE ARRANGEMENTS' ALONE. *** Measured first,
+// on the page's 99 chains: round 14's finishing weld moved 12,376 vertices by an ULP, 100 by up to snap and 75 beyond it.
+// Traced, event by event: the ULP moves were one seam crossing computed by two pairs that share an edge (now one point --
+// triTriIntersect.mjs's ROUND 16 note: 12,376 -> 711); the sub-snap moves were EXACTLY the two ends of a seam segment
+// no longer than snap, which every arrangement drops as a point contact and merges its own way. seamConsensus() (below)
+// finds every pair's segment once, makes such ends ONE point for every arrangement on both meshes, and hands both
+// arrangements the pair results it found so neither computes a pair again: on the 99 chains the weld's sub-snap moves go
+// 100 -> 0, its ULP moves 711 -> 200, the shots needing any weld beyond an ULP 108 -> 47. Its cost, with the pair
+// results shared: +5% on the 30-shot chain (interleaved medians, against round 15's). Also new: a ZERO-THICKNESS FIN --
+// two faces of one operand on the same three vertices, wound opposite ways -- is cancelled before anything else
+// (reverseTwins): it has no volume, and left in, every ray across it lost a hit (meshBoolean-selfcheck section 19: 5.3e-2
+// -> exact). On the rotated-copy family the fallbacks go 87 -> 33 (triArrangement.mjs's ROUND 16 note, and this).
+// TRIED, MEASURED, NOT KEPT: placing a near-parallel pair's seam by its raw, unsnapped distances (the band's worst 2.8e-2
+// -> 1.7e-2, but outside it 1.4e-9 -> 1.1e-2); calling a near-parallel pair coplanar when its seam's uncertainty exceeds
+// the triangles (K = 10 or 30 snaps: the band to 3.8e-2, and with K = 30 errors outside it); making seam ends within 8
+// snaps that share a triangle one point (the weld's 65 moves beyond snap -> 28 on the page, but the rotated family's band
+// 2.8e-2 -> 1e-1 and outside it 1.1e-4 -- twin surfaces are dense with genuinely distinct points that close).
+// KNOWN, MEASURED, NOT FIXED: (1) the rotated-copy band -- worst still 2.8e-2 (a copy rotated 1e-9 about (1,2,3)). Its
+// cracks all border plane-path fragments, from triangles the arrangement refuses: a corner left with one edge, Earcut,
+// the face-area sum, and dangling seam chains 3e-8..8e-8 short of each other -- each a per-triangle decision with a
+// tolerance, on twin triangles a few 1e-9 apart. Per-pair tolerances provably cannot be made consistent there (round 12,
+// and the K experiment above); it needs the seam's TOPOLOGY decided exactly (orientation predicates on input
+// coordinates) and its vertices rounded once, globally -- backlog bvh-csg-r16b-exact-seam-topology. (2) The weld's moves
+// beyond snap: 65 on the 99 chains, ends of two different pairs' segments 1.2e-9..7e-9 apart, not traced. (3) A fin whose
+// two faces are triangulated differently is not cancelled -- that needs the operand arranged against itself.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { arrangeTriangle } from "./triArrangement.mjs";
+import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
+import { triTriIntersect } from "./triTriIntersect.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
-import { closestOnTriangle, angleAt, CONTACT_EPS } from "./triContact.mjs";
+import { closestOnTriangle, angleAt, CONTACT_EPS, contactPair } from "./triContact.mjs";
 
 /** Round 12: the broad phase's pad, and the distance under which a face is sided locally rather than by rays. */
 export const MESH_BOOLEAN_NEAR = 1e-8;
@@ -475,7 +502,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     const agreementThreshold = opts.agreementThreshold ?? 1;
     // Round 12: contacts on by default -- see the header. false is the round-11 pipeline, pair for pair.
     const contacts = opts.contacts !== false;
-    const pairs = pairOverlap(bvhSelf, bvhOther, contacts ? MESH_BOOLEAN_NEAR : 0);
+    const pairs = opts.pairs || pairOverlap(bvhSelf, bvhOther, contacts ? MESH_BOOLEAN_NEAR : 0);
     const byTri = groupCandidatesByTriA(pairs);
     const triCount = trisSelf.length / 9;
     const fragments = [];
@@ -517,12 +544,14 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     // B's surface reaches an A-edge -- a B edge crossing A's face exactly on the diagonal two A-triangles share gives
     // one a segment ending there and the other only a point contact (flush-box fuzz: 3 unmatched edges on 23 of 450
     // runs before; round 11 identical).
+    // round 16: the pair results meshBooleanCore's seamConsensus already found, by this side's (t, other) order
+    const pairOf = (t) => (opts.pairResults ? (o) => opts.pairResults.get(opts.pairSide ? o * 4294967296 + t : t * 4294967296 + o) : null);
     const arrs = new Array(triCount);
     let rearranged = 0, injected = 0, conformScanned = 0;
     if (cutting === "arrangement" && contacts) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
-            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { contacts });
+            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), contacts });
         }
         const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
         const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
@@ -576,7 +605,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                 }
             }
             if (!need.length) continue;
-            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { contacts, sidePoints: need });
+            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), contacts, sidePoints: need });
             rearranged++; injected += need.length;
         }
     }
@@ -603,7 +632,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { contacts });
+            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), contacts });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
@@ -768,6 +797,113 @@ export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
     return r;
 }
 
+// round 16: the triangles of `tris` to keep once every pair that is one triangle twice, wound opposite ways, is
+// cancelled -- or null when there is none. Found by a numeric hash of the three vertices' bits, sorted, then compared.
+const _f64 = new Float64Array(9), _u32 = new Uint32Array(_f64.buffer);
+export function reverseTwins(tris) {
+    const n = tris.length / 9, byHash = new Map(), sorted = new Float64Array(n * 9), parity = new Uint8Array(n);
+    for (let t = 0; t < n; t++) {
+        const o = t * 9;
+        let i0 = 0, i1 = 1, i2 = 2, swaps = 0, x;
+        const gt = (a, b) => { const d = tris[o + a * 3] - tris[o + b * 3] || tris[o + a * 3 + 1] - tris[o + b * 3 + 1] || tris[o + a * 3 + 2] - tris[o + b * 3 + 2]; return d > 0; };
+        if (gt(i0, i1)) { x = i0; i0 = i1; i1 = x; swaps++; }
+        if (gt(i1, i2)) { x = i1; i1 = i2; i2 = x; swaps++; }
+        if (gt(i0, i1)) { x = i0; i0 = i1; i1 = x; swaps++; }
+        parity[t] = swaps & 1;
+        for (let c = 0; c < 3; c++) { _f64[c] = tris[o + i0 * 3 + c]; _f64[3 + c] = tris[o + i1 * 3 + c]; _f64[6 + c] = tris[o + i2 * 3 + c]; }
+        sorted.set(_f64, o);
+        let h = 0x811c9dc5;
+        for (let i = 0; i < 18; i++) h = Math.imul(h ^ _u32[i], 16777619);
+        const list = byHash.get(h);
+        if (list) list.push(t); else byHash.set(h, [t]);
+    }
+    const dead = new Uint8Array(n);
+    let any = false;
+    for (const list of byHash.values()) {
+        if (list.length < 2) continue;
+        for (let i = 0; i < list.length; i++) {
+            const a = list[i];
+            if (dead[a]) continue;
+            for (let j = i + 1; j < list.length; j++) {
+                const b = list[j];
+                if (dead[b] || parity[a] === parity[b]) continue;
+                let same = true;
+                for (let k = 0; k < 9 && same; k++) same = sorted[a * 9 + k] === sorted[b * 9 + k];
+                if (same) { dead[a] = dead[b] = 1; any = true; break; }
+            }
+        }
+    }
+    if (!any) return null;
+    const keep = [];
+    for (let t = 0; t < n; t++) if (!dead[t]) keep.push(t);
+    return Int32Array.from(keep);
+}
+function pick(tris, keep) {
+    const out = new Float64Array(keep.length * 9);
+    for (let i = 0; i < keep.length; i++) out.set(tris.subarray(keep[i] * 9, keep[i] * 9 + 9), i * 9);
+    return out;
+}
+
+/**
+ * BVH-CSG ROUND 16: SEAM CONSENSUS. Every arrangement merges the points it is given that lie within snap of each other,
+ * each for itself -- so a seam segment shorter than snap became one point in triangle a's arrangement and stayed two in
+ * the triangles across from it (round 14's 11 of 20 gaps; 100 of the weld's moves on the page's 99 chains). Here every
+ * candidate pair's segment is found once (triTriIntersect, else triContact's contactPair, exactly as triArrangement
+ * finds them), and the ends of each segment no longer than snap are made ONE point for everybody: a cluster's
+ * representative is an input vertex if it holds one (never two -- such clusters are kept apart), else its
+ * lexicographically smallest point. Returns { canon, results }: canon(p) -> p's representative (p itself if it is in no
+ * cluster), or null when nothing was joined; and every pair's result, keyed a x 2^32 + b, which both meshes' arrangements
+ * read instead of computing the pair again (triTriIntersect(a, b) and (b, a) give the same points -- triArrangement's gate).
+ */
+export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS) {
+    const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
+    const rd = (buf, t) => [[buf[t * 9], buf[t * 9 + 1], buf[t * 9 + 2]], [buf[t * 9 + 3], buf[t * 9 + 4], buf[t * 9 + 5]], [buf[t * 9 + 6], buf[t * 9 + 7], buf[t * 9 + 8]]];
+    const results = new Map();          // only pairs that touch: an arrangement reads a missing pair as "none"
+    const short = [];                   // the segments no longer than snap, with which of their ends are input vertices
+    for (const [a, b] of pairs) {       // (pairOverlap gives each pair once: a triangle is in one leaf)
+        const pk = a * 4294967296 + b;
+        const r = triTriIntersect(trisA, a, trisB, b);
+        if (r.status === "none") continue;
+        let p0, p1;
+        if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; results.set(pk, { r }); }
+        else { const c = contactPair(rd(trisA, a), rd(trisB, b)); results.set(pk, { r, c }); if (c.kind !== "segment") continue; p0 = c.p0; p1 = c.p1; }
+        if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]) > snap) continue;
+        const T = [...rd(trisA, a), ...rd(trisB, b)], isC = (p) => T.some((v) => v[0] === p[0] && v[1] === p[1] && v[2] === p[2]);
+        short.push({ p0, p1, c0: isC(p0), c1: isC(p1) });
+    }
+    const j = joinSeamEnds(short);
+    seamConsensus.last = j.stats;
+    return { canon: j.canon, results, pairs };
+}
+
+/**
+ * The clustering behind seamConsensus, on its own so it can be held to its rules by hand: the two ends of every short
+ * segment {p0, p1, c0, c1} (c: that end is an input vertex) become one point. A cluster's representative is its input
+ * vertex if it has one -- an input vertex never moves -- and two input vertices are never joined; otherwise the
+ * cluster's lexicographically smallest point. Returns { canon (or null when nothing was joined), stats }.
+ */
+export function joinSeamEnds(short) {
+    const key = (p) => p[0] + "," + p[1] + "," + p[2];
+    const id = new Map(), P = [], corner = [], par = [], hasCorner = [];
+    const node = (p, isCorner) => { const k = key(p); let i = id.get(k); if (i === undefined) { i = P.length; id.set(k, i); P.push(p); corner.push(false); par.push(i); } if (isCorner) corner[i] = true; return i; };
+    const find = (i) => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+    let joined = 0, refused = 0;
+    for (const { p0, p1, c0, c1 } of short) {
+        const x = find(node(p0, c0)), y = find(node(p1, c1));
+        if (x === y) continue;
+        const cx = hasCorner[x] ?? corner[x], cy = hasCorner[y] ?? corner[y];
+        if (cx && cy) { refused++; continue; }                    // two input vertices: never one point
+        par[Math.max(x, y)] = Math.min(x, y); hasCorner[Math.min(x, y)] = cx || cy; joined++;
+    }
+    if (!joined) return { canon: null, stats: { points: P.length, joined: 0, refused, moved: 0 } };
+    const lex = (u, v) => u[0] - v[0] || u[1] - v[1] || u[2] - v[2];
+    const rep = new Map();
+    P.forEach((p, i) => { const r = find(i), c = rep.get(r); if (c === undefined || (corner[i] && !corner[c]) || (corner[i] === corner[c] && lex(p, P[c]) < 0)) rep.set(r, i); });
+    const out = new Map();
+    P.forEach((p, i) => { const r = P[rep.get(find(i))]; if (r !== p) out.set(key(p), r); });
+    return { canon: out.size ? (p) => out.get(key(p)) || p : null, stats: { points: P.length, joined, refused, moved: out.size } };
+}
+
 /**
  * ROUND 11: the band of combined extents (the larger side of A's and B's joint bounding box) the absolute
  * tolerances in triTriIntersect, triArrangement, triClip, triFragmentAccumulate and meshPointClassify were measured
@@ -839,6 +975,25 @@ function emptyStats(tris, empty) {
 }
 
 function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
+    // round 16: a ZERO-THICKNESS FIN -- two faces of one operand on the same three vertices, wound opposite ways -- has
+    // no volume and is not in the regularised result; left in, it breaks every ray that crosses it (pointInMesh welds
+    // the two coincident hits into one and the parity flips). Each such pair is cancelled before anything else, and
+    // `from` still names the caller's triangles.
+    if (opts.contacts !== false && opts.cancelFins !== false) {
+        const ka = reverseTwins(trisA), kb = reverseTwins(trisB);
+        if (ka || kb) {
+            const A2 = ka ? pick(trisA, ka) : trisA, B2 = kb ? pick(trisB, kb) : trisB;
+            const r = meshBooleanCore(A2, ka ? new MeshBVH(A2) : bvhA, B2, kb ? new MeshBVH(B2) : bvhB, op, { ...opts, cancelFins: false });
+            for (let i = 0; i < r.from.length; i++) {
+                const f = r.from[i];
+                if (f >= 0) { if (ka) r.from[i] = ka[f]; }
+                else if (f !== -0x7fffffff && kb) r.from[i] = -(kb[-f - 1] + 1);
+            }
+            r.stats.a.finsCancelled = ka ? trisA.length / 9 - ka.length : 0;
+            r.stats.b.finsCancelled = kb ? trisB.length / 9 - kb.length : 0;
+            return r;
+        }
+    }
     if (opts.contacts !== false) {
         const eA = isEmptySolid(trisA), eB = isEmptySolid(trisB);
         if (eA || eB) {
@@ -853,8 +1008,15 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
                      stats: { a: emptyStats(trisA, eA), b: emptyStats(trisB, eB) }, emptyOperand: eA ? (eB ? "both" : "a") : "b" };
         }
     }
-    const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, opts);
-    const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, opts);
+    // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
+    let optsA = opts, optsB = opts;
+    if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
+        const sc = seamConsensus(trisA, bvhA, trisB, bvhB);
+        optsA = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 0, pairs: sc.pairs };
+        optsB = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 1, pairs: sc.pairs.map(([a, b]) => [b, a]) };
+    }
+    const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, optsA);
+    const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, optsB);
     const { tris, ambiguousTriIndices, from } = assembleBoolean(classifiedA, classifiedB, op);
     const buf = new Float64Array(tris.length * 9);
     for (let i = 0; i < tris.length; i++) {

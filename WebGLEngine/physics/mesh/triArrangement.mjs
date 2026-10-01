@@ -154,6 +154,17 @@
 //   - opts.sidePoints may now be {p, side}: a point goes on the side it is given. Near a sliver's sharp corner the
 //     two long sides are closer together than rounding at wall-size coordinates, and by distance alone 292 of 2,000
 //     such points (section 6 of the gate) went on the wrong side. A bare point still goes on the nearest.
+//
+// *** ROUND 16 (contacts). ***
+//   - A NEAR-PARALLEL pair -- planes within NEAR_PARALLEL (sine 1e-6) of parallel -- places its seam only to within
+//     snap / NEAR_PARALLEL, a thousandth of a unit and worse: on a copy of a mesh rotated 1e-9..3e-8, such segments ran
+//     0.1..0.9 long and ended 3e-8..8e-8 from any other, and the dangling chain refused the triangle to the plane path,
+//     whose rays cannot classify a face 1e-9 from the other surface. Such a segment is now marked like an on-plane
+//     contact, so a chain of them that dangles is pruned rather than refusing the triangle. Rotated family: fallbacks
+//     84 -> 39, rotated 3e-8 about (1,2,3) 1.3e-3 -> 8.2e-10 off; insensitive across 1e-7..1e-5.
+//   - opts.canon: the seam's points as meshBoolean's seamConsensus agreed them, applied to every segment's ends before
+//     anything else, so a segment no longer than snap is one point here exactly as across the edge.
+//   - opts.pairOf(triB): the pair's result as meshBoolean already found it (a missing pair does not touch).
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
@@ -161,6 +172,14 @@ import { triTriIntersect } from "./triTriIntersect.mjs";
 import { contactPair } from "./triContact.mjs";
 
 export const SNAP_EPS = 1e-9;
+// round 16: two triangles' planes within this sine of parallel -- the seam between them placed only to within
+// snap / NEAR_PARALLEL (1e-3) of where it is. Measured insensitive across 1e-7..1e-5 on the rotated-copy family.
+export const NEAR_PARALLEL = 1e-6;
+function nearParallel(T, U) {
+    const n1 = cross(sub(T[1], T[0]), sub(T[2], T[0])), n2 = cross(sub(U[1], U[0]), sub(U[2], U[0]));
+    const c = cross(n1, n2), d = Math.hypot(n1[0], n1[1], n1[2]) * Math.hypot(n2[0], n2[1], n2[2]);
+    return d > 0 && Math.hypot(c[0], c[1], c[2]) < NEAR_PARALLEL * d;
+}
 const JOIN = 8;   // round 12, contacts: a dangling chain end within JOIN x snap of triA's boundary is joined to it
 const AREA_REL = 1e-9;
 
@@ -311,17 +330,29 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         if (seen.has(triB)) continue;
         seen.add(triB);
         if (!boxesMeet(tb, box3(readTri(trisB, triB), 0))) continue;
-        const r = triTriIntersect(trisA, triA, trisB, triB);
+        // round 16: meshBoolean's seamConsensus has already found every pair once, for both meshes
+        const cached = opts.pairOf ? opts.pairOf(triB) : undefined;
+        if (opts.pairOf && !cached) continue;     // not in meshBoolean's list: the pair does not touch
+        const r = cached ? cached.r : triTriIntersect(trisA, triA, trisB, triB);
         if (r.status === "none") continue;
         let p0, p1, onPlane = false;
-        if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; }
+        if (r.status === "intersect") {
+            p0 = r.p0; p1 = r.p1;
+            // BVH-CSG round 16: a pair within NEAR_PARALLEL of parallel places its seam to within snap / sin(angle) -- a
+            // thousandth of the triangle and worse -- so a chain of such segments that dangles is not a cut the data
+            // supports: it is pruned like an on-plane contact rather than refusing the triangle (see the ROUND 16 note)
+            if (opts.contacts && nearParallel(T, readTri(trisB, triB))) onPlane = true;
+        }
         else if (opts.contacts) {
             // coplanar/degenerate: resolved here (triContact.mjs)
-            const U = readTri(trisB, triB), c = contactPair(T, U);
+            const U = readTri(trisB, triB), c = cached && cached.c ? cached.c : contactPair(T, U);
             if (c.kind === "none" || c.kind === "point") continue;
             if (c.kind === "coplanar") { coplanar.push({ U, orient: c.orient, triB }); continue; }
-            p0 = c.p0; p1 = c.p1; onPlane = c.onPlane; contactSegs++;
+            p0 = c.p0; p1 = c.p1; onPlane = c.onPlane || nearParallel(T, U); contactSegs++;
         } else return refuse(r.status, { triB });
+        // round 16: the seam's points as every arrangement agrees on them (meshBoolean's seamConsensus), so a segment
+        // shorter than snap collapses to one point here exactly as in the triangles across from it
+        if (opts.canon) { p0 = opts.canon(p0); p1 = opts.canon(p1); }
         const d = sub(p1, p0);
         if (Math.hypot(d[0], d[1], d[2]) <= snap) { pointContacts++; continue; }
         segs.push({ p0, p1, triB, onPlane });
