@@ -202,6 +202,14 @@
 //   Z4  corners first at the twin join                           -> 2 / 0 / 0   (the 128-snap row)
 //   Z5  the first-pass arrangement ignores opts.joinTwin         -> 1 / 0 / 0   (section 22's control)
 //   Z6  the twin join 32 snaps                                   -> 3 / 0 / 0
+// SABOTAGE LOG (BVH-CSG round 16e) -- round 16e built nothing (four fixes measured, none kept); its one new row pins the
+// four cases left (section 22). Against it, on the real files, restored and md5 verified:
+//   W1  vertex rounding off by default                           -> 5 red, none of them the pin
+//   W2  the twin join 8 snaps                                    -> 4 red, none of them the pin
+//   W3  near-parallel at a sine of 1e-9                          -> 3 red, none of them the pin
+//   The pin is held by none of them, and that is measured, not a gap in it: the four cases do not depend on rounds
+//   16c-16d's mechanisms (each removed, they come out the same or better -- seed 7 about x: 4.71e-2, 3.75e-2 without
+//   the rounding). The pin guards those four against what comes next; the mechanisms are held by the rows that went red.
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -1456,9 +1464,16 @@ console.log("\n22. *** ROUND 16d: BEYOND THE FIXTURE -- OTHER BLOBS, OTHER AXES 
     const f = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, {}), f8 = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, { joinTwin: 8 });
     ok("!! a second blob (seed 33) against its copy rotated 2e-8 about (1,2,3): all 3 ops within the first-order volume (+3e-9) -- round 16c's 8-snap join left a cone there",
         f.e <= 1.01 * f.fo + 3e-9 && f8.e > 1e-6, "worst " + f.e.toExponential(2) + " (fo " + f.fo.toExponential(1) + "); joinTwin:8 " + f8.e.toExponential(2));
-    const k = worstOf(7, 8, [0, 0, 0], [1, 0, 0], 1e-8, {});
-    console.log("  KNOWN  a blob (seed 7) against its copy rotated 1e-8 about x: " + k.e.toExponential(2) + " (fo " + k.fo.toExponential(1) + ") -- a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap: it is taken as a TOUCH (a contact segment on the plane) where it crosses, the face is not split, and both copies are kept whole. Backlog bvh-csg-r16e-straddling-twins.");
-    ok("   (KNOWN, pinned) that case stays within 2.5x its measured 4.7e-2 -- a regression alarm, not a correctness claim", k.e < 2.5 * 4.71e-2, k.e.toExponential(2));
+    // the four cases left beyond first-order (12 runs: each of them, all 3 ops), each pinned at 2.5x its measured worst.
+    // Round 16e measured four per-pair fixes for them, all worse -- see meshBoolean.mjs's ROUND 16e paragraph.
+    const known = [[7, 8, [0, 0, 0], [1, 0, 0], 1e-8, 4.71e-2], [202, 6, [-0.15, 0.1, 0.2], [1, 0, 0], 2e-8, 1.7e-2],
+                   [7, 8, [0, 0, 0], [0, 0, 1], 3e-8, 2.9e-3], [33, 10, [0.2, -0.1, 0.05], [-2, 1, 1], 3e-8, 1.2e-3]];
+    const got = known.map(([seed, fc, c, w0, th, was]) => ({ seed, w0, th, was, ...worstOf(seed, fc, c, w0, th, {}) }));
+    console.log("  KNOWN  blobs against their copies rotated in the band, beyond their first-order volume: " +
+        got.map((g) => "seed " + g.seed + " about (" + g.w0.join(",") + ") " + g.th.toExponential(0) + ": " + g.e.toExponential(2) + " (fo " + g.fo.toExponential(1) + ")").join("; ") +
+        " -- the worst traced: a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap, is taken as a TOUCH where it crosses, the face is not split, and both copies are kept whole. Backlog bvh-csg-r16f-exact-arrangement.");
+    ok("   (KNOWN, pinned) each of those four stays within 2.5x its measured worst -- a regression alarm, not a correctness claim",
+        got.every((g) => g.e < 2.5 * g.was), got.map((g) => g.e.toExponential(2) + " / " + g.was.toExponential(1)).join(", "));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

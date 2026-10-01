@@ -438,6 +438,22 @@
 // whose vertices sit within and beyond the 1e-9 snap of each other's plane (5e-10, 7e-10, 1.7e-9 on a blob rotated 1e-8
 // about x) is taken by triContact as a touch along the plane where it crosses; the face is not split and both copies are
 // kept whole (4.7e-2) -- backlog bvh-csg-r16e-straddling-twins.
+//
+// *** ROUND 16e: STRADDLING TWINS -- MEASURED, NOT FIXED; PER-PAIR FIXES ARE EXHAUSTED. *** Measured first: in each of the
+// four cases left (12 of round 16d's 252-run family), 25..88 near-parallel pairs are 'degenerate' (a vertex within snap of
+// the other's plane) where the exact signs say they CROSS by more than snap. Four fixes, each confined to such pairs and
+// each measured on the gate's rotated band and the 252-run family (round 16d: 12 runs beyond first-order, worst 4.7e-2):
+//   - decide them by the exact pair test (triTriIntersectExact): 108 runs, worst 2.5e-2, and the gate's outside rows
+//     broken (6.4e-3 where 1.4e-9);
+//   - the same, only for unshared near-copies (every corner within 3.2e-8 of a distinct twin corner): 99 runs, 2.2e-2;
+//   - call them COPLANAR, decided by the ON rule, when every corner is within K snaps: K = 2, 13 runs, 3.2e-2; K = 8 and
+//     32, the gate's band 7.7e-2 and 1.3e-1 (near-copies only, K = 8: 7.7e-2);
+//   - label a face ON when its sample lies within snap of a twin the pair test called a touch, and inside it: 43 runs,
+//     4.1e-2 (A's face goes ON, B's twin, split differently, does not).
+// Every one moves the problem rather than removing it: the pair's verdict is consistent across both meshes already; what
+// breaks is the arrangement's own 1e-9 decisions (vertex merging, side splitting, crossing detection) on slivers 1e-9..1e-8
+// wide that an exact or a coplanar verdict creates. None was kept. The four cases are pinned in the gate (section 22);
+// the next step is the arrangement itself made exact -- backlog bvh-csg-r16f-exact-arrangement.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
