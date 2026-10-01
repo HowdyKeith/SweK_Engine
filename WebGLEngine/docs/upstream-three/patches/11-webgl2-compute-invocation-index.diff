@@ -1,0 +1,25 @@
+diff --git a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
+index e35c9dc..101dcb5 100644
+--- a/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
++++ b/src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js
+@@ -1187,6 +1187,11 @@ ${ flowData.code }
+ 	 */
+ 	getInstanceIndex() {
+ 
++		// a compute is drawn as points -- instanced when its first buffer is instanced, as many points otherwise -- so its
++		// invocation is whichever of the two counts, the other being 0
++
++		if ( this.shaderStage === 'compute' ) return 'uint( gl_InstanceID + gl_VertexID )';
++
+ 		return 'uint( gl_InstanceID )';
+ 
+ 	}
+@@ -1202,7 +1207,7 @@ ${ flowData.code }
+ 
+ 		const size = workgroupSize.reduce( ( acc, curr ) => acc * curr, 1 );
+ 
+-		return `uint( gl_InstanceID ) % ${size}u`;
++		return `uint( gl_InstanceID + gl_VertexID ) % ${size}u`;
+ 
+ 	}
+ 

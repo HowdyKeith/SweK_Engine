@@ -72,6 +72,15 @@ const DRAFTS = {
         bug: (r) => r.webgpu.moved.join() === "true,true" && r.webgl2.moved.join() === "true,false",
         fixed: (r) => r.webgpu.moved.join() === "true,true" && r.webgl2.moved.join() === "true,true",
         observed: (r) => `webgpu moved [${r.webgpu.moved.join(", ")}]; webgl2 moved [${r.webgl2.moved.join(", ")}]` },
+    // v4790: the two found by threeUpstreamPaths' computeSkinning case at v4786
+    "10-compute-skinning-under-velocity-mrt.md": { patch: "10-compute-needs-no-previous-data.diff",
+        bug: (r) => r.webgpu.noMRT === 0.5 && r.webgpu.velocityMRT === 0 && r.webgl2.noMRT === 0.5 && r.webgl2.velocityMRT === 0.5,
+        fixed: (r) => [r.webgpu, r.webgl2].every((b) => b.noMRT === 0.5 && b.velocityMRT === 0.5),
+        observed: (r) => `webgpu: noMRT ${r.webgpu.noMRT}, velocityMRT ${r.webgpu.velocityMRT}; webgl2: noMRT ${r.webgl2.noMRT}, velocityMRT ${r.webgl2.velocityMRT} -- the mean x the compute wrote, the bone at 0.5` },
+    "11-webgl2-compute-instance-index.md": { patch: "11-webgl2-compute-invocation-index.diff",
+        bug: (r) => r.webgpu.storageBuffer === 8 && r.webgpu.instancedArray === 8 && r.webgl2.storageBuffer === 1 && r.webgl2.instancedArray === 8,
+        fixed: (r) => [r.webgpu, r.webgl2].every((b) => b.storageBuffer === 8 && b.instancedArray === 8),
+        observed: (r) => `webgpu: storageBuffer ${r.webgpu.storageBuffer}, instancedArray ${r.webgpu.instancedArray}; webgl2: storageBuffer ${r.webgl2.storageBuffer}, instancedArray ${r.webgl2.instancedArray} -- the distinct points the compute wrote, of a box's 8 corners` },
 };
 const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
 
@@ -166,15 +175,15 @@ for (const [f, d] of Object.entries(DRAFTS)) {
 // applied here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed,
 // 1 todo, 0 failed, as for r185 unpatched. v4775 recorded it again for all nine: 08 changes the same import line of Instance.js
 // as 01, so it was merged by hand. v4786 recorded it again after 07 moved to the render, and v4788 after 03 reached per-instance
-// morphs: unit tests the same each time, lint clean. A patch changed since makes the second hash stale: build three again, and record it.
-const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "c43645ca3d14b0f050659c1f80ed47a47a7a364bf1a7f1e38c5ad30f4653811a" });
+// morphs, and v4790 with 10 and 11 added: lint clean each time. A patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "54962de6fce080f84f7c2c248e2fdae1f1b57d7aaf0a014d7c61ce3b463f0c4f" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { const t = allNine.text, found = allNine.found;
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
   ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
-      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4788 from `git apply` of the nine (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
+      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4790 from `git apply` of the eleven (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];
@@ -212,7 +221,9 @@ else {
 // adds up, that it was taken on the two builds this gate's hashes name -- a patch changed since makes it stale, as it makes
 // the second hash stale -- and that the README states it.
 console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's build and with all of them");
-{   const E2E = path.join(DIR, "e2e", "v4789.json"), rec = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
+{   // the newest record is the one that speaks for the patches as they are; older ones stay as history
+    const E2E_DIR = path.join(DIR, "e2e"), recs = fs.existsSync(E2E_DIR) ? fs.readdirSync(E2E_DIR).filter((f) => /^v\d+\.json$/.test(f)).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1))) : [];
+    const recName = recs[recs.length - 1], rec = recName ? JSON.parse(fs.readFileSync(path.join(E2E_DIR, recName), "utf8")) : null;
     ok("  docs/upstream-three/e2e/ holds the record and the runner it was taken with", !!rec && fs.existsSync(path.join(DIR, "e2e", "puppeteer-local.diff")));
     if (rec) {
         const failed = Object.keys(rec.failed || {}), varying = Object.keys(rec.varyingOnOneBuild || {});
@@ -221,7 +232,7 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
         ok(`*** it was taken on the builds this gate's hashes name: r185 ${rec.builds.r185.slice(0, 16)}..., all of them ${rec.builds.allPatched.slice(0, 16)}... ***`,
             rec.builds.r185 === THREE_BUILT.r185 && rec.builds.allPatched === THREE_BUILT.allPatched, "a patch changed since the record makes it stale: run three's e2e again, and record it");
         ok("  the README states it as the record does", index.includes(`${rec.examples} WebGPU examples, ${rec.passed} passed and the same ${failed.length} failed`) &&
-            index.includes(`${rec.screenshotsIdentical} of the ${rec.examples} screenshots`) && index.includes("](e2e/v4789.json)"));
+            index.includes(`${rec.screenshotsIdentical} of the ${rec.examples} screenshots`) && index.includes(`](e2e/${recName})`), `the record is e2e/${recName}`);
     }
 }
 

@@ -23,8 +23,8 @@ import { ENG, BUNDLE, apply, patchTexts, rootWithBuilds } from "./threePatch.mjs
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
-const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"]];
-const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md" };
+const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"], ["localIndex", "11"]];
+const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md", "11": "11-webgl2-compute-instance-index.md" };
 
 console.log("\n1. THE PATCHED BUILDS: each draft's patch alone on r185's build, every hunk found once");
 const bundle = fs.readFileSync(BUNDLE, "utf8"), texts = patchTexts(), builds = {};
@@ -133,6 +133,14 @@ else {
         for (let k = 0; k < 3; k++) { await frame(); m = [];
           for (const x of [-0.5 + 0.3 * k, -0.35 + 0.3 * k]) { bone.position.x = x; bone.updateMatrixWorld(true); await renderer.computeAsync(job); m.push(await meanX()); } }
         o.it = [+(m[1] - m[0]).toFixed(3) + 0];
+      } else if (name === "localIndex") {
+        // v4790: patch 11's second hunk -- invocationLocalIndex, which read gl_InstanceID too. A compute of 128 writing it into a
+        // plain storage buffer: how many distinct values it wrote, 64 with the default workgroup of 64
+        renderer.setMRT(null);
+        const N = 128, outA = new THREE.StorageBufferAttribute(N, 4), out = T.storage(outA, "vec4", N);
+        await renderer.computeAsync(T.Fn(() => { out.element(T.instanceIndex).assign(T.vec4(T.float(T.invocationLocalIndex), 0, 0, 1)); })().compute(N));
+        const f = new Float32Array(await renderer.getArrayBufferAsync(outA)), seen = new Set(); for (let i = 0; i < N; i++) seen.add(f[i * 4]);
+        o.it = [seen.size];
       } else if (name === "perInstance") {
         // three morphs per instance only where an InstancedMesh draws more than one. v4788: the second is drawn too, above the
         // first and still -- its influence held at -0.4 -- so an influence read from the wrong instance's row is motion that is not
@@ -223,6 +231,13 @@ if (res) {
             ran && P[0] === 0.15, "computeSkinning updates the skeleton under the same test as skinning(); the patch keys it on the render, and each compute is a render of its own");
         if (ran) lines.push(`computed twice a frame, the bone moved 0.15 between: the second compute moved r185 ${px(R[0])}, patched ${px(P[0])} (x, both backends)`);
         if (lines.length === 3) said["07"] = lines.join("\n");
+    }
+    // 11 -- v4790: invocationLocalIndex on WebGL2, a compute writing a plain storage buffer
+    {   const at2 = (b, m) => (at("localIndex", b, m).it || [])[0], R = at2("r185", "webgl2"), P = at2("patched", "webgl2"), Rg = at2("r185", "webgpu"), Pg = at2("patched", "webgpu");
+        const ran = [R, P, Rg, Pg].every(Number.isFinite);
+        ok(`*** 11, invocationLocalIndex in a compute of 128 writing a plain storage buffer: the distinct values it wrote -- ${ran ? `WebGL2 r185 ${R}, patched ${P}; WebGPU ${Rg} and ${Pg}` : "did not run"} ***`,
+            ran && R === 1 && P === 64 && Rg === 64 && Pg === 64, "the workgroup is 64: r185 reads gl_InstanceID, 0 in a draw that is not instanced");
+        if (ran) said["11"] = `invocationLocalIndex in a compute of 128 writing a plain storage buffer: r185 ${R}, patched ${P} distinct values on WebGL2; ${Rg} on WebGPU, both builds`;
     }
 
     console.log(`\n2b. ALL ${Object.keys(texts).length} TOGETHER: each path on the one build with every patch, as on its own patch's`);
