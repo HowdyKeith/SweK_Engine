@@ -210,6 +210,19 @@
 //   The pin is held by none of them, and that is measured, not a gap in it: the four cases do not depend on rounds
 //   16c-16d's mechanisms (each removed, they come out the same or better -- seed 7 about x: 4.71e-2, 3.75e-2 without
 //   the rounding). The pin guards those four against what comes next; the mechanisms are held by the rows that went red.
+// SABOTAGE LOG (BVH-CSG round 17) -- meshBoolean.mjs's translation; two gates (THIS / blastEngine), each on the real file,
+// restored in a `finally`, md5 verified. 6 of 7 red on the final file:
+//   T1  no translation                                           -> 4 / 1
+//   T2  t far below the coordinates (x 0.3): the check refuses it -> 3 / 1   (so nothing is moved)
+//   T3  the result not moved back                                -> 5 / 1
+//   T4  every axis moved, near the origin too                    -> 2 / 0   (the page's wall is centred: t = 0, unmoved)
+//   T5  moved back the wrong way                                 -> 5 / 1
+//   T7  the TwoSum exactness check ignored                       -> 0 / 0   NOT CAUGHT, by construction: under the
+//       condition (max |x| > 2 x span) x and t are within a factor of 2, and Sterbenz makes every x - t exact -- the
+//       check never refuses. It stays, so a change to the condition cannot make the move silently inexact:
+//   T8  T2's t AND the check ignored (an inexact move)           -> 3 / 1
+//   The first battery also dropped t's rounding to a multiple of ulp(max |x|), and tried an off-grid t with the check
+//   in: 0 red both, for the same reason -- the rounding was redundant and was removed.
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
