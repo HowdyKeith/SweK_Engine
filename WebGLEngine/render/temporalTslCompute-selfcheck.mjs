@@ -102,6 +102,71 @@ else {
     }
 }
 
+// ---- 2. v4783: INSTANCE MATRICES A COMPUTE PASS WRITES ------------------------------------------------------------
+// An InstancedMesh whose instanceMatrix is a StorageInstancedBufferAttribute a kernel fills: the array the stage kept is
+// where the application last set it on the CPU, so the previous matrices were the first ones for ever. The hook is
+// userData.previousInstanceMatrix, a mat4 storage node makePreviousCopy keeps before the pass that moves them. WebGPU only:
+// three's WebGL2 backend does not draw a storage-matrix InstancedMesh at all, and the last row measures that.
+console.log("\n2. ON THE DEVICE: instance matrices a compute pass writes");
+if (!skip) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D, N: 4 }, script: `async (a) => {
+    const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+    const TT = await import("/render/temporalTsl.mjs"); const out = {};
+    for (const mode of ["webgpu", "webgl2"]) { try {
+        const { D, N } = a, canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+        const gl = TT.glClip(THREE, renderer), rd = async (t) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, D, D));
+        const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+        const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5), M = new THREE.Matrix4();
+        const at = (i, k) => M.makeTranslation(-1.2 + (i % 2) * 2.4 + 0.25 * k * (i - 1.5), -0.8 + Math.floor(i / 2) * 1.6 + 0.15 * k, 0);
+        const build = (hook) => {
+            const attr = new THREE.StorageInstancedBufferAttribute(new Float32Array(N * 16), 16);
+            for (let i = 0; i < N; i++) at(i, 0).toArray(attr.array, i * 16);
+            const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicNodeMaterial(), N); mesh.instanceMatrix = attr; mesh.frustumCulled = false; mesh.name = "herd";
+            const mats = T.storage(attr, "mat4", N), k = T.uniform(0);
+            const move = T.Fn(() => { const i = T.float(T.instanceIndex);
+                const x = T.float(-1.2).add(i.mod(2).mul(2.4)).add(k.mul(0.25).mul(i.sub(1.5))), y = T.float(-0.8).add(i.div(2).floor().mul(1.6)).add(k.mul(0.15));
+                mats.element(T.instanceIndex).assign(T.mat4(T.vec4(1, 0, 0, 0), T.vec4(0, 1, 0, 0), T.vec4(0, 0, 1, 0), T.vec4(x, y, 0, 1))); })().compute(N);
+            const prev = hook ? TT.makePreviousCopy(THREE, T, mats, N, "mat4") : null;
+            if (prev) mesh.userData.previousInstanceMatrix = prev.node;
+            const sc = new THREE.Scene(); sc.add(mesh);
+            return { mesh, sc, step: async (kk) => { if (prev) await prev.step(renderer); k.value = kk; await renderer.computeAsync(move); } };
+        };
+        const fieldOf = async (scene, step, opts = {}) => { const st = TT.makeMotionStage(THREE, T, { w: D, h: D, gl, ...opts });
+            try { for (const kk of [0, 1, 2]) { await step(kk); await st.render(renderer, scene, cam, opts.toward ? 0.5 : undefined); } return await rd(st.motion); } finally { st.dispose(); } };
+        const plain = Array.from({ length: N }, () => new THREE.Mesh(geo, new THREE.MeshBasicNodeMaterial())), ps = new THREE.Scene(); for (const p of plain) ps.add(p);
+        const R = await fieldOf(ps, async (kk) => plain.forEach((p, i) => { at(i, kk).decompose(p.position, p.quaternion, p.scale); p.updateMatrixWorld(); }));
+        const cmp = (F) => { let w = 0, moving = 0; for (let i = 0; i < D * D; i++) { const ma = Math.hypot(F[i*4], F[i*4+1]) * D, mb = Math.hypot(R[i*4], R[i*4+1]) * D;
+            if (ma > 0.01 || mb > 0.01) { moving++; w = Math.max(w, Math.hypot(F[i*4] - R[i*4], F[i*4+1] - R[i*4+1]) * D); } } return { w, moving }; };
+        const o = {};
+        if (mode === "webgpu") {
+            const h = build(true); o.hooked = cmp(await fieldOf(h.sc, h.step));
+            const n = build(false); o.unhooked = cmp(await fieldOf(n.sc, n.step));
+            const t = build(true); try { await fieldOf(t.sc, t.step, { toward: true }); o.towardRefused = "drawn"; } catch (e) { o.towardRefused = String(e.message); }
+        }
+        // three's own: how many pixels its colour pass draws of the storage-matrix mesh
+        try { const c = build(false); await c.step(2); const tgt = new THREE.RenderTarget(D, D, { type: THREE.FloatType });
+            renderer.setRenderTarget(tgt); await renderer.renderAsync(c.sc, cam); const C = await rd(tgt); tgt.dispose(); renderer.setRenderTarget(null);
+            let px = 0; for (let i = 0; i < D * D; i++) if (C[i * 4 + 3] > 0.5) px++; o.colourPx = px;
+        } catch (e) { o.colourPx = 0; o.threw = String(e && e.message || e).slice(0, 120); }
+        out[mode] = o; renderer.dispose();
+    } catch (e) { out[mode] = { err: String(e && e.stack || e).slice(0, 400) }; } }
+    return out; }` });
+    ok("the harness ran the matrices on both backends", r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err,
+       r.ok ? `webgpu ${r.result.webgpu.err || "ok"}; webgl2 ${r.result.webgl2.err || "ok"}` : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err) {
+        const g = r.result.webgpu, w = r.result.webgl2, e = (x) => x.toExponential(2);
+        ok(`*** [webgpu] instance matrices a COMPUTE PASS writes carry its motion with userData.previousInstanceMatrix: ${e(g.hooked.w)} px against plain meshes over ${g.hooked.moving} pixels ***`,
+           g.hooked.w < 1e-3 && g.hooked.moving > 100, "makePreviousCopy(THREE, TSL, storage(attr, \"mat4\", n), n, \"mat4\"), stepped before the pass that moves them");
+        ok(`  [webgpu] ...and without it the stage keeps the matrices the CPU last set -- ${g.unhooked.w.toFixed(2)} px wrong`,
+           g.unhooked.w > 1, "what v4783 found: the array three uploads is not where a kernel writes");
+        ok(`  [webgpu] a toward stage refuses GPU-kept matrices by name rather than drawing a chord between them`,
+           typeof g.towardRefused === "string" && g.towardRefused.includes('"herd"') && g.towardRefused.includes("previousInstanceMatrix"), g.towardRefused.slice(0, 160));
+        ok(`three's own: the storage-matrix InstancedMesh is drawn on webgpu (${g.colourPx} px) and not on webgl2 (${w.threw ? "it throws: " + w.threw : w.colourPx + " px"})`,
+           g.colourPx > 100 && !g.threw && w.colourPx === 0, "three's WebGL2 backend cannot draw storage instance matrices -- docs/upstream-three/01's paths; when that changes this row goes red and the matrices can be held there too");
+    }
+}
+
 // ---- v4762 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against render/temporalTsl.mjs, here (and render/temporalTslZoo-selfcheck.mjs green through every one): C1 a sprite's last
 // centre its current one -> 4; C2 the hook not handed to the stage's sprite material -> 4; C3 its positionNode not handed ->
@@ -110,6 +175,10 @@ else {
 // positionNode over instances not refused -> 2; C11 makePreviousCopy copying element 0 to every particle -> 3 (a copy that
 // copies nothing left the WebGL2 page unable to build, which hid the rows -- not counted); C12 the centre not the positionNode
 // -> 4. Twelve, none green.
+// v4783, against render/temporalTsl.mjs, measured: M1 the hook ignored (the CPU texture read) -> 2; M2 the CPU record stepped
+// as well as the hook -> 0, EQUIVALENT (the shader reads the hook, and the record it also keeps is never read) and kept out
+// of the count; M3 the toward refusal removed -> 2; M4 makePreviousCopy copying instance 0 to every slot -> 5 (section 1's
+// particles read it too). Three red, one equivalent.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a scaleNode or positionNode that CHANGES with no previous one given, which the stage takes to stand still " +
     "and cannot tell from one that does. A sprite turned by rotationNode, sized points (a PointsNodeMaterial on a Sprite) and a " +

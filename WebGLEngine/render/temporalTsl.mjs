@@ -128,7 +128,13 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         const w = TSL.int(TSL.textureSize(TSL.textureLoad(tex), 0).x), j = TSL.int(i).mul(4), x = j.mod(w), y = j.div(w);
         return TSL.mat4(TSL.textureLoad(tex, TSL.ivec2(x, y)), TSL.textureLoad(tex, TSL.ivec2(x.add(1), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(2), y)), TSL.textureLoad(tex, TSL.ivec2(x.add(3), y)));
     };
-    const instanceBefore = (object) => matrixIn(instanceRecord(object).tex, TSL.instanceIndex);
+    // v4783: *** MATRICES A COMPUTE PASS WRITES ARE NOT IN THE ARRAY THIS KEEPS. *** A StorageInstancedBufferAttribute that a
+    // kernel fills on the GPU leaves instanceMatrix.array where the application last set it on the CPU, so the record above
+    // kept the first matrices for ever: 7.48 px wrong on boxes a kernel moved. Their previous matrices have to be kept on the
+    // GPU, before the pass that moves them -- mesh.userData.previousInstanceMatrix, a storage node of the same count and mat4
+    // type (makePreviousCopy(THREE, TSL, storage(attr, "mat4", n), n, "mat4") keeps one), read here by the instance's index.
+    const gpuBefore = (object) => { const u = object.userData && object.userData.previousInstanceMatrix; return u && u.isNode ? u : null; };
+    const instanceBefore = (object) => { const g = gpuBefore(object); return g ? g.element(TSL.instanceIndex) : matrixIn(instanceRecord(object).tex, TSL.instanceIndex); };
     // under `toward`, each instance's previous matrix is ITS pose at t between its last draw and this one, as the mesh's is
     const ia = toward ? new THREE.Matrix4() : null, ib = toward ? new THREE.Matrix4() : null, it = toward ? new THREE.Matrix4() : null;
     const instancesBefore = (object, r) => {
@@ -332,7 +338,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             if (!m) { m = object.matrixWorld.clone(); prev.set(object, m); }
             this.previousModelWorldMatrix.value.copy(toward ? poseAt(THREE, m, object.matrixWorld, toward.t, scratch) : m);
             // an instanced mesh's texture is marked for upload here, and uploaded with this draw's other bindings
-            if (object.isInstancedMesh) instancesBefore(object, instanceRecord(object));
+            if (object.isInstancedMesh && !gpuBefore(object)) instancesBefore(object, instanceRecord(object));
             if (object.isBatchedMesh) batchBefore(object, batchRecord(object));
             if (object.isSprite) { const now = object.material.rotation, was = rotations.has(object) ? rotations.get(object) : now; rotPrev.value = toward ? was + toward.t * (now - was) : was; }
             // three's renderId is its render call's -- frameId is its animation loop's, and several passes fall in one of those
@@ -345,7 +351,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         updateAfter({ object }) {
             const m = prev.get(object);
             if (m) m.copy(object.matrixWorld); else prev.set(object, object.matrixWorld.clone());
-            if (object.isInstancedMesh) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
+            if (object.isInstancedMesh && !gpuBefore(object)) { const r = instanceRecord(object); r.last.set(object.instanceMatrix.array.subarray(0, r.n * 16)); }
             if (object.isBatchedMesh) { const r = batchRecord(object); r.last.set(r.src.image.data); }
             if (object.isSprite) rotations.set(object, object.material.rotation);
             if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
@@ -485,6 +491,10 @@ export function makeMotionStage(THREE, TSL, { w, h, gl, type = null, toward = fa
     // v4762: a positionNode over instancing, skinning or morphs replaces the local position the stage's histories build -- only
     // the application can say where such a point was
     const placedOver = (o) => {
+        // v4783: a toward stage interpolates each instance's pose on the arc, on the CPU; matrices kept on the GPU have no such
+        // path here, and a chord between two matrices is not a pose -- refused by name rather than drawn wrong
+        if (toward && o.isInstancedMesh && o.userData && o.userData.previousInstanceMatrix)
+            throw new Error(`render/temporalTsl: ${o.name ? JSON.stringify(o.name) : "an InstancedMesh"} keeps its previous matrices on the GPU (userData.previousInstanceMatrix), and a toward stage interpolates instance poses on the CPU -- draw it through an ordinary stage`);
         const m = o.material; if (!m || Array.isArray(m) || !m.positionNode) return;
         const p = m.userData && m.userData.previousPositionNode, name = o.name ? JSON.stringify(o.name) : "a " + o.type;
         // v4770: a function of the kept point is the stage's to apply, and it keeps no point for a batch

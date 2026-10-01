@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4783 -- THE 387th CLOSING: NO new gate file -- instance matrices a compute pass writes, through the motion stage.
+    since480: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4783", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslCompute-selfcheck.mjs (section 2: instance matrices a compute pass writes)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE KEPT THE MATRICES THE CPU LAST SET, AND A KERNEL WRITES ELSEWHERE. *** An InstancedMesh whose " +
+                 "instanceMatrix is a StorageInstancedBufferAttribute a compute pass fills leaves the array where the application " +
+                 "set it, so the stage's previous matrices were the first ones for ever: 7.48 px wrong on boxes a kernel moved. " +
+                 "The hook is userData.previousInstanceMatrix, a mat4 storage node -- makePreviousCopy keeps one when stepped " +
+                 "before the pass that moves them -- read by the instance's index: 5.4e-6 px against plain meshes on WebGPU. A " +
+                 "toward stage interpolates instance poses on the CPU and refuses GPU-kept matrices by name rather than draw a " +
+                 "chord. three's WebGL2 backend throws on a storage-matrix InstancedMesh, a row of its own. NOT WRITTEN, AND WHY: " +
+                 "the three.js side (patch 01b) -- three would have to copy the storage attribute after each draw inside its own " +
+                 "render's command stream, which is backend work no public API reaches; the copy an application makes before its " +
+                 "pass is what the stage asks for. Three sabotages red, one equivalent.",
+    }),
     // v4782 -- THE 386th CLOSING: NO new gate file -- the orphan censuses fifty times faster, and run by name at ship.
     since479: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened them.
