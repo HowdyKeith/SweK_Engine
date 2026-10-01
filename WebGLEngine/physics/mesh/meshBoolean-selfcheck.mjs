@@ -173,12 +173,30 @@
 //   H10 a same-winding duplicate cancelled as a fin              -> 0 / 0 / 1 / 0 / 0   (0 first; by-hand row added)
 //   H11 `from` not remapped after cancelling (B side)            -> 0 / 0 / 1 / 0 / 0   (0 first: the fin was LAST in
 //       its operand, so cancelling it renumbered nothing; the fixture now puts it first and checks every `from`)
+// SABOTAGE LOG (BVH-CSG round 16c) -- meshBoolean.mjs's vertexRound and its wiring; two gates (THIS / meshBooleanBlast),
+// each on the real file, restored in a `finally`, md5 verified. 10 of 11 red; meshBooleanBlast is 0 on every one (the
+// page's blobs never come within the radius of the wall, so nothing there is rounded -- measured, 60 shots):
+//   Y1  the radius 0 (no rounding)                               -> 11 / 0
+//   Y2  the pairing not mutual                                   -> 1 / 0   (section 21's by-hand pair)
+//   Y3  no collapse/turn-over refusal                            -> 1 / 0   (section 21's needle)
+//   Y4  a tie to the larger point                                -> 1 / 0
+//   Y5  a vertex moved in one of its triangles only              -> 5 / 0
+//   Y6  the radius in the caller's units, not the normalised band -> 2 / 0   (section 21's 4096x row, and section 16's
+//       1e-100 / 1e100 row: at 1e-100 such a radius rounds everything, 6.6e-2 off)
+//   Y7  B's BVH not rebuilt after rounding                       -> 0 / 0   NOT CAUGHT, and named: rays would then
+//       cross B's triangles up to 8e-9 from where the arrangements put them, but every point within MESH_BOOLEAN_NEAR
+//       (1e-8) of B is sided locally from the rounded triangles, never by rays, so no fixture reaches the difference.
+//       The rebuild stays: a tree over the triangles it is asked about is the only correct one.
+//   Y8  the radius 30 snaps                                      -> 2 / 0   (the tilt at 1e-8; a copy rotated 1e-7, 4e-9)
+//   Y9  the stats not recorded                                   -> 2 / 0
+//   Y10 the grid searched in one cell                            -> 8 / 0
+//   Y11 rounding off by default                                  -> 6 / 0
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 import { closestOnTriangle } from "./triContact.mjs";
 
@@ -1013,21 +1031,32 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             const Bp = [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]].map((ix) => { const vs = ix.map((i) => P[i].slice()); return { vs, pl: M.planeOf(vs) }; });
             return { Ap, Bp };
         };
-        let worstIn = 0, worstOut = 0, fbs = 0, crack = 0, near = 0;
+        // round 16c: with vertex rounding (the default) B's two lifted corners are given A's when |s| <= VERTEX_ROUND, and
+        // the wedge between the faces -- s/2 -- is flattened: the bound is the wedge itself, no more (the rounding radius
+        // is the most a vertex moves, so it is the most a face is moved). Beyond the radius nothing is rounded and the
+        // bound is 1e-12, as before. Round 12's bound -- 5.01e-10 where |s| <= 3e-9, s/2 of the 1e-9 contact snap -- is
+        // held on the same slopes with vertexRound:false: the pipeline under the rounding still resolves the wedge.
+        let worstIn = 0, worstOut = 0, fbs = 0, crack = 0, near = 0, overWedge = 0, worstIn0 = 0, worstOut0 = 0, fbs0 = 0, crack0 = 0;
         const slopes = [1e-12, 1e-10, 3e-10, 1e-9, 3e-9, 1e-8, 1e-7, 1e-6, 1e-4, -1e-10, -1e-9, -1e-8];
         for (const sl of slopes) {
             const { Ap, Bp } = tilt(sl), VB = 1 + sl / 2, i = sl > 0 ? sl / 2 : 0, T = { union: 1 + VB - i, subtract: 1 - i, intersect: i };
             for (const op of OPS) {
                 const r = run(Ap, Bp, op), e = Math.abs(vol(r) - T[op]);
-                if (Math.abs(sl) <= 3e-9) worstIn = Math.max(worstIn, e); else worstOut = Math.max(worstOut, e);
+                if (Math.abs(sl) <= VERTEX_ROUND) { worstIn = Math.max(worstIn, e); if (e > Math.abs(sl) / 2 + 1e-12) overWedge++; } else worstOut = Math.max(worstOut, e);
                 fbs += fbk(r); crack += cracks(r.tris).crack; near += stat(r, "nearSided");
+                const r0 = run(Ap, Bp, op, { vertexRound: false }), e0 = Math.abs(vol(r0) - T[op]);
+                if (Math.abs(sl) <= 3e-9) worstIn0 = Math.max(worstIn0, e0); else worstOut0 = Math.max(worstOut0, e0);
+                fbs0 += fbk(r0); crack0 += cracks(r0.tris).crack;
             }
         }
         const { Ap, Bp } = tilt(1e-10), r0 = run(Ap, Bp, "intersect", { contacts: false });
-        ok("!! *** NEAR-FLUSH TILT, 12 slopes 1e-12..1e-4 and lifted: within 5.01e-10 where |s| <= 3e-9 (s/2 of wedge is the most a contact can hide), 1e-12 beyond; no fallback, no crack ***",
-            worstIn < 5.01e-10 && worstOut < 1e-12 && fbs === 0 && crack === 0 && near > 0,
-            "worst |err| " + worstIn.toExponential(2) + " / " + worstOut.toExponential(2) + ", fallbacks " + fbs + ", cracks " + crack + ", faces sided locally (within 1e-8) " + near +
+        ok("!! *** NEAR-FLUSH TILT, 12 slopes 1e-12..1e-4 and lifted: within the wedge s/2 where |s| <= VERTEX_ROUND (8e-9: rounded flat), 1e-12 beyond; no fallback, no crack ***",
+            overWedge === 0 && worstOut < 1e-12 && fbs === 0 && crack === 0 && near > 0,
+            "runs over their wedge " + overWedge + ", worst |err| " + worstIn.toExponential(2) + " / " + worstOut.toExponential(2) + ", fallbacks " + fbs + ", cracks " + crack + ", faces sided locally (within 1e-8) " + near +
             " -- control contacts:false, s=1e-10 intersect: " + vol(r0).toExponential(3) + " (true 5e-11)");
+        ok("!! the same slopes with vertexRound:false: round 12's bound, within 5.01e-10 where |s| <= 3e-9 and 1e-12 beyond, no fallback, no crack",
+            worstIn0 < 5.01e-10 && worstOut0 < 1e-12 && fbs0 === 0 && crack0 === 0,
+            "worst |err| " + worstIn0.toExponential(2) + " / " + worstOut0.toExponential(2) + ", fallbacks " + fbs0 + ", cracks " + crack0);
     }
 
     // (c) ZERO-VOLUME OPERANDS: a flat rectangle, flattened along each axis, inside the box or lying on its face, as A or B
@@ -1094,13 +1123,16 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             return S;
         };
         const outside = [], inside = [];
+        let ctrlBand = 0;
         for (const w0 of [[0, 0, 1], [1, 2, 3]]) {
             const L = Math.hypot(...w0), w = w0.map((x) => x / L), S = firstOrder(w);
             for (const th of [1e-12, 1e-10, 3e-10, 1e-9, 3e-9, 1e-8, 3e-8, 1e-7, 1e-6]) {
                 const fo = th * S / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo };
                 let wst = 0, f = 0;
                 for (const op of OPS) { const r = run(blob, rot(blob, w, th), op); wst = Math.max(wst, Math.abs(vol(r) - T[op])); f += fbk(r); }
-                (th >= 1e-9 && th <= 3e-8 ? inside : outside).push([th, wst, f, w0.join("")]);
+                (th >= 1e-9 && th <= 3e-8 ? inside : outside).push([th, wst, f, w0.join(""), fo]);
+                // round 16c: the control -- round 16's pipeline, unrounded, on the band's worst case
+                if (w0[0] === 1 && th === 1e-9) ctrlBand = Math.abs(vol(run(blob, rot(blob, w, th), "subtract", { vertexRound: false })) - T.subtract);
             }
         }
         ok("!! rotated by 1e-12, 1e-10, 3e-10, 1e-7 or 1e-6 rad, about z and about (1,2,3): all 3 ops within 3e-9 of the first-order oracle (round 11: up to 0.2)",
@@ -1108,14 +1140,22 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
         console.log("  ..... fallback triangles by angle, inside the band: " + inside.map(([t, , f, ax]) => ax + " " + t.toExponential(0) + ": " + f).join(", "));
         const fbAll = [...outside, ...inside].reduce((n, [, , f]) => n + f, 0);
         // round 16: 87 -> 33, by a dangling chain of seam segments from a NEAR-PARALLEL pair being pruned instead of refusing
-        // the triangle (triArrangement's ROUND 16 note: 84 -> 39), and the seam consensus (39 -> 33)
-        ok("   the rotated family's plane-path fallbacks stay at or under the 33 measured -- 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
-            fbAll <= 33, fbAll + " fallback triangles over 54 runs");
+        // the triangle (triArrangement's ROUND 16 note: 84 -> 39), and the seam consensus (39 -> 33); round 16c: 33 -> 15,
+        // twin triangles within VERTEX_ROUND made the same triangle by vertex rounding
+        ok("   the rotated family's plane-path fallbacks stay at or under the 15 measured -- 33 at round 16, 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
+            fbAll <= 15, fbAll + " fallback triangles over 54 runs");
+        // round 16c: inside the band, an angle whose twins are all rounded together comes out as the copy unrotated --
+        // off by its own first-order volume fo, no more. Every angle but one is within fo (+3e-9): no cone.
+        const coned = inside.filter(([, w, , , fo]) => w > 1.01 * fo + 3e-9);
+        ok("!! round 16c: in the band, every angle but one comes out within its own first-order volume (+3e-9) -- no worse than calling the copy identical, no cone",
+            coned.length <= 1, coned.length + " beyond: " + coned.map(([t, w, , ax, fo]) => ax + " " + t.toExponential(0) + " " + w.toExponential(1) + " (fo " + fo.toExponential(1) + ")").join(", ") +
+            " -- control vertexRound:false, (1,2,3) 1e-9 subtract: " + ctrlBand.toExponential(2));
+        ok("   control: without the rounding the band's worst case is still the cone round 16 left", ctrlBand > 1e-3, ctrlBand.toExponential(2));
         const bandWorst = Math.max(...inside.map(([, w]) => w));
         console.log("  KNOWN  rotated by 1e-9..3e-8 rad, about z and about (1,2,3): " + inside.map(([t, w, , ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1)).join(", ") +
-            " -- twin triangles 1e-9..1e-8 apart, straddling the 1e-9 contact tolerance: a face sided one way on A and its twin the other way on B costs a cone of volume, not a sliver. meshBoolean.mjs's ROUND 12 paragraph.");
-        ok("   (KNOWN, pinned) the band's worst stays within 2.5x its measured 2.8e-2 -- a regression alarm, not a correctness claim",
-            bandWorst < 2.5 * 2.8e-2, "worst " + bandWorst.toExponential(2));
+            " -- about z by 3e-8 the twins near the axis are rounded together and those beyond it are 1e-8..4.5e-8 apart; three triangles there are refused (a seam chain stops 2.6e-8 from a corner), and their plane-path pieces miss their twins'. meshBoolean.mjs's ROUND 16c paragraph.");
+        ok("   (KNOWN, pinned) the band's worst stays within 2.5x its measured 5.6e-5 (round 16: 2.8e-2) -- a regression alarm, not a correctness claim",
+            bandWorst < 2.5 * 5.6e-5, "worst " + bandWorst.toExponential(2));
     }
 }
 
@@ -1254,18 +1294,116 @@ console.log("\n20. *** ROUND 16b: EXACT SEAM TOPOLOGY, AN OPTION -- MEASURED NOT
     // backlog bvh-csg-r16c-global-snap-rounding.
     const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), c = Math.cos(1e-12), sn = Math.sin(1e-12);
     const rotB = blob.map((p) => { const vs = p.vs.map((v) => [c * v[0] - sn * v[1], sn * v[0] + c * v[1], v[2]]); return { vs, pl: M.planeOf(vs) }; });
-    let wDef = 0, wEx = 0;
-    const Vb = M.volume(blob);
+    // round 16c: vertex rounding (the default) makes this copy the blob itself -- every vertex within 1.5e-12 of its twin --
+    // and both paths are then exact. The comparison is therefore made unrounded (vertexRound:false), where they differ.
+    let wDef = 0, wEx = 0, wR = 0, wRx = 0;
+    const Vb = M.volume(blob), NR = { vertexRound: false };
     for (const op of ["union", "intersect"]) {
-        wDef = Math.max(wDef, Math.abs(vol(run(blob, rotB, op)) - Vb));
-        wEx = Math.max(wEx, Math.abs(vol(run(blob, rotB, op, { exactSeam: true })) - Vb));
+        wDef = Math.max(wDef, Math.abs(vol(run(blob, rotB, op, NR)) - Vb));
+        wEx = Math.max(wEx, Math.abs(vol(run(blob, rotB, op, { ...NR, exactSeam: true })) - Vb));
+        wR = Math.max(wR, Math.abs(vol(run(blob, rotB, op)) - Vb));
+        wRx = Math.max(wRx, Math.abs(vol(run(blob, rotB, op, { exactSeam: true })) - Vb));
     }
     // and it is OFF unless asked for: where the two paths differ, the default is the snapped path, bit for bit
-    const rDef = run(blob, rotB, "union"), rOff = run(blob, rotB, "union", { exactSeam: false }), rOn = run(blob, rotB, "union", { exactSeam: true });
+    const rDef = run(blob, rotB, "union", NR), rOff = run(blob, rotB, "union", { ...NR, exactSeam: false }), rOn = run(blob, rotB, "union", { ...NR, exactSeam: true });
     const same = (x, y) => x.tris.length === y.tris.length && x.tris.every((v, i) => v === y.tris[i]);
-    ok("!! exactSeam is OFF unless asked for: on the rotated copy the default output is the snapped path's, bit for bit, and not the exact path's",
+    ok("!! exactSeam is OFF unless asked for: on the rotated copy (unrounded) the default output is the snapped path's, bit for bit, and not the exact path's",
         same(rDef, rOff) && !same(rDef, rOn), "default = exactSeam:false " + same(rDef, rOff) + ", default = exactSeam:true " + same(rDef, rOn));
-    console.log("  KNOWN  a blob against its copy rotated 1e-12 (union, intersect): default |err| " + wDef.toExponential(1) + ", exactSeam " + wEx.toExponential(1) + " -- exact topology without global snap rounding");
+    console.log("  KNOWN  a blob against its copy rotated 1e-12 (union, intersect), unrounded: default |err| " + wDef.toExponential(1) + ", exactSeam " + wEx.toExponential(1) +
+        " -- exact topology without rounding; with round 16c's vertex rounding (the default) both are exact: " + wR.toExponential(1) + ", " + wRx.toExponential(1));
+}
+
+console.log("\n21. *** ROUND 16c: VERTEX ROUNDING -- B'S VERTICES WITHIN VERTEX_ROUND OF A'S TAKE A'S COORDINATES ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const buf = (P) => M.toTriangleBuffer(P);
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // a closed mesh, by its exact bits: every directed edge has its reverse
+    const closed = (t) => { const k = (o) => t[o] + "," + t[o + 1] + "," + t[o + 2], E = new Map();
+        for (let o = 0; o < t.length; o += 9) for (let i = 0; i < 3; i++) { const e = k(o + i * 3) + "|" + k(o + ((i + 1) % 3) * 3); E.set(e, (E.get(e) || 0) + 1); }
+        for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) return false; } return true; };
+    let st = 99 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    // (a) a blob and a copy whose every vertex is nudged up to 0.9 x VERTEX_ROUND (the same nudge wherever a vertex is
+    // used): rounded back onto the blob, bit for bit -- the twin IS the blob, and every op is the blob with itself
+    {
+        const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), A = buf(blob), nudge = new Map(), B = Float64Array.from(A);
+        for (let o = 0; o < B.length; o += 3) {
+            const k = A[o] + "," + A[o + 1] + "," + A[o + 2];
+            if (!nudge.has(k)) { const d = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], L = Math.hypot(...d); nudge.set(k, d.map((x) => x / L * 0.9 * VERTEX_ROUND * rnd())); }
+            const d = nudge.get(k); B[o] += d[0]; B[o + 1] += d[1]; B[o + 2] += d[2];
+        }
+        const r = vertexRound(A, new MeshBVH(A), B);
+        const back = r.tris && r.tris.every((x, i) => x === A[i]);
+        const V = vol(A), T = { union: V, subtract: 0, intersect: V };
+        let worst = 0; for (const op of OPS) worst = Math.max(worst, Math.abs(vol(meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op).tris) - T[op]));
+        ok("!! a copy with every vertex nudged up to 0.9 x VERTEX_ROUND is rounded back onto the original, bit for bit, and all 3 ops are the blob with itself (exact to 1e-13)",
+            back && worst < 1e-13, "bits back " + back + ", moved " + r.stats.moved + " of " + nudge.size + ", max move " + r.stats.maxMove.toExponential(2) + ", worst |err| " + worst.toExponential(2));
+        // the same nudges scaled to 1.5 x VERTEX_ROUND: nothing within the radius, nothing moves
+        const B2 = Float64Array.from(A);
+        for (let o = 0; o < B2.length; o += 3) { const d = nudge.get(A[o] + "," + A[o + 1] + "," + A[o + 2]), L = Math.hypot(...d); if (L > 0) for (let c = 0; c < 3; c++) B2[o + c] += d[c] / L * 1.5 * VERTEX_ROUND; }
+        const r2 = vertexRound(A, new MeshBVH(A), B2);
+        ok("   nudged 1.5 x VERTEX_ROUND instead, no vertex is within the radius and none moves", r2.tris === null && r2.stats.moved === 0, "moved " + r2.stats.moved + ", candidates " + r2.stats.candidates);
+        // round 11's normalisation: the rounding runs on the operands brought into the band, so its radius scales with
+        // them. The blob at 4x (extent ~8, in the band: not rescaled) with a copy nudged up to 0.9 x VERTEX_ROUND, against
+        // the same pair at 4096x -- which meshBoolean brings back down by exactly 2^10 to the 4x pair: rounded the same,
+        // the output 1024x the 4x one, bit for bit. (A radius applied before the normalisation would round nothing at 4096x.)
+        const s4 = (t, f) => t.map((x) => x * f), A4 = s4(A, 4), B4 = Float64Array.from(A4);
+        for (let o = 0; o < B4.length; o += 3) { const d = nudge.get(A[o] + "," + A[o + 1] + "," + A[o + 2]); for (let c = 0; c < 3; c++) B4[o + c] += d[c]; }
+        const A4k = s4(A4, 1024), B4k = s4(B4, 1024);
+        const r1 = meshBoolean(A4, new MeshBVH(A4), B4, new MeshBVH(B4), "union"), rs = meshBoolean(A4k, new MeshBVH(A4k), B4k, new MeshBVH(B4k), "union");
+        ok("   at 4096x the nudged copy is rounded as at 4x: the result is 1024x the 4x one, bit for bit (the radius is a length in the normalised band)",
+            rs.scaleExponent === 10 && r1.scaleExponent === 0 && r1.tris.length > 0 && rs.tris.length === r1.tris.length && rs.tris.every((x, i) => x === r1.tris[i] * 1024) && (r1.stats.b.vertexRound?.moved ?? 0) > 0,
+            rs.tris.length / 9 + " triangles against " + r1.tris.length / 9 + ", scale exponents " + rs.scaleExponent + " / " + r1.scaleExponent + ", rounded at 4x " + (r1.stats.b.vertexRound?.moved ?? "none"));
+    }
+    // (b) by hand: a's nearest B vertex must be b itself -- two B vertices within the radius of one A vertex, the nearer
+    // moves and the other does not (no two vertices of B on one point, no triangle collapsed)
+    {
+        const A = Float64Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+        const B = Float64Array.from([2e-9, 0, 1e-9, -5e-9, 0, 0, 0, -1, 1]);
+        const r = vertexRound(A, new MeshBVH(A), B), t = r.tris || B;
+        const p0 = [t[0], t[1], t[2]], p1 = [t[3], t[4], t[5]];
+        ok("!! two B vertices within the radius of one A vertex: only the nearer takes it (the pairing is mutual), the triangle keeps three points",
+            p0.join() === "0,0,0" && p1.join() === [-5e-9, 0, 0].join() && r.stats.refused === 1, "moved " + p0.join() + " / " + p1.join() + ", refused " + r.stats.refused);
+    }
+    // (c) by hand: a move that would turn a B triangle over is refused -- a needle 2e-9 tall whose apex has an A vertex
+    // 4e-9 away on the far side of its base
+    {
+        const A = Float64Array.from([0.5, -2e-9, 0, 0.5, -2e-9, 5, 3, 3, 3]);
+        const B = Float64Array.from([0, 0, 0, 1, 0, 0, 0.5, 2e-9, 0]);
+        const r = vertexRound(A, new MeshBVH(A), B);
+        ok("!! a move that would turn a B triangle over (a needle's apex across its own base) is refused, and the triangle is left as it was",
+            r.tris === null && r.stats.refused === 1, "refused " + r.stats.refused + ", moved " + r.stats.moved);
+    }
+    // (d) by hand: an A vertex exactly as far from b as another -- the lexicographically smaller is taken, whatever the
+    // order of A's triangles
+    {
+        const t1 = [1e-9, 0, 0, 1, 1, 1, 1, 2, 1], t2 = [-1e-9, 0, 0, -1, 1, 1, -1, 2, 1];
+        const B = Float64Array.from([0, 0, 0, 0, -1, 3, 2, -1, 3]);
+        const pick = (A) => { const r = vertexRound(A, new MeshBVH(A), B); return r.tris ? r.tris[0] : NaN; };
+        const x1 = pick(Float64Array.from([...t1, ...t2])), x2 = pick(Float64Array.from([...t2, ...t1]));
+        ok("   two A vertices equally near: the lexicographically smaller is taken, in either order of A's triangles", x1 === -1e-9 && x2 === -1e-9, x1 + " / " + x2);
+    }
+    // (e) closedness: a box whose corners are nudged within the radius of a second box's corners, both closed; after the
+    // rounding B is still closed, by its bits, and the union is exact
+    {
+        const A = buf(M.boxPolys([0, 0, 0], [1, 1, 1])), B0 = buf(M.boxPolys([2, 2, 2], [1, 1, 1]));
+        const n = new Map(), B = Float64Array.from(B0);
+        for (let o = 0; o < B.length; o += 3) { const k = B0[o] + "," + B0[o + 1] + "," + B0[o + 2]; if (!n.has(k)) n.set(k, [3e-9 * (rnd() - 0.5), 3e-9 * (rnd() - 0.5), 3e-9 * (rnd() - 0.5)]); const d = n.get(k); for (let c = 0; c < 3; c++) B[o + c] += d[c]; }
+        const r = vertexRound(A, new MeshBVH(A), B);
+        ok("!! a box touching another at one corner, its corners nudged by up to 1.5e-9: B moves only the shared corner and stays closed, by its bits",
+            r.stats.moved === 1 && closed(r.tris || B), "moved " + r.stats.moved + ", closed " + closed(r.tris || B));
+    }
+    // (f) the switch: vertexRound:false is round 16's pipeline (same bits as the unrounded operands), and the default
+    // rounds (section 17's tilt and band rows measure what it buys)
+    {
+        const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), A = buf(blob), c = Math.cos(1e-9), sn = Math.sin(1e-9);
+        const B = buf(blob.map((p) => { const vs = p.vs.map((v) => [c * v[0] - sn * v[1], sn * v[0] + c * v[1], v[2]]); return { vs, pl: M.planeOf(vs) }; }));
+        const rOff = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", { vertexRound: false });
+        const rDef = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract");
+        const vr = rDef.stats.b.vertexRound;
+        ok("!! vertex rounding is ON by default (the copy rotated 1e-9 about z has its vertices rounded) and vertexRound:false turns it off (none recorded)",
+            vr && vr.moved > 0 && !rOff.stats.b.vertexRound, "default moved " + (vr ? vr.moved : "none") + ", off: " + (rOff.stats.b.vertexRound ? "rounded" : "not rounded"));
+    }
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

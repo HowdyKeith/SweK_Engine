@@ -403,6 +403,28 @@
 // arrangement snap-rounded GLOBALLY: seam vertices and nearby input vertices rounded once, to one grid, so surfaces a
 // rounding apart become exactly coincident and the exact-zero contact path takes them -- backlog
 // bvh-csg-r16c-global-snap-rounding.
+//
+// *** ROUND 16c: VERTEX ROUNDING -- THE INPUT-VERTEX PART OF GLOBAL SNAP ROUNDING. *** Measured first: every cone in the
+// rotated band is a triangle the arrangement REFUSED (dangling, face area sum, Earcut) beside a twin it arranged. On a
+// copy rotated 1e-9 about (1,2,3), 215 of A's 252 fragments are ON their twins and kept or dropped by orientation; one
+// triangle of B fell back, rays called four of its five pieces inside, its twin was ON and dropped, and the hole is the
+// 2.81e-2. Before anything is cut, vertexRound() now gives each vertex of B within VERTEX_ROUND (JOIN x snap, 8e-9 -- the
+// arrangement's own largest move) of a vertex of A that vertex's coordinates, exactly: twin triangles become the same
+// triangle, which the ON rule decides once. A never moves; the pairing is mutual-nearest, so no two vertices of B land on
+// one point; a move that would collapse or turn over a triangle is refused; B stays closed. ON by default (opts.vertexRound
+// false turns it off; opts.vertexRoundRadius sets it). MEASURED, against round 16: the rotated band's worst 2.8e-2 ->
+// 5.6e-5; fallbacks 33 -> 15; every band angle but one within its own first-order volume (no worse than calling the copy
+// identical); outside the band unchanged (1.39e-9); 1,350 flush-box runs still exact; on the page's chains no blob vertex is
+// ever within the radius of a wall vertex, so nothing moves and the cost is the search (30-shot chain within noise). THE
+// COST, AGREED: a vertex moved by up to the radius moves its faces by as much -- the near-flush tilt at slope 3e-9 (B's
+// lifted corners rounded flat) is off by the whole wedge, 1.5e-9, where round 12 resolved it to 5.01e-10; the gate now
+// bounds rounded slopes by their wedge and keeps round 12's bound under vertexRound:false. Radii were measured: 1e-9 keeps
+// the tilt bound but not the band (2.8e-2); 2e-9 and 4e-9 leave 7.7e-3; 8e-9..2.5e-8 all leave 5.6e-5; 3e-8 clears the band
+// but costs 4e-9 on a copy rotated 1e-7, against the gate's 3e-9. KNOWN, the 5.6e-5: about z by 3e-8, twins near the axis
+// are rounded together and those beyond are 1e-8..4.5e-8 apart; three triangles there are refused (a seam chain stops 2.6e-8
+// from a corner, past the 8e-9 join -- widening the join to a corner to 64 snaps changed nothing). exactSeam on top of the
+// rounding is still worse (band 2.5e-2, 189 fallbacks): off. The rest -- seam points rerouted through hot pixels at every
+// vertex, so a chain that stops near a corner ends AT it on both sides -- is backlog bvh-csg-r16d-hot-pixel-seams.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -919,6 +941,103 @@ export function joinSeamEnds(short) {
 }
 
 /**
+ * BVH-CSG ROUND 16c: VERTEX ROUNDING, the input-vertex part of global snap rounding. A vertex of B within `radius` of a
+ * vertex of A is given A's coordinates exactly, so two surfaces a rounding apart share their vertices and a twin
+ * triangle becomes the SAME triangle -- coplanar, decided once by the ON rule -- instead of a pair whose 1e-9 decisions
+ * each arrangement takes for itself. A never moves (the wall's vertices are where earlier shots put them). The pairing
+ * is one to one: b and a must each be the other's nearest within the radius, so no two vertices of B land on one point.
+ * A vertex whose move would collapse or turn over any triangle using it is not moved (refused). Vertices are matched
+ * by their bits, so every triangle using a vertex moves it alike and B stays closed. Returns { tris } -- a new buffer,
+ * or null when nothing moved -- and stats { candidates, moved, refused, maxMove }.
+ */
+export function vertexRound(trisA, bvhA, trisB, radius = VERTEX_ROUND) {
+    const nB = trisB.length / 9;
+    const stats = { candidates: 0, moved: 0, refused: 0, maxMove: 0 };
+    if (!nB || !(radius > 0) || !bvhA.count) return { tris: null, stats };
+    // B's unique vertices, by bits, with the triangles using them
+    const key = (x, y, z) => x + "," + y + "," + z;
+    const vid = new Map(), BV = [], uses = [];
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let t = 0; t < nB; t++) for (let v = 0; v < 3; v++) {
+        const o = t * 9 + v * 3, x = trisB[o], y = trisB[o + 1], z = trisB[o + 2], k = key(x, y, z);
+        let i = vid.get(k);
+        if (i === undefined) { i = BV.length; vid.set(k, i); BV.push([x, y, z]); uses.push([]); }
+        uses[i].push(t * 3 + v);
+        if (x < lo[0]) lo[0] = x; if (x > hi[0]) hi[0] = x;
+        if (y < lo[1]) lo[1] = y; if (y > hi[1]) hi[1] = y;
+        if (z < lo[2]) lo[2] = z; if (z > hi[2]) hi[2] = z;
+    }
+    // A's vertices near B's box, on a grid of cell `radius` (found through A's BVH: only the part of A near B)
+    const cell = (x) => Math.floor(x / radius), gk = (i, j, k) => i + "," + j + "," + k;
+    const grid = new Map(), AV = [], aid = new Map();
+    for (const t of bvhA.trianglesInBox(lo.map((x) => x - radius), hi.map((x) => x + radius))) for (let v = 0; v < 3; v++) {
+        const o = t * 9 + v * 3, x = trisA[o], y = trisA[o + 1], z = trisA[o + 2], k = key(x, y, z);
+        if (aid.has(k)) continue;
+        aid.set(k, AV.length); AV.push([x, y, z]);
+        const g = gk(cell(x), cell(y), cell(z));
+        if (!grid.has(g)) grid.set(g, []);
+        grid.get(g).push(AV.length - 1);
+    }
+    const nearest = (p, pts, index) => {
+        let best = -1, bd = radius * radius;
+        const i = cell(p[0]), j = cell(p[1]), k = cell(p[2]);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+            for (const q of index.get(gk(i + a, j + b, k + c)) || []) {
+                const P = pts[q], d = (P[0] - p[0]) ** 2 + (P[1] - p[1]) ** 2 + (P[2] - p[2]) ** 2;
+                // nearest; a tie goes to the lexicographically smaller point, so the choice does not depend on order
+                if (d < bd || (d === bd && (best < 0 || (P[0] - pts[best][0] || P[1] - pts[best][1] || P[2] - pts[best][2]) < 0))) { bd = d; best = q; }
+            }
+        }
+        return best;
+    };
+    const target = new Int32Array(BV.length).fill(-1);
+    let gridB = null;
+    for (let i = 0; i < BV.length; i++) {
+        const a = nearest(BV[i], AV, grid);
+        if (a < 0) continue;
+        stats.candidates++;
+        if (!gridB) {   // built once, the first time any B vertex has a partner
+            gridB = new Map();
+            BV.forEach((p, q) => { const g = gk(cell(p[0]), cell(p[1]), cell(p[2])); if (!gridB.has(g)) gridB.set(g, []); gridB.get(g).push(q); });
+        }
+        if (nearest(AV[a], BV, gridB) !== i) { stats.refused++; continue; }   // not mutual: another B vertex is nearer a
+        const P = AV[a], Q = BV[i];
+        if (P[0] === Q[0] && P[1] === Q[1] && P[2] === Q[2]) continue;      // already the same point
+        target[i] = a;
+    }
+    // a move that collapses or turns over a triangle using the vertex is refused (the triangle as it would be with
+    // every accepted move applied -- checked until nothing more is refused)
+    const pos = (i) => (target[i] >= 0 ? AV[target[i]] : BV[i]);
+    const vOf = (t, v) => { const o = t * 9 + v * 3; return vid.get(key(trisB[o], trisB[o + 1], trisB[o + 2])); };
+    for (let changed = true; changed;) {
+        changed = false;
+        for (let i = 0; i < BV.length; i++) {
+            if (target[i] < 0) continue;
+            for (const u of uses[i]) {
+                const t = (u / 3) | 0, ids = [vOf(t, 0), vOf(t, 1), vOf(t, 2)];
+                const p = ids.map(pos), q = ids.map((j) => BV[j]);
+                const n1 = cross3(sub3(p[1], p[0]), sub3(p[2], p[0])), n0 = cross3(sub3(q[1], q[0]), sub3(q[2], q[0]));
+                if (!(n1[0] * n0[0] + n1[1] * n0[1] + n1[2] * n0[2] > 0)) { target[i] = -1; stats.refused++; changed = true; break; }
+            }
+        }
+    }
+    let any = false;
+    const out = Float64Array.from(trisB);
+    for (let i = 0; i < BV.length; i++) {
+        if (target[i] < 0) continue;
+        const P = AV[target[i]], Q = BV[i];
+        stats.moved++; any = true; stats.maxMove = Math.max(stats.maxMove, Math.hypot(P[0] - Q[0], P[1] - Q[1], P[2] - Q[2]));
+        for (const u of uses[i]) out.set(P, u * 3);
+    }
+    vertexRound.last = stats;
+    return { tris: any ? out : null, stats };
+}
+/** Round 16c: vertexRound's radius -- JOIN x snap, the largest move the arrangement itself makes (triArrangement.mjs). */
+export const VERTEX_ROUND = 8 * SNAP_EPS;
+function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+
+/**
  * ROUND 11: the band of combined extents (the larger side of A's and B's joint bounding box) the absolute
  * tolerances in triTriIntersect, triArrangement, triClip, triFragmentAccumulate and meshPointClassify were measured
  * in: [2^0, 2^4). Every fixture of rounds 1-10 falls inside it (unit cubes span 2, meshCSG's wall 8).
@@ -1022,6 +1141,12 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
                      stats: { a: emptyStats(trisA, eA), b: emptyStats(trisB, eB) }, emptyOperand: eA ? (eB ? "both" : "a") : "b" };
         }
     }
+    // round 16c: B's vertices within VERTEX_ROUND of A's take A's coordinates (vertexRound, above)
+    let rounded = null;
+    if (opts.contacts !== false && opts.vertexRound !== false) {
+        rounded = vertexRound(trisA, bvhA, trisB, opts.vertexRoundRadius ?? VERTEX_ROUND);
+        if (rounded.tris) { trisB = rounded.tris; bvhB = new MeshBVH(trisB); }
+    }
     // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
     let optsA = opts, optsB = opts;
     if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
@@ -1037,6 +1162,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = tris[i][v][c];
     }
     const capped = classifiedA.stats.capped || classifiedB.stats.capped;
+    if (rounded) classifiedB.stats.vertexRound = rounded.stats;
     return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped, from: Int32Array.from(from),
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }
