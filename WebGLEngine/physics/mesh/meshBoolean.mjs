@@ -534,8 +534,8 @@
 //     (1e-14, a few ulps at the page's coordinates). Without it the wall kept edges 1.5e-17 long (texel spread 1.47 on
 //     seed 1's 20 shots, against 3.75e-6) and seed 11's T-junction 3.5e-18 wide stayed open 26 shots (none with it).
 //   - a PRECONDITION found by the page itself: a meshCSG BSP wall is not conforming (a long edge against two short ones
-//     whose middle vertex lies on it only to rounding). The other mesh's plane crosses "the same" line at points 1e-16
-//     apart, the seam has a gap, and a region floods through it: a session switching engines every 25 shots lost 6.2 units
+//     whose middle vertex lies near it -- written "only to rounding" here at 16g; round 16h measured up to 1.03e-9 off,
+//     and near-miss vertices besides). The other mesh's plane crosses "the same" line at distinct points, the seam has a gap, and a region floods through it: a session switching engines every 25 shots lost 6.2 units
 //     of the wall by shot 100. The exact path now runs only where both operands are conforming near the seam
 //     (nonConformingNear, below), and otherwise declines to the snapped path, whose snap closes such gaps
 //     (stats.exactDeclined; result.exact says which ran). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
@@ -546,6 +546,23 @@
 // Chromium, 100 shots through the page's button: unmatched 0 at every 25 shots and after settle, 0 fallbacks; a session
 // switching bvh / bsp every 25 shots ends at the single-engine volume (12.003929; 6.2 lost before the precondition), 55
 // unmatched after settle (the BSP alone: 49).
+//
+// *** ROUND 16h: AN OPERAND THAT IS NOT CONFORMING NEAR THE SEAM IS MADE CONFORMING THERE, THEN THE EXACT PATH RUNS
+// (conformNear). *** Measured first, on the switching chains (12 seeds, 10 bvh / 10 bsp / 10 bvh): every edge near the
+// seam without a twin is a NEAR-MISS -- two vertices that should be one: a rounding apart (1.2e-14 at most, the BSP's split
+// points computed per polygon), or a corner 1.6e-9 from its neighbour's -- or one side of a T-JUNCTION, the middle vertex up to
+// 1.03e-9 off the long side (none of 2,077 exactly on it; 16g's "only to rounding" was wrong). No third kind. conformNear
+// merges untwinned edges' ends within CONFORM_MERGE and splits untwinned edges at those ends within CONFORM_SPLIT (both
+// meshCSG's EPS, 1e-8), `from` still naming the caller's triangles; what is still not conforming declines as at 16g (a
+// crack 1.4e-6 wide does; so does a near-miss 2e-8 apart). MEASURED: the 120 shots after the BSP's 20 -- 120 exact, where 100
+// declined before; 0 fallbacks; each chain within 8.0e-11 of the snapped one; no output edge open that the wall had not
+// already opened along its own cracks, none on the blob's side. At a 1e-12 merge 27 of the 120 still declined (a split beside
+// a corner 1.6e-9 off turned a triangle over). Its own first draft read an edge on the region's rim as open (the twin lay
+// outside the box) and split it at a point its twin already had -- 5 edges doubled on seed 12's shot 28; the edge census
+// now covers every twin. COST: those 120 shots 55 s against 30 s snapped (1.84x); a page that never cuts with the BSP
+// never conforms (the default soak: 0 such shots). Chromium, switching bvh / bsp every 25 shots: the single-engine volume,
+// 16,985 unmatched after the third quarter (115,963 at 16g, the conformed wall repaired around each cut); after the BSP's
+// last quarter and settle, 70 (55 at 16g; the BSP alone 49) -- meshCSG's settle on a different wall, KNOWN.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -1258,6 +1275,7 @@ export function vertexRound(trisA, bvhA, trisB, radius = VERTEX_ROUND) {
 export const VERTEX_ROUND = 8 * SNAP_EPS;
 function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
 /**
  * ROUND 11: the band of combined extents (the larger side of A's and B's joint bounding box) the absolute
@@ -1362,6 +1380,150 @@ function nonConformingNear(tris, bvh, pairs, side) {
     return open;
 }
 
+/**
+ * Round 16h: how far apart two ends of untwinned edges of one operand may be and still be taken as one point -- meshCSG's
+ * EPS. Measured on the page's switching chains (12 seeds, 10 bvh / 10 bsp / 10 bvh): most such pairs are a rounding apart
+ * (1.2e-14 at most: the BSP computes a split point per polygon), but a corner of one polygon can sit 1.6e-9 from its
+ * neighbour's; at 1e-12 27 of the 120 shots after the BSP's still declined (a split beside such a corner turns a triangle
+ * over), at 1e-8 none.
+ */
+export const CONFORM_MERGE = 1e-8;
+/**
+ * Round 16h: how far off a T-junction's long side its middle vertex may lie -- meshCSG's EPS, within which the BSP rounds a
+ * vertex onto a plane (measured 1.03e-9 at most on the page's switching chains).
+ */
+export const CONFORM_SPLIT = 1e-8;
+
+/**
+ * Round 16h: make side `side` of the pairs conforming near the seam, where it is not (nonConformingNear): among the
+ * triangles around the pair triangles, (1) vertices on an untwinned edge within CONFORM_MERGE of each other become one (the
+ * lexicographically least; every triangle of the mesh on the moved bits follows), and (2) each untwinned edge is split
+ * at the untwinned edges' vertices lying strictly inside it within CONFORM_SPLIT -- a T-junction's long side gets its
+ * short sides' points. Returns { tris, src (new triangle -> old), stats } or null (nothing to do, or a split would turn a
+ * triangle over: the caller declines).
+ */
+function conformNear(tris, bvh, pairs, side) {
+    const cand = new Set();
+    for (const p of pairs) cand.add(p[side]);
+    if (!cand.size) return null;
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const t of cand) for (let c = 0; c < 9; c++) { const v = tris[t * 9 + c], a = c % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+    const R = 2 * Math.max(CONFORM_MERGE, CONFORM_SPLIT);                 // a box query stays valid after the merge's moves
+    for (let a = 0; a < 3; a++) { lo[a] -= R; hi[a] += R; }
+    // the region is every triangle the box touches; edges are indexed over every triangle touching THEIR box, so each
+    // region triangle's twin is indexed (a twin overlaps its triangle's box) -- one on the rim of the first box may have its
+    // twin outside it, which is not an open edge
+    const out = Float64Array.from(tris), region = bvh.trianglesInBox(lo, hi), inRegion = new Uint8Array(tris.length / 9);
+    const lo2 = [...lo], hi2 = [...hi];
+    for (const t of region) { inRegion[t] = 1; for (let c = 0; c < 9; c++) { const v = tris[t * 9 + c], a = c % 3; if (v < lo2[a]) lo2[a] = v; if (v > hi2[a]) hi2[a] = v; } }
+    for (let a = 0; a < 3; a++) { lo2[a] -= R; hi2[a] += R; }
+    const touched = bvh.trianglesInBox(lo2, hi2);
+    const same = (o, q) => out[o] === out[q] && out[o + 1] === out[q + 1] && out[o + 2] === out[q + 2];
+    const hv = (o) => out[o] * 1.1 + out[o + 1] * 2.3 + out[o + 2] * 3.7;
+    // the region's untwinned directed edges, [corner offset, next corner offset] (nonConformingNear's hash, every match exact)
+    const openEdges = () => {
+        const E = new Map();
+        for (const t of touched) for (let i = 0; i < 3; i++) {
+            const o = t * 9 + i * 3, q = t * 9 + ((i + 1) % 3) * 3, k = hv(o) * 5.9 + hv(q) * 7.3, l = E.get(k);
+            if (l) l.push(o, q); else E.set(k, [o, q]);
+        }
+        const open = [];
+        for (const t of region) for (let i = 0; i < 3; i++) {
+            const o = t * 9 + i * 3, q = t * 9 + ((i + 1) % 3) * 3;
+            if (same(o, q)) continue;
+            const l = E.get(hv(q) * 5.9 + hv(o) * 7.3);
+            let found = false;
+            if (l) for (let m = 0; m < l.length && !found; m += 2) found = same(l[m], q) && same(l[m + 1], o);
+            if (!found) open.push(o, q);
+        }
+        return open;
+    };
+    // the distinct points among the untwinned edges' ends, by bits
+    const endsOf = (open) => {
+        const H = new Map(), P = [];
+        for (const o of open) {
+            const h = hv(o), l = H.get(h);
+            if (l && l.some((p) => same(p, o))) continue;
+            if (l) l.push(o); else H.set(h, [o]);
+            P.push(o);
+        }
+        return { H, P };
+    };
+    // (1) the near-misses: ends of untwinned edges within CONFORM_MERGE become one -- the least by x, y, z; every corner of
+    // the mesh on the moved bits follows (a triangle outside the region shares a moved vertex only by its bits)
+    let open = openEdges();
+    if (!open.length) return null;
+    let { P } = endsOf(open);
+    const V = P.map((o) => [out[o], out[o + 1], out[o + 2]]).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    const parent = V.map((_, i) => i), find = (i) => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
+    for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length && V[j][0] - V[i][0] <= CONFORM_MERGE; j++) {
+        const a = V[i], b = V[j];
+        if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= CONFORM_MERGE) { const ri = find(i), rj = find(j); if (ri !== rj) parent[Math.max(ri, rj)] = Math.min(ri, rj); }
+    }
+    let merged = 0;
+    for (let i = 0; i < V.length; i++) {
+        const r = find(i); if (r === i) continue;
+        const from = V[i], to = V[r], e = CONFORM_MERGE;
+        for (const t of bvh.trianglesInBox([from[0] - e, from[1] - e, from[2] - e], [from[0] + e, from[1] + e, from[2] + e]))
+            for (let c = 0; c < 3; c++) { const o = t * 9 + c * 3; if (out[o] === from[0] && out[o + 1] === from[1] && out[o + 2] === from[2]) { out[o] = to[0]; out[o + 1] = to[1]; out[o + 2] = to[2]; merged++; } }
+    }
+    // (2) the T-junctions: an untwinned edge split at the untwinned edges' ends strictly inside it, within CONFORM_SPLIT
+    open = openEdges();
+    const ends = endsOf(open), isEnd = (o) => { const l = ends.H.get(hv(o)); return !!l && l.some((p) => same(p, o)); };
+    const splits = new Map();
+    for (let e = 0; e < open.length; e += 2) {
+        const o = open[e], q = open[e + 1], t = (o / 9) | 0, i = ((o - t * 9) / 3) | 0;
+        const a = [out[o], out[o + 1], out[o + 2]], d = [out[q] - a[0], out[q + 1] - a[1], out[q + 2] - a[2]], L2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+        const blo = [Math.min(a[0], out[q]) - R, Math.min(a[1], out[q + 1]) - R, Math.min(a[2], out[q + 2]) - R];
+        const bhi = [Math.max(a[0], out[q]) + R, Math.max(a[1], out[q + 1]) + R, Math.max(a[2], out[q + 2]) + R];
+        const on = [], seen = new Map();
+        for (const u of bvh.trianglesInBox(blo, bhi)) {
+            if (!inRegion[u]) continue;
+            for (let c = 0; c < 3; c++) {
+                const x = u * 9 + c * 3, hx = hv(x), sl = seen.get(hx);
+                if ((sl && sl.some((y) => same(x, y))) || !isEnd(x)) continue;
+                if (sl) sl.push(x); else seen.set(hx, [x]);
+                const s = ((out[x] - a[0]) * d[0] + (out[x + 1] - a[1]) * d[1] + (out[x + 2] - a[2]) * d[2]) / L2;
+                if (!(s > 0 && s < 1) || same(x, o) || same(x, q)) continue;
+                if (Math.hypot(a[0] + s * d[0] - out[x], a[1] + s * d[1] - out[x + 1], a[2] + s * d[2] - out[x + 2]) <= CONFORM_SPLIT) on.push([s, [out[x], out[x + 1], out[x + 2]]]);
+            }
+        }
+        if (on.length) { on.sort((u, v) => u[0] - v[0]); if (!splits.has(t)) splits.set(t, [[], [], []]); splits.get(t)[i] = on.map((u) => u[1]); }
+    }
+    if (!merged && !splits.size) return null;
+    const nT = out.length / 9, res = new Float64Array(out.length * 3 + [...splits.values()].reduce((n, sp) => n + 9 * (sp[0].length + sp[1].length + sp[2].length + 3), 0)), src = [];
+    let split = 0, collapsed = 0, w = 0;
+    const emit = (f) => { for (const v of f) { res[w++] = v[0]; res[w++] = v[1]; res[w++] = v[2]; } };
+    for (let t = 0; t < nT; t++) {
+        const sp = splits.get(t);
+        if (!sp) {
+            const o = t * 9;
+            if (same(o, o + 3) || same(o + 3, o + 6) || same(o + 6, o)) { collapsed++; continue; }    // two corners merged: an edge, not a face
+            res.set(out.subarray(o, o + 9), w); w += 9; src.push(t); continue;
+        }
+        const C = [0, 1, 2].map((c) => [out[t * 9 + c * 3], out[t * 9 + c * 3 + 1], out[t * 9 + c * 3 + 2]]);
+        const n = cross3(sub3(C[1], C[0]), sub3(C[2], C[0]));
+        // one split side fans from its opposite corner; more, from the centroid
+        const sides = sp.filter((x) => x.length).length, fans = [];
+        if (sides === 1) {
+            const i = sp.findIndex((x) => x.length), apex = C[(i + 2) % 3], chain = [C[i], ...sp[i], C[(i + 1) % 3]];
+            for (let k = 0; k + 1 < chain.length; k++) fans.push([chain[k], chain[k + 1], apex]);
+        } else {
+            const ring = [];
+            for (let i = 0; i < 3; i++) { ring.push(C[i]); for (const x of sp[i]) ring.push(x); }
+            const g = [(C[0][0] + C[1][0] + C[2][0]) / 3, (C[0][1] + C[1][1] + C[2][1]) / 3, (C[0][2] + C[1][2] + C[2][2]) / 3];
+            for (let k = 0; k < ring.length; k++) fans.push([ring[k], ring[(k + 1) % ring.length], g]);
+        }
+        for (const f of fans) {
+            if (dot3(cross3(sub3(f[1], f[0]), sub3(f[2], f[0])), n) <= 0) return null;   // a split would turn it over: decline
+            emit(f);
+            src.push(t);
+        }
+        split++;
+    }
+    return { tris: res.slice(0, w), src: Int32Array.from(src), stats: { merged, split, collapsed, open: open.length / 2 } };
+}
+
 function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // round 16: a ZERO-THICKNESS FIN -- two faces of one operand on the same three vertices, wound opposite ways -- has
     // no volume and is not in the regularised result; left in, it breaks every ray that crosses it (pointInMesh welds
@@ -1401,8 +1563,8 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     let exactArr = !!opts.exactArrangement && opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
     // round 16g: the exact arrangement's PRECONDITION -- where the operands meet, every edge has its twin on the same two
     // doubles. A seam then closes by identity; with a T-junction (a meshCSG BSP wall: a long edge against two short ones
-    // whose middle vertex lies on it only to rounding) the plane of the other mesh crosses "the same" line at points 1e-16
-    // apart, the chain has a gap, and the region floods through it -- a blob triangle classified whole (page session,
+    // whose middle vertex lies up to 1.03e-9 off it, measured at 16h) the plane of the other mesh crosses "the same" line at
+    // distinct points, the chain has a gap, and the region floods through it -- a blob triangle classified whole (page session,
     // engines switched every 25 shots: 6.2 units of the wall lost by shot 100). Where the precondition fails the operation
     // takes the snapped path, whose 1e-9 snap closes such gaps (stats.exactDeclined); opts.exactConforming:false skips the
     // check (the gate's control).
@@ -1411,6 +1573,22 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         pairsX = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
         if (opts.exactConforming !== false) {
             const a = nonConformingNear(trisA, bvhA, pairsX, 0), b = nonConformingNear(trisB, bvhB, pairsX, 1);
+            // round 16h: first make the operands conforming there (conformNear) and run on those, `from` naming the
+            // caller's triangles; only what that leaves non-conforming declines
+            if ((a || b) && opts.conform !== false) {
+                const cA = a ? conformNear(trisA, bvhA, pairsX, 0) : null, cB = b ? conformNear(trisB, bvhB, pairsX, 1) : null;
+                if (cA || cB) {
+                    const A2 = cA ? cA.tris : trisA, B2 = cB ? cB.tris : trisB;
+                    const r = meshBooleanCore(A2, cA ? new MeshBVH(A2) : bvhA, B2, cB ? new MeshBVH(B2) : bvhB, op, { ...opts, conform: false, cancelFins: false });
+                    for (let i = 0; i < r.from.length; i++) {
+                        const f = r.from[i];
+                        if (f >= 0) { if (cA) r.from[i] = cA.src[f]; }
+                        else if (f !== -0x7fffffff && cB) r.from[i] = -(cB.src[-f - 1] + 1);
+                    }
+                    r.stats.a.conformed = cA ? cA.stats : null; r.stats.b.conformed = cB ? cB.stats : null;
+                    return r;
+                }
+            }
             if (a || b) { exactArr = false; declined = { a, b }; opts = { ...opts, exactArrangement: false }; }
         }
     }

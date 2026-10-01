@@ -137,6 +137,22 @@
 //        control, 1024x weld, pin-prick conformity, sub-snap moves, translate:false, flatEars:false)
 //   W8 meshBoolean-selfcheck's SNAPPED pin dropped                        13 / -   (normalize, conformity, rounding,
 //        joins, exactSeam rows)
+// SABOTAGE LOG (round 16h) -- meshBoolean.mjs's conformNear, each on the real file, restored and md5 verified. 8 of 8 red.
+// Rows red in meshBoolean-selfcheck / THIS gate:
+//   V1 conforming off unless asked                                         1 / 2   (25(f); section 15's chains: seed 3
+//        exact 2 of 10, seed 12 3 of 9)
+//   V2 CONFORM_MERGE a rounding (1e-12)                                    0 / 2   (25's near-miss is 1e-14, inside
+//        either radius; section 15: seed 3 1 declined, seed 12 2 -- the corner 1.6e-9 off)
+//   V3 CONFORM_SPLIT 1e-10                                                 1 / 1   (the T-junction 7e-10 off)
+//   V4 edges indexed over the region only (the round's first draft)       0 / 1   (seed 12's rim: 5 openings of its own)
+//   V5 `from` not mapped back to the caller's triangles                    1 / 1   (the fin row: 42 output triangles off
+//        their source; seed 3's chain 4.1e-3 off the snapped volume)
+//   V6 a split that turns a triangle over accepted                         1 / 0   (0 red on the first battery: no such
+//        configuration in either gate; 25(g)'s turn-over fixture was added for it)
+//   V7 a triangle the merge collapsed kept                                 1 / 0   (0 red on the first battery; 25(g)'s
+//        collapse fixture was added: 1 degenerate triangle in the output)
+//   V8 the merge applied inside the region only                            0 / 2   (a moved vertex's triangles outside
+//        it keep the old bits: seed 3 210 openings of its own, seed 12 324)
 "use strict";
 
 import fs from "node:fs";
@@ -829,7 +845,7 @@ console.log("\n14. *** ROUND 16g: THE EXACT ARRANGEMENT IS THE DEFAULT -- A ROUN
     ok("   control: the exact output unwelded (finishWeld:0) keeps edges a rounding long, and the texel density is noise", w0.spread > 0.1 || w0.minEdge < 1e-15,
         "spread " + w0.spread.toExponential(2) + ", degenerate " + w0.degenerate + ", shortest edge " + w0.minEdge.toExponential(2));
     // (c) the precondition. A meshCSG BSP wall is non-conforming -- a long edge against two short ones whose middle vertex
-    // lies on it only to rounding -- and the exact arrangement's seam has a gap there through which a region floods. Where
+    // lies near it (up to 1.03e-9 off, measured at 16h), and near-miss vertices -- and the exact arrangement's seam has a gap there through which a region floods. Where
     // the operands meet non-conforming, the operation takes the snapped path. Measured on a page session switching engines
     // (seed 3: 10 shots bvh, 10 bsp, 10 bvh): the default within 3.9e-12 of the snapped chain; unchecked
     // (exactConforming:false) 6.9e-3 off. In the page itself, switching every 25 shots: 6.2 units of the wall lost by shot 100.
@@ -838,14 +854,56 @@ console.log("\n14. *** ROUND 16g: THE EXACT ARRANGEMENT IS THE DEFAULT -- A ROUN
             const r = blastWith(eng, w, bl[k], { select: eng === "bsp" ? M.bvhSelect(w).select : null, ...opts }); w = r.polys;
             if (eng === "bvh" && k >= 20) { if (r.stats.exact) exactAfter++; else { declined++; moveDeclined = Math.max(moveDeclined, r.stats.maxMove || 0); } } }
         return { vol: M.volume(w), declined, exactAfter, moveDeclined }; };
-    const md = mixed({}), ms = mixed(SNAPPED), mu = mixed({ exactConforming: false });
+    // (round 16h makes such a wall conforming first; these rows pin 16g's precondition and its weld, so they run without)
+    const md = mixed({ conform: false }), ms = mixed(SNAPPED), mu = mixed({ conform: false, exactConforming: false });
     const dd = Math.abs(md.vol - ms.vol), du = Math.abs(mu.vol - ms.vol);
-    ok("!! *** A SESSION SWITCHING ENGINES (10 bvh / 10 bsp / 10 bvh, seed 3): THE DEFAULT DECLINES THE EXACT PATH ON THE BSP'S WALL AND MATCHES THE SNAPPED CHAIN TO 1e-9 ***",
+    ok("!! *** A SESSION SWITCHING ENGINES (10 bvh / 10 bsp / 10 bvh, seed 3), NOT CONFORMED: THE EXACT PATH DECLINES ON THE BSP'S WALL AND MATCHES THE SNAPPED CHAIN TO 1e-9 ***",
         md.declined > 0 && dd < 1e-9, "declined " + md.declined + " of the 10 shots after the BSP's (exact " + md.exactAfter + "), |volume - snapped| " + dd.toExponential(1));
     // the weld is the one for the path that RAN: a declined shot's snapped output gets the 8e-9 weld, which closes its near-misses
     ok("   a declined shot is finished by the snapped path's weld (moves past EXACT_FINISH_WELD), not the rounding one", md.moveDeclined > EXACT_FINISH_WELD && md.moveDeclined <= WELD,
         "largest move on a declined shot " + md.moveDeclined.toExponential(2));
     ok("   control: without the precondition (exactConforming:false) the exact path floods through the BSP wall's T-junctions", du > 1e-6, "|volume - snapped| " + du.toExponential(1));
+}
+
+console.log("\n15. *** ROUND 16h: A WALL THE BSP HAS CUT, MADE CONFORMING NEAR THE SEAM -- THEN EXACT ***");
+{
+    // Measured on the switching chains (12 seeds, 10 bvh / 10 bsp / 10 bvh), every edge of the BSP's wall near the seam that
+    // has no twin is one of two things: a NEAR-MISS -- two vertices that should be one, a rounding apart (1.2e-14 at most)
+    // or a corner 1.6e-9 from its neighbour's -- or a T-JUNCTION, its middle vertex up to 1.03e-9 off the long side (none of
+    // 2,077 exactly on it; round 16g's "only to rounding" was wrong). meshBoolean now merges and splits them within meshCSG's
+    // EPS (conformNear) and runs exact: 120 of 120 such shots, where 100 of 120 declined before; every chain within 8.0e-11
+    // of the snapped one; no output edge open that the wall had not already opened (on the blob's side none).
+    const buf = (polys) => { const t = []; for (const p of polys) for (const x of p.tris || M.toTriangles([p])) t.push(x); const b = new Float64Array(t.length * 9); t.forEach((x, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = x[v][c]; }); return b; };
+    const opens = (b) => { const key = (o) => b[o] + "," + b[o + 1] + "," + b[o + 2], E = new Map(), tri = new Map();
+        for (let o = 0; o < b.length; o += 9) for (let i = 0; i < 3; i++) { const a = key(o + i * 3), c = key(o + ((i + 1) % 3) * 3); if (a !== c) { const e = a + "|" + c; E.set(e, (E.get(e) || 0) + 1); tri.set(e, o / 9); } }
+        const out = []; for (const [e, n] of E) { const [a, c] = e.split("|"); if ((E.get(c + "|" + a) || 0) !== n) out.push([e, tri.get(e)]); } return out; };
+    const P = (k) => k.split(",").map(Number);
+    const onSeg = (x, a, b) => { const e = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l2 = e[0] ** 2 + e[1] ** 2 + e[2] ** 2, t = ((x[0] - a[0]) * e[0] + (x[1] - a[1]) * e[1] + (x[2] - a[2]) * e[2]) / l2;
+        return t > -1e-9 && t < 1 + 1e-9 && Math.hypot(a[0] + t * e[0] - x[0], a[1] + t * e[1] - x[1], a[2] + t * e[2] - x[2]) < 2e-8; };
+    // a switching chain: every shot after the BSP's through meshBoolean raw (exact? which openings are its own?), then the page's
+    const chain = (seed, n, opts) => { const bl = pageBlasts(seed, n); let w = M.boxPolys([0, 0, 0], HALF), exact = 0, declined = 0, fb = 0, seam = 0, own = 0, inherited = 0;
+        for (let k = 0; k < n; k++) { const eng = Math.floor(k / 10) % 2 ? "bsp" : "bvh";
+            if (eng === "bvh" && k >= 20) {
+                const A = buf(w), B = buf(bl[k]), r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", opts);
+                if (r.exact) exact++; else declined++;
+                fb += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+                if (r.exact) { const oA = opens(A), inA = new Set(oA.map((x) => x[0])), segs = oA.map(([e]) => e.split("|").map(P));
+                    for (const [e, t] of opens(r.tris)) { if (inA.has(e)) continue; if (r.from[t] < 0) { seam++; continue; }
+                        const [a, b] = e.split("|").map(P); if (segs.some(([u, v]) => onSeg(a, u, v) && onSeg(b, u, v))) inherited++; else own++; } }
+            }
+            w = blastWith(eng, w, bl[k], { select: eng === "bsp" ? M.bvhSelect(w).select : null, ...opts }).polys;
+        }
+        return { exact, declined, fb, seam, own, inherited, vol: M.volume(w) }; };
+    const c3 = chain(3, 30, {}), s3 = chain(3, 30, SNAPPED), n3 = chain(3, 30, { conform: false }), dv = Math.abs(c3.vol - s3.vol);
+    ok("!! *** SEED 3, 10 bvh / 10 bsp / 10 bvh: EVERY SHOT AFTER THE BSP'S EXACT (CONFORMED), NO FALLBACK, NO OPENING OF ITS OWN OR ON THE BLOB'S SIDE, THE SNAPPED CHAIN'S SOLID TO 1e-9 ***",
+        c3.exact === 10 && c3.declined === 0 && c3.fb === 0 && c3.seam === 0 && c3.own === 0 && dv < 1e-9,
+        "exact " + c3.exact + ", declined " + c3.declined + ", fallbacks " + c3.fb + ", new open edges: blob's side " + c3.seam + ", own " + c3.own + ", along the wall's own cracks " + c3.inherited + "; |volume - snapped| " + dv.toExponential(1));
+    ok("   control: not conformed (conform:false), most of them decline (round 16g)", n3.declined >= 5, "declined " + n3.declined + " of 10");
+    // seed 12, shot 28: a sliver 1.4e-8 wide beside a region's rim -- the edge census must reach every twin (round 16h's own
+    // first draft read an edge on the rim as open and split it at a point its twin already had: 5 edges doubled)
+    const c12 = chain(12, 29, {});
+    ok("!! seed 12's chain to shot 28 (a wall sliver 1.4e-8 wide on the region's rim): every shot after the BSP's exact, no opening of its own or on the blob's side",
+        c12.exact === 9 && c12.declined === 0 && c12.seam === 0 && c12.own === 0, "exact " + c12.exact + ", declined " + c12.declined + ", blob's side " + c12.seam + ", own " + c12.own + ", along the wall's cracks " + c12.inherited);
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

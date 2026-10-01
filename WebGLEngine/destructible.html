@@ -58,7 +58,8 @@
       <p class="note">The <b>engine</b> is <code>physics/mesh/meshBoolean.mjs</code> by default, via
          <code>physics/mesh/blastEngine.mjs</code>: cut along the actual intersection segments, at exact seam points,
          closed without settle -- each shot merges its pieces back into convex polygons. Where the wall is not
-         conforming near the cut (a BSP shot left T-junctions there) that shot takes the snapped arrangement instead. The flag (or
+         conforming near the cut (a BSP shot left T-junctions and near-miss points there) the shot first makes it so,
+         within meshCSG's own tolerance; only what that cannot repair takes the snapped arrangement. The flag (or
          <code>?csg=bsp</code>) sends the blast through meshCSG's BSP instead: the same solid and the same SKIN/CUT
          tags, open until settled.</p>
     </div>

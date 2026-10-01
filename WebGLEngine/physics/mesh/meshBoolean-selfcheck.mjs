@@ -234,6 +234,8 @@
 // exactArrangement.mjs, meshBoolean.mjs and blastEngine.mjs, with this gate's red rows in their column.
 // SABOTAGE LOG (round 16g) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (W1-W8), 8 red; THIS gate red on W1 (4),
 // W3 (1), W6 (7) and W8 (13: this gate's SNAPPED pin dropped).
+// SABOTAGE LOG (round 16h) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (V1-V8) of conformNear, 8 red; THIS gate red
+// on V1, V3, V5, V6 and V7 (1 each; V6 and V7 by section 25(g)'s fixtures, added when the first battery left them 0 red).
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -1762,20 +1764,51 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
     const b1 = built(); meshBoolean(A0, new MeshBVH(A0), B0, new MeshBVH(B0), "union", SNAPPED); const onOff = built() - b1;
     ok("!! round 16g: the exact arrangement is ON by default (a default run builds implicit points) and exactArrangement:false is the snapped path (none)",
         onDef > 0 && onOff === 0, "default " + onDef + ", exactArrangement:false " + onOff);
-    // (e) round 16g: the exact arrangement's precondition -- conforming where the operands meet. A box whose top face has a
-    // T-junction (one triangle's diagonal against two half-edges); a box cut out of its top declines the exact path (to the
-    // snapped one) and is still right; the same T-junction on the bottom face, far from the cut, is not looked at.
-    const tBox = (zf) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+    // (e) round 16g: the exact arrangement's precondition -- conforming where the operands meet -- and round 16h: an operand
+    // that is not is first made conforming there (merge within CONFORM_MERGE, split within CONFORM_SPLIT: meshCSG's EPS).
+    // A box whose top face has a T-junction: one triangle's diagonal a-c against two triangles meeting at m on (or near) it.
+    const tBox = (zf, m, m2 = m) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
         for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === zf && src[o + 5] === zf && src[o + 8] === zf)) out.push(...src.subarray(o, o + 9));
-        const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1], m = [0, 0], up = zf > 0;
-        for (const t of [[a, b, c], [m, c, d], [a, m, d]]) { const u = up ? t : [t[0], t[2], t[1]]; for (const v of u) out.push(v[0], v[1], zf); }
+        const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1], up = zf > 0;
+        for (const t of [[a, b, c], [m, c, d], [a, m2, d]]) { const u = up ? t : [t[0], t[2], t[1]]; for (const v of u) out.push(v[0], v[1], zf); }
         return new Float64Array(out); };
     const cutter = M.toTriangleBuffer(M.boxPolys([0.1, 0.05, 1], [0.3, 0.3, 0.3])), CV = 8 - 0.6 * 0.6 * 0.3;
-    const tj = (zf, o) => { const A = tBox(zf), r = meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract", o); return { r, err: Math.abs(vol(r.tris) - CV), open: bitsOpen(r.tris) }; };
-    const top = tj(1), bot = tj(-1);
-    ok("!! round 16g: a T-junction where the operands meet declines the exact arrangement (stats.a.exactDeclined) for the snapped path, which is right; one on the far face does not",
-        top.r.exact === false && top.r.stats.a.exactDeclined > 0 && top.err < 1e-12 && bot.r.exact === true && !bot.r.stats.a.exactDeclined && bot.err < 1e-12,
-        "top: exact " + top.r.exact + ", declined " + top.r.stats.a.exactDeclined + ", off " + top.err.toExponential(1) + "; bottom: exact " + bot.r.exact + ", off " + bot.err.toExponential(1));
+    const tj = (zf, ms, o) => { const A = tBox(zf, ...ms), r = meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract", o); return { r, err: Math.abs(vol(r.tris) - CV), open: bitsOpen(r.tris) }; };
+    const onTop = tj(1, [[0, 0]], { conform: false }), bot = tj(-1, [[0, 0]], { conform: false });
+    ok("!! round 16g: a T-junction where the operands meet, not conformed (conform:false), declines the exact arrangement (stats.a.exactDeclined) for the snapped path, which is right; one on the far face is not looked at",
+        onTop.r.exact === false && onTop.r.stats.a.exactDeclined > 0 && onTop.err < 1e-12 && bot.r.exact === true && !bot.r.stats.a.exactDeclined && bot.err < 1e-12,
+        "top: exact " + onTop.r.exact + ", declined " + onTop.r.stats.a.exactDeclined + ", off " + onTop.err.toExponential(1) + "; bottom: exact " + bot.r.exact + ", off " + bot.err.toExponential(1));
+    // (f) round 16h: conformed, then exact -- the T-junction on the line, 7e-10 off it (a BSP wall's), and with a near-miss
+    // 1e-14 beside it (the BSP's split points, computed per polygon): split / merged, exact, closed bit for bit, right
+    const fam = [["on the line", [[0, 0]]], ["7e-10 off it", [[5e-10, -5e-10]]], ["and a 1e-14 near-miss", [[5e-10, -5e-10], [5e-10 + 1e-14, -5e-10]]]];
+    const fx = fam.map(([n, ms]) => ({ n, d: tj(1, ms), c: tj(1, ms, { conform: false }) }));
+    ok("!! *** round 16h: A T-JUNCTION, ON ITS LONG SIDE OR 7e-10 OFF IT, AND A 1e-14 NEAR-MISS: CONFORMED (stats.a.conformed), THEN EXACT -- CLOSED BIT FOR BIT, THE VOLUME TO 1e-14 ***",
+        fx.every((x) => x.d.r.exact === true && x.d.r.stats.a.conformed && x.d.r.stats.a.conformed.split > 0 && x.d.open === 0 && x.d.err < 1e-14) && fx[2].d.r.stats.a.conformed.merged > 0,
+        fx.map((x) => x.n + ": exact " + x.d.r.exact + ", " + JSON.stringify(x.d.r.stats.a.conformed) + ", open " + x.d.open + ", off " + x.d.err.toExponential(1)).join("; "));
+    ok("   control: not conformed (conform:false) each declines to the snapped path, whose raw output is open there", fx.every((x) => x.c.r.exact === false && x.c.open > 0),
+        fx.map((x) => x.n + ": exact " + x.c.r.exact + ", open " + x.c.open + ", off " + x.c.err.toExponential(1)).join("; "));
+    // and what is not a T-junction or a near-miss at meshCSG's EPS is not made one: a crack 1.4e-6 wide, a near-miss 2e-8
+    const crack = tj(1, [[1e-6, -1e-6]]), nm = tj(1, [[0, 0], [2e-8, 0]]);
+    ok("!! round 16h: a crack 1.4e-6 wide and a near-miss 2e-8 apart -- beyond meshCSG's EPS -- are not conformed: both decline to the snapped path",
+        crack.r.exact === false && crack.r.stats.a.exactDeclined > 0 && nm.r.exact === false && nm.r.stats.a.exactDeclined > 0,
+        "crack: exact " + crack.r.exact + ", declined " + crack.r.stats.a.exactDeclined + "; near-miss 2e-8: exact " + nm.r.exact + ", declined " + nm.r.stats.a.exactDeclined);
+    // (g) round 16h: what conforming must not do -- keep a triangle the merge collapsed, or a split that turns one over
+    const degen = (b) => { let n = 0; for (let o = 0; o < b.length; o += 9) { const eq = (u, v) => b[o + u] === b[o + v] && b[o + u + 1] === b[o + v + 1] && b[o + u + 2] === b[o + v + 2]; if (eq(0, 3) || eq(3, 6) || eq(6, 0)) n++; } return n; };
+    const topFace = (ts) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+        for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === 1 && src[o + 5] === 1 && src[o + 8] === 1)) out.push(...src.subarray(o, o + 9));
+        for (const t of ts) for (const v of t) out.push(v[0], v[1], 1); return new Float64Array(out); };
+    const qa = [-1, -1], qb = [1, -1], qc = [1, 1], qd = [-1, 1], run = (A) => meshBoolean(A, new MeshBVH(A), cutter, new MeshBVH(cutter), "subtract");
+    // a sliver (m2, m, d) between two near-miss points 5e-9 apart: merged, it is an edge, not a face
+    const C1 = run(topFace([[qa, qb, qc], [[0, 0], qc, qd], [[5e-9, 0], [0, 0], qd], [qa, [5e-9, 0], qd]]));
+    ok("!! round 16h: a sliver between two near-miss points 5e-9 apart collapses when they merge and is dropped -- exact, closed, no degenerate triangle in the output, the volume to 1e-14",
+        C1.exact === true && C1.stats.a.conformed && C1.stats.a.conformed.collapsed === 1 && bitsOpen(C1.tris) === 0 && degen(C1.tris) === 0 && Math.abs(vol(C1.tris) - CV) < 1e-14,
+        "exact " + C1.exact + ", " + JSON.stringify(C1.stats.a.conformed) + ", open " + bitsOpen(C1.tris) + ", degenerate " + degen(C1.tris) + ", off " + Math.abs(vol(C1.tris) - CV).toExponential(1));
+    // the diagonal's triangle a sliver (a, s, c), s 1e-9 off a-c towards b; the other half meets at m 5e-9 off towards b --
+    // splitting the sliver at m would turn a piece over: the shot declines instead
+    const r2 = Math.SQRT2, C2 = run(topFace([[qa, qb, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2]], [[0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qb, qc], [qa, [0.5 + 1e-9 / r2, 0.5 - 1e-9 / r2], qc],
+        [[0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qc, qd], [qa, [0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qd]]));
+    ok("!! round 16h: a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot declines to the snapped path",
+        C2.exact === false && C2.stats.a.exactDeclined > 0, "exact " + C2.exact + ", declined " + C2.stats.a.exactDeclined);
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
