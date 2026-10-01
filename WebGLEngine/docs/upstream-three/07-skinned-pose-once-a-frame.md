@@ -98,7 +98,8 @@ both renders, where a plain mesh shows it only in the first. The same patch make
 use the bones as they are.
 
 Measured there and not changed by the patch: in r185, `computeSkinning` writes zeros on WebGPU while an MRT with velocity is
-set, and on WebGL 2 every vertex reads the first vertex's position. Neither is this draft's subject.
+set, and on WebGL 2 every vertex reads the first vertex's position. They are [10](10-compute-skinning-under-velocity-mrt.md)'s
+and [11](11-webgl2-compute-instance-index.md)'s subjects.
 
 ## A fix that works in an application
 

@@ -71,6 +71,17 @@ reproduction prints:
 webgpu: storageBuffer 8, instancedArray 8; webgl2: storageBuffer 8, instancedArray 8 -- the distinct points the compute wrote, of a box's 8 corners
 <!-- patched:end -->
 
+## Paths the reproduction does not take
+
+`invocationLocalIndex`, which read `gl_InstanceID` too, in a compute of 128 writing a plain storage buffer, on r185's build and
+with the patch:
+
+<!-- paths:begin -->
+invocationLocalIndex in a compute of 128 writing a plain storage buffer: r185 1, patched 64 distinct values on WebGL2; 64 on WebGPU, both builds
+<!-- paths:end -->
+
+The default workgroup is 64, so 64 distinct values is every invocation's own.
+
 ## A fix that works in an application
 
 Write a compute's output to an `instancedArray` (a `StorageInstancedBufferAttribute`) rather than a `StorageBufferAttribute`, so the WebGL backend draws it instanced.

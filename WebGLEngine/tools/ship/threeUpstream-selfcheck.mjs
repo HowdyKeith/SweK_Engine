@@ -273,6 +273,12 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
 // record's pass count off by one -> 2 (it no longer adds up, and the README no longer states it); E3 the README's identical-
 // screenshot count edited -> 1; E4 the record's patched hash off by one digit -> 1; E5 the runner's diff deleted -> 1; E6 the
 // record saying the builds differed on an example -> 1. None green.
+// ---- v4790 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// X1 patch 10's compute test removed -> 4 (the hash, 10 fixed, its patched block, 10 with all of them); X7 the same test
+// misspelt, isComputNode -> 4; X3 patch 11's instanceIndex back to gl_InstanceID -> 4; X5 patch 11 reading gl_VertexID alone
+// -> 5, and 10 with all of them among them -- 10's reproduction writes an instancedArray, drawn instanced, where gl_VertexID is
+// 0, which is why the patch takes the sum; X6 a number of 10's Observed block edited -> 2. In threeUpstreamPaths: X4 patch 11's
+// invocationLocalIndex hunk reverted -> 2. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +

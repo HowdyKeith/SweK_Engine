@@ -12,6 +12,7 @@
 //   04  the velocity node drawn by the material's colorNode, not its fragmentNode
 //   07  (v4786) a skinned mesh rendered twice in one browser frame, against a plain mesh moved the same way; and computeSkinning
 //       run twice in one frame
+//   11  (v4790) invocationLocalIndex in a WebGL2 compute writing a plain storage buffer
 // Each draft's "paths" block states what these print, character for character, and says which paths the patch does not reach.
 // *** NOTHING HERE POSTS ANYTHING. ***
 "use strict";
@@ -120,7 +121,8 @@ else {
         // v4786: computeSkinning -- the skin computed into a buffer twice in each browser frame, the bone moved 0.15 between the
         // two; how far the second compute's mean x moved from the first's. Measured as a step, because r185 computes the skin
         // wrongly here on both backends in ways no patch here touches: on WebGPU it writes zeros while an MRT with velocity is
-        // set (so the MRT is cleared for this case), and on WebGL2 every vertex reads the first vertex's position.
+        // set (so the MRT is cleared for this case), and on WebGL2 every vertex reads the first vertex's position -- drafts 10
+        // and 11 since v4790, each with its patch.
         renderer.setMRT(null);
         const g = box(), n = g.attributes.position.count;
         g.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Array(n * 4).fill(0), 4));
@@ -273,7 +275,7 @@ if (res) {
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
     "patch here changes that; many morph targets past the uniform buffer; per-instance influences over absolute targets, or beside " +
-    "a mesh-level morphTargetInfluences, which r185 throws on; computeSkinning's absolute positions -- r185 " +
-    "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2, so only the step " +
-    "between two computes is read; and a real GPU.");
+    "a mesh-level morphTargetInfluences, which r185 throws on; computeSkinning's absolute positions in 07's case -- r185 " +
+    "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2 (drafts 10 and 11), " +
+    "so only the step between two computes is read there; and a real GPU.");
 process.exitCode = fails ? 1 : 0;

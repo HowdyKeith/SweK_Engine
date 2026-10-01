@@ -8723,6 +8723,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4790 -- THE 394th CLOSING: NO new gate file -- drafts 10 and 11, computeSkinning's two r185 bugs.
+    since487: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4790", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (drafts 10 and 11 with their patches; the e2e section reads the newest record)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: invocationLocalIndex in a WebGL2 compute writing a plain storage buffer)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE TWO BUGS v4786 STEPPED AROUND ARE DRAFTS NOW, EACH TO ITS CAUSE. *** WebGPU: needsPreviousData() asks only " +
+                 "whether the MRT has velocity, so a compute built under one gets computeSkinning's positionPrevious, which a compute " +
+                 "shader does not declare -- unresolved value, invalid pipeline, the pass skipped, the buffer zeros (velocityMRT 0, " +
+                 "noMRT 0.5). Patch 10: false for a compute build. WebGL2: a compute is drawn as points, instanced only when its first " +
+                 "buffer is instanced, yet instanceIndex is always gl_InstanceID -- 0 in the other case, so computeSkinning skins every " +
+                 "vertex from the first (1 point of a box's 8). Patch 11: gl_InstanceID + gl_VertexID in a compute, one of the two " +
+                 "always 0; reading gl_VertexID alone breaks the instanced case, which the sabotage that tried it showed through " +
+                 "draft 10's reproduction. invocationLocalIndex had the same fault: 1 distinct value of 64, patched 64. three rebuilt " +
+                 "with all eleven matches the applier, lint clean, unit tests 1310 passed, 1 todo; its e2e on the eleven: the same " +
+                 "176 of 187 pass, the same 11 fail for the same reasons, 185 screenshots the same bytes as r185. Six sabotages red.",
+    }),
     // v4789 -- THE 393rd CLOSING: NO new gate file -- three's own e2e tests, on r185's build and with all nine patches.
     since486: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

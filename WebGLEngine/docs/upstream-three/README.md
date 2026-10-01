@@ -25,19 +25,19 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
 
 - `npm run build` of the tag, unpatched: `three.webgpu.js` and `three.core.js` are the vendored files byte for byte
   (`three.tsl.js` differs only by the vendoring's one edit, its import of `three/webgpu` made relative).
-- The patches applied with `git apply`, in order -- all nine since v4775; 08 changes the same import line of `Instance.js` as
+- The patches applied with `git apply`, in order -- all nine since v4775, all eleven since v4790; 08 changes the same import line of `Instance.js` as
   01, and that line was merged by hand, to `import { OnBeforeObjectUpdate } from '../utils/EventNode.js';` --
   `npm run lint-core` is clean, and `npm run build` makes the same bytes the gates' applier makes from the vendored build, but
   for the order of the names in its one import from `three.core.js`: rollup lists them by first use, and patch 02 uses three of
   them earlier.
 - Three's unit tests (`test/unit`, run in headless Chromium with QUnit served locally): 1311 tests, 1310 passed, 1 todo,
-  0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, and at v4788 with 03 reaching per-instance morphs -- the same as the unpatched tag. They exercise none of the paths the patches change.
-- All nine together, on one build (since v4787): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
+  0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, at v4788 with 03 reaching per-instance morphs, and at v4790 with all eleven -- the same as the unpatched tag. They exercise none of the paths the patches change.
+- All of them together, on one build (since v4787; eleven since v4790): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
   prints what it prints with its own patch alone -- but for 04's `mrtSameFrame`, which patch 07 fixes as well (04's "together" block).
 - Three's e2e tests (`test/e2e`), at v4789 in a checkout of the r185 tag with its examples, run by
   [`e2e/puppeteer-local.diff`](e2e/puppeteer-local.diff) -- three's runner with this box's flags for presenting WebGPU on
   SwiftShader, and the workaround this tree's harness installs for its Chromium rejecting three's string `swizzle` -- recorded in
-  [`e2e/v4789.json`](e2e/v4789.json): 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with all nine, each
+  [`e2e/v4789.json`](e2e/v4789.json) for the nine and [`e2e/v4790.json`](e2e/v4790.json) for all eleven: 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with the patches, each
   for the same reason (seven a 2D view of a 3D texture, which WebGPU refused here; two a fetch that failed here; one video,
   `RAF is not defined`; one XR layers example 0.4% of its pixels off); 185 of the 187 screenshots the same bytes, and the
   other two vary between runs of one build, whichever build it is. The WebGL examples load `three.module.js`, which no patch changes.
