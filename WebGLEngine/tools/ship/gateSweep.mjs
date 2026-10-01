@@ -8731,7 +8731,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (a pre-registration is a registration; the baseline caught up by name)",
                                 "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)",
                                 "tools/ship/patchScanDoor-selfcheck.mjs (the fixture is the zips in the uploads folder, not the folder)",
-                                "tools/ship/recordDrift-selfcheck.mjs (its injected census skips the swap scan nothing compares)"]),
+                                "tools/ship/recordDrift-selfcheck.mjs (its injected census skips the swap scan nothing compares)",
+                                "tools/ship/recordReach-selfcheck.mjs (the margin row reads THIS box's alone readings where the shared record is another box's)"]),
         redOnArrival: Object.freeze([]),
         verdict: "*** TWO RATCHETS THE MERGE LANDED OVER, BECAUSE NOTHING THAT RUNS EVERY ROUND RUNS THEM. *** graveyard takes ~157 s " +
                  "and referenceKind ~175, so the v4776 merge went in unmeasured and the first run read 188 orphaned utilities against " +
@@ -8748,7 +8749,14 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "and this container provides that folder EMPTY: three reds on a scan that correctly found nothing. Whether there " +
                  "is anything to scan is read off the folder's listing now, never off the scanner. And recordReach's margin fell " +
                  "to 764 ms on recordDrift-selfcheck at 2,236: its injected-census row ran the full census, swap scan included, " +
-                 "for two fields it overrides -- ~450 ms. 2,300 to 1,800.",
+                 "for two fields it overrides -- ~450 ms. 2,300 to 1,800. " +
+                 "*** AND THE SECOND VERIFY STAYED RED, BECAUSE THIS IS ANOTHER BOX. *** The container changed between rounds: " +
+                 "linux-x64-4c-16095mb-420793, while the shared record belongs to -142c0d, which no longer exists. So verify wrote " +
+                 "this box's timings to the ignored local file, and recordReach's margin read the old box's ring, which nothing " +
+                 "here can refresh -- the clear state since475 found unreachable for coverage, in a cost row. boxTimings' " +
+                 "recordLocal keeps the last three alone readings now, and on a box that does not own the shared record the " +
+                 "margin row reads this box's when it has two: frozenRecords 1,423 and recordDrift 1,807 here, margin 1,193. Gate " +
+                 "selection still reads the shared record (task #87). A slow own ring reddens it.",
     }),
     // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
     since477: Object.freeze({
