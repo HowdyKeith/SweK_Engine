@@ -496,7 +496,7 @@
 // band, flush boxes and every other gate unchanged. LEFT: seed 8's shot 84 -- a fan of wall slivers ~6e-6 wide along a
 // seam 3e-3 inside the wall's back face, 10 edges -- backlog bvh-csg-r19c-sliver-fan-openings.
 //
-// *** ROUND 16f: THE EXACT ARRANGEMENT -- opts.exactArrangement (OFF by default). *** Round 16e left the near-coincident
+// *** ROUND 16f: THE EXACT ARRANGEMENT -- opts.exactArrangement (off by default until round 16g). *** Round 16e left the near-coincident
 // family to the arrangement's own 1e-9 decisions. Measured first, in a copy with every tolerance made finer: exact pair
 // verdicts with vertexRound off and a 1e-11 snap put three of section 22's four KNOWN cases within 2e-12 of their oracle
 // (from 4.7e-2, 1.7e-2, 1.2e-3); the fourth, and a copy rotated 1e-12, stayed wrong at every snap -- the tolerance was the
@@ -524,6 +524,28 @@
 // same input: closed bit for bit; seed 8's 100 shots exact: closed after every shot (blastEngine-selfcheck section 13). The
 // same holds for round 18b's KNOWN intersect chain (6 'dangling' fallbacks at the big blobs' z = 0 equators): exact, no
 // fallback, its remaining mismatches all under 1.2e-16 (rounding). Folded into bvh-csg-r16g-exact-default.
+//
+// *** ROUND 16g: THE EXACT ARRANGEMENT IS THE DEFAULT (MESH_BOOLEAN_EXACT_DEFAULT); opts.exactArrangement:false is the
+// snapped path, kept and gated. *** What round 16f named against it, measured and settled:
+//   - the page's census was a 1e-9 key, which reads distinct points closer than 1e-9 as T-junctions. It now counts at the
+//     exact-bits key (destructible.html, blastEngine-selfcheck's pageCensus); the gates that pinned the snapped path's
+//     own mechanisms run it by name (SNAPPED).
+//   - rounding folds features finer than a rounding: blastEngine.mjs welds the exact output within EXACT_FINISH_WELD
+//     (1e-14, a few ulps at the page's coordinates). Without it the wall kept edges 1.5e-17 long (texel spread 1.47 on
+//     seed 1's 20 shots, against 3.75e-6) and seed 11's T-junction 3.5e-18 wide stayed open 26 shots (none with it).
+//   - a PRECONDITION found by the page itself: a meshCSG BSP wall is not conforming (a long edge against two short ones
+//     whose middle vertex lies on it only to rounding). The other mesh's plane crosses "the same" line at points 1e-16
+//     apart, the seam has a gap, and a region floods through it: a session switching engines every 25 shots lost 6.2 units
+//     of the wall by shot 100. The exact path now runs only where both operands are conforming near the seam
+//     (nonConformingNear, below), and otherwise declines to the snapped path, whose snap closes such gaps
+//     (stats.exactDeclined; result.exact says which ran). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
+//     3.9e-12 of the snapped chain (8 of the last 10 declined); unchecked (opts.exactConforming:false) 6.9e-3 off.
+// MEASURED on the final code, the page's 12 x 100-shot soak, default against snapped: fallbacks 0 / 6; shots ending open at
+// the exact-bits key 0 / 42 (seed 8 open from shot 84, 10 edges at the end; seed 11 26 shots, up to 43); the same solid to
+// 3.5e-11; 0 shots declined; op time 162 / 139 s summed (1.17x; 96 / 92 s wall clock, four chains to a process). In
+// Chromium, 100 shots through the page's button: unmatched 0 at every 25 shots and after settle, 0 fallbacks; a session
+// switching bvh / bsp every 25 shots ends at the single-engine volume (12.003929; 6.2 lost before the precondition), 55
+// unmatched after settle (the BSP alone: 49).
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -859,6 +881,13 @@ const VALID_OPS = new Set(["union", "subtract", "intersect"]);
 export const MESH_BOOLEAN_MAX_FRAGMENTS = 65536;
 /** Round 9: segment-bounded cutting (triArrangement.mjs) by default; "plane" is round 8's path. See the header. */
 export const MESH_BOOLEAN_DEFAULT_CUTTING = "arrangement";
+/**
+ * Round 16g: the exact arrangement (round 16f, exactArrangement.mjs) is meshBoolean()'s default -- see this file's ROUND 16g
+ * paragraph for the soak that decided it. opts.exactArrangement:false is the snapped path (triArrangement.mjs with
+ * vertexRound, seamConsensus and the conformity pass), kept and gated. classifyMeshAgainstOther(), called directly, is
+ * snapped unless asked: meshBoolean() resolves the option once and passes it down.
+ */
+export const MESH_BOOLEAN_EXACT_DEFAULT = true;
 function bKeepAndFlip(op, inside, on = 0) {
     if (on) return null;
     if (op === "union") return inside ? null : { flip: false };
@@ -934,6 +963,8 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  *     while the volume came back 0.74% off.
  */
 export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
+    // round 16g: the arrangement is exact unless asked otherwise -- resolved here, so every step below sees one answer
+    opts = { ...opts, exactArrangement: opts.exactArrangement ?? MESH_BOOLEAN_EXACT_DEFAULT };
     // ROUND 11: every tolerance downstream is an absolute length, tuned where the extent is 1..16. Outside that band
     // the operands are brought into it by an EXACT power of two and the result is sent back by the inverse -- see
     // MESH_BOOLEAN_SCALE_BAND and scaleExponent() below. Inside it (every fixture before round 11) k is 0 and
@@ -1298,6 +1329,39 @@ function emptyStats(tris, empty) {
              fallbackReasons: {}, onFaces: 0, nearSided: 0, nearPseudo: 0, nearEdge: 0, rearranged: 0, injected: 0 };
 }
 
+/**
+ * Round 16g: the edges of side `side`'s pair triangles (pairs [a, b]: side 0 is a, 1 is b) that have no twin on the very
+ * same two doubles, among the triangles around them -- 0 when the mesh is conforming where the operands meet. The twin of a
+ * triangle's edge shares that edge, so its box meets the triangle's; the triangles in the pairs' box hold every twin.
+ */
+function nonConformingNear(tris, bvh, pairs, side) {
+    const cand = new Set();
+    for (const p of pairs) cand.add(p[side]);
+    if (!cand.size) return 0;
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const t of cand) for (let c = 0; c < 9; c++) { const v = tris[t * 9 + c], a = c % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+    // directed edges by a numeric hash of their six coordinates (the same doubles give the same hash), each match then
+    // confirmed coordinate by coordinate -- string keys cost 9% of a late page shot
+    const E = new Map(), h = (o, q) => tris[o] * 1.1 + tris[o + 1] * 2.3 + tris[o + 2] * 3.7 + tris[q] * 5.9 + tris[q + 1] * 7.3 + tris[q + 2] * 11.1;
+    const same = (o, q) => tris[o] === tris[q] && tris[o + 1] === tris[q + 1] && tris[o + 2] === tris[q + 2];
+    for (const t of bvh.trianglesInBox(lo, hi)) for (let i = 0; i < 3; i++) {
+        const o = t * 9 + i * 3, q = t * 9 + ((i + 1) % 3) * 3;
+        if (same(o, q)) continue;
+        const k = h(o, q), l = E.get(k);
+        if (l) l.push(o, q); else E.set(k, [o, q]);
+    }
+    let open = 0;
+    for (const t of cand) for (let i = 0; i < 3; i++) {
+        const o = t * 9 + i * 3, q = t * 9 + ((i + 1) % 3) * 3;
+        if (same(o, q)) continue;
+        const l = E.get(h(q, o));                                   // the twin runs q -> o
+        let found = false;
+        if (l) for (let m = 0; m < l.length && !found; m += 2) found = same(l[m], q) && same(l[m + 1], o);
+        if (!found) open++;
+    }
+    return open;
+}
+
 function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // round 16: a ZERO-THICKNESS FIN -- two faces of one operand on the same three vertices, wound opposite ways -- has
     // no volume and is not in the regularised result; left in, it breaks every ray that crosses it (pointInMesh welds
@@ -1334,7 +1398,22 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     }
     // round 16c: B's vertices within VERTEX_ROUND of A's take A's coordinates (vertexRound, above)
     let rounded = null;
-    const exactArr = !!opts.exactArrangement && opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
+    let exactArr = !!opts.exactArrangement && opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
+    // round 16g: the exact arrangement's PRECONDITION -- where the operands meet, every edge has its twin on the same two
+    // doubles. A seam then closes by identity; with a T-junction (a meshCSG BSP wall: a long edge against two short ones
+    // whose middle vertex lies on it only to rounding) the plane of the other mesh crosses "the same" line at points 1e-16
+    // apart, the chain has a gap, and the region floods through it -- a blob triangle classified whole (page session,
+    // engines switched every 25 shots: 6.2 units of the wall lost by shot 100). Where the precondition fails the operation
+    // takes the snapped path, whose 1e-9 snap closes such gaps (stats.exactDeclined); opts.exactConforming:false skips the
+    // check (the gate's control).
+    let pairsX = null, declined = null;
+    if (exactArr) {
+        pairsX = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
+        if (opts.exactConforming !== false) {
+            const a = nonConformingNear(trisA, bvhA, pairsX, 0), b = nonConformingNear(trisB, bvhB, pairsX, 1);
+            if (a || b) { exactArr = false; declined = { a, b }; opts = { ...opts, exactArrangement: false }; }
+        }
+    }
     if (opts.contacts !== false && opts.vertexRound !== false && !exactArr) {
         rounded = vertexRound(trisA, bvhA, trisB, opts.vertexRoundRadius ?? VERTEX_ROUND);
         if (rounded.tris) { trisB = rounded.tris; bvhB = new MeshBVH(trisB); }
@@ -1343,7 +1422,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     let optsA = opts, optsB = opts;
     if (exactArr) {
         // round 16f: every pair decided once, exactly, for both meshes' arrangements (exactArrangement.mjs)
-        const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR), res = new Map();
+        const pairs = pairsX, res = new Map();
         for (const [a, b] of pairs) res.set(a * 4294967296 + b, exactPair(readTri(trisA, a), readTri(trisB, b)));
         optsA = { ...opts, exactPairs: res, pairSide: 0, pairs };
         optsB = { ...opts, exactPairs: res, pairSide: 1, pairs: pairs.map(([a, b]) => [b, a]) };
@@ -1361,6 +1440,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     }
     const capped = classifiedA.stats.capped || classifiedB.stats.capped;
     if (rounded) classifiedB.stats.vertexRound = rounded.stats;
-    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped, from: Int32Array.from(from),
+    if (declined) { classifiedA.stats.exactDeclined = declined.a; classifiedB.stats.exactDeclined = declined.b; }
+    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped, from: Int32Array.from(from), exact: exactArr,
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }

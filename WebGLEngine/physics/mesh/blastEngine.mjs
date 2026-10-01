@@ -66,7 +66,13 @@
 // points 1e-10..8e-9 apart, which folded the wall: page seed 5's shot 38 then found two seams crossing (45 open edges after
 // it; merge-only: 0 fallbacks, closed bit for bit through 40 shots). The page's 12 x 100-shot soak with the flag: 0
 // fallbacks (default 7), every chain closed at the exact-bits key at the end, the default's solid to 3.5e-11, 1.03x time.
-// The page's own 1e-9 census reads its distinct close points as open -- one reason it is not the default (bvh-csg-r16g).
+// The page's own 1e-9 census read its distinct close points as open -- one reason it was not the default until round 16g.
+//
+// *** ROUND 16g: the exact arrangement is meshBoolean's default, and the finishing weld is chosen by the PATH THAT RAN
+// (result.exact): EXACT_FINISH_WELD (1e-14, a rounding) after the exact one, the 8e-9 weld after the snapped one --
+// including where the exact one declined because an operand is not conforming near the seam (a BSP wall). The page's
+// census counts at the exact-bits key. opts.finishWeld overrides the radius (the gate's control). See meshBoolean.mjs's
+// ROUND 16g paragraph for the measurements.
 "use strict";
 
 import * as M from "./meshCSG.mjs";
@@ -108,6 +114,15 @@ const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const len3 = (a) => Math.hypot(a[0], a[1], a[2]);
+
+/**
+ * Round 16g: the finishing weld for the exact arrangement's output -- a ROUNDING, not a snap: points a few ulps apart at the
+ * page's coordinates (an ulp of 4 is 8.9e-16), which doubles cannot meaningfully tell apart. Measured: without it the exact
+ * wall keeps edges 1.5e-17 long, where uvUnwrap's texel density is noise (spread 1.89 on seed 1's 100 shots; 2.5e-5 with
+ * it), and seed 11 keeps a T-junction 3.5e-18 wide for 26 shots (none with it). The 8e-9 weld, on exact output, joined
+ * distinct points and folded the wall (round 16f).
+ */
+export const EXACT_FINISH_WELD = 1e-14;
 
 export function finishPieces(pieces, { weld = FINISH_WELD_SNAPS * SNAP, merge = true, convexTol = 1e-10 } = {}) {
     const t0 = Date.now();
@@ -229,7 +244,9 @@ export function blastBVH(polys, blob, opts = {}) {
  *   union     -- its polygon's plane as it is, keeping its own tag (SKIN if it had none: the other solid's skin)
  * opts.otherTag overrides the tag given to other's pieces.
  */
-export function booleanBVH(polys, other, op, { finish = true, otherTag = null, ...opts } = {}) {
+// opts.finishWeld (round 16g): the weld radius at the operands' scale, in place of the one the path that ran implies --
+// the gate's control for EXACT_FINISH_WELD
+export function booleanBVH(polys, other, op, { finish = true, otherTag = null, finishWeld = null, ...opts } = {}) {
     if (op !== "subtract" && op !== "union" && op !== "intersect") throw new Error('blastEngine: unrecognized op "' + op + '" (expected "subtract", "union" or "intersect")');
     const blob = other, turn = op === "subtract";
     const t0 = Date.now();
@@ -274,7 +291,8 @@ export function booleanBVH(polys, other, op, { finish = true, otherTag = null, .
         }
     }
     const sa = r.stats.a, sb = r.stats.b;
-    const stats = { engine: "bvh", triangles: r.triCount, fallbackTris: (sa.fallbackTris || 0) + (sb.fallbackTris || 0),
+    // round 16g: exact -- which arrangement ran (the exact one declines where the operands are not conforming)
+    const stats = { engine: "bvh", exact: !!r.exact, triangles: r.triCount, fallbackTris: (sa.fallbackTris || 0) + (sb.fallbackTris || 0),
                     ambiguous: r.ambiguousTriIndices.length, capped: r.capped, emptyOperand: r.emptyOperand, unknown,
                     wallTriangles: nA, conformScanned: (sa.conformScanned || 0) + (sb.conformScanned || 0), piecesBuilt: pieces.length };
     if (!finish) {
@@ -287,7 +305,7 @@ export function booleanBVH(polys, other, op, { finish = true, otherTag = null, .
     // snapped arrangement's near-misses, and on exact output it only joined distinct points 1e-10..8e-9 apart, folding the
     // wall: a later shot's arrangement found two of its seams crossing (page seed 5, shot 38: 45 open edges after it)
     const fin = finishPieces(pieces,
-                             { weld: opts.exactArrangement ? 0 : FINISH_WELD_SNAPS * SNAP * 2 ** (r.scaleExponent || 0) });
+                             { weld: (finishWeld ?? (r.exact ? EXACT_FINISH_WELD : FINISH_WELD_SNAPS * SNAP)) * 2 ** (r.scaleExponent || 0) });   // the path that ran
     Object.assign(stats, { kept: kept.length, finished: fin.polys.length, welded: fin.stats.welded, maxMove: fin.stats.maxMove,
                            weldRefused: fin.stats.refused, weldMoves: fin.stats.moves, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,
                            ms: Date.now() - t0 });

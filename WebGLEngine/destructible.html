@@ -56,8 +56,9 @@
       <p class="note">Blast cuts. <b>Settle</b> snaps, merges the coplanar waste and welds every T-junction —
          a whole-mesh pass that belongs where the shooting stops, not in the frame loop.</p>
       <p class="note">The <b>engine</b> is <code>physics/mesh/meshBoolean.mjs</code> by default, via
-         <code>physics/mesh/blastEngine.mjs</code>: cut along the actual intersection segments, closed without settle --
-         each shot welds its own seam and merges its pieces back into convex polygons. The flag (or
+         <code>physics/mesh/blastEngine.mjs</code>: cut along the actual intersection segments, at exact seam points,
+         closed without settle -- each shot merges its pieces back into convex polygons. Where the wall is not
+         conforming near the cut (a BSP shot left T-junctions there) that shot takes the snapped arrangement instead. The flag (or
          <code>?csg=bsp</code>) sends the blast through meshCSG's BSP instead: the same solid and the same SKIN/CUT
          tags, open until settled.</p>
     </div>
@@ -121,7 +122,9 @@ function draw() {
 
 function census() {
     const E = new Map();
-    const Q = 1e-9, key = (v) => [Math.round(v[0] / Q), Math.round(v[1] / Q), Math.round(v[2] / Q)].join(",");
+    // round 16g: an edge is matched only by its twin on the very same two doubles -- the exact arrangement keeps distinct
+    // points closer than any key, which a 1e-9 key would merge and read as T-junctions
+    const key = (v) => v[0] + "," + v[1] + "," + v[2];
     let n = 0;
     for (const p of wall) for (let i = 0; i < p.vs.length; i++) {
         const a = p.vs[i], b = p.vs[(i + 1) % p.vs.length];
@@ -142,7 +145,7 @@ function show() {
         "unmatched     " + c.unmatched + "  (" + (100 * c.unmatched / Math.max(1, c.edges)).toFixed(2) + "%)\n" +
         "volume        " + v.toFixed(6) + "  of " + V0.toFixed(6) + "\n" +
         "removed       " + (100 * (1 - v / V0)).toFixed(2) + "%\n" +
-        "engine        " + $("engine").value + (lastStats && lastStats.engine === "bvh" ? "  (fallbacks " + lastStats.fallbackTris + ", welded " + lastStats.welded + ", merged " + lastStats.merged + ")" : "") + "\n" +
+        "engine        " + $("engine").value + (lastStats && lastStats.engine === "bvh" ? "  (" + (lastStats.exact ? "exact" : "snapped") + ", fallbacks " + lastStats.fallbackTris + ", welded " + lastStats.welded + ", merged " + lastStats.merged + ")" : "") + "\n" +
         "last op       " + lastMs.toFixed(1) + " ms";
 }
 
