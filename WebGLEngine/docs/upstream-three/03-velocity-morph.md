@@ -66,7 +66,7 @@ point's distance from the unmorphed one at the third frame (influence 0.1).
 
 ## A patch
 
-[`patches/03-morph-previous-influences.diff`](patches/03-morph-previous-influences.diff), a diff against three's `src/` at the r185 tag. When `needsPreviousData()`, the base and influences of the last draw are kept per mesh (swapped in the existing `OnObjectUpdate`) and `positionPrevious` is morphed by them. Per-instance morphs (`morphTexture` on an `InstancedMesh`) are left as they are. Applied to r185's build, the
+[`patches/03-morph-previous-influences.diff`](patches/03-morph-previous-influences.diff), a diff against three's `src/` at the r185 tag. When `needsPreviousData()`, the base and influences of the last draw are kept per mesh (swapped in the existing `OnObjectUpdate`) and `positionPrevious` is morphed by them. Per-instance morphs (`morphTexture` on an `InstancedMesh`) are read the same way from a copy of the morph texture as it was at the last draw, each instance from its own row. Applied to r185's build, the
 reproduction prints:
 
 <!-- patched:begin -->
@@ -80,11 +80,13 @@ Several targets, absolute targets, and per-instance morphs, measured the same wa
 <!-- paths:begin -->
 three relative targets, moving it in x and y: r185 14.801, 9.251, patched 5.551, 3.700 (px x, y, both backends)
 the same as absolute targets: r185 14.801, 9.251, patched 5.551, 3.700 (px x, y, both backends)
-per-instance morphs (an InstancedMesh's morphTexture): r185 1.871, patched 1.871 (px, both backends) -- not reached
+per-instance morphs (an InstancedMesh's morphTexture, two drawn, one still): r185 -2.770, 0.000, patched 2.817, 0.000 (px x, y, both backends)
 <!-- paths:end -->
 
-Per-instance morphs (`morphTexture` on an `InstancedMesh`) are left as they are: the patch morphs `positionPrevious` only
-where a mesh has one set of influences.
+With per-instance morphs, two instances are drawn, one moved by its morph and one held still above it, against two plain
+meshes where they are. r185 takes the still one's influence for motion -- its previous point is the geometry unmorphed -- and
+the patch reads both as the plain meshes do. Per-instance influences over absolute targets, or beside a mesh-level
+`morphTargetInfluences`, throw in r185 on both backends before any of this is reached.
 
 ## A fix that works in an application
 

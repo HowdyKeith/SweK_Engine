@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4788 -- THE 392nd CLOSING: NO new gate file -- patch 03 reaches per-instance morphs.
+    since485: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4788", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (03's per-instance case: two instances drawn, one still, against two plain meshes; now held reached)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 03 STOPPED AT ONE SET OF INFLUENCES PER MESH, SO AN INSTANCED MESH'S OWN MORPHS STILL READ AS 1.871 PX OF " +
+                 "5.612. *** Per instance, three reads each influence from the mesh's morphTexture, row instanceIndex; the patch now " +
+                 "keeps a copy of that texture as it was at the last draw, swapped in the same OnObjectUpdate as the shared " +
+                 "influences, and morphs positionPrevious from it. AND THE CASE HAD TO BE MADE ABLE TO TELL. It drew one instance " +
+                 "with the second scaled to nothing, so an influence read from the wrong row could not show. With the second drawn " +
+                 "and still, held at 0.2, r185 read 2.796 against the plain meshes' 2.806: its still instance's error and its " +
+                 "moving one's averaged to the reference by coincidence. Held at -0.4: r185 -2.770, patched 2.817, the plain " +
+                 "meshes 2.817, both backends; a row-0 mutant reads 0.962. three rebuilt with all nine: its build matches the " +
+                 "applier's byte for byte, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Five sabotages red.",
+    }),
     // v4787 -- THE 391st CLOSING: NO new gate file -- the nine three.js patches run together, not only applied together.
     since484: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

@@ -29,7 +29,7 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
   for the order of the names in its one import from `three.core.js`: rollup lists them by first use, and patch 02 uses three of
   them earlier.
 - Three's unit tests (`test/unit`, run in headless Chromium with QUnit served locally): 1311 tests, 1310 passed, 1 todo,
-  0 failed, with the six and with the nine, and again at v4786 with 07 keyed on the render -- the same as the unpatched tag. They exercise none of the paths the patches change.
+  0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, and at v4788 with 03 reaching per-instance morphs -- the same as the unpatched tag. They exercise none of the paths the patches change.
 - All nine together, on one build (since v4787): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
   prints what it prints with its own patch alone -- but for 04's `mrtSameFrame`, which patch 07 fixes as well (04's "together" block).
 - Not run: three's e2e tests (`test/e2e`), which need its examples and screenshots.

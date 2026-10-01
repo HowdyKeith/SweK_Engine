@@ -134,11 +134,16 @@ else {
           for (const x of [-0.5 + 0.3 * k, -0.35 + 0.3 * k]) { bone.position.x = x; bone.updateMatrixWorld(true); await renderer.computeAsync(job); m.push(await meanX()); } }
         o.it = [+(m[1] - m[0]).toFixed(3) + 0];
       } else if (name === "perInstance") {
-        // three morphs per instance only where an InstancedMesh draws more than one: the second is scaled to nothing
+        // three morphs per instance only where an InstancedMesh draws more than one. v4788: the second is drawn too, above the
+        // first and still -- its influence held at -0.4 -- so an influence read from the wrong instance's row is motion that is not
+        // there (at 0.2, r185's previous point -- the geometry unmorphed -- happened to give the still one's error and the moving one's
+        // the same mean as the reference, within 0.01 px); the reference is two plain meshes where the instances are
         const g = box(), n = g.attributes.position.count, d = new Float32Array(n * 3); for (let i = 0; i < n; i++) d[i * 3] = 1;
         g.morphAttributes.position = [new THREE.Float32BufferAttribute(d, 3)]; g.morphTargetsRelative = true;
-        const mesh = new THREE.InstancedMesh(g, material(), 2), dummy = new THREE.Mesh(g); dummy.morphTargetInfluences = [0]; sc.add(mesh); mesh.setMatrixAt(1, M.makeScale(0, 0, 0));
-        o.it = await velocityOf(sc, (k) => { dummy.morphTargetInfluences[0] = -0.5 + 0.3 * k; mesh.setMorphAt(0, dummy); dummy.morphTargetInfluences[0] = 0; mesh.setMorphAt(1, dummy); mesh.morphTexture.needsUpdate = true; });
+        const mesh = new THREE.InstancedMesh(g, material(), 2), dummy = new THREE.Mesh(g); dummy.morphTargetInfluences = [0]; sc.add(mesh); mesh.setMatrixAt(1, M.makeTranslation(0, 0.9, 0));
+        o.it = await velocityOf(sc, (k) => { dummy.morphTargetInfluences[0] = -0.5 + 0.3 * k; mesh.setMorphAt(0, dummy); dummy.morphTargetInfluences[0] = -0.4; mesh.setMorphAt(1, dummy); mesh.morphTexture.needsUpdate = true; });
+        const a = new THREE.Mesh(box(), material()), b = new THREE.Mesh(box(), material()), s2 = new THREE.Scene(); s2.add(a, b); b.position.set(-0.4, 0.9, 0); b.updateMatrixWorld();
+        o.plainPair = await velocityOf(s2, (k) => { a.position.x = -0.5 + 0.3 * k; a.updateMatrixWorld(); });
       }
       res[forceWebGL ? "webgl2" : "webgpu"] = o; renderer.dispose();
     } catch (e) { res[forceWebGL ? "webgl2" : "webgpu"] = { err: String(e && e.message || e).slice(0, 160) }; } }
@@ -188,10 +193,10 @@ if (res) {
                 ran && eq(P, pl) && !eq(R, pl));
             if (ran) lines.push(`${what}: r185 ${px(R[0])}, ${px(R[1])}, patched ${px(P[0])}, ${px(P[1])} (px x, y, both backends)`);
         }
-        const R = both("perInstance", "r185", "it"), P = both("perInstance", "patched", "it"), pl = plainOf("perInstance"), ran = [R, P, pl].every(Boolean);
-        ok(`  03, per-instance morphs (an InstancedMesh's morphTexture): NOT reached -- ${ran ? `r185 ${px(R[0])}, patched ${px(P[0])} px, the plain mesh ${px(pl[0])}` : "did not run alike"}`,
-            ran && eq(R, P) && !eq(P, pl), "the patch morphs positionPrevious only where a mesh has one set of influences");
-        if (ran) lines.push(`per-instance morphs (an InstancedMesh's morphTexture): r185 ${px(R[0])}, patched ${px(P[0])} (px, both backends) -- not reached`);
+        const R = both("perInstance", "r185", "it"), P = both("perInstance", "patched", "it"), pl = both("perInstance", "r185", "plainPair"), ran = [R, P, pl].every(Boolean);
+        ok(`*** 03, per-instance morphs (an InstancedMesh's morphTexture, two drawn, one still): ${ran ? `patched ${px(P[0])}, ${px(P[1])} px, the plain meshes ${px(pl[0])}, ${px(pl[1])}; r185 ${px(R[0])}, ${px(R[1])}` : "did not run alike"} ***`,
+            ran && eq(P, pl) && !eq(R, pl), "v4788: the previous influences read from a copy of the last draw's morphTexture, each instance from its own row");
+        if (ran) lines.push(`per-instance morphs (an InstancedMesh's morphTexture, two drawn, one still): r185 ${px(R[0])}, ${px(R[1])}, patched ${px(P[0])}, ${px(P[1])} (px x, y, both backends)`);
         if (lines.length === 3) said["03"] = lines.join("\n");
     }
     // 04
@@ -243,10 +248,17 @@ if (res) {
 // drew it from the old texture -- the current matrices frozen -- and the patch's copy, re-made in place at a new size, was never
 // uploaded either: both frozen, one frame apart, read as the right 5.612. With the material updated the patch read 11.224; the
 // copy is a new texture now, the last draw's matrices kept as its first entries.
+// ---- v4786 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against patch 07: the v4775 patch (previous bones once a frame) -> 3; both hunks back on frameId -> 5; computeSkinning's hunk
+// alone back on frameId -> 2 (before the computed case it passed here, caught only by the recorded build hash). None green.
+// ---- v4788 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against 03's per-instance branch, each -> 2 (the case and the draft's paths block): B1 the previous influences read from the
+// live morphTexture -> patched 0.000; B2 every instance reading row 0 -> 0.962; B3 the swap made after the copy, so the previous
+// is this draw's -> 0.000; B4 the copy never marked for upload -> 5.633; B5 the branch never taken -> -2.770, r185's. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
-    "patch here changes that; many morph targets past the uniform buffer; per-instance morphs, which patch 03 does not reach " +
-    "(1.871 alone and with all nine); computeSkinning's absolute positions -- r185 " +
+    "patch here changes that; many morph targets past the uniform buffer; per-instance influences over absolute targets, or beside " +
+    "a mesh-level morphTargetInfluences, which r185 throws on; computeSkinning's absolute positions -- r185 " +
     "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2, so only the step " +
     "between two computes is read; and a real GPU.");
 process.exitCode = fails ? 1 : 0;
