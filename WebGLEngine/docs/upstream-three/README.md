@@ -32,6 +32,12 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
   0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, and at v4788 with 03 reaching per-instance morphs -- the same as the unpatched tag. They exercise none of the paths the patches change.
 - All nine together, on one build (since v4787): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
   prints what it prints with its own patch alone -- but for 04's `mrtSameFrame`, which patch 07 fixes as well (04's "together" block).
-- Not run: three's e2e tests (`test/e2e`), which need its examples and screenshots.
+- Three's e2e tests (`test/e2e`), at v4789 in a checkout of the r185 tag with its examples, run by
+  [`e2e/puppeteer-local.diff`](e2e/puppeteer-local.diff) -- three's runner with this box's flags for presenting WebGPU on
+  SwiftShader, and the workaround this tree's harness installs for its Chromium rejecting three's string `swizzle` -- recorded in
+  [`e2e/v4789.json`](e2e/v4789.json): 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with all nine, each
+  for the same reason (seven a 2D view of a 3D texture, which WebGPU refused here; two a fetch that failed here; one video,
+  `RAF is not defined`; one XR layers example 0.4% of its pixels off); 185 of the 187 screenshots the same bytes, and the
+  other two vary between runs of one build, whichever build it is. The WebGL examples load `three.module.js`, which no patch changes.
 
 `tools/ship/threeUpstream-selfcheck.mjs` holds the hash of each build; a patch changed since makes the patched one stale.

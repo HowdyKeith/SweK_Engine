@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4789 -- THE 393rd CLOSING: NO new gate file -- three's own e2e tests, on r185's build and with all nine patches.
+    since486: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4789", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 5: three's e2e record -- it adds up, it names the builds the gate's hashes name, and the README states it)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE'S OWN e2e TESTS HAD NEVER RUN ON THE PATCHES; THE README SAID SO. *** In a checkout of r185 with its examples, " +
+                 "three's runner drew every WebGPU example BLACK at first, and said nothing: this Chromium refuses three's string " +
+                 "swizzle on createView, the exception is uncaught, and the runner listens only to the console. With this harness's " +
+                 "presenting flags and its swizzle workaround (docs/upstream-three/e2e/puppeteer-local.diff), 187 WebGPU examples: " +
+                 "176 passed and the same 11 failed on r185 and with all nine, each for the same reason, and 185 screenshots are " +
+                 "the same bytes. The other two are not the patches': four runs of one build gave four rasterizer images, and the " +
+                 "video panorama lands on one of two frames whichever build runs it. Recorded in e2e/v4789.json against both build " +
+                 "hashes, so a changed patch has two rows to clear: the hash, then the e2e. Seven sabotages red.",
+    }),
     // v4788 -- THE 392nd CLOSING: NO new gate file -- patch 03 reaches per-instance morphs.
     since485: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

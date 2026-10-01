@@ -1,0 +1,57 @@
+--- a/test/e2e/puppeteer.js
++++ b/test/e2e/puppeteer-local.js
+@@ -202,13 +202,13 @@
+ 
+ 	/* Launch browser */
+ 
++	// LOCAL: SwiftShader's Vulkan, the set SweK_Engine's webgpuHarness found to present a WebGPU frame on this box (no lavapipe here)
+ 	const flags = [
+ 		'--hide-scrollbars',
+ 		'--enable-unsafe-webgpu',
+ 		'--enable-features=Vulkan',
+-		'--disable-vulkan-surface',
+-		'--ignore-gpu-blocklist',
+-		'--disable-gpu-driver-bug-workarounds',
++		'--use-vulkan=swiftshader',
++		'--use-angle=swiftshader',
+ 		'--disable-gpu-watchdog',
+ 		'--no-sandbox'
+ 	];
+@@ -217,7 +217,7 @@
+ 
+ 	const launchOptions = {
+ 		headless: ( 'CI' in process.env || process.env.VISIBLE ) ? false : 'new',
+-		env: { ...process.env, VK_DRIVER_FILES: '/usr/share/vulkan/icd.d/lvp_icd.x86_64.json' },
++		env: { ...process.env },
+ 		args: flags,
+ 		defaultViewport: viewport,
+ 		handleSIGINT: false,
+@@ -238,7 +238,7 @@
+ 	const builds = {
+ 		'three.core.js': buildInjection( await fs.readFile( 'build/three.core.js', 'utf8' ) ),
+ 		'three.module.js': buildInjection( await fs.readFile( 'build/three.module.js', 'utf8' ) ),
+-		'three.webgpu.js': buildInjection( await fs.readFile( 'build/three.webgpu.js', 'utf8' ) )
++		'three.webgpu.js': buildInjection( await fs.readFile( process.env.THREE_WEBGPU_BUILD || 'build/three.webgpu.js', 'utf8' ) )
+ 	};
+ 
+ 	/* Prepare page */
+@@ -317,6 +317,11 @@
+ async function preparePage( page, injection, builds, errorMessages ) {
+ 
+ 	await page.evaluateOnNewDocument( injection );
++	// LOCAL: this sandbox's Chromium rejects three's string `swizzle` on every texture view (SweK_Engine's webgpuHarness,
++	// installSwizzleWorkaround, v4319); a current browser ignores the field, so strip it where it is three's string default
++	await page.evaluateOnNewDocument( `if ( typeof GPUTexture !== 'undefined' ) { const orig = GPUTexture.prototype.createView;
++		GPUTexture.prototype.createView = function ( d ) { if ( d && typeof d === 'object' && typeof d.swizzle === 'string' ) { const { swizzle, ...rest } = d; return orig.call( this, rest ); } return orig.call( this, d ); }; }` );
++	page.on( 'pageerror', ( e ) => { if ( page.file !== undefined ) page.error = page.error ?? `${ page.file }: ${ String( e && e.message || e ).slice( 0, 200 ) }`; } );
+ 	await page.setRequestInterception( true );
+ 
+ 	page.on( 'console', async msg => {
+@@ -513,6 +518,7 @@
+ 		const pageElapsed = ( performance.now() - pageStart ) / 1000;
+ 
+ 		const screenshot = ( await Image.read( await page.screenshot() ) ).scale( 1 / viewScale );
++		if ( process.env.E2E_OUT ) await fs.writeFile( `${ process.env.E2E_OUT }/${ file }.rgba`, Buffer.from( screenshot.data ) ); // LOCAL: every actual, raw RGBA, lossless
+ 
+ 		if ( page.error !== undefined ) throw new Error( page.error );
+ 

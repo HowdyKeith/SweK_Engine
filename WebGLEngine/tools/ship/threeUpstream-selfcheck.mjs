@@ -206,6 +206,25 @@ else {
     ok(`  ${DRAFTS[RELEASE_DRAFT].patch}'s released stages with all of them: ${JSON.stringify(all).replace(/"/g, "")}, as with it alone`, ran(all) && JSON.stringify(all) === JSON.stringify(one));
 }
 
+// v4789: THREE'S OWN e2e TESTS, RECORDED. They need three's examples/ and its screenshots, so they run in a checkout of three,
+// not here: docs/upstream-three/e2e/puppeteer-local.diff is the runner as run (this box's presenting flags, and the swizzle
+// workaround this harness installs), e2e/v4789.json what it said on r185's build and on all nine. Held here: that the record
+// adds up, that it was taken on the two builds this gate's hashes name -- a patch changed since makes it stale, as it makes
+// the second hash stale -- and that the README states it.
+console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's build and with all of them");
+{   const E2E = path.join(DIR, "e2e", "v4789.json"), rec = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
+    ok("  docs/upstream-three/e2e/ holds the record and the runner it was taken with", !!rec && fs.existsSync(path.join(DIR, "e2e", "puppeteer-local.diff")));
+    if (rec) {
+        const failed = Object.keys(rec.failed || {}), varying = Object.keys(rec.varyingOnOneBuild || {});
+        ok(`  it adds up: ${rec.examples} examples, ${rec.passed} passed and ${failed.length} failed, each the same on both builds; ${rec.screenshotsIdentical} screenshots the same bytes and ${varying.length} varying between runs of one build`,
+            rec.examples > 0 && rec.passed + failed.length === rec.examples && rec.samePerExample === true && rec.screenshotsIdentical + varying.length === rec.examples);
+        ok(`*** it was taken on the builds this gate's hashes name: r185 ${rec.builds.r185.slice(0, 16)}..., all of them ${rec.builds.allPatched.slice(0, 16)}... ***`,
+            rec.builds.r185 === THREE_BUILT.r185 && rec.builds.allPatched === THREE_BUILT.allPatched, "a patch changed since the record makes it stale: run three's e2e again, and record it");
+        ok("  the README states it as the record does", index.includes(`${rec.examples} WebGPU examples, ${rec.passed} passed and the same ${failed.length} failed`) &&
+            index.includes(`${rec.screenshotsIdentical} of the ${rec.examples} screenshots`) && index.includes("](e2e/v4789.json)"));
+    }
+}
+
 // ---- v4763 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the drafts themselves: U1 an Observed number edited by a thousandth -> 1; U2 a reproduction importing more than
 // three -> 2; U3 the instanced reproduction made to move the mesh instead (no bug) -> 2; U4 the README not saying DRAFTS, NOT
@@ -237,9 +256,15 @@ else {
 // -> 1; A4 04's together block saying what its patched block says -> 2. In tools/ship/threeUpstreamPaths-selfcheck.mjs: A5 the
 // all-nine build r185's own -> 8 (every case a patch changes; storageGPU and perInstance, which no patch reaches, the same either way); A6 the
 // all-nine build made without 03 -> 2. None green.
+// ---- v4789 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against the e2e record: E1 a patch changed (05, a comment reworded) -> 1, the build hash; E7 the same with the hash recorded
+// again but three's e2e not run again -> 1, the record's staleness row -- the two steps a changed patch has to clear; E2 the
+// record's pass count off by one -> 2 (it no longer adds up, and the README no longer states it); E3 the README's identical-
+// screenshot count edited -> 1; E4 the record's patched hash off by one digit -> 1; E5 the runner's diff deleted -> 1; E6 the
+// record saying the builds differed on an example -> 1. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
-    "0.185.1, which the recorded hash says is three's own build of it); three's e2e tests, which need its examples and screenshots; " +
+    "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +
     "its unit tests beyond the record above -- they touch none of the paths the patches change; a real GPU; and whether three's " +
     "maintainers would take the patches as they are.");
 process.exitCode = fails ? 1 : 0;
