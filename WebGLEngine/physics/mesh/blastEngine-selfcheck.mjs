@@ -474,6 +474,34 @@ console.log("\n7. *** ROUND 16: WHAT THE FINISHING WELD STILL FINDS, NOW THE ARR
     report("KNOWN, left to the weld: the " + on.overSnap + " moves beyond snap join two seam ends 1.2e-9..7e-9 apart, each the end of a triTriIntersect segment of a different pair (measured; why the two pairs end apart is not traced). Merging such ends before cutting (all within 8 snaps that share a triangle) closed 37 of 65 on 99 chains -- and wrecked the rotated-copy family (its band 2.8e-2 -> 1e-1, outside it 1.4e-9 -> 1.1e-4), whose twin surfaces are dense with genuinely distinct points that close. Tried and not kept.");
 }
 
+console.log("\n8. *** ROUND 17: THE WALL FAR FROM THE ORIGIN -- A BIG LEVEL ***");
+{
+    // the page's wall and blasts moved 2^27 out on every axis (the wall's corners exactly; the blobs' vertices round to
+    // ulp(2^27) = 1.5e-8 on the way, which is the geometry out there). meshBoolean moves each shot's operands back to the
+    // origin exactly (its translationFor) and the result out again; with translate:false it works out there, where a
+    // coordinate's ulp is fifteen times the arrangement's 1e-9 snap.
+    const D = 2 ** 27, off = (P) => P.map((p) => { const vs = p.vs.map((v) => [v[0] + D, v[1] + D, v[2] + D]); return { vs, pl: M.planeOf(vs) }; });
+    const vol = (polys, c) => { let v = 0; for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) { const a = p.vs[0].map((x) => x - c), b = p.vs[i].map((x) => x - c), d = p.vs[i + 1].map((x) => x - c); v += a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0]); } return v / 6; };
+    const go = (opts) => {
+        let fb = 0, open = 0, worst = 0;
+        for (const seed of [107, 101, 202]) {
+            let near = M.boxPolys([0, 0, 0], HALF), far = off(M.boxPolys([0, 0, 0], HALF));
+            for (const b of pageBlasts(seed, 10)) {
+                near = blastWith("bvh", near, b).polys;
+                const r = blastWith("bvh", far, off(b), opts); far = r.polys; fb += r.stats.fallbackTris || 0;
+            }
+            open += pageCensus(far); worst = Math.max(worst, Math.abs(vol(far, D) - vol(near, 0)));
+        }
+        return { fb, open, worst };
+    };
+    const on = go({}), offR = go({ translate: false });
+    // the blobs' own rounding out there moves their surface by up to ulp(2^27)/2 = 7.5e-9: over ~1e2 of blob area, 1e-6
+    ok("!! three ten-shot chains with the wall at 2^27: closed at the page's 1e-9 census, no fallback, within 1e-6 of the same chains at the origin (the blobs' own rounding out there)",
+        on.open === 0 && on.fb === 0 && on.worst < 1e-6, "open edges " + on.open + ", fallback triangles " + on.fb + ", |volume - at the origin| " + on.worst.toExponential(2));
+    ok("   control: translate:false -- the shots worked out there -- falls back and opens the wall", offR.fb > 0 && offR.open > 0,
+        "fallback triangles " + offR.fb + ", open edges " + offR.open + ", |volume - at the origin| " + offR.worst.toExponential(2));
+}
+
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: the page draws polygons on a 2D canvas and nothing here looks at the " +
     "picture; the finishing pass closes the seam's near-misses after the fact -- the arrangements still disagree on " +

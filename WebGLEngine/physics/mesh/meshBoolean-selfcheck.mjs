@@ -215,7 +215,7 @@ import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
+import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, translationFor, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 import { closestOnTriangle } from "./triContact.mjs";
 
@@ -1474,6 +1474,79 @@ console.log("\n22. *** ROUND 16d: BEYOND THE FIXTURE -- OTHER BLOBS, OTHER AXES 
         " -- the worst traced: a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap, is taken as a TOUCH where it crosses, the face is not split, and both copies are kept whole. Backlog bvh-csg-r16f-exact-arrangement.");
     ok("   (KNOWN, pinned) each of those four stays within 2.5x its measured worst -- a regression alarm, not a correctness claim",
         got.every((g) => g.e < 2.5 * g.was), got.map((g) => g.e.toExponential(2) + " / " + g.was.toExponential(1)).join(", "));
+}
+
+console.log("\n23. *** ROUND 17: FAR FROM THE ORIGIN -- THE OPERANDS MOVED TO IT, EXACTLY ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const vol = (t, c = 0) => { let v = 0; for (let o = 0; o < t.length; o += 9) { const a = [t[o] - c, t[o + 1] - c, t[o + 2] - c], b = [t[o + 3] - c, t[o + 4] - c, t[o + 5] - c], d = [t[o + 6] - c, t[o + 7] - c, t[o + 8] - c]; v += a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0]); } return v / 6; };
+    const area = (t) => { let s = 0; for (let o = 0; o < t.length; o += 9) { const e1 = [t[o + 3] - t[o], t[o + 4] - t[o + 1], t[o + 5] - t[o + 2]], e2 = [t[o + 6] - t[o], t[o + 7] - t[o + 1], t[o + 8] - t[o + 2]]; s += Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]) / 2; } return s; };
+    const cracks = (buf, D) => { const Q = 1e-6, key = (o) => Math.round((buf[o] - D) / Q) + "," + Math.round((buf[o + 1] - D) / Q) + "," + Math.round((buf[o + 2] - D) / Q), E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const run = (A, B, op, o = {}) => meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, o);
+    const rotz = (P, a) => P.map((p) => { const vs = p.vs.map(([x, y, z]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a), z]); return { vs, pl: M.planeOf(vs) }; });
+    // the operands are BUILT far away -- x = fl(p + D), exact doubles out there -- and moved back by D exactly (Sterbenz:
+    // every x is within a factor 2 of D), so the oracle is the same geometry at the origin, where the pipeline is trusted
+    const far = (P, D) => { const t = M.toTriangleBuffer(P), o = new Float64Array(t.length); for (let i = 0; i < t.length; i++) o[i] = t[i] + D; return o; };
+    const back = (X, D) => X.map((x) => x - D);
+    const pairs = [["two blobs", M.jaggedBlob([0, 0, 0], 1, 8, 11), M.jaggedBlob([0.4, 0.3, -0.2], 0.9, 8, 12)],
+                   ["a box and a rotated box", M.boxPolys([0, 0, 0], [1, 1, 1]), rotz(M.boxPolys([0.3, 0.2, 0.1], [0.7, 0.8, 0.9]), 0.4)],
+                   ["a blob and its copy rotated 1e-6", M.jaggedBlob([0, 0, 0], 1, 8, 7), rotz(M.jaggedBlob([0, 0, 0], 1, 8, 7), 1e-6)]];
+    let over = 0, fbs = 0, crk = 0, ident = 0, n = 0, worstRel = 0;
+    const ctrl = {};
+    for (const e of [13, 20, 27]) {
+        const D = 2 ** e, ulp = 2 ** (e - 52);
+        for (const [name, P, Q] of pairs) {
+            const X = far(P, D), Y = far(Q, D), X0 = back(X, D), Y0 = back(Y, D), bound = ulp * (area(X0) + area(Y0));
+            for (const op of OPS) {
+                const r = run(X, Y, op), r0 = run(X0, Y0, op), err = Math.abs(vol(r.tris, D) - vol(r0.tris));
+                n++; if (err > bound) over++; worstRel = Math.max(worstRel, err / bound);
+                // cracks at the 1e-6 census beyond those the same geometry has at the origin (a copy rotated 1e-6 has 5
+                // there: its twins are a census key apart)
+                fbs += r.stats.a.fallbackTris + r.stats.b.fallbackTris; crk += Math.max(0, cracks(r.tris, D) - cracks(r0.tris, 0));
+                // the far result IS the result for the operands moved by -t, moved back by +t, bit for bit: the move in is
+                // exact, so the pipeline saw exactly those operands
+                const t = r.translation, Xt = t && X.map((x, i) => x - t[i % 3]), Yt = t && Y.map((x, i) => x - t[i % 3]);
+                const rt = t && run(Xt, Yt, op);
+                if (!t || rt.translation || rt.tris.length !== r.tris.length || r.tris.some((x, i) => x !== rt.tris[i] + t[i % 3])) ident++;
+                if (op === "union" && (e === 13 || e === 27)) { const rc = run(X, Y, op, { translate: false }); ctrl[name + " 2^" + e] = [Math.abs(vol(rc.tris, D) - vol(r0.tris)), rc.stats.a.fallbackTris + rc.stats.b.fallbackTris]; }
+            }
+        }
+    }
+    ok("!! *** THREE PAIRS AT 2^13, 2^20 AND 2^27 FROM THE ORIGIN, 3 OPS: WITHIN ulp(D) x THEIR AREA OF THE SAME GEOMETRY AT THE ORIGIN, NO FALLBACK, NO CRACK IT DOES NOT HAVE THERE ***",
+        over === 0 && fbs === 0 && crk === 0, over + " of " + n + " beyond (worst " + worstRel.toFixed(3) + " of the bound), fallbacks " + fbs + ", cracks " + crk);
+    ok("!! the far result IS the result for the operands moved by -t (exactly), moved back by +t, bit for bit, on every one of those runs",
+        ident === 0, ident + " of " + n + " differ");
+    const c13 = ctrl["a blob and its copy rotated 1e-6 2^13"], c27 = ctrl["a box and a rotated box 2^27"];
+    ok("   control: translate:false -- round 11's pipeline, scaled but not moved -- is off there (a blob and its copy rotated 1e-6 at 2^13; the boxes at 2^27)",
+        c13[0] > 1e-9 && c13[1] > 0 && c27[0] > 1e-3, Object.entries(ctrl).map(([k, [e, f]]) => k + ": " + e.toExponential(1) + " (" + f + " fb)").join(", "));
+    // input vertices come back bit for bit: two far boxes apart -- the union is their triangles, untouched
+    {
+        const X = far(M.boxPolys([0, 0, 0], [1, 1, 1]), 2 ** 30), Y = far(M.boxPolys([3.1, 0.2, 0.3], [1, 1, 1]), 2 ** 30), r = run(X, Y, "union");
+        const key = (b, o) => b[o] + "," + b[o + 1] + "," + b[o + 2], inp = new Set();
+        for (const b of [X, Y]) for (let o = 0; o < b.length; o += 3) inp.add(key(b, o));
+        let foreign = 0; for (let o = 0; o < r.tris.length; o += 3) if (!inp.has(key(r.tris, o))) foreign++;
+        ok("   two disjoint boxes at 2^30, moved in and back: every output vertex is an input vertex, bit for bit", r.translation && foreign === 0 && r.triCount === 24, "foreign vertices " + foreign + ", triangles " + r.triCount);
+    }
+    // by hand: near the origin nothing moves; only a far axis moves; t lands on the coordinates' own grid
+    {
+        const A = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1])), B = M.toTriangleBuffer(M.boxPolys([0.5, 0.5, 0.5], [1, 1, 1]));
+        const near = translationFor(A, B);
+        const shiftX = (b, D) => b.map((x, i) => (i % 3 === 0 ? x + D : x)), t = translationFor(shiftX(A, 1e6), shiftX(B, 1e6));
+        ok("   by hand: a pair at the origin is not moved; the same pair 1e6 along x is moved along x only, by a value within its spread",
+            near === null && t && t[1] === 0 && t[2] === 0 && t[0] > 1e6 - 1 && t[0] < 1e6 + 1.5, "near " + JSON.stringify(near) + ", far " + JSON.stringify(t));
+    }
+    // moved AND scaled: a pair 1e-3 across at 2^10 (moved in, then scaled up by 2^10) and one 1e4 across at 2^40
+    {
+        let worst = 0, bad = 0;
+        for (const [ext, D] of [[1e-3, 2 ** 10], [1e4, 2 ** 40]]) {
+            const P = M.jaggedBlob([0, 0, 0], ext, 8, 21), Q = M.jaggedBlob([0.3 * ext, 0.2 * ext, -0.1 * ext], 0.9 * ext, 8, 22);
+            const X = far(P, D), Y = far(Q, D), X0 = back(X, D), Y0 = back(Y, D), bound = 2 ** (Math.floor(Math.log2(D)) - 52) * (area(X0) + area(Y0)) + 1e-12 * ext ** 3;
+            for (const op of OPS) { const r = run(X, Y, op), e = Math.abs(vol(r.tris, D) - vol(run(X0, Y0, op).tris)); worst = Math.max(worst, e / bound); if (e > bound || !r.translation) bad++; }
+        }
+        ok("   moved and scaled together: a pair 1e-3 across at 2^10 and one 1e4 across at 2^40, within the same bound", bad === 0, bad + " beyond, worst " + worst.toFixed(3) + " of the bound");
+    }
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

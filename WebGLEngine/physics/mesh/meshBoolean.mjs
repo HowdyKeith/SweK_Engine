@@ -273,7 +273,8 @@
 // NAMED, NOT FIXED: (1) OFFSETS -- the step scales, it does not translate. A unit-size pair at distance d from the
 // origin: 9.1e-13 relative at 1e5, 2.0e-11 at 1e6, 1.1e-10 with 1 fallback and 10 open edges at 1e7, 6.2e-9 with 225
 // fallbacks and 1,115 open edges at 1e8. Translating by a representable offset is not exact the way a power of two
-// is, so it is a design question, not a one-liner. (2) MIXED SIZES -- the band is chosen for the JOINT extent, so a
+// is, so it is a design question, not a one-liner. [FIXED at round 17: an exact translation -- see ROUND 17 below.]
+// (2) MIXED SIZES -- the band is chosen for the JOINT extent, so a
 // small feature on a big part is normalised to a small size. With the ray test fixed the error grows smoothly with
 // the ratio instead of falling off a cliff: 1.4e-13 at 1:1e5, 9.9e-13 at 2e5, 2.3e-12 at 5e5, 3.2e-12 at 1e6,
 // 1.9e-11 at 1e7. (3) meshCSG.mjs (the BSP, what the engine runs) keeps its absolute EPS and settle tolerances;
@@ -454,6 +455,21 @@
 // breaks is the arrangement's own 1e-9 decisions (vertex merging, side splitting, crossing detection) on slivers 1e-9..1e-8
 // wide that an exact or a coplanar verdict creates. None was kept. The four cases are pinned in the gate (section 22);
 // the next step is the arrangement itself made exact -- backlog bvh-csg-r16f-exact-arrangement.
+//
+// *** ROUND 17: FAR FROM THE ORIGIN -- THE OPERANDS MOVED TO IT, EXACTLY (translationFor). *** Measured first, with an
+// oracle that is exactly the same geometry: operands built out at 2^e (x = fl(p + 2^e), exact doubles there) and moved
+// back by 2^e (exact, Sterbenz). Before: a blob against its copy rotated 1e-6 -- exact at the origin -- 3.6e-7 off with 36
+// fallbacks at 2^13 (8,192), 4.0e-5 at 2^20, 3.7e-3 at 2^23; general-position pairs 3.1e-11 at 2^20, a box against a
+// rotated box 3.4e-1 off at 2^27 with fallbacks and cracks; three ten-shot page chains with the wall at 2^27: 1,622
+// fallback triangles, 9,581 open edges at the page census. The pipeline's tolerances are absolute and a coordinate's ulp
+// is 1.8e-12 at 2^13, 1.5e-8 at 2^27 -- past the 1e-9 snap. NOW: per axis, when every coordinate lies further from 0 than
+// twice their spread, the operands are moved by t -- the middle of the spread -- which is exact for every one of them
+// (Sterbenz: x and t within a factor of 2; each checked by TwoSum anyway), then scaled
+// as round 11 does; the result is moved back by +t: input vertices bit for bit, a new seam point rounded once, to what a
+// coordinate out there can hold. After: 0 fallbacks and 0 cracks the same geometry does not have at the origin, at every
+// distance to 2^30; the error is the way back's rounding, within ulp(2^e) x area (worst 0.008 of it); the far result is
+// the moved-in result moved out, bit for bit; the page chains at 2^27 closed with no fallback. Near the origin -- every
+// fixture before, and the page -- no axis qualifies and nothing changes. opts.translate:false turns it off.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -848,18 +864,60 @@ export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
     // the operands are brought into it by an EXACT power of two and the result is sent back by the inverse -- see
     // MESH_BOOLEAN_SCALE_BAND and scaleExponent() below. Inside it (every fixture before round 11) k is 0 and
     // nothing here runs: the result is bit for bit what it was.
+    // ROUND 17: and an axis whose coordinates all sit far from 0 against their spread is first moved to it, EXACTLY --
+    // see translationFor() below. Near the origin (every fixture before round 17, and the page) t is 0 and nothing runs.
+    const t = opts.normalize === false || opts.translate === false ? null : translationFor(trisA, trisB);
+    if (t) { trisA = translateTris(trisA, t, -1); trisB = translateTris(trisB, t, -1); bvhA = null; bvhB = null; }
     const k = opts.normalize === false ? 0 : scaleExponent(trisA, trisB);
+    let r;
     if (k !== 0) {
         const down = 2 ** -k, up = 2 ** k;
         const A = scaleTris(trisA, down), B = scaleTris(trisB, down);
-        const r = meshBooleanCore(A, new MeshBVH(A), B, new MeshBVH(B), op, opts);
+        r = meshBooleanCore(A, new MeshBVH(A), B, new MeshBVH(B), op, opts);
         r.tris = scaleTris(r.tris, up);
-        r.scaleExponent = k;
-        return r;
-    }
-    const r = meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts);
-    r.scaleExponent = 0;
+    } else r = meshBooleanCore(trisA, bvhA || new MeshBVH(trisA), trisB, bvhB || new MeshBVH(trisB), op, opts);
+    r.scaleExponent = k;
+    if (t) { r.tris = translateTris(r.tris, t, +1); r.translation = t; }
     return r;
+}
+
+/**
+ * ROUND 17: the translation meshBoolean() moves the operands by before anything else, or null. Per axis: when every
+ * coordinate on it (both operands) lies further from 0 than twice their spread -- max |x| > 2 x span -- the axis is
+ * moved by t, the middle of the spread. Every x - t is then EXACT, by Sterbenz's lemma: x and t both lie in
+ * [max |x| - span, max |x|], one sign, within a factor of 2 of each other. (Built first with t rounded to a multiple of
+ * ulp(max |x|) as well -- redundant under that condition: the sabotage that dropped the rounding went 0 red, and was
+ * measured to be right to.) Each subtraction is still checked, by the exact error of TwoSum, and an axis with any
+ * inexact one is not moved: the condition guarantees it, the check keeps a change to the condition from making the move
+ * silently inexact (the gate's sabotage of t far below the coordinates). So the pipeline sees the very same geometry,
+ * near the origin, where its absolute tolerances keep their meaning; the result is moved back by +t, which returns
+ * every input vertex bit for bit and rounds a new seam point once, to the precision its coordinates have out there.
+ * An axis near the origin (max |x| <= 2 x span) is left alone.
+ */
+export function translationFor(trisA, trisB) {
+    const t = [0, 0, 0];
+    let any = false;
+    for (let c = 0; c < 3; c++) {
+        let lo = Infinity, hi = -Infinity, m = 0;
+        for (const buf of [trisA, trisB]) for (let i = c; i < buf.length; i += 3) { const x = buf[i]; if (x < lo) lo = x; if (x > hi) hi = x; }
+        if (!(hi >= lo)) continue;
+        m = Math.max(Math.abs(lo), Math.abs(hi));
+        if (!(m > 2 * (hi - lo)) || !Number.isFinite(m)) continue;
+        const tc = lo / 2 + hi / 2;
+        let exact = tc !== 0;
+        for (const buf of [trisA, trisB]) for (let i = c; i < buf.length && exact; i += 3) exact = subtractsExactly(buf[i], tc);
+        if (exact) { t[c] = tc; any = true; }
+    }
+    return any ? t : null;
+}
+function subtractsExactly(x, t) {   // TwoSum (Knuth): the rounding error of x - t, exactly
+    const s = x - t, z = s - x;
+    return (x - (s - z)) + (-t - z) === 0;
+}
+function translateTris(tris, t, sign) {
+    const out = new Float64Array(tris.length);
+    for (let i = 0; i < tris.length; i++) out[i] = sign > 0 ? tris[i] + t[i % 3] : tris[i] - t[i % 3];
+    return out;
 }
 
 // round 16: the triangles of `tris` to keep once every pair that is one triangle twice, wound opposite ways, is
@@ -1086,8 +1144,8 @@ export const MESH_BOOLEAN_SCALE_BAND = [0, 4];
  * the point: its absolute tolerances mean what they were tuned to mean. (meshBoolean-selfcheck section 16 gates the
  * bit-for-bit identity against the in-band run.) The band's edges are as precise as Math.log2, so an extent within an
  * ULP of a power of two may land one step either side; both are in or at the band. Not exact through subnormals:
- * extents below ~1e-290 or above ~1e290 are not handled, named rather than guarded. NOT a translation: a small part
- * far from the origin keeps its large coordinates, and the tolerances then fight their ULP (this file's header).
+ * extents below ~1e-290 or above ~1e290 are not handled, named rather than guarded. NOT a translation -- that is round
+ * 17's translationFor(), applied first: a part far from the origin is moved to it exactly, then scaled.
  */
 export function scaleExponent(trisA, trisB) {
     let lo0 = Infinity, lo1 = Infinity, lo2 = Infinity, hi0 = -Infinity, hi1 = -Infinity, hi2 = -Infinity;
