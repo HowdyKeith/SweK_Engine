@@ -50,6 +50,16 @@
 // It now counts which triangles came through bit for bit FIRST, decides what it keeps, and builds pieces only for the
 // rest (stats.piecesBuilt; a face-cutting pin-prick on that wall builds 108). Same pieces in the same order: every shot
 // of 99 chains is round 14's, bit for bit. meshBoolean.mjs and mesh/meshBVH.mjs have the rest of the round.
+//
+// *** ROUND 18b: THE FINISHING FOR EVERY OP. *** Round 18 found every op's raw output leaving seam ends ~1e-9 apart
+// (20 five-op raw chains on the page's wall: union 0 open edges, subtract 3, intersect 21; 50 mixed ops: 14), and only
+// the blast finishing them. booleanBVH(polys, other, op) is blastBVH for any op, in the same contract and with the
+// same finishing; blastBVH is now booleanBVH(..., "subtract"), bit for bit what it was. Only the other operand's pieces
+// differ by op (subtract: plane turned round, CUT; intersect: plane as is, CUT; union: plane as is, their own tag) --
+// see its doc. Finished, the same chains: union 0, subtract 0, intersect 4 -- those 4 are a fallback's plane-path
+// pieces (wall triangles refused 'dangling' where the big blobs' equators meet in z = 0), which no finishing closes;
+// the 50 mixed ops closed after every step, within 1.6e-12 of the BSP's chain. Nothing in the engine calls union or
+// intersect yet; this is what a second caller gets.
 "use strict";
 
 import * as M from "./meshCSG.mjs";
@@ -198,10 +208,26 @@ export function finishPieces(pieces, { weld = FINISH_WELD_SNAPS * SNAP, merge = 
  *   round 13's raw triangles. Anything else is passed to meshBoolean (e.g. contacts, normalize).
  * @returns {{polys:object[], stats:object}}
  */
-export function blastBVH(polys, blob, { finish = true, ...opts } = {}) {
+export function blastBVH(polys, blob, opts = {}) {
+    return booleanBVH(polys, blob, "subtract", opts);
+}
+
+/**
+ * BVH-CSG ROUND 18b: blastBVH for any op -- polys OP other, in blast()'s contract (polygons, exact planes, SKIN/CUT tags),
+ * FINISHED as a blast is (finishPieces: the weld, the merge by provenance). Round 18 measured every op's raw output
+ * leaving seam ends ~1e-9 apart, open at the page's 1e-9 census, and only the blast had the finishing that closes them.
+ * A piece of `polys` keeps its source polygon's plane and tag (SKIN if it had none), as in a blast. A piece of `other`:
+ *   subtract  -- its polygon's plane turned round, tagged CUT (the blast, exactly as before)
+ *   intersect -- its polygon's plane as it is, tagged CUT (surface the op made inside polys)
+ *   union     -- its polygon's plane as it is, keeping its own tag (SKIN if it had none: the other solid's skin)
+ * opts.otherTag overrides the tag given to other's pieces.
+ */
+export function booleanBVH(polys, other, op, { finish = true, otherTag = null, ...opts } = {}) {
+    if (op !== "subtract" && op !== "union" && op !== "intersect") throw new Error('blastEngine: unrecognized op "' + op + '" (expected "subtract", "union" or "intersect")');
+    const blob = other, turn = op === "subtract";
     const t0 = Date.now();
     const A = trianglesOf(polys), B = trianglesOf(blob);
-    const r = meshBoolean(A.buf, new MeshBVH(A.buf), B.buf, new MeshBVH(B.buf), "subtract", opts);
+    const r = meshBoolean(A.buf, new MeshBVH(A.buf), B.buf, new MeshBVH(B.buf), op, opts);
     const flipped = new Map(), nA = A.owner.length, nB = B.owner.length, t = r.tris;
     const whole = new Int32Array(polys.length), total = new Int32Array(polys.length);
     for (let i = 0; i < nA; i++) total[A.owner[i]]++;
@@ -232,9 +258,9 @@ export function blastBVH(polys, blob, { finish = true, ...opts } = {}) {
             const oldCorner = vs.map((v) => { for (let c = 0; c < 3; c++) if (v[0] === A.buf[f * 9 + c * 3] && v[1] === A.buf[f * 9 + c * 3 + 1] && v[2] === A.buf[f * 9 + c * 3 + 2]) return true; return false; });
             pieces.push({ vs, pl: p.pl, src: p.src ?? M.SKIN, poly: own, oldCorner });
         } else if (q) {
-            let pl = flipped.get(q);
-            if (!pl) { pl = { n: [-q.pl.n[0], -q.pl.n[1], -q.pl.n[2]], w: -q.pl.w }; flipped.set(q, pl); }
-            pieces.push({ vs, pl, src: M.CUT, poly: -1 });
+            let pl = q.pl;
+            if (turn) { pl = flipped.get(q); if (!pl) { pl = { n: [-q.pl.n[0], -q.pl.n[1], -q.pl.n[2]], w: -q.pl.w }; flipped.set(q, pl); } }
+            pieces.push({ vs, pl, src: otherTag ?? (op === "union" ? (q.src ?? M.SKIN) : M.CUT), poly: -1 });
         } else {
             unknown++;                                       // no provenance: not reached by any path today
             pieces.push({ vs, pl: M.planeOf(vs), src: M.CUT, poly: -1 });

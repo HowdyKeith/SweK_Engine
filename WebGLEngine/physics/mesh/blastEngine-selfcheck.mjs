@@ -99,6 +99,16 @@
 //       0 red on the first battery: the face's area sum had been taken BEFORE the repair, so a lost piece passed it.
 //       It is summed again after the repair now, and the lost piece refuses the face (44 edges, section 10's session).
 //   W5 FOLD_SNAPS 1 (no fold is ever long enough)                        -> 1 / 0 / 0
+// SABOTAGE LOG (round 18b) -- blastEngine.mjs's booleanBVH, against THIS gate, each on the real file, restored and md5
+// verified. 6 of 6 red (rows red, all in section 11):
+//   X1 union tags the other operand's pieces CUT                         -> 2
+//   X2 the other operand's plane turned round for every op               -> 2
+//   X3 no finishing but for subtract                                     -> 2   (the 50 ops; the KNOWN pin, 4 -> 22)
+//   X4 opts.otherTag ignored                                             -> 1
+//   X5 union ignoring the other operand's own tags (all SKIN)            -> 1
+//   X6 no op check in the adapter                                        -> 1
+//       0 red on the first battery: meshBoolean throws on an unknown op too, and the row asked only that something
+//       threw. It now asks that the adapter's own check threw (first, before it builds two BVHs).
 "use strict";
 
 import fs from "node:fs";
@@ -107,7 +117,9 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import * as M from "./meshCSG.mjs";
-import { blastWith, blastBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS } from "./blastEngine.mjs";
+import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS } from "./blastEngine.mjs";
+import { meshBoolean } from "./meshBoolean.mjs";
+import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../../tools/ship/playwrightResolve.mjs";
 import { polysToMesh, unwrap, texelDensity } from "./uvUnwrap.mjs";
 import { concreteAt } from "../../render/solidTexture.mjs";
@@ -591,6 +603,68 @@ console.log("\n10. *** ROUND 19b: TWO OF THE SOAK'S OPENINGS, ROOT-CAUSED AND CL
     const on = pageCensus(blastWith("bvh", w8, b8[80]).polys), off = pageCensus(blastWith("bvh", w8, b8[80], { seamFolds: false }).polys);
     ok("!! the soak's seed 8, shot 80: closed at the page's census -- with the seam's folds joined -- where seamFolds:false opens it",
         on === 0 && off > 0, "open " + on + "; seamFolds:false " + off);
+}
+
+console.log("\n11. *** ROUND 18b: THE FINISHING FOR EVERY OP -- booleanBVH ***");
+{
+    // Round 18 measured every op's raw meshBoolean output leaving seam ends ~1e-9 apart, open at the page's census, and
+    // only the blast (subtract) finishing them. booleanBVH(polys, other, op) is the blast for any op, in its contract.
+    // meshBoolean throws on it too; the adapter's own check throws first, before it builds two BVHs, and names itself
+    let threw = ""; try { booleanBVH(M.boxPolys([0, 0, 0], HALF), pageBlasts(1, 1)[0], "difference"); } catch (e) { threw = e.message; }
+    ok("an unrecognized op throws, from the adapter's own check", threw.startsWith("blastEngine: unrecognized op"), threw || "no throw");
+    // subtract through it IS the blast, bit for bit, over a chain
+    let w1 = M.boxPolys([0, 0, 0], HALF), w2 = w1, same = true;
+    for (const b of pageBlasts(5, 6)) { w1 = blastWith("bvh", w1, b).polys; w2 = booleanBVH(w2, b, "subtract").polys;
+        same = same && w1.length === w2.length && w1.every((p, i) => p.src === w2[i].src && p.vs.length === w2[i].vs.length && p.vs.every((v, j) => v[0] === w2[i].vs[j][0] && v[1] === w2[i].vs[j][1] && v[2] === w2[i].vs[j][2])); }
+    ok("   subtract through booleanBVH is blastWith(\"bvh\") bit for bit (a six-shot chain)", same);
+    // the mixed chains of meshBoolean-selfcheck section 24(d) -- even shots ADD a page blob, odd shots blast one, every
+    // fourth keeps what lies inside a big blob -- finished, against the same chains through the BSP; raw as the control
+    const cracksBuf = (buf) => { const key = (o) => Math.round(buf[o] / 1e-9) + "," + Math.round(buf[o + 1] / 1e-9) + "," + Math.round(buf[o + 2] / 1e-9), E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    let worst = 0, open = 0, rawOpen = 0, fb = 0, ops = 0, bare = 0;
+    for (const seed of [1, 2, 3, 107, 202]) {
+        let fin = M.boxPolys([0, 0, 0], HALF), bsp = fin, raw = M.toTriangleBuffer(fin);
+        pageBlasts(seed, 10).forEach((b, k) => {
+            const op = k % 4 === 3 ? "intersect" : (k % 2 === 0 ? "union" : "subtract"), P = op === "intersect" ? M.jaggedBlob([0, 0, 0], 3.6, 10, seed * 7 + k) : b;
+            const r = booleanBVH(fin, P, op); fin = r.polys; fb += r.stats.fallbackTris || 0; ops++;
+            bsp = M[op](bsp, P); worst = Math.max(worst, Math.abs(M.volume(fin) - M.volume(bsp)) / M.volume(bsp));
+            open += pageCensus(fin);
+            const Bb = M.toTriangleBuffer(P); raw = meshBoolean(raw, new MeshBVH(raw), Bb, new MeshBVH(Bb), op).tris; rawOpen += cracksBuf(raw);
+        });
+        for (const p of fin) if (!p.src || !p.pl) bare++;
+    }
+    ok("!! *** " + ops + " OPS THAT ADD, BLAST AND TRIM THE PAGE'S WALL, FINISHED: CLOSED AT THE PAGE'S 1e-9 CENSUS AFTER EVERY STEP, THE BSP'S SOLID TO 1e-10, NO FALLBACK, EVERY POLYGON TAGGED ON ITS PLANE ***",
+        open === 0 && worst < 1e-10 && fb === 0 && bare === 0, "open (summed over every step) " + open + ", |volume - BSP| " + worst.toExponential(1) + ", fallbacks " + fb + ", untagged " + bare);
+    ok("   control: the same steps raw (meshBoolean alone) are open at that census", rawOpen > 0, "open (summed over every step) " + rawOpen);
+    // the tags and planes each op gives the other operand's pieces
+    const wall = M.boxPolys([0, 0, 0], HALF), blob = M.jaggedBlob([0.5, 0.2, 0], 0.9, 8, 3), big = M.jaggedBlob([0, 0, 0], 3.6, 10, 9);
+    const rule = (polys, other, op, want, turned) => {
+        const r = booleanBVH(polys, other, op, { finish: false }).polys, plOf = new Set(other.map((q) => q.pl));
+        let bad = 0, n = 0;
+        for (const p of r) {
+            const onWall = polys.some((q) => q.pl === p.pl);
+            if (onWall) { if (p.src !== "skin") bad++; continue; }   // the wall's pieces keep theirs (its faces are SKIN)
+            n++; if (p.src !== want || plOf.has(p.pl) === turned) bad++;
+        }
+        return { bad, n };
+    };
+    const u = rule(wall, blob, "union", "skin", false), i = rule(wall, big, "intersect", "cut", false), s2 = rule(wall, blob, "subtract", "cut", true);
+    ok("!! the other operand's pieces: union keeps its tag (SKIN) on its own plane, intersect tags them CUT on their own plane, subtract CUT on the plane turned round; the wall's keep SKIN",
+        u.bad + i.bad + s2.bad === 0 && u.n > 0 && i.n > 0 && s2.n > 0, "union " + u.bad + "/" + u.n + ", intersect " + i.bad + "/" + i.n + ", subtract " + s2.bad + "/" + s2.n + " wrong");
+    // a tagged other keeps its tags through a union (a wall grown by another wall's pieces); opts.otherTag overrides
+    const tagged = blob.map((q, k) => ({ ...q, src: k % 2 ? "cut" : "skin" })), tagOf = new Map(tagged.map((q) => [q.pl, q.src]));
+    let kept = 0, keptN = 0, forced = 0, forcedN = 0;
+    for (const p of booleanBVH(wall, tagged, "union", { finish: false }).polys) if (tagOf.has(p.pl)) { keptN++; if (p.src !== tagOf.get(p.pl)) kept++; }
+    for (const p of booleanBVH(wall, blob, "union", { finish: false, otherTag: "cut" }).polys) if (!wall.some((q) => q.pl === p.pl)) { forcedN++; if (p.src !== "cut") forced++; }
+    ok("   a union keeps the other operand's own tags (SKIN and CUT, alternating), and otherTag overrides them",
+        kept + forced === 0 && keptN > 0 && forcedN > 0, "own tags " + kept + "/" + keptN + ", otherTag " + forced + "/" + forcedN + " wrong");
+    // KNOWN: an intersect chain the finishing does not close -- its opening is a fallback's, not a near-miss's
+    let wk = M.boxPolys([0, 0, 0], HALF), ofb = 0;
+    for (let k = 0; k < 5; k++) { const r = booleanBVH(wk, M.jaggedBlob([0, 0, 0], 3.8, 10, 4 * 7 + k), "intersect"); wk = r.polys; ofb += r.stats.fallbackTris || 0; }
+    const ko = pageCensus(wk);
+    report("KNOWN  five intersects with big blobs centred at the origin (seed 4): " + ko + " open edges, from " + ofb + " wall triangles refused 'dangling' (every blob's equator lies in z = 0) -- the plane path's, which no finishing closes. Raw, that chain had 21; 20 chains of each op raw / finished: union 0 / 0, subtract 3 / 0, intersect 21 / 4. Backlog bvh-csg-r19c-sliver-fan-openings (the z = 0 contacts).");
+    ok("   (KNOWN, pinned) that chain stays within 2.5x its measured 4 open edges -- a regression alarm, not a correctness claim", ko <= 10, String(ko));
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
