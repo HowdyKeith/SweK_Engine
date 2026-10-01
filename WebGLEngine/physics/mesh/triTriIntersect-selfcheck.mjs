@@ -50,7 +50,7 @@
 //
 // Run: node physics/mesh/triTriIntersect-selfcheck.mjs
 "use strict";
-import { triTriIntersect } from "./triTriIntersect.mjs";
+import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -330,6 +330,51 @@ console.log("\n*** BVH-CSG ROUND 16: A CROSSING ON A SHARED EDGE IS ONE POINT, F
     ok("!! two triangles sharing an edge, a third crossing it: both pairs put the crossing at the SAME point, bit for bit",
         cases > 1000 && same === cases, same + " of " + cases + " identical (round 15's file: 1,147 of 1,838)");
 }
+console.log("\n*** BVH-CSG ROUND 16b: THE SAME TEST, DECIDED BY EXACT ORIENTATION PREDICATES ***");
+{
+    // triTriIntersectExact decides everything from the sign of orient3d of input points (exactPredicates.mjs), after
+    // Guigue & Devillers; its segment ends are the same canonical crossings. Where the float test is reliable -- random
+    // triangles in general position -- the two must agree exactly; where it is not, only the exact one is consistent.
+    let s1 = 1717; const r1 = () => { s1 = (s1 * 1664525 + 1013904223) >>> 0; return s1 / 4294967296; };
+    const Q = () => [r1() * 2 - 1, r1() * 2 - 1, r1() * 2 - 1];
+    const eq = (x, y) => x[0] === y[0] && x[1] === y[1] && x[2] === y[2];
+    let n = 0, same = 0, hits = 0;
+    for (let k = 0; k < 50000; k++) {
+        const A = Float64Array.from([...Q(), ...Q(), ...Q()]), B = Float64Array.from([...Q(), ...Q(), ...Q()]);
+        const a = triTriIntersect(A, 0, B, 0), b = triTriIntersectExact(A, 0, B, 0);
+        n++;
+        if (a.status !== b.status) continue;
+        if (a.status !== "intersect") { same++; continue; }
+        hits++;
+        if ((eq(a.p0, b.p0) && eq(a.p1, b.p1)) || (eq(a.p0, b.p1) && eq(a.p1, b.p0))) same++;
+    }
+    ok("!! " + n + " random pairs in general position: the exact test gives the float test's answer, segment ends bit for bit",
+        same === n && hits > 5000, same + " of " + n + " agree (" + hits + " intersecting)");
+    // the round-16 shared-edge configuration, exactly: both pairs end at the same crossing
+    let cases = 0, agree = 0;
+    for (let k = 0; k < 20000; k++) {
+        const p = Q(), q = Q(), a = Q(), b = Q(), u = Q(), v = Q(), w = Q();
+        const A = Float64Array.from([...p, ...q, ...a, ...q, ...p, ...b]), B = Float64Array.from([...u, ...v, ...w]);
+        const x1 = triTriIntersectExact(A, 0, B, 0), x2 = triTriIntersectExact(A, 1, B, 0);
+        if (x1.status !== "intersect" || x2.status !== "intersect") continue;
+        let best = null;
+        for (const x of [x1.p0, x1.p1]) for (const y of [x2.p0, x2.p1]) { const d = Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); if (!best || d < best.d) best = { d, x, y }; }
+        if (best.d > 1e-9) continue;
+        cases++; if (eq(best.x, best.y)) agree++;
+    }
+    ok("   two triangles sharing an edge, a third crossing it: the exact test puts the crossing at the same point from both pairs",
+        cases > 1000 && agree === cases, agree + " of " + cases);
+    // exact zeros: four exactly coplanar dyadic vertices say "coplanar"; a vertex exactly ON the other plane is a touch,
+    // decided (not refused), and its seam ends on that vertex
+    const Tx = Float64Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+    const cop = triTriIntersectExact(Tx, 0, Float64Array.from([0.25, 0.25, 0, 0.75, 0.25, 0, 0.25, 0.5, 0]), 0);
+    const touch = triTriIntersectExact(Tx, 0, Float64Array.from([0.25, 0.25, 0, 0.5, 0.5, 1, 0.75, 0.25, 1]), 0);
+    const pierce = triTriIntersectExact(Tx, 0, Float64Array.from([0.25, 0.25, -1, 0.25, 0.25, 1, 0.75, 0.25, 1]), 0);
+    ok("   exact zeros: an exactly coplanar pair is \"coplanar\"; a vertex exactly on the plane touches at that vertex; a crossing edge pierces",
+        cop.status === "coplanar" && touch.status === "intersect" && eq(touch.p0, [0.25, 0.25, 0]) && eq(touch.p1, [0.25, 0.25, 0]) && pierce.status === "intersect",
+        "coplanar: " + cop.status + "; touch: " + touch.status + " at " + JSON.stringify(touch.p0) + ".." + JSON.stringify(touch.p1) + "; pierce: " + pierce.status);
+}
+
 console.log(`triTriIntersect-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: coplanar and degenerate (vertex-on-plane) triangle pairs are " +
     "DETECTED but not RESOLVED -- this module's own header states that scope boundary and why. Also " +

@@ -168,7 +168,7 @@
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
-import { triTriIntersect } from "./triTriIntersect.mjs";
+import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 import { contactPair } from "./triContact.mjs";
 
 export const SNAP_EPS = 1e-9;
@@ -333,7 +333,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         // round 16: meshBoolean's seamConsensus has already found every pair once, for both meshes
         const cached = opts.pairOf ? opts.pairOf(triB) : undefined;
         if (opts.pairOf && !cached) continue;     // not in meshBoolean's list: the pair does not touch
-        const r = cached ? cached.r : triTriIntersect(trisA, triA, trisB, triB);
+        const r = cached ? cached.r : (opts.exact ? triTriIntersectExact : triTriIntersect)(trisA, triA, trisB, triB);
         if (r.status === "none") continue;
         let p0, p1, onPlane = false;
         if (r.status === "intersect") {

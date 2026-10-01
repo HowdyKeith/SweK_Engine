@@ -168,3 +168,87 @@ export function triTriIntersect(trisA, triA, trisB, triB) {
     const hi = t1max <= t2max ? { t: t1max, P: P1max } : { t: t2max, P: P2max };
     return { status: "intersect", p0: lo.P, p1: hi.P };
 }
+
+// ---- BVH-CSG ROUND 16b: THE SAME QUESTION, DECIDED EXACTLY --------------------------------------------------------
+// Guigue & Devillers ("Fast and Robust Triangle-Triangle Overlap Test Using Orientation Predicates", 2003): every
+// decision -- does either triangle lie wholly to one side of the other's plane, which vertex is alone, do the two
+// intervals on the planes' common line overlap, and which crossings bound the segment -- is the sign of orient3d of
+// four INPUT points, computed exactly (exactPredicates.mjs). So two pairs that share an edge cannot decide it two ways.
+// No EPS anywhere: a pair is "coplanar" only when every vertex lies exactly on the other's plane. The segment's ends are
+// still constructed in floating point, as triContact's canonical edgeCross of the edge with the other plane, from the
+// raw (unsnapped) distances -- a function of (edge, plane) alone, the same bits in every pair that asks.
+import { orient3d } from "./exactPredicates.mjs";
+
+function rawDist(T, p) {
+    const n = cross(sub(T[1], T[0]), sub(T[2], T[0])), L = Math.hypot(n[0], n[1], n[2]);
+    const m = [n[0] / L, n[1] / L, n[2] / L];
+    return dot(m, p) + -dot(m, T[0]);
+}
+// the crossing of edge (a, b) with the plane of triangle T
+function crossing(a, b, T) {
+    const da = rawDist(T, a), db = rawDist(T, b);
+    if (da === db) return cmpPt(a, b) <= 0 ? a.slice() : b.slice();   // both on the plane to rounding: an end
+    const p = edgeCross(a, b, da, db);
+    return p;
+}
+const cmpPt = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+// p1 is alone on its side of triangle 2's plane, and triangle 2 is ordered so the tests below read one way. T1 and T2
+// are the triangles in their STORED vertex order: a crossing's plane is computed from them, never from a permutation,
+// so it is the same plane -- to the bit -- in every pair
+function construct(p1, q1, r1, p2, q2, r2, T1, T2) {
+    if (orient3d(q1, r2, p2, p1) > 0) {
+        if (orient3d(r1, r2, p2, p1) <= 0) {
+            if (orient3d(r1, q2, p2, p1) > 0) return { status: "intersect", p0: crossing(p1, r1, T2), p1: crossing(p2, r2, T1) };
+            return { status: "intersect", p0: crossing(p2, q2, T1), p1: crossing(p2, r2, T1) };
+        }
+        return { status: "none" };
+    }
+    if (orient3d(q1, q2, p2, p1) < 0) return { status: "none" };
+    if (orient3d(r1, q2, p2, p1) >= 0) return { status: "intersect", p0: crossing(p1, q1, T2), p1: crossing(p1, r1, T2) };
+    return { status: "intersect", p0: crossing(p1, q1, T2), p1: crossing(p2, q2, T1) };
+}
+function inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2) {
+    if (dp2 > 0) {
+        if (dq2 > 0) return construct(p1, r1, q1, r2, p2, q2, T1, T2);
+        if (dr2 > 0) return construct(p1, r1, q1, q2, r2, p2, T1, T2);
+        return construct(p1, q1, r1, p2, q2, r2, T1, T2);
+    }
+    if (dp2 < 0) {
+        if (dq2 < 0) return construct(p1, q1, r1, r2, p2, q2, T1, T2);
+        if (dr2 < 0) return construct(p1, q1, r1, q2, r2, p2, T1, T2);
+        return construct(p1, r1, q1, p2, q2, r2, T1, T2);
+    }
+    if (dq2 < 0) return dr2 >= 0 ? construct(p1, r1, q1, q2, r2, p2, T1, T2) : construct(p1, q1, r1, p2, q2, r2, T1, T2);
+    if (dq2 > 0) return dr2 > 0 ? construct(p1, r1, q1, p2, q2, r2, T1, T2) : construct(p1, q1, r1, q2, r2, p2, T1, T2);
+    if (dr2 > 0) return construct(p1, q1, r1, r2, p2, q2, T1, T2);
+    if (dr2 < 0) return construct(p1, r1, q1, r2, p2, q2, T1, T2);
+    return { status: "coplanar" };
+}
+
+/** triTriIntersect's contract, decided by exact orientation predicates: "intersect" | "none" | "coplanar". */
+export function triTriIntersectExact(trisA, triA, trisB, triB) {
+    const T1 = readTri(trisA, triA), T2 = readTri(trisB, triB);
+    const [p1, q1, r1] = T1, [p2, q2, r2] = T2;
+    // the side of each vertex as Guigue & Devillers read it, dot(v - r2, N2): positive where the normal points -- the
+    // opposite of Shewchuk's orient3d convention, hence the minus
+    const dp1 = -orient3d(p2, q2, r2, p1), dq1 = -orient3d(p2, q2, r2, q1), dr1 = -orient3d(p2, q2, r2, r1);
+    if (dp1 * dq1 > 0 && dp1 * dr1 > 0) return { status: "none" };
+    const dp2 = -orient3d(p1, q1, r1, p2), dq2 = -orient3d(p1, q1, r1, q2), dr2 = -orient3d(p1, q1, r1, r2);
+    if (dp2 * dq2 > 0 && dp2 * dr2 > 0) return { status: "none" };
+    if (dp1 > 0) {
+        if (dq1 > 0) return inter(r1, p1, q1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+        if (dr1 > 0) return inter(q1, r1, p1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+        return inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    }
+    if (dp1 < 0) {
+        if (dq1 < 0) return inter(r1, p1, q1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+        if (dr1 < 0) return inter(q1, r1, p1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+        return inter(p1, q1, r1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+    }
+    if (dq1 < 0) return dr1 >= 0 ? inter(q1, r1, p1, p2, r2, q2, dp2, dr2, dq2, T1, T2) : inter(p1, q1, r1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dq1 > 0) return dr1 > 0 ? inter(p1, q1, r1, p2, r2, q2, dp2, dr2, dq2, T1, T2) : inter(q1, r1, p1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dr1 > 0) return inter(r1, p1, q1, p2, q2, r2, dp2, dq2, dr2, T1, T2);
+    if (dr1 < 0) return inter(r1, p1, q1, p2, r2, q2, dp2, dr2, dq2, T1, T2);
+    return { status: "coplanar" };
+}

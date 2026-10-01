@@ -1232,6 +1232,42 @@ console.log("\n19. *** ROUND 16: A ZERO-THICKNESS FIN, AND THE SEAM AGREED BEFOR
         k1 && k1.length === 0 && k2 && k2.length === 0 && k3 === null, "reversed " + (k1 && k1.length) + " kept, rotated-reversed " + (k2 && k2.length) + " kept, same winding " + (k3 === null ? "untouched" : "cancelled"));
 }
 
+console.log("\n20. *** ROUND 16b: EXACT SEAM TOPOLOGY, AN OPTION -- MEASURED NOT TO BE ENOUGH ON ITS OWN ***");
+{
+    const OPS = ["union", "subtract", "intersect"];
+    const run = (PA, PB, op, opts) => { const A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB); return meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); };
+    const vol = (r) => { const t = r.tris; let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    // opts.exactSeam: every pair decided by triTriIntersectExact (orient3d signs of input points) instead of the 1e-9
+    // snapped distances. In general position it is the same answer: a box against a box offset off every grid.
+    const A = M.boxPolys([0, 0, 0], [1, 1, 1]), B = M.boxPolys([0.31, 0.27, 0.19], [0.7, 0.8, 0.9]);
+    const I = [0, 1, 2].reduce((p, k) => p * (Math.min(1, [0.31, 0.27, 0.19][k] + [0.7, 0.8, 0.9][k]) - Math.max(-1, [0.31, 0.27, 0.19][k] - [0.7, 0.8, 0.9][k])), 1);
+    const T = { union: 8 + 8 * 0.7 * 0.8 * 0.9 - I, subtract: 8 - I, intersect: I };
+    let worst = 0;
+    for (const op of OPS) worst = Math.max(worst, Math.abs(vol(run(A, B, op, { exactSeam: true })) - T[op]));
+    ok("   asked for, exactSeam on a box pair in general position comes out exact (the path is kept working)",
+        worst < 1e-12, "worst |err| " + worst.toExponential(2));
+    // KNOWN: near-coincidence. A blob against its copy rotated 1e-12: every twin pair now INTERSECTS exactly, along a
+    // sliver the arrangement then snaps at 1e-9 triangle by triangle -- the inconsistency moved one level down. Round 16b
+    // measured, exactSeam against the default: rotated family fallbacks 6 against 33, but the band's worst 4.7e-2 against
+    // 2.8e-2 and outside it 9e-3 against 1.4e-9; flush boxes 3 of 900 wrong (1.2e-2) against 0. It needs the arrangement
+    // snap-rounded GLOBALLY (near-coincident surfaces made exactly coincident, then the exact-zero contact path) --
+    // backlog bvh-csg-r16c-global-snap-rounding.
+    const blob = M.jaggedBlob([0.1, 0.05, 0], 1, 8, 101), c = Math.cos(1e-12), sn = Math.sin(1e-12);
+    const rotB = blob.map((p) => { const vs = p.vs.map((v) => [c * v[0] - sn * v[1], sn * v[0] + c * v[1], v[2]]); return { vs, pl: M.planeOf(vs) }; });
+    let wDef = 0, wEx = 0;
+    const Vb = M.volume(blob);
+    for (const op of ["union", "intersect"]) {
+        wDef = Math.max(wDef, Math.abs(vol(run(blob, rotB, op)) - Vb));
+        wEx = Math.max(wEx, Math.abs(vol(run(blob, rotB, op, { exactSeam: true })) - Vb));
+    }
+    // and it is OFF unless asked for: where the two paths differ, the default is the snapped path, bit for bit
+    const rDef = run(blob, rotB, "union"), rOff = run(blob, rotB, "union", { exactSeam: false }), rOn = run(blob, rotB, "union", { exactSeam: true });
+    const same = (x, y) => x.tris.length === y.tris.length && x.tris.every((v, i) => v === y.tris[i]);
+    ok("!! exactSeam is OFF unless asked for: on the rotated copy the default output is the snapped path's, bit for bit, and not the exact path's",
+        same(rDef, rOff) && !same(rDef, rOn), "default = exactSeam:false " + same(rDef, rOff) + ", default = exactSeam:true " + same(rDef, rOn));
+    console.log("  KNOWN  a blob against its copy rotated 1e-12 (union, intersect): default |err| " + wDef.toExponential(1) + ", exactSeam " + wEx.toExponential(1) + " -- exact topology without global snap rounding");
+}
+
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: only `subtract` is required to pass this gate on axis-aligned " +
     "box fixtures (per this round's own scope decision, see meshBoolean.mjs's own header) -- `union` and " +

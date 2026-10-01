@@ -389,13 +389,27 @@
 // coordinates) and its vertices rounded once, globally -- backlog bvh-csg-r16b-exact-seam-topology. (2) The weld's moves
 // beyond snap: 65 on the 99 chains, ends of two different pairs' segments 1.2e-9..7e-9 apart, not traced. (3) A fin whose
 // two faces are triangulated differently is not cancelled -- that needs the operand arranged against itself.
+//
+// *** ROUND 16b: EXACT SEAM TOPOLOGY -- BUILT, VERIFIED, AND MEASURED NOT TO BE ENOUGH ON ITS OWN. *** opts.exactSeam
+// decides every pair with triTriIntersectExact (orient3d signs of the input points, exactPredicates.mjs) instead of
+// the 1e-9 snapped distances; the segment ends are the same canonical crossings. In general position it is the float
+// test's answer bit for bit (50,000 random pairs, triTriIntersect-selfcheck), and pairs sharing an edge agree by
+// construction. MEASURED, against the default: on the rotated-copy family the fallbacks go 33 -> 6 -- the topology is
+// consistent -- but the band's worst goes 2.8e-2 -> 4.7e-2, outside it 1.4e-9 -> 9e-3 (a copy rotated 1e-12: 0 -> 8.9e-3),
+// and 3 of 900 flush-box runs go wrong (1.2e-2) against none. Without a tolerance, surfaces 1e-12..1e-8 apart (or
+// 5.55e-17, the flush boxes' rounding) no longer meet "on" each other: every twin pair intersects exactly, along slivers
+// the arrangement then snaps at 1e-9 triangle by triangle -- round 16's inconsistency, one level down. So exactSeam
+// stays OFF (meshBoolean-selfcheck section 20 holds the default to the snapped path, bit for bit). What it needs is the
+// arrangement snap-rounded GLOBALLY: seam vertices and nearby input vertices rounded once, to one grid, so surfaces a
+// rounding apart become exactly coincident and the exact-zero contact path takes them -- backlog
+// bvh-csg-r16c-global-snap-rounding.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
-import { triTriIntersect } from "./triTriIntersect.mjs";
+import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { closestOnTriangle, angleAt, CONTACT_EPS, contactPair } from "./triContact.mjs";
 
@@ -551,7 +565,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     if (cutting === "arrangement" && contacts) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
-            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), contacts });
+            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts });
         }
         const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
         const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
@@ -605,7 +619,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                 }
             }
             if (!need.length) continue;
-            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), contacts, sidePoints: need });
+            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts, sidePoints: need });
             rearranged++; injected += need.length;
         }
     }
@@ -632,7 +646,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), contacts });
+            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
@@ -855,14 +869,14 @@ function pick(tris, keep) {
  * cluster), or null when nothing was joined; and every pair's result, keyed a x 2^32 + b, which both meshes' arrangements
  * read instead of computing the pair again (triTriIntersect(a, b) and (b, a) give the same points -- triArrangement's gate).
  */
-export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS) {
+export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS, exact = false) {
     const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
     const rd = (buf, t) => [[buf[t * 9], buf[t * 9 + 1], buf[t * 9 + 2]], [buf[t * 9 + 3], buf[t * 9 + 4], buf[t * 9 + 5]], [buf[t * 9 + 6], buf[t * 9 + 7], buf[t * 9 + 8]]];
     const results = new Map();          // only pairs that touch: an arrangement reads a missing pair as "none"
     const short = [];                   // the segments no longer than snap, with which of their ends are input vertices
     for (const [a, b] of pairs) {       // (pairOverlap gives each pair once: a triangle is in one leaf)
         const pk = a * 4294967296 + b;
-        const r = triTriIntersect(trisA, a, trisB, b);
+        const r = (exact ? triTriIntersectExact : triTriIntersect)(trisA, a, trisB, b);
         if (r.status === "none") continue;
         let p0, p1;
         if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; results.set(pk, { r }); }
@@ -1011,7 +1025,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
     let optsA = opts, optsB = opts;
     if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
-        const sc = seamConsensus(trisA, bvhA, trisB, bvhB);
+        const sc = seamConsensus(trisA, bvhA, trisB, bvhB, SNAP_EPS, !!opts.exactSeam);
         optsA = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 0, pairs: sc.pairs };
         optsB = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 1, pairs: sc.pairs.map(([a, b]) => [b, a]) };
     }
