@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4784 -- THE 388th CLOSING: NO new gate file -- an InstancedMesh with morph targets, through the motion stage.
+    since481: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4784", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 2: an InstancedMesh with morph targets, per instance and shared)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE'S INSTANCED BRANCH NEVER MORPHED. *** It took the bare geometry through the previous instance matrix, " +
+                 "so a morphing herd carried its morph as motion: 1.67 px wrong with influences per instance, 1.39 with the mesh's " +
+                 "own. The previous point is now the geometry morphed as three morphs it, then the previous instance matrix -- per " +
+                 "instance (three's own test, count > 1 and a morphTexture) from a copy of that texture the stage keeps, otherwise " +
+                 "from the mesh's influences as a mesh's: under 1e-5 px against plain meshes on both backends, relative and " +
+                 "absolute, and through a toward stage. AND WHAT THREE ITSELF CANNOT DRAW IS A ROW: per-instance influences over " +
+                 "absolute targets, or beside a mesh-level morphTargetInfluences, throw in r185 on both backends -- its morph " +
+                 "node updates the mesh's influences on every draw whatever the shader reads. Patch 03 still stops at per-instance " +
+                 "morphs; extending it, and a draft for the throw, wait for the round that rebuilds three with every patch. " +
+                 "Five sabotages red.",
+    }),
     // v4783 -- THE 387th CLOSING: NO new gate file -- instance matrices a compute pass writes, through the motion stage.
     since480: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

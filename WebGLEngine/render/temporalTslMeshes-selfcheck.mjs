@@ -122,6 +122,78 @@ else {
     }
 }
 
+// ---- 2. v4784: AN INSTANCED MESH WITH MORPH TARGETS ---------------------------------------------------------------
+// The stage's instanced branch took the BARE geometry through the previous instance matrix, so a morphing herd carried its
+// morph as motion, 1.39 to 1.67 px here. Held, both backends, against plain meshes doing the same: influences per instance
+// (setMorphAt -- three's own test is count > 1 and a morphTexture) and the mesh's own, relative and absolute; and through a
+// toward stage. What three itself cannot draw is the last row: per-instance influences over ABSOLUTE targets, or alongside a
+// mesh-level morphTargetInfluences, throw in r185 on both backends.
+console.log("\n2. ON THE DEVICE: an InstancedMesh with morph targets, per instance and shared");
+if (!skip) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D: 64, N: 4 }, script: `async (a) => {
+    const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+    const TT = await import("/render/temporalTsl.mjs"); const out = {};
+    for (const mode of ["webgpu", "webgl2"]) { try {
+        const { D, N } = a, canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
+        const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
+        const gl = TT.glClip(THREE, renderer), rd = async (t) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, D, D));
+        const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0, 5); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+        const mkGeo = (relative) => { const g = new THREE.BoxGeometry(0.6, 0.6, 0.6), p = g.attributes.position, A = [], B = [];
+            for (let v = 0; v < p.count; v++) { const x = p.getX(v), y = p.getY(v), z = p.getZ(v);
+                A.push(relative ? 0.5 * x : 1.5 * x, relative ? 0 : y, relative ? 0 : z); B.push(relative ? 0 : x, relative ? 0.6 * y : 1.6 * y, relative ? 0 : z); }
+            g.morphAttributes.position = [new THREE.Float32BufferAttribute(A, 3), new THREE.Float32BufferAttribute(B, 3)]; g.morphTargetsRelative = relative; return g; };
+        const M = new THREE.Matrix4();
+        const at = (i, k) => M.makeTranslation(-1.2 + (i % 2) * 2.4 + 0.2 * k * (i - 1.5), -0.8 + Math.floor(i / 2) * 1.6 + 0.1 * k, 0);
+        const infl = (i, k) => [Math.min(1, 0.15 * k * (i + 1)), Math.min(1, 0.1 * k * (4 - i))];
+        const fieldOf = async (scene, step, toward) => { const st = TT.makeMotionStage(THREE, T, { w: D, h: D, gl, toward: !!toward });
+            for (const k of [0, 1, 2]) { step(k); await st.render(renderer, scene, cam, toward ? 0.5 : undefined); } const m = await rd(st.motion); st.dispose(); return m; };
+        const cmp = (F, R) => { let w = 0, moving = 0; for (let i = 0; i < D * D; i++) { const ma = Math.hypot(F[i*4], F[i*4+1]) * D, mb = Math.hypot(R[i*4], R[i*4+1]) * D;
+            if (ma > 0.01 || mb > 0.01) { moving++; w = Math.max(w, Math.hypot(F[i*4] - R[i*4], F[i*4+1] - R[i*4+1]) * D); } } return { w, moving }; };
+        const o = {};
+        for (const [name, relative, perInstance, toward] of [["perInstance", true, true, false], ["sharedRelative", true, false, false], ["sharedAbsolute", false, false, false], ["perInstanceToward", true, true, true]]) {
+            const geo = mkGeo(relative), im = new THREE.InstancedMesh(geo, new THREE.MeshBasicNodeMaterial(), N); im.frustumCulled = false;
+            if (!perInstance) im.morphTargetInfluences = [0, 0];
+            const sc = new THREE.Scene(); sc.add(im); const dummy = new THREE.Mesh(geo);
+            const plain = Array.from({ length: N }, () => new THREE.Mesh(geo, new THREE.MeshBasicNodeMaterial())), ps = new THREE.Scene(); for (const p of plain) ps.add(p);
+            const F = await fieldOf(sc, (k) => { for (let i = 0; i < N; i++) { im.setMatrixAt(i, at(i, k));
+                    if (perInstance) { dummy.morphTargetInfluences.splice(0, 2, ...infl(i, k)); im.setMorphAt(i, dummy); } }
+                im.instanceMatrix.needsUpdate = true; if (perInstance) im.morphTexture.needsUpdate = true; else im.morphTargetInfluences.splice(0, 2, ...infl(0, k)); }, toward);
+            const R = await fieldOf(ps, (k) => plain.forEach((p, i) => { at(i, k).decompose(p.position, p.quaternion, p.scale); p.morphTargetInfluences.splice(0, 2, ...infl(perInstance ? i : 0, k)); p.updateMatrixWorld(); }), toward);
+            o[name] = cmp(F, R);
+        }
+        // three's own: which of these it can draw at all
+        o.three = {};
+        for (const [name, relative, arr] of [["perInstanceAbsolute", false, false], ["perInstanceWithMeshInfluences", true, true]]) {
+            try { const geo = mkGeo(relative), im = new THREE.InstancedMesh(geo, new THREE.MeshBasicNodeMaterial(), 2); if (arr) im.morphTargetInfluences = [0, 0];
+                const d = new THREE.Mesh(geo); d.morphTargetInfluences[0] = 0.5; im.setMorphAt(0, d); im.setMorphAt(1, d);
+                const sc = new THREE.Scene(); sc.add(im); const t = new THREE.RenderTarget(16, 16); renderer.setRenderTarget(t); await renderer.renderAsync(sc, cam); renderer.setRenderTarget(null); t.dispose(); o.three[name] = "drawn"; }
+            catch (e) { renderer.setRenderTarget(null); o.three[name] = String(e && e.message || e).slice(0, 70); } }
+        out[mode] = o; renderer.dispose();
+    } catch (e) { out[mode] = { err: String(e && e.stack || e).slice(0, 400) }; } }
+    return out; }` });
+    ok("the harness ran the instanced morphs on both backends", r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err,
+       r.ok ? `webgpu ${r.result.webgpu.err || "ok"}; webgl2 ${r.result.webgl2.err || "ok"}` : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result && !r.result.webgpu.err && !r.result.webgl2.err) {
+        for (const mode of ["webgpu", "webgl2"]) {
+            const o = r.result[mode], e = (x) => x.toExponential(2);
+            ok(`*** [${mode}] an InstancedMesh's PER-INSTANCE morphs carry their motion: ${e(o.perInstance.w)} px against plain meshes over ${o.perInstance.moving} pixels -- it was 1.67 px off ***`,
+               o.perInstance.w < 1e-3 && o.perInstance.moving > 300, "each instance's influences at the last draw, from the stage's copy of three's morphTexture");
+            ok(`*** [${mode}] ...and the MESH's own influences over instances, relative ${e(o.sharedRelative.w)} and absolute ${e(o.sharedAbsolute.w)} px ***`,
+               o.sharedRelative.w < 1e-3 && o.sharedAbsolute.w < 1e-3 && o.sharedRelative.moving > 300 && o.sharedAbsolute.moving > 300, "it was 1.39 px off: the instanced branch never morphed");
+            ok(`  [${mode}] ...and through a toward stage at t = 0.5, each instance's influences on the line from the last draw's: ${e(o.perInstanceToward.w)} px`,
+               o.perInstanceToward.w < 1e-3 && o.perInstanceToward.moving > 300, "against plain meshes through the same stage");
+        }
+        const tg = r.result.webgpu.three, tw = r.result.webgl2.three;
+        ok(`three's own: per-instance influences over absolute targets, or beside a mesh-level morphTargetInfluences, are NOT drawn -- webgpu ${JSON.stringify(tg)}; webgl2 ${JSON.stringify(tw)}`,
+           [tg, tw].every((x) => x.perInstanceAbsolute !== "drawn" && x.perInstanceWithMeshInfluences !== "drawn"),
+           "r185's morph node updates the MESH's influences on every draw whatever the shader reads; when three draws these this row goes red and the stage can be held to them");
+    }
+}
+
+// ---- v4784 SABOTAGE LOG, against render/temporalTsl.mjs ---------------------------------------------------------
+// I1 the instanced branch left unmorphed (as it was) -> 7; I2 each instance's weights read from texel t, the base column, not
+// t + 1 -> 5; I3 the copy of the morphTexture never stepped -> 5; I4 the last draw's weights never kept -> 5; I5 no lerp under
+// toward -> 3. Five, none green.
 // ---- v4757 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against render/temporalTsl.mjs, each against this gate (both backends):
 //   K1 the skeleton not updated before the draw       -> 6    K6 absolute targets read as relative            -> 2

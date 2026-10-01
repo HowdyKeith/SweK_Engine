@@ -292,6 +292,37 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
         return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
     };
+    // v4784: *** AN INSTANCED MESH'S MORPHS WERE NOT IN ITS PREVIOUS POINT AT ALL. *** The instanced branch took the bare
+    // geometry through the previous instance matrix, so a morphing herd read 1.39 to 1.67 px wrong. Its point as it was: the
+    // geometry morphed as three morphs it, then the previous instance matrix. Per instance -- three's own test, count > 1 and a
+    // morphTexture -- each instance's influences at the last draw, from a copy of that texture the stage keeps (row = instance,
+    // texel 1 + t = target t; texel 0, the base, three's node does not read). Otherwise the mesh's own influences, as a mesh's.
+    const instMorphs = new WeakMap();
+    const perInstanceMorph = (object) => !!(object && object.isInstancedMesh && object.count > 1 && object.morphTexture && object.geometry &&
+        object.geometry.morphAttributes && object.geometry.morphAttributes.position && object.geometry.morphAttributes.position.length > 0);
+    const instMorphRecord = (object) => {
+        let r = instMorphs.get(object); const src = object.morphTexture;
+        if (!r || r.src !== src) { const { width: W, height: H, data } = src.image, last = Float32Array.from(data), cur = Float32Array.from(data);
+            const tex = keep(new THREE.DataTexture(cur, W, H, THREE.RedFormat, THREE.FloatType)); tex.needsUpdate = true;
+            r = { src, last, cur, tex }; instMorphs.set(object, r); }
+        return r;
+    };
+    const stepInstMorph = (object, r) => {
+        const now = r.src.image.data;
+        if (!toward) r.cur.set(r.last); else for (let i = 0; i < r.cur.length; i++) r.cur[i] = r.last[i] + toward.t * (now[i] - r.last[i]);
+        r.tex.needsUpdate = true;
+    };
+    const instanceMorphedBefore = (object, pos) => {
+        if (perInstanceMorph(object)) {
+            const g = object.geometry, r = instMorphRecord(object), { tex, W, count, n } = morphTargets(g);
+            const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
+            let acc = null;
+            for (let t = 0; t < n; t++) { const w = TSL.textureLoad(r.tex, TSL.ivec2(t + 1, TSL.int(TSL.instanceIndex))).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; }
+            // three multiplies by the MESH's base -- 1 for relative targets; absolute ones over per-instance influences throw in r185
+            return pos.add(acc);
+        }
+        return hasMorph(object) ? morphedBefore(object, pos) : pos;
+    };
     const skinnedBefore = (object, pos) => {
         const m = perDraw("mat4", object.skeleton.bones.length).node, bind = bindU, bindInv = bindInvU;
         const si = TSL.attribute("skinIndex", "uvec4"), sw = TSL.attribute("skinWeight", "vec4"), v = bind.mul(vec4(pos, 1.0));
@@ -345,6 +376,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             if (object.isSkinnedMesh) { const r = skinRecord(object); stepSkin(object, r, renderId); perDraw("mat4", r.n).arr.set(r.cur);
                 bindU.value.copy(object.bindMatrix); bindInvU.value.copy(object.bindMatrixInverse); }
             if (hasMorph(object)) { const r = morphRecord(object); stepMorph(object, r); perDraw("vec4", r.n).arr.set(r.cur); }
+            if (perInstanceMorph(object)) stepInstMorph(object, instMorphRecord(object));
             if (object.isSprite) centreU.value.copy(object.center);
             if (toward) towardU.value = toward.t;
         }
@@ -356,6 +388,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             if (object.isSprite) rotations.set(object, object.material.rotation);
             if (object.isSkinnedMesh) skinRecord(object).last.set(object.skeleton.boneMatrices);
             if (hasMorph(object)) { const r = morphRecord(object); for (let i = 0; i < r.n; i++) r.last[i] = object.morphTargetInfluences[i]; }
+            if (perInstanceMorph(object)) { const r = instMorphRecord(object); r.last.set(r.src.image.data); }
         }
         setup(builder) {
             let cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal), was = null;
@@ -386,11 +419,11 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
                 // v4770: where the application's is a function, of the point the stage keeps -- instanced, skinned or morphed
                 const own = Array.isArray(object.material) ? null : object.material, fn = own && own.userData && typeof own.userData.previousPositionNode === "function";
                 let kept = null;
-                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0)).xyz;
+                if (fn && object.isInstancedMesh) kept = instanceBefore(object).mul(vec4(instanceMorphedBefore(object, TSL.positionGeometry), 1.0)).xyz;
                 else if (fn && (object.isSkinnedMesh || hasMorph(object))) { let q = TSL.positionGeometry; if (hasMorph(object)) q = morphedBefore(object, q); if (object.isSkinnedMesh) q = skinnedBefore(object, q); kept = q; }
                 before = TSL.varying(TSL.vec3(previousOf(own, builder.material.positionNode, kept)));
             }
-            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(TSL.positionGeometry, 1.0))).xyz;
+            else if (object && object.isInstancedMesh) before = TSL.varying(instanceBefore(object).mul(vec4(instanceMorphedBefore(object, TSL.positionGeometry), 1.0))).xyz;
             else if (object && (object.isSkinnedMesh || hasMorph(object))) {
                 // v4757: the geometry's point morphed by the previous influences, then skinned by the previous bone matrices
                 let p = TSL.positionGeometry;
