@@ -8723,6 +8723,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4781 -- THE 385th CLOSING: NO new gate file -- the two orphan ratchets the v4776 merge landed over unmeasured.
+    since478: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4781", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (a pre-registration is a registration; the baseline caught up by name)",
+                                "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO RATCHETS THE MERGE LANDED OVER, BECAUSE NOTHING THAT RUNS EVERY ROUND RUNS THEM. *** graveyard takes ~157 s " +
+                 "and referenceKind ~175, so the v4776 merge went in unmeasured and the first run read 188 orphaned utilities against " +
+                 "159, 324 prose-rescued modules against 288, and 58 hidden by sweep closings against 39. MEASURED BY NAME: 32 " +
+                 "arrived in graveyard's pile and 3 left -- 19 from the merged line, absent from main before it, and 13 from main " +
+                 "after the baselines were set; the same 32 are among the 36 prose-rescued; the closings hide 10 of this line's, 4 of " +
+                 "main's and 5 older modules. FOUR WERE PAID BY THE DETECTOR: frameDisagree, frameSwayRep, frameVertical and " +
+                 "genGateAbsolute export a pre-registration (PREREG_H*) and the result their gate re-derives (RESULT_H*), and " +
+                 "graveyard's record test knew *REGISTRATION and not that spelling -- 188 to 184. The rest are caught up and named, " +
+                 "as the v4327 and v4535 merges were, and excused by none of it. AND THE ACCOUNT FIRST HID TWO OF ITS OWN SUBJECTS: " +
+                 "graveyard's note named its modules by basename, referenceKind matches the basename, and the count read 326 -- a " +
+                 "register naming debt is not its consumer, so the note names them without their extensions. Three sabotages red.",
+    }),
     // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
     since477: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened fifty-six.

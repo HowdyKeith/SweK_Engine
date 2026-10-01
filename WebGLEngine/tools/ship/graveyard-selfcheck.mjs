@@ -94,7 +94,11 @@ function scan() {
 // instrument keys and v2977 caught in a shader promising a test that did not exist. So instead: does the module
 // export a RECORDED MEASUREMENT -- a MEASURED_* constant, a registration, an outcome table -- that its gate can
 // re-derive? Nobody types that. It is a fact about the file.
-const RECORD_EXPORT = /export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+)\b/;
+// v4781 -- AND A PRE-REGISTRATION IS A REGISTRATION. The frame*/genGate* analysis modules declare a hypothesis before
+// its data exists (PREREG_H16) and name the result file its gate re-derives (RESULT_H16); `*REGISTRATION` could not see
+// either spelling, so four of them read as utilities nothing calls. The test is still the export's NAME, a fact about
+// the file: delete the constant and the module goes back on the pile.
+const RECORD_EXPORT = /export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+|PREREG_H\d+|RESULT_H\d+)\b/;
 function isAnalysisRecord(full) {
     try { return RECORD_EXPORT.test(fs.readFileSync(full, "utf8")); } catch { return false; }
 }
@@ -408,7 +412,29 @@ function isAnalysisRecord(full) {
 // miss. The partition still holds (245 of 245 gate-only classified: 61 records + 159 actionable + 20 doored +
 // 1 MCP door + 4 explained), so nothing here is unclassified debt hiding in a total; it is the SAME debt this
 // ratchet has always tracked, now counted on the tree both branches actually built.
-const ORPHAN_UTIL_BASELINE = 159;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above).
+// *** v4781 -- RAISED FROM 159 TO 184 AFTER THE v4776 MERGE, WHICH NO VERIFY RAN THIS FILE OVER. *** It costs ~157 s,
+// far over the sweep's budget, so the merge of the exported-functions-mesh line landed without it and the count read
+// 188 the first time anyone ran it. MEASURED BY NAME, not by difference: 32 arrived and 3 left. (Named without their extensions: a register that
+// names debt must not be read as mentioning it -- referenceKind's census matches the basename, and the first draft
+// of this note rescued two of these from it.)
+//   19 FROM THE MERGED LINE (absent from main at 915dbfb3): CPU references its TSL/WGSL ports are held to --
+//      render/dilate, render/flicker, render/reactive; raw-WebGPU runners the TSL ports replaced at runtime
+//      and the WGSL parity gates still drive -- render/luminancePyramidGPU, render/opticalFlowGPU,
+//      render/visibilityGPU; render/edgeReveal; censuses and appliers their own gates call --
+//      tools/ship/constantRows, fsr2Coverage, runnerCallers, threePatch, pageShot, and
+//      realGpuRun, a command the rig runs by hand (docs/real-hardware-fsr.md) with no tools.html row; and the
+//      pre-registered analyses frameDisagree, frameSwayRep, frameVertical, genGateAbsolute, genGateCalibrate,
+//      genGateTransfer.
+//   13 FROM MAIN after this baseline was set (fc12eefc..915dbfb3): anim/reachIK,
+//      physics/character/capsuleSettle, render/frameRecorder, render/ringFloor, render/temporalLock,
+//      tools/ship/adapterRecord, deadlineLeak, ensureDxc, kernelReach, murmurSpeciesFrames,
+//      pixelWorst, thrownRow, world/traderGraphGithub.
+// FOUR WERE PAID DOWN BY THE DETECTOR, NOT BY THE NUMBER: the RECORD_EXPORT widening above takes frameDisagree,
+// frameSwayRep, frameVertical and genGateAbsolute to the analysis records they are. 188 - 4 = 184. The other 28 are
+// debt with names on them; the CPU references are the case this register has no population for yet -- a module whose
+// consumer is CORRECTLY its gate, as a record's is, but which exports functions, not a measurement.
+// v4781 SABOTAGE: the PREREG_/RESULT_ widening reverted -> 1 red, 188 now vs 184 recorded.
+const ORPHAN_UTIL_BASELINE = 184;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4781 the v4776 merge caught up, four paid down by the detector (184).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

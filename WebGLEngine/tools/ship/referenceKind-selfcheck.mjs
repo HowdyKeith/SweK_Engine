@@ -225,7 +225,15 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
-const RESCUED_CEILING = 288;
+// v4781 -- 288 -> 324 AFTER THE v4776 MERGE, BY THE SAME METHOD THE v4535 NOTE ABOVE USED, AND FOR ITS REASON: this
+// gate takes ~175 s, so no verify runs it and the merge of the exported-functions-mesh line landed unmeasured. 32 of
+// the 36 are graveyard's arrivals over the same interval, named there -- each a module only gates import that
+// something in the tree mentions (19 of them in vba/runtimeGap.mjs's census notes, which name the files they count).
+// The other 4 are not named here: this file prints the population's rescuers, not its members. Paying them down is
+// the same three routes one module at a time; raising the ceiling catches up to the merge and excuses none of it.
+// v4781 SABOTAGES: graveyard's new note with its module names WITH their extensions (its first draft) -> 1 red, 326
+// against 324; a sweep closing naming one more gate-only module -> 1 red on the ritual row, 59 against 58, naming it.
+const RESCUED_CEILING = 324;
 
 const rescued = [];
 {
@@ -308,7 +316,14 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
-    const RITUAL_CEILING = 39;
+    // v4781 -- 39 -> 58 AFTER THE v4776 MERGE, MEASURED BY NAME. 10 from the merged line, each a module its round
+    // built, gated and named in its closing: render/dilate.mjs, render/flicker.mjs, render/luminancePyramidGPU.mjs,
+    // render/opticalFlowGPU.mjs, render/reactive.mjs, tools/ship/constantRows.mjs, tools/ship/fsr2Coverage.mjs,
+    // tools/ship/pageShot.mjs, tools/ship/realGpuRun.mjs, tools/ship/threePatch.mjs. 4 from main after the ceiling
+    // was set (fc12eefc): render/ringFloor.mjs, render/temporalLock.mjs, tools/ship/kernelReach.mjs,
+    // tools/ship/murmurSpeciesFrames.mjs. 5 older modules joined since -- named by a later closing or left without
+    // their last non-gate importer. Exactly the accrual the v4386 note predicted, one paragraph per round.
+    const RITUAL_CEILING = 58;
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,
