@@ -109,6 +109,14 @@
 //   X6 no op check in the adapter                                        -> 1
 //       0 red on the first battery: meshBoolean throws on an unknown op too, and the row asked only that something
 //       threw. It now asks that the adapter's own check threw (first, before it builds two BVHs).
+// SABOTAGE LOG (round 19c) -- on the exact arrangement section 13 leans on, each on the real file, restored and md5 verified.
+// 4 of 4 red. Rows red in THIS gate / exactArrangement-selfcheck:
+//   Z1 strictly-between reversed (segments)                                0 / 1   (no vertex lies exactly on a seam in
+//        seed 8's chain: section 13 cannot see it; the arrangement gate's hand-built row does)
+//   Z2 Delaunay off by default                                             2 / 1   (section 12's self-crossing, and
+//        section 13's seed-8 chain: needles turn over when rounded)
+//   Z3 coplanar pairs give no points                                       0 / 3   (no coplanar pair in seed 8's chain)
+//   Z4 the flag taking the snapped arrangement                             4 / -   (shot 84's input: 31 open)
 // SABOTAGE LOG (round 16f) -- in exactArrangement-selfcheck.mjs's header: 15 sabotages across implicitPoints.mjs,
 // exactArrangement.mjs, meshBoolean.mjs and blastEngine.mjs, with this gate's red rows in their column.
 "use strict";
@@ -573,7 +581,7 @@ console.log("\n9. *** ROUND 19: THE SOAK THAT MADE \"bvh\" THE DEFAULT ***");
         cut.length + " CUT polygons, " + mesh.triangles + " triangles, UVs out of [0,1] " + uvOut + ", texel spread " + td.spread.toExponential(1) + " (a vertex the weld left ~2e-9 off its plane, in a small polygon), rebar on " + (100 * rodArea / cutArea).toFixed(1) + "% of the cut");
     // KNOWN: the openings the soak found in the BVH engine, with their reproductions
     const k8 = chain("bvh", 8, 100), o8 = pageCensus(k8.wall);
-    report("KNOWN  seed 8 stands at " + o8 + " open edges after 100 shots (13 at round 19): round 19b closed its shot-80 opening (section 10); what is left opens at shot 84, a fan of wall slivers ~6e-6 wide along a seam 3e-3 inside the wall's back face -- backlog bvh-csg-r19c-sliver-fan-openings. The BSP: open raw on every chain (~50,000 edges), and after settle on every one (382 edges over the 12).");
+    report("KNOWN  seed 8 stands at " + o8 + " open edges after 100 shots (13 at round 19): round 19b closed its shot-80 opening (section 10); what is left opens at shot 84, where the blob crosses a fan of wall slivers 1.1e-9..3.7e-9 high -- as thin as the snap; root-caused at round 19c (section 13), closed by the exact arrangement, backlog bvh-csg-r16g-exact-default. The BSP: open raw on every chain (~50,000 edges), and after settle on every one (382 edges over the 12).");
     ok("   (KNOWN, pinned) seed 8 stays within 2.5x its measured 10 open edges after 100 shots -- a regression alarm, not a correctness claim", o8 <= 2.5 * 10, String(o8));
 }
 
@@ -697,6 +705,48 @@ console.log("\n12. *** ROUND 16f: THE EXACT ARRANGEMENT ON THE PAGE'S CHAIN (opt
     ok("!! the wall never crosses itself by more than a rounding (Delaunay); without it (delaunay:false) needles beside nearly straight seams turn over when rounded and it does",
         sx.L <= 1e-15 && sn.L > 1e-3, "longest self-crossing " + sx.L.toExponential(1) + " (" + sx.n + "), delaunay:false " + sn.L.toExponential(1) + " (" + sn.n + ")");
     report("KNOWN  rounding the exact output to doubles can still fold the wall where its features are finer than a rounding -- here " + sx.n + " self-crossings, the longest " + sx.L.toExponential(1) + " (a blob's equator vertices at z ~ 1e-16 against the wall's z = 0). The soak (12 chains x 100 shots): 0 fallbacks, every chain closed bit for bit at the end, one T-junction 3.5e-18 wide open for 26 shots of seed 11. Backlog bvh-csg-r16g-exact-default.");
+}
+
+console.log("\n13. *** ROUND 19c: SEED 8'S SHOT 84 -- A FAN OF SLIVERS AS THIN AS THE SNAP, WHICH ONLY THE EXACT ARRANGEMENT RESOLVES ***");
+{
+    // The opening section 9 pins: at shot 84 the blob's triangle B58 crosses a fan of wall slivers 1.1e-9..3.7e-9 high and
+    // 0.11 long (the snapped arrangement's sliver path), cutting their long sides at points 1.1e-9..3.5e-9 apart. Every
+    // arrangement decides them at a 1e-9 snap of its own -- the slivers project each point onto their side, B58 keeps it --
+    // and they disagree: 29 edges open raw, 10 after the weld (whose chained joins moved one point 2.2e-8). Measured and
+    // dropped: keeping a point's own bits when it lies on the side (29 -> 19 raw, 10 still after the weld; the 12-chain
+    // soak identical). The exact arrangement decides them exactly.
+    const bitsT = (t) => { const E = new Map(), key = (o) => t[o] + "," + t[o + 1] + "," + t[o + 2];
+        for (let o = 0; o < t.length; o += 9) for (let i = 0; i < 3; i++) { const a = key(o + i * 3), b = key(o + ((i + 1) % 3) * 3); if (a !== b) E.set(a + "|" + b, (E.get(a + "|" + b) || 0) + 1); }
+        const open = []; for (const [e, k] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== k) open.push(e); } return open; };
+    const bitsP = (wall) => { const E = new Map(), key = (v) => v[0] + "," + v[1] + "," + v[2];
+        for (const p of wall) for (let i = 0; i < p.vs.length; i++) { const a = key(p.vs[i]), b = key(p.vs[(i + 1) % p.vs.length]); if (a === b) continue; const e = a + "|" + b; E.set(e, (E.get(e) || 0) + 1); }
+        let c = 0; for (const [e, k] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== k) c++; } return c; };
+    const toBuf = (polys) => { const tris = []; for (const p of polys) for (const t of p.tris || M.toTriangles([p])) tris.push(t); const b = new Float64Array(tris.length * 9); tris.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = t[v][c]; }); return b; };
+    const bl = pageBlasts(8, 100);
+    let w = M.boxPolys([0, 0, 0], HALF);
+    for (let k = 0; k < 84; k++) w = blastWith("bvh", w, bl[k]).polys;
+    const A = toBuf(w), B = toBuf(bl[84]);
+    const raw = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract"), ex = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", { exactArrangement: true });
+    // which output triangles carry the raw openings, and how thin their source triangles are
+    const ro = bitsT(raw.tris), at = new Set(ro.flatMap((e) => e.split("|")));
+    let slivers = 0;
+    for (let i = 0; i < raw.from.length; i++) {
+        const f = raw.from[i]; if (f < 0) continue;
+        const o = i * 9; if (![0, 3, 6].some((c) => at.has(raw.tris[o + c] + "," + raw.tris[o + c + 1] + "," + raw.tris[o + c + 2]))) continue;
+        const q = f * 9, u = [A[q + 3] - A[q], A[q + 4] - A[q + 1], A[q + 5] - A[q + 2]], v = [A[q + 6] - A[q], A[q + 7] - A[q + 1], A[q + 8] - A[q + 2]];
+        const L = Math.max(Math.hypot(...u), Math.hypot(...v), Math.hypot(v[0] - u[0], v[1] - u[1], v[2] - u[2])), h = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / L;
+        if (h <= 4e-9) slivers++;
+    }
+    ok("   the reproduction: the default engine's raw output of shot 84 is open, at wall pieces of slivers no higher than 4e-9 (round 19's 29 edges)",
+        ro.length > 0 && slivers > 0, ro.length + " open directed edges, " + slivers + " output triangles of slivers on them");
+    const xo = bitsT(ex.tris);
+    ok("!! *** THE SAME INPUT THROUGH THE EXACT ARRANGEMENT: CLOSED BIT FOR BIT, NO FALLBACK ***", xo.length === 0 && ex.stats.a.fallbackTris + ex.stats.b.fallbackTris === 0,
+        xo.length + " open, " + (ex.stats.a.fallbackTris + ex.stats.b.fallbackTris) + " fallbacks");
+    // and the whole chain, exact: closed bit for bit after every shot
+    let we = M.boxPolys([0, 0, 0], HALF), openShots = 0, fbe = 0;
+    for (const b of bl) { const r = blastWith("bvh", we, b, { exactArrangement: true }); we = r.polys; fbe += r.stats.fallbackTris || 0; if (bitsP(we)) openShots++; }
+    ok("!! seed 8's 100 shots through the exact arrangement: closed bit for bit after every shot, no fallback (the default: open from shot 84, 10 edges at the end)",
+        openShots === 0 && fbe === 0, "shots open " + openShots + ", fallbacks " + fbe);
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

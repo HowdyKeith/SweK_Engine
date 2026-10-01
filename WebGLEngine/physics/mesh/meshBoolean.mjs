@@ -510,6 +510,20 @@
 // 1.4..1.9x. blastEngine.mjs finishes the flag's output by merging only. NOT the default: the decision -- the page's census
 // (a 1e-9 key, which reads the exact arrangement's distinct close points as T-junctions), the gates that hold the snapped
 // path's mechanisms, and the folds rounding still leaves -- is backlog bvh-csg-r16g-exact-default.
+//
+// *** ROUND 19c: SEED 8'S SHOT 84 -- ROOT-CAUSED; NOT FIXABLE WITH A TOLERANCE; CLOSED BY THE EXACT ARRANGEMENT. *** The
+// last soak opening of the default engine (10 open edges from shot 84): the blob's triangle B58 crosses a fan of wall slivers
+// 1.1e-9..3.7e-9 high and 0.11 long -- earlier shots' pieces, arranged by triArrangement.mjs's sliver path -- cutting their
+// long sides at seven points 1.1e-9..3.5e-9 apart. The seam consensus agrees one chain (no segment of it is under snap); the
+// slivers project each point onto their side (two slivers sharing a side get different bits for one point), B58 keeps the
+// consensus' bits: 29 edges open raw, and the finishing weld, joining the chain by chained pairs (one point moved 2.2e-8,
+// past its 8e-9 radius), leaves 10. MEASURED AND DROPPED: keeping a point's own bits when it lies on the sliver's side to
+// rounding (1e-17 off it, against 1e-10 for a blob edge piercing the sliver) -- raw 29 -> 19, after the weld still 10, and
+// the 12-chain soak identical shot for shot; merging vertices by 3D rather than projected distance -- no change. Sub-snap
+// geometry is decided at the snap, by each arrangement for itself, and no choice of it agrees. The exact arrangement on the
+// same input: closed bit for bit; seed 8's 100 shots exact: closed after every shot (blastEngine-selfcheck section 13). The
+// same holds for round 18b's KNOWN intersect chain (6 'dangling' fallbacks at the big blobs' z = 0 equators): exact, no
+// fallback, its remaining mismatches all under 1.2e-16 (rounding). Folded into bvh-csg-r16g-exact-default.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
