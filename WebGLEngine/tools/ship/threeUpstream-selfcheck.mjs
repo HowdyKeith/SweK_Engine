@@ -308,6 +308,11 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
 // Y1 the raw write's texture made without RENDER_ATTACHMENT, a browser that no longer fails it -> 1; Y2 the failure's pattern
 // matching e3D for e2D -> 1. Both green until the browser's message was read whole: cut at 100 characters, it stopped short of
 // the words the pattern needs, and the row was red on a browser that does fail. None green.
+// ---- v4792 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Z1 patch 12's storage node back in the shared `node` slot -> 4 (the hash, 12 fixed, its patched block, 12 with all of them);
+// Z2 patch 12's BufferAttributeNode hunk dropped -> 3: the storage node now makes the entry as {} with its own slot, and the
+// attribute node reads `.node` off it and throws -- both hunks are the patch; Z3 a number of 12's Observed block edited -> 2.
+// None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +

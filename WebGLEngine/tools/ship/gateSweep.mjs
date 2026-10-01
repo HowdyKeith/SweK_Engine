@@ -8723,6 +8723,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4792 -- THE 396th CLOSING: NO new gate file -- draft 12, a WebGL2 storage buffer named without its count.
+    since489: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4792", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 12 and its patch; the e2e record for all twelve)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: an instanced storage source into a plain output, held NOT reached)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE WebGL2 COMPUTE THAT NEVER LINKED, TAKEN TO ITS CAUSE. *** v4790's probe saw 'two transform feedback " +
+                 "varyings specify the same output variable' and set it aside. It is storage(attr, type) with the count left at 0: " +
+                 "StorageBufferNode then shares its hash through builder.globalCache keyed by the buffer, and BufferAttributeNode " +
+                 "does the same through the SAME entry -- and on WebGL2 a storage buffer is read through a BufferAttributeNode of " +
+                 "that very buffer, so the two get one hash. The attribute is never declared, the transform is registered twice, " +
+                 "the program does not link and the compute writes zeros (r185 0 0 0 0 0 0, patched 1 2 3 4 5 6). Patch 12: a slot " +
+                 "each. Forcing the hash to the node's own id fixed it before the patch was written, which is what named the cause. " +
+                 "Run on one renderer, the patched second compute's code equals the first's and meets draft 06's cached stage, so the " +
+                 "reproduction gives each case its own. And a neighbouring fault patch 11 does not reach, held as a path: a storage " +
+                 "source fetched as an attribute follows its own class, so an instanced source into a plain output reads the first " +
+                 "element everywhere. three with all twelve: build matches the applier, lint clean, unit tests 1310 passed, e2e the " +
+                 "same 176 of 187 with 185 screenshots the same bytes as r185. Three sabotages red.",
+    }),
     // v4791 -- THE 395th CLOSING: NO new gate file -- whose the e2e's seven 3D-texture failures are.
     since488: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

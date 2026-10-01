@@ -78,9 +78,14 @@ with the patch:
 
 <!-- paths:begin -->
 invocationLocalIndex in a compute of 128 writing a plain storage buffer: r185 1, patched 64 distinct values on WebGL2; 64 on WebGPU, both builds
+an instanced storage source copied into a plain output: r185 1 1 1 1 1 1, patched 1 1 1 1 1 1 on WebGL2 -- not reached; 1 2 3 4 5 6 on WebGPU, both builds
 <!-- paths:end -->
 
-The default workgroup is 64, so 64 distinct values is every invocation's own.
+The default workgroup is 64, so 64 distinct values is every invocation's own. The second line is a neighbouring fault the
+patch does not reach: a storage buffer read as a vertex attribute rather than through a PBO is fetched per instance or per
+vertex by its own class, so a source whose class differs from the dispatch's -- instanced, into a plain output here; plain,
+into an instanced output the other way -- reads the first element everywhere. Fixing it means matching the dispatch to every
+buffer the compute reads, which is a change to `WebGLBackend.compute()` this draft does not make.
 
 ## A fix that works in an application
 
