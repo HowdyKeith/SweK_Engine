@@ -245,8 +245,17 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             r = { n, last, cur, frame: -1 }; skins.set(sk, r); }
         return r;
     };
+    // v4785: three keeps a geometry's targets as the layers of one array texture, and a renderer allows so many layers --
+    // 256 and 2048 on this adapter's WebGPU and WebGL2. Past that WebGPU draws nothing, and WebGL2 draws the mesh UNMORPHED
+    // without a word; a field carrying the morph would then describe a surface nobody drew. So past the renderer's own limit,
+    // read from it at the first build, the stage morphs nothing either.
+    let maxLayers = Infinity;
+    const layerLimit = (renderer) => { const b = renderer && renderer.backend;
+        if (b && b.gl && typeof b.gl.getParameter === "function") return b.gl.getParameter(b.gl.MAX_ARRAY_TEXTURE_LAYERS);
+        if (b && b.device && b.device.limits) return b.device.limits.maxTextureArrayLayers;
+        return Infinity; };
     const hasMorph = (object) => !!(object && object.geometry && object.geometry.morphAttributes && object.geometry.morphAttributes.position &&
-        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences);
+        object.geometry.morphAttributes.position.length > 0 && object.morphTargetInfluences && object.geometry.morphAttributes.position.length <= maxLayers);
     const morphRecord = (object) => {
         let r = morphs.get(object);
         // the influences as vec4s, each in .x: a uniform array's elements must be 16 bytes apart, and an array of f32 is not
@@ -283,14 +292,26 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
         for (let i = 0; i < r.n; i++) r.cur[i * 4] = toward ? r.last[i] + toward.t * (object.morphTargetInfluences[i] - r.last[i]) : r.last[i];
     };
     // the geometry's point as it was: morphed by the previous influences, then skinned by the previous bone matrices
+    // v4785: *** A LOOP IN THE SHADER, NOT ONE UNROLLED IN JAVASCRIPT. *** The sum over targets was written out a target at a
+    // time, one texture read each, and past a few hundred targets the vertex stage did not survive it: the field read NO
+    // motion -- WebGPU from 150 targets, WebGL2 from 256, where three itself morphs to 256 and 2048 on this adapter. As a TSL
+    // Loop it is one read in a loop whatever the count (render/temporalTslMeshes-selfcheck.mjs, section 3).
+    const sumTargets = (tex, W, count, n, weight) => {
+        const acc = TSL.vec3(0.0).toVar(), sum = TSL.float(0.0).toVar();
+        TSL.Loop(n, ({ i }) => {
+            const w = weight(i), idx = TSL.int(TSL.vertexIndex).add(TSL.int(i).mul(count));
+            acc.addAssign(TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz.mul(w)); sum.addAssign(w);
+        });
+        return { acc, sum };
+    };
     const morphedBefore = (object, pos) => {
         const g = object.geometry, r = morphRecord(object), { tex, W, count, n } = morphTargets(g);
-        const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
-        let sum = null, acc = null;
         const node = perDraw("vec4", n).node;
-        for (let t = 0; t < n; t++) { const w = node.element(t).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; sum = sum ? sum.add(w) : w; }
-        // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
-        return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+        return TSL.Fn(() => {
+            const { acc, sum } = sumTargets(tex, W, count, n, (i) => node.element(i).x);
+            // relative targets are displacements; absolute ones are positions, the base weighted by what the influences leave
+            return g.morphTargetsRelative ? pos.add(acc) : pos.mul(TSL.float(1.0).sub(sum)).add(acc);
+        })();
     };
     // v4784: *** AN INSTANCED MESH'S MORPHS WERE NOT IN ITS PREVIOUS POINT AT ALL. *** The instanced branch took the bare
     // geometry through the previous instance matrix, so a morphing herd read 1.39 to 1.67 px wrong. Its point as it was: the
@@ -299,7 +320,8 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // texel 1 + t = target t; texel 0, the base, three's node does not read). Otherwise the mesh's own influences, as a mesh's.
     const instMorphs = new WeakMap();
     const perInstanceMorph = (object) => !!(object && object.isInstancedMesh && object.count > 1 && object.morphTexture && object.geometry &&
-        object.geometry.morphAttributes && object.geometry.morphAttributes.position && object.geometry.morphAttributes.position.length > 0);
+        object.geometry.morphAttributes && object.geometry.morphAttributes.position && object.geometry.morphAttributes.position.length > 0 &&
+        object.geometry.morphAttributes.position.length <= maxLayers);
     const instMorphRecord = (object) => {
         let r = instMorphs.get(object); const src = object.morphTexture;
         if (!r || r.src !== src) { const { width: W, height: H, data } = src.image, last = Float32Array.from(data), cur = Float32Array.from(data);
@@ -315,11 +337,8 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     const instanceMorphedBefore = (object, pos) => {
         if (perInstanceMorph(object)) {
             const g = object.geometry, r = instMorphRecord(object), { tex, W, count, n } = morphTargets(g);
-            const at = (t) => { const idx = TSL.int(TSL.vertexIndex).add(t * count); return TSL.textureLoad(tex, TSL.ivec2(idx.mod(W), idx.div(W))).xyz; };
-            let acc = null;
-            for (let t = 0; t < n; t++) { const w = TSL.textureLoad(r.tex, TSL.ivec2(t + 1, TSL.int(TSL.instanceIndex))).x, term = at(t).mul(w); acc = acc ? acc.add(term) : term; }
             // three multiplies by the MESH's base -- 1 for relative targets; absolute ones over per-instance influences throw in r185
-            return pos.add(acc);
+            return TSL.Fn(() => pos.add(sumTargets(tex, W, count, n, (i) => TSL.textureLoad(r.tex, TSL.ivec2(TSL.int(i).add(1), TSL.int(TSL.instanceIndex))).x).acc))();
         }
         return hasMorph(object) ? morphedBefore(object, pos) : pos;
     };
@@ -391,6 +410,7 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
             if (perInstanceMorph(object)) { const r = instMorphRecord(object); r.last.set(r.src.image.data); }
         }
         setup(builder) {
+            if (maxLayers === Infinity && builder && builder.renderer) maxLayers = layerLimit(builder.renderer);
             let cur = cameraProjectionMatrix.mul(modelViewMatrix).mul(positionLocal), was = null;
             // an instanced mesh's previous point: its geometry through ITS previous instance matrix, evaluated per vertex
             const object = builder && builder.object;

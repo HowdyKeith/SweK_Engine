@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4785 -- THE 389th CLOSING: NO new gate file -- morph targets in the hundreds and thousands, to three's own limit.
+    since482: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4785", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 3: 1, 200, L and L + 1 morph targets, L read from the renderer)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE UNROLLED ITS SUM OVER MORPH TARGETS, AND PAST A FEW HUNDRED THE VERTEX STAGE DID NOT SURVIVE IT. *** " +
+                 "One texture read per target written out in JavaScript: the field read NO motion from 150 targets on WebGPU and " +
+                 "from 256 on WebGL2, while three morphed to 256 and 2048 -- this adapter's array-texture layers, which is where " +
+                 "three keeps a geometry's targets. As a TSL Loop the field is a one-target quad's to 0 px at 1, 200 and the " +
+                 "limit, both backends. AND ONE PAST THE LIMIT THE FIELD MUST DESCRIBE WHAT THREE DREW: WebGPU draws nothing, and " +
+                 "WebGL2 draws the mesh UNMORPHED without a word, so the stage reads the renderer's own limit and morphs nothing " +
+                 "past it either -- the limit read, never assumed, since a GPU that allows more layers moves both. Bones past the " +
+                 "uniform buffer (1,100 here) are the same story without a fix to make: three draws nothing, and the field is " +
+                 "empty with it. Three sabotages red.",
+    }),
     // v4784 -- THE 388th CLOSING: NO new gate file -- an InstancedMesh with morph targets, through the motion stage.
     since481: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
