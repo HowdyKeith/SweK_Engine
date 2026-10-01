@@ -8728,7 +8728,11 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
         at: "v4789", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
-        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 5: three's e2e record -- it adds up, it names the builds the gate's hashes name, and the README states it)"]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: three's e2e record -- it adds up, it names the builds the gate's hashes name, and the README states it)",
+            "tools/ship/redCensus-selfcheck.mjs (an EMPTY register passes only when every gate it recovered is recorded as repaired)",
+            "tools/ship/redCensusFresh-selfcheck.mjs (the subset is still the whole register when the register is empty)",
+        ]),
         redOnArrival: Object.freeze([]),
         verdict: "*** THREE'S OWN e2e TESTS HAD NEVER RUN ON THE PATCHES; THE README SAID SO. *** In a checkout of r185 with its examples, " +
                  "three's runner drew every WebGPU example BLACK at first, and said nothing: this Chromium refuses three's string " +
@@ -8737,7 +8741,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "176 passed and the same 11 failed on r185 and with all nine, each for the same reason, and 185 screenshots are " +
                  "the same bytes. The other two are not the patches': four runs of one build gave four rasterizer images, and the " +
                  "video panorama lands on one of two frames whichever build runs it. Recorded in e2e/v4789.json against both build " +
-                 "hashes, so a changed patch has two rows to clear: the hash, then the e2e. Seven sabotages red.",
+                 "hashes, so a changed patch has two rows to clear: the hash, then the e2e. Seven sabotages red. AND THE FIRST VERIFY " +
+                 "WAS RED FOR A REASON OLDER THAN THIS ROUND: registerDrift's audit, frozen at v4776, turned 13 rounds old. Re-" +
+                 "frozen, it said the register's ONLY gate, shaderRefs, now passes -- repaired at v4782 (six callers to SOURCE_EXT, " +
+                 "400 s -> 56 s) and carried as a standing red for seven rounds since. Moved to FIXED_SINCE_V4279; the register is " +
+                 "empty, and two census rows that assumed it never would be now accept that only when its history accounts for " +
+                 "it. Two sabotages red (the repair record deleted; the gate put back without a re-freeze).",
     }),
     // v4788 -- THE 392nd CLOSING: NO new gate file -- patch 03 reaches per-instance morphs.
     since485: Object.freeze({

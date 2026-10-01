@@ -173,7 +173,9 @@ const RED_AT_V4279_GATES = Object.freeze([
     // tools/ship/registerResidue-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. The v4590 residue
     // sweep dropped it from 62 to 22 against a ceiling lowered to match; re-run fresh, exit 0, "all checks
     // pass".
-    "tools/ship/shaderRefs-selfcheck.mjs",
+    // tools/ship/shaderRefs-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. v4782 moved six callers to
+    // moduleRefs' SOURCE_EXT (back to the 11 its ratchet allows) and made the reference scan one pass, 400 s -> 56 s;
+    // the v4789 re-freeze of the audit found it exit 0, and two direct runs agreed: exit 0, "all checks pass".
     // tools/ship/sunshineHost-selfcheck.mjs REMOVED, repaired: see FIXED_SINCE_V4279. registerDrift-
     // selfcheck's live cheapest-first sample caught this one directly: "frozen exit 1, now 0". Independently
     // re-confirmed by a direct run at cba0f571: exit 0, "sunshineHost-selfcheck: all checks pass".
@@ -193,11 +195,8 @@ const RED_AT_V4279_GATES = Object.freeze([
 ]);
 
 // What the audit cannot supply, said explicitly rather than by a typed line standing in for a reading.
-export const UNVERIFIED_LINE = Object.freeze({
-    "tools/ship/shaderRefs-selfcheck.mjs":
-        "379,838 ms: the audit's cap ends the run before it prints a failing line. NOT a stale reading -- an " +
-        "absent one. Measuring it needs a cap raised past six minutes, which is a decision about the audit.",
-});
+// v4789: shaderRefs, the one entry this held, was repaired (see FIXED_SINCE_V4279); the audit reads every gate left.
+export const UNVERIFIED_LINE = Object.freeze({});
 
 const auditRow = (gate) => ((REGISTER_AUDIT && REGISTER_AUDIT.rows) || []).find((r) => r.gate === gate) || null;
 
@@ -285,6 +284,12 @@ export const registerAtSweep = () =>
     RED_AT_V4279.length + FIXED_SINCE_V4279.length - RECOVERED_SINCE_V4279.length;
 
 export const FIXED_SINCE_V4279 = Object.freeze([
+    { gate: "tools/ship/shaderRefs-selfcheck.mjs", round: "v4782, found at v4789",
+      why: "registered at v4318 as RED at 379.8 s: 16 callers spelling /\\.(js|mjs|html)$/ by hand. v4782 moved six of them " +
+           "to moduleRefs' SOURCE_EXT, back under its ratchet of 11, and answered the substring test for every basename in " +
+           "one pass, 400 s -> 56 s. Nothing re-read the register until registerDrift's audit-age row went red at v4789 " +
+           "(frozen at v4776, 13 rounds); the re-freeze ran it to exit 0 in 54.6 s, and two direct runs agreed: exit 0, " +
+           "\"shaderRefs-selfcheck: all checks pass\"." },
     { gate: "tools/ship/proseAudit-selfcheck.mjs", round: "post-v4297-sweep drift-fix pass",
       why: "the full selfchecks.mjs sweep at cba0f571 (1643 gates, 24626.2s) found this one FAILED, and a " +
            "following batch-fix round repaired it. redCensus-selfcheck's own live re-run caught the gap " +

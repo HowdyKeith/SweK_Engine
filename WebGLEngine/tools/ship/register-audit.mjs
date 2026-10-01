@@ -10,18 +10,7 @@
  * reading stdout. Rewritten by tools/ship/freezeRegisterAudit.mjs.
  */
 export const REGISTER_AUDIT = Object.freeze({
- "at": "v4776",
+ "at": "v4789",
  "capMs": 120000,
- "rows": [
-  {
-   "gate": "tools/ship/shaderRefs-selfcheck.mjs",
-   "exit": "timeout",
-   "ms": 120095,
-   "first": "",
-   "all": [],
-   "count": 0,
-   "printedBeforeTheCap": [],
-   "onStderr": false
-  }
- ]
+ "rows": []
 });

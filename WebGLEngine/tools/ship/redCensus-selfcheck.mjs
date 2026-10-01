@@ -47,7 +47,12 @@ console.log("redCensus-selfcheck -- what is actually red, re-measured rather tha
 
 console.log("1. *** THE CENSUS IS A MEASUREMENT, AND EVERY ENTRY CARRIES WHAT IT COST TO TAKE ***");
 {
-    ok("the census names a red set", RED_AT_V4279.length > 0, RED_AT_V4279.length + " gates");
+    // v4789: an EMPTY register is the outcome the register exists to reach, not a broken census -- but only when the
+    // gates it held are accounted for: every one it ever recovered into the red set must now be in FIXED_SINCE_V4279.
+    const repaired = (g) => FIXED_SINCE_V4279.some((f) => f.gate === g);
+    ok("the census names a red set, or every gate it held is recorded as repaired",
+        RED_AT_V4279.length > 0 || RECOVERED_SINCE_V4279.every((r) => repaired(r.gate)),
+        RED_AT_V4279.length ? RED_AT_V4279.length + " gates" : `empty since v4789: ${RECOVERED_SINCE_V4279.map((r) => r.gate.split("/").pop()).join(", ")} repaired`);
     ok("every entry names a gate FILE that exists on disk",
         RED_AT_V4279.every((e) => fs.existsSync(path.join(ENG, e.gate))),
         RED_AT_V4279.filter((e) => !fs.existsSync(path.join(ENG, e.gate))).map((e) => e.gate).join(" ") || "all present");
@@ -251,10 +256,11 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
     // pinned to the number that was actually measured serially -- so the check is that the recovered reading
     // is the LARGER one and that the discrepancy is declared, rather than that two instruments agree when one
     // of them was cut off.
-    ok("  ...and every RECOVERED gate is IN the red set and OUT of the timeout bucket, with its measurement",
+    ok("  ...and every RECOVERED gate is IN the red set (or since repaired) and OUT of the timeout bucket, with its measurement",
         RECOVERED_SINCE_V4279.every((r) =>
-            RED_AT_V4279.some((e) => e.gate === r.gate &&
-                (e.ms === r.ms || (UNVERIFIED_LINE[r.gate] && r.ms > e.ms))) &&
+            (RED_AT_V4279.some((e) => e.gate === r.gate &&
+                (e.ms === r.ms || (UNVERIFIED_LINE[r.gate] && r.ms > e.ms))) ||
+             FIXED_SINCE_V4279.some((f) => f.gate === r.gate)) &&   // v4789: or since repaired, which is the other way out
             !UNCONFIRMED_SLOW.includes(r.gate) && r.ms > 0 && r.method && r.why.length > 40),
         RECOVERED_SINCE_V4279.map((r) => r.gate.split("/").pop() + " " + r.verdict + " at " +
             (r.ms / 1000).toFixed(1) + "s (" + r.round + ")").join(", ") +

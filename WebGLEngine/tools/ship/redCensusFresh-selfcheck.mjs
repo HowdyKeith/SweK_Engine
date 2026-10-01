@@ -100,7 +100,9 @@ sec("4. A BOUNDED SUBSET IS RE-RUN, AND A GATE THAT WENT GREEN MAKES THIS RED");
     // matter, this can go back to being budget-bounded; today it is not, and pretending otherwise would be
     // exactly the "pin a number that happens to be true" mistake this file's own history keeps naming.
     const { gates, costMs } = RC.cheapSubset(150000);
-    ok(gates.length === RC.RED_AT_V4279.length && gates.length >= 1,
+    // v4789: and the register EMPTIED -- shaderRefs, the last gate in it, was repaired -- so "the whole register" is nothing
+    // to re-run; the subset must still be all of it, which is what the first term says
+    ok(gates.length === RC.RED_AT_V4279.length && (gates.length >= 1 || RC.RED_AT_V4279.length === 0),
        "the subset covers the ENTIRE register, because the register is now small enough that it fits",
        `${gates.length} of ${RC.RED_AT_V4279.length} gates, ~${costMs} ms recorded`);
     ok(JSON.stringify(RC.cheapSubset(150000).gates.map((g) => g.gate)) === JSON.stringify(gates.map((g) => g.gate)),
