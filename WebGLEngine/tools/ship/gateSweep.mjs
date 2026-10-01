@@ -8723,6 +8723,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4787 -- THE 391st CLOSING: NO new gate file -- the nine three.js patches run together, not only applied together.
+    since484: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4787", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 4: every reproduction on one build with all nine patches, and drafts' \"together\" blocks)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (2b: every path case on the all-nine build, against its own patch's)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE NINE PATCHES HAD ONLY EVER BEEN APPLIED TOGETHER AS TEXT, AND RUN ONE AT A TIME. *** Every hunk was found once " +
+                 "in the combined build and three's own build of the combined source matched it, but no reproduction had run on it. " +
+                 "Run there, eight of nine drafts and all ten path cases print exactly what their own patch prints alone. The ninth " +
+                 "is a change for the better and the gate now says so: 04's mrtSameFrame -- three renders in one frame, a skin read " +
+                 "through MRT -- reads 0.000 with 04 alone and 5.612 with all nine, a plain mesh's number, because 07 steps the bones " +
+                 "per render. Bisected: 07 alone gives 5.612, all nine without 07 give 0.000. Draft 04 had set it aside as 'another " +
+                 "matter' -- it now points at 07 and carries a \"together\" block the gate holds, and a draft may differ together " +
+                 "only by saying so. Per-instance morphs stay at 1.871 with every patch: 03 does not reach them, the next round's. " +
+                 "Six sabotages red.",
+    }),
     // v4786 -- THE 390th CLOSING: NO new gate file -- what a skin's velocity means when a frame holds two renders.
     since483: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

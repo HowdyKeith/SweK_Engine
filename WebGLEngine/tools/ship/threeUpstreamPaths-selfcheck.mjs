@@ -38,11 +38,13 @@ const skip = webgpuSkipReason();
 let res = null;
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The paths' numbers are the device's."); fails++; }
 else {
-    const { root, dispose } = rootWithBuilds(builds);
+    // v4787: and every patch at once, each case run on it too
+    const all = Object.keys(texts).sort().reduce((t, slot) => apply(texts[slot], t).text, bundle);
+    const { root, dispose } = rootWithBuilds({ ...builds, all });
     try {
         const r = await runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: { CASES }, script: `async (a) => {
   const out = {};
-  for (const [name, slot] of a.CASES) for (const [build, dir] of [["r185", "/vendor/three-webgpu"], ["patched", "/three-patched/" + slot]]) {
+  for (const [name, slot] of a.CASES) for (const [build, dir] of [["r185", "/vendor/three-webgpu"], ["patched", "/three-patched/" + slot], ["all", "/three-patched/all"]]) {
     const THREE = await import(dir + "/three.webgpu.js"), T = await import(dir + "/three.tsl.js"), frame = () => new Promise((q) => requestAnimationFrame(q));
     const res = {};
     for (const forceWebGL of [false, true]) { try {
@@ -218,6 +220,10 @@ if (res) {
         if (lines.length === 3) said["07"] = lines.join("\n");
     }
 
+    console.log(`\n2b. ALL ${Object.keys(texts).length} TOGETHER: each path on the one build with every patch, as on its own patch's`);
+    for (const [name, slot] of CASES) { const one = res[`${name} patched`] || {}, every = res[`${name} all`] || {};
+        const same = ["webgpu", "webgl2"].every((m) => JSON.stringify(every[m]) === JSON.stringify(one[m]));
+        ok(`  ${name} (${slot}) with every patch: the same numbers as with patch ${slot} alone, both backends`, same, same ? "" : `all: ${JSON.stringify(every)}; ${slot} alone: ${JSON.stringify(one)}`); }
     console.log("\n3. THE DRAFTS: each one's paths block is what the paths print");
     const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
     for (const [slot, f] of Object.entries(DRAFT)) {
@@ -239,8 +245,8 @@ if (res) {
 // copy is a new texture now, the last draw's matrices kept as its first entries.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
-    "patch here changes that; many morph targets past the uniform buffer; the patches with each other -- each is run alone, " +
-    "tools/ship/threeUpstream-selfcheck.mjs applies all nine together as text only; computeSkinning's absolute positions -- r185 " +
+    "patch here changes that; many morph targets past the uniform buffer; per-instance morphs, which patch 03 does not reach " +
+    "(1.871 alone and with all nine); computeSkinning's absolute positions -- r185 " +
     "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2, so only the step " +
     "between two computes is read; and a real GPU.");
 process.exitCode = fails ? 1 : 0;

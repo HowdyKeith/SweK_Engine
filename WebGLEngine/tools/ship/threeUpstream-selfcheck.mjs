@@ -10,7 +10,9 @@
 // three's src/ at the r185 tag. Section 3 finds every hunk exactly once in the vendored build (the bundle is the source
 // concatenated: no import lines, no `export`, and one identifier the bundler renamed), applies the draft's patch alone to a copy,
 // runs the draft's reproduction on it, and holds (a) the fix -- the bug is gone on both backends -- and (b) the draft's "patched"
-// block to what it prints. All six are applied together too, each hunk still found once. v4773: the applier is
+// block to what it prints. All six are applied together too, each hunk still found once. v4787: and run together -- section 4
+// runs every reproduction on the one build with all of them, which must print what the draft's own patch alone prints, or what
+// the draft's "together" block says another patch changes. v4773: the applier is
 // tools/ship/threePatch.mjs, shared with tools/ship/threeUpstreamPaths-selfcheck.mjs, which runs the patches on the paths these
 // reproductions do not take.
 // *** NOTHING HERE POSTS ANYTHING. *** Filing them is the maintainer's call.
@@ -100,6 +102,8 @@ for (const f of files) {
 const bundle = fs.readFileSync(BUNDLE, "utf8");
 const diffs = Object.fromEntries(Object.entries(DRAFTS).map(([f, d]) => [f, fs.existsSync(path.join(PATCHES, d.patch)) ? fs.readFileSync(path.join(PATCHES, d.patch), "utf8") : ""]));
 const applied = Object.fromEntries(Object.keys(DRAFTS).map((f) => [f, apply(diffs[f], bundle)]));
+// v4787: every patch on one build, in order -- the build three's maintainers would have if they took them all
+const allNine = Object.keys(DRAFTS).reduce((acc, f) => { const a = apply(diffs[f], acc.text); return { text: a.text, found: acc.found.concat(a.found) }; }, { text: bundle, found: [] });
 
 // ONE PAGE FOR EVERY REPRODUCTION, BOTH BUILDS: a temporary engine root -- this tree by symlink, and beside it a directory per
 // draft holding r185's build with that draft's patch (three.tsl.js and three.core.js import it by a relative path, so each
@@ -120,10 +124,10 @@ const RELEASE_DRAFT = "06-webgl2-second-compute.md", RELEASE = `const out = {};
     window.__result = out;`;
 let results = {};
 if (!skip) {
-    const { root, dispose } = rootWithBuilds(Object.fromEntries(Object.keys(scripts).map((f) => [SLOT(f), applied[f].text])));
+    const { root, dispose } = rootWithBuilds({ ...Object.fromEntries(Object.keys(scripts).map((f) => [SLOT(f), applied[f].text])), all: allNine.text });
     try {
-        const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]]]);
-        if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE]);
+        const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]], [`all ${f}`, "/three-patched/all", scripts[f]]]);
+        if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE], ["stages all", "/three-patched/all", RELEASE]);
         // two pages at once -- r185's runs and the patched builds' -- each a browser of its own
         const page = (list) => runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: {}, script: `async () => {
             const out = {};
@@ -165,7 +169,7 @@ for (const [f, d] of Object.entries(DRAFTS)) {
 // patch changed since makes the second hash stale: build three again, and record it.
 const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "d34679157fa81391294dfbba56f6176d41ceefe63c10376d33cefa95ef25078a" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
-{ let t = bundle, found = []; for (const f of Object.keys(DRAFTS)) { const a = apply(diffs[f], t); t = a.text; found = found.concat(a.found); }
+{ const t = allNine.text, found = allNine.found;
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
@@ -183,6 +187,24 @@ else for (const f of Object.keys(scripts)) {
 if (!skip) { const was = results["stages r185"], r = results["stages patched"];
     ok(`  ${DRAFTS[RELEASE_DRAFT].patch}: two systems from one source -- WebGL2 shares one stage in r185 and has one each with the patch, WebGPU one each in both; disposing their compute nodes leaves none: r185 ${JSON.stringify(was).replace(/"/g, "")}, patched ${JSON.stringify(r).replace(/"/g, "")}`,
         ran(was) && ran(r) && was.webgl2.made === 1 && was.webgpu.made === 2 && r.webgl2.made === 2 && r.webgpu.made === 2 && r.webgpu.left === 0 && r.webgl2.left === 0); }
+
+console.log(`\n4. ALL ${Object.keys(DRAFTS).length} TOGETHER: each reproduction on the one build with every patch, printing what it prints with its own patch alone`);
+if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
+else {
+    for (const f of Object.keys(scripts)) {
+        const d = DRAFTS[f], alone = results[`patched ${f}`], all = results[`all ${f}`];
+        ok(`  ${f}: the reproduction ran on both backends with all ${Object.keys(DRAFTS).length}`, ran(all), ran(all) ? "" : JSON.stringify(all));
+        if (!ran(all) || !ran(alone)) continue;
+        // a draft whose reproduction prints something else with every patch says so in a "together" block, and says which patch
+        // does it; without one, all nine must print what its own patch alone prints
+        const tog = block(f, "together");
+        ok(`*** ${f}: with all of them the bug is still gone, and it prints ${tog === null ? "what its own patch alone prints" : "its \"together\" block"}: "${d.observed(all)}" ***`,
+            d.fixed(all) && d.observed(all) === (tog ?? d.observed(alone)), `with its patch alone: "${d.observed(alone)}"`);
+        if (tog !== null) ok(`  ${f}: its "together" block says something its "patched" block does not`, tog !== block(f, "patched"));
+    }
+    const one = results["stages patched"], all = results["stages all"];
+    ok(`  ${DRAFTS[RELEASE_DRAFT].patch}'s released stages with all of them: ${JSON.stringify(all).replace(/"/g, "")}, as with it alone`, ran(all) && JSON.stringify(all) === JSON.stringify(one));
+}
 
 // ---- v4763 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the drafts themselves: U1 an Observed number edited by a thousandth -> 1; U2 a reproduction importing more than
@@ -209,6 +231,12 @@ if (!skip) { const was = results["stages r185"], r = results["stages patched"];
 // 3; W4 the bundler's hash -> hash$1 rename forgotten -> 5 (09's hunk not found, so its build is r185's); W5 a number of 08's
 // Observed block edited -> 2 (the block and the index line). None green. W1 first ran on no text at all: its line is in the
 // patch twice, once for skinning() and once for computeSkinning(), as 07's hunks were until given six lines of context.
+// ---- v4787 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// A1 the all-nine build made without 07 -> 3 (the recorded hash, 04's together block, 07's own); A2 the all-nine runs importing
+// each draft's own patched build -> 1 (04's together block: the one draft another patch changes); A3 04's together block deleted
+// -> 1; A4 04's together block saying what its patched block says -> 2. In tools/ship/threeUpstreamPaths-selfcheck.mjs: A5 the
+// all-nine build r185's own -> 8 (every case a patch changes; storageGPU and perInstance, which no patch reaches, the same either way); A6 the
+// all-nine build made without 03 -> 2. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's e2e tests, which need its examples and screenshots; " +

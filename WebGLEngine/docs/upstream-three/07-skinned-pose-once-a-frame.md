@@ -92,7 +92,8 @@ computed twice a frame, the bone moved 0.15 between: the second compute moved r1
 <!-- paths:end -->
 
 r185 measures every render's velocity from the pose of the frame before, so a skin moved once in a frame shows that move in
-both renders, where a plain mesh shows it only in the first. `computeSkinning` updates the skeleton under the same test, and
+both renders, where a plain mesh shows it only in the first. The same patch makes [04](04-velocity-outside-mrt.md)'s
+`mrtSameFrame` -- three renders in one frame, read through MRT -- read a plain mesh's motion. `computeSkinning` updates the skeleton under the same test, and
 `renderer.compute` advances the render id as a render does, so the patch's second hunk makes a second compute in a frame
 use the bones as they are.
 
