@@ -81,6 +81,15 @@
 // G1 and G2 are 0 here: on the page's shots no triangle the restricted scan misses would have received a point --
 // meshBoolean-selfcheck's flush boxes, where conformity was born, are where they show. G5 changes the tree's shape and
 // so the output's bits, never its solid (round 15's measurement), which only the tree comparison sees.
+// SABOTAGE LOG (round 19) -- the default flip and the soak's fix; blastEngine.mjs, destructible.html, uvUnwrap.mjs, each on
+// the real file, restored and md5 verified. 5 of 5 red (rows red in the gate run / in section 9):
+//   V1 DEFAULT_BLAST_ENGINE back to "bsp"                                -> 2 / 0   (sections 1 and 4)
+//   V2 the page choosing "bsp" when nothing is asked                     -> 1 / 0   (section 4, the page in Chromium)
+//   V3 uvUnwrap.texelDensity's Math.min(...ratios) back                  -> uvUnwrap-selfcheck 1 (it throws RangeError)
+//   V4 a piece of the blob tagged SKIN                                   -> 6 / 2
+//   V5 finishing off by default                                          -> 12 / 3
+//       First run: 8, none in section 9 -- section 7 (round 16) read r.stats.weldMoves, which only finishing makes, and
+//       threw before section 9 ran. Section 7 now reads it as NaN when absent and fails by name; the gate runs on.
 "use strict";
 
 import fs from "node:fs";
@@ -91,6 +100,9 @@ import { createRequire } from "node:module";
 import * as M from "./meshCSG.mjs";
 import { blastWith, blastBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS } from "./blastEngine.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../../tools/ship/playwrightResolve.mjs";
+import { polysToMesh, unwrap, texelDensity } from "./uvUnwrap.mjs";
+import { concreteAt } from "../../render/solidTexture.mjs";
+import { rebarDistance } from "../../render/rebar.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -177,8 +189,8 @@ const run = (engine, blobs, wall = M.boxPolys([0, 0, 0], HALF), opts = {}) => {
 
 console.log("1. *** THE CONTRACT: blast()'s POLYGONS, PLANES AND TAGS ***");
 {
-    ok("the engines are \"bsp\" and \"bvh\", and \"bsp\" is the default -- the flag is off unless asked for",
-        BLAST_ENGINES.join() === "bsp,bvh" && DEFAULT_BLAST_ENGINE === "bsp");
+    ok("the engines are \"bsp\" and \"bvh\", and \"bvh\" is the default since round 19 (section 9's soak decided it)",
+        BLAST_ENGINES.join() === "bsp,bvh" && DEFAULT_BLAST_ENGINE === "bvh");
     let threw = false;
     try { blastWith("manifold", M.boxPolys([0, 0, 0], HALF), pageBlasts(1, 1)[0]); } catch { threw = true; }
     ok("an unknown engine throws rather than quietly using one", threw);
@@ -314,7 +326,7 @@ console.log("\n4. *** THE PAGE, IN A REAL BROWSER ***");
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const b = await chromium.launch({ executablePath: HEADLESS_SHELL });
         const seen = {};
-        for (const q of ["", "?csg=bvh"]) {
+        for (const q of ["", "?csg=bsp"]) {
             const pg = await (await b.newContext()).newPage();
             const errs = [];
             pg.on("pageerror", (e) => errs.push(String(e.message)));
@@ -330,12 +342,12 @@ console.log("\n4. *** THE PAGE, IN A REAL BROWSER ***");
             await pg.close();
         }
         await b.close(); srv.close();
-        const d = seen.default, v = seen["?csg=bvh"];
-        ok("!! the page loads with no page error and BSP selected; four blasts and a settle run and the stats say so",
-            d.errs.length === 0 && d.engine === "bsp" && d.blasts && d.named && d.settled, JSON.stringify(d));
-        ok("!! ?csg=bvh selects the BVH engine; four blasts and a settle run with no page error, the stats name it",
-            v.errs.length === 0 && v.engine === "bvh" && v.blasts && v.named && v.settled, JSON.stringify(v));
-        report("unmatched (page census) after four random blasts, before settle: BSP " + d.un + ", BVH " + v.un);
+        const d = seen.default, v = seen["?csg=bsp"];
+        ok("!! the page loads with no page error and BVH selected (the default since round 19); four blasts and a settle run and the stats say so",
+            d.errs.length === 0 && d.engine === "bvh" && d.blasts && d.named && d.settled, JSON.stringify(d));
+        ok("!! ?csg=bsp selects the BSP engine; four blasts and a settle run with no page error, the stats name it",
+            v.errs.length === 0 && v.engine === "bsp" && v.blasts && v.named && v.settled, JSON.stringify(v));
+        report("unmatched (page census) after four random blasts, before settle: BVH " + d.un + ", BSP " + v.un);
     }
 }
 
@@ -464,7 +476,7 @@ console.log("\n7. *** ROUND 16: WHAT THE FINISHING WELD STILL FINDS, NOW THE ARR
     const tally = (opts) => {
         const t = { ulp: 0, subSnap: 0, overSnap: 0 };
         const chains = []; for (let seed = 1; seed <= 20; seed++) chains.push(pageBlasts(seed, 5)); chains.push(pageBlasts(107, 30));
-        for (const blobs of chains) { let w = M.boxPolys([0, 0, 0], HALF); for (const b of blobs) { const r = blastWith("bvh", w, b, opts); w = r.polys; for (const k in t) t[k] += r.stats.weldMoves[k]; } }
+        for (const blobs of chains) { let w = M.boxPolys([0, 0, 0], HALF); for (const b of blobs) { const r = blastWith("bvh", w, b, opts); w = r.polys; for (const k in t) t[k] += (r.stats.weldMoves || {})[k] ?? NaN; } }
         return t;
     };
     const on = tally({}), off = tally({ seamConsensus: false });
@@ -500,6 +512,44 @@ console.log("\n8. *** ROUND 17: THE WALL FAR FROM THE ORIGIN -- A BIG LEVEL ***"
         on.open === 0 && on.fb === 0 && on.worst < 1e-6, "open edges " + on.open + ", fallback triangles " + on.fb + ", |volume - at the origin| " + on.worst.toExponential(2));
     ok("   control: translate:false -- the shots worked out there -- falls back and opens the wall", offR.fb > 0 && offR.open > 0,
         "fallback triangles " + offR.fb + ", open edges " + offR.open + ", |volume - at the origin| " + offR.worst.toExponential(2));
+}
+
+console.log("\n9. *** ROUND 19: THE SOAK THAT MADE \"bvh\" THE DEFAULT ***");
+{
+    // Round 19 soaked both engines -- twelve 100-shot chains each in node, 100 shots through the page in Chromium -- and
+    // ran the code that reads the tags (uvUnwrap, solidTexture, rebar) on BVH walls for the first time. One chain of it
+    // is held here: seed 1, 100 shots, each engine.
+    const chain = (engine, seed, n) => {
+        let wall = M.boxPolys([0, 0, 0], HALF), fb = 0; const t0 = Date.now();
+        for (const b of pageBlasts(seed, n)) { const r = blastWith(engine, wall, b, { select: engine === "bsp" ? M.bvhSelect(wall).select : null }); wall = r.polys; fb += r.stats.fallbackTris || 0; }
+        return { wall, fb, ms: Date.now() - t0 };
+    };
+    const area = (p) => { const a = [0, 0, 0]; for (let i = 1; i + 1 < p.vs.length; i++) { const u = p.vs[i].map((x, k) => x - p.vs[0][k]), w = p.vs[i + 1].map((x, k) => x - p.vs[0][k]); a[0] += u[1] * w[2] - u[2] * w[1]; a[1] += u[2] * w[0] - u[0] * w[2]; a[2] += u[0] * w[1] - u[1] * w[0]; } return Math.hypot(...a) / 2; };
+    const onBox = (p) => [0, 1, 2].some((ax) => [-1, 1].some((sg) => p.vs.every((v) => Math.abs(v[ax] - sg * HALF[ax]) < 1e-9)));
+    const tags = (wall) => { let bad = 0, skin = 0, cut = 0; for (const p of wall) { if ((p.src === "skin") !== onBox(p) || (p.src !== "skin" && p.src !== "cut")) bad++; if (p.src === "skin") skin += area(p); else cut += area(p); } return { bad, skin, cut }; };
+    const v = chain("bvh", 1, 100), s = chain("bsp", 1, 100), tv = tags(v.wall), ts = tags(s.wall);
+    const vOpen = pageCensus(v.wall), sOpen = pageCensus(s.wall), sSettled = pageCensus(settleWith("bsp", s.wall).polys);
+    const dVol = Math.abs(M.volume(v.wall) - M.volume(s.wall)) / M.volume(s.wall);
+    ok("!! *** 100 SHOTS (seed 1): THE BVH WALL CLOSED AT THE PAGE'S CENSUS RAW, NO FALLBACK, THE BSP'S SOLID TO 1e-10, ITS SKIN AND CUT AREAS TO 1e-10, EVERY TAG RIGHT ***",
+        vOpen === 0 && v.fb === 0 && dVol < 1e-10 && Math.abs(tv.cut - ts.cut) / ts.cut < 1e-10 && Math.abs(tv.skin - ts.skin) / ts.skin < 1e-10 && tv.bad === 0 && ts.bad === 0,
+        "open " + vOpen + ", fallback triangles " + v.fb + ", volume " + dVol.toExponential(1) + ", CUT area " + (Math.abs(tv.cut - ts.cut) / ts.cut).toExponential(1) + ", SKIN area " + (Math.abs(tv.skin - ts.skin) / ts.skin).toExponential(1) + ", tags wrong " + tv.bad + " / " + ts.bad);
+    ok("   and faster, with a tenth of the polygons -- the BSP's own wall open raw and still open after its settle",
+        v.ms < s.ms && v.wall.length * 5 < s.wall.length && sOpen > 0,
+        "BVH " + v.ms + " ms, " + v.wall.length + " polygons; BSP " + s.ms + " ms, " + s.wall.length + " polygons, open " + sOpen + " raw, " + sSettled + " settled");
+    // the code that reads the tags, on the BVH wall: the CUT faces unwrapped (isometric -- a texel is a texel), the solid
+    // texture and the rebar sampled on them
+    const cut = v.wall.filter((p) => p.src === "cut"), mesh = polysToMesh(v.wall, { only: "cut" }), uw = unwrap(cut), td = texelDensity(cut, uw.uvs);
+    let uvOut = 0; for (const x of mesh.uvs) if (!(x >= 0 && x <= 1)) uvOut++;
+    let finite = 0, rodArea = 0, cutArea = 0;
+    for (const p of cut) { const c = [0, 1, 2].map((k) => p.vs.reduce((t, q) => t + q[k], 0) / p.vs.length), col = concreteAt(...c), rd = rebarDistance(...c);
+        if ([].concat(col).flat().every((x) => typeof x !== "number" || Number.isFinite(x))) finite++; if (rd.inside) rodArea += area(p); cutArea += area(p); }
+    ok("!! uvUnwrap, solidTexture and rebar on the BVH wall's CUT faces: every face unwrapped with UVs in [0,1], texel density one number (spread under 1e-3), the texture finite everywhere, the rebar exposed on a share of the cut",
+        mesh.polys === cut.length && mesh.triangles > 0 && uvOut === 0 && td.spread < 1e-3 && td.degenerate === 0 && finite === cut.length && rodArea > 0 && rodArea < cutArea,
+        cut.length + " CUT polygons, " + mesh.triangles + " triangles, UVs out of [0,1] " + uvOut + ", texel spread " + td.spread.toExponential(1) + " (a vertex the weld left ~2e-9 off its plane, in a small polygon), rebar on " + (100 * rodArea / cutArea).toFixed(1) + "% of the cut");
+    // KNOWN: the openings the soak found in the BVH engine, with their reproductions
+    const k8 = chain("bvh", 8, 100), o8 = pageCensus(k8.wall);
+    report("KNOWN  the soak's BVH openings: seed 8 opens at shot 80 (a sliver triangle, three edges unpartnered, where blob equators -- every page blob's lies in z = 0 -- meet earlier cut edges) and stands at " + o8 + " open edges after 100 shots; a session of large blasts opened 44 edges at one shot through an Earcut fallback (its plane-path pieces). On 12 node chains: 1 open (13 edges), 7 fallback triangles in 1,200 shots. The BSP: open raw on every chain (~50,000 edges), and after settle on every one (382 edges over the 12). Backlog bvh-csg-r19b-long-chain-openings.");
+    ok("   (KNOWN, pinned) seed 8 stays within 2.5x its measured 13 open edges after 100 shots -- a regression alarm, not a correctness claim", o8 <= 2.5 * 13, String(o8));
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

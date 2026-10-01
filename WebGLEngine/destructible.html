@@ -47,18 +47,19 @@
       <label>jaggedness <input id="j" type="range" min="0" max="90" step="5" value="60"><span id="jv">0.60</span></label>
       <label>facets <input id="s" type="range" min="4" max="14" step="1" value="8"><span id="sv">8</span></label>
       <label>engine <select id="engine">
-        <option value="bsp">BSP -- meshCSG blast() (default)</option>
-        <option value="bvh">BVH -- meshBoolean (behind a flag)</option>
+        <option value="bvh">BVH -- meshBoolean (default)</option>
+        <option value="bsp">BSP -- meshCSG blast()</option>
       </select></label>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button id="hit">blast</button><button id="settle">settle</button><button id="reset">reset</button>
       </div>
       <p class="note">Blast cuts. <b>Settle</b> snaps, merges the coplanar waste and welds every T-junction —
          a whole-mesh pass that belongs where the shooting stops, not in the frame loop.</p>
-      <p class="note">The <b>engine</b> flag (or <code>?csg=bvh</code>) sends the blast through
-         <code>physics/mesh/meshBoolean.mjs</code> instead, via <code>physics/mesh/blastEngine.mjs</code>: the same
-         solid and the same SKIN/CUT tags, cut along the actual intersection segments, and closed without settle:
-         each shot welds its own seam and merges its pieces back into convex polygons. BSP stays the default.</p>
+      <p class="note">The <b>engine</b> is <code>physics/mesh/meshBoolean.mjs</code> by default, via
+         <code>physics/mesh/blastEngine.mjs</code>: cut along the actual intersection segments, closed without settle --
+         each shot welds its own seam and merges its pieces back into convex polygons. The flag (or
+         <code>?csg=bsp</code>) sends the blast through meshCSG's BSP instead: the same solid and the same SKIN/CUT
+         tags, open until settled.</p>
     </div>
 
     <div class="panel">

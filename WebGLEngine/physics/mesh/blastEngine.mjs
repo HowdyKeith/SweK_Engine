@@ -8,7 +8,7 @@
 // render/solidTexture.mjs, render/rebar.mjs and physics/mesh/uvUnwrap.mjs select by. This file puts the two engines
 // behind one call with that contract:
 //
-//   blastWith(engine, polys, blob, opts) -> { polys, stats }      engine: "bsp" (DEFAULT_BLAST_ENGINE) or "bvh"
+//   blastWith(engine, polys, blob, opts) -> { polys, stats }      engine: "bvh" (DEFAULT_BLAST_ENGINE since round 19) or "bsp"
 //
 // "bsp" is meshCSG.blast() exactly. "bvh" is meshBoolean.mjs's subtract, and its output is brought back into the
 // contract by meshBoolean's per-triangle provenance (`from`, round 13): a piece of the wall keeps its source polygon's
@@ -57,7 +57,13 @@ import { meshBoolean } from "./meshBoolean.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 
 export const BLAST_ENGINES = ["bsp", "bvh"];
-export const DEFAULT_BLAST_ENGINE = "bsp";
+// BVH-CSG ROUND 19: "bvh" is the default. A soak decided it -- twelve 100-shot chains per engine (node) and 100 shots
+// through the page in Chromium, the same blasts on both: the BVH engine 2.4x faster (5x in the page), a tenth of the
+// polygons, the same solid to 2.5e-11 and the same SKIN/CUT areas, closed at the page's census on 11 of 12 chains
+// raw, where the BSP is open on every chain raw (~50,000 edges) and still on every one after settle (382 edges over
+// the 12). The BVH openings are filed with their reproductions (backlog bvh-csg-r19b-long-chain-openings).
+// ?csg=bsp keeps the BSP one parameter away.
+export const DEFAULT_BLAST_ENGINE = "bvh";
 
 // polygons -> flat triangle buffer, with each triangle's source polygon. A polygon this file finished (round 14)
 // carries the triangles it was merged from, and those go in exactly: the next shot sees the surface the last one

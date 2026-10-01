@@ -256,5 +256,18 @@ console.log("\n6. *** THE CALLER THAT ASKED, ANSWERED ***");
 // maximum has 1/dimension and 1/span equal by arithmetic and a sabotage aimed at it is a no-op however wrong
 // it looks. Chasing that found the letterbox that made the atlas 1.2% surface.
 //
+// BVH-CSG ROUND 19: the soak that ran this module on 100-shot walls found texelDensity() throwing RangeError on a BSP
+// wall's ~300,000 edges -- Math.min(...ratios) spreads every ratio into an argument list. Every fixture above has a
+// few hundred edges, so none reached it. Held here at the size that broke it, with the density checked, not just
+// survived: 75,000 unit squares in a row, 300,000 edges, every ratio the same.
+{
+    const quads = [];
+    for (let i = 0; i < 75000; i++) quads.push({ vs: [[i, 0, 0], [i + 1, 0, 0], [i + 1, 1, 0], [i, 1, 0]] });
+    const uvs = quads.map(() => [[0, 0], [0.5, 0], [0.5, 0.5], [0, 0.5]]);
+    let d = null, err = null;
+    try { d = texelDensity(quads, uvs); } catch (e) { err = String(e); }
+    ok("   round 19: texelDensity on 300,000 edges (a long-chain wall's size) returns, and every ratio is the one 2", !err && d.n === 300000 && d.min === 2 && d.max === 2 && d.spread === 0,
+       err ? "threw " + err : "n " + d.n + ", min " + d.min + ", max " + d.max + ", spread " + d.spread);
+}
 console.log(fails ? "\nuvUnwrap-selfcheck: " + fails + " FAILED" : "\nuvUnwrap-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

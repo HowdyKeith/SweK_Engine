@@ -201,7 +201,10 @@ export function texelDensity(polys, uvs) {
         }
     }
     if (!ratios.length) return { n: 0, min: 0, max: 0, mean: 0, spread: 0, degenerate };
-    const min = Math.min(...ratios), max = Math.max(...ratios);
+    // a loop, not Math.min(...ratios): spread into arguments, a real wall's edges overflow the stack -- a 100-shot BSP
+    // wall (~68,000 polygons, ~300,000 edges) threw RangeError here (BVH-CSG round 19's soak, the first caller this big)
+    let min = Infinity, max = -Infinity;
+    for (const r of ratios) { if (r < min) min = r; if (r > max) max = r; }
     const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length;
     return { n: ratios.length, min, max, mean, spread: (max - min) / (mean || 1), degenerate };
 }
