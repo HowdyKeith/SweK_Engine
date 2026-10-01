@@ -1816,8 +1816,9 @@ console.log("unchecked here, named honestly: round 6 required only `subtract` to
     "(sections 1/2/9 are subtract's alone); since round 12 sections 8 and 15-23 run all three ops, and round 18's " +
     "audit (section 24) holds union and intersect to subtract's depth -- the algebra, the BSP as oracle on random " +
     "blob pairs, outputs fed back in, containment and touching, orientation by rays, and a workload that adds material. " +
-    "Still not checked for any op: self-intersection away from shared edges, and doubled shells, which neither the " +
-    "volume nor the ray-orientation check can see. A SECOND adversarial review (run after the first fix pass) found and this file's " +
+    "Self-intersection away from shared edges, pinched vertices and doubled shells, which neither the volume nor the " +
+    "ray-orientation check can see, are checked since round 20 by manifoldAudit.mjs -- on the page's walls and on union and " +
+    "intersect chains (blastEngine-selfcheck section 16), not in this file. A SECOND adversarial review (run after the first fix pass) found and this file's " +
     "own fixes address: (a) an unrecognized `op` silently returned an empty mesh with no error -- FIXED, gated " +
     "in section 12; (b) a DEGENERATE (zero-volume) operand embedded in the other mesh's interior yields a " +
     "wrong-SIGN volume error -- a NEW manifestation of the same root cause as the touching-contact gap below; " +

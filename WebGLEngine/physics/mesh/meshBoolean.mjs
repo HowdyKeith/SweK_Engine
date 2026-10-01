@@ -563,6 +563,13 @@
 // never conforms (the default soak: 0 such shots). Chromium, switching bvh / bsp every 25 shots: the single-engine volume,
 // 16,985 unmatched after the third quarter (115,963 at 16g, the conformed wall repaired around each cut); after the BSP's
 // last quarter and settle, 70 (55 at 16g; the BSP alone 49) -- meshCSG's settle on a different wall, KNOWN.
+//
+// *** ROUND 20: IS THE OUTPUT TWO-MANIFOLD? (manifoldAudit.mjs) *** The question the arc's backlog item was opened for --
+// three-bvh-csg says its BVH-CSG may not be. Audited at exact bits: on the page soak (12 chains x 100 shots, every 25) 48
+// of 48 walls closed, edge- and vertex-manifold, no degenerate triangle, touch or coplanar overlap; crossings on 6 of them
+// (2..9), every one at most 1.8e-16 deep and up to 2.2e-9 long -- two nearly coplanar slivers sharing a corner, exact,
+// then rounded to doubles (bvh-csg-r20b-embedded-rounding). Union, subtract and intersect chains: clean. meshCSG's own
+// twelve-blast stress case: this engine 1,098 ms and clean; the BSP localised 597 ms with 32,889 open edges.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";

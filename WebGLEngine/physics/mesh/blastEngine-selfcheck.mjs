@@ -153,6 +153,8 @@
 //        collapse fixture was added: 1 degenerate triangle in the output)
 //   V8 the merge applied inside the region only                            0 / 2   (a moved vertex's triangles outside
 //        it keep the old bits: seed 3 210 openings of its own, seed 12 324)
+// SABOTAGE LOG (round 20) -- in manifoldAudit-selfcheck.mjs's header: 8 sabotages (X1-X8), 8 red; THIS gate red on X1 (1)
+// and X8 (6: EXACT_FINISH_WELD 0, three of them section 16's).
 "use strict";
 
 import fs from "node:fs";
@@ -166,6 +168,7 @@ import { meshBoolean, MESH_BOOLEAN_EXACT_DEFAULT } from "./meshBoolean.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { exactPair } from "./exactArrangement.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
+import { manifoldAudit } from "./manifoldAudit.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../../tools/ship/playwrightResolve.mjs";
 import { polysToMesh, unwrap, texelDensity } from "./uvUnwrap.mjs";
 import { concreteAt } from "../../render/solidTexture.mjs";
@@ -904,6 +907,54 @@ console.log("\n15. *** ROUND 16h: A WALL THE BSP HAS CUT, MADE CONFORMING NEAR T
     const c12 = chain(12, 29, {});
     ok("!! seed 12's chain to shot 28 (a wall sliver 1.4e-8 wide on the region's rim): every shot after the BSP's exact, no opening of its own or on the blob's side",
         c12.exact === 9 && c12.declined === 0 && c12.seam === 0 && c12.own === 0, "exact " + c12.exact + ", declined " + c12.declined + ", blob's side " + c12.seam + ", own " + c12.own + ", along the wall's cracks " + c12.inherited);
+}
+
+console.log("\n16. *** ROUND 20: IS THE WALL TWO-MANIFOLD? -- THE QUESTION bvh-csg-speed-vs-manifold-tradeoff WAS OPENED TO WEIGH ***");
+{
+    // three-bvh-csg's README: "due to numerical precision and corner cases resulting geometry may not be correctly completely
+    // two-manifold". manifoldAudit.mjs counts, at exact bits: zero-area triangles, open and non-manifold edges, pinched
+    // vertices, crossings, touches, coplanar overlaps -- and how deep each crossing is.
+    const buf = (polys) => { const t = []; for (const p of polys) for (const x of p.tris || M.toTriangles([p])) t.push(x); const b = new Float64Array(t.length * 9); t.forEach((x, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = x[v][c]; }); return b; };
+    const KEYS = ["degenerate", "open", "nonManifoldEdges", "pinchedVertices", "crossings", "touches", "coplanarOverlaps"];
+    const show = (r) => KEYS.filter((k) => r[k]).map((k) => k + " " + r[k]).join(", ") || "clean";
+    const topo = (r) => r.degenerate + r.open + r.nonManifoldEdges + r.pinchedVertices + r.touches + r.coplanarOverlaps;
+    // (a) the page's seed 1, 20 shots
+    let w1 = M.boxPolys([0, 0, 0], HALF);
+    for (const b of pageBlasts(1, 20)) w1 = blastWith("bvh", w1, b).polys;
+    const a1 = manifoldAudit(buf(w1));
+    ok("!! *** SEED 1, 20 SHOTS, THE DEFAULT ENGINE: TWO-MANIFOLD -- NO DEGENERATE TRIANGLE, NO OPEN OR NON-MANIFOLD EDGE, NO PINCHED VERTEX, NO CROSSING, TOUCH OR COPLANAR OVERLAP ***",
+        topo(a1) === 0 && a1.crossings === 0, a1.triangles + " triangles: " + show(a1));
+    // (b) meshCSG's own stress case (its header: twelve overlapping blasts on one wall, shot 12 at 318.8 ms), every engine
+    const WALL12 = () => M.boxPolys([0, 0, 0], [4, 3, 0.3]), BLOB12 = (k) => M.jaggedBlob([(k % 5 - 2) * 1.4, ((k * 7) % 5 - 2) * 1.0, 0], 0.9, 8, 1000 + k * 37);
+    const twelve = (step) => { let w = WALL12(); const ms = []; for (let k = 1; k <= 12; k++) { const t = Date.now(); w = step(w, BLOB12(k)); ms.push(Date.now() - t); } return { w, ms }; };
+    const tv = twelve((w, b) => blastWith("bvh", w, b).polys), tb = twelve((w, b) => M.blast(w, b, { select: M.bvhSelect(w).select }).polys);
+    const ts = settleWith("bsp", tb.w).polys, av = [], ab = [], as = [];
+    const rv = manifoldAudit(buf(tv.w), { detail: av }), rb = manifoldAudit(buf(tb.w), { detail: ab }), rs = manifoldAudit(buf(ts), { detail: as });
+    const deep = (d) => (d.length ? Math.max(...d.map((x) => x.depth)) : 0), dv = Math.abs(M.volume(tv.w) - M.volume(tb.w));
+    report("twelve overlapping blasts: BVH " + tv.ms.reduce((x, y) => x + y) + " ms (shot 1 " + tv.ms[0] + ", shot 12 " + tv.ms[11] + "), " + tv.w.length + " polygons; BSP localised " + tb.ms.reduce((x, y) => x + y) + " ms (shot 12 " + tb.ms[11] + "), " + tb.w.length + " polygons, settled " + ts.length);
+    ok("!! *** meshCSG's TWELVE-BLAST STRESS CASE, THE DEFAULT ENGINE: TWO-MANIFOLD, THE BSP's SOLID TO 1e-10 ***", topo(rv) === 0 && rv.crossings === 0 && dv < 1e-10, show(rv) + "; |volume - BSP| " + dv.toExponential(1));
+    ok("   control: the BSP on the same twelve, raw -- open, pinched, crossing itself for real (deeper than 1e-6); settled, still open at its triangles",
+        rb.open > 0 && rb.pinchedVertices > 0 && deep(ab) > 1e-6 && rs.open > 0,
+        "raw: " + show(rb) + ", deepest " + deep(ab).toExponential(1) + "; settled: " + show(rs) + ", deepest " + deep(as).toExponential(1));
+    // (c) the default's one departure: crossings a rounding deep. Seed 12's shot 44 cuts slivers 3e-10 high near the
+    // blobs' z = 0 equators; rounded to doubles, two nearly coplanar slivers sharing a corner cross along 4e-10 and reach
+    // 7.7e-17 past each other. Measured, 12 chains x 100 shots every 25: 6 of 48 walls with 2..9, every one at most 1.8e-16 deep.
+    let w12 = M.boxPolys([0, 0, 0], HALF);
+    for (const b of pageBlasts(12, 50)) w12 = blastWith("bvh", w12, b).polys;
+    const d12 = [], a12 = manifoldAudit(buf(w12), { detail: d12 });
+    ok("!! seed 12, 50 shots: every topological property holds (closed, edge- and vertex-manifold, no degenerate triangle, touch or coplanar overlap); its crossings no deeper than an ulp at the wall's coordinates (8.9e-16)",
+        topo(a12) === 0 && deep(d12) <= 8.9e-16, show(a12) + ", deepest " + deep(d12).toExponential(2) + ", longest " + (d12.length ? Math.max(...d12.map((x) => x.length)).toExponential(2) : "-"));
+    report("KNOWN  rounding the exact arrangement to doubles: " + a12.crossings + " crossings on seed 12's wall at shot 50 (measured 2), a rounding deep. Closing them needs the output rounded with its topology checked (snap rounding) -- backlog bvh-csg-r20b-embedded-rounding.");
+    ok("   (KNOWN, pinned) that wall's crossings stay within 2.5x the measured 2 -- a regression alarm", a12.crossings <= 5, String(a12.crossings));
+    // (d) union and intersect (round 18b's booleanBVH): three five-op chains each
+    const rng = (s0) => { let s = s0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; };
+    let opsBad = 0; const opsShow = [];
+    for (const op of ["union", "intersect"]) for (let seed = 1; seed <= 3; seed++) {
+        const r = rng(seed * 101); let w = M.boxPolys([0, 0, 0], HALF);
+        for (let k = 0; k < 5; k++) { const c = [(r() * 2 - 1) * 3, (r() * 2 - 1) * 2, (r() * 2 - 1) * 0.3]; w = booleanBVH(w, M.jaggedBlob(c, 0.4 + r() * 1.4, 4 + Math.floor(r() * 10), seed * 10 + k, { rough: r() * 0.9, floor: 0.3 }), op).polys; }
+        const a = manifoldAudit(buf(w)); if (topo(a) || a.crossings) { opsBad++; opsShow.push(op + seed + ": " + show(a)); }
+    }
+    ok("!! union and intersect, three five-op chains each: two-manifold", opsBad === 0, opsBad + " of 6 with a defect" + (opsShow.length ? " -- " + opsShow.join("; ") : ""));
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
