@@ -10,6 +10,8 @@
 //       needs to draw a grown batch at all (three keeps drawing it from the old texture otherwise)
 //   03  three relative morph targets moving a mesh in x and y; the same as absolute targets; and per-instance morphs
 //   04  the velocity node drawn by the material's colorNode, not its fragmentNode
+//   07  (v4786) a skinned mesh rendered twice in one browser frame, against a plain mesh moved the same way; and computeSkinning
+//       run twice in one frame
 // Each draft's "paths" block states what these print, character for character, and says which paths the patch does not reach.
 // *** NOTHING HERE POSTS ANYTHING. ***
 "use strict";
@@ -21,8 +23,8 @@ import { ENG, BUNDLE, apply, patchTexts, rootWithBuilds } from "./threePatch.mjs
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
-const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"]];
-const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md" };
+const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"]];
+const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md" };
 
 console.log("\n1. THE PATCHED BUILDS: each draft's patch alone on r185's build, every hunk found once");
 const bundle = fs.readFileSync(BUNDLE, "utf8"), texts = patchTexts(), builds = {};
@@ -93,6 +95,42 @@ else {
         const mesh = new THREE.Mesh(g, material()); sc.add(mesh); mesh.morphTargetInfluences = [0, 0, 0];
         // influences that never sum to 0, so an absolute target's base weight (1 less their sum) is never 1
         o.it = await velocityOf(sc, (k) => { mesh.morphTargetInfluences[0] = 0.2 + 0.3 * k; mesh.morphTargetInfluences[1] = 0.1 + 0.2 * k; mesh.morphTargetInfluences[2] = 0; });
+      } else if (name === "views" || name === "between") {
+        // v4786: TWO renders in each browser frame -- two views, or a pass that renders the scene again. "views": the bone moved
+        // once, before the frame; "between": moved again by 0.15 between the two renders. The reference is a PLAIN mesh moved
+        // the same way through the same renders: a skin's velocity should mean what a mesh's means.
+        const tB = new THREE.RenderTarget(D, D, { type: THREE.FloatType, count: 2 }); tB.textures[0].name = "output"; tB.textures[1].name = "velocity";
+        const read = async (tg) => { const c = await renderer.readRenderTargetPixelsAsync(tg, 0, 0, D, D, 0), v = await renderer.readRenderTargetPixelsAsync(tg, 0, 0, D, D, 1); let m = 0, x = 0;
+            for (let i = 0; i < D * D; i++) if (c[i * 4 + 3] > 0.5) { m++; x += v[i * 4] * D / 2; } return m ? +(x / m).toFixed(3) : null; };
+        const twice = async (scene, place) => { let a = null, b = null;
+            for (let k = 0; k < 3; k++) { await frame(); place(-0.5 + 0.3 * k); renderer.setRenderTarget(target); await renderer.renderAsync(scene, camera);
+                if (name === "between") place(-0.5 + 0.3 * k + 0.15); renderer.setRenderTarget(tB); await renderer.renderAsync(scene, camera); }
+            a = await read(target); b = await read(tB); return [a, b]; };
+        const pm = new THREE.Mesh(box(), material()), s2 = new THREE.Scene(); s2.add(pm);
+        o.plainTwice = await twice(s2, (x) => { pm.position.x = x; pm.updateMatrixWorld(); });
+        const g = box(), n = g.attributes.position.count;
+        g.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Array(n * 4).fill(0), 4));
+        g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(Array.from({ length: n * 4 }, (_, i) => (i % 4 === 0 ? 1 : 0)), 4));
+        const bone = new THREE.Bone(), mesh = new THREE.SkinnedMesh(g, material()); sc.add(bone); sc.add(mesh); mesh.bind(new THREE.Skeleton([bone]));
+        o.it = await twice(sc, (x) => { bone.position.x = x; bone.updateMatrixWorld(true); });
+        tB.dispose();
+      } else if (name === "computed") {
+        // v4786: computeSkinning -- the skin computed into a buffer twice in each browser frame, the bone moved 0.15 between the
+        // two; how far the second compute's mean x moved from the first's. Measured as a step, because r185 computes the skin
+        // wrongly here on both backends in ways no patch here touches: on WebGPU it writes zeros while an MRT with velocity is
+        // set (so the MRT is cleared for this case), and on WebGL2 every vertex reads the first vertex's position.
+        renderer.setMRT(null);
+        const g = box(), n = g.attributes.position.count;
+        g.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Array(n * 4).fill(0), 4));
+        g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(Array.from({ length: n * 4 }, (_, i) => (i % 4 === 0 ? 1 : 0)), 4));
+        const bone = new THREE.Bone(), mesh = new THREE.SkinnedMesh(g, material()); sc.add(bone); sc.add(mesh); mesh.bind(new THREE.Skeleton([bone]));
+        const outA = new THREE.StorageBufferAttribute(n, 4), out = T.storage(outA, "vec4", n);   // vec4: a vec3 array is padded on WebGPU
+        const job = T.Fn(() => { out.element(T.instanceIndex).assign(T.vec4(T.computeSkinning(mesh), 1)); })().compute(n);
+        const meanX = async () => { const f = new Float32Array(await renderer.getArrayBufferAsync(outA)); let t = 0; for (let i = 0; i < n; i++) t += f[i * 4]; return t / n; };
+        let m = [];
+        for (let k = 0; k < 3; k++) { await frame(); m = [];
+          for (const x of [-0.5 + 0.3 * k, -0.35 + 0.3 * k]) { bone.position.x = x; bone.updateMatrixWorld(true); await renderer.computeAsync(job); m.push(await meanX()); } }
+        o.it = [+(m[1] - m[0]).toFixed(3) + 0];
       } else if (name === "perInstance") {
         // three morphs per instance only where an InstancedMesh draws more than one: the second is scaled to nothing
         const g = box(), n = g.attributes.position.count, d = new Float32Array(n * 3); for (let i = 0; i < n; i++) d[i * 3] = 1;
@@ -161,6 +199,25 @@ if (res) {
         if (ran) said["04"] = `the velocity node drawn by the colorNode: r185 ${px(R[0])}, patched ${px(P[0])} (px, both backends)`;
     }
 
+    // 07 -- v4786: what a skin's velocity means when a frame holds two renders, against a plain mesh moved the same way
+    {   const lines = [];
+        for (const [name, what] of [["views", "two renders a frame, the bone moved before the frame"], ["between", "two renders a frame, the bone moved again between them"]]) {
+            const R = both(name, "r185", "it"), P = both(name, "patched", "it"), pl = both(name, "r185", "plainTwice");
+            const ran = [R, P, pl].every(Boolean) && R.every((v) => v !== null) && P.every((v) => v !== null);
+            ok(`*** 07, ${what}: the patched skin's velocity in each render is a plain mesh's -- ${ran ? `patched ${P.map(px).join(" then ")}, the plain mesh ${pl.map(px).join(" then ")}; r185 ${R.map(px).join(" then ")} (px x, both backends)` : "did not run alike"} ***`,
+                ran && eq(P, pl), name === "views" ? "the previous pose steps each render: nothing moved between the two, so the second has no velocity, as a plain mesh's has none" :
+                "each render's velocity is the move since the render before it, as a plain mesh's is; r185 measures both from the last frame's pose");
+            if (ran) lines.push(`${what}: r185 ${R.map(px).join(" then ")}, patched ${P.map(px).join(" then ")}, a plain mesh ${pl.map(px).join(" then ")} (px x, both backends)`);
+        }
+        // computeSkinning: no velocity to compare, only whether the second compute in a frame follows the bone moved before it
+        const R = both("computed", "r185", "it"), P = both("computed", "patched", "it");
+        const ran = [R, P].every((v) => Array.isArray(v) && v.length === 1 && Number.isFinite(v[0]));
+        ok(`*** 07, computed twice a frame, the bone moved 0.15 between: with the patch the second compute moves with it -- ${ran ? `patched ${px(P[0])}, r185 ${px(R[0])} (x, both backends)` : `did not run alike: ${JSON.stringify(["r185", "patched"].map((b) => ["webgpu", "webgl2"].map((m) => at("computed", b, m).it ?? at("computed", b, m).err)))}`} ***`,
+            ran && P[0] === 0.15, "computeSkinning updates the skeleton under the same test as skinning(); the patch keys it on the render, and each compute is a render of its own");
+        if (ran) lines.push(`computed twice a frame, the bone moved 0.15 between: the second compute moved r185 ${px(R[0])}, patched ${px(P[0])} (x, both backends)`);
+        if (lines.length === 3) said["07"] = lines.join("\n");
+    }
+
     console.log("\n3. THE DRAFTS: each one's paths block is what the paths print");
     const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
     for (const [slot, f] of Object.entries(DRAFT)) {
@@ -183,5 +240,7 @@ if (res) {
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
     "patch here changes that; many morph targets past the uniform buffer; the patches with each other -- each is run alone, " +
-    "tools/ship/threeUpstream-selfcheck.mjs applies all six together as text only; and a real GPU.");
+    "tools/ship/threeUpstream-selfcheck.mjs applies all nine together as text only; computeSkinning's absolute positions -- r185 " +
+    "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2, so only the step " +
+    "between two computes is read; and a real GPU.");
 process.exitCode = fails ? 1 : 0;

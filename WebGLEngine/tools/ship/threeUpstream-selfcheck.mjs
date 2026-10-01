@@ -161,15 +161,16 @@ for (const [f, d] of Object.entries(DRAFTS)) {
 // the one line rollup orders by first use -- the names imported from three.core.js -- sorted: the same bytes as the patches
 // applied here. The same checkout gave `npm run lint-core` clean, and three's unit tests (test/unit, 1311 of them) 1310 passed,
 // 1 todo, 0 failed, as for r185 unpatched. v4775 recorded it again for all nine: 08 changes the same import line of Instance.js
-// as 01, so it was merged by hand. A patch changed since makes the second hash stale: build three again, and record it.
-const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "3afebc0c2e3d3024324e5145fd4c0faa7d1865eea3adc6054cb2000f00a983f4" });
+// as 01, so it was merged by hand. v4786 recorded it again after 07 moved to the render: unit tests the same, lint clean. A
+// patch changed since makes the second hash stale: build three again, and record it.
+const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488de7bd47f61308f44bd2e66b3340", allPatched: "d34679157fa81391294dfbba56f6176d41ceefe63c10376d33cefa95ef25078a" });
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { let t = bundle, found = []; for (const f of Object.keys(DRAFTS)) { const a = apply(diffs[f], t); t = a.text; found = found.concat(a.found); }
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
   ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
   ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
-      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4775 from `git apply` of the nine (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
+      sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4786 from `git apply` of the nine (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The patches' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const d = DRAFTS[f], res = results[`patched ${f}`];

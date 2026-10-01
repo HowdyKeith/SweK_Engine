@@ -1,22 +1,8 @@
 diff --git a/src/nodes/accessors/Skinning.js b/src/nodes/accessors/Skinning.js
-index 2356aed..fad173f 100644
+index 2356aed..abd2663 100644
 --- a/src/nodes/accessors/Skinning.js
 +++ b/src/nodes/accessors/Skinning.js
-@@ -10,12 +10,13 @@ import { buffer } from './BufferNode.js';
- import { storage } from './StorageBufferNode.js';
- import { instanceIndex } from '../core/IndexNode.js';
- 
- import { InstancedBufferAttribute } from '../../core/InstancedBufferAttribute.js';
- 
- const _skeletonsUpdated = /*@__PURE__*/ new WeakMap();
-+const _skeletonsPosed = /*@__PURE__*/ new WeakMap();
- const _previousBoneMatricesData = /*@__PURE__*/ new WeakMap();
- 
- /**
-  * Computes the skinned position by applying bone matrices based on weights.
-  *
-  * @param {Node} boneMatrices - The bone matrices buffer or storage node.
-@@ -134,28 +135,38 @@ export const skinning = /*@__PURE__*/ Fn( ( [ skinnedMesh ], builder ) => {
+@@ -134,19 +134,19 @@ export const skinning = /*@__PURE__*/ Fn( ( [ skinnedMesh ], builder ) => {
  	const skinIndexNode = attribute( 'skinIndex', 'uvec4' );
  	const skinWeightNode = attribute( 'skinWeight', 'vec4' );
  	const bindMatrixNode = reference( 'bindMatrix', 'mat4' );
@@ -24,39 +10,22 @@ index 2356aed..fad173f 100644
  	const boneMatricesNode = referenceBuffer( 'skeleton.boneMatrices', 'mat4', skinnedMesh.skeleton.bones.length );
  
 -	OnObjectUpdate( ( { object, frameId } ) => {
-+	OnObjectUpdate( ( { object, frameId, renderId } ) => {
++	OnObjectUpdate( ( { object, renderId } ) => {
  
  		const skeleton = object.skeleton;
  
-+		// the previous pose steps once a frame, to the pose of the last render before it
-+
- 		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
  
- 			_skeletonsUpdated.set( skeleton, frameId );
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
  
  			const skeletonData = _previousBoneMatricesData.get( skeleton );
  
  			if ( skeletonData !== undefined ) {
  
  				skeletonData.previousBoneMatrices.set( skeleton.boneMatrices );
- 
- 			}
- 
-+		}
-+
-+		// the pose follows the bones at every render: a scene rendered again in the same frame, its bones moved, is drawn as they are
-+
-+		if ( _skeletonsPosed.get( skeleton ) !== renderId ) {
-+
-+			_skeletonsPosed.set( skeleton, renderId );
-+
- 			skeleton.update();
- 
- 		}
- 
- 	} );
- 
-@@ -203,13 +214,13 @@ export const computeSkinning = /*@__PURE__*/ Fn( ( [ skinnedMesh, toPosition = n
+@@ -203,17 +203,17 @@ export const computeSkinning = /*@__PURE__*/ Fn( ( [ skinnedMesh, toPosition = n
  	const bindMatrixNode = uniform( skinnedMesh.bindMatrix, 'mat4' );
  	const bindMatrixInverseNode = uniform( skinnedMesh.bindMatrixInverse, 'mat4' );
  	const boneMatricesNode = buffer( skinnedMesh.skeleton.boneMatrices, 'mat4', skinnedMesh.skeleton.bones.length );
@@ -64,29 +33,16 @@ index 2356aed..fad173f 100644
  	const skeleton = skinnedMesh.skeleton;
  
 -	OnObjectUpdate( ( { frameId } ) => {
-+	OnObjectUpdate( ( { frameId, renderId } ) => {
++	OnObjectUpdate( ( { renderId } ) => {
  
- 		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
  
- 			_skeletonsUpdated.set( skeleton, frameId );
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
  
  			const state = _previousBoneMatricesData.get( skeleton );
-@@ -217,12 +228,18 @@ export const computeSkinning = /*@__PURE__*/ Fn( ( [ skinnedMesh, toPosition = n
+ 
  			if ( state !== undefined ) {
  
  				state.previousBoneMatrices.set( skeleton.boneMatrices );
- 
- 			}
- 
-+		}
-+
-+		if ( _skeletonsPosed.get( skeleton ) !== renderId ) {
-+
-+			_skeletonsPosed.set( skeleton, renderId );
-+
- 			skeleton.update();
- 
- 		}
- 
- 	} );
- 

@@ -69,18 +69,35 @@ plain [142, 142], skinned [0, 142], skinnedUpdated [142, 142] -- pixels left and
 
 Verified by the patch below. `skinning()` (`src/nodes/accessors/Skinning.js`) calls `skeleton.update()` -- which turns the
 bones into `boneMatrices` -- in an `OnObjectUpdate` that runs it once per `frameId`, and `frameId` advances once per browser
-frame of the renderer's animation loop, not once per render. The same test steps the previous bone matrices that velocity reads,
-and it is right for them; the pose need not wait on it. Updating the skeleton by hand before each render draws it where it is
-(`skinnedUpdated`).
+frame of the renderer's animation loop, not once per render. The same test steps the previous bone matrices that velocity reads.
+A plain mesh's previous matrix steps once per render (`VelocityNode` steps it in an `OBJECT` update, which runs for each object in each render), so a skinned
+mesh's velocity also follows the frame while a plain mesh's follows the render. Updating the skeleton by hand before each
+render draws it where it is (`skinnedUpdated`).
 
 ## A patch
 
-[`patches/07-skinned-pose-every-render.diff`](patches/07-skinned-pose-every-render.diff), a diff against three's `src/` at the r185 tag. The pose is updated once per render (`renderId`); the previous bone matrices still step once a frame, to the pose of the last render before it. Applied to r185's build, the
+[`patches/07-skinned-pose-every-render.diff`](patches/07-skinned-pose-every-render.diff), a diff against three's `src/` at the r185 tag. The test is keyed on the render (`renderId`) instead of the frame, so the pose is updated and the previous bone matrices step once per render -- as a plain mesh's previous matrix does. Applied to r185's build, the
 reproduction prints:
 
 <!-- patched:begin -->
 plain [142, 142], skinned [142, 142], skinnedUpdated [142, 142] -- pixels left and right of the centre; the renders in one browser frame: true (both backends)
 <!-- patched:end -->
+
+With two renders in one frame, against a plain mesh moved the same way (the velocity's x, in pixels, in each render):
+
+<!-- paths:begin -->
+two renders a frame, the bone moved before the frame: r185 5.612 then 5.612, patched 5.612 then 0.000, a plain mesh 5.612 then 0.000 (px x, both backends)
+two renders a frame, the bone moved again between them: r185 5.612 then 5.612, patched 2.806 then 2.806, a plain mesh 2.806 then 2.806 (px x, both backends)
+computed twice a frame, the bone moved 0.15 between: the second compute moved r185 0.000, patched 0.150 (x, both backends)
+<!-- paths:end -->
+
+r185 measures every render's velocity from the pose of the frame before, so a skin moved once in a frame shows that move in
+both renders, where a plain mesh shows it only in the first. `computeSkinning` updates the skeleton under the same test, and
+`renderer.compute` advances the render id as a render does, so the patch's second hunk makes a second compute in a frame
+use the bones as they are.
+
+Measured there and not changed by the patch: in r185, `computeSkinning` writes zeros on WebGPU while an MRT with velocity is
+set, and on WebGL 2 every vertex reads the first vertex's position. Neither is this draft's subject.
 
 ## A fix that works in an application
 

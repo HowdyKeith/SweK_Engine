@@ -8723,6 +8723,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4786 -- THE 390th CLOSING: NO new gate file -- what a skin's velocity means when a frame holds two renders.
+    since483: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4786", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (07: two renders a frame against a plain mesh, and computeSkinning twice a frame)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 07 MADE A SKIN'S VELOCITY MEAN SOMETHING A PLAIN MESH'S DOES NOT. *** It updated the pose every render but " +
+                 "stepped the previous bones once a frame, so with two renders in one frame the second measured from the last FRAME'S " +
+                 "pose. Measured against a plain mesh moved the same way: three steps a mesh's previous matrix in an OBJECT update, " +
+                 "once per render -- 5.612 then 0.000 px when the mesh moved once before the frame, 2.806 then 2.806 when it moved " +
+                 "again between the renders -- and the old patch read 5.612 then 5.612 and 2.806 then 5.612. Keyed on the render, both " +
+                 "hunks, the skin reads the mesh's numbers exactly on both backends. computeSkinning shares the test, and each compute " +
+                 "advances the render id: the second compute in a frame follows the bone (0.150, r185 0.000), as under the old patch, " +
+                 "which kept a second WeakMap for it; the new one is two keys changed. Its own absolute " +
+                 "output is wrong in r185 in two ways no patch here touches -- zeros on WebGPU under a velocity MRT, the first vertex " +
+                 "for every vertex on WebGL2 -- so only the step is read, and both are named for a draft of their own. three rebuilt " +
+                 "with all nine: the recorded hash updated, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Three sabotages red.",
+    }),
     // v4785 -- THE 389th CLOSING: NO new gate file -- morph targets in the hundreds and thousands, to three's own limit.
     since482: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
