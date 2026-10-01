@@ -57,8 +57,8 @@
          a whole-mesh pass that belongs where the shooting stops, not in the frame loop.</p>
       <p class="note">The <b>engine</b> flag (or <code>?csg=bvh</code>) sends the blast through
          <code>physics/mesh/meshBoolean.mjs</code> instead, via <code>physics/mesh/blastEngine.mjs</code>: the same
-         solid and the same SKIN/CUT tags, cut along the actual intersection segments, closed without settle, in
-         triangles. BSP stays the default.</p>
+         solid and the same SKIN/CUT tags, cut along the actual intersection segments, and closed without settle:
+         each shot welds its own seam and merges its pieces back into convex polygons. BSP stays the default.</p>
     </div>
 
     <div class="panel">
@@ -77,13 +77,13 @@
 
 <script type="module">
 import * as CSG from "./physics/mesh/meshCSG.mjs";
-import { blastWith, BLAST_ENGINES, DEFAULT_BLAST_ENGINE } from "./physics/mesh/blastEngine.mjs";
+import { blastWith, settleWith, BLAST_ENGINES, DEFAULT_BLAST_ENGINE } from "./physics/mesh/blastEngine.mjs";
 
 const cv = document.getElementById("view"), g = cv.getContext("2d");
 const $ = (id) => document.getElementById(id);
 const HALF = [4, 3, 0.35];
 let wall = CSG.boxPolys([0, 0, 0], HALF);
-let seed = 1, shots = 0, lastMs = 0, settled = false, lastStats = null;
+let seed = 1, shots = 0, lastMs = 0, settled = false, lastStats = null, bspSince = false;   // a BSP blast since the last settle
 const asked = new URLSearchParams(location.search).get("csg");
 $("engine").value = BLAST_ENGINES.includes(asked) ? asked : DEFAULT_BLAST_ENGINE;
 const V0 = CSG.volume(wall);
@@ -141,7 +141,7 @@ function show() {
         "unmatched     " + c.unmatched + "  (" + (100 * c.unmatched / Math.max(1, c.edges)).toFixed(2) + "%)\n" +
         "volume        " + v.toFixed(6) + "  of " + V0.toFixed(6) + "\n" +
         "removed       " + (100 * (1 - v / V0)).toFixed(2) + "%\n" +
-        "engine        " + $("engine").value + (lastStats && lastStats.engine === "bvh" ? "  (fallbacks " + lastStats.fallbackTris + ")" : "") + "\n" +
+        "engine        " + $("engine").value + (lastStats && lastStats.engine === "bvh" ? "  (fallbacks " + lastStats.fallbackTris + ", welded " + lastStats.welded + ", merged " + lastStats.merged + ")" : "") + "\n" +
         "last op       " + lastMs.toFixed(1) + " ms";
 }
 
@@ -154,19 +154,21 @@ $("hit").onclick = () => {
     const select = engine === "bsp" ? CSG.bvhSelect(wall).select : null;
     const t0 = performance.now();
     const cut = blastWith(engine, wall, blob, { select });
-    wall = cut.polys; lastStats = cut.stats;
+    wall = cut.polys; lastStats = cut.stats; if (engine === "bsp") bspSince = true;
     lastMs = performance.now() - t0;
     shots++; settled = false; draw(); show();
 };
 $("settle").onclick = () => {
     const t0 = performance.now();
-    wall = CSG.settle(wall).polys;
+    // a wall only the BVH engine has cut since the last settle is closed already and only merges; anything else
+    // gets meshCSG's whole settle (snap, merge, weld)
+    wall = settleWith(bspSince ? "bsp" : "bvh", wall).polys; bspSince = false;
     lastMs = performance.now() - t0;
     settled = true; draw(); show();
 };
 $("engine").onchange = () => show();
 $("reset").onclick = () => {
-    wall = CSG.boxPolys([0, 0, 0], HALF); shots = 0; lastMs = 0; settled = false; draw(); show();
+    wall = CSG.boxPolys([0, 0, 0], HALF); shots = 0; lastMs = 0; settled = false; bspSince = false; draw(); show();
 };
 for (const [id, el, fmt] of [["r", "rv", (v) => (v / 100).toFixed(2)], ["j", "jv", (v) => (v / 100).toFixed(2)],
                              ["s", "sv", (v) => String(v)]]) {
