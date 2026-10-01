@@ -165,6 +165,18 @@
 //   - opts.canon: the seam's points as meshBoolean's seamConsensus agreed them, applied to every segment's ends before
 //     anything else, so a segment no longer than snap is one point here exactly as across the edge.
 //   - opts.pairOf(triB): the pair's result as meshBoolean already found it (a missing pair does not touch).
+//
+// *** ROUND 16d: THE TWIN JOIN. *** A triangle CROSSED by a near-parallel twin -- an intersecting pair within NEAR_PARALLEL
+// (stats.twinCrossed): two surfaces 1e-9..1e-7 apart that are not the same -- joins a dangling chain end to its boundary
+// within JOIN_TWIN (64) snaps instead of JOIN (8). Measured on round 16c's KNOWN (a blob minus its copy rotated 3e-8 about
+// z): the ends that stopped the chains were not near corners -- one 2.6e-8 from a corner, one 1.1e-7, one 0.3 from any
+// vertex -- but where a twin's EDGE pierces this triangle's plane, its own side's twin 1e-8..5e-8 away, so the seam
+// stops that far inside the side. Hot pixels at vertices (round 16c's plan) would have reached one of the three. A corner
+// is still joined only within JOIN; past it the nearest SIDE is taken, then a corner within the twin join: contracted
+// into the corner, an end 1.1e-7 from it slid the point that far and the outline no longer closed ('outer face', at 128
+// snaps). With that order the result is the same from 64 snaps up (64..512 measured, same bits at 128) and the 32- and
+// 48-snap joins leave the cone: the join must reach the twins' separation, ~5e-8 in the band. The page's chains never
+// have such a pair (60 shots bit for bit the 8-snap join's), nor do the 1,350 flush boxes (exactly coplanar, never crossed).
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
@@ -181,6 +193,9 @@ function nearParallel(T, U) {
     return d > 0 && Math.hypot(c[0], c[1], c[2]) < NEAR_PARALLEL * d;
 }
 const JOIN = 8;   // round 12, contacts: a dangling chain end within JOIN x snap of triA's boundary is joined to it
+// round 16d: the same join, in a triangle CROSSED BY A NEAR-PARALLEL TWIN (a pair within NEAR_PARALLEL that intersects --
+// two surfaces 1e-9..1e-7 apart, not touching). See the ROUND 16d note.
+export const JOIN_TWIN = 64;
 const AREA_REL = 1e-9;
 
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -325,7 +340,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     const segs = [];
     const seen = new Set();
     const coplanar = [];          // round 12: {U (triB's corners), orient}
-    let pointContacts = 0, contactSegs = 0;
+    let pointContacts = 0, contactSegs = 0, twinCrossed = false;
     for (const triB of candidateTriBs || []) {
         if (seen.has(triB)) continue;
         seen.add(triB);
@@ -341,7 +356,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
             // BVH-CSG round 16: a pair within NEAR_PARALLEL of parallel places its seam to within snap / sin(angle) -- a
             // thousandth of the triangle and worse -- so a chain of such segments that dangles is not a cut the data
             // supports: it is pruned like an on-plane contact rather than refusing the triangle (see the ROUND 16 note)
-            if (opts.contacts && nearParallel(T, readTri(trisB, triB))) onPlane = true;
+            if (opts.contacts && nearParallel(T, readTri(trisB, triB))) { onPlane = true; twinCrossed = true; }
         }
         else if (opts.contacts) {
             // coplanar/degenerate: resolved here (triContact.mjs)
@@ -475,6 +490,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // chain made only of on-plane contacts: B's edge lying in triA's plane with B on one side touches triA without
     // crossing it, and ends where B leaves the plane. Those are pruned, one end at a time, and counted. ------------
     let pruned = 0, contracted = 0, joined = 0, joinedMax = 0;
+    const join = (twinCrossed ? (opts.joinTwin ?? JOIN_TWIN) : JOIN) * snap;
     for (let pass = 0; opts.contacts && pass < 8; pass++) {
         const before = pruned + contracted + joined;
         // A contact point just outside snap of one of triA's corners can still lie within snap of BOTH sides that meet
@@ -508,15 +524,21 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         // and the distance moved is recorded (stats.joined, stats.joinedMax).
         for (let v = 3; v < V2.length; v++) {
             if (adj[v].size !== 1) continue;
+            // a corner within JOIN x snap first (a point that near a corner is near both its sides); then the nearest side
+            // within the join; then a corner within it. Round 16d: with the twin join wider than JOIN, the end that is
+            // 1.1e-7 from a corner but 5e-8 from a side goes onto the side -- contracted into the corner, the point slides
+            // 1e-7 and the outline no longer closes ('outer face', measured at a join of 128 snaps)
             let best = null;
-            for (let k = 0; k < 3; k++) {
+            const corner = (lim) => { for (let k = 0; k < 3; k++) {
                 const dc = Math.hypot(V2[v][0] - V2[k][0], V2[v][1] - V2[k][1]);
-                if (dc <= JOIN * snap && (!best || dc < best.d)) best = { d: dc, corner: k };
-            }
+                if (dc <= lim && (!best || dc < best.d)) best = { d: dc, corner: k };
+            } };
+            corner(JOIN * snap);
             if (!best) for (let k = 0; k < 3; k++) {
                 const r = segDist(V2[v], V2[k], V2[(k + 1) % 3]);
-                if (r.d <= JOIN * snap && r.t > 0 && r.t < 1 && (!best || r.d < best.d)) best = { d: r.d, side: k, t: r.t };
+                if (r.d <= join && r.t > 0 && r.t < 1 && (!best || r.d < best.d)) best = { d: r.d, side: k, t: r.t };
             }
+            if (!best) corner(join);
             if (!best) continue;
             joined++; joinedMax = Math.max(joinedMax, best.d);
             if (best.corner !== undefined) {
@@ -752,6 +774,6 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         sideVerts,
         stats: { segments: segs.length, vertices: V2.length, crossings, pointContacts, absorbed: absorbedTotal,
                  faceCount: out.length, holeCount: holes.length, coplanar: coplanar.length, contactSegs,
-                 pruned, contracted, joined, joinedMax, onConflicts, droppedThin, splitEdges },
+                 pruned, contracted, joined, joinedMax, twinCrossed, onConflicts, droppedThin, splitEdges },
     };
 }

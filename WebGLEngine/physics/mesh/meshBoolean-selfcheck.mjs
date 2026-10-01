@@ -191,6 +191,17 @@
 //   Y9  the stats not recorded                                   -> 2 / 0
 //   Y10 the grid searched in one cell                            -> 8 / 0
 //   Y11 rounding off by default                                  -> 6 / 0
+// SABOTAGE LOG (BVH-CSG round 16d) -- triArrangement.mjs's twin join and meshBoolean.mjs's joinTwin wiring; three gates
+// (THIS / triArrangement / meshBooleanBlast), each on the real file, restored in a `finally`, md5 verified. 5 of 6 red:
+//   Z1  the twin join 8 snaps (round 16c)                        -> 4 / 0 / 0
+//   Z2  a crossing twin never marked                             -> 3 / 0 / 0
+//   Z3  a contact ON a plane marked a twin as well               -> 0 / 0 / 0   NOT CAUGHT, and named: no workload has
+//       a touching (not crossing) triangle with a chain end 8..64 snaps from its side -- the 1,350 flush boxes, the
+//       rotated families, and the page's chains (60 shots, measured with the sabotage in: bit for bit the 8-snap join's)
+//       all come out the same. The join stays limited to crossing twins, the mechanism measured.
+//   Z4  corners first at the twin join                           -> 2 / 0 / 0   (the 128-snap row)
+//   Z5  the first-pass arrangement ignores opts.joinTwin         -> 1 / 0 / 0   (section 22's control)
+//   Z6  the twin join 32 snaps                                   -> 3 / 0 / 0
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -988,7 +999,7 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
     // (a) FLUSH-BOX FUZZ: corners on a 1/4 grid, so faces are flush, edges collinear and corners coincident at random;
     // as built, rotated 0.7 rad about z (flush only to rounding), and shifted 0.1 (grid values no longer exact)
     {
-        let runs = 0, worst = 0, fbs = 0, amb = 0, crack = 0, nm = 0, rearr = 0, bad0 = 0, conformDiff = 0, scanned = 0, scannedAll = 0;
+        let runs = 0, worst = 0, fbs = 0, amb = 0, crack = 0, nm = 0, rearr = 0, bad0 = 0, conformDiff = 0, scanned = 0, scannedAll = 0, twinDiff = 0;
         for (const variant of ["grid", "rot0.7", "shift0.1"]) {
             let st = 4242 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
             const q = () => Math.round((rnd() * 2 - 1) * 4) / 4, hq = () => (1 + Math.floor(rnd() * 4)) / 4;
@@ -1009,6 +1020,10 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
                     const rAll = run(A, B, op, { conformAll: true });
                     if (rAll.tris.length !== r.tris.length || rAll.tris.some((x, i) => x !== r.tris[i]) || rAll.from.some((x, i) => x !== r.from[i])) conformDiff++;
                     scanned += stat(r, "conformScanned"); scannedAll += stat(rAll, "conformScanned");
+                    // round 16d: the twin join widens only in a triangle crossed by a near-parallel pair; flush faces are
+                    // exactly coplanar (or a rounding apart, and rounded together), never crossed -- the 8-snap join's bits
+                    const r8 = run(A, B, op, { joinTwin: 8 });
+                    if (r8.tris.length !== r.tris.length || r8.tris.some((x, i) => x !== r.tris[i])) twinDiff++;
                 }
             }
         }
@@ -1020,6 +1035,8 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
         ok("   the edge-conformity pass ran (a triangle got its neighbour's split point) -- the T-junction it closes is in this set", rearr > 0, rearr + " re-arrangements");
         ok("!! round 15: the conformity pass over only the triangles touching a split one gives the SAME BITS as over all of them, on every run (where conformity was born)",
             conformDiff === 0 && scanned < scannedAll, conformDiff + " of " + runs + " runs differing; triangles scanned " + scanned + " against " + scannedAll);
+        ok("!! round 16d: the twin join changes no flush-box run -- the same bits as with the 8-snap join, on every run (no flush face is crossed by a near-parallel twin)",
+            twinDiff === 0, twinDiff + " of " + runs + " runs differing");
     }
 
     // (b) NEAR-FLUSH TILT: B sits on the unit box A=[0,1]^3 with its bottom face tilted by slope s about the x=0 edge,
@@ -1123,7 +1140,7 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             return S;
         };
         const outside = [], inside = [];
-        let ctrlBand = 0;
+        let ctrlBand = 0, ctrl8 = 0, same128 = true;
         for (const w0 of [[0, 0, 1], [1, 2, 3]]) {
             const L = Math.hypot(...w0), w = w0.map((x) => x / L), S = firstOrder(w);
             for (const th of [1e-12, 1e-10, 3e-10, 1e-9, 3e-9, 1e-8, 3e-8, 1e-7, 1e-6]) {
@@ -1133,6 +1150,13 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
                 (th >= 1e-9 && th <= 3e-8 ? inside : outside).push([th, wst, f, w0.join(""), fo]);
                 // round 16c: the control -- round 16's pipeline, unrounded, on the band's worst case
                 if (w0[0] === 1 && th === 1e-9) ctrlBand = Math.abs(vol(run(blob, rot(blob, w, th), "subtract", { vertexRound: false })) - T.subtract);
+                // round 16d: the controls -- round 16c's 8-snap join, and a join twice as wide (the window is open upward:
+                // past a corner's 8 snaps an end goes onto the nearest side, so a wider join reaches nothing new)
+                if (w0[0] === 0 && th === 3e-8) for (const op of OPS) {
+                    ctrl8 = Math.max(ctrl8, Math.abs(vol(run(blob, rot(blob, w, th), op, { joinTwin: 8 })) - T[op]));
+                    const a = run(blob, rot(blob, w, th), op), b = run(blob, rot(blob, w, th), op, { joinTwin: 128 });
+                    if (a.tris.length !== b.tris.length || a.tris.some((x, i) => x !== b.tris[i])) same128 = false;
+                }
             }
         }
         ok("!! rotated by 1e-12, 1e-10, 3e-10, 1e-7 or 1e-6 rad, about z and about (1,2,3): all 3 ops within 3e-9 of the first-order oracle (round 11: up to 0.2)",
@@ -1141,21 +1165,19 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
         const fbAll = [...outside, ...inside].reduce((n, [, , f]) => n + f, 0);
         // round 16: 87 -> 33, by a dangling chain of seam segments from a NEAR-PARALLEL pair being pruned instead of refusing
         // the triangle (triArrangement's ROUND 16 note: 84 -> 39), and the seam consensus (39 -> 33); round 16c: 33 -> 15,
-        // twin triangles within VERTEX_ROUND made the same triangle by vertex rounding
-        ok("   the rotated family's plane-path fallbacks stay at or under the 15 measured -- 33 at round 16, 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
-            fbAll <= 15, fbAll + " fallback triangles over 54 runs");
-        // round 16c: inside the band, an angle whose twins are all rounded together comes out as the copy unrotated --
-        // off by its own first-order volume fo, no more. Every angle but one is within fo (+3e-9): no cone.
+        // twin triangles within VERTEX_ROUND made the same triangle by vertex rounding; round 16d: 15 -> 6, the twin join
+        ok("   the rotated family's plane-path fallbacks stay at or under the 6 measured -- 15 at round 16c, 33 at round 16, 87 at round 12, 357 without triArrangement's join of chain ends stopping short of the boundary",
+            fbAll <= 6, fbAll + " fallback triangles over 54 runs");
+        // round 16c/16d: inside the band, an angle whose twins are all rounded together comes out as the copy unrotated --
+        // off by its own first-order volume fo, no more; since round 16d EVERY angle is within fo (+3e-9): no cone
         const coned = inside.filter(([, w, , , fo]) => w > 1.01 * fo + 3e-9);
-        ok("!! round 16c: in the band, every angle but one comes out within its own first-order volume (+3e-9) -- no worse than calling the copy identical, no cone",
-            coned.length <= 1, coned.length + " beyond: " + coned.map(([t, w, , ax, fo]) => ax + " " + t.toExponential(0) + " " + w.toExponential(1) + " (fo " + fo.toExponential(1) + ")").join(", ") +
-            " -- control vertexRound:false, (1,2,3) 1e-9 subtract: " + ctrlBand.toExponential(2));
-        ok("   control: without the rounding the band's worst case is still the cone round 16 left", ctrlBand > 1e-3, ctrlBand.toExponential(2));
         const bandWorst = Math.max(...inside.map(([, w]) => w));
-        console.log("  KNOWN  rotated by 1e-9..3e-8 rad, about z and about (1,2,3): " + inside.map(([t, w, , ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1)).join(", ") +
-            " -- about z by 3e-8 the twins near the axis are rounded together and those beyond it are 1e-8..4.5e-8 apart; three triangles there are refused (a seam chain stops 2.6e-8 from a corner), and their plane-path pieces miss their twins'. meshBoolean.mjs's ROUND 16c paragraph.");
-        ok("   (KNOWN, pinned) the band's worst stays within 2.5x its measured 5.6e-5 (round 16: 2.8e-2) -- a regression alarm, not a correctness claim",
-            bandWorst < 2.5 * 5.6e-5, "worst " + bandWorst.toExponential(2));
+        ok("!! *** ROUND 16d: THE BAND CLOSED -- every angle 1e-9..3e-8, about z and about (1,2,3), all 3 ops within its own first-order volume (+3e-9): no worse than calling the copy identical, no cone ***",
+            coned.length === 0, coned.length + " beyond; worst " + bandWorst.toExponential(2) + " -- " + inside.map(([t, w, , ax]) => ax + " " + t.toExponential(0) + ": " + w.toExponential(1)).join(", "));
+        ok("   control: without the rounding the band's worst case is still the cone round 16 left (round 16: 2.8e-2)", ctrlBand > 1e-3, "vertexRound:false, (1,2,3) 1e-9 subtract: " + ctrlBand.toExponential(2));
+        ok("   control: with round 16c's 8-snap join, about z by 3e-8 is still the cone round 16c left (5.6e-5)", ctrl8 > 1e-6, "joinTwin:8: " + ctrl8.toExponential(2));
+        ok("   a twin join of 128 snaps gives the same bits as 64 there: the window is open upward (a corner is joined only within 8 snaps; past them, the nearest side)",
+            same128, same128 ? "same bits, all 3 ops" : "differ");
     }
 }
 
@@ -1404,6 +1426,39 @@ console.log("\n21. *** ROUND 16c: VERTEX ROUNDING -- B'S VERTICES WITHIN VERTEX_
         ok("!! vertex rounding is ON by default (the copy rotated 1e-9 about z has its vertices rounded) and vertexRound:false turns it off (none recorded)",
             vr && vr.moved > 0 && !rOff.stats.b.vertexRound, "default moved " + (vr ? vr.moved : "none") + ", off: " + (rOff.stats.b.vertexRound ? "rounded" : "not rounded"));
     }
+}
+
+console.log("\n22. *** ROUND 16d: BEYOND THE FIXTURE -- OTHER BLOBS, OTHER AXES ***");
+{
+    // Round 16d measured a wider family -- 3 blobs x 4 axes x 7 angles 1e-9..3e-8 x 3 ops, 252 runs -- against each one's
+    // first-order oracle: beyond fo + 3e-9 on 118 runs at round 16 (worst 1.2e-1, 606 fallbacks), 24 at round 16c
+    // (4.7e-2, 75), 12 with the twin join (4.7e-2, 48). Too slow for this gate whole; two of its cases are held here.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const rot = (P, w, th) => { const c = Math.cos(th), sn = Math.sin(th), C = 1 - c, [x, y, z] = w;
+        const R = [[c + x * x * C, x * y * C - z * sn, x * z * C + y * sn], [y * x * C + z * sn, c + y * y * C, y * z * C - x * sn], [z * x * C - y * sn, z * y * C + x * sn, c + z * z * C]];
+        return P.map((p) => { const vs = p.vs.map((v) => [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2])); return { vs, pl: M.planeOf(vs) }; }); };
+    const firstOrder = (buf, w) => { let S = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const a = [buf[o], buf[o + 1], buf[o + 2]], e1 = [buf[o + 3] - a[0], buf[o + 4] - a[1], buf[o + 5] - a[2]], e2 = [buf[o + 6] - a[0], buf[o + 7] - a[1], buf[o + 8] - a[2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], A2 = Math.hypot(...nn), K = 24; let acc = 0, cnt = 0;
+            for (let i = 0; i < K; i++) for (let j = 0; j < K - i; j++) for (const [du, dv] of j < K - i - 1 ? [[1 / 3, 1 / 3], [2 / 3, 2 / 3]] : [[1 / 3, 1 / 3]]) {
+                const u = (i + du) / K, v = (j + dv) / K, p = [a[0] + u * e1[0] + v * e2[0], a[1] + u * e1[1] + v * e2[1], a[2] + u * e1[2] + v * e2[2]];
+                acc += Math.abs(((w[1] * p[2] - w[2] * p[1]) * nn[0] + (w[2] * p[0] - w[0] * p[2]) * nn[1] + (w[0] * p[1] - w[1] * p[0]) * nn[2]) / A2); cnt++;
+            }
+            S += acc / cnt * A2 / 2;
+        } return S; };
+    const worstOf = (seed, facets, c, w0, th, opts) => {
+        const blob = M.jaggedBlob(c, 1, facets, seed), A = M.toTriangleBuffer(blob), Vb = M.volume(blob), L = Math.hypot(...w0), w = w0.map((x) => x / L);
+        const fo = th * firstOrder(A, w) / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo }, B = M.toTriangleBuffer(rot(blob, w, th));
+        let e = 0; for (const op of ["union", "subtract", "intersect"]) e = Math.max(e, Math.abs(vol(meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts).tris) - T[op]));
+        return { e, fo };
+    };
+    const f = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, {}), f8 = worstOf(33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8, { joinTwin: 8 });
+    ok("!! a second blob (seed 33) against its copy rotated 2e-8 about (1,2,3): all 3 ops within the first-order volume (+3e-9) -- round 16c's 8-snap join left a cone there",
+        f.e <= 1.01 * f.fo + 3e-9 && f8.e > 1e-6, "worst " + f.e.toExponential(2) + " (fo " + f.fo.toExponential(1) + "); joinTwin:8 " + f8.e.toExponential(2));
+    const k = worstOf(7, 8, [0, 0, 0], [1, 0, 0], 1e-8, {});
+    console.log("  KNOWN  a blob (seed 7) against its copy rotated 1e-8 about x: " + k.e.toExponential(2) + " (fo " + k.fo.toExponential(1) + ") -- a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap: it is taken as a TOUCH (a contact segment on the plane) where it crosses, the face is not split, and both copies are kept whole. Backlog bvh-csg-r16e-straddling-twins.");
+    ok("   (KNOWN, pinned) that case stays within 2.5x its measured 4.7e-2 -- a regression alarm, not a correctness claim", k.e < 2.5 * 4.71e-2, k.e.toExponential(2));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

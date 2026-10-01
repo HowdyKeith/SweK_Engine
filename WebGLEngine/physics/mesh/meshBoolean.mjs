@@ -425,6 +425,19 @@
 // from a corner, past the 8e-9 join -- widening the join to a corner to 64 snaps changed nothing). exactSeam on top of the
 // rounding is still worse (band 2.5e-2, 189 fallbacks): off. The rest -- seam points rerouted through hot pixels at every
 // vertex, so a chain that stops near a corner ends AT it on both sides -- is backlog bvh-csg-r16d-hot-pixel-seams.
+//
+// *** ROUND 16d: THE TWIN JOIN (triArrangement.mjs's ROUND 16d note) -- THE BAND CLOSED. *** Measured first, the hot-pixel
+// plan was wrong: of the three ends that stopped round 16c's chains only one was near a vertex; they stop where a twin's
+// edge pierces the triangle, 1e-8..5e-8 inside a side. A triangle crossed by a near-parallel twin now joins such an end to
+// its boundary within 64 snaps (nearest side past a corner's 8). The gate's rotated band: every angle within its own
+// first-order volume (worst 1.79e-8; 5.6e-5 at round 16c), fallbacks 15 -> 6. A wider family -- 3 blobs x 4 axes x 7
+// angles x 3 ops, 252 runs, beyond its first-order volume + 3e-9: 118 runs at round 16 (worst 1.2e-1), 24 at round 16c
+// (4.7e-2), 12 now (4.7e-2), fallbacks 606 -> 75 -> 48. Page chains and flush boxes bit for bit unchanged. TRIED AND
+// DROPPED: letting vertexRound reach past its radius along the surface (off every face by no more than the radius):
+// reach 2x: 9 runs, worst 2.2e-2; 4x and 8x: 12 runs -- not monotone, not kept. KNOWN, the rest of the 12: a twin pair
+// whose vertices sit within and beyond the 1e-9 snap of each other's plane (5e-10, 7e-10, 1.7e-9 on a blob rotated 1e-8
+// about x) is taken by triContact as a touch along the plane where it crosses; the face is not split and both copies are
+// kept whole (4.7e-2) -- backlog bvh-csg-r16e-straddling-twins.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -587,7 +600,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     if (cutting === "arrangement" && contacts) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
-            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts });
+            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts });
         }
         const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
         const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
@@ -641,7 +654,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                 }
             }
             if (!need.length) continue;
-            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts, sidePoints: need });
+            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts, sidePoints: need });
             rearranged++; injected += need.length;
         }
     }
@@ -668,7 +681,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, contacts });
+            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
