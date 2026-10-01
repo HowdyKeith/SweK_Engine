@@ -495,12 +495,29 @@
 // 12 chains: fallbacks 7 -> 6 (the rest 'dangling', none opening), seed 8's open edges 13 -> 10; the gate's rotated
 // band, flush boxes and every other gate unchanged. LEFT: seed 8's shot 84 -- a fan of wall slivers ~6e-6 wide along a
 // seam 3e-3 inside the wall's back face, 10 edges -- backlog bvh-csg-r19c-sliver-fan-openings.
+//
+// *** ROUND 16f: THE EXACT ARRANGEMENT -- opts.exactArrangement (OFF by default). *** Round 16e left the near-coincident
+// family to the arrangement's own 1e-9 decisions. Measured first, in a copy with every tolerance made finer: exact pair
+// verdicts with vertexRound off and a 1e-11 snap put three of section 22's four KNOWN cases within 2e-12 of their oracle
+// (from 4.7e-2, 1.7e-2, 1.2e-3); the fourth, and a copy rotated 1e-12, stayed wrong at every snap -- the tolerance was the
+// defect, not its size. With the flag, every pair is decided once by exactArrangement.mjs's exactPair (both meshes share
+// the result) and every triangle arranged by arrangeTriangleExact on implicitPoints.mjs's exact seam points: no
+// vertexRound, no seamConsensus, no conformity pass; a face sample within EXACT_NEAR (1e-11) of the other mesh -- an
+// untouched triangle's centroid included -- is classified by exactInside, at its exact point (opts.exactNear: 0 is the
+// control). MEASURED (exactArrangement.mjs has the mechanisms, each found by this round's own runs): round 16d's 252-run
+// family 12 beyond first-order -> 0, fallbacks 51 -> 0, open at 1e-9 113 runs -> 0; section 22's four cases 4.7e-2..1.2e-3
+// -> 5e-13..2e-12, a copy rotated 1e-12 1.3e-15; the 1,350 flush boxes exact to 2.7e-15, no crack; time on the family
+// 1.4..1.9x. blastEngine.mjs finishes the flag's output by merging only. NOT the default: the decision -- the page's census
+// (a 1e-9 key, which reads the exact arrangement's distinct close points as T-junctions), the gates that hold the snapped
+// path's mechanisms, and the folds rounding still leaves -- is backlog bvh-csg-r16g-exact-default.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
+import { exactPair, arrangeTriangleExact, exactInside, EXACT_NEAR } from "./exactArrangement.mjs";
+import { explicitPoint, centroidPoint } from "./implicitPoints.mjs";
 import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { closestOnTriangle, angleAt, CONTACT_EPS, contactPair } from "./triContact.mjs";
@@ -632,9 +649,21 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     const fallbackReasons = {};
     // a face or whole triangle's label: ON the other surface (round 12, from the arrangement), sided locally when
     // within MESH_BOOLEAN_NEAR of it, else by rays
-    const classify = (s, cands, on) => {
+    let exactClassified = 0;
+    const classify = (s, cands, on, exactSample) => {
         classifications++;
         if (on) { onFaces++; return { inside: false, ambiguous: false, on }; }
+        // round 16f: a face of the exact arrangement whose sample lies within EXACT_NEAR of the other mesh is classified
+        // at its EXACT centroid by an exact ray (exactArrangement.mjs's exactInside)
+        if (exactSample && cands) {
+            let d2 = Infinity;
+            for (const tb of cands) { const o = tb * 9, r = closestOnTriangle(s, [trisOther[o], trisOther[o + 1], trisOther[o + 2]], [trisOther[o + 3], trisOther[o + 4], trisOther[o + 5]], [trisOther[o + 6], trisOther[o + 7], trisOther[o + 8]]); if (r.d2 < d2) d2 = r.d2; }
+            const near = opts.exactNear ?? EXACT_NEAR;    // opts.exactNear: 0 is float classification throughout (the gate's control)
+            if (d2 <= near * near && near > 0) {
+                const inside = exactInside(exactSample(), trisOther, bvhOther);
+                if (inside !== null) { exactClassified++; return { inside, ambiguous: false, on: 0 }; }
+            }
+        }
         if (contacts && cands) {
             const n = nearSide(s, trisOther, cands);
             if (n && !n.edge) { nearSided++; if (n.pseudo) nearPseudo++; return { inside: n.inside, ambiguous: false, on: 0 }; }
@@ -651,10 +680,13 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     // one a segment ending there and the other only a point contact (flush-box fuzz: 3 unmatched edges on 23 of 450
     // runs before; round 11 identical).
     // round 16: the pair results meshBooleanCore's seamConsensus already found, by this side's (t, other) order
+    // round 16f: exactPair's results, computed once for both sides by meshBooleanCore
+    const exactPairOf = (t) => (opts.exactPairs ? (o) => opts.exactPairs.get(opts.pairSide ? o * 4294967296 + t : t * 4294967296 + o) : null);
     const pairOf = (t) => (opts.pairResults ? (o) => opts.pairResults.get(opts.pairSide ? o * 4294967296 + t : t * 4294967296 + o) : null);
     const arrs = new Array(triCount);
     let rearranged = 0, injected = 0, conformScanned = 0;
-    if (cutting === "arrangement" && contacts) {
+    // round 16f: the exact arrangement needs no conformity pass -- a point on a side splits it whatever pair it came from
+    if (cutting === "arrangement" && contacts && !opts.exactArrangement) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
             if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts });
@@ -738,12 +770,15 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts });
+            const arr = arrs[t] || (opts.exactArrangement && contacts
+                ? arrangeTriangleExact(trisSelf, t, trisOther, cands, { pairOf: exactPairOf(t), delaunay: opts.delaunay, crossings: opts.crossings })
+                : arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts }));
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
                 const c = centroid(tri);
-                const cls = classify(c, cands, 0);
+                // round 16f: untouched EXACTLY can still lie a rounding from the other surface (a flush face rotated 0.7)
+                const cls = classify(c, cands, 0, opts.exactArrangement ? () => centroidPoint(...tri.map(explicitPoint)) : null);
                 fragments.push({ tri, inside: cls.inside, ambiguous: cls.ambiguous, on: 0, src: t });
                 continue;
             }
@@ -751,7 +786,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                 arrangedTris++;
                 for (const face of arr.faces) {
                     arrangementFaces++;
-                    const cls = classify(face.sample, cands, face.on);
+                    const cls = classify(face.sample, cands, face.on, face.exactSample);
                     for (const tri of face.tris) {
                         accumulatedFragments++;
                         fragments.push({ tri, inside: cls.inside, ambiguous: cls.ambiguous, on: cls.on, src: t });
@@ -780,7 +815,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
                                  gateSkipped, gateTested, examined, cutting, classifications, arrangedTris,
                                  arrangementFaces, untouchedTris, fallbackTris, fallbackReasons, onFaces, nearSided,
-                                 nearPseudo, nearEdge, rearranged, injected, outsideBoxShortcuts, conformScanned } };
+                                 nearPseudo, nearEdge, rearranged, injected, outsideBoxShortcuts, conformScanned, exactClassified } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its
@@ -1285,13 +1320,20 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     }
     // round 16c: B's vertices within VERTEX_ROUND of A's take A's coordinates (vertexRound, above)
     let rounded = null;
-    if (opts.contacts !== false && opts.vertexRound !== false) {
+    const exactArr = !!opts.exactArrangement && opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
+    if (opts.contacts !== false && opts.vertexRound !== false && !exactArr) {
         rounded = vertexRound(trisA, bvhA, trisB, opts.vertexRoundRadius ?? VERTEX_ROUND);
         if (rounded.tris) { trisB = rounded.tris; bvhB = new MeshBVH(trisB); }
     }
     // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
     let optsA = opts, optsB = opts;
-    if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
+    if (exactArr) {
+        // round 16f: every pair decided once, exactly, for both meshes' arrangements (exactArrangement.mjs)
+        const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR), res = new Map();
+        for (const [a, b] of pairs) res.set(a * 4294967296 + b, exactPair(readTri(trisA, a), readTri(trisB, b)));
+        optsA = { ...opts, exactPairs: res, pairSide: 0, pairs };
+        optsB = { ...opts, exactPairs: res, pairSide: 1, pairs: pairs.map(([a, b]) => [b, a]) };
+    } else if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
         const sc = seamConsensus(trisA, bvhA, trisB, bvhB, SNAP_EPS, !!opts.exactSeam, opts.seamFolds !== false);
         optsA = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 0, pairs: sc.pairs };
         optsB = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 1, pairs: sc.pairs.map(([a, b]) => [b, a]) };

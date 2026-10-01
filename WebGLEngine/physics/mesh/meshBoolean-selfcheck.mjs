@@ -230,6 +230,8 @@
 //   U2  union turns B's pieces round                             -> 32 / 7
 //   U3  intersect turns B's pieces round                         -> 25 / 6
 //   U4  union keeps B's pieces inside A too                      -> 21 / 6
+// SABOTAGE LOG (round 16f) -- in exactArrangement-selfcheck.mjs's header: 15 sabotages across implicitPoints.mjs,
+// exactArrangement.mjs, meshBoolean.mjs and blastEngine.mjs, with this gate's red rows in their column.
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -238,6 +240,7 @@ import { pointInMesh } from "./meshPointClassify.mjs";
 import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, translationFor, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 import { closestOnTriangle } from "./triContact.mjs";
+import { stats as implicitStats } from "./implicitPoints.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -1299,7 +1302,9 @@ console.log("\n19. *** ROUND 16: A ZERO-THICKNESS FIN, AND THE SEAM AGREED BEFOR
     let same = true, joinedNone = true;
     for (const [PA, PB] of [[M.boxPolys([0, 0, 0], [1, 1, 1]), M.boxPolys([0.31, 0.27, 0.19], [0.7, 0.8, 0.9])], [M.jaggedBlob([0, 0, 0], 1, 8, 101), M.jaggedBlob([0.4, 0.2, 0.1], 0.9, 8, 501)]]) for (const op of OPS) {
         const r = run(PA, PB, op), r0 = run(PA, PB, op, { seamConsensus: false });
-        joinedNone = joinedNone && seamConsensus.last.joined === 0;
+        // read robustly: a run that never reached the seam consensus leaves no `last` -- the row fails by name, the gate
+        // runs on (round 16f: a sabotage that took the exact path by default threw here, and section 25 never ran)
+        joinedNone = joinedNone && (seamConsensus.last || {}).joined === 0;
         same = same && r.tris.length === r0.tris.length && r.tris.every((x, i) => x === r0.tris[i]);
     }
     ok("   the pair results meshBoolean shares with both arrangements change nothing where the consensus joins nothing (a box pair, a blob pair, 3 ops: bit for bit)",
@@ -1491,7 +1496,7 @@ console.log("\n22. *** ROUND 16d: BEYOND THE FIXTURE -- OTHER BLOBS, OTHER AXES 
     const got = known.map(([seed, fc, c, w0, th, was]) => ({ seed, w0, th, was, ...worstOf(seed, fc, c, w0, th, {}) }));
     console.log("  KNOWN  blobs against their copies rotated in the band, beyond their first-order volume: " +
         got.map((g) => "seed " + g.seed + " about (" + g.w0.join(",") + ") " + g.th.toExponential(0) + ": " + g.e.toExponential(2) + " (fo " + g.fo.toExponential(1) + ")").join("; ") +
-        " -- the worst traced: a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap, is taken as a TOUCH where it crosses, the face is not split, and both copies are kept whole. Backlog bvh-csg-r16f-exact-arrangement.");
+        " -- the worst traced: a twin pair whose vertices sit 5e-10, 7e-10 and 1.7e-9 off each other's plane straddles the 1e-9 snap, is taken as a TOUCH where it crosses, the face is not split, and both copies are kept whole. Closed by round 16f's exact arrangement (section 25); the default still has them -- bvh-csg-r16g-exact-default.");
     ok("   (KNOWN, pinned) each of those four stays within 2.5x its measured worst -- a regression alarm, not a correctness claim",
         got.every((g) => g.e < 2.5 * g.was), got.map((g) => g.e.toExponential(2) + " / " + g.was.toExponential(1)).join(", "));
 }
@@ -1671,6 +1676,74 @@ console.log("\n24. *** ROUND 18: UNION AND INTERSECT HELD TO SUBTRACT'S DEPTH --
             worst < 1e-10 && fbs === 0 && crk6 === 0 && wrong === 0, "worst " + worst.toExponential(2) + ", fallbacks " + fbs + ", open edges at 1e-6 " + crk6 + ", wrong-facing " + wrong + " of " + faces);
         console.log("  KNOWN  raw, at the page's 1e-9 census, those steps leave " + crk9 + " open edges in all: seam ends 1.4e-9..3.5e-9 apart, the near-misses every op's raw output can carry (20 five-op chains each: union 0 edges, subtract 3, intersect 21). The page's blasts close them with round 14's finishing (blastEngine.mjs), which only the subtract adapter has -- backlog bvh-csg-r18b-finish-any-op.");
     }
+}
+
+console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) -- THE NEAR-COINCIDENT FAMILY CLOSED ***");
+{
+    // exactArrangement.mjs on implicitPoints.mjs: every seam point exact, every arrangement decision an exact sign, the
+    // triangulation Delaunay, a face a rounding from the other surface classified by an exact ray. Off by default.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const open = (buf, q) => { const key = q ? (o) => Math.round(buf[o] / q) + "," + Math.round(buf[o + 1] / q) + "," + Math.round(buf[o + 2] / q) : (o) => buf[o] + "," + buf[o + 1] + "," + buf[o + 2], E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const rot = (P, w, th) => { const c = Math.cos(th), sn = Math.sin(th), C = 1 - c, [x, y, z] = w;
+        const R = [[c + x * x * C, x * y * C - z * sn, x * z * C + y * sn], [y * x * C + z * sn, c + y * y * C, y * z * C - x * sn], [z * x * C - y * sn, z * y * C + x * sn, c + z * z * C]];
+        return P.map((p) => { const vs = p.vs.map((v) => [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2])); return { vs, pl: M.planeOf(vs) }; }); };
+    const firstOrder = (buf, w) => { let S = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const a = [buf[o], buf[o + 1], buf[o + 2]], e1 = [buf[o + 3] - a[0], buf[o + 4] - a[1], buf[o + 5] - a[2]], e2 = [buf[o + 6] - a[0], buf[o + 7] - a[1], buf[o + 8] - a[2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], A2 = Math.hypot(...nn), K = 24; let acc = 0, cnt = 0;
+            for (let i = 0; i < K; i++) for (let j = 0; j < K - i; j++) for (const [du, dv] of j < K - i - 1 ? [[1 / 3, 1 / 3], [2 / 3, 2 / 3]] : [[1 / 3, 1 / 3]]) {
+                const u = (i + du) / K, v = (j + dv) / K, p = [a[0] + u * e1[0] + v * e2[0], a[1] + u * e1[1] + v * e2[1], a[2] + u * e1[2] + v * e2[2]];
+                acc += Math.abs(((w[1] * p[2] - w[2] * p[1]) * nn[0] + (w[2] * p[0] - w[0] * p[2]) * nn[1] + (w[0] * p[1] - w[1] * p[0]) * nn[2]) / A2); cnt++;
+            }
+            S += acc / cnt * A2 / 2;
+        } return S; };
+    const band = (seed, facets, c, w0, th, opts) => {
+        const blob = M.jaggedBlob(c, 1, facets, seed), A = M.toTriangleBuffer(blob), Vb = M.volume(blob), L = Math.hypot(...w0), w = w0.map((x) => x / L);
+        const fo = th * firstOrder(A, w) / 2, T = { union: Vb + fo, subtract: fo, intersect: Vb - fo }, B = M.toTriangleBuffer(rot(blob, w, th));
+        let e = 0, fb = 0, o9 = 0;
+        for (const op of ["union", "subtract", "intersect"]) { const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, opts); e = Math.max(e, Math.abs(vol(r.tris) - T[op])); fb += r.stats.a.fallbackTris + r.stats.b.fallbackTris; o9 += open(r.tris, 1e-9); }
+        return { e, fo, fb, o9, beyond: e > 1.01 * fo + 3e-9 };
+    };
+    // (a) section 22's four KNOWN cases, its seed-33 row, and a copy rotated 1e-12 (below any snap ever tried)
+    const cases = [[7, 8, [0, 0, 0], [1, 0, 0], 1e-8], [202, 6, [-0.15, 0.1, 0.2], [1, 0, 0], 2e-8], [7, 8, [0, 0, 0], [0, 0, 1], 3e-8], [33, 10, [0.2, -0.1, 0.05], [-2, 1, 1], 3e-8],
+                   [33, 10, [0.2, -0.1, 0.05], [1, 2, 3], 2e-8], [7, 8, [0, 0, 0], [1, 2, 3], 1e-12]];
+    const ex = cases.map((k) => band(...k, { exactArrangement: true })), df = cases.slice(0, 4).map((k) => band(...k, {}));
+    ok("!! *** THE FOUR CASES SECTION 22 PINS, ITS SEED-33 ROW AND A COPY ROTATED 1e-12, EXACT ARRANGEMENT: EVERY OP WITHIN ITS FIRST-ORDER VOLUME, NO FALLBACK, CLOSED AT THE PAGE'S 1e-9 CENSUS ***",
+        ex.every((g) => !g.beyond && g.fb === 0 && g.o9 === 0), ex.map((g) => g.e.toExponential(1) + (g.fb ? " fb" + g.fb : "") + (g.o9 ? " open" + g.o9 : "")).join(", "));
+    ok("   control: the same four cases on the default arrangement are still the KNOWN ones (beyond first-order)", df.every((g) => g.beyond), df.map((g) => g.e.toExponential(1)).join(", "));
+    // (b) the family's worst blob (round 16d: seed 7 held 6 of its 12 cases beyond first-order), every axis and angle
+    let runs = 0, beyond = 0, fb = 0, o9 = 0;
+    for (const w0 of [[0, 0, 1], [1, 0, 0], [1, 2, 3], [-2, 1, 1]]) for (const th of [1e-9, 2e-9, 3e-9, 5e-9, 1e-8, 2e-8, 3e-8]) {
+        const g = band(7, 8, [0, 0, 0], w0, th, { exactArrangement: true }); runs += 3; if (g.beyond) beyond += 3; fb += g.fb; o9 += g.o9;
+    }
+    ok("!! " + runs + " runs (seed 7's blob, 4 axes x 7 angles 1e-9..3e-8 x 3 ops): none beyond its first-order volume, no fallback, closed at 1e-9 (round 16d's 252-run family, measured whole: 12 -> 0, fallbacks 51 -> 0, open runs 113 -> 0)",
+        beyond === 0 && fb === 0 && o9 === 0, beyond + " beyond, " + fb + " fallbacks, " + o9 + " open edges");
+    // (c) section 17's flush boxes rotated 0.7 about z: faces flush only to rounding, 1e-17 apart -- exactly, they cross
+    {
+        let st = 4242 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+        const q = () => Math.round((rnd() * 2 - 1) * 4) / 4, hq = () => (1 + Math.floor(rnd() * 4)) / 4;
+        const rz = (P) => P.map((p) => { const vs = p.vs.map((v) => [v[0] * Math.cos(0.7) - v[1] * Math.sin(0.7), v[0] * Math.sin(0.7) + v[1] * Math.cos(0.7), v[2]]); return { vs, pl: M.planeOf(vs) }; });
+        let n = 0, worst = 0, crack = 0, amb = 0, fbk = 0, ctrl = 0;
+        for (let k = 0; k < 150; k++) {
+            const c1 = [q(), q(), q()], h1 = [hq(), hq(), hq()], c2 = [q(), q(), q()], h2 = [hq(), hq(), hq()];
+            const A = M.toTriangleBuffer(rz(M.boxPolys(c1, h1))), B = M.toTriangleBuffer(rz(M.boxPolys(c2, h2)));
+            const i = overlapVol(c1, h1, c2, h2), a = 8 * h1[0] * h1[1] * h1[2], b = 8 * h2[0] * h2[1] * h2[2], T = { union: a + b - i, subtract: a - i, intersect: i };
+            for (const op of ["union", "subtract", "intersect"]) {
+                const r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, { exactArrangement: true });
+                n++; worst = Math.max(worst, Math.abs(vol(r.tris) - T[op])); crack += open(r.tris, 1e-6); amb += r.ambiguousTriIndices.length; fbk += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+                if (k === 11 && op === "subtract") { const r0 = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op, { exactArrangement: true, exactNear: 0 }); ctrl = Math.abs(vol(r0.tris) - T[op]); }
+            }
+        }
+        ok("!! " + n + " flush-box runs rotated 0.7 (section 17's): exact to 1e-13, no fallback, no ambiguous fragment, no crack -- the faces CROSS, a rounding apart, and are cut and classified as they are",
+            worst < 1e-13 && fbk === 0 && amb === 0 && crack === 0, "worst " + worst.toExponential(2) + ", fallbacks " + fbk + ", ambiguous " + amb + ", cracks " + crack);
+        ok("   control: classified by float sides and rays (exactNear:0), case 11 is a large share of a box off", ctrl > 1e-2, "subtract off by " + ctrl.toExponential(2));
+    }
+    // (d) off by default: a default run builds no implicit point
+    const before = implicitStats.lpi + implicitStats.lli + implicitStats.tpi;
+    { const A = M.toTriangleBuffer(M.jaggedBlob([0, 0, 0], 1, 8, 7)), B = M.toTriangleBuffer(rot(M.jaggedBlob([0, 0, 0], 1, 8, 7), [1, 0, 0], 1e-8)); meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "union"); }
+    ok("the exact arrangement is OFF by default: a default run builds no implicit point", implicitStats.lpi + implicitStats.lli + implicitStats.tpi === before, String(implicitStats.lpi + implicitStats.lli + implicitStats.tpi - before));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

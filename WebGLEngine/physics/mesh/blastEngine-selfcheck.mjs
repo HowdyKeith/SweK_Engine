@@ -109,6 +109,8 @@
 //   X6 no op check in the adapter                                        -> 1
 //       0 red on the first battery: meshBoolean throws on an unknown op too, and the row asked only that something
 //       threw. It now asks that the adapter's own check threw (first, before it builds two BVHs).
+// SABOTAGE LOG (round 16f) -- in exactArrangement-selfcheck.mjs's header: 15 sabotages across implicitPoints.mjs,
+// exactArrangement.mjs, meshBoolean.mjs and blastEngine.mjs, with this gate's red rows in their column.
 "use strict";
 
 import fs from "node:fs";
@@ -120,6 +122,8 @@ import * as M from "./meshCSG.mjs";
 import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS } from "./blastEngine.mjs";
 import { meshBoolean } from "./meshBoolean.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
+import { exactPair } from "./exactArrangement.mjs";
+import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../../tools/ship/playwrightResolve.mjs";
 import { polysToMesh, unwrap, texelDensity } from "./uvUnwrap.mjs";
 import { concreteAt } from "../../render/solidTexture.mjs";
@@ -665,6 +669,34 @@ console.log("\n11. *** ROUND 18b: THE FINISHING FOR EVERY OP -- booleanBVH ***")
     const ko = pageCensus(wk);
     report("KNOWN  five intersects with big blobs centred at the origin (seed 4): " + ko + " open edges, from " + ofb + " wall triangles refused 'dangling' (every blob's equator lies in z = 0) -- the plane path's, which no finishing closes. Raw, that chain had 21; 20 chains of each op raw / finished: union 0 / 0, subtract 3 / 0, intersect 21 / 4. Backlog bvh-csg-r19c-sliver-fan-openings (the z = 0 contacts).");
     ok("   (KNOWN, pinned) that chain stays within 2.5x its measured 4 open edges -- a regression alarm, not a correctness claim", ko <= 10, String(ko));
+}
+
+console.log("\n12. *** ROUND 16f: THE EXACT ARRANGEMENT ON THE PAGE'S CHAIN (opts.exactArrangement; off by default) ***");
+{
+    // The page's blasts through the exact arrangement: finished by MERGING only (the weld would join its distinct points),
+    // checked at the EXACT-BITS key -- every edge's twin the same two doubles. (The page's 1e-9 census lumps distinct points
+    // closer than 1e-9, which the exact arrangement keeps, and reports them as T-junctions.)
+    const bitsOpen = (wall) => { const E = new Map(), key = (v) => v[0] + "," + v[1] + "," + v[2];
+        for (const p of wall) for (let i = 0; i < p.vs.length; i++) { const a = key(p.vs[i]), b = key(p.vs[(i + 1) % p.vs.length]); if (a === b) continue; const e = a + "|" + b; E.set(e, (E.get(e) || 0) + 1); }
+        let c = 0; for (const [e, k] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== k) c++; } return c; };
+    // the wall crossing itself: wall triangles meeting along a segment that is not an edge they share
+    const selfCross = (wall) => { const tris = []; for (const p of wall) for (const t of p.tris || M.toTriangles([p])) tris.push(t);
+        const buf = new Float64Array(tris.length * 9); tris.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = t[v][c]; });
+        const bvh = new MeshBVH(buf); let L = 0, n = 0;
+        for (const [a, b] of pairOverlap(bvh, bvh, 0)) { if (a >= b) continue; const T1 = tris[a], T2 = tris[b], e = exactPair(T1, T2); if (e.kind !== "segment") continue;
+            if (T1.filter((x) => T2.some((y) => y[0] === x[0] && y[1] === x[1] && y[2] === x[2])).length === 2) continue;
+            n++; L = Math.max(L, Math.hypot(e.P0.r[0] - e.P1.r[0], e.P0.r[1] - e.P1.r[1], e.P0.r[2] - e.P1.r[2])); }
+        return { n, L }; };
+    const chain = (opts) => { let wall = M.boxPolys([0, 0, 0], HALF), fb = 0, openShots = 0, welded = 0;
+        for (const b of pageBlasts(1, 20)) { const r = blastWith("bvh", wall, b, opts); wall = r.polys; fb += r.stats.fallbackTris || 0; welded += r.stats.welded || 0; if (bitsOpen(wall)) openShots++; }
+        return { wall, fb, openShots, welded }; };
+    const ex = chain({ exactArrangement: true }), df = chain({}), nd = chain({ exactArrangement: true, delaunay: false });
+    const sx = selfCross(ex.wall), sn = selfCross(nd.wall), dv = Math.abs(M.volume(ex.wall) - M.volume(df.wall));
+    ok("!! *** SEED 1, 20 SHOTS, EXACT ARRANGEMENT: NO FALLBACK, CLOSED BIT FOR BIT AFTER EVERY SHOT, NOTHING WELDED, THE DEFAULT ENGINE'S SOLID TO 1e-10 ***",
+        ex.fb === 0 && ex.openShots === 0 && ex.welded === 0 && dv < 1e-10, "fallbacks " + ex.fb + ", shots open at bits " + ex.openShots + ", welded " + ex.welded + ", |volume - default| " + dv.toExponential(1));
+    ok("!! the wall never crosses itself by more than a rounding (Delaunay); without it (delaunay:false) needles beside nearly straight seams turn over when rounded and it does",
+        sx.L <= 1e-15 && sn.L > 1e-3, "longest self-crossing " + sx.L.toExponential(1) + " (" + sx.n + "), delaunay:false " + sn.L.toExponential(1) + " (" + sn.n + ")");
+    report("KNOWN  rounding the exact output to doubles can still fold the wall where its features are finer than a rounding -- here " + sx.n + " self-crossings, the longest " + sx.L.toExponential(1) + " (a blob's equator vertices at z ~ 1e-16 against the wall's z = 0). The soak (12 chains x 100 shots): 0 fallbacks, every chain closed bit for bit at the end, one T-junction 3.5e-18 wide open for 26 shots of seed 11. Backlog bvh-csg-r16g-exact-default.");
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

@@ -60,6 +60,13 @@
 // pieces (wall triangles refused 'dangling' where the big blobs' equators meet in z = 0), which no finishing closes;
 // the 50 mixed ops closed after every step, within 1.6e-12 of the BSP's chain. Nothing in the engine calls union or
 // intersect yet; this is what a second caller gets.
+//
+// *** ROUND 16f: opts.exactArrangement passes through to meshBoolean, and its output is MERGED, NOT WELDED. *** The weld
+// closes the snapped arrangement's near-misses; the exact one has none (closed bit for bit), and welding it joined distinct
+// points 1e-10..8e-9 apart, which folded the wall: page seed 5's shot 38 then found two seams crossing (45 open edges after
+// it; merge-only: 0 fallbacks, closed bit for bit through 40 shots). The page's 12 x 100-shot soak with the flag: 0
+// fallbacks (default 7), every chain closed at the exact-bits key at the end, the default's solid to 3.5e-11, 1.03x time.
+// The page's own 1e-9 census reads its distinct close points as open -- one reason it is not the default (bvh-csg-r16g).
 "use strict";
 
 import * as M from "./meshCSG.mjs";
@@ -276,8 +283,11 @@ export function booleanBVH(polys, other, op, { finish = true, otherTag = null, .
     }
     // (tagged as a piece of it would be: a wall polygon with no tag is SKIN -- boxPolys' own faces carry none)
     const kept = polys.filter((_, i) => keep[i]).map((p) => (p.src ? p : { ...p, src: M.SKIN }));
+    // round 16f: the exact arrangement's output is closed bit for bit, so it is MERGED only -- the weld exists to close the
+    // snapped arrangement's near-misses, and on exact output it only joined distinct points 1e-10..8e-9 apart, folding the
+    // wall: a later shot's arrangement found two of its seams crossing (page seed 5, shot 38: 45 open edges after it)
     const fin = finishPieces(pieces,
-                             { weld: FINISH_WELD_SNAPS * SNAP * 2 ** (r.scaleExponent || 0) });
+                             { weld: opts.exactArrangement ? 0 : FINISH_WELD_SNAPS * SNAP * 2 ** (r.scaleExponent || 0) });
     Object.assign(stats, { kept: kept.length, finished: fin.polys.length, welded: fin.stats.welded, maxMove: fin.stats.maxMove,
                            weldRefused: fin.stats.refused, weldMoves: fin.stats.moves, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,
                            ms: Date.now() - t0 });
