@@ -223,6 +223,13 @@
 //   T8  T2's t AND the check ignored (an inexact move)           -> 3 / 1
 //   The first battery also dropped t's rounding to a multiple of ulp(max |x|), and tried an off-grid t with the check
 //   in: 0 red both, for the same reason -- the rounding was redundant and was removed.
+// SABOTAGE LOG (BVH-CSG round 18) -- round 18 audited, built nothing; its section 24 against meshBoolean.mjs's keep rules
+// for union and intersect, each on the real file, restored and md5 verified. 4 of 4 red, every one in section 24 itself
+// (rows red in the whole gate / in section 24):
+//   U1  union keeps an opposite-facing ON piece                  -> 9 / 1   (touching at a face)
+//   U2  union turns B's pieces round                             -> 32 / 7
+//   U3  intersect turns B's pieces round                         -> 25 / 6
+//   U4  union keeps B's pieces inside A too                      -> 21 / 6
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -1562,11 +1569,117 @@ console.log("\n23. *** ROUND 17: FAR FROM THE ORIGIN -- THE OPERANDS MOVED TO IT
     }
 }
 
+const HALF_PAGE = [4, 3, 0.35];   // destructible.html's wall (blastEngine-selfcheck's HALF)
+function pageBlastsAudit(seed, n) {   // destructible.html's blast, seeded (blastEngine-selfcheck's pageBlasts)
+    let st = seed >>> 0; const r = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }, out = [];
+    for (let k = 0; k < n; k++) { const rad = 0.2 + r() * 1.2, rough = r() * 0.9, sub = 4 + Math.floor(r() * 11);
+        const c = [(r() * 2 - 1) * (HALF_PAGE[0] - rad), (r() * 2 - 1) * (HALF_PAGE[1] - rad), 0]; out.push(M.jaggedBlob(c, rad, sub, k + 1, { rough, floor: 1 - rough })); }
+    return out;
+}
+console.log("\n24. *** ROUND 18: UNION AND INTERSECT HELD TO SUBTRACT'S DEPTH -- A CSG PROPERTY-LIST AUDIT ***");
+{
+    // Nothing in the engine calls union or intersect (a blast is a subtract); this is the audit before a second caller.
+    // Sections 8, 15-20, 22 and 23 already run all three ops; what subtract had and they did not: an independent
+    // randomized oracle (section 9 is box-minus-box), the algebra, outputs fed back in, an orientation check, the
+    // containment and touching cases, and a workload that ADDS material.
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const census = (buf, Q) => { const key = (o) => Math.round(buf[o] / Q) + "," + Math.round(buf[o + 1] / Q) + "," + Math.round(buf[o + 2] / Q), E = new Map();
+        for (let o = 0; o < buf.length; o += 9) { const k = [key(o), key(o + 3), key(o + 6)]; for (let i = 0; i < 3; i++) if (k[i] !== k[(i + 1) % 3]) { const e = k[i] + "|" + k[(i + 1) % 3]; E.set(e, (E.get(e) || 0) + 1); } }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const run = (A, B, op) => meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), op);
+    // ORIENTATION, by rays against the result itself: a point 1e-6 off each triangle along its normal is outside, 1e-6
+    // the other way inside (at 1e-4 the probe crosses thin features -- 19 false alarms of 19,843 on (d); none at 1e-6, 1e-8)
+    const facing = (buf, h = 1e-6) => {
+        const bvh = new MeshBVH(buf); let wrong = 0, n = 0;
+        for (let o = 0; o < buf.length; o += 9) {
+            const e1 = [buf[o + 3] - buf[o], buf[o + 4] - buf[o + 1], buf[o + 5] - buf[o + 2]], e2 = [buf[o + 6] - buf[o], buf[o + 7] - buf[o + 1], buf[o + 8] - buf[o + 2]];
+            const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], L = Math.hypot(...nn); if (L < 1e-6) continue;
+            const c = [0, 1, 2].map((k) => (buf[o + k] + buf[o + 3 + k] + buf[o + 6 + k]) / 3), u = nn.map((x) => x / L);
+            n++; if (pointInMesh(bvh, c[0] + u[0] * h, c[1] + u[1] * h, c[2] + u[2] * h).inside || !pointInMesh(bvh, c[0] - u[0] * h, c[1] - u[1] * h, c[2] - u[2] * h).inside) wrong++;
+        }
+        return { wrong, n };
+    };
+    const rng = (seed) => { let st = seed >>> 0; return () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; }; };
+    // (a) twelve random blob triples: the algebra, an independent oracle (meshCSG's BSP union / intersect / subtract), and
+    // (b) outputs fed back in -- absorption and associativity
+    {
+        const R = { partition: 0, inclusionExclusion: 0, threeWay: 0, commuteU: 0, commuteI: 0, bspU: 0, bspI: 0, bspS: 0, absorbU: 0, absorbI: 0, assocU: 0, assocI: 0 };
+        let fbs = 0, crk = 0, neg = 0, wrong = 0, faces = 0;
+        const up = (k, x) => { R[k] = Math.max(R[k], Math.abs(x)); };
+        for (let seed = 1; seed <= 12; seed++) {
+            const r = rng(seed), blob = (k) => M.jaggedBlob([(r() - 0.5) * 1.2, (r() - 0.5) * 1.2, (r() - 0.5) * 0.6], 0.3 + r() * 0.9, 4 + Math.floor(r() * 8), seed * 10 + k, { rough: r() * 0.9, floor: 0.5 });
+            const PA = blob(1), PB = blob(2), PC = blob(3), A = M.toTriangleBuffer(PA), B = M.toTriangleBuffer(PB), C = M.toTriangleBuffer(PC), vA = vol(A), vB = vol(B);
+            const out = {}; for (const op of ["union", "intersect", "subtract"]) { const x = run(A, B, op); out[op] = x; fbs += x.stats.a.fallbackTris + x.stats.b.fallbackTris; crk += census(x.tris, 1e-9); if (vol(x.tris) < 0) neg++; }
+            const U = vol(out.union.tris), I = vol(out.intersect.tris), S = vol(out.subtract.tris), S2 = vol(run(B, A, "subtract").tris);
+            up("partition", S + I - vA); up("inclusionExclusion", U + I - vA - vB); up("threeWay", S + S2 + I - U);
+            up("commuteU", vol(run(B, A, "union").tris) - U); up("commuteI", vol(run(B, A, "intersect").tris) - I);
+            up("bspU", M.volume(M.union(PA, PB)) - U); up("bspI", M.volume(M.intersect(PA, PB)) - I); up("bspS", M.volume(M.subtract(PA, PB)) - S);
+            const chained = [run(A, out.intersect.tris, "union"), run(A, out.union.tris, "intersect"), run(out.union.tris, C, "union"), run(A, run(B, C, "union").tris, "union"),
+                             run(out.intersect.tris, C, "intersect"), run(A, run(B, C, "intersect").tris, "intersect")];
+            up("absorbU", vol(chained[0].tris) - vA); up("absorbI", vol(chained[1].tris) - vA);
+            up("assocU", vol(chained[2].tris) - vol(chained[3].tris)); up("assocI", vol(chained[4].tris) - vol(chained[5].tris));
+            for (const x of chained) { crk += census(x.tris, 1e-9); fbs += x.stats.a.fallbackTris + x.stats.b.fallbackTris; }
+            for (const op of ["union", "intersect"]) { const f = facing(out[op].tris); wrong += f.wrong; faces += f.n; }
+        }
+        const worstAlg = Math.max(R.partition, R.inclusionExclusion, R.threeWay, R.commuteU, R.commuteI), worstBsp = Math.max(R.bspU, R.bspI, R.bspS), worstChain = Math.max(R.absorbU, R.absorbI, R.assocU, R.assocI);
+        ok("!! *** 12 RANDOM BLOB PAIRS: |A-B| + |AnB| = |A|, |AuB| + |AnB| = |A| + |B|, |A-B| + |B-A| + |AnB| = |AuB|, u and n commute -- to 1e-13 ***",
+            worstAlg < 1e-13, Object.entries(R).slice(0, 5).map(([k, v]) => k + " " + v.toExponential(1)).join(", "));
+        ok("!! union, intersect and subtract each within 1e-12 of meshCSG's BSP on the same pairs (an oracle that shares no code)",
+            worstBsp < 1e-12, "union " + R.bspU.toExponential(1) + ", intersect " + R.bspI.toExponential(1) + ", subtract " + R.bspS.toExponential(1));
+        ok("!! OUTPUTS FED BACK IN: A u (A n B) = A, A n (A u B) = A, (A u B) u C = A u (B u C), (A n B) n C = A n (B n C) -- to 1e-13",
+            worstChain < 1e-13, "absorption " + R.absorbU.toExponential(1) + " / " + R.absorbI.toExponential(1) + ", associativity " + R.assocU.toExponential(1) + " / " + R.assocI.toExponential(1));
+        ok("   all of those runs: no fallback, closed at the page's 1e-9 census, no negative volume, and every union and intersect triangle faces out (rays, 1e-6 off it)",
+            fbs === 0 && crk === 0 && neg === 0 && wrong === 0, "fallbacks " + fbs + ", open edges " + crk + ", negative volumes " + neg + ", wrong-facing " + wrong + " of " + faces);
+    }
+    // (c) containment, disjoint, touching at a face, an edge, a corner: each op exact against intervals, closed, facing out
+    {
+        const box = (c, h) => M.toTriangleBuffer(M.boxPolys(c, h)), V = (h) => 8 * h[0] * h[1] * h[2], small = [0.3, 0.4, 0.5];
+        const cases = [["B inside A", box([0, 0, 0], [1, 1, 1]), box([0.1, 0.2, -0.1], small), { union: 8, intersect: V(small), subtract: 8 - V(small) }],
+                       ["A inside B", box([0.1, 0.2, -0.1], small), box([0, 0, 0], [1, 1, 1]), { union: 8, intersect: V(small), subtract: 0 }],
+                       ["disjoint", box([0, 0, 0], [1, 1, 1]), box([3, 0, 0], [1, 1, 1]), { union: 16, intersect: 0, subtract: 8 }],
+                       ["touching at a face", box([0, 0, 0], [1, 1, 1]), box([2, 0.2, 0.1], [1, 0.5, 0.5]), { union: 10, intersect: 0, subtract: 8 }],
+                       ["touching at an edge", box([0, 0, 0], [1, 1, 1]), box([2, 2, 0.3], [1, 1, 0.5]), { union: 12, intersect: 0, subtract: 8 }],
+                       ["touching at a corner", box([0, 0, 0], [1, 1, 1]), box([2, 2, 2], [1, 1, 1]), { union: 16, intersect: 0, subtract: 8 }]];
+        let worst = 0, crk = 0, wrong = 0, faces = 0, n = 0;
+        for (const [, A, B, T] of cases) for (const op of ["union", "intersect", "subtract"]) {
+            const r = run(A, B, op); n++; worst = Math.max(worst, Math.abs(vol(r.tris) - T[op])); crk += census(r.tris, 1e-9); const f = facing(r.tris); wrong += f.wrong; faces += f.n;
+        }
+        ok("!! containment both ways, disjoint, touching at a face, an edge and a corner -- all 3 ops (" + n + " runs): exact to 1e-13, closed, every triangle facing out, an empty result empty",
+            worst < 1e-13 && crk === 0 && wrong === 0, "worst |err| " + worst.toExponential(2) + ", open edges " + crk + ", wrong-facing " + wrong + " of " + faces);
+        // the instrument sees a turned triangle: one triangle of a union turned round is found, and only it
+        const u = run(cases[3][1], cases[3][2], "union").tris, t = Float64Array.from(u);
+        for (let c = 0; c < 3; c++) { const x = t[3 + c]; t[3 + c] = t[6 + c]; t[6 + c] = x; }
+        const f = facing(t);
+        ok("   control: in that union with ONE triangle turned round, the orientation check finds exactly one", f.wrong === 1, f.wrong + " of " + f.n);
+    }
+    // (d) a workload that ADDS material: the page's wall, five chains of ten ops -- even shots ADD a page blob (union), odd
+    // shots blast one (subtract), every fourth keeps only what lies inside a big blob (intersect) -- against the same chain
+    // through meshCSG's BSP
+    {
+        let worst = 0, fbs = 0, crk6 = 0, crk9 = 0, wrong = 0, faces = 0, ops = 0;
+        for (const seed of [1, 2, 3, 107, 202]) {
+            let wall = M.toTriangleBuffer(M.boxPolys([0, 0, 0], HALF_PAGE)), bsp = M.boxPolys([0, 0, 0], HALF_PAGE);
+            pageBlastsAudit(seed, 10).forEach((b, k) => {
+                const op = k % 4 === 3 ? "intersect" : (k % 2 === 0 ? "union" : "subtract"), P = op === "intersect" ? M.jaggedBlob([0, 0, 0], 3.6, 10, seed * 7 + k) : b, B = M.toTriangleBuffer(P);
+                const r = run(wall, B, op); wall = r.tris; ops++; fbs += r.stats.a.fallbackTris + r.stats.b.fallbackTris;
+                bsp = M[op](bsp, P); worst = Math.max(worst, Math.abs(vol(wall) - M.volume(bsp)) / M.volume(bsp));
+                crk6 += census(wall, 1e-6); crk9 += census(wall, 1e-9);
+            });
+            const f = facing(wall); wrong += f.wrong; faces += f.n;
+        }
+        ok("!! *** " + ops + " OPS ON THE PAGE'S WALL, ADDING, BLASTING AND TRIMMING: within 1e-10 (relative) of the same chains through the BSP, no fallback, closed at the arc's 1e-6 census at every step, every triangle facing out ***",
+            worst < 1e-10 && fbs === 0 && crk6 === 0 && wrong === 0, "worst " + worst.toExponential(2) + ", fallbacks " + fbs + ", open edges at 1e-6 " + crk6 + ", wrong-facing " + wrong + " of " + faces);
+        console.log("  KNOWN  raw, at the page's 1e-9 census, those steps leave " + crk9 + " open edges in all: seam ends 1.4e-9..3.5e-9 apart, the near-misses every op's raw output can carry (20 five-op chains each: union 0 edges, subtract 3, intersect 21). The page's blasts close them with round 14's finishing (blastEngine.mjs), which only the subtract adapter has -- backlog bvh-csg-r18b-finish-any-op.");
+    }
+}
+
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
-console.log("unchecked here, named honestly: only `subtract` is required to pass this gate on axis-aligned " +
-    "box fixtures (per this round's own scope decision, see meshBoolean.mjs's own header) -- `union` and " +
-    "`intersect` are exercised in sections 4, 7, and 12 but not with the same fixture-count depth as subtract's " +
-    "own sections 1/2/8/9. A SECOND adversarial review (run after the first fix pass) found and this file's " +
+console.log("unchecked here, named honestly: round 6 required only `subtract` to pass on axis-aligned box fixtures " +
+    "(sections 1/2/9 are subtract's alone); since round 12 sections 8 and 15-23 run all three ops, and round 18's " +
+    "audit (section 24) holds union and intersect to subtract's depth -- the algebra, the BSP as oracle on random " +
+    "blob pairs, outputs fed back in, containment and touching, orientation by rays, and a workload that adds material. " +
+    "Still not checked for any op: self-intersection away from shared edges, and doubled shells, which neither the " +
+    "volume nor the ray-orientation check can see. A SECOND adversarial review (run after the first fix pass) found and this file's " +
     "own fixes address: (a) an unrecognized `op` silently returned an empty mesh with no error -- FIXED, gated " +
     "in section 12; (b) a DEGENERATE (zero-volume) operand embedded in the other mesh's interior yields a " +
     "wrong-SIGN volume error -- a NEW manifestation of the same root cause as the touching-contact gap below; " +

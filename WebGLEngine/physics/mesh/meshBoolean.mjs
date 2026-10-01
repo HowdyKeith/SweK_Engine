@@ -470,6 +470,17 @@
 // distance to 2^30; the error is the way back's rounding, within ulp(2^e) x area (worst 0.008 of it); the far result is
 // the moved-in result moved out, bit for bit; the page chains at 2^27 closed with no fallback. Near the origin -- every
 // fixture before, and the page -- no axis qualifies and nothing changes. opts.translate:false turns it off.
+//
+// *** ROUND 18: UNION AND INTERSECT AUDITED (meshBoolean-selfcheck section 24) -- NO DEFECT FOUND. *** Held to subtract's
+// depth against a formal property list. Measured: on random blob pairs the algebra holds to 1e-14 (|A-B| + |AnB| = |A|,
+// |AuB| + |AnB| = |A| + |B|, |A-B| + |B-A| + |AnB| = |AuB|, u and n commute) and all three ops agree with meshCSG's BSP
+// to 1e-14; outputs fed back in obey absorption and associativity to 1e-14; containment, disjoint, and touching at a
+// face, an edge or a corner are exact for every op; every output triangle faces out (rays 1e-6 off it); fifty ops on the
+// page's wall that ADD, blast and trim agree with the same chains through the BSP to 3.5e-12 relative, closed at the
+// arc's 1e-6 census, no fallback. The one finding is not about union or intersect: every op's RAW output can carry seam
+// ends 1.4e-9..3.5e-9 apart (open at the page's 1e-9 census: 20 five-op chains each, union 0 edges, subtract 3,
+// intersect 21), which the page's blasts close with round 14's finishing -- and only the subtract adapter has it. A
+// second caller needs it for its op too: backlog bvh-csg-r18b-finish-any-op.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
