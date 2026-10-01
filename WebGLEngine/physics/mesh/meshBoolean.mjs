@@ -350,6 +350,19 @@
 // The page's workload found two more arrangement defects (triArrangement.mjs's ROUND 13 paragraph). After all of it:
 // on 20 five-shot chains and one of thirty, this file and the BSP cut the same solid to 6.7e-12 relative, with no
 // fallback and no crack at the 1e-6 census (blastEngine-selfcheck).
+//
+// *** ROUND 15: WHAT A SHOT COSTS ON A BIG WALL. *** On the page's 30-shot chain a shot that cuts nothing cost 63-80 ms
+// at the end, ~6 us per wall triangle -- 36% of the chain. The edge-conformity pass (round 12, below) was the largest
+// part of it: it built two string keys for each edge of EVERY triangle to look up the few that received a split, ~18
+// ms a shot on the final 13,448-triangle wall. It now visits only the triangles whose boxes touch a triangle that put
+// points on its sides, found by the BVH (a triangle sharing an edge with one shares two vertices, so their boxes
+// touch). opts.conformAll is the old scan: the gate holds the two equal bit for bit on 1,350 flush-box runs, and
+// blastEngine-selfcheck on 80 page shots; stats.conformScanned counts what was visited. With MeshBVH's build made
+// cheaper (same tree) and blastEngine's pieces built only for what it does not keep, every shot of 99 page chains is
+// what round 14 made, bit for bit, and the fixed cost is 18% of the chain. NOT DONE, MEASURED: the output depends on
+// the BVH's SHAPE (candidate order -> arrangement order): a differently shaped tree changed the bits of 53 of 62
+// blasts, never the solid (same triangle count, volume within 1e-15). So reusing the last shot's tree -- half of the
+// remaining fixed cost -- would trade away the bit-for-bit guarantee.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -505,7 +518,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     // one a segment ending there and the other only a point contact (flush-box fuzz: 3 unmatched edges on 23 of 450
     // runs before; round 11 identical).
     const arrs = new Array(triCount);
-    let rearranged = 0, injected = 0;
+    let rearranged = 0, injected = 0, conformScanned = 0;
     if (cutting === "arrangement" && contacts) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
@@ -527,7 +540,26 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         // injecting a second vertex a few 1e-9 from an existing one only makes a sliver (measured on the twelve-blast
         // chain: 1e-6-census non-manifold edges 0 -> 2 and a fallback at shot 12). Only a MISSING split is injected.
         const SNAP2 = 64e-18;
-        for (let t = 0; t < triCount; t++) {
+        // Round 15: only a triangle that SHARES AN EDGE with one that put points on its sides can be given any, and two
+        // triangles sharing an edge share two vertices, so their boxes touch: the BVH finds every such triangle
+        // (trianglesInBox is closed). Scanning all of them built two string keys per edge of every triangle in the mesh
+        // on every shot -- 18 of the 33 ms a pin-prick blast spent classifying the page's 13,448-triangle wall.
+        // opts.conformAll scans them all (the control; the gate holds the two bit for bit).
+        let receivers;
+        if (opts.conformAll) receivers = Array.from({ length: triCount }, (_, t) => t);
+        else {
+            const found = new Set();
+            for (let u = 0; u < triCount; u++) {
+                const arr = arrs[u];
+                if (!arr || arr.status !== "ok" || !arr.sideVerts.some((l) => l.length)) continue;
+                const o = u * 9, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+                for (let c = 0; c < 9; c++) { const v = trisSelf[o + c], a = c % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+                for (const t of bvhSelf.trianglesInBox(lo, hi)) found.add(t);
+            }
+            receivers = [...found];   // in any order: each reads only its own first arrangement and byEdge
+        }
+        conformScanned += receivers.length;
+        for (const t of receivers) {
             if (arrs[t] && arrs[t].status === "fallback") continue;
             const need = [];
             for (let k = 0; k < 3; k++) {
@@ -613,7 +645,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     return { fragments, stats: { triCount, emptyCandidateShortcuts, accumulatedFragments, capped, unresolvedCount,
                                  gateSkipped, gateTested, examined, cutting, classifications, arrangedTris,
                                  arrangementFaces, untouchedTris, fallbackTris, fallbackReasons, onFaces, nearSided,
-                                 nearPseudo, nearEdge, rearranged, injected, outsideBoxShortcuts } };
+                                 nearPseudo, nearEdge, rearranged, injected, outsideBoxShortcuts, conformScanned } };
 }
 
 // The keep-rule table -- see this file's own header for the boundary-of-the-result derivation and its

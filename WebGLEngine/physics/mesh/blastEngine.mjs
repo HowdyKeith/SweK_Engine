@@ -44,6 +44,12 @@
 // fresh ones (raw: 135 on 17), and at 1024x scale; 0 fallbacks; the solid within 5.1e-13 of the BSP's (raw: 6.6e-12);
 // 31,487 polygons where the raw wall has 50,834 triangles and the BSP's 105,836 polygons; finishing is 14% of the
 // time. A finished vertex may sit up to the weld tolerance off its polygon's plane (worst measured 1.9e-9).
+//
+// *** ROUND 15: THE ADAPTER'S SHARE OF A SHOT. *** blastBVH built a piece -- three vertex arrays and an object -- for
+// every output triangle, ~13,000 on the 30-shot wall, and then discarded those belonging to polygons it keeps whole.
+// It now counts which triangles came through bit for bit FIRST, decides what it keeps, and builds pieces only for the
+// rest (stats.piecesBuilt; a face-cutting pin-prick on that wall builds 108). Same pieces in the same order: every shot
+// of 99 chains is round 14's, bit for bit. meshBoolean.mjs and mesh/meshBVH.mjs have the rest of the round.
 "use strict";
 
 import * as M from "./meshCSG.mjs";
@@ -184,45 +190,55 @@ export function blastBVH(polys, blob, { finish = true, ...opts } = {}) {
     const t0 = Date.now();
     const A = trianglesOf(polys), B = trianglesOf(blob);
     const r = meshBoolean(A.buf, new MeshBVH(A.buf), B.buf, new MeshBVH(B.buf), "subtract", opts);
-    const pieces = new Array(r.triCount), flipped = new Map();
+    const flipped = new Map(), nA = A.owner.length, nB = B.owner.length, t = r.tris;
     const whole = new Int32Array(polys.length), total = new Int32Array(polys.length);
-    for (let i = 0; i < A.owner.length; i++) total[A.owner[i]]++;
+    for (let i = 0; i < nA; i++) total[A.owner[i]]++;
+    // is output triangle i its wall triangle, bit for bit? Counted per source polygon BEFORE any piece is built
+    // (round 15): a polygon kept whole needs none, and on a long chain that is nearly the whole wall
+    for (let i = 0; i < r.triCount; i++) {
+        const f = r.from[i];
+        if (!(f >= 0 && f < nA)) continue;
+        let same = true;
+        for (let k = 0; k < 9 && same; k++) same = t[i * 9 + k] === A.buf[f * 9 + k];
+        if (same) whole[A.owner[f]]++;
+    }
+    // a polygon every one of whose triangles came through whole is kept as it was; the rest is finished
+    const keep = finish ? polys.map((_, i) => total[i] > 0 && whole[i] === total[i]) : null;
+    const pieces = [];
     let unknown = 0;
     for (let i = 0; i < r.triCount; i++) {
-        const o = i * 9, t = r.tris;
-        const vs = [[t[o], t[o + 1], t[o + 2]], [t[o + 3], t[o + 4], t[o + 5]], [t[o + 6], t[o + 7], t[o + 8]]];
         const f = r.from[i];
         // a `from` out of either operand's range is no provenance at all: counted with the untraced, never indexed
-        const p = f >= 0 && f < A.owner.length ? polys[A.owner[f]] : null;
-        const q = f < 0 && -f - 1 < B.owner.length ? blob[B.owner[-f - 1]] : null;
+        const own = f >= 0 && f < nA ? A.owner[f] : -1;
+        if (own >= 0 && keep && keep[own]) continue;
+        const o = i * 9;
+        const vs = [[t[o], t[o + 1], t[o + 2]], [t[o + 3], t[o + 4], t[o + 5]], [t[o + 6], t[o + 7], t[o + 8]]];
+        const p = own >= 0 ? polys[own] : null;
+        const q = f < 0 && -f - 1 < nB ? blob[B.owner[-f - 1]] : null;
         if (p) {
-            // which corners are the source triangle's own (the wall had them: they never move), and is it all of it
+            // which corners are the source triangle's own (the wall had them: they never move)
             const oldCorner = vs.map((v) => { for (let c = 0; c < 3; c++) if (v[0] === A.buf[f * 9 + c * 3] && v[1] === A.buf[f * 9 + c * 3 + 1] && v[2] === A.buf[f * 9 + c * 3 + 2]) return true; return false; });
-            let same = true;
-            for (let k = 0; k < 9 && same; k++) same = t[o + k] === A.buf[f * 9 + k];
-            if (same) whole[A.owner[f]]++;
-            pieces[i] = { vs, pl: p.pl, src: p.src ?? M.SKIN, poly: A.owner[f], oldCorner };
+            pieces.push({ vs, pl: p.pl, src: p.src ?? M.SKIN, poly: own, oldCorner });
         } else if (q) {
             let pl = flipped.get(q);
             if (!pl) { pl = { n: [-q.pl.n[0], -q.pl.n[1], -q.pl.n[2]], w: -q.pl.w }; flipped.set(q, pl); }
-            pieces[i] = { vs, pl, src: M.CUT, poly: -1 };
+            pieces.push({ vs, pl, src: M.CUT, poly: -1 });
         } else {
             unknown++;                                       // no provenance: not reached by any path today
-            pieces[i] = { vs, pl: M.planeOf(vs), src: M.CUT, poly: -1 };
+            pieces.push({ vs, pl: M.planeOf(vs), src: M.CUT, poly: -1 });
         }
     }
     const sa = r.stats.a, sb = r.stats.b;
     const stats = { engine: "bvh", triangles: r.triCount, fallbackTris: (sa.fallbackTris || 0) + (sb.fallbackTris || 0),
-                    ambiguous: r.ambiguousTriIndices.length, capped: r.capped, emptyOperand: r.emptyOperand, unknown };
+                    ambiguous: r.ambiguousTriIndices.length, capped: r.capped, emptyOperand: r.emptyOperand, unknown,
+                    wallTriangles: nA, conformScanned: (sa.conformScanned || 0) + (sb.conformScanned || 0), piecesBuilt: pieces.length };
     if (!finish) {
         stats.ms = Date.now() - t0;
         return { polys: pieces.map(({ vs, pl, src }) => ({ vs, pl, src })), stats };
     }
-    // a polygon every one of whose triangles came through whole is kept as it was; the rest is finished
-    const keep = polys.map((_, i) => total[i] > 0 && whole[i] === total[i]);
     // (tagged as a piece of it would be: a wall polygon with no tag is SKIN -- boxPolys' own faces carry none)
     const kept = polys.filter((_, i) => keep[i]).map((p) => (p.src ? p : { ...p, src: M.SKIN }));
-    const fin = finishPieces(pieces.filter((pc) => !(pc.poly >= 0 && keep[pc.poly])),
+    const fin = finishPieces(pieces,
                              { weld: FINISH_WELD_SNAPS * SNAP * 2 ** (r.scaleExponent || 0) });
     Object.assign(stats, { kept: kept.length, finished: fin.polys.length, welded: fin.stats.welded, maxMove: fin.stats.maxMove,
                            weldRefused: fin.stats.refused, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,

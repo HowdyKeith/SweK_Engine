@@ -19,6 +19,8 @@
 //      the same objects, every merged polygon convex and tiled exactly by the triangles the next blast reads.
 //      Sections 2 and 3 hold the finished wall to the page's census (round 13's raw wall is section 2's control), and
 //      the BVH settle -- a merge -- to opening no edge.
+//   6. A SHOT'S COST (round 15) -- the same wall with and without the conformity scan restricted, and what a pin-prick
+//      on the 30-shot wall touches: its neighbourhood, not the wall.
 //
 // SABOTAGE LOG (round 13) -- each applied to the real file, four gates run (THIS / meshCSG-selfcheck /
 // meshBoolean-selfcheck / triArrangement-selfcheck), the file restored in a `finally` and md5 verified. Reds on the
@@ -60,6 +62,23 @@
 // "triangle" reached the next blast's buffer in section 2) and now fails by name in section 1 first. F8 -- the merge
 // allowing a ring or figure of eight -- was 0 red because the test it sabotaged never fired: two convex polygons with
 // disjoint interiors that share an edge share nothing else. The test was removed, and F8 with it.
+//
+// SABOTAGE LOG (round 15) -- meshBoolean.mjs, mesh/meshBVH.mjs, blastEngine.mjs; three gates (tools/ship/meshBVH-
+// selfcheck / meshBoolean-selfcheck / THIS), each on the real file, restored in a `finally`, md5 verified. 9 of 9 red:
+//   G1 conformity: only the split triangles themselves receive points    -> 0 / 2 / 0
+//   G2 conformity: the box query open (touching triangles missed)        -> 0 / 4 / 0
+//   G3 conformAll ignored (the control runs the restricted scan)         -> 0 / 1 / 0
+//   G4 BVH: children given each other's boxes                            -> 7 / 47 / 9
+//   G5 BVH: the split sweep reads the prefix one bin short               -> 1 / 3 / 0
+//   G6 BVH: one scratch slot for every depth                             -> 7 / 9 / 10
+//   G7 BVH: the chosen axis keeps the first axis's range                 -> 6 / 10 / 11
+//   G8 adapter: pieces built for kept polygons too                       -> 0 / 0 / 1   (on the first battery THIS
+//       gate passed section 1 and then ran away in section 2 -- the wall doubles every shot -- and was stopped; section
+//       1's "every surface there once" row was added for it: volume 5.37x off, 2,810 edges open)
+//   G9 adapter: every triangle counted as come through whole             -> 0 / 0 / 7
+// G1 and G2 are 0 here: on the page's shots no triangle the restricted scan misses would have received a point --
+// meshBoolean-selfcheck's flush boxes, where conformity was born, are where they show. G5 changes the tree's shape and
+// so the output's bits, never its solid (round 15's measurement), which only the tree comparison sees.
 "use strict";
 
 import fs from "node:fs";
@@ -175,6 +194,11 @@ console.log("1. *** THE CONTRACT: blast()'s POLYGONS, PLANES AND TAGS ***");
     const wall0 = M.boxPolys([0, 0, 0], HALF), b2 = blastBVH(wall0, blobs[0]);
     ok("   a piece of the wall carries its source polygon's plane itself, not a recomputed one (settle groups by plane)",
         b2.polys.filter((p) => p.src === M.SKIN).every((p) => wall0.some((q) => q.pl === p.pl)));
+    // and the wall is the solid, once: a polygon kept whole must not ALSO come back as pieces (round 15's adapter
+    // decides what it keeps before building any) -- the rows above see planes and tags, which a duplicate has right
+    const a3 = run("bsp", blobs).wall, b3 = run("bvh", blobs).wall, rel = Math.abs(M.volume(b3) - M.volume(a3)) / M.volume(a3);
+    ok("!! bvh: after the same three blasts, the BSP's solid to 1e-10 and closed at the page's 1e-9 census -- every surface there once",
+        rel < 1e-10 && pageCensus(b3) === 0, "relative volume difference " + rel.toExponential(2) + ", unmatched " + pageCensus(b3));
 }
 
 {
@@ -392,6 +416,41 @@ console.log("\n5. *** ROUND 14: FINISHING -- THE WELD AND THE MERGE, ON SEEDS IT
     ok("!! every merged polygon is convex and its triangles tile it exactly; the triangles the next blast reads close at the page's census",
         reflex === 0 && areaOff === 0 && tileUn === 0 && merged > 0,
         withTris + " polygons carrying triangles, " + merged + " merges; reflex vertices " + reflex + ", area mismatches " + areaOff + ", unmatched among the triangles " + tileUn);
+}
+
+console.log("\n6. *** ROUND 15: WHAT A SHOT COSTS ON A BIG WALL -- THE SAME OUTPUT, LESS OF THE WALL TOUCHED ***");
+{
+    // Round 15 measured the fixed cost of a shot -- what a 0.02-radius pin-prick costs on the same wall -- at 36% of the
+    // 30-shot chain and 63-80 ms a shot at its end, growing with the wall (~6 us a triangle), and found three things
+    // that touched every wall triangle every shot without needing to: meshBoolean's edge-conformity scan (two string
+    // keys per edge of every triangle), MeshBVH's build waste (tools/ship/meshBVH-selfcheck holds the new build to the
+    // old tree), and the adapter building a piece for every output triangle before discarding those of kept polygons.
+    const sig = (polys) => polys.map((p) => p.src + ":" + p.pl.n.join(",") + "," + p.pl.w + ":" + p.vs.map((v) => v.join(",")).join(";") + "|" + (p.tris ? p.tris.map((t) => t.join(";")).join("/") : "")).join("\n");
+    const chains = [pageBlasts(107, 30)];
+    for (let seed = 1; seed <= 10; seed++) chains.push(pageBlasts(seed, 5));
+    let shots = 0, differ = 0, last = null;
+    for (const blobs of chains) {
+        let a = M.boxPolys([0, 0, 0], HALF), b = a;
+        for (const blob of blobs) {
+            a = blastWith("bvh", a, blob).polys; b = blastWith("bvh", b, blob, { conformAll: true }).polys; shots++;
+            if (sig(a) !== sig(b)) { differ++; b = a; }
+        }
+        if (!last) last = a;
+    }
+    ok("!! " + shots + " shots (the 30-shot chain and ten of 5): the conformity scan restricted by the BVH gives the very same wall as scanning every triangle",
+        differ === 0, differ + " shots differing");
+    // a pin-prick through the 30-shot chain's final wall's front face: what it touches is the blast's neighbourhood,
+    // not the wall. (Round 15's fixed-cost measurement put the pin INSIDE the wall, where it cuts no face at all and
+    // leaves a cavity -- the cost of a shot that cuts nothing, i.e. the wall's. This one cuts.)
+    const pin = M.jaggedBlob([3.7, -2.7, HALF[2]], 0.02, 6, 99, { rough: 0, floor: 1 });
+    const r = blastWith("bvh", last, pin), s = r.stats;
+    // (measured: the scan takes 279 triangles, 2.1% -- the triangles the pin splits are big face triangles whose boxes
+    // reach across much of the wall, and the BVH returns all that touch them. The bound is 5%, against 100% before.)
+    ok("!! a pin-prick on the 30-shot wall (" + s.wallTriangles + " triangles) scans and rebuilds only its neighbourhood: conformity scan under 5% of the wall, pieces under 1%, the rest kept whole",
+        s.conformScanned < 0.05 * s.wallTriangles && s.piecesBuilt < 0.01 * s.wallTriangles && s.kept > 0.99 * last.length && s.kept < last.length && s.conformScanned > 0,
+        "conformity scan " + s.conformScanned + " triangles, pieces built " + s.piecesBuilt + ", polygons kept " + s.kept + " of " + last.length);
+    const t = []; for (let i = 0; i < 5; i++) { const t0 = performance.now(); blastWith("bvh", last, pin); t.push(performance.now() - t0); }
+    report("that pin-prick: " + t.sort((x, y) => x - y)[2].toFixed(1) + " ms (median of 5), printed, not asserted. Round 15 measured one inside the wall (no face cut) at 71.5 ms before, 25.7 ms after: conformity 33.4 -> 2.6, BVH build 21.8 -> 12.4, pieces and finishing 6.4 -> ~2");
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

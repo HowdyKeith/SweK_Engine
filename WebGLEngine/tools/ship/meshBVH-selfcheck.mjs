@@ -345,5 +345,166 @@ console.log("      slower than brute force. three-mesh-bvh has a refit() for exa
 console.log("      here, because neither call site deforms: wall triangles are per level, and krbn's mesh is");
 console.log("      the rest pose the strokes are lifted onto. If a deforming caller appears, refit is the work.");
 
+// *** BVH-CSG ROUND 15: THE BUILD IS THE OLD BUILD, ONLY FASTER -- THE SAME TREE, ARRAY FOR ARRAY. *** The page's
+// blast rebuilds a MeshBVH over the whole wall every shot, so round 15 rewrote _build without its waste (no per-node
+// typed arrays, one centroid scan per axis, an O(bins) split sweep, children's boxes from their bins). Every query in
+// the engine walks the tree, and meshBoolean's output depends on its SHAPE (round 15 measured it: a differently
+// shaped tree changed 53 of 62 blasts' output bits, never the solid), so the new build must give the very same tree.
+// RefBVH below is the round-14 build verbatim, held here so nothing can drift it.
+console.log("\n*** ROUND 15: THE NEW BUILD AGAINST THE OLD ONE, ARRAY FOR ARRAY ***");
+{
+    const AXIS = 3;
+    class RefBVH {
+        constructor(tris, opts = {}) {
+            this.tris = tris;
+            this.count = (tris.length / 9) | 0;
+            this.maxLeaf = opts.maxLeaf || 8;
+            this.bins = opts.bins || 12;
+            this.order = new Int32Array(this.count);
+            for (let i = 0; i < this.count; i++) this.order[i] = i;
+            // centroid per triangle, computed once -- the build sorts on these, never on the vertices
+            this._cent = new Float64Array(this.count * 3);
+            for (let n = 0; n < this.count; n++) {
+                const o = n * 9;
+                this._cent[n * 3] = (tris[o] + tris[o + 3] + tris[o + 6]) / 3;
+                this._cent[n * 3 + 1] = (tris[o + 1] + tris[o + 4] + tris[o + 7]) / 3;
+                this._cent[n * 3 + 2] = (tris[o + 2] + tris[o + 5] + tris[o + 8]) / 3;
+            }
+            const maxNodes = Math.max(1, 2 * this.count);
+            this.bounds = new Float64Array(maxNodes * 6);
+            this.meta = new Int32Array(maxNodes * 3);
+            this.nodes = 0;
+            this.leaves = 0;
+            this.depth = 0;
+            if (this.count) this._build(0, this.count, 0);
+            else { this.nodes = 1; this.meta[1] = 0; this.meta[2] = 0; for (let k = 0; k < 6; k++) this.bounds[k] = k < 3 ? Infinity : -Infinity; }
+        }
+
+        _boundsOf(start, end, out) {
+            let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+            for (let s = start; s < end; s++) {
+                const o = this.order[s] * 9;
+                for (let c = 0; c < 3; c++) {
+                    const x = this.tris[o + c * 3], y = this.tris[o + c * 3 + 1], z = this.tris[o + c * 3 + 2];
+                    if (x < x0) x0 = x; if (x > x1) x1 = x;
+                    if (y < y0) y0 = y; if (y > y1) y1 = y;
+                    if (z < z0) z0 = z; if (z > z1) z1 = z;
+                }
+            }
+            out[0] = x0; out[1] = y0; out[2] = z0; out[3] = x1; out[4] = y1; out[5] = z1;
+        }
+
+        _build(start, end, depth) {
+            const node = this.nodes++;
+            if (depth > this.depth) this.depth = depth;
+            const b = new Float64Array(6);
+            this._boundsOf(start, end, b);
+            this.bounds.set(b, node * 6);
+            const n = end - start;
+            if (n <= this.maxLeaf) { this.meta[node * 3] = -1; this.meta[node * 3 + 1] = start; this.meta[node * 3 + 2] = n; this.leaves++; return node; }
+
+            // *** BINNED SAH, AND THE FALLBACK MATTERS AS MUCH AS THE SPLIT. *** When every centroid coincides --
+            // coplanar fans, or a mesh of degenerate triangles -- no split separates anything, every SAH cost is
+            // equal, and a naive "best bin" returns an empty side. That recurses on the same range forever. If no
+            // bin split is valid the range is halved by rank instead, which always terminates.
+            let axis = 0, extent = -1;
+            for (let a = 0; a < AXIS; a++) {
+                let lo = Infinity, hi = -Infinity;
+                for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + a]; if (c < lo) lo = c; if (c > hi) hi = c; }
+                if (hi - lo > extent) { extent = hi - lo; axis = a; }
+            }
+            let mid = -1;
+            if (extent > 0) {
+                let lo = Infinity, hi = -Infinity;
+                for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + axis]; if (c < lo) lo = c; if (c > hi) hi = c; }
+                const B = this.bins, scale = B / (hi - lo);
+                const cnt = new Int32Array(B), bb = new Float64Array(B * 6).fill(0);
+                for (let i = 0; i < B; i++) { bb[i * 6] = bb[i * 6 + 1] = bb[i * 6 + 2] = Infinity; bb[i * 6 + 3] = bb[i * 6 + 4] = bb[i * 6 + 5] = -Infinity; }
+                for (let s = start; s < end; s++) {
+                    const t = this.order[s];
+                    let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                    cnt[bi]++;
+                    const o = t * 9;
+                    for (let c = 0; c < 3; c++) {
+                        const x = this.tris[o + c * 3], y = this.tris[o + c * 3 + 1], z = this.tris[o + c * 3 + 2];
+                        if (x < bb[bi * 6]) bb[bi * 6] = x; if (x > bb[bi * 6 + 3]) bb[bi * 6 + 3] = x;
+                        if (y < bb[bi * 6 + 1]) bb[bi * 6 + 1] = y; if (y > bb[bi * 6 + 4]) bb[bi * 6 + 4] = y;
+                        if (z < bb[bi * 6 + 2]) bb[bi * 6 + 2] = z; if (z > bb[bi * 6 + 5]) bb[bi * 6 + 5] = z;
+                    }
+                }
+                const area = (x0, y0, z0, x1, y1, z1) => {
+                    if (!(x1 >= x0)) return 0;
+                    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+                    return 2 * (dx * dy + dy * dz + dz * dx);
+                };
+                let bestCost = Infinity, bestBin = -1;
+                for (let split = 1; split < B; split++) {
+                    let lx0 = Infinity, ly0 = Infinity, lz0 = Infinity, lx1 = -Infinity, ly1 = -Infinity, lz1 = -Infinity, lc = 0;
+                    for (let i = 0; i < split; i++) {
+                        if (!cnt[i]) continue;
+                        lc += cnt[i];
+                        if (bb[i * 6] < lx0) lx0 = bb[i * 6]; if (bb[i * 6 + 3] > lx1) lx1 = bb[i * 6 + 3];
+                        if (bb[i * 6 + 1] < ly0) ly0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ly1) ly1 = bb[i * 6 + 4];
+                        if (bb[i * 6 + 2] < lz0) lz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > lz1) lz1 = bb[i * 6 + 5];
+                    }
+                    let rx0 = Infinity, ry0 = Infinity, rz0 = Infinity, rx1 = -Infinity, ry1 = -Infinity, rz1 = -Infinity, rc = 0;
+                    for (let i = split; i < B; i++) {
+                        if (!cnt[i]) continue;
+                        rc += cnt[i];
+                        if (bb[i * 6] < rx0) rx0 = bb[i * 6]; if (bb[i * 6 + 3] > rx1) rx1 = bb[i * 6 + 3];
+                        if (bb[i * 6 + 1] < ry0) ry0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ry1) ry1 = bb[i * 6 + 4];
+                        if (bb[i * 6 + 2] < rz0) rz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > rz1) rz1 = bb[i * 6 + 5];
+                    }
+                    if (!lc || !rc) continue;
+                    const cost = lc * area(lx0, ly0, lz0, lx1, ly1, lz1) + rc * area(rx0, ry0, rz0, rx1, ry1, rz1);
+                    if (cost < bestCost) { bestCost = cost; bestBin = split; }
+                }
+                if (bestBin > 0) {
+                    // partition in place around the chosen bin
+                    let i = start, j = end - 1;
+                    while (i <= j) {
+                        const t = this.order[i];
+                        let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                        if (bi < bestBin) i++;
+                        else { this.order[i] = this.order[j]; this.order[j] = t; j--; }
+                    }
+                    if (i > start && i < end) mid = i;
+                }
+            }
+            if (mid < 0) {
+                // the fallback described above: split by rank, which cannot produce an empty side
+                mid = (start + end) >> 1;
+                const slice = Array.from(this.order.subarray(start, end));
+                slice.sort((a, b2) => this._cent[a * 3 + axis] - this._cent[b2 * 3 + axis]);
+                this.order.set(slice, start);
+            }
+            const left = this._build(start, mid, depth + 1);
+            const right = this._build(mid, end, depth + 1);
+            this.meta[node * 3] = left; this.meta[node * 3 + 1] = right; this.meta[node * 3 + 2] = 0;
+            return node;
+        }
+    }
+    const R = rng(1515), meshes = [];
+    for (const n of [0, 1, 2, 7, 8, 9, 100, 5000]) { const b = new Float64Array(n * 9); for (let i = 0; i < b.length; i++) b[i] = R() * 2 - 1; meshes.push([b, {}]); }
+    { const b = new Float64Array(20000 * 9); for (let i = 0; i < 20000; i++) { const x = R() * 10, y = R() * 10, z = R() * 10; for (let v = 0; v < 3; v++) { b[i * 9 + v * 3] = x + R() * 0.1; b[i * 9 + v * 3 + 1] = y + R() * 0.1; b[i * 9 + v * 3 + 2] = z + R() * 0.1; } } meshes.push([b, {}]); meshes.push([b, { maxLeaf: 3, bins: 5 }]); meshes.push([b, { maxLeaf: 1, bins: 32 }]); }
+    { const b = new Float64Array(500 * 9); for (let i = 0; i < 500; i++) b.set([0, 0, 0, 1, 0, 0, 0, 1, 0], i * 9); meshes.push([b, {}]); }      // every centroid the same
+    { const b = new Float64Array(300 * 9); for (let i = 0; i < 300; i++) b.set([i, 0, 0, i, 0, 0, i, 0, 0], i * 9); meshes.push([b, {}]); }      // points on a line
+    { const b = new Float64Array(64 * 9); for (let i = 0; i < 64; i++) b.set([-0, 0, i % 2 ? -0 : 0, 1, -0, 0, 0, 1, -0], i * 9); meshes.push([b, {}]); }   // signed zeros
+    { const b = new Float64Array(4000 * 9); for (let i = 0; i < 4000; i++) { const k = i % 40; b.set([k, k % 7, 0, k + 1, k % 7, 0, k, k % 7 + 1, 0], i * 9); } meshes.push([b, {}]); }   // duplicates, coplanar
+    let differ = 0, nodes = 0, tOld = 0, tNew = 0;
+    for (const [b, o] of meshes) {
+        let t0 = performance.now(); const r = new RefBVH(b, o); tOld += performance.now() - t0;
+        t0 = performance.now(); const x = new MeshBVH(b, o); tNew += performance.now() - t0;
+        let same = r.nodes === x.nodes && r.leaves === x.leaves && r.depth === x.depth;
+        for (let i = 0; same && i < r.count; i++) same = r.order[i] === x.order[i];
+        for (let i = 0; same && i < r.nodes * 3; i++) same = r.meta[i] === x.meta[i];
+        for (let i = 0; same && i < r.nodes * 6; i++) same = Object.is(r.bounds[i], x.bounds[i]);
+        if (!same) differ++;
+        nodes += r.nodes;
+    }
+    ok("!! *** " + meshes.length + " meshes (random soups 0..20,000, three leaf/bin settings, coincident centroids, a line, signed zeros, duplicates): THE SAME TREE AS THE ROUND-14 BUILD -- order, meta, bounds (Object.is), nodes, leaves, depth ***",
+        differ === 0, nodes + " nodes, " + differ + " meshes differing; build " + tOld.toFixed(0) + " ms old, " + tNew.toFixed(0) + " ms new (printed, not asserted)");
+}
+
 console.log("\nmeshBVH-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

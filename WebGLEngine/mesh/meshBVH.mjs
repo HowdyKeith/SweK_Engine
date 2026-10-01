@@ -156,12 +156,25 @@ export class MeshBVH {
         out[0] = x0; out[1] = y0; out[2] = z0; out[3] = x1; out[4] = y1; out[5] = z1;
     }
 
-    _build(start, end, depth) {
+    // *** BVH-CSG ROUND 15: THE SAME TREE, BUILT WITHOUT ITS WASTE. *** The page's blast rebuilds this over the whole
+    // wall every shot, and on a 13,448-triangle wall the build was 21.8 ms of a 41 ms pin-prick shot. Four changes, each
+    // a reorganisation of exact operations, so `order`, `bounds` and `meta` come out bit for bit as before (min and max
+    // are exact; the SAH sums are formed from the same operands in the same order -- tools/ship/meshBVH-selfcheck.mjs
+    // holds the tree against a frozen copy of the old build): (1) no typed array allocated per node -- the bin scratch is
+    // reused, as nothing reads it after the partition; (2) the chosen axis's centroid range is kept, not scanned twice;
+    // (3) the split sweep is prefix/suffix, O(bins) rather than O(bins^2); (4) a child's bounds are the union of its
+    // side's bins -- exactly the min/max of its triangles' vertices -- instead of a second pass over them (the
+    // rank-split fallback still scans).
+    _build(start, end, depth, pre = null) {
         const node = this.nodes++;
         if (depth > this.depth) this.depth = depth;
-        const b = new Float64Array(6);
-        this._boundsOf(start, end, b);
-        this.bounds.set(b, node * 6);
+        const o6 = node * 6;
+        if (pre) for (let k = 0; k < 6; k++) this.bounds[o6 + k] = pre[k];
+        else {
+            const b = this._b6 || (this._b6 = new Float64Array(6));
+            this._boundsOf(start, end, b);
+            this.bounds.set(b, o6);
+        }
         const n = end - start;
         if (n <= this.maxLeaf) { this.meta[node * 3] = -1; this.meta[node * 3 + 1] = start; this.meta[node * 3 + 2] = n; this.leaves++; return node; }
 
@@ -169,79 +182,93 @@ export class MeshBVH {
         // coplanar fans, or a mesh of degenerate triangles -- no split separates anything, every SAH cost is
         // equal, and a naive "best bin" returns an empty side. That recurses on the same range forever. If no
         // bin split is valid the range is halved by rank instead, which always terminates.
-        let axis = 0, extent = -1;
+        const cent = this._cent, order = this.order, tris = this.tris;
+        let axis = 0, extent = -1, lo = 0, hi = 0;
         for (let a = 0; a < AXIS; a++) {
-            let lo = Infinity, hi = -Infinity;
-            for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + a]; if (c < lo) lo = c; if (c > hi) hi = c; }
-            if (hi - lo > extent) { extent = hi - lo; axis = a; }
+            let l = Infinity, h = -Infinity;
+            for (let s = start; s < end; s++) { const c = cent[order[s] * 3 + a]; if (c < l) l = c; if (c > h) h = c; }
+            if (h - l > extent) { extent = h - l; axis = a; lo = l; hi = h; }
         }
-        let mid = -1;
+        let mid = -1, leftB = null, rightB = null;
         if (extent > 0) {
-            let lo = Infinity, hi = -Infinity;
-            for (let s = start; s < end; s++) { const c = this._cent[this.order[s] * 3 + axis]; if (c < lo) lo = c; if (c > hi) hi = c; }
             const B = this.bins, scale = B / (hi - lo);
-            const cnt = new Int32Array(B), bb = new Float64Array(B * 6).fill(0);
+            if (!this._cnt || this._cnt.length !== B) {
+                this._cnt = new Int32Array(B); this._bb = new Float64Array(B * 6);
+                this._pre = new Float64Array((B + 1) * 6); this._suf = new Float64Array((B + 1) * 6);
+                this._pc = new Int32Array(B + 1); this._sc = new Int32Array(B + 1);
+            }
+            const cnt = this._cnt, bb = this._bb;
+            cnt.fill(0);
             for (let i = 0; i < B; i++) { bb[i * 6] = bb[i * 6 + 1] = bb[i * 6 + 2] = Infinity; bb[i * 6 + 3] = bb[i * 6 + 4] = bb[i * 6 + 5] = -Infinity; }
             for (let s = start; s < end; s++) {
-                const t = this.order[s];
-                let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                const t = order[s];
+                let bi = ((cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
                 cnt[bi]++;
-                const o = t * 9;
+                const o = t * 9, q = bi * 6;
                 for (let c = 0; c < 3; c++) {
-                    const x = this.tris[o + c * 3], y = this.tris[o + c * 3 + 1], z = this.tris[o + c * 3 + 2];
-                    if (x < bb[bi * 6]) bb[bi * 6] = x; if (x > bb[bi * 6 + 3]) bb[bi * 6 + 3] = x;
-                    if (y < bb[bi * 6 + 1]) bb[bi * 6 + 1] = y; if (y > bb[bi * 6 + 4]) bb[bi * 6 + 4] = y;
-                    if (z < bb[bi * 6 + 2]) bb[bi * 6 + 2] = z; if (z > bb[bi * 6 + 5]) bb[bi * 6 + 5] = z;
+                    const x = tris[o + c * 3], y = tris[o + c * 3 + 1], z = tris[o + c * 3 + 2];
+                    if (x < bb[q]) bb[q] = x; if (x > bb[q + 3]) bb[q + 3] = x;
+                    if (y < bb[q + 1]) bb[q + 1] = y; if (y > bb[q + 4]) bb[q + 4] = y;
+                    if (z < bb[q + 2]) bb[q + 2] = z; if (z > bb[q + 5]) bb[q + 5] = z;
                 }
             }
-            const area = (x0, y0, z0, x1, y1, z1) => {
-                if (!(x1 >= x0)) return 0;
-                const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            // pre[s] = union of bins [0, s), suf[s] = union of bins [s, B): the same min/max the per-split loops formed
+            const pre6 = this._pre, suf = this._suf, pc = this._pc, sc = this._sc;
+            pre6[0] = pre6[1] = pre6[2] = Infinity; pre6[3] = pre6[4] = pre6[5] = -Infinity; pc[0] = 0;
+            for (let i = 0; i < B; i++) {
+                const p = i * 6, q = p + 6, g = i * 6;
+                pre6[q] = bb[g] < pre6[p] ? bb[g] : pre6[p]; pre6[q + 1] = bb[g + 1] < pre6[p + 1] ? bb[g + 1] : pre6[p + 1]; pre6[q + 2] = bb[g + 2] < pre6[p + 2] ? bb[g + 2] : pre6[p + 2];
+                pre6[q + 3] = bb[g + 3] > pre6[p + 3] ? bb[g + 3] : pre6[p + 3]; pre6[q + 4] = bb[g + 4] > pre6[p + 4] ? bb[g + 4] : pre6[p + 4]; pre6[q + 5] = bb[g + 5] > pre6[p + 5] ? bb[g + 5] : pre6[p + 5];
+                pc[i + 1] = pc[i] + cnt[i];
+            }
+            const e = B * 6;
+            suf[e] = suf[e + 1] = suf[e + 2] = Infinity; suf[e + 3] = suf[e + 4] = suf[e + 5] = -Infinity; sc[B] = 0;
+            for (let i = B - 1; i >= 0; i--) {
+                const q = i * 6, p = q + 6, g = i * 6;
+                suf[q] = bb[g] < suf[p] ? bb[g] : suf[p]; suf[q + 1] = bb[g + 1] < suf[p + 1] ? bb[g + 1] : suf[p + 1]; suf[q + 2] = bb[g + 2] < suf[p + 2] ? bb[g + 2] : suf[p + 2];
+                suf[q + 3] = bb[g + 3] > suf[p + 3] ? bb[g + 3] : suf[p + 3]; suf[q + 4] = bb[g + 4] > suf[p + 4] ? bb[g + 4] : suf[p + 4]; suf[q + 5] = bb[g + 5] > suf[p + 5] ? bb[g + 5] : suf[p + 5];
+                sc[i] = sc[i + 1] + cnt[i];
+            }
+            const area = (A, k) => {
+                if (!(A[k + 3] >= A[k])) return 0;
+                const dx = A[k + 3] - A[k], dy = A[k + 4] - A[k + 1], dz = A[k + 5] - A[k + 2];
                 return 2 * (dx * dy + dy * dz + dz * dx);
             };
             let bestCost = Infinity, bestBin = -1;
             for (let split = 1; split < B; split++) {
-                let lx0 = Infinity, ly0 = Infinity, lz0 = Infinity, lx1 = -Infinity, ly1 = -Infinity, lz1 = -Infinity, lc = 0;
-                for (let i = 0; i < split; i++) {
-                    if (!cnt[i]) continue;
-                    lc += cnt[i];
-                    if (bb[i * 6] < lx0) lx0 = bb[i * 6]; if (bb[i * 6 + 3] > lx1) lx1 = bb[i * 6 + 3];
-                    if (bb[i * 6 + 1] < ly0) ly0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ly1) ly1 = bb[i * 6 + 4];
-                    if (bb[i * 6 + 2] < lz0) lz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > lz1) lz1 = bb[i * 6 + 5];
-                }
-                let rx0 = Infinity, ry0 = Infinity, rz0 = Infinity, rx1 = -Infinity, ry1 = -Infinity, rz1 = -Infinity, rc = 0;
-                for (let i = split; i < B; i++) {
-                    if (!cnt[i]) continue;
-                    rc += cnt[i];
-                    if (bb[i * 6] < rx0) rx0 = bb[i * 6]; if (bb[i * 6 + 3] > rx1) rx1 = bb[i * 6 + 3];
-                    if (bb[i * 6 + 1] < ry0) ry0 = bb[i * 6 + 1]; if (bb[i * 6 + 4] > ry1) ry1 = bb[i * 6 + 4];
-                    if (bb[i * 6 + 2] < rz0) rz0 = bb[i * 6 + 2]; if (bb[i * 6 + 5] > rz1) rz1 = bb[i * 6 + 5];
-                }
+                const lc = pc[split], rc = sc[split];
                 if (!lc || !rc) continue;
-                const cost = lc * area(lx0, ly0, lz0, lx1, ly1, lz1) + rc * area(rx0, ry0, rz0, rx1, ry1, rz1);
+                const cost = lc * area(pre6, split * 6) + rc * area(suf, split * 6);
                 if (cost < bestCost) { bestCost = cost; bestBin = split; }
             }
             if (bestBin > 0) {
                 // partition in place around the chosen bin
                 let i = start, j = end - 1;
                 while (i <= j) {
-                    const t = this.order[i];
-                    let bi = ((this._cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
+                    const t = order[i];
+                    let bi = ((cent[t * 3 + axis] - lo) * scale) | 0; if (bi >= B) bi = B - 1;
                     if (bi < bestBin) i++;
-                    else { this.order[i] = this.order[j]; this.order[j] = t; j--; }
+                    else { order[i] = order[j]; order[j] = t; j--; }
                 }
-                if (i > start && i < end) mid = i;
+                if (i > start && i < end) {
+                    mid = i;
+                    // the children's boxes, which recursion below would overwrite in the scratch: kept per depth
+                    const lv = this._lvl || (this._lvl = []);
+                    const slot = lv[depth] || (lv[depth] = new Float64Array(12));
+                    for (let k = 0; k < 6; k++) { slot[k] = pre6[bestBin * 6 + k]; slot[6 + k] = suf[bestBin * 6 + k]; }
+                    leftB = slot.subarray(0, 6); rightB = slot.subarray(6, 12);
+                }
             }
         }
         if (mid < 0) {
             // the fallback described above: split by rank, which cannot produce an empty side
             mid = (start + end) >> 1;
-            const slice = Array.from(this.order.subarray(start, end));
-            slice.sort((a, b2) => this._cent[a * 3 + axis] - this._cent[b2 * 3 + axis]);
-            this.order.set(slice, start);
+            const slice = Array.from(order.subarray(start, end));
+            slice.sort((a, b2) => cent[a * 3 + axis] - cent[b2 * 3 + axis]);
+            order.set(slice, start);
         }
-        const left = this._build(start, mid, depth + 1);
-        const right = this._build(mid, end, depth + 1);
+        const left = this._build(start, mid, depth + 1, leftB);
+        const right = this._build(mid, end, depth + 1, rightB);
         this.meta[node * 3] = left; this.meta[node * 3 + 1] = right; this.meta[node * 3 + 2] = 0;
         return node;
     }

@@ -955,7 +955,7 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
     // (a) FLUSH-BOX FUZZ: corners on a 1/4 grid, so faces are flush, edges collinear and corners coincident at random;
     // as built, rotated 0.7 rad about z (flush only to rounding), and shifted 0.1 (grid values no longer exact)
     {
-        let runs = 0, worst = 0, fbs = 0, amb = 0, crack = 0, nm = 0, rearr = 0, bad0 = 0;
+        let runs = 0, worst = 0, fbs = 0, amb = 0, crack = 0, nm = 0, rearr = 0, bad0 = 0, conformDiff = 0, scanned = 0, scannedAll = 0;
         for (const variant of ["grid", "rot0.7", "shift0.1"]) {
             let st = 4242 >>> 0; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
             const q = () => Math.round((rnd() * 2 - 1) * 4) / 4, hq = () => (1 + Math.floor(rnd() * 4)) / 4;
@@ -971,6 +971,11 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
                     runs++; worst = Math.max(worst, e); fbs += fbk(r); amb += r.ambiguousTriIndices.length; crack += c.crack; nm += c.nm; rearr += stat(r, "rearranged");
                     const r0 = run(A, B, op, { contacts: false });
                     if (Math.abs(vol(r0) - T[op]) > 1e-9 || cracks(r0.tris).crack) bad0++;
+                    // round 15: the conformity pass scans only the triangles the BVH says touch a split one; conformAll
+                    // scans every triangle, as rounds 12-14 did -- the very same bits, or the restriction lost a split
+                    const rAll = run(A, B, op, { conformAll: true });
+                    if (rAll.tris.length !== r.tris.length || rAll.tris.some((x, i) => x !== r.tris[i]) || rAll.from.some((x, i) => x !== r.from[i])) conformDiff++;
+                    scanned += stat(r, "conformScanned"); scannedAll += stat(rAll, "conformScanned");
                 }
             }
         }
@@ -980,6 +985,8 @@ console.log("\n17. *** ROUND 12: PIECES OF ONE SURFACE LYING ON THE OTHER -- FLU
             ", non-manifold edges (solids meeting on a line) " + nm + ", triangles re-arranged for edge conformity " + rearr);
         ok("   control: contacts:false is wrong or cracked on a large share of the same runs", bad0 > runs / 4, bad0 + " of " + runs);
         ok("   the edge-conformity pass ran (a triangle got its neighbour's split point) -- the T-junction it closes is in this set", rearr > 0, rearr + " re-arrangements");
+        ok("!! round 15: the conformity pass over only the triangles touching a split one gives the SAME BITS as over all of them, on every run (where conformity was born)",
+            conformDiff === 0 && scanned < scannedAll, conformDiff + " of " + runs + " runs differing; triangles scanned " + scanned + " against " + scannedAll);
     }
 
     // (b) NEAR-FLUSH TILT: B sits on the unit box A=[0,1]^3 with its bottom face tilted by slope s about the x=0 edge,
