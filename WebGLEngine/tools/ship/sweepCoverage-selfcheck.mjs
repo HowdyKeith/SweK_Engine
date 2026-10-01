@@ -192,7 +192,13 @@ const overInSomeReading = (x) => [x.hereMs, x.recordedWas, x.overMs, x.v4476Ms, 
 // retirement path the old clause existed for is kept and sharpened: if a live CONTENDED sample says the
 // gate is under budget under load too, it is fast everywhere and falls off the roll -- which is a fact
 // about the gate rather than about which run was most recent.
+// v4782 -- THE MEDIAN OF THE RING, NOT THE LAST READING. headlessGpu's alone readings ran 2,770 / 2,722 / 11,890 /
+// 2,659 across four sweeps, and this read only the newest: the "12 OF THE 22" row was red on the record one pass
+// wrote and green on the next, nothing about any gate having changed. quickSweep keeps the last three serial
+// readings for exactly this reason (its SERIAL_RING note, v4648: "one sample was standing in for a property").
 const aloneMs = (g, F = FILE) => {
+    const ring = ((F.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0);
+    if (ring.length >= 2) { const a = ring.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; }
     const s = (F.serial || {})[g];
     if (typeof s === "number") return s;
     return (F.contended || {})[g] === false ? (F.timings || {})[g] : null;
@@ -501,7 +507,9 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
                                  ((FILE.timings || {})[r.gate] === r.recordedMs ||
-                                  (returned.has(r.gate) && (FILE.timings || {})[r.gate] < SC.BUDGET_MS) ||
+                                  // v4782: a returnee is judged by aloneMs -- the median of its last three serial readings --
+                                  // not the newest one: headlessGpu read 11,890 alone once between 2,722 and 2,659.
+                                  (returned.has(r.gate) && (aloneMs(r.gate) ?? (FILE.timings || {})[r.gate]) < SC.BUDGET_MS) ||
                                   // v4477: the THIRD state, which the merged tree created and neither branch
                                   // had alone -- RE-MEASURED AND STILL OVER. crossBackend was re-timed at v4476
                                   // to 12,851 ms here against main's 376, a 34x disagreement between two boxes

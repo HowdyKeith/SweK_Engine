@@ -8723,6 +8723,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4782 -- THE 386th CLOSING: NO new gate file -- the orphan censuses fifty times faster, and run by name at ship.
+    since479: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened them.
+        at: "v4782", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/moduleRefs-selfcheck.mjs (basenameHits held equal to includes() case by case)",
+                                "tools/ship/graveyard-selfcheck.mjs (157 s to 2.9: the index, and the directory test once per directory)",
+                                "tools/ship/referenceKind-selfcheck.mjs (175 s to 3.1, the same two fixes)",
+                                "tools/ship/sweepCoverage-selfcheck.mjs (a returnee judged by the median of its last three alone readings)",
+                                "tools/ship/verify.mjs (the two orphan ratchets as named ship steps)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REASON NO VERIFY SAW THE ORPHAN RATCHETS WAS TWO QUADRATIC LOOPS. *** moduleRefs' referenceGraph asked " +
+                 "includes(basename) of every file for every unreferenced module -- 2,798 modules, 5,087 files, 90 MB, 107 s -- and " +
+                 "both censuses asked whether a directory is named once per FILE in it. One pass now answers the substring test " +
+                 "for every basename: each ends in .js, .mjs or .html, so each occurrence ends at that anchor, walked backwards " +
+                 "through a trie of reversed stems. Identical on the real tree, 0 of 2,798 mention lists different, 725 ms " +
+                 "against 105,555; the directory test is asked once per directory with the same answer. graveyard 157 s to " +
+                 "2.9, referenceKind 175 to 3.1, shaderRefs from a 400 s timeout to 56 -- WHICH SHOWED A RED THE TIMEOUT HAD " +
+                 "HIDDEN: 17 callers hand-spelling the corpus filter against a ceiling of 11. Six were moved to moduleRefs' " +
+                 "SOURCE_EXT by hand, the three this round touched and three in live tool code, 11 again. AND RUN BY NAME: the " +
+                 "sweep picks gates by a timing record a foreign box cannot refresh, so verify now runs both censuses as " +
+                 "steps whatever any record says. sweepCoverage's 12-of-22 row flipped on headlessGpu reading 11,890 ms alone " +
+                 "once between 2,722 and 2,659; a returnee is judged by the median of its last three alone readings, as " +
+                 "quickSweep's own ring is. Three sabotages red.",
+    }),
     // v4781 -- THE 385th CLOSING: NO new gate file -- the two orphan ratchets the v4776 merge landed over unmeasured.
     since478: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

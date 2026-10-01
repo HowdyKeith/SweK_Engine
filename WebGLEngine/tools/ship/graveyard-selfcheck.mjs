@@ -31,7 +31,7 @@ import { hasToolDoor, toolDoors } from "./doorKinds.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { referenceGraph } from "./moduleRefs.mjs";
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -46,7 +46,7 @@ function scan() {
             if (e === "node_modules" || e.startsWith(".")) continue;
             const p = path.join(d, e);
             let st; try { st = fs.statSync(p); } catch { continue; }
-            if (st.isDirectory()) walk(p); else if (/\.(js|mjs|html)$/.test(e)) all.push(p);
+            if (st.isDirectory()) walk(p); else if (SOURCE_EXT.test(e)) all.push(p);
         }
     })(ENG);
     const text = new Map(all.map((f) => { try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; } }));
@@ -62,9 +62,13 @@ function scan() {
                           path.join(ENG, "tools/ship/referenceKind-selfcheck.mjs")]),
     });
 
-    const dynDirs = new Set();
+    const dynDirs = new Set(), askedDirs = new Set();
     for (const f of all) {
         const dir = path.dirname(f);
+        // v4782 -- ONCE PER DIRECTORY. The answer depends on the directory alone, and it was asked once per FILE: a
+        // directory nobody names scanned the whole corpus again for each module in it -- ~7 of this gate's 8.5 s.
+        if (askedDirs.has(dir)) continue;
+        askedDirs.add(dir);
         const dirRel = rel(dir);
         if (!dirRel || dirRel === ".") continue;
         for (const c of all) {
