@@ -177,6 +177,13 @@
 // snaps). With that order the result is the same from 64 snaps up (64..512 measured, same bits at 128) and the 32- and
 // 48-snap joins leave the cone: the join must reach the twins' separation, ~5e-8 in the band. The page's chains never
 // have such a pair (60 shots bit for bit the 8-snap join's), nor do the 1,350 flush boxes (exactly coplanar, never crossed).
+//
+// *** ROUND 19b: A FLAT EAR. *** Earcut can join three EXACTLY collinear ring vertices into a triangle of zero area: a hole
+// whose edge points straight at a vertex of the outer ring (the page's workload -- a blob's edge on the line of an
+// earlier seam). That refused the triangle ('earcut'), and its plane-path pieces opened 44 edges on one shot of a
+// 100-shot session (round 19's soak). Now the flat triangle (p, m, q) goes and the triangle across its long edge is
+// split at m, fanned from its opposite corner (stats.flatEars); with nothing across, it is refused as before.
+// opts.flatEars:false is the old refusal (blastEngine-selfcheck section 10's control).
 "use strict";
 
 import { ShapeUtils, Vector2 } from "../../vendor/three/three.core.js";
@@ -644,7 +651,7 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
     // Earcut sees only the corners, and each absorbed run is put back by fanning the one triangle that owns that
     // edge from its opposite vertex. Every vertex comes back, so the face still meets its neighbours edge for edge.
     const out = [];
-    let absorbedTotal = 0, onConflicts = 0, splitEdges = 0;
+    let absorbedTotal = 0, onConflicts = 0, splitEdges = 0, flatEars = 0;
     for (const f of faces) {
         const want = f.area + f.holes.reduce((s, h) => s + h.area, 0);
         const absorbed = new Map();          // "p,q" (a surviving ring edge) -> the vertices strictly between, in order
@@ -678,15 +685,40 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
             rings.slice(1).map((r) => r.map((i) => new Vector2(V2[i][0], V2[i][1]))));
         let T3 = [];
         let got = 0;
+        const flatTris = [];
         for (const [i, j, k] of idx) {
             const a = flat[i];
             let b = flat[j], c = flat[k];
             let ar = triArea2(V2[a], V2[b], V2[c]);
             if (ar < 0) { [b, c] = [c, b]; ar = -ar; }
-            if (ar === 0) return refuse("earcut", { zeroArea: true });
+            if (ar === 0) { if (opts.flatEars === false) return refuse("earcut", { zeroArea: true }); flatTris.push([a, b, c]); continue; }
             got += ar;
             T3.push([a, b, c]);
         }
+        // BVH-CSG round 19b: Earcut can join three EXACTLY collinear ring vertices into a triangle of zero area -- a hole's
+        // edge pointing straight at a vertex of the outer ring (the page's workload: a blob's edge on the line of an
+        // earlier seam; round 19's soak, 44 edges opened by the refusal). Refused, the whole triangle went to the plane
+        // path. The flat triangle (p, m, q), m strictly between p and q, covers nothing: it goes, and the triangle across
+        // its long edge p-q is split at m, fanned from its opposite corner -- both pieces positive, every edge paired
+        // again, the face's area unchanged. With nothing across p-q it is refused as before.
+        for (const [x, y, z] of flatTris) {
+            const P = [x, y, z], d2 = (u, v) => (V2[u][0] - V2[v][0]) ** 2 + (V2[u][1] - V2[v][1]) ** 2;
+            let mi = 0, best = -1;   // the middle vertex: opposite the longest side
+            for (let k = 0; k < 3; k++) { const L = d2(P[(k + 1) % 3], P[(k + 2) % 3]); if (L > best) { best = L; mi = k; } }
+            const m = P[mi], p0 = P[(mi + 1) % 3], q0 = P[(mi + 2) % 3];
+            let hit = -1, e = -1;
+            for (let ti = 0; ti < T3.length && hit < 0; ti++) for (let k = 0; k < 3; k++) {
+                const u = T3[ti][k], v = T3[ti][(k + 1) % 3];
+                if ((u === p0 && v === q0) || (u === q0 && v === p0)) { hit = ti; e = k; break; }
+            }
+            if (hit < 0 || !(best > 0)) return refuse("earcut", { zeroArea: true });
+            const u = T3[hit][e], v = T3[hit][(e + 1) % 3], r = T3[hit][(e + 2) % 3];
+            if (!(triArea2(V2[u], V2[m], V2[r]) > 0 && triArea2(V2[m], V2[v], V2[r]) > 0)) return refuse("earcut", { zeroArea: true });
+            T3.splice(hit, 1, [u, m, r], [m, v, r]);
+            flatEars++;
+        }
+        // the triangles must still tile the face: summed again after the repair, so the check below holds it too
+        if (flatTris.length) { got = 0; for (const [a, b, c] of T3) got += triArea2(V2[a], V2[b], V2[c]); }
         const tolF = snap * (perim(f) + f.holes.reduce((s, h) => s + perim(h), 0)) + AREA_REL * areaT;
         if (T3.length === 0 || Math.abs(got - want) > tolF) return refuse("earcut", { got, want });
         // Round 13 (contacts): Earcut can run ONE triangle edge straight through other face vertices lying on its line
@@ -774,6 +806,6 @@ export function arrangeTriangle(trisA, triA, trisB, candidateTriBs, opts = {}) {
         sideVerts,
         stats: { segments: segs.length, vertices: V2.length, crossings, pointContacts, absorbed: absorbedTotal,
                  faceCount: out.length, holeCount: holes.length, coplanar: coplanar.length, contactSegs,
-                 pruned, contracted, joined, joinedMax, twinCrossed, onConflicts, droppedThin, splitEdges },
+                 pruned, contracted, joined, joinedMax, twinCrossed, onConflicts, droppedThin, splitEdges, flatEars },
     };
 }

@@ -90,6 +90,15 @@
 //   V5 finishing off by default                                          -> 12 / 3
 //       First run: 8, none in section 9 -- section 7 (round 16) read r.stats.weldMoves, which only finishing makes, and
 //       threw before section 9 ran. Section 7 now reads it as NaN when absent and fails by name; the gate runs on.
+// SABOTAGE LOG (round 19b) -- triArrangement.mjs's flat-ear repair and meshBoolean.mjs's fold join; three gates (THIS /
+// meshBoolean-selfcheck / triArrangement-selfcheck), each on the real file, restored and md5 verified. 5 of 5 red:
+//   W1 the flat-ear repair gone (every zero-area ear refused)            -> 1 / 0 / 0   (section 10's session)
+//   W2 folds off by default                                              -> 1 / 0 / 0   (section 10's shot 80)
+//   W3 any short neighbour joined, doubling back or not                  -> 3 / 5 / 0   (the rotated band too)
+//   W4 the repair's split keeping one of its two pieces                  -> 1 / 0 / 0
+//       0 red on the first battery: the face's area sum had been taken BEFORE the repair, so a lost piece passed it.
+//       It is summed again after the repair now, and the lost piece refuses the face (44 edges, section 10's session).
+//   W5 FOLD_SNAPS 1 (no fold is ever long enough)                        -> 1 / 0 / 0
 "use strict";
 
 import fs from "node:fs";
@@ -548,8 +557,40 @@ console.log("\n9. *** ROUND 19: THE SOAK THAT MADE \"bvh\" THE DEFAULT ***");
         cut.length + " CUT polygons, " + mesh.triangles + " triangles, UVs out of [0,1] " + uvOut + ", texel spread " + td.spread.toExponential(1) + " (a vertex the weld left ~2e-9 off its plane, in a small polygon), rebar on " + (100 * rodArea / cutArea).toFixed(1) + "% of the cut");
     // KNOWN: the openings the soak found in the BVH engine, with their reproductions
     const k8 = chain("bvh", 8, 100), o8 = pageCensus(k8.wall);
-    report("KNOWN  the soak's BVH openings: seed 8 opens at shot 80 (a sliver triangle, three edges unpartnered, where blob equators -- every page blob's lies in z = 0 -- meet earlier cut edges) and stands at " + o8 + " open edges after 100 shots; a session of large blasts opened 44 edges at one shot through an Earcut fallback (its plane-path pieces). On 12 node chains: 1 open (13 edges), 7 fallback triangles in 1,200 shots. The BSP: open raw on every chain (~50,000 edges), and after settle on every one (382 edges over the 12). Backlog bvh-csg-r19b-long-chain-openings.");
-    ok("   (KNOWN, pinned) seed 8 stays within 2.5x its measured 13 open edges after 100 shots -- a regression alarm, not a correctness claim", o8 <= 2.5 * 13, String(o8));
+    report("KNOWN  seed 8 stands at " + o8 + " open edges after 100 shots (13 at round 19): round 19b closed its shot-80 opening (section 10); what is left opens at shot 84, a fan of wall slivers ~6e-6 wide along a seam 3e-3 inside the wall's back face -- backlog bvh-csg-r19c-sliver-fan-openings. The BSP: open raw on every chain (~50,000 edges), and after settle on every one (382 edges over the 12).");
+    ok("   (KNOWN, pinned) seed 8 stays within 2.5x its measured 10 open edges after 100 shots -- a regression alarm, not a correctness claim", o8 <= 2.5 * 10, String(o8));
+}
+
+console.log("\n10. *** ROUND 19b: TWO OF THE SOAK'S OPENINGS, ROOT-CAUSED AND CLOSED ***");
+{
+    // (a) a session of the page's own range of blasts -- radius 0.20..1.40 in the slider's steps of 5, jaggedness to 0.90,
+    // 4..14 facets, Math.random seeded as round 19 seeded the page -- 100 shots. Round 19 found one blob triangle refused
+    // 'earcut' at shot 98: Earcut joined a hole's edge to an outer-ring vertex lying exactly on its line, a triangle of
+    // zero area, and the plane path that took the whole triangle opened 44 edges. Now the flat triangle goes and the one
+    // across its long edge is split at its middle vertex (triArrangement.mjs, round 19b).
+    let st = 12345; const rnd = () => { st = (st * 1664525 + 1013904223) >>> 0; return st / 4294967296; };
+    let wall = M.boxPolys([0, 0, 0], HALF), seed = 1, worst = 0, fb = 0, at98 = null;
+    for (let k = 0; k < 100; k++) {
+        const sl = (n) => ((k * 2654435761 + n * 40503) >>> 0) / 4294967296;
+        const r = (20 + Math.round(sl(1) * 120)) / 100, rough = Math.round(sl(2) * 90) / 100, sub = 4 + Math.floor(sl(3) * 11);
+        const c = [(rnd() * 2 - 1) * (HALF[0] - r), (rnd() * 2 - 1) * (HALF[1] - r), 0];
+        const blob = M.jaggedBlob(c, r, sub, seed++, { rough, floor: 1 - rough });
+        if (k === 97) at98 = { wall, blob };
+        const out = blastWith("bvh", wall, blob); wall = out.polys; fb += out.stats.fallbackTris || 0;
+        worst = Math.max(worst, pageCensus(wall));
+    }
+    const ctrlA = pageCensus(blastWith("bvh", at98.wall, at98.blob, { flatEars: false }).polys);
+    ok("!! a session of the page's range of blasts, 100 shots: the wall closed at the page's census after EVERY shot, no fallback",
+        worst === 0 && fb === 0, "worst open edges after any shot " + worst + ", fallback triangles " + fb);
+    ok("   control: with the flat-triangle repair off (flatEars:false), shot 98 opens the wall again", ctrlA > 0, ctrlA + " open edges");
+    // (b) the soak's seed 8, shot 80: two pairs' segments meet at b, where a wall edge crosses the blob's plane 4e-10 from
+    // a blob edge, and the next pair's segment runs 1.5e-8 straight back -- a FOLD. The triangle across split a-b at its
+    // far end, the triangles beyond kept a-b whole: 3 edges open, past the weld. The seam consensus joins a fold's ends.
+    let w8 = M.boxPolys([0, 0, 0], HALF); const b8 = pageBlasts(8, 81);
+    for (let k = 0; k < 80; k++) w8 = blastWith("bvh", w8, b8[k]).polys;
+    const on = pageCensus(blastWith("bvh", w8, b8[80]).polys), off = pageCensus(blastWith("bvh", w8, b8[80], { seamFolds: false }).polys);
+    ok("!! the soak's seed 8, shot 80: closed at the page's census -- with the seam's folds joined -- where seamFolds:false opens it",
+        on === 0 && off > 0, "open " + on + "; seamFolds:false " + off);
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

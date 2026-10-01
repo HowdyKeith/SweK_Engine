@@ -481,6 +481,20 @@
 // ends 1.4e-9..3.5e-9 apart (open at the page's 1e-9 census: 20 five-op chains each, union 0 edges, subtract 3,
 // intersect 21), which the page's blasts close with round 14's finishing -- and only the subtract adapter has it. A
 // second caller needs it for its op too: backlog bvh-csg-r18b-finish-any-op.
+//
+// *** ROUND 19b: TWO OF THE DEFAULT ENGINE'S OPENINGS, ROOT-CAUSED. *** Round 19's soak (1,200 page shots and a 100-shot
+// session of the page's range) found the page's wall opened twice. (1) An Earcut refusal -- triArrangement.mjs's ROUND
+// 19b note: 44 edges, now 0. (2) A seam FOLD (seed 8, shot 80): two pairs' segments meet at b, where a wall edge crosses
+// the blob's plane 4e-10 from a blob edge, and the next pair's segment runs 1.5e-8 straight back along the first; the blob
+// triangle split the first segment at the fold's far end c (within snap of it), the wall triangles kept it whole, and 3
+// edges opened that the finishing weld could not close (b and c 1.5e-8 apart, past its 8e-9). seamConsensus now joins
+// a fold's two ends -- a segment no longer than FOLD_SNAPS (16) x snap that shares an end with another and doubles back
+// within snap of it -- as it already joined segments shorter than snap (opts.seamFolds:false is the control). Measured
+// first and dropped: joining EVERY short segment up to 8, 16 or 32 snaps (seed 8: 13 open edges -> 18, 39, 58), and a
+// wider finishing weld (16 or 32 snaps: 13 -> 10, only the fold). Fold lengths 16, 32 and 64 measure alike. The soak's
+// 12 chains: fallbacks 7 -> 6 (the rest 'dangling', none opening), seed 8's open edges 13 -> 10; the gate's rotated
+// band, flush boxes and every other gate unchanged. LEFT: seed 8's shot 84 -- a fan of wall slivers ~6e-6 wide along a
+// seam 3e-3 inside the wall's back face, 10 edges -- backlog bvh-csg-r19c-sliver-fan-openings.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -643,7 +657,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     if (cutting === "arrangement" && contacts) {
         for (let t = 0; t < triCount; t++) {
             const cands = byTri.get(t);
-            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts });
+            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts });
         }
         const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
         const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
@@ -697,7 +711,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
                 }
             }
             if (!need.length) continue;
-            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts, sidePoints: need });
+            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts, sidePoints: need });
             rearranged++; injected += need.length;
         }
     }
@@ -724,7 +738,7 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, contacts });
+            const arr = arrs[t] || arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
@@ -989,11 +1003,12 @@ function pick(tris, keep) {
  * cluster), or null when nothing was joined; and every pair's result, keyed a x 2^32 + b, which both meshes' arrangements
  * read instead of computing the pair again (triTriIntersect(a, b) and (b, a) give the same points -- triArrangement's gate).
  */
-export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS, exact = false) {
+export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS, exact = false, folds = true) {
     const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
     const rd = (buf, t) => [[buf[t * 9], buf[t * 9 + 1], buf[t * 9 + 2]], [buf[t * 9 + 3], buf[t * 9 + 4], buf[t * 9 + 5]], [buf[t * 9 + 6], buf[t * 9 + 7], buf[t * 9 + 8]]];
     const results = new Map();          // only pairs that touch: an arrangement reads a missing pair as "none"
     const short = [];                   // the segments no longer than snap, with which of their ends are input vertices
+    const all = [];
     for (const [a, b] of pairs) {       // (pairOverlap gives each pair once: a triangle is in one leaf)
         const pk = a * 4294967296 + b;
         const r = (exact ? triTriIntersectExact : triTriIntersect)(trisA, a, trisB, b);
@@ -1001,15 +1016,44 @@ export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS, exact =
         let p0, p1;
         if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; results.set(pk, { r }); }
         else { const c = contactPair(rd(trisA, a), rd(trisB, b)); results.set(pk, { r, c }); if (c.kind !== "segment") continue; p0 = c.p0; p1 = c.p1; }
-        if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]) > snap) continue;
         const T = [...rd(trisA, a), ...rd(trisB, b)], isC = (p) => T.some((v) => v[0] === p[0] && v[1] === p[1] && v[2] === p[2]);
+        if (folds) all.push({ p0, p1, c0: isC(p0), c1: isC(p1) });
+        if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]) > snap) continue;
         short.push({ p0, p1, c0: isC(p0), c1: isC(p1) });
     }
+    // BVH-CSG round 19b: a FOLD -- a segment b-c no longer than FOLD_SNAPS x snap that shares its end b with a segment
+    // a-b and doubles back along it (c within snap of a-b's interior) -- has its two ends made one point, as a segment
+    // shorter than snap does. Measured on the page (soak seed 8, shot 80): two pairs' segments meet at b, where one
+    // mesh's edge crosses the other's plane 4e-10 from the other mesh's edge, and the next pair runs 1.5e-8 straight
+    // back; the triangle across splits a-b at c (within snap of it) while the triangles beyond keep a-b whole, and the
+    // wall opened 3 edges that no weld closed (c is 1.5e-8 from b, past the finishing weld's 8e-9).
+    let nFolds = 0;
+    if (folds) {
+        const key = (p) => p[0] + "," + p[1] + "," + p[2], at = new Map();
+        for (const g of all) for (const e of [g.p0, g.p1]) { const k = key(e); if (!at.has(k)) at.set(k, []); at.get(k).push(g); }
+        for (const g of all) {
+            const L = Math.hypot(g.p1[0] - g.p0[0], g.p1[1] - g.p0[1], g.p1[2] - g.p0[2]);
+            if (!(L > snap && L <= FOLD_SNAPS * snap)) continue;
+            for (const [b, c, cb, cc] of [[g.p0, g.p1, g.c0, g.c1], [g.p1, g.p0, g.c1, g.c0]]) {
+                const hit = (at.get(key(b)) || []).some((h) => {
+                    if (h === g) return false;
+                    const a = key(h.p0) === key(b) ? h.p1 : h.p0, ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+                    if (!(L2 > 0)) return false;
+                    const t = ((c[0] - a[0]) * ab[0] + (c[1] - a[1]) * ab[1] + (c[2] - a[2]) * ab[2]) / L2;
+                    const f = [c[0] - a[0] - t * ab[0], c[1] - a[1] - t * ab[1], c[2] - a[2] - t * ab[2]];
+                    return t > 0 && t < 1 && Math.hypot(f[0], f[1], f[2]) <= snap;
+                });
+                if (hit) { short.push({ p0: b, p1: c, c0: cb, c1: cc }); nFolds++; break; }
+            }
+        }
+    }
     const j = joinSeamEnds(short);
-    seamConsensus.last = j.stats;
+    seamConsensus.last = { ...j.stats, folds: nFolds };
     return { canon: j.canon, results, pairs };
 }
 
+/** Round 19b: the longest seam FOLD seamConsensus joins, in snaps (2 x JOIN; 16, 32 and 64 measured alike on the page). */
+export const FOLD_SNAPS = 16;
 /**
  * The clustering behind seamConsensus, on its own so it can be held to its rules by hand: the two ends of every short
  * segment {p0, p1, c0, c1} (c: that end is an input vertex) become one point. A cluster's representative is its input
@@ -1248,7 +1292,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
     let optsA = opts, optsB = opts;
     if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
-        const sc = seamConsensus(trisA, bvhA, trisB, bvhB, SNAP_EPS, !!opts.exactSeam);
+        const sc = seamConsensus(trisA, bvhA, trisB, bvhB, SNAP_EPS, !!opts.exactSeam, opts.seamFolds !== false);
         optsA = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 0, pairs: sc.pairs };
         optsB = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 1, pairs: sc.pairs.map(([a, b]) => [b, a]) };
     }
