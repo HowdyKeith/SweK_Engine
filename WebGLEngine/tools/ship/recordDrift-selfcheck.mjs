@@ -306,7 +306,9 @@ console.log("\n2. handed a stale record, each check names it");
     // gateFiles is not given a row: it takes ENG and returns a file list, no check reads it directly, and the
     // two checks that use it are both covered here and above. Said rather than left as a gap.
     const aReal = await import("./assertionShape.mjs");
-    const aFake = { ...aReal, census: () => ({ ...aReal.census(), definesOk: 1, gates: 1 }) };
+    // v4781 -- shapes:false, as recordDrift's own check asks: it reads definesOk and gates, both overridden here, and
+    // the swap scan the default census also runs was ~450 ms of this gate's 2,300 for fields nothing compares.
+    const aFake = { ...aReal, census: () => ({ ...aReal.census({ shapes: false }), definesOk: 1, gates: 1 }) };
     const dA = await checks({ load: async (p) => (p.includes("assertionShape") ? aFake : import(p)), only: "assertionShape census" });
     const rA = dA.find((c) => c.name === "assertionShape census");
     ok("!! an injected assertionShape census is MEASURED, not served from the memo the live pass filled",

@@ -107,19 +107,23 @@ export function signatureOf(src) {
  * recognising "this argument is a name" by its opening character.
  */
 export function maskStrings(src) {
-    let out = "", i = 0;
+    // v4781 -- the output is built in parts and the last significant character is CARRIED, not re-found: the first
+    // version asked prevSignificant(out) at every "/", scanning a growing string backwards, and the census spent a
+    // third of recordDrift-selfcheck's time here. Byte-identical output over every .mjs and .js in the tree.
+    const parts = [];
+    let i = 0, last = "";
+    const emit = (t) => { parts.push(t); for (let k = t.length - 1; k >= 0; k--) if (!/\s/.test(t[k])) { last = t[k]; break; } };
     while (i < src.length) {
         const ch = src[i];
         if (ch === '"' || ch === "'" || ch === "`") {
-            const q = ch; out += q; i++;
-            let body = "";
+            const q = ch; let body = q; i++;
             while (i < src.length && src[i] !== q) {
                 if (src[i] === "\\") { body += "xx"; i += 2; continue; }
                 body += src[i] === "\n" ? "\n" : "x";     // newlines kept so line offsets survive
                 i++;
             }
-            out += body;
-            if (i < src.length) { out += q; i++; }
+            if (i < src.length) { body += q; i++; }
+            emit(body);
             continue;
         }
         // *** AND REGEX LITERALS, BECAUSE ONE OF THEM BROKE THE BALANCER ON THE FIRST REAL TEST. ***
@@ -127,28 +131,24 @@ export function maskStrings(src) {
         // so firstArgOf never found the top-level comma. Two of my own three swaps were caught and this was
         // the third. A `/` starting a literal is told from division by what precedes it -- after an operator
         // or an opening bracket a regex can start and a division cannot.
-        if (ch === "/" && /[([{,;=!&|?:+\-*%~^<>]|^$/.test(prevSignificant(out))) {
-            out += "/"; i++;
-            let body = "", inClass = false;
+        if (ch === "/" && /[([{,;=!&|?:+\-*%~^<>]|^$/.test(last)) {
+            let body = "/", inClass = false; i++;
             while (i < src.length && (inClass || src[i] !== "/")) {
                 if (src[i] === "\\") { body += "xx"; i += 2; continue; }
                 if (src[i] === "[") inClass = true; else if (src[i] === "]") inClass = false;
                 if (src[i] === "\n") break;                 // an unterminated literal is not one
                 body += "x"; i++;
             }
-            out += body;
-            if (i < src.length && src[i] === "/") { out += "/"; i++; }
+            if (i < src.length && src[i] === "/") { body += "/"; i++; }
+            emit(body);
             continue;
         }
-        out += ch; i++;
+        // a run of plain characters at once: everything up to the next quote or slash
+        let j = i + 1;
+        while (j < src.length && src[j] !== '"' && src[j] !== "'" && src[j] !== "`" && src[j] !== "/") j++;
+        emit(src.slice(i, j)); i = j;
     }
-    return out;
-}
-
-/** The last non-whitespace character emitted so far, or "" -- what tells a regex literal from a division. */
-function prevSignificant(out) {
-    for (let k = out.length - 1; k >= 0; k--) if (!/\s/.test(out[k])) return out[k];
-    return "";
+    return parts.join("");
 }
 
 const stripComments = (s) => s

@@ -8729,7 +8729,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         at: "v4781", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (a pre-registration is a registration; the baseline caught up by name)",
-                                "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)"]),
+                                "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)",
+                                "tools/ship/patchScanDoor-selfcheck.mjs (the fixture is the zips in the uploads folder, not the folder)",
+                                "tools/ship/recordDrift-selfcheck.mjs (its injected census skips the swap scan nothing compares)"]),
         redOnArrival: Object.freeze([]),
         verdict: "*** TWO RATCHETS THE MERGE LANDED OVER, BECAUSE NOTHING THAT RUNS EVERY ROUND RUNS THEM. *** graveyard takes ~157 s " +
                  "and referenceKind ~175, so the v4776 merge went in unmeasured and the first run read 188 orphaned utilities against " +
@@ -8741,7 +8743,12 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "graveyard's record test knew *REGISTRATION and not that spelling -- 188 to 184. The rest are caught up and named, " +
                  "as the v4327 and v4535 merges were, and excused by none of it. AND THE ACCOUNT FIRST HID TWO OF ITS OWN SUBJECTS: " +
                  "graveyard's note named its modules by basename, referenceKind matches the basename, and the count read 326 -- a " +
-                 "register naming debt is not its consumer, so the note names them without their extensions. Three sabotages red.",
+                 "register naming debt is not its consumer, so the note names them without their extensions. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND TWO MORE. patchScanDoor read 'the uploads folder exists' as 'Keith's patch zips are here', " +
+                 "and this container provides that folder EMPTY: three reds on a scan that correctly found nothing. Whether there " +
+                 "is anything to scan is read off the folder's listing now, never off the scanner. And recordReach's margin fell " +
+                 "to 764 ms on recordDrift-selfcheck at 2,236: its injected-census row ran the full census, swap scan included, " +
+                 "for two fields it overrides -- ~450 ms. 2,300 to 1,800.",
     }),
     // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
     since477: Object.freeze({

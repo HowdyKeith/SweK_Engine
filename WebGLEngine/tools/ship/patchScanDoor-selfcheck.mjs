@@ -23,7 +23,12 @@ ok("!! *** the CJS bridge really can reach the ESM tool -- driven, not asserted 
 
 // ---- THE HAPPY PATH, against real patch zips ---------------------------------------------------------------
 const UP = "/mnt/user-data/uploads";
-if (fs.existsSync(UP)) {
+// v4781 -- THE FIXTURE IS THE ZIPS, NOT THE FOLDER. A claude.ai container can provide /mnt/user-data/uploads EMPTY,
+// and this read "the folder exists" as "Keith's patch zips are here": three reds on a scan that correctly found
+// nothing. Whether there is anything to scan is read off the folder's own listing, NOT off the scanner -- a broken
+// scanner returning ok with no rows must still fail where zips exist, so the scanner cannot excuse itself.
+const zipsHere = (() => { try { return fs.readdirSync(UP).some((f) => /\.zip$/i.test(f)); } catch { return false; } })();
+if (zipsHere) {
     // v3937 -- THE FOLDER IS AN ARGUMENT NOW, NOT A CONFIG WRITE. This called setConfig and never restored it,
     // the same defect downloadScan-selfcheck carried -- and that one left Keith's live installer aimed at a
     // temp folder of one-byte fixtures with auto-apply on. Nothing here writes to the config any more.
@@ -48,7 +53,7 @@ if (fs.existsSync(UP)) {
     ok("...and the tree version comes from the tree", /^v\d+$/.test(String(r.tree)),
         "a caller supplying both sides of a comparison is the shape that lets a mismatch be argued away");
 } else {
-    say("uploads directory absent; the happy path is exercised where the zips live. SAID OUT LOUD rather than " +
+    say((fs.existsSync(UP) ? "uploads directory holds no .zip" : "uploads directory absent") + "; the happy path is exercised where the zips live. SAID OUT LOUD rather than " +
         "skipped, because a check that vanishes with its fixture reads exactly like one that passed");
 }
 
