@@ -570,14 +570,25 @@
 // (2..9), every one at most 1.8e-16 deep and up to 2.2e-9 long -- two nearly coplanar slivers sharing a corner, exact,
 // then rounded to doubles (bvh-csg-r20b-embedded-rounding). Union, subtract and intersect chains: clean. meshCSG's own
 // twelve-blast stress case: this engine 1,098 ms and clean; the BSP localised 597 ms with 32,889 open edges.
+//
+// *** ROUND 20b: THE EXACT OUTPUT ROUNDED WITHOUT CROSSING ITSELF (embedRounded). *** Measured first: 9 of the soak's
+// 1,200 shots made crossings, 29 pairs, every one with a triangle at most 1.4e-9 high (a sliver near the blobs' z = 0
+// equators) and none with an edge shorter than 7.2e-13. Among the pairs where one triangle is new and one is a sliver
+// (EMBED_SLIVER), each exact crossing is removed by collapsing the shortest edge that moves a point the arrangement made --
+// never an operand's vertex -- by at most EMBED_SLIVER; refused where a triangle would turn over or the surface pinch (the
+// link condition). Triangles with an edge a rounding long (EMBED_ROUNDING) are left to the finishing weld, which merges
+// them: tested too, they cost meshCSG's twelve-blast case 1.6x (4,000-5,500 pairs a shot, every collapse 3e-16 at most).
+// MEASURED, 12 chains x 100 shots audited every 25: 48 of 48 walls two-manifold (6 crossing before), 0 fallbacks, closed
+// after every shot, the same solids to 7.1e-14, 1.036x the time; the twelve-blast case within noise (1.04..1.12x).
+// opts.embed:false is the control.
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
-import { exactPair, arrangeTriangleExact, exactInside, EXACT_NEAR } from "./exactArrangement.mjs";
-import { explicitPoint, centroidPoint } from "./implicitPoints.mjs";
+import { exactPair, arrangeTriangleExact, exactInside, EXACT_NEAR, degenerateTri } from "./exactArrangement.mjs";
+import { explicitPoint, centroidPoint, same as samePoint } from "./implicitPoints.mjs";
 import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { closestOnTriangle, angleAt, CONTACT_EPS, contactPair } from "./triContact.mjs";
@@ -1531,6 +1542,148 @@ function conformNear(tris, bvh, pairs, side) {
     return { tris: res.slice(0, w), src: Int32Array.from(src), stats: { merged, split, collapsed, open: open.length / 2 } };
 }
 
+/**
+ * Round 20b: the height under which an output triangle is a SLIVER -- the only triangles the exact output's rounding has
+ * been measured to fold (round 20: every crossing on the page soak had one 1.4e-9 high or less) -- and the longest edge
+ * embedRounded() collapses. meshCSG's EPS.
+ */
+export const EMBED_SLIVER = 1e-8;
+/**
+ * Round 20b: a triangle with an edge this short is left to the caller's rounding weld (blastEngine.mjs's EXACT_FINISH_WELD,
+ * the same 1e-14): its two points are a few ulps apart and the weld makes them one. Measured on meshCSG's twelve-blast case:
+ * 2..9 crossings a shot among such triangles, every collapse that removed one moving a point 3e-16 at most -- and 4,000-
+ * 5,500 pairs tested a shot to find them (1.6x the shot); the finished wall had none (round 20). On the page soak every
+ * crossing's shortest edge was 7.2e-13 or longer.
+ */
+export const EMBED_ROUNDING = 1e-14;
+const shortestEdge = (b, t) => { const o = t * 9; return Math.min(Math.hypot(b[o + 3] - b[o], b[o + 4] - b[o + 1], b[o + 5] - b[o + 2]), Math.hypot(b[o + 6] - b[o + 3], b[o + 7] - b[o + 4], b[o + 8] - b[o + 5]), Math.hypot(b[o] - b[o + 6], b[o + 1] - b[o + 7], b[o + 2] - b[o + 8])); };
+
+const triOf = (b, t) => [[b[t * 9], b[t * 9 + 1], b[t * 9 + 2]], [b[t * 9 + 3], b[t * 9 + 4], b[t * 9 + 5]], [b[t * 9 + 6], b[t * 9 + 7], b[t * 9 + 8]]];
+const vkey = (b, o) => b[o] + "," + b[o + 1] + "," + b[o + 2];
+function heightOf(b, t) {
+    const o = t * 9, u = [b[o + 3] - b[o], b[o + 4] - b[o + 1], b[o + 5] - b[o + 2]], v = [b[o + 6] - b[o], b[o + 7] - b[o + 1], b[o + 8] - b[o + 2]];
+    const w = [b[o + 6] - b[o + 3], b[o + 7] - b[o + 4], b[o + 8] - b[o + 5]];
+    const L = Math.max(Math.hypot(u[0], u[1], u[2]), Math.hypot(v[0], v[1], v[2]), Math.hypot(w[0], w[1], w[2]));
+    return L ? Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / L : 0;
+}
+
+/**
+ * Round 20b: the exact output, rounded to doubles, made to cross itself nowhere. Rounding moves each seam point by up to
+ * half an ulp, which turns two nearly coplanar slivers sharing a corner into a crossing (round 20: 29 on the page soak,
+ * 1.8e-16 deep at most, up to 2.2e-9 long). Among the pairs where one triangle is NEW (not its source triangle, bit for
+ * bit) and one of the two is a sliver (EMBED_SLIVER), each crossing -- exactPair, exactly -- is removed by collapsing the
+ * shortest edge of its two triangles that moves a point the ARRANGEMENT made (never a vertex of either operand) by at most
+ * EMBED_SLIVER, onto the edge's other end; a collapse that would turn a triangle over, or join two vertices that share a
+ * neighbour other than the edge's own two (the link condition: the surface would pinch), is refused. Triangles the
+ * collapse flattens go. Repeated until none is left or nothing collapses, at most ROUNDS times, and checked once more after
+ * the last (stats.embed.left counts what stays). Exported for its gate's synthetic fixtures (meshBoolean-selfcheck 26).
+ */
+export function embedRounded(buf, from, trisA, bvhA, trisB, bvhB, amb = []) {
+    const n0 = buf.length / 9, stats = { pairs: 0, crossings: 0, collapsed: 0, refused: 0, left: 0, rounds: 0, maxMove: 0 };
+    // the operands' own vertices never move (a vertex's own box finds every triangle it is a corner of)
+    const isInput = (b, o) => { const p = [b[o], b[o + 1], b[o + 2]];
+        for (const [T, bv] of [[trisA, bvhA], [trisB, bvhB]]) for (const t of bv.trianglesInBox(p, p)) for (let c = 0; c < 3; c++) { const q = t * 9 + c * 3; if (T[q] === p[0] && T[q + 1] === p[1] && T[q + 2] === p[2]) return true; }
+        return false; };
+    let B = buf, F = from, alive = new Uint8Array(n0).fill(1);
+    const same9 = (X, i, Y, j) => { for (let c = 0; c < 9; c++) if (X[i * 9 + c] !== Y[j * 9 + c]) return false; return true; };
+    const isNew = new Uint8Array(n0);
+    for (let i = 0; i < n0; i++) { const f = F[i]; isNew[i] = f >= 0 ? (same9(B, i, trisA, f) ? 0 : 1) : f !== -0x7fffffff && same9(B, i, trisB, -f - 1) ? 0 : 1; }
+    const sub = (idx) => { const s = new Float64Array(idx.length * 9); idx.forEach((t, k) => s.set(B.subarray(t * 9, t * 9 + 9), k * 9)); return s; };
+    const ROUNDS = 4;
+    for (let round = 0; round <= ROUNDS; round++) {
+        // the pairs to test: a new sliver against every triangle; a new triangle against every sliver. Heights are taken
+        // for the new triangles and for the old ones in the new triangles' box only (the rest cannot meet them)
+        const n = B.length / 9, NEW = [], NS = [], SL = [];
+        const outA = new Int32Array(trisA.length / 9).fill(-1), outB = new Int32Array(trisB.length / 9).fill(-1);
+        const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+        for (let t = 0; t < n; t++) {
+            if (!alive[t]) continue;
+            if (!isNew[t]) { const f = F[t]; if (f >= 0) outA[f] = t; else outB[-f - 1] = t; continue; }
+            NEW.push(t);
+            for (let c = 0; c < 9; c++) { const v = B[t * 9 + c], a = c % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+            if (heightOf(B, t) < EMBED_SLIVER && shortestEdge(B, t) > EMBED_ROUNDING) { NS.push(t); SL.push(t); }
+        }
+        if (!NEW.length) break;
+        for (const [bv, out] of [[bvhA, outA], [bvhB, outB]]) for (const j of bv.trianglesInBox(lo, hi)) { const t = out[j]; if (t >= 0 && heightOf(B, t) < EMBED_SLIVER && shortestEdge(B, t) > EMBED_ROUNDING) SL.push(t); }
+        if (!NS.length && !SL.length) break;
+        const pairs = [], seen = new Set(), add = (a, b) => { if (a === b || !alive[a] || !alive[b]) return; const k = Math.min(a, b) * 4294967296 + Math.max(a, b); if (!seen.has(k)) { seen.add(k); pairs.push([a, b]); } };
+        const bvhNEW = NEW.length ? new MeshBVH(sub(NEW)) : null;
+        if (NS.length) {
+            const bvhNS = new MeshBVH(sub(NS));
+            if (bvhNEW) for (const [i, j] of pairOverlap(bvhNS, bvhNEW, 0)) add(NS[i], NEW[j]);
+            for (const [i, j] of pairOverlap(bvhNS, bvhA, 0)) if (outA[j] >= 0) add(NS[i], outA[j]);
+            for (const [i, j] of pairOverlap(bvhNS, bvhB, 0)) if (outB[j] >= 0) add(NS[i], outB[j]);
+        }
+        const OS = SL.filter((t) => !isNew[t]);   // (the new slivers are paired with every new triangle above)
+        if (bvhNEW && OS.length) for (const [i, j] of pairOverlap(bvhNEW, new MeshBVH(sub(OS)), 0)) add(NEW[i], OS[j]);
+        const crossing = [];
+        stats.pairs += pairs.length;
+        for (const [a, b] of pairs) {
+            const TA = triOf(B, a), TB = triOf(B, b);
+            if (degenerateTri(TA) || degenerateTri(TB)) continue;
+            const e = exactPair(TA, TB);
+            if (e.kind !== "point" && e.kind !== "segment") continue;
+            const sh = TA.filter((p) => TB.some((q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2])).map(explicitPoint), isSh = (P) => sh.some((Q) => samePoint(P, Q));
+            if (e.kind === "point" ? !isSh(e.P) : !(sh.length === 2 && isSh(e.P0) && isSh(e.P1))) crossing.push([a, b]);
+        }
+        if (round === 0) stats.crossings = crossing.length;
+        stats.left = crossing.length;                                // what the last detection found -- after the last collapse
+        if (!crossing.length || round === ROUNDS) break;
+        stats.rounds++;
+        // incidence: vertex key -> triangles
+        const inc = new Map();
+        for (let t = 0; t < n; t++) if (alive[t]) for (let c = 0; c < 3; c++) { const k = vkey(B, t * 9 + c * 3); let l = inc.get(k); if (!l) inc.set(k, (l = [])); l.push(t); }
+        const touched = new Set();
+        let any = false;
+        for (const [a, b] of crossing) {
+            if (touched.has(a) || touched.has(b)) continue;
+            const cands = [];
+            for (const t of [a, b]) for (let i = 0; i < 3; i++) for (const [pi, qi] of [[i, (i + 1) % 3], [(i + 1) % 3, i]]) {
+                const po = t * 9 + pi * 3, qo = t * 9 + qi * 3, kp = vkey(B, po);
+                if (isInput(B, po)) continue;
+                const d = Math.hypot(B[po] - B[qo], B[po + 1] - B[qo + 1], B[po + 2] - B[qo + 2]);
+                if (d > 0 && d <= EMBED_SLIVER) cands.push([d, kp, [B[qo], B[qo + 1], B[qo + 2]]]);
+            }
+            cands.sort((x, y) => x[0] - y[0]);
+            for (const [d, kp, q] of cands) {
+                const kq = q[0] + "," + q[1] + "," + q[2], onP = inc.get(kp) || [], onQ = inc.get(kq) || [];
+                if (onP.some((t) => touched.has(t)) || onQ.some((t) => touched.has(t))) continue;
+                // link condition: the vertices next to both p and q are exactly the apexes of the triangles on edge pq
+                const nb = (l, self) => { const s = new Set(); for (const t of l) for (let c = 0; c < 3; c++) { const k = vkey(B, t * 9 + c * 3); if (k !== self) s.add(k); } return s; };
+                const NP = nb(onP, kp), NQ = nb(onQ, kq), apex = new Set();
+                for (const t of onP) if (onQ.includes(t)) for (let c = 0; c < 3; c++) { const k = vkey(B, t * 9 + c * 3); if (k !== kp && k !== kq) apex.add(k); }
+                let link = true;
+                for (const k of NP) if (k !== kq && NQ.has(k) && !apex.has(k)) { link = false; break; }
+                // no triangle on p turns over
+                let flip = false;
+                for (const t of onP) {
+                    if (onQ.includes(t)) continue;                            // flattened by the collapse: it goes
+                    const T = triOf(B, t), j = T.findIndex((v) => v[0] + "," + v[1] + "," + v[2] === kp), T2 = T.map((v, i) => (i === j ? q : v));
+                    const n1 = cross3(sub3(T[1], T[0]), sub3(T[2], T[0])), n2 = cross3(sub3(T2[1], T2[0]), sub3(T2[2], T2[0]));
+                    if (dot3(n1, n2) <= 0) { flip = true; break; }
+                }
+                if (!link || flip) { stats.refused++; continue; }
+                for (const t of onP) {
+                    if (onQ.includes(t)) { alive[t] = 0; continue; }
+                    for (let c = 0; c < 3; c++) { const o = t * 9 + c * 3; if (vkey(B, o) === kp) { if (B === buf) B = Float64Array.from(buf); B[o] = q[0]; B[o + 1] = q[1]; B[o + 2] = q[2]; } }
+                    isNew[t] = 1;
+                }
+                for (const t of onP) touched.add(t);
+                for (const t of onQ) touched.add(t);
+                stats.collapsed++; stats.maxMove = Math.max(stats.maxMove, d); any = true;
+                break;
+            }
+        }
+        if (!any) break;
+    }
+    if (B === buf && alive.every((x) => x)) return { tris: buf, from, amb, stats };
+    const keep = [];
+    for (let t = 0; t < alive.length; t++) if (alive[t]) keep.push(t);
+    const renum = new Int32Array(alive.length).fill(-1);
+    keep.forEach((t, i) => { renum[t] = i; });
+    return { tris: sub(keep), from: keep.map((t) => F[t]), amb: amb.map((t) => renum[t]).filter((t) => t >= 0), stats };
+}
+
 function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // round 16: a ZERO-THICKNESS FIN -- two faces of one operand on the same three vertices, wound opposite ways -- has
     // no volume and is not in the regularised result; left in, it breaks every ray that crosses it (pointInMesh welds
@@ -1624,8 +1777,14 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) buf[i * 9 + v * 3 + c] = tris[i][v][c];
     }
     const capped = classifiedA.stats.capped || classifiedB.stats.capped;
+    // round 20b: the exact output rounded without crossing itself
+    let outTris = buf, outFrom = from, outAmb = ambiguousTriIndices;
+    if (exactArr && opts.embed !== false) {
+        const e = embedRounded(buf, from, trisA, bvhA, trisB, bvhB, ambiguousTriIndices);
+        outTris = e.tris; outFrom = e.from; outAmb = e.amb; classifiedA.stats.embed = e.stats;
+    }
     if (rounded) classifiedB.stats.vertexRound = rounded.stats;
     if (declined) { classifiedA.stats.exactDeclined = declined.a; classifiedB.stats.exactDeclined = declined.b; }
-    return { tris: buf, triCount: tris.length, ambiguousTriIndices, capped, from: Int32Array.from(from), exact: exactArr,
+    return { tris: outTris, triCount: outTris.length / 9, ambiguousTriIndices: outAmb, capped, from: Int32Array.from(outFrom), exact: exactArr,
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }

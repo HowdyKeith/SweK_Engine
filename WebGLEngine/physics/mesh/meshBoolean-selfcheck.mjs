@@ -236,11 +236,15 @@
 // W3 (1), W6 (7) and W8 (13: this gate's SNAPPED pin dropped).
 // SABOTAGE LOG (round 16h) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (V1-V8) of conformNear, 8 red; THIS gate red
 // on V1, V3, V5, V6 and V7 (1 each; V6 and V7 by section 25(g)'s fixtures, added when the first battery left them 0 red).
+// SABOTAGE LOG (round 20b) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (Y1-Y8) of embedRounded, 7 red, 1 named;
+// THIS gate red on Y2 (2), Y3 (1) and Y5 (1), by section 26's fixtures, built when the first battery left them 0 red.
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
+import { embedRounded } from "./meshBoolean.mjs";
+import { manifoldAudit } from "./manifoldAudit.mjs";
 import { classifyMeshAgainstOther, assembleBoolean, meshBoolean, seamConsensus, joinSeamEnds, reverseTwins, vertexRound, VERTEX_ROUND, translationFor, MESH_BOOLEAN_MAX_FRAGMENTS } from "./meshBoolean.mjs";
 import * as M from "./meshCSG.mjs";
 import { closestOnTriangle } from "./triContact.mjs";
@@ -1809,6 +1813,33 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
         [[0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qc, qd], [qa, [0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qd]]));
     ok("!! round 16h: a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot declines to the snapped path",
         C2.exact === false && C2.stats.a.exactDeclined > 0, "exact " + C2.exact + ", declined " + C2.stats.a.exactDeclined);
+}
+
+console.log("\n26. *** ROUND 20b: embedRounded ON HAND-BUILT CROSSINGS -- WHAT IT MAY MOVE, WHAT IT REFUSES, WHAT IT TESTS ***");
+{
+    // Two slivers sharing a corner, crossing by 1e-16 (manifoldAudit-selfcheck's pair): S1 in z = 0, 4e-10 wide at x = 1;
+    // S2's far side from z = -1e-16 to +1e-16 across it. Every case below is the repair called directly on such an output.
+    const F = (...ts) => new Float64Array(ts.flat(2)), far = F([[9, 9, 9], [9, 8, 9], [8, 9, 9]]), other = [[7, 7, 7], [7, 6, 7], [6, 7, 7]];
+    const S1 = [[0, 0, 0], [1, 0, 0], [1, 4e-10, 0]], S2 = [[0, 0, 0], [1, 1e-10, -1e-16], [1, 3e-10, 1e-16]];
+    const run = (out, from, A) => embedRounded(out, Int32Array.from(from), A, new MeshBVH(A), far, new MeshBVH(far));
+    const has = (buf, p) => { for (let o = 0; o < buf.length; o += 3) if (buf[o] === p[0] && buf[o + 1] === p[1] && buf[o + 2] === p[2]) return true; return false; };
+    // (a) S2's short side is two vertices of an operand: the collapse takes S1's side instead (4e-10), not S2's (2e-10)
+    const ra = run(F(S1, S2), [1, 1], F([S2[1], S2[2], [5, 5, 5]], other));
+    ok("!! the shortest side of a crossing joins two OPERAND vertices: they stay; the next side, an arrangement point's, collapses -- and the crossing is gone",
+        has(ra.tris, S2[1]) && has(ra.tris, S2[2]) && ra.stats.collapsed === 1 && ra.stats.left === 0 && manifoldAudit(ra.tris).crossings === 0, JSON.stringify(ra.stats));
+    // (b) a triangle T3 on S2's corner (1, 1e-10), beyond the line through (1, 2e-10): moving that corner onto (1, 3e-10)
+    // would turn T3 over -- refused; the other way round is taken
+    const T3 = [S2[1], [1.5, 2.5e-10, -1e-16], [2, 3e-10, -1e-16]], rb = run(F(S1, S2, T3), [0, 0, 0], F(other));
+    const nrm = (T) => { const u = [0, 1, 2].map((c) => T[1][c] - T[0][c]), v = [0, 1, 2].map((c) => T[2][c] - T[0][c]); return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]; };
+    let t3 = null; for (let o = 0; o < rb.tris.length; o += 9) if (rb.tris[o + 3] === 1.5 && rb.tris[o + 6] === 2) t3 = [0, 1, 2].map((c) => [rb.tris[o + c * 3], rb.tris[o + c * 3 + 1], rb.tris[o + c * 3 + 2]]);
+    const n0 = nrm(T3), n1 = t3 ? nrm(t3) : [0, 0, 0];
+    ok("!! a collapse that would turn a neighbouring triangle over is refused (stats.refused) and the crossing removed the other way; the neighbour keeps its side",
+        rb.stats.refused >= 1 && rb.stats.left === 0 && !!t3 && n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2] > 0 && manifoldAudit(rb.tris).crossings === 0, JSON.stringify(rb.stats));
+    // (c) an OLD sliver (S1, its operand's own triangle) crossed by a NEW triangle that is no sliver: found, though nothing
+    // there may move (S1's corners are an operand's; the new triangle's sides are long) -- counted in stats.left
+    const rc = run(F(S1, [[0, 0, 0], [1, 2e-10, -1e-16], [0.9, -0.5, 1e-3]]), [0, 1], F(S1, other));
+    ok("!! a new triangle crossing an OLD sliver is found (a new triangle is tested against every sliver near it), and what cannot be collapsed is counted",
+        rc.stats.crossings === 1 && rc.stats.left === 1 && rc.stats.collapsed === 0, JSON.stringify(rc.stats));
 }
 
 console.log(`\nmeshBoolean-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

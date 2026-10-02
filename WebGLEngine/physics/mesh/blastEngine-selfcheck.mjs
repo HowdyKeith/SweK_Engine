@@ -155,6 +155,24 @@
 //        it keep the old bits: seed 3 210 openings of its own, seed 12 324)
 // SABOTAGE LOG (round 20) -- in manifoldAudit-selfcheck.mjs's header: 8 sabotages (X1-X8), 8 red; THIS gate red on X1 (1)
 // and X8 (6: EXACT_FINISH_WELD 0, three of them section 16's).
+// SABOTAGE LOG (round 20b) -- meshBoolean.mjs's embedRounded, each on the real file, restored and md5 verified. Rows red in
+// meshBoolean-selfcheck / THIS gate (the first column added for Y2, Y3, Y5 after the first battery):
+//   Y1 the repair off unless asked                                         0 / 4   (16(c), 17: shot 44, its operand check,
+//        seed 7)
+//   Y2 an operand vertex may move                                          2 / 0   (0 red on the first battery: no gated
+//        crossing's shortest side joins two operand vertices; section 26(a) was built for it)
+//   Y3 no refusal (a triangle turned over, the link condition)             1 / 0   (likewise; 26(b), a neighbour that the
+//        shortest collapse would turn over)
+//   Y4 EMBED_SLIVER 1e-12                                                  - / 4   (the slivers are 3e-10 high)
+//   Y5 new triangles not tested against old slivers                        1 / 0   (every soak crossing had a NEW sliver;
+//        26(c), an old sliver crossed by a new triangle that is none)
+//   Y6 EMBED_ROUNDING 0 (triangles a rounding long tested too)             - / 1   (the cost alarm: 4,330 pairs a shot)
+//   Y7 one round only                                                      - / 0   (NAMED, not caught: red on the first
+//        battery only through stats.left, which then reported the detection BEFORE the last collapse -- a defect of the
+//        stat, fixed: a last detection follows the last round. Re-run: 0 red; no gated case needs a second round)
+//   Y8 a triangle the collapse flattens kept                               - / 5   (degenerate, open, the chains)
+// The second battery was cut off during Y7, which left ROUNDS = 1 in meshBoolean.mjs: found, restored, md5 verified
+// against the battery's own pre-run sum, Y7 re-run alone.
 "use strict";
 
 import fs from "node:fs";
@@ -164,7 +182,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import * as M from "./meshCSG.mjs";
 import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS, EXACT_FINISH_WELD } from "./blastEngine.mjs";
-import { meshBoolean, MESH_BOOLEAN_EXACT_DEFAULT } from "./meshBoolean.mjs";
+import { meshBoolean, MESH_BOOLEAN_EXACT_DEFAULT, EMBED_SLIVER } from "./meshBoolean.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { exactPair } from "./exactArrangement.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -936,16 +954,15 @@ console.log("\n16. *** ROUND 20: IS THE WALL TWO-MANIFOLD? -- THE QUESTION bvh-c
     ok("   control: the BSP on the same twelve, raw -- open, pinched, crossing itself for real (deeper than 1e-6); settled, still open at its triangles",
         rb.open > 0 && rb.pinchedVertices > 0 && deep(ab) > 1e-6 && rs.open > 0,
         "raw: " + show(rb) + ", deepest " + deep(ab).toExponential(1) + "; settled: " + show(rs) + ", deepest " + deep(as).toExponential(1));
-    // (c) the default's one departure: crossings a rounding deep. Seed 12's shot 44 cuts slivers 3e-10 high near the
-    // blobs' z = 0 equators; rounded to doubles, two nearly coplanar slivers sharing a corner cross along 4e-10 and reach
-    // 7.7e-17 past each other. Measured, 12 chains x 100 shots every 25: 6 of 48 walls with 2..9, every one at most 1.8e-16 deep.
-    let w12 = M.boxPolys([0, 0, 0], HALF);
-    for (const b of pageBlasts(12, 50)) w12 = blastWith("bvh", w12, b).polys;
-    const d12 = [], a12 = manifoldAudit(buf(w12), { detail: d12 });
-    ok("!! seed 12, 50 shots: every topological property holds (closed, edge- and vertex-manifold, no degenerate triangle, touch or coplanar overlap); its crossings no deeper than an ulp at the wall's coordinates (8.9e-16)",
-        topo(a12) === 0 && deep(d12) <= 8.9e-16, show(a12) + ", deepest " + deep(d12).toExponential(2) + ", longest " + (d12.length ? Math.max(...d12.map((x) => x.length)).toExponential(2) : "-"));
-    report("KNOWN  rounding the exact arrangement to doubles: " + a12.crossings + " crossings on seed 12's wall at shot 50 (measured 2), a rounding deep. Closing them needs the output rounded with its topology checked (snap rounding) -- backlog bvh-csg-r20b-embedded-rounding.");
-    ok("   (KNOWN, pinned) that wall's crossings stay within 2.5x the measured 2 -- a regression alarm", a12.crossings <= 5, String(a12.crossings));
+    // (c) crossings a rounding deep. Seed 12's shot 44 cuts slivers 3e-10 high near the blobs' z = 0 equators; rounded to
+    // doubles, two nearly coplanar slivers sharing a corner cross along 4e-10, 7.7e-17 deep (round 20: 6 of 48 soak walls,
+    // 2..9 each, at most 1.8e-16 deep). Since round 20b meshBoolean removes them (embedRounded); embed:false is the control.
+    const wall12 = (o) => { let w = M.boxPolys([0, 0, 0], HALF); for (const b of pageBlasts(12, 50)) w = blastWith("bvh", w, b, o).polys; return w; };
+    const w12 = wall12({}), w12x = wall12({ embed: false }), d12 = [], d12x = [], a12 = manifoldAudit(buf(w12), { detail: d12 }), a12x = manifoldAudit(buf(w12x), { detail: d12x });
+    ok("!! *** SEED 12, 50 SHOTS: TWO-MANIFOLD -- NO CROSSING EITHER (round 20b) -- AND THE SOLID OF THE UNREPAIRED CHAIN TO 1e-11 ***",
+        topo(a12) === 0 && a12.crossings === 0 && Math.abs(M.volume(w12) - M.volume(w12x)) < 1e-11, show(a12) + "; |volume - unrepaired| " + Math.abs(M.volume(w12) - M.volume(w12x)).toExponential(1));
+    ok("   control: unrepaired (embed:false) the same wall crosses itself, no deeper than an ulp at its coordinates (8.9e-16) -- round 20's measured 2",
+        topo(a12x) === 0 && a12x.crossings > 0 && deep(d12x) <= 8.9e-16, show(a12x) + ", deepest " + deep(d12x).toExponential(2));
     // (d) union and intersect (round 18b's booleanBVH): three five-op chains each
     const rng = (s0) => { let s = s0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; };
     let opsBad = 0; const opsShow = [];
@@ -955,6 +972,42 @@ console.log("\n16. *** ROUND 20: IS THE WALL TWO-MANIFOLD? -- THE QUESTION bvh-c
         const a = manifoldAudit(buf(w)); if (topo(a) || a.crossings) { opsBad++; opsShow.push(op + seed + ": " + show(a)); }
     }
     ok("!! union and intersect, three five-op chains each: two-manifold", opsBad === 0, opsBad + " of 6 with a defect" + (opsShow.length ? " -- " + opsShow.join("; ") : ""));
+}
+
+console.log("\n17. *** ROUND 20b: THE EXACT OUTPUT ROUNDED WITHOUT CROSSING ITSELF (meshBoolean's embedRounded) ***");
+{
+    // Measured first (12 chains x 100 shots): 9 of 1,200 shots made crossings, 29 pairs, every one with a triangle at most
+    // 1.4e-9 high. A crossing is removed by collapsing the shortest edge of its two triangles that moves a point the
+    // arrangement made (never an operand's vertex) by at most EMBED_SLIVER -- refused if a triangle would turn over or the
+    // surface pinch. Soak: 48 of 48 audited walls clean (6 crossing before), the same solids to 9.3e-13, 1.04x the time.
+    const buf = (polys) => { const t = []; for (const p of polys) for (const x of p.tris || M.toTriangles([p])) t.push(x); const b = new Float64Array(t.length * 9); t.forEach((x, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = x[v][c]; }); return b; };
+    // shot 44 of seed 12, raw
+    let w = M.boxPolys([0, 0, 0], HALF); const bl = pageBlasts(12, 45);
+    for (let k = 0; k < 44; k++) w = blastWith("bvh", w, bl[k]).polys;
+    const A = buf(w), B = buf(bl[44]), r = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract"), rx = meshBoolean(A, new MeshBVH(A), B, new MeshBVH(B), "subtract", { embed: false });
+    const e = r.stats.a.embed, ar = manifoldAudit(r.tris), ax = manifoldAudit(rx.tris);
+    const vol = (t) => { let v = 0; for (let o = 0; o < t.length; o += 9) v += t[o] * (t[o + 4] * t[o + 8] - t[o + 5] * t[o + 7]) - t[o + 1] * (t[o + 3] * t[o + 8] - t[o + 5] * t[o + 6]) + t[o + 2] * (t[o + 3] * t[o + 7] - t[o + 4] * t[o + 6]); return v / 6; };
+    const dv = Math.abs(vol(r.tris) - vol(rx.tris));
+    ok("!! *** SEED 12's SHOT 44, RAW: THE 2 CROSSINGS FOUND AND COLLAPSED (no point moved past EMBED_SLIVER, no operand vertex moved), THE OUTPUT TWO-MANIFOLD, THE VOLUME TO 1e-12 ***",
+        e && e.crossings === 2 && e.collapsed >= 1 && e.left === 0 && e.maxMove <= EMBED_SLIVER && ar.crossings === 0 && ar.open === 0 && ar.pinchedVertices === 0 && ar.nonManifoldEdges === 0 && dv < 1e-12,
+        JSON.stringify(e) + "; output crossings " + ar.crossings + ", open " + ar.open + "; |dV| " + dv.toExponential(1));
+    ok("   control: embed:false, the same output crosses itself twice", ax.crossings === 2, "crossings " + ax.crossings);
+    // independently of the repair's own account: every point the repair removed is one the arrangement made
+    const pts = (t) => { const S = new Set(); for (let o = 0; o < t.length; o += 3) S.add(t[o] + "," + t[o + 1] + "," + t[o + 2]); return S; };
+    const inA = pts(A), inB = pts(B), withR = pts(r.tris), gone = [...pts(rx.tris)].filter((k) => !withR.has(k));
+    ok("!! the points the repair removed (" + gone.length + ") are all points the arrangement made -- no vertex of either operand moved", gone.length > 0 && gone.every((k) => !inA.has(k) && !inB.has(k)),
+        gone.filter((k) => inA.has(k) || inB.has(k)).length + " operand vertices among them");
+    // what it costs: meshCSG's twelve-blast case, the pairs tested a shot (measured 725 at most; 3,757..5,539 while triangles
+    // with an edge a rounding long were tested too -- they are the finishing weld's)
+    const WALL12 = () => M.boxPolys([0, 0, 0], [4, 3, 0.3]), BLOB12 = (k) => M.jaggedBlob([(k % 5 - 2) * 1.4, ((k * 7) % 5 - 2) * 1.0, 0], 0.9, 8, 1000 + k * 37);
+    let wt = WALL12(), maxPairs = 0;
+    for (let k = 1; k <= 12; k++) { const At = buf(wt), Bt = buf(BLOB12(k)), rt = meshBoolean(At, new MeshBVH(At), Bt, new MeshBVH(Bt), "subtract"); maxPairs = Math.max(maxPairs, rt.stats.a.embed ? rt.stats.a.embed.pairs : 0); wt = blastWith("bvh", wt, BLOB12(k)).polys; }
+    ok("   meshCSG's twelve-blast case: the repair tests at most 2,000 pairs a shot -- a cost alarm (measured 725)", maxPairs <= 2000, "at most " + maxPairs + " pairs a shot");
+    // seed 7's chain to shot 50: the soak's most crossings (13), and collapses refused before one is found
+    let w7 = M.boxPolys([0, 0, 0], HALF);
+    for (const b of pageBlasts(7, 50)) w7 = blastWith("bvh", w7, b).polys;
+    const a7 = manifoldAudit(buf(w7));
+    ok("!! seed 7, 50 shots (13 crossings unrepaired): two-manifold, no crossing", a7.crossings === 0 && a7.open + a7.nonManifoldEdges + a7.pinchedVertices + a7.degenerate === 0, Object.entries(a7).filter(([k, v]) => k !== "triangles" && k !== "vertices" && v).map(([k, v]) => k + " " + v).join(", ") || "clean");
 }
 
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

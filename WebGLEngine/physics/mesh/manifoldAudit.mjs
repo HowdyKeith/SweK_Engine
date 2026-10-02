@@ -22,7 +22,8 @@
 // MEASURED (round 20), on the page's default engine: 12 chains x 100 shots audited every 25 -- 48 walls closed,
 // edge- and vertex-manifold and with no degenerate triangle; 6 of them with 2..9 crossings, every one at most 1.8e-16
 // deep (below an ulp at the wall's coordinates) and up to 2.2e-9 long: the exact arrangement's slivers near the page
-// blobs' z = 0 equators, rounded to doubles. meshCSG's BSP on the same 20 shots: tens of thousands of open edges raw,
+// blobs' z = 0 equators, rounded to doubles; since round 20b none (meshBoolean's embedRounded). meshCSG's BSP on the same
+// 20 shots: tens of thousands of open edges raw,
 // thousands after settle, real crossings up to 6.8e-3 deep. See blastEngine-selfcheck section 16.
 "use strict";
 
