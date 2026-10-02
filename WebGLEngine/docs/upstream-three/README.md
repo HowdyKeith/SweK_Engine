@@ -28,28 +28,28 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
 
 - `npm run build` of the tag, unpatched: `three.webgpu.js` and `three.core.js` are the vendored files byte for byte
   (`three.tsl.js` differs only by the vendoring's one edit, its import of `three/webgpu` made relative).
-- The patches applied with `git apply`, in order -- all nine since v4775, all eleven since v4790, all twelve since v4792, all thirteen since v4793; 08 changes the same import line of `Instance.js` as
+- The patches applied with `git apply`, in order -- all nine since v4775, all eleven since v4790, all twelve since v4792, all thirteen since v4793, all fourteen since v4795; 08 changes the same import line of `Instance.js` as
   01, and that line was merged by hand, to `import { OnBeforeObjectUpdate } from '../utils/EventNode.js';` --
   `npm run lint-core` is clean, and `npm run build` makes the same bytes the gates' applier makes from the vendored build, but
   for the order of the names in its one import from `three.core.js`: rollup lists them by first use, and patch 02 uses three of
   them earlier.
 - Three's unit tests (`test/unit`, run in headless Chromium with QUnit served locally): 1311 tests, 1310 passed, 1 todo,
-  0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, at v4788 with 03 reaching per-instance morphs, at v4790 with all eleven, at v4792 with all twelve, and at v4793 with all thirteen -- the same as the unpatched tag. They exercise none of the paths the patches change.
-- All of them together, on one build (since v4787; thirteen since v4793): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
+  0 failed, with the six and with the nine, again at v4786 with 07 keyed on the render, at v4788 with 03 reaching per-instance morphs, at v4790 with all eleven, at v4792 with all twelve, at v4793 with all thirteen, and at v4795 with all fourteen -- the same as the unpatched tag. They exercise none of the paths the patches change.
+- All of them together, on one build (since v4787; fourteen since v4795): every reproduction, and every path in `tools/ship/threeUpstreamPaths-selfcheck.mjs`,
   prints what it prints with its own patch alone -- but for 04's `mrtSameFrame`, which patch 07 fixes as well (04's "together" block).
 - Three's e2e tests (`test/e2e`), at v4789 in a checkout of the r185 tag with its examples, run by
   [`e2e/puppeteer-local.diff`](e2e/puppeteer-local.diff) -- three's runner with this box's flags for presenting WebGPU on
   SwiftShader, and the workaround this tree's harness installs for its Chromium rejecting three's string `swizzle` -- recorded in
-  [`e2e/v4789.json`](e2e/v4789.json) for the nine [`e2e/v4790.json`](e2e/v4790.json) for eleven [`e2e/v4792.json`](e2e/v4792.json) for twelve and [`e2e/v4793.json`](e2e/v4793.json) for all thirteen: 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with the patches, each
+  [`e2e/v4789.json`](e2e/v4789.json) for the nine [`e2e/v4790.json`](e2e/v4790.json) for eleven [`e2e/v4792.json`](e2e/v4792.json) for twelve and [`e2e/v4793.json`](e2e/v4793.json) for thirteen and [`e2e/v4795.json`](e2e/v4795.json) for all fourteen: 187 WebGPU examples, 176 passed and the same 11 failed on r185 and with the patches, each
   for the same reason (seven a 2D view of a 3D texture -- since v4791 known to be this Chromium's (141): it fails any `writeTexture` into a 3D
   texture with `RENDER_ATTACHMENT` usage in raw WebGPU, three or no three, on a view it makes itself; two a fetch that failed here; one video,
   `RAF is not defined`; one XR layers example 0.4% of its pixels off); 185 of the 187 screenshots the same bytes, and the
   other two vary between runs of one build, whichever build it is. The WebGL examples load `three.module.js`, which no patch changes.
 - The same examples on three's WebGL 2 backend (since v4794) -- patches 06, 11 and 12 change only that backend, which the run
   above never reaches -- with `navigator.gpu` hidden so `WebGPURenderer` falls back to it, recorded in
-  [`e2e/v4794-webgl2.json`](e2e/v4794-webgl2.json): 187 WebGPU examples on the WebGL 2 backend, 135 passed and the same 52 failed
-  on r185 and with all thirteen, each for the same reason (33 a few percent off three's screenshots, which are WebGPU's; 15
+  [`e2e/v4794-webgl2.json`](e2e/v4794-webgl2.json) for thirteen and [`e2e/v4795-webgl2.json`](e2e/v4795-webgl2.json) for all fourteen:
+  187 WebGPU examples on the WebGL 2 backend, 135 passed and the same 52 failed on r185 and with the patches, each for the same reason (33 a few percent off three's screenshots, which are WebGPU's; 15
   that need WebGPU; two fetches that failed here; one video; and `webgpu_postprocessing_ssr`, whose WebGL program does not link
-  on r185 either); 184 of the 187 screenshots the same bytes, and the other three vary between runs of one build.
+  on r185 either); 183 of the 187 screenshots the same bytes, and the other four vary between runs of one build.
 
 `tools/ship/threeUpstream-selfcheck.mjs` holds the hash of each build; a patch changed since makes the patched one stale.

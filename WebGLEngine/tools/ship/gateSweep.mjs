@@ -8723,6 +8723,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4795 -- THE 399th CLOSING: NO new gate file -- draft 14, a WebGL2 compute reading a buffer of the other class.
+    since492: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4795", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 14 and its patch; both e2e records for all fourteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (the instanced-source path v4792 held under 11 removed: it is 14's reproduction)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PATH DRAFT 11 HELD AS NOT REACHED, TAKEN TO A PATCH OF ITS OWN. *** The WebGL backend draws a compute " +
+                 "instanced only when its FIRST buffer is a StorageInstancedBufferAttribute, and every buffer it reads as a vertex " +
+                 "attribute steps by its OWN class -- so a buffer of the other class holds at its first element: r185 '1 1 1 1 1 1' " +
+                 "copying instanced into plain and plain into instanced. Patch 14 draws every compute as one point and count " +
+                 "instances, with a vertex array of its own that steps every attribute per instance: '1 2 3 4 5 6' both ways. " +
+                 "gl_InstanceID is then the invocation in every compute, so 14 fixes draft 11's reproduction by itself as well. " +
+                 "Since it changes WebGL 2 dispatch, both e2e runs again: the same pass and fail on each backend with the same " +
+                 "reasons; on WebGL 2 one more screenshot differs, gltf_transmission -- measured, not assumed: eight runs of each " +
+                 "build gave four and five different images, four shared. Three sabotages; the compute vertex array's own key is " +
+                 "reached by none and is held by the hash alone, said as such.",
+    }),
     // v4794 -- THE 398th CLOSING: NO new gate file -- three's e2e on its WebGL 2 backend, r185 and all thirteen patches.
     since491: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

@@ -336,6 +336,12 @@ for (const [backend, RE, phrase] of [["webgpu", /^v(\d+)\.json$/, "WebGPU exampl
 // ---- v4794 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the WebGL 2 record: V1 its pass count off by one -> 2 (it no longer adds up, and the README no longer states it); V2 the
 // record deleted -> 1; V3 its patched hash off by one digit -> 1. None green.
+// ---- v4795 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// X1 patch 14's dispatch back to instanced only when the first buffer is -> 5 (the hash, 14 fixed, its patched block, 14 and 12
+// with all of them); X2 its per-instance divisor kept only for instanced buffers -> 5, the same rows; X3 the compute vertex
+// array's own key dropped -> 1, the hash alone: a render and a compute over the same attribute set would share a vertex array
+// with the wrong divisors, and no reproduction here builds both from one set -- kept as the defence it is, said as such.
+// The first X1 ran on an anchor that did not match and passed on the unmodified patch; re-run on the line itself. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +
