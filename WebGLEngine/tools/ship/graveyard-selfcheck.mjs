@@ -417,11 +417,12 @@ function isAnalysisRecord(full) {
 // miss. The partition still holds (245 of 245 gate-only classified: 61 records + 159 actionable + 20 doored +
 // 1 MCP door + 4 explained), so nothing here is unclassified debt hiding in a total; it is the SAME debt this
 // ratchet has always tracked, now counted on the tree both branches actually built.
-// *** v4778 RIG RUN -- RED AT 192, MEASURED BY NAME, AND NOT RAISED. *** Over the budget, so no verify ran this over the
-// v4776 and v4778 merges. Diffed against a run at 5d3d8d83 (the commit that set 159; it read 157 there): 38 arrived and
-// 3 left (anim/ik, tools/ship/wgslCorpus, world/vendoredLicences) -- 157 + 38 - 3 = 192. FOUR WERE CENSUS ERRORS, paid
-// by RECORD_EXPORT above: frameDisagree, frameSwayRep, frameVertical, genGateAbsolute. 188 now. The other 34, named
-// WITHOUT extensions (referenceKind matches basenames, and a note naming them would rescue them from it):
+// *** v4778 -- RAISED FROM 159 TO 188, BY NAME, ON KEITH'S DECISION. *** Over the budget, so no verify ran this over the
+// v4776 and v4778 merges, and Keith's rig run of v4778 read 192. Diffed against a run at 5d3d8d83 (the commit that set
+// 159; it read 157 there): 38 arrived and 3 left (anim/ik, tools/ship/wgslCorpus, world/vendoredLicences) -- 157 + 38
+// - 3 = 192. FOUR WERE CENSUS ERRORS, paid by RECORD_EXPORT above: frameDisagree, frameSwayRep, frameVertical,
+// genGateAbsolute. 188. The other 34 are debt with names on them, named WITHOUT extensions (referenceKind matches
+// basenames, and a note naming them would rescue them from it):
 //   the exported-functions line's CPU references its TSL/WGSL ports are held to, and the runners those ports
 //   replaced -- render/dilate, render/flicker, render/reactive, render/ringFloor, render/temporalLock,
 //   render/luminancePyramidGPU, render/opticalFlowGPU, render/visibilityGPU, render/edgeReveal, render/frameRecorder;
@@ -431,9 +432,10 @@ function isAnalysisRecord(full) {
 //   genGateCalibrate, genGateTransfer, world/traderGraphGithub;
 //   libraries with no runtime consumer yet -- anim/reachIK, physics/character/capsuleCollideTsl and capsuleSettle,
 //   physics/mesh/meshBoolean and mikktSpace, ui/precisionProbe.
-// 29 over the ceiling. Each is wire it, delete it, or show the census wrong about it; raising the number is none of
-// those, and is left to a decision rather than taken here.
-const ORPHAN_UTIL_BASELINE = 159;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above).
+// The ceiling catches up to the merges, as v4327's and v4535's did, and excuses none of the 34: each is still wire
+// it, delete it, or show the census wrong about it, and the number may only fall from here.
+// v4778 SABOTAGES: the PREREG_/RESULT_ widening reverted -> 1 red, 192 now vs 188 recorded.
+const ORPHAN_UTIL_BASELINE = 188;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4778 the v4776 and v4778 merges caught up by name, four paid down by the detector (188).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

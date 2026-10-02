@@ -226,14 +226,20 @@ const WHERE = GRAPH.where;
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
-// *** v4778 RIG RUN -- RED AT 332, MEASURED BY NAME, AND NOT RAISED. *** The member list diffed against a run at
-// 5d3d8d83, the commit that set 288: 49 arrived and 5 left (anim/ik, tools/ship/absenceScope, recordDrift,
-// wgslCorpus, world/vendoredLicences) -- 288 + 49 - 5 = 332. 36 of the 49 are graveyard-selfcheck's arrivals over the
-// same interval, named there. The other 13, without extensions so this note rescues none of them: brain/capsuleHazard,
-// mesh/colliderFromGLB, nav/partitionScore, nav/pathCost, physics/character/groundProbe, tools/bakeConnectomeTopology,
-// tools/bakeGfcTopology, tools/ship/backlogAbsence, controllerAgreement, fixtures/tslBuilderThrows, ship, verify,
-// wasmTeardown. Wire, delete or teach the census; raising the ceiling is left to a decision, not taken here.
-const RESCUED_CEILING = 288;
+// *** v4778 -- RAISED FROM 288 TO 332, BY NAME, ON KEITH'S DECISION, by the method the v4535 note above used and for its
+// reason: this gate ran over the budget, so the v4776 and v4778 merges landed unmeasured. The member list diffed
+// against a run at 5d3d8d83, the commit that set 288 (it reproduces 288 there): 49 arrived and 5 left (anim/ik,
+// tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 288 + 49 - 5 = 332. 36 of the 49 are
+// graveyard-selfcheck's arrivals over the same interval, named there. The other 13, without extensions so this note
+// rescues none of them: brain/capsuleHazard, mesh/colliderFromGLB, nav/partitionScore, nav/pathCost,
+// physics/character/groundProbe, tools/bakeConnectomeTopology, tools/bakeGfcTopology, tools/ship/backlogAbsence,
+// controllerAgreement, fixtures/tslBuilderThrows, ship, verify, wasmTeardown. Catching up to the merges, excusing none:
+// the three routes down are unchanged.
+// v4778 SABOTAGES, each on the real file, restored and md5 verified: graveyard-selfcheck's note spelling one module
+// with its extension (adapterRecord.mjs, the one arrival no prose rescued) -> 1 red, 333 against 332; a sweep closing
+// in gateSweep.mjs naming one more gate-only module (anim/reachIK.mjs) -> 1 red on the ritual row, 58 against 57,
+// naming it.
+const RESCUED_CEILING = 332;
 
 const rescued = [];
 {
@@ -320,7 +326,15 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
-    const RITUAL_CEILING = 39;
+    // *** v4778 -- RAISED FROM 39 TO 57, BY NAME, ON KEITH'S DECISION. *** Diffed against 5d3d8d83 (39 there): 22
+    // arrived and 4 left (tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 39 + 22 - 4 =
+    // 57. Named without extensions: from the exported-functions line, each a module its round built, gated and named
+    // in its closing -- render/dilate, flicker, luminancePyramidGPU, opticalFlowGPU, reactive, ringFloor,
+    // temporalLock, tools/ship/constantRows, fsr2Coverage, kernelReach, murmurSpeciesFrames, pageShot, realGpuRun,
+    // threePatch; and brain/agent/dispatch, math/solverFit, tools/roundhouse/androidRunner, tools/ship/budgetExile,
+    // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
+    // importer. The accrual the v4386 note predicted, one paragraph per round.
+    const RITUAL_CEILING = 57;
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,
