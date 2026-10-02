@@ -951,8 +951,10 @@ console.log("\n16. *** ROUND 20: IS THE WALL TWO-MANIFOLD? -- THE QUESTION bvh-c
     const deep = (d) => (d.length ? Math.max(...d.map((x) => x.depth)) : 0), dv = Math.abs(M.volume(tv.w) - M.volume(tb.w));
     report("twelve overlapping blasts: BVH " + tv.ms.reduce((x, y) => x + y) + " ms (shot 1 " + tv.ms[0] + ", shot 12 " + tv.ms[11] + "), " + tv.w.length + " polygons; BSP localised " + tb.ms.reduce((x, y) => x + y) + " ms (shot 12 " + tb.ms[11] + "), " + tb.w.length + " polygons, settled " + ts.length);
     ok("!! *** meshCSG's TWELVE-BLAST STRESS CASE, THE DEFAULT ENGINE: TWO-MANIFOLD, THE BSP's SOLID TO 1e-10 ***", topo(rv) === 0 && rv.crossings === 0 && dv < 1e-10, show(rv) + "; |volume - BSP| " + dv.toExponential(1));
-    ok("   control: the BSP on the same twelve, raw -- open, pinched, crossing itself for real (deeper than 1e-6); settled, still open at its triangles",
-        rb.open > 0 && rb.pinchedVertices > 0 && deep(ab) > 1e-6 && rs.open > 0,
+    // (round 20: settled, the BSP was still open at its triangles -- 3,491 edges -- because toTriangles dropped the flat fan
+    // triangles at the points settle welded; round 20c keeps them, and the settled wall is two-manifold as triangles)
+    ok("   control: the BSP on the same twelve, raw -- open, pinched, crossing itself for real (deeper than 1e-6); settled (since round 20c), two-manifold as triangles",
+        rb.open > 0 && rb.pinchedVertices > 0 && deep(ab) > 1e-6 && topo(rs) === 0 && rs.crossings === 0,
         "raw: " + show(rb) + ", deepest " + deep(ab).toExponential(1) + "; settled: " + show(rs) + ", deepest " + deep(as).toExponential(1));
     // (c) crossings a rounding deep. Seed 12's shot 44 cuts slivers 3e-10 high near the blobs' z = 0 equators; rounded to
     // doubles, two nearly coplanar slivers sharing a corner cross along 4e-10, 7.7e-17 deep (round 20: 6 of 48 soak walls,

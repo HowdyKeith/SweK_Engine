@@ -958,7 +958,8 @@ export function degenerateFan(polys, eps = DEGENERATE_FLATNESS) {
 }
 
 /**
- * Fan triangulation, minus the triangles that are not triangles.
+ * Fan triangulation, minus the triangles that are not triangles -- and, since round 20c of the BVH-CSG arc, without
+ * losing the points that made them.
  *
  * *** THE WELD IS WHAT MAKES THEM AND THE FAN IS WHERE THEY LAND. *** weldTJunctions() inserts a vertex into
  * every edge that has one lying on it -- 2,853 of them on the twelve-blast wall -- and every inserted vertex
@@ -968,20 +969,47 @@ export function degenerateFan(polys, eps = DEGENERATE_FLATNESS) {
  * On one blast -- the case this file's gate calls "100.0% matched, zero T-junctions, zero gaps" -- it is 136
  * of 596 (22.8%), and again none before the weld.
  *
- * Dropping them is LOSSLESS and not merely cheap: they carry 1.7e-11 of a 120.06 surface, they cover a set of
- * measure zero, and the remaining fan triangles still tile the polygon, so the union is unchanged. The
- * T-junction the weld went in to sew is sewn by the VERTEX BEING ON THE BOUNDARY, which is a polygon
- * property; nothing about it needed a triangle of zero width to represent it.
+ * Dropping them loses no AREA (they carry 1.7e-11 of a 120.06 surface) -- but it loses the POINT. This comment
+ * said the T-junction "is sewn by the vertex being on the boundary, which is a polygon property; nothing about
+ * it needed a triangle of zero width". At the polygon level, yes. At the triangle level the dropped triangle was
+ * the only one with the edges v0-vi and vi-vi+1: the fan that remains runs v0-vi+1 past vi, and the neighbour's
+ * triangles stop at vi -- the T-junction the weld sewed, reopened in what every triangle consumer reads (round
+ * 20's manifoldAudit: a page wall settled to 15 unmatched polygon edges read 5,850 open edges as triangles; the
+ * twelve-blast wall 0 and 3,491).
+ *
+ * *** SO THE FAN MOVES INSTEAD. *** A polygon whose fan from vs[0] drops nothing is fanned from vs[0] exactly as
+ * before (bit for bit -- every polygon without a welded point on a side through vs[0]). Otherwise it is fanned
+ * from the first vertex whose fan drops nothing (a corner whose two sides carry no welded point), and failing
+ * that -- every corner has one beside it -- from its centroid, one point more, n triangles. Measured: those walls
+ * read exactly their polygon census as triangles (15 / 12 / 4 / 0 open edges), no pinched vertex.
  *
  * volume() and surfaceArea() inline their own fans and do NOT come through here, deliberately -- the
- * instrument that grades the drop must not be computed by the code that drops.
+ * instrument that grades the triangulation must not be computed by the code that triangulates.
  */
 export function toTriangles(polys, { eps = DEGENERATE_FLATNESS } = {}) {
     const out = [];
-    for (const p of polys) for (let i = 1; i + 1 < p.vs.length; i++) {
-        const a = p.vs[0], b = p.vs[i], c = p.vs[i + 1];
-        if (flatness(a, b, c) <= eps) continue;
-        out.push([a, b, c]);
+    // the fan of vs from apex k, or null if any of its triangles is flat
+    const fanFrom = (vs, k) => {
+        const n = vs.length, f = [];
+        for (let i = 1; i + 1 < n; i++) {
+            const a = vs[k], b = vs[(k + i) % n], c = vs[(k + i + 1) % n];
+            if (flatness(a, b, c) <= eps) return null;
+            f.push([a, b, c]);
+        }
+        return f;
+    };
+    for (const p of polys) {
+        const vs = p.vs;
+        let f = fanFrom(vs, 0);
+        for (let k = 1; !f && k < vs.length; k++) f = fanFrom(vs, k);
+        if (f) { for (const t of f) out.push(t); continue; }
+        // every corner has a welded point beside it: fan from the centroid (and drop what is still flat -- a polygon
+        // with no area at all, as before)
+        const g = [0, 1, 2].map((c) => vs.reduce((sum, v) => sum + v[c], 0) / vs.length);
+        for (let i = 0; i < vs.length; i++) {
+            const a = vs[i], b = vs[(i + 1) % vs.length];
+            if (flatness(g, a, b) > eps) out.push([g, a, b]);
+        }
     }
     return out;
 }

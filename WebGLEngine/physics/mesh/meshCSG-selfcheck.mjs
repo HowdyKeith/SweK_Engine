@@ -399,13 +399,45 @@ console.log("\n8. *** THE FAN WAS SHIPPING TRIANGLES THAT COVER NOTHING, AND FOU
     // own fan and never calls toTriangles(), so the instrument grading the drop is not the code that drops.
     const kept = M.toTriangles(TWELVE_SETTLED);
     const keptArea = kept.reduce((a, [x, y, z]) => a + area3(x, y, z), 0);
-    ok("!! *** DROPPING THEM CHANGES THE SURFACE BY EXACTLY ZERO, TO THE LAST BIT ***",
-        kept.length === post.tris - post.degenerate && keptArea === M.surfaceArea(TWELVE_SETTLED),
-        kept.length + " triangles kept of " + post.tris + ", area " + keptArea.toFixed(12) + " against " +
-        "surfaceArea()'s " + M.surfaceArea(TWELVE_SETTLED).toFixed(12) + " -- BIT-IDENTICAL, from two fans " +
-        "written independently. The dropped ones carried " + post.area.toExponential(2) + " between them. The " +
-        "T-junction the weld went in to sew is sewn by the vertex being ON THE BOUNDARY, which is a polygon " +
-        "property; nothing about it ever needed a triangle of zero width to carry it.");
+    // round 20c of the BVH-CSG arc: the triangulation moves its fan off a welded point instead of dropping the flat
+    // triangle there -- which was the only one carrying the boundary edges at that point. Open directed edges at the
+    // exact bits, per triangle and per polygon:
+    const openOf = (loops) => { const E = new Map(), key = (v) => v[0] + "," + v[1] + "," + v[2];
+        for (const L of loops) for (let i = 0; i < L.length; i++) { const a = key(L[i]), b = key(L[(i + 1) % L.length]); if (a === b) continue; const e = a + "|" + b; E.set(e, (E.get(e) || 0) + 1); }
+        let c = 0; for (const [e, n] of E) { const [a, b] = e.split("|"); if ((E.get(b + "|" + a) || 0) !== n) c++; } return c; };
+    const oldFan = []; for (const p of TWELVE_SETTLED) for (let i = 1; i + 1 < p.vs.length; i++) if (M.flatness(p.vs[0], p.vs[i], p.vs[i + 1]) > M.DEGENERATE_FLATNESS) oldFan.push([p.vs[0], p.vs[i], p.vs[i + 1]]);
+    const openPoly = openOf(TWELVE_SETTLED.map((p) => p.vs)), openTri = openOf(kept), openOld = openOf(oldFan);
+    // (until round 20c this row asserted the area BIT-IDENTICAL, which held because the fan was surfaceArea()'s own fan
+    // minus triangles too thin to reach the last bit. 1,035 polygons are now fanned from another corner or their
+    // centroid, summed in another order: measured 9.95e-14 of 120.06, about 7 ulps)
+    ok("!! *** THE TRIANGULATION COVERS THE SURFACE (to 1e-12 -- a different fan sums in a different order) AND IS AS CLOSED AS THE POLYGONS ARE -- every welded point kept ***",
+        Math.abs(keptArea - M.surfaceArea(TWELVE_SETTLED)) <= 1e-12 && openTri === openPoly,
+        kept.length + " triangles, area " + keptArea + " against surfaceArea()'s " + M.surfaceArea(TWELVE_SETTLED) + " (diff " + (keptArea - M.surfaceArea(TWELVE_SETTLED)).toExponential(2) + ", from two triangulations written independently)" +
+        "; open directed edges " + openTri + " as triangles, " + openPoly + " as polygons");
+    ok("   control: the fan from vs[0] with its flat triangles dropped (this file's triangulation until round 20c) reopens what the weld sewed",
+        openOld > openPoly, oldFan.length + " triangles, " + openOld + " open directed edges against the polygons' " + openPoly +
+        " -- the dropped triangle (v0, vi, vi+1) was the only one with edges v0-vi and vi-vi+1; " + post.degenerate + " of them");
+    // and the fan moves only where it must: a polygon whose fan from vs[0] drops nothing is triangulated as before, bit for bit
+    let same = 0, moved = 0, diff = 0;
+    for (const p of TWELVE_SETTLED) {
+        const plain = []; let flat = false;
+        for (let i = 1; i + 1 < p.vs.length; i++) { if (M.flatness(p.vs[0], p.vs[i], p.vs[i + 1]) <= M.DEGENERATE_FLATNESS) flat = true; plain.push([p.vs[0], p.vs[i], p.vs[i + 1]]); }
+        if (flat) { moved++; continue; }
+        const t = M.toTriangles([p]);
+        if (t.length === plain.length && t.every((T, i) => T.every((v, j) => v === plain[i][j]))) same++; else diff++;
+    }
+    ok("!! a polygon whose fan from vs[0] drops nothing is triangulated exactly as before (the same vertex objects, the same order); only the others move",
+        diff === 0 && same > 0 && moved > 0, same + " as before, " + diff + " not, " + moved + " with a welded point beside vs[0]");
+    // by hand: a point welded beside vs[0] (a corner whose fan drops nothing exists), and a point on every side (none does)
+    const sides = (tris) => { const S = new Set(); for (const T of tris) for (let i = 0; i < 3; i++) S.add(T[i].join() + "|" + T[(i + 1) % 3].join()); return S; };
+    const keepsBoundary = (vs) => { const S = sides(M.toTriangles([{ vs }])); return vs.every((v, i) => S.has(v.join() + "|" + vs[(i + 1) % vs.length].join())); };
+    // (one point on each side of a triangle needs no centroid -- a side's own point is an apex whose fan drops nothing;
+    // with two on each side every vertex has one beside it)
+    const penta = [[0, 0, 0], [0.5, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]];
+    const tri3 = [[0, 0, 0], [1 / 3, 0, 0], [2 / 3, 0, 0], [1, 0, 0], [2 / 3, 1 / 3, 0], [1 / 3, 2 / 3, 0], [0, 1, 0], [0, 2 / 3, 0], [0, 1 / 3, 0]];
+    ok("!! by hand: a square with a point welded beside vs[0] (3 triangles from another corner), a triangle with two points on every side (9 from its centroid): every boundary edge kept",
+        M.toTriangles([{ vs: penta }]).length === 3 && keepsBoundary(penta) && M.toTriangles([{ vs: tri3 }]).length === 9 && keepsBoundary(tri3),
+        M.toTriangles([{ vs: penta }]).length + " and " + M.toTriangles([{ vs: tri3 }]).length + " triangles");
     ok("   ...and it reaches the buffer meshBVH is handed, not just the array",
         M.toTriangleBuffer(TWELVE_SETTLED).length === kept.length * 9,
         kept.length * 9 + " floats");
@@ -639,6 +671,16 @@ console.log("\n10. *** EPS (ROUND 10 OF THE BVH-CSG ARC): WHAT A PLANE TOLERANCE
 //   F8 parity trusted even when its five rays disagree        -> 0 / 0  NOT A MISSING CHECK, A PATH NO INPUT HAS TAKEN:
 //                                                                        `ambiguous` read 0 in every run measured
 // meshBooleanBlast-selfcheck is 0 on all of them: its BSP chain's volumes are right on either side of every one.
+// SABOTAGE LOG, ROUND 20c OF THE BVH-CSG ARC -- toTriangles(), each on the real meshCSG.mjs, restored in a `finally` and
+// md5 verified. 4 of 4 red. Reds here / blastEngine-selfcheck:
+//   Z1 the old fan: flat triangles dropped, the apex never moved  -> 2 / 1  (section 8: 3,491 open triangle edges against
+//                                                                        0 polygon edges; the hand cases; section 16's
+//                                                                        settled control)
+//   Z2 no other corner tried: straight to the centroid           -> 1 / -  (the hand square: 5 triangles, not 3)
+//   Z3 no centroid fallback: such a polygon gives nothing         -> 3 / -  (114 open edges, the area 5.75 short, the
+//                                                                        multiplicity-one rays)
+//   Z4 vs[0] not preferred                                        -> 2 / -  (no polygon left as it was; the area 1.6e-10
+//                                                                        off on polygons only planar to rounding)
 console.log("\n11. *** blast()'s LOCALISATION: FOUND AT ROUND 10, FIXED AT ROUND 10B -- B IS CLASSIFIED AGAINST THE WHOLE SOLID ***");
 {
     // Round 10 found subtractLocal() keeping or dropping the BLOB's surface by a BSP of the near patch -- an open

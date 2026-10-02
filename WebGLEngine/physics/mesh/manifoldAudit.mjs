@@ -23,8 +23,8 @@
 // edge- and vertex-manifold and with no degenerate triangle; 6 of them with 2..9 crossings, every one at most 1.8e-16
 // deep (below an ulp at the wall's coordinates) and up to 2.2e-9 long: the exact arrangement's slivers near the page
 // blobs' z = 0 equators, rounded to doubles; since round 20b none (meshBoolean's embedRounded). meshCSG's BSP on the same
-// 20 shots: tens of thousands of open edges raw,
-// thousands after settle, real crossings up to 6.8e-3 deep. See blastEngine-selfcheck section 16.
+// 20 shots: tens of thousands of open edges raw, real crossings up to 6.8e-3 deep; after settle thousands at its triangles
+// until round 20c (meshCSG's fan dropped the points settle welded), its polygon census since. See blastEngine-selfcheck 16.
 "use strict";
 
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
