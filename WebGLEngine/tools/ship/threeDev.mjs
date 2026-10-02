@@ -21,6 +21,7 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const DEV_DIR = path.join(ENG, "docs", "upstream-three", "dev");
@@ -56,8 +57,10 @@ export function devPatches(dir = DEV_PATCHES) {
 }
 
 function main() {
-    const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
-    const three = arg("--three"), r186 = arg("--r186");
+    const CLI = { values: { "--three": "path", "--r186": "path" } };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("threeDev", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const three = cli.values["--three"] || null, r186 = cli.values["--r186"] || null;
     if (!three || !r186) { console.error("usage: node tools/ship/threeDev.mjs --three <three checkout at " + DEV_COMMIT.slice(0, 7) + "> --r186 <three@" + RELEASE + " unpacked>"); process.exit(2); }
     const git = (...a) => execFileSync("git", a, { cwd: three, encoding: "utf8" }).trim();
     const head = git("rev-parse", "HEAD");
