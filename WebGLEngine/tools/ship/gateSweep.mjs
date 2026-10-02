@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4796 -- THE 400th CLOSING: NO new gate file -- one machine type, one id.
+    since493: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4796", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/hostScale-selfcheck.mjs (the id survives a megabyte of drift and still tells 16, 32 and 8 GB apart)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** ONE MACHINE TYPE HAD TWO IDS, AND A MEGABYTE DECIDED WHICH. *** boxId() carried total memory in megabytes, and " +
+                 "the same container type read 16095 in one session and 16096 in another: two per-box records for one box, and " +
+                 "recordReach red on a box whose readings sat under its twin's name. The id is in whole gigabytes now -- coarser than " +
+                 "any one machine's drift, finer than any difference between machine types this tree has met -- and the records are " +
+                 "merged under it: 16095mb-420793 and 16096mb-420793 into 16gb-420793 (six gates), 16095mb-142c0d into 16gb-142c0d. " +
+                 "EVERY COMPARISON STAYS EXACT: the shared record's host keeps the old format, so no box owns it -- as no live box " +
+                 "has -- and verify never writes the committed file. Re-hosting it is a decision of its own, not a side effect of " +
+                 "a rename. Two sabotages red.",
+    }),
     // v4795 -- THE 399th CLOSING: NO new gate file -- draft 14, a WebGL2 compute reading a buffer of the other class.
     since492: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

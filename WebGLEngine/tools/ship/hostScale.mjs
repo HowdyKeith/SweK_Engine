@@ -79,7 +79,12 @@ export function boxId(facts = hostFacts()) {
     // the model string is hashed rather than embedded: "Intel(R) Xeon(R) Processor @ 2.80GHz" carries spaces,
     // parentheses and an @, and an id that needs quoting is an id that will be mangled by something.
     const m = crypto.createHash("md5").update(String(f.model || "unknown")).digest("hex").slice(0, 6);
-    return `${f.platform || "?"}-${f.arch || "?"}-${f.cpus || 0}c-${f.totalMemMB || 0}mb-${m}`;
+    // *** v4796 -- MEMORY IN WHOLE GIGABYTES, BECAUSE ONE MACHINE TYPE REPORTED TWO MEGABYTE COUNTS. *** The same
+    // container type read 16095 MB in one session and 16096 MB in the next, and the id split it in two: two per-box
+    // records for one box, and recordReach red on a box that had readings filed under its twin. A gigabyte is coarser than
+    // any one machine's drift and finer than any difference between machine types this tree has met (4c-16gb, 12c-32gb).
+    // Every comparison stays EXACT: the shared record's host is the old format, so no box owns it -- as no live box did.
+    return `${f.platform || "?"}-${f.arch || "?"}-${f.cpus || 0}c-${Math.round((f.totalMemMB || 0) / 1024)}gb-${m}`;
 }
 
 // *** THE DENOMINATOR IS gateBudget.MEASURED, AND gate-timings.json IS THE WRONG FILE FOR IT. ***

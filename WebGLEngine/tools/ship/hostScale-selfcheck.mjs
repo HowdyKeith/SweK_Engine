@@ -302,7 +302,13 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
     // puts a handful, which is two machines disagreeing rather than a number moving.
     const ME = boxId();
     ok("boxId is stable within a run and shaped for a filename, not for quoting",
-       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+mb-[0-9a-f]{6}$/.test(ME), ME);
+       ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+gb-[0-9a-f]{6}$/.test(ME), ME);
+    // v4796: one machine type reported 16095 MB in one session and 16096 MB in the next, and the megabyte id split it in two
+    const facts = hostFacts(), at = (mb) => boxId({ ...facts, totalMemMB: mb });
+    ok("!! the id survives a machine's megabyte drift and still tells machine types apart: 16095 and 16096 MB one id, 32 GB another",
+       at(16095) === at(16096) && at(16096) !== at(32678) && at(7908) !== at(16095), `${at(16095)} / ${at(16096)} / ${at(32678)} / ${at(7908)}`);
+    // SABOTAGES (v4796): the id back in megabytes -> 2 (this row and the shape above); memory dropped from the id -> 1, this row,
+    // 16 GB and 32 GB then one box. Rounding DOWN in place of to-nearest is equivalent at these sizes and was not counted.
 
     const mine = timingsTarget({ host: ME });
     ok("!! *** the box that OWNS the record writes the shared file ***",
