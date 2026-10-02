@@ -25,7 +25,7 @@ import { ENG, BUNDLE, apply, patchTexts, rootWithBuilds } from "./threePatch.mjs
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
-const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"], ["localIndex", "11"], ["mismatch", "11"], ["perInstanceAbsolute", "13", "together"]];
+const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"], ["localIndex", "11"], ["perInstanceAbsolute", "13", "together"]];
 const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md", "11": "11-webgl2-compute-instance-index.md", "13": "13-instanced-morph-absolute-and-mesh-level.md" };
 
 console.log("\n1. THE PATCHED BUILDS: each draft's patch alone on r185's build, every hunk found once");
@@ -144,16 +144,6 @@ else {
         await renderer.computeAsync(T.Fn(() => { out.element(T.instanceIndex).assign(T.vec4(T.float(T.invocationLocalIndex), 0, 0, 1)); })().compute(N));
         const f = new Float32Array(await renderer.getArrayBufferAsync(outA)), seen = new Set(); for (let i = 0; i < N; i++) seen.add(f[i * 4]);
         o.it = [seen.size];
-      } else if (name === "mismatch") {
-        // v4792: what patch 11 does NOT reach. A storage buffer read as a vertex attribute -- not through a PBO -- is fetched
-        // per instance or per vertex by ITS OWN class, while the dispatch is instanced only when the first buffer is: an
-        // instanced source copied into a plain output reads the first element in every invocation, builtin index or not
-        renderer.setMRT(null);
-        const N = 6, a = new Float32Array(N * 4); for (let i = 0; i < N; i++) a[i * 4] = i + 1;
-        const src = T.storage(new THREE.StorageInstancedBufferAttribute(a, 4), "vec4", N).toReadOnly(), outA = new THREE.StorageBufferAttribute(N, 4), out = T.storage(outA, "vec4", N);
-        await renderer.computeAsync(T.Fn(() => { out.element(T.instanceIndex).assign(src.element(T.instanceIndex)); })().compute(N));
-        const f = new Float32Array(await renderer.getArrayBufferAsync(outA));
-        o.it = [Array.from({ length: N }, (_, i) => f[i * 4]).join(" ")];
       } else if (name === "perInstance" || name === "perInstanceAbsolute") {
         // v4793: perInstanceAbsolute is the same over ABSOLUTE targets, which r185 throws on (draft 13): its velocity needs 13
         // to draw at all and 03 for the previous point, so it is held on the build with every patch -- a "together" case.
@@ -253,12 +243,8 @@ if (res) {
         const ran = [R, P, Rg, Pg].every(Number.isFinite);
         ok(`*** 11, invocationLocalIndex in a compute of 128 writing a plain storage buffer: the distinct values it wrote -- ${ran ? `WebGL2 r185 ${R}, patched ${P}; WebGPU ${Rg} and ${Pg}` : "did not run"} ***`,
             ran && R === 1 && P === 64 && Rg === 64 && Pg === 64, "the workgroup is 64: r185 reads gl_InstanceID, 0 in a draw that is not instanced");
-        const m = (b, mm) => (at("mismatch", b, mm).it || [])[0], MR = m("r185", "webgl2"), MP = m("patched", "webgl2"), MG = m("r185", "webgpu"), MGP = m("patched", "webgpu");
-        const mran = [MR, MP, MG, MGP].every((v) => typeof v === "string");
-        ok(`  11, an instanced storage source copied into a plain output: NOT reached -- ${mran ? `WebGL2 r185 ${MR}, patched ${MP}; WebGPU ${MG}` : "did not run"}`,
-            mran && MR === MP && MR === "1 1 1 1 1 1" && MG === "1 2 3 4 5 6" && MGP === MG, "an attribute's fetch follows its own class, not the builtin the patch changes; a fix would match the dispatch to every buffer it reads");
-        if (ran && mran) said["11"] = `invocationLocalIndex in a compute of 128 writing a plain storage buffer: r185 ${R}, patched ${P} distinct values on WebGL2; ${Rg} on WebGPU, both builds\n` +
-            `an instanced storage source copied into a plain output: r185 ${MR}, patched ${MP} on WebGL2 -- not reached; ${MG} on WebGPU, both builds`;
+        // v4795: the instanced-source path that stood here (v4792) is draft 14's reproduction now, with a patch of its own
+        if (ran) said["11"] = `invocationLocalIndex in a compute of 128 writing a plain storage buffer: r185 ${R}, patched ${P} distinct values on WebGL2; ${Rg} on WebGPU, both builds`;
     }
 
     console.log(`\n2b. ALL ${Object.keys(texts).length} TOGETHER: each path on the one build with every patch, as on its own patch's`);
