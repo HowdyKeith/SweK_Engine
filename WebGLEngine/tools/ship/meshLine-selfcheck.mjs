@@ -145,7 +145,9 @@ console.log("\n5. *** THE ATTRIBUTE NAMES MUST MATCH, AND A MISMATCH IS SILENT *
 console.log("\n6. *** ASKING THE DRIVER, AND THEN COUNTING PIXELS ***");
 {
     const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
-    const skip = browserSkipReason(require);
+    // v4778 rig: this handed browserSkipReason the require function -- where the CHROMIUM object goes, which is truthy, so it
+    // never refused and the next line launched null. The two facts are resolved and handed over as the function takes them.
+    const PW = resolvePlaywright(require), skip = browserSkipReason(PW.chromium, PW.from, HEADLESS_SHELL);
     if (skip) {
         console.log("  ----  SKIPPED, WITH A REASON: " + skip);
         console.log("        Sections 1-5 gate the geometry and the shader source. What only a GL context can");

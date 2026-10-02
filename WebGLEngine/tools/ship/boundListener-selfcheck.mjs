@@ -224,7 +224,9 @@ console.log("\n6b. whenDetached: the shape kaggleLab hand-rolled");
 console.log("\n7. *** THE MEASUREMENT THAT MATTERS, IN A REAL DOM ***");
 {
     const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
-    const skip = browserSkipReason(require);
+    // v4778 rig: this handed browserSkipReason the require function -- where the CHROMIUM object goes, which is truthy, so it
+    // never refused and the next line launched null. The two facts are resolved and handed over as the function takes them.
+    const PW = resolvePlaywright(require), skip = browserSkipReason(PW.chromium, PW.from, HEADLESS_SHELL);
     if (skip) {
         console.log("  ----  SKIPPED, WITH A REASON: " + skip);
         console.log("        Sections 1-6 drive the same code with a fake target, so the LOGIC is gated either");

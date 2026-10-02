@@ -65,7 +65,8 @@ else {
 console.log("\n2. THE PAGE, HERE: IT LOADS, COMPARES ITSELF TO THE FILE, AND PASSES ON WebGL2");
 {
     const pw = resolvePlaywright(createRequire(import.meta.url));
-    if (!pw || !fs.existsSync(HEADLESS_SHELL) || !hist) { console.log("  SKIP  no browser or no expected file"); fails++; }
+    // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object; the field is pw.chromium
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL) || !hist) { console.log("  SKIP  no browser or no expected file"); fails++; }
     else {
         const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
         const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]); const f = path.join(ENG, u === "/" ? "gpu-rig-check.html" : u);

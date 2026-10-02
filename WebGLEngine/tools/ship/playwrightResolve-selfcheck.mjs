@@ -31,9 +31,10 @@
 // files whose only test is those files -- v3202's sweep deleted 61 live modules. It is named here as owed.
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
-         HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright,
+         HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright, globalNpmPaths, siblingCopies,
          resolvePlaywright, SHELL_DIR_SAMPLES } from "./playwrightResolve.mjs";
 import fs from "node:fs";
+import { treePaths } from "./treeRead.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -330,6 +331,43 @@ console.log("\nTHE HARNESS GUARD THAT COULD NOT FIRE (found on the rig, after v4
             const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), g + "-selfcheck.mjs"), "utf8");
             return /webglLaunchArgs\(\)/.test(src) && !/args:\s*\["--use-gl=swiftshader"\]/.test(src);
         }));
+}
+
+console.log("\nTHE v4778 RIG RUN: 248 GATES RED ON A PACKAGE THIS LIST COULD NOT FIND ON WINDOWS");
+{
+    // a fresh copy per version empties tools/render-qa/node_modules while the browser survives in %LOCALAPPDATA%
+    const win = globalNpmPaths({ APPDATA: "C:\\Users\\K\\AppData\\Roaming", npm_config_prefix: "D:\\npm" }, "win32");
+    const nix = globalNpmPaths({ npm_config_prefix: "/opt/npm" }, "linux");
+    ok("!! the global npm root is asked: %APPDATA%\\npm on Windows, npm_config_prefix's node_modules (win32) or lib/node_modules (POSIX)",
+       win.length === 2 && /AppData.Roaming.npm.node_modules.playwright$/.test(win[0]) && /D:.npm.node_modules.playwright$/.test(win[1]) &&
+       nix.length === 1 && /\/opt\/npm\/lib\/node_modules\/playwright$/.test(nix[0]) && globalNpmPaths({}, "win32").length === 0,
+       JSON.stringify([...win, ...nix]));
+    const sib = siblingCopies("/x/SweK_Engine_v4778/WebGLEngine",
+        { readdir: () => ["SweK_Engine_v4776", "SweK_Engine_v4778", "Other", "SweK_Engine_v4777", "SweK_Engine_v4775"], exists: (q) => !/v4776/.test(q) });
+    ok("!! a SIBLING copy's render-qa install is a last resort: newest version first, only where it exists, never this copy, never an unrelated folder",
+       JSON.stringify(sib.map((q) => q.split(/[\\/]/)[2])) === JSON.stringify(["SweK_Engine_v4777", "SweK_Engine_v4775"]) &&
+       sib.every((q) => /WebGLEngine.tools.render-qa.node_modules.playwright$/.test(q)) &&
+       PLAYWRIGHT_PATHS.indexOf("playwright") === 0 && PLAYWRIGHT_PATHS.indexOf(path.join(ENG, "tools", "render-qa", "node_modules", "playwright")) === 2,
+       JSON.stringify(sib));
+    const said = browserSkipReason(null, "", ENG);
+    ok("!! the refusal says the ONE command that fixes it, and that nothing need be downloaded when the browser is already there",
+       /to fix: cd .*render-qa && npm install --ignore-scripts/.test(said), said.slice(said.indexOf("-- to fix")));
+    // *** AND ELEVEN FILES WHOSE GUARD COULD NOT FIRE. *** `if (!pw)` / `if (!pw || ...)` on resolvePlaywright's { chromium,
+    // from } is always false, and browserSkipReason handed `require` never refuses -- the harness header above describes the
+    // bug, and the harness's own two entry points and nine gates still carried it: on the rig they died at `null.launch`
+    // instead of saying why. (textureBytes launched with no check at all, a shape this text scan does not claim to see.)
+    const offenders = [];
+    for (const f of treePaths(ENG)) {
+        if (!/\.(mjs|js|cjs)$/.test(f)) continue;
+        const src = fs.readFileSync(f, "utf8");
+        if (!src.includes("resolvePlaywright(")) continue;
+        // `if (!pw)` and `if (!pw || ...)` after `const pw = resolvePlaywright(...)`, within a few lines; and the
+        // require function handed to browserSkipReason where the chromium object goes (boundListener, meshLine)
+        for (const m of src.matchAll(/const\s+(\w+)\s*=\s*resolvePlaywright\([^)]*\)[^;\n]*;[\s\S]{0,240}?if\s*\(\s*!\s*\1\s*(\)|\|\|)/g)) offenders.push(path.relative(ENG, f) + " (!" + m[1] + ")");
+        for (const m of src.matchAll(/browserSkipReason\(\s*(require|requireFn|createRequire\([^)]*\))\s*\)/g)) offenders.push(path.relative(ENG, f) + " (browserSkipReason(" + m[1] + "))");
+    }
+    ok("!! *** no file guards on the resolver's OBJECT (`if (!pw)`, `if (!pw || ...)`: always false; the field is pw.chromium), nor hands browserSkipReason a require ***",
+       offenders.length === 0, offenders.length ? "STILL: " + offenders.join(", ") : "none of the files that call resolvePlaywright");
 }
 
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

@@ -51,7 +51,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { makeGitEconomy, marketsOf, goodOf, GOODS, reprice, PRICE_FLOOR, PRICE_CEIL, BASE, RECIPES, DEFAULTS } from "../../world/gitEconomy.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { traders } from "../../world/traderGraph.mjs";
@@ -227,7 +227,8 @@ console.log("\n2. A HUNDRED DAYS OF LIFE, ACCOUNTED FOR TO THE UNIT");
 console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRADER OR A BODY");
 {
     const pw = resolvePlaywright(createRequire(import.meta.url));
-    if (!pw || !fs.existsSync(HEADLESS_SHELL)) { console.log("  SKIP  no browser"); fails++; }
+    // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object; the field is pw.chromium
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL)) { console.log("  SKIP  no browser -- " + (browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL) || "no headless shell")); fails++; }
     else {
         const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
         const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]); const f = path.join(ENG, u === "/" ? "orrery-gpu.html" : u);

@@ -413,7 +413,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
 
     const n = srcSize;
     const src = new Uint8Array(n * n * 4);
@@ -592,7 +592,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
     const three = path.join(engineRoot, "vendor/three/three.module.js");
     if (!fs.existsSync(three)) return { ok: false, skipped: true, reason: "no vendored three at " + three, pixels: null };
 

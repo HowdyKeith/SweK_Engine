@@ -16,7 +16,7 @@
 import * as THREE from "../../vendor/three/three.module.js";
 import { classifyDiagonals, barycentricGeometry, wireframeMesh } from "../../ui/barycentricWireframe.js";
 import { SECURE_HOST } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,7 +41,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 async function runWebGL2InEngineOrigin({ engineRoot, script, args = null }) {
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", result: null, pageErrors: [] };
     const pw = resolvePlaywright();
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", result: null, pageErrors: [] };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), result: null, pageErrors: [] };
     const root = path.resolve(engineRoot);
     const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html" };
     const srv = http.createServer((q, s) => {

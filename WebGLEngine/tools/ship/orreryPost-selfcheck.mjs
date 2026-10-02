@@ -17,7 +17,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { EFFECTS, TEXTURE_CAPABLE_BACKENDS, postSkipReason } from "../../ui/orreryPost.mjs";
 import { UV_CONVENTION } from "../../render/badTvDevicePass.mjs";
 
@@ -82,8 +82,9 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
 {
     const requireFn = createRequire(import.meta.url);
     const pw = resolvePlaywright(requireFn);
-    if (!pw || !fs.existsSync(HEADLESS_SHELL)) {
-        console.log("  SKIP  no browser available here");
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL)) {   // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object
+        // v4778 rig: this branch never ran (its guard could not fire), so it was never noticed that it counted nothing
+        console.log("  SKIP  no browser available here -- " + (browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL) || "no headless shell")); fails++;
         report("*** NOT A PASS. *** Sections 1 and 2 read source. Only this one attaches the stage to a real " +
             "device, and 'the first consumer works' is the entire claim of the round.");
     } else {
@@ -245,8 +246,8 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
 {
     const requireFn2 = createRequire(import.meta.url);
     const pw2 = resolvePlaywright(requireFn2);
-    if (!pw2 || !fs.existsSync(HEADLESS_SHELL)) {
-        console.log("  SKIP  no browser available here");
+    if (!pw2.chromium || !fs.existsSync(HEADLESS_SHELL)) {
+        console.log("  SKIP  no browser available here -- " + (browserSkipReason(pw2.chromium, pw2.from, HEADLESS_SHELL) || "no headless shell")); fails++;
         report("*** NOT A PASS. *** Section 4 reads the page's source. Only this one loads it, clicks the " +
             "control and looks at what appears -- which is the difference between wired and working.");
     } else {
