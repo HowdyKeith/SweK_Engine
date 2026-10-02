@@ -218,19 +218,29 @@ console.log("\n2. handed a stale record, each check names it");
         (await checks({ records: without("timings"), only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === true);
     ok("...while the untouched records are clean, so neither is simply always true",
         (await checks({ records: world, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale === false);
-    ok("!! ...and the planted hole is NOT masked when only the shared record is sabotaged and a local record exists -- which is WHY the rows above sabotage every record",
-        // v4791: A LOCAL RECORD MASKS THE HOLE ONLY WHERE COVERAGE READS THAT RECORD FOR THIS GATE. coverageOf takes, per
-        // gate, the first record that times it unless a later one is THIS box's -- so a local record that merely HOLDS
-        // the gate masks nothing when the shared record is read first. The row asked "does any non-shared record hold
-        // it", and went red at HEAD on a box whose CPU model made it the shared record's owner (142c0d), where the shared
-        // entry is this box's own and wins. It asks now which record coverage actually reads, and sabotages the shared
-        // entry inside the full record set rather than through `timings`.
-        world.length < 2 || (() => { const e = BT.coverageOf(world).entries.get(rel), from = e && world.find((r) => r.file === e.from);
-            return !from || from.kind === "shared" || !e.at; })() ||
-        (await checks({ records: world.map((r) => r.kind !== "shared" ? r : { ...r, rec: { ...r.rec,
-            at: Object.fromEntries(Object.entries(r.rec.at || {}).filter(([k]) => k !== rel)) } }), only: "sweep timings" }))
-            .find((c) => c.name === "sweep timings").stale === false,
-        "the v4679 shape of this row, kept as a witness to the masking rather than as the test");
+    // *** v4797 -- THE MASKING WITNESS ON A WORLD IT BUILDS, NOT THE ONE IT FINDS. *** Until v4791 it asked whether any local
+    // record HELD the gate; v4791 made it ask which record coverage READS -- and on a box whose own record is not the one read
+    // for this gate, that left it passing on nothing (it did, on every box this session). The masking is a property of
+    // coverageOf, so it is shown on a world made for it: the real records with the shared one given a host that is not this
+    // box, and one more record that IS this box's and times the gate. Hole the shared entry and this box's reading fills it
+    // -- MASKED; make the extra record foreign too and the first record is read, holed -- NOT masked. Both on every box.
+    {   const { boxId } = await import("./hostScale.mjs"), here = boxId(), now = new Date().toISOString();
+        const holed = (w) => w.map((r) => r.kind !== "shared" ? r : { ...r, rec: { ...r.rec, at: Object.fromEntries(Object.entries(r.rec.at || {}).filter(([k]) => k !== rel)) } });
+        // every other real record loses this gate, so the shared entry and the one made here are the only two that time it
+        const without = (rec) => ({ ...rec, timings: Object.fromEntries(Object.entries(rec.timings || {}).filter(([k]) => k !== rel)) });
+        const built = (host) => [...world.map((r) => r.kind === "shared" ? { ...r, host: "fixture-foreign-host", rec: { ...r.rec, host: "fixture-foreign-host" } } : { ...r, rec: without(r.rec) }),
+            { file: "tools/ship/sweep-timings.fixture.json", kind: "per-box", host, rec: { host, timings: { [rel]: 1 }, at: { [rel]: now }, kinds: { [rel]: "alone" }, codes: { [rel]: 0 } } }];
+        const staleOf = async (w) => (await checks({ records: w, only: "sweep timings" })).find((c) => c.name === "sweep timings").stale;
+        const clean = await staleOf(built(here)), masked = await staleOf(holed(built(here))), unmasked = await staleOf(holed(built("fixture-other-box")));
+        ok("!! ...and a hole in the shared record IS masked where this box's own record times the gate -- which is WHY the rows above sabotage every record",
+            clean === false && masked === false, `built world clean: ${!clean}; holed shared entry with this box's reading beside it: ${masked ? "stale" : "masked"}`);
+        ok("  ...and NOT masked where the record beside it is another box's, which coverage reads after the shared one",
+            unmasked === true, `holed shared entry with a foreign reading beside it: ${unmasked ? "stale" : "masked"}`);
+        // SABOTAGES (v4797), on tools/ship/boxTimings.mjs's coverageOf: the first record always read -> 1, the masked row; the
+        // last record always read -> 1, the control. The first draft built the world from the live records as they stood, and
+        // the control came out masked -- this box's own local timings file already held the gate -- so every other record
+        // gives the gate up before the two that matter are added.
+    }
 }
 
 {

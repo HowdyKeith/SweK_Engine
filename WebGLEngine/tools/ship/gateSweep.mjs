@@ -8723,6 +8723,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4797 -- THE 401st CLOSING: NO new gate file -- recordDrift's masking witness on a world it builds.
+    since494: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4797", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/recordDrift-selfcheck.mjs (the masking witness: masked beside this box's reading, not beside another's, on a built world)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A WITNESS THAT PASSED ON NOTHING. *** Since v4791 recordDrift's masking row asked which record coverage reads for " +
+                 "a gate, and passed vacuously on any box whose own record was not that one -- every box this session. Masking is a " +
+                 "property of coverageOf, so it is shown on a world made for it: the real records, the shared one given a foreign " +
+                 "host, every other giving the gate up, and one more record that is this box's and times it. Holed, the shared entry " +
+                 "is masked by this box's reading; with the extra record foreign it is not. The first draft left the live records " +
+                 "as they stood and the control came out masked -- this box's own local timings already held the gate. Two " +
+                 "sabotages of coverageOf's precedence red, one row each.",
+    }),
     // v4796 -- THE 400th CLOSING: NO new gate file -- one machine type, one id.
     since493: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
