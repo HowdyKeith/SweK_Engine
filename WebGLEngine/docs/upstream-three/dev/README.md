@@ -67,3 +67,13 @@ a reproduction edited since the record is red until the tool is run again.
 13's give what they gave on r185 with its patches. Instance matrices in a storage buffer written on the CPU are right on `dev`;
 written by a compute pass they still are not -- as on r185 with patch 01, which never reached them, and not filed. A batch
 grown with its material updated throws on `dev`: that is issue 15.
+
+## Checked with three's own tests
+
+Run in the `dev` checkout, on `dev` and on `dev` with all thirteen patches in order, each built by three's rollup -- the same
+bytes `record.json` names:
+
+- Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1522 tests, 1521 passed, 1 todo, 0 failed, on both builds.
+- e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
+  failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the
+  same bytes on each backend; the other two vary between runs of one build.

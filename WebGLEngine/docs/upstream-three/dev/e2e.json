@@ -1,0 +1,38 @@
+{
+ "at": "v4799",
+ "devCommit": "1ea31f304854ee3c85df39fdb3eaec584bba6d9b",
+ "builds": {
+  "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
+  "all": "4918bb20f08865966e3e59a1aeff03045a8d4f9ce0dfc465c74c7765e4d2295e"
+ },
+ "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev runner), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all thirteen patches in order",
+ "unit": {
+  "tests": 1522,
+  "passed": 1521,
+  "todo": 1,
+  "failed": 0,
+  "sameOnBoth": true
+ },
+ "webgpu": {
+  "examples": 202,
+  "passed": 191,
+  "failed": 11,
+  "samePerExample": true,
+  "screenshotsIdentical": 200,
+  "varyingOnOneBuild": {
+   "webgpu_compute_rasterizer": "a different image on each of three runs of each build",
+   "webgpu_gaussian_splat": "a different image on each of three runs of each build"
+  }
+ },
+ "webgl2": {
+  "examples": 202,
+  "passed": 148,
+  "failed": 54,
+  "samePerExample": true,
+  "screenshotsIdentical": 200,
+  "varyingOnOneBuild": {
+   "webgpu_upscaling_fsr1": "a different image on each run of either build (so on r185 at v4795)",
+   "webgpu_upscaling_taau": "a different image on each run of either build (so on r185 at v4795)"
+  }
+ }
+}

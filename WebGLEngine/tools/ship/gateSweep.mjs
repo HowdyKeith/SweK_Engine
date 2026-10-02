@@ -8738,7 +8738,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "under a velocity MRT throws on every render. Each is now an issue in three's Bug Report form, its reproduction the draft's " +
                  "with the version swapped, its patch rebased onto dev -- five by hand, and 10 rebased as it was applied cleanly and fixed " +
                  "nothing, the compute builder's object having moved to builder.compute. A tool runs them beside a three checkout and " +
-                 "records what each page printed; section 6 holds the issues to the record. Fourteen sabotages red.",
+                 "records what each page printed; section 6 holds the issues to the record, and three's own unit and e2e tests to " +
+                 "theirs: the same on dev and with all thirteen. Sixteen sabotages red.",
     }),
     // v4798 -- THE 402nd CLOSING: NO new gate file -- a timing row that tolerates load, and four callers off a hand-spelled regex.
     since495: Object.freeze({

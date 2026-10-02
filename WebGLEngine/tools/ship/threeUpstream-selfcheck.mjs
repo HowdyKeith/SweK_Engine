@@ -310,6 +310,16 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`*** the record is of dev at ${DEV_COMMIT.slice(0, 7)} and r186 ${DEV_RELEASE}, and of every patch and reproduction as they are now ***`,
         !!rec && rec.devCommit === DEV_COMMIT && rec.release === DEV_RELEASE && SLOTS.every(fresh),
         !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threeDev.mjs again`);
+    // three's own unit and e2e tests on dev and on dev with every patch, run in the checkout: the record adds up, names the two
+    // builds the issues' record names, and the README states it
+    const E2E = path.join(DEV_DIR, "e2e.json"), e2e = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
+    const adds = (x) => !!x && x.examples > 0 && x.passed + x.failed === x.examples && x.samePerExample === true && x.screenshotsIdentical + Object.keys(x.varyingOnOneBuild || {}).length === x.examples;
+    ok(`*** three's tests on dev and with all ${SLOTS.length}: unit ${e2e && e2e.unit.passed} passed and ${e2e && e2e.unit.failed} failed on both; e2e ${e2e && e2e.webgpu.passed} of ${e2e && e2e.webgpu.examples} on WebGPU and ${e2e && e2e.webgl2.passed} on WebGL 2, the same on both builds ***`,
+        !!e2e && !!rec && e2e.devCommit === DEV_COMMIT && e2e.builds.dev === rec.builds.dev && e2e.builds.all === rec.builds.all && e2e.unit.failed === 0 && e2e.unit.sameOnBoth === true && adds(e2e.webgpu) && adds(e2e.webgl2),
+        "taken on the builds the record names; a patch changed since makes both stale");
+    ok(`  the README states them as e2e.json does`, !!e2e && devIndex.includes(`${e2e.unit.tests} tests, ${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed`) &&
+        devIndex.includes(`${e2e.webgpu.examples} WebGPU examples, ${e2e.webgpu.passed} passed and the same ${e2e.webgpu.failed}`) && devIndex.includes(`${e2e.webgl2.passed} passed and the same ${e2e.webgl2.failed} failed`) &&
+        devIndex.includes(`${e2e.webgpu.screenshotsIdentical} of the ${e2e.webgpu.examples} screenshots`) && devIndex.includes("(e2e.json)"));
     for (const s of SLOTS) {
         const f = issues[s]; if (!f) continue;
         const t = fs.readFileSync(path.join(DEV_DIR, f), "utf8"), parts = issueParts(t), draft = draftOf(s), d = draft ? DRAFTS[draft] : OWN[s];
@@ -340,7 +350,7 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
 // S6 the README dropping #34107 -> 1; S7 the record's dev printing otherwise than r186 on one backend -> 1; S8 a live example
 // claimed -> 1; S9 the record of another dev commit -> 1; S10 issue 15 removed -> 2; S11 08 held to r185's symptom -> 1; S12 04's
 // together block removed -> 1; S13 an issue's inline patch edited by one space -> 1; S14 15's fix missing from the all-patch run
-// -> 2. Fourteen, none green.
+// -> 2. Fourteen, none green. Then E1 e2e.json naming another all-patch build -> 1; E2 its WebGL 2 count edited -> 2 (adds up; the README).
 // ---- v4763 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the drafts themselves: U1 an Observed number edited by a thousandth -> 1; U2 a reproduction importing more than
 // three -> 2; U3 the instanced reproduction made to move the mesh instead (no bug) -> 2; U4 the README not saying DRAFTS, NOT
