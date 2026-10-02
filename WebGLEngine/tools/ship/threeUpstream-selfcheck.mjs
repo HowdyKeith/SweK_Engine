@@ -318,6 +318,12 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
 // Z2 patch 12's BufferAttributeNode hunk dropped -> 3: the storage node now makes the entry as {} with its own slot, and the
 // attribute node reads `.node` off it and throws -- both hunks are the patch; Z3 a number of 12's Observed block edited -> 2.
 // None green.
+// ---- v4793 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Each -> 4 (the hash, 13 fixed, its patched block, 13 with all of them): W1 patch 13 scaling by the mesh-level base again --
+// nothing throws, the absolute instance is drawn half as wide again, which only the width shows; W2 the mesh-level influences
+// array made per instance again -> relative+mesh throws; W3 the base guard removed -> absolute throws. W4, in
+// threeUpstreamPaths: patch 03's previous base back to the mesh-level one -> 0 at first, a velocity nobody measured, caught
+// only by the hash; with the "together" path written -> 2 (2.669 px against the plain meshes' 2.817). None green now.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +

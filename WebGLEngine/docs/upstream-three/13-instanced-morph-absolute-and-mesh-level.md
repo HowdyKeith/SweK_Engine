@@ -89,6 +89,15 @@ The widths are the base's test: scaled by a mesh-level base of 1 rather than its
 targets would be drawn half as wide again. [03](03-velocity-morph.md)'s patch reads the previous base from the same column
 of its copy of the texture.
 
+## Paths the reproduction does not take
+
+Their velocity, read through MRT, two instances drawn and one still, against two plain meshes where they are -- which needs
+this patch to draw at all and [03](03-velocity-morph.md)'s to step the previous point:
+
+<!-- paths:begin -->
+per-instance morphs over absolute targets, two drawn, one still: r185 throws, 13 alone -2.770, 0.000, every patch 2.817, 0.000, the plain meshes 2.817, 0.000 (px x, y, both backends)
+<!-- paths:end -->
+
 ## A fix that works in an application
 
 Use relative morph targets (`geometry.morphTargetsRelative = true`) for per-instance morphs, and leave the `InstancedMesh`'s own

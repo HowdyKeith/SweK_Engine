@@ -13,6 +13,7 @@
 //   07  (v4786) a skinned mesh rendered twice in one browser frame, against a plain mesh moved the same way; and computeSkinning
 //       run twice in one frame
 //   11  (v4790) invocationLocalIndex in a WebGL2 compute writing a plain storage buffer
+//   13  (v4793) per-instance morphs over absolute targets, through velocity -- held with EVERY patch, since it needs 13 and 03
 // Each draft's "paths" block states what these print, character for character, and says which paths the patch does not reach.
 // *** NOTHING HERE POSTS ANYTHING. ***
 "use strict";
@@ -24,8 +25,8 @@ import { ENG, BUNDLE, apply, patchTexts, rootWithBuilds } from "./threePatch.mjs
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
-const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"], ["localIndex", "11"], ["mismatch", "11"]];
-const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md", "11": "11-webgl2-compute-instance-index.md" };
+const CASES = [["storageCPU", "01"], ["storageGPU", "01"], ["grown", "02"], ["multi", "03"], ["absolute", "03"], ["perInstance", "03"], ["colorNode", "04"], ["views", "07"], ["between", "07"], ["computed", "07"], ["localIndex", "11"], ["mismatch", "11"], ["perInstanceAbsolute", "13", "together"]];
+const DRAFT = { "01": "01-velocity-instancedmesh.md", "02": "02-velocity-batchedmesh.md", "03": "03-velocity-morph.md", "04": "04-velocity-outside-mrt.md", "07": "07-skinned-pose-once-a-frame.md", "11": "11-webgl2-compute-instance-index.md", "13": "13-instanced-morph-absolute-and-mesh-level.md" };
 
 console.log("\n1. THE PATCHED BUILDS: each draft's patch alone on r185's build, every hunk found once");
 const bundle = fs.readFileSync(BUNDLE, "utf8"), texts = patchTexts(), builds = {};
@@ -153,13 +154,16 @@ else {
         await renderer.computeAsync(T.Fn(() => { out.element(T.instanceIndex).assign(src.element(T.instanceIndex)); })().compute(N));
         const f = new Float32Array(await renderer.getArrayBufferAsync(outA));
         o.it = [Array.from({ length: N }, (_, i) => f[i * 4]).join(" ")];
-      } else if (name === "perInstance") {
+      } else if (name === "perInstance" || name === "perInstanceAbsolute") {
+        // v4793: perInstanceAbsolute is the same over ABSOLUTE targets, which r185 throws on (draft 13): its velocity needs 13
+        // to draw at all and 03 for the previous point, so it is held on the build with every patch -- a "together" case.
         // three morphs per instance only where an InstancedMesh draws more than one. v4788: the second is drawn too, above the
         // first and still -- its influence held at -0.4 -- so an influence read from the wrong instance's row is motion that is not
         // there (at 0.2, r185's previous point -- the geometry unmorphed -- happened to give the still one's error and the moving one's
         // the same mean as the reference, within 0.01 px); the reference is two plain meshes where the instances are
-        const g = box(), n = g.attributes.position.count, d = new Float32Array(n * 3); for (let i = 0; i < n; i++) d[i * 3] = 1;
-        g.morphAttributes.position = [new THREE.Float32BufferAttribute(d, 3)]; g.morphTargetsRelative = true;
+        const g = box(), n = g.attributes.position.count, d = new Float32Array(n * 3), rel = name === "perInstance";
+        for (let i = 0; i < n; i++) d.set(rel ? [1, 0, 0] : [g.attributes.position.getX(i) + 1, g.attributes.position.getY(i), g.attributes.position.getZ(i)], i * 3);
+        g.morphAttributes.position = [new THREE.Float32BufferAttribute(d, 3)]; g.morphTargetsRelative = rel;
         const mesh = new THREE.InstancedMesh(g, material(), 2), dummy = new THREE.Mesh(g); dummy.morphTargetInfluences = [0]; sc.add(mesh); mesh.setMatrixAt(1, M.makeTranslation(0, 0.9, 0));
         o.it = await velocityOf(sc, (k) => { dummy.morphTargetInfluences[0] = -0.5 + 0.3 * k; mesh.setMorphAt(0, dummy); dummy.morphTargetInfluences[0] = -0.4; mesh.setMorphAt(1, dummy); mesh.morphTexture.needsUpdate = true; });
         const a = new THREE.Mesh(box(), material()), b = new THREE.Mesh(box(), material()), s2 = new THREE.Scene(); s2.add(a, b); b.position.set(-0.4, 0.9, 0); b.updateMatrixWorld();
@@ -258,9 +262,18 @@ if (res) {
     }
 
     console.log(`\n2b. ALL ${Object.keys(texts).length} TOGETHER: each path on the one build with every patch, as on its own patch's`);
-    for (const [name, slot] of CASES) { const one = res[`${name} patched`] || {}, every = res[`${name} all`] || {};
+    for (const [name, slot, together] of CASES) { if (together) continue; const one = res[`${name} patched`] || {}, every = res[`${name} all`] || {};
         const same = ["webgpu", "webgl2"].every((m) => JSON.stringify(every[m]) === JSON.stringify(one[m]));
         ok(`  ${name} (${slot}) with every patch: the same numbers as with patch ${slot} alone, both backends`, same, same ? "" : `all: ${JSON.stringify(every)}; ${slot} alone: ${JSON.stringify(one)}`); }
+    // v4793: a "together" case needs more than its own patch, so it is held where every patch is applied, to the reference
+    {   const at = (b, m) => (res[`perInstanceAbsolute ${b}`] || {})[m] || {}, A = ["webgpu", "webgl2"].map((m) => at("all", m));
+        const R = ["webgpu", "webgl2"].map((m) => at("r185", m)), P = ["webgpu", "webgl2"].map((m) => at("patched", m));
+        const ran = A.every((x) => Array.isArray(x.it) && Array.isArray(x.plainPair)) && JSON.stringify(A[0]) === JSON.stringify(A[1]);
+        ok(`*** 13 + 03, per-instance morphs over ABSOLUTE targets (two drawn, one still), with every patch: the plain meshes' velocity -- ${ran ? `${A[0].it.map(px).join(", ")} px, the plain meshes ${A[0].plainPair.map(px).join(", ")}; r185 ${R[0].err ? "throws" : JSON.stringify(R[0].it)}; 13 alone ${P[0].err ? "throws" : P[0].it.map(px).join(", ")}` : "did not run alike"} ***`,
+            ran && JSON.stringify(A[0].it) === JSON.stringify(A[0].plainPair) && R.every((x) => !!x.err) && P.every((x) => Array.isArray(x.it)),
+            "13 draws it and 03 steps its previous point, each instance's base from column 0 of its row");
+        if (ran) said["13"] = `per-instance morphs over absolute targets, two drawn, one still: r185 throws, 13 alone ${P[0].it.map(px).join(", ")}, ` +
+            `every patch ${A[0].it.map(px).join(", ")}, the plain meshes ${A[0].plainPair.map(px).join(", ")} (px x, y, both backends)`; }
     console.log("\n3. THE DRAFTS: each one's paths block is what the paths print");
     const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b, i + a.length); return i < 0 || j < 0 ? null : s.slice(i + a.length, j); };
     for (const [slot, f] of Object.entries(DRAFT)) {
@@ -289,9 +302,8 @@ if (res) {
 // is this draw's -> 0.000; B4 the copy never marked for upload -> 5.633; B5 the branch never taken -> -2.770, r185's. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a batch grown WITHOUT its material updated -- three itself draws it from the old texture then, and no " +
-    "patch here changes that; many morph targets past the uniform buffer; the VELOCITY of per-instance influences over absolute " +
-    "targets, or beside a mesh-level morphTargetInfluences -- r185 throws on both (draft 13), and patch 03 reads the previous " +
-    "base from column 0 for it, unmeasured here; computeSkinning's absolute positions in 07's case -- r185 " +
+    "patch here changes that; many morph targets past the uniform buffer; per-instance influences BESIDE a mesh-level " +
+    "morphTargetInfluences, through velocity -- draft 13's reproduction draws them; only absolute targets are a path here; computeSkinning's absolute positions in 07's case -- r185 " +
     "writes zeros on WebGPU under an MRT with velocity, and reads the first vertex for every vertex on WebGL2 (drafts 10 and 11), " +
     "so only the step between two computes is read there; and a real GPU.");
 process.exitCode = fails ? 1 : 0;

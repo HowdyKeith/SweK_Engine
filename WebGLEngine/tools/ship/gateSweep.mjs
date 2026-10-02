@@ -8723,6 +8723,29 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4793 -- THE 397th CLOSING: NO new gate file -- draft 13, per-instance morphs beside absolute targets or a mesh-level array.
+    since490: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4793", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 13 and its patch; the e2e record for all thirteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (13: per-instance absolute targets through velocity, a 'together' case held with every patch)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THROWS v4784 RECORDED AND LEFT, EACH TO ITS CAUSE, IN ONE BRANCH OF Morph.js. *** Per instance three reads the " +
+                 "influences from the instance's row of morphTexture but two things beside them from the MESH: the base, a uniform set " +
+                 "from object.morphTargetInfluences -- undefined on such a mesh, so .reduce throws for absolute targets -- and the " +
+                 "influences array, updated on every draw though per instance the shader never builds it, so its value is null and " +
+                 "update() throws whenever the mesh has an array. setMorphAt already writes each instance's base into column 0 of its " +
+                 "row; nothing read it. Patch 13 reads it, makes no mesh-level array per instance, and guards the mesh-level base. The " +
+                 "reproduction reads WIDTH as well as centre: scaled by a base of 1 instead of 0.5, the absolute instance is drawn " +
+                 "half as wide again at the same centre, and a sabotage that did exactly that went unseen until width was measured. " +
+                 "Patch 03 reads its previous base from the same column, and that velocity -- which needs 13 to draw and 03 to step -- " +
+                 "is held as a 'together' path on the build with every patch: 2.817 px, the plain meshes 2.817; 13 alone -2.770. " +
+                 "three with all thirteen: build matches, lint clean, unit tests 1310 passed, e2e the same 176 of 187 and 185 " +
+                 "screenshots the same bytes. Four sabotages red.",
+    }),
     // v4792 -- THE 396th CLOSING: NO new gate file -- draft 12, a WebGL2 storage buffer named without its count.
     since489: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
