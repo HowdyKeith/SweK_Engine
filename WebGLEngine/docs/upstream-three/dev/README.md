@@ -6,7 +6,7 @@ fields, its reproduction imports three's latest release, **r186** (`0.186.1`), a
 `1ea31f304854ee3c85df39fdb3eaec584bba6d9b` (2 October 2026). Every reproduction prints the same on r186 and on that `dev`
 commit -- headless Chromium 141, SwiftShader, on WebGPU and on the WebGL 2 backend.
 
-`tools/ship/threeDev.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
+`tools/ship/threePatch.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
 three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all thirteen in order, and writes what each page
 printed to [`record.json`](record.json). Section 6 of `tools/ship/threeUpstream-selfcheck.mjs` holds the issues to it: a patch or
 a reproduction edited since the record is red until the tool is run again.

@@ -8729,7 +8729,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         at: "v4799", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         widened: Object.freeze([
-            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the thirteen issues in docs/upstream-three/dev/, held to tools/ship/threeDev.mjs's record of r186 and dev)",
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the thirteen issues in docs/upstream-three/dev/, held to tools/ship/threePatch.mjs's record of r186 and dev)",
         ]),
         redOnArrival: Object.freeze([]),
         verdict: "*** THE DRAFTS WERE r185'S, AND THREE HAS MOVED. *** Measured on r186 and on dev at 1ea31f3, built by three's own " +

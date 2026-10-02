@@ -21,8 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import crypto from "node:crypto";
-import { ENG, BUNDLE, apply, normalImports, rootWithBuilds } from "./threePatch.mjs";
-import { DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threeDev.mjs";
+import { ENG, BUNDLE, apply, normalImports, rootWithBuilds, DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threePatch.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
@@ -279,11 +278,11 @@ for (const [backend, RE, phrase] of [["webgpu", /^v(\d+)\.json$/, "WebGPU exampl
 // v4799: THE ISSUES READY TO PASTE. The drafts above hold r185, the release vendored here; three's bug form asks for its latest
 // release and its pull requests go against `dev`. docs/upstream-three/dev/ holds one issue per draft whose bug still stands on
 // r186 -- in the form's own fields, in its order, its reproduction the draft's with the version swapped and nothing else -- and a
-// patch against `dev` at DEV_COMMIT, rebased; and one more, a bug r186 brought (15). tools/ship/threeDev.mjs runs them, beside a
+// patch against `dev` at DEV_COMMIT, rebased; and one more, a bug r186 brought (15). tools/ship/threePatch.mjs runs them, beside a
 // three checkout, on r186 as npm ships it, on `dev`, on `dev` with the issue's patch, and on `dev` with every patch, and records
 // what each page printed; held here: the record against the files (a patch or a reproduction edited since is red until it is
 // run again) and the issues against the record, through the same predicates and printouts the drafts use.
-console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship/threeDev.mjs's record (dev at ${DEV_COMMIT.slice(0, 7)}, r186 ${DEV_RELEASE})`);
+console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship/threePatch.mjs's record (dev at ${DEV_COMMIT.slice(0, 7)}, r186 ${DEV_RELEASE})`);
 {
     // 01 and 02 are fixed in r186 (#34100, #34101, #34107); 08 stands with another symptom -- r186 syncs the instance buffer before a
     // frame's first render, so the second and third draw the first's matrices -- and 15 is r186's own
@@ -309,7 +308,7 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
         rec.code[s] === sha256(issueParts(fs.readFileSync(path.join(DEV_DIR, issues[s]), "utf8")).html || "");
     ok(`*** the record is of dev at ${DEV_COMMIT.slice(0, 7)} and r186 ${DEV_RELEASE}, and of every patch and reproduction as they are now ***`,
         !!rec && rec.devCommit === DEV_COMMIT && rec.release === DEV_RELEASE && SLOTS.every(fresh),
-        !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threeDev.mjs again`);
+        !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threePatch.mjs again`);
     // three's own unit and e2e tests on dev and on dev with every patch, run in the checkout: the record adds up, names the two
     // builds the issues' record names, and the README states it
     const E2E = path.join(DEV_DIR, "e2e.json"), e2e = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
