@@ -23,11 +23,29 @@
 // survive, and the record carries a demonstration of exactly that on this round's own repair. Nor that the
 // sweep would reproduce today -- it is a reading taken at v4487, and the two repairs this round shipped have
 // already moved it, which is why the frozen number is compared against nothing live.
+//
+// ---- ROUND 22 (#39) SABOTAGE LOG -- frozenRecords.mjs and recordProbe.mjs, each on the real file, restored and
+// md5 verified. 9 of 9 red. Rows red in frozenRecords / recordProbe / recordReach selfchecks:
+//   G1 the old rule: a guardian is a gate whose text CONTAINS the name          1 / 0 / 1  (the fixture census; the
+//        live unguarded count back to 17)
+//   G2 codeMask reads a template interpolation as text                          2 / 0 / 0
+//   G3 codeMask has no regex branch                                             2 / 0 / 0
+//   G4 census's cheap reject on comment-stripped text again                     1 / 0 / 0  (the read after a slash-star in a
+//        string). 0 red ONCE, after this round took every literal slash-star out of its own text -- the fixture lost
+//        its closing star-slash, and with no closer the stripper swallows nothing. The closer is assembled now; re-run, red.
+//   G5 usesInCode without the word boundary                                     2 / 0 / 0
+//   G6 drop takes the first string followed by a comma, field value or not      0 / 1 / 0
+//   G7 no parse check: a broken file is handed to the gates                     0 / 1 / 0  (filed noticed, not
+//        unparseable)
+//   G8 readSites blanks a declaration quoted in a comment                       1 / 0 / 0  -- 0 RED ON THE FIRST
+//        BATTERY: no live file has that shape. The scratch-tree readSites row was built for it.
+//   G9 the raw text is not cached                                               1 / 0 / 0  (the cache CONTROL row)
 "use strict";
-import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
+import { codeMask, usesInCode, readSites, census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
          PROBE_AT_V4487 as OLD, PROBE_AT_V4536 as REC, ENG, clearScanCache }
     from "./frozenRecords.mjs";
 import fs from "node:fs";
+import os from "node:os";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -372,7 +390,7 @@ console.log("\n2. the observer effect, checked to be exactly one");
     // perturbation vocabulary that reaches list-valued records. The list stays TYPED rather than derived from
     // the file, because deriving it would make the row agree with whatever the file happens to hold: a record
     // added here without a line added there is exactly the drift this row exists to catch.
-    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536", "PROBE_AT_V4675"];
+    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536", "PROBE_AT_V4675", "PROBE_AT_V4675_R22"];   // round 22: its re-run
     ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
         all.records.length - without.records.length === MINE.length &&
         MINE.every((n) => all.records.some((r) => r.name === n)) &&
@@ -545,13 +563,13 @@ ok("...and the counted subsets do not exceed the population they are drawn from"
 {
     const F = REC;
     ok("!! the with-module and without-module readings differ by exactly this module's own records",
-        // v4675: THREE, for PROBE_AT_V4675. Both differences move together by construction -- all three of
-        // this module's records carry numeric fields -- so a round that updates one reading and not the other
-        // reddens here rather than leaving the pair quietly inconsistent.
-        F.currentIncludingModule.records - F.excluding.records === 3 &&
-        F.currentIncludingModule.withFields - F.excluding.withFields === 3,
+        // v4675: THREE, for PROBE_AT_V4675. Both differences move together by construction -- all of this
+        // module's records carry numeric fields -- so a round that updates one reading and not the other
+        // reddens here rather than leaving the pair quietly inconsistent. Round 22: FOUR, for PROBE_AT_V4675_R22.
+        F.currentIncludingModule.records - F.excluding.records === 4 &&
+        F.currentIncludingModule.withFields - F.excluding.withFields === 4,
         `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
-        "PROBE_AT_V4487, PROBE_AT_V4536 and PROBE_AT_V4675, the three records this file holds. A pair of " +
+        "PROBE_AT_V4487, PROBE_AT_V4536, PROBE_AT_V4675 and PROBE_AT_V4675_R22, the four records this file holds. A pair of " +
         "numbers that drifted apart by anything else would mean the exclude pattern had stopped matching " +
         "this module.");
 }
@@ -691,6 +709,67 @@ console.log("\n4. what was closed, checked against the files rather than claimed
         for (const f of [MOD, GATE]) { try { fs.unlinkSync(f); } catch { /* reported by the rows above */ } }
         clearScanCache();   // never leave the tree's real entries shadowed by a fixture's
     }
+}
+
+console.log("\n*** ROUND 22: A GUARDIAN USES THE NAME IN CODE -- A NAME IN A STRING, A COMMENT OR ANOTHER IDENTIFIER IS NOT A USE ***");
+{
+    // The NAME is assembled so this file holds no literal declaration and no literal use of it (RECORD_RE reads text).
+    const N = "ROW" + "_AT_" + "V9922";
+    // SS: a slash-star, assembled. Written out, the tree's comment stripper (runtimeGap.stripComments) opens a block
+    // comment at it and eats this file to the next star-slash -- which is the defect these rows are about, and it took
+    // this gate's imports out of runtimeGap's ES-module count the first time this section was written with it.
+    const SS = "/" + "*", SE = "*" + "/";   // and its closer: without one the stripper swallows nothing
+    const table = [
+        [`const a = X.${N}.n;`, true, "a read in code"],
+        [`console.log("${N} is stale");`, false, "a name in a string"],
+        ["f(`the " + N + " record`);", false, "a name in template TEXT"],
+        ["f(`${X." + N + ".n} left`);", true, "a read inside a template INTERPOLATION"],
+        ["f(`${ `inner ${X." + N + "}` } x`);", true, "inside an interpolation nested in an interpolation"],
+        [`// ${N}\nq();`, false, "a comment"],
+        ["/" + "* " + N + " *" + "/ q();", false, "a block comment"],      // the sequence is assembled: see SS below
+        [`const r = /${N}/.test(s);`, false, "a regex literal"],
+        [`const k = UN${N};`, false, "another identifier CONTAINING the name (UNMEASURED_AT_ held MEASURED_AT_)"],
+        [`const g = "tools/ship${SS}-selfcheck.mjs";\nconst a = X.${N};\n// ${SE}`, true, "a read AFTER a slash-star inside a string -- the comment stripper's swallow"],
+    ];
+    const wrong = table.filter(([src, want]) => usesInCode(src, N) !== want);
+    ok("!! *** usesInCode: a use in code is one, and nothing else is -- " + table.length + " cases ***",
+       wrong.length === 0, wrong.length ? "WRONG: " + wrong.map((w) => w[2]).join("; ") : table.map((t) => t[2] + " " + (t[1] ? "yes" : "no")).join(", "));
+    // every letter below is one kind of text; codeMask must keep exactly a, d, g, k, q and drop b, c, e, f, h
+    // (`q = a / g` is a division, not a regex: after a value, `/` divides -- recordBody's rule, isCodeOffset's rule)
+    const s = "a = \"b\" + `c ${d} e`; x = /f/; q = a / g; // h\nk", mk = codeMask(s);
+    const kept = [..."abcdefghkq"].filter((ch) => [...s].some((c, i) => c === ch && mk[i])).join("");
+    ok("  and codeMask keeps exactly the code characters of a line that has every kind (string, template text, interpolation, regex, division, comment)",
+       kept === "adgkq", JSON.stringify(kept) + " kept of a..q");
+
+    // the census on fixtures: one record, four gates that mention it four ways, injected through `read`
+    const MOD = path.join(ENG, "__fx_r22_mod.mjs");
+    const G = (k) => path.join(ENG, "__fx_r22_" + k + "-selfcheck.mjs");
+    const text = new Map([
+        [MOD, EC + N + FR + "{\n    n: 1,\n});\n"],
+        [G("code"), `import { ${N} } from "./__fx_r22_mod.mjs";\nif (${N}.n !== 1) process.exit(1);\n`],
+        [G("prose"), `console.log("${N} was re-taken this round");\n`],
+        [G("substring"), `const UN${N} = 3;\nconsole.log(UN${N});\n`],
+        [G("swallow"), `const glob = "tools/ship${SS}-selfcheck.mjs";\nimport * as X from "./__fx_r22_mod.mjs";\nif (X.${N}.n !== 1) process.exit(1);\n// ${SE}\n`],
+    ]);
+    const c = census({ files: [...text.keys()], exclude: null, read: (f) => text.get(f) });
+    const row = c.records.find((r) => r.name === N), got = row ? row.guardians.map((g) => g.replace(/^.*__fx_r22_|-selfcheck\.mjs$/g, "")).sort() : [];
+    ok("!! *** the census credits the gate that READS the record and the one whose read follows a slash-star in a string -- not the one that writes its name in a sentence, nor the one whose own identifier contains it ***",
+       JSON.stringify(got) === JSON.stringify(["code", "swallow"]),
+       "guardians: [" + got.join(", ") + "]. Before round 22 the census asked `includes` of comment-stripped text: it credited prose and substring, and stripped the swallow gate's read away");
+
+    // readSites blanks every record declaration before it looks for reads -- and a declaration QUOTED IN A COMMENT is
+    // not one: blanked from there, its "body" (recordBody from inside a comment) runs on over the real code below it.
+    // No live file has this shape today (round 22's sabotage G8 was 0 red until this fixture), so it is built here.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frozenRecords22-"));
+    try {
+        const R = "READ" + "_AT_V9921";
+        fs.writeFileSync(path.join(tmp, "m.mjs"), "// the old note read: " + EC + "OLD_AT_V9920" + FR + "{ and the comment never closes it\n" +
+            `import { ${R} } from "./d.mjs";\nexport const used = ${R}.n;\nexport function later() { return ({ a: 1 }); }\n`);
+        fs.writeFileSync(path.join(tmp, "d.mjs"), EC + R + FR + "{\n    n: 1,\n});\n");
+        const sites = readSites([R], { root: tmp }).get(R).map((f) => path.basename(f));
+        ok("!! *** readSites finds a read that sits after a declaration QUOTED IN A COMMENT -- the quote is not blanked as a record ***",
+           JSON.stringify(sites) === JSON.stringify(["m.mjs"]), "read in [" + sites.join(", ") + "]");
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
 console.log(`\nfrozenRecords-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

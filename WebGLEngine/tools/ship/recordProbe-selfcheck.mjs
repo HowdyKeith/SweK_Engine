@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RP from "./recordProbe.mjs";
 import * as FR from "./frozenRecords.mjs";
-import { PROBE_AT_V4675 as P } from "./frozenRecords.mjs";
+import { PROBE_AT_V4675 as P, PROBE_AT_V4675_R22 as P22 } from "./frozenRecords.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -394,6 +394,62 @@ sec("8. *** THE RECORD THIS ROUND WROTE HAS A GUARDIAN, WHICH IS THIS SECTION **
         `${P.passesRun} passes run, ${P.passesDiscarded} discarded, ${P.harnessDefects} harness defects. A ` +
         `reading thrown away is evidence about the method, which is frozenRecords' own rule for the v4487 ` +
         `numbers it keeps beside the v4536 re-take.`);
+}
+
+// =============================================================================================================
+sec("9. *** ROUND 22: A CORRUPTION MUST LEAVE THE FILE PARSING, OR IT IS NOT A CORRUPTION OF THE RECORD ***");
+{
+    // *** 94 OF THE 108 DROPS v4675's perturb() OFFERED BROKE THE FILE. *** `drop` removed the first quoted string
+    // followed by a comma, and in `at: "v4578",` that is a field's VALUE: the record then read `at:` followed by
+    // the next key. Every gate importing the file failed on the SyntaxError and was filed NOTICED -- render/
+    // exactHash.mjs's SHADER_SINHASH_V4578 was "noticed" by starField-selfcheck, which names it only in a
+    // sentence and imports the module for its hash functions.
+    const fieldOnly = '({\n    at: "v4578",\n    note: "a sentence about it",\n    n: 3,\n})';
+    const list = '([\n    "keep/me.mjs",\n    "and/me.mjs",\n    "and/this.mjs",\n])';
+    const dl = RP.perturb(list, "drop");
+    ok("!! *** drop removes an element of a LIST, never the value of a FIELD ***",
+        RP.perturb(fieldOnly, "drop") === null && dl && dl.what === 'dropped "keep/me.mjs"' && !dl.body.includes("keep/me.mjs") &&
+        dl.body.includes("and/me.mjs") && dl.body.includes("and/this.mjs"),
+        `a record of fields offers no drop (it has no list to shorten); a list loses one element and keeps the ` +
+        `rest -- "${dl ? dl.what : "nothing"}"`);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "recordProbe22-"));
+    try {
+        const recFile = "fix.mjs", gateFile = "fix-selfcheck.mjs", original = EC("FIX_V4675") + '["keep/me.mjs", "and/me.mjs"]);\n';
+        fs.writeFileSync(path.join(tmp, recFile), original);
+        fs.writeFileSync(path.join(tmp, recFile.replace(".mjs", "-copy.mjs")), EC("FIX_V4675") + dl.body.slice(1) + ";\n");
+        ok("!! ...and the list it leaves PARSES (node --check, the probe's own test)", RP.parses(path.join(tmp, "fix-copy.mjs")));
+        // a guardian that merely IMPORTS the module and fails if the import fails -- the starField shape
+        fs.writeFileSync(path.join(tmp, gateFile), 'import "./fix.mjs";\nconsole.log("  PASS  imports it");\nprocess.exit(0);\n');
+        const broken = (body) => ({ body: body.replace('"keep/me.mjs",', '"keep/me.mjs" "and"'), kind: "retitle", what: "a syntax error" });
+        const res = RP.probe({ root: tmp, records: [{ name: "FIX_V4675", file: recFile, guardians: [gateFile], fields: [] }], kinds: ["retitle"], perturbWith: broken });
+        const row = res.rows[0], cls = RP.summarise(res);
+        ok("!! *** a mutation that breaks the parse is filed UNPARSEABLE, no gate is asked, and nothing is NOTICED ***",
+            row.tried.length === 1 && row.tried[0].unparseable === true && row.pairs.length === 0 && cls.noticed.length === 0 &&
+            cls.unparseable === 1 && fs.readFileSync(path.join(tmp, recFile), "utf8") === original,
+            `tried ${JSON.stringify(row.tried.map((t) => ({ kind: t.kind, unparseable: !!t.unparseable })))}, class ` +
+            `${Object.keys(cls).find((k) => Array.isArray(cls[k]) && cls[k].includes("FIX_V4675"))}, file restored. Without the ` +
+            `check the importing gate exits non-zero on the SyntaxError and the pair reads NOTICED.`);
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+// =============================================================================================================
+sec("10. *** ROUND 22'S RE-RUN HAS A GUARDIAN TOO: ITS ARITHMETIC, AND WHAT IT SAYS ABOUT v4675's ***");
+{
+    const classes = P22.noticed + P22.blind + P22.unmeasurable + P22.opaque + P22.empty + P22.derived + P22.unguarded;
+    ok("!! *** the seven classes sum to the population, and the pairs' three verdicts to the pairs ***",
+        classes === P22.records && P22.pairsNoticed + P22.pairsBlind + P22.pairsUnmeasurable === P22.pairs && P22.records === P.records + 1,
+        `${classes} of ${P22.records} records: v4675's ${P.records} and PROBE_AT_V4675, which was written after that run ` +
+        `(this one was written after its own, so it is not among them); ${P22.pairsNoticed} + ` +
+        `${P22.pairsBlind} + ${P22.pairsUnmeasurable} = ${P22.pairs} pairs`);
+    ok("!! *** the named list agrees with its count, and no mutation it used broke a file ***",
+        P22.nothingNoticed.length === P22.blind && new Set(P22.nothingNoticed).size === P22.blind &&
+        P22.opaqueRecords.length === P22.opaque && P22.unparseable === 0 && P22.drop > 0,
+        `${P22.nothingNoticed.length} named, ${P22.blind} counted; ${P22.drop} drops used, ${P22.unparseable} unparseable`);
+    ok("!! *** and the correction is the size the static measurement predicted: the new 'nothing noticed' are the old drop's broken files ***",
+        P22.syntaxNoticedAtV4675 === P22.blind - 1 && P22.nothingNoticed.includes("MEASURED_AT_V4422") &&
+        P.nothingNoticed.includes("MEASURED_AT_V4422") && P22.noticed < P.noticed,
+        `${P22.syntaxNoticedAtV4675} of ${P22.blind} are records whose v4675 drop left the file unparseable; the other ` +
+        `is MEASURED_AT_V4422, already v4675's. noticed ${P.noticed} -> ${P22.noticed}`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

@@ -189,6 +189,15 @@ function strippedOf(f, read, cacheable) {
     if (cacheable) _stripCache.set(f, out);
     return out;
 }
+// round 22: the guardian search reads RAW text (see census) -- cached on the same terms as the stripped text, so one
+// clearScanCache() still makes a whole census cold, and a fixture's injected read never reaches a path-keyed entry
+const _rawCache = new Map();       // absolute path -> { raw, mask } (mask filled on first use)
+function rawOf(f, read, cacheable) {
+    if (cacheable) { const hit = _rawCache.get(f); if (hit !== undefined) return hit; }
+    const out = { raw: read(f), mask: null };
+    if (cacheable) _rawCache.set(f, out);
+    return out;
+}
 const _recCache = new Map();       // path -> the record rows in it, guardians not yet attached
 
 // *** v4647r -- `cacheable` IS NEW, AND THE BYPASS IT REPLACES DID NOT BYPASS. *** census() called this as
@@ -216,7 +225,7 @@ function recordsIn(f, read, cacheable = true) {
 }
 
 /** Drop both memos. The gate needs a cold scan to prove the warm one is not simply answering from a stale copy. */
-export function clearScanCache() { _scanCache.clear(); _recCache.clear(); _importCache.clear(); _stripCache.clear(); }
+export function clearScanCache() { _scanCache.clear(); _recCache.clear(); _importCache.clear(); _stripCache.clear(); _rawCache.clear(); }
 
 /**
  * *** WHICH LOCAL NAMES A GATE COULD CALL `fn` BY, IF IT IMPORTS IT FROM `target` -- AND [] IF IT DOES NOT. ***
@@ -267,6 +276,88 @@ export function importedAs(gateRel, gateSrc, target, fn) {
 }
 
 /**
+ * *** ROUND 22 -- A GUARDIAN IS A GATE THAT USES THE NAME IN CODE, AND A NAME IN A STRING IS NOT A USE. ***
+ *
+ * census() credited a gate with guarding a record when its comment-stripped text CONTAINED the name, and v4675's
+ * probe left the consequence on the record (PROBE_AT_V4675.proseGuardianship): a gate that writes a record's name
+ * into a message or a sentence is its guardian. Measured on 146 records and 187 credited pairs, before this rule:
+ *
+ *   TWO PAIRS WERE NOT EVEN THE NAME. `includes` has no word boundary, so UNMEASURED_AT_V4424 credited slowCensus
+ *     with MEASURED_AT_V4424 -- one of v4675's ten blind pairs -- and MEASURED_AT_V4424 credited colourReach with
+ *     RED_AT_V4424 (M-E-A-S-U-RED_AT_V4424).
+ *   TEN PAIRS NAME THE RECORD ONLY IN STRING TEXT. ADDED_AT_V4403's ONLY guardian was one of them: the record the
+ *     probe found nobody noticing is the record nobody reads -- playerGround-selfcheck writes its name in a
+ *     sentence about it.
+ *
+ * And the first measurement was wrong the other way, which is why this is a lexer of its own rather than
+ * recordProbe.isCodeOffset: that answers "is a DECLARATION here", where text inside `${...}` is correctly not a
+ * place a declaration can be. For a USE it is the opposite -- `${RC.FIXED_SINCE_V4279.length}` reads the record --
+ * and isCodeOffset called five real reads string-only.
+ *
+ * codeMask(src) marks every character that is CODE: outside comments, outside string and template TEXT, outside
+ * regex literals, and INSIDE template interpolations, to any depth. The regex rule is recordBody's and
+ * isCodeOffset's (a `/` after one of `=(,:[!&|?{;` opens one), so the three agree about what a division is.
+ */
+export function codeMask(src) {
+    const n = src.length, m = new Uint8Array(n);
+    let prev = "";
+    // lex CODE from i; inside an interpolation, stop after the `}` that closes it
+    const code = (i, inInterp) => {
+        let depth = 0;
+        while (i < n) {
+            const c = src[i];
+            if (c === '"' || c === "'") {
+                i++;
+                while (i < n && src[i] !== c) { if (src[i] === "\\") i++; i++; }
+                i++; prev = c; continue;
+            }
+            if (c === "`") { i = text(i + 1); prev = "`"; continue; }
+            if (c === "/" && src[i + 1] === "/") { const e = src.indexOf("\n", i); i = e < 0 ? n : e; continue; }
+            if (c === "/" && src[i + 1] === "*") { const e = src.indexOf("*/", i + 2); i = e < 0 ? n : e + 2; continue; }
+            if (c === "/" && /[=(,:[!&|?{;]/.test(prev)) {
+                i++;
+                while (i < n) {
+                    if (src[i] === "\\") { i += 2; continue; }
+                    if (src[i] === "[") { while (i < n && src[i] !== "]") { if (src[i] === "\\") i++; i++; } }
+                    if (src[i] === "/") { i++; break; }
+                    i++;
+                }
+                prev = "/"; continue;
+            }
+            if (inInterp) {
+                if (c === "{") depth++;
+                else if (c === "}") { if (depth === 0) return i + 1; depth--; }
+            }
+            m[i] = 1;
+            if (!/\s/.test(c)) prev = c;
+            i++;
+        }
+        return i;
+    };
+    // template TEXT from i (just past the backtick); returns the index past the closing backtick
+    const text = (i) => {
+        while (i < n) {
+            if (src[i] === "\\") { i += 2; continue; }
+            if (src[i] === "`") return i + 1;
+            if (src[i] === "$" && src[i + 1] === "{") { prev = "{"; i = code(i + 2, true); continue; }
+            i++;
+        }
+        return i;
+    };
+    code(0, false);
+    return m;
+}
+
+/** Does `src` use `name` as a whole word, at least once, in CODE (codeMask)? `mask` may be passed in, cached. */
+export function usesInCode(src, name, mask = null) {
+    if (!src.includes(name)) return false;
+    const re = new RegExp("(?<![\\w$])" + name + "(?![\\w$])", "g");
+    let mk = mask, r;
+    while ((r = re.exec(src))) { mk = mk || codeMask(src); if (mk[r.index]) return true; }
+    return false;
+}
+
+/**
  * *** WHICH FILES NAME THESE RECORDS IN CODE -- WITH EVERY RECORD DECLARATION BLANKED FIRST. ***
  *
  * census() answers "which GATES name it", which is the guardian question. This answers the one underneath it:
@@ -295,19 +386,19 @@ export function readSites(names, { root = ENG } = {}) {
         if (!/\.(mjs|js|cjs)$/.test(f)) continue;
         let src = TR.textOf(f);
         if (!want.some((n) => src.includes(n))) continue;         // cheap reject before the expensive work
-        src = stripComments(src);
+        // round 22: the blanking and the search run on the RAW text and the search asks for a use in CODE
+        // (usesInCode skips comments itself, and the comment stripper mangles a string holding `//`)
         RECORD_RE.lastIndex = 0;
         let m;
-        const spans = [];
+        const spans = [], declMask = codeMask(src);
         while ((m = RECORD_RE.exec(src))) {
+            if (!declMask[m.index]) continue;                      // a declaration written out in prose is not one
             const { body } = recordBody(src, m.index);
             spans.push([m.index, m.index + (body ? src.slice(m.index).indexOf(body) + body.length : m[0].length)]);
         }
         for (const [a, b] of spans) src = src.slice(0, a) + " ".repeat(b - a) + src.slice(b);
-        for (const n of want) {
-            const re = new RegExp("\\b" + n + "\\b");
-            if (re.test(src)) out.get(n).push(rel(f));
-        }
+        const mask = codeMask(src);
+        for (const n of want) if (usesInCode(src, n, mask)) out.get(n).push(rel(f));
     }
     return out;
 }
@@ -352,7 +443,22 @@ export function census({ files = null, read = null, exclude = null } = {}) {
     const all = [];
     for (const f of mjs) for (const r of recordsIn(f, rd, cacheable))
         { all.push({ r, f }); if (!named.has(r.name)) named.set(r.name, []); }
-    for (const [g, src] of gateSrc) for (const [name, list_] of named) if (src.includes(name)) list_.push(g);
+    // *** ROUND 22: A GUARDIAN USES THE NAME IN CODE. *** `includes` on the stripped text credited a gate that wrote the
+    // name in a message, and one whose OTHER identifier merely contains it (UNMEASURED_AT_V4424 "guarded"
+    // MEASURED_AT_V4424) -- see codeMask. The cheap `includes` stays as the reject; only a hit is lexed, on the RAW
+    // text, because runtimeGap's stripComments reads a `//` inside a string as a comment and leaves the rest of the
+    // file inside an unterminated string (measured: importPosition-selfcheck lost a real reader that way).
+    // And the cheap reject runs on the RAW text too: the same stripper reads a slash-star inside a string (a glob of
+    // gates under tools/ship) as a block comment running to the next star-slash -- measured on redCensus.mjs, 552 of
+    // its 1,959 lines gone -- so a reject on stripped text would miss a guardian whose use sits in a swallowed span.
+    for (const g of gates) {
+        const R = rawOf(g, rd, cacheable);
+        for (const [name, list_] of named) {
+            if (!R.raw.includes(name)) continue;
+            R.mask = R.mask || codeMask(R.raw);
+            if (usesInCode(R.raw, name, R.mask)) list_.push(rel(g));
+        }
+    }
     // *** v4576 -- ONE LEVEL OF DERIVATION, BECAUSE A RECORD READ ONLY THROUGH ANOTHER ONE READ AS UNGUARDED. ***
     // The search above asks which gates NAME a record. Seven records failed it for a reason that is not a gap
     // in the tree: redCensus.mjs defines `RED_AT_V4531 = Object.freeze(RED_AT_V4531_GATES.map(...))`, so the
@@ -617,7 +723,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // module's own records, which is now PROBE_AT_V4487, PROBE_AT_V4536 and PROBE_AT_V4675 -- the third is the
     // re-run of the +7 probe with a vocabulary that reaches list-valued records, and the pair below asserts
     // the gap is exactly this module's own set rather than a number that drifted.
-    currentIncludingModule: Object.freeze({ records: 149, withFields: 71, fields: 399 }),
+    // round 22 -- RE-TAKEN: 149/71/399 -> 150/72/408, PROBE_AT_V4675_R22 (one record, 9 fields); `excluding` does not move.
+    currentIncludingModule: Object.freeze({ records: 150, withFields: 72, fields: 408 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -1000,4 +1107,74 @@ export const PROBE_AT_V4675 = Object.freeze({
     // a restore that only ran on the happy path -- which left a sentinel in tools/ship/orphanSets.mjs when a
     // run was killed. Every one was found by disbelieving a surprising number.
     passesRun: 5, passesDiscarded: 4, harnessDefects: 12,
+});
+
+/**
+ * *** ROUND 22 -- THE PROBE RE-RUN WITH A DROP THAT CANNOT BREAK THE FILE, AND THE HEADLINE WAS MOSTLY SYNTAX ERRORS. ***
+ *
+ * PROBE_AT_V4675 is kept exactly as it was taken -- the file's rule for a run whose ENUMERATOR was wrong (see
+ * PROBE_AT_V4536 beside PROBE_AT_V4487). What was wrong: `drop` removed the first quoted string followed by a comma, and
+ * in `at: "v4578",` that is a field's VALUE, so the file stopped parsing and every gate importing it died on the
+ * SyntaxError -- filed NOTICED. Over the census 94 of the 108 drops it offered broke the file. Now a drop removes only a
+ * list element, and every mutated file must pass `node --check` before a gate is asked (tools/ship/recordProbe.mjs).
+ * The guardians are also round 22's: a gate that USES the name in code (codeMask), not one that writes it in a sentence.
+ *
+ *   noticed 79 -> 52,  nothing noticed 2 -> 32,  unmeasurable 21 -> 18,  unguarded 11 -> 12
+ *
+ * 31 of the 32 "nothing noticed" are exactly the records whose old drop broke the file; the other is MEASURED_AT_V4422,
+ * one of v4675's own two. Its other, ADDED_AT_V4403, is UNGUARDED now: its only guardian wrote its name in a sentence.
+ * A record nothing notices is not WRONG -- no guardian that could answer changed its verdict when it was made false.
+ */
+export const PROBE_AT_V4675_R22 = Object.freeze({
+    at: "round 22, on v4675",
+    supersedes: "PROBE_AT_V4675",
+    method: "as PROBE_AT_V4675, with two changes: a drop removes only a LIST element (its last code character before " +
+            "it is `[` or `,`), and a mutated file must pass node --check before any gate is asked -- one that does not " +
+            "is filed unparseable, never noticed; guardians are gates that USE the record in code (frozenRecords.codeMask)",
+    records: 149, pairs: 140,
+    noticed: 52, blind: 32, unmeasurable: 18,
+    opaque: 1, empty: 23, derived: 11,
+    unguarded: 12,
+    // every pair, by verdict: the three sum to `pairs`
+    pairsNoticed: 58, pairsBlind: 44, pairsUnmeasurable: 38,
+    baselineGates: 82, baselineRed: 10,
+    bump: 64, retitle: 63, drop: 8, unparseable: 0,
+    // of the "nothing noticed", how many are records whose v4675 drop left the file unparseable
+    syntaxNoticedAtV4675: 31,
+    runSeconds: 895,
+    nothingNoticed: Object.freeze([
+        "PLAYER_SLOPE_AT_V4546",
+        "RISK_AT_V4438",
+        "BTDF_AT_V4447",
+        "KC_ERROR_AT_V4446",
+        "GRID_FAILS_AT_V4437",
+        "BTDF_VERDICT_V4458",
+        "CROSSOVER_AT_V4441",
+        "MEASURED_AT_V4422",
+        "TAINT_AT_V4479",
+        "MARGIN_AT_V4481",
+        "LET_FINISH_V4573",
+        "NOISE_FLOOR_V4304",
+        "SEPARATOR_SITES_AT_V4647",
+        "POSIX_AT_V4485",
+        "REACH_AT_V4548",
+        "UNGUARDED_SPLIT_V4577",
+        "FIXED_AT_V4279",
+        "RECOVERED_SINCE_V4279",
+        "FIXED_SINCE_V4279",
+        "FIXED_SINCE_V4408",
+        "RECHECK_V4314",
+        "CALL_COST_V4459",
+        "BUDGET_DRIFT_V4536",
+        "KILLED_PASS_V4568",
+        "LOAD_EXPERIMENT_V4576",
+        "SPOT_CHECK_V4575",
+        "EIGHT_WIDE_V4578",
+        "SKEW_PROBE_V4578",
+        "SURVIVORS_V4577",
+        "VACUITY_AT_V4459",
+        "MEASURED_V4528",
+        "MEASURED_AT_V4553",
+    ]),
+    opaqueRecords: Object.freeze(["OVERCOUNT_AT_V4455"]),
 });
