@@ -24,6 +24,7 @@ import { DEFAULT_LIMITS, LIMITS_PROVENANCE, STAGES, ADDRESS_SPACES, LIMITS, stri
 import { probeSource } from "./wgslDeviceLimits.mjs";
 import { codeOnly, noComments, prose } from "./sourceScan.mjs";
 import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";   // v4798 -- one definition of a source file, not a regex spelled by hand
 
 let pass = 0, fail = 0;
 // *** v4476 -- THIS PRINTED ITS FAIL LINE TO STDERR, AND THAT BROKE AN INSTRUMENT TWO ROUNDS RUNNING. ***
@@ -129,7 +130,7 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     let requestDevice = 0, requiredLimits = 0, scanned = 0;
     let vendorRequiredLimits = 0, vendorFiles = 0;
     for (const f of walk(ENG)) {
-        if (!/\.(js|mjs|html)$/.test(f)) continue;
+        if (!SOURCE_EXT.test(f)) continue;
         // v4681: posix, or SELF never matches on Windows and the gate counts its own three files -- exactly the 3
         // requiredLimits the rig reported.
         const rel = path.relative(ENG, f).split(path.sep).join("/");

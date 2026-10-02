@@ -240,7 +240,8 @@ console.log("\n5. THE CENSUS IS A CENSUS -- NOT RATCHETED, NOT SWEPT, AND IT HAS
     // MEASUREMENT OF THE TREE, it was a measurement of a detector that could not see past 0 -- the same v3453
     // shape ("a rise is only debt if the thing being measured actually rose"), verified here by reading BOTH
     // detectors against the identical files rather than assumed.
-    const HAND_SPELLED_CEILING = 11;
+    // v4798: 11 -> 7, as roundTrip, glbTexture, wgslSpec and canvasFill import SOURCE_EXT -- by hand, one at a time, each run.
+    const HAND_SPELLED_CEILING = 7;
     const handSpelled = handSpelledCorpusFilters();
     ok("!! the hand-spelled corpus filters are COUNTED, not swept",
         handSpelled.length > 0 && handSpelled.length <= HAND_SPELLED_CEILING,

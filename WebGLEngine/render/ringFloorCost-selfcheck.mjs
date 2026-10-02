@@ -119,6 +119,7 @@ console.log("\n2. AGAINST A PREDICTION FROM OP COUNTS, WHICH IS WHERE THE INTERE
         flatOf(A64, A128) < 0.35,
         `push ${A64.pushNs.toFixed(0)} -> ${A128.pushNs.toFixed(0)} ns/px, floor ${A64.floorNs.toFixed(0)} -> ${A128.floorNs.toFixed(0)} ns/px` +
         (attempts.length > 1 ? `; ${attempts.length} attempts, push 64 -> 128 ${attempts.map(([a, b]) => `${a.pushNs.toFixed(0)}->${b.pushNs.toFixed(0)}`).join(", ")}` : ""));
+    // SABOTAGE (v4798): the push made to read twice as slow at 128 -> 1, after all three attempts, each printed.
 }
 
 console.log("\n3. *** THE OBVIOUS OPTIMISATION IS UNSAFE, AND ITS FAILURE IS THE MOST DANGEROUS ANSWER THERE IS ***");

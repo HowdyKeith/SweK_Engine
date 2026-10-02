@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4798 -- THE 402nd CLOSING: NO new gate file -- a timing row that tolerates load, and four callers off a hand-spelled regex.
+    since495: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4798", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "render/ringFloorCost-selfcheck.mjs (the flatness row re-measures under load, up to twice, every attempt printed)",
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 11 -> 7)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO LEFTOVERS, EACH SMALL AND EACH A RATCHET. *** ringFloorCost's flatness row compared two absolute per-pixel " +
+                 "times taken a section apart and went red once in eight verifies under load, passing alone every time. Contention " +
+                 "only adds time, so a missed first attempt is measured again, both sizes together, up to twice, and the flattest " +
+                 "attempt is the reading -- printed, every one: a push made to slow with size fails all three. And four gates -- " +
+                 "roundTrip, glbTexture, wgslSpec, canvasFill -- import SOURCE_EXT in place of the regex they spelled by hand, each " +
+                 "edited and run on its own, as the ratchet's own note asks; its ceiling 11 -> 7. Two sabotages red.",
+    }),
     // v4797 -- THE 401st CLOSING: NO new gate file -- recordDrift's masking witness on a world it builds.
     since494: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

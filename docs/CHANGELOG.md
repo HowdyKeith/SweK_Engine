@@ -50,6 +50,10 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      the marker and the murmuration line's do not, so labelling them would leave two lines that cannot be
      compared by any number at all. -->
 
+## v4798 -- a timing row that tolerates load, and four callers off a hand-spelled regex
+
+*** TWO LEFTOVERS, EACH SMALL AND EACH A RATCHET. *** render/ringFloorCost-selfcheck.mjs's flatness row compared two absolute per-pixel times taken a section apart, and went red once in eight verifies under load while passing alone every time. Contention only ever adds time, so when the first attempt misses, both sizes are measured again together, up to twice, and the flattest attempt is the reading; every attempt is printed, and a push made to read twice as slow at 128 fails all three. And four gates -- tools/ship/roundTrip-selfcheck.mjs, glbTexture-selfcheck.mjs, wgslSpec-selfcheck.mjs and canvasFill-selfcheck.mjs -- import `SOURCE_EXT` from tools/ship/moduleRefs.mjs in place of the `/\.(js|mjs|html)$/` they spelled by hand, each edited and run on its own as the ratchet's note asks; tools/ship/shaderRefs-selfcheck.mjs's ceiling falls from 11 to 7. Two sabotages red. 1881 gates.
+
 ## v4797 -- recordDrift's masking witness on a world it builds
 
 *** A WITNESS THAT PASSED ON NOTHING. *** Since v4791, tools/ship/recordDrift-selfcheck.mjs's masking row asked which record coverage reads for a gate, and on any box whose own record was not that one it passed without testing anything -- which was every box this session. The masking is a property of `coverageOf` (tools/ship/boxTimings.mjs), so it is now shown on a world made for it: the real records, the shared one given a foreign host and every other giving the gate up, plus one record that is this box's and times the gate. With the shared entry holed, this box's reading masks it; with the extra record made foreign, it does not. Both rows run on every box. The first draft left the live records as they stood, and the control came out masked -- this box's own local timings already held the gate. Two sabotages of `coverageOf`'s precedence red, one row each. 1881 gates.
