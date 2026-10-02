@@ -35,7 +35,7 @@
  	};
  
  	/* Prepare page */
-@@ -317,6 +317,11 @@
+@@ -317,6 +317,13 @@
  async function preparePage( page, injection, builds, errorMessages ) {
  
  	await page.evaluateOnNewDocument( injection );
@@ -43,11 +43,13 @@
 +	// installSwizzleWorkaround, v4319); a current browser ignores the field, so strip it where it is three's string default
 +	await page.evaluateOnNewDocument( `if ( typeof GPUTexture !== 'undefined' ) { const orig = GPUTexture.prototype.createView;
 +		GPUTexture.prototype.createView = function ( d ) { if ( d && typeof d === 'object' && typeof d.swizzle === 'string' ) { const { swizzle, ...rest } = d; return orig.call( this, rest ); } return orig.call( this, d ); }; }` );
++	// LOCAL: E2E_NO_WEBGPU=1 hides navigator.gpu before any page code runs, so WebGPURenderer falls back to its WebGL 2 backend
++	if ( process.env.E2E_NO_WEBGPU ) await page.evaluateOnNewDocument( `Object.defineProperty( Navigator.prototype, 'gpu', { get: () => undefined, configurable: true } );` );
 +	page.on( 'pageerror', ( e ) => { if ( page.file !== undefined ) page.error = page.error ?? `${ page.file }: ${ String( e && e.message || e ).slice( 0, 200 ) }`; } );
  	await page.setRequestInterception( true );
  
  	page.on( 'console', async msg => {
-@@ -513,6 +518,7 @@
+@@ -513,6 +520,7 @@
  		const pageElapsed = ( performance.now() - pageStart ) / 1000;
  
  		const screenshot = ( await Image.read( await page.screenshot() ) ).scale( 1 / viewScale );

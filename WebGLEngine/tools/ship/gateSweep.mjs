@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4794 -- THE 398th CLOSING: NO new gate file -- three's e2e on its WebGL 2 backend, r185 and all thirteen patches.
+    since491: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4794", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 5: one e2e record per backend; the WebGL 2 one)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE PATCHES CHANGE ONLY THE WebGL 2 BACKEND, AND THE e2e HAD ONLY EVER RUN ON WebGPU. *** 06, 11 and 12 are " +
+                 "WebGL-backend code no WebGPU example reaches. Run again with navigator.gpu hidden, so WebGPURenderer falls back to " +
+                 "WebGL 2: 187 examples, 135 passed and the same 52 failed on r185 and with all thirteen, each for the same reason -- 33 " +
+                 "a few percent off three's screenshots, which are WebGPU's, 15 that need WebGPU, two fetches, one video, and " +
+                 "webgpu_postprocessing_ssr, whose WebGL program does not link on r185 either -- and 184 of 187 screenshots the same " +
+                 "bytes. The other three vary between runs of ONE build: fsr1 and taau gave a different image on each of three runs " +
+                 "of each, measured before they were set down as noise. The first parse read no failures at all: the GL info logs " +
+                 "carry NUL bytes and grep took the logs for binary. Three sabotages red.",
+    }),
     // v4793 -- THE 397th CLOSING: NO new gate file -- draft 13, per-instance morphs beside absolute targets or a mesh-level array.
     since490: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

@@ -230,24 +230,28 @@ else {
 // workaround this harness installs), e2e/v4789.json what it said on r185's build and on all nine. Held here: that the record
 // adds up, that it was taken on the two builds this gate's hashes name -- a patch changed since makes it stale, as it makes
 // the second hash stale -- and that the README states it.
-console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's build and with all of them");
-{   // the newest record is the one that speaks for the patches as they are; older ones stay as history
-    const E2E_DIR = path.join(DIR, "e2e"), recs = fs.existsSync(E2E_DIR) ? fs.readdirSync(E2E_DIR).filter((f) => /^v\d+\.json$/.test(f)).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1))) : [];
+console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's build and with all of them -- on WebGPU, and on WebGL 2");
+// v4794: ONE RECORD PER BACKEND. Patches 06, 11 and 12 change only the WebGL 2 backend, which the WebGPU run never reaches; the
+// same examples are run with navigator.gpu hidden, so WebGPURenderer falls back to WebGL 2 (vNNNN-webgl2.json). The newest of
+// each speaks for the patches as they are; older ones stay as history.
+for (const [backend, RE, phrase] of [["webgpu", /^v(\d+)\.json$/, "WebGPU examples"], ["webgl2", /^v(\d+)-webgl2\.json$/, "WebGPU examples on the WebGL 2 backend"]]) {
+    const E2E_DIR = path.join(DIR, "e2e"), recs = fs.existsSync(E2E_DIR) ? fs.readdirSync(E2E_DIR).filter((f) => RE.test(f)).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1))) : [];
     const recName = recs[recs.length - 1], rec = recName ? JSON.parse(fs.readFileSync(path.join(E2E_DIR, recName), "utf8")) : null;
-    ok("  docs/upstream-three/e2e/ holds the record and the runner it was taken with", !!rec && fs.existsSync(path.join(DIR, "e2e", "puppeteer-local.diff")));
+    ok(`  ${backend}: docs/upstream-three/e2e/ holds the record and the runner it was taken with`, !!rec && fs.existsSync(path.join(DIR, "e2e", "puppeteer-local.diff")));
     if (rec) {
         const failed = Object.keys(rec.failed || {}), varying = Object.keys(rec.varyingOnOneBuild || {});
-        ok(`  it adds up: ${rec.examples} examples, ${rec.passed} passed and ${failed.length} failed, each the same on both builds; ${rec.screenshotsIdentical} screenshots the same bytes and ${varying.length} varying between runs of one build`,
+        ok(`  ${backend}: it adds up: ${rec.examples} examples, ${rec.passed} passed and ${failed.length} failed, each the same on both builds; ${rec.screenshotsIdentical} screenshots the same bytes and ${varying.length} varying between runs of one build`,
             rec.examples > 0 && rec.passed + failed.length === rec.examples && rec.samePerExample === true && rec.screenshotsIdentical + varying.length === rec.examples);
-        ok(`*** it was taken on the builds this gate's hashes name: r185 ${rec.builds.r185.slice(0, 16)}..., all of them ${rec.builds.allPatched.slice(0, 16)}... ***`,
+        ok(`*** ${backend}: it was taken on the builds this gate's hashes name: r185 ${rec.builds.r185.slice(0, 16)}..., all of them ${rec.builds.allPatched.slice(0, 16)}... ***`,
             rec.builds.r185 === THREE_BUILT.r185 && rec.builds.allPatched === THREE_BUILT.allPatched, "a patch changed since the record makes it stale: run three's e2e again, and record it");
-        ok("  the README states it as the record does", index.includes(`${rec.examples} WebGPU examples, ${rec.passed} passed and the same ${failed.length} failed`) &&
+        ok(`  ${backend}: the README states it as the record does`, index.includes(`${rec.examples} ${phrase}, ${rec.passed} passed and the same ${failed.length} failed`) &&
             index.includes(`${rec.screenshotsIdentical} of the ${rec.examples} screenshots`) && index.includes(`](e2e/${recName})`), `the record is e2e/${recName}`);
         // v4791: WHOSE ARE THE SEVEN "2D view of a 3D texture" FAILURES. Not three's: three uploads a 3D texture a slice at a
         // time with queue.writeTexture, a valid call, and no view is asked for in JS -- the view is the browser's own. This
         // Chromium (141) fails ANY writeTexture into a 3D texture that has RENDER_ATTACHMENT usage, three or no three, and the
         // same write without that usage succeeds. Re-measured here in raw WebGPU, so a browser that fixes it turns this red, and
         // the e2e has to be run again to see whether those seven pass.
+        if (backend !== "webgpu") continue;
         const VIEW3D = /TextureViewDimension::e2D\) of the texture view is not compatible with the dimension \(TextureDimension::e3D/;
         const seven = failed.filter((n) => VIEW3D.test(rec.failed[n]) || /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The dimension \(TextureViewDimension::e2D\) of the t/.test(rec.failed[n]));
         let raw = null;
@@ -324,6 +328,9 @@ console.log("\n5. THREE'S e2e TESTS: the record of its WebGPU examples on r185's
 // array made per instance again -> relative+mesh throws; W3 the base guard removed -> absolute throws. W4, in
 // threeUpstreamPaths: patch 03's previous base back to the mesh-level one -> 0 at first, a velocity nobody measured, caught
 // only by the hash; with the "together" path written -> 2 (2.669 px against the plain meshes' 2.817). None green now.
+// ---- v4794 SABOTAGE LOG ----------------------------------------------------------------------------------------
+// Against the WebGL 2 record: V1 its pass count off by one -> 2 (it no longer adds up, and the README no longer states it); V2 the
+// record deleted -> 1; V3 its patched hash off by one digit -> 1. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +

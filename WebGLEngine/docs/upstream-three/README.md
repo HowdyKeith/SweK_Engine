@@ -44,5 +44,11 @@ In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here an
   texture with `RENDER_ATTACHMENT` usage in raw WebGPU, three or no three, on a view it makes itself; two a fetch that failed here; one video,
   `RAF is not defined`; one XR layers example 0.4% of its pixels off); 185 of the 187 screenshots the same bytes, and the
   other two vary between runs of one build, whichever build it is. The WebGL examples load `three.module.js`, which no patch changes.
+- The same examples on three's WebGL 2 backend (since v4794) -- patches 06, 11 and 12 change only that backend, which the run
+  above never reaches -- with `navigator.gpu` hidden so `WebGPURenderer` falls back to it, recorded in
+  [`e2e/v4794-webgl2.json`](e2e/v4794-webgl2.json): 187 WebGPU examples on the WebGL 2 backend, 135 passed and the same 52 failed
+  on r185 and with all thirteen, each for the same reason (33 a few percent off three's screenshots, which are WebGPU's; 15
+  that need WebGPU; two fetches that failed here; one video; and `webgpu_postprocessing_ssr`, whose WebGL program does not link
+  on r185 either); 184 of the 187 screenshots the same bytes, and the other three vary between runs of one build.
 
 `tools/ship/threeUpstream-selfcheck.mjs` holds the hash of each build; a patch changed since makes the patched one stale.
