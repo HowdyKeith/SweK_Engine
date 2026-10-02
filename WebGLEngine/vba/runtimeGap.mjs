@@ -1080,8 +1080,15 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4778 -- closures 4121 -> 4125, typed arrays 1258 -> 1261 at the rtx merge: the reportLines() the six
     // BVH-CSG modules grew for their instruments rows. Closures from bvhPairOverlap, meshBoolean, triClip and
     // triTriIntersect; typed arrays from meshPointClassify, triClip and triTriIntersect. No new file.
-    esModules: 4276, closures: 4125, asyncAwait: 1704, typedArrays: 1261, promises: 399,
-    fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // (superseded in rig run 2) esModules: 4276, closures: 4125, asyncAwait: 1704, typedArrays: 1261, promises: 399,
+    // (superseded in rig run 2) fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // rig run 2 -- four rows, each traced to the file that moved it against HEAD: realGpuRun.mjs's software-GL probe
+    // (async/await, Promises, WebGL, WebGPU: it awaits a launch, wraps a listen in a Promise, opens a webgl2 context
+    // and asks navigator.gpu); realGpuRun-selfcheck awaiting it; and windowsImport-selfcheck, whose new fixture is
+    // the string `"const M=await import(" + ...` -- the census reads string text, so a fixture that spells an await
+    // counts as one. async/await 1704 -> 1707, Promises 399 -> 400, WebGL 195 -> 196, WebGPU 55 -> 56. No new file.
+    esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1261, promises: 400,
+    fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

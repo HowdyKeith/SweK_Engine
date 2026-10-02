@@ -51,6 +51,7 @@ import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../tools/s
 import { createRequire } from "node:module";
 import * as FD from "./frontDoor.mjs";
 import { gateReport } from "../tools/ship/gateReport.mjs";
+import { LAUNCH_ARGS } from "../tools/ship/webgpuHarness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..");
@@ -233,7 +234,11 @@ window.__door = r;
     fs.writeFileSync(path.join(ENG, "gfx-door-probe.html"), probe);
     // TWO LAUNCHES, because the flag turns out to matter as much as the address -- see section 5.
     const bPlain = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
-    const bFlag = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+    // RIG RUN 2: the harness's OWN flags, not a copy of one of them. On win32 LAUNCH_ARGS is --enable-unsafe-webgpu
+    // --use-angle=d3d11 -- the pair webgpuHarness.mjs measured necessary and sufficient there -- and this launch carried
+    // the first alone (plus --use-gl=swiftshader), so Keith's rig read "no-device" on the very box the claim is about.
+    // SABOTAGE F1: this launch given no WebGPU flag at all -> 2 red, the one-flag row and the three-reasons row. Restored, md5.
+    const bFlag = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
     const read = async (host, b = bPlain) => {
         const pg = await (await b.newContext()).newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
@@ -286,7 +291,7 @@ window.__door = r;
     // =========================================================================================================
     console.log("\n5b. *** AND THE SAME ORIGIN AGAIN WITH ONE LAUNCH FLAG, WHICH IS A THIRD ANSWER ***");
     const flagR = await read("127.0.0.1", bFlag);
-    console.log(`        from http://127.0.0.1:${port} with --enable-unsafe-webgpu -> ` +
+    console.log(`        from http://127.0.0.1:${port} with ${LAUNCH_ARGS.join(" ")} -> ` +
                 (flagR.d ? `secure=${flagR.d.secure} webgpu=${flagR.d.state.webgpu} backend=${flagR.d.backend}` : "no parse"));
     ok("*** one launch flag turns 'no adapter' into an adapter, on the SAME origin and the SAME box ***",
        !!flagR.d && flagR.d.detected && flagR.d.detected.webgpu === true &&

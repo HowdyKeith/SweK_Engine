@@ -339,8 +339,14 @@ console.log("\nTHE v4778 RIG RUN: 248 GATES RED ON A PACKAGE THIS LIST COULD NOT
     const win = globalNpmPaths({ APPDATA: "C:\\Users\\K\\AppData\\Roaming", npm_config_prefix: "D:\\npm" }, "win32");
     const nix = globalNpmPaths({ npm_config_prefix: "/opt/npm" }, "linux");
     ok("!! the global npm root is asked: %APPDATA%\\npm on Windows, npm_config_prefix's node_modules (win32) or lib/node_modules (POSIX)",
-       win.length === 2 && /AppData.Roaming.npm.node_modules.playwright$/.test(win[0]) && /D:.npm.node_modules.playwright$/.test(win[1]) &&
-       nix.length === 1 && /\/opt\/npm\/lib\/node_modules\/playwright$/.test(nix[0]) && globalNpmPaths({}, "win32").length === 0,
+       // SABOTAGE P1 (rig run 2): globalNpmPaths joined with the HOST's path again (`const P = path;`) -> 1 red here,
+       // "C:\\Users\\K\\AppData\\Roaming/npm/node_modules/playwright". Restored, md5 verified.
+       // EXACT strings, each in its own platform's separator (rig run 2): the regexes this row had used `.` for the
+       // separator, so a Linux box passed "C:\\...\\Roaming/npm/node_modules/playwright" and Windows wrote
+       // "\\opt\\npm\\lib\\..." for POSIX -- both mixed, both green here
+       win.length === 2 && win[0] === "C:\\Users\\K\\AppData\\Roaming\\npm\\node_modules\\playwright" &&
+       win[1] === "D:\\npm\\node_modules\\playwright" &&
+       nix.length === 1 && nix[0] === "/opt/npm/lib/node_modules/playwright" && globalNpmPaths({}, "win32").length === 0,
        JSON.stringify([...win, ...nix]));
     const sib = siblingCopies("/x/SweK_Engine_v4778/WebGLEngine",
         { readdir: () => ["SweK_Engine_v4776", "SweK_Engine_v4778", "Other", "SweK_Engine_v4777", "SweK_Engine_v4775"], exists: (q) => !/v4776/.test(q) });

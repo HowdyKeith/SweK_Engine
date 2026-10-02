@@ -183,11 +183,14 @@ export function resolveHeadlessShell({ env = process.env, home = os.homedir(), e
 // in-tree install: node_modules at the engine and repo roots, the global npm root (%APPDATA%\npm on Windows,
 // npm_config_prefix anywhere), and -- last, and named as such in `from` -- the same render-qa install in a SIBLING
 // copy of this repo (C:\Intel\SweK_Engine_v4777\...), newest version first, only where one exists on disk.
+// Joined with THAT platform's separator, not this process's: asked about POSIX from a Windows box, path.join wrote
+// "\\opt\\npm\\lib\\..." (Keith's second rig run), which is neither box's path.
 export function globalNpmPaths(env = process.env, platform = process.platform) {
+    const P = platform === "win32" ? path.win32 : path.posix;
     const out = [];
-    if (env.APPDATA) out.push(path.join(env.APPDATA, "npm", "node_modules", "playwright"));
-    if (env.npm_config_prefix) out.push(platform === "win32" ? path.join(env.npm_config_prefix, "node_modules", "playwright")
-                                                              : path.join(env.npm_config_prefix, "lib", "node_modules", "playwright"));
+    if (env.APPDATA) out.push(P.join(env.APPDATA, "npm", "node_modules", "playwright"));
+    if (env.npm_config_prefix) out.push(platform === "win32" ? P.join(env.npm_config_prefix, "node_modules", "playwright")
+                                                              : P.join(env.npm_config_prefix, "lib", "node_modules", "playwright"));
     return out;
 }
 export function siblingCopies(eng = ENG, { readdir = fs.readdirSync, exists = fs.existsSync } = {}) {

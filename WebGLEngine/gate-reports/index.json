@@ -71,6 +71,7 @@
   "pageFxOverlay-selfcheck.json",
   "pathTracerGpu-selfcheck.json",
   "raceKnob-selfcheck.json",
+  "realGpuRun-selfcheck.json",
   "registerDrift-selfcheck.json",
   "reportDoors-selfcheck.json",
   "retroRaster-selfcheck.json",

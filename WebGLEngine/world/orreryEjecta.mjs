@@ -526,6 +526,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // v4778 -- the rtx line, merged: the batched GPU capsule kernel's gate imports three.webgpu.js and
         // three.tsl.js to run physics/character/capsuleCollideTsl.mjs, like the TSL rows above. One arrival.
         "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+        // rig run 2 -- threeUpstream-selfcheck's section 4 reads three.core.js through the overlay where a file symlink
+        // is refused, and compares it with the vendored copy: a real read of this body, by name.
+        "tools/ship/threeUpstream-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",

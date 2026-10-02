@@ -97,13 +97,24 @@ const L = await import(pathToFileURL(path.join(HERE, "labExport.mjs")).href);
 //       same-lab row first ("A DIFFERENT SHAPE"), then "APPEARED unannounced" and the corpus count.
 //   L2. baseFor() looks for the Node 24 baseline under a name that does not exist -> 3 RED: this runtime's row, and
 //       the 20 + 14 moved values Keith's rig printed, to the digit. That is the rig's state, reproduced.
-const NODE_MAJOR = process.versions.node.split(".")[0];
-const DEFAULT_NODE_MAJOR = "22";
-const baseFor = (major) => path.join(HERE, major === DEFAULT_NODE_MAJOR ? "lab-results-baseline.json"
-                                                                          : `lab-results-baseline.node${major}.json`);
-const BASE_OWN = baseFor(NODE_MAJOR);
+// *** RIG RUN 2 -- AND THE PLATFORM IS PART OF THE RUNTIME TOO. *** Node v24.15.0 on Keith's Windows rig, against the
+// Node 24 baseline taken on Linux: 2 values moved and nothing else -- blackbody's wienNuMax 2.8214393786846763 ->
+// 2.821439378159087 and the wienNuAgreeRel derived from it, at the default and at its spectrum pair. wienPeakMaximise is
+// a golden-section search on the flat top of x^3/(e^x - 1); near the maximum every comparison is decided by the last bits
+// of that function, so below about 1e-8 its answer IS the platform's rounding. So a runtime is (Node major, platform):
+// lab-results-baseline.json is Node 22 on Linux, .node<major>.json another major on Linux, .node<major>.<platform>.json
+// anywhere else. A runtime with no baseline of its own is compared against the nearest one (same major on Linux, else
+// Node 22's) and is red, as before.
+const NODE_MAJOR = process.versions.node.split(".")[0], PLATFORM = process.platform;
+const DEFAULT_NODE_MAJOR = "22", DEFAULT_PLATFORM = "linux";
+const baseFor = (major, platform = DEFAULT_PLATFORM) => path.join(HERE,
+    major === DEFAULT_NODE_MAJOR && platform === DEFAULT_PLATFORM ? "lab-results-baseline.json"
+    : `lab-results-baseline.node${major}${platform === DEFAULT_PLATFORM ? "" : "." + platform}.json`);
+const BASE_OWN = baseFor(NODE_MAJOR, PLATFORM);
 let hasOwnBase = fsMod.existsSync(BASE_OWN);
-const BASE = hasOwnBase ? BASE_OWN : baseFor(DEFAULT_NODE_MAJOR);
+const BASE = hasOwnBase ? BASE_OWN
+           : fsMod.existsSync(baseFor(NODE_MAJOR)) ? baseFor(NODE_MAJOR) : baseFor(DEFAULT_NODE_MAJOR);
+const runtimeOf = (b) => `Node ${b.node || DEFAULT_NODE_MAJOR} on ${b.platform || DEFAULT_PLATFORM}`;
 const base = JSON.parse(fsMod.readFileSync(BASE, "utf8"));
 
 // v3519 -- *** THIS RATCHET WATCHED ONE MODE PER DEVICE, AND 528 OBSERVABLES SOUNDED LIKE THE LAB. ***
@@ -145,6 +156,7 @@ for (const n of D.DEVICE_NAMES) {
 
 if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
     base.node = NODE_MAJOR;
+    base.platform = PLATFORM;
     base.devices = now;
     base.pairs = pairs;
     base.deviceCount = D.DEVICE_NAMES.length;
@@ -160,15 +172,15 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
 // ---- 0. WHICH RUNTIME'S BASELINE, AND WHETHER THE RUNTIMES' BASELINES DESCRIBE THE SAME LAB (v4778) --------------
 {
     ok("!! *** this runtime is compared against a baseline TAKEN ON IT ***",
-       hasOwnBase && (base.node || DEFAULT_NODE_MAJOR) === NODE_MAJOR,
-       hasOwnBase ? `Node ${process.versions.node} against ${path.basename(BASE)} (taken on Node ${base.node || DEFAULT_NODE_MAJOR})`
-                  : `NO BASELINE WAS TAKEN ON NODE ${NODE_MAJOR}: compared below against Node ${DEFAULT_NODE_MAJOR}'s, whose ` +
+       hasOwnBase && (base.node || DEFAULT_NODE_MAJOR) === NODE_MAJOR && (base.platform || DEFAULT_PLATFORM) === PLATFORM,
+       hasOwnBase ? `Node ${process.versions.node} on ${PLATFORM} against ${path.basename(BASE)} (taken on ${runtimeOf(base)})`
+                  : `NO BASELINE WAS TAKEN ON NODE ${NODE_MAJOR} ON ${PLATFORM}: compared below against ${runtimeOf(base)}'s, whose ` +
                     `last digits this runtime's float library does not reproduce. Take one deliberately -- run this gate ` +
                     `once and read what moved, then SWEK_FREEZE_LAB_RESULTS=1 writes ${path.basename(BASE_OWN)}`);
     // Two baselines may differ in VALUES -- that is what a second runtime is -- and in nothing else. A device, mode
     // or observable present in one and not the other means one was frozen against different code, and then its
     // exact comparison is protecting a lab that no longer exists.
-    const files = fsMod.readdirSync(HERE).filter((f) => /^lab-results-baseline(\.node\d+)?\.json$/.test(f)).sort();
+    const files = fsMod.readdirSync(HERE).filter((f) => /^lab-results-baseline(\.node\d+(\.[a-z0-9]+)?)?\.json$/.test(f)).sort();
     const shape = (b) => {
         const keys = [];
         for (const [n, d] of Object.entries(b.devices || {})) keys.push("dev " + n + " " + Object.keys(d.outputs || {}).sort().join(","));
@@ -189,14 +201,14 @@ if (process.env.SWEK_FREEZE_LAB_RESULTS === "1") {
         const v = values(x.b);
         let differ = 0;
         for (const [k, val] of v) if (refVals.get(k) !== val) differ++;
-        return { f: x.f, node: x.b.node, same: shape(x.b).join("\n") === refShape, differ, of: v.size };
+        return { f: x.f, runtime: runtimeOf(x.b), same: shape(x.b).join("\n") === refShape, differ, of: v.size };
     });
     ok("!! ...and every runtime's baseline describes the SAME lab -- the same devices, modes and observables, differing only in values",
        !!ref && report.every((r) => r.same),
        `${files.length} baseline(s): ` + (report.length
-           ? report.map((r) => `${r.f} (Node ${r.node}) ${r.same ? "same shape" : "A DIFFERENT SHAPE -- frozen against other code"}, ` +
-                               `${r.differ} of ${r.of} values differ from Node ${DEFAULT_NODE_MAJOR}'s`).join("; ")
-           : "Node " + DEFAULT_NODE_MAJOR + "'s only"));
+           ? report.map((r) => `${r.f} (${r.runtime}) ${r.same ? "same shape" : "A DIFFERENT SHAPE -- frozen against other code"}, ` +
+                               `${r.differ} of ${r.of} values differ from Node ${DEFAULT_NODE_MAJOR} on ${DEFAULT_PLATFORM}'s`).join("; ")
+           : "Node " + DEFAULT_NODE_MAJOR + " on " + DEFAULT_PLATFORM + "'s only"));
 }
 
 // ---- 0a. THE REPORTER ITSELF, DRIVEN RATHER THAN READ OUT OF THE SOURCE --------------------------------------------

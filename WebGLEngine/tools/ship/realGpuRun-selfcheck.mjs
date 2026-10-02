@@ -10,8 +10,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { gateList, categorize, parseRows, verdict, runGates } from "./realGpuRun.mjs";
+import { gateList, categorize, parseRows, verdict, runGates, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL } from "./realGpuRun.mjs";
 import { webgpuSkipReason } from "./webgpuHarness.mjs";
+import { gateReport } from "./gateReport.mjs";
+const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -45,8 +47,14 @@ else {
     const rep = runGates({ root: ENG, only: "translucentLayer-selfcheck", log: quiet });
     const g = rep.gates[0];
     ok(`the gate ran, green, and the harness logged the adapter it ran on: ${g ? g.adapters.join(", ") : "none"}`, rep.gates.length === 1 && g.ok && g.adapters.length === 1 && g.adapters[0] !== "none");
-    ok(`*** and the run says what this box is: "${rep.verdict}" ***`, g.software === true && /NOT A REAL-HARDWARE RUN/.test(rep.verdict),
-       "on a machine with a GPU this row goes red -- and that is the run's point, not a fault");
+    // *** RIG RUN 2 -- THIS ROW ASSERTED THE BOX, AND WENT RED ON THE BOX THE RUN EXISTS FOR. *** It required a SOFTWARE
+    // adapter, so Keith's rig read "a real-hardware run on nvidia pascal" and failed -- "that is the run's point, not a
+    // fault" was written beside a red that every GPU owner would see. What the run must get right on any box is that its
+    // verdict AGREES with the adapter the harness logged: software -> NOT A REAL-HARDWARE RUN, hardware -> named.
+    const agrees = g.software === true ? /NOT A REAL-HARDWARE RUN/.test(rep.verdict)
+                                       : rep.verdict === "a real-hardware run on " + g.adapters[0];
+    ok(`*** and the run says what this box is, as the harness saw it: "${rep.verdict}" ***`, !!g && agrees,
+       `adapter ${g ? g.adapters[0] : "none"} (${g && g.software ? "software" : "hardware"}) -- the verdict names it either way`);
     ok(`  ...its kind, time and summary: ${g.category}, ${(g.ms / 1000).toFixed(1)} s, "${rep.summary}"`, g.category === "quality" && g.ms > 0 && rep.summary === "exact 0/0, quality 1/1, timing 0/0");
     const was = process.env.SWEK_LAUNCH_ARGS; process.env.SWEK_LAUNCH_ARGS = "--enable-unsafe-webgpu --no-first-run";
     const rep2 = runGates({ root: ENG, only: "temporalTslZoo-selfcheck", log: quiet });
@@ -55,12 +63,42 @@ else {
     ok(`SWEK_LAUNCH_ARGS reaches the browser: the harness launched with "${la.join("; ")}"`, rep2.gates[0] && rep2.gates[0].ok && la.length === 1 && la[0] === "--enable-unsafe-webgpu --no-first-run");
 }
 
+console.log("\n3. RIG RUN 2: WHAT \"SOFTWARE GL\" GETS ON THIS BOX, PER FLAG SET");
+// 72 files launch with --use-gl=swiftshader and hold their pixels to SwiftShader's. On Keith's rig all twelve such gates
+// in the run were red, some with a context that answered null. This section is the measurement a fix to them needs:
+// it is RED where the tree's spelling does not get a software renderer, and its lines say which spelling does.
+if (skip) { console.log("  SKIP  no browser: " + skip); console.log("  ----  *** NOT A PASS. ***"); fails++; }
+else {
+    const probe = await probeSoftwareGl();
+    for (const l of softwareGlLines(probe)) console.log("  ----  " + l);
+    GR.table("which renderer each flag set gets on this box", ["flags", "WebGL2", "WebGL2 renderer", "WebGPU"],
+             probe.rows.map((r) => [r.args.join(" ") || "(no flags)", r.error ? "launch threw" : !r.context ? "none" : (r.software ? "software" : "hardware"),
+                                    r.renderer || r.error || "", r.webgpu || ""]),
+             "the headless shell this box resolves; on a GPU box this table is the measurement a fix to the 72 needs");
+    const tree = probe.rows.find((r) => r.args.join(" ") === TREE_SOFTWARE_GL.join(" "));
+    const working = probe.rows.filter((r) => r.context && r.software).map((r) => r.args.join(" ") || "(no flags)");
+    ok(`!! *** the tree's software-GL spelling (${TREE_SOFTWARE_GL.join(" ")}) gets a SOFTWARE WebGL2 renderer on this box ***`,
+       probe.ok && !!tree && tree.context && tree.software === true,
+       !probe.ok ? probe.reason
+       : `got ${tree && tree.context ? (tree.software ? "software" : "HARDWARE") + ": " + tree.renderer : "no WebGL2 context" + (tree && tree.error ? " (" + tree.error + ")" : "")}` +
+         (tree && tree.software ? "" : `. Every gate launched with it is holding a ${tree && tree.context ? "GPU's" : "dead context's"} pixels to SwiftShader's. ` +
+          `Spellings that DO get software here: ${working.join(" | ") || "NONE"}`));
+}
+
 // ---- v4764 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against tools/ship/realGpuRun.mjs: R1 the render gates left out of the run -> 3; R2 dB read before the clock -> 1; R3 the
 // summary line counted as a failing row -> 1; R4 a software adapter never named -> 2; R5 the log not handed to the gates -> 3;
 // R6 measured lines not read -> 1. Against tools/ship/webgpuHarness.mjs: H1 the log never written -> 3; H2 SWEK_LAUNCH_ARGS
 // ignored -> 1; H3 a gate logged by its full path (the runner then finds no adapter for it) -> 3; H4 the flags not logged -> 1.
 // Ten, none green.
+// RIG RUN 2: G1 section 2's verdict row looking for "a real-hardware run on" on a software box -> 1 red (only the software
+// branch can be driven red without a GPU); S1 probeSoftwareGl reading a SwiftShader renderer as hardware -> 1 red, the
+// tree-spelling row, "got HARDWARE: ANGLE (... SwiftShader driver)". Both restored, md5 verified.
+{
+    const w = GR.write();
+    console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +
+                ` -- ${w.doc.tables.length} tables, ${w.doc.tables.reduce((n, t) => n + t.rows.length * t.columns.length, 0)} cells`);
+}
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a real GPU -- the run exists for one and this box has none; the whole run, 8 min 25 s on SwiftShader, " +
     "measured once and too long for a gate -- two gates here; and which Linux flags reach which GPU, which the doc offers as a first try, not a finding.");

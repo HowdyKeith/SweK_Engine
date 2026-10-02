@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "08011513d2a9686cafbef371a3cb7963fa11f47e",
+ "head": "3b5c57589dc62e63a6a5906460812bf7eba9bab9",
  "bodies": {
   "box3d": [
    {
@@ -1198,13 +1198,18 @@
    },
    {
     "path": "tools/ship/threePatch.mjs",
-    "bytes": 5076,
+    "bytes": 6969,
     "sha": "28dfd29ec97b285edafe468b6e6aa49110335f2e"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
     "bytes": 22534,
     "sha": "82a77f78f5526c14af8e96ae9c9a24eb6386ed21"
+   },
+   {
+    "path": "tools/ship/threeUpstream-selfcheck.mjs",
+    "bytes": 25501,
+    "sha": "4d04ac769796138d1bdfde760cf6456de9b5d0e9"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",

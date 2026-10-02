@@ -54,7 +54,7 @@ const report = (n, d) => console.log("  ----  " + n + (d ? "   " + d : ""));
 // tools/ship/reportingTools.mjs is the one definition and both the gate and the bridge read it.
 import { REPORTING, NO_MAIN, PAGE_DOOR, isReportingTool, ARTEFACT_TOOLS, artefactTool } from "./reportingTools.mjs";
 import { scaled } from "./hostScale.mjs";
-import { referenceGraph } from "./moduleRefs.mjs";   // v3546 -- ASK THE THING THAT WALKS, never a path prefix
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";   // v3546 -- ASK THE THING THAT WALKS, never a path prefix
 const SHOULD_REPORT = REPORTING.map((t) => t.rel);
 
 // ---- 1. EVERY TOOL THAT SHOULD REPORT, REPORTS -------------------------------------------------------------------
@@ -192,7 +192,7 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
             if (e === "node_modules" || e.startsWith(".")) continue;
             const q = path.join(d, e);
             let st; try { st = fs.statSync(q); } catch { continue; }
-            if (st.isDirectory()) walk(q); else if (/\.(js|mjs|html)$/.test(e)) all.push(q);
+            if (st.isDirectory()) walk(q); else if (SOURCE_EXT.test(e)) all.push(q);
         }
     })(ROOT);
     const text = new Map(all.map((f) => { try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; } }));

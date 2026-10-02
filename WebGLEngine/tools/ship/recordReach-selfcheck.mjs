@@ -19,7 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RR from "./recordReach.mjs";
 import * as FR from "./frozenRecords.mjs";
-import { costOf, ownerOf } from "./quickSweep.mjs";
+import { costOf } from "./quickSweep.mjs";
 import * as BT from "./boxTimings.mjs";
 import { boxId } from "./hostScale.mjs";
 
@@ -268,14 +268,15 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // Gate SELECTION still reads the shared record -- task #87 -- because this row reports and does not choose.
     // SABOTAGES (v4781): this box's own ring set to [2900, 2900, 2900] -> 1 red, margin 100; the own ring ignored, i.e.
     // the row as it was -> 1 red on this box, margin 764 off the departed box's readings.
-    // v4778 -- OWNERSHIP FOLLOWS THE HANDOVER (quickSweep.RECORD_HANDOVERS), NOT `host`. The record's `host` still
-    // names the retired container until the rig writes it, and the rig owns it by a dated handover: on the rig the
-    // shared ring IS its own, and reading its per-box file instead would read a ring nothing there fills.
-    const shared = t.host ? ownerOf(t.host) : null, here = boxId();
+    // *** RIG RUN 2 -- WHOSE RING IS WHO MEASURED IT, NOT WHO MAY WRITE NEXT. *** Part 2 asked ownerOf(host), so on the rig --
+    // the record's owner by the v4778 handover -- the shared ring read as the rig's own, and Keith's run printed the retired
+    // container's [1263, 1347, 2080] "on linux-x64-4c-16096mb-142c0d" as his box's margin. Ownership says who may WRITE the
+    // record; the readings in it are the measuring box's until the owner's own sweep replaces them. So, as v4781 had it: on
+    // any box that did not measure the shared ring, its own per-box ring when it has two readings.
+    const shared = t.host || null, here = boxId();
     // v4778 SABOTAGE R1: this box's own ring for recordDrift-selfcheck set to [2900, 2900, 2900] in
     // sweep-timings.linux-x64-4c-16095mb-142c0d.json -> 1 red, margin 100. Restored, md5 verified. The ownerOf()
-    // change cannot be driven red from here -- the record is foreign to this box either way; it differs only on the
-    // rig, which owns the record by the handover and must read the shared ring as its own.
+    // change of part 2 was reverted in rig run 2 (above): driving it red needed the rig, and the rig is where it was wrong.
     const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
     const costMs = (g) => {
         const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
@@ -292,7 +293,11 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
             return `${path.basename(g)} ${c.ms} ms (` +
                    (c.n >= 2 ? `median of ${c.n} serial readings [${((c.whose === "this box" ? own[g] : RING[g]) || []).join(", ")}] on ${c.whose}`
                              : `${cost[g].source}, ONE reading -- the ring has ${c.n}`) +
+                   (c.whose !== "this box" && shared && shared !== here ? `, measured by ${c.whose}, not this box` : "") +
                    `, ${road(g) || "no road"})`; }).join(" and ") +
+        (pair.some((g) => costMs(g).whose !== "this box") && shared && shared !== here
+            ? `. THIS BOX HAS NOT TIMED THEM: node tools/ship/boxTimings.mjs --record ${pair.join(" ")} gives it its own ring`
+            : "") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +

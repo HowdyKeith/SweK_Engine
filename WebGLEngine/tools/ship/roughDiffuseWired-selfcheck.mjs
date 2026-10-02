@@ -58,7 +58,7 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
     const before = path.join(ENG, "physics/render/_ptBefore.mjs");
     const REL = "WebGLEngine/physics/render/pathTracer.mjs";
     const ROOT = path.join(ENG, "..");
-    let ran = false, beforeSha = null, rev = null, beforeSrc = null;
+    let ran = false, beforeSha = null, rev = null, beforeSrc = null, why = "";
     try {
         const revs = execFileSync("git", ["log", "--format=%H", "--", REL],
                                   { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 }).trim().split("\n");
@@ -70,14 +70,20 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
         if (!rev) throw new Error("no revision of the tracer predates the roughDiffuse import");
         const src = beforeSrc;
         fs.writeFileSync(before, src);
-        const prog = "const M=await import(" + JSON.stringify(before) + ");" +
+        // pathToFileURL, not the path (rig run 2): on Windows `import("C:\\...")` reads "C:" as a URL scheme, so the child
+        // died and this row said "git show failed" -- git show had worked
+        const prog = "const M=await import(" + JSON.stringify(pathToFileURL(before).href) + ");" +
             "const b=M.render([{centre:[0,0,0],radius:1.6,albedo:0.8,emit:0},{centre:[3,4,3],radius:1,albedo:0,emit:8}]," +
             JSON.stringify(OPTS) + ");" +
             "const c=await import('node:crypto');" +
             "process.stdout.write(c.createHash('sha256').update(Buffer.from(Float64Array.from(b).buffer)).digest('hex').slice(0,16));";
         beforeSha = execFileSync(process.execPath, ["--input-type=module", "-e", prog], { encoding: "utf8" });
         ran = true;
-    } catch (e) { report("could not run the committed tracer: " + String(e).slice(0, 90)); }
+    } catch (e) {
+        why = (rev ? "the pre-wiring tracer (" + rev.slice(0, 12) + ") did not run: " : "git could not supply it: ") +
+              String((e && e.stderr) || e).trim().split("\n").slice(-2).join(" ").slice(0, 240);
+        report("could not run the committed tracer -- " + why);
+    }
     finally { try { fs.unlinkSync(before); } catch {} }
 
     const now = shot(undefined);
@@ -88,7 +94,7 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
         ran && beforeSrc !== null && beforeSrc !== nowSrc && !/roughDiffuse\.mjs/.test(beforeSrc),
         ran ? `${rev.slice(0, 12)}, ${beforeSrc.length} chars against ${nowSrc.length}` : "not reached");
     ok("*** the pre-wiring tracer and the patched one render the same bits ***", ran && beforeSha === now.sha,
-        !ran ? "SKIPPED -- git show failed, so this proves nothing"
+        !ran ? "SKIPPED -- " + why + " -- so this proves nothing"
              : beforeSha === now.sha ? `both ${now.sha}`
              : `committed ${beforeSha} against patched ${now.sha}`);
     ok("  and an explicit sigma of 0 is the same bits again", shot(0).sha === now.sha,

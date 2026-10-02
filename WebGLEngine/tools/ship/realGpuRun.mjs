@@ -23,6 +23,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LAUNCH_ARGS } from "./webgpuHarness.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
+import { createRequire } from "node:module";
+import http from "node:http";
+import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -79,12 +83,92 @@ export function runGates({ root = ENG, only = null, log = console.log } = {}) {
     return report;
 }
 
+/**
+ * *** RIG RUN 2 -- WHICH RENDERER DOES "SOFTWARE GL" GET ON THIS BOX? *** 72 files launch the headless shell with
+ * `--use-gl=swiftshader` and hold what they draw to SwiftShader's bits. On Keith's rig (Windows, a GeForce, the headless
+ * shell npm brings today) every one of the twelve such gates in the run went red, several with a context that answers
+ * null (MAX_TEXTURE_SIZE of null, a shader that throws with no log) and several drawing real pixels that are not
+ * SwiftShader's. On this Linux box every candidate below lands on SwiftShader -- there is no GPU to land on -- so the
+ * flag cannot be chosen here. This asks the browser, per candidate, which WebGL2 renderer it hands out. Nothing is
+ * changed by it; the answer is what a fix to the 72 must be built on.
+ */
+export const TREE_SOFTWARE_GL = Object.freeze(["--use-gl=swiftshader"]);
+// and the WebGPU side of the same question: eight launches hand-spell `--use-gl=swiftshader --enable-unsafe-webgpu`,
+// the harness uses LAUNCH_ARGS, and which adapter each gets on a GPU box is equally unmeasured
+export const TREE_SOFTWARE_WEBGPU = Object.freeze(["--use-gl=swiftshader", "--enable-unsafe-webgpu"]);
+export const SOFTWARE_GL_CANDIDATES = Object.freeze([
+    TREE_SOFTWARE_GL,
+    Object.freeze(["--use-angle=swiftshader"]),
+    Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
+    Object.freeze(["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
+    Object.freeze([]),
+    TREE_SOFTWARE_WEBGPU,
+    Object.freeze([...LAUNCH_ARGS]),
+    Object.freeze([...LAUNCH_ARGS, "--use-webgpu-adapter=swiftshader"]),
+    Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
+]);
+export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executablePath = HEADLESS_SHELL } = {}) {
+    const pw = resolvePlaywright(createRequire(import.meta.url));
+    if (!pw.chromium || !executablePath) return { ok: false, reason: "no playwright or no headless shell", rows: [] };
+    // a LOOPBACK page: navigator.gpu exists only in a secure context, and about:blank is not one
+    const srv = http.createServer((q, r) => { r.writeHead(200, { "content-type": "text/html" }); r.end("<!doctype html><title>gl probe</title>"); });
+    await new Promise((ok) => srv.listen(0, "127.0.0.1", ok));
+    const url = `http://127.0.0.1:${srv.address().port}/`;
+    const rows = [];
+    try {
+        for (const args of sets) {
+            const row = { args: [...args], context: false, renderer: null, maxTexture: null, software: null,
+                          webgpu: null, webgpuSoftware: null, error: null };
+            let b = null;
+            try {
+                b = await pw.chromium.launch({ executablePath, args: [...args] });
+                const p = await b.newPage();
+                await p.goto(url);
+                Object.assign(row, await p.evaluate(async () => {
+                    const out = { context: false };
+                    const gl = document.createElement("canvas").getContext("webgl2");
+                    if (gl) {
+                        const d = gl.getExtension("WEBGL_debug_renderer_info");
+                        Object.assign(out, { context: !gl.isContextLost(), maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                            renderer: String(d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) });
+                    }
+                    try {
+                        const a = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
+                        const i = (a && a.info) || {};
+                        out.webgpu = !navigator.gpu ? "no navigator.gpu" : !a ? "no adapter"
+                            : [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ") || "an adapter with no info";
+                    } catch (e) { out.webgpu = "threw: " + String((e && e.message) || e).slice(0, 80); }
+                    return out;
+                }));
+                row.software = row.renderer ? SOFTWARE_HINTS.test(row.renderer) : null;
+                row.webgpuSoftware = /no |threw/.test(row.webgpu || "no ") ? null : SOFTWARE_HINTS.test(row.webgpu);
+            } catch (e) { row.error = String((e && e.message) || e).split("\n")[0].slice(0, 160); }
+            finally { if (b) await b.close().catch(() => {}); }
+            rows.push(row);
+        }
+    } finally { srv.close(); }
+    return { ok: true, executablePath, rows };
+}
+export function softwareGlLines(probe) {
+    if (!probe.ok) return ["software GL: not probed -- " + probe.reason];
+    return probe.rows.map((r) => `${(r.args.join(" ") || "(no flags)").padEnd(70)} ` +
+        (r.error ? "LAUNCH THREW " + r.error
+                 : `WebGL2 ${!r.context ? "NONE" : (r.software ? "SOFTWARE" : "HARDWARE") + " " + r.renderer + " (max texture " + r.maxTexture + ")"}` +
+                   ` | WebGPU ${r.webgpuSoftware === null ? r.webgpu : (r.webgpuSoftware ? "SOFTWARE " : "HARDWARE ") + r.webgpu}`));
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     // v4776 -- parsed by cliArgs.mjs rather than read off argv: `--onyl fsr` used to run EVERY gate and say nothing,
     // which on a real GPU is the longest run this tool makes. A mistyped option is refused with a did-you-mean.
-    const CLI = { values: { "--out": "path", "--only": "string" }, flags: [] };
+    const CLI = { values: { "--out": "path", "--only": "string" }, flags: ["--gl-flags"] };
     const cli = parseArgs(process.argv.slice(2), CLI);
     if (cli.errors.length) { for (const l of refusalLines("realGpuRun", cli.errors, CLI)) console.error(l); process.exit(2); }
+    if (cli.flags.has("--gl-flags")) {
+        const probe = await probeSoftwareGl();
+        console.log(`\nrealGpuRun --gl-flags: which WebGL2 renderer each flag set gets from ${probe.executablePath || "(no browser)"}`);
+        for (const l of softwareGlLines(probe)) console.log("  " + l);
+        process.exit(0);
+    }
     const arg = (k) => cli.values[k] ?? null;
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
     console.log(`\nthe FSR and frame-generation gates, with the harness logging each call's adapter (${process.platform})`);
