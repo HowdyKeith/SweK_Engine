@@ -303,8 +303,16 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // definesOk and nameFirst move with it, which is the same three-rows-together pattern the note above
     // records: one new gate that names its subject first is counted by all four.
     // v4626 -- RE-TAKEN 1670 -> 1671 for tools/ship/murmurSpecies-selfcheck.mjs.
-    gates: 1671, usesOk: 1650, definesOk: 1642, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1543, condFirst: 91, unknownSignature: 16,
+    // Round 21 of the BVH-CSG arc (no version bump; the records a ship owes, refreshed on its branch) -- RE-TAKEN
+    // 1671 -> 1724 for the 53 gates since: 21 of the BVH-CSG arc's physics/mesh gates, the aircraft / 6DOF arc's,
+    // and the capsule / camera / page gates of the rounds between. usesOk 1650 -> 1703, definesOk 1642 -> 1695,
+    // nameFirst 1543 -> 1585; condFirst 91 -> 92 (tools/ship/gltfConformance-selfcheck.mjs); distinctDefinitions
+    // 41 -> 43; unknownSignature 16 -> 26 -- TEN gates whose ok() this census cannot classify, all of the aircraft
+    // / 6DOF arc: brain/autopilot6dof-, brain/autopilotAircraft-, brain/fleetAssign-, physics/mechanics/aeroSurface-,
+    // aircraftAssembly-, rigidBody6dofCollision-, rigidBody6dofWeapon-, physics/obbManifold-, tools/ship/aircraftPage-
+    // and rigidBody6dofPage-selfcheck.mjs. Counted, not judged: suspects held at 0.
+    gates: 1724, usesOk: 1703, definesOk: 1695, importsOk: 0,
+    distinctDefinitions: 43, nameFirst: 1585, condFirst: 92, unknownSignature: 26,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

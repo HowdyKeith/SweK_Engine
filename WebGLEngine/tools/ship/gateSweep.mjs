@@ -5085,6 +5085,83 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "it (interior mean 441 against 254); and one sabotage's anchor had gone stale against a " +
                  "multi-line ternary and was reported as green rather than as missing.",
     }),
+    since251: Object.freeze({
+        at: "v4660", swept: 53, green: 51, red: 2,
+        added: Object.freeze([
+            "brain/autopilot6dof-selfcheck.mjs",
+            "brain/autopilotAircraft-selfcheck.mjs",
+            "brain/fleetAssign-selfcheck.mjs",
+            "physics/mechanics/aeroSurface-selfcheck.mjs",
+            "physics/mechanics/aircraftAssembly-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dof-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
+            "physics/mesh/blastEngine-selfcheck.mjs",
+            "physics/mesh/bvhPairOverlap-selfcheck.mjs",
+            "physics/mesh/exactArrangement-selfcheck.mjs",
+            "physics/mesh/exactPredicates-selfcheck.mjs",
+            "physics/mesh/implicitPoints-selfcheck.mjs",
+            "physics/mesh/manifoldAudit-selfcheck.mjs",
+            "physics/mesh/meshBoolean-selfcheck.mjs",
+            "physics/mesh/meshBooleanBlast-selfcheck.mjs",
+            "physics/mesh/meshPointClassify-selfcheck.mjs",
+            "physics/mesh/triArrangement-selfcheck.mjs",
+            "physics/mesh/triClip-selfcheck.mjs",
+            "physics/mesh/triContact-selfcheck.mjs",
+            "physics/mesh/triFragmentAccumulate-selfcheck.mjs",
+            "physics/mesh/triTriIntersect-selfcheck.mjs",
+            "physics/obbManifold-selfcheck.mjs",
+            "tools/gunnerTraceDemo-selfcheck.mjs",
+            "tools/maleCnsLoader-selfcheck.mjs",
+            "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs",
+            "tools/ship/aggroHazardFeature-selfcheck.mjs",
+            "tools/ship/aircraftPage-selfcheck.mjs",
+            "tools/ship/botCapsuleNav-selfcheck.mjs",
+            "tools/ship/cameraCapsuleWalk-selfcheck.mjs",
+            "tools/ship/cameraTerrainWalk-selfcheck.mjs",
+            "tools/ship/cameraViewMode-selfcheck.mjs",
+            "tools/ship/capsuleCollide-selfcheck.mjs",
+            "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+            "tools/ship/capsuleHazardPolicy-selfcheck.mjs",
+            "tools/ship/cityChunkScene-selfcheck.mjs",
+            "tools/ship/colliderFromGLB-selfcheck.mjs",
+            "tools/ship/controllerLabWorld-selfcheck.mjs",
+            "tools/ship/flyConnectomePage-selfcheck.mjs",
+            "tools/ship/gltfConformance-selfcheck.mjs",
+            "tools/ship/kaijuGroundCollider-selfcheck.mjs",
+            "tools/ship/mikktSpace-selfcheck.mjs",
+            "tools/ship/peerBrain-selfcheck.mjs",
+            "tools/ship/peerBrainFleet-selfcheck.mjs",
+            "tools/ship/pilotPolicy-selfcheck.mjs",
+            "tools/ship/platformCarryWorld-selfcheck.mjs",
+            "tools/ship/precisionProbe-selfcheck.mjs",
+            "tools/ship/qrBridge-selfcheck.mjs",
+            "tools/ship/rigidBody6dofPage-selfcheck.mjs",
+            "tools/ship/rtViewer-selfcheck.mjs",
+            "tools/ship/splatWalkWorld-selfcheck.mjs",
+            "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+            "tools/ship/worldColliderBVH-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([
+            Object.freeze({ gate: "tools/ship/qrBridge-selfcheck.mjs",
+                why: "two rows ask that @napi-rs/canvas, an OPTIONAL native dependency, be installed on this box; it is not " +
+                     "(status() reports available:false and the gate's own section 5 shows the honest degradation passing)" }),
+            Object.freeze({ gate: "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+                why: "Cannot find module '@napi-rs/canvas' at import: the same optional native dependency, absent on this box; " +
+                     "no row of the gate runs" }),
+        ]),
+        widened: Object.freeze([]),
+        verdict: "swept on branch claude/round21-suite-green (BVH-CSG rounds 20..21), no version bump: the closing no ship " +
+                 "had written for 53 gates on disk -- the BVH-CSG arc's own (blastEngine, meshBoolean, manifoldAudit, the " +
+                 "exact-arrangement gates) and the aircraft / 6DOF / capsule / peer-brain arcs' gates that landed since v4626 " +
+                 "and were never swept (swept here, the since77 precedent). quickSweep, 8 workers, 20 s cap: 47 green, 2 red, " +
+                 "4 at the cap; the four re-run alone -- blastEngine (6 min 56 s), meshBoolean (67 s), gunnerTraceDemo (21 s) " +
+                 "green, rigidBody6dofPage RED in 65 s. That red was the GATE's: it read a 150-tick window by its two ends, and " +
+                 "since bbb5bb3e every battle on es-box3d-6dof.html ends in 83..119 ticks with newBattle() resetting tick and " +
+                 "hp -- '5 -> 32, stalled' on a loop measured at 60 frames a second. Fixed (summed across the page's resets; " +
+                 "8 s green; 5 page sabotages red) and the degenerate fight it uncovered -- every battle a draw, 36 hits, both " +
+                 "fleets dead -- filed as sixdof-page-every-battle-a-draw. The two reds are a missing optional native module.",
+    }),
     since249: Object.freeze({
         at: "v4623", swept: 1, green: 1, red: 0,
         added: Object.freeze([
