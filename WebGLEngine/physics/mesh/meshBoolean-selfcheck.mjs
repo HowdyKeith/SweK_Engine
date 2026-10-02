@@ -238,6 +238,13 @@
 // on V1, V3, V5, V6 and V7 (1 each; V6 and V7 by section 25(g)'s fixtures, added when the first battery left them 0 red).
 // SABOTAGE LOG (round 20b) -- in blastEngine-selfcheck.mjs's header: 8 sabotages (Y1-Y8) of embedRounded, 7 red, 1 named;
 // THIS gate red on Y2 (2), Y3 (1) and Y5 (1), by section 26's fixtures, built when the first battery left them 0 red.
+// SABOTAGE LOG (round 25, can the snapped path go?) -- meshBoolean.mjs, on the real file, restored and md5 verified; this
+// gate. 2 of 3 red on the round-25 row, 1 named:
+//   X1 conforming off by default                                       3 red (the round-25 row: 60 of 60 fall back)
+//   X2 no decline: the exact path runs on what conforming leaves        5 red (the round-25 row: 0 fall back; and the four
+//        16g/16h rows that assert a decline -- the rows a retirement of the fallback would rewrite)
+//   X3 the exact path without embedRounded                             0 red -- NAMED: the sweep's box operands make no
+//        rounded crossing, so this row cannot see embedRounded; blastEngine-selfcheck sections 16-17 guard it
 "use strict";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { pairOverlap } from "./bvhPairOverlap.mjs";
@@ -1813,6 +1820,37 @@ console.log("\n25. *** ROUND 16f: THE EXACT ARRANGEMENT (opts.exactArrangement) 
         [[0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qc, qd], [qa, [0.3 + 5e-9 / r2, 0.3 - 5e-9 / r2], qd]]));
     ok("!! round 16h: a split that would turn a triangle over (a point 5e-9 off a sliver 1e-9 wide) is refused -- the shot declines to the snapped path",
         C2.exact === false && C2.stats.a.exactDeclined > 0, "exact " + C2.exact + ", declined " + C2.stats.a.exactDeclined);
+
+    // (h) ROUND 25: CAN THE SNAPPED PATH GO? -- the inputs that still reach it. The page's workloads never do: 0 of 1,690
+    // default operations declined (12 x 100 soak shots, 440 switching-chain BVH shots -- 117 of them conformed first --
+    // 50 union/subtract/intersect); its only production caller (destructible.html) passes no option. What declines is
+    // non-conformity BEYOND what conforming fixes: cracks and near-misses wider than meshCSG's EPS, and splits conforming
+    // refuses. Here they are swept -- 1e-9..1e-4 wide, cracks and near-misses, five cutters across the junction -- and
+    // wherever the default fell back, the exact arrangement forced onto the same operands (exactConforming:false) is set
+    // beside it. Round 16g's reason for the fallback (6.2 units of a switching chain's wall lost) was non-conformity WITHIN
+    // EPS, which conforming now closes before the check (section 15's n3 control in blastEngine-selfcheck is that loss).
+    {
+        const tB = (m, m2 = m) => { const out = [], src = M.toTriangleBuffer(M.boxPolys([0, 0, 0], [1, 1, 1]));
+            for (let o = 0; o < src.length; o += 9) if (!(src[o + 2] === 1 && src[o + 5] === 1 && src[o + 8] === 1)) out.push(...src.subarray(o, o + 9));
+            const a = [-1, -1], b = [1, -1], c = [1, 1], d = [-1, 1];
+            for (const t of [[a, b, c], [m, c, d], [a, m2, d]]) for (const v of t) out.push(v[0], v[1], 1);
+            return new Float64Array(out); };
+        let cases = 0, fell = 0, snapVol = 0, snapOpen = 0, exactOpen = 0, worstDv = 0;
+        for (const w of [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4]) for (const kind of ["crack", "near-miss"]) for (const [cx, cy, h] of [[0.1, 0.05, 0.3], [0, 0, 0.2], [-0.2, 0.15, 0.25], [0.3, -0.3, 0.4], [0.05, 0.1, 0.1]]) {
+            const A = tB(...(kind === "crack" ? [[w / Math.SQRT2, -w / Math.SQRT2]] : [[0, 0], [w, 0]])), C = M.toTriangleBuffer(M.boxPolys([cx, cy, 1], [h, h, 0.3]));
+            const want = vol(A) - 4 * h * h * 0.3, go = (o) => { const r = meshBoolean(A, new MeshBVH(A), C, new MeshBVH(C), "subtract", o); return { exact: r.exact, err: Math.abs(vol(r.tris) - want), open: bitsOpen(r.tris) }; };
+            const d = go({}); cases++;
+            if (d.exact) continue;
+            const x = go({ exactConforming: false }); fell++;
+            worstDv = Math.max(worstDv, d.err - x.err);
+            if (d.err < x.err - 1e-14) snapVol++;
+            if (d.open < x.open) snapOpen++; if (x.open < d.open) exactOpen++;
+        }
+        ok("!! *** round 25: where the default still falls back to the snapped path, the exact arrangement forced is NEVER WORSE -- not in volume (beyond a rounding), not in open edges ***",
+            fell === 40 && snapVol === 0 && snapOpen === 0,
+            cases + " cases, " + fell + " fell back; the snapped answer smaller in volume error in " + snapVol + " (worst " + worstDv.toExponential(1) + "), fewer open edges in " +
+            snapOpen + "; the forced exact fewer open edges in " + exactOpen + ". The fallback buys nothing measurable on what reaches it.");
+    }
 }
 
 console.log("\n26. *** ROUND 20b: embedRounded ON HAND-BUILT CROSSINGS -- WHAT IT MAY MOVE, WHAT IT REFUSES, WHAT IT TESTS ***");
