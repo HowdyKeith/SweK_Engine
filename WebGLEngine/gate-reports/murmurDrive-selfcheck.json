@@ -1,0 +1,126 @@
+{
+ "gate": "tools/ship/murmurDrive-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "the lean's direction by drive",
+   "columns": [
+    "drive",
+    "mean deg",
+    "worst pair deg"
+   ],
+   "rows": [
+    [
+     0,
+     86.8166177149684,
+     177.26584431990293
+    ],
+    [
+     0.25,
+     87.34004661708585,
+     166.89185714490483
+    ],
+    [
+     0.5,
+     63.35353693863434,
+     114.52802303673329
+    ],
+    [
+     0.75,
+     20.963404438798932,
+     36.083907298423235
+    ],
+    [
+     1,
+     0.00000126589210413003,
+     0.0000017075472925031877
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "each species' lean vector",
+   "columns": [
+    "species",
+    "|v|",
+    "k",
+    "pre",
+    "wired"
+   ],
+   "rows": [
+    [
+     "still",
+     1.0006497888872012,
+     1,
+     "false",
+     "true"
+    ],
+    [
+     "abyss",
+     0.9976472322419383,
+     0.8,
+     "false",
+     "true"
+    ],
+    [
+     "sol",
+     0.9970456358662827,
+     0.7,
+     "true",
+     "true"
+    ],
+    [
+     "droplet",
+     1.000999500499376,
+     0.3,
+     "true",
+     "true"
+    ],
+    [
+     "nebula",
+     0.9998499887483121,
+     0.42,
+     "false",
+     "false"
+    ],
+    [
+     "tempest",
+     0.9996499387285531,
+     0.5,
+     "false",
+     "false"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "bytes moved: drive 0 against IDLE, and drive 0 to 1",
+   "columns": [
+    "species",
+    "drive 0 vs IDLE %",
+    "drive 0 -> 1 %",
+    "drive 0 -> 1 mean",
+    "drive 0 -> 1 worst"
+   ],
+   "rows": [
+    [
+     "still",
+     0,
+     10.112847222222221,
+     1.2469618055555556,
+     225
+    ],
+    [
+     "droplet",
+     0,
+     19.249131944444443,
+     1.8053385416666667,
+     200
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

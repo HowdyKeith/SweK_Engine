@@ -1,0 +1,414 @@
+{
+ "gate": "render/frameInterpTsl-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "[webgpu] the TSL splat against interpolateFrameCPU",
+   "columns": [
+    "case",
+    "CPU holes",
+    "mask differs",
+    "vector differs",
+    "depth differs",
+    "worst |frame|"
+   ],
+   "rows": [
+    [
+     "flat",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "checker",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "signed",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "prevIndexed",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "t0",
+     314,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "t1",
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "contested",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "contestedFlat",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "contestedQuarter",
+     410,
+     0,
+     0,
+     0,
+     2.384185791015625e-7
+    ],
+    [
+     "fartherWins",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "declined",
+     358,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "zeroMotion",
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "tieHalf",
+     127,
+     0,
+     0,
+     0,
+     5.960464477539063e-8
+    ],
+    [
+     "ragged",
+     119,
+     0,
+     0,
+     0,
+     2.682209014892578e-7
+    ],
+    [
+     "perPixel",
+     350,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "[webgpu] the TSL arc against interpolateFrameCPU({ toT })",
+   "columns": [
+    "case",
+    "CPU holes",
+    "filled",
+    "mask differs",
+    "cur offset differs",
+    "prev offset differs",
+    "worst |frame|"
+   ],
+   "rows": [
+    [
+     "arcChord",
+     190,
+     0,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "arcCurve",
+     457,
+     0,
+     0,
+     0,
+     0,
+     1.7881393432617188e-7
+    ],
+    [
+     "arcContested",
+     544,
+     0,
+     0,
+     0,
+     0,
+     1.4901161193847656e-7
+    ],
+    [
+     "arcPerPixel",
+     382,
+     0,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "arcDeclined",
+     626,
+     0,
+     0,
+     0,
+     0,
+     1.7881393432617188e-7
+    ],
+    [
+     "arcFilled",
+     0,
+     544,
+     0,
+     0,
+     0,
+     1.4901161193847656e-7
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "[webgl2] the TSL splat against interpolateFrameCPU",
+   "columns": [
+    "case",
+    "CPU holes",
+    "mask differs",
+    "vector differs",
+    "depth differs",
+    "worst |frame|"
+   ],
+   "rows": [
+    [
+     "flat",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "checker",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "signed",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "prevIndexed",
+     190,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "t0",
+     314,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "t1",
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "contested",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "contestedFlat",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "contestedQuarter",
+     410,
+     0,
+     0,
+     0,
+     2.384185791015625e-7
+    ],
+    [
+     "fartherWins",
+     318,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "declined",
+     358,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "zeroMotion",
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "tieHalf",
+     127,
+     0,
+     0,
+     0,
+     5.960464477539063e-8
+    ],
+    [
+     "ragged",
+     119,
+     0,
+     0,
+     0,
+     2.682209014892578e-7
+    ],
+    [
+     "perPixel",
+     350,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "[webgl2] the TSL arc against interpolateFrameCPU({ toT })",
+   "columns": [
+    "case",
+    "CPU holes",
+    "filled",
+    "mask differs",
+    "cur offset differs",
+    "prev offset differs",
+    "worst |frame|"
+   ],
+   "rows": [
+    [
+     "arcChord",
+     190,
+     0,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "arcCurve",
+     457,
+     0,
+     0,
+     0,
+     0,
+     1.7881393432617188e-7
+    ],
+    [
+     "arcContested",
+     544,
+     0,
+     0,
+     0,
+     0,
+     1.4901161193847656e-7
+    ],
+    [
+     "arcPerPixel",
+     382,
+     0,
+     0,
+     0,
+     0,
+     1.1920928955078125e-7
+    ],
+    [
+     "arcDeclined",
+     626,
+     0,
+     0,
+     0,
+     0,
+     1.7881393432617188e-7
+    ],
+    [
+     "arcFilled",
+     0,
+     544,
+     0,
+     0,
+     0,
+     1.4901161193847656e-7
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

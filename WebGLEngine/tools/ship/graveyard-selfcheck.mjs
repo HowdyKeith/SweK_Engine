@@ -31,7 +31,7 @@ import { hasToolDoor, toolDoors } from "./doorKinds.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { referenceGraph } from "./moduleRefs.mjs";
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -46,7 +46,7 @@ function scan() {
             if (e === "node_modules" || e.startsWith(".")) continue;
             const p = path.join(d, e);
             let st; try { st = fs.statSync(p); } catch { continue; }
-            if (st.isDirectory()) walk(p); else if (/\.(js|mjs|html)$/.test(e)) all.push(p);
+            if (st.isDirectory()) walk(p); else if (SOURCE_EXT.test(e)) all.push(p);
         }
     })(ENG);
     const text = new Map(all.map((f) => { try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; } }));
@@ -62,9 +62,13 @@ function scan() {
                           path.join(ENG, "tools/ship/referenceKind-selfcheck.mjs")]),
     });
 
-    const dynDirs = new Set();
+    const dynDirs = new Set(), askedDirs = new Set();
     for (const f of all) {
         const dir = path.dirname(f);
+        // v4782 -- ONCE PER DIRECTORY. The answer depends on the directory alone, and it was asked once per FILE: a
+        // directory nobody names scanned the whole corpus again for each module in it -- ~7 of this gate's 8.5 s.
+        if (askedDirs.has(dir)) continue;
+        askedDirs.add(dir);
         const dirRel = rel(dir);
         if (!dirRel || dirRel === ".") continue;
         for (const c of all) {
@@ -94,7 +98,12 @@ function scan() {
 // instrument keys and v2977 caught in a shader promising a test that did not exist. So instead: does the module
 // export a RECORDED MEASUREMENT -- a MEASURED_* constant, a registration, an outcome table -- that its gate can
 // re-derive? Nobody types that. It is a fact about the file.
-const RECORD_EXPORT = /export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+)\b/;
+// v4778 rig run (v4781's finding on the other line, the same four modules here) -- AND A PRE-REGISTRATION IS A
+// REGISTRATION. frameDisagree, frameSwayRep, frameVertical and genGateAbsolute declare a hypothesis before its data
+// exists (PREREG_H16) and name the result their gate re-derives (RESULT_H16); `*REGISTRATION` could not see either
+// spelling, so four analysis records read as utilities nothing calls. Still a fact about the file, the export's
+// NAME: delete the constant and the module goes back on the pile.
+const RECORD_EXPORT = /export\s+const\s+(MEASURED[A-Z_0-9]*|[A-Z_0-9]*REGISTRATION|[A-Z_0-9]*OUTCOMES|[A-Z_0-9]*_V\d+|PREREG_H\d+|RESULT_H\d+)\b/;
 function isAnalysisRecord(full) {
     try { return RECORD_EXPORT.test(fs.readFileSync(full, "utf8")); } catch { return false; }
 }
@@ -408,6 +417,22 @@ function isAnalysisRecord(full) {
 // miss. The partition still holds (245 of 245 gate-only classified: 61 records + 159 actionable + 20 doored +
 // 1 MCP door + 4 explained), so nothing here is unclassified debt hiding in a total; it is the SAME debt this
 // ratchet has always tracked, now counted on the tree both branches actually built.
+// *** v4778 RIG RUN -- RED AT 192, MEASURED BY NAME, AND NOT RAISED. *** Over the budget, so no verify ran this over the
+// v4776 and v4778 merges. Diffed against a run at 5d3d8d83 (the commit that set 159; it read 157 there): 38 arrived and
+// 3 left (anim/ik, tools/ship/wgslCorpus, world/vendoredLicences) -- 157 + 38 - 3 = 192. FOUR WERE CENSUS ERRORS, paid
+// by RECORD_EXPORT above: frameDisagree, frameSwayRep, frameVertical, genGateAbsolute. 188 now. The other 34, named
+// WITHOUT extensions (referenceKind matches basenames, and a note naming them would rescue them from it):
+//   the exported-functions line's CPU references its TSL/WGSL ports are held to, and the runners those ports
+//   replaced -- render/dilate, render/flicker, render/reactive, render/ringFloor, render/temporalLock,
+//   render/luminancePyramidGPU, render/opticalFlowGPU, render/visibilityGPU, render/edgeReveal, render/frameRecorder;
+//   its censuses and appliers -- tools/ship/constantRows, fsr2Coverage, runnerCallers, threePatch, kernelReach,
+//   murmurSpeciesFrames, adapterRecord, deadlineLeak, pixelWorst, thrownRow, pageShot;
+//   commands run by hand with no door -- tools/mesh/mikktRef, tools/ship/ensureDxc, realGpuRun, sweepRotation,
+//   genGateCalibrate, genGateTransfer, world/traderGraphGithub;
+//   libraries with no runtime consumer yet -- anim/reachIK, physics/character/capsuleCollideTsl and capsuleSettle,
+//   physics/mesh/meshBoolean and mikktSpace, ui/precisionProbe.
+// 29 over the ceiling. Each is wire it, delete it, or show the census wrong about it; raising the number is none of
+// those, and is left to a decision rather than taken here.
 const ORPHAN_UTIL_BASELINE = 159;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above).
 const ORPHAN_BASELINE = 1;
 

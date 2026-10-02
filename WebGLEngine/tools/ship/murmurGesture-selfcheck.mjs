@@ -32,6 +32,8 @@ import * as K from "../../render/murmurKit.mjs";
 import { createPresenceState, STATE_INDEX } from "../../render/aiPresenceOrbState.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurGesture-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -118,6 +120,9 @@ sec("1. *** THE GESTURE IS REPLACED RATHER THAN ADVANCED: the index moves 21 slo
     for (const [name, T] of Object.entries(tally))
         say(`${name.padEnd(8)} murmur: slot jumps>1 on ${T.nM}/${T.frames} frames (worst ${T.jumpM}), ` +
             `env step ${T.wM.toFixed(4)}, re-seeded MID-GESTURE on ${T.reMid}   |   repaired: jumps>1 ${T.nF} (worst ${T.jumpF}), env step ${T.wF.toFixed(4)}`);
+            REPORT.table("gesture slots: murmur against the repair", ["species", "frames", "murmur: jumps > 1", "murmur: worst jump", "murmur: env step", "murmur: re-seeded mid-gesture",
+                "repaired: jumps > 1", "repaired: worst jump", "repaired: env step"],
+                Object.entries(tally).map(([name, T]) => [name, T.frames, T.nM, T.jumpM, T.wM, T.reMid, T.nF, T.jumpF, T.wF]));
 
     const worstM = Math.max(...Object.values(tally).map((t) => t.wM));
     const worstJ = Math.max(...Object.values(tally).map((t) => t.jumpM));
@@ -416,6 +421,7 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_flourish's slot INDEX, which is not a phase -- every number in the gesture " +
     "is a hash of it, so a slot length that moves does not advance the gesture, it replaces it. tempest's " +

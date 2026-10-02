@@ -150,7 +150,9 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
         "right); this is how a box records what IT measured without overwriting another machine's numbers. " +
         "`kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial " +
         "reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed " +
-        "-- and NOT for the ship-time budget, which still reads the shared file. See task #87.";
+        "-- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` " +
+        "holds the last three alone readings; recordReach's margin row reads it on a box that does not own the " +
+        "shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.";
     const stamp = now || new Date().toISOString();
     rec.captured = stamp;
     const wrote = [];
@@ -164,6 +166,9 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
         rec.at[g] = stamp;
         rec.kinds[g] = capped ? "capped" : "alone";
         rec.codes[g] = capped ? null : (r && typeof r.status === "number" ? r.status : null);
+        // v4781 -- and the last three ALONE readings, as the shared record keeps them (quickSweep's SERIAL_RING): one
+        // reading is an hour, not a property. A capped run is a floor, so it never enters the ring.
+        if (!capped) { rec.serialRing = rec.serialRing || {}; rec.serialRing[g] = (rec.serialRing[g] || []).concat(ms).slice(-3); }
         wrote.push({ gate: g, ms, capped, code: rec.codes[g] });
     }
     fs.writeFileSync(abs, JSON.stringify(rec, null, 1) + "\n");

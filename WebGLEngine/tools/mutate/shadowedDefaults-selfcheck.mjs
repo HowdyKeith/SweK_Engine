@@ -116,6 +116,18 @@ const C = census(S.rows);
     ok("*** and the SAME callee carries the opposite verdict on a different edge ***",
        S.rows.some((r) => r.key === "shipHalf" && r.to === "physics/esBox3d.js" && r.verdict === VERDICT.REDIRECTED),
        "ev/tools/es-arena.mjs:134 || 60 --createESBox3D()--> the same unchanged line of esBox3d.js");
+    // *** v4778 RIG RUN: THE TWO ROWS ABOVE AND BOTH FROZEN-EDGE ROWS BELOW WERE RED ON WINDOWS. *** scan()
+    // keyed `from`/`to` by the raw path.relative, so every row read "physics\box3dLockstep.js" there and the
+    // census matched nothing it names. Asked here the way Windows asks it, so a Linux box sees it too.
+    const W = scan(ENG, path.win32);
+    const keyOf = (r) => `${r.from}:${r.fromLine}:${r.key}:${r.to}`;
+    const winKeys = new Set(W.rows.map(keyOf));
+    const winOff = S.rows.filter((r) => !winKeys.has(keyOf(r)));
+    ok("!! ...and a scan under Windows' separator names every edge exactly as this one does",
+       W.rows.length === S.rows.length && winOff.length === 0,
+       winOff.length ? `${winOff.length} of ${S.rows.length} edges keyed differently under path.win32, e.g. ` +
+                       W.rows.slice(0, 2).map((r) => r.from + " -> " + r.to).join("; ") + " -- the rig's red"
+                     : `${W.rows.length} of ${S.rows.length} edges keyed "a/b" under path.win32`);
     ok("the control is DERIVED, not remembered: the same question asked without the import edge",
        S.naiveNamePairs > 20 * C.total,
        `name-only pairing over the same tree: ${S.naiveNamePairs} candidate pairs; with the import edge: ${C.total}`);
@@ -369,6 +381,12 @@ console.log("\n7. THE SCOREBOARD, DERIVED FROM WHAT THIS FILE ACTUALLY ASSERTS")
 //   D  brain/flowfieldCache.mjs:15, `|| 32` changed to `?? 32` -- the forwarder starts letting zeros through.
 //      -> 1 RED, and its detail line reads `makeCachedSolver({ max: 0 }) -> 256`, which is the prediction the
 //      first draft made and could not justify. The sabotage turns the draft's error into the passing case.
+//
+// ---- v4778 RIG RUN ------------------------------------------------------------------------------------------
+//   W  shadowedDefaults.mjs's scan() keys by the raw P.relative again (the `.split(P.sep).join("/")` removed)
+//      -> 1 RED, the path.win32 row: "21 of 21 edges keyed differently under path.win32, e.g.
+//      ai\DemoGenerator.js -> ai\OllamaClient.js". The Linux rows stay green, which is exactly how Keith's
+//      rig went red with nothing here noticing. Restored, md5 verified.
 //
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: WHICH FUNCTION holds the consuming default. The scan is module-level, so a module " +

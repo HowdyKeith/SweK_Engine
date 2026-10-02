@@ -1,0 +1,62 @@
+{
+ "gate": "tools/ship/genGateMeasure-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "H1: each arm's mean generated dB",
+   "columns": [
+    "arm",
+    "frames",
+    "mean gen dB",
+    "gate",
+    "mean blocks kept",
+    "blocks"
+   ],
+   "rows": [
+    [
+     "off",
+     33,
+     11.999999999999998,
+     "none",
+     "none",
+     "none"
+    ],
+    [
+     "cpu",
+     33,
+     12.053030303030303,
+     "the CPU",
+     122.15151515151516,
+     576
+    ],
+    [
+     "oracle",
+     33,
+     12.319090909090907,
+     "ORACLE (C1, sees the answer)",
+     437.6060606060606,
+     576
+    ],
+    [
+     "never",
+     33,
+     11.979696969696967,
+     "always cross-fade (C2)",
+     0,
+     576
+    ],
+    [
+     "device",
+     33,
+     12.053030303030303,
+     "the device",
+     122.15151515151516,
+     576
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

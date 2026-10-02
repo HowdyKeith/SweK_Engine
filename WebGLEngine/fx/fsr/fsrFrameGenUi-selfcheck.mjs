@@ -18,6 +18,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenUi-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -114,6 +116,8 @@ else {
     if (r.ok && r.result && !r.result.webgpu.err) {
         const o = r.result.webgpu, S = o.score, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         for (const k of ["baked", "newer", "older", "atT"]) say(`${k.padEnd(6)} whole frame ${f(S[k].all)} dB, the translucent panels' ${o.glassPx} pixels ${f(S[k].glass)}, the marker's ${o.markPx} ${f(S[k].mark)}`);
+        REPORT.table("a UI that moves: dB by how it is composited", ["UI", "whole frame dB", "translucent panels dB", "moving marker dB"],
+            ["baked", "newer", "older", "atT"].map((k) => [k, S[k].all, S[k].glass, S[k].mark]), `panels ${o.glassPx} px, marker ${o.markPx} px`);
         ok(`*** [webgpu] a TRANSLUCENT panel composited over the generated frame is ${d(S.newer.glass, S.baked.glass)} dB over one drawn into the frames and generated with the scene, on the panels' pixels -- and the same to the bit whichever frame's UI it is, at ${o.sameGlass[0]} of ${o.sameGlass[1]} ***`,
            S.newer.glass - S.baked.glass >= 3 && o.sameGlass[0] === o.sameGlass[1] && o.sameGlass[1] > 1000,
            "the panel's colour is laid over the scene behind as it is, where drawn in it is carried by the scene's vectors and the flow with what shows through");
@@ -139,6 +143,7 @@ else {
 // And fsr-three.html's paced view, with the HUD on and the timed policy, composited real frame k from targets.frames[k % 2]
 // while makeFsr3({ hold: 2 }) keeps THREE (v4751): the wrong frame, a third of the time. It reads the ring's own length now.
 // No gate draws that view to the refresh a real frame is shown on -- this device takes seconds a frame at 960 x 540.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a UI that changes in STEPS -- a counter, a line of text -- where the newer frame's UI shows the change half a " +
     "frame early and the older's half a frame late, and which is right is the application's to say; and translucent surfaces IN the " +

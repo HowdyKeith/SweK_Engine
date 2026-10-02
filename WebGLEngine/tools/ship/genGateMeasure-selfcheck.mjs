@@ -19,6 +19,8 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin } from "./webgpuHarness.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
 import { TRAIN_SCENES, HELD_OUT, WEIGHTS } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -137,6 +139,8 @@ const parse = (arm) => r.result[arm].seen.map((g, i) => ({
 const A = Object.fromEntries(ARMS.map((g) => [g, parse(g)]));
 for (const g of ARMS) say(`${g.padEnd(7)}: ${A[g].length} frames, mean gen ${avg(A[g].map((x) => x.gen)).toFixed(4)} dB` +
     (A[g][0] && A[g][0].of ? `, gate ${A[g][0].of}, kept ${avg(A[g].map((x) => x.kept)).toFixed(1)} of ${A[g][0].blocks}` : ""));
+REPORT.table("H1: each arm's mean generated dB", ["arm", "frames", "mean gen dB", "gate", "mean blocks kept", "blocks"],
+    ARMS.map((g) => [g, A[g].length, avg(A[g].map((x) => x.gen)), (A[g][0] && A[g][0].of) || "none", A[g][0] && A[g][0].of ? avg(A[g].map((x) => x.kept)) : "none", (A[g][0] && A[g][0].blocks) || "none"]));
 
 // *** THE DEVICE ARM IS HELD TO THE CPU ARM, NOT QUOTED ON ITS OWN. *** They run the SAME weights through
 // the same two layers; the only difference is which forward pass computed the probabilities. So the claim is
@@ -284,6 +288,7 @@ console.log("\n6. SECONDARIES -- DECLARED IN SECTION 9, REPORTED, NEVER PROMOTED
 // asserted, and the asymmetry is the point: beating always-decline is the minimum claim a gate must make to
 // be a gate, while beating ungated generation is the open question the threshold was set on.
 
+REPORT.write();
 console.log(`\ngenGateMeasure-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: ANY SCENE OUTSIDE THESE THREE, which are synthetic and this page's own. NOTHING " +
     "ABOUT FSR4 -- that is a trained network replacing the whole chain, and this is an eleven-feature gate on " +

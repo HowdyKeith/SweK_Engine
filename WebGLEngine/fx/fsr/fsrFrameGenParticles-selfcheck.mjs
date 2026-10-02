@@ -21,6 +21,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenParticles-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -117,6 +119,9 @@ else {
         const o = r.result.webgpu, I = o.instanced, B = o.baked, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         for (const [k, x] of [["instanced", I], ["baked", B]])
             say(`${k.padEnd(9)} over the frame / the particles' ${x.region} pixels: vectors ${f(x.vectors[0])} / ${f(x.vectors[1])} dB, flow ${f(x.flow[0])} / ${f(x.flow[1])}, drawn at t ${f(x.drawnAtT[0])} / ${f(x.drawnAtT[1])}; largest vector on them ${f(x.largest)} px`);
+        REPORT.table("particles: dB over the frame and on their pixels, by motion source", ["particles", "region px", "vectors: frame", "vectors: particles", "flow: frame", "flow: particles",
+            "drawn at t: frame", "drawn at t: particles", "largest vector px"],
+            [["instanced", I], ["baked", B]].map(([k, x]) => [k, x.region, x.vectors[0], x.vectors[1], x.flow[0], x.flow[1], x.drawnAtT[0], x.drawnAtT[1], x.largest]));
         ok(`*** [webgpu] an instanced particle's vector is its motion: the largest on the particles' pixels ${f(I.largest)} px, the fastest particle's centre moving ${f(o.fastest)} px -- and the SAME particles in one buffer carry ${f(B.largest)} ***`,
            Math.abs(I.largest - o.fastest) < 0.5 && B.largest === 0,
            "at v4751 the instanced ones read 103 px: three's previous instance matrices were the ones the material was built with. The buffer's object never moves");
@@ -144,6 +149,7 @@ else {
 // *** TWO LINES OF THE FIRST DRAFT WERE DEAD, AND TWO SABOTAGES SAID SO. *** Flagging the buffer node for upload and setting
 // its value each draw both left every gate green: three's Buffer binding reports itself changed at every draw, and the value
 // was the same array. Both lines are gone.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: particles whose positions a compute pass writes, which carry nothing as the buffer's do; and a moving " +
     "camera. TRANSLUCENT particles are render/translucentLayer.mjs's since v4760 (fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs), " +

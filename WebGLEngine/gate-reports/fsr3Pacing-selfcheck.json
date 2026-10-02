@@ -1,0 +1,42 @@
+{
+ "gate": "fx/fsr/fsr3Pacing-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "each refresh against the scene at its time, by policy",
+   "columns": [
+    "policy",
+    "mean dB",
+    "worst dB",
+    "judder ms of scene time",
+    "frames generated"
+   ],
+   "rows": [
+    [
+     "none",
+     20.744391989862855,
+     17.885149034655946,
+     13.22214713369864,
+     0
+    ],
+    [
+     "midpoint",
+     22.006532494246343,
+     20.51981337511296,
+     6.756389246394532,
+     1
+    ],
+    [
+     "timed",
+     22.621254797101525,
+     21.76226469044986,
+     1.8346134549116834e-14,
+     2
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

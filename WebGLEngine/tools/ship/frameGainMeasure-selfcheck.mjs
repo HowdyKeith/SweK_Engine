@@ -13,6 +13,8 @@ import { CACHE_H7 } from "./frameGate.mjs";
 import { spearman } from "./frameGate.mjs";
 import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, cellOf, gainRow, gainSummary, h11 } from "./frameGain.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameGainMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -69,6 +71,8 @@ const pos = (c) => d.scenes.filter((s) => per[c][s].rho !== null && per[c][s].rh
     ok("*** the recomputed H11 is the recorded one ***", J(H) === J(R.h11));
     for (const c of d.cells) say(`${c}: scene rho / H6's block-mean rho / mean gain / mean advantage / wins -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${signed(p.rho)}/${signed(p.blockRho)}/${p.gain.toFixed(3)}/${signed(p.adv)}/${p.wins}`; }).join("  "));
+        REPORT.table("H11 per scene: motion's gain over standing still", ["cell", "scene", "rho", "H6's block-mean rho", "mean gain", "mean advantage dB", "wins"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.rho, p.blockRho, p.gain, p.adv, p.wins]; })));
     ok("*** H11 IS NOT SUPPORTED: both cells reportable with no scene excluded, and NEITHER clears -- not a one-scene price ***",
        H.reportable && !H.supported && d.cells.every((c) => H.cells[c].excluded.length === 0 && !H.cells[c].cleared && H.cells[c].test.sign.up <= 1),
        d.cells.map((c) => `${c}: sign ${H.cells[c].test.sign.up}/7, t mean ${signed(H.cells[c].test.t.mean)}`).join("; ") +
@@ -100,6 +104,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "moving a frame's motion and its advantage together, and nothing here separates them. No mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeGainMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: the negation, which owes its own document and fresh cells; why zone is the exception; a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);

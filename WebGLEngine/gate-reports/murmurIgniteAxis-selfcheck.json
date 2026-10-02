@@ -1,0 +1,75 @@
+{
+ "gate": "tools/ship/murmurIgniteAxis-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "ignition width against the gesture pulse's",
+   "columns": [
+    "species",
+    "gesture width",
+    "ignition width"
+   ],
+   "rows": [
+    [
+     "arc",
+     0.34,
+     0.3
+    ],
+    [
+     "flux",
+     0.42,
+     0.38
+    ],
+    [
+     "prism",
+     0.28,
+     0.26
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "the ignition's axis at the peak",
+   "columns": [
+    "species",
+    "% of bytes moved",
+    "worst channel",
+    "interior ratio",
+    "interior ratio at v4658"
+   ],
+   "rows": [
+    [
+     "arc",
+     15.180121527777779,
+     197,
+     2.1752907109946236,
+     1.81
+    ],
+    [
+     "flux",
+     22.34157986111111,
+     193,
+     5.921121690826964,
+     4.33
+    ],
+    [
+     "prism",
+     10.83984375,
+     134,
+     2.082113962526844,
+     1
+    ],
+    [
+     "helix",
+     17.33940972222222,
+     183,
+     2.9344733459776777,
+     1
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

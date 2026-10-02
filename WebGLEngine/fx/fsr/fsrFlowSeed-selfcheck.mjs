@@ -20,6 +20,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -91,6 +92,9 @@ else {
     if (r.ok && r.result && !r.result.webgpu.err) {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         for (const cn of CASES) say(`${cn.padEnd(12)} vectors up to ${o[cn].maxVectorPx.toFixed(1)} px: the vectors ${f(o[cn].vectors)} dB, the flow ${f(o[cn].flow)}, seeded ${f(o[cn].seeded)} (${d(o[cn].seeded, o[cn].flow)})`);
+        gateReport("fx/fsr/fsrFlowSeed-selfcheck.mjs").table("a generated frame's dB: the vectors, the flow, and the flow seeded with the vectors",
+            ["case", "largest vector px", "vectors dB", "flow dB", "seeded dB"],
+            CASES.map((cn) => [cn, o[cn].maxVectorPx, o[cn].vectors, o[cn].flow, o[cn].seeded])).write();
         ok(`  [webgpu] the seed is asked for and nothing else changes it: ${JSON.stringify(o.seedFlags).replace(/"/g, "")} -- and at 2 px, where it has nothing to bring, the frame is the unseeded one's to ${Math.abs(o.slow.seeded - o.slow.flow).toExponential(1)} dB`,
            o.seedFlags.flow === false && o.seedFlags.seeded === true && Math.abs(o.slow.seeded - o.slow.flow) < 0.01, "a vector of 2 px is 0 or 1 at the coarsest level, a quarter of the size, and the search around it finds what it found around zero");
         ok(`*** [webgpu] where the pan is fastest the seed pays -- on a reflection ${d(o.reflection44.seeded, o.reflection44.flow)} dB at ${o.reflection44.maxVectorPx.toFixed(0)} px, and on the scrolling wall ${d(o.scroll27.seeded, o.scroll27.flow)} at ${o.scroll27.maxVectorPx.toFixed(0)} px and ${d(o.scroll40.seeded, o.scroll40.flow)} at ${o.scroll40.maxVectorPx.toFixed(0)}, where v4758 read -0.24 and -0.63 ***`,

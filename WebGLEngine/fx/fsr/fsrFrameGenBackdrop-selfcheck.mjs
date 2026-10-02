@@ -18,6 +18,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -92,6 +94,9 @@ else {
         const o = r.result, f = (v) => (v === null || v === Infinity ? "exact" : v.toFixed(2)), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         say("dB on the lens's pixels against the supersampled midpoint (over the frame):");
         for (const cn of CASES) say(`${cn.padEnd(22)} ${String(o[cn].px).padStart(4)} px  ${ARMS.map((k) => `${k} ${f(o[cn][k].see)} (${f(o[cn][k].all)})`).join("  ")}`);
+        REPORT.table("dB on the lens's pixels and over the frame, against the supersampled midpoint (Infinity: exact)",
+            ["case", "lens px", ...ARMS.flatMap((k) => [`${k}: lens`, `${k}: frame`])],
+            CASES.map((cn) => [cn, o[cn].px, ...ARMS.flatMap((k) => [o[cn][k].see ?? Infinity, o[cn][k].all ?? Infinity])]));
         ok(`*** a REAL frame rebuilt -- drawn without the lens, the lens drawn over it -- is the frame drawn with it, on every case: ${CASES.map((cn) => o[cn].rebuilt.nd).join(", ")} channel values differ ***`,
            CASES.every((cn) => o[cn].rebuilt.mx === 0), "three's backdrop reads the render target as it stands, and renderOver hands it the frame");
         const best = (cn) => Math.max(o[cn].drawn.see, o[cn].flow.see, o[cn].skipped.see), bestAll = (cn) => Math.max(o[cn].drawn.all, o[cn].flow.all, o[cn].skipped.all);
@@ -111,6 +116,7 @@ else {
 // layer's lens stands clear of the box; the occluded cases here do not); L22 the frame not copied in -> 2, 4; L23 the layer
 // drawing them too -> 4, 0; L24 autoClear left off -> 2, 4. Against fx/fsr/fsrFrameGenTsl.mjs, here: G22 `over` never called
 // -> 3; G23 called at t = 0 -> 2; G24 its frame not written out without a `ui` -> 2. Ten, none green.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a translucent panel BEHIND a lens, which three draws first and the lens refracts -- here the lens is drawn " +
     "before the layer, and such a panel is missing behind it; a transmission lens's own motion blur of what it shows; and the cost " +

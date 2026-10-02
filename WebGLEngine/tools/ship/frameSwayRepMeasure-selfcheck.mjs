@@ -14,6 +14,8 @@ import { cellOf } from "./frameGain.mjs";
 import { RESULT_H14, slabBlocks, nonTurnRows, swaySummary } from "./frameSway.mjs";
 import { PREREG_H15, CACHE_H15, RESULT_H15, REP_KEYS, h15, reversalsNear } from "./frameSwayRep.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameSwayRepMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -78,6 +80,8 @@ const against = (P, c) => d.scenes.filter((s) => d.direction * P[c][s].rho < 0);
     ok("*** the recomputed H15 is the recorded one ***", J(H) === J(R.h15));
     for (const c of d.cells) say(`${c} ${d.path}: scene rho here | H14's at x${cellOf(twin(c)).speed} / partial given frame / turn frames out -- ` +
         d.scenes.map((s) => `${s} ${signed(per[c][s].rho)}|${signed(R14.per[twin(c)][s].rho)}/${signed(per[c][s].partial)}/${per[c][s].turns}`).join("  "));
+        REPORT.table("the sway replicated, per scene, beside H14's", ["cell", "scene", "rho here", "H14's rho", "partial given frame", "turn frames out"],
+            d.cells.flatMap((c) => d.scenes.map((s) => [c, s, per[c][s].rho, R14.per[twin(c)][s].rho, per[c][s].partial, per[c][s].turns])));
     ok("*** H15 IS NOT SUPPORTED: NEITHER cell clears -- each stops at 6 of 7, with a DIFFERENT scene against it in each ***",
        H.reportable && !H.supported && d.cells.every((c) => !H.cells[c].cleared && H.cells[c].test.sign.up === 6 && against(per, c).length === 1) &&
        new Set(d.cells.map((c) => against(per, c)[0])).size === d.cells.length,
@@ -115,6 +119,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         `(${cellNames.join(" / ")}). ${always.length} scenes go backwards in all four cells (${always.join(", ")}). No test is attached to any of this, and no scene is dropped.`);
 }
 
+REPORT.write();
 console.log(`\nframeSwayRepMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: frames at a turn; why one scene per cell goes the other way; a threshold, and a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);

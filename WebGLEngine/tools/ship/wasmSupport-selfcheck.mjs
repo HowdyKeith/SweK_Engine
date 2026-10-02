@@ -111,14 +111,17 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // exported-functions line (v4739/v4766): a static server for headless page shots whose MIME table maps ".wasm"
     // to "application/wasm" -- the type instantiateStreaming refuses to compile without. +1 mention, +1 inCode;
     // comment-only stayed at 25 and callsApi and probes did not move, so the split says what it should.
-    ok("!! 122 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
-        mentions === 122, `${mentions} mention it`);
+    // v4778 rig run -- RE-TAKEN 122 -> 123, AND THIS ONE IS PROSE. physics/mesh/mikktSpace.mjs arrived with the rtx
+    // line's merge: its header explains why the npm port's ~41 KB .wasm build does not fit how this engine serves pages,
+    // and it hand-ports the C instead. +1 mention, 0 inCode; comment-only 25 -> 26, which is what the split is for.
+    ok("!! 123 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
+        mentions === 123, `${mentions} mention it`);
     // *** AND THIS ROW'S TITLE CARRIED A NUMBER ITS ASSERTION DOES NOT CHECK. *** It said "24 of those are
     // comments" while asserting only `inCode === 94`, so when comment-only went to 25 the row kept passing and
     // kept saying 24 -- a title reporting a moving quantity as a fixed one, beside a detail line printing the
     // true value. Both halves are asserted now, so the title cannot drift away from the check underneath it.
-    ok("!! ...but 25 of those are comments and prose only; 97 mention it in live code",
-        inCode === 97 && mentions - inCode === 25, `${inCode} in code, ${mentions - inCode} comment-only`);
+    ok("!! ...but 26 of those are comments and prose only; 97 mention it in live code",
+        inCode === 97 && mentions - inCode === 26, `${inCode} in code, ${mentions - inCode} comment-only`);
     // *** AND MY OWN GREP GAVE 12, WHICH WAS WRONG, FOR THE FOURTH TIME IN THIS CLASS. *** A raw search for
     // /WebAssembly\./ matched wasm-demo.html, where the text is a SENTENCE -- "executed by the bridge's own
     // Node WebAssembly. No Docker" -- and the full stop matched the escaped dot. Same shape as the licence

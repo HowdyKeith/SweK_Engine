@@ -1,0 +1,96 @@
+{
+ "gate": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "a generated frame's dB, block grid against each level on its own",
+   "columns": [
+    "case",
+    "block grid dB",
+    "level grid dB",
+    "level grid refining within 2 dB"
+   ],
+   "rows": [
+    [
+     "scroll",
+     34.097515878542815,
+     34.26786328180833,
+     34.40530927359812
+    ],
+    [
+     "panScroll",
+     37.0852279282947,
+     37.351121290345404,
+     37.36299833711761
+    ],
+    [
+     "dollyScroll",
+     36.02157228450423,
+     36.011215835034776,
+     36.04429086727387
+    ],
+    [
+     "dollyFast",
+     33.05401324458826,
+     33.05403345664542,
+     33.22000936922515
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "the scrolling wall's clear interior",
+   "columns": [
+    "case",
+    "interior px",
+    "block grid dB",
+    "level grid dB",
+    "level grid refining within 2 dB"
+   ],
+   "rows": [
+    [
+     "scroll",
+     4224,
+     45.01722672356426,
+     53.470939344379296,
+     53.15722429039741
+    ],
+    [
+     "panScroll",
+     4035,
+     44.99233438025971,
+     62.335406689390005,
+     63.29095628977292
+    ],
+    [
+     "dollyScroll",
+     3405,
+     58.03221356477728,
+     58.03221356477728,
+     58.03221356477728
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "the search's reads against the block grid's",
+   "columns": [
+    "setting",
+    "share of the reads"
+   ],
+   "rows": [
+    [
+     "level grid",
+     0.4613413203235966
+    ],
+    [
+     "level grid, refining within 2",
+     0.18467856481195577
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

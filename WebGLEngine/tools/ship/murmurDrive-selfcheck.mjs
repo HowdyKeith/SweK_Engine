@@ -28,6 +28,8 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies, ringChange } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurDrive-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -108,6 +110,7 @@ sec("1. *** TWELVE GESTURES THAT POINT ANYWHERE BECOME ONE AXIS -- exactly, and 
     const st = [0, 0.25, 0.5, 0.75, 1].map((d) => ({ d, ...spreadDeg(dirsAt("still", d)) }));
     say(`still's ${GESTURES.length} gesture directions, mean pairwise angle by drive:`);
     for (const r of st) say(`   drive ${r.d.toFixed(2)}:  ${r.mean.toFixed(2)} deg   (worst pair ${r.worst.toFixed(2)} deg)`);
+    REPORT.table("the lean's direction by drive", ["drive", "mean deg", "worst pair deg"], st.map((r) => [r.d, r.mean, r.worst]));
 
     ok("!! *** still's WANDER BECOMES A TRAVERSE: 86.82 degrees of scatter goes to EXACTLY zero ***",
         Math.abs(st[0].mean - 86.82) < 0.01 && st[4].mean < EPS && st[4].worst < EPS && st[0].worst > 170 && EPS < 1e-3,
@@ -154,6 +157,7 @@ sec("2. *** THE SIX HEADINGS ARE NOT ONE VECTOR, NONE OF THEM IS A UNIT VECTOR, 
     const H = K.MH_DRIVE_HEADING, names = Object.keys(H);
     const lens = names.map((n) => ({ n, L: Math.hypot(...H[n].v) }));
     for (const r of lens) say(`${r.n.padEnd(8)} |v| = ${r.L.toFixed(6)}  (off unit by ${((r.L - 1) * 100).toFixed(3)}%)  k ${H[r.n].k.toFixed(2)}  pre ${H[r.n].pre}  wired ${H[r.n].wired}`);
+    REPORT.table("each species' lean vector", ["species", "|v|", "k", "pre", "wired"], lens.map((r) => [r.n, r.L, H[r.n].k, String(H[r.n].pre), String(H[r.n].wired)]));
 
     // *** THE BOUND CARRIES ITS OWN NEGATIVE CONTROL, because loosening a bound on a correct subject is
     // invisible otherwise. *** A sabotage put this back to 1e-6 and walked through: murmur's real vectors
@@ -250,6 +254,8 @@ sec("3. *** IT REACHES PIXELS, AND drive = 0 INSIDE RESPONDING IS BYTE-IDENTICAL
             quiet: diff(run.frames[i * 3], run.frames[i * 3 + 1]),
             lean: diff(run.frames[i * 3 + 1], run.frames[i * 3 + 2]) }));
         for (const r of rows) say(`${r.s.padEnd(8)} drive 0 vs IDLE: ${r.quiet.pct.toFixed(1)}% of bytes   |   drive 0 -> 1: ${r.lean.pct.toFixed(1)}%, mean ${r.lean.mean.toFixed(3)}, worst ${r.lean.mx}`);
+        REPORT.table("bytes moved: drive 0 against IDLE, and drive 0 to 1", ["species", "drive 0 vs IDLE %", "drive 0 -> 1 %", "drive 0 -> 1 mean", "drive 0 -> 1 worst"],
+            rows.map((r) => [r.s, r.quiet.pct, r.lean.pct, r.lean.mean, r.lean.mx]));
 
         ok("!! *** THE LEAN REACHES THE PICTURE IN BOTH, and RESPONDING AT drive 0 MOVES NOT ONE BYTE ***",
             rows.every((r) => r.quiet.pct === 0) && rows.every((r) => r.lean.pct > 5 && r.lean.mx > 50),
@@ -384,6 +390,7 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
         `which is the failure this tree finds most often and the one a green row hides best.`);
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: st.drive's heading family -- the last of mh_state's four outputs to reach a " +
     "pixel, and the only one whose subject is a direction. The strongest rows are CPU rows and the gate says " +

@@ -18,6 +18,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -104,6 +106,8 @@ else {
         const o = r.result.webgpu, f = (v) => (v === Infinity ? "exact" : v.toFixed(2)), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         say(`the background moves ${o.pxPerFrame.toFixed(2)} px a frame; dB on the translucent things' pixels (over the frame):`);
         for (const cn of CASES) say(`${cn.padEnd(9)} ${String(o[cn].px).padStart(4)} px  ${ARMS.map((k) => `${k} ${f(o[cn][k].see)} (${f(o[cn][k].all)})`).join("  ")}`);
+        REPORT.table("dB on the translucent things' pixels and over the frame (Infinity: exact)", ["case", "their px", ...ARMS.flatMap((k) => [`${k}: theirs`, `${k}: frame`])],
+            CASES.map((cn) => [cn, o[cn].px, ...ARMS.flatMap((k) => [o[cn][k].see, o[cn][k].all])]), `the background moves ${o.pxPerFrame} px a frame`);
         const drawnWins = ["glass", "etched", "sparks", "window"], skipWins = ["glassFine", "occluded"];
         ok(`*** no one field is right: drawn beats skipped where the pane or the sparks keep still over a smooth wall or move themselves -- ${drawnWins.map((cn) => `${cn} ${d(o[cn].drawn.see, o[cn].skipped.see)}`).join(", ")} -- and skipped beats drawn over a fine wall and behind the box -- ${skipWins.map((cn) => `${cn} ${d(o[cn].skipped.see, o[cn].drawn.see)}`).join(", ")} ***`,
            drawnWins.every((cn) => o[cn].drawn.see - o[cn].skipped.see > 5) && skipWins.every((cn) => o[cn].skipped.see - o[cn].drawn.see > 2),
@@ -125,6 +129,7 @@ else {
 // additive swap (the sparks' pixels 7.92 dB, -14.55 against the best field), a layer cleared opaque, the background drawn into
 // it and hide() hiding nothing all turn a row here red. Nothing in fx/fsr/fsrFrameGenTsl.mjs changed: the layer goes through
 // `ui` as a function of t, whose sabotages are fx/fsr/fsrFrameGenUi-selfcheck.mjs's (v4755).
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: refraction and anything else that reads the frame behind it (a transmission material, a backdrop node) -- " +
     "the layer draws over transparent black, where there is nothing behind to read; a translucent thing's cost against the flow's, " +

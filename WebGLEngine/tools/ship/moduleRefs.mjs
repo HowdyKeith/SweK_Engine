@@ -121,7 +121,50 @@ export function resolveSpec(fromFile, spec, root) {
  * file; it is a PARAMETER here rather than a hardcoded list, so a caller states its own and the rule stops being
  * a property of whichever file happened to be noticed.
  */
-export function referenceGraph(files, readText, root, { exclude = new Set() } = {}) {
+/**
+ * *** v4782 -- WHICH FILES CONTAIN EACH BASENAME, IN ONE PASS. *** referenceGraph asked `text.includes(base)` of
+ * every file for every unreferenced module: 2,798 modules against 5,087 files and 90 MB, 107 of graveyard's 157
+ * seconds, and the reason neither orphan census could run inside a verify. This answers the SAME substring test for
+ * all of them at once. Every basename here ends in .js, .mjs or .html, so every occurrence of one ends at an
+ * occurrence of that extension (".js" also inside ".json", exactly as includes() saw it); each such anchor is walked
+ * BACKWARDS through a trie of the reversed stems, and every stem that completes there is a hit. Exact, not a
+ * heuristic: moduleRefs-selfcheck holds it equal to includes() on its fixture, and the real tree's census was run
+ * both ways when it went in.
+ */
+export function basenameHits(files, text, bases) {
+    const tries = {};                                   // ext -> reversed-stem trie; a node's END holds the bases
+    const out = new Map();
+    for (const b of bases) {
+        const m = /^(.*)\.(mjs|js|html)$/.exec(b);
+        if (!m || !m[1]) continue;
+        out.set(b, new Set());
+        let node = (tries[m[2]] ||= { kids: new Map(), end: null });
+        for (let i = m[1].length - 1; i >= 0; i--) {
+            const c = m[1][i];
+            let next = node.kids.get(c);
+            if (!next) { next = { kids: new Map(), end: null }; node.kids.set(c, next); }
+            node = next;
+        }
+        (node.end ||= []).push(b);
+    }
+    const ANCHOR = /\.(mjs|js|html)/g;
+    for (const f of files) {
+        const s = text.get(f) || "";
+        ANCHOR.lastIndex = 0;
+        let m;
+        while ((m = ANCHOR.exec(s))) {
+            let node = tries[m[1]];
+            for (let i = m.index - 1; node && i >= 0; i--) {
+                node = node.kids.get(s[i]);
+                if (node && node.end) for (const b of node.end) out.get(b).add(f);
+            }
+            ANCHOR.lastIndex = m.index + 1;             // overlapping anchors: ".js" may start inside a longer run
+        }
+    }
+    return out;
+}
+
+export function referenceGraph(files, readText, root, { exclude = new Set(), allBases = false } = {}) {
     const text = new Map(files.map((f) => [f, readText(f)]));
     const refs = new Map(files.map((f) => [f, []]));          // target -> [{ from, route }]
     for (const from of files) {
@@ -131,13 +174,18 @@ export function referenceGraph(files, readText, root, { exclude = new Set() } = 
         }
     }
     const state = new Map();
+    // allBases: index every file's basename, not only the unreferenced ones', so a caller asking the same question
+    // of a wider population (referenceKind: modules with no NON-GATE importer) reads this one index, not a second.
+    const where = basenameHits(files, text, new Set(files.filter((f) => allBases || !refs.get(f).length).map((f) => path.basename(f))));
     for (const f of files) {
         const resolved = refs.get(f);
         if (resolved.length) { state.set(f, { state: "referenced", by: resolved, mentions: [] }); continue; }
         const base = path.basename(f);
         const hits = new Set(resolved.map((r) => r.from));
-        const mentions = files.filter((c) => c !== f && !exclude.has(c) && !hits.has(c) && (text.get(c) || "").includes(base));
+        const holders = where.get(base);
+        const mentions = holders ? files.filter((c) => holders.has(c) && c !== f && !exclude.has(c) && !hits.has(c))
+                                 : files.filter((c) => c !== f && !exclude.has(c) && !hits.has(c) && (text.get(c) || "").includes(base));
         state.set(f, { state: mentions.length ? "mentioned-only" : "unreferenced", by: [], mentions });
     }
-    return { refs, state, text };
+    return { refs, state, text, where };
 }

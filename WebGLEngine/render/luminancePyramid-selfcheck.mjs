@@ -22,6 +22,8 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { luminancePyramidCPU, levelsFor, exposureFrom } from "./luminancePyramid.mjs";
 import { luma } from "./temporalReject.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/luminancePyramid-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -94,6 +96,7 @@ for (const [w, h] of [[8, 8], [16, 16], [64, 64], [5, 3], [9, 9], [100, 100], [1
     drift.push({ w, h, rel: 100 * (Q.mean - Q.exact) / Q.exact });
 }
 for (const d of drift) say(`  ${d.w}x${d.h}`, `${d.rel >= 0 ? "+" : ""}${d.rel.toFixed(2)}% against the direct sum`);
+REPORT.table("the pyramid's mean against the direct sum, by size", ["width", "height", "% off the direct sum"], drift.map((d) => [d.w, d.h, d.rel]));
 const pow2 = drift.filter((d) => (d.w & (d.w - 1)) === 0 && (d.h & (d.h - 1)) === 0);
 ok("!! *** at a power of two the chain's bottom IS the frame's mean, exactly ***",
    pow2.length >= 3 && pow2.every((d) => Math.abs(d.rel) < 1e-4),
@@ -166,6 +169,7 @@ if (r.ok && r.result) {
             if (e > worst) { worst = e; worstL = L; }
         }
     say("parity", `shape ${sameShape ? "same" : "DIFFERS"}, worst |gpu - cpu| ${worst.toExponential(2)} (level ${worstL})`);
+    REPORT.table("the device's chain against the CPU's", ["shape", "worst |gpu - cpu|", "at level"], [[sameShape ? "same" : "differs", worst, worstL]]);
     ok("!! *** the device builds the same chain at EVERY level, not merely the same bottom ***",
        sameShape && worst < 1e-6,
        "f32 on the device against f64 in JS, through as many reductions as the chain has levels, each one " +
@@ -180,6 +184,7 @@ if (r.ok && r.result) {
 }
 }
 
+REPORT.write();
 console.log(fails ? `\nluminancePyramid-selfcheck: ${fails} FAILED` : "\nluminancePyramid-selfcheck: ALL GREEN");
 console.log("unchecked here: whether an exposure derived from this chain IMPROVES anything, which this " +
             "page's content cannot answer -- its colour is already in [0,1], so the scale is one and a " +

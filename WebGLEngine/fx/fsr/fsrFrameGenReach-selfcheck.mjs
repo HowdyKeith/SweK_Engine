@@ -16,6 +16,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenReach-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -101,6 +103,9 @@ else {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2), a = o.wideSlow.audit;
         const names = { wideSlow: "v4758's wall, 40 wide, scrolling 8.4 px under a 1.2 px pan", scroll13: "the wall scrolling 2.9 px under a 12 px pan", wide13: "the 40-wide wall under the 12 px pan", pan24: "a 24 px pan, nothing scrolling" };
         for (const cn of CASES) say(`${names[cn]}: the vectors ${f(o[cn].vectors.db)} dB with the radius alone (${o[cn].vectors.black} pixels black), ${f(o[cn].vectorsReach.db)} reaching 16 (${o[cn].vectorsReach.black}); the flow ${f(o[cn].flow.db)} (${o[cn].flow.black}), ${f(o[cn].flowReach.db)} (${o[cn].flowReach.black})`);
+        REPORT.table("the fill's radius alone against reaching 16: dB and pixels left black", ["case", "vectors dB", "vectors black", "vectors reaching 16 dB", "...black",
+            "flow dB", "flow black", "flow reaching 16 dB", "...black"],
+            CASES.map((cn) => [cn, o[cn].vectors.db, o[cn].vectors.black, o[cn].vectorsReach.db, o[cn].vectorsReach.black, o[cn].flow.db, o[cn].flow.black, o[cn].flowReach.db, o[cn].flowReach.black]));
         ok(`  [webgpu] the generator's default fill reaches 16 past its radius of 4, and a fill given without a reach does not: ${JSON.stringify(o.dflt).replace(/"/g, "")} and ${JSON.stringify(o.given).replace(/"/g, "")}`,
            o.dflt && o.dflt.radius === 4 && o.dflt.reach === 16 && o.dflt.side === "blend" && o.given && o.given.reach === null,
            "fx/fsr/fsrFrameGenTsl.mjs: fill = { radius: 4, reach: 16, side: \"blend\" } unless given");
@@ -142,6 +147,8 @@ if (!skip) {
     if (r.ok && r.result) {
         const t = r.result, f = (v) => v.toFixed(1);
         say(`the radius alone: no holes ${f(t.none)} ms, a tenth ${f(t.tenth)}, all ${f(t.all)}; reaching 16: ${f(t.noneReach)} and ${f(t.tenthReach)} -- the median of five, SwiftShader's milliseconds`);
+        REPORT.table("the fill's time, the median of five, this device's ms", ["holes", "radius alone ms", "reaching 16 ms"],
+            [["none", t.none, t.noneReach], ["a tenth", t.tenth, t.tenthReach], ["all", t.all, "not timed"]]);
         ok(`*** [webgpu] only a hole searches: a frame with none costs ${f(t.none)} ms against ${f(t.all)} with every pixel one -- and reaching 16 costs nothing where the radius finds something, ${f(t.tenthReach)} ms against ${f(t.tenth)} for a tenth of the pixels ***`,
            t.none < 0.3 * t.all && t.noneReach < 0.3 * t.all && t.tenthReach < 1.5 * t.tenth + 3,
            "v4737's fill searched its window at every pixel and returned the landed ones' own texel after; it skips the search there now (the fill is fillHolesCPU's to the bit either way, render/holeFillTsl-selfcheck.mjs). " +
@@ -162,6 +169,7 @@ if (!skip) {
 // render/frameInterpTsl.mjs: F2 the reach dropped -> 2, 2. Against fx/fsr/fsrFrameGenTsl.mjs, here and in
 // fx/fsr/fsrFlowSeed-selfcheck.mjs: G1 the default reaching nothing -> 3, 1; G2 the default reaching 8 -> 3, 1 -- at 8 the
 // seed's gain on the scrolling wall is -0.02 and -0.08 dB, which is part of why the default is 16.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: what a reached hole is filled WITH -- the farthest vector within 16 px and the blend of both frames, which is " +
     "the radius's rule carried further and not a measured choice for gaps this wide; content entering at the frame's edge, which " +
