@@ -1,0 +1,24 @@
+diff --git a/src/renderers/common/RenderObject.js b/src/renderers/common/RenderObject.js
+index b4d87d7..b0f16fa 100644
+--- a/src/renderers/common/RenderObject.js
++++ b/src/renderers/common/RenderObject.js
+@@ -2,7 +2,7 @@ import { hashArray, hashString } from '../../nodes/core/NodeUtils.js';
+ 
+ let _id = 0;
+ const _protoKeysCache = new WeakMap();
+-const _cacheKeyValues = [ 0, 0, 0, 0, 0 ];
++const _cacheKeyValues = [ 0, 0, 0, 0, 0, 0 ];
+ 
+ function getKeys( obj ) {
+ 
+@@ -955,6 +955,10 @@ class RenderObject {
+ 		_cacheKeyValues[ 3 ] = this.renderer.contextNode.id;
+ 		_cacheKeyValues[ 4 ] = this.renderer.contextNode.version;
+ 
++		// a batch that grows re-makes its textures, and must be drawn from the new ones
++
++		_cacheKeyValues[ 5 ] = this.object.isBatchedMesh ? this.object._matricesTexture.id : 0;
++
+ 		return hashArray( _cacheKeyValues );
+ 
+ 	}

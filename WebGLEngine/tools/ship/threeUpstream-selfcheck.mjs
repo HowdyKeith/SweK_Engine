@@ -22,6 +22,7 @@ import path from "node:path";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import crypto from "node:crypto";
 import { ENG, BUNDLE, apply, normalImports, rootWithBuilds } from "./threePatch.mjs";
+import { DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threeDev.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
@@ -275,6 +276,71 @@ for (const [backend, RE, phrase] of [["webgpu", /^v(\d+)\.json$/, "WebGPU exampl
     }
 }
 
+// v4799: THE ISSUES READY TO PASTE. The drafts above hold r185, the release vendored here; three's bug form asks for its latest
+// release and its pull requests go against `dev`. docs/upstream-three/dev/ holds one issue per draft whose bug still stands on
+// r186 -- in the form's own fields, in its order, its reproduction the draft's with the version swapped and nothing else -- and a
+// patch against `dev` at DEV_COMMIT, rebased; and one more, a bug r186 brought (15). tools/ship/threeDev.mjs runs them, beside a
+// three checkout, on r186 as npm ships it, on `dev`, on `dev` with the issue's patch, and on `dev` with every patch, and records
+// what each page printed; held here: the record against the files (a patch or a reproduction edited since is red until it is
+// run again) and the issues against the record, through the same predicates and printouts the drafts use.
+console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship/threeDev.mjs's record (dev at ${DEV_COMMIT.slice(0, 7)}, r186 ${DEV_RELEASE})`);
+{
+    // 01 and 02 are fixed in r186 (#34100, #34101, #34107); 08 stands with another symptom -- r186 syncs the instance buffer before a
+    // frame's first render, so the second and third draw the first's matrices -- and 15 is r186's own
+    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15"];
+    const DEV_BUG = {
+        "08": (r) => all(r) && r.webgpu.sameFrame && r.webgpu.one.every((n) => n > 50) && r.webgpu.many[0] === 0 && r.webgpu.many[1] === 0 && r.webgpu.many[2] > 50 && r.webgpu.manyDynamic.every((n) => n > 50),
+    };
+    const OWN = { "15": {
+        bug: (r) => all(r) && r.webgpu.plain === "5.612" && /^throws RangeError: /.test(r.webgpu.atGrowth) && /^throws RangeError: /.test(r.webgpu.after),
+        fixed: (r) => all(r) && r.webgpu.atGrowth === r.webgpu.plain && r.webgpu.after === r.webgpu.plain,
+        observed: (r) => `plain ${r.webgpu.plain}, atGrowth ${r.webgpu.atGrowth}, after ${r.webgpu.after} -- the batch's mean x velocity in pixels, grown before the third frame (both backends)` } };
+    const TEMPLATE = ["Description", "Reproduction steps", "Code", "Live example", "Screenshots", "Version", "Device", "Browser", "OS"];
+    const issues = issueFiles(), patches = devPatches(), rec = fs.existsSync(DEV_RECORD) ? JSON.parse(fs.readFileSync(DEV_RECORD, "utf8")) : null;
+    const draftOf = (slot) => Object.keys(DRAFTS).find((f) => f.startsWith(slot + "-")) || null;
+    ok(`  docs/upstream-three/dev/ holds an issue and a patch for each of ${SLOTS.join(", ")}, and nothing else`, Object.keys(issues).sort().join() === SLOTS.join() && Object.keys(patches).sort().join() === SLOTS.join(),
+        `issues ${Object.keys(issues).sort().join(",")}; patches ${Object.keys(patches).sort().join(",")}`);
+    const devIndex = fs.existsSync(path.join(DEV_DIR, "README.md")) ? fs.readFileSync(path.join(DEV_DIR, "README.md"), "utf8") : "";
+    ok(`  its README says they are not posted, names dev's commit and r186, links each issue, and says which drafts r186 fixed and by what`,
+        /DRAFTS, NOT POSTED/.test(devIndex) && devIndex.includes(DEV_COMMIT) && devIndex.includes(DEV_RELEASE) && Object.values(issues).every((f) => devIndex.includes(`(${f})`)) &&
+        ["#34100", "#34101", "#34107", "#34018"].every((pr) => devIndex.includes(pr)) && devIndex.includes("(../01-velocity-instancedmesh.md)") && devIndex.includes("(../02-velocity-batchedmesh.md)"));
+    ok(`  the drafts' README points at it`, index.includes("(dev/README.md)"));
+    const fresh = (s) => !!rec && !!issues[s] && !!patches[s] && rec.patches[s] === sha256(fs.readFileSync(path.join(DEV_DIR, "patches", patches[s]), "utf8")) &&
+        rec.code[s] === sha256(issueParts(fs.readFileSync(path.join(DEV_DIR, issues[s]), "utf8")).html || "");
+    ok(`*** the record is of dev at ${DEV_COMMIT.slice(0, 7)} and r186 ${DEV_RELEASE}, and of every patch and reproduction as they are now ***`,
+        !!rec && rec.devCommit === DEV_COMMIT && rec.release === DEV_RELEASE && SLOTS.every(fresh),
+        !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threeDev.mjs again`);
+    for (const s of SLOTS) {
+        const f = issues[s]; if (!f) continue;
+        const t = fs.readFileSync(path.join(DEV_DIR, f), "utf8"), parts = issueParts(t), draft = draftOf(s), d = draft ? DRAFTS[draft] : OWN[s];
+        const heads = [...t.matchAll(/^### (.+)$/gm)].map((m) => m[1]), field = (h) => between(t, `### ${h}\n\n`, "\n\n###") ?? between(t, `### ${h}\n\n`, "\n");
+        ok(`  ${f}: a title, then the Bug Report form's fields in its order, the version r186, and no live example claimed`,
+            /^# \S/.test(t) && heads.join("|") === TEMPLATE.join("|") && field("Version") === "r186" && field("Device") === "Desktop" && field("Browser") === "Chrome" && t.endsWith("### OS\n\nLinux\n") &&
+            /^<!-- Before posting: [^>]*-->$/.test(field("Live example")), `headings: ${heads.join(" | ")}`);
+        const want = draft ? (between(text[draft], "<!-- repro:begin -->\n```html\n", "```\n<!-- repro:end -->") || "").split("0.185.1").join("0.186.1") : null;
+        ok(`  ${f}: its reproduction is ${draft ? `the draft's, three r185 swapped for r186 and nothing else` : "standalone, importing three r186 from the CDN and nothing else"}`,
+            !!parts.script && (draft ? parts.html === want : parts.html.includes("three@0.186.1/build/three.webgpu.js") && parts.html.includes("three@0.186.1/build/three.tsl.js") && !/import\s/.test(parts.script)));
+        ok(`  ${f}: the patch in its Description is ${patches[s]}, byte for byte`, !!patches[s] && parts.patch === fs.readFileSync(path.join(DEV_DIR, "patches", patches[s]), "utf8"));
+        const r = rec && rec.results[s];
+        if (!r || !d) { ok(`  ${f}: the record holds its four runs`, false); continue; }
+        const four = ["r186", "dev", "patched", "all"].every((k) => r[k] && r[k].webgpu && r[k].webgl2);
+        ok(`*** ${f}: the bug ${four ? `stands on r186 and on dev alike ("${d.observed(r.r186)}"), and the patch fixes it ("${d.observed(r.patched)}")` : "-- did not run on all four builds"} ***`,
+            four && JSON.stringify(r.r186) === JSON.stringify(r.dev) && (DEV_BUG[s] || d.bug)(r.r186) && d.fixed(r.patched) && d.fixed(r.all), four ? "" : JSON.stringify(r).slice(0, 300));
+        if (!four) continue;
+        const blk = (tag) => between(t, `<!-- ${tag}:begin -->\n`, `\n<!-- ${tag}:end -->`), tog = blk("together");
+        ok(`  ${f}: its Screenshots print what the record does: on r186 "${d.observed(r.r186)}"; with the patch "${d.observed(r.patched)}"`, blk("observed") === d.observed(r.r186) && blk("patched") === d.observed(r.patched));
+        ok(`  ${f}: with every patch it prints ${tog === null ? "what its own patch alone prints" : `its "together" block, which says something its "patched" block does not`}: "${d.observed(r.all)}"`,
+            tog === null ? d.observed(r.all) === d.observed(r.patched) : tog === d.observed(r.all) && tog !== d.observed(r.patched));
+    }
+}
+
+// ---- v4799 SABOTAGE LOG (section 6) -------------------------------------------------------------------------------
+// S1 patch 10 edited, the record not re-run -> 2 (stale record; the Description's patch); S2 issue 03's reproduction pointed at
+// 0.186.0 -> 2; S3 an observed number edited by a thousandth -> 1; S4 a form field renamed -> 1; S5 an issue saying r185 -> 1;
+// S6 the README dropping #34107 -> 1; S7 the record's dev printing otherwise than r186 on one backend -> 1; S8 a live example
+// claimed -> 1; S9 the record of another dev commit -> 1; S10 issue 15 removed -> 2; S11 08 held to r185's symptom -> 1; S12 04's
+// together block removed -> 1; S13 an issue's inline patch edited by one space -> 1; S14 15's fix missing from the all-patch run
+// -> 2. Fourteen, none green.
 // ---- v4763 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the drafts themselves: U1 an Observed number edited by a thousandth -> 1; U2 a reproduction importing more than
 // three -> 2; U3 the instanced reproduction made to move the mesh instead (no bug) -> 2; U4 the README not saying DRAFTS, NOT

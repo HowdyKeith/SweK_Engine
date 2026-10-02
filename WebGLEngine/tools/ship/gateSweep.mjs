@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4799 -- THE 403rd CLOSING: NO new gate file -- the drafts on three's latest release and its dev branch.
+    since496: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4799", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the thirteen issues in docs/upstream-three/dev/, held to tools/ship/threeDev.mjs's record of r186 and dev)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE DRAFTS WERE r185'S, AND THREE HAS MOVED. *** Measured on r186 and on dev at 1ea31f3, built by three's own " +
+                 "rollup: r186 fixed 01 and 02 (#34100, #34101, #34107 -- bisected), and the WebGL 2 min/max that kept three's SSR example " +
+                 "from linking (#34018). The other twelve stand, 08 with a new symptom, and r186 brought a thirteenth: a BatchedMesh grown " +
+                 "under a velocity MRT throws on every render. Each is now an issue in three's Bug Report form, its reproduction the draft's " +
+                 "with the version swapped, its patch rebased onto dev -- five by hand, and 10 rebased as it was applied cleanly and fixed " +
+                 "nothing, the compute builder's object having moved to builder.compute. A tool runs them beside a three checkout and " +
+                 "records what each page printed; section 6 holds the issues to the record. Fourteen sabotages red.",
+    }),
     // v4798 -- THE 402nd CLOSING: NO new gate file -- a timing row that tolerates load, and four callers off a hand-spelled regex.
     since495: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

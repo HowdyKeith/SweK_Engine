@@ -1,0 +1,36 @@
+diff --git a/src/nodes/accessors/Skinning.js b/src/nodes/accessors/Skinning.js
+index 437e0c0..b6e2b5c 100644
+--- a/src/nodes/accessors/Skinning.js
++++ b/src/nodes/accessors/Skinning.js
+@@ -237,13 +237,13 @@ export const skinning = /*@__PURE__*/ Fn( ( [ skinnedMesh ], builder ) => {
+ 	const bindMatrixInverseNode = reference( 'bindMatrixInverse', 'mat4' );
+ 	const boneMatricesNode = getBoneMatricesNode( builder, skinnedMesh.skeleton );
+ 
+-	OnObjectUpdate( ( { object, frameId } ) => {
++	OnObjectUpdate( ( { object, renderId } ) => {
+ 
+ 		const skeleton = object.skeleton;
+ 
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
+ 
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
+ 
+ 			const skeletonData = _previousBoneMatricesData.get( skeleton );
+ 
+@@ -312,11 +312,11 @@ export const computeSkinning = /*@__PURE__*/ Fn( ( [ skinnedMesh, toPosition = n
+ 
+ 	const skeleton = skinnedMesh.skeleton;
+ 
+-	OnObjectUpdate( ( { frameId } ) => {
++	OnObjectUpdate( ( { renderId } ) => {
+ 
+-		if ( _skeletonsUpdated.get( skeleton ) !== frameId ) {
++		if ( _skeletonsUpdated.get( skeleton ) !== renderId ) {
+ 
+-			_skeletonsUpdated.set( skeleton, frameId );
++			_skeletonsUpdated.set( skeleton, renderId );
+ 
+ 			const state = _previousBoneMatricesData.get( skeleton );
+ 

@@ -7,6 +7,11 @@ and holds the numbers each draft states; then applies each draft's patch alone t
 on it, and holds the fix and the numbers the draft states for it; `tools/ship/threeUpstreamPaths-selfcheck.mjs` (v4773) runs each
 patch on the paths its reproduction does not take, and holds each draft's "paths" block. Posting them is the maintainer's call.
 
+**To post, see [dev/README.md](dev/README.md)** (v4799): the issues ready to paste into three's Bug Report form, measured on
+three's latest release (r186) and its `dev` branch, each with its patch rebased onto `dev`. The drafts below stay as they are,
+the record of r185, the release vendored here. r186 fixed 01 and 02; the other twelve still stand there, and r186 brought a
+thirteenth issue of its own.
+
 - [VelocityNode: an InstancedMesh's previous instance matrix is its current one](01-velocity-instancedmesh.md) -- observed: plain 5.612, instanced 0.000, many 11.224 (px, both backends); patched: plain 5.612, instanced 5.612, many 5.612 (px, both backends)
 - [VelocityNode: a BatchedMesh's previous position never gets the instance's matrix](02-velocity-batchedmesh.md) -- observed: plain 5.612, batched 1.871 (px, both backends); patched: plain 5.612, batched 5.612 (px, both backends)
 - [VelocityNode: a morphed mesh's previous position is the unmorphed one](03-velocity-morph.md) -- observed: plain 5.612, morphed 1.871 (px, both backends); patched: plain 5.612, morphed 5.612 (px, both backends)
