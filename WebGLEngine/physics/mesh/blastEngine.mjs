@@ -77,7 +77,7 @@
 
 import * as M from "./meshCSG.mjs";
 import { meshBoolean } from "./meshBoolean.mjs";
-import { MeshBVH } from "../../mesh/meshBVH.mjs";
+import { MeshBVH, deriveBVH } from "../../mesh/meshBVH.mjs";
 
 export const BLAST_ENGINES = ["bsp", "bvh"];
 // BVH-CSG ROUND 19: "bvh" is the default. A soak decided it -- twelve 100-shot chains per engine (node) and 100 shots
@@ -246,12 +246,49 @@ export function blastBVH(polys, blob, opts = {}) {
  */
 // opts.finishWeld (round 16g): the weld radius at the operands' scale, in place of the one the path that ran implies --
 // the gate's control for EXACT_FINISH_WELD
-export function booleanBVH(polys, other, op, { finish = true, otherTag = null, finishWeld = null, ...opts } = {}) {
+/**
+ * *** BVH-CSG ROUND 23: THE WALL'S TREE IS CARRIED FROM SHOT TO SHOT. *** Every shot rebuilt the BVH over the whole wall:
+ * 9.1-12.1% of four 100-shot page chains, and most of a small late blast (seed 3's last shot: 16.5 of 27.9 ms). A
+ * shot's polygons come back as the next shot's wall, and the ones it kept whole are the SAME OBJECTS with the same
+ * triangles. So each finished shot leaves, keyed by the polygons it returned, the tree it used and the triangles under
+ * it; the next shot maps every triangle of a polygon it finds there again -- same object, same triangle count, the same
+ * bits, checked -- and derives its tree from that one (meshBVH.deriveBVH: the survivors refit in the old topology, the
+ * new triangles in a small tree beside them). Output bit for bit what a full build gives: meshBoolean's candidates no
+ * longer depend on the tree's shape (canonPairs). A full build again every WALL_TREE_DERIVE_MAX shots, or when the
+ * triangles placed by small builds pass WALL_TREE_APPENDED of the wall, so the tree does not degrade.
+ * opts.reuseWallTree:false is the control: a full build every shot, as before.
+ */
+export const WALL_TREE_DERIVE_MAX = 16;
+export const WALL_TREE_APPENDED = 0.25;
+const WALL_TREES = new WeakMap();      // polygons a shot returned -> { polys, buf, owner, bvh } of that shot's wall
+function wallTree(polys, A, reuse) {
+    const prev = reuse ? WALL_TREES.get(polys) : null;
+    if (!prev || (prev.bvh.derived || 0) >= WALL_TREE_DERIVE_MAX || (prev.bvh.appended || 0) > WALL_TREE_APPENDED * prev.bvh.count)
+        return { bvh: new MeshBVH(A.buf), tree: prev ? "rebuilt" : "built", mapped: 0 };
+    const first = new Map(), po = prev.owner, nOld = po.length;
+    for (let i = nOld - 1; i >= 0; i--) first.set(prev.polys[po[i]], i);
+    const map = new Int32Array(prev.bvh.count).fill(-1), ao = A.owner, nA = ao.length;
+    let mapped = 0;
+    for (let i = 0; i < nA;) {
+        let j = i; while (j < nA && ao[j] === ao[i]) j++;
+        const os = first.get(polys[ao[i]]), n = j - i;
+        if (os !== undefined && os + n <= nOld && po[os + n - 1] === po[os] && (os + n === nOld || po[os + n] !== po[os])) {
+            let same = true;
+            for (let k = 0; k < n * 9 && same; k++) same = Object.is(A.buf[i * 9 + k], prev.buf[os * 9 + k]);
+            if (same) { for (let k = 0; k < n; k++) map[os + k] = i + k; mapped += n; }
+        }
+        i = j;
+    }
+    return { bvh: deriveBVH(prev.bvh, A.buf, map), tree: "derived", mapped };
+}
+
+export function booleanBVH(polys, other, op, { finish = true, otherTag = null, finishWeld = null, reuseWallTree = true, ...opts } = {}) {
     if (op !== "subtract" && op !== "union" && op !== "intersect") throw new Error('blastEngine: unrecognized op "' + op + '" (expected "subtract", "union" or "intersect")');
     const blob = other, turn = op === "subtract";
     const t0 = Date.now();
     const A = trianglesOf(polys), B = trianglesOf(blob);
-    const r = meshBoolean(A.buf, new MeshBVH(A.buf), B.buf, new MeshBVH(B.buf), op, opts);
+    const W = wallTree(polys, A, reuseWallTree), treeMs = Date.now() - t0;
+    const r = meshBoolean(A.buf, W.bvh, B.buf, new MeshBVH(B.buf), op, opts);
     const flipped = new Map(), nA = A.owner.length, nB = B.owner.length, t = r.tris;
     const whole = new Int32Array(polys.length), total = new Int32Array(polys.length);
     for (let i = 0; i < nA; i++) total[A.owner[i]]++;
@@ -294,7 +331,8 @@ export function booleanBVH(polys, other, op, { finish = true, otherTag = null, f
     // round 16g: exact -- which arrangement ran (the exact one declines where the operands are not conforming)
     const stats = { engine: "bvh", exact: !!r.exact, triangles: r.triCount, fallbackTris: (sa.fallbackTris || 0) + (sb.fallbackTris || 0),
                     ambiguous: r.ambiguousTriIndices.length, capped: r.capped, emptyOperand: r.emptyOperand, unknown,
-                    wallTriangles: nA, conformScanned: (sa.conformScanned || 0) + (sb.conformScanned || 0), piecesBuilt: pieces.length };
+                    wallTriangles: nA, conformScanned: (sa.conformScanned || 0) + (sb.conformScanned || 0), piecesBuilt: pieces.length,
+                    wallTree: W.tree, wallTreeMapped: W.mapped, wallTreeMs: treeMs };
     if (!finish) {
         stats.ms = Date.now() - t0;
         return { polys: pieces.map(({ vs, pl, src }) => ({ vs, pl, src })), stats };
@@ -309,7 +347,9 @@ export function booleanBVH(polys, other, op, { finish = true, otherTag = null, f
     Object.assign(stats, { kept: kept.length, finished: fin.polys.length, welded: fin.stats.welded, maxMove: fin.stats.maxMove,
                            weldRefused: fin.stats.refused, weldMoves: fin.stats.moves, collapsed: fin.stats.dropped, merged: fin.stats.merged, finishMs: fin.stats.ms,
                            ms: Date.now() - t0 });
-    return { polys: kept.concat(fin.polys), stats };
+    const out = kept.concat(fin.polys);
+    if (reuseWallTree) WALL_TREES.set(out, { polys, buf: A.buf, owner: A.owner, bvh: W.bvh });
+    return { polys: out, stats };
 }
 
 /**

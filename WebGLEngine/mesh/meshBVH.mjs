@@ -405,4 +405,102 @@ export class MeshBVH {
     stats() { return { triangles: this.count, nodes: this.nodes, leaves: this.leaves, depth: this.depth, maxLeaf: this.maxLeaf }; }
 }
 
+/**
+ * *** BVH-CSG ROUND 23: THE LAST SHOT'S TREE, CARRIED FORWARD, IN PLACE OF A FULL BUILD. ***
+ *
+ * The page's blast rebuilt this over the whole wall every shot: 9-12% of a 100-shot chain, and on a small late blast most
+ * of the shot (seed 3's last: 16.5 ms of 27.9). Most of the wall comes through a shot untouched, so its triangles are
+ * the same triangles at new indices.
+ *
+ * deriveBVH(prev, tris, oldToNew) returns a tree over `tris` built from `prev`, a tree over the previous buffer.
+ * `oldToNew[i]` is the index in `tris` of prev's triangle i, or -1 where it is gone. Every triangle of `tris` no old one
+ * maps to is NEW. The result:
+ *   - prev's nodes, each leaf keeping the survivors of its range (compacted, in order), every box REFIT to them -- a box
+ *     only shrinks, so the old topology stays a valid tree, with empty leaves where everything went
+ *   - a tree built in full over the new triangles alone
+ *   - a root joining the two (node 0, where every query starts)
+ * It answers every query as a full build does -- the same triangles, by the same exact tests -- and differs only in
+ * shape, which meshBoolean's output no longer depends on (round 23's canonPairs). `derived` counts the chain of
+ * derivations and `appended` the triangles placed by the small builds since the last full one, so a caller can rebuild
+ * before the tree degrades.
+ */
+export function deriveBVH(prev, tris, oldToNew, opts = {}) {
+    const count = (tris.length / 9) | 0;
+    const maxLeaf = opts.maxLeaf || prev.maxLeaf, bins = opts.bins || prev.bins;
+    const order = new Int32Array(count), placed = new Uint8Array(count);
+    // prev's leaves, in the order their ranges sit in prev.order
+    const leaves = [];
+    for (let nd = 0; nd < prev.nodes; nd++) if (prev.meta[nd * 3] < 0) leaves.push(nd);
+    leaves.sort((a, b) => prev.meta[a * 3 + 1] - prev.meta[b * 3 + 1]);
+    const newStart = new Int32Array(prev.nodes), newCount = new Int32Array(prev.nodes);
+    let w = 0;
+    for (const nd of leaves) {
+        const s = prev.meta[nd * 3 + 1], c = prev.meta[nd * 3 + 2];
+        newStart[nd] = w;
+        for (let k = s; k < s + c; k++) {
+            const o = oldToNew[prev.order[k]];
+            if (o >= 0) { if (placed[o]) throw new Error("deriveBVH: triangle " + o + " mapped twice"); placed[o] = 1; order[w++] = o; }
+        }
+        newCount[nd] = w - newStart[nd];
+    }
+    const survivors = w, fresh = [];
+    for (let i = 0; i < count; i++) if (!placed[i]) fresh.push(i);
+    if (!survivors || !prev.nodes) return Object.assign(new MeshBVH(tris, { maxLeaf, bins }), { derived: 0, appended: 0 });
+    let sub = null;
+    if (fresh.length) {
+        const sb = new Float64Array(fresh.length * 9);
+        fresh.forEach((t, k) => sb.set(tris.subarray(t * 9, t * 9 + 9), k * 9));
+        sub = new MeshBVH(sb, { maxLeaf, bins });
+    }
+    const off = sub ? 1 : 0, base = off + prev.nodes, nodes = base + (sub ? sub.nodes : 0);
+    const bvh = Object.create(MeshBVH.prototype);
+    Object.assign(bvh, { tris, count, maxLeaf, bins, order, nodes, leaves: 0, depth: 0,
+                         bounds: new Float64Array(nodes * 6), meta: new Int32Array(nodes * 3) });
+    const M = bvh.meta, Bd = bvh.bounds, T = tris;
+    // the old part: same topology, shifted by `off`, leaves at their compacted ranges
+    for (let nd = 0; nd < prev.nodes; nd++) {
+        const q = (nd + off) * 3;
+        if (prev.meta[nd * 3] < 0) { M[q] = -1; M[q + 1] = newStart[nd]; M[q + 2] = newCount[nd]; bvh.leaves++; }
+        else { M[q] = prev.meta[nd * 3] + off; M[q + 1] = prev.meta[nd * 3 + 1] + off; M[q + 2] = 0; }
+    }
+    // refit, children before parents: a depth-first build allocates every child after its parent
+    for (let nd = prev.nodes - 1; nd >= 0; nd--) {
+        const n = nd + off, b = n * 6;
+        let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+        if (M[n * 3] < 0) {
+            for (let k = M[n * 3 + 1], e = k + M[n * 3 + 2]; k < e; k++) {
+                const o = order[k] * 9;
+                for (let c = 0; c < 9; c += 3) {
+                    const x = T[o + c], y = T[o + c + 1], z = T[o + c + 2];
+                    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
+                }
+            }
+        } else {
+            for (const ch of [M[n * 3], M[n * 3 + 1]]) {
+                const cb = ch * 6;
+                if (Bd[cb] < x0) x0 = Bd[cb]; if (Bd[cb + 1] < y0) y0 = Bd[cb + 1]; if (Bd[cb + 2] < z0) z0 = Bd[cb + 2];
+                if (Bd[cb + 3] > x1) x1 = Bd[cb + 3]; if (Bd[cb + 4] > y1) y1 = Bd[cb + 4]; if (Bd[cb + 5] > z1) z1 = Bd[cb + 5];
+            }
+        }
+        Bd[b] = x0; Bd[b + 1] = y0; Bd[b + 2] = z0; Bd[b + 3] = x1; Bd[b + 4] = y1; Bd[b + 5] = z1;
+    }
+    bvh.depth = prev.depth + off;
+    if (sub) {
+        // the new part: its own tree, shifted to `base`, its ranges after the survivors, its order back in `tris` indices
+        for (let k = 0; k < sub.count; k++) order[survivors + k] = fresh[sub.order[k]];
+        for (let nd = 0; nd < sub.nodes; nd++) {
+            const q = (nd + base) * 3;
+            if (sub.meta[nd * 3] < 0) { M[q] = -1; M[q + 1] = sub.meta[nd * 3 + 1] + survivors; M[q + 2] = sub.meta[nd * 3 + 2]; bvh.leaves++; }
+            else { M[q] = sub.meta[nd * 3] + base; M[q + 1] = sub.meta[nd * 3 + 1] + base; M[q + 2] = 0; }
+            for (let k = 0; k < 6; k++) Bd[(nd + base) * 6 + k] = sub.bounds[nd * 6 + k];
+        }
+        M[0] = 1; M[1] = base; M[2] = 0;
+        for (let k = 0; k < 3; k++) { Bd[k] = Math.min(Bd[6 + k], Bd[base * 6 + k]); Bd[k + 3] = Math.max(Bd[6 + k + 3], Bd[base * 6 + k + 3]); }
+        bvh.depth = Math.max(bvh.depth, sub.depth + 1);
+    }
+    bvh.derived = (prev.derived || 0) + 1;
+    bvh.appended = (prev.appended || 0) + fresh.length;
+    return bvh;
+}
+
 export default MeshBVH;

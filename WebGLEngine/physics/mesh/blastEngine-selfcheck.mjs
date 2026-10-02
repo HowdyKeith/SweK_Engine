@@ -173,6 +173,25 @@
 //   Y8 a triangle the collapse flattens kept                               - / 5   (degenerate, open, the chains)
 // The second battery was cut off during Y7, which left ROUNDS = 1 in meshBoolean.mjs: found, restored, md5 verified
 // against the battery's own pre-run sum, Y7 re-run alone.
+//
+// SABOTAGE LOG (round 23, the wall's tree carried from shot to shot) -- meshBoolean.mjs, mesh/meshBVH.mjs and
+// blastEngine.mjs, each on the real file, restored and md5 verified. Rows red in
+// tools/ship/meshBVH-selfcheck / section 18 here:
+//   W1 canonPairs off (candidates in the tree's traversal order)       0 / 3   (bit for bit on the chains; leaf sizes
+//        4/8/16; the in-place row) -- the canonical order is what makes carrying the tree safe
+//   W2 deriveBVH keeps the old boxes, no refit                         1 / 0   (the tight-box row: loose boxes answer
+//        correctly, so only that row can see it)
+//   W3 deriveBVH leaves the new triangles out                          2 / 2
+//   W4 wallTree carries a polygon without comparing its bits           0 / 1   (the in-place row)
+//   W5 no rebuild policy                                               0 / 1   (99 of 102 derived, 0 rebuilt)
+//   W6 the shot's tree never left for the next                         0 / 3   (0 of 102 derived)
+//   W7 a leaf keeps its old count after compaction                     1 / 1   (by a THROW: the next derivation's own
+//        "mapped twice" guard finds the corrupted leaves)
+//   W8 no freshTree: the snapped path runs on the carried tree         0 / 2   (seed 5's snapped chain; the in-place row,
+//        whose moved point sends a shot through the conforming branch)
+// 8 of 8 red. The first suite with canonPairs at EVERY pairOverlap site went red on four snapped/plane-path controls
+// (round 16c's cone, round 11's contacts:false, the plane path's settled twelve-blast wall, round 19's shot 84): the
+// order is geometry there. canonPairs is the exact path's alone, and those controls read as recorded again.
 "use strict";
 
 import fs from "node:fs";
@@ -181,7 +200,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import * as M from "./meshCSG.mjs";
-import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS, EXACT_FINISH_WELD } from "./blastEngine.mjs";
+import { blastWith, blastBVH, booleanBVH, settleWith, finishPieces, BLAST_ENGINES, DEFAULT_BLAST_ENGINE, FINISH_WELD_SNAPS, EXACT_FINISH_WELD, WALL_TREE_DERIVE_MAX } from "./blastEngine.mjs";
 import { meshBoolean, MESH_BOOLEAN_EXACT_DEFAULT, EMBED_SLIVER } from "./meshBoolean.mjs";
 import { MeshBVH } from "../../mesh/meshBVH.mjs";
 import { exactPair } from "./exactArrangement.mjs";
@@ -1012,11 +1031,95 @@ console.log("\n17. *** ROUND 20b: THE EXACT OUTPUT ROUNDED WITHOUT CROSSING ITSE
     ok("!! seed 7, 50 shots (13 crossings unrepaired): two-manifold, no crossing", a7.crossings === 0 && a7.open + a7.nonManifoldEdges + a7.pinchedVertices + a7.degenerate === 0, Object.entries(a7).filter(([k, v]) => k !== "triangles" && k !== "vertices" && v).map(([k, v]) => k + " " + v).join(", ") || "clean");
 }
 
+console.log("\n18. *** ROUND 23: THE WALL'S TREE CARRIED FROM SHOT TO SHOT -- BIT FOR BIT WHAT A FULL BUILD GIVES ***");
+{
+    // every polygon's vertices, plane, tag and triangles, as bits
+    const bitsOf = (polys) => {
+        const f = new Float64Array(1), u = new Uint32Array(f.buffer); let h1 = 2166136261, h2 = 0;
+        const mix = (x) => { f[0] = x; h1 = Math.imul(h1 ^ u[0], 16777619); h1 = Math.imul(h1 ^ u[1], 16777619); h2 = (h2 + u[0] * 31 + u[1]) >>> 0; };
+        for (const p of polys) { mix(p.vs.length); for (const v of p.vs) v.forEach(mix); mix(p.pl.n[0]); mix(p.pl.n[1]); mix(p.pl.n[2]); mix(p.pl.w); mix(p.src === M.CUT ? 7 : 3); if (p.tris) for (const t of p.tris) for (const v of t) v.forEach(mix); }
+        return (h1 >>> 0) + ":" + h2 + ":" + polys.length;
+    };
+    const chain = (blobs, reuse, wall = M.boxPolys([0, 0, 0], HALF)) => {
+        const h = [], how = { built: 0, derived: 0, rebuilt: 0 }; let ms = 0, treeMs = 0, run = 0, longest = 0, before = wall;
+        for (const b of blobs) {
+            before = wall;
+            const t0 = performance.now(), r = blastWith("bvh", wall, b, { reuseWallTree: reuse }); ms += performance.now() - t0;
+            treeMs += r.stats.wallTreeMs; how[r.stats.wallTree]++; run = r.stats.wallTree === "derived" ? run + 1 : 0; longest = Math.max(longest, run);
+            wall = r.polys; h.push(bitsOf(wall));
+        }
+        return { h, how, ms, treeMs, longest, wall, before };
+    };
+    const firstDiff = (a, b) => a.h.findIndex((x, i) => x !== b.h[i]);
+    const buf = (polys) => { const t = []; for (const p of polys) for (const x of p.tris || M.toTriangles([p])) t.push(x); const b = new Float64Array(t.length * 9); t.forEach((x, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) b[i * 9 + v * 3 + c] = x[v][c]; }); return b; };
+    const W12 = () => M.boxPolys([0, 0, 0], [4, 3, 0.3]), B12 = Array.from({ length: 12 }, (_, k) => M.jaggedBlob([(k % 5 - 2) * 1.4, ((k * 7) % 5 - 2) * 1.0, 0], 0.9, 8, 1000 + k * 37));
+    const cases = [["the page's 30-shot chain (seed 107)", pageBlasts(107, 30)], ["seed 1, 60 shots", pageBlasts(1, 60)], ["the twelve-blast case", B12, W12()]];
+    let worst = -1, derived = 0, shots = 0, longest = 0, rebuilt = 0, tFull = 0, tReuse = 0, msFull = 0, msReuse = 0, detail = [];
+    let reused107 = null;
+    for (const [name, blobs, wall] of cases) {
+        const full = chain(blobs, false, wall), mine = chain(blobs, true, wall), d = firstDiff(full, mine);
+        if (d >= 0) detail.push(name + " first differs at shot " + (d + 1));
+        derived += mine.how.derived; rebuilt += mine.how.rebuilt; shots += blobs.length; longest = Math.max(longest, mine.longest);
+        tFull += full.treeMs; tReuse += mine.treeMs; msFull += full.ms; msReuse += mine.ms;
+        if (!reused107) reused107 = mine;
+    }
+    ok("!! " + shots + " shots on three chains, the wall's tree derived from the last shot's: EVERY SHOT bit for bit what a full build gives (vertices, planes, tags, triangles)",
+        detail.length === 0, detail.join("; ") || derived + " shots derived, " + rebuilt + " rebuilt by the policy");
+    ok("!! and it is the derived tree that ran: most shots derived, a full build again within " + WALL_TREE_DERIVE_MAX + " derivations",
+        derived > shots / 2 && rebuilt > 0 && longest <= WALL_TREE_DERIVE_MAX, derived + " of " + shots + " derived, " + rebuilt + " rebuilt, longest run " + longest);
+    report("triangles + tree: " + tFull + " ms full build, " + tReuse + " ms carried; the chains " + msFull.toFixed(0) + " -> " + msReuse.toFixed(0) + " ms (printed, not asserted)");
+    // the snapped path reads the tree's traversal order as GEOMETRY (meshBoolean's canonPairs note): a carried tree is
+    // built in full before it runs (freshTree), so a chain forced onto it is still bit for bit a full build's
+    {
+        const bl = pageBlasts(5, 30), snapped = (reuse) => { let w = M.boxPolys([0, 0, 0], HALF); const h = [], how = { built: 0, derived: 0, rebuilt: 0 }; for (const b of bl) { const r = blastWith("bvh", w, b, { reuseWallTree: reuse, exactArrangement: false }); how[r.stats.wallTree]++; w = r.polys; h.push(bitsOf(w)); } return { h, how }; };
+        const f = snapped(false), c = snapped(true), d = firstDiff(f, c);
+        ok("!! seed 5's 30 shots on the SNAPPED path (exactArrangement:false), the tree carried: every shot bit for bit a full build's",
+            d < 0 && c.how.derived > 10, (d < 0 ? "all 30 equal" : "first differs at shot " + (d + 1)) + "; " + c.how.derived + " shots handed a derived tree, rebuilt inside meshBoolean");
+    }
+    // a pin-prick on the 30-shot wall maps nearly all of it
+    const pin = M.jaggedBlob([3.7, -2.7, HALF[2]], 0.02, 6, 99, { rough: 0, floor: 1 });
+    const pp = blastWith("bvh", reused107.wall, pin), had = new Set(reused107.before);
+    const keptTris = reused107.wall.reduce((n, p) => n + (had.has(p) ? (p.tris || M.toTriangles([p])).length : 0), 0);
+    ok("!! a pin-prick on the 30-shot wall carries EXACTLY the triangles of the polygons shot 30 kept (and builds only what shot 30 made)",
+        pp.stats.wallTree === "derived" && pp.stats.wallTreeMapped === keptTris && keptTris > 0.9 * pp.stats.wallTriangles,
+        pp.stats.wallTree + ", " + pp.stats.wallTreeMapped + " carried = " + keptTris + " kept, of " + pp.stats.wallTriangles);
+    // the tree's SHAPE no longer reaches the output (meshBoolean's canonPairs)
+    {
+        let w = M.boxPolys([0, 0, 0], HALF); const bl = pageBlasts(1, 20);
+        for (let k = 0; k < 19; k++) w = blastWith("bvh", w, bl[k]).polys;
+        const A = buf(w), B = buf(bl[19]);
+        const outs = [4, 8, 16].map((ml) => meshBoolean(A, new MeshBVH(A, { maxLeaf: ml }), B, new MeshBVH(B), "subtract"));
+        const same = outs.every((o) => o.triCount === outs[1].triCount && o.tris.every((x, i) => Object.is(x, outs[1].tris[i])));
+        ok("!! seed 1's shot 20 through wall trees of leaf size 4, 8 and 16: the same output, bit for bit (it differed in 26 of 6,224 triangles' first corner before round 23)",
+            same, outs.map((o) => o.triCount).join(" / ") + " triangles");
+    }
+    // a polygon changed IN PLACE is not mapped: same object, different triangles
+    {
+        const bl = pageBlasts(3, 12);
+        let w = M.boxPolys([0, 0, 0], HALF);
+        for (let k = 0; k < 11; k++) w = blastWith("bvh", w, bl[k]).polys;
+        const victim = w.find((p) => p.tris && p.tris.length >= 2);
+        const a = blastWith("bvh", w, bl[11], { reuseWallTree: true }), b = blastWith("bvh", w, bl[11], { reuseWallTree: false });
+        const mappedSame = a.stats.wallTreeMapped, B0 = buf(w);
+        victim.tris[0][0][0] += 1e-6;                     // different bits, same objects -- and the point is SHARED by neighbours
+        // the carried tree maps a polygon whole or not at all: every triangle of a polygon holding a changed one stays out
+        const B1 = buf(w), own = w.flatMap((p, i) => (p.tris || M.toTriangles([p])).map(() => i)), hit = new Set();
+        let changedTris = 0;
+        for (let t = 0; t < B0.length / 9; t++) { let same = true; for (let k = 0; k < 9 && same; k++) same = Object.is(B0[t * 9 + k], B1[t * 9 + k]); if (!same) { changedTris++; hit.add(own[t]); } }
+        const changed = own.filter((i) => hit.has(i)).length;
+        const c = blastWith("bvh", w, bl[11], { reuseWallTree: true }), d = blastWith("bvh", w, bl[11], { reuseWallTree: false });
+        ok("!! a point moved IN PLACE (same objects, one coordinate 1e-6 off): exactly the polygons whose triangles' bits changed are left out of the carried tree, and both shots are bit for bit a full build's",
+            bitsOf(a.polys) === bitsOf(b.polys) && bitsOf(c.polys) === bitsOf(d.polys) && changed > 0 && c.stats.wallTreeMapped === mappedSame - changed,
+            "carried " + mappedSame + " -> " + c.stats.wallTreeMapped + "; " + changedTris + " triangles share the moved point, in " + hit.size + " polygons of " + changed + " triangles");
+    }
+}
+
 console.log(`\nblastEngine-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here, named honestly: the page draws polygons on a 2D canvas and nothing here looks at the " +
     "picture; the finishing pass closes the seam's near-misses after the fact -- the arrangements still disagree on " +
     "seam points under 8 snaps apart, which snap rounding would fix at the root (backlog: round 16); a finished vertex " +
-    "may sit up to the weld tolerance off its polygon's plane; meshBoolean rebuilds the whole wall's BVH every shot " +
-    "(the BSP builds its polygon index every shot too); and the flag is the page's alone -- no other caller in the " +
+    "may sit up to the weld tolerance off its polygon's plane; the wall is re-triangulated into a buffer every shot " +
+    "and its carried tree refit over all of it (round 23 halved the cost, did not remove it; the BSP builds its polygon " +
+    "index every shot too); and the flag is the page's alone -- no other caller in the " +
     "engine cuts a mesh today.");
 process.exit(fails ? 1 : 0);

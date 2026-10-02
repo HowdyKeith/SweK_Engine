@@ -17,7 +17,7 @@
 // FASTER. A wrong one is not visibly wrong -- it is fast and quietly missing geometry, which reads as a
 // content bug. So the exactness checks below compare against brute force over the same triangles, and the
 // speed check is separate and secondary.
-import { MeshBVH, rayTriangle, trianglesFrom, baryAt, EPS } from "../../mesh/meshBVH.mjs";
+import { MeshBVH, rayTriangle, trianglesFrom, baryAt, EPS, deriveBVH } from "../../mesh/meshBVH.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -504,6 +504,58 @@ console.log("\n*** ROUND 15: THE NEW BUILD AGAINST THE OLD ONE, ARRAY FOR ARRAY 
     }
     ok("!! *** " + meshes.length + " meshes (random soups 0..20,000, three leaf/bin settings, coincident centroids, a line, signed zeros, duplicates): THE SAME TREE AS THE ROUND-14 BUILD -- order, meta, bounds (Object.is), nodes, leaves, depth ***",
         differ === 0, nodes + " nodes, " + differ + " meshes differing; build " + tOld.toFixed(0) + " ms old, " + tNew.toFixed(0) + " ms new (printed, not asserted)");
+}
+
+console.log("\n*** BVH-CSG ROUND 23: A TREE DERIVED FROM THE LAST ONE ANSWERS AS A FULL BUILD DOES ***");
+{
+    // a "shot": drop some triangles, keep the rest at shuffled new indices, add new ones -- the shape blastEngine hands it
+    const shot = (prevTris, seed, dropFrac, addN) => {
+        const r = rng(seed), n = prevTris.length / 9, keep = [];
+        for (let i = 0; i < n; i++) if (r() >= dropFrac) keep.push(i);
+        for (let i = keep.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; const t = keep[i]; keep[i] = keep[j]; keep[j] = t; }
+        const add = addN ? lumpyMesh(addN, seed + 1000) : new Float64Array(0), m = keep.length + add.length / 9;
+        const tris = new Float64Array(m * 9), map = new Int32Array(n).fill(-1);
+        keep.forEach((o, k) => { tris.set(prevTris.subarray(o * 9, o * 9 + 9), k * 9); map[o] = k; });
+        tris.set(add, keep.length * 9);
+        return { tris, map };
+    };
+    const tight = (b) => {
+        let bad = 0;
+        const under = (nd, out) => { if (b.meta[nd * 3] < 0) { for (let k = b.meta[nd * 3 + 1]; k < b.meta[nd * 3 + 1] + b.meta[nd * 3 + 2]; k++) out.push(b.order[k]); } else { under(b.meta[nd * 3], out); under(b.meta[nd * 3 + 1], out); } return out; };
+        for (let nd = 0; nd < b.nodes; nd++) {
+            const ts = under(nd, []), lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+            for (const t of ts) for (let c = 0; c < 9; c++) { const a = c % 3, v = b.tris[t * 9 + c]; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
+            for (let a = 0; a < 3; a++) if (!Object.is(b.bounds[nd * 6 + a], lo[a]) || !Object.is(b.bounds[nd * 6 + 3 + a], hi[a])) { bad++; break; }
+        }
+        return bad;
+    };
+    const once = (b) => { const seen = new Uint8Array(b.count); for (let k = 0; k < b.count; k++) { if (seen[b.order[k]]) return false; seen[b.order[k]] = 1; } return seen.every((x) => x === 1); };
+    const boxes = (seed, n) => { const r = rng(seed), out = []; for (let i = 0; i < n; i++) { const c = [r() * 4 - 2, r() * 4 - 2, r() * 4 - 2], h = 0.05 + r() * 0.6; out.push([c.map((x) => x - h), c.map((x) => x + h)]); } return out; };
+    const sameAnswers = (d, f) => {
+        let bad = 0;
+        for (const [ox, oy, oz, dx, dy, dz] of rayBattery(11, 300)) {
+            const a = d.raycastFirst(ox, oy, oz, dx, dy, dz), b = f.raycastFirst(ox, oy, oz, dx, dy, dz), c = bruteFirst(d.tris, ox, oy, oz, dx, dy, dz);
+            if ((a === null) !== (b === null) || (a && (a.tri !== b.tri || a.t !== b.t || a.tri !== c.tri))) bad++;
+        }
+        for (const [lo, hi] of boxes(5, 200)) { const a = d.trianglesInBox(lo, hi).sort((x, y) => x - y), b = f.trianglesInBox(lo, hi).sort((x, y) => x - y); if (a.length !== b.length || a.some((x, i) => x !== b[i])) bad++; }
+        return bad;
+    };
+    let prev = new MeshBVH(lumpyMesh(4000, 21)), worstBad = 0, worstTight = 0, allOnce = true, chainDepth = 0;
+    for (let g = 0; g < 20; g++) {
+        const { tris, map } = shot(prev.tris, 100 + g, 0.08, 150);
+        const d = deriveBVH(prev, tris, map), f = new MeshBVH(tris);
+        worstBad = Math.max(worstBad, sameAnswers(d, f)); worstTight = Math.max(worstTight, tight(d)); allOnce = allOnce && once(d);
+        chainDepth = d.derived; prev = d;
+    }
+    ok("!! twenty shots in a chain (8% dropped, 150 added, the rest shuffled), each tree derived from the last: every ray's first hit (triangle AND t) and every box query's set exactly what a full build and brute force give",
+        worstBad === 0, "worst " + worstBad + " disagreements over 300 rays and 200 boxes; " + chainDepth + " derivations deep");
+    ok("!! every box of every derived tree is EXACTLY the min/max of the triangles under it (refit, not merely containing), and every triangle sits in exactly one leaf",
+        worstTight === 0 && allOnce, worstTight + " loose boxes at worst; " + (allOnce ? "each triangle once" : "a triangle missing or twice"));
+    const { tris } = shot(prev.tris, 7, 0, 0), m2 = new Int32Array(prev.count).fill(0);
+    let threw = false; try { deriveBVH(prev, tris, m2); } catch (e) { threw = /mapped twice/.test(e.message); }
+    ok("!! a map sending two old triangles to one new index is refused, not built into a tree that answers twice", threw);
+    const empty = deriveBVH(prev, lumpyMesh(300, 9), new Int32Array(prev.count).fill(-1));
+    ok("!! nothing surviving: a full build of the new triangles (derived 0), answering as one", empty.derived === 0 && sameAnswers(empty, new MeshBVH(empty.tris)) === 0);
 }
 
 console.log("\nmeshBVH-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));

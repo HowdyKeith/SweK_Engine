@@ -584,6 +584,18 @@
 "use strict";
 
 import { pairOverlap } from "./bvhPairOverlap.mjs";
+// BVH-CSG ROUND 23: CANDIDATE PAIRS IN ONE ORDER, WHATEVER TREE FOUND THEM -- ON THE EXACT PATH. pairOverlap reports pairs
+// in its traversal order, so the tree's SHAPE reached the output: measured on seed 1's 100 shots, a wall tree with
+// maxLeaf 4 or 16 in place of 8 gave 12 of 20 outputs with 26 of 6,224 triangles starting at another corner (the same
+// triangles, vertex set and volume to the bit -- the exact arrangement is order-independent as geometry, not as bits).
+// Sorted, 20 of 20 are bit for bit, which is what lets blastEngine hand meshBoolean a tree derived from the last shot's.
+// NOT on the snapped or plane paths: there the order is GEOMETRY. Sorted everywhere, round 16c's snapped cone (5.6e-5)
+// read 1.02e-9, the plane path's settled twelve-blast wall opened 3 edges, round 11's contacts:false control read 27
+// unmatched for 28 and round 19's seed 8 shot 84 opened 3 edges for 29 -- order-dependent answers, kept as recorded. A
+// derived tree is therefore rebuilt in full before either of those paths runs (freshTree, below).
+const canonPairs = (p) => p.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+// a tree derived from another (meshBVH.deriveBVH) has its own shape; where shape is geometry, the full build's is used
+const freshTree = (bvh, tris) => (bvh && bvh.derived ? new MeshBVH(tris) : bvh);
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
 import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
@@ -1617,6 +1629,7 @@ export function embedRounded(buf, from, trisA, bvhA, trisB, bvhB, amb = []) {
         const OS = SL.filter((t) => !isNew[t]);   // (the new slivers are paired with every new triangle above)
         if (bvhNEW && OS.length) for (const [i, j] of pairOverlap(bvhNEW, new MeshBVH(sub(OS)), 0)) add(NEW[i], OS[j]);
         const crossing = [];
+        pairs.sort((x, y) => Math.min(x[0], x[1]) - Math.min(y[0], y[1]) || Math.max(x[0], x[1]) - Math.max(y[0], y[1]));   // round 23
         stats.pairs += pairs.length;
         for (const [a, b] of pairs) {
             const TA = triOf(B, a), TB = triOf(B, b);
@@ -1730,11 +1743,13 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
     // check (the gate's control).
     let pairsX = null, declined = null;
     if (exactArr) {
-        pairsX = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
+        pairsX = canonPairs(pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR));
         if (opts.exactConforming !== false) {
             const a = nonConformingNear(trisA, bvhA, pairsX, 0), b = nonConformingNear(trisB, bvhB, pairsX, 1);
             // round 16h: first make the operands conforming there (conformNear) and run on those, `from` naming the
             // caller's triangles; only what that leaves non-conforming declines
+            // round 23: conforming and the snapped path read the tree's traversal order -- a derived tree is built in full first
+            if (a || b) { bvhA = freshTree(bvhA, trisA); bvhB = freshTree(bvhB, trisB); }
             if ((a || b) && opts.conform !== false) {
                 const cA = a ? conformNear(trisA, bvhA, pairsX, 0) : null, cB = b ? conformNear(trisB, bvhB, pairsX, 1) : null;
                 if (cA || cB) {
@@ -1752,6 +1767,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
             if (a || b) { exactArr = false; declined = { a, b }; opts = { ...opts, exactArrangement: false }; }
         }
     }
+    if (!exactArr) { bvhA = freshTree(bvhA, trisA); bvhB = freshTree(bvhB, trisB); }   // round 23: see canonPairs
     if (opts.contacts !== false && opts.vertexRound !== false && !exactArr) {
         rounded = vertexRound(trisA, bvhA, trisB, opts.vertexRoundRadius ?? VERTEX_ROUND);
         if (rounded.tris) { trisB = rounded.tris; bvhB = new MeshBVH(trisB); }
