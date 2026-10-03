@@ -1,0 +1,188 @@
+diff --git a/src/nodes/accessors/Instance.js b/src/nodes/accessors/Instance.js
+index 2723fa9..fbfe9b8 100644
+--- a/src/nodes/accessors/Instance.js
++++ b/src/nodes/accessors/Instance.js
+@@ -1,6 +1,6 @@
+ 
+ import { vec3, mat4, Fn } from '../tsl/TSLBase.js';
+-import { OnAfterObjectUpdate, OnBeforeFrameUpdate } from '../utils/EventNode.js';
++import { OnAfterObjectUpdate, OnBeforeFrameUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';
+ import { normalLocal, transformNormal } from './Normal.js';
+ import { positionLocal, positionPrevious } from './Position.js';
+ import { varyingProperty } from '../core/PropertyNode.js';
+@@ -210,20 +210,46 @@ export const instance = /*@__PURE__*/ Fn( ( [ matrices, colors = null ], builder
+ 
+ 		const instancedMesh = builder.object;
+ 
+-		OnAfterObjectUpdate( ( { object } ) => {
++		if ( isStorageMatrix ) {
+ 
+-			const { previousInstanceMatrix } = _previousInstanceMatrices.get( object );
++			// storage matrices may be written on the GPU -- by a compute pass -- where their CPU array never sees it, so
++			// the previous matrices are kept on the GPU: before each draw, the last draw's copy becomes the previous
++			// matrices, and the matrices as they are now become the last draw's
+ 
+-			previousInstanceMatrix.array.set( matrices.array );
+-			previousInstanceMatrix.version = matrices.version;
++			OnBeforeObjectUpdate( ( { object, renderer } ) => {
+ 
+-			// handle interleaved path
++				const data = _previousInstanceMatrices.get( object );
+ 
+-			const previousInterleavedMatrix = _matrixBuffers.get( previousInstanceMatrix );
++				if ( data.lastInstanceMatrix === undefined ) {
+ 
+-			if ( previousInterleavedMatrix !== undefined ) previousInterleavedMatrix.version = matrices.version;
++					data.lastInstanceMatrix = matrices.clone();
++					renderer.copyBufferToBuffer( matrices, data.lastInstanceMatrix );
+ 
+-		} );
++				}
++
++				renderer.copyBufferToBuffer( data.lastInstanceMatrix, data.previousInstanceMatrix );
++				renderer.copyBufferToBuffer( matrices, data.lastInstanceMatrix );
++
++			} );
++
++		} else {
++
++			OnAfterObjectUpdate( ( { object } ) => {
++
++				const { previousInstanceMatrix } = _previousInstanceMatrices.get( object );
++
++				previousInstanceMatrix.array.set( matrices.array );
++				previousInstanceMatrix.version = matrices.version;
++
++				// handle interleaved path
++
++				const previousInterleavedMatrix = _matrixBuffers.get( previousInstanceMatrix );
++
++				if ( previousInterleavedMatrix !== undefined ) previousInterleavedMatrix.version = matrices.version;
++
++			} );
++
++		}
+ 
+ 		const previousInstanceMatrixNode = getPreviousInstance( instancedMesh, matrices, builder );
+ 		positionPrevious.assign( previousInstanceMatrixNode.mul( positionPrevious ).xyz );
+diff --git a/src/renderers/common/Backend.js b/src/renderers/common/Backend.js
+index 6b31fbd..c6b9be0 100644
+--- a/src/renderers/common/Backend.js
++++ b/src/renderers/common/Backend.js
+@@ -373,6 +373,16 @@ class Backend {
+ 	 */
+ 	async copyTextureToBuffer( /*texture, x, y, width, height, faceIndex*/ ) {}
+ 
++	/**
++	 * Copies the data of one storage buffer attribute's GPU buffer into another's, on the GPU,
++	 * ordered after the work submitted before it and before the draws recorded after it.
++	 *
++	 * @abstract
++	 * @param {BufferAttribute} srcAttribute - The source attribute.
++	 * @param {BufferAttribute} dstAttribute - The destination attribute.
++	 */
++	copyBufferToBuffer( /*srcAttribute, dstAttribute*/ ) {}
++
+ 	/**
+ 	 * Copies data of the given source texture to the given destination texture.
+ 	 *
+diff --git a/src/renderers/common/Renderer.js b/src/renderers/common/Renderer.js
+index 678541a..c59c9ce 100644
+--- a/src/renderers/common/Renderer.js
++++ b/src/renderers/common/Renderer.js
+@@ -1,6 +1,7 @@
+ import Animation from './Animation.js';
+ import RenderObjects from './RenderObjects.js';
+ import Attributes from './Attributes.js';
++import { AttributeType } from './Constants.js';
+ import Geometries from './Geometries.js';
+ import Info from './Info.js';
+ import Pipelines from './Pipelines.js';
+@@ -3243,6 +3244,23 @@ class Renderer {
+ 
+ 	}
+ 
++	/**
++	 * Copies the data of one storage buffer attribute into another, on the GPU. Each is created, and
++	 * uploaded if its CPU data changed, before the copy -- so a buffer a compute pass wrote and one the
++	 * CPU wrote are copied alike.
++	 *
++	 * @param {BufferAttribute} srcAttribute - The source attribute.
++	 * @param {BufferAttribute} dstAttribute - The destination attribute.
++	 */
++	copyBufferToBuffer( srcAttribute, dstAttribute ) {
++
++		this._attributes.update( srcAttribute, AttributeType.STORAGE );
++		this._attributes.update( dstAttribute, AttributeType.STORAGE );
++
++		this.backend.copyBufferToBuffer( srcAttribute, dstAttribute );
++
++	}
++
+ 	/**
+ 	 * Copies data of the given source texture into a destination texture.
+ 	 *
+diff --git a/src/renderers/webgl-fallback/WebGLBackend.js b/src/renderers/webgl-fallback/WebGLBackend.js
+index 4f109bf..05a851c 100644
+--- a/src/renderers/webgl-fallback/WebGLBackend.js
++++ b/src/renderers/webgl-fallback/WebGLBackend.js
+@@ -2200,6 +2200,28 @@ class WebGLBackend extends Backend {
+ 
+ 	}
+ 
++	/**
++	 * Copies the data of one storage buffer attribute's GPU buffer into another's, on the GPU,
++	 * in command order.
++	 *
++	 * @param {BufferAttribute} srcAttribute - The source attribute.
++	 * @param {BufferAttribute} dstAttribute - The destination attribute.
++	 */
++	copyBufferToBuffer( srcAttribute, dstAttribute ) {
++
++		const { gl } = this;
++
++		const src = this.get( this.getBufferAttribute( srcAttribute ) ).bufferGPU;
++		const dst = this.get( this.getBufferAttribute( dstAttribute ) ).bufferGPU;
++
++		gl.bindBuffer( gl.COPY_READ_BUFFER, src );
++		gl.bindBuffer( gl.COPY_WRITE_BUFFER, dst );
++		gl.copyBufferSubData( gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, 0, 0, Math.min( srcAttribute.array.byteLength, dstAttribute.array.byteLength ) );
++		gl.bindBuffer( gl.COPY_READ_BUFFER, null );
++		gl.bindBuffer( gl.COPY_WRITE_BUFFER, null );
++
++	}
++
+ 	/**
+ 	 * Copies data of the given source texture to the given destination texture.
+ 	 *
+diff --git a/src/renderers/webgpu/WebGPUBackend.js b/src/renderers/webgpu/WebGPUBackend.js
+index 1a0880a..6834e83 100644
+--- a/src/renderers/webgpu/WebGPUBackend.js
++++ b/src/renderers/webgpu/WebGPUBackend.js
+@@ -2962,6 +2962,26 @@ class WebGPUBackend extends Backend {
+ 
+ 	}
+ 
++	/**
++	 * Copies the data of one storage buffer attribute's GPU buffer into another's, on the GPU.
++	 * The copy is submitted at once: after the work already submitted, and before the render
++	 * pass being recorded, which is submitted when the render finishes.
++	 *
++	 * @param {BufferAttribute} srcAttribute - The source attribute.
++	 * @param {BufferAttribute} dstAttribute - The destination attribute.
++	 */
++	copyBufferToBuffer( srcAttribute, dstAttribute ) {
++
++		const src = this.get( this.getBufferAttribute( srcAttribute ) ).buffer;
++		const dst = this.get( this.getBufferAttribute( dstAttribute ) ).buffer;
++
++		const encoder = this.device.createCommandEncoder( { label: 'copyBufferToBuffer' } );
++		encoder.copyBufferToBuffer( src, 0, dst, 0, Math.min( src.size, dst.size ) );
++
++		this.device.queue.submit( [ encoder.finish() ] );
++
++	}
++
+ 	/**
+ 	 * Copies data of the given source texture to the given destination texture.
+ 	 *

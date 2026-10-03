@@ -124,6 +124,26 @@ export function issueParts(text) {
     };
 }
 
+/**
+ * v4802: a three-way merge's conflict blocks (diff3 style) resolved where, and only where, each side is ONE import line from
+ * the same module: the names either side imports, less any name either side removed from the base. Returns { text, lines }
+ * -- the merged import lines -- or null if any block is anything else.
+ */
+export function mergeImportConflicts(text) {
+    const RE = /^<<<<<<< [^\n]*\n(.*)\n\|\|\|\|\|\|\| [^\n]*\n(.*)\n=======\n(.*)\n>>>>>>> [^\n]*$/gm;
+    const IMPORT = /^import \{ ([^}]*) \} from ('[^']+');$/;
+    const lines = []; let bad = false;
+    const out = text.replace(RE, (whole, ours, base, theirs) => {
+        const [o, b, t] = [ours, base, theirs].map((l) => IMPORT.exec(l));
+        if (!o || !b || !t || o[2] !== b[2] || t[2] !== b[2]) { bad = true; return whole; }
+        const names = (m) => m[1].split(",").map((x) => x.trim()).filter(Boolean);
+        const [N, B, T] = [o, b, t].map(names), removed = B.filter((n) => !N.includes(n) || !T.includes(n));
+        const keep = [...B, ...N, ...T].filter((n, i, a) => a.indexOf(n) === i && !removed.includes(n));
+        const line = `import { ${keep.join(", ")} } from ${b[2]};`; lines.push(line); return line;
+    });
+    return bad || /^(<<<<<<<|=======|>>>>>>>)/m.test(out) ? null : { text: out, lines };
+}
+
 /** The patch files, by slot. */
 export function devPatches(dir = DEV_PATCHES) {
     return Object.fromEntries((fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => /^\d\d-.*\.diff$/.test(f)).sort().map((f) => [f.slice(0, 2), f]));
@@ -151,9 +171,24 @@ function main() {
 
     // three's own builds: dev, each patch alone, and every patch in order -- the checkout's src/ restored after each
     const out = fs.mkdtempSync(path.join(os.tmpdir(), "three-dev-")), FILES = ["three.core.js", "three.tsl.js", "three.webgpu.js"];
+    const merged = [];
     const build = (label, list) => {
-        git("checkout", "--", "src");
-        for (const s of list) execFileSync("git", ["apply", patchPath(s)], { cwd: three });
+        git("reset", "-q"); git("checkout", "HEAD", "--", "src");
+        for (const s of list) {
+            try { execFileSync("git", ["apply", "--index", patchPath(s)], { cwd: three, stdio: "pipe" }); continue; } catch { /* below */ }
+            // v4802: applied on top of earlier patches, a patch can meet a line one of them changed too -- 16 and 08 both edit
+            // Instance.js's one import from EventNode.js, and three's lint forbids a second import of the module. So: three-way,
+            // and ONLY an import line's conflict is resolved (mergeImportConflicts); anything else stops the build.
+            try { execFileSync("git", ["-c", "merge.conflictStyle=diff3", "apply", "-3", patchPath(s)], { cwd: three, stdio: "pipe" }); } catch { /* conflicts, below */ }
+            const conflicted = git("diff", "--name-only", "--diff-filter=U").split("\n").filter(Boolean);
+            if (!conflicted.length) throw new Error(`patch ${s} does not apply on top of ${list.slice(0, list.indexOf(s)).join(", ")}`);
+            for (const f of conflicted) {
+                const r = mergeImportConflicts(fs.readFileSync(path.join(three, f), "utf8"));
+                if (r === null) throw new Error(`patch ${s} conflicts in ${f} beyond an import line`);
+                fs.writeFileSync(path.join(three, f), r.text); git("add", f);
+                for (const line of r.lines) merged.push({ build: label, patch: s, file: f, line });
+            }
+        }
         execFileSync("npx", ["rollup", "-c", "utils/build/rollup.config.js"], { cwd: three, stdio: "ignore" });
         fs.mkdirSync(path.join(out, label));
         for (const f of FILES) fs.copyFileSync(path.join(three, "build", f), path.join(out, label, f));
@@ -164,7 +199,7 @@ function main() {
         build("dev", []);
         for (const s of slots) build("p" + s, [s]);
         build("all", slots);
-    } finally { git("checkout", "--", "src", "build"); }
+    } finally { git("reset", "-q"); git("checkout", "HEAD", "--", "src", "build"); }
     // r186 as npm ships it, but for three.tsl.js's one import of the bare 'three/webgpu', pointed at the file beside it: the page
     // has no import map
     fs.mkdirSync(path.join(out, "r186"));
@@ -196,6 +231,7 @@ function main() {
             builds, browser: "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
             patches: Object.fromEntries(all.map((s) => [s, sha256(fs.readFileSync(patchPath(s), "utf8"))])),
             code: Object.fromEntries(all.map((s) => [s, sha256(parts[s].html)])),
+            merged,
             results,
         };
         fs.writeFileSync(RECORD, JSON.stringify(record, null, 1) + "\n");

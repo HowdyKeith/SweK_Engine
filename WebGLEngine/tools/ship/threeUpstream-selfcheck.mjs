@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import crypto from "node:crypto";
-import { ENG, BUNDLE, apply, normalImports, rootWithBuilds, DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threePatch.mjs";
+import { ENG, BUNDLE, apply, normalImports, rootWithBuilds, mergeImportConflicts, DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threePatch.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
@@ -286,14 +286,22 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
 {
     // 01 and 02 are fixed in r186 (#34100, #34101, #34107); 08 stands with another symptom -- r186 syncs the instance buffer before a
     // frame's first render, so the second and third draw the first's matrices -- and 15 is r186's own
-    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15"];
+    // v4802: and 16, compute-written storage instance matrices -- r186's fix for 01 reaches only the CPU array
+    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16"];
     const DEV_BUG = {
         "08": (r) => all(r) && r.webgpu.sameFrame && r.webgpu.one.every((n) => n > 50) && r.webgpu.many[0] === 0 && r.webgpu.many[1] === 0 && r.webgpu.many[2] > 50 && r.webgpu.manyDynamic.every((n) => n > 50),
     };
+    // v4802: 15 holds the first frame too -- a still batch reads 7.482 px there on r186, its copy never uploaded until after it
     const OWN = { "15": {
-        bug: (r) => all(r) && r.webgpu.plain === "5.612" && /^throws RangeError: /.test(r.webgpu.atGrowth) && /^throws RangeError: /.test(r.webgpu.after),
-        fixed: (r) => all(r) && r.webgpu.atGrowth === r.webgpu.plain && r.webgpu.after === r.webgpu.plain,
-        observed: (r) => `plain ${r.webgpu.plain}, atGrowth ${r.webgpu.atGrowth}, after ${r.webgpu.after} -- the batch's mean x velocity in pixels, grown before the third frame (both backends)` } };
+        bug: (r) => all(r) && r.webgpu.plain === "5.612" && /^throws RangeError: /.test(r.webgpu.atGrowth) && /^throws RangeError: /.test(r.webgpu.after) && r.webgpu.firstFrame !== "0.000",
+        fixed: (r) => all(r) && r.webgpu.atGrowth === r.webgpu.plain && r.webgpu.after === r.webgpu.plain && r.webgpu.firstFrame === "0.000",
+        observed: (r) => `plain ${r.webgpu.plain}, atGrowth ${r.webgpu.atGrowth}, after ${r.webgpu.after} -- the batch's mean x velocity in pixels, grown before the third frame; ` +
+            `firstFrame ${r.webgpu.firstFrame} -- a still batch's on the first frame it is drawn (both backends)` },
+        // WebGPU only: the WebGL 2 backend draws no InstancedMesh with storage matrices, in any build
+        "16": { webgpuOnly: true,
+        bug: (r) => r.webgpu.plain === "5.612" && r.webgpu.storageCPU === r.webgpu.plain && r.webgpu.storageCompute !== r.webgpu.plain,
+        fixed: (r) => r.webgpu.storageCPU === r.webgpu.plain && r.webgpu.storageCompute === r.webgpu.plain,
+        observed: (r) => `plain ${r.webgpu.plain}, storageCPU ${r.webgpu.storageCPU}, storageCompute ${r.webgpu.storageCompute} -- the instance's mean x velocity in pixels (WebGPU)` } };
     const TEMPLATE = ["Description", "Reproduction steps", "Code", "Live example", "Screenshots", "Version", "Device", "Browser", "OS"];
     const issues = issueFiles(), patches = devPatches(), rec = fs.existsSync(DEV_RECORD) ? JSON.parse(fs.readFileSync(DEV_RECORD, "utf8")) : null;
     const draftOf = (slot) => Object.keys(DRAFTS).find((f) => f.startsWith(slot + "-")) || null;
@@ -309,6 +317,19 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`*** the record is of dev at ${DEV_COMMIT.slice(0, 7)} and r186 ${DEV_RELEASE}, and of every patch and reproduction as they are now ***`,
         !!rec && rec.devCommit === DEV_COMMIT && rec.release === DEV_RELEASE && SLOTS.every(fresh),
         !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threePatch.mjs again`);
+    // v4802: the one line the patches cannot apply in order without -- 08 and 16 both edit Instance.js's import from EventNode.js
+    {   const M = (rec && rec.merged) || [];
+        ok(`  the "all" build's merges are import lines only, made only there, and the README says so: ${M.map((m) => `${m.patch} in ${m.file}`).join("; ") || "none"}`,
+            M.length > 0 && M.every((m) => m.build === "all" && /^import \{ [^}]+ \} from '[^']+';$/.test(m.line)) && M.every((m) => devIndex.includes(m.line)) &&
+            devIndex.includes("`merged`"));
+        const conflict = (o, b, t) => `x\n<<<<<<< ours\n${o}\n||||||| base\n${b}\n=======\n${t}\n>>>>>>> theirs\ny\n`;
+        const ev = (names) => `import { ${names} } from '../utils/EventNode.js';`;
+        const r = mergeImportConflicts(conflict(ev("OnAfterObjectUpdate, OnBeforeObjectUpdate"), ev("OnAfterObjectUpdate, OnBeforeFrameUpdate"), ev("OnAfterObjectUpdate, OnBeforeFrameUpdate, OnBeforeObjectUpdate")));
+        ok("  ...the merge keeps what either side imports, less what either removed -- and refuses any conflict that is not an import line",
+            !!r && r.lines.join() === ev("OnAfterObjectUpdate, OnBeforeObjectUpdate") && !r.text.includes("<<<<<<<") &&
+            mergeImportConflicts(conflict("const a = 1;", "const a = 0;", "const a = 2;")) === null &&
+            mergeImportConflicts(conflict(ev("A"), ev("B"), "import { C } from './Other.js';")) === null,
+            r ? r.lines.join(" | ") : "no merge"); }
     // three's own unit and e2e tests on dev and on dev with every patch, run in the checkout: the record adds up, names the two
     // builds the issues' record names, and the README states it
     const E2E = path.join(DEV_DIR, "e2e.json"), e2e = fs.existsSync(E2E) ? JSON.parse(fs.readFileSync(E2E, "utf8")) : null;
@@ -332,7 +353,7 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
         ok(`  ${f}: the patch in its Description is ${patches[s]}, byte for byte`, !!patches[s] && parts.patch === fs.readFileSync(path.join(DEV_DIR, "patches", patches[s]), "utf8"));
         const r = rec && rec.results[s];
         if (!r || !d) { ok(`  ${f}: the record holds its four runs`, false); continue; }
-        const four = ["r186", "dev", "patched", "all"].every((k) => r[k] && r[k].webgpu && r[k].webgl2);
+        const four = ["r186", "dev", "patched", "all"].every((k) => r[k] && r[k].webgpu && (d.webgpuOnly || r[k].webgl2));
         ok(`*** ${f}: the bug ${four ? `stands on r186 and on dev alike ("${d.observed(r.r186)}"), and the patch fixes it ("${d.observed(r.patched)}")` : "-- did not run on all four builds"} ***`,
             four && JSON.stringify(r.r186) === JSON.stringify(r.dev) && (DEV_BUG[s] || d.bug)(r.r186) && d.fixed(r.patched) && d.fixed(r.all), four ? "" : JSON.stringify(r).slice(0, 300));
         if (!four) continue;
@@ -349,7 +370,8 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
 // S6 the README dropping #34107 -> 1; S7 the record's dev printing otherwise than r186 on one backend -> 1; S8 a live example
 // claimed -> 1; S9 the record of another dev commit -> 1; S10 issue 15 removed -> 2; S11 08 held to r185's symptom -> 1; S12 04's
 // together block removed -> 1; S13 an issue's inline patch edited by one space -> 1; S14 15's fix missing from the all-patch run
-// -> 2. Fourteen, none green. Then E1 e2e.json naming another all-patch build -> 1; E2 its WebGL 2 count edited -> 2 (adds up; the README).
+// -> 2. Fourteen, none green. v4802: M1 the record's merge a non-import line -> 1; M2 the resolver keeping a name a side removed
+// -> 1; M3 16's bug not standing on dev -> 1; M4 15's first frame right on r186 -> 2 (the bug; its Screenshots). Then E1 e2e.json naming another all-patch build -> 1; E2 its WebGL 2 count edited -> 2 (adds up; the README).
 // ---- v4763 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against the drafts themselves: U1 an Observed number edited by a thousandth -> 1; U2 a reproduction importing more than
 // three -> 2; U3 the instanced reproduction made to move the mesh instead (no bug) -> 2; U4 the README not saying DRAFTS, NOT

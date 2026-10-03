@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4802 -- THE 406th CLOSING: NO new gate file -- the fourteenth issue, and the first frame of the thirteenth.
+    since499: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4802", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 16, issue 15's first frame, and the one import-line merge the all-patch build makes)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THINGS THE LAST ROUND NAMED AND DID NOT FILE. *** An InstancedMesh whose storage instance matrices a compute pass " +
+                 "writes reads 1.496 px of velocity where a plain mesh reads 5.612, on r186 and dev: r186's fix for 01 copies the previous " +
+                 "matrices from the CPU array, which a compute pass never writes. Issue 16, with a patch that keeps them on the GPU -- " +
+                 "renderer.copyBufferToBuffer, two copies before each draw -- and 5.612. And r186 makes a batch's previous-matrices copy " +
+                 "without marking it for upload, so a fresh still BatchedMesh reads 7.482 px on its first frame: issue 15 gains the row, " +
+                 "its patch already fixing it. 08 and 16 edit one import line three's lint will not let be split; the tool merges that, " +
+                 "and only that, and the record lists it. Three's e2e and unit tests on dev with all fourteen, again.",
+    }),
     // v4801 -- THE 405th CLOSING: NO new gate file -- five more callers off a hand-spelled regex.
     since498: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

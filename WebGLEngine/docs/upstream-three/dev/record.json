@@ -8,7 +8,7 @@
  },
  "releaseEdit": "three.tsl.js's one import of 'three/webgpu' pointed at './three.webgpu.js' (the page has no import map); nothing else",
  "builds": {
-  "all": "4918bb20f08865966e3e59a1aeff03045a8d4f9ce0dfc465c74c7765e4d2295e",
+  "all": "ab56381fcb27d43d1d3857ee74500c2558e6288135af55c91ab3131c1de27e83",
   "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p03": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p04": "cf3a6e85d566e9e33451fd9f509da33ea9458bc0cbc95b896a571a89aa6eca7d",
@@ -23,6 +23,7 @@
   "p13": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p14": "ed96fae7d9ae391f7e5a0d74d32ba71dc57ef38f44391077f111a6b45acf9c03",
   "p15": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
+  "p16": "6ca24eafd6b6f8b1929c39ce289d52a62eb5aa91ce697cdcd9e722f51289af59",
   "r186": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
  },
  "browser": "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
@@ -33,6 +34,7 @@
   "13": "0ac6bd9b08d2e253527e49750ce4ee6863d23ae38437c7c3892d64c74e96b016",
   "14": "3884cd1a7bb7658f791a94ca4dc9c1a2b2185e5f95ab350b480a4e47727b8456",
   "15": "71ff2566af7ad8d6443045f3f52c0c3ece2ed7a81353aa83589d158a6dedf6c2",
+  "16": "9a996ac3b3bc8bf7e103c5e6f9ae867644fd6e333871ff34c3da4cef81c8147c",
   "03": "7907879533d9b4071c495cd8521218fa7a05a3cb903a411e1d4656e3f938e36b",
   "04": "20d14b397fc4fdac6879efcd1199a36b63c75e53a148e2ff845a4f63d27794d4",
   "05": "549c955536325a1d1749671be585c1678cb7c4bc8b5aebd2bdd98a9154d707fe",
@@ -47,7 +49,8 @@
   "12": "c95a98f6847cf2dfb76699b58620a0e508a38b6c86429b5c5bc47c7e02676933",
   "13": "d293aa8997c0b7d9cddf758e23b252a51ce3743c6cc659efb9773cdebb672af7",
   "14": "98c18afa805cefba2c1b50c17161e0924dafcf37363580b3e27abee03c498a64",
-  "15": "5f1562010d7841474ed1792abf778854bd4e299823107f494b843b6922f05c05",
+  "15": "f6ec405cc26a8694dfbc290d7275135677e93e7ba1dfa8db68229eb243796605",
+  "16": "9216c55e269711550a40969be94eee0c766482e56d04b3eb0b214eba93d95248",
   "03": "ed747ca7257b078ba882273d921589ae24369e57e8c0256622951fd4ce472d16",
   "04": "2fc5a4796d64196654969b9e90289cbe715ab2fcdd8a6c6fbe843dccdbaa4118",
   "05": "e9490f2082dbe2b851ec6d49557adaa32edf9d642b5f35117281622c0cdb0033",
@@ -56,6 +59,14 @@
   "08": "efec8420da6109ac71e54911d4db512dfad45803a0b464cf6350aa74f7dbf367",
   "09": "dbf5163b1ad771b1c214acce6cbe7b6adebbe40d80812a22d742550453e814cb"
  },
+ "merged": [
+  {
+   "build": "all",
+   "patch": "16",
+   "file": "src/nodes/accessors/Instance.js",
+   "line": "import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';"
+  }
+ ],
  "results": {
   "10": {
    "r186": {
@@ -288,48 +299,86 @@
     "webgpu": {
      "plain": "5.612",
      "atGrowth": "throws RangeError: offset is out of bounds",
-     "after": "throws RangeError: offset is out of bounds"
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
     },
     "webgl2": {
      "plain": "5.612",
      "atGrowth": "throws RangeError: offset is out of bounds",
-     "after": "throws RangeError: offset is out of bounds"
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
     }
    },
    "dev": {
     "webgpu": {
      "plain": "5.612",
      "atGrowth": "throws RangeError: offset is out of bounds",
-     "after": "throws RangeError: offset is out of bounds"
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
     },
     "webgl2": {
      "plain": "5.612",
      "atGrowth": "throws RangeError: offset is out of bounds",
-     "after": "throws RangeError: offset is out of bounds"
+     "after": "throws RangeError: offset is out of bounds",
+     "firstFrame": "7.482"
     }
    },
    "all": {
     "webgpu": {
      "plain": "5.612",
      "atGrowth": "5.612",
-     "after": "5.612"
+     "after": "5.612",
+     "firstFrame": "0.000"
     },
     "webgl2": {
      "plain": "5.612",
      "atGrowth": "5.612",
-     "after": "5.612"
+     "after": "5.612",
+     "firstFrame": "0.000"
     }
    },
    "patched": {
     "webgpu": {
      "plain": "5.612",
      "atGrowth": "5.612",
-     "after": "5.612"
+     "after": "5.612",
+     "firstFrame": "0.000"
     },
     "webgl2": {
      "plain": "5.612",
      "atGrowth": "5.612",
-     "after": "5.612"
+     "after": "5.612",
+     "firstFrame": "0.000"
+    }
+   }
+  },
+  "16": {
+   "r186": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "1.496"
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "1.496"
+    }
+   },
+   "all": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "5.612"
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "plain": "5.612",
+     "storageCPU": "5.612",
+     "storageCompute": "5.612"
     }
    }
   },

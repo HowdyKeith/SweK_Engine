@@ -1,16 +1,16 @@
-# BatchedMesh: grown by setInstanceCount under a velocity MRT, every render throws `RangeError: offset is out of bounds`
+# BatchedMesh under a velocity MRT: every render throws once the batch grows, and the first frame reads motion that is not there
 
 <!-- DRAFT, NOT POSTED. Three's Bug Report form (https://github.com/mrdoob/three.js/issues/new?template=bug_report.yml), field by field: the title is this heading, and each ### section below is the body of the field of that name. -->
 
 ### Description
 
-A `BatchedMesh` rendered with an MRT that has a `velocity` output throws on every render after its instance count is grown with `setInstanceCount`: `RangeError: offset is out of bounds`. Before the growth it draws, and its velocity is a plain mesh's. New in r186 with the batch's previous matrices (#34100); r185 did not throw.
+A `BatchedMesh` rendered with an MRT that has a `velocity` output throws on every render after its instance count is grown with `setInstanceCount`: `RangeError: offset is out of bounds`. Before the growth it draws, and its velocity is a plain mesh's -- but for the first frame a batch is drawn: a still one reads 7.482 px of motion there, where a plain mesh reads 0. New in r186 with the batch's previous matrices (#34100); r185 did not throw.
 
-**Expected:** `atGrowth` and `after` equal to `plain`.
+**Expected:** `atGrowth` and `after` equal to `plain`, and `firstFrame` 0.000.
 
-**Cause.** `batch()` (`src/nodes/accessors/Batch.js`) keeps a copy of the batch's matrices texture for the previous matrices, made once per batch at its size then (`getPreviousNode()`), and after each draw copies the current matrices into it: `previousMatricesTexture.image.data.set( object._matricesTexture.image.data )` in an `OnAfterObjectUpdate`. `setInstanceCount` re-makes the matrices texture larger; the copy stays the old size, and `set()` throws.
+**Cause.** `batch()` (`src/nodes/accessors/Batch.js`) keeps a copy of the batch's matrices texture for the previous matrices, made once per batch at its size then (`getPreviousNode()`), and after each draw copies the current matrices into it: `previousMatricesTexture.image.data.set( object._matricesTexture.image.data )` in an `OnAfterObjectUpdate`. `setInstanceCount` re-makes the matrices texture larger; the copy stays the old size, and `set()` throws. And the copy is never marked for upload when it is made, so the first draw reads an empty texture -- every previous matrix zero, every previous position the origin.
 
-**Fix.** The patch makes the copy again at the new size when the batch's node is built again, the last draw's matrices kept as its first entries, and leaves the copy as it is until then. The new copy is marked for upload when it is made: without that, the growth frame's velocity read an empty texture. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch makes the copy again at the new size when the batch's node is built again, the last draw's matrices kept as its first entries, and leaves the copy as it is until then. The copy is marked for upload when it is made, which is what fixes the first frame -- and the growth frame, whose new copy would otherwise be read empty too. Against `dev` at 1ea31f3; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -72,7 +72,7 @@ index f0b2e65..dcf6370 100644
 
 1. Save the code below as an `.html` file and open it in Chrome.
 2. It renders on WebGPU, then again with `forceWebGL: true` (the WebGL 2 backend), and prints what it measured on both.
-3. Compare `atGrowth` and `after` with `plain`. (The page marks the batch's material for update after growing it, as the issue "BatchedMesh: grown by setInstanceCount, it is drawn from its old matrices texture" filed beside this one needs.)
+3. Compare `atGrowth` and `after` with `plain`, and read `firstFrame`. (The page marks the batch's material for update after growing it, as the issue "BatchedMesh: grown by setInstanceCount, it is drawn from its old matrices texture" filed beside this one needs.)
 
 ### Code
 
@@ -106,7 +106,11 @@ const run = async (forceWebGL) => {
         batch.frustumCulled = false; batch.perObjectFrustumCulled = false; const s = new THREE.Scene(); s.add(batch);
         return velocityOf(s, (k) => { if (k === 2) { batch.setInstanceCount(64); batch.material.needsUpdate = true; } batch.setMatrixAt(id, M.makeTranslation(-0.5 + 0.3 * k, 0, 0)); }, n); };
     const atGrowth = await grown(3), after = await grown(4);
-    renderer.dispose(); return { plain, atGrowth, after };
+    // and a batch that never moves, drawn once: the velocity on the first frame it is drawn, which a plain mesh reads as 0
+    const still = new THREE.BatchedMesh(1, 100, 300, material()), sid = still.addInstance(still.addGeometry(new THREE.BoxGeometry(0.6, 0.6, 0.6)));
+    still.frustumCulled = false; still.perObjectFrustumCulled = false; still.setMatrixAt(sid, M.makeTranslation(0.4, 0, 0)); const s3 = new THREE.Scene(); s3.add(still);
+    const firstFrame = await velocityOf(s3, () => {}, 1);
+    renderer.dispose(); return { plain, atGrowth, after, firstFrame };
 };
 report({ webgpu: await run(false), webgl2: await run(true) });
 </script>
@@ -121,13 +125,13 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
-plain 5.612, atGrowth throws RangeError: offset is out of bounds, after throws RangeError: offset is out of bounds -- the batch's mean x velocity in pixels, grown before the third frame (both backends)
+plain 5.612, atGrowth throws RangeError: offset is out of bounds, after throws RangeError: offset is out of bounds -- the batch's mean x velocity in pixels, grown before the third frame; firstFrame 7.482 -- a still batch's on the first frame it is drawn (both backends)
 <!-- observed:end -->
 
 With the patch:
 
 <!-- patched:begin -->
-plain 5.612, atGrowth 5.612, after 5.612 -- the batch's mean x velocity in pixels, grown before the third frame (both backends)
+plain 5.612, atGrowth 5.612, after 5.612 -- the batch's mean x velocity in pixels, grown before the third frame; firstFrame 0.000 -- a still batch's on the first frame it is drawn (both backends)
 <!-- patched:end -->
 
 ### Version

@@ -7,7 +7,7 @@ fields, its reproduction imports three's latest release, **r186** (`0.186.1`), a
 commit -- headless Chromium 141, SwiftShader, on WebGPU and on the WebGL 2 backend.
 
 `tools/ship/threePatch.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
-three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all thirteen in order, and writes what each page
+three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all fourteen in order, and writes what each page
 printed to [`record.json`](record.json). Section 6 of `tools/ship/threeUpstream-selfcheck.mjs` holds the issues to it: a patch or
 a reproduction edited since the record is red until the tool is run again.
 
@@ -19,7 +19,10 @@ a reproduction edited since the record is red until the tool is run again.
 3. Live example: the form requires one. Paste the Code into a fork of the "jsfiddle-latest-release WebGPURenderer" fiddle
    (https://jsfiddle.net/mnqr9oj0/) and link the fork where the issue's comment says.
 4. The patch is in the Description. For a pull request: `git apply patches/NN-*.diff` on `dev` at the commit above. All
-   thirteen apply together in numeric order (10 carries two lines of context, so it applies after 04).
+   fourteen apply together in numeric order (10 carries two lines of context, so it applies after 04), but for one line: 08 and
+   16 both edit `Instance.js`'s one import from `EventNode.js`, and three's lint forbids a second. Applied together it reads
+   `import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';` -- the tool makes that merge, and only
+   that kind (an import line, each side's names less what either removed), and `record.json` lists it under `merged`.
 
 ## The issues
 
@@ -35,7 +38,8 @@ a reproduction edited since the record is red until the tool is run again.
 - [WebGLBackend: a storage buffer named without its count shares its attribute node's hash, and the compute never links](12-webgl2-storage-without-count.md)
 - [InstancedMesh with per-instance morphs: absolute targets throw, and so does a mesh-level morphTargetInfluences](13-instanced-morph-absolute-and-mesh-level.md)
 - [WebGLBackend: a compute reads the first element of any buffer whose class differs from its first buffer's](14-webgl2-compute-buffer-class.md)
-- [BatchedMesh: grown by setInstanceCount under a velocity MRT, every render throws `RangeError: offset is out of bounds`](15-batched-grown-velocity-throws.md) -- new in r186
+- [BatchedMesh under a velocity MRT: every render throws once the batch grows, and the first frame reads motion that is not there](15-batched-grown-velocity-throws.md) -- new in r186
+- [InstancedMesh: velocity is wrong when a compute pass writes its storage instance matrices](16-instance-storage-compute-velocity.md) -- WebGPU; r186's fix for 01 reaches the CPU array only
 
 ## Fixed in r186, so not filed
 
@@ -65,12 +69,12 @@ a reproduction edited since the record is red until the tool is run again.
 
 `tools/ship/threeUpstreamPaths-selfcheck.mjs`'s cases, run on `dev` and on `dev` with these patches: 03's, 04's, 07's, 11's and
 13's give what they gave on r185 with its patches. Instance matrices in a storage buffer written on the CPU are right on `dev`;
-written by a compute pass they still are not -- as on r185 with patch 01, which never reached them, and not filed. A batch
+written by a compute pass they still are not -- as on r185 with patch 01, which never reached them: issue 16 (v4802). A batch
 grown with its material updated throws on `dev`: that is issue 15.
 
 ## Checked with three's own tests
 
-Run in the `dev` checkout, on `dev` and on `dev` with all thirteen patches in order, each built by three's rollup -- the same
+Run in the `dev` checkout, on `dev` and on `dev` with all fourteen patches in order, each built by three's rollup -- the same
 bytes `record.json` names:
 
 - Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1522 tests, 1521 passed, 1 todo, 0 failed, on both builds.
