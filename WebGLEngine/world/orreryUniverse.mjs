@@ -196,7 +196,7 @@ export const MEASURED_AT_V4432 = Object.freeze({
     vendoredBytesMisattributed: 810948,
     axesReachable: 1,
     axesRefused: 2,
-    languageAgree: 7,       // v4560: xatlas, C++ against C++
+    languageAgree: 8,       // v4560: xatlas, C++ against C++; v4805: three-webgpu-r185, JavaScript against three.js's JavaScript
     languageBuilt: 2,
     languageTranspiled: 2,
     languagePaperwork: 1,

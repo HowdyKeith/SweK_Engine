@@ -161,8 +161,10 @@ console.log("\n4. the widest rule in the tree, checked in the direction nobody c
     // 25 -> 26: vendor/draco-encoder/LICENSE. draco-encoder arrived 2026-09-10 (orrery.json, commit a70d9c78,
     // re-baked via its own --write builder) and vendor/draco-encoder/LICENSE exists on disk (13898 bytes,
     // verified with `ls vendor/draco-encoder/`) -- a fifth vendored licence file, not a bookkeeping slip.
+    // v4805: 26 -> 27, vendor/three-webgpu-r185/LICENSE -- three's MIT grant byte for byte, beside the r185 build kept for the r185
+    // drafts when vendor/three-webgpu moved to r186. A new body's licence, landing in the bake as this row expects.
     ok("!! ...and the constraint costs the rule NOTHING: every vendored licence is still matched",
-        vendorLicences === 26, `${vendorLicences} of 26 -- measured before the change and after, again at the Racing city 0 re-bake, and again when xatlas and draco-encoder arrived`);
+        vendorLicences === 27, `${vendorLicences} of 27 -- measured before the change and after, again at the Racing city 0 re-bake, and again when xatlas, draco-encoder and three-webgpu-r185 arrived`);
     ok("...and one owner holds the rule, so the two copies cannot drift",
         // NOT a source pattern -- the first version of this row matched the exact `export { x } from "y"` line
         // and went red the moment that had to become an import plus an export, which it did, because a

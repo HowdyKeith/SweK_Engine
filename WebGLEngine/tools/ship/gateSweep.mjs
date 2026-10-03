@@ -8725,7 +8725,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     }),
     // v4805 -- THE 409th CLOSING: NO new gate file -- the engine's three-webgpu moved to r186.
     since502: Object.freeze({
-        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened six.
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened nine.
         at: "v4805", swept: 0, green: 0, red: 0,
         added: Object.freeze([]),
         widened: Object.freeze([
@@ -8735,6 +8735,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "tools/ship/tsl-selfcheck.mjs (revision 186, the README's heading)",
             "tools/ship/threeProbe-selfcheck.mjs (RIG-PENDING for 0.186.1 rather than passed on 0.185.1's capture)",
             "tools/ship/threeUpstreamPaths-selfcheck.mjs (r185 from vendor/three-webgpu-r185)",
+            "tools/ship/predicatePairs-selfcheck.mjs, tools/ship/orreryUniverse-selfcheck.mjs, tools/ship/referenceKind-selfcheck.mjs (the kept r185 body: 27 licences, 17 upstreams, 8 agreeing, one gate-only module named)",
         ]),
         redOnArrival: Object.freeze([]),
         verdict: "*** MEASURED BEFORE IT WAS MOVED, AND WHAT MOVED WAS THREE. *** r186 was swapped into a scratch worktree and the 327 gates " +

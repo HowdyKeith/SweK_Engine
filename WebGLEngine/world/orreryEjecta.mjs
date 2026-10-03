@@ -514,6 +514,13 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/temporalTslNodes-selfcheck.mjs",
         "render/temporalTslZoo-selfcheck.mjs",
         "render/translucentLayer-selfcheck.mjs",
+        // v4805 -- the engine moved to r186 and kept r185 beside it: threePatch.mjs applies the r185 patches to vendor/three-webgpu-r185
+        // now (its row below), and threeUpstream-selfcheck.mjs's section 6 runs the issues on this body's r186. One gone, one arrived.
+        "tools/ship/threeUpstream-selfcheck.mjs",
+    ]),
+    // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
+    // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
+    "three-webgpu-r185": Object.freeze([
         "tools/ship/threePatch.mjs",
     ]),
     "wasm": Object.freeze([

@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-09-15",
+ "built": "2026-10-03",
  "bodies": [
   {
    "name": "box3d",
@@ -277,7 +277,23 @@
     "owner": "mrdoob",
     "repo": "three.js"
    },
-   "bytes": 3654294
+   "bytes": 3786213
+  },
+  {
+   "name": "three-webgpu-r185",
+   "kind": "collective",
+   "who": "three.js authors",
+   "line": "Copyright © 2010-2026 three.js authors",
+   "licenceFile": "LICENSE",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.txt",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/mrdoob/three.js",
+    "owner": "mrdoob",
+    "repo": "three.js"
+   },
+   "bytes": 3653275
   },
   {
    "name": "wasm",
@@ -330,9 +346,10 @@
    "kind": "collective",
    "bodies": [
     "three",
-    "three-webgpu"
+    "three-webgpu",
+    "three-webgpu-r185"
    ],
-   "bytes": 6999121
+   "bytes": 10784315
   },
   {
    "author": "Dunfan Lu",
@@ -469,14 +486,14 @@
   }
  ],
  "counts": {
-  "bodies": 20,
-  "attributed": 18,
+  "bodies": 21,
+  "attributed": 19,
   "authors": 16,
-  "covered": 18,
+  "covered": 19,
   "missing": 2,
-  "withUpstream": 16,
+  "withUpstream": 17,
   "person": 14,
-  "collective": 4,
+  "collective": 5,
   "disclaimed": 1,
   "prose": 1,
   "none": 0,

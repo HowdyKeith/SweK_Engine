@@ -92,7 +92,7 @@ const biomeOf = (p) => BIOME_ORDER[biomeIdFor(p)];
     ok("the correction moved exactly the record that was wrong and left the others alone",
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjakel").length === 0 &&
         AUTH.bodies.filter((b) => b.upstream && b.upstream.owner === "justjake").length === 1 &&
-        AUTH.counts.withUpstream === 16,   // 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md); 15 at v4560 (xatlas, whose PROVENANCE.txt names jpcy/xatlas); 16 now (draco-encoder, vendored for Task 53 with a PROVENANCE.txt naming google/draco -- measured directly from orrery-authors.json's re-bake, not guessed)
+        AUTH.counts.withUpstream === 17,   // v4805: 17, three-webgpu-r185 (its PROVENANCE.txt names mrdoob/three.js); 11 at v4432; 14 since Racing city 0 re-baked orrery-authors.json (morphicons at v4498, kenney-city and kenney-racing now, each with a PROVENANCE.md); 15 at v4560 (xatlas, whose PROVENANCE.txt names jpcy/xatlas); 16 now (draco-encoder, vendored for Task 53 with a PROVENANCE.txt naming google/draco -- measured directly from orrery-authors.json's re-bake, not guessed)
         "gifenc's git:// URL and htmx's LICENSE-blob URL say more about where the bytes came from than a repo " +
         "root does, so a canonical URL is synthesised ONLY when the vote overrides the first URL's owner");
     ok("and the vendored text was NOT edited -- the stray L is still in the file, as measured",

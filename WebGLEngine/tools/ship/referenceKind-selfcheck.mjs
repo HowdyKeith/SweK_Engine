@@ -234,7 +234,13 @@ const WHERE = GRAPH.where;
 // the same three routes one module at a time; raising the ceiling catches up to the merge and excuses none of it.
 // v4781 SABOTAGES: graveyard's new note with its module names WITH their extensions (its first draft) -> 1 red, 326
 // against 324; a sweep closing naming one more gate-only module -> 1 red on the ritual row, 59 against 58, naming it.
-const RESCUED_CEILING = 324;
+// v4805 -- 324 -> 325, ONE NEW ENTRY, MEASURED BY NAME (the rescued sets of v4804 and v4805 diffed): vendor/three-webgpu-r185/
+// three.tsl.js. vendor/three-webgpu moved to r186 and its r185 files were kept beside it for the r185 drafts; three.webgpu.js is read
+// by tools/ship/threePatch.mjs and imports three.core.js, but three.tsl.js is loaded only by the upstream gates, through a path they
+// compose ("/vendor/three-webgpu-r185" + "/three.tsl.js"), and mentioned by the READMEs that say so. A gate-only module by design --
+// the r185 build exists for gates -- so the routes that pay it down are this census learning composed paths, or the r185 drafts
+// retiring and the copy going with them.
+const RESCUED_CEILING = 325;
 
 const rescued = [];
 {
