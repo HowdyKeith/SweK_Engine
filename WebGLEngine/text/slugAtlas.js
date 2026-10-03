@@ -111,6 +111,32 @@ export function toHalf(value) {
     return sign | h;
 }
 
+/**
+ * binary32 -> binary16, ROUND TOWARD ZERO, with overflow to the largest finite half and underflow to signed zero.
+ * v4778 rig run 5: what Direct3D does when it converts to a smaller float format, a write to a 16-bit float render
+ * target included (Direct3D's floating-point rules: round-to-zero on conversion to another float format, and an
+ * out-of-range value becomes the largest representable one, not infinity). A GTX 1080 under ANGLE D3D11 and Dawn D3D12
+ * writes half this way; SwiftShader rounds to nearest even, as toHalf does. fx/fsr/fsrTemporalHalf-selfcheck.mjs
+ * asks a device which.
+ */
+export function toHalfRTZ(value) {
+    _f32[0] = value;
+    const x = _u32[0];
+    const sign = (x >>> 16) & 0x8000;
+    const exp = (x >>> 23) & 0xFF;
+    let man = x & 0x007FFFFF;
+
+    if (exp === 0xFF) return sign | 0x7C00 | (man ? 0x0200 : 0);          // Inf / NaN pass through
+    const e = exp - 127 + 15;
+    if (e >= 0x1F) return sign | 0x7BFF;                                   // overflow -> largest finite
+    if (e <= 0) {
+        if (e < -10) return sign;                                          // underflow -> zero
+        man |= 0x00800000;
+        return sign | (man >>> (14 - e));                                  // subnormal, the remainder dropped
+    }
+    return sign | (e << 10) | (man >>> 13);                                // the remainder dropped
+}
+
 /** binary16 -> binary32. Present so the selfcheck can read back exactly what the GPU will see. */
 export function fromHalf(h) {
     const sign = (h & 0x8000) ? -1 : 1;
