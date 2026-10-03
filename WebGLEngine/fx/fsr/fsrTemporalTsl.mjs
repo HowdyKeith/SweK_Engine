@@ -54,6 +54,32 @@ import { reactiveNode } from "../../render/reactiveTsl.mjs";
 import { rcasNode } from "./fsrTsl.mjs";
 
 /**
+ * *** v4778 RIG RUN 5 -- HOW THIS RENDERER WRITES HALF. *** makeFsrTemporal's colour targets default to HalfFloatType, and
+ * how a device rounds into them is not one rule: SwiftShader rounds to nearest even, Direct3D (WebGL2 through ANGLE D3D11,
+ * WebGPU through Dawn D3D12) toward zero. Renders `values` into a one-row HalfFloatType target, one per texel, and returns
+ * the raw binary16 words; text/slugAtlas.js's halfRuleOf names the rule from HALF_PROBE_VALUES' words. One row, so WebGPU's
+ * 256-byte row padding never applies and WebGL2's flipped rows are the same row.
+ *
+ * A SUM OF ONE-LEVEL SELECTS, each its value at its own texel and 0 elsewhere -- adding zeros is exact in f32. Nested
+ * selects are the obvious spelling, and the WebGL2 backend's node builder throws on them in this three.js ("Cannot read
+ * properties of undefined (reading 'addToStack')"): the target was never written and the probe read six zeros.
+ */
+export async function probeHalfWrite(THREE, TSL, renderer, values) {
+    const n = values.length;
+    const rt = new THREE.RenderTarget(n, 1, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+    const x = TSL.int(TSL.screenCoordinate.x);
+    let v = TSL.float(0);
+    for (let i = 0; i < n; i++) v = v.add(TSL.select(x.equal(TSL.int(i)), TSL.float(values[i]), TSL.float(0)));
+    const m = new THREE.NodeMaterial(); m.fragmentNode = TSL.vec4(v, v, v, 1); m.blending = THREE.NoBlending; m.depthTest = false; m.depthWrite = false;
+    const sc = new THREE.Scene(); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+    const was = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt); await renderer.renderAsync(sc, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)); renderer.setRenderTarget(was);
+    const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, n, 1);
+    rt.dispose(); m.dispose();
+    return Array.from({ length: n }, (_, i) => px[i * 4]);
+}
+
+/**
  * Build the chain. `ratio` is the upscale factor the jitter's phase count is taken at (displayWidth / renderWidth
  * unless given). Returns { render(scene, camera, output), targets, jitter, memory, frames, dispose }.
  */

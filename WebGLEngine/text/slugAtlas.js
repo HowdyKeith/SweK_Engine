@@ -116,8 +116,8 @@ export function toHalf(value) {
  * v4778 rig run 5: what Direct3D does when it converts to a smaller float format, a write to a 16-bit float render
  * target included (Direct3D's floating-point rules: round-to-zero on conversion to another float format, and an
  * out-of-range value becomes the largest representable one, not infinity). A GTX 1080 under ANGLE D3D11 and Dawn D3D12
- * writes half this way; SwiftShader rounds to nearest even, as toHalf does. fx/fsr/fsrTemporalHalf-selfcheck.mjs
- * asks a device which.
+ * writes half this way; SwiftShader rounds to nearest even, as toHalf does. halfRuleOf, below, names which a
+ * device follows.
  */
 export function toHalfRTZ(value) {
     _f32[0] = value;
@@ -135,6 +135,28 @@ export function toHalfRTZ(value) {
         return sign | (man >>> (14 - e));                                  // subnormal, the remainder dropped
     }
     return sign | (e << 10) | (man >>> 13);                                // the remainder dropped
+}
+
+/**
+ * WHICH RULE A DEVICE WRITES HALF BY, from the words it wrote for HALF_PROBE_VALUES (fx/fsr/fsrTemporalTsl.mjs's
+ * probeHalfWrite renders them). Three are controls that land on the same half under either rule -- 1, 1 + 1 ulp exactly,
+ * and 1 + 0.25 ulp -- so anything else is a probe that did not write what it meant to. Three decide:
+ *   1 + 0.75 ulp  ->  1 + 1 ulp to nearest,  1 toward zero
+ *   1 + 1.5 ulp   ->  1 + 2 ulp to nearest (the tie goes to even),  1 + 1 ulp toward zero
+ *   0.5 + 0.75 of 0.5's ulp, the same question an octave down
+ * Returns { rule: "rtne" | "rtz" | "other", why, words }.
+ */
+export const HALF_PROBE_VALUES = Object.freeze([1, 1 + 2 ** -10, 1 + 0.25 * 2 ** -10, 1 + 0.75 * 2 ** -10, 1 + 1.5 * 2 ** -10, 0.5 + 0.75 * 2 ** -11]);
+const HALF_PROBE_CONTROLS = 3;
+export function halfRuleOf(words) {
+    const w = Array.from(words || []), V = HALF_PROBE_VALUES;
+    if (w.length < V.length) return { rule: "other", why: `read ${w.length} words, wanted ${V.length}`, words: w };
+    const ne = V.map(toHalf), z = V.map(toHalfRTZ);
+    for (let i = 0; i < HALF_PROBE_CONTROLS; i++) if (w[i] !== ne[i]) return { rule: "other", why: `control ${V[i]} wrote ${fromHalf(w[i])}, not itself`, words: w };
+    const is = (v) => v.every((x, i) => x === w[i]);
+    if (is(ne)) return { rule: "rtne", why: "to nearest, ties to even", words: w };
+    if (is(z)) return { rule: "rtz", why: "toward zero", words: w };
+    return { rule: "other", why: `wrote ${w.slice(HALF_PROBE_CONTROLS).map(fromHalf).join(", ")} for ${V.slice(HALF_PROBE_CONTROLS).join(", ")}`, words: w };
 }
 
 /** binary16 -> binary32. Present so the selfcheck can read back exactly what the GPU will see. */
