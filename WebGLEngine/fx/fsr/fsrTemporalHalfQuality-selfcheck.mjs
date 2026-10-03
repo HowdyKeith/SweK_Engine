@@ -75,10 +75,16 @@ else {
                     for (const [fn, type] of [["float", THREE.FloatType], ["half", null]]) {
                         const f2 = FT.makeFsrTemporal(THREE, T, renderer, { renderWidth: a.RW, renderHeight: a.RW, displayWidth: D, displayHeight: D, threshold, type });
                         const o2 = tgt(D);
-                        for (let k = 0; k < a.N; k++) { setT(k); await f2.render(scene, cam, o2); }
-                        c[fn] = { out: await read(o2, D), hist: await read(f2.targets.history[(a.N - 1) % 2], D), alpha: f2.uniforms.accumulate[0].alpha.value };
+                        // rig run 6: each frame's history factor too -- the masks' weight -- so a value outside the stall bound can
+                        // be laid against whether the two chains' masks disagreed there
+                        const fac = [];
+                        for (let k = 0; k < a.N; k++) { setT(k); await f2.render(scene, cam, o2); fac.push((await read(f2.targets.factor, D)).filter((_, i) => i % 4 === 0)); }
+                        c[fn] = { out: await read(o2, D), hist: await read(f2.targets.history[(a.N - 1) % 2], D), alpha: f2.uniforms.accumulate[0].alpha.value, fac };
                         f2.dispose(); o2.dispose();
                     }
+                    // the largest |half - float| factor each pixel saw over the run, and not the 32 frames themselves
+                    c.facDiff = Array.from({ length: D * D }, (_, i) => Math.max(...c.float.fac.map((f, k) => Math.abs(f[i] - c.half.fac[k][i]))));
+                    delete c.float.fac; delete c.half.fac;
                     o[cn] = c;
                 }
                 out[mode] = o; renderer.dispose();
@@ -104,9 +110,17 @@ else {
             const pF = psnr(c.float.out), pH = psnr(c.half.out);
             const hh = c.half.hist.map(fromHalf), hf = c.float.hist, a = c.half.alpha;
             const stall = hr.rule === "rtz" ? 1 / a + 1 : 1 / (2 * a) + 1, rule = hr.rule === "rtz" ? "ulp / alpha + 1" : "ulp / (2 alpha) + 1";
-            let inside = 0, n = 0, worstU = 0, over = 0;
+            let inside = 0, n = 0, worstU = 0, over = 0; const outsidePx = [];
             for (let i = 0; i < D * D; i++) for (let k = 0; k < 3; k++) { const x = hh[i * 4 + k], y = hf[i * 4 + k], u = ulp(Math.max(Math.abs(x), Math.abs(y)));
-                const e = Math.abs(x - y) / u; n++; worstU = Math.max(worstU, e); if (e <= stall) inside++; else over++; }
+                const e = Math.abs(x - y) / u; n++; worstU = Math.max(worstU, e); if (e <= stall) inside++; else { over++; outsidePx.push(i); } }
+            // *** RIG RUN 6 -- ARE THE ONES OUTSIDE THE BOUND WHERE THE MASKS DISAGREED? *** The row's own account of them is "a
+            // lock or a mask that went one way at half and the other at float". This chain runs without locks, so the mask is
+            // the history factor. Measured, not asserted, until the rig has said: how many of the values outside sit on a
+            // pixel, or within two of one, whose factor differed between the chains by more than a quarter at some frame.
+            if (c.facDiff) { const big = (i) => c.facDiff[i] > 0.25, near = (i) => { const x0 = i % D, y0 = (i / D) | 0;
+                    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const X = x0 + dx, Y = y0 + dy; if (X >= 0 && Y >= 0 && X < D && Y < D && big(Y * D + X)) return true; } return false; };
+                const flips = c.facDiff.filter((v) => v > 0.25).length;
+                console.log(`  ----  [${mode}] ${cn}: ${outsidePx.length} values outside ${stall.toFixed(0)} ulps; ${outsidePx.filter(big).length} on a pixel whose factor differed by > 0.25 at some frame, ${outsidePx.filter(near).length} within 2 px of one; ${flips} of ${D * D} pixels' factors differed so; the largest factor difference on an outside pixel ${Math.max(0, ...outsidePx.map((i) => c.facDiff[i])).toExponential(2)}, anywhere ${Math.max(...c.facDiff).toExponential(2)}`); }
             ok(`*** [${mode}] ${cn === "still" ? "fsr-three.html's scene, still" : "moving wires and a turning knot"}: HALF reads ${pH.toFixed(3)} dB against FLOAT's ${pF.toFixed(3)} -- a ${(pH - pF >= 0 ? "+" : "") + (pH - pF).toFixed(3)} dB difference ***`,
                Math.abs(pH - pF) < 0.01, "32 frames at 2x, 32 -> 64, against a 4x4-supersampled truth");
             ok(`  [${mode}] ...and ${inside} of ${n} history values sit within fsrTemporalHalf-selfcheck.mjs's stall bound of float's for ${hr.rule} (${rule} = ${stall.toFixed(0)} ulps), worst ${worstU.toFixed(1)} ulps`,
@@ -124,6 +138,7 @@ else {
 // Against fx/fsr/fsrTemporalTsl.mjs's probeHalfWrite, restored and md5 verified: P1 it never renders -> 1, the harness row;
 // P2 its words read one texel over -> 2, both probe rows. P3 (text/slugAtlas.js halfRuleOf calling this box truncating)
 // stays green here, and should: the truncating bound is the wider, so it only shows on a box that truncates -- the rig.
+// Rig run 6's factor line is a measurement, not a row: nothing to sabotage until the rig says what it should hold.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the page at 3x; perceived quality, which PSNR does not measure; and half with the lock ring on.");
 process.exitCode = fails ? 1 : 0;
