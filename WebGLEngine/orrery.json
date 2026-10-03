@@ -1574,7 +1574,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3786037,
+   "bytes": 3786213,
    "files": [
     {
      "path": "LICENSE",
@@ -1586,7 +1586,7 @@
     },
     {
      "path": "README.md",
-     "bytes": 3453
+     "bytes": 3629
     },
     {
      "path": "three.core.js",
@@ -1604,8 +1604,8 @@
   },
   {
    "name": "three-webgpu-r185",
-   "arrived": null,
-   "sha": null,
+   "arrived": "2026-10-03",
+   "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211",
    "bytes": 3653275,
    "files": [
     {
