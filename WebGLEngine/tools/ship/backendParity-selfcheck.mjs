@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 import { GLSL_MARK, GLSL_TELL, WGSL_MARKS, LANG, codeOnly, classify, census, countsOf, shortfall, glslStyle,
          PARITY_BASELINE, DEVICE_CONTRACT, PORTED_PAIRS } from "../../render/backendParity.mjs";
 
@@ -32,7 +33,7 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 const C = census(ENG, {
     readdir: (d) => fs.readdirSync(d, { withFileTypes: true }),
     readFile: (f) => fs.readFileSync(f, "utf8"),
-    join: path.join, relative: path.relative,
+    join: path.join, relative: path.relative, isSource: (name) => SOURCE_EXT.test(name),
 });
 const N = countsOf(C);
 

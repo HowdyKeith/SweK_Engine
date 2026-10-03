@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4803 -- THE 407th CLOSING: NO new gate file -- no caller spells the source regex by hand.
+    since500: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4803", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled ceiling 2 -> 0, a planted control in place of the > 0 bound)",
+            "tools/ship/backendParity-selfcheck.mjs (hands the census SOURCE_EXT as isSource)",
+            "tools/ship/toolFrontDoor-selfcheck.mjs (imports SOURCE_EXT; run alone, 377 s)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE LAST TWO. *** The parity census is pure on purpose -- its readers are handed in -- so it takes isSource the " +
+                 "same way, and its gate hands in SOURCE_EXT: the module stays free of node:fs and applies the one definition of a " +
+                 "source file. The front-door gate imports SOURCE_EXT and was run alone, 377 s, which is why no sweep runs it. The " +
+                 "ceiling 2 -> 0; and at 0 the old bound that the count stay above zero -- the proof, since v4087 found the detector " +
+                 "blind, that it could see -- has nothing to stand on, so a tree made for it holds that proof: one file spelling the " +
+                 "regex, one importing SOURCE_EXT, and the detector must name the first alone. Two sabotages red.",
+    }),
     // v4802 -- THE 406th CLOSING: NO new gate file -- the fourteenth issue, and the first frame of the thirteenth.
     since499: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

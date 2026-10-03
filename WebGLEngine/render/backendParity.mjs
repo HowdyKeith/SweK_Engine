@@ -354,8 +354,10 @@ export const PORTED_PAIRS = Object.freeze([
                             "against the CPU model" }),
 ]);
 
-/** Walk a tree and classify every candidate file. Pure but for the two readers handed in. */
-export function census(root, { readdir, readFile, join, relative }) {
+/** Walk a tree and classify every candidate file. Pure but for the readers handed in -- and, since v4803, the test for which
+ *  files are source: `isSource`, handed in like the readers rather than spelled here, so this module stays free of node:fs
+ *  while the one definition of a source file (tools/ship/moduleRefs.mjs's SOURCE_EXT) is the one it applies. */
+export function census(root, { readdir, readFile, join, relative, isSource }) {
     const skip = new Set(["node_modules", ".git", "vendor"]);
     const out = { glsl: [], wgsl: [], both: [], none: 0, scanned: 0 };
     (function walk(dir) {
@@ -365,7 +367,7 @@ export function census(root, { readdir, readFile, join, relative }) {
             if (skip.has(e.name)) continue;
             const full = join(dir, e.name);
             if (e.isDirectory()) { walk(full); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!isSource(e.name)) continue;
             let body = ""; try { body = readFile(full); } catch { continue; }
             out.scanned++;
             const rel = relative(root, full).split(/[\\/]/).join("/");
