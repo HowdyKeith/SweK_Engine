@@ -295,7 +295,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // and whether the reds it lists are still outside the sweep -- so `unguarded` is unmoved at 17.
     // v4776 -- 149 -> 150: COMMIT_BELT_DRIFT_V4776 in world/orreryFleet.mjs, three's sixth commit (ce276dff) recorded
     // beside the v4621 record rather than over it. Re-taken in the round that added it.
-    total: 150,
+    // v4800 -- 150 -> 151: RETURNED_AT_V4800 in tools/ship/sweepCoverage.mjs, headlessGpu named still over on the box that
+    // owns the timing record now. It arrives GUARDED -- sweepCoverage-selfcheck's returnee row reads it. Re-taken in the round that added it.
+    total: 151,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -505,7 +507,8 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // named by the gate beside it.
     // v4664 -- 148 -> 149, the one arrival re-taken above; `unguarded` does not move.
     // v4776 -- 149 -> 150, the one arrival re-taken above.
-    structural: Object.freeze({ total: 150, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
+    // v4800 -- 150 -> 151, the one arrival re-taken above; `unguarded` does not move.
+    structural: Object.freeze({ total: 151, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

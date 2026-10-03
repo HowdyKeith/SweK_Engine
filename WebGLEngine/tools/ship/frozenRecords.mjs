@@ -714,7 +714,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
     // v4776 -- RE-TAKEN 149 -> 150 with `excluding` below, for COMMIT_BELT_DRIFT_V4776 (no field on its own lines).
-    currentIncludingModule: Object.freeze({ records: 150, withFields: 72, fields: 399 }),
+    // v4800 -- RE-TAKEN 150 -> 151 with `excluding`, for RETURNED_AT_V4800 (no field on its own lines).
+    currentIncludingModule: Object.freeze({ records: 151, withFields: 72, fields: 399 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -910,7 +911,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // world/orreryFleet.mjs -- built by spreading COMMIT_BELT_DRIFT_V4621 and replacing one body, so it carries
     // no numeric field ON ITS OWN LINES and the per-line reader counts none: records moves by one, the other two
     // do not. Re-taken in the round that added it.
-    excluding: Object.freeze({ records: 148, withFields: 70, fields: 379 }),
+    // v4800 -- RE-TAKEN: 148 -> 149 records, the other two unmoved. RETURNED_AT_V4800 in tools/ship/sweepCoverage.mjs --
+    // its numbers sit inside an array of objects, so the per-line reader counts no field of its own. Re-taken in the round that added it.
+    excluding: Object.freeze({ records: 149, withFields: 70, fields: 379 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
