@@ -80,4 +80,4 @@ bytes `record.json` names:
 - Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1522 tests, 1521 passed, 1 todo, 0 failed, on both builds.
 - e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
   failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the
-  same bytes on each backend; the other two vary between runs of one build.
+  same bytes on WebGPU and 199 on WebGL 2; the others vary between runs of one build (`e2e.json` names each).
