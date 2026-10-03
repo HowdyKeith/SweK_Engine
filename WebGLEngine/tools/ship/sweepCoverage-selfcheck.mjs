@@ -491,7 +491,11 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
-        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g);
+        // v4800: and a returnee genuinely over on the box that owns the record now (RETURNED_AT_V4800). SABOTAGES: the
+        // record not consulted -> 1 red (the first verify of the re-hosted record found it so); its reason emptied -> 1;
+        // its readings put under budget -> 1. And the share row: compared against afterPct instead -> 1.
+        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
+            SC.RETURNED_AT_V4800.stillOver.find((x) => x.gate === g);
         return !!row && justifiedOver(row);
     };
     const returned = new Map([

@@ -8732,7 +8732,7 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
             "tools/ship/quickSweep-selfcheck.mjs (ownTimings: whose record chooses the gates, on fixtures, and that the sweep uses it)",
             "tools/ship/boxTimings-selfcheck.mjs (the budget row states the new choice instead of pinning the old one)",
             "tools/ship/recordReach-selfcheck.mjs (this box's own alone readings win the margin whenever there are two)",
-            "tools/ship/sweepCoverage-selfcheck.mjs (the population outside the sweep compared as a share of a grown tree)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (the population outside the sweep as a share of a grown tree; headlessGpu named still over on this box)",
         ]),
         redOnArrival: Object.freeze([]),
         verdict: "*** TASK #87. *** quickSweep chose its gates by the shared timing record on every box, and the shared record " +
@@ -8742,7 +8742,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "shared one, said as such -- while timingsTarget still routes the write by the shared record's owner. And the " +
                  "shared record is re-hosted to linux-x64-4c-16gb-420793, from that local file. Three gates moved with it: " +
                  "boxTimings had pinned the old choice; recordReach read rings the departed box had filled, now that this box " +
-                 "owns them; sweepCoverage compared a count frozen on a 1,617-gate tree. Six sabotages red.",
+                 "owns them; sweepCoverage compared a count frozen on a 1,617-gate tree -- and once this box's verify " +
+                 "rewrote the record, it found headlessGpu, returned to the sweep at v4461 on the old box's 2,700 ms, over alone " +
+                 "here at 3,240, and named it as meshLine was. Nine sabotages red.",
     }),
     // v4799 -- THE 403rd CLOSING: NO new gate file -- the drafts on three's latest release and its dev branch.
     since496: Object.freeze({
