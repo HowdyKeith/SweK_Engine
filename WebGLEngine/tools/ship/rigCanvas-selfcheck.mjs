@@ -17,7 +17,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -73,7 +73,7 @@ console.log("\n2. THE PAGE, HERE: IT LOADS, COMPARES ITSELF TO THE FILE, AND PAS
             if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
             s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage(); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(3000);
         const st = await pg.evaluate(() => ({ text: document.getElementById("out").textContent, json: document.getElementById("json").value }));

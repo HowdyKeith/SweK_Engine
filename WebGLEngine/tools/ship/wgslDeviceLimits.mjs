@@ -19,7 +19,7 @@
 //      or open the printed page in any browser and read the table.
 
 import { DEFAULT_LIMITS, LIMITS_PROVENANCE } from "../../render/wgslSpec.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
@@ -43,7 +43,7 @@ export async function main() {
     const skip = browserSkipReason(chromium, from, HEADLESS_SHELL);
     if (skip) { console.log("SKIP: " + skip); process.exit(2); }
     const browser = await chromium.launch({ executablePath: HEADLESS_SHELL,
-        args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--ignore-gpu-blocklist"] });
+        args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--ignore-gpu-blocklist"] });
     const page = await browser.newPage();
     await page.goto("about:blank");
     const out = await page.evaluate(probeSource());

@@ -92,7 +92,7 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell, vertexDisplacement, stampThreeRevision } from "../../render/tslSource.mjs";
 import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
@@ -205,7 +205,7 @@ else {
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     // the page PRESENTS to a canvas, which loses a WebGPU device on this headless shell (measured at v4319 and again here), so the page
     // is loaded on the WebGL2 route as every other page gate loads its page: three's WebGL backend emits GLSL, and the swap is graded there
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));

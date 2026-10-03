@@ -191,7 +191,7 @@ console.log("\n6. *** LIVE: THE ACTUAL SPAWN PANEL, IN A REAL BROWSER -- BUTTON,
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(f));
         });
         await new Promise((x) => srv.listen(0, "127.0.0.1", x));
-        const b = BROWSER = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = BROWSER = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: [...pw.webglLaunchArgs().args, "--enable-webgl"] });
         try {
             const pg = await b.newPage();
             const errs = [];

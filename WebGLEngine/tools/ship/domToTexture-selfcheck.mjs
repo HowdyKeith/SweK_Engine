@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { codeOnly, noComments } from "./sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { REFUSED, MEASURED, buildSvg } from "../../ui/domToTexture.js";
 
 const require_ = createRequire(import.meta.url);
@@ -78,7 +78,7 @@ console.log("\n3. *** RASTERISING FOR REAL -- AND THE HIDDEN-STATE TRAP ***");
         report("*** A SKIP, NOT A PASS: sections 1-2 read strings. Whether a DOM actually rasterises, and");
         report("    whether the result is tainted, cannot be known from source at all.");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
         await pg.route("**/*", (route) => {

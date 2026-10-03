@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "bf438a5ca20eccb70423e0c5343f66afb16354e8",
+ "head": "a94efb160a03c8af200cc7e3d8f8abed951e6cf1",
  "bodies": {
   "box3d": [
    {
@@ -222,7 +222,7 @@
    },
    {
     "path": "tools/ship/deviceUniformsPerDraw-selfcheck.mjs",
-    "bytes": 10630,
+    "bytes": 10806,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {
@@ -242,17 +242,17 @@
    },
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
-    "bytes": 20784,
+    "bytes": 20960,
     "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "tools/ship/slugMelt-selfcheck.mjs",
-    "bytes": 20849,
+    "bytes": 21025,
     "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
     "path": "tools/ship/slugMorph-selfcheck.mjs",
-    "bytes": 18857,
+    "bytes": 19033,
     "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
    },
    {
@@ -262,7 +262,7 @@
    },
    {
     "path": "tools/ship/slugProjective-selfcheck.mjs",
-    "bytes": 17096,
+    "bytes": 17272,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {
@@ -277,7 +277,7 @@
    },
    {
     "path": "tools/ship/slugTicker-selfcheck.mjs",
-    "bytes": 21169,
+    "bytes": 21345,
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
@@ -472,7 +472,7 @@
    },
    {
     "path": "tools/ship/flyConnectomePage-selfcheck.mjs",
-    "bytes": 21101,
+    "bytes": 21121,
     "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
    },
    {
@@ -841,7 +841,7 @@
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
-    "bytes": 21703,
+    "bytes": 21726,
     "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
    },
    {
@@ -861,7 +861,7 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 78857,
+    "bytes": 80200,
     "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
    },
    {
@@ -1158,7 +1158,7 @@
    },
    {
     "path": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
-    "bytes": 30455,
+    "bytes": 30475,
     "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
    },
    {
@@ -1233,7 +1233,7 @@
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 82483,
+    "bytes": 82503,
     "sha": "ce5d9b226ae20ed6a5a308c4f5c486167dc25c73"
    },
    {
@@ -1243,12 +1243,12 @@
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
-    "bytes": 25204,
+    "bytes": 25380,
     "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 78857,
+    "bytes": 80200,
     "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
    },
    {

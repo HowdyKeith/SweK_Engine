@@ -10,7 +10,7 @@
 // case where WebAssembly is switched off, and checking this tree against that case found a real defect that
 // has nothing to do with polyfills.
 import { probeWasm, wasmUsable, wasmUnavailableReason, explainWasmFailure, _resetWasmProbe } from "../../engine/wasmSupport.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly, noComments, proseHas } from "./sourceScan.mjs";
 import fs from "node:fs";
 import http from "node:http";
@@ -230,7 +230,7 @@ console.log("\n5. *** THE MEASUREMENT THE ROUND IS BUILT ON: A REAL BROWSER WITH
         });
         await new Promise((r) => server.listen(0, "127.0.0.1", r));
         const port = server.address().port;
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const askLoaders = async (killWasm) => {
                 const page = await browser.newPage();

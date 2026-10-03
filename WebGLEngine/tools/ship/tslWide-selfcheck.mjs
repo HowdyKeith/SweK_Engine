@@ -61,7 +61,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingDecls, vertexVaryingBlock, vertexDisplacement, transplantIntoShell, transplantCompute, computeShell, stampThreeRevision } from "../../render/tslSource.mjs";
 import { quadShell, quadHand, quadColourAt, PLANES_UNIFORMS, QUAD_KNOBS } from "../../render/tslWide.mjs";
@@ -123,7 +124,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const N = 128, CELLS = 8, COUNT = 64;
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, CELLS, COUNT }, timeoutMs: 180000, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, CELLS, COUNT }, timeoutMs: 180000, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const S = await import("/render/tslSource.mjs"); const W = await import("/render/tslWide.mjs"); const { requestDevice } = await import("/gfx/device.js"); const { runCompute } = await import("/render/computeRun.mjs");
         const out = { emitted: {}, emittedPV: {}, run: {} };

@@ -41,7 +41,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { whereWorst } from "./pixelWorst.mjs";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
 import { glyphMorph, packMorphed, polygonArea } from "../../render/slugMorph.mjs";
@@ -101,7 +102,7 @@ sec("2. THE FRAME, ON BOTH BACKENDS: t = 0, 0.5, 1 through fromAtlas with one sh
     const skip = webgpuSkipReason();
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
     else {
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, N, FIRE, COLOUR }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, SIZE, ORIGIN, N, FIRE, COLOUR }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");

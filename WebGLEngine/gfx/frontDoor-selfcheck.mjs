@@ -47,7 +47,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { specifiers, resolveSpec } from "../tools/ship/moduleRefs.mjs";
 import { noComments } from "../tools/ship/sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "../tools/ship/playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
 import { createRequire } from "node:module";
 import * as FD from "./frontDoor.mjs";
 import { gateReport } from "../tools/ship/gateReport.mjs";
@@ -233,7 +233,7 @@ window.__door = r;
 </script></body>`;
     fs.writeFileSync(path.join(ENG, "gfx-door-probe.html"), probe);
     // TWO LAUNCHES, because the flag turns out to matter as much as the address -- see section 5.
-    const bPlain = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const bPlain = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     // RIG RUN 2: the harness's OWN flags, not a copy of one of them. On win32 LAUNCH_ARGS is --enable-unsafe-webgpu
     // --use-angle=d3d11 -- the pair webgpuHarness.mjs measured necessary and sufficient there -- and this launch carried
     // the first alone (plus --use-gl=swiftshader), so Keith's rig read "no-device" on the very box the claim is about.

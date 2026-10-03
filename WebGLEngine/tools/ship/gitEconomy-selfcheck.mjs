@@ -51,7 +51,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { makeGitEconomy, marketsOf, goodOf, GOODS, reprice, PRICE_FLOOR, PRICE_CEIL, BASE, RECIPES, DEFAULTS } from "../../world/gitEconomy.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { traders } from "../../world/traderGraph.mjs";
@@ -235,7 +235,7 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
             if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
             s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage({ viewport: { width: 800, height: 600 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(2500);
         const log1 = await pg.evaluate(() => document.getElementById("trade").textContent); await pg.waitForTimeout(2500);

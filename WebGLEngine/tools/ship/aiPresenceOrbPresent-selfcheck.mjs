@@ -14,7 +14,7 @@
 // plumbing that chains scene -> present.
 "use strict";
 import { SECURE_HOST } from "./webgpuHarness.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -44,7 +44,7 @@ async function runInEngineOrigin({ engineRoot, script, args = null }) {
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu"] });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e && e.stack || e).slice(0, 400)));

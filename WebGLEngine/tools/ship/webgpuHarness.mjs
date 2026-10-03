@@ -38,7 +38,7 @@
 
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
@@ -82,6 +82,19 @@ export function launchArgsFor(platform) {
 }
 export const HARDWARE_ARGS = Object.freeze(hardwareArgsFor(process.platform));
 export const LAUNCH_ARGS = Object.freeze(launchArgsFor(process.platform));
+
+// *** v4778 RIG RUN 10 -- PARITY_ARGS: WHERE A GATE HOLDS THE TWO BACKENDS TO EACH OTHER, BOTH ON ONE RASTERISER (Keith's decision). ***
+// Since rig run 4 an ordinary win32 run puts WebGPU on SwiftShader (--use-webgpu-adapter=swiftshader) and WebGL2 stays on the
+// GPU's ANGLE D3D11 -- and no flag set measured on the rig puts both on SwiftShader: every ANGLE-on-SwiftShader set lost the
+// WebGPU adapter, the one both-software set is WARP for WebGL2 against SwiftShader for WebGPU (two rasterisers still), and
+// node-webgpu there reaches D3D12 alone (realGpuRun --gl-flags, rig run 10). So the 14 gates that went newly red at the switch --
+// each holds WebGL2 and WebGPU (or node-webgpu and the browser) to ONE picture -- launch with the pair on win32: one rasteriser,
+// the GPU, reached two ways, which is what their rows claim and how all 14 were green on the rig before the switch. Gates
+// that hold a backend to SwiftShader's own figures keep LAUNCH_ARGS. Elsewhere PARITY_ARGS is LAUNCH_ARGS: SwiftShader both.
+export function parityArgsFor(platform) {
+    return platform === "win32" ? hardwareArgsFor(platform) : launchArgsFor(platform);
+}
+export const PARITY_ARGS = Object.freeze(parityArgsFor(process.platform));
 
 // *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
 // gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded
@@ -184,7 +197,7 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
                                        workgroups = 1, compileOnly = false, timeoutMs = 60000,
                                        inputs = null, outInit = null,
-                                       outBinding = 0, uniformBinding = 1 }) {
+                                       outBinding = 0, uniformBinding = 1, launchArgs = null }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -199,7 +212,7 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
         const page = await browser.newPage();
         await page.goto(url);
         const out = await page.evaluate(async (a) => {
@@ -460,7 +473,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     // process that must be killed from outside.
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
         let timer = null;
         const out = await Promise.race([page.evaluate(async (a) => {
@@ -633,7 +646,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));

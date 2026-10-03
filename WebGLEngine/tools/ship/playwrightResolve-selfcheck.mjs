@@ -331,6 +331,26 @@ console.log("\nTHE HARNESS GUARD THAT COULD NOT FIRE (found on the rig, after v4
             const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), g + "-selfcheck.mjs"), "utf8");
             return /webglLaunchArgs\(\)/.test(src) && !/args:\s*\["--use-gl=swiftshader"\]/.test(src);
         }));
+    // *** v4778 RIG RUN 10 -- AND NOW EVERY LAUNCH IN THE TREE, NOT FOUR. *** realGpuRun --gl-flags' sustained loop on Keith's rig:
+    // --use-gl=swiftshader "CONTEXT LOST within 100 draws", --use-angle=swiftshader with --enable-unsafe-swiftshader "100 half-float
+    // draws held" -- v4684's finding on the other 69 files that still spelled the literal (effectMerge's "threw null", slugRig's
+    // "MAX_TEXTURE_SIZE of null", dockFraming's 0.004). Every one now takes webglLaunchArgs(). This row walks the tree so a new
+    // launch cannot bring the literal back: no code line may open an args array with it. realGpuRun.mjs keeps it as
+    // RETIRED_SOFTWARE_GL, the candidate its table measures, and is the one file named here.
+    // SABOTAGE G1: tools/ship/meshLine-selfcheck.mjs given its literal back -> 1 red, this row, "meshLine-selfcheck.mjs:158".
+    // Restored, md5 verified.
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const hits = [], LIT = /\[\s*"--use-gl=swiftshader"/, SELF = "tools/ship/playwrightResolve-selfcheck.mjs", KEEP = "tools/ship/realGpuRun.mjs";
+    const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) { if (!["node_modules", "vendor", ".git"].includes(e.name)) walk(path.join(d, e.name)); continue; }
+        if (!/\.(mjs|js|html)$/.test(e.name)) continue;
+        const f = path.join(d, e.name), rel = path.relative(ENG, f).split(path.sep).join("/");
+        if (rel === SELF || rel === KEEP) continue;
+        fs.readFileSync(f, "utf8").split("\n").forEach((l, i) => { const t = l.trim(); if (!t.startsWith("//") && !t.startsWith("*") && LIT.test(l)) hits.push(rel + ":" + (i + 1)); });
+    } };
+    walk(ENG);
+    ok("!! ...and NO launch in the tree spells --use-gl=swiftshader any more: every one takes webglLaunchArgs()",
+        hits.length === 0, hits.length ? hits.slice(0, 6).join(", ") : "the rig lost the context under it within 100 draws; realGpuRun.mjs keeps it as RETIRED_SOFTWARE_GL, its measured candidate");
 }
 
 console.log("\nTHE v4778 RIG RUN: 248 GATES RED ON A PACKAGE THIS LIST COULD NOT FIND ON WINDOWS");

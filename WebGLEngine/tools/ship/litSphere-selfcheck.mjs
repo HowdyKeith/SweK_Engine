@@ -29,7 +29,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import * as L from "../../render/litSphere.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
@@ -109,7 +110,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const W = 160, RAD = 0.5, DIST = 6, FOV = Math.PI / 3, AMB = 0.2;
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, RAD, DIST, FOV, AMB, BACKENDS: ["webgpu", "webgl2"] }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, RAD, DIST, FOV, AMB, BACKENDS: ["webgpu", "webgl2"] }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const L = await import("/render/litSphere.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const out = {};
         for (const backend of a.BACKENDS) {

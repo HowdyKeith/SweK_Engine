@@ -10,7 +10,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import { universeRecords, slimUniverse, kindOf } from "../../world/universeBodies.mjs";
 import { makeUniverseEconomy } from "../../world/universeEconomy.mjs";
@@ -109,7 +109,7 @@ else {
         if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(4000);
     // sweep the pointer across the middle until something is named

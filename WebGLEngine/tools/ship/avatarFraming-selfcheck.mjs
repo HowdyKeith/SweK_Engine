@@ -43,7 +43,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { decodePNG, subjectFraction } from "./pngCoverage.mjs";
 import { noComments } from "./sourceScan.mjs";
 
@@ -86,7 +86,7 @@ if (skip) {
     process.exit(fails ? 1 : 0);
 }
 
-const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"] });
+const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl", "--ignore-gpu-blocklist"] });
 async function shotFraction(url, selector) {
     const page = await (await b.newContext({ viewport: { width: 900, height: 700 } })).newPage();
     await page.route("**/*", (route) => {

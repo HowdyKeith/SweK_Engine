@@ -17,7 +17,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { EFFECTS, TEXTURE_CAPABLE_BACKENDS, postSkipReason } from "../../ui/orreryPost.mjs";
 import { UV_CONVENTION } from "../../render/badTvDevicePass.mjs";
 
@@ -99,7 +99,7 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL,
-            args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+            args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu"] });
         const page = await browser.newPage();
         const errs = [];
         page.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));
@@ -261,7 +261,7 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             s2.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv2.listen(0, "127.0.0.1", r));
-        const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
         const perr = [];
         pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));

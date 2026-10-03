@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
-import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, HARDWARE_ARGS } from "./webgpuHarness.mjs";
+import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
 
@@ -103,6 +103,27 @@ console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER Web
     const runWin = runLaunchArgs({}, "win32");
     ok(`!! *** realGpuRun hands its gates the HARDWARE flags on win32, not an ordinary run's: "${runWin.join(" ")}" ***`,
        runWin.join(" ") === winHw.join(" ") && !runWin.includes("--use-webgpu-adapter=swiftshader"));
+    // rig run 10, Keith's decision: a gate that holds the two backends to each other launches with PARITY_ARGS -- the pair on
+    // win32 (no flag set there puts both on SwiftShader, measured), LAUNCH_ARGS elsewhere
+    ok(`win32: the two-backend gates' flags are "${parityArgsFor("win32").join(" ")}" -- both backends on the GPU, one rasteriser`,
+       parityArgsFor("win32").join(" ") === winHw.join(" ") && !parityArgsFor("win32").includes("--use-webgpu-adapter=swiftshader"));
+    ok("  ...and elsewhere they are an ordinary run's: SwiftShader for both, as every pixel row there was measured",
+       parityArgsFor("linux").join(" ") === lin.join(" ") && parityArgsFor("darwin").join(" ") === launchArgsFor("darwin").join(" "));
+    {   // and the fourteen launch with them: every runInEngineOrigin / runWgslCompute call in each passes PARITY_ARGS
+        const PARITY_GATES = ["tslWide", "deviceTexture", "slugFill", "slugMelt", "litSphere", "stereographic", "slugMorph", "hiZ",
+                              "deviceUniformsPerDraw", "gpuDriven", "gpuTerrain", "slugTicker", "slugProjective", "headlessGpu"];
+        const bare = [];
+        for (const g of PARITY_GATES) {
+            const src = fs.readFileSync(path.join(ENG, "tools/ship", g + "-selfcheck.mjs"), "utf8");
+            // [^\n]+ and not [^\n]* -- a star before the closing slash reads as a comment's end to vba/runtimeGap.mjs's stripper,
+            // which then blanked this file's code back to the last opener and dropped it from two census rows (found by that gate)
+            const calls = src.match(/(runInEngineOrigin|runWgslCompute)\(\{[^\n]+/g) || [];
+            if (!calls.length) bare.push(g + " (no launch found)");
+            for (const c of calls) if (!/^\w+\(\{ launchArgs: PARITY_ARGS,/.test(c)) bare.push(g + ": " + c.slice(0, 60));
+        }
+        ok(`  ...and the ${PARITY_GATES.length} gates that hold the two backends to one picture launch every call with PARITY_ARGS`,
+           bare.length === 0, bare.length ? bare.slice(0, 4).join("; ") : "the 14 that went newly red when an ordinary win32 run put WebGPU on SwiftShader alone");
+    }
     ok("  ...and an owner's SWEK_LAUNCH_ARGS still wins over both",
        runLaunchArgs({ SWEK_LAUNCH_ARGS: " --enable-unsafe-webgpu  --enable-features=Vulkan " }, "win32").join(" ") === "--enable-unsafe-webgpu --enable-features=Vulkan");
     if (skip) { console.log("  SKIP  no browser: " + skip); console.log("  ----  *** NOT A PASS. ***"); fails++; }
@@ -149,6 +170,9 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // colour) -> 1 red, the tree-spelling row, "drew nothing: 51,102". Restored, md5 verified.
 // RIG RUN 9: D2 the sustained loop losing its context at draw 50 (WEBGL_lose_context) -> 1 red, the tree-spelling row,
 // "CONTEXT LOST within 51 draws". Restored, md5 verified.
+// RIG RUN 10, against tools/ship/webgpuHarness.mjs and tools/ship/hiZ-selfcheck.mjs: P1 parityArgsFor("win32") falling back to an
+// ordinary run's -> 1 red, the win32 parity row ("... --use-webgpu-adapter=swiftshader"); P2 one hiZ call launched without
+// PARITY_ARGS -> 1 red, the scan row, naming it. Both restored, md5 verified.
 // RIG RUN 4, section 4. Against tools/ship/webgpuHarness.mjs: A1 win32's LAUNCH_ARGS without the adapter flag -> 1 red, the
 // ordinary-run row; A2 the adapter flag on every platform -> 1 red, the linux/darwin row. Against tools/ship/realGpuRun.mjs:
 // R7 runLaunchArgs falling back to launchArgsFor -> 1 red, the hardware row ("... --use-webgpu-adapter=swiftshader"); R8

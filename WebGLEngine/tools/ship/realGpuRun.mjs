@@ -25,7 +25,7 @@ import { HARDWARE_ARGS, hardwareArgsFor } from "./webgpuHarness.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { createRequire } from "node:module";
 import http from "node:http";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, WEBGL_DEFAULT_ARGS } from "./playwrightResolve.mjs";
 import { SOFTWARE_HINTS } from "../../ui/localModelProbe.js";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -102,17 +102,24 @@ export function runGates({ root = ENG, only = null, log = console.log, launchArg
  * flag cannot be chosen here. This asks the browser, per candidate, which WebGL2 renderer it hands out. Nothing is
  * changed by it; the answer is what a fix to the 72 must be built on.
  */
-export const TREE_SOFTWARE_GL = Object.freeze(["--use-gl=swiftshader"]);
-// and the WebGPU side of the same question: eight launches hand-spell `--use-gl=swiftshader --enable-unsafe-webgpu`,
-// the harness uses LAUNCH_ARGS, and which adapter each gets on a GPU box is equally unmeasured
-export const TREE_SOFTWARE_WEBGPU = Object.freeze(["--use-gl=swiftshader", "--enable-unsafe-webgpu"]);
+// *** rig run 10 -- ANSWERED. *** Keith's rig, this probe's sustained loop: --use-gl=swiftshader "CONTEXT LOST within 100
+// draws", alone and with --enable-unsafe-webgpu; --use-angle=swiftshader, with or without --enable-unsafe-swiftshader, "100
+// half-float draws held". The same finding v4684 made for four gates (playwrightResolve.mjs WEBGL_DEFAULT_ARGS), now on the
+// rest: every launch in the tree takes webglLaunchArgs(), and THE TREE'S SPELLING IS WEBGL_DEFAULT_ARGS. The retired one
+// stays a candidate by name, so the table keeps saying why it went.
+export const RETIRED_SOFTWARE_GL = Object.freeze(["--use-gl=swiftshader"]);
+export const TREE_SOFTWARE_GL = Object.freeze([...WEBGL_DEFAULT_ARGS]);
+// and the WebGPU side: the launches that also want WebGPU add --enable-unsafe-webgpu to the same default (on Linux it keeps
+// its SwiftShader adapter, measured; on win32 it had none under the retired spelling either)
+export const TREE_SOFTWARE_WEBGPU = Object.freeze([...WEBGL_DEFAULT_ARGS, "--enable-unsafe-webgpu"]);
 export const SOFTWARE_GL_CANDIDATES = Object.freeze([
     TREE_SOFTWARE_GL,
+    RETIRED_SOFTWARE_GL,
     Object.freeze(["--use-angle=swiftshader"]),
-    Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
     Object.freeze(["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
     Object.freeze([]),
     TREE_SOFTWARE_WEBGPU,
+    Object.freeze([...RETIRED_SOFTWARE_GL, "--enable-unsafe-webgpu"]),
     // rig run 4: spelled from HARDWARE_ARGS, so the two rows Keith's decision was read off stay the same two on win32
     // now that LAUNCH_ARGS is the second of them
     Object.freeze([...HARDWARE_ARGS]),

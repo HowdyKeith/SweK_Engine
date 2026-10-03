@@ -13,7 +13,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as EM from "../../render/effectMerge.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -116,7 +116,7 @@ console.log("\n4. *** THE GLSL, ACTUALLY RUN -- merged against chained on a real
             rs.writeHead(200, { "content-type": "text/html" }); rs.end(HARNESS);
         }).listen(0);
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await b.newPage();
         const errs = [], said = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
@@ -254,7 +254,7 @@ console.log("\n5. *** THE REAL PAGE, THROUGH THE TREE'S OWN RECORDER -- what the
             '    quad: draws.filter(c => Number(c.args[2]) === 6).length,\n' +
             '    redundant: redundantStateSets(h).slice(0, 6).map(r => r.op + " x" + r.count) };\n' +
             '});\n</script>';
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await b.newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));

@@ -14,7 +14,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { webgpuSkipReason, installSwizzleWorkaround } from "./webgpuHarness.mjs";
 import { LN2, PARAMS, truePeak } from "../../render/physicsTsl.mjs";
 import { probeCpu as heidlerGrid } from "../../render/heidlerWgsl.mjs";
@@ -62,7 +62,7 @@ else {
         if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU"] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     // webgpuHarness.mjs's header explains the bug and why the fix belongs here, not in vendor/. addInitScript
     // (not page.evaluate) because tsl-rig.html's own script runs on navigation, outside this gate's control --

@@ -40,7 +40,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
@@ -154,7 +155,7 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-300 snapshot drawn one body at a t
         // transforms were the node atlas's (logWidth 11) against the browser's (12) -- the texcoords matched the model to 2e-7 em
         // and every glyph was garbage ink. What crosses is the rows per body, nothing that names an atlas texel.
         const rowsPerBody = gbMain.bodies.map((b, k) => Array.from(bodyRows(PV, snapshot.xf, snapshot.ids[k])));
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, CHARS, rowsPerBody }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, CHARS, rowsPerBody }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");
