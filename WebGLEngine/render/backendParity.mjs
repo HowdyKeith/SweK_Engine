@@ -273,8 +273,13 @@ export const PARITY_BASELINE = Object.freeze({
     // A fifth, tools/ship/flyConnectomePage-selfcheck.mjs, arrived carrying a retyped copy of the page's pipeline
     // and was taken OUT rather than counted -- see DEVICE_CONTRACT.consumers; it now draws with the page's text.
     // glslFramework does not move: nothing that arrived leans on three.js to prepend the header.
-    glslBearing: 161,
-    glslDirective: 143,  // raw WebGL2 -- the file writes its own version header
+    // v4778 rig run 4 -- +1 GLSL, directive style, GLSL only: tools/ship/realGpuRun.mjs. Its --gl-flags probe compiles a
+    // bufferless gl_VertexID triangle and draws it, to ask whether a software-GL context DRAWS and not only names its
+    // renderer. A tool, not a shader module; counted per v4392's rule that embedded shader text is counted. Found by a
+    // census diff against 3677d747, the commit before it -- the only file that moved -- and missed for four commits,
+    // because this gate was not in that round's battery. Keith's rig run read it first: measured 162, recorded 161.
+    glslBearing: 162,
+    glslDirective: 144,  // raw WebGL2 -- the file writes its own version header
     glslFramework: 18,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
@@ -339,7 +344,7 @@ export const PARITY_BASELINE = Object.freeze({
     // shader module, which is why wgslOnly moves with it and `both` does not.
     wgslBearing: 108,
     both: 24,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
-    glslOnly: 137,
+    glslOnly: 138,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above)
     wgslOnly: 84,
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.

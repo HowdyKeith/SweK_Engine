@@ -118,7 +118,48 @@ export const SOFTWARE_GL_CANDIDATES = Object.freeze([
     Object.freeze([...HARDWARE_ARGS]),
     Object.freeze([...HARDWARE_ARGS, "--use-webgpu-adapter=swiftshader"]),
     Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
+    // *** rig run 9 -- A SET WITH BOTH BACKENDS ON SWIFTSHADER, ON WINDOWS. *** Since rig run 4 an ordinary win32 run puts
+    // WebGPU on SwiftShader and leaves WebGL2 on the GPU's ANGLE D3D11, and every gate that holds the two backends to
+    // each other compares two rasterisers: 14 went newly red in Keith's rig.html run (91 went green). Every measured set
+    // with ANGLE on SwiftShader lost the WebGPU adapter. These are the next candidates, nothing more -- the table says.
+    Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-features=Vulkan", "--use-vulkan=swiftshader"]),
+    Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--ignore-gpu-blocklist"]),
+    Object.freeze(["--use-angle=swiftshader-webgl", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
+    Object.freeze(["--use-angle=vulkan", "--use-vulkan=swiftshader", "--enable-features=Vulkan", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
+    Object.freeze(["--use-angle=d3d11-warp", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
 ]);
+
+/**
+ * *** rig run 9 -- AND THE NATIVE SIDE: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASKING. *** headlessGpu-selfcheck holds
+ * node-webgpu and the browser to ONE adapter. On win32 Dawn's default is D3D12 -- the GTX 1080 on Keith's rig -- so with the
+ * browser on SwiftShader the two cannot agree. Whether Dawn there can be asked for SwiftShader is unmeasured; this asks it
+ * three ways and reports each, changing nothing.
+ */
+export async function probeNativeAdapters({ requireFn = createRequire(import.meta.url) } = {}) {
+    const { resolveWebgpu, configureVulkanIcd } = await import("./headlessGpu.mjs");
+    const { mod, from } = resolveWebgpu(requireFn);
+    if (!mod) return { ok: false, reason: "node-webgpu does not resolve", rows: [] };
+    // as the harness does before every native call: point Dawn's Vulkan backend at the browser bundle's SwiftShader
+    // driver, unless VK_ICD_FILENAMES already chose one. On Linux that is the only adapter there is; on win32 it is
+    // what 'backend=vulkan' would need to reach SwiftShader at all
+    const icd = configureVulkanIcd();
+    const asks = [["create([]), requestAdapter()", [], {}], ["create([]), forceFallbackAdapter", [], { forceFallbackAdapter: true }],
+                  ["create(['adapter=SwiftShader'])", ["adapter=SwiftShader"], {}], ["create(['backend=vulkan'])", ["backend=vulkan"], {}]];
+    const rows = [];
+    for (const [label, flags, opts] of asks) {
+        try {
+            const a = await mod.create(flags).requestAdapter(opts);
+            const i = a ? (a.info || (a.requestAdapterInfo ? await a.requestAdapterInfo() : {})) : null;
+            const name = i ? [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ") : null;
+            rows.push({ label, adapter: name, software: name ? SOFTWARE_HINTS.test(name) : null, error: null });
+        } catch (e) { rows.push({ label, adapter: null, software: null, error: String((e && e.message) || e).slice(0, 120) }); }
+    }
+    return { ok: true, from, icd: icd.path || "(none found)", rows };
+}
+export function nativeAdapterLines(probe) {
+    if (!probe.ok) return ["node-webgpu: not probed -- " + probe.reason];
+    return probe.rows.map((r) => `${r.label.padEnd(40)} ${r.error ? "THREW " + r.error : r.adapter ? (r.software ? "SOFTWARE " : "HARDWARE ") + r.adapter : "no adapter"}`);
+}
 export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executablePath = HEADLESS_SHELL } = {}) {
     const pw = resolvePlaywright(createRequire(import.meta.url));
     if (!pw.chromium || !executablePath) return { ok: false, reason: "no playwright or no headless shell", rows: [] };
@@ -195,6 +236,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         const probe = await probeSoftwareGl();
         console.log(`\nrealGpuRun --gl-flags: which WebGL2 renderer each flag set gets from ${probe.executablePath || "(no browser)"}`);
         for (const l of softwareGlLines(probe)) console.log("  " + l);
+        const native = await probeNativeAdapters();
+        console.log(`\nand node-webgpu (${native.from || "unresolved"}), Vulkan driver ${native.icd || "-"}, asked for an adapter four ways:`);
+        for (const l of nativeAdapterLines(native)) console.log("  " + l);
         process.exit(0);
     }
     const arg = (k) => cli.values[k] ?? null;

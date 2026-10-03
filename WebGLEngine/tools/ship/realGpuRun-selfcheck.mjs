@@ -10,7 +10,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL } from "./realGpuRun.mjs";
+import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
+         probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, HARDWARE_ARGS } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
@@ -118,6 +119,20 @@ console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER Web
            rep.gates[0] && rep.gates[0].ok && logged.length === 1 && logged[0] === mark.join(" ") && rep.launchArgs.join(" ") === mark.join(" "));
         ok(`  ...and the run's flags, unset, are this box's HARDWARE_ARGS: "${dflt.join(" ")}"`, dflt.join(" ") === HARDWARE_ARGS.join(" "));
     }
+}
+
+console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASKING");
+// headlessGpu-selfcheck holds node-webgpu and the browser to one adapter; with the browser on SwiftShader on win32 the native
+// side must reach it too, and whether Dawn there can is the rig's to say. Here the probe must at least ask all four ways and
+// read what it gets: on this box every way is SwiftShader, through the browser bundle's Vulkan driver.
+{
+    const native = await probeNativeAdapters();
+    for (const l of nativeAdapterLines(native)) console.log("  ----  " + l);
+    ok(`node-webgpu asked four ways, each answered with an adapter or a reason: ${native.rows.map((r) => r.adapter ? (r.software ? "software" : "hardware") : r.error ? "threw" : "none").join(", ")}`,
+       native.ok && native.rows.length === 4 && native.rows.every((r) => r.adapter || r.error || r.adapter === null),
+       `from ${native.from}, Vulkan driver ${native.icd}`);
+    ok("  ...and on this box the default is software, as every device row here was measured on", native.ok && native.rows[0].software === true,
+       native.rows[0] ? native.rows[0].adapter || native.rows[0].error || "no adapter" : "not probed");
 }
 
 // ---- v4764 SABOTAGE LOG ----------------------------------------------------------------------------------------

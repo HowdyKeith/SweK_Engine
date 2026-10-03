@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3b5c57589dc62e63a6a5906460812bf7eba9bab9",
+ "head": "bf438a5ca20eccb70423e0c5343f66afb16354e8",
  "bodies": {
   "box3d": [
    {
@@ -861,8 +861,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 77363,
-    "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
+    "bytes": 78857,
+    "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
    },
    {
     "path": "toroidal-wave.html",
@@ -963,8 +963,8 @@
    },
    {
     "path": "fx/fsr/fsrFlowCost-selfcheck.mjs",
-    "bytes": 11729,
-    "sha": "08011513d2a9686cafbef371a3cb7963fa11f47e"
+    "bytes": 13832,
+    "sha": "bf438a5ca20eccb70423e0c5343f66afb16354e8"
    },
    {
     "path": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
@@ -1008,8 +1008,8 @@
    },
    {
     "path": "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
-    "bytes": 14552,
-    "sha": "08011513d2a9686cafbef371a3cb7963fa11f47e"
+    "bytes": 16655,
+    "sha": "bf438a5ca20eccb70423e0c5343f66afb16354e8"
    },
    {
     "path": "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
@@ -1018,8 +1018,8 @@
    },
    {
     "path": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
-    "bytes": 21706,
-    "sha": "08011513d2a9686cafbef371a3cb7963fa11f47e"
+    "bytes": 23809,
+    "sha": "bf438a5ca20eccb70423e0c5343f66afb16354e8"
    },
    {
     "path": "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
@@ -1028,8 +1028,8 @@
    },
    {
     "path": "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs",
-    "bytes": 15891,
-    "sha": "08011513d2a9686cafbef371a3cb7963fa11f47e"
+    "bytes": 17941,
+    "sha": "d84c1e2806380eabbf061c3b67aa91e9d52e2979"
    },
    {
     "path": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
@@ -1043,13 +1043,13 @@
    },
    {
     "path": "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
-    "bytes": 14201,
-    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
+    "bytes": 22305,
+    "sha": "78945b7ee2d5e148f1b043ab45ec97da5056bab5"
    },
    {
     "path": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
-    "bytes": 9922,
-    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
+    "bytes": 14126,
+    "sha": "d84c1e2806380eabbf061c3b67aa91e9d52e2979"
    },
    {
     "path": "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
@@ -1199,7 +1199,7 @@
    {
     "path": "tools/ship/threePatch.mjs",
     "bytes": 6969,
-    "sha": "28dfd29ec97b285edafe468b6e6aa49110335f2e"
+    "sha": "43b2117b6f129005e8ac146dccd40bcac78a1721"
    },
    {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
@@ -1209,7 +1209,7 @@
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
     "bytes": 25501,
-    "sha": "4d04ac769796138d1bdfde760cf6456de9b5d0e9"
+    "sha": "43b2117b6f129005e8ac146dccd40bcac78a1721"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
@@ -1248,8 +1248,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 77363,
-    "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
+    "bytes": 78857,
+    "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
    },
    {
     "path": "tsl-probe.html",
