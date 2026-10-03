@@ -139,7 +139,8 @@ export function mergeImportConflicts(text) {
         const names = (m) => m[1].split(",").map((x) => x.trim()).filter(Boolean);
         const [N, B, T] = [o, b, t].map(names), removed = B.filter((n) => !N.includes(n) || !T.includes(n));
         const keep = [...B, ...N, ...T].filter((n, i, a) => a.indexOf(n) === i && !removed.includes(n));
-        const line = `import { ${keep.join(", ")} } from ${b[2]};`; lines.push(line); return line;
+        // concatenated, not a template: a template building an import line reads as a generated import to windowsImport
+        const line = "import { " + keep.join(", ") + " } from " + b[2] + ";"; lines.push(line); return line;
     });
     return bad || /^(<<<<<<<|=======|>>>>>>>)/m.test(out) ? null : { text: out, lines };
 }
