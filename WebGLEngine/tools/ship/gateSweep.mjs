@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4804 -- THE 408th CLOSING: NO new gate file -- the eighteen cost headers, re-measured.
+    since501: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4804", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 18 -> 0)",
+            "tools/ship/statedRuntime-selfcheck.mjs (out of its own population by identity)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PAID DOWN BY RE-MEASURING, ONE GATE AT A TIME. *** The eighteen gates whose Run: line was more than 2x off " +
+                 "the alone median were each run alone three times on this box, and each line re-written to the geometric mean of " +
+                 "that median and the sweep's serial median -- within 2x of both -- with both readings and the old claim beside it: " +
+                 "~40 s became ~2.2s, ~40 ms became ~860 ms, ~11.6s became ~5.5s. The ratchet 18 -> 0. One gate re-written was " +
+                 "statedRuntime, whose new header disagreed with its own stale record: a candidate, so the gate ran itself, which " +
+                 "ran itself, until the cap -- it is out of its own population now, as declaredCost's gate is. Two sabotages red.",
+    }),
     // v4803 -- THE 407th CLOSING: NO new gate file -- no caller spells the source regex by hand.
     since500: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.

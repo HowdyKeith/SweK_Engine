@@ -35,7 +35,7 @@
 //                   C  gradeProbe accepting ok:true beside an error                                        -> exit=1, red: the eight-lies row
 //                   D  the page reporting ok without reading the gradient back                            -> exit=1, red: the refusal row reads 'it drew' -- a probe that does not draw cannot refuse
 //
-// Run: node tools/ship/threeProbe-selfcheck.mjs      (~40 s; the first run fetches 5.3 MB from the registry)
+// Run: node tools/ship/threeProbe-selfcheck.mjs      (~2.2s — re-measured v4804: 2.1 s-2.2 s alone, 2.4 s the sweep's serial median; it read ~40s; the first run fetches 5.3 MB from the registry)
 "use strict";
 import fs from "node:fs";
 import os from "node:os";

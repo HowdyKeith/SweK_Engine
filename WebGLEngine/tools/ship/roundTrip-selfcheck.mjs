@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/roundTrip-selfcheck.mjs
 //
-// Run: node tools/ship/roundTrip-selfcheck.mjs   (~4.5s MEASURED (gate-timings.json) -- MEASURED)
+// Run: node tools/ship/roundTrip-selfcheck.mjs   (~10.5s — re-measured v4804: 6.6 s-7.0 s alone, 16.1 s the sweep's serial median; it read ~4.5s MEASURED (gate-timings.json) -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3243 -- KEITH'S SIX RULES FOR A ROUND-TRIP CONTROL, IN ONE PLACE.

@@ -163,9 +163,14 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // than 2x off, on the record this box's verify wrote and on the one before it alike. The ratchet stands at 18.
     // v4801 SABOTAGE: the census back on `timings[g]` -> 1 red, 140-odd against 18.
     const ROTTED_AT_V4801 = 18;
+    // v4804 -- 18 -> 0, PAID DOWN BY RE-MEASURING. Each of the 18 was run alone three times on this box and its Run: line
+    // re-written to the geometric mean of that median and the sweep's serial median -- within 2x of both, which this census
+    // judges by -- with both readings and the old claim beside it. lagReading, the 19th, went at v4803.
+    // v4804 SABOTAGE: boundaryLint's header put back to ~2.4s -> 1 red.
+    const ROTTED_AT_V4804 = 0;
     ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4801 && ROTTED_AT_V4801 <= ROTTED_AT_V4666,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4801} (${ROTTED_AT_V4666} at v4666, judged against loaded readings). Each one is a gate whose header claims a ` +
+        c.rotted.length <= ROTTED_AT_V4804 && ROTTED_AT_V4804 <= ROTTED_AT_V4801 && ROTTED_AT_V4801 <= ROTTED_AT_V4666,
+        `${c.rotted.length} against a frozen ${ROTTED_AT_V4804} (${ROTTED_AT_V4801} at v4801, ${ROTTED_AT_V4666} at v4666 judged against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

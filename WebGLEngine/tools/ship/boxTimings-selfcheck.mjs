@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/boxTimings-selfcheck.mjs -- v4679
 //
-// Run: node tools/ship/boxTimings-selfcheck.mjs      (~3s)
+// Run: node tools/ship/boxTimings-selfcheck.mjs      (~100 ms — re-measured v4804: 0.1 s-0.1 s alone, 0.1 s the sweep's serial median; it read ~3s)
 //
 // *** A RATCHET WITH NO REACHABLE CLEAR STATE IS NOT A CHECK. ***
 //
