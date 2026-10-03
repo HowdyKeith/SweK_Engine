@@ -78,6 +78,12 @@ export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-linux", "headless_shell"),
     path.join("chrome-win", "headless_shell.exe"),
     path.join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
+    // v4778 rig run 4: and the SAME rename on Linux and macOS, which v4617 measured only on Windows. Playwright 1.63's
+    // chromium_headless_shell-1243 unpacks on Linux to chrome-headless-shell-linux64/chrome-headless-shell (installed and
+    // listed in this sandbox), so a Linux box with a current Playwright resolved an older build or nothing at all.
+    path.join("chrome-headless-shell-linux64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-arm64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-x64", "chrome-headless-shell"),
     path.join("chrome-mac", "headless_shell"),
     path.join("chrome-linux", "chrome"),
     path.join("chrome-win", "chrome.exe"),

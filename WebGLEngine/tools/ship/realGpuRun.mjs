@@ -117,7 +117,7 @@ export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executabl
     const rows = [];
     try {
         for (const args of sets) {
-            const row = { args: [...args], context: false, renderer: null, maxTexture: null, software: null,
+            const row = { args: [...args], context: false, renderer: null, maxTexture: null, software: null, draws: null,
                           webgpu: null, webgpuSoftware: null, error: null };
             let b = null;
             try {
@@ -131,6 +131,22 @@ export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executabl
                         const d = gl.getExtension("WEBGL_debug_renderer_info");
                         Object.assign(out, { context: !gl.isContextLost(), maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
                             renderer: String(d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) });
+                        // rig run 4: a context that ANSWERS is not one that DRAWS. Keith's rig named SwiftShader for
+                        // --use-gl=swiftshader and still lost the context in the gates (a compile that "threw null",
+                        // MAX_TEXTURE_SIZE of null). So: compile effectMerge's shape -- a bufferless gl_VertexID
+                        // triangle -- draw it, read the centre back, and say whether the context survived.
+                        try {
+                            const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x);
+                                if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error("compile: " + gl.getShaderInfoLog(x)); return x; };
+                            const pr = gl.createProgram();
+                            gl.attachShader(pr, sh(gl.VERTEX_SHADER, "#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}"));
+                            gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, "#version 300 es\nprecision highp float;out vec4 o;void main(){o=vec4(0.2,0.4,0.6,1.0);}"));
+                            gl.linkProgram(pr);
+                            if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error("link: " + gl.getProgramInfoLog(pr));
+                            gl.useProgram(pr); gl.drawArrays(gl.TRIANGLES, 0, 3);
+                            const px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+                            out.draws = gl.isContextLost() ? "CONTEXT LOST after drawing" : (px[2] > 100 ? "draws" : "drew nothing: " + Array.from(px).join(","));
+                        } catch (e) { out.draws = (gl.isContextLost() ? "CONTEXT LOST: " : "failed: ") + String((e && e.message) || e).slice(0, 80); }
                     }
                     try {
                         const a = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
@@ -153,7 +169,7 @@ export function softwareGlLines(probe) {
     if (!probe.ok) return ["software GL: not probed -- " + probe.reason];
     return probe.rows.map((r) => `${(r.args.join(" ") || "(no flags)").padEnd(70)} ` +
         (r.error ? "LAUNCH THREW " + r.error
-                 : `WebGL2 ${!r.context ? "NONE" : (r.software ? "SOFTWARE" : "HARDWARE") + " " + r.renderer + " (max texture " + r.maxTexture + ")"}` +
+                 : `WebGL2 ${!r.context ? "NONE" : (r.software ? "SOFTWARE" : "HARDWARE") + " " + r.renderer + " (max texture " + r.maxTexture + ") -- " + r.draws}` +
                    ` | WebGPU ${r.webgpuSoftware === null ? r.webgpu : (r.webgpuSoftware ? "SOFTWARE " : "HARDWARE ") + r.webgpu}`));
 }
 

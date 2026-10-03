@@ -71,17 +71,18 @@ if (skip) { console.log("  SKIP  no browser: " + skip); console.log("  ----  ***
 else {
     const probe = await probeSoftwareGl();
     for (const l of softwareGlLines(probe)) console.log("  ----  " + l);
-    GR.table("which renderer each flag set gets on this box", ["flags", "WebGL2", "WebGL2 renderer", "WebGPU"],
+    GR.table("which renderer each flag set gets on this box", ["flags", "WebGL2", "WebGL2 renderer", "draws", "WebGPU"],
              probe.rows.map((r) => [r.args.join(" ") || "(no flags)", r.error ? "launch threw" : !r.context ? "none" : (r.software ? "software" : "hardware"),
-                                    r.renderer || r.error || "", r.webgpu || ""]),
+                                    r.renderer || r.error || "", r.draws || "", r.webgpu || ""]),
              "the headless shell this box resolves; on a GPU box this table is the measurement a fix to the 72 needs");
     const tree = probe.rows.find((r) => r.args.join(" ") === TREE_SOFTWARE_GL.join(" "));
-    const working = probe.rows.filter((r) => r.context && r.software).map((r) => r.args.join(" ") || "(no flags)");
+    const working = probe.rows.filter((r) => r.context && r.software && r.draws === "draws").map((r) => r.args.join(" ") || "(no flags)");
     ok(`!! *** the tree's software-GL spelling (${TREE_SOFTWARE_GL.join(" ")}) gets a SOFTWARE WebGL2 renderer on this box ***`,
-       probe.ok && !!tree && tree.context && tree.software === true,
+       // rig run 4: and DRAWS -- the rig named SwiftShader for this spelling and still lost the context in the gates
+       probe.ok && !!tree && tree.context && tree.software === true && tree.draws === "draws",
        !probe.ok ? probe.reason
-       : `got ${tree && tree.context ? (tree.software ? "software" : "HARDWARE") + ": " + tree.renderer : "no WebGL2 context" + (tree && tree.error ? " (" + tree.error + ")" : "")}` +
-         (tree && tree.software ? "" : `. Every gate launched with it is holding a ${tree && tree.context ? "GPU's" : "dead context's"} pixels to SwiftShader's. ` +
+       : `got ${tree && tree.context ? (tree.software ? "software" : "HARDWARE") + ": " + tree.renderer + " -- " + tree.draws : "no WebGL2 context" + (tree && tree.error ? " (" + tree.error + ")" : "")}` +
+         (tree && tree.software && tree.draws === "draws" ? "" : `. Every gate launched with it is holding a ${tree && tree.context ? "GPU's" : "dead context's"} pixels to SwiftShader's. ` +
           `Spellings that DO get software here: ${working.join(" | ") || "NONE"}`));
 }
 
@@ -94,6 +95,8 @@ else {
 // RIG RUN 2: G1 section 2's verdict row looking for "a real-hardware run on" on a software box -> 1 red (only the software
 // branch can be driven red without a GPU); S1 probeSoftwareGl reading a SwiftShader renderer as hardware -> 1 red, the
 // tree-spelling row, "got HARDWARE: ANGLE (... SwiftShader driver)". Both restored, md5 verified.
+// RIG RUN 4: D1 the probe's fragment blue channel 0.6 -> 0.0 in realGpuRun.mjs (the triangle still draws, in the wrong
+// colour) -> 1 red, the tree-spelling row, "drew nothing: 51,102". Restored, md5 verified.
 {
     const w = GR.write();
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +

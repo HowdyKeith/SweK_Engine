@@ -1087,7 +1087,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // and asks navigator.gpu); realGpuRun-selfcheck awaiting it; and windowsImport-selfcheck, whose new fixture is
     // the string `"const M=await import(" + ...` -- the census reads string text, so a fixture that spells an await
     // counts as one. async/await 1704 -> 1707, Promises 399 -> 400, WebGL 195 -> 196, WebGPU 55 -> 56. No new file.
-    esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1261, promises: 400,
+    // (superseded in rig run 4) esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1261, promises: 400,
+    // rig run 4 -- typed arrays 1261 -> 1262 alone: realGpuRun.mjs's probe now draws a triangle and reads the pixel
+    // back into a Uint8Array, the first typed array in that file. No other row moved. No new file.
+    esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1262, promises: 400,
     fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
