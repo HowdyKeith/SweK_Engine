@@ -8730,14 +8730,18 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         added: Object.freeze([]),
         widened: Object.freeze([
             "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 7 -> 2, the two left named)",
+            "tools/ship/declaredCost-selfcheck.mjs (headers judged against the alone median; the ratchet 138 -> 18)",
         ]),
         redOnArrival: Object.freeze([]),
-        verdict: "*** FIVE MORE, ONE AT A TIME. *** render/colourReach.mjs, mesh/greedyMesh-selfcheck.mjs, tools/ship/ragdollFrom" +
+        verdict: "*** FIVE MORE, ONE AT A TIME. *** render/colourReach (named without its extension: a closing that names a module rescues it from the orphan census), mesh/greedyMesh-selfcheck.mjs, tools/ship/ragdollFrom" +
                  "Skeleton-selfcheck.mjs, tools/ship/videoFrames-selfcheck.mjs and ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT in " +
                  "place of the regex they spelled by hand, each edited and its gate run before the next, as the ratchet's note asks; " +
                  "its ceiling 7 -> 2. The two left are named rather than swept: render/backendParity.mjs has no top-level node import " +
                  "and is named from browser-side code, so moduleRefs' node:fs is not pulled into it unread; toolFrontDoor-selfcheck " +
-                 "is over the sweep's budget and moves when it is run. Two sabotages red.",
+                 "is over the sweep's budget and moves when it is run. And the first verify on a record this box rewrites each run " +
+                 "flipped declaredCost between 144 and 136 rotted headers against a frozen 138: it judged each header against " +
+                 "the newest reading, ~2.4x the alone cost when 8-way. Judged by the alone median, 18 -- the ratchet stands " +
+                 "there, not one header re-written. Three sabotages red.",
     }),
     // v4800 -- THE 404th CLOSING: NO new gate file -- the sweep chooses by this box's own stopwatch, and the shared record has an owner.
     since497: Object.freeze({

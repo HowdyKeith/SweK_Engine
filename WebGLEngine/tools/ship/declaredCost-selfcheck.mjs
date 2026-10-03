@@ -157,9 +157,15 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // each one a gate run to completion -- which is a pass of its own and not a tail-end edit. What must not
     // happen is the number growing while nobody looks, which is how it reached 138.
     const ROTTED_AT_V4666 = 138;
+    // *** v4801 -- 138 -> 18, AND NOT ONE HEADER WAS RE-WRITTEN. *** The census read `timings[g]`, the newest reading,
+    // and from an 8-way sweep that is ~2.4x a gate's alone cost: most of the 138 were contention, a header stating
+    // the alone cost against a loaded reading. Judged by the alone median (declaredCost.mjs, census), 18 are more
+    // than 2x off, on the record this box's verify wrote and on the one before it alike. The ratchet stands at 18.
+    // v4801 SABOTAGE: the census back on `timings[g]` -> 1 red, 140-odd against 18.
+    const ROTTED_AT_V4801 = 18;
     ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4666,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4666}. Each one is a gate whose header claims a ` +
+        c.rotted.length <= ROTTED_AT_V4801 && ROTTED_AT_V4801 <= ROTTED_AT_V4666,
+        `${c.rotted.length} against a frozen ${ROTTED_AT_V4801} (${ROTTED_AT_V4666} at v4666, judged against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

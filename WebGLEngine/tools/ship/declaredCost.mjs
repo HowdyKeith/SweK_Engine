@@ -82,7 +82,13 @@ export function census(root = ENG, timings = null, { exclude = null } = {}) {
         const d = declaredOf(src);
         if (d) declared.set(g, d); else missing.push(g);
     }
-    const ms = (g) => T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null;
+    // v4801 -- THE ALONE COST WHERE THE RECORD HAS ONE: the median of the last three serial readings (serialRing), as
+    // sweepCoverage's returnee row judges since v4782. `timings[g]` is the newest reading, and from an 8-way sweep that is
+    // ~2.4x the alone cost: once this box's verify rewrote the record at every run (v4800), gates near the 2x line flipped
+    // with whichever kind landed last -- 144 rotted on one pass, 136 on the next, against a frozen 138.
+    const ring = (g) => ((T.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0).sort((x, y) => x - y);
+    const ms = (g) => { const r = ring(g); if (r.length >= 2) return r[(r.length - 1) >> 1];
+        return T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null; };
     const finished = (g) => !(T.finished && T.finished[g] === false);
     const agree = [], rotted = [], suppliesFloor = [], contradicts = [], noRecord = [];
     for (const [g, d] of declared) {
