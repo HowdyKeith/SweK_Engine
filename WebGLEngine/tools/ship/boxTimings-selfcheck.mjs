@@ -164,19 +164,21 @@ console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***")
         shared ? `shared record belongs to ${shared.host}; this box is ${live.thisBox} -- ` +
             (shared.host === live.thisBox ? "the owner, so its readings are this box's own" :
              "not the owner, so neither writes it and coverage had to stop being asked of it") : "no shared record");
-    ok("!! *** and the BUDGET still reads the shared file alone -- stated, not quietly fixed ***",
-        /costOf/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")) &&
-        !/boxTimings/.test(fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8")),
-        "quickSweep does not import this module. On the rig that means gate SELECTION is still computed from a " +
-        "foreign box's numbers -- 91 of 1,409 read over budget there for that reason. Task #87, and it changes " +
-        "which gates run, so it is not smuggled into a round about a staleness row");
+    // v4800 -- TASK #87 DONE IN quickSweep ITSELF: the sweep chooses its gates by THIS box's record (ownTimings), the
+    // shared one where this box owns it or nobody does, else the local file this box writes. Not through this module:
+    // the per-box files recordLocal writes hold a handful of entries, and choosing by one would run every gate it lacks.
+    {   const qs = fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+        ok("!! *** and the BUDGET reads this box's own record now -- quickSweep's ownTimings, not this module's per-box files ***",
+            /export function ownTimings\(/.test(qs) && /const prior = own\.rec;/.test(qs) && !/import[^;]*boxTimings/.test(qs),
+            "before v4800 gate SELECTION was computed from whichever box owned the shared record -- 91 of 1,409 over " +
+            "budget on the rig for that reason, ~100 at each verify of this session's box. tools/ship/quickSweep-selfcheck.mjs holds the choice"); }
 }
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
 console.log("\nunchecked here: WHETHER A FOREIGN READING IS A GOOD ENOUGH ANSWER FOR ANYTHING BUT COVERAGE. It is " +
     "not, and nothing here pretends otherwise -- the rig's own verify measured 91 of 1,409 gates over budget " +
-    "purely for being named by a faster box. What would settle it is the cost half reading per-box records and " +
-    "scaling or refusing, which is task #87 and belongs with origin/claude/v4672-relative-budget's scale " +
-    "machinery rather than beside a second copy of it.");
+    "purely for being named by a faster box. v4800 (task #87) made the sweep choose by this box's own record " +
+    "when it has one; what it does NOT do is scale a foreign reading on a box's first sweep, which still chooses " +
+    "by the shared record and says so -- origin/claude/v4672-relative-budget's scale machinery is the place for that.");
 console.log(fails ? `\nboxTimings-selfcheck: ${fails} FAILED` : "\nboxTimings-selfcheck: all checks pass");
 process.exitCode = fails ? 1 : 0;

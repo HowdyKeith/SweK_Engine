@@ -228,6 +228,9 @@ export function redRegister() {
 // hostScale already exists to absorb (it scales a budget by what the local machine has actually done). What
 // changes here is only that a foreign box can no longer silently overwrite the shared record, and that the
 // record says who wrote it. Making fifteen readers host-aware is a different round with a different risk.
+// v4800 (#87): ONE OF THEM IS REDIRECTED NOW -- the sweep's own choice of gates, through ownTimings below, the one
+// whose cost was measured: ~100 gates read "now over budget" at every verify of a session whose box no record named.
+// The other readers (sweepCoverage, recordInputs, mechanical among them) still read the shared file, unchanged here.
 export const LOCAL_TIMINGS = "tools/ship/sweep-timings.local.json";
 
 /**
@@ -248,6 +251,31 @@ export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCA
 
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
     try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
+}
+
+/**
+ * v4800 (#87) -- THE RECORD THIS BOX'S SWEEP CHOOSES ITS GATES BY. Returns { rec, file, own, why }.
+ *
+ * timingsTarget answers WHERE this box's readings go; this answers which readings choose the gates, and the two
+ * were never the same question. Until now the sweep always chose by the shared record, so a box that did not own
+ * it chose by another machine's stopwatch: ~100 gates read over budget at every verify on this session's box,
+ * because the record belonged to an id no live box has. That box's own readings were written, every sweep, to
+ * LOCAL_TIMINGS -- and never read back. They are read back now:
+ *
+ *   - the shared record, if this box owns it or nobody does (timingsTarget's own rule for who may write it);
+ *   - else LOCAL_TIMINGS, if THIS box wrote it -- a full sweep's readings, the file a foreign box writes;
+ *   - else the shared record still, said as such (`own: false`): a box's first sweep has nothing of its own.
+ *
+ * The per-box files (boxTimings.FILES.perBox) are not candidates: recordLocal writes a handful of entries there,
+ * and a record that does not cover the tree would make every gate it lacks "unmeasured", run regardless of cost.
+ */
+export function ownTimings(shared, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, root = ENG, id = boxId() } = {}) {
+    const was = shared && shared.host;
+    if (!was || was === id) return { rec: shared, file, own: true, why: was ? `this box (${id}) owns ${file}` : `${file} names no box; ${id} adopts it` };
+    const mine = readTimings(local, root);
+    if (mine.host === id && Object.keys(mine.timings || {}).length > 0)
+        return { rec: mine, file: local, own: true, why: `${file} belongs to ${was}; choosing by this box's own ${local}` };
+    return { rec: shared, file, own: false, why: `${file} belongs to ${was} and this box (${id}) has no record of its own yet; choosing by ${was}'s` };
 }
 
 /**
@@ -588,7 +616,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // gateSweep.TRANSIENT_DIRS). Not for a caller's own gate list -- those are fixtures in their own root.
     if (!gates) { const gone = reclaimScratchDirs(root); if (gone.length) log(`[sweep] reclaimed ${gone.length} stranded gate scratch dir(s): ${gone.join(", ")}`); }
     const all = gates || enumerateGates(root);
-    const prior = readTimings(timingsFile, root);
+    // v4800 (#87): the gates are chosen by -- and this run's readings merged into -- the record of THIS box's stopwatch
+    // (ownTimings); whose record the shared file is still decides where they are written (timingsTarget, below).
+    const shared = readTimings(timingsFile, root);
+    const own = ownTimings(shared, { file: timingsFile, root });
+    const prior = own.rec;
     // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.
     // A missing or unreadable record yields an empty one, and skippable() answers "no recorded input set" for
     // every gate, so the sweep behaves exactly as it did before this parameter existed.
@@ -841,7 +873,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     const foreignTimings = !!timingsHost && timingsHost !== boxId();
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
-        timingsHost, foreignTimings, box: boxId(),
+        timingsHost, foreignTimings, box: boxId(), timingsFrom: own.file, timingsWhy: own.why,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
@@ -873,7 +905,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     stage({ stage: "write", write });
     if (write) {
         // v4647 -- whose stopwatch. A foreign box writes its own file rather than overwriting this one.
-        const target = timingsTarget(prior, { file: timingsFile });
+        const target = timingsTarget(shared, { file: timingsFile });
         // v4647h: through the caller's sink. This line fires on a FOREIGN box -- the only kind whose
         // result gets carried to another machine -- so under --json it was the line most likely to
         // land inside the capture and the least likely to be noticed by the box that wrote it.

@@ -810,6 +810,36 @@ sec("8f. THE FIVE EXPORTS NO GATE NAMED, CLOSED BY ASSERTION");
        "...and a record with NO host is not foreign to anybody, so a first write is not refused",
        "an unstamped file is the state before any box has claimed it");
 
+    // v4800 SABOTAGES: Q1 ownTimings never reading the local record -> 1 red; Q2 taking another box's local record for this
+    // box's -> 1; Q3 the sweep choosing by the shared record again -> 1.
+    // v4800 (#87): ownTimings -- which record CHOOSES the gates. timingsTarget routes the writes; this says whose stopwatch
+    // decides membership, and until v4800 that was always the shared file's, on every box.
+    {   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ownTimings-")), local = "local.json";
+        const put = (rec) => fs.writeFileSync(path.join(tmp, local), JSON.stringify(rec));
+        const shared = { host: "boxA", timings: { g: 4000 } };
+        try {
+            const owned = Q.ownTimings(shared, { file: "t.json", local, root: tmp, id: "boxA" });
+            put({ host: "boxB", timings: { g: 900 } });
+            const mine = Q.ownTimings(shared, { file: "t.json", local, root: tmp, id: "boxB" });
+            put({ host: "boxC", timings: { g: 900 } });
+            const theirs = Q.ownTimings(shared, { file: "t.json", local, root: tmp, id: "boxB" });
+            put({ host: "boxB", timings: {} });
+            const empty = Q.ownTimings(shared, { file: "t.json", local, root: tmp, id: "boxB" });
+            const unclaimed = Q.ownTimings({ timings: { g: 1 } }, { file: "t.json", local, root: tmp, id: "boxB" });
+            ok(owned.rec === shared && owned.own === true && mine.file === local && mine.own === true && mine.rec.timings.g === 900,
+               "!! *** a box that does not own the shared record chooses its gates by ITS OWN readings, when it has them ***",
+               `owner -> ${owned.file}; boxB with its own record -> ${mine.file} (${mine.rec.timings && mine.rec.timings.g} ms, not ${shared.timings.g}). ` +
+               `Before v4800 every box chose by the shared file: ~100 gates "now over budget" at each verify of a box no record named`);
+            ok(theirs.rec === shared && theirs.own === false && empty.rec === shared && empty.own === false && unclaimed.own === true && /boxA/.test(theirs.why),
+               "...and a local record ANOTHER box wrote, or one with no readings, is not taken for this box's: it falls back to the shared one and says so",
+               `another box's local file -> ${theirs.file} (own: ${theirs.own}); an empty one -> ${empty.file} (own: ${empty.own}); an unclaimed shared record is this box's to adopt (own: ${unclaimed.own})`);
+        } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+        const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+        ok(/const own = ownTimings\(shared, \{ file: timingsFile, root \}\);\s*const prior = own\.rec;/.test(src) && /timingsTarget\(shared, \{ file: timingsFile \}\)/.test(src),
+           "!! ...and the sweep CHOOSES by it, while timingsTarget still routes the write by the shared record's owner",
+           "a function nothing calls would pass the two rows above and change nothing");
+    }
+
     // readTimings: the reader every consumer goes through, including on a file that is not there.
     const missing = Q.readTimings("tools/ship/__no_such_timings__.json", ENG);
     ok(missing && typeof missing === "object" && Object.keys(missing.timings || {}).length === 0,

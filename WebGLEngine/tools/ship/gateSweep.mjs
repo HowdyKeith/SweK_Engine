@@ -8723,6 +8723,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4800 -- THE 404th CLOSING: NO new gate file -- the sweep chooses by this box's own stopwatch, and the shared record has an owner.
+    since497: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
+        at: "v4800", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/quickSweep-selfcheck.mjs (ownTimings: whose record chooses the gates, on fixtures, and that the sweep uses it)",
+            "tools/ship/boxTimings-selfcheck.mjs (the budget row states the new choice instead of pinning the old one)",
+            "tools/ship/recordReach-selfcheck.mjs (this box's own alone readings win the margin whenever there are two)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (the population outside the sweep compared as a share of a grown tree)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TASK #87. *** quickSweep chose its gates by the shared timing record on every box, and the shared record " +
+                 "belonged to an id no live box has: ~100 gates read \"now over budget\" at each verify this session, and this " +
+                 "box's own readings were written to its local file every sweep and never read back. ownTimings reads them " +
+                 "back -- the shared record where this box owns it or nobody does, else the local file this box wrote, else the " +
+                 "shared one, said as such -- while timingsTarget still routes the write by the shared record's owner. And the " +
+                 "shared record is re-hosted to linux-x64-4c-16gb-420793, from that local file. Three gates moved with it: " +
+                 "boxTimings had pinned the old choice; recordReach read rings the departed box had filled, now that this box " +
+                 "owns them; sweepCoverage compared a count frozen on a 1,617-gate tree. Six sabotages red.",
+    }),
     // v4799 -- THE 403rd CLOSING: NO new gate file -- the drafts on three's latest release and its dev branch.
     since496: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

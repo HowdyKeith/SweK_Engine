@@ -1030,7 +1030,9 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     const entrantsUnmeasured = entrants.filter((g) => !c.graded.includes(g));
     const fromPopulation = c.killed.length - entrants.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       outside <= R.outsideTheSweep.before && fromPopulation <= R.remaining.killedUnreachable &&
+       // v4800 -- the SHARE, not the count: the record froze 464 of a 1,617-gate tree on another box, and the tree is 1,881
+       // now. Re-hosted to this box the count read 469, five more over a tree 264 larger; the share is 24.9% against 28.7%.
+       100 * outside / gates.length <= R.outsideTheSweep.beforePct && fromPopulation <= R.remaining.killedUnreachable &&
        entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,

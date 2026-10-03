@@ -272,7 +272,11 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
     const costMs = (g) => {
         const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
-        if (shared && shared !== here && mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
+        // v4800 -- this box's own ALONE readings win whenever there are two, owner or not. The shared record was re-hosted to
+        // this box from the local file it had been writing, and a foreign box's writes merged into the shared record's
+        // contents until v4800: its rings carried the departed box's readings ([2236, 2248] beside this box's 1971 for
+        // recordDrift), and owning the record made this row read them as this box's. They age out of a three-deep ring.
+        if (mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
         const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
         return r.length >= 2 ? { ms: median(r), n: r.length, whose: shared || "the record" } : { ms: cost[g].ms, n: r.length, whose: shared || "the record" };
     };
