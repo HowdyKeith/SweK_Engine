@@ -23,6 +23,20 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);
+// *** v4778 RIG RUN 8 -- A COST ROW IS SWIFTSHADER'S COST MODEL, ASSERTED ON SOFTWARE AND REPORTED ON A GPU (Keith's decision). ***
+// The rows costRow carries assert how SwiftShader, a CPU rasteriser, spends its time; their own text says "SwiftShader's
+// milliseconds". On Keith's GTX 1080 (realGpuRun, three runs) a fixed cost of a few ms swallowed every proportion they hold,
+// and the readings moved run to run by more than the claims' margins. So: on an adapter the harness KNOWS is hardware, the
+// row is printed with its figures and whether it would hold, and not asserted; on software, or an adapter it cannot name,
+// it is asserted as before. A GPU cost model is a separate measurement nobody has taken.
+const adapterName = (r) => (r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown");
+const costRow = (r, label, cond, detail) => {
+    if (r && r.software === false) { say(`NOT ASSERTED on a hardware adapter (${adapterName(r)}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${label.replace(/\*\*\* ?| ?\*\*\*/g, "")}`); return false; }
+    ok(label, cond, detail); return true;
+};
+// ...and the scope is itself held: on software, the cost row WAS asserted, or the decision above has been widened by accident.
+const costHeld = (r, asserted) => ok(`the cost row was ${asserted ? "asserted" : "reported"} on a ${r && r.software === false ? "hardware" : "software"} adapter (${adapterName(r)}), as decided`,
+    asserted === !(r && r.software === false), "SwiftShader's cost model is held where it was measured and reported where it was not");
 const D = 128, CASES = ["wideSlow", "scroll13", "wide13", "pan24"];
 
 console.log("\n1. ON THE DEVICE: a knot in front of a wall, the camera panning and the wall's texture scrolling");
@@ -149,10 +163,10 @@ if (!skip) {
         say(`the radius alone: no holes ${f(t.none)} ms, a tenth ${f(t.tenth)}, all ${f(t.all)}; reaching 16: ${f(t.noneReach)} and ${f(t.tenthReach)} -- the median of five, SwiftShader's milliseconds`);
         REPORT.table("the fill's time, the median of five, this device's ms", ["holes", "radius alone ms", "reaching 16 ms"],
             [["none", t.none, t.noneReach], ["a tenth", t.tenth, t.tenthReach], ["all", t.all, "not timed"]]);
-        ok(`*** [webgpu] only a hole searches: a frame with none costs ${f(t.none)} ms against ${f(t.all)} with every pixel one -- and reaching 16 costs nothing where the radius finds something, ${f(t.tenthReach)} ms against ${f(t.tenth)} for a tenth of the pixels ***`,
+        costHeld(r, costRow(r, `*** [webgpu] only a hole searches: a frame with none costs ${f(t.none)} ms against ${f(t.all)} with every pixel one -- and reaching 16 costs nothing where the radius finds something, ${f(t.tenthReach)} ms against ${f(t.tenth)} for a tenth of the pixels ***`,
            t.none < 0.3 * t.all && t.noneReach < 0.3 * t.all && t.tenthReach < 1.5 * t.tenth + 3,
            "v4737's fill searched its window at every pixel and returned the landed ones' own texel after; it skips the search there now (the fill is fillHolesCPU's to the bit either way, render/holeFillTsl-selfcheck.mjs). " +
-           "What the reach costs is the holes it searches for: a frame of holes nothing is near pays (2 x 16 + 1)^2 taps a pixel -- MEASURED ONCE when this round was built, 650 to 693 ms here, and not re-measured each run for the gate's time; no generated frame here comes near it");
+           "What the reach costs is the holes it searches for: a frame of holes nothing is near pays (2 x 16 + 1)^2 taps a pixel -- MEASURED ONCE when this round was built, 650 to 693 ms here, and not re-measured each run for the gate's time; no generated frame here comes near it"));
     }
 }
 
@@ -170,6 +184,10 @@ if (!skip) {
 // fx/fsr/fsrFlowSeed-selfcheck.mjs: G1 the default reaching nothing -> 3, 1; G2 the default reaching 8 -> 3, 1 -- at 8 the
 // seed's gain on the scrolling wall is -0.02 and -0.08 dB, which is part of why the default is 16.
 REPORT.write();
+// ---- v4778 RIG RUN 8 SABOTAGE LOG ------------------------------------------------------------------------------------
+// S1 costRow's scope widened to report on any adapter not known to be software -> 1 red here, the "as decided" row (run
+// against fsrFrameGenLayerCost and fsrFrameGenReach, each restored and md5 verified; the helper is the same three lines in
+// fsrFlowCost). The hardware branch is the rig's to show: this box has no GPU.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: what a reached hole is filled WITH -- the farthest vector within 16 px and the blend of both frames, which is " +
     "the radius's rule carried further and not a measured choice for gaps this wide; content entering at the frame's edge, which " +
