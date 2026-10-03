@@ -77,13 +77,14 @@ else {
                                     r.renderer || r.error || "", r.draws || "", r.webgpu || ""]),
              "the headless shell this box resolves; on a GPU box this table is the measurement a fix to the 72 needs");
     const tree = probe.rows.find((r) => r.args.join(" ") === TREE_SOFTWARE_GL.join(" "));
-    const working = probe.rows.filter((r) => r.context && r.software && r.draws === "draws").map((r) => r.args.join(" ") || "(no flags)");
+    const holds = (r) => r.draws === "draws" && /held$/.test(r.sustain || "");   // rig run 9: one draw AND a hundred under work
+    const working = probe.rows.filter((r) => r.context && r.software && holds(r)).map((r) => r.args.join(" ") || "(no flags)");
     ok(`!! *** the tree's software-GL spelling (${TREE_SOFTWARE_GL.join(" ")}) gets a SOFTWARE WebGL2 renderer on this box ***`,
        // rig run 4: and DRAWS -- the rig named SwiftShader for this spelling and still lost the context in the gates
-       probe.ok && !!tree && tree.context && tree.software === true && tree.draws === "draws",
+       probe.ok && !!tree && tree.context && tree.software === true && holds(tree),
        !probe.ok ? probe.reason
-       : `got ${tree && tree.context ? (tree.software ? "software" : "HARDWARE") + ": " + tree.renderer + " -- " + tree.draws : "no WebGL2 context" + (tree && tree.error ? " (" + tree.error + ")" : "")}` +
-         (tree && tree.software && tree.draws === "draws" ? "" : `. Every gate launched with it is holding a ${tree && tree.context ? "GPU's" : "dead context's"} pixels to SwiftShader's. ` +
+       : `got ${tree && tree.context ? (tree.software ? "software" : "HARDWARE") + ": " + tree.renderer + " -- " + tree.draws + " / " + tree.sustain : "no WebGL2 context" + (tree && tree.error ? " (" + tree.error + ")" : "")}` +
+         (tree && tree.software && holds(tree) ? "" : `. Every gate launched with it is holding a ${tree && tree.context ? "GPU's" : "dead context's"} pixels to SwiftShader's. ` +
           `Spellings that DO get software here: ${working.join(" | ") || "NONE"}`));
 }
 
@@ -146,6 +147,8 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // tree-spelling row, "got HARDWARE: ANGLE (... SwiftShader driver)". Both restored, md5 verified.
 // RIG RUN 4: D1 the probe's fragment blue channel 0.6 -> 0.0 in realGpuRun.mjs (the triangle still draws, in the wrong
 // colour) -> 1 red, the tree-spelling row, "drew nothing: 51,102". Restored, md5 verified.
+// RIG RUN 9: D2 the sustained loop losing its context at draw 50 (WEBGL_lose_context) -> 1 red, the tree-spelling row,
+// "CONTEXT LOST within 51 draws". Restored, md5 verified.
 // RIG RUN 4, section 4. Against tools/ship/webgpuHarness.mjs: A1 win32's LAUNCH_ARGS without the adapter flag -> 1 red, the
 // ordinary-run row; A2 the adapter flag on every platform -> 1 red, the linux/darwin row. Against tools/ship/realGpuRun.mjs:
 // R7 runLaunchArgs falling back to launchArgsFor -> 1 red, the hardware row ("... --use-webgpu-adapter=swiftshader"); R8

@@ -179,8 +179,10 @@ console.log("\n5. *** THE POOL ABOVE TWO WORKERS, AND MORE OF THEM IS NOT FASTER
         R.pools.map((p) => p.size + ":" + p.found).join(" ") + ". The pool's own default is " +
         "Math.max(2, Math.min(4, hardwareConcurrency - 2)).");
     const one = R.pools.find((p) => p.size === 1), eight = R.pools.find((p) => p.size === 8);
-    ok("!! *** AND MORE WORKERS IS SLOWER ON THIS BOX, WHICH IS A READING RATHER THAN A RULE ***",
-        eight.ms > one.ms,
+    // *** v4778 RIG RUN 9 -- THIS WAS ASSERTED, AND ITS OWN TEXT SAYS "NOT ASSERTED AS A PROPERTY OF THE POOL". *** It read red
+    // on Keith's rig, twelve cores, where eight workers won: 161.5 ms for one against 140.2 for eight. The reading is
+    // printed on every box, which way it went with it; the row above -- every size CORRECT -- is the one that holds.
+    console.log("  ----  " + (eight.ms > one.ms ? "MORE WORKERS IS SLOWER ON THIS BOX" : "MORE WORKERS IS FASTER ON THIS BOX") + ", A READING RATHER THAN A RULE:  " +
         "1 worker " + one.ms + " ms against 8 workers " + eight.ms + " ms for the same 32 jobs. Each worker " +
         "is a module Worker that must fetch and parse botPathfinder.worker.js AND nav/navmesh.mjs before it " +
         "answers anything, and on a box with few cores that spin-up is not repaid by 32 jobs. *** NOT " +

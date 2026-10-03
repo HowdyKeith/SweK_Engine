@@ -170,7 +170,7 @@ export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executabl
     const rows = [];
     try {
         for (const args of sets) {
-            const row = { args: [...args], context: false, renderer: null, maxTexture: null, software: null, draws: null,
+            const row = { args: [...args], context: false, renderer: null, maxTexture: null, software: null, draws: null, sustain: null,
                           webgpu: null, webgpuSoftware: null, error: null };
             let b = null;
             try {
@@ -200,6 +200,29 @@ export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executabl
                             const px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
                             out.draws = gl.isContextLost() ? "CONTEXT LOST after drawing" : (px[2] > 100 ? "draws" : "drew nothing: " + Array.from(px).join(","));
                         } catch (e) { out.draws = (gl.isContextLost() ? "CONTEXT LOST: " : "failed: ") + String((e && e.message) || e).slice(0, 80); }
+                        // rig run 9: and does it STAY alive under work? effectMerge-selfcheck's compiles "threw null" on the rig
+                        // -- a lost context's info log, reproduced here by losing one on purpose -- while the one triangle above
+                        // drew. So: a loop-heavy fragment, 100 draws into a half-float target, read back every tenth, then a
+                        // pause for a loss the GPU process reports late. The browser's own console names the suspect:
+                        // "Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader".
+                        try {
+                            const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x);
+                                if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error("compile: " + gl.getShaderInfoLog(x)); return x; };
+                            const pr = gl.createProgram();
+                            gl.attachShader(pr, sh(gl.VERTEX_SHADER, "#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}"));
+                            gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, "#version 300 es\nprecision highp float;uniform float uT;out vec4 o;void main(){vec2 q=gl_FragCoord.xy/256.0;float a=0.0;for(int i=0;i<64;i++){a+=sin(q.x*float(i)+uT)*cos(q.y*float(i)-uT);}o=vec4(a,q,1.0);}"));
+                            gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error("link: " + gl.getProgramInfoLog(pr));
+                            const half = !!gl.getExtension("EXT_color_buffer_float"), tex = gl.createTexture();
+                            gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                            gl.texImage2D(gl.TEXTURE_2D, 0, half ? gl.RGBA16F : gl.RGBA8, 256, 256, 0, gl.RGBA, half ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+                            const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+                            gl.viewport(0, 0, 256, 256); gl.useProgram(pr); const uT = gl.getUniformLocation(pr, "uT");
+                            let k = 0;
+                            for (; k < 100 && !gl.isContextLost(); k++) { gl.uniform1f(uT, k * 0.1); gl.drawArrays(gl.TRIANGLES, 0, 3);
+                                if (k % 10 === 9) gl.readPixels(0, 0, 1, 1, gl.RGBA, half ? gl.FLOAT : gl.UNSIGNED_BYTE, half ? new Float32Array(4) : new Uint8Array(4)); }
+                            await new Promise((r) => setTimeout(r, 300));
+                            out.sustain = gl.isContextLost() ? `CONTEXT LOST within ${k} draws` : `100 ${half ? "half-float" : "8-bit"} draws held`;
+                        } catch (e) { out.sustain = (gl.isContextLost() ? "CONTEXT LOST: " : "failed: ") + String((e && e.message) || e).slice(0, 80); }
                     }
                     try {
                         const a = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
@@ -222,7 +245,7 @@ export function softwareGlLines(probe) {
     if (!probe.ok) return ["software GL: not probed -- " + probe.reason];
     return probe.rows.map((r) => `${(r.args.join(" ") || "(no flags)").padEnd(70)} ` +
         (r.error ? "LAUNCH THREW " + r.error
-                 : `WebGL2 ${!r.context ? "NONE" : (r.software ? "SOFTWARE" : "HARDWARE") + " " + r.renderer + " (max texture " + r.maxTexture + ") -- " + r.draws}` +
+                 : `WebGL2 ${!r.context ? "NONE" : (r.software ? "SOFTWARE" : "HARDWARE") + " " + r.renderer + " (max texture " + r.maxTexture + ") -- " + r.draws + (r.sustain ? " / " + r.sustain : "")}` +
                    ` | WebGPU ${r.webgpuSoftware === null ? r.webgpu : (r.webgpuSoftware ? "SOFTWARE " : "HARDWARE ") + r.webgpu}`));
 }
 
