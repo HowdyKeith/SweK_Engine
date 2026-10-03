@@ -28,6 +28,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { boxId } from "./hostScale.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -86,7 +87,14 @@ export function census(root = ENG, timings = null, { exclude = null } = {}) {
     // sweepCoverage's returnee row judges since v4782. `timings[g]` is the newest reading, and from an 8-way sweep that is
     // ~2.4x the alone cost: once this box's verify rewrote the record at every run (v4800), gates near the 2x line flipped
     // with whichever kind landed last -- 144 rotted on one pass, 136 on the next, against a frozen 138.
-    const ring = (g) => ((T.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0).sort((x, y) => x - y);
+    // v4804 -- and THIS BOX'S OWN alone readings first, where it has two (boxTimings.recordLocal's per-box ring), as recordReach's
+    // margin row reads them since v4800: the shared ring is three readings deep and a sweep refreshes a gate's entry only when it
+    // reaches it, so a gate's cost that changed this round (statedRuntime, 6,462 ms while it re-ran a stale candidate twice,
+    // 1,600 alone once the record was put right) sits on the old median for sweeps. Only the default record: a caller that hands
+    // in its own timings gets those alone. SABOTAGE (v4804): the per-box ring ignored -> 1 red, statedRuntime on its 6,462.
+    const own = (() => { if (timings) return {}; try { return JSON.parse(fs.readFileSync(path.join(root, "tools", "ship", `sweep-timings.${boxId()}.json`), "utf8")).serialRing || {}; } catch { return {}; } })();
+    const ring = (g) => { const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
+        return (mine.length >= 2 ? mine : ((T.serialRing || {})[g] || []).filter((n) => typeof n === "number" && n > 0)).slice().sort((x, y) => x - y); };
     const ms = (g) => { const r = ring(g); if (r.length >= 2) return r[(r.length - 1) >> 1];
         return T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null; };
     const finished = (g) => !(T.finished && T.finished[g] === false);
