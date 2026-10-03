@@ -241,7 +241,12 @@ console.log("\n5. THE CENSUS IS A CENSUS -- NOT RATCHETED, NOT SWEPT, AND IT HAS
     // shape ("a rise is only debt if the thing being measured actually rose"), verified here by reading BOTH
     // detectors against the identical files rather than assumed.
     // v4798: 11 -> 7, as roundTrip, glbTexture, wgslSpec and canvasFill import SOURCE_EXT -- by hand, one at a time, each run.
-    const HAND_SPELLED_CEILING = 7;
+    // v4801: 7 -> 2, as render/colourReach.mjs, mesh/greedyMesh-, tools/ship/ragdollFromSkeleton-, tools/ship/videoFrames- and
+    // ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT -- by hand, one at a time, each run. The two left are named: render/
+    // backendParity.mjs has no top-level node import and is named from browser-side code, so moduleRefs' node:fs is not
+    // pulled into it unread; tools/ship/toolFrontDoor-selfcheck.mjs is over the sweep's budget and is moved when it is run.
+    // v4801 SABOTAGES: the ceiling at 1 -> 1 red; colourReach spelling the regex by hand again -> 1.
+    const HAND_SPELLED_CEILING = 2;
     const handSpelled = handSpelledCorpusFilters();
     ok("!! the hand-spelled corpus filters are COUNTED, not swept",
         handSpelled.length > 0 && handSpelled.length <= HAND_SPELLED_CEILING,

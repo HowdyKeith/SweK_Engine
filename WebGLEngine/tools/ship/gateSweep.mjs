@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4801 -- THE 405th CLOSING: NO new gate file -- five more callers off a hand-spelled regex.
+    since498: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4801", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 7 -> 2, the two left named)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** FIVE MORE, ONE AT A TIME. *** render/colourReach.mjs, mesh/greedyMesh-selfcheck.mjs, tools/ship/ragdollFrom" +
+                 "Skeleton-selfcheck.mjs, tools/ship/videoFrames-selfcheck.mjs and ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT in " +
+                 "place of the regex they spelled by hand, each edited and its gate run before the next, as the ratchet's note asks; " +
+                 "its ceiling 7 -> 2. The two left are named rather than swept: render/backendParity.mjs has no top-level node import " +
+                 "and is named from browser-side code, so moduleRefs' node:fs is not pulled into it unread; toolFrontDoor-selfcheck " +
+                 "is over the sweep's budget and moves when it is run. Two sabotages red.",
+    }),
     // v4800 -- THE 404th CLOSING: NO new gate file -- the sweep chooses by this box's own stopwatch, and the shared record has an owner.
     since497: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.

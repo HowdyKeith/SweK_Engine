@@ -48,6 +48,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildGreedyMesh } from "./greedyMesher.js";
 import { greedyMesh } from "../voxel/greedyMesh.js";
+import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let fails = 0;
@@ -132,7 +133,7 @@ const slab = () => {
             // GATE MATCHED THE CLAIM DESCRIBING THE BUG AS AN INSTANCE OF THE BUG. A REGEX THAT GREPS PROSE
             // WILL FIND PROSE -- the same lesson as v2571's shader check, from the opposite direction.
             // DOCUMENTATION QUOTING A PATH IS NOT AN IMPORT.
-            else if (/\.(js|mjs|html)$/.test(e.name) && !/selfcheck/.test(e.name)
+            else if (SOURCE_EXT.test(e.name) && !/selfcheck/.test(e.name)
                      && e.name !== "predictions.html") out.push(p);
         }
         return out;
