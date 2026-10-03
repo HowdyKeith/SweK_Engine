@@ -237,6 +237,7 @@ window.__door = r;
     // RIG RUN 2: the harness's OWN flags, not a copy of one of them. On win32 LAUNCH_ARGS is --enable-unsafe-webgpu
     // --use-angle=d3d11 -- the pair webgpuHarness.mjs measured necessary and sufficient there -- and this launch carried
     // the first alone (plus --use-gl=swiftshader), so Keith's rig read "no-device" on the very box the claim is about.
+    // (Rig run 4: win32's LAUNCH_ARGS also carries --use-webgpu-adapter=swiftshader now; WebGPU is live under it, measured.)
     // SABOTAGE F1: this launch given no WebGPU flag at all -> 2 red, the one-flag row and the three-reasons row. Restored, md5.
     const bFlag = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS] });
     const read = async (host, b = bPlain) => {

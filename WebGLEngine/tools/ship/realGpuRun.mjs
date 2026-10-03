@@ -21,7 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { LAUNCH_ARGS } from "./webgpuHarness.mjs";
+import { HARDWARE_ARGS, hardwareArgsFor } from "./webgpuHarness.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { createRequire } from "node:module";
 import http from "node:http";
@@ -59,14 +59,24 @@ export function verdict(report) {
     return `a real-hardware run on ${ads.map((a) => a.name).join("; ")}`;
 }
 
-export function runGates({ root = ENG, only = null, log = console.log } = {}) {
+/**
+ * *** v4778 RIG RUN 4 -- THE FLAGS A REAL-HARDWARE RUN HANDS ITS GATES. *** The owner's SWEK_LAUNCH_ARGS if set; else this
+ * platform's HARDWARE_ARGS, NOT LAUNCH_ARGS: on win32 an ordinary run now asks for the SwiftShader adapter (webgpuHarness.mjs),
+ * and this run exists to reach the GPU. Every gate it runs goes through runInEngineOrigin, which reads SWEK_LAUNCH_ARGS.
+ */
+export function runLaunchArgs(env = process.env, platform = process.platform) {
+    return env.SWEK_LAUNCH_ARGS ? env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : hardwareArgsFor(platform);
+}
+
+export function runGates({ root = ENG, only = null, log = console.log, launchArgs = runLaunchArgs() } = {}) {
     const gates = gateList(root).filter((g) => !only || g.includes(only));
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
     const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
-                     launchArgs: process.env.SWEK_LAUNCH_ARGS ? process.env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : [...LAUNCH_ARGS], gates: [], adapters: [] };
+                     launchArgs, gates: [], adapters: [] };
     for (const g of gates) {
         const t0 = Date.now();
-        const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: 600000, env: { ...process.env, SWEK_ADAPTER_LOG: logFile } });
+        const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: 600000,
+                                                    env: { ...process.env, SWEK_ADAPTER_LOG: logFile, SWEK_LAUNCH_ARGS: launchArgs.join(" ") } });
         const ms = Date.now() - t0, rows = parseRows(r.stdout || "");
         const seen = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.gate === g) : [];
         const names = [...new Set(seen.map((x) => (x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none")))];
@@ -103,8 +113,10 @@ export const SOFTWARE_GL_CANDIDATES = Object.freeze([
     Object.freeze(["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
     Object.freeze([]),
     TREE_SOFTWARE_WEBGPU,
-    Object.freeze([...LAUNCH_ARGS]),
-    Object.freeze([...LAUNCH_ARGS, "--use-webgpu-adapter=swiftshader"]),
+    // rig run 4: spelled from HARDWARE_ARGS, so the two rows Keith's decision was read off stay the same two on win32
+    // now that LAUNCH_ARGS is the second of them
+    Object.freeze([...HARDWARE_ARGS]),
+    Object.freeze([...HARDWARE_ARGS, "--use-webgpu-adapter=swiftshader"]),
     Object.freeze(["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"]),
 ]);
 export async function probeSoftwareGl(sets = SOFTWARE_GL_CANDIDATES, { executablePath = HEADLESS_SHELL } = {}) {

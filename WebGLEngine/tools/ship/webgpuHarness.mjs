@@ -63,9 +63,25 @@ const LAUNCH_ENV = launchEnv();
 // d3d12, and Vulkan-via-ANGLE were each tried alone and did nothing on this box. Scoped to win32 only because
 // that is the one platform this was actually measured on -- darwin's real behaviour here is still unknown and
 // guessing a flag for it would be exactly the mistake this comment is refusing to make for Linux already.
-export const LAUNCH_ARGS = Object.freeze(
-    process.platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"]
-);
+//
+// *** v4778 RIG RUN 4 -- AND ON win32 THAT PAIR PUTS WebGPU ON THE BOX'S GPU, WHICH NO GATE'S NUMBERS WERE TAKEN ON. ***
+// Keith's rig (GTX 1080) under the pair: WebGPU "nvidia / pascal", and about forty exact device rows red, each holding
+// a figure SwiftShader produced. realGpuRun --gl-flags on the same box, same headless shell 1243:
+//     --enable-unsafe-webgpu --use-angle=d3d11                                   WebGPU HARDWARE nvidia / pascal
+//     --enable-unsafe-webgpu --use-angle=d3d11 --use-webgpu-adapter=swiftshader  WebGPU SOFTWARE google / swiftshader
+// and WebGL2 stays on the GPU's ANGLE D3D11 under both, drawing. So, on Keith's decision: an ORDINARY run on win32 asks
+// for the SwiftShader adapter, which is what the device rows were measured on, and HARDWARE_ARGS is the pair -- what
+// realGpuRun.mjs hands its gates, because a real-hardware run is the one that wants the GPU. Elsewhere both are the one
+// flag they always were: Linux and darwin were not measured with the adapter flag on a GPU, and a Linux box with no GPU
+// reaches SwiftShader without it. Per platform as functions so a box can check another platform's answer.
+export function hardwareArgsFor(platform) {
+    return platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"];
+}
+export function launchArgsFor(platform) {
+    return platform === "win32" ? [...hardwareArgsFor(platform), "--use-webgpu-adapter=swiftshader"] : hardwareArgsFor(platform);
+}
+export const HARDWARE_ARGS = Object.freeze(hardwareArgsFor(process.platform));
+export const LAUNCH_ARGS = Object.freeze(launchArgsFor(process.platform));
 
 // *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
 // gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded

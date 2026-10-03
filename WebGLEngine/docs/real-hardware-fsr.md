@@ -13,8 +13,10 @@ From `WebGLEngine/`, with the repository's usual `npm install` done (it brings P
 node tools/ship/realGpuRun.mjs --out real-gpu-run.json
 ```
 
-- **Windows**: nothing more. The harness already launches with `--enable-unsafe-webgpu --use-angle=d3d11`, the pair measured
-  necessary and sufficient on a D3D12 machine (tools/ship/webgpuHarness.mjs, LAUNCH_ARGS).
+- **Windows**: nothing more. This run launches its gates with `--enable-unsafe-webgpu --use-angle=d3d11`, the pair measured
+  necessary and sufficient on a D3D12 machine (tools/ship/webgpuHarness.mjs, HARDWARE_ARGS), which reaches the GPU. An
+  ordinary gate run on Windows adds `--use-webgpu-adapter=swiftshader` (LAUNCH_ARGS) since v4778 rig run 4, because the
+  device rows were measured on SwiftShader; realGpuRun does not, so its report names the GPU.
 - **Linux with a GPU**: if the report's first line says SOFTWARE ADAPTER, the browser fell back to SwiftShader. Try
   `SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan" node tools/ship/realGpuRun.mjs`.
 - **macOS**: `--enable-unsafe-webgpu` (the default) reaches Metal.

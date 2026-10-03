@@ -10,8 +10,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { gateList, categorize, parseRows, verdict, runGates, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL } from "./realGpuRun.mjs";
-import { webgpuSkipReason } from "./webgpuHarness.mjs";
+import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL } from "./realGpuRun.mjs";
+import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, HARDWARE_ARGS } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
 
@@ -86,6 +86,40 @@ else {
           `Spellings that DO get software here: ${working.join(" | ") || "NONE"}`));
 }
 
+console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER WebGPU, AND THIS RUN ASKS FOR THE GPU");
+// Keith's decision, off his --gl-flags table: the device rows were measured on SwiftShader, and win32's pair put WebGPU on
+// the GTX 1080 (about forty exact rows red). Both platforms' answers are read here, so a Linux box checks win32's.
+{
+    const win = launchArgsFor("win32"), winHw = hardwareArgsFor("win32"), lin = launchArgsFor("linux");
+    ok(`win32: an ordinary run's flags are "${win.join(" ")}" -- the measured pair plus the SwiftShader adapter`,
+       win.join(" ") === "--enable-unsafe-webgpu --use-angle=d3d11 --use-webgpu-adapter=swiftshader");
+    ok(`  ...and a real-hardware run's are the pair alone, "${winHw.join(" ")}", which Keith's rig measured on nvidia / pascal`,
+       winHw.join(" ") === "--enable-unsafe-webgpu --use-angle=d3d11");
+    ok(`linux and darwin are unchanged: "${lin.join(" ")}" for both kinds -- neither was measured with the adapter flag on a GPU`,
+       lin.join(" ") === "--enable-unsafe-webgpu" && hardwareArgsFor("linux").join(" ") === lin.join(" ") &&
+       launchArgsFor("darwin").join(" ") === "--enable-unsafe-webgpu" && hardwareArgsFor("darwin").join(" ") === "--enable-unsafe-webgpu");
+    const runWin = runLaunchArgs({}, "win32");
+    ok(`!! *** realGpuRun hands its gates the HARDWARE flags on win32, not an ordinary run's: "${runWin.join(" ")}" ***`,
+       runWin.join(" ") === winHw.join(" ") && !runWin.includes("--use-webgpu-adapter=swiftshader"));
+    ok("  ...and an owner's SWEK_LAUNCH_ARGS still wins over both",
+       runLaunchArgs({ SWEK_LAUNCH_ARGS: " --enable-unsafe-webgpu  --enable-features=Vulkan " }, "win32").join(" ") === "--enable-unsafe-webgpu --enable-features=Vulkan");
+    if (skip) { console.log("  SKIP  no browser: " + skip); console.log("  ----  *** NOT A PASS. ***"); fails++; }
+    else {
+        // With SWEK_LAUNCH_ARGS UNSET in this process, the gate's browser can only get the run's flags if runGates hands
+        // them to the child. On this box HARDWARE_ARGS and LAUNCH_ARGS are the same flag, so the run is given a set that
+        // is neither -- otherwise a runGates that passed nothing would read green here and only be wrong on win32.
+        const was = process.env.SWEK_LAUNCH_ARGS; delete process.env.SWEK_LAUNCH_ARGS;
+        const mark = [...HARDWARE_ARGS, "--no-first-run"];
+        const rep = runGates({ root: ENG, only: "translucentLayer-selfcheck", log: () => {}, launchArgs: mark });
+        const dflt = runLaunchArgs();
+        if (was !== undefined) process.env.SWEK_LAUNCH_ARGS = was;
+        const logged = rep.adapters.map((a) => (a.launchArgs || []).join(" "));
+        ok(`  ...and runGates hands the run's flags to the gate itself: launched with "${logged.join("; ")}", nothing in the environment`,
+           rep.gates[0] && rep.gates[0].ok && logged.length === 1 && logged[0] === mark.join(" ") && rep.launchArgs.join(" ") === mark.join(" "));
+        ok(`  ...and the run's flags, unset, are this box's HARDWARE_ARGS: "${dflt.join(" ")}"`, dflt.join(" ") === HARDWARE_ARGS.join(" "));
+    }
+}
+
 // ---- v4764 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // Against tools/ship/realGpuRun.mjs: R1 the render gates left out of the run -> 3; R2 dB read before the clock -> 1; R3 the
 // summary line counted as a failing row -> 1; R4 a software adapter never named -> 2; R5 the log not handed to the gates -> 3;
@@ -97,6 +131,12 @@ else {
 // tree-spelling row, "got HARDWARE: ANGLE (... SwiftShader driver)". Both restored, md5 verified.
 // RIG RUN 4: D1 the probe's fragment blue channel 0.6 -> 0.0 in realGpuRun.mjs (the triangle still draws, in the wrong
 // colour) -> 1 red, the tree-spelling row, "drew nothing: 51,102". Restored, md5 verified.
+// RIG RUN 4, section 4. Against tools/ship/webgpuHarness.mjs: A1 win32's LAUNCH_ARGS without the adapter flag -> 1 red, the
+// ordinary-run row; A2 the adapter flag on every platform -> 1 red, the linux/darwin row. Against tools/ship/realGpuRun.mjs:
+// R7 runLaunchArgs falling back to launchArgsFor -> 1 red, the hardware row ("... --use-webgpu-adapter=swiftshader"); R8
+// runGates not handing SWEK_LAUNCH_ARGS to the child -> 1 red, the plumbing row ("launched with --enable-unsafe-webgpu").
+// That row's first draft passed under R8: on Linux HARDWARE_ARGS is LAUNCH_ARGS, so it now hands the run a third set. All
+// four restored, md5 verified.
 {
     const w = GR.write();
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +
