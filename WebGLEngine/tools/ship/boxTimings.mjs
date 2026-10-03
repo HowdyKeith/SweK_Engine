@@ -53,6 +53,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { boxId } from "./hostScale.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -177,16 +178,16 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
 
 // *** RIG RUN 2 -- A COMMAND FOR IT. *** recordLocal had no front door, so a box whose readings a gate wants (recordReach's
 // margin row reads this box's own ring wherever another box measured the shared one) had no way to give them but code.
-//     node tools/ship/boxTimings.mjs --record <gate> [<gate> ...] [--times N]
-// runs each gate alone N times (default 3, the ring's depth) and writes this box's per-box record.
+//     node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]
+// runs each gate alone N times (default 3, the ring's depth) and writes this box's per-box record. Parsed by cliArgs, the
+// tree's one parser (rig run 3: the first draft read argv by hand and cliArgs-selfcheck counted it, 13 -> 14).
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-    const argv = process.argv.slice(2);
-    const i = argv.indexOf("--record");
-    if (i < 0) { console.log("boxTimings: usage: node tools/ship/boxTimings.mjs --record <gate> [<gate> ...] [--times N]"); process.exit(2); }
-    const t = argv.indexOf("--times"), times = t >= 0 ? Math.max(1, Number(argv[t + 1]) || 3) : 3;
-    const gates = argv.slice(i + 1).filter((a, k, all) => !a.startsWith("--") && all[k - 1] !== "--times")
-        .map((g) => g.split(path.sep).join("/"));
-    if (!gates.length) { console.log("boxTimings: --record needs at least one gate path, relative to WebGLEngine/"); process.exit(2); }
+    const CLI = { values: { "--record": "string", "--times": "number" }, flags: [] };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("boxTimings", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const gates = String(cli.values["--record"] || "").split(",").map((g) => g.trim().split(path.sep).join("/")).filter(Boolean);
+    if (!gates.length) { console.log("boxTimings: usage: node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]"); process.exit(2); }
+    const times = cli.values["--times"] || 3;
     let res = null;
     for (let k = 0; k < times; k++) {
         res = recordLocal(gates);

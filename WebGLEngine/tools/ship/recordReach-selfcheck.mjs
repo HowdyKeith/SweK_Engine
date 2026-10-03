@@ -296,7 +296,7 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
                    (c.whose !== "this box" && shared && shared !== here ? `, measured by ${c.whose}, not this box` : "") +
                    `, ${road(g) || "no road"})`; }).join(" and ") +
         (pair.some((g) => costMs(g).whose !== "this box") && shared && shared !== here
-            ? `. THIS BOX HAS NOT TIMED THEM: node tools/ship/boxTimings.mjs --record ${pair.join(" ")} gives it its own ring`
+            ? `. THIS BOX HAS NOT TIMED THEM: node tools/ship/boxTimings.mjs --record ${pair.join(",")} gives it its own ring`
             : "") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
