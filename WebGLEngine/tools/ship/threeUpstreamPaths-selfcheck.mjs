@@ -46,7 +46,7 @@ else {
     try {
         const r = await runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: { CASES }, script: `async (a) => {
   const out = {};
-  for (const [name, slot] of a.CASES) for (const [build, dir] of [["r185", "/vendor/three-webgpu"], ["patched", "/three-patched/" + slot], ["all", "/three-patched/all"]]) {
+  for (const [name, slot] of a.CASES) for (const [build, dir] of [["r185", "/vendor/three-webgpu-r185"], ["patched", "/three-patched/" + slot], ["all", "/three-patched/all"]]) {
     const THREE = await import(dir + "/three.webgpu.js"), T = await import(dir + "/three.tsl.js"), frame = () => new Promise((q) => requestAnimationFrame(q));
     const res = {};
     for (const forceWebGL of [false, true]) { try {

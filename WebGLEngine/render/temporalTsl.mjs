@@ -112,6 +112,12 @@ export function makeMotionNode(THREE, TSL, { toward = null } = {}) {
     // MAX_TEXTURE_SIZE WebGL2 allows -- read by the instance's index as the batch's are; filled in update(), before the draw's
     // textures are uploaded. Every InstancedMesh is drawn by a program of its own (three keys it by the mesh's uuid), so the
     // texture built into it is the mesh's.
+    // v4805: *** r186 FIXED THREE'S OWN PREVIOUS INSTANCE MATRIX AND A BATCH'S positionPrevious (#34100, #34101, #34107) -- AND THESE
+    // RECORDS STAY. *** three builds them only where needsPreviousData() -- a velocity MRT, or an object its own VelocityNode marked --
+    // and this pass is neither: an override material, docs/upstream-three/dev/04's path. Measured on r186 with three's positionPrevious
+    // in place of these records on the plain paths (no toward, no compute, no per-instance morph): a batch 32.7 px off, the r185 error
+    // to the tenth, and instances 40.8 px at 1024 and past it (render/temporalTslZoo-selfcheck.mjs, temporalTslMany-selfcheck.mjs).
+    // And toward, compute-written matrices and per-instance morphs need them whatever three keeps.
     // every texture the node makes -- instances', batches' and morph targets' -- freed by disposeHistory() with the stage
     const made = new Set(), keep = (tex) => { made.add(tex); return tex; };
     const instances = new WeakMap(), MATS_A_ROW = 512;

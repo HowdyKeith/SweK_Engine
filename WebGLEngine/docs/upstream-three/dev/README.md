@@ -11,6 +11,11 @@ three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all
 printed to [`record.json`](record.json). Section 6 of `tools/ship/threeUpstream-selfcheck.mjs` holds the issues to it: a patch or
 a reproduction edited since the record is red until the tool is run again.
 
+Since v4805 the engine vendors r186 itself (`vendor/three-webgpu`, npm's three files byte for byte as `record.json`'s
+`releaseFiles` names them, but for the one import its `releaseEdit` names), so section 6 also runs every reproduction on it at
+every sweep, and each must print what the record's r186 run printed. The r185 drafts one directory up run on r185, kept in
+`vendor/three-webgpu-r185`.
+
 ## To post one
 
 1. Open three's [Bug Report form](https://github.com/mrdoob/three.js/issues/new?template=bug_report.yml).

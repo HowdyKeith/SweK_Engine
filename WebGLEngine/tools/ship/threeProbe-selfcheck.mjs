@@ -95,7 +95,7 @@ sec("1. HEADLESS: the tar walker, the build picker, the import rewrite, the grad
     const urls = { "three.core.js": "blob:core", "three.webgpu.js": "blob:webgpu", "three.tsl.js": "blob:tsl" };
     const rw = rewriteImports(vend, urls);
     const bare = (t) => (t.match(/from\s+['"](?:\.\/three\.(?:core|webgpu)\.js|three\/webgpu)['"]/g) || []).length;
-    ok(`rewriteImports on the vendored 0.185.1 touches three.webgpu.js's core import (${rw.counts["three.webgpu.js"]}x) and three.tsl.js's './three.webgpu.js' (${rw.counts["three.tsl.js"]}x), leaves no bare internal import, and changes nothing else`,
+    ok(`rewriteImports on the vendored ${VERSION} touches three.webgpu.js's core import (${rw.counts["three.webgpu.js"]}x) and three.tsl.js's './three.webgpu.js' (${rw.counts["three.tsl.js"]}x), leaves no bare internal import, and changes nothing else`,
         rw.counts["three.webgpu.js"] >= 1 && rw.counts["three.tsl.js"] === 1 && rw.counts["three.core.js"] === 0 && bare(rw.files["three.webgpu.js"]) === 0 && bare(rw.files["three.tsl.js"]) === 0 && rw.files["three.core.js"] === vend["three.core.js"]
         && rw.files["three.tsl.js"].includes('from "blob:webgpu"') && rw.files["three.webgpu.js"].includes('from "blob:core"')
         && rw.files["three.webgpu.js"].length === vend["three.webgpu.js"].length + rw.counts["three.webgpu.js"] * ('"blob:core"'.length - "'./three.core.js'".length));
@@ -228,7 +228,14 @@ sec("3. THE RIG'S ANSWER: tools/ship/three-probe.json, if a rig has saved one");
         if (j !== raw) report(`this capture predates the PROBE_CONTROL rename -- graded with its own "${LEGACY_CONTROL_LABEL}" read as today's control label, every measured field untouched`);
         for (const n of g.newest) report(`${n.label}: ${n.ok ? "DREW on " + n.backend + " (revision " + n.revision + ")" : "REFUSED: " + (n.error || "").slice(0, 160)}`);
         const drewOnWebgpu = g.newest.some((n) => n.ok && n.backend === "webgpu");
-        report(drewOnWebgpu ? "THE PIN WAS THE BUILD BOX'S: a rig drew the newer build on WebGPU, and vendor/three-webgpu has since been re-vendored to it (see its own PROVENANCE.txt). A fresh capture post-re-vendor would retire this legacy-label reading entirely, but is not required for this gate to pass." : "THE PIN IS THE FLEET'S TOO on this rig: the newer build is refused there as well.");
+        // v4805: *** THE RIG ANSWERED FOR 0.185.1, AND vendor/three-webgpu IS 0.186.1 NOW. *** The capture stays what it is -- a real
+        // rig drawing 0.185.1 -- and is not read as an answer about a build it never fetched. Until a rig saves a capture of VERSION,
+        // the fleet claim for the vendored build is pending, and this section says so instead of passing on the older capture.
+        const rigVersions = g.newest.map((n) => n.version).filter(Boolean), measured = rigVersions.includes(VERSION);
+        if (!measured) report(`RIG-PENDING for ${VERSION}: the rig's capture is of ${rigVersions.join(", ") || "no named version"}, and vendor/three-webgpu is ${VERSION} since v4805. Open three-probe.html on a rig and save its JSON as tools/ship/three-probe.json.`);
+        ok(`the rig's capture is read as what it measured (${rigVersions.join(", ") || "none"}), and the vendored ${VERSION} is ${measured ? "among them" : "said to be RIG-PENDING rather than passed on it"}`,
+            true, measured ? "" : "RIG-PENDING -- the same shape as no file at all: the gate refuses the fleet claim by saying so");
+        report(drewOnWebgpu ? `THE PIN WAS THE BUILD BOX'S: a rig drew ${rigVersions.join(", ")} on WebGPU, and vendor/three-webgpu was re-vendored to it (see its own PROVENANCE.txt)${measured ? "" : `, then moved on to ${VERSION} at v4805, which no rig has drawn yet`}.` : "THE PIN IS THE FLEET'S TOO on this rig: the newer build is refused there as well.");
     }
 }
 

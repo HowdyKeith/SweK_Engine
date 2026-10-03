@@ -15,8 +15,9 @@
 // tools/ship/three-probe.json is saved from the page.
 "use strict";
 
-export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.185.1", kind: "local", src: "./vendor/three-webgpu/" });
-export const PROBE_VERSIONS = Object.freeze(["0.185.1"]);          // the newest at v4494; the page takes ?versions=
+// v4805: vendor/three-webgpu moved to 0.186.1 -- this box drew it, and no rig has yet: tools/ship/three-probe.json is of 0.185.1
+export const PROBE_CONTROL = Object.freeze({ label: "vendored 0.186.1", kind: "local", src: "./vendor/three-webgpu/" });
+export const PROBE_VERSIONS = Object.freeze(["0.186.1"]);          // the vendored release since v4805 (0.185.1 at v4494); the page takes ?versions=
 // *** THE KNOWN, NAMED SHAPE OF THE ONE ACCEPTABLE CONTROL FAILURE. *** See gradeProbe()'s own comment: since
 // the re-vendor, PROBE_CONTROL and PROBE_VERSIONS[0] can be the SAME build, so a control that fails on webgpu
 // with THIS exact browser refusal is reporting the identical finding the newest probe does, not a broken rig.

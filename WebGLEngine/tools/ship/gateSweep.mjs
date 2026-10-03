@@ -8723,6 +8723,28 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4805 -- THE 409th CLOSING: NO new gate file -- the engine's three-webgpu moved to r186.
+    since502: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened six.
+        at: "v4805", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the vendored build is the record's r186, and every issue runs on it at every sweep)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (the rebuild where three draws it right; three's stale transmission read held as three's)",
+            "render/temporalTslMany-selfcheck.mjs (three's own colour pass past 1024 instances, r186's symptom)",
+            "tools/ship/tsl-selfcheck.mjs (revision 186, the README's heading)",
+            "tools/ship/threeProbe-selfcheck.mjs (RIG-PENDING for 0.186.1 rather than passed on 0.185.1's capture)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (r185 from vendor/three-webgpu-r185)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AND WHAT MOVED WAS THREE. *** r186 was swapped into a scratch worktree and the 327 gates " +
+                 "that reach the bundle run on both trees: eleven went red on r186 alone. One was ours to fix (render/tslSource.mjs: r186 keys a " +
+                 "render list by the renderer's lighting); the rest were three's own behaviour changing -- issue 08's symptom on the second render " +
+                 "now, the probe and version rows -- and one regression, bisected to #34162: after renders to other targets a transmission lens " +
+                 "samples a stale copy of the frame behind it, on both backends, still so on dev. Held as three's, by a row that goes red when " +
+                 "three fixes it. The stage's own previous instance and batch matrices stay: with three's positionPrevious in their place on the " +
+                 "plain paths a batch is 32.7 px off and instances 40.8. r185 is kept for the r185 drafts. Nine sabotages red.",
+    }),
     // v4804 -- THE 408th CLOSING: NO new gate file -- the eighteen cost headers, re-measured.
     since501: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

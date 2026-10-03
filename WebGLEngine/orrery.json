@@ -1574,7 +1574,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3654294,
+   "bytes": 3786037,
    "files": [
     {
      "path": "LICENSE",
@@ -1582,11 +1582,43 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 1302
+     "bytes": 1681
     },
     {
      "path": "README.md",
-     "bytes": 2195
+     "bytes": 3453
+    },
+    {
+     "path": "three.core.js",
+     "bytes": 1458113
+    },
+    {
+     "path": "three.tsl.js",
+     "bytes": 36859
+    },
+    {
+     "path": "three.webgpu.js",
+     "bytes": 2284850
+    }
+   ]
+  },
+  {
+   "name": "three-webgpu-r185",
+   "arrived": null,
+   "sha": null,
+   "bytes": 3653275,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1081
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 1078
+    },
+    {
+     "path": "README.md",
+     "bytes": 1400
     },
     {
      "path": "three.core.js",

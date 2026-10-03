@@ -2,14 +2,15 @@
 
 Found while building SweK_Engine's FSR3 frame generation on three.js r185 (v4752-v4762). Each draft carries a minimal
 standalone reproduction that imports three from a CDN, the cause, and a patch against three's `src/` at the r185 tag
-(`patches/`, v4771). `tools/ship/threeUpstream-selfcheck.mjs` runs every reproduction against the vendored r185 on both backends
+(`patches/`, v4771). `tools/ship/threeUpstream-selfcheck.mjs` runs every reproduction against r185 on both backends
 and holds the numbers each draft states; then applies each draft's patch alone to a copy of r185's build, runs the reproduction
 on it, and holds the fix and the numbers the draft states for it; `tools/ship/threeUpstreamPaths-selfcheck.mjs` (v4773) runs each
 patch on the paths its reproduction does not take, and holds each draft's "paths" block. Posting them is the maintainer's call.
 
 **To post, see [dev/README.md](dev/README.md)** (v4799): the issues ready to paste into three's Bug Report form, measured on
 three's latest release (r186) and its `dev` branch, each with its patch rebased onto `dev`. The drafts below stay as they are,
-the record of r185, the release vendored here. r186 fixed 01 and 02; the other twelve still stand there, and r186 brought a
+the record of r185, the release vendored here until v4805 -- the engine vendors r186 since, and keeps r185's build, unchanged, in
+`vendor/three-webgpu-r185` for these drafts. r186 fixed 01 and 02; the other twelve still stand there, and r186 brought a
 thirteenth issue of its own.
 
 - [VelocityNode: an InstancedMesh's previous instance matrix is its current one](01-velocity-instancedmesh.md) -- observed: plain 5.612, instanced 0.000, many 11.224 (px, both backends); patched: plain 5.612, instanced 5.612, many 5.612 (px, both backends)
@@ -29,7 +30,7 @@ thirteenth issue of its own.
 
 ## Checked with three's own tools (v4774)
 
-In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here and the one every number above was measured on:
+In a checkout of three's `r185` tag -- release 0.185.1, the one vendored here until v4805 (`vendor/three-webgpu-r185` since) and the one every number above was measured on:
 
 - `npm run build` of the tag, unpatched: `three.webgpu.js` and `three.core.js` are the vendored files byte for byte
   (`three.tsl.js` differs only by the vendoring's one edit, its import of `three/webgpu` made relative).

@@ -3,7 +3,7 @@
 //
 // THE THREE.JS BUG REPORTS IN docs/upstream-three/ ARE DRAFTS, AND WHAT THEY SAY IS HELD HERE. Each draft carries a minimal
 // standalone reproduction that imports three from a CDN; this gate lifts each one out of its draft, points its imports at the
-// vendored r185, runs it in a headless browser on both backends, and holds (a) the numbers to the bug -- the reproduction
+// r185 (vendored until v4805, kept since in vendor/three-webgpu-r185), runs it in a headless browser on both backends, and holds (a) the numbers to the bug -- the reproduction
 // still shows it -- and (b) the draft's "Observed" block to the numbers, character for character, so no draft states what
 // its own reproduction does not print. When three is updated and a bug is fixed, its row goes red and says which draft is stale.
 // v4771: EACH DRAFT CARRIES A PATCH, AND THE PATCH IS HELD TOO. docs/upstream-three/patches/ holds one diff per draft, against
@@ -117,7 +117,7 @@ const scripts = {};
 for (const f of files) {
     const html = between(text[f], "<!-- repro:begin -->\n```html\n", "```\n<!-- repro:end -->"), mod = html && between(html, '<script type="module">\n', "</script>");
     const importLine = 'import * as THREE from "three"; import * as T from "three/tsl";';
-    ok(`  ${f}: a standalone reproduction importing three 0.185.1 (r185, the release vendored and measured here) from the CDN, and nothing else`,
+    ok(`  ${f}: a standalone reproduction importing three 0.185.1 (r185, the release these drafts measure, kept in vendor/three-webgpu-r185) from the CDN, and nothing else`,
         !!mod && mod.startsWith(importLine) && html.includes("three@0.185.1/build/three.webgpu.js") && html.includes("three@0.185.1/build/three.tsl.js") && !/@0\.185\.0\//.test(html) && !/import\s/.test(mod.slice(importLine.length)));
     if (mod) scripts[f] = mod.slice(importLine.length).replace('document.getElementById("out").textContent = JSON.stringify(r, null, 1);', "");
 }
@@ -150,8 +150,8 @@ let results = {};
 if (!skip) {
     const { root, dispose } = rootWithBuilds({ ...Object.fromEntries(Object.keys(scripts).map((f) => [SLOT(f), applied[f].text])), all: allNine.text });
     try {
-        const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]], [`all ${f}`, "/three-patched/all", scripts[f]]]);
-        if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE], ["stages all", "/three-patched/all", RELEASE]);
+        const runs = Object.keys(scripts).flatMap((f) => [[`r185 ${f}`, "/vendor/three-webgpu-r185", scripts[f]], [`patched ${f}`, `/three-patched/${SLOT(f)}`, scripts[f]], [`all ${f}`, "/three-patched/all", scripts[f]]]);
+        if (scripts[RELEASE_DRAFT]) runs.push(["stages r185", "/vendor/three-webgpu-r185", RELEASE], ["stages patched", `/three-patched/${SLOT(RELEASE_DRAFT)}`, RELEASE], ["stages all", "/three-patched/all", RELEASE]);
         // two pages at once -- r185's runs and the patched builds' -- each a browser of its own
         const page = (list) => runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: {}, script: `async () => {
             const out = {};
@@ -167,7 +167,7 @@ if (!skip) {
 }
 const ran = (res) => !!(res && res.webgpu && res.webgl2);
 
-console.log("\n2. ON THE DEVICE: each reproduction against the vendored r185, both backends");
+console.log("\n2. ON THE DEVICE: each reproduction against r185 (vendor/three-webgpu-r185), both backends");
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The drafts' numbers are the device's."); fails++; }
 else for (const f of Object.keys(scripts)) {
     const res = results[`r185 ${f}`], d = DRAFTS[f];
@@ -178,7 +178,7 @@ else for (const f of Object.keys(scripts)) {
     ok(`  ${f}: the draft's Observed block is what its reproduction prints: "${said}"`, said === d.observed(res), `printed: "${d.observed(res)}"`);
 }
 
-console.log("\n3. THE PATCHES: each hunk found once in the vendored r185, and each reproduction run on r185 with its draft's patch");
+console.log("\n3. THE PATCHES: each hunk found once in r185's build, and each reproduction run on r185 with its draft's patch");
 for (const [f, d] of Object.entries(DRAFTS)) {
     const a = applied[f];
     ok(`  ${d.patch}: a git diff of three's src/, ${a.found.length} hunk(s) that change the build, each found exactly once in it: [${a.found.join(", ")}]`,
@@ -195,7 +195,7 @@ const THREE_BUILT = Object.freeze({ r185: "50e4013dd3903e8afb09a4829962dbf105488
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
 { const t = allNine.text, found = allNine.found;
   ok(`  all ${Object.keys(DRAFTS).length} applied together: each of the ${found.length} hunks still found exactly once`, found.length > 0 && found.every((n) => n === 1));
-  ok(`  the vendored build is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
+  ok(`  vendor/three-webgpu-r185 is three's own rollup build of its r185 tag, byte for byte: sha256 ${sha(bundle).slice(0, 16)}...`, sha(bundle) === THREE_BUILT.r185,
       "recorded at v4774 from `npm run build` in a checkout of the tag");
   ok(`*** all ${Object.keys(DRAFTS).length} applied here are three's own rollup build of the patched source -- but for the order of the names it imports from three.core.js: sha256 ${sha(normalImports(t)).slice(0, 16)}... with those names sorted ***`,
       sha(normalImports(t)) === THREE_BUILT.allPatched, "recorded at v4795 from `git apply` of the fourteen (08's import line merged by hand) and `npm run build`; a patch changed since makes it stale -- build three again and record it"); }
@@ -275,7 +275,7 @@ for (const [backend, RE, phrase] of [["webgpu", /^v(\d+)\.json$/, "WebGPU exampl
     }
 }
 
-// v4799: THE ISSUES READY TO PASTE. The drafts above hold r185, the release vendored here; three's bug form asks for its latest
+// v4799: THE ISSUES READY TO PASTE. The drafts above hold r185, the release vendored here until v4805 (r186 since); three's bug form asks for its latest
 // release and its pull requests go against `dev`. docs/upstream-three/dev/ holds one issue per draft whose bug still stands on
 // r186 -- in the form's own fields, in its order, its reproduction the draft's with the version swapped and nothing else -- and a
 // patch against `dev` at DEV_COMMIT, rebased; and one more, a bug r186 brought (15). tools/ship/threePatch.mjs runs them, beside a
@@ -340,6 +340,27 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`  the README states them as e2e.json does`, !!e2e && devIndex.includes(`${e2e.unit.tests} tests, ${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.examples} WebGPU examples, ${e2e.webgpu.passed} passed and the same ${e2e.webgpu.failed}`) && devIndex.includes(`${e2e.webgl2.passed} passed and the same ${e2e.webgl2.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.screenshotsIdentical} of the ${e2e.webgpu.examples} screenshots`) && devIndex.includes("(e2e.json)"));
+    // v4805: *** THE ENGINE VENDORS THE RELEASE THE RECORD WAS TAKEN ON, SO THE ISSUES RUN ON IT HERE, AT EVERY SWEEP. *** Until now
+    // section 6 held the record's freshness and nothing ran: r186 lived beside a three checkout, outside this tree. vendor/three-webgpu
+    // is r186 now -- npm's three files, but for the one import the record names -- so each issue's reproduction runs on it on the device,
+    // as the drafts' run on r185 in section 2, and must print what the record's r186 run printed, field for field.
+    const VEND = path.join(ENG, "vendor", "three-webgpu"), vend = Object.fromEntries(["three.core.js", "three.tsl.js", "three.webgpu.js"].map((f) => [f, fs.readFileSync(path.join(VEND, f), "utf8")]));
+    const asShipped = { ...vend, "three.tsl.js": vend["three.tsl.js"].replace("from './three.webgpu.js'", "from 'three/webgpu'") };
+    ok(`*** vendor/three-webgpu is r186 as npm ships it but for the one import the record names: each file's sha256 is the record's ***`,
+        !!rec && Object.keys(vend).every((f) => sha256(asShipped[f]) === rec.releaseFiles[f]) && asShipped["three.tsl.js"] !== vend["three.tsl.js"] && sha256(vend["three.webgpu.js"]) === rec.builds.r186,
+        Object.keys(vend).map((f) => `${f} ${sha256(asShipped[f]).slice(0, 12)}${rec && sha256(asShipped[f]) === rec.releaseFiles[f] ? "" : " (record " + (rec ? String(rec.releaseFiles[f]).slice(0, 12) : "none") + ")"}`).join(", "));
+    let live = {};
+    if (!skip) {
+        const scriptsOf = Object.fromEntries(SLOTS.filter((s) => issues[s]).map((s) => [s, issueParts(fs.readFileSync(path.join(DEV_DIR, issues[s]), "utf8")).script]));
+        const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: {}, script: `async () => {
+            const out = {};
+            ${Object.entries(scriptsOf).map(([s, code]) => `try {
+                const THREE = await import("/vendor/three-webgpu/three.webgpu.js"), T = await import("/vendor/three-webgpu/three.tsl.js"); window.__result = undefined;
+                await (async () => { ${code} })(); out[${JSON.stringify(s)}] = window.__result;
+            } catch (e) { out[${JSON.stringify(s)}] = { error: String((e && e.message) || e) }; }`).join("\n            ")}
+            return out; }` });
+        live = r.ok ? r.result : Object.fromEntries(SLOTS.map((s) => [s, { error: r.reason || (r.pageErrors || []).join("; ") }]));
+    } else { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** The issues' numbers on the vendored r186 are the device's."); fails++; }
     for (const s of SLOTS) {
         const f = issues[s]; if (!f) continue;
         const t = fs.readFileSync(path.join(DEV_DIR, f), "utf8"), parts = issueParts(t), draft = draftOf(s), d = draft ? DRAFTS[draft] : OWN[s];
@@ -358,12 +379,18 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
             four && JSON.stringify(r.r186) === JSON.stringify(r.dev) && (DEV_BUG[s] || d.bug)(r.r186) && d.fixed(r.patched) && d.fixed(r.all), four ? "" : JSON.stringify(r).slice(0, 300));
         if (!four) continue;
         const blk = (tag) => between(t, `<!-- ${tag}:begin -->\n`, `\n<!-- ${tag}:end -->`), tog = blk("together");
+        if (!skip) ok(`*** ${f}: run here on the vendored r186, it prints what the record's r186 run did: "${d.observed(r.r186)}" ***`, JSON.stringify(live[s]) === JSON.stringify(r.r186),
+            `printed ${JSON.stringify(live[s]).slice(0, 300)}`);
         ok(`  ${f}: its Screenshots print what the record does: on r186 "${d.observed(r.r186)}"; with the patch "${d.observed(r.patched)}"`, blk("observed") === d.observed(r.r186) && blk("patched") === d.observed(r.patched));
         ok(`  ${f}: with every patch it prints ${tog === null ? "what its own patch alone prints" : `its "together" block, which says something its "patched" block does not`}: "${d.observed(r.all)}"`,
             tog === null ? d.observed(r.all) === d.observed(r.patched) : tog === d.observed(r.all) && tog !== d.observed(r.patched));
     }
 }
 
+// ---- v4805 SABOTAGE LOG (section 6, the vendored r186) ----------------------------------------------------------------
+// V1 one byte of vendor/three-webgpu/three.webgpu.js -> 1 (the bytes row; the reproductions still print the record's); V2 three.tsl.js's
+// import edit undone -> 15 (the bytes row, and all fourteen live rows: the page has no import map); V3 the record's r186 and dev runs of
+// 11 edited alike -> 3 (its bug row, its live row, its Screenshots). None green.
 // ---- v4799 SABOTAGE LOG (section 6) -------------------------------------------------------------------------------
 // S1 patch 10 edited, the record not re-run -> 2 (stale record; the Description's patch); S2 issue 03's reproduction pointed at
 // 0.186.0 -> 2; S3 an observed number edited by a thousandth -> 1; S4 a form field renamed -> 1; S5 an issue saying r185 -> 1;
@@ -440,8 +467,8 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
 // with the wrong divisors, and no reproduction here builds both from one set -- kept as the defence it is, said as such.
 // The first X1 ran on an anchor that did not match and passed on the unmodified patch; re-run on the line itself. None green.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
-console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
-    "0.185.1, which the recorded hash says is three's own build of it); three's WebGL e2e examples, which load a build no patch changes; " +
+console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the " +
+    "kept 0.185.1, which the recorded hash says is three's own build of it, and the issues' at the vendored 0.186.1, npm's bytes by the record); three's WebGL e2e examples, which load a build no patch changes; " +
     "its unit tests beyond the record above -- they touch none of the paths the patches change; a real GPU; and whether three's " +
     "maintainers would take the patches as they are.");
 process.exitCode = fails ? 1 : 0;

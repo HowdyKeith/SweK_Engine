@@ -18,7 +18,10 @@ import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PATCHES = path.join(ENG, "docs", "upstream-three", "patches");
-export const BUNDLE = path.join(ENG, "vendor", "three-webgpu", "three.webgpu.js");
+// v4805: the engine vendors r186 now; the drafts one directory up, their patches and the paths gate are r185's, and run on r185
+// kept beside it -- vendor/three-webgpu-r185, the same bytes vendor/three-webgpu held until then
+export const R185_DIR = path.join(ENG, "vendor", "three-webgpu-r185");
+export const BUNDLE = path.join(R185_DIR, "three.webgpu.js");
 
 /** Identifiers the bundler renamed where two modules declared the same name, per source file. */
 export const RENAMED = Object.freeze({
@@ -76,7 +79,7 @@ export function rootWithBuilds(builds) {
     for (const [slot, text] of Object.entries(builds)) {
         const dir = path.join(root, "three-patched", slot); fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, "three.webgpu.js"), text);
-        for (const e of ["three.tsl.js", "three.core.js"]) fs.symlinkSync(path.join(ENG, "vendor", "three-webgpu", e), path.join(dir, e));
+        for (const e of ["three.tsl.js", "three.core.js"]) fs.symlinkSync(path.join(R185_DIR, e), path.join(dir, e));
     }
     return { root, dispose: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
