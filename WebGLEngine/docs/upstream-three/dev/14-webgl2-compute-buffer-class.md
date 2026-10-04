@@ -10,7 +10,7 @@ On the WebGL 2 backend, a compute that copies from a `StorageInstancedBufferAttr
 
 **Cause.** The WebGL backend runs a compute as a transform-feedback draw of points (`WebGLBackend.compute()`): instanced -- one point, `count` instances -- when its first buffer is a `StorageInstancedBufferAttribute`, otherwise `count` points. A buffer the compute reads (not through a PBO) is a vertex attribute, and `WebGLVertexArrayUtils._createVAO()` gives it the divisor of its own class: an instanced buffer steps per instance, a plain one per vertex. So in a draw of `count` points an instanced buffer holds at its first element, and in a draw of one point a plain buffer does.
 
-**Fix.** The patch draws every compute as one point and `count` instances, from a vertex array of its own whose every attribute steps once per instance. `instanceIndex`, which the GLSL builder reads as `gl_InstanceID`, is then the invocation in every compute, so the plain-storage-buffer issue filed beside this one ("a compute writing a plain storage buffer reads every instanceIndex as 0") is fixed by this patch alone as well. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch draws every compute as one point and `count` instances, from a vertex array of its own whose every attribute steps once per instance. `instanceIndex`, which the GLSL builder reads as `gl_InstanceID`, is then the invocation in every compute, so the plain-storage-buffer issue filed beside this one ("a compute writing a plain storage buffer reads every instanceIndex as 0") is fixed by this patch alone as well. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -154,7 +154,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: instancedIntoPlain 1 2 3 4 5 6, plainIntoInstanced 1 2 3 4 5 6; webgl2: instancedIntoPlain 1 1 1 1 1 1, plainIntoInstanced 1 1 1 1 1 1 -- the x of each element the compute copied

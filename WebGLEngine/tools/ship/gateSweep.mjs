@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4811 -- THE 415th CLOSING: NO new gate file -- the sixteen drafts re-checked against three's dev at 576b084.
+    since508: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4811", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: each patch made against dev's own blobs, each issue naming the dev it was measured on)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** NONE OF THE SIXTEEN WAS FIXED IN THE TWELVE COMMITS SINCE 1ea31f3. *** threePatch.mjs re-taken on dev at 576b084 " +
+                 "(4 October): every reproduction prints exactly what it printed on 1ea31f3 -- on dev, with its patch, with all sixteen. " +
+                 "Every patch still applied, and that hid something: 09 and 16 named blobs dev no longer holds, their hunks seven lines " +
+                 "off, in RenderObject.js, Renderer.js and WebGPUBackend.js. Both made again on dev's files; 10, made again with three " +
+                 "lines of context, no longer applied after 04, so it keeps its two. The record now holds dev's blob for each of the 23 " +
+                 "files the patches edit, and section 6 holds each patch's index line to it. Three's tests on 576b084: unit 1525, 1524 " +
+                 "passed, 1 todo, on both builds; e2e 191 of 202 on WebGPU and 148 on WebGL 2, every outcome the same on both builds and " +
+                 "as on 1ea31f3. Five sabotages red.",
+    }),
     // v4810 -- THE 414th CLOSING: NO new gate file -- declaredCost reads a same-type box's alone readings before the shared record.
     since507: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

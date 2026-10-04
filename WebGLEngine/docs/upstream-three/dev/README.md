@@ -3,8 +3,15 @@
 The drafts one directory up hold three r185, the release this engine vendored until v4805. Three's Bug Report form asks for the latest
 release and a live example, and three takes pull requests against `dev`; so each issue here is written in the form's own
 fields, its reproduction imports three's latest release, **r186** (`0.186.1`), and its patch is rebased onto `dev` at
-`1ea31f304854ee3c85df39fdb3eaec584bba6d9b` (2 October 2026). Every reproduction prints the same on r186 and on that `dev`
+`576b084aff43ec5bb79911befb1d51be178cb7ed` (4 October 2026). Every reproduction prints the same on r186 and on that `dev`
 commit -- headless Chromium 141, SwiftShader, on WebGPU and on the WebGL 2 backend.
+
+Re-checked at v4811 against that commit, twelve commits past `1ea31f3` (2 October), where the drafts were first rebased: none of
+the sixteen was fixed meanwhile -- every reproduction prints, on `dev` and with its patch and with all sixteen, exactly what it
+printed on `1ea31f3`. Two patches (09 and 16) met code that had moved -- `RenderObject.js`, `Renderer.js` and `WebGPUBackend.js` --
+and were made again on `576b084`: the same lines added and removed, their hunks seven lines further down. 10 was left as it was,
+its context still two lines: made again with three's usual three, it no longer applies after 04. Three's unit and e2e tests were run again on the new `dev`
+([`e2e.json`](e2e.json)).
 
 `tools/ship/threePatch.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
 three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all sixteen in order, and writes what each page
@@ -84,7 +91,9 @@ grown with its material updated throws on `dev`: that is issue 15.
 Run in the `dev` checkout, on `dev` and on `dev` with all sixteen patches in order, each built by three's rollup -- the same
 bytes `record.json` names:
 
-- Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1522 tests, 1521 passed, 1 todo, 0 failed, on both builds.
+- Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1525 tests, 1524 passed, 1 todo, 0 failed, on both builds.
 - e2e ([`e2e.json`](e2e.json), the runner as `../e2e/puppeteer-local.diff`): 202 WebGPU examples, 191 passed and the same 11
   failed on both builds; on the WebGL 2 backend, 148 passed and the same 54 failed on both. 200 of the 202 screenshots are the
-  same bytes on WebGPU and 199 on WebGL 2; the others vary between runs of one build (`e2e.json` names each).
+  same bytes on WebGPU and 200 on WebGL 2; the others vary between runs of one build (`e2e.json` names each). Re-run at v4811 on
+  `576b084`: the outcomes are those of `1ea31f3`, example for example, three new unit tests pass on both builds, and the WebGL 2
+  `webgpu_loader_gltf_transmission`, which drew five different images over eight runs on r185, happened to match.

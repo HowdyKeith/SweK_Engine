@@ -1,5 +1,5 @@
 {
- "devCommit": "1ea31f304854ee3c85df39fdb3eaec584bba6d9b",
+ "devCommit": "576b084aff43ec5bb79911befb1d51be178cb7ed",
  "release": "0.186.1",
  "releaseFiles": {
   "three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
@@ -8,24 +8,24 @@
  },
  "releaseEdit": "three.tsl.js's one import of 'three/webgpu' pointed at './three.webgpu.js' (the page has no import map); nothing else",
  "builds": {
-  "all": "9e5fd537b3e8a17b1c1d9c0055249493b92e7e7b40afd003d678550fa1309d19",
-  "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p03": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p04": "cf3a6e85d566e9e33451fd9f509da33ea9458bc0cbc95b896a571a89aa6eca7d",
-  "p05": "67e653ca1ac878ef9fb0cc4a4ecb4df573acec63e0556048bcbe032736a21c32",
-  "p06": "e9d1623fac6e2d20fef94fef172cf10ae40c4ab1bb72b8e77f506661905da4bc",
-  "p07": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p08": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p09": "b38eb635a5e7bc8b5a9cb98e519e5c7a48f20d811fbde6592dd708522e2d7f7b",
-  "p10": "74c60d923e3ff18804048fb7b28b23ed9b300f36fbb38b5cb4893e5bdd20c8aa",
-  "p11": "9729ba79016f34ff6ffff4d4165b3635a0b385f7de534f323f66e4be91e858f8",
-  "p12": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p13": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p14": "ed96fae7d9ae391f7e5a0d74d32ba71dc57ef38f44391077f111a6b45acf9c03",
-  "p15": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "p16": "6ca24eafd6b6f8b1929c39ce289d52a62eb5aa91ce697cdcd9e722f51289af59",
-  "p17": "e000d7df6fa91910e342a84eed771c7c5abcadf6b9bb6d4f1501d35c65425f3d",
-  "p18": "347dc9e04caa55e1cb7863b328e80e7b2ba81937dda3d4a97a8ca4b01dc64316",
+  "all": "404bd19f6deed30ed62175b0e44ac8ff7e7fef868638a935b030f278693960ea",
+  "dev": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p03": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p04": "7400b8c2304a0b873d1f7bd529b5758a3d97354acd325b9ecc096c177db2afe6",
+  "p05": "a623307715ef7d3aa06e36b9328f40cce416f3ecaa77a6ec699d5cc5806362c9",
+  "p06": "15a8f711602cd908376af70a087d2130a722f40c5ee2adc05f71afae77dda038",
+  "p07": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p08": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p09": "6dd32be58230a0d3194b6fa758604db1f834caa0e0c57db04247f764f6bba390",
+  "p10": "537a9facb83693013cc9aca6282c5bffea7b89816c84935bbdebeb1154865f35",
+  "p11": "6e224c8a0539ac5b8b3a3769654526a91aeca754dd1eb71fbe22df70cd63b9d7",
+  "p12": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p13": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p14": "aae948375e159ec5b521d98942a584ac0a4b1b4ab9318d52261078a30d7576ba",
+  "p15": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "p16": "e83d5130be7ef2a71eab4089ce3e954ed6a5ebc5479457a247a529f169c0d401",
+  "p17": "ba11ee700f3f6bd81781048977a5fc5741d31e87830966a6c66757d2d1b06c27",
+  "p18": "43d96490559644725e158b2fb7dc6343ce305427621279d9f24ad5c8c3f1bc21",
   "r186": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
  },
  "browser": "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
@@ -36,7 +36,7 @@
   "13": "0ac6bd9b08d2e253527e49750ce4ee6863d23ae38437c7c3892d64c74e96b016",
   "14": "3884cd1a7bb7658f791a94ca4dc9c1a2b2185e5f95ab350b480a4e47727b8456",
   "15": "71ff2566af7ad8d6443045f3f52c0c3ece2ed7a81353aa83589d158a6dedf6c2",
-  "16": "9a996ac3b3bc8bf7e103c5e6f9ae867644fd6e333871ff34c3da4cef81c8147c",
+  "16": "5a5c87e5a3df87ffa77f3ed1e990d6956f341906c490f46d7f8c265ab752414e",
   "17": "c05f5d6c6402e65f5a4f4f7e644c02a1a2635b72538c34a55ef103c7411713b0",
   "18": "ce62a01838dad1abec7162570e5431d6d1347a9e0038d1594b16cad9b04d6b69",
   "03": "7907879533d9b4071c495cd8521218fa7a05a3cb903a411e1d4656e3f938e36b",
@@ -45,7 +45,7 @@
   "06": "e2911d3201b46bcc619dac45b644b2ec9fd7345518ce5b5b324beaa592ecfe9d",
   "07": "e2a4642926ef099b786a5caa8ef1486f031607dab88670f4f48961ed41df021e",
   "08": "20215992179a7d25712952ae970b98d0c5737aada0c3d1cb9f52ad79b106081c",
-  "09": "377da58a29c7c7b14cda636ca6c8b4b22276031bde175942e56f3c77b2654089"
+  "09": "879f16cbf513bfd028e4af70f2946f1b352c1dd10f629b23b76fa6d272318a91"
  },
  "code": {
   "10": "10d3dbaab28c164a55cb5fac8e8ffe00df25cd752b3ec1cb32dce2e34e2830ee",
@@ -73,6 +73,63 @@
    "line": "import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';"
   }
  ],
+ "bases": {
+  "10": {
+   "src/nodes/core/NodeBuilder.js": "de53c08b96e1848bb4a6c171d228007e7b5410b4"
+  },
+  "11": {
+   "src/renderers/webgl-fallback/nodes/GLSLNodeBuilder.js": "73ea390b8d8dfc4e5d1dbc2d1ed438525b6af9f6"
+  },
+  "12": {
+   "src/nodes/accessors/BufferAttributeNode.js": "b80504a92a15ed1d326ee164371086fde477c088",
+   "src/nodes/accessors/StorageBufferNode.js": "e7ca04d3ddabc626d5d649aaef01c4e29c014b29"
+  },
+  "13": {
+   "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
+  },
+  "14": {
+   "src/renderers/webgl-fallback/WebGLBackend.js": "4f109bf83a233c2b4489acbac3fbfa7918e425ea",
+   "src/renderers/webgl-fallback/utils/WebGLVertexArrayUtils.js": "46bf16396719a255c11a6a6a79d544ffa331d29c"
+  },
+  "15": {
+   "src/nodes/accessors/Batch.js": "f0b2e65caa03e5f7207817a2bc6f7edefc47d3c4"
+  },
+  "16": {
+   "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c",
+   "src/renderers/common/Backend.js": "6b31fbdf8b3ab34dc9537554fb7bf21a4ba9dd3d",
+   "src/renderers/common/Renderer.js": "74fa89f5b1dd8f23203abcb7936b395425d86ec0",
+   "src/renderers/webgl-fallback/WebGLBackend.js": "4f109bf83a233c2b4489acbac3fbfa7918e425ea",
+   "src/renderers/webgpu/WebGPUBackend.js": "afedea91e3b4a9767192cdc8d73355edd21e6684"
+  },
+  "17": {
+   "src/renderers/common/Bindings.js": "5350ae3f3afc66d4757516ba46d1bd7bb194af9e"
+  },
+  "18": {
+   "src/renderers/webgl-fallback/utils/WebGLState.js": "60d8e400f7a3581d69c6b40e84c996749868b6d8"
+  },
+  "03": {
+   "src/nodes/accessors/Morph.js": "e9b9319658097bf84e6cbae587a657038a9e685a"
+  },
+  "04": {
+   "src/nodes/accessors/VelocityNode.js": "515a70c0fa70b39ad599ec133c838d521a6a96a9",
+   "src/nodes/core/NodeBuilder.js": "de53c08b96e1848bb4a6c171d228007e7b5410b4"
+  },
+  "05": {
+   "src/materials/nodes/SpriteNodeMaterial.js": "e03f2c26cd29492c8c6729ddbcf36ffa6b63ddc0"
+  },
+  "06": {
+   "src/renderers/common/Pipelines.js": "78237dbaabc96328b82b3d9d5876f123393eabcd"
+  },
+  "07": {
+   "src/nodes/accessors/Skinning.js": "437e0c02c98c3847c8fd7b0198b3fd443a6467ef"
+  },
+  "08": {
+   "src/nodes/accessors/Instance.js": "2723fa918f28e286b33fdc9e4627c1d8c23b6a9c"
+  },
+  "09": {
+   "src/renderers/common/RenderObject.js": "f03f388135c37e259ac8c980a3d1833dcefde0c6"
+  }
+ },
  "results": {
   "10": {
    "r186": {

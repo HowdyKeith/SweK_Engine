@@ -10,7 +10,7 @@ A `BatchedMesh` rendered with an MRT that has a `velocity` output throws on ever
 
 **Cause.** `batch()` (`src/nodes/accessors/Batch.js`) keeps a copy of the batch's matrices texture for the previous matrices, made once per batch at its size then (`getPreviousNode()`), and after each draw copies the current matrices into it: `previousMatricesTexture.image.data.set( object._matricesTexture.image.data )` in an `OnAfterObjectUpdate`. `setInstanceCount` re-makes the matrices texture larger; the copy stays the old size, and `set()` throws. And the copy is never marked for upload when it is made, so the first draw reads an empty texture -- every previous matrix zero, every previous position the origin.
 
-**Fix.** The patch makes the copy again at the new size when the batch's node is built again, the last draw's matrices kept as its first entries, and leaves the copy as it is until then. The copy is marked for upload when it is made, which is what fixes the first frame -- and the growth frame, whose new copy would otherwise be read empty too. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch makes the copy again at the new size when the batch's node is built again, the last draw's matrices kept as its first entries, and leaves the copy as it is until then. The copy is marked for upload when it is made, which is what fixes the first frame -- and the growth frame, whose new copy would otherwise be read empty too. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -122,7 +122,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain 5.612, atGrowth throws RangeError: offset is out of bounds, after throws RangeError: offset is out of bounds -- the batch's mean x velocity in pixels, grown before the third frame; firstFrame 7.482 -- a still batch's on the first frame it is drawn (both backends)

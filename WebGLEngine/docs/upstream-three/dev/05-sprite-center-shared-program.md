@@ -10,7 +10,7 @@ A `Sprite` whose `center` is (0.5, 0.5) is drawn off-centre if a sprite with a d
 
 **Cause.** `SpriteNodeMaterial.setupPositionView()` (`src/materials/nodes/SpriteNodeMaterial.js`) builds `reference( 'center', 'vec2', object )` -- a reference bound to the sprite being built, which it reads at every update. The render object's cache key holds nothing of that sprite, so every like sprite shares the program, and with it the first sprite's `center`.
 
-**Fix.** The patch reads `center` through a reference that is not bound to one object, so it is read from the sprite being drawn. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch reads `center` through a reference that is not bound to one object, so it is read from the sprite being drawn. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -77,7 +77,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 offCentre 38.5, centredAfter 38.5, centredUnlike 31.5 (both backends)

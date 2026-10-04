@@ -10,7 +10,7 @@ A `computeSkinning` compute built while the renderer's MRT has a `velocity` outp
 
 **Cause.** `computeSkinning()` (`src/nodes/accessors/Skinning.js`) builds the previous skinned position when `builder.needsPreviousData()`, and assigns it to `positionPrevious`. `needsPreviousData()` (`src/nodes/core/NodeBuilder.js`) asks whether the renderer's MRT has a `velocity` output, or the object wants velocity -- not whether this build is a compute (`builder.compute`). For a compute it is true whenever the MRT is, and the WGSL names `positionPrevious`, which a compute shader does not declare. The GLSL a compute becomes on WebGL 2 declares it, so the same build runs there.
 
-**Fix.** The patch makes `needsPreviousData()` false for a compute build: a compute pass draws nothing, so it has no motion to measure. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch makes `needsPreviousData()` false for a compute build: a compute pass draws nothing, so it has no motion to measure. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -80,7 +80,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: noMRT 0.5, velocityMRT 0; webgl2: noMRT 0.5, velocityMRT 0.5 -- the mean x the compute wrote, the bone at 0.5

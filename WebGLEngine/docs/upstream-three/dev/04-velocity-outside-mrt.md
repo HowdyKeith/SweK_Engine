@@ -10,7 +10,7 @@ Three's `velocity` node drawn by the material itself -- `material.fragmentNode =
 
 **Cause.** Skinning, instancing, batching and morphing build the previous position only when `builder.needsPreviousData()` (`src/nodes/core/NodeBuilder.js`), which is true when the renderer's MRT has a `velocity` output or the object is flagged `useVelocity` -- not when the material draws `velocity` itself. The previous point is then the geometry as it stands, without the bone: 1.871 px is the bone's distance from the origin at the third frame (x = 0.1), where one frame's motion is 5.612.
 
-**Fix.** The patch makes `needsPreviousData()` also look through the material's own nodes for a `VelocityNode`, once per build. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch makes `needsPreviousData()` also look through the material's own nodes for a `VelocityNode`, once per build. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -169,7 +169,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain 5.612, drawn 1.871, mrt 5.612, mrtSameFrame 0.000 (px, both backends)

@@ -10,7 +10,7 @@ An `InstancedMesh` whose instances morph separately (`setMorphAt`) draws only wh
 
 **Cause.** `morphReference()` (`src/nodes/accessors/Morph.js`) reads per-instance influences from the instance's row of `mesh.morphTexture`, but two things beside that read are the mesh's own. The base, by which the position is scaled before the targets are added, is a uniform set in `OnObjectUpdate` from `object.morphTargetInfluences` -- 1 for relative targets, 1 less their sum for absolute ones -- and an `InstancedMesh` with per-instance morphs has no such array, so `.reduce` throws; `setMorphAt` already writes each instance's own base into column 0 of its row, and nothing reads it. And the influences array, made whenever the mesh has `morphTargetInfluences`, is updated in every `OnObjectUpdate`; per instance the shader never reads it, so its node is never built, its value buffer is `null`, and the update writes into it.
 
-**Fix.** The patch reads each instance's base from column 0 of its row, and builds and updates the mesh-level influences only where they are read. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch reads each instance's base from column 0 of its row, and builds and updates the mesh-level influences only where they are read. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -122,7 +122,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 relative 16.0/12 0.0/12; absolute throws: Cannot read properties of undefined (reading 'reduce'); relative+mesh throws: Cannot set properties of null (setting '0'); absolute+mesh throws: Cannot set properties of null (setting '0') -- each instance's centre x/width in pixels (both backends)

@@ -10,7 +10,7 @@ With `forceWebGL: true`, two particle systems -- each its own `instancedArray` p
 
 **Cause.** `Pipelines.getForCompute()` (`src/renderers/common/Pipelines.js`) caches the compute stage by its shader code. On WebGL 2 the two systems' kernels compile to the same GLSL, so the second compute node gets the first's stage -- and the stage carries the buffers it binds by transform feedback (`transforms`, `nodeAttributes`), which `WebGLBackend.createComputePipeline()` binds: the second dispatch reads and writes the first system's buffers. On WebGPU the two kernels compile to different WGSL, so each has its own stage.
 
-**Fix.** The patch keys a compute stage by its code and, on the WebGL backend, by the buffers it binds as well; a released stage is dropped from the cache by the key it was cached by. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch keys a compute stage by its code and, on the WebGL backend, by the buffers it binds as well; a released stage is dropped from the cache by the key it was cached by. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -123,7 +123,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu moved [true, true]; webgl2 moved [true, false]

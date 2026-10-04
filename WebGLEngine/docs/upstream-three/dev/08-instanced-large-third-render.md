@@ -10,7 +10,7 @@ An `InstancedMesh` of more instances than a uniform buffer holds (1024 matrices 
 
 **Cause.** Past the uniform buffer, `instance()` (`src/nodes/accessors/Instance.js`) draws the matrices from an `InstancedInterleavedBuffer` over the attribute's array, and syncs that buffer's version with the attribute's in an `OnBeforeFrameUpdate` -- once per browser frame, before the frame's first render. A second or third render in the same frame finds the version already synced and uploads nothing, so it draws the matrices the first uploaded. Marking the attribute `DynamicDrawUsage`, which uploads it at every draw, draws it where it is (`manyDynamic`).
 
-**Fix.** The patch syncs the version in an `OnBeforeObjectUpdate`: before each draw, and before its buffers are uploaded. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch syncs the version in an `OnBeforeObjectUpdate`: before each draw, and before its buffers are uploaded. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -96,7 +96,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 one [142, 144, 142], many [0, 0, 142], manyDynamic [142, 144, 142] -- pixels in the left, middle and right thirds; the renders in one browser frame: true (both backends)

@@ -50,6 +50,14 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      the marker and the murmuration line's do not, so labelling them would leave two lines that cannot be
      compared by any number at all. -->
 
+## v4811 -- the drafts re-checked on today's dev: none fixed, two patches made again
+
+*** NOTHING THREE MERGED SINCE 2 OCTOBER FIXES ANY OF THE SIXTEEN. *** `dev` moved twelve commits, to `576b084` (4 October) -- among them changes to `RenderObject.js`, `Renderer.js`, `WebGPUBackend.js` and `NodeMaterial.js`. `tools/ship/threePatch.mjs`'s record, taken again there: every reproduction prints exactly what it printed on `1ea31f3`, on `dev`, with its own patch and with all sixteen. `DEV_COMMIT` is `576b084`, and each draft says so.
+
+*** EVERY PATCH STILL APPLIED, AND THAT HID SOMETHING. *** 09 and 16 applied with offsets: their `index` lines named blobs `dev` no longer holds, and their hunks were seven lines off. Both were made again on `dev`'s own files -- the same lines added and removed. 10 was made again too and put back: with three's usual three lines of context it no longer applies after 04, so it keeps its two. The record now holds `dev`'s blob for each of the 23 files the patches edit, and section 6 of `tools/ship/threeUpstream-selfcheck.mjs` holds each patch's `index` line to it, and each issue to the commit it names.
+
+*** THREE'S OWN TESTS, AGAIN. *** On `576b084`, plain and with all sixteen: unit 1525 tests (three added three), 1524 passed, 1 todo, 0 failed, on both builds; e2e 191 of 202 on WebGPU and 148 on WebGL 2, every example's outcome the same on both builds and as on `1ea31f3`; 200 screenshots the same bytes on each backend. Five sabotages red. 1882 gates.
+
 ## v4810 -- a box costs its gates by its own kind, not by the shared record's sweep
 
 *** THE HEADERS STOP FLIP-FLOPPING BETWEEN MACHINES. *** Sessions here resume on two machines of one type -- four cores, 16 GB -- whose CPU models differ, so `boxId` gives them two ids and two per-box records. `tools/ship/declaredCost.mjs`'s census read this box's own alone readings, and where it had none it fell straight to the shared record's ring of SWEEP readings, eight gates to four cores: a header went red on a change of machine, not of cost (v4806: statedRuntime and cloneSource, put right then by timing them again). The census now reads this box's ring, then the rings of every box of the same type pooled with this box's one reading where it has one and not two, then the shared record -- and each row names which (`from`). A box of another type, and `sweep-timings.local.json`, are not witnesses: a different machine's cost is not this one's.

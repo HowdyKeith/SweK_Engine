@@ -1,14 +1,14 @@
 {
- "at": "v4808",
- "devCommit": "1ea31f304854ee3c85df39fdb3eaec584bba6d9b",
+ "at": "v4811",
+ "devCommit": "576b084aff43ec5bb79911befb1d51be178cb7ed",
  "builds": {
-  "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "all": "9e5fd537b3e8a17b1c1d9c0055249493b92e7e7b40afd003d678550fa1309d19"
+  "dev": "029ad444d81066e47905cc9b96ef68f4a6fd8f59672125e15b5c979c6775d954",
+  "all": "404bd19f6deed30ed62175b0e44ac8ff7e7fef868638a935b030f278693960ea"
  },
  "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev runner), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all sixteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
  "unit": {
-  "tests": 1522,
-  "passed": 1521,
+  "tests": 1525,
+  "passed": 1524,
   "todo": 1,
   "failed": 0,
   "sameOnBoth": true
@@ -29,11 +29,13 @@
   "passed": 148,
   "failed": 54,
   "samePerExample": true,
-  "screenshotsIdentical": 199,
+  "screenshotsIdentical": 200,
   "varyingOnOneBuild": {
    "webgpu_upscaling_fsr1": "a different image on each run of either build (so on r185 at v4795)",
-   "webgpu_upscaling_taau": "a different image on each run of either build (so on r185 at v4795)",
-   "webgpu_loader_gltf_transmission": "five different images over eight runs of one build, recorded on r185 at v4795"
+   "webgpu_upscaling_taau": "a different image on each run of either build (so on r185 at v4795)"
+  },
+  "sameThisRun": {
+   "webgpu_loader_gltf_transmission": "the same bytes on both builds at v4811; five different images over eight runs of one build on r185 at v4795, so not counted on as fixed"
   }
  }
 }

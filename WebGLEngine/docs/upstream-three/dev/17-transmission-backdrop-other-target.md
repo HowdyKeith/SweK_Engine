@@ -10,7 +10,7 @@ A transmission material (`MeshPhysicalMaterial` with `transmission > 0`) drawn i
 
 **Cause.** The viewport texture node keeps one copy of the framebuffer per render target (`ViewportTextureNode.updateReference()` sets its `value` to the current target's copy) and fills it in `updateBefore()`. Since #34162 a render object that did not change takes a `SHARED` refresh: `updateBefore()` still runs, so the current target's copy is filled, but `Bindings.updateSharedForRender()` updates only the shared uniform buffers -- the sampled texture binding keeps the texture it was last bound to, another target's copy. A plain `MeshPhysicalMaterial` has no node properties, so `NodeMaterialObserver` never forces it to a full refresh. Bisected between r185 and r186: #34162 is the first commit that prints `lensMoved 0`.
 
-**Fix.** The patch makes a shared refresh follow a texture node that switched textures: `updateSharedForRender()` runs the full update for a bind group whose sampled texture no longer refers to its node's current texture (`binding.texture !== binding.textureNode.value`), and only for that group, so an unchanged render object still skips the rest. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch makes a shared refresh follow a texture node that switched textures: `updateSharedForRender()` runs the full update for a bind group whose sampled texture no longer refers to its node's current texture (`binding.texture !== binding.textureNode.value`), and only for that group, so an unchanged render object still skips the rest. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -115,7 +115,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: wallMoved 4, lensMoved 0; webgl2: wallMoved 4, lensMoved 0 -- of eight pixels in a row, how many changed when the wall moved

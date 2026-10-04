@@ -10,7 +10,7 @@ On the WebGL 2 backend, a compute that reads `storage( attribute, 'vec3' )` -- t
 
 **Cause.** With `bufferCount` 0, `StorageBufferNode.getHash()` (`src/nodes/accessors/StorageBufferNode.js`) shares its hash among all nodes of the same buffer through `builder.globalCache`, keyed by the buffer. `BufferAttributeNode.getHash()` (`src/nodes/accessors/BufferAttributeNode.js`) does the same, through the same entry under the same key. On WebGL 2 a storage buffer is read through a `BufferAttributeNode` of that very buffer, so the two nodes find each other's entry and get one hash. The builder takes them for one node: the attribute is never declared, the storage node is built twice and registers its transform-feedback output twice, and `transformFeedbackVaryings` is handed the same varying twice.
 
-**Fix.** The patch keeps a slot of its own for each of the two node classes in the buffer's shared entry, so a storage node and an attribute node of one buffer never share a hash. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch keeps a slot of its own for each of the two node classes in the buffer's shared entry, so a storage node and an attribute node of one buffer never share a hash. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -108,7 +108,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: withCount 1 2 3 4 5 6, withoutCount 1 2 3 4 5 6; webgl2: withCount 1 2 3 4 5 6, withoutCount 0 0 0 0 0 0 -- the x of each element the compute copied

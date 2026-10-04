@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import crypto from "node:crypto";
-import { ENG, BUNDLE, apply, normalImports, rootWithBuilds, mergeImportConflicts, DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, sha256 } from "./threePatch.mjs";
+import { ENG, BUNDLE, apply, normalImports, rootWithBuilds, mergeImportConflicts, DEV_DIR, DEV_COMMIT, RELEASE as DEV_RELEASE, RECORD as DEV_RECORD, issueFiles, issueParts, devPatches, patchBases, sha256 } from "./threePatch.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
 let fails = 0;
@@ -329,6 +329,26 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`*** the record is of dev at ${DEV_COMMIT.slice(0, 7)} and r186 ${DEV_RELEASE}, and of every patch and reproduction as they are now ***`,
         !!rec && rec.devCommit === DEV_COMMIT && rec.release === DEV_RELEASE && SLOTS.every(fresh),
         !rec ? "no record" : SLOTS.every(fresh) ? "" : `stale: ${SLOTS.filter((s) => !fresh(s)).join(", ")} -- run tools/ship/threePatch.mjs again`);
+    // v4811: *** AND EACH PATCH IS MADE AGAINST dev's OWN FILES AT THAT COMMIT, not carried from an older dev and applied with offsets.
+    // *** Moving DEV_COMMIT from 1ea31f3 to 576b084, every patch still applied and every reproduction printed the same -- and two of
+    // them (09, 16) named blobs dev no longer held, their hunks seven lines off. A record re-taken on a new dev passes the row above
+    // with such a patch; three's reviewers would see an `index` line naming blobs their dev does not have. The record keeps the blob dev
+    // holds for each file a patch edits, and each patch's `index` line must name it. SABOTAGES (v4811, all red, restored by copy): the
+    // record's base for 09 put back to 1ea31f3's -> 1; 09 itself put back -> 3 (stale, this row, its draft); DEV_COMMIT put back -> 4;
+    // the reader missing index lines -> 1 (0 of 23 read); an issue naming 1ea31f3 -> 1.
+    {   const texts = Object.fromEntries(SLOTS.map((s) => [s, patches[s] ? fs.readFileSync(path.join(DEV_DIR, "patches", patches[s]), "utf8") : ""]));
+        const edits = SLOTS.flatMap((s) => patchBases(texts[s]).map((e) => ({ slot: s, ...e })));
+        const headers = SLOTS.reduce((n, s) => n + (texts[s].match(/^diff --git /gm) || []).length, 0);
+        const off = edits.filter(({ slot, file, pre }) => { const b = rec && rec.bases && rec.bases[slot] ? rec.bases[slot][file] : undefined;
+            return /^0+$/.test(pre) ? b !== null : !(typeof b === "string" && b.startsWith(pre)); });
+        ok(`*** every patch is made against dev's own files at ${DEV_COMMIT.slice(0, 7)}: each of the ${edits.length} files the ${SLOTS.length} patches edit names the blob dev holds there ***`,
+            edits.length > 0 && edits.length === headers && off.length === 0,
+            off.length ? "made against another dev: " + off.map((e) => `${e.slot} ${e.file} (${e.pre}, dev holds ${String(((rec && rec.bases && rec.bases[e.slot]) || {})[e.file]).slice(0, 7)})`).join("; ")
+                       : `${headers} file header(s) in the patches, ${edits.length} read` + (edits.length === headers ? "" : " -- a header the reader missed"));
+        const named = SLOTS.map((s) => [s, issues[s] ? [...fs.readFileSync(path.join(DEV_DIR, issues[s]), "utf8").matchAll(/`dev` at ([0-9a-f]{7,40})\b/g)].map((m) => m[1]) : []]);
+        const wrong = named.filter(([, h]) => h.length === 0 || h.some((x) => !DEV_COMMIT.startsWith(x)));
+        ok(`  ...and each issue names ${DEV_COMMIT.slice(0, 7)} as the dev it was measured on, and no other`, wrong.length === 0,
+            wrong.length ? wrong.map(([s, h]) => `${s}: ${h.join(", ") || "names no dev commit"}`).join("; ") : `${named.reduce((n, [, h]) => n + h.length, 0)} mentions in ${SLOTS.length} issues`); }
     // v4802: the one line the patches cannot apply in order without -- 08 and 16 both edit Instance.js's import from EventNode.js
     {   const M = (rec && rec.merged) || [];
         ok(`  the "all" build's merges are import lines only, made only there, and the README says so: ${M.map((m) => `${m.patch} in ${m.file}`).join("; ") || "none"}`,

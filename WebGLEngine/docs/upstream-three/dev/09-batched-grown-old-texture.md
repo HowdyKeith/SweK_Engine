@@ -10,13 +10,13 @@ A `BatchedMesh` whose instance count is grown by `setInstanceCount` -- which re-
 
 **Cause.** The render object's cache key holds the batch's matrices texture (`getMaterialCacheKey()` in `src/renderers/common/RenderObject.js`), but `RenderObjects.get()` compares the whole key only when the material's version or the dynamic key changes, and the dynamic key (`getDynamicCacheKey()`) holds nothing of the batch. `setInstanceCount` re-makes the texture, disposes the old one and copies the matrices over; the render object, never made again, keeps drawing from the old.
 
-**Fix.** The patch adds the batch's matrices texture to the dynamic key, so a grown batch's render object is made again. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch adds the batch's matrices texture to the dynamic key, so a grown batch's render object is made again. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
 ```diff
 diff --git a/src/renderers/common/RenderObject.js b/src/renderers/common/RenderObject.js
-index b4d87d7..b0f16fa 100644
+index f03f388..5a0ba99 100644
 --- a/src/renderers/common/RenderObject.js
 +++ b/src/renderers/common/RenderObject.js
 @@ -2,7 +2,7 @@ import { hashArray, hashString } from '../../nodes/core/NodeUtils.js';
@@ -28,7 +28,7 @@ index b4d87d7..b0f16fa 100644
  
  function getKeys( obj ) {
  
-@@ -955,6 +955,10 @@ class RenderObject {
+@@ -962,6 +962,10 @@ class RenderObject {
  		_cacheKeyValues[ 3 ] = this.renderer.contextNode.id;
  		_cacheKeyValues[ 4 ] = this.renderer.contextNode.version;
  
@@ -95,7 +95,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 grown [22.4, 28, 28, 28, 28], grownMaterialUpdated [22.4, 28, 33, 39, 44.5] -- the centre x of each frame's pixels, the batch grown before the third (both backends)

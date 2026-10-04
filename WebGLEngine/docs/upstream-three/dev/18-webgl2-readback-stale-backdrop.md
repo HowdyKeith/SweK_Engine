@@ -10,7 +10,7 @@ On the WebGL 2 backend, a transmission material (`MeshPhysicalMaterial` with `tr
 
 **Cause.** `WebGLState.bindFramebuffer()` caches what is bound to `gl.FRAMEBUFFER`, but binding `gl.FRAMEBUFFER` binds both the draw and the read framebuffer, and the cache records only the draw side. `WebGLTextureUtils.copyTextureToBuffer()` (behind `readRenderTargetPixelsAsync()`) binds `gl.READ_FRAMEBUFFER` to a framebuffer of its own and leaves it at `null`. The next render binds the same target to `gl.FRAMEBUFFER`, the cache says it already is, and the bind never reaches GL -- so the read binding stays on the default framebuffer, and `copyFramebufferToTexture()` (the viewport texture the transmission samples) copies from it instead of from the target. Read from the code, the same holds for any `copyFramebufferToTexture()` that copies with `copyTexSubImage2D` (no multisampling, no depth) after a readback, not only transmission's.
 
-**Fix.** The patch records the read binding when `gl.FRAMEBUFFER` is bound, and treats `gl.FRAMEBUFFER` as cached only while the draw and the read binding are the same framebuffer; once one of them is bound alone to another, the next `gl.FRAMEBUFFER` bind reaches GL. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch records the read binding when `gl.FRAMEBUFFER` is bound, and treats `gl.FRAMEBUFFER` as cached only while the draw and the read binding are the same framebuffer; once one of them is bound alone to another, the next `gl.FRAMEBUFFER` bind reaches GL. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -98,7 +98,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 webgpu: wallMoved 4, lensMoved 8; webgl2: wallMoved 4, lensMoved 0 -- of eight pixels in a row, how many changed when the wall moved, the target read back after each render

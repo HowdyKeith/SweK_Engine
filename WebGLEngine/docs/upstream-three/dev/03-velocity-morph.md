@@ -10,7 +10,7 @@ Read through `mrt( { output, velocity } )`, one render per browser frame, a `Mes
 
 **Cause.** `morphReference()` (`src/nodes/accessors/Morph.js`) morphs `positionLocal` by the current influences; nothing keeps the influences of the last draw, and `positionPrevious` is left unmorphed. 1.871 px is the morphed point's distance from the unmorphed one at the third frame (influence 0.1).
 
-**Fix.** The patch keeps each mesh's influences as they were at its last draw -- and, for an `InstancedMesh` with per-instance morphs, a copy of its `morphTexture` -- and morphs `positionPrevious` by them when previous data is needed. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch keeps each mesh's influences as they were at its last draw -- and, for an `InstancedMesh` with per-instance morphs, a copy of its `morphTexture` -- and morphs `positionPrevious` by them when previous data is needed. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -221,7 +221,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain 5.612, morphed 1.871 (px, both backends)

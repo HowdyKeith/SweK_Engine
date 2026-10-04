@@ -104,7 +104,9 @@ export const DEV_DIR = path.join(ENG, "docs", "upstream-three", "dev");
 export const DEV_PATCHES = path.join(DEV_DIR, "patches");
 export const RECORD = path.join(DEV_DIR, "record.json");
 /** three's dev branch where the patches were made and measured, and the release the reproductions import. */
-export const DEV_COMMIT = "1ea31f304854ee3c85df39fdb3eaec584bba6d9b";
+// export const DEV_COMMIT = "1ea31f304854ee3c85df39fdb3eaec584bba6d9b";   // 2 October 2026, v4799-v4810
+// v4811 -- dev on 4 October 2026: twelve commits on, every patch applies unchanged, and the record was taken again here.
+export const DEV_COMMIT = "576b084aff43ec5bb79911befb1d51be178cb7ed";
 export const RELEASE = "0.186.1";
 export const IMPORT_LINE = 'import * as THREE from "three"; import * as T from "three/tsl";';
 
@@ -149,6 +151,17 @@ export function mergeImportConflicts(text) {
 }
 
 /** The patch files, by slot. */
+/**
+ * v4811 -- the files a patch edits and the blob each was made against: `diff --git a/F b/F` and its `index PRE..POST` line, PRE as
+ * the patch abbreviates it (all zeros for a file the patch creates). A patch made against dev's own files names dev's blobs here; one
+ * carried forward from an older dev and applied with offsets names that dev's.
+ */
+export function patchBases(text) {
+    const out = [], re = /^diff --git a\/(\S+) b\/\S+\n(?:(?:new|deleted) file mode \d+\n)?index ([0-9a-f]+)\.\.[0-9a-f]+/gm;
+    for (let m; (m = re.exec(text));) out.push({ file: m[1], pre: m[2] });
+    return out;
+}
+
 export function devPatches(dir = DEV_PATCHES) {
     return Object.fromEntries((fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => /^\d\d-.*\.diff$/.test(f)).sort().map((f) => [f.slice(0, 2), f]));
 }
@@ -172,6 +185,9 @@ function main() {
     const bad = Object.keys(issues).filter((s) => !parts[s].script || !patches[s]);
     if (bad.length) { console.error("issues without a reproduction as the drafts write it, or without a patch: " + bad.join(", ")); process.exit(2); }
     const patchPath = (s) => path.join(DEV_PATCHES, patches[s]);
+    // v4811: the blob dev holds at this commit for every file each patch edits -- null where the file does not exist
+    const blobAt = (f) => { try { return git("rev-parse", `HEAD:${f}`); } catch { return null; } };
+    const bases = Object.fromEntries(slots.map((s) => [s, Object.fromEntries(patchBases(fs.readFileSync(patchPath(s), "utf8")).map(({ file }) => [file, blobAt(file)]))]));
 
     // three's own builds: dev, each patch alone, and every patch in order -- the checkout's src/ restored after each
     const out = fs.mkdtempSync(path.join(os.tmpdir(), "three-dev-")), FILES = ["three.core.js", "three.tsl.js", "three.webgpu.js"];
@@ -235,7 +251,7 @@ function main() {
             builds, browser: "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
             patches: Object.fromEntries(all.map((s) => [s, sha256(fs.readFileSync(patchPath(s), "utf8"))])),
             code: Object.fromEntries(all.map((s) => [s, sha256(parts[s].html)])),
-            merged,
+            merged, bases,
             results,
         };
         fs.writeFileSync(RECORD, JSON.stringify(record, null, 1) + "\n");

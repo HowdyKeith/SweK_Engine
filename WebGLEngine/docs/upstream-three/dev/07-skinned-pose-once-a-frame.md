@@ -10,7 +10,7 @@ A `SkinnedMesh` rendered twice in one browser frame, its bone moved between the 
 
 **Cause.** `skinning()` (`src/nodes/accessors/Skinning.js`) calls `skeleton.update()` -- which turns the bones into `boneMatrices` -- in an `OnObjectUpdate` that runs it once per `frameId`, and `frameId` advances once per browser frame of the renderer's animation loop, not once per render. The same test steps the previous bone matrices that velocity reads, so a skinned mesh's velocity also follows the frame while a plain mesh's follows the render. Updating the skeleton by hand before each render draws it where it is (`skinnedUpdated`).
 
-**Fix.** The patch keys the skeleton's update -- and the step of its previous bone matrices -- on the render rather than the frame, in `skinning()` and `computeSkinning()` alike. Against `dev` at 1ea31f3; I can open it as a pull request:
+**Fix.** The patch keys the skeleton's update -- and the step of its previous bone matrices -- on the render rather than the frame, in `skinning()` and `computeSkinning()` alike. Against `dev` at 576b084; I can open it as a pull request:
 
 <details><summary>Patch</summary>
 
@@ -113,7 +113,7 @@ report({ webgpu: await run(false), webgl2: await run(true) });
 
 ### Screenshots
 
-What the page prints, the same on r186 and on `dev` at 1ea31f3 (headless Chromium 141, SwiftShader):
+What the page prints, the same on r186 and on `dev` at 576b084 (headless Chromium 141, SwiftShader):
 
 <!-- observed:begin -->
 plain [142, 142], skinned [0, 142], skinnedUpdated [142, 142] -- pixels left and right of the centre; the renders in one browser frame: true (both backends)

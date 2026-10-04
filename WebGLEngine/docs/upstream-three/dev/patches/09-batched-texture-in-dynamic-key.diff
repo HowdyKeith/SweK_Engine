@@ -1,5 +1,5 @@
 diff --git a/src/renderers/common/RenderObject.js b/src/renderers/common/RenderObject.js
-index b4d87d7..b0f16fa 100644
+index f03f388..5a0ba99 100644
 --- a/src/renderers/common/RenderObject.js
 +++ b/src/renderers/common/RenderObject.js
 @@ -2,7 +2,7 @@ import { hashArray, hashString } from '../../nodes/core/NodeUtils.js';
@@ -11,7 +11,7 @@ index b4d87d7..b0f16fa 100644
  
  function getKeys( obj ) {
  
-@@ -955,6 +955,10 @@ class RenderObject {
+@@ -962,6 +962,10 @@ class RenderObject {
  		_cacheKeyValues[ 3 ] = this.renderer.contextNode.id;
  		_cacheKeyValues[ 4 ] = this.renderer.contextNode.version;
  

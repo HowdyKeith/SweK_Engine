@@ -87,7 +87,7 @@ index 6b31fbd..c6b9be0 100644
  	 * Copies data of the given source texture to the given destination texture.
  	 *
 diff --git a/src/renderers/common/Renderer.js b/src/renderers/common/Renderer.js
-index 678541a..c59c9ce 100644
+index 74fa89f..0f8825c 100644
 --- a/src/renderers/common/Renderer.js
 +++ b/src/renderers/common/Renderer.js
 @@ -1,6 +1,7 @@
@@ -98,7 +98,7 @@ index 678541a..c59c9ce 100644
  import Geometries from './Geometries.js';
  import Info from './Info.js';
  import Pipelines from './Pipelines.js';
-@@ -3243,6 +3244,23 @@ class Renderer {
+@@ -3250,6 +3251,23 @@ class Renderer {
  
  	}
  
@@ -156,10 +156,10 @@ index 4f109bf..05a851c 100644
  	 * Copies data of the given source texture to the given destination texture.
  	 *
 diff --git a/src/renderers/webgpu/WebGPUBackend.js b/src/renderers/webgpu/WebGPUBackend.js
-index 1a0880a..6834e83 100644
+index afedea9..d13cced 100644
 --- a/src/renderers/webgpu/WebGPUBackend.js
 +++ b/src/renderers/webgpu/WebGPUBackend.js
-@@ -2962,6 +2962,26 @@ class WebGPUBackend extends Backend {
+@@ -2969,6 +2969,26 @@ class WebGPUBackend extends Backend {
  
  	}
  
