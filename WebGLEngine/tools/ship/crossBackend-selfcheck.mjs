@@ -25,7 +25,7 @@
 // "tools/roundhouse" dropped from the census's default roots AND a copy of scatter.wgsl planted at gfx/ -> exit=1,
 // 2 red BY NAME ("the scan reaches tools/roundhouse/" and "unwalked: gfx/stray-sabotage.wgsl"); restored.
 "use strict";
-import { runWgslCompute, runWgslComputeToTexture, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { runWgslCompute, runWgslComputeToTexture, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { runWgslComputeNative, runWgslComputeToTextureNative, headlessGpuSkipReason,
          exitCleanly } from "./headlessGpu.mjs";
 import { corpus, EXCLUDED, census, compare } from "./wgslCorpus.mjs";
@@ -41,6 +41,11 @@ const ok = (c, name, detail) => {
     if (!c) fails++;
 };
 const sec = (t) => console.log("\n" + t);
+// rig run 13: the browser side launches with PARITY_ARGS. The native side is node-webgpu's default adapter, which on Keith's
+// rig is the GTX 1080 (D3D12); an ordinary win32 run put the browser's WebGPU on SwiftShader, so "identical" compared two
+// adapters and four kernels parted (holeFill by 1.0). On Linux PARITY_ARGS is LAUNCH_ARGS and both sides are SwiftShader.
+const B = (o) => runWgslCompute({ launchArgs: PARITY_ARGS, ...o });
+const BT = (o) => runWgslComputeToTexture({ launchArgs: PARITY_ARGS, ...o });
 
 const bSkip = webgpuSkipReason(), nSkip = headlessGpuSkipReason();
 if (bSkip || nSkip) {
@@ -113,9 +118,15 @@ sec("2. EVERY SHADER IN THE CORPUS RUNS ON BOTH BACKENDS");
 // ---------------------------------------------------------------------------------------------------------
 const results = [];
 {
+    // rig run 13: the two sides are one adapter reached two ways, or "identical" below is a claim about two pieces of silicon
+    const probe = corpus().find((e) => !e.compileOnly && !e.texture);
+    const pb = await B(probe.opts), pn = await runWgslComputeNative(probe.opts);
+    const name = (r) => r && r.ok && r.adapter ? `${r.adapter.vendor}/${r.adapter.architecture}` : (r && r.reason) || "no adapter";
+    ok(pb.ok && pn.ok && pb.adapter && pn.adapter && pb.adapter.vendor === pn.adapter.vendor && pb.adapter.architecture === pn.adapter.architecture,
+       "*** the browser and node-webgpu report the SAME ADAPTER, so the comparison below is one rasteriser reached two ways ***",
+       `browser ${name(pb)}, native ${name(pn)} (probed on ${probe.id})`);
     for (const e of corpus())
-        results.push(await compare(e, runWgslCompute, runWgslComputeNative,
-                                   runWgslComputeToTexture, runWgslComputeToTextureNative));
+        results.push(await compare(e, B, runWgslComputeNative, BT, runWgslComputeToTextureNative));
     for (const r of results)
         ok(r.ok, `runs: ${r.id}`, r.ok ? (r.compileOnly ? "compileOnly"
               : r.texture ? `${r.n} texels x4, ${r.format}, bytesPerRow ${r.bytesPerRow}` : `${r.n} floats`) : r.reason);
@@ -142,7 +153,7 @@ sec("3. AND EVERY ONE IS BYTE-IDENTICAL");
     const bogus = await compare(
         { id: "control.invalidWgsl", compileOnly: true,
           opts: { code: "@compute @workgroup_size(1) fn main() { this is not wgsl }", compileOnly: true, outCount: 0 } },
-        runWgslCompute, runWgslComputeNative);
+        B, runWgslComputeNative);
     ok(bogus.browserOk === false && bogus.nativeOk === false,
        "CONTROL: both backends REJECT deliberately invalid WGSL", "neither is quietly accepting anything");
     ok(bogus.identical === false,
@@ -187,7 +198,7 @@ sec("4. THE CONTROL: THE COMPARISON CAN FAIL, ON THE SAME PAIR OF HARNESSES");
     // apart. If THIS came back identical the section above would be a fact about the comparison.
     const NPIX = PT.VIEW.w * PT.VIEW.h, OUT = NPIX * PT.COVERAGE_STRIDE, WG = Math.ceil(NPIX / 64);
     const U = PT.coverageUniforms();
-    const b = await runWgslCompute({ code: PT.coverageWgsl(), outCount: OUT, uniforms: U, workgroups: WG });
+    const b = await B({ code: PT.coverageWgsl(), outCount: OUT, uniforms: U, workgroups: WG });
     const a = await runWgslComputeNative({ code: PT.coverageWgsl({ shaderTan: true }), outCount: OUT, uniforms: U, workgroups: WG });
     ok(b.ok && a.ok, "both halves of the control ran");
     let diff = 0, maxAbs = 0;

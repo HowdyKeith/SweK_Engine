@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d127baebdccab4abb426be4084ad96d2ee5699ce",
+ "head": "b83ac2e9638bda6290767940be844129cb1521c2",
  "bodies": {
   "box3d": [
    {
@@ -233,12 +233,12 @@
    {
     "path": "tools/ship/slugCurve-selfcheck.mjs",
     "bytes": 24748,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tools/ship/slugDevice-selfcheck.mjs",
     "bytes": 23828,
-    "sha": "5312d3081260a24e4a57277db99cb1b7ae63a3a7"
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
@@ -273,7 +273,7 @@
    {
     "path": "tools/ship/slugShatter-selfcheck.mjs",
     "bytes": 26599,
-    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tools/ship/slugTicker-selfcheck.mjs",
@@ -861,8 +861,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 82221,
-    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
+    "bytes": 82304,
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "toroidal-wave.html",
@@ -1048,7 +1048,7 @@
    },
    {
     "path": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
-    "bytes": 14126,
+    "bytes": 16198,
     "sha": "d84c1e2806380eabbf061c3b67aa91e9d52e2979"
    },
    {
@@ -1189,7 +1189,7 @@
    {
     "path": "tools/ship/img2three-selfcheck.mjs",
     "bytes": 24164,
-    "sha": "2a88a2a03645797205cf424a39e2617772981d59"
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
@@ -1234,7 +1234,7 @@
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
     "bytes": 82949,
-    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
@@ -1248,8 +1248,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 82221,
-    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
+    "bytes": 82304,
+    "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
     "path": "tsl-probe.html",
