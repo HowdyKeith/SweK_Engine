@@ -287,7 +287,8 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     // 01 and 02 are fixed in r186 (#34100, #34101, #34107); 08 stands with another symptom -- r186 syncs the instance buffer before a
     // frame's first render, so the second and third draw the first's matrices -- and 15 is r186's own
     // v4802: and 16, compute-written storage instance matrices -- r186's fix for 01 reaches only the CPU array
-    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16"];
+    // v4806: and 17, a transmission lens drawn into a second target showing the first's backdrop -- r186's own, bisected to #34162
+    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17"];
     const DEV_BUG = {
         "08": (r) => all(r) && r.webgpu.sameFrame && r.webgpu.one.every((n) => n > 50) && r.webgpu.many[0] === 0 && r.webgpu.many[1] === 0 && r.webgpu.many[2] > 50 && r.webgpu.manyDynamic.every((n) => n > 50),
     };
@@ -301,7 +302,12 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
         "16": { webgpuOnly: true,
         bug: (r) => r.webgpu.plain === "5.612" && r.webgpu.storageCPU === r.webgpu.plain && r.webgpu.storageCompute !== r.webgpu.plain,
         fixed: (r) => r.webgpu.storageCPU === r.webgpu.plain && r.webgpu.storageCompute === r.webgpu.plain,
-        observed: (r) => `plain ${r.webgpu.plain}, storageCPU ${r.webgpu.storageCPU}, storageCompute ${r.webgpu.storageCompute} -- the instance's mean x velocity in pixels (WebGPU)` } };
+        observed: (r) => `plain ${r.webgpu.plain}, storageCPU ${r.webgpu.storageCPU}, storageCompute ${r.webgpu.storageCompute} -- the instance's mean x velocity in pixels (WebGPU)` },
+        // both backends: the wall beside the lens moves, and through the lens nothing does -- r185 printed lensMoved 8 on both
+        "17": {
+        bug: (r) => all(r) && ["webgpu", "webgl2"].every((b) => r[b].wallMoved > 0 && r[b].lensMoved === 0),
+        fixed: (r) => all(r) && ["webgpu", "webgl2"].every((b) => r[b].wallMoved > 0 && r[b].lensMoved > 0),
+        observed: (r) => `webgpu: wallMoved ${r.webgpu.wallMoved}, lensMoved ${r.webgpu.lensMoved}; webgl2: wallMoved ${r.webgl2.wallMoved}, lensMoved ${r.webgl2.lensMoved} -- of eight pixels in a row, how many changed when the wall moved` } };
     const TEMPLATE = ["Description", "Reproduction steps", "Code", "Live example", "Screenshots", "Version", "Device", "Browser", "OS"];
     const issues = issueFiles(), patches = devPatches(), rec = fs.existsSync(DEV_RECORD) ? JSON.parse(fs.readFileSync(DEV_RECORD, "utf8")) : null;
     const draftOf = (slot) => Object.keys(DRAFTS).find((f) => f.startsWith(slot + "-")) || null;
@@ -387,6 +393,9 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     }
 }
 
+// ---- v4806 SABOTAGE LOG (section 6, issue 17) ---------------------------------------------------------------------
+// S1 patch 17 edited, the record not re-run -> 2 (stale record; the Description's patch); S2 17's observed block off by one digit -> 1;
+// S3 17 held as fixed on r186 -> 1; S4 the README not linking 17 -> 1; S5 e2e.json naming the fourteen-patch build -> 1. None green.
 // ---- v4805 SABOTAGE LOG (section 6, the vendored r186) ----------------------------------------------------------------
 // V1 one byte of vendor/three-webgpu/three.webgpu.js -> 1 (the bytes row; the reproductions still print the record's); V2 three.tsl.js's
 // import edit undone -> 15 (the bytes row, and all fourteen live rows: the page has no import map); V3 the record's r186 and dev runs of

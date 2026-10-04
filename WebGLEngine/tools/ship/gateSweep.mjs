@@ -8723,6 +8723,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4806 -- THE 410th CLOSING: NO new gate file -- issue 17, the transmission regression, drafted with its patch.
+    since503: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4806", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 17, recorded, run on the vendored r186, three's tests with all fifteen)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (names the issue its three's-own row is)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REGRESSION v4805 HELD AS THREE'S, DRAFTED FOR THREE. *** A reproduction of thirty lines -- a striped wall, a plain " +
+                 "MeshPhysicalMaterial lens, two renders into two targets with the wall moved between -- prints lensMoved 0 on r186 and dev " +
+                 "and 8 on r185, both backends. The cause is #34162's SHARED refresh: the viewport texture node switches to the current " +
+                 "target's copy, and a shared refresh never rebinds it. The patch runs the full update for a bind group whose sampled " +
+                 "texture no longer matches its node, and only for it; lensMoved 8, alone and with the other fourteen, and three's unit and " +
+                 "e2e tests unchanged on both backends. Its first stated workaround was tested and did not work, so the issue says so. Five " +
+                 "sabotages red.",
+    }),
     // v4805 -- THE 409th CLOSING: NO new gate file -- the engine's three-webgpu moved to r186.
     since502: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened nine.

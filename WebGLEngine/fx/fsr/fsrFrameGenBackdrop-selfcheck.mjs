@@ -114,6 +114,8 @@ else {
         // targets with the wall moved 0.25 between: the lens's centre changed by 0.0599 on r185, by 0 on r186). Bisected between
         // r185 and r186 to #34162, "WebGPURenderer: Introduce refresh types for render objects": a SHARED refresh updates the shared
         // uniform buffers and not the sampled texture three's viewport node switches to per render target. Still so on dev.
+        // v4806: drafted as docs/upstream-three/dev/17-transmission-backdrop-other-target.md, with a patch that makes a shared refresh
+        // follow a texture node that switched textures; its reproduction prints lensMoved 0 on r186 and 8 patched, on both backends.
         const late = CASES.map((cn) => o[cn].rebuiltLate.nd), stale = (cn) => cn.startsWith("transmission:") && cn !== "transmission:moving";
         ok(`  THREE'S OWN (r186): the same rebuild after a render at 4x and two at this size: ${late.join(", ")} channel values differ -- a transmission lens reads the frame three copied for the render before, where the wall moved between`,
            CASES.every((cn) => (stale(cn) ? o[cn].rebuiltLate.nd > 0 : o[cn].rebuiltLate.nd === 0)),

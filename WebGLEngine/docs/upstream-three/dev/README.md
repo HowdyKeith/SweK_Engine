@@ -1,13 +1,13 @@
 # three.js issues, ready to paste -- DRAFTS, NOT POSTED
 
-The drafts one directory up hold three r185, the release this engine vendors. Three's Bug Report form asks for the latest
+The drafts one directory up hold three r185, the release this engine vendored until v4805. Three's Bug Report form asks for the latest
 release and a live example, and three takes pull requests against `dev`; so each issue here is written in the form's own
 fields, its reproduction imports three's latest release, **r186** (`0.186.1`), and its patch is rebased onto `dev` at
 `1ea31f304854ee3c85df39fdb3eaec584bba6d9b` (2 October 2026). Every reproduction prints the same on r186 and on that `dev`
 commit -- headless Chromium 141, SwiftShader, on WebGPU and on the WebGL 2 backend.
 
 `tools/ship/threePatch.mjs` (v4799) runs each reproduction, beside a three checkout, on r186 as npm ships it, on `dev` built by
-three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all fourteen in order, and writes what each page
+three's own rollup, on `dev` with the issue's patch alone, and on `dev` with all fifteen in order, and writes what each page
 printed to [`record.json`](record.json). Section 6 of `tools/ship/threeUpstream-selfcheck.mjs` holds the issues to it: a patch or
 a reproduction edited since the record is red until the tool is run again.
 
@@ -24,7 +24,7 @@ every sweep, and each must print what the record's r186 run printed. The r185 dr
 3. Live example: the form requires one. Paste the Code into a fork of the "jsfiddle-latest-release WebGPURenderer" fiddle
    (https://jsfiddle.net/mnqr9oj0/) and link the fork where the issue's comment says.
 4. The patch is in the Description. For a pull request: `git apply patches/NN-*.diff` on `dev` at the commit above. All
-   fourteen apply together in numeric order (10 carries two lines of context, so it applies after 04), but for one line: 08 and
+   fifteen apply together in numeric order (10 carries two lines of context, so it applies after 04), but for one line: 08 and
    16 both edit `Instance.js`'s one import from `EventNode.js`, and three's lint forbids a second. Applied together it reads
    `import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';` -- the tool makes that merge, and only
    that kind (an import line, each side's names less what either removed), and `record.json` lists it under `merged`.
@@ -45,6 +45,7 @@ every sweep, and each must print what the record's r186 run printed. The r185 dr
 - [WebGLBackend: a compute reads the first element of any buffer whose class differs from its first buffer's](14-webgl2-compute-buffer-class.md)
 - [BatchedMesh under a velocity MRT: every render throws once the batch grows, and the first frame reads motion that is not there](15-batched-grown-velocity-throws.md) -- new in r186
 - [InstancedMesh: velocity is wrong when a compute pass writes its storage instance matrices](16-instance-storage-compute-velocity.md) -- WebGPU; r186's fix for 01 reaches the CPU array only
+- [Transmission: after a render into another target, the material shows that target's backdrop](17-transmission-backdrop-other-target.md) -- new in r186, bisected to #34162 (v4806)
 
 ## Fixed in r186, so not filed
 
@@ -79,7 +80,7 @@ grown with its material updated throws on `dev`: that is issue 15.
 
 ## Checked with three's own tests
 
-Run in the `dev` checkout, on `dev` and on `dev` with all fourteen patches in order, each built by three's rollup -- the same
+Run in the `dev` checkout, on `dev` and on `dev` with all fifteen patches in order, each built by three's rollup -- the same
 bytes `record.json` names:
 
 - Unit tests (`test/unit`, headless Chromium, QUnit served locally): 1522 tests, 1521 passed, 1 todo, 0 failed, on both builds.
