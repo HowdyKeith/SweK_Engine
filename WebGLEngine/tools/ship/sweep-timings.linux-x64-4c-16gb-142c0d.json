@@ -1,22 +1,30 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
- "note": "v4796: merged from linux-x64-4c-16095mb-142c0d -- one machine type, ids that differed by a megabyte of RAM. THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-01T22:27:15.126Z",
+ "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
+ "captured": "2026-10-04T00:49:42.184Z",
  "timings": {
   "tools/ship/frozenRecords-selfcheck.mjs": 1319,
-  "tools/ship/recordDrift-selfcheck.mjs": 1770
+  "tools/ship/recordDrift-selfcheck.mjs": 1770,
+  "tools/ship/statedRuntime-selfcheck.mjs": 1301,
+  "tools/ship/cloneSource-selfcheck.mjs": 99
  },
  "at": {
   "tools/ship/frozenRecords-selfcheck.mjs": "2026-10-01T22:27:15.126Z",
-  "tools/ship/recordDrift-selfcheck.mjs": "2026-10-01T22:27:15.126Z"
+  "tools/ship/recordDrift-selfcheck.mjs": "2026-10-01T22:27:15.126Z",
+  "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-04T00:49:42.184Z",
+  "tools/ship/cloneSource-selfcheck.mjs": "2026-10-04T00:49:42.184Z"
  },
  "kinds": {
   "tools/ship/frozenRecords-selfcheck.mjs": "alone",
-  "tools/ship/recordDrift-selfcheck.mjs": "alone"
+  "tools/ship/recordDrift-selfcheck.mjs": "alone",
+  "tools/ship/statedRuntime-selfcheck.mjs": "alone",
+  "tools/ship/cloneSource-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/frozenRecords-selfcheck.mjs": 0,
-  "tools/ship/recordDrift-selfcheck.mjs": 0
+  "tools/ship/recordDrift-selfcheck.mjs": 0,
+  "tools/ship/statedRuntime-selfcheck.mjs": 0,
+  "tools/ship/cloneSource-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -28,6 +36,16 @@
    1635,
    1578,
    1770
+  ],
+  "tools/ship/statedRuntime-selfcheck.mjs": [
+   1357,
+   1320,
+   1301
+  ],
+  "tools/ship/cloneSource-selfcheck.mjs": [
+   93,
+   105,
+   99
   ]
  }
 }
