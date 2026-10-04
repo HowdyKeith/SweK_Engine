@@ -1073,6 +1073,60 @@ export const PROBE_AT_V4487 = Object.freeze({
     }),
 });
 
+/**
+ * *** v4778 -- THE STALENESS QUESTION, WITHOUT THE GATE AROUND IT, SO verify.mjs CAN ASK IT. ***
+ *
+ * Keith's rig read tools/ship/frozenRecords-selfcheck.mjs at 5,230 ms against quickSweep's 3,000 ms budget, and
+ * since 9ed30746 the rig's readings are the ones that decide what the sweep runs -- so on the box that decides a
+ * ship, this module's detector did not run at all, and recordReach-selfcheck said so: "NO ROAD". v4639 met the
+ * same fact about recordDrift by giving verify.mjs a step that calls drift() in-process; this is the same road
+ * for the other detector.
+ *
+ * WHAT IT ASKS IS THE GATE'S CORE STALENESS ASSERTION AND NOTHING WIDER: the census this module froze against
+ * the census the tree holds. Section 2 of the gate asserts `excluding` against census({ exclude: /frozenRecords/ })
+ * and the v4487 population against the commit's record list; this asks those, plus `currentIncludingModule`
+ * against the census with this module in it (the gate holds that one only by its difference from `excluding`,
+ * and recordDrift's pre-flight by its record count), plus PROBE_AT_V4487's reconciliation with the replay that
+ * retired it -- the arithmetic section 3 asserts, and the only reading of that record a step can afford.
+ * What it does NOT ask is everything that needs fixtures, git, or the guardian search: the census here is
+ * census({ guardians: false }), the same cheap one recordDrift's pre-flight takes, so it is memoised already
+ * when verify runs this after drift(). The v4487 population is read off SWEEP_COMMIT_RECORD_NAMES, the frozen
+ * list the gate itself falls back to on a shallow clone, and not off git: the gate compares the two, and a
+ * step that shells out to git is a second instrument rather than a cheap one.
+ *
+ * MEASURED on this box, in-process: 518 ms for the including census cold plus 77 ms for the excluding one off
+ * the same per-file record cache. After recordDrift's drift() in the same process the including census is
+ * a memo hit; see verify.mjs step 1c for the cost there.
+ *
+ * Every input is injectable so recordReach-selfcheck can hand this a stale record and watch it say so, which
+ * is what lets that gate count the records below as checked by this step rather than merely named by it.
+ */
+export function stale({ record = PROBE_AT_V4536, old = PROBE_AT_V4487, names = SWEEP_COMMIT_RECORD_NAMES,
+                        take = census } = {}) {
+    const inc = take({ guardians: false });
+    const exc = take({ guardians: false, exclude: /frozenRecords/ });
+    const triple = (c) => `${c.records.length} / ${c.withFields} / ${c.fields}`;
+    const same = (c, f) => !!f && c.records.length === f.records && c.withFields === f.withFields && c.fields === f.fields;
+    const atCommit = new Set(names);
+    const atSweep = exc.records.filter((r) => atCommit.has(r.name)).length;
+    const R = record.v4487Recount || {}, N = R.narrowRuler || {};
+    const rows = [
+        { name: "census excluding this module", stale: !same(exc, record.excluding),
+          detail: `${triple(exc)} live, record says ${record.excluding ? `${record.excluding.records} / ${record.excluding.withFields} / ${record.excluding.fields}` : "nothing"}` +
+                  " -- a round that adds a record re-takes this" },
+        { name: "census including this module", stale: !same(inc, record.currentIncludingModule),
+          detail: `${triple(inc)} live, record says ${record.currentIncludingModule ? `${record.currentIncludingModule.records} / ${record.currentIncludingModule.withFields} / ${record.currentIncludingModule.fields}` : "nothing"}` },
+        { name: "records at the v4487 sweep's commit", stale: atSweep !== R.records,
+          detail: `${atSweep} of today's records are on the commit's list, record says ${R.records}` },
+        { name: "the v4487 record against the replay that retired it",
+          stale: !(R.fields - old.fields === R.neverProbed && R.missedByWindow + R.missedByRuler === R.neverProbed &&
+                   N.fields - old.fields === R.missedByWindow && R.fields - N.fields === R.missedByRuler &&
+                   R.records - N.records === (R.theTwoItCouldNotSee || []).length && record.commit === old.commit),
+          detail: `${old.fields} fields recorded at ${old.commit}, ${R.fields} replayed, ${R.neverProbed} never probed` },
+    ];
+    return { rows, stale: rows.filter((r) => r.stale) };
+}
+
 export function reportLines(c = null) {
     const s = c || census();
     const L = ["frozen records -- which of this tree's frozen numbers anything actually checks"];

@@ -39,6 +39,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FR from "./frozenRecords.mjs";
+import { stripComments } from "../../vba/runtimeGap.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -80,24 +81,99 @@ export const CLASS = Object.freeze({
 });
 
 /**
+ * *** v4778 -- THE SECOND ROAD TO SHIP TIME, WRITTEN DOWN ONCE INSTEAD OF AS A REGEX FOR ONE GATE. ***
+ *
+ * Until now "checked at ship time" had one road in this module -- a guardian under quickSweep's budget -- and
+ * the selfcheck carried a second for exactly one detector, `/recordDrift\.mjs/.test(verify.mjs)`, which also
+ * matched verify's COMMENTS, so deleting the step and keeping its paragraph would have left the road standing.
+ * Keith's rig then read frozenRecords-selfcheck at 5,230 ms and recordDrift-selfcheck at 4,829 ms, and since
+ * 9ed30746 the rig's readings decide what the sweep runs. On that box BOTH detectors are over the budget, so
+ * every record whose guardians are those two gates fell out of `checked` -- including the three v4548 rescued --
+ * whether or not verify.mjs runs the detector's check itself.
+ *
+ * A DETECTOR WHOSE CHECK IS A verify.mjs STEP DOES RUN AT SHIP TIME, BUT ONLY FOR WHAT THE STEP ASKS. So a step
+ * is declared with the records its call actually compares, and a record counts as checked through it IF AND
+ * ONLY IF (a) verify.mjs's code -- comments stripped -- imports the module and calls the function, (b) the
+ * record is in that call's list, or is read by verify's own line beside it as a member of the module, and
+ * (c) the record's guardians include the detector's gate. (c) keeps this to the question asked: it lifts a
+ * guarded record the sweep cannot reach, and never turns an unguarded record into a checked one.
+ *
+ * The lists are DECLARED here and PROVEN by recordReach-selfcheck: frozenRecords' by handing stale() each
+ * record corrupted and watching it go stale, recordDrift's by finding each record read as a module member in
+ * recordDrift.mjs's comment-stripped code (its own gate, section 2, drives those reads stale by injection).
+ * What is deliberately absent: drift() also compares SHAPE_AT_V4480 and MEASURED_AT_V4462, but proving those
+ * here costs the two O(tree) censuses behind them; they are left to their own guardians, which under-reports
+ * rather than over-claims.
+ */
+export const SHIP_STEPS = Object.freeze([
+    Object.freeze({ detector: "tools/ship/frozenRecords-selfcheck.mjs", module: "./frozenRecords.mjs", call: "stale",
+                    records: Object.freeze(["PROBE_AT_V4536", "PROBE_AT_V4487"]), verifyReads: Object.freeze([]) }),
+    Object.freeze({ detector: "tools/ship/recordDrift-selfcheck.mjs", module: "./recordDrift.mjs", call: "drift",
+                    records: Object.freeze(["PROBE_AT_V4536", "REACH_AT_V4548"]),
+                    // compared by verify's own check() beside the call, against the `all` drift() returns
+                    verifyReads: Object.freeze(["DRIFT_AT_V4482"]) }),
+]);
+
+const _escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const _stepsMemo = new Map();
+/**
+ * Which SHIP_STEPS verify.mjs really runs, read off its code: the module bound by a dynamic import, and that
+ * binding's call. `verifySrc` is injectable so the gate can hand it a verify without the step and watch the road
+ * close. Returns each step with `live` and `checks`, the records it checks at ship time when live.
+ */
+export function shipSteps({ root = ENG, verifySrc = null } = {}) {
+    const memo = verifySrc == null;
+    if (memo && _stepsMemo.has(root)) return _stepsMemo.get(root);
+    let src = verifySrc;
+    if (src == null) { try { src = fs.readFileSync(path.join(root, "tools", "ship", "verify.mjs"), "utf8"); } catch { src = ""; } }
+    const code = stripComments(src);
+    const out = Object.freeze(SHIP_STEPS.map((s) => {
+        // `const X = <wait-for> import("./mod.mjs")` -- the binding the step's call is made through
+        const bind = new RegExp("(?:const|let|var)\\s+(\\w+)\\s*=\\s*\\w+\\s+import\\(\\s*[\"'`]" + _escRe(s.module) + "[\"'`]\\s*\\)").exec(code);
+        const binding = bind ? bind[1] : null;
+        const called = !!binding && new RegExp("\\b" + binding + "\\." + s.call + "\\s*\\(").test(code);
+        const reads = binding ? s.verifyReads.filter((n) => new RegExp("\\b" + binding + "\\." + n + "\\b").test(code)) : [];
+        const live = called;
+        return Object.freeze({ ...s, binding, called, live,
+            checks: Object.freeze(live ? [...s.records, ...reads] : []),
+            missingReads: Object.freeze(s.verifyReads.filter((n) => !reads.includes(n))) });
+    }));
+    if (memo) _stepsMemo.set(root, out);
+    return out;
+}
+
+/**
  * Join the record census to the sweep timings and classify every record.
  *
  * `timings` and `census` are injectable so the gate can hand this a world where one gate got slower and
- * watch the count move -- a ratchet that cannot be shown to move is a number nobody has tested.
+ * watch the count move -- a ratchet that cannot be shown to move is a number nobody has tested. `steps` too
+ * (v4778): [] is the sweep road alone, which is what the timing fixtures in the gate need to stay about timing.
  */
-export function reach({ budgetMs = null, timings = null, census = null, root = ENG } = {}) {
+export function reach({ budgetMs = null, timings = null, census = null, root = ENG, steps = null } = {}) {
     const t = timings || readTimings(root);
     const budget = budgetMs ?? t.budgetMs ?? 3000;
     const c = census || FR.census();
     const timed = (g) => t.timings?.[g] != null;
     const runsAtShipTime = (g) => timed(g) && t.timings[g] <= budget;
+    const st = steps ?? shipSteps({ root });
+    const stepChecks = new Map();      // record -> [detector gate whose live step checks it]
+    for (const s of st) if (s.live) for (const n of s.checks) {
+        if (!stepChecks.has(n)) stepChecks.set(n, []);
+        stepChecks.get(n).push(s.detector);
+    }
     const rows = c.records.map((r) => {
+        const steppedBy = r.guardians.length ? (stepChecks.get(r.name) || []).filter((d) => r.guardians.includes(d)) : [];
+        const swept = r.guardians.some(runsAtShipTime);
         const cls = !r.guardians.length ? CLASS.UNGUARDED
-            : r.guardians.some(runsAtShipTime) ? CLASS.CHECKED
+            : swept || steppedBy.length ? CLASS.CHECKED
             : r.guardians.some(timed) ? CLASS.OVER_BUDGET
             : CLASS.UNMEASURED;
         return Object.freeze({
             name: r.name, file: r.file, guardians: r.guardians, cls,
+            // v4778: which road makes it checked -- "swept" wins when both are open, so `stepped` counts only
+            // the records a verify step is the SOLE ship-time check of
+            road: swept ? "swept" : steppedBy.length ? "a verify step" : null,
+            steppedBy: Object.freeze(steppedBy),
             // the cheapest guardian, so a reader knows how far from the budget the record actually is
             bestMs: r.guardians.length ? Math.min(...r.guardians.map((g) => t.timings?.[g] ?? Infinity)) : null,
         });
@@ -119,6 +195,9 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
         budgetMs: budget, capMs: t.capMs ?? null,
         total: rows.length,
         checked: by(CLASS.CHECKED).length,
+        // v4778: of `checked`, how many have NO guardian under the budget and are checked only by a verify step
+        stepped: rows.filter((r) => r.road === "a verify step").length,
+        steps: st,
         overBudget: overBudget.length,
         unmeasured: unmeasured.length,
         unguarded: unguarded.length,
@@ -560,7 +639,8 @@ export function reportLines() {
     const out = [
         "[recordReach] which frozen records the ship ritual actually checks",
         `  ${r.total} records at a ${r.budgetMs} ms budget: ${r.checked} checked, ${r.overBudget} guarded only by ` +
-        `over-budget gates, ${r.unmeasured} by never-timed gates, ${r.unguarded} guarded by nothing`,
+        `over-budget gates, ${r.unmeasured} by never-timed gates, ${r.unguarded} guarded by nothing` +
+        (r.stepped ? ` (${r.stepped} of the checked are checked by a verify step alone, no guardian swept)` : ""),
         `  => ${r.unchecked} of ${r.total} (${(100 * r.unchecked / r.total).toFixed(0)}%) not checked at ship time`,
     ];
     for (const b of r.blockers.slice(0, 8))

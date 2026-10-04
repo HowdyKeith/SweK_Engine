@@ -204,11 +204,21 @@ function seam() {
     return { positions, normals, uvs, indices };
 }
 
-/** sha256 of everything the recorded figures actually depend on: the vendor drop and the harness that drives it. */
+/**
+ * sha256 of everything the recorded figures actually depend on: the vendor drop and the harness that drives it.
+ *
+ * v4778: the KEYS are forward-slash on every OS. path.relative() on Windows spells them
+ * "vendor\mikktspace\mikktspace.c", so Keith's rig read the LF-keyed record as "3 changed, 3 unrecorded" with the
+ * file bytes untouched -- the "unrecorded" count is the tell: it counts live keys missing from the record, which a
+ * content change (or a CRLF checkout) cannot produce. Not line endings: the repo-root .gitattributes is "* -text",
+ * so git never converts these files, and git ls-files --eol shows i/lf w/lf for all three. Same one-line fix
+ * xatlasRef.mjs's inputHashes got in v4681. Reproduced here by preloading a backslash path.relative (same
+ * "3 changed, 3 unrecorded" line, exit 1); green with this change under the same preload.
+ */
 export function inputHashes() {
     const h = {};
     for (const f of [path.join(SRC, "mikktspace.c"), path.join(SRC, "mikktspace.h"), CLI])
-        h[path.relative(ENG, f)] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
+        h[path.relative(ENG, f).split(path.sep).join("/")] = createHash("sha256").update(fs.readFileSync(f)).digest("hex").slice(0, 16);
     return h;
 }
 

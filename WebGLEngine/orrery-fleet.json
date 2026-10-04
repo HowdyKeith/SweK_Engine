@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3202ebe70a3424c29d7474ece15b5937de1d3ad1",
+ "head": "8ea02790721a967108f0025707621098cec7e5a0",
  "bodies": {
   "box3d": [
    {
@@ -374,7 +374,7 @@
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 126906,
+    "bytes": 131378,
     "sha": "b684a04dd2b6e6b24cf92165ea3cc90eddafc6d2"
    },
    {
@@ -477,14 +477,14 @@
    },
    {
     "path": "tools/ship/pilotPolicy-selfcheck.mjs",
-    "bytes": 25096,
+    "bytes": 28591,
     "sha": "9680980498e9a4aaff72bfd4fd33ee2f8192071a"
    }
   ],
   "mikktspace": [
    {
     "path": "tools/mesh/mikktRef.mjs",
-    "bytes": 14318,
+    "bytes": 15095,
     "sha": "9d6c904e6a46c424d679d5637f9ba59f1ce12fa7"
    }
   ],
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3433510,
-    "sha": "6e96f8e284b97a19f37b757ac3297002b6057633"
+    "sha": "a9b5ff83fbd42b0f2a06cbe605d7a13f74f81277"
    },
    {
     "path": "mpm3d.html",
