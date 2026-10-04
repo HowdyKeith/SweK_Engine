@@ -12,7 +12,10 @@
 // MEASURED on a scratch copy of the tree (pagePlacement.mjs and this gate copied, everything else linked; the tree
 // file never edited): panelProfiles' weight made the raw count (`n / spread.get(t)` -> `n`) -> exit=1, 2 red by
 // name: "box3d-blobs.html is filed by a word no other panel holds..." (weighted picks sampling on [physics]) and
-// "a panel-unique token outweighs a spread one by more than an order of magnitude" (blob 2.00 against physics 1.000).
+// "a panel-unique token [that RECURS in its panel] outweighs a spread one by more than an order of magnitude" (blob
+// 2.00 against physics 1.000). v4778 review: the bracketed words were added to the row name because a unique token
+// seen ONCE is 8x physics, not ten (the note in section 4 says so); re-run the same way under the new name, same
+// exit=1, same 2 red, same numbers.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -148,12 +151,12 @@ console.log("\n4. *** AND A RAW COUNT REWARDS A WORD FOR BEING COMMON, WHICH IS 
         rawPick.id === "sampling" && !!r.suggestion && r.suggestion !== "sampling" && uniqueWin.length > 0,
         "raw count picks " + rawPick.id + " (" + rawPick.n + " hits); weighted picks " + (r.suggestion || "nothing: " + r.why) +
         " on [" + (r.evidence || []).join(" ") + "], panel-unique: [" + uniqueWin.join(" ") + "]. " +
-        "*** \"physics\" APPEARS IN EIGHT PANELS AND SAYS NOTHING ABOUT WHICH ONE; A WORD IN ONE PANEL SAYS " +
-        "EVERYTHING. *** Seven hits on the common word outscore the discriminating ones and the wrong panel wins. " +
+        "*** \"physics\" APPEARS IN " + panelsHolding("physics") + " PANELS AND SAYS NOTHING ABOUT WHICH ONE; A WORD IN ONE " +
+        "PANEL SAYS EVERYTHING. *** " + rawPick.n + " raw hits outscore the discriminating ones and the wrong panel wins. " +
         "This survived the entity fix because \"physics\" is a REAL subject word -- just not a discriminating " +
         "one, which a raw count cannot tell apart.");
     const bl = prof.get("blobs").bag;
-    ok("!! a panel-unique token outweighs a spread one by more than an order of magnitude",
+    ok("!! a panel-unique token that RECURS in its panel outweighs a spread one by more than an order of magnitude",
         panelsHolding("blob") === 1 && bl.get("blob") > 10 * bl.get("physics") && bl.get("physics") > 0,
         "measured in the Blobs panel: blob " + (bl.get("blob") || 0).toFixed(2) + " (in " + panelsHolding("blob") +
         " panel) against physics " + (bl.get("physics") || 0).toFixed(3) + " (in " + panelsHolding("physics") +

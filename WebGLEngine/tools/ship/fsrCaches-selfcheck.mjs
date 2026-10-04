@@ -64,6 +64,20 @@
 //   P   install-fsr-caches.html: POST sent as PUT             -> 1 red "reads GET and POSTs the same route"
 //   Q   server.html: the anchor's title attribute renamed     -> 1 red "server.html carries an anchor ... title"
 //   R   pageSections.mjs: install-fsr-caches.html unclaimed   -> 1 red "pageSections claims it in a drawer"
+// ---- v4778 review: the redirect and error-text rows, added by the review, each run the same way ----------------
+//   T1  curlTo(): "--max-redirs", "0" removed                  -> 1 red "a redirect ... is NOT followed" (auto:
+//                                                                elsewhere asked 1)
+//   T2  fetchTo(): fetch(url) without redirect: "error"        -> 1 red "a redirect ... is NOT followed" (fetch:
+//                                                                elsewhere asked 1)
+//   T3  curlTo(): why back to err.message's first line          -> 1 red "a missing source file reports the HTTP
+//                                                                status" (it read "Command failed: curl -fsSL ...")
+//   U1  sourceBase(): "/WebGLEngine" dropped from the URL      -> 1 red "the default source is raw.githubusercontent
+//                                                                .com/HowdyKeith/SweK_Engine/<ENGINE_VERSION>/..."
+//   U2  buildManifest(): the writer field dropped from a row   -> 1 red "buildManifest() ... reproduces every row"
+//   E, D and C above re-run by the review against the reviewed tree: 3, 1 and 1 red by the names logged.
+//   Section 7 and the sha256File/job row exist because definitionGates-selfcheck went red on this feature:
+//   engineTag, sourceBase, job, sha256File, buildManifest, DIR and REPO were exported and named by no gate
+//   (tree-wide 358 -> 363, all shapes 698 -> 705, both over their frozen 362 / 703); now 358 / 698 again.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -224,12 +238,24 @@ const fixtureManifest = { files: [
 ] };
 fs.writeFileSync(path.join(dir, FC.MANIFEST_NAME), JSON.stringify(fixtureManifest));
 const asked = [];
+const askedElsewhere = [];
+const elsewhere = http.createServer((req, res) => {
+    const n = decodeURIComponent(req.url.split("?")[0]).split("/").pop();
+    askedElsewhere.push(n);
+    if (served[n]) { res.writeHead(200, { "Content-Type": "application/octet-stream" }); res.end(served[n]); }
+    else { res.writeHead(404); res.end(); }
+});
+await new Promise((r) => elsewhere.listen(0, "127.0.0.1", r));
 const fixture = http.createServer((req, res) => {
     // Keyed by the BASENAME of the decoded request, so a hostile "../escape.json" entry is SERVED its bytes. The first
     // draft keyed by the raw last segment, 404'd it, and a sabotage that removed both escape guards stayed green --
     // nothing escaped only because nothing arrived. A refusal is only proven against a source that would deliver.
     const n = decodeURIComponent(req.url.split("?")[0]).split("/").pop();
     asked.push(n);
+    // v4778 review -- /redir/<name> answers 302 to ANOTHER server that serves the right bytes, so only the transport's
+    // refusal to follow can keep the file out (the sha256 would match).
+    if (req.url.startsWith("/redir/") && elsewhere.listening) {
+        res.writeHead(302, { Location: `http://127.0.0.1:${elsewhere.address().port}/WebGLEngine/fsr-caches/${n}` }); res.end(); return; }
     if (served[n]) { res.writeHead(200, { "Content-Type": "application/octet-stream" }); res.end(served[n]); }
     else { res.writeHead(404); res.end(); }
 });
@@ -293,6 +319,29 @@ try {
        p4.ok === true && p4.present === 3 && p4.missing === 0, `present ${p4.present}, missing ${p4.missing}`);
     transport = "auto";
 
+    // v4778 review -- a redirect to another server, which WOULD serve the right bytes, so the sha256 cannot be what
+    // stops it: only the transport refusing to follow can. Driven through install() on its own scratch folder, once
+    // per transport ("auto" is curl where curl exists, fetch where it does not).
+    {
+        const rdir = path.join(root, "fsr-caches-redirect");
+        const rman = { files: [fixtureManifest.files[0]] };
+        const rbase = `http://127.0.0.1:${fixture.address().port}/redir/`;
+        const seen = [];
+        for (const tr of ["auto", "fetch"]) {
+            askedElsewhere.length = 0;
+            const r = await FC.install({ dir: rdir, manifest: rman, baseUrl: rbase, transport: tr });
+            const x = (r.results || [])[0] || {};
+            seen.push({ tr, ok: x.ok, kept: fs.existsSync(path.join(rdir, x.name || "?")), elsewhere: askedElsewhere.length, why: String(x.why || "").slice(0, 90) });
+        }
+        ok("!! *** a redirect to another server is NOT followed, by either transport -- even to the right bytes ***",
+           seen.length === 2 && seen.every((s) => s.ok === false && !s.kept && s.elsewhere === 0) &&
+           !fs.readdirSync(rdir).some((n) => /\.part-/.test(n)), seen.map((s) => `${s.tr}: elsewhere asked ${s.elsewhere}, ${s.why}`).join("; "));
+        // A 404 (an unpublished tag) must say 404, not echo the command line back.
+        const r404 = await FC.install({ dir: rdir, manifest: { files: [{ name: "frameVertical-cache.json.gz", bytes: 10, sha256: sha(Buffer.from("0123456789")), what: "fixture", readers: [] }] }, baseUrl: base });
+        const w404 = String((((r404.results || [])[0]) || {}).why || "");
+        ok("!! a missing source file reports the HTTP status, not the command it ran", /404/.test(w404) && !/Command failed/.test(w404), w404.slice(0, 120));
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     console.log("\n5. *** STATUS: PRESENT, MISSING, BAD -- AND BAD MEANS THE HASH ***");
     const flip = Buffer.from(holes); flip[10] ^= 1;
@@ -310,8 +359,15 @@ try {
     const p5 = await post({});
     ok("!! and a POST repairs the bad one and fetches the missing one", p5.ok && p5.present === 3 &&
        sha(fs.readFileSync(path.join(dir, "frameHoles-cache.json.gz"))) === sha(holes));
+    // v4778 review -- the two helpers status() and the page lean on, asserted rather than merely exported:
+    // sha256File is the streamed hash every keep/refuse decision rests on, and job() is what the page polls.
+    const jb = FC.job();
+    ok("!! sha256File() streams the same digest a one-shot hash gives, and job() reports the finished run",
+       FC.sha256File(path.join(dir, "frameHoles-cache.json.gz")) === sha(holes) &&
+       !!jb && jb.running === false && jb.results.length === p5.results.length && jb.finishedAt >= jb.startedAt,
+       `job: running ${jb && jb.running}, ${jb && jb.results.length} results`);
 } finally {
-    bridge.close(); fixture.close();
+    bridge.close(); fixture.close(); elsewhere.close();
     fs.rmSync(root, { recursive: true, force: true });
 }
 
@@ -331,6 +387,31 @@ console.log("\n6. *** THE BRIDGE ROUTE, THE PAGE, AND WHERE IT IS LINKED ***");
     const claim = PS.SECTIONS.filter((x) => x.pages.includes(FC.INSTALL_PAGE));
     ok("!! pageSections claims it in a drawer inside MAX_PER_PANEL", claim.length >= 1 && claim.every((x) => x.pages.length <= PS.MAX_PER_PANEL),
        claim.map((x) => `${x.id} (${x.pages.length}/${PS.MAX_PER_PANEL})`).join(", "));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// v4778 review -- the source URL and the folder, asserted. The fixture rows above inject baseUrl, so nothing there
+// says the REAL default is right; a wrong repo or tag would only show on a user's machine as a 404.
+console.log("\n7. *** THE REAL SOURCE: THIS REPO, THIS ENGINE_VERSION'S TAG, THIS FOLDER ***");
+{
+    const ver = PB.engineVersion();
+    const want = "https://raw.githubusercontent.com/HowdyKeith/SweK_Engine/" + ver + "/WebGLEngine/fsr-caches/";
+    ok("!! *** the default source is raw.githubusercontent.com/HowdyKeith/SweK_Engine/<ENGINE_VERSION>/WebGLEngine/fsr-caches/ ***",
+       !!ver && FC.REPO === "HowdyKeith/SweK_Engine" && FC.engineTag() === ver && FC.sourceBase(FC.engineTag()) === want &&
+       FC.SOURCE_TEMPLATE.replace("<tag>", ver).replace("<file>", "") === want,
+       `${FC.sourceBase(FC.engineTag())} -- the tag is read by versionMarker, checked against packagerBridge's own reader`);
+    ok("!! fsrCaches.DIR is WebGLEngine/fsr-caches unless SWEK_FSR_CACHES_DIR moves it (only this gate's absent-cache run does)",
+       FC.DIR === (process.env.SWEK_FSR_CACHES_DIR ? path.resolve(process.env.SWEK_FSR_CACHES_DIR) : path.join(ENG, "fsr-caches")), posix(path.relative(ENG, FC.DIR)));
+    // buildManifest() is what --write-manifest writes; with every cache here it must reproduce the committed file's
+    // rows exactly (the hashes are memoised from section 1, so this re-reads nothing).
+    if (onDisk.length !== names.length) skip("buildManifest() reproduces manifest.json", `${names.length - onDisk.length} cache(s) not installed`);
+    else {
+        const built = FC.buildManifest(realDir, ENG);
+        const row = (f) => J([f.name, f.bytes, f.sha256, f.hyp, f.what, f.writer, f.readers]);
+        ok("!! buildManifest() -- what --write-manifest writes -- reproduces every row of the committed manifest.json",
+           J(built.files.map(row)) === J(man.files.map(row)) && built.totalBytes === man.totalBytes && built.source === man.source,
+           `${built.files.length} rows, ${built.totalBytes} bytes`);
+    }
 }
 
 console.log(`\nfsrCaches-selfcheck: ${fails ? fails + " FAILED" : "ALL PASS"}`);

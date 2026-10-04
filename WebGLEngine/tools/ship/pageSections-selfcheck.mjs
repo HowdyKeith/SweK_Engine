@@ -35,7 +35,9 @@
 // SABOTAGES, MEASURED (each on a scratch copy of the tree -- the broken file copied, everything else linked, this
 // gate copied beside it so ROOT is the copy -- so the tree file itself was never edited and needs no restore):
 //   S1 server.html's clone branch made to reuse the node (`const c = first;`, so a later claim MOVES it again)
-//      -> exit=1, 1 red here, "...and a page a later drawer shares is CLONED ..." by name.
+//      -> exit=1, 1 red here, "...and a page a later drawer shares is CLONED ..." by name. (v4778 review, re-run
+//      2026-10-04 after the id row below was added: exit=1, 2 red -- that row too, "...and the clone carries no
+//      id ...", since with no cloneNode(true) left it finds no clone branch to read and says so.)
 //   S2 rtx-viewer.html listed twice in the rtx section -> exit=1, 1 red, "no drawer names the same page twice",
 //      naming "rtx-viewer.html (twice in rtx)".
 import fs from "node:fs";
@@ -156,6 +158,22 @@ const ui = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
         /firstHome\.get\(page\)/.test(moverSrc) && /\.cloneNode\(true\)/.test(moverSrc) && /firstHome\.set\(page,\s*a\)/.test(moverSrc),
         multi.length + " shared page(s) today. A second appendChild of the SAME node would take it out of the first " +
         "drawer -- Keith would see the page in Fruit Fly Brain and lose it from RTX");
+
+    // v4778 review -- THE CLONE DROPS EVERY id IT CARRIES, AND NOTHING ELSE PINNED THAT. No shared anchor carries an
+    // id today, so the runtime half cannot see this either way; the day one does (an anchor a script finds by id),
+    // a clone that kept it would put a duplicate id in the document and getElementById would answer with whichever
+    // copy comes first. Pinned on the shape, in the clone branch: the copy and its descendants lose `id`.
+    // SABOTAGE, MEASURED 2026-10-04 on a scratch copy (server.html and this gate copied, everything else linked):
+    // the removeAttribute("id") line deleted from the clone branch -> exit=1, 1 red, this row, by name.
+    const cloneBranch = (() => {
+        const i = moverSrc.indexOf(".cloneNode(true)");
+        const j = moverSrc.indexOf("appendChild(c)", i);
+        return i >= 0 && j > i ? moverSrc.slice(i, j) : "";
+    })();
+    ok("!! ...and the clone carries no id, so a shared page never puts a duplicate id in the document",
+        /querySelectorAll\(\s*"\[id\]"\s*\)/.test(cloneBranch) && /removeAttribute\(\s*"id"\s*\)/.test(cloneBranch),
+        "the original keeps its ids; every copy and its descendants drop theirs before appendChild" +
+        (cloneBranch ? "" : ". CLONE BRANCH NOT FOUND (no cloneNode(true) ... appendChild(c) in the mover)"));
 }
 
 // ---- 3. THE PAGES LEFT BEHIND ARE A DECISION, NOT A REMAINDER --------------------------------------------------------

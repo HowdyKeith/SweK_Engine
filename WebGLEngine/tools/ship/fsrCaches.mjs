@@ -242,21 +242,32 @@ export const sourceBase = (tag) => "https://raw.githubusercontent.com/" + REPO +
  * network; curl.exe ships with Windows 10+. fetch is the fallback for a box with no curl at all. Either way the
  * download lands in a temp name and is HASHED before it is kept -- the transport's own success is not evidence.
  * --max-filesize caps the write at the manifest's size, so a hostile or wrong URL cannot fill the disk.
+ *
+ * v4778 review -- *** NO REDIRECT IS FOLLOWED, BY EITHER TRANSPORT. *** The first draft passed -L with no limit and
+ * called fetch() with its default redirect: "follow", so a 3xx from the source went to any host it named; only
+ * the sha256 stood between that host and the folder. raw.githubusercontent.com serves a tagged file with a plain
+ * 200 (measured: HowdyKeith/SweK_Engine v4777, genGate-folds7.json.gz, 200, 14,465,294 bytes, no Location), so a
+ * redirect is not the source answering -- --max-redirs 0 turns one into curl exit 47 and redirect: "error" into
+ * a fetch rejection, and the file is not kept. fsrCaches-selfcheck drives both against a 302 to a second server
+ * that WOULD serve the right bytes. The why also carries curl's own stderr now: the first draft kept only the
+ * first line of err.message, which is the command line, so a 404 on an unpublished tag read as "Command failed".
  */
 function curlTo(url, tmp, maxBytes) {
     return new Promise((resolve) => {
         // --noproxy for loopback only: a proxy in the environment still carries the GitHub fetch, but a mirror or a
         // gate's fixture on 127.0.0.1 must not be sent to it.
-        execFile("curl", ["-fsSL", "--noproxy", "127.0.0.1,localhost", "--connect-timeout", "20", "-Y", "1024", "-y", "60", "--max-filesize", String(maxBytes + 1),
-                          "-o", tmp, url], { windowsHide: true, timeout: 3600000 }, (err) => {
+        execFile("curl", ["-fsSL", "--max-redirs", "0", "--noproxy", "127.0.0.1,localhost", "--connect-timeout", "20", "-Y", "1024", "-y", "60", "--max-filesize", String(maxBytes + 1),
+                          "-o", tmp, url], { windowsHide: true, timeout: 3600000 }, (err, _stdout, stderr) => {
             if (err && err.code === "ENOENT") return resolve({ ok: false, noCurl: true });
-            resolve(err ? { ok: false, why: "curl: " + String((err && err.message) || err).split("\n")[0].slice(0, 200) } : { ok: true });
+            const said = String(stderr || "").trim().split(/\r?\n/).filter(Boolean).pop() || String((err && err.message) || err).split("\n")[0];
+            resolve(err ? { ok: false, why: "curl exit " + (err.code == null ? "?" : err.code) + ": " + said.slice(0, 200) } : { ok: true });
         });
     });
 }
 async function fetchTo(url, tmp, maxBytes) {
     let r;
-    try { r = await fetch(url); } catch (e) { return { ok: false, why: "fetch: " + String((e && e.message) || e).slice(0, 200) }; }
+    try { r = await fetch(url, { redirect: "error" }); }
+    catch (e) { return { ok: false, why: "fetch: " + (String((e && e.message) || e) + (e && e.cause && e.cause.message ? " (" + e.cause.message + ")" : "")).slice(0, 200) }; }
     if (!r.ok || !r.body) return { ok: false, why: "HTTP " + r.status };
     const fd = fs.openSync(tmp, "w");
     let n = 0;
@@ -314,8 +325,11 @@ export async function install({ dir = DIR, manifest = null, baseUrl = "", tag = 
                 let size = -1, h = "";
                 try { size = fs.statSync(tmp).size; h = sha256File(tmp); } catch {}
                 if (size === f.bytes && h === f.sha256) {
-                    fs.renameSync(tmp, final);
-                    r = { name, ok: true, kept: true, bytes: size, ms: Date.now() - t0, url };
+                    // v4778 review -- a rename that throws (on Windows a scanner holding the fresh temp file gives
+                    // EPERM) used to escape the loop past the rmSync below, leaving the .part file and failing
+                    // every later file; now it is that one file's result and the temp is still removed.
+                    try { fs.renameSync(tmp, final); r = { name, ok: true, kept: true, bytes: size, ms: Date.now() - t0, url }; }
+                    catch (e) { r = { name, ok: false, kept: false, url, why: "verified, but could not be moved into place: " + String((e && e.message) || e).slice(0, 160) }; }
                 } else r = { name, ok: false, kept: false, url,
                     why: size !== f.bytes ? `got ${size} bytes, manifest says ${f.bytes} -- not kept` : `sha256 ${h.slice(0, 12)} does not match the manifest's ${f.sha256.slice(0, 12)} -- not kept` };
             }

@@ -672,15 +672,20 @@ export const SECTIONS = [
     // three pages below keep their homes in rtx, racing and endlesssky and show here as well.
     //
     // FILED BY WHAT THEY IMPORT, NOT BY THEIR NAMES -- the keyword probe has misled this file three times:
-    //   fly-connectome.html  render/maleCnsLoader.mjs, which fetches vendor/male-cns/ (the connectome itself), and
-    //                        fetches brain/gunnerTraceDemo.json to replay gunnerPolicy's hidden layer on those neurons
+    //   fly-connectome.html  fetches vendor/male-cns/giant-fiber-circuit.json (the connectome itself) and builds its
+    //                        meshes with render/maleCnsLoader.mjs, and fetches brain/gunnerTraceDemo.json to replay
+    //                        gunnerPolicy's hidden layer on those neurons (v4778 review: the PAGE does the fetch, the
+    //                        loader only shapes what it is given -- checked by reading both)
     //   race-brain.html      brain/drivePolicy.mjs (E-PG-masked core, epgTopology.mjs) and brain/gunnerPolicy.mjs
     //                        (Giant Fiber core, gfcTopology.mjs), and it TRAINS both recurrent cores
     //   es-box3d-fly3d.html  brain/pilotPolicy.mjs (Giant Fiber core, gfcTopology.mjs) flies team A, by default the
     //                        shipped pre-trained brain/pilotWeightsDefault.json rather than the identity-core handWeights()
     // AND THE FOUR THAT REACH IT AND ARE NOT HERE, each for a measured reason rather than a hunch:
     //   race-replay.html, physics-lab.html  import drivePolicy but drive only handWeights(), whose recurrent core is
-    //                        left at zero -- a provable identity, so the connectome contributes nothing they run
+    //                        left at zero -- a provable identity, so the connectome contributes nothing they run.
+    //                        race-replay with the bridge up plays the lab's recorded log instead, through
+    //                        drivePolicy's replay() (zero weights on the log), and that log was driven by
+    //                        physics/raceKnob.mjs's driverOf() -- handWeights() again -- so the reason holds there too
     //   race-crash.html, race-terrain.html  reach drivePolicy only through raceReplayBake.mjs for carMesh and
     //                        CAR_COLOURS (its replay() runs zero weights on a recorded input log); no policy runs
     // A text match followed through imports also finds index, orrery, orrery-gpu, instruments, lab-home, method-lab,
