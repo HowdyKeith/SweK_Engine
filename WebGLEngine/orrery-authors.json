@@ -277,7 +277,7 @@
     "owner": "mrdoob",
     "repo": "three.js"
    },
-   "bytes": 3786213
+   "bytes": 3786262
   },
   {
    "name": "three-webgpu-r185",
@@ -349,7 +349,7 @@
     "three-webgpu",
     "three-webgpu-r185"
    ],
-   "bytes": 10818841
+   "bytes": 10818890
   },
   {
    "author": "Dunfan Lu",
