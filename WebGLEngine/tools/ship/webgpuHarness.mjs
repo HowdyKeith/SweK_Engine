@@ -726,7 +726,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
  */
 export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 64, format = "rgba16float",
                                                 uniforms = null, workgroups = 1, timeoutMs = 60000,
-                                                inputTexel = null }) {
+                                                inputTexel = null, launchArgs = null }) {
     // `inputTexel(x,y,n) -> [r,g,b,a]` uploads an rgba16float SAMPLED texture at binding 2. Half-float
     // because a bloom input carries values above 1, and an 8-bit input would clip the scene before the
     // shader ever saw it -- the same trap the output format has, one stage earlier.
@@ -763,7 +763,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 13: crossBackend's, PARITY_ARGS */, env: LAUNCH_ENV });
         const page = await browser.newPage();
         page.setDefaultTimeout(timeoutMs);
         await page.goto(url);

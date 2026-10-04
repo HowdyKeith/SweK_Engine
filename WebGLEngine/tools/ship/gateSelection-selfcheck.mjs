@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/gateSelection-selfcheck.mjs — v3285
 //
-// Run: node tools/ship/gateSelection-selfcheck.mjs   (~70.5s — MEASURED v3941, was ~41s; builds the real import graph)
+// Run: node tools/ship/gateSelection-selfcheck.mjs   (~14s here at v4778 rig run 13, 93s before affected.mjs read each
+//   module once per build; ~70.5s MEASURED v3941, was ~41s; builds the real import graph, about twenty times)
 //
 // v3941 -- the header said ~7s. It builds the import graph over the whole tree, and the tree went from ~600
 // gates to 1111, so the number aged out with the corpus rather than with anything in this file. Re-measured

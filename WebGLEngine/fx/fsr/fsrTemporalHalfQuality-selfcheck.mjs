@@ -110,9 +110,24 @@ else {
             const pF = psnr(c.float.out), pH = psnr(c.half.out);
             const hh = c.half.hist.map(fromHalf), hf = c.float.hist, a = c.half.alpha;
             const stall = hr.rule === "rtz" ? 1 / a + 1 : 1 / (2 * a) + 1, rule = hr.rule === "rtz" ? "ulp / alpha + 1" : "ulp / (2 alpha) + 1";
-            let inside = 0, n = 0, worstU = 0, over = 0; const outsidePx = [];
+            let inside = 0, n = 0, worstU = 0, over = 0; const outsidePx = [], outsideAt = [];
             for (let i = 0; i < D * D; i++) for (let k = 0; k < 3; k++) { const x = hh[i * 4 + k], y = hf[i * 4 + k], u = ulp(Math.max(Math.abs(x), Math.abs(y)));
-                const e = Math.abs(x - y) / u; n++; worstU = Math.max(worstU, e); if (e <= stall) inside++; else { over++; outsidePx.push(i); } }
+                const e = Math.abs(x - y) / u; n++; worstU = Math.max(worstU, e); if (e <= stall) inside++; else { over++; outsidePx.push(i); outsideAt.push([i, k, e]); } }
+            // *** RIG RUN 13 -- WHAT THE ONES OUTSIDE ARE, MEASURED, NOT ASSERTED. *** Rig run 12 put them on no mask flip (the factor
+            // line below) and the CPU mirror predicts 0.003% outside eleven ulps for a truncating device, against 0.23% on the rig.
+            // The five worst, each with what could explain it: the values (a half subnormal, below 2^-14, is the first suspect --
+            // a device that flushes them reads hundreds of ulps on nothing), how far the half sits and on which side of float
+            // (truncation stalls BELOW a rising value only), and the local contrast (an edge, where a sub-texel reprojection
+            // filters at the texture unit's precision, not the shader's).
+            if (outsideAt.length) {
+                const contrast = (i, k) => { const x0 = i % D, y0 = (i / D) | 0; let m = 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x0 + dx, Y = y0 + dy; if (X >= 0 && Y >= 0 && X < D && Y < D) m = Math.max(m, Math.abs(hf[(Y * D + X) * 4 + k] - hf[i * 4 + k])); } return m; };
+                const sub = outsideAt.filter(([i, k]) => Math.min(Math.abs(hh[i * 4 + k]), Math.abs(hf[i * 4 + k])) < 2 ** -14).length;
+                const above = outsideAt.filter(([i, k]) => hh[i * 4 + k] > hf[i * 4 + k]).length;
+                const worst5 = [...outsideAt].sort((p, q) => q[2] - p[2]).slice(0, 5).map(([i, k, e]) =>
+                    `(${i % D},${(i / D) | 0}).${"rgb"[k]} float ${hf[i * 4 + k].toPrecision(6)} half ${hh[i * 4 + k].toPrecision(6)} = ${e.toFixed(1)} ulp ${hh[i * 4 + k] > hf[i * 4 + k] ? "above" : "below"}, contrast ${contrast(i, k).toFixed(3)}${c.facDiff ? ", factor diff " + c.facDiff[i].toExponential(2) : ""}`);
+                console.log(`  ----  [${mode}] ${cn}: of the ${outsideAt.length} outside, ${sub} touch a half subnormal and ${above} sit ABOVE float${hr.rule === "rtz" ? " (a truncating write cannot put them there by itself)" : ""}; worst: ${worst5.join(" | ")}`);
+            }
             // *** RIG RUN 6 -- ARE THE ONES OUTSIDE THE BOUND WHERE THE MASKS DISAGREED? *** The row's own account of them is "a
             // lock or a mask that went one way at half and the other at float". This chain runs without locks, so the mask is
             // the history factor. Measured, not asserted, until the rig has said: how many of the values outside sit on a

@@ -36,7 +36,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 13: launched with PARITY_ARGS, so the device's WebGPU and node-webgpu are one adapter (see crossBackend-selfcheck)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { runWgslComputeNative, headlessGpuSkipReason, storageWords } from "./headlessGpu.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { corpus } from "./wgslCorpus.mjs";
@@ -88,7 +89,7 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
             // adding the thirteen to the corpus turned this into twelve reds until BOTH this line and the
             // reconstruction inside the page carried them. A field that exists is not a field that travels.
             outBinding: e.opts.outBinding ?? 0, uniformBinding: e.opts.uniformBinding ?? 1 });
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { entries: entries.map(pack) }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { entries: entries.map(pack) }, script: `async (a) => {
             const C = await import("/render/computeRun.mjs"); const { requestDevice } = await import("/gfx/device.js");
             const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
             const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
@@ -105,6 +106,10 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
         }`, timeoutMs: 180000 });
         ok("*** the corpus ran through the device on the browser's WebGPU ***", r.ok && r.result && !r.result.noWebgpu, r.ok ? (r.result && r.result.noWebgpu ? "no webgpu: " + r.result.noWebgpu : "") : r.reason);
         if (r.ok && r.result && !r.result.noWebgpu) {
+            const nat0 = await runWgslComputeNative(entries[0].opts), name = (a) => a ? `${a.vendor}/${a.architecture}` : "unread";
+            ok("*** the device's WebGPU and node-webgpu report the SAME ADAPTER -- the rows below compare one rasteriser reached two ways ***",
+               !!(r.adapter && nat0.ok && nat0.adapter && r.adapter.vendor === nat0.adapter.vendor && r.adapter.architecture === nat0.adapter.architecture),
+               `device ${name(r.adapter)}, native ${nat0.ok ? name(nat0.adapter) : nat0.reason}`);
             let allIdentical = true, floats = 0, msTotal = 0;
             for (const e of entries) {
                 const d = r.result[e.id];

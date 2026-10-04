@@ -18,6 +18,9 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+// rig run 13: section 3 draws through BOTH routes and diffs them, so it launches with PARITY_ARGS -- on Keith's rig ANGLE on
+// SwiftShader leaves WebGPU with no adapter at all (realGpuRun's GL table), and the page fell to its WebGL2 route
+import { PARITY_ARGS } from "./webgpuHarness.mjs";
 import { EFFECTS, TEXTURE_CAPABLE_BACKENDS, postSkipReason } from "../../ui/orreryPost.mjs";
 import { UV_CONVENTION } from "../../render/badTvDevicePass.mjs";
 
@@ -98,8 +101,7 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
             s.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL,
-            args: [...webglLaunchArgs().args, "--enable-unsafe-webgpu"] });
+        const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...PARITY_ARGS] });
         const page = await browser.newPage();
         const errs = [];
         page.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));

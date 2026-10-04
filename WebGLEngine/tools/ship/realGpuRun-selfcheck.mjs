@@ -111,7 +111,9 @@ console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER Web
        parityArgsFor("linux").join(" ") === lin.join(" ") && parityArgsFor("darwin").join(" ") === launchArgsFor("darwin").join(" "));
     {   // and the fourteen launch with them: every runInEngineOrigin / runWgslCompute call in each passes PARITY_ARGS
         const PARITY_GATES = ["tslWide", "deviceTexture", "slugFill", "slugMelt", "litSphere", "stereographic", "slugMorph", "hiZ",
-                              "deviceUniformsPerDraw", "gpuDriven", "gpuTerrain", "slugTicker", "slugProjective", "headlessGpu"];
+                              "deviceUniformsPerDraw", "gpuDriven", "gpuTerrain", "slugTicker", "slugProjective", "headlessGpu",
+                              // rig run 13: the two that hold the browser's WebGPU to node-webgpu's, which on win32 is the GPU
+                              "deviceCompute", "crossBackend"];
         const bare = [];
         for (const g of PARITY_GATES) {
             const src = fs.readFileSync(path.join(ENG, "tools/ship", g + "-selfcheck.mjs"), "utf8");
@@ -122,7 +124,13 @@ console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER Web
             for (const c of calls) if (!/^\w+\(\{ launchArgs: PARITY_ARGS,/.test(c)) bare.push(g + ": " + c.slice(0, 60));
         }
         ok(`  ...and the ${PARITY_GATES.length} gates that hold the two backends to one picture launch every call with PARITY_ARGS`,
-           bare.length === 0, bare.length ? bare.slice(0, 4).join("; ") : "the 14 that went newly red when an ordinary win32 run put WebGPU on SwiftShader alone");
+           bare.length === 0, bare.length ? bare.slice(0, 4).join("; ") : "the 14 that went newly red when an ordinary win32 run put WebGPU on SwiftShader alone, and the 2 that hold it to node-webgpu");
+    }
+    {   // rig run 13: a gate that launches its own browser and draws through both routes -- no harness call for the scan above to read
+        const DIRECT = ["orreryPost"], bare = DIRECT.filter((g) =>
+            !/chromium\.launch\(\{ executablePath: HEADLESS_SHELL, args: \[\.\.\.PARITY_ARGS\] \}\)/.test(fs.readFileSync(path.join(ENG, "tools/ship", g + "-selfcheck.mjs"), "utf8")));
+        ok(`  ...and the ${DIRECT.length} that launch their own browser for both routes launch it with PARITY_ARGS`, bare.length === 0,
+           bare.length ? "not: " + bare.join(", ") : DIRECT.join(", ") + " -- on the rig its WebGL launch left WebGPU no adapter, and the preferred route fell to WebGL2");
     }
     {   // rig run 12, Keith's option (a): seven WebGL2 gates whose rows hold a backend to a model of SwiftShader's rasterisation.
         // Their two-backend launch takes PARITY_ARGS too (on the GTX 1080 both backends then run on the GPU), and those rows go
@@ -212,6 +220,9 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // RIG RUN 10, against tools/ship/webgpuHarness.mjs and tools/ship/hiZ-selfcheck.mjs: P1 parityArgsFor("win32") falling back to an
 // ordinary run's -> 1 red, the win32 parity row ("... --use-webgpu-adapter=swiftshader"); P2 one hiZ call launched without
 // PARITY_ARGS -> 1 red, the scan row, naming it. Both restored, md5 verified.
+// RIG RUN 13: U4 orreryPost launched with an ordinary run's LAUNCH_ARGS -> 1 red, the direct-launch row naming it. U1 crossBackend's browser wrapper without PARITY_ARGS -> 1 red, the scan row ("crossBackend: runWgslCompute({
+// ...o });"). U2/U3, each gate's SAME ADAPTER row with one side's name altered -> 1 red in deviceCompute and 1 in crossBackend
+// (on Linux both sides are SwiftShader, so only an altered reading can part them here). All restored, md5 verified.
 // RIG RUN 12 (option a). Against tools/ship/webgpuHarness.mjs: S1 softwareClaims reporting on a software adapter too -> 2 red
 // here (both scope rows) and 1 in slugCurve-selfcheck (its held row, "0 asserted, 4 reported"); S4 the held row checking only
 // that the count adds up -> 1 red, the wrong-side row -- which this file did NOT have when S4 first ran: it read green, and the

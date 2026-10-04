@@ -58,6 +58,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { setImmediate as yieldTurn } from "node:timers/promises";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { EULER_WGSL } from "../../simulation/euler/eulerShader.js";
 import { makeEuler } from "../../simulation/euler/euler2d.js";
@@ -71,8 +72,13 @@ const report = (s) => console.log(`  ----  ${s}`);
 const G = 1.4, EXACT = (G + 1) / (G - 1);          // 6.000, Rankine-Hugoniot -- not a number the kernel knows
 const sod = (nx) => (i) => (i < nx / 2 ? { rho: 1, u: 0, p: 1000 } : { rho: 1, u: 0, p: 0.01 });
 const dtFor = (nx, ny) => makeEuler({ nx, ny, gamma: G, bc: "outflow", order: 1, init: sod(nx) }).cflDt(0.4) * 0.5;
-const cpuRun = (nx, ny, dt, steps) => { const c = makeEuler({ nx, ny, gamma: G, bc: "outflow", order: 1, init: sod(nx) });
-    for (let s = 0; s < steps; s++) c.step(dt); return c; };
+// *** v4778 RIG RUN 13 -- THE CPU TWINS STEP WHILE THE BROWSER RUNS. *** Keith's rig printed KEY 1 and was killed at its 47 s
+// budget: the two f64 twins ran AFTER the browser, one after the other, and KEY 2's (800 cells, 1,124 steps) is about 7 s
+// here. They read nothing the device returns, so they now step in slices from the moment the jobs are known, yielding a
+// turn every eight steps so Playwright's messages are still answered, and the browser's work overlaps theirs. The same
+// solver, the same steps, the same numbers: KEY 1 still reads its 3.217e-7.
+const cpuRun = async (nx, ny, dt, steps) => { const c = makeEuler({ nx, ny, gamma: G, bc: "outflow", order: 1, init: sod(nx) });
+    for (let s = 0; s < steps; s++) { c.step(dt); if (s % 8 === 7) await yieldTurn(); } return c; };
 const SABOTAGED = EULER_WGSL.replace("(P.scal.y - 1.0) * (uSrc[k + 3u]", "(P.scal.y - 1.02) * (uSrc[k + 3u]");
 
 console.log("\n1. THE TRIAGE ENTRY THIS ROUND RETIRES (no device needed)");
@@ -100,6 +106,8 @@ else {
         { name: "shock-ratio", nx: 800, ny: 8, tEnd: 12, wgsl: EULER_WGSL },
         { name: "sabotaged", nx: 800, ny: 8, tEnd: 12, wgsl: SABOTAGED },
     ].map((j) => { const dt = dtFor(j.nx, j.ny); return { ...j, dt, steps: Math.ceil(j.tEnd / dt) }; });
+    const tw0 = Date.now(), twin = (name) => { const j = JOBS.find((x) => x.name === name); return cpuRun(j.nx, j.ny, j.dt, j.steps); };
+    const twins = (async () => { const c1 = await twin("same-solver"), c2 = await twin("shock-ratio"); return { c1, c2, ms: Date.now() - tw0 }; })();
     const r = await runInEngineOrigin({ engineRoot: ENG, args: { G, jobs: JOBS }, script: `async (a) => {
         const { requestDevice } = await import("/gfx/device.js");
         const out = { runs: {} };
@@ -140,6 +148,8 @@ else {
         } catch (e) { out.error = String(e && e.message || e).slice(0, 600); }
         return out;
     }` });
+    const browserMs = Date.now() - tw0, T = await twins;
+    report(`measured, not asserted: the browser's part took ${(browserMs / 1000).toFixed(1)} s on ${r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") : "an unread adapter"}, the two CPU twins ${(T.ms / 1000).toFixed(1)} s alongside it, and the gate had waited ${((Date.now() - tw0) / 1000).toFixed(1)} s for both`);
     ok("*** the kernel COMPILES AND RUNS HEADLESSLY, which its own header says had never happened ***",
         r.ok && r.result && !r.result.error && r.result.runs && r.result.runs["same-solver"],
         r.ok ? (r.result && r.result.error) : (r.reason || (r.pageErrors || []).join("; ")));
@@ -147,7 +157,7 @@ else {
         const F = r.result, J = Object.fromEntries(JOBS.map((j) => [j.name, j]));
         // KEY 1 -- the same solver
         const g1 = F.runs["same-solver"], j1 = J["same-solver"];
-        const c1 = cpuRun(j1.nx, j1.ny, j1.dt, j1.steps);
+        const c1 = T.c1;
         let worst = 0, ref = 0, differing = 0;
         for (let i = 0; i < j1.nx; i++) { const cr = c1.get(i, 4)[0];
             if (g1[i] !== cr) differing++;
@@ -158,7 +168,7 @@ else {
             `${differing} of ${j1.nx} cells differ at all, worst absolute ${worst.toExponential(4)} on a peak of ${ref.toFixed(4)}. euler2d.js is Float64Array throughout, so this is f32 epsilon accumulated -- the right order, and NOT zero, which would have meant the comparison was reading one solver twice`);
         // KEY 2 -- Rankine-Hugoniot
         const g2 = F.runs["shock-ratio"], j2 = J["shock-ratio"];
-        const c2 = cpuRun(j2.nx, j2.ny, j2.dt, j2.steps);
+        const c2 = T.c2;
         const dPeak = Math.max(...g2);
         let cPeak = 0; for (let i = 0; i < j2.nx; i++) cPeak = Math.max(cPeak, c2.get(i, 4)[0]);
         const dErr = Math.abs(dPeak - EXACT) / EXACT, cErr = Math.abs(cPeak - EXACT) / EXACT;
@@ -201,6 +211,8 @@ console.log("unchecked here: SPEED, for the reason above -- the kernel exists to
     "deliberately does not -- the module's header argues first order was the right thing to write blind, and now " +
     "that it can be run, whether second order is worth writing is a question this round opens and does not answer. " +
     "And simulation/lbm/lbmShader.js, which carries the SAME confession in the same words and still has no gate.");
+// RIG RUN 13 SABOTAGE: W1 the stepped twin skipping the step it yields on (one in eight) -> 2 red, KEY 1 (8.326e-1 relative)
+// and KEY 2 (the twin at 5.9468). Restored, md5 verified. Measured here: 12.8 s before the overlap, 9.4 s after.
 // v4663 -- process.exitCode, NOT process.exit: this gate compiles a wasm module, and exiting while V8's
 // background compiler still has work posts a task into a torn-down platform. tools/ship/wasmTeardown.mjs.
 process.exitCode = fails ? 1 : 0;
