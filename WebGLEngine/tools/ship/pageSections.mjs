@@ -641,6 +641,14 @@ export const SECTIONS = [
     // Three pages is the same founding size as Blobs and PetFBI, both real panels today.
     { id: "toroidal", tab: "toroidal", label: "Toroidal Buffers", note: "a wraparound buffer, what accumulates on it, and what it remembers",
       pages: ["toroidal-wave.html", "wear-field.html", "fog-of-war.html"] },
+    // v4778 -- RTX, KEITH'S CALL: "Rtx can have its own link bucket on server.html." The four pages the rtx line
+    // (claude/shader-porting-swek-ozgvb0) brought sat in UNPLACED from the merge, each with a plausible drawer by
+    // subject and none by decision -- rtx-viewer wanted WebGPU, which is at MAX_PER_PANEL; es-box3d-6dof and
+    // es-aircraft are a physics substrate wearing an es- prefix; fly-connectome had no neuron drawer at all. They
+    // are filed by the LINE that made them, which is the decision Keith made, and four is above the founding size
+    // of Blobs, PetFBI and Toroidal Buffers.
+    { id: "rtx", tab: "rtx", label: "RTX", note: "the rtx line: the path-traced viewer, 6DOF and aerodynamic flight, and the fly connectome",
+      pages: ["rtx-viewer.html", "es-box3d-6dof.html", "es-aircraft.html", "fly-connectome.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -656,22 +664,8 @@ export const MAX_PER_PANEL = 15;
  * look identical, and the second one gets placed by a guess.
  */
 export const UNPLACED = new Map([
-    // v4778-merge -- FOUR PAGES FROM THE rtx LINE, linked from server.html and in neither list. The rtx line
-    // branched long before this register asked for a decision per page, so none of the four arrived with one.
-    // Each has a plausible drawer by subject, and plausible is the word: that is the guess this map exists to
-    // stop, so they wait here for Keith rather than being placed by a merge.
-    ["es-box3d-6dof.html", "the Newtonian 6DOF substrate's first page (rigidBody6dof, autopilot6dof); by subject it " +
-                           "sits beside the es-box3d pages in Game: Endless Sky, but it is a physics-substrate " +
-                           "page rather than an Endless Sky one and which of those it is filed as is Keith's call"],
-    ["es-aircraft.html", "aerodynamic flight on the same 6DOF substrate (aeroSurface, aircraftAssembly, " +
-                         "autopilotAircraft); it has no Endless Sky content at all despite its es- prefix, and no " +
-                         "flight or vehicle drawer exists -- naming one is Keith's decision, not a merge's"],
-    ["fly-connectome.html", "a front door for Janelia's male-cns connectome (34 traced Giant Fiber neurons); server.html groups it " +
-                            "with the five physics front doors, but no drawer is about neurons or connectomes and " +
-                            "choosing one is a judgement about what the drawer is for"],
-    ["rtx-viewer.html", "the rtx line's present path (rtPipeline BVH trace, rtViewer accumulate, WebGPU only); by " +
-                        "machinery it wants the WebGPU drawer, which is at MAX_PER_PANEL -- the same drawer " +
-                        "decision fsr.html and fsr-three.html are waiting on below"],
+    // v4778-merge -- the four rtx-line pages that waited here (rtx-viewer, es-box3d-6dof, es-aircraft,
+    // fly-connectome) were filed by Keith into their own RTX drawer above -- see that section's note.
     // *** v4623-merge -- fsr.html, AND THE SENTENCE THIS FILE USED TO CARRY FOR IT IS NOW FALSE. ***
     //
     // It was placed in the techniques drawer with the reason "It is NOT in the WebGPU drawer beside anime4k
