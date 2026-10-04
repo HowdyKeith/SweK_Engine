@@ -34,6 +34,12 @@ console.log("\n1. THE VENDORED BUILD: the vendored WebGPU build and TSL, beside 
     // r160 module stays for main.js and every three.js page regardless of which WebGPU build sits beside it.
     // v4805 -- 0.185.1 -> 0.186.1; the README still tells 0.185.1's history, so it is its HEADING that must name the build
     ok(`the build is r186 (the README's heading names 0.186.1), and the classic module stays beside it for main.js and every three.js page`, rev === "186" && /^# three\.js 0\.186\.1 /.test(readme) && fs.existsSync(path.join(ENG, "vendor/three/three.module.js")), `revision ${rev}`);
+    // v4807 -- vendor/three, the classic build main.js and every page import, moved to 0.186.1 too: the two copies of THREE never meet in
+    // one page, but a round that moves one and not the other leaves the tree on two releases, which is how 0.178 sat beside r160 for months
+    const classicRev = (fs.readFileSync(path.join(ENG, "vendor/three/three.core.js"), "utf8").match(/REVISION = '(\d+)'/) || [])[1];
+    const classicProv = fs.readFileSync(path.join(ENG, "vendor/three/PROVENANCE.txt"), "utf8");
+    ok(`the classic build (vendor/three) is the same release, revision ${classicRev}, and its PROVENANCE's newest re-vendor names 0.${rev}`,
+        classicRev === rev && (/RE-VENDORED[^\n]*->\s*0\.(\d+)\.\d+/.exec(classicProv) || [])[1] === rev, `vendor/three ${classicRev}, vendor/three-webgpu ${rev}`);
     ok("*** the ONE edit: three.tsl.js imports './three.webgpu.js' instead of the bare 'three/webgpu', and the README says so ***", /from '\.\/three\.webgpu\.js'/.test(tsl) && !/from 'three\/webgpu'/.test(tsl) && /ONE EDIT/.test(readme));
     ok("  three.webgpu.js imports its core by relative path as shipped (no edit)", /from '\.\/three\.core\.js'/.test(webgpu));
     ok("  the licence is three.js's MIT", /MIT License/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")) && /three\.js authors/.test(fs.readFileSync(path.join(V, "LICENSE"), "utf8")));
@@ -219,6 +225,7 @@ else {
     }
 }
 
+// v4807 SABOTAGE: vendor/three/three.core.js's REVISION 185 -> 1 (the same-release row: vendor/three 185, vendor/three-webgpu 186).
 // v4805 SABOTAGE: vendor/three-webgpu/README.md's heading naming 0.185.1 again -> 1 (the build row: the README tells 0.185.1's
 // history, so only its heading may name the build).
 // SABOTAGE LOG -- applied, gate run, exit code read, restored. MEASURED at v4319.

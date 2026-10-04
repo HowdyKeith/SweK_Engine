@@ -2,8 +2,8 @@
 
 Vendored from the npm tarball `three@0.186.1` (https://registry.npmjs.org/three/-/three-0.186.1.tgz),
 `build/three.webgpu.js`, `build/three.core.js`, `build/three.tsl.js` and `LICENSE` (MIT, three.js authors).
-Beside, not instead of, `vendor/three/three.module.js` (r160 until 2026-09-14, 0.185.1 since, and still 0.185.1 after
-v4805), which main.js and every three.js page use: the two builds are separate copies of THREE and must not meet in one page (instanceof breaks).
+Beside, not instead of, `vendor/three/three.module.js` (r160 until 2026-09-14, 0.185.1 until v4807, 0.186.1
+since -- the same three.core.js as this directory, byte for byte), which main.js and every three.js page use: the two builds are separate copies of THREE and must not meet in one page (instanceof breaks).
 
 ONE EDIT: `three.tsl.js` imports `from 'three/webgpu'`, a bare specifier that needs an import map. It is
 rewritten here to `from './three.webgpu.js'` so a page (and the ship harness, which loads modules by path)

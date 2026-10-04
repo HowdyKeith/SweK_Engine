@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4807 -- THE 411th CLOSING: NO new gate file -- vendor/three, the classic build, moved to r186 beside three-webgpu.
+    since504: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4807", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gltfKtx2-selfcheck.mjs (the other fourteen upstream files of vendor/three, by digest, and nothing untabled)",
+            "tools/ship/tsl-selfcheck.mjs (vendor/three and vendor/three-webgpu the same release)",
+            "tools/krbn/krbnCompareLive-selfcheck.mjs (its provenance row reads the new line)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AGAIN, AND THIS TIME NOTHING MOVED BUT THE RECORD. *** The 305 gates whose imports " +
+                 "reach vendor/three ran on this tree and on a worktree with 0.186.1: they differ by krbnCompareLive's provenance row and " +
+                 "the orrery's bake, nothing else. Seven files changed, thirteen are byte-identical, every relative import resolves, and " +
+                 "`three` drops no export. The seven had no digest anywhere -- a GLTFLoader.js left behind would have passed every gate -- " +
+                 "so gltfKtx2 holds all twenty now, and the classic core turns out to be three-webgpu's own, byte for byte. Four sabotages red.",
+    }),
     // v4806 -- THE 410th CLOSING: NO new gate file -- issue 17, the transmission regression, drafted with its patch.
     since503: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.

@@ -1470,11 +1470,11 @@
    "name": "three",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 3344827,
+   "bytes": 3379353,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
-     "bytes": 40504
+     "bytes": 40755
     },
     {
      "path": "jsm/curves/NURBSCurve.js",
@@ -1486,7 +1486,7 @@
     },
     {
      "path": "jsm/exporters/GLTFExporter.js",
-     "bytes": 92973
+     "bytes": 93570
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.js",
@@ -1526,11 +1526,11 @@
     },
     {
      "path": "jsm/loaders/FBXLoader.js",
-     "bytes": 111266
+     "bytes": 113372
     },
     {
      "path": "jsm/loaders/GLTFLoader.js",
-     "bytes": 114959
+     "bytes": 117570
     },
     {
      "path": "jsm/loaders/KTX2Loader.js",
@@ -1542,7 +1542,7 @@
     },
     {
      "path": "jsm/utils/BufferGeometryUtils.js",
-     "bytes": 37621
+     "bytes": 37712
     },
     {
      "path": "jsm/utils/SkeletonUtils.js",
@@ -1558,15 +1558,15 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 14694
+     "bytes": 15888
     },
     {
      "path": "three.core.js",
-     "bytes": 1443056
+     "bytes": 1458113
     },
     {
      "path": "three.module.js",
-     "bytes": 650153
+     "bytes": 662772
     }
    ]
   },
