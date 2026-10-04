@@ -197,6 +197,14 @@ console.log("\n6. *** LIVE: THE ACTUAL SPAWN PANEL, IN A REAL BROWSER -- BUTTON,
             const errs = [];
             pg.on("pageerror", (e) => errs.push(String(e).slice(0, 300)));
             await pg.setViewportSize({ width: 1400, height: 900 });
+            // *** v4778 RIG RUN 11 -- THE WELCOME CARD CAME BACK AFTER IT WAS REMOVED. *** main.js opens #swek-welcome from a 2.2 s
+            // timer once the page is up, unless voxelengine.welcomeSeen is set. The removal below ran at a fixed 6 s; when the
+            // engine boots slowly -- under load, on Keith's rig, or under the ANGLE-SwiftShader spelling, ~5 s slower here -- the
+            // timer fires AFTER it, and the drop's left-click landed on the card (traced: pointerdown/mousedown/click all at
+            // #swek-welcome), so carry mode never ended and the next lookup threw. A returning user has seen the card: say so
+            // before the page loads, and keep the removal for anything else that opens it.
+            // SABOTAGE W1: this line removed -> red alone on this box (the drop row, then the throw). Restored, md5 verified.
+            await pg.addInitScript(() => { try { localStorage.setItem("voxelengine.welcomeSeen", "1"); } catch (e) {} });
             await pg.goto("http://127.0.0.1:" + srv.address().port + "/index.html", { waitUntil: "load", timeout: 60000 });
             await pg.waitForTimeout(6000);
             // dismiss the two first-run modals that would otherwise eat every mouse event

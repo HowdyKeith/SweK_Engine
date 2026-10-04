@@ -153,8 +153,13 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
     ok(`node-webgpu asked four ways, each answered with an adapter or a reason: ${native.rows.map((r) => r.adapter ? (r.software ? "software" : "hardware") : r.error ? "threw" : "none").join(", ")}`,
        native.ok && native.rows.length === 4 && native.rows.every((r) => r.adapter || r.error || r.adapter === null),
        `from ${native.from}, Vulkan driver ${native.icd}`);
-    ok("  ...and on this box the default is software, as every device row here was measured on", native.ok && native.rows[0].software === true,
-       native.rows[0] ? native.rows[0].adapter || native.rows[0].error || "no adapter" : "not probed");
+    // *** rig run 11 -- THIS ROW ASSERTED THE BOX. *** "On this box the default is software" read red on Keith's rig, whose
+    // default IS the GPU (nvidia / pascal, D3D12) -- the very fact this section exists to report. What holds on any box: the
+    // default way of asking gets an adapter, and the line says which kind.
+    const d0 = native.rows[0] || {};
+    console.log(`  ----  node-webgpu's default adapter here: ${d0.adapter ? (d0.software ? "SOFTWARE " : "HARDWARE ") + d0.adapter : d0.error || "none"}`);
+    ok("  ...and the default way of asking gets an adapter, whichever kind this box has", native.ok && !!d0.adapter,
+       d0.adapter || d0.error || "no adapter");
 }
 
 // ---- v4764 SABOTAGE LOG ----------------------------------------------------------------------------------------
