@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a94efb160a03c8af200cc7e3d8f8abed951e6cf1",
+ "head": "d127baebdccab4abb426be4084ad96d2ee5699ce",
  "bodies": {
   "box3d": [
    {
@@ -223,7 +223,7 @@
    {
     "path": "tools/ship/deviceUniformsPerDraw-selfcheck.mjs",
     "bytes": 10806,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/gposKern-selfcheck.mjs",
@@ -232,28 +232,28 @@
    },
    {
     "path": "tools/ship/slugCurve-selfcheck.mjs",
-    "bytes": 24381,
+    "bytes": 24748,
     "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
    },
    {
     "path": "tools/ship/slugDevice-selfcheck.mjs",
-    "bytes": 23461,
+    "bytes": 23828,
     "sha": "5312d3081260a24e4a57277db99cb1b7ae63a3a7"
    },
    {
     "path": "tools/ship/slugFill-selfcheck.mjs",
     "bytes": 20960,
-    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/slugMelt-selfcheck.mjs",
     "bytes": 21025,
-    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/slugMorph-selfcheck.mjs",
     "bytes": 19033,
-    "sha": "14c8ae47eea5c92b18efe45017bc7d336249ed89"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/slugNapalm-selfcheck.mjs",
@@ -263,7 +263,7 @@
    {
     "path": "tools/ship/slugProjective-selfcheck.mjs",
     "bytes": 17272,
-    "sha": "a70d9c786e3bed4679e472630d97c8a05da23a7c"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/slugReupload-selfcheck.mjs",
@@ -272,13 +272,13 @@
    },
    {
     "path": "tools/ship/slugShatter-selfcheck.mjs",
-    "bytes": 26232,
+    "bytes": 26599,
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
     "path": "tools/ship/slugTicker-selfcheck.mjs",
     "bytes": 21345,
-    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/slugTsl-selfcheck.mjs",
@@ -473,7 +473,7 @@
    {
     "path": "tools/ship/flyConnectomePage-selfcheck.mjs",
     "bytes": 21121,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/pilotPolicy-selfcheck.mjs",
@@ -842,7 +842,7 @@
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
     "bytes": 21726,
-    "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/threeImportmap-selfcheck.mjs",
@@ -861,8 +861,8 @@
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 80200,
-    "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
+    "bytes": 82221,
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "toroidal-wave.html",
@@ -1159,7 +1159,7 @@
    {
     "path": "tools/ship/aiPresenceOrbPresent-selfcheck.mjs",
     "bytes": 30475,
-    "sha": "22faf54c99259df4936b00cf5f565a26ef8efa04"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/brainTsl-page.js",
@@ -1188,7 +1188,7 @@
    },
    {
     "path": "tools/ship/img2three-selfcheck.mjs",
-    "bytes": 23915,
+    "bytes": 24164,
     "sha": "2a88a2a03645797205cf424a39e2617772981d59"
    },
    {
@@ -1233,8 +1233,8 @@
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 82503,
-    "sha": "ce5d9b226ae20ed6a5a308c4f5c486167dc25c73"
+    "bytes": 82949,
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
@@ -1244,12 +1244,12 @@
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
     "bytes": 25380,
-    "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
-    "bytes": 80200,
-    "sha": "bd806b455022c3b997227f9fd74715d1ebf8847d"
+    "bytes": 82221,
+    "sha": "ced0bd6d468c8e072539b5315470ac842da18c0c"
    },
    {
     "path": "tsl-probe.html",

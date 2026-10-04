@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
-import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS } from "./webgpuHarness.mjs";
+import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
 
@@ -124,6 +124,40 @@ console.log("\n4. RIG RUN 4: AN ORDINARY RUN ON WINDOWS ASKS FOR SWIFTSHADER Web
         ok(`  ...and the ${PARITY_GATES.length} gates that hold the two backends to one picture launch every call with PARITY_ARGS`,
            bare.length === 0, bare.length ? bare.slice(0, 4).join("; ") : "the 14 that went newly red when an ordinary win32 run put WebGPU on SwiftShader alone");
     }
+    {   // rig run 12, Keith's option (a): seven WebGL2 gates whose rows hold a backend to a model of SwiftShader's rasterisation.
+        // Their two-backend launch takes PARITY_ARGS too (on the GTX 1080 both backends then run on the GPU), and those rows go
+        // through softwareClaims -- asserted on a software adapter, printed on a hardware one, with a held row counting which.
+        // Each gate's other launches are single-backend and stay ordinary, so the scan counts, not "every call".
+        const MODEL_GATES = { slugDevice: [1, 1], slugCurve: [1, 1], slugShatter: [1, 1], gpuUniverse: [1, 1], tslRace: [2, 2],
+                              img2three: [1, 0], threeUpstreamPaths: [1, 0] };   // [launches with PARITY_ARGS, softwareClaims scopes]
+        const off = [];
+        for (const [g, [np, nc]] of Object.entries(MODEL_GATES)) {
+            const src = fs.readFileSync(path.join(ENG, "tools/ship", g + "-selfcheck.mjs"), "utf8");
+            const p = (src.match(/(runInEngineOrigin|runWgslCompute)\(\{ launchArgs: PARITY_ARGS,/g) || []).length;
+            const c = (src.match(/softwareClaims\(ok, r\)/g) || []).length, h = (src.match(/\bSW\.held\(\d+\)/g) || []).length;
+            if (p !== np || c !== nc || h !== nc) off.push(`${g}: ${p} PARITY_ARGS launch(es), ${c} scope(s), ${h} held row(s) -- want ${np}, ${nc}, ${nc}`);
+        }
+        ok(`  ...and the ${Object.keys(MODEL_GATES).length} SwiftShader-model gates launch their two-backend run with PARITY_ARGS and scope their model rows`,
+           off.length === 0, off.length ? off.slice(0, 3).join("; ") : "img2three, slugDevice, slugCurve, slugShatter, gpuUniverse, tslRace, threeUpstreamPaths");
+        // and softwareClaims does what the scope says, on a made-up result of each kind -- no browser needed
+        const run = (software) => { const said = [], got = []; const fake = (l, c) => got.push([l, c]);
+            const SW = softwareClaims(fake, { software, adapter: { vendor: "v", architecture: "a" } }, (m) => said.push(m));
+            const r1 = SW("model row", true), r2 = SW("*** model row ***", false); SW.held(2);
+            return { said, got, r1, r2, held: got[got.length - 1] }; };
+        const sw = run(true), hw = run(false);
+        ok("  softwareClaims on a SOFTWARE adapter asserts every row (a false one fails) and its held row passes",
+           sw.got.length === 3 && sw.got[0][1] === true && sw.got[1][1] === false && sw.said.length === 0 && sw.r1 && sw.r2 && sw.held[1] === true);
+        ok("  ...and on a HARDWARE adapter asserts none, prints each with whether it held there, and its held row passes",
+           hw.got.length === 1 && hw.said.length === 2 && /holds here too: model row$/.test(hw.said[0]) && /does not hold here: model row$/.test(hw.said[1]) &&
+           !hw.r1 && !hw.r2 && hw.held[1] === true && /reported on a hardware adapter \(v a\)/.test(hw.held[0]));
+        const short = (() => { const got = []; const SW = softwareClaims((l, c) => got.push(c), { software: true }, () => {}); SW("x", true); SW.held(2); return got[got.length - 1]; })();
+        ok("  ...and its held row goes red when fewer rows ran than the gate says", short === false);
+        // and when the rows ran on the wrong side of the scope: counts that add up are not enough (sabotage S4 read green without this)
+        const wrongSide = (software, field) => { const got = []; const SW = softwareClaims((l, c) => got.push(c), { software }, () => {});
+            SW[field] = 2; SW.held(2); return got[got.length - 1]; };
+        ok("  ...and when the rows were reported on a software adapter, or asserted on a hardware one, though the count adds up",
+           wrongSide(true, "reported") === false && wrongSide(false, "asserted") === false);
+    }
     ok("  ...and an owner's SWEK_LAUNCH_ARGS still wins over both",
        runLaunchArgs({ SWEK_LAUNCH_ARGS: " --enable-unsafe-webgpu  --enable-features=Vulkan " }, "win32").join(" ") === "--enable-unsafe-webgpu --enable-features=Vulkan");
     if (skip) { console.log("  SKIP  no browser: " + skip); console.log("  ----  *** NOT A PASS. ***"); fails++; }
@@ -178,6 +212,12 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // RIG RUN 10, against tools/ship/webgpuHarness.mjs and tools/ship/hiZ-selfcheck.mjs: P1 parityArgsFor("win32") falling back to an
 // ordinary run's -> 1 red, the win32 parity row ("... --use-webgpu-adapter=swiftshader"); P2 one hiZ call launched without
 // PARITY_ARGS -> 1 red, the scan row, naming it. Both restored, md5 verified.
+// RIG RUN 12 (option a). Against tools/ship/webgpuHarness.mjs: S1 softwareClaims reporting on a software adapter too -> 2 red
+// here (both scope rows) and 1 in slugCurve-selfcheck (its held row, "0 asserted, 4 reported"); S4 the held row checking only
+// that the count adds up -> 1 red, the wrong-side row -- which this file did NOT have when S4 first ran: it read green, and the
+// row was added for it. Against tools/ship/slugCurve-selfcheck.mjs: S2 its two-backend launch without PARITY_ARGS -> 1 red, the
+// scan row, naming it. Against tools/ship/slugDevice-selfcheck.mjs: S3 one model row back on plain ok -> 1 red there, the held
+// row ("4 asserted, 0 reported" of 6). All restored, md5 verified.
 // RIG RUN 4, section 4. Against tools/ship/webgpuHarness.mjs: A1 win32's LAUNCH_ARGS without the adapter flag -> 1 red, the
 // ordinary-run row; A2 the adapter flag on every platform -> 1 red, the linux/darwin row. Against tools/ship/realGpuRun.mjs:
 // R7 runLaunchArgs falling back to launchArgsFor -> 1 red, the hardware row ("... --use-webgpu-adapter=swiftshader"); R8

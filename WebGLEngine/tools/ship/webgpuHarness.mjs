@@ -96,6 +96,28 @@ export function parityArgsFor(platform) {
 }
 export const PARITY_ARGS = Object.freeze(parityArgsFor(process.platform));
 
+/**
+ * *** v4778 RIG RUN 12 -- A ROW THAT HOLDS A BACKEND TO A MODEL OF SWIFTSHADER'S RASTERISATION IS ASSERTED ON SOFTWARE AND
+ * REPORTED ON A GPU (Keith's decision, option a). *** slugDevice/slugCurve/slugShatter fit the fragment's texcoord to a
+ * snapped-corner model of SwiftShader's rasteriser and hold every pixel to slugEval through it; gpuUniverse holds Sol's picks
+ * and tslRace a generated pipeline to a hand-written one on every pixel -- all measured where SwiftShader ran both. On the GTX
+ * 1080 the snap and the rounding are the GPU's. With the two-backend gates' PARITY_ARGS both backends are that GPU; these rows
+ * then print their figures and whether they would hold, and are not asserted. On software, or an adapter the harness cannot
+ * name, they are asserted as before -- and `asserted`/`reported` let a gate hold that scope too.
+ */
+export function softwareClaims(ok, r, say = (m) => console.log("  ----  " + m)) {
+    const name = r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown";
+    const row = (label, cond, detail) => {
+        if (r && r.software === false) { row.reported++; say(`NOT ASSERTED on a hardware adapter (${name}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${String(label).replace(/\*\*\* ?| ?\*\*\*/g, "")}${detail ? " -- " + String(detail).slice(0, 160) : ""}`); return false; }
+        row.asserted++; ok(label, cond, detail); return true;
+    };
+    row.asserted = 0; row.reported = 0; row.hardware = !!(r && r.software === false);
+    // ...and the scope held: every such row asserted on software, every one reported on hardware
+    row.held = (n) => ok(`the ${n} SwiftShader-model row(s) were ${row.hardware ? "reported on a hardware adapter" : "asserted on a software adapter"} (${name}), as decided`,
+        row.hardware ? row.asserted === 0 && row.reported === n : row.reported === 0 && row.asserted === n, `${row.asserted} asserted, ${row.reported} reported`);
+    return row;
+}
+
 // *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
 // gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded
 // as a property of the headless shell. It is not: it is a property of the flags. Measured on this box, headless shell and

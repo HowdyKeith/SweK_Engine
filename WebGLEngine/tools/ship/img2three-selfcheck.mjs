@@ -31,7 +31,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launch takes PARITY_ARGS, so on Windows both backends run on the GPU
+// (tools/ship/webgpuHarness.mjs); this gate holds no row to a model of SwiftShader's rasterisation
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { flattenThreeTree, normalMatrix, baseColor, unitMesh } from "../../render/img2three.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -94,7 +96,7 @@ console.log("\n1. THE BRIDGE, ON THE CPU: no three, no browser -- it is read by 
 console.log("\n2. A three.js TREE, DRAWN BY THIS TREE: the shapes a generated factory has, through the FLEETS' own lit pipeline, on both backends");
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192 }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N: 192 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js");
         const B = await import("/render/img2three.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const out = {};

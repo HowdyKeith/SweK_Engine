@@ -9,7 +9,9 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import { universeRecords, slimUniverse, kindOf } from "../../world/universeBodies.mjs";
@@ -50,7 +52,7 @@ else {
     const targets = [sol]; for (let i = U.systems; i < U.count; i++) if (U.systemOf[i] === sol) targets.push(i);
     const solC = [U.records[sol * 4], U.records[sol * 4 + 1], 0];
     const NEAR = { eye: [solC[0], solC[1] - 4, 6], target: solC, fov: 0.7, near: 0.05, far: 200 };
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, CAM, NEAR, THRESHOLDS, slim, targets }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, CAM, NEAR, THRESHOLDS, slim, targets }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const { universeRecords } = await import("/world/universeBodies.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const U = universeRecords(a.slim);
         const lods = () => [{ name: "far", mesh: G.quadMesh(1, [0.35, 0.5, 0.8, 1]) }, { name: "mid", mesh: G.quadMesh(2, [0.55, 0.7, 0.95, 1]) }, { name: "near", mesh: G.quadMesh(5, [0.85, 0.92, 1, 1]) }];
@@ -89,12 +91,14 @@ else {
         const covers = (hitId, targetId) => { const hx = U.records[hitId * 4], hy = U.records[hitId * 4 + 1], hz = U.records[hitId * 4 + 2], hr = U.records[hitId * 4 + 3];
             // one pixel of slack in map units at this distance: the pick pixel is the FLOOR of the projected centre
             const tx = U.records[targetId * 4], ty = U.records[targetId * 4 + 1], tz = U.records[targetId * 4 + 2], px = 7.2 * 2 * Math.tan(NEAR.fov / 2) / N; return Math.abs(hx - tx) <= hr + px && Math.abs(hy - ty) <= hr + px && hz >= tz; };
+        const SW = softwareClaims(ok, r);
         for (const b of ["webgpu", "webgl2"]) {
             let exact = 0, covered = 0, wrong = []; for (const i of Object.keys(r.result[b].picks)) { const h = r.result[b].picks[i]; if (h && h.id === Number(i)) exact++; else if (h && covers(h.id, Number(i))) covered++; else wrong.push(`${U.names[i]}->${h ? U.names[h.id] : "nothing"}`); }
-            ok(`*** ${b}: near Sol, every one of Sol's records picks as itself or as a body whose quad covers it from in front ***`, wrong.length === 0 && exact >= 2, `${exact} exact, ${covered} covered by a nearer body, ${wrong.length} wrong of ${Object.keys(r.result[b].picks).length}${wrong.length ? " -- " + wrong.join(", ") : ""}`);
+            SW(`*** ${b}: near Sol, every one of Sol's records picks as itself or as a body whose quad covers it from in front ***`, wrong.length === 0 && exact >= 2, `${exact} exact, ${covered} covered by a nearer body, ${wrong.length} wrong of ${Object.keys(r.result[b].picks).length}${wrong.length ? " -- " + wrong.join(", ") : ""}`);
         }
         const hist = (P) => { const c = {}; for (let i = 0; i < P.length; i += 4) { const k = P[i] + "," + P[i + 1] + "," + P[i + 2]; c[k] = (c[k] || 0) + 1; } return c; };
         const hw = hist(W.pixels), hl = hist(L.pixels), keys = [...new Set([...Object.keys(hw), ...Object.keys(hl)])]; let worst = 0; for (const k of keys) worst = Math.max(worst, Math.abs((hw[k] || 0) - (hl[k] || 0)));
+        SW.held(2);
         ok("  the two backends agree per colour within edge pixels, occluded or not", worst <= N * 2, `largest per-colour difference ${worst} of ${N * N}`);
     }
     if (r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
