@@ -872,8 +872,11 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // condFirst 96 -> 97 (+1): tools/ship/gltfConformance-selfcheck.mjs defines `ok = (c, m)` and calls it that way
     // throughout, so it is the forty-second distinct spelling (41 -> 42) and it is self-consistent, which is what the
     // suspects row (still 0) asks. unknownSignature holds at 11.
-    gates: 1925, usesOk: 1904, definesOk: 1896, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1796, condFirst: 97, unknownSignature: 11,
+    // v4778 -- 1925 -> 1926 for tools/ship/fsrCaches-selfcheck.mjs -- the FSR caches in their own folder, out of the
+    // release zip, installable on request. usesOk 1904 -> 1905, definesOk 1896 -> 1897, nameFirst 1796 -> 1797; the
+    // rest hold (measured with census()).
+    gates: 1926, usesOk: 1905, definesOk: 1897, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1797, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

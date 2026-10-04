@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 477,
+  "page": 478,
   "demo": 49,
   "builtin": 37
  },
@@ -1167,7 +1167,7 @@
    "id": "es-aircraft.html",
    "display": "Es Aircraft",
    "href": "/es-aircraft.html",
-   "section": null,
+   "section": "RTX",
    "collision": false
   },
   {
@@ -1191,7 +1191,7 @@
    "id": "es-box3d-6dof.html",
    "display": "Es Box3d 6dof",
    "href": "/es-box3d-6dof.html",
-   "section": null,
+   "section": "RTX",
    "collision": false
   },
   {
@@ -1199,7 +1199,7 @@
    "id": "es-box3d-fly3d.html",
    "display": "Es Box3d Fly3d",
    "href": "/es-box3d-fly3d.html",
-   "section": "Game: Endless Sky",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -1463,7 +1463,7 @@
    "id": "fly-connectome.html",
    "display": "Fly Connectome",
    "href": "/fly-connectome.html",
-   "section": null,
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -1800,6 +1800,14 @@
    "display": "IndexPlus",
    "href": "/indexPlus.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "install-fsr-caches.html",
+   "display": "Install Fsr Caches",
+   "href": "/install-fsr-caches.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -2671,7 +2679,7 @@
    "id": "race-brain.html",
    "display": "Race Brain",
    "href": "/race-brain.html",
-   "section": "Racing City",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -2903,7 +2911,7 @@
    "id": "rtx-viewer.html",
    "display": "Rtx Viewer",
    "href": "/rtx-viewer.html",
-   "section": null,
+   "section": "RTX",
    "collision": false
   },
   {

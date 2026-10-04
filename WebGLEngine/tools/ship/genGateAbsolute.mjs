@@ -12,11 +12,13 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { ARMS_H5, PREREG_H5, declared, readDoc, usableFolds, h5, c11 } from "./foldStats.mjs";
 import { harvestAll, runFolds } from "./genGateFolds.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const CACHE_H5 = "tools/ship/genGate-absolute4.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H5 = cacheRel("genGate-absolute4.json.gz");
 export const RESULT_H5 = "tools/ship/genGate-absolute4-result.json";
 
 export function analyse(run, d) {

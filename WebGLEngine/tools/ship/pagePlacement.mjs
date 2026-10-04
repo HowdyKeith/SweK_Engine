@@ -97,7 +97,10 @@ export function readPages() {
 export function inventory() {
     const pages = readPages();
     const placed = new Map();
-    for (const s of SECTIONS) for (const f of s.pages) placed.set(f, s.id);
+    // v4778 -- THE FIRST CLAIM, as page-index.json's `g` and server.html's mover both read it. Keith: "There can be
+    // duplicate links in folder buckets." A page two sections claim is placed ONCE here (this is a partition of
+    // pages, not of slots) under the section that moves its anchor; a plain set() would have kept the LAST.
+    for (const s of SECTIONS) for (const f of s.pages) if (!placed.has(f)) placed.set(f, s.id);
     const reasoned = new Set(UNPLACED.keys());
     const silent = [];
     for (const f of pages.keys()) if (!placed.has(f) && !reasoned.has(f)) silent.push(f);
@@ -114,8 +117,11 @@ export function capacity(inv = inventory()) {
     const free = per.reduce((a, p) => a + p.free, 0);
     const need = inv.counts.silent;
     const shortfall = Math.max(0, need - free);
+    // v4778 -- USED IS SLOTS, NOT PAGES. Keith: "There can be duplicate links in folder buckets." A page in two
+    // drawers fills a slot in each, so slots used is the sum over drawers; inv.counts.placed stays the count of
+    // DISTINCT pages, because that is the number the placed + reasoned + silent partition is made of.
     return { panels: SECTIONS.length, cap: MAX_PER_PANEL, totalSlots: SECTIONS.length * MAX_PER_PANEL,
-             used: inv.counts.placed, free, need, shortfall,
+             used: per.reduce((a, p) => a + p.used, 0), free, need, shortfall,
              extraPanelsNeeded: Math.ceil(shortfall / MAX_PER_PANEL), per };
 }
 

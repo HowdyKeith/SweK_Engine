@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 477,
+ "count": 478,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1555,6 +1555,13 @@
    "t": "Voxel Engine Showcase v2.6",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "install-fsr-caches.html",
+   "t": "Install FSR caches (opt-in)",
+   "d": "Install FSR caches (opt-in): the frame-generation measurement data the release zip leaves out -- twelve harvested caches, about 300 MB -- downloaded from the release tag into WebGLEngine/fsr-caches/ and kept only when each file's sha256 matches the manifest. Only the H3-H16 measurement gates read them; nothing at runtime does.",
+   "g": "thirdparty",
    "p": 0
   },
   {

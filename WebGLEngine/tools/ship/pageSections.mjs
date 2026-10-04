@@ -18,6 +18,12 @@
 // (the gate-file walk) and four (a mesher's liveness). Moving the node means ONE ASSIGNMENT, TWO CONSEQUENCES,
 // AND NO SECOND EDIT: it appears in the panel because it left Arriving, not because somebody deleted a line.
 //
+// v4778 -- A PAGE MAY BE CLAIMED BY MORE THAN ONE SECTION. Keith: "There can be duplicate links in folder buckets."
+// The first section in SECTIONS order that claims a page still MOVES its anchor out of Arriving; every later one
+// gets a runtime clone of that same node, so the text is still written once and drift is still impossible. What
+// stays forbidden: a page claimed twice by ONE section, a claimed page with no Arriving anchor, a drawer over
+// MAX_PER_PANEL, and a page both claimed and in UNPLACED. pageSections-selfcheck holds each of those.
+//
 // TEN PER PANEL IS KEITH'S LIMIT AND pageSections-selfcheck ENFORCES IT. A drawer of 25 is the flat row again
 // with a lid on it.
 
@@ -167,6 +173,9 @@ export const SECTIONS = [
     // are different operations. The static `pages` list is an OWNERSHIP claim -- pageSections-selfcheck demands
     // an ANCHOR for the drawer to move, and an anchor can only be moved to one place, so listing raycast.html
     // here as well as in System Tools would fight over one element and one of the two drawers would lose it.
+    // (v4778: no longer a fight -- a second claim now gets a clone, per Keith's "duplicate links in folder
+    // buckets" -- but this drawer still carries no pages, because macPages() was the design and nothing asked
+    // for it to change.)
     // The placement layer supports topics[] as an ARRAY and would render a second copy happily, but every page
     // below is ALREADY claimed by a static section, which is the layer that moves.
     //
@@ -317,7 +326,14 @@ export const SECTIONS = [
               "ws-scrcpy.html",
               // v4590 -- sunshine.html JOINS, from registerResidue's residue sweep: an opt-in install of Sunshine
               // (GPL-3.0), a game-stream host -- the exact pattern this shelf already holds seven of.
-              "sunshine.html"] },
+              "sunshine.html",
+              // v4778 -- install-fsr-caches.html JOINS, and it is the one here that is NOT somebody else's work:
+              // the FSR frame-generation caches this engine harvested itself, which left the release zip for
+              // WebGLEngine/fsr-caches/ at Keith's ask ("access /install from there if the user chooses"). Filed by
+              // the OTHER half of this shelf's note -- an opt-in install button, fetched onto your machine, never in
+              // the zip -- because System Tools, where install and rig pages live, is at MAX_PER_PANEL (15 of 15)
+              // and this shelf is its own sub-drawer. Nine of fifteen.
+              "install-fsr-caches.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
@@ -649,6 +665,29 @@ export const SECTIONS = [
     // of Blobs, PetFBI and Toroidal Buffers.
     { id: "rtx", tab: "rtx", label: "RTX", note: "the rtx line: the path-traced viewer, 6DOF and aerodynamic flight, and the fly connectome",
       pages: ["rtx-viewer.html", "es-box3d-6dof.html", "es-aircraft.html", "fly-connectome.html"] },
+    // v4778 -- FRUIT FLY BRAIN, KEITH'S CALL, AND THE FIRST SECTION WHOSE EVERY PAGE IS ALSO SOMEWHERE ELSE. Keith:
+    // "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket too." Until
+    // this round a page lived in exactly one drawer because the mover MOVED its one anchor; it now moves the anchor
+    // for the FIRST section (in this array's order) that claims a page and CLONES it into every later one, so the
+    // three pages below keep their homes in rtx, racing and endlesssky and show here as well.
+    //
+    // FILED BY WHAT THEY IMPORT, NOT BY THEIR NAMES -- the keyword probe has misled this file three times:
+    //   fly-connectome.html  render/maleCnsLoader.mjs, which fetches vendor/male-cns/ (the connectome itself), and
+    //                        fetches brain/gunnerTraceDemo.json to replay gunnerPolicy's hidden layer on those neurons
+    //   race-brain.html      brain/drivePolicy.mjs (E-PG-masked core, epgTopology.mjs) and brain/gunnerPolicy.mjs
+    //                        (Giant Fiber core, gfcTopology.mjs), and it TRAINS both recurrent cores
+    //   es-box3d-fly3d.html  brain/pilotPolicy.mjs (Giant Fiber core, gfcTopology.mjs) flies team A, by default the
+    //                        shipped pre-trained brain/pilotWeightsDefault.json rather than the identity-core handWeights()
+    // AND THE FOUR THAT REACH IT AND ARE NOT HERE, each for a measured reason rather than a hunch:
+    //   race-replay.html, physics-lab.html  import drivePolicy but drive only handWeights(), whose recurrent core is
+    //                        left at zero -- a provable identity, so the connectome contributes nothing they run
+    //   race-crash.html, race-terrain.html  reach drivePolicy only through raceReplayBake.mjs for carMesh and
+    //                        CAR_COLOURS (its replay() runs zero weights on a recorded input log); no policy runs
+    // A text match followed through imports also finds index, orrery, orrery-gpu, instruments, lab-home, method-lab,
+    // panel-brain, race-car, es-box3d-6dof and es-aircraft, and every one of those is a COMMENT or a catalogue string
+    // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
+    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
+      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */

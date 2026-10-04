@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { N_FEATURES, N_FEATURES_V2, HIDDEN, fitScaler, applyScaler, forward, auc, aucP } from "../../render/genGate.mjs";
 import { harvest } from "./genGateTrain.mjs";
 import { MLPTrainer } from "../../brain/learn.js";
@@ -19,7 +20,8 @@ import { seededRng } from "./foldStats.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SCENES = Object.freeze(["smooth", "zone", "checker"]);
-export const CACHE = "tools/ship/genGate-folds.json";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE = cacheRel("genGate-folds.json");
 
 /** Pull the rows for one feature set out of a harvested frame list. */
 export function rowsOf(frames, which) {

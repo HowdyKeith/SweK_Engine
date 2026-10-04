@@ -21,11 +21,22 @@
 // a correct string in a source file. The bug only exists once the DOM exists. So the report is READ OFF A REAL
 // PAGE, and -- because a fix that reports nothing looks exactly like a fix that silenced everything -- the two
 // failing cases are PROVOKED with a doctored registry rather than assumed to still work.
+//
+// v4778 -- A PAGE IN SEVERAL DRAWERS, READ OFF THE SAME REAL PAGE. Keith: "There can be duplicate links in folder
+// buckets. So Fruit Fly Brain could have its own link bucket too." Section 1b checks that every page the registry
+// shares between drawers is in EACH drawer's slot and no longer in Arriving; section 2 provokes a later claim on a
+// moved page (lbm3d-gpu.html) and checks it is cloned, not reported. SABOTAGE, MEASURED: server.html's clone branch
+// made to reuse the node (`const c = first;` -- move instead of clone), on a scratch copy of the tree (server.html
+// and this gate copied, everything else linked, so the page served is the broken copy and the tree file is never
+// edited) -> exit=1, 2 red by name: "a page several drawers claim appears in EACH of them"
+// (SHORT: es-box3d-fly3d missing from endlesssky, race-brain from racing, fly-connectome from rtx) and "a later
+// section claiming a page ... gets a CLONE" (lbm3d-gpu.html in: brain only).
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { SECTIONS } from "./pageSections.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -80,8 +91,24 @@ async function report(extra) {
     // BOTH SURFACES, because they are two renderings of one verdict and the whole risk is that they disagree.
     const spans = await page.evaluate(() => [...document.querySelectorAll("span")]
         .map((s) => s.textContent || "").filter((t) => /registry entr|already linked in another/.test(t)));
+    // v4778 -- WHERE EVERY LINK ENDED UP, read off the DOM after the mover ran: for each href, the drawer slots
+    // holding it, and whether the Arriving row still does. The Arriving row is found the way server.html finds it
+    // (the "Arriving Pages" header's box), so this cannot disagree with the mover about which row that is.
+    const where = await page.evaluate(() => {
+        const slots = {};
+        for (const slot of document.querySelectorAll("[data-panel-pages]"))
+            for (const a of slot.querySelectorAll("a[href]")) {
+                const h = (a.getAttribute("href") || "").replace(/^\//, "");
+                (slots[h] = slots[h] || []).push(slot.getAttribute("data-panel-pages"));
+            }
+        const hdr = [...document.querySelectorAll("span")].find((x) => /Arriving Pages/.test(x.textContent || ""));
+        const box = hdr && hdr.closest("div").parentElement;
+        const row = box ? box.querySelector('div[style*="flex-wrap"]') : null;
+        const arriving = row ? [...row.querySelectorAll("a[href]")].map((a) => (a.getAttribute("href") || "").replace(/^\//, "")) : null;
+        return { slots, arriving };
+    });
     await page.close();
-    return { line, spans, all: line + " " + spans.join(" ") };
+    return { line, spans, all: line + " " + spans.join(" "), where };
 }
 
 // ---- 1. the page as it actually ships -------------------------------------------------------------------
@@ -95,22 +122,63 @@ for (const p of ACCUSED) {
 ok("!! and no alarm span is drawn at all when nothing is actually wrong",
     live.spans.length === 0, live.spans.join(" ").slice(0, 120));
 
+// ---- 1b. a page several drawers claim is in EVERY one of them (v4778) ------------------------------------------
+// Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket too."
+// The mover MOVES the Arriving anchor for the first section that claims a page and CLONES it for every later one.
+// The static gate can only see that the clone call is there; whether the page actually SHOWS in each drawer is a
+// DOM fact, so it is read here off the real page. A mover that moved a second time instead of cloning would leave
+// the page in the LAST drawer only -- each earlier drawer silently missing it -- and this row names which.
+{
+    const claims = new Map();
+    for (const s of SECTIONS) for (const p of s.pages) {
+        if (!claims.has(p)) claims.set(p, []);
+        const slot = s.tab || s.id;
+        if (!claims.get(p).includes(slot)) claims.get(p).push(slot);
+    }
+    const shared = [...claims].filter(([, slots]) => slots.length > 1);
+    const short = [], stillArriving = [];
+    for (const [p, slots] of shared) {
+        const got = live.where.slots[p] || [];
+        const lacking = slots.filter((x) => !got.includes(x));
+        if (lacking.length) short.push(p + " missing from " + lacking.join("+") + " (in: " + (got.join("+") || "none") + ")");
+        if (live.where.arriving && live.where.arriving.includes(p)) stillArriving.push(p);
+    }
+    ok("!! *** a page several drawers claim appears in EACH of them, and is gone from Arriving ***",
+        shared.length > 0 && live.where.arriving !== null && short.length === 0 && stillArriving.length === 0,
+        shared.length + " shared page(s): " + shared.map(([p, s]) => p + "=" + s.join("+")).join(", ") +
+        (live.where.arriving === null ? ". ARRIVING ROW NOT FOUND" : "") +
+        (short.length ? ". SHORT: " + short.join("; ") : "") +
+        (stillArriving.length ? ". STILL IN ARRIVING: " + stillArriving.join(", ") : "") +
+        (shared.length ? "" : ". NO SHARED PAGE IN THE REGISTRY, SO THIS ROW TESTED NOTHING"));
+}
+
 // ---- 2. the two failing cases, provoked -----------------------------------------------------------------
 // A page nothing links, and a page linked in a DIFFERENT drawer from the one claiming it. If the fix had merely
 // widened the search until everything matched, both of these would go quiet too -- which is the failure this
 // half exists to catch.
+// v4778 -- *** THE "LINKED ELSEWHERE" PAGE WAS lbm3d-gpu.html, AND KEITH'S RULE MADE IT A CLONE INSTEAD. *** It is
+// in the Arriving row and fluidgpu moves it out, so a second section claiming it is exactly what Keith now allows
+// ("There can be duplicate links in folder buckets") and the mover clones it rather than calling it misfiled. The
+// elsewhere case still exists, but only for a page that was NEVER in Arriving -- hand-placed in another drawer --
+// so thermal-flow.html (hand-placed in the fluidgpu drawer, not one of the eleven) carries that case now, and
+// lbm3d-gpu.html stays in the doctored section as the second, provoked proof that a later claim is a clone.
 const doctored = await report(
     '\nSECTIONS.push({ id: "zzSelfcheck", tab: "brain", label: "selfcheck",' +
-    ' pages: ["xx-not-a-real-page.html", "lbm3d-gpu.html"] });\n');
+    ' pages: ["xx-not-a-real-page.html", "thermal-flow.html", "lbm3d-gpu.html"] });\n');
 ok("a registry page with no anchor anywhere is still reported, by name",
     /no anchor at all: [^|]*xx-not-a-real-page\.html/.test(doctored.line), doctored.line);
 ok("a registry page linked in ANOTHER drawer is still reported, by name",
-    /linked elsewhere: [^|]*lbm3d-gpu\.html/.test(doctored.line), doctored.line);
+    /linked elsewhere: [^|]*thermal-flow\.html/.test(doctored.line), doctored.line);
 ok("!! the two are told APART on the page, not lumped -- lumping them is what accused the eleven",
     doctored.spans.length === 1 &&
     /no link anywhere on this page: [^|]*xx-not-a-real-page\.html/.test(doctored.spans[0]) &&
-    /already linked in another part of the page: [^|]*lbm3d-gpu\.html/.test(doctored.spans[0]),
+    /already linked in another part of the page: [^|]*thermal-flow\.html/.test(doctored.spans[0]),
     doctored.spans.join(" "));
+ok("!! a later section claiming a page an earlier one moved out of Arriving gets a CLONE in its own slot (v4778)",
+    (doctored.where.slots["lbm3d-gpu.html"] || []).join("+") === "fluidgpu+brain" &&
+    !/lbm3d-gpu\.html/.test(doctored.all),
+    "lbm3d-gpu.html in: " + ((doctored.where.slots["lbm3d-gpu.html"] || []).join("+") || "none") +
+    " -- fluidgpu keeps the original, the doctored brain-tab section shows the copy, and neither is reported");
 ok("!! and the eleven stay quiet even while the doctored pair is being shouted about",
     !ACCUSED.some((p) => doctored.all.includes(p)));
 

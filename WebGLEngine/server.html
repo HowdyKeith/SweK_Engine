@@ -786,6 +786,12 @@ window.addEventListener("load", function () {
                  pagePlacements.mjs's macPages()) since diskutil/MacFUSE make it Mac-only by construction --
                  this anchor is still its one real home. -->
             <a href="/ntfs-mounter.html" target="_blank" rel="noopener" title="NTFS Mounter (opt-in, macOS only) -- an install button for zavierferodova/Mac-NTFS-Mounter, which has NO LICENSE FILE at all (checked directly, so all rights reserved by default -- automating a clone onto your own machine is still not distribution, the same reasoning as the GPL-3.0 case beside it). Needs root and touches a real disk, so unlike this tree's other install buttons it never auto-mounts: volumes are listed read-only, and mounting one needs a separate explicit confirmation naming that exact volume. Never receives, prompts for, or stores a password -- every privileged step uses `sudo -n`, which fails closed rather than prompting.">NTFS Mounter (macOS)</a>
+            <!-- v4778 -- install-fsr-caches.html JOINS the opt-in shelf, and like excel.html it is THIS engine's
+                 own work rather than a stranger's. Keith: "put the FSR frame caches in its own repo folder, and
+                 access /install from there if the user chooses." The twelve harvested FSR caches (about 300 MB) left
+                 the release zip for WebGLEngine/fsr-caches/; this page shows each one and installs the missing
+                 ones from the release tag, keeping a file only when its sha256 matches the manifest. -->
+            <a href="/install-fsr-caches.html" target="_blank" rel="noopener" title="Install FSR caches (opt-in) -- the frame-generation measurement data the release zip leaves out: twelve per-block feature harvests off fsr.html (about 300 MB) that the H3-H16 measurement gates re-derive their verdicts from. Shows each cache, what it is for, its size and whether it is here; Install downloads only the missing or damaged ones from the release tag on GitHub and keeps each file only when its sha256 matches fsr-caches/manifest.json. Nothing at runtime needs them -- without them those gates skip by name and say it is not a pass.">Install FSR Caches</a>
             <a href="/petfbi.html" target="_blank" rel="noopener" title="PetFBI -- the lost-pet posting flow.">PetFBI</a>
             <a href="/path-tracer.html" target="_blank" rel="noopener" title="Path tracer: Monte Carlo global illumination on the CPU. The furnace scene must render FLAT -- the sphere disappears -- which is the answer key six rounds of physics/render were built around.">Path Tracer</a>
             <a href="/petfbi-board.html" target="_blank" rel="noopener" title="PetFBI board -- the lost-pet board itself.">PetFBI Board</a>
@@ -1272,6 +1278,7 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rtx"><span class="gtabTog">&#9656;</span><span>&#128294; RTX</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1686,7 +1693,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="physicslab" hidden>
           <div class="gpanelHdr">&#9883; Physics Lab</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="physicslab" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
           <!-- v3329 -- SAMPLING & METHODS AS A GROUP INSIDE THIS PANEL, NOT A CHIP OF ITS OWN.
                Keith: "i meant that all the physics lab related links would want to be a link inside the
@@ -1703,12 +1710,12 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="optics" hidden>
           <div class="gpanelHdr">&#128301; PL: Optics &amp; Imaging</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="optics" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="cosmic" hidden>
           <div class="gpanelHdr">&#127756; PL: Cosmic &amp; Relativity</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="cosmic" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="em" hidden>
@@ -1759,7 +1766,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="matter" hidden>
           <div class="gpanelHdr">&#9883;&#65039; PL: Matter &amp; Chaos</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="matter" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="systools" hidden>
@@ -1791,7 +1798,7 @@ window.addEventListener("load", function () {
           <!-- v3360 -- KEEP AWAKE MOVED HERE from the top controls row. It is a SYSTEM STATE, not a page
                control: it stays on until turned off. The row it left is for things you press. -->
           <div style="padding:4px 0 6px;"><label id="kaWrap" title="Prevent Windows from sleeping while the server runs (SetThreadExecutionState). A STATE, not an action: it stays on until turned off or the server stops." style="display:inline-flex;align-items:center;gap:5px;font:inherit;color:var(--dim);cursor:pointer"><input type="checkbox" id="bKeepAwake" style="cursor:pointer"><span id="kaLabel">☕ Keep awake</span></label></div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-group-chips="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
           <!-- v4138 -- OPT-IN: SOMEBODY ELSE'S WORK. A sub-drawer of System Tools, same shape as Physics Lab's
@@ -1808,17 +1815,17 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="voxels" hidden>
           <div class="gpanelHdr">&#129482; Voxels</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The DATA: storage, meshing and traversal of voxel volumes. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The DATA: storage, meshing and traversal of voxel volumes. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="voxels" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="renders" hidden>
           <div class="gpanelHdr">&#129513; Renders</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="renders" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="racing" hidden>
           <div class="gpanelHdr">&#127950; Racing City</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Kenney's kits, the grid track, the car on box3d, and the brains that will drive it -- docs/TSL-ROADMAP.md item 12, one page per round. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Kenney's kits, the grid track, the car on box3d, and the brains that will drive it -- docs/TSL-ROADMAP.md item 12, one page per round. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; race-brain.html is in Fruit Fly Brain as well, cloned there.</div>
           <div data-panel-pages="racing" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4379 -- THE RIG-ONLY LIST GETS A SURFACE AGAIN, ON A DIFFERENT PAGE FROM THE ONE KEITH CLEARED.
@@ -1850,29 +1857,38 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="slugtext" hidden>
           <div class="gpanelHdr">&#9999;&#65039; Slug Text</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="slugtext" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="avatars" hidden>
           <div class="gpanelHdr">&#128100; Avatars</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="avatars" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="toroidal" hidden>
           <div class="gpanelHdr">&#127760; Toroidal Buffers</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="toroidal" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4778 -- Keith: "Rtx can have its own link bucket on server.html." The rtx line's four pages, filed by
              the line that made them; the anchors stay in Arriving and pageSections.mjs moves them here. -->
         <div class="gpanel" data-panel="rtx" hidden>
           <div class="gpanelHdr">&#128294; RTX</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The rtx line: the path-traced viewer (rtx-viewer.html), Newtonian 6DOF combat (es-box3d-6dof.html) and aerodynamic flight (es-aircraft.html) on the same rigid-body substrate, and the fly connectome (fly-connectome.html). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The rtx line: the path-traced viewer (rtx-viewer.html), Newtonian 6DOF combat (es-box3d-6dof.html) and aerodynamic flight (es-aircraft.html) on the same rigid-body substrate, and the fly connectome (fly-connectome.html), which Fruit Fly Brain shows too. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="rtx" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- v4778 -- Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link
+             bucket too." Every page built on the male-cns connectome, found by what it imports rather than by its
+             name. All three are ALSO in another drawer (RTX, Racing City, Game: Endless Sky); the first drawer moves
+             the Arriving anchor and this one gets a clone of it, so the title is still written once. -->
+        <div class="gpanel" data-panel="flybrain" hidden>
+          <div class="gpanelHdr">&#129712; Fruit Fly Brain</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages built on Janelia's male-cns connectome (vendor/male-cns/): the connectome itself, 34 traced Giant Fiber neurons (fly-connectome.html); a driving and a gunnery brain trained through the real E-PG compass and Giant Fiber circuits (race-brain.html); and a 3D dogfight piloted through the Giant Fiber circuit (es-box3d-fly3d.html). Each is also in its own subject's drawer -- a page two drawers claim is moved by the first and cloned into the second, so the link here is the same link, title and all.</div>
+          <div data-panel-pages="flybrain" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="box3d" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4327 -- WEBGPU. The membership is DERIVED (tools/ship/pageSections.mjs): a page is here because it
@@ -1882,17 +1898,17 @@ window.addEventListener("load", function () {
              subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D, opt-in). -->
         <div class="gpanel" data-panel="webgpu" hidden>
           <div class="gpanelHdr">&#9650; WebGPU</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages that ask this machine for a GPU adapter -- open one and it either answers or it does not, which is the whole test. These are the ones no other drawer owned: the rest are filed under the subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D) and stay there, and gpu-rig-check and tsl-rig went to Render TSL when main named that drawer -- a page is filed by what it is ABOUT, and this drawer does not get to keep one because it would like to. Start with <b>WebGPU Lab</b> for what the adapter is worth; the adapter's own yes/no lives in <b>Render TSL</b> (GPU rig check). All THREE FLEET KERNEL BENCHES are here -- hmc-bench, ising-bench and magmap-bench -- and each owes a real-GPU verdict: running one on a box with a real adapter submits a report and settles a debt tools/render-qa/deviceOwed.mjs has been carrying since v3339. Opening a page here does not by itself verify anything: deviceOwed is the register, this drawer is the address. MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages that ask this machine for a GPU adapter -- open one and it either answers or it does not, which is the whole test. These are the ones no other drawer owned: the rest are filed under the subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D) and stay there, and gpu-rig-check and tsl-rig went to Render TSL when main named that drawer -- a page is filed by what it is ABOUT, and this drawer does not get to keep one because it would like to. Start with <b>WebGPU Lab</b> for what the adapter is worth; the adapter's own yes/no lives in <b>Render TSL</b> (GPU rig check). All THREE FLEET KERNEL BENCHES are here -- hmc-bench, ising-bench and magmap-bench -- and each owes a real-GPU verdict: running one on a box with a real adapter submits a report and settles a debt tools/render-qa/deviceOwed.mjs has been carrying since v3339. Opening a page here does not by itself verify anything: deviceOwed is the register, this drawer is the address. MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="webgpu" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="blobs" hidden>
           <div class="gpanelHdr">&#129514; Blobs</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="blobs" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="face" hidden>
           <div class="gpanelHdr">&#128100; Face &amp; Population</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="face" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="gametheory" hidden>
@@ -8538,6 +8554,9 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
 // registry would put the text in two places and guarantee they drift -- the defect this session found in nine
 // files (MODES), three (the gate-file walk) and four (a mesher's liveness). Moving the node means A PAGE IS IN
 // EXACTLY ONE PLACE BECAUSE IT IS ASSIGNED, not because somebody remembered a second edit.
+// v4778 -- "EXACTLY ONE PLACE" IS NOW "WHEREVER IT IS ASSIGNED". Keith: "There can be duplicate links in folder
+// buckets." A page claimed by two sections is moved by the first and CLONED into the second -- still assigned, still
+// one source line for its title, now shown in every drawer that claims it. See the firstHome note at the loop.
 import { SECTIONS, PROFILES, sectionsFor, CHIP_GROUPS, CHIP_PINNED } from "./tools/ship/pageSections.mjs";
 
 // v3230 -- A TAILORED FRONT DOOR. The profile comes from ?profile=NAME, or from the shipped landing config, and
@@ -8667,7 +8686,15 @@ const arrivingRow = (() => {
   }
 }
 
-let moved = 0, missing = [], elsewhere = [], placed = 0;
+// v4778 -- *** A PAGE MAY NOW SIT IN MORE THAN ONE DRAWER, AND THE SECOND ONE GETS A CLONE, NOT A REWRITE. ***
+// Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket too."
+// The FIRST shown section (SECTIONS order) that claims a page MOVES its Arriving anchor, exactly as before; every
+// LATER section claiming the same page gets cloneNode(true) of that moved anchor. The label and the hand-written
+// title still exist ONCE in the source -- the clone copies the node at runtime, so there is no second copy of the
+// text to drift, which is the whole reason this mover never rebuilt anchors from the registry. Arriving still loses
+// the page, because the first claim still moves it out.
+const firstHome = new Map();   // page -> the anchor the first claiming section moved out of Arriving
+let moved = 0, cloned = 0, missing = [], elsewhere = [], placed = 0;
 for (const sec of shownSections) {
   const slot = document.querySelector('[data-panel-pages="' + (sec.tab || sec.id) + '"]');
   if (!slot) { missing.push("no slot for " + sec.tab); continue; }
@@ -8685,6 +8712,16 @@ for (const sec of shownSections) {
     // never part of it, and any page with both a toolbar shortcut and an Arriving entry would have gone the same
     // way. A LOOKUP WIDER THAN ITS PURPOSE finds something eventually.
     const a = arrivingRow ? arrivingRow.querySelector('a[href="/' + page + '"]') : null;
+    const first = !a ? firstHome.get(page) : null;
+    if (first) {
+      // A LATER CLAIM: the first drawer already took the Arriving anchor, so this one shows a copy of it. An id on
+      // the copy would be a duplicate id in the document, so it is dropped from the copy and kept on the original.
+      const c = first.cloneNode(true);
+      for (const el of [c, ...c.querySelectorAll("[id]")]) el.removeAttribute("id");
+      slot.appendChild(c);
+      cloned++;
+      continue;
+    }
     if (!a) {
       // v3959 -- *** "FOUND NO LINK ON THIS PAGE" WAS FALSE, AND ALARMINGLY SO. *** Keith read the line naming
       // eleven brain and lattice-Boltzmann pages and said he was pretty sure they were already in the panels.
@@ -8713,7 +8750,8 @@ for (const sec of shownSections) {
       else elsewhere.push(page);
       continue;
     }
-    slot.appendChild(a);   // appendChild MOVES a node that already has a parent -- no clone, no duplicate
+    slot.appendChild(a);   // appendChild MOVES a node that already has a parent -- the first claim takes the original
+    firstHome.set(page, a);
     moved++;
   }
 }
@@ -8773,6 +8811,7 @@ if ((missing.length || elsewhere.length) && arrivingRow) {
   arrivingRow.appendChild(n);
 }
 console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.length + " panels" +
+            (cloned ? ", " + cloned + " cloned into a second drawer" : "") +
             (placed ? ", " + placed + " already in their panel" : "") +
             (elsewhere.length ? ", " + elsewhere.length + " linked elsewhere: " + elsewhere.join(", ") : "") +
             (missing.length ? ", " + missing.length + " with no anchor at all: " + missing.join(", ") : ""));

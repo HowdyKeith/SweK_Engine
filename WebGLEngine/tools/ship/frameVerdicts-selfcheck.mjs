@@ -28,8 +28,12 @@ import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, reverse } from "./frameRev
 import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, h14 } from "./frameSway.mjs";
 import { PREREG_H15, CACHE_H15, RESULT_H15, REP_KEYS, h15 } from "./frameSwayRep.mjs";
 import { PREREG_H16, CACHE_H16, RESULT_H16, DIS_KEYS, h16 } from "./frameDisagree.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameVerdicts-selfcheck", [CACHE_H7, CACHE_H8, CACHE_H9, CACHE_H10, CACHE_H11, CACHE_H12, CACHE_H14, CACHE_H15, CACHE_H16]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const J = (x) => JSON.stringify(x);

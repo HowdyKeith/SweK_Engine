@@ -584,7 +584,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4776 -- the merged tree's own figures:
     // v4776 -- then 4494 -> 4495 in the same round: tools/rig/run-trader-github.mjs, the trader graph's rig job (one ES module, one closure).
     // v4778 -- 4495 -> 4581 at the rtx merge (86 files: its 45 gates and the modules they test), RE-DERIVED over the merged tree.
-    files: 4581,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4778 -- then 4581 -> 4583 for tools/ship/fsrCaches.mjs and tools/ship/fsrCaches-selfcheck.mjs -- the FSR caches in their own folder.
+    files: 4583,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1080,8 +1081,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4778 -- closures 4121 -> 4125, typed arrays 1258 -> 1261 at the rtx merge: the reportLines() the six
     // BVH-CSG modules grew for their instruments rows. Closures from bvhPairOverlap, meshBoolean, triClip and
     // triTriIntersect; typed arrays from meshPointClassify, triClip and triTriIntersect. No new file.
-    esModules: 4276, closures: 4125, asyncAwait: 1704, typedArrays: 1261, promises: 399,
-    fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // v4778 -- then tools/ship/fsrCaches.mjs and its gate, re-derived: ES modules 4276 -> 4278, closures 4125 -> 4127,
+    // async/await 1704 -> 1706, Promises 399 -> 401, fetch/XHR 249 -> 251 (the install route downloads, and its gate drives
+    // it over real HTTP); the other seven held.
+    esModules: 4278, closures: 4127, asyncAwait: 1706, typedArrays: 1261, promises: 401,
+    fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

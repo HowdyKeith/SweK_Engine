@@ -27,6 +27,17 @@
 // SABOTAGE R, MEASURED: the section's `tab` pointed at a chip that does not exist -> exit=1, 1 red, naming it. A
 // section whose chip is missing renders into nothing and looks exactly like a page that vanished, which is the
 // twenty-seven-round failure this file was written after.
+//
+// v4778 -- KEITH: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket
+// too." The row "no page is claimed by two drawers" became "no drawer names the same page twice", and a row pins
+// that the mover CLONES the first drawer's anchor for a later claim. The DOM half -- that a shared page really
+// shows in each of its drawers and has left Arriving -- is a browser fact and lives in pageSectionsReport-selfcheck.
+// SABOTAGES, MEASURED (each on a scratch copy of the tree -- the broken file copied, everything else linked, this
+// gate copied beside it so ROOT is the copy -- so the tree file itself was never edited and needs no restore):
+//   S1 server.html's clone branch made to reuse the node (`const c = first;`, so a later claim MOVES it again)
+//      -> exit=1, 1 red here, "...and a page a later drawer shares is CLONED ..." by name.
+//   S2 rtx-viewer.html listed twice in the rtx section -> exit=1, 1 red, "no drawer names the same page twice",
+//      naming "rtx-viewer.html (twice in rtx)".
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,17 +116,46 @@ const ui = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
         "WITH A LID ON IT -- which is why the 25 instruments were split three ways rather than filed under one " +
         "Physics Lab chip" + (over.length ? ". OVER: " + over.map((s) => s.id + "=" + s.pages.length).join(", ") : ""));
 
+    // v4778 -- KEITH'S RULE CHANGED, SO THIS ROW CHANGED WITH IT. Keith: "There can be duplicate links in folder
+    // buckets. So Fruit Fly Brain could have its own link bucket too." It said "no page is claimed by two drawers"
+    // from v3227 to v4778, and that was a fact about the MOVER (one anchor, one appendChild) dressed as a rule
+    // about the registry. The mover now moves for the first claim and clones for the rest, so two drawers is
+    // allowed. What is still a mistake is ONE drawer naming a page twice -- that is a typo, not a decision, and it
+    // would render the same link twice side by side.
     const seen = new Map();
-    const dupes = [];
-    for (const s of SECTIONS) for (const p of s.pages) {
-        if (seen.has(p)) dupes.push(p + " (" + seen.get(p) + " and " + s.id + ")");
-        seen.set(p, s.id);
+    const twiceInOne = [];
+    for (const s of SECTIONS) {
+        const own = new Set();
+        for (const p of s.pages) {
+            if (own.has(p)) twiceInOne.push(p + " (twice in " + s.id + ")");
+            own.add(p);
+            if (!seen.has(p)) seen.set(p, []);
+            if (!seen.get(p).includes(s.id)) seen.get(p).push(s.id);
+        }
     }
-    ok("!! *** no page is claimed by two drawers ***",
-        dupes.length === 0,
-        "88 assignments, " + seen.size + " distinct pages" + (dupes.length ? ". IN TWO: " + dupes.join(", ") : "") +
+    const multi = [...seen].filter(([, ids]) => ids.length > 1);
+    ok("!! *** no drawer names the same page twice (several drawers may share one -- Keith, v4778) ***",
+        twiceInOne.length === 0,
+        SECTIONS.reduce((a, s) => a + s.pages.length, 0) + " assignments, " + seen.size + " distinct pages, " +
+        multi.length + " in more than one drawer" +
+        (multi.length ? " (" + multi.map(([p, ids]) => p + ": " + ids.join("+")).join(", ") + ")" : "") +
+        (twiceInOne.length ? ". REPEATED INSIDE ONE DRAWER: " + twiceInOne.join(", ") : "") +
         ". brain-bench.html USED TO BE IN BOTH the GPU Brain panel and Arriving, kept in step by nobody -- the " +
-        "renderer MOVES a node rather than copying it, so that state is now unreachable rather than merely fixed");
+        "first claim MOVES the node out of Arriving, so that state is still unreachable");
+
+    // v4778 -- A SHARED PAGE IS CLONED BY THE MOVER, AND THAT IS THE ONLY WAY IT REACHES A SECOND DRAWER. If the
+    // mover lost its clone branch, every page in `multi` would be moved twice and the first drawer would end up
+    // EMPTY of it -- the bug this static half cannot see at runtime, which pageSectionsReport-selfcheck drives in a
+    // real page. This half pins the shape: the later claim copies the node the first claim moved, with cloneNode.
+    const moverSrc = (() => {
+        const i = ui.indexOf("for (const page of sec.pages)");
+        const j = ui.indexOf('console.log("[pageSections] moved', i);
+        return i >= 0 && j > i ? noComments(ui.slice(i, j)) : "";
+    })();
+    ok("!! ...and a page a later drawer shares is CLONED from the first drawer's anchor, not moved again",
+        /firstHome\.get\(page\)/.test(moverSrc) && /\.cloneNode\(true\)/.test(moverSrc) && /firstHome\.set\(page,\s*a\)/.test(moverSrc),
+        multi.length + " shared page(s) today. A second appendChild of the SAME node would take it out of the first " +
+        "drawer -- Keith would see the page in Fruit Fly Brain and lose it from RTX");
 }
 
 // ---- 3. THE PAGES LEFT BEHIND ARE A DECISION, NOT A REMAINDER --------------------------------------------------------

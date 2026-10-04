@@ -8123,6 +8123,22 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // v4778 -- GET/POST /install/fsr-caches. Keith: "access /install from there if the user chooses ... an install
+    // FSR caches page." The FSR frame-generation caches (WebGLEngine/fsr-caches/, about 300 MB) no longer ride in the
+    // release zip; GET reports each file present / missing / bad against fsr-caches/manifest.json with the total
+    // download, POST fetches the missing or bad ones from the release tag and keeps a file only when its sha256
+    // matches. All of it lives in tools/ship/fsrCaches.mjs so a gate drives the same handler against a local
+    // server: names outside the manifest are refused and nothing is written outside the folder.
+    // SWEK_FSR_CACHES_BASE overrides the source URL (a mirror, or a gate's fixture server).
+    if (req.url.split("?")[0] === "/install/fsr-caches" && (req.method === "GET" || req.method === "POST")) {
+        // A POST writes 300 MB into the engine folder, so it is the host's call: a tunnel session may look, not install.
+        if (req.method === "POST" && _isRemoteReq(req)) { sendJson({ ok: false, error: "not available to remote sessions" }, 403); return; }
+        import("../tools/ship/fsrCaches.mjs")
+            .then((m) => m.handleRoute(req, res, { sendJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); } catch {} });
+        return;
+    }
+
     if (req.method === "GET" && req.url === "/install/catalog") {
         const catalog = loadInstallCatalog();
         res.writeHead(200, { "Content-Type": "application/json" });

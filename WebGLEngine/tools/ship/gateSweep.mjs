@@ -8063,6 +8063,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
+    // v4778 -- THE FSR CACHES LEAVE THE ZIP FOR THEIR OWN FOLDER, AND A ROUTE BRINGS THEM BACK ON REQUEST.
+    since477: Object.freeze({
+        at: "v4778", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrCaches-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** TWELVE HARVESTS WERE 300 MB OF A 333 MB RELEASE ZIP, AND NOTHING AT RUNTIME READS THEM. *** Keith: \"put the FSR " +
+                 "frame caches in its own repo folder, and access /install from there if the user chooses.\" The nine frame*-cache " +
+                 "files and three genGate harvests moved with git mv into WebGLEngine/fsr-caches/, with a manifest (bytes, sha256, " +
+                 "readers derived from the imports) built by tools/ship/fsrCaches.mjs --write-manifest. The packer reads the manifest's " +
+                 "names and skips them; a real pack of the same tree, the skip off then on, went 332,679,578 -> 46,792,031 bytes " +
+                 "(6619 -> 6607 files), manifest kept. 24 reader gates now skip by " +
+                 "name, NOT a pass, when a cache is absent -- none regenerates on a miss, a harvest is a WebGPU drive of fsr.html -- " +
+                 "and all 24 ran green here with the caches present. GET/POST /install/fsr-caches and install-fsr-caches.html fetch " +
+                 "from the release tag and keep a file only on a sha256 match. 27 sabotages; one (both escape guards removed) was " +
+                 "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds

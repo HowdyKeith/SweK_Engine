@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8ea02790721a967108f0025707621098cec7e5a0",
+ "head": "b8dc475365c2280e3134e7755d02faf55f9365b4",
  "bodies": {
   "box3d": [
    {
@@ -11,7 +11,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1493527,
+    "bytes": 1494912,
     "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
@@ -330,7 +330,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1493527,
+    "bytes": 1494912,
     "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 874107,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "bytes": 879797,
+    "sha": "b8dc475365c2280e3134e7755d02faf55f9365b4"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -375,7 +375,7 @@
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
     "bytes": 131378,
-    "sha": "b684a04dd2b6e6b24cf92165ea3cc90eddafc6d2"
+    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -478,14 +478,14 @@
    {
     "path": "tools/ship/pilotPolicy-selfcheck.mjs",
     "bytes": 28591,
-    "sha": "9680980498e9a4aaff72bfd4fd33ee2f8192071a"
+    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
    }
   ],
   "mikktspace": [
    {
     "path": "tools/mesh/mikktRef.mjs",
     "bytes": 15095,
-    "sha": "9d6c904e6a46c424d679d5637f9ba59f1ce12fa7"
+    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
    }
   ],
   "morphicons": [
@@ -526,7 +526,7 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1493527,
+    "bytes": 1494912,
     "sha": "14c5b5973323c2edb14b6770be94cec0d79e6ba9"
    },
    {
@@ -766,8 +766,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 874107,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "bytes": 879797,
+    "sha": "b8dc475365c2280e3134e7755d02faf55f9365b4"
    },
    {
     "path": "shipavatar.html",

@@ -10,8 +10,12 @@ import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { declared, readDoc, minFoldsFor, seededRng } from "./foldStats.mjs";
 import { FRAME_KEYS, PREREG_H7, spearman } from "./frameGate.mjs";
 import { PREREG_H8, CACHE_H8, RESULT_H8, HOLE_COL, holeRow, holeSummary, h8Cell, h8 } from "./frameHoles.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameHoles-selfcheck", [CACHE_H8]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };
