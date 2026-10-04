@@ -8723,6 +8723,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4809 -- THE 413th CLOSING: ONE new gate file -- the engine's way around three's issues 17 and 18, until three takes the patches.
+    since506: Object.freeze({
+        at: "v4809", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/threeWorkarounds-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (both backends; all six cases held again; read back through readTargetPixels)",
+        ]),
+        verdict: "green, 2.2 s. *** GLASS DRAWN RIGHT ON r186, BY THE ENGINE, UNTIL THREE TAKES THE PATCHES. *** Issue 17: three forces a " +
+                 "full refresh on a material holding a node in ANY property, so render/threeWorkarounds.mjs's refreshEveryRender gives a " +
+                 "transmission material one nothing reads -- the same bytes as no mark, and every render rebinds; marked after its first " +
+                 "render it needs the rebuild, which it asks for. Issue 18: readTargetPixels reads back, then renders an empty scene into a " +
+                 "1x1 target of its own, never the canvas. The translucent layer marks every backdrop reader it meets and has prepare(scene) " +
+                 "for an application's first frame. fsrFrameGenBackdrop prints r185's figures on r186 again, on WebGPU and now on WebGL 2 -- " +
+                 "where reading back plainly would have cost its midpoint 30 dB. Three's own behaviour is held beside each workaround, so the " +
+                 "rows go red when three is fixed. Six sabotages red.",
+    }),
     // v4808 -- THE 412th CLOSING: NO new gate file -- issue 18, the WebGL 2 lens frozen after a readback, drafted with its patch.
     since505: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

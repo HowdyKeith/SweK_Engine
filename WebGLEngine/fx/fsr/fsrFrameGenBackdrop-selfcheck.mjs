@@ -13,7 +13,8 @@
 //   over     frames and the stage's pass WITHOUT the lens, and the lens drawn at t over the generated frame -- the generator's
 //            `over`, render/translucentLayer.mjs's renderOver: the frame copied in, the opaque scene's depth, the lens
 // *** "OVER" BEATS EVERY FIELD ON EVERY CASE, AND A REAL FRAME REBUILT SO IS THE FRAME DRAWN WITH THE LENS, TO THE BIT. ***
-// WEBGPU ONLY: render/translucentLayer-selfcheck.mjs holds renderOver on both backends.
+// WEBGPU ONLY until v4809: render/translucentLayer-selfcheck.mjs holds renderOver on both backends. v4809: and this, on both, read back
+// through render/threeWorkarounds.mjs's readTargetPixels (three's issue 18) with the lens marked by the layer (issue 17).
 // v4805, ON r186: *** THREE DRAWS A TRANSMISSION LENS FROM A STALE COPY OF THE FRAME BEHIND IT, AND THE GATE SAYS SO RATHER THAN GRADING IT. ***
 // After renders to other targets, three's lens samples the frame it copied for one of them (bisected to #34162; still so on dev). The
 // rebuild is checked where three draws it right, beside a row that holds three's stale read; the transmission cases' figures print as
@@ -35,13 +36,16 @@ console.log("\n1. ON THE DEVICE: lenses that read the frame behind them, generat
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D }, script: `async (a) => {
+  // v4809: on both backends -- the lens through the workarounds render/threeWorkarounds.mjs keeps for three's issues 17 and 18
+  for (const mode of ["webgpu", "webgl2"]) {
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { D, gl: mode === "webgl2" }, script: `async (a) => {
     const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
-    const TT = await import("/render/temporalTsl.mjs"); const FG = await import("/fx/fsr/fsrFrameGenTsl.mjs"); const TL = await import("/render/translucentLayer.mjs");
+    const TT = await import("/render/temporalTsl.mjs"); const FG = await import("/fx/fsr/fsrFrameGenTsl.mjs"); const TL = await import("/render/translucentLayer.mjs"); const WK = await import("/render/threeWorkarounds.mjs");
     const D = a.D, canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8;
-    const renderer = new THREE.WebGPURenderer({ canvas, antialias: false }); await renderer.init();
+    const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, forceWebGL: a.gl }); await renderer.init();
     const tgt = (n) => new THREE.RenderTarget(n, n, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    const read = async (t, n) => { const px = await renderer.readRenderTargetPixelsAsync(t, 0, 0, n, n), s = Math.ceil(n / 16) * 16, o = new Float32Array(n * n * 4);
+    // v4809: read through the engine's readTargetPixels -- on WebGL 2 a plain readback leaves the next render's frame copy on the canvas
+    const read = async (t, n) => { const px = await WK.readTargetPixels(THREE, renderer, t, 0, 0, n, n), s = Math.ceil(n / 16) * 16, o = new Float32Array(n * n * 4);
         for (let y = 0; y < n; y++) for (let x = 0; x < n * 4; x++) o[y * n * 4 + x] = px[y * s * 4 + x]; return o; };
     const cl = (v) => Math.min(1, Math.max(0, v)), gl = TT.glClip(THREE, renderer);
     const stage = TT.makeMotionStage(THREE, T, { w: D, h: D, gl, camera: true });
@@ -64,6 +68,7 @@ else {
         else { lm = new THREE.MeshPhysicalNodeMaterial({ color: 0xffffff, transmission: 1, roughness: 0.0, ior: 1.5, thickness: 0.4, metalness: 0 }); }
         if (kind !== "backdrop") { scene.add(new THREE.AmbientLight(0xffffff, 1)); const dl = new THREE.DirectionalLight(0xffffff, 1); dl.position.set(1, 2, 3); scene.add(dl); }
         const lens = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6, 1, 1), lm); lens.position.z = 0.5; scene.add(lens);
+        layer.prepare(scene);   // v4809: as an application does before its first render -- the lens marked for three r186's issue 17
         const setT = (k) => { bg.position.x = k * cs.bg; bg.updateMatrixWorld(); lens.position.x = k * cs.lens; lens.updateMatrixWorld(); if (box) { box.position.x = -0.9 + k * cs.box; box.updateMatrixWorld(); } };
         const draw = async (k, target, without) => { setT(k); const back = without ? layer.hide(scene) : null; renderer.setRenderTarget(target); await renderer.renderAsync(scene, cam); if (back) back(); };
         await draw(0, A); await draw(1, B); await draw(0, A2, true); await draw(1, B2, true);
@@ -98,43 +103,35 @@ else {
     out.ms = performance.now() - t0; layer.dispose(); stage.dispose(); for (const g of Object.values(gen)) g.dispose();
     return out;
 }` });
-    ok("the harness ran all six cases", r.ok && r.result && !r.result.err, r.ok ? `in ${r.result && r.result.ms ? (r.result.ms / 1000).toFixed(1) : "?"} s` : (r.reason || (r.pageErrors || []).join("; ")));
+    ok(`[${mode}] the harness ran all six cases`, r.ok && r.result && !r.result.err, r.ok ? `in ${r.result && r.result.ms ? (r.result.ms / 1000).toFixed(1) : "?"} s` : (r.reason || (r.pageErrors || []).join("; ")));
     if (r.ok && r.result) {
         const o = r.result, f = (v) => (v === null || v === Infinity ? "exact" : v.toFixed(2)), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
-        say("dB on the lens's pixels against the supersampled midpoint (over the frame):");
+        say(`[${mode}] dB on the lens's pixels against the supersampled midpoint (over the frame):`);
         for (const cn of CASES) say(`${cn.padEnd(22)} ${String(o[cn].px).padStart(4)} px  ${ARMS.map((k) => `${k} ${f(o[cn][k].see)} (${f(o[cn][k].all)})`).join("  ")}`);
-        REPORT.table("dB on the lens's pixels and over the frame, against the supersampled midpoint (Infinity: exact)",
+        REPORT.table(`[${mode}] dB on the lens's pixels and over the frame, against the supersampled midpoint (Infinity: exact)`,
             ["case", "lens px", ...ARMS.flatMap((k) => [`${k}: lens`, `${k}: frame`])],
             CASES.map((cn) => [cn, o[cn].px, ...ARMS.flatMap((k) => [o[cn][k].see ?? Infinity, o[cn][k].all ?? Infinity])]));
-        ok(`*** a REAL frame rebuilt -- drawn without the lens, the lens drawn over it -- is the frame drawn with it, on every case: ${CASES.map((cn) => o[cn].rebuilt.nd).join(", ")} channel values differ ***`,
+        ok(`*** [${mode}] a REAL frame rebuilt -- drawn without the lens, the lens drawn over it -- is the frame drawn with it, on every case: ${CASES.map((cn) => o[cn].rebuilt.nd).join(", ")} channel values differ ***`,
            CASES.every((cn) => o[cn].rebuilt.mx === 0), "three's backdrop reads the render target as it stands, and renderOver hands it the frame");
-        // v4805: *** r186 BROKE THE SAME REBUILD DONE LATER, AND IT IS THREE'S, NOT renderOver'S. *** After a render at another size and one
-        // to another target, a transmission lens samples the frame three copied for that other target: three's own render does it as
-        // much as renderOver (scratchpad probe: a plain render after the same sequence, 2700 channel values of 2700; and two renders to two new
-        // targets with the wall moved 0.25 between: the lens's centre changed by 0.0599 on r185, by 0 on r186). Bisected between
-        // r185 and r186 to #34162, "WebGPURenderer: Introduce refresh types for render objects": a SHARED refresh updates the shared
-        // uniform buffers and not the sampled texture three's viewport node switches to per render target. Still so on dev.
-        // v4806: drafted as docs/upstream-three/dev/17-transmission-backdrop-other-target.md, with a patch that makes a shared refresh
-        // follow a texture node that switched textures; its reproduction prints lensMoved 0 on r186 and 8 patched, on both backends.
-        const late = CASES.map((cn) => o[cn].rebuiltLate.nd), stale = (cn) => cn.startsWith("transmission:") && cn !== "transmission:moving";
-        ok(`  THREE'S OWN (r186): the same rebuild after a render at 4x and two at this size: ${late.join(", ")} channel values differ -- a transmission lens reads the frame three copied for the render before, where the wall moved between`,
-           CASES.every((cn) => (stale(cn) ? o[cn].rebuiltLate.nd > 0 : o[cn].rebuiltLate.nd === 0)),
-           "r185 read its own frame; #34162 made it stale. Held as three's behaviour, not this tree's: when three changes it, this row goes red");
+        // v4805 found the same rebuild done later -- after a render at 4x and two at this size -- stale on the transmission cases: three
+        // r186's issue 17 (#34162). v4809: the layer marks the lens (render/threeWorkarounds.mjs), so three refreshes it at every render,
+        // and the late rebuild is the frame drawn with the lens too; render/threeWorkarounds-selfcheck.mjs holds three's own without the mark
+        ok(`  [${mode}] ...and done later, after a render at 4x and two at this size, it still is: ${CASES.map((cn) => o[cn].rebuiltLate.nd).join(", ")} channel values differ`,
+           CASES.every((cn) => o[cn].rebuiltLate.mx === 0), "the lens marked, three refreshes it at every render (until v4809: 10800 and 10080 on the transmission cases, three's issue 17)");
         const best = (cn) => Math.max(o[cn].drawn.see, o[cn].flow.see, o[cn].skipped.see), bestAll = (cn) => Math.max(o[cn].drawn.all, o[cn].flow.all, o[cn].skipped.all);
-        ok(`*** OVER beats the best field on every case's lens pixels -- ${CASES.map((cn) => `${cn} ${d(o[cn].over.see, best(cn))}`).join(", ")} -- and over the frame, ${CASES.map((cn) => d(o[cn].over.all, bestAll(cn))).join(", ")} ***`,
+        ok(`*** [${mode}] OVER beats the best field on every case's lens pixels -- ${CASES.map((cn) => `${cn} ${d(o[cn].over.see, best(cn))}`).join(", ")} -- and over the frame, ${CASES.map((cn) => d(o[cn].over.all, bestAll(cn))).join(", ")} ***`,
            CASES.every((cn) => o[cn].over.see - best(cn) > 1 && o[cn].over.all - bestAll(cn) > 0.2),
            "through the generator's `over`: what reads its backdrop, drawn at t over the frame generated without it");
-        // v4805: on r186 the transmission lens in the frames, and in the midpoint drawn at this resolution, is drawn by three from a stale
-        // copy (the row above): until three draws it from its own, the two rows below hold the cases it draws right -- the backdrop's
-        // three -- and print the transmission cases' figures as three's. When that row goes red, hold all six again, as v4765 did.
-        const trusted = CASES.filter((cn) => !cn.startsWith("transmission:") || late.every((n) => n === 0));
-        ok(`  ...and against the frame rendered at the midpoint at this resolution, a moving lens over a still wall is ${f(o["backdrop:moving"].over.see1)}${trusted.includes("transmission:moving") ? "" : `; the transmission lens's midpoint is three's stale one on r186 (${f(o["transmission:moving"].over.see1)}, exact on r185)`}`,
-           trusted.filter((cn) => cn.endsWith(":moving")).every((cn) => o[cn].over.see1 === null || o[cn].over.see1 === Infinity), "where what is behind stands still, the generated frame IS the real one");
-        ok(`  ...and the lens drawn as a surface is the worst arm on every case three draws right: ${trusted.map((cn) => f(o[cn].drawn.see)).join(", ")} dB${trusted.length < CASES.length ? ` (transmission on r186, three's stale lens in the frames: ${CASES.filter((cn) => !trusted.includes(cn)).map((cn) => `drawn ${f(o[cn].drawn.see)}, flow ${f(o[cn].flow.see)}`).join("; ")})` : ""}`,
-           trusted.length >= 3 && trusted.every((cn) => o[cn].drawn.see < Math.min(o[cn].flow.see, o[cn].skipped.see, o[cn].over.see)), "what the tree did with them before v4765 -- in the frames, and in the stage's pass");
+        ok(`  [${mode}] ...and against the frame rendered at the midpoint at this resolution, a moving lens over a still wall is ${f(o["backdrop:moving"].over.see1)} and ${f(o["transmission:moving"].over.see1)}`,
+           [o["backdrop:moving"].over.see1, o["transmission:moving"].over.see1].every((v) => v === null || v === Infinity), "where what is behind stands still, the generated frame IS the real one");
+        ok(`  [${mode}] ...and the lens drawn as a surface is the worst arm on every case: ${CASES.map((cn) => f(o[cn].drawn.see)).join(", ")} dB`,
+           CASES.every((cn) => o[cn].drawn.see < Math.min(o[cn].flow.see, o[cn].skipped.see, o[cn].over.see)), "what the tree did with them before v4765 -- in the frames, and in the stage's pass");
     }
+  }
 }
 
+// ---- v4809: the rows v4805's sabotages B1-B3 below were run against are gone -- three's stale read is held in
+// render/threeWorkarounds-selfcheck.mjs, and this gate holds all six cases on both backends; its sabotages are W5 and W6 there.
 // ---- v4805 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // B1 the late rebuild taken where the early one is -> 2 (three's row reads 0 stale everywhere; the arms row, trusting transmission
 // again); B2 the transmission cases trusted on r186 -> 2 (its midpoint not exact; drawn not the worst arm); B3 the rebuild checked late,
