@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/cloneSource-selfcheck.mjs -- v3941
 //
-// Run: node tools/ship/cloneSource-selfcheck.mjs   (~0.06s — MEASURED v3941, median of 60/58/60)
+// Run: node tools/ship/cloneSource-selfcheck.mjs   (~0.12s — re-measured v4808: 116-118 ms alone on two machines' worth of readings (93-137 ms at v4806), 124 ms the sweep's record; it read ~0.06s — MEASURED v3941, median of 60/58/60)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES githubBridge.cloneEngineSource -- the route from "pushed to GitHub" to "running on this box".
