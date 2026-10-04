@@ -208,6 +208,33 @@ if (!skip) { const was = results["stages r185"], r = results["stages patched"];
 // 3; W4 the bundler's hash -> hash$1 rename forgotten -> 5 (09's hunk not found, so its build is r185's); W5 a number of 08's
 // Observed block edited -> 2 (the block and the index line). None green. W1 first ran on no text at all: its line is in the
 // patch twice, once for skinning() and once for computeSkinning(), as 07's hunks were until given six lines of context.
+// ---- RIG RUN 2: THE OVERLAY ON A BOX THAT REFUSES FILE SYMLINKS --------------------------------------------------------
+// Keith's rig died on rootWithBuilds' first line: "EPERM: operation not permitted, symlink '...\\WebGLEngine\\.gitignore'".
+// Windows grants a FILE symlink only to an administrator or in Developer Mode. Asked here with the refusal planted, so a box
+// that allows symlinks still sees the path the rig takes. Runs with or without a browser.
+// SABOTAGES, on tools/ship/threePatch.mjs, restored and md5 verified: U1 linkInto rethrows the EPERM instead of falling back
+// -> 2 red ("THREW: EPERM ...", and nothing to dispose); U2 disposeRoot skips the unlink-first loop -> 1 red, "root removed:
+// false ... LINKS LEFT, NOT REMOVED" -- it refuses to recurse over links, which is the guarantee the rig's tree depends on.
+console.log("\n4. the overlay where a file symlink is refused (Windows without Developer Mode)");
+{
+    const refuse = { ...fs, symlinkSync: (t, a, type) => { if (type === "file") { const e = new Error("EPERM: operation not permitted, symlink"); e.code = "EPERM"; throw e; } return fs.symlinkSync(t, a, type); } };
+    const before = fs.readdirSync(ENG).length, mainBefore = fs.statSync(path.join(ENG, "main.js")).size;
+    let o = null, threw = null;
+    try { o = rootWithBuilds({ "99": "export const probe = 1;\n" }, { fsx: refuse }); } catch (e) { threw = e; }
+    const kinds = o ? o.made.reduce((m, x) => (m[x.kind] = (m[x.kind] || 0) + 1, m), {}) : {};
+    const same = o ? ["main.js", ".gitignore", "vendor/three-webgpu/three.core.js"].every((r) => fs.existsSync(path.join(ENG, r)) &&
+        fs.readFileSync(path.join(o.root, r)).equals(fs.readFileSync(path.join(ENG, r)))) : false;
+    const viaSlot = o ? fs.readFileSync(path.join(o.root, "three-patched", "99", "three.core.js")).equals(fs.readFileSync(path.join(ENG, "vendor", "three-webgpu", "three.core.js"))) : false;
+    ok("!! *** the overlay is built where a file symlink is refused: directories as junctions, files by hardlink or copy ***",
+       !threw && !kinds.symlink && (kinds.hardlink || 0) + (kinds.copy || 0) > 0 && (kinds.junction || 0) > 0 && same && viaSlot,
+       threw ? "THREW: " + threw.message : JSON.stringify(kinds) + "; main.js, .gitignore and three.core.js read the same through the root and through a slot");
+    const gone = o ? o.dispose() : { removed: false, left: [] };
+    ok("!! ...and disposing it removes the overlay and NOTHING it pointed at",
+       gone.removed && o && !fs.existsSync(o.root) && fs.readdirSync(ENG).length === before && fs.statSync(path.join(ENG, "main.js")).size === mainBefore,
+       `root removed: ${gone.removed}; the engine still holds ${fs.readdirSync(ENG).length} of ${before} entries and main.js its ${mainBefore} bytes` +
+       (gone.left.length ? `; LINKS LEFT, NOT REMOVED: ${gone.left.join(", ")}` : ""));
+}
+
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the reproductions against the CDN's own copy, which the page here cannot load (they point at the vendored " +
     "0.185.1, which the recorded hash says is three's own build of it); three's e2e tests, which need its examples and screenshots; " +

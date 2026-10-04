@@ -120,11 +120,16 @@ export function costFor(device, mode, rec = null) {
  * Falls back to the unscaled cost if the scale cannot be read, because a missing scale is 1.0 by that
  * module's own definition and an unscaled hint is exactly what the caller had before.
  */
-export function scaledCostFor(device, mode, rec = null, scale = null) {
+// *** v4778 RIG RUN -- AN UNREADABLE SCALE WAS REPLACED BY THE HOST'S, NOT BY 1.0. *** `!Number.isFinite(s)` sent a
+// GIVEN NaN to hostScale() exactly as it sent an absent one, so "a missing scale falls back to 1.0" held only on a
+// box whose host scale IS 1.0 -- this container's, with no local runs to scale by. Keith's rig reads 1.22 and the
+// row went red there. Only an ABSENT scale (null/undefined) asks the host; one that was given and cannot be read
+// is 1.0, as the header says. `readHost` is the seam a gate uses to see that on a box whose own scale is 1.
+export function scaledCostFor(device, mode, rec = null, scale = null, { readHost = () => hostScale().scale } = {}) {
     const base = costFor(device, mode, rec);
     if (base === null) return null;
     let s = scale;
-    if (!Number.isFinite(s)) { try { s = hostScale().scale; } catch { s = 1; } }
+    if (s == null) { try { s = readHost(); } catch { s = 1; } }
     return base * (Number.isFinite(s) && s > 0 ? s : 1);
 }
 

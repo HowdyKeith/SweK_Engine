@@ -1,0 +1,47 @@
+{
+ "gate": "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "particles: dB over the frame and on their pixels, by motion source",
+   "columns": [
+    "particles",
+    "region px",
+    "vectors: frame",
+    "vectors: particles",
+    "flow: frame",
+    "flow: particles",
+    "drawn at t: frame",
+    "drawn at t: particles",
+    "largest vector px"
+   ],
+   "rows": [
+    [
+     "instanced",
+     1707,
+     24.28406586686073,
+     14.762886800778148,
+     26.134985597928825,
+     16.79271849324926,
+     27.60484562482761,
+     18.651941644683887,
+     5.04656066306275
+    ],
+    [
+     "baked",
+     1707,
+     21.891111027622078,
+     12.285861755943309,
+     23.866450052445703,
+     14.591044940962716,
+     27.60484562482761,
+     18.651941644683887,
+     0
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

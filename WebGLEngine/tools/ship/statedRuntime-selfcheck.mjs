@@ -43,6 +43,8 @@ import { execFileSync } from "node:child_process";
 // spent a round removing, when three counters had disagreed for 153 versions without anything noticing. Two
 // rounds after reading that law I committed it. staleness.mjs owns the walk; this imports it.
 import { gateFiles } from "./staleness.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/statedRuntime-selfcheck.mjs");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -194,6 +196,8 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
         console.log(`  ----  ${path.basename(r.gate).padEnd(32)} header ${String(Math.round(r.claimMs)).padStart(7)} ms   ` +
             `record ${String(r.obs).padStart(7)} ms   RAN ${String(r.ms).padStart(6)} ms   ` +
             (reallyDrifted.includes(r) ? "DRIFTED" : "header agrees -- the RECORD was the stale side"));
+            REPORT.table("stated runtimes against the record and a run", ["gate", "header ms", "record ms", "ran ms", "verdict"],
+                ran.map((r) => [r.gate, Math.round(r.claimMs), r.obs, r.ms, reallyDrifted.includes(r) ? "drifted" : "header agrees"]), `this box is ${k}x the headers' box`);
     ok("!! *** no NEW header has drifted from what its gate actually does, MEASURED BY RUNNING IT ***",
         reallyDrifted.length === 0,
         reallyDrifted.length === 0
@@ -279,5 +283,6 @@ console.log("  ----  otherwise would be inventing a purpose for a sentence.");
 // "all checks pass" -- a gate contradicting itself in its own last two lines, introduced by the round that
 // was fixing a gate whose output could not be trusted. Caught by reading the output the repair had just
 // made visible, which is the only reason it was visible to read.
+REPORT.write();
 if (fails) { console.log("statedRuntime-selfcheck: " + fails + " FAILURES"); process.exitCode = 1; }
 else console.log("statedRuntime-selfcheck: all checks pass");

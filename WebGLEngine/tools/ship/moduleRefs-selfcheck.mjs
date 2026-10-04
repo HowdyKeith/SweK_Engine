@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { referenceGraph, specifiers, resolveSpec, ROUTES, REF_STATES } from "./moduleRefs.mjs";
+import { referenceGraph, specifiers, resolveSpec, ROUTES, REF_STATES, basenameHits, SOURCE_EXT } from "./moduleRefs.mjs";
 import { gateFiles } from "./staleness.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -119,7 +119,7 @@ try {
         for (const e of es) {
             const p = path.join(d, e.name);
             if (e.isDirectory()) { if (!/node_modules|\.git/.test(p)) walk(p); }
-            else if (/\.(js|mjs|html)$/.test(e.name)) all.push(p);
+            else if (SOURCE_EXT.test(e.name)) all.push(p);
         }
     })(ENG);
     const GATES = new Set(gateFiles(ENG).map((p) => path.resolve(p)));
@@ -145,6 +145,29 @@ try {
     ok("...and the resolver here is the SAME one the fixture proved, not a second copy",
        fs.readFileSync(fileURLToPath(import.meta.url), "utf8").includes('from "./moduleRefs.mjs"'),
        "one definition, imported by both halves of this file. A private copy for the real tree would be the second declaration this project names more often than any other defect -- and it is how the earlier attempt drifted between runs.");
+}
+
+// *** v4782 -- THE ONE-PASS INDEX IS includes(), CASE BY CASE. *** basenameHits answers "which files contain this
+// basename" for every name at once by walking backwards from each extension anchor, and referenceGraph and
+// referenceKind read it in place of a per-name scan. Every shape where a cleverer test would part company with a
+// plain substring test is here: one name the suffix of another (a.js / ba.js), ".js" inside ".json" and ".jsx",
+// ".mjs" against ".js", several dots in one name, a name at the very start of a file, and one nothing mentions.
+{
+    const T = new Map([
+        ["f1", 'import "./ba.js"; // and a.js'],
+        ["f2", "config: x.json and y.jsx"],
+        ["f3", "z.mjs, three.webgpu.js"],
+        ["f4", "a.js"],
+        ["f5", "nothing here at all"],
+    ]);
+    const bases = ["a.js", "ba.js", "x.js", "y.js", "z.js", "z.mjs", "webgpu.js", "three.webgpu.js", "nobody.js", "index.html"];
+    const got = basenameHits([...T.keys()], T, new Set(bases));
+    const want = new Map(bases.map((b) => [b, [...T.keys()].filter((f) => T.get(f).includes(b))]));
+    const bad = bases.filter((b) => [...got.get(b)].sort().join() !== want.get(b).sort().join());
+    ok("!! *** basenameHits gives includes()'s answer for every name, on the cases where a shortcut would not ***",
+        bad.length === 0,
+        bad.length ? "DIFFERS: " + bad.map((b) => `${b} got [${[...got.get(b)]}] want [${want.get(b)}]`).join("; ")
+                   : `${bases.length} names, ${[...T.keys()].length} files, every set equal -- a.js in f1 and f4 and ba.js in f1 alone, x.js inside x.json, z.js NOT in z.mjs`);
 }
 
 console.log(fails ? "\nmoduleRefs-selfcheck: " + fails + " FAILED" : "\nmoduleRefs-selfcheck: all checks pass");

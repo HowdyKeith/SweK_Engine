@@ -33,6 +33,8 @@ import { fileURLToPath } from "node:url";
 import * as ST from "../../render/aiPresenceOrbState.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurTempo-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -71,6 +73,7 @@ sec("1. *** THE CLOCK NEVER ADVANCES MORE THAN ONE FRAME IN ONE FRAME -- and the
     const rows = SESSIONS.map((s) => ({ s, ...jump(s, "responding") }));
     say("idle -> responding, worst ONE-FRAME advance in shader time, by how long the orb sat idle first:");
     for (const r of rows) say(`  ${String(r.s).padStart(4)}s idle:  t*speed ${r.mul.toFixed(3)}s    phase ${r.ph.toFixed(4)}s    ${(r.mul / r.ph).toFixed(0)}x`);
+    REPORT.table("idle tempo: t*speed against the integrated phase", ["idle s", "t*speed s", "phase s", "ratio"], rows.map((r) => [r.s, r.mul, r.ph, r.mul / r.ph]));
 
     // The bound is what a clock running at `speed` CAN advance in one frame and not a number chosen to pass.
     //
@@ -276,6 +279,8 @@ sec("4. *** WHAT 2.902 SECONDS LOOKS LIKE: the jump, in pixels, against one hone
                                                  bad: diff(run.frames[i * 3], run.frames[i * 3 + 2]) }));
         for (const r of rows) say(`${r.s.padEnd(7)} one honest frame (+${D_OK}s): ${r.ok.pct.toFixed(1)}% of bytes move, mean ${r.ok.mean.toFixed(3)}, worst ${r.ok.mx}`);
         for (const r of rows) say(`${r.s.padEnd(7)} the SHIPPED frame (+${D_BAD}s): ${r.bad.pct.toFixed(1)}% of bytes move, mean ${r.bad.mean.toFixed(3)}, worst ${r.bad.mx}`);
+        REPORT.table(`one honest frame (+${D_OK}s) against the shipped frame (+${D_BAD}s)`, ["species", "honest: % of bytes moved", "honest: mean", "honest: worst", "shipped: % of bytes moved", "shipped: mean", "shipped: worst"],
+            rows.map((r) => [r.s, r.ok.pct, r.ok.mean, r.ok.mx, r.bad.pct, r.bad.mean, r.bad.mx]));
         const ratios = rows.map((r) => r.bad.mean / Math.max(r.ok.mean, 1e-9));
         // *** THE SECOND HALF IS A RATIO NOW AND NOT A FITTED COUNT, AND v4654 IS WHY. *** It read
         // `r.ok.mx <= 20`, which was limn's honest frame at 18 of 255 -- for as long as limn's rate was
@@ -304,6 +309,7 @@ sec("4. *** WHAT 2.902 SECONDS LOOKS LIKE: the jump, in pixels, against one hone
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the orb's clock. render/aiPresenceOrbState.mjs computes the integral of speed " +
     "every tick and has done since the port's first round; until v4650 the two call sites that feed a shader " +

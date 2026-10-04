@@ -41,7 +41,7 @@ import { bcsEmboss, bcsHeatShimmer, toHalf, fmod, glmod, luma, mix, clamp, sampl
          METAL_TO_GLSL, LUMA } from "../../render/swiftShaderModel.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // v4169 -- IMPORTED AS AN ES MODULE, WHICH IS THE ONLY WAY A PAGE COULD EVER LOAD IT. The old line here was
@@ -1150,7 +1150,7 @@ console.log("\n11. *** THE GLSL, ACTUALLY RUN *** -- all 19 shaders on a real We
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
         await pg.goto("http://127.0.0.1:" + port + "/g.html", { waitUntil: "load" });

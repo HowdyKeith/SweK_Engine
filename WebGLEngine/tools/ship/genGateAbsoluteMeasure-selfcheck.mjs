@@ -20,6 +20,8 @@ import { ARMS_H5, PREREG_H5, readDoc, declared, usableFolds, foldMean, clause, h
 import { jointRows, fit, shuffled, ARM_SPEC } from "./genGateFolds.mjs";
 import { CACHE_H5, RESULT_H5 } from "./genGateAbsolute.mjs";
 import { N_FEATURES, N_FEATURES_V2, fitScaler, applyScaler, forward, auc } from "../../render/genGate.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateAbsoluteMeasure-selfcheck.mjs");
 import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -88,6 +90,8 @@ const H = h5(R.results, R.meta, d);
 {
     say("fold      base    " + ARMS_H5.map((a) => a.padEnd(7)).join(" ") + "  (seed-mean held-out AUC, seeds 11-20, x4)");
     for (const f of d.scenes) say(`${f.padEnd(8)}  ${(R.meta[f].pos / R.meta[f].n).toFixed(3)}  ` + ARMS_H5.map((a) => foldMean(R.results[f][a]).toFixed(4)).join("  "));
+    REPORT.table("H5 per fold at x4: base rate and each arm's seed-mean held-out AUC, seeds 11-20", ["fold", "base rate", ...ARMS_H5],
+        d.scenes.map((f) => [f, R.meta[f].pos / R.meta[f].n, ...ARMS_H5.map((a) => foldMean(R.results[f][a]))]));
     ok("*** the recomputed H5 is the recorded H5, diff for diff ***", J(H.a.diffs) === J(R.h5.a.diffs) && H.supported === R.h5.supported);
     const below = d.scenes.filter((f, i) => H.a.diffs[i] < 0);
     ok("*** H5 IS NOT SUPPORTED: the absolute set beats its own twin on four folds of seven, and its MEAN is NEGATIVE ***",
@@ -121,6 +125,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
     say(`S19 the largest across-seed sd per fold: ${spread.map(([f, s]) => `${f} ${s.toFixed(3)}`).join(", ")}.`);
 }
 
+REPORT.write();
 console.log(`\ngenGateAbsoluteMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: WHETHER THE x2 OBSERVATION WAS REAL AT x2. The document forbids re-analysing the x2 cache for H5, " +
             "and this gate does not. NOTHING IN dB, NOTHING BEYOND SEVEN SYNTHETIC SCENES AT TWO SPEEDS, NOTHING ABOUT REAL HARDWARE.");

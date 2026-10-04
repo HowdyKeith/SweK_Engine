@@ -19,7 +19,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { CAPABILITIES, nullBackend } from "../../gfx/device.js";
 import { TEXTURE_CAPABLE_BACKENDS } from "../../ui/orreryPost.mjs";
 import { parseBindings } from "../../render/wgslSpec.mjs";
@@ -81,7 +82,7 @@ let r = null;
         report("*** NOT A PASS. *** Sections 1 and 2 read source. Only this one binds a texture on a real device.");
         fails++;
     } else {
-        r = await runInEngineOrigin({ engineRoot: ENG, args: { N, TIME }, script: `async (a) => {
+        r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, TIME }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { badTvPipelineDesc, packKnobs, KNOB_ORDER } = await import("/render/badTvDevicePass.mjs");
             const N = a.N;
@@ -161,7 +162,7 @@ console.log("\n4. THE ADDRESS MODE IS THE CALLER'S, AND IT IS THE SAME ON BOTH B
     const skip2 = webgpuSkipReason();
     if (skip2) { console.log(`  SKIP  ${skip2}`); fails++; }
     else {
-        const w = await runInEngineOrigin({ engineRoot: ENG, args: { N, TIME }, script: `async (a) => {
+        const w = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, TIME }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { badTvPipelineDesc, packKnobs, KNOB_ORDER } = await import("/render/badTvDevicePass.mjs");
             const N = a.N, src = new Uint8Array(N * N * 4);

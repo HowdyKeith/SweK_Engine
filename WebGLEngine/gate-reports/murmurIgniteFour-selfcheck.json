@@ -1,0 +1,49 @@
+{
+ "gate": "tools/ship/murmurIgniteFour-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "four species at the peak",
+   "columns": [
+    "species",
+    "% of bytes moved",
+    "worst channel",
+    "interior ratio",
+    "interior ratio at v4659"
+   ],
+   "rows": [
+    [
+     "aura",
+     20.84418402777778,
+     132,
+     3.585572312488178,
+     2.45
+    ],
+    [
+     "fathom",
+     18.033854166666668,
+     192,
+     4.02620027851186,
+     1
+    ],
+    [
+     "geode",
+     9.74392361111111,
+     178,
+     4.897004221271257,
+     1
+    ],
+    [
+     "comet",
+     6.434461805555555,
+     36,
+     1.1359344726709684,
+     1
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

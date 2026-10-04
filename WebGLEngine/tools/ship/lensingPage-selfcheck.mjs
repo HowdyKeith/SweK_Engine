@@ -13,7 +13,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { noComments } from "./sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { einsteinRadius, imagePositions, magnifications, magnificationDifference, uOfTime, M_SUN, PARSEC }
     from "../../physics/astroparticle/lensing.js";
 
@@ -104,7 +104,7 @@ console.log("\n5. *** THE REAL BROWSER: DOES THE INVARIANT ACTUALLY HOLD ON SCRE
         report("live half SKIPPED -- " + skip);
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-4 read source, and source cannot show it runs");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const ctx = await b.newContext();
         const pg = await ctx.newPage();
         const errs = [];

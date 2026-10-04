@@ -1,0 +1,34 @@
+{
+ "gate": "render/temporalLockGPU-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "the lock kernels against their CPU mirrors",
+   "columns": [
+    "kernel",
+    "worst |gpu - cpu|",
+    "disagreements"
+   ],
+   "rows": [
+    [
+     "RING_PUSH ring",
+     3.2782554626464844e-7,
+     0
+    ],
+    [
+     "RING_FLOOR frame",
+     1.4901161193847656e-7,
+     "not counted"
+    ],
+    [
+     "RING_FLOOR window",
+     2.384185791015625e-7,
+     "not counted"
+    ]
+   ],
+   "note": "the ring over 12288 slots; fill disagreements of 1536"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -293,8 +293,10 @@ export function ownerOf(host, handovers = RECORD_HANDOVERS) {
     }
 }
 
+// v4778 rig run: path.resolve, not path.join -- `--timings C:\\x.json` (or /tmp/x.json) is an ABSOLUTE path, and join
+// glued it under the tree, so the file the caller named was never the file read.
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
-    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
+    try { return JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
 }
 
 /**
@@ -925,7 +927,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // result gets carried to another machine -- so under --json it was the line most likely to
         // land inside the capture and the least likely to be noticed by the box that wrote it.
         if (target.foreign) log(`[sweep] NOT writing ${timingsFile}: ${target.why}`);
-        fs.writeFileSync(path.join(root, target.file), JSON.stringify({
+        fs.writeFileSync(path.resolve(root, target.file), JSON.stringify({
             host: target.host,
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
                   "*** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with " +

@@ -29,6 +29,8 @@ import * as K from "../../render/murmurKit.mjs";
 import { createPresenceState } from "../../render/aiPresenceOrbState.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurClock-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -70,6 +72,8 @@ sec("1. *** THE CLOCK NO LONGER LEAPS WHEN THE CADENCE RISES -- and the expressi
     const rows = SESSIONS.map((s) => ({ s, ...ramp(s) }));
     say("comet's orbital phase, worst ONE-FRAME advance as the cadence goes to full:");
     for (const r of rows) say(`   after ${String(r.s).padStart(4)}s:  integrated ${r.worstInt.toFixed(5)} rad    murmur's rate*t ${r.worstNaive.toFixed(4)} rad    ${(r.worstNaive / r.worstInt).toFixed(0)}x`);
+    REPORT.table("comet's orbital phase: worst one-frame advance as the cadence goes to full", ["session s", "integrated rad", "murmur's rate*t rad", "ratio"],
+        rows.map((r) => [r.s, r.worstInt, r.worstNaive, r.worstNaive / r.worstInt]));
 
     // The ceiling is what the clock CAN cover in one frame at IDLE's own tempo, not a number chosen to pass:
     // the phase advances at most base * (1 + a) per second of shader time, and IDLE runs at speed 0.30.
@@ -446,6 +450,8 @@ sec("5. *** THE TWO RATES THIS FILE RECORDED AS OUT OF REACH, AND WHAT EACH ONE 
         const rows = [5, 60, 300, 1800].map((s) => ({ s, ...run(s) }));
         say("duet's orbital phase, worst ONE-FRAME advance across a 25 s window containing one gesture:");
         for (const r of rows) say(`   after ${String(r.s).padStart(4)}s:  integrated ${r.wI.toFixed(6)} rad    murmur's rate*t ${r.wN.toFixed(4)} rad    ${(r.wN / r.wI).toFixed(0)}x`);
+        REPORT.table("duet's orbital phase: worst one-frame advance across a window holding one gesture", ["session s", "integrated rad", "murmur's rate*t rad", "ratio"],
+            rows.map((r) => [r.s, r.wI, r.wN, r.wN / r.wI]));
         const flat = Math.max(...rows.map((r) => r.wI)) - Math.min(...rows.map((r) => r.wI));
         // THE FLATNESS BOUND IS RELATIVE AND THE REASON IS THE SAMPLING GRID, not slack. Each window starts
         // at a different settle, so its 1/60 s frames land on different points of the gesture's sin^2 peak
@@ -599,6 +605,7 @@ sec("4. *** AND IT REACHES PIXELS: the cadence moves comet's orbit, and IDLE at 
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the species' own clocks, and the one place this port deliberately does NOT do " +
     "what murmur does. murmur hands a moving rate to mh_drift, whose phase is rate * t; this port hands it " +

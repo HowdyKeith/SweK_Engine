@@ -15,6 +15,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -76,6 +77,9 @@ else {
     if (r.ok && r.result && !r.result.webgpu.err) {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         for (const cn of ["belt8", "belt16"]) say(`${cn}: the highlight's ${o[cn].hlPx} pixels -- vectors ${f(o[cn].vectors.hl)} dB, the flow ${f(o[cn].flow.hl)}, standing still guessed ${f(o[cn].still.hl)}; the frame ${f(o[cn].vectors.all)}, ${f(o[cn].flow.all)}, ${f(o[cn].still.all)}`);
+        gateReport("fx/fsr/fsrFlowStill-selfcheck.mjs").table("a still highlight over a moving belt: dB by motion source",
+            ["case", "highlight px", "highlight: vectors", "highlight: flow", "highlight: still guessed", "frame: vectors", "frame: flow", "frame: still guessed"],
+            ["belt8", "belt16"].map((cn) => [cn, o[cn].hlPx, o[cn].vectors.hl, o[cn].flow.hl, o[cn].still.hl, o[cn].vectors.all, o[cn].flow.all, o[cn].still.all])).write();
         ok(`  [webgpu] the generator asks for standing still only when told: ${JSON.stringify(o.flags).replace(/"/g, "")}`, o.flags.flow === false && o.flags.still === true,
            "fx/fsr/fsrFrameGenTsl.mjs passes { stillGuess: !!flow.stillGuess } to render/opticalFlowTsl.mjs");
         ok(`*** [webgpu] the flow finds the still highlight the belt's vectors drag -- ${d(o.belt8.flow.hl, o.belt8.vectors.hl)} and ${d(o.belt16.flow.hl, o.belt16.vectors.hl)} dB on its pixels -- and standing still guessed adds ${d(o.belt8.still.hl, o.belt8.flow.hl)} and ${d(o.belt16.still.hl, o.belt16.flow.hl)} ***`,

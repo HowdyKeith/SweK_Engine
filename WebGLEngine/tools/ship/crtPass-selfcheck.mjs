@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { prose } from "./sourceScan.mjs";   // v4145 -- the licence-reasoning check reads a COMMENT, so it reads prose()
 import { DEFAULTS, PRESETS, barrel, scanline, mask, vignette, crtImage } from "../../render/crtModel.js";
 
@@ -139,7 +139,7 @@ console.log("\n4. *** GPU vs CPU: TWO IMPLEMENTATIONS, ONE ANSWER ***");
         report("*** A SKIP, NOT A PASS: sections 1-3 only ever exercised the CPU model. Without this the GLSL");
         report("    is UNTESTED, and it is the half that actually ships to the screen.");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e.message)));
         await pg.route("**/*", (route) => {

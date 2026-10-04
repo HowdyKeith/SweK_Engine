@@ -14,6 +14,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -152,6 +153,14 @@ else {
         const w = o.scroll, j = w.changedAt[0] || { flow: [], retry: [], nb: [] }, v = (a) => `(${a.slice(0, 2).map((x) => x.toFixed(1)).join(", ")}) at ${(a[2] ?? 0).toFixed(2)}`;
         say(`the block it changed, (${j.bx}, ${j.by}), ${j.inn} of its 64 pixels in the interior: ${v(j.flow)} without the retry and ${v(j.retry)} with it; the wall beside it ${j.nb[3] ? v(j.nb[3].split(",").map(Number)) : "-"}`);
         say(`the knot in front of a wall scrolling 3 px a frame: the frame ${f(w.flow.all)} dB with the flow, ${f(w.retry.all)} retrying; the wall's clear interior (${w.innerPx} px) ${f(w.flow.wall)} and ${f(w.retry.wall)}; the retry changed ${w.changed} of ${w.blocks} blocks`);
+        const SQ = ["16 px", "12 px", "16 px bright"];
+        gateReport("fx/fsr/fsrFlowRetry-selfcheck.mjs")
+            .table("a small square moving fast over a still wall: dB by motion source", ["case", "square px", "square: vectors", "square: flow", "square: retrying",
+                "where it was, is and will be: vectors", "...flow", "...retrying", "frame: vectors", "frame: flow", "frame: retrying", "blocks right: flow", "blocks right: retrying"],
+                SQ.map((cn) => [cn, o[cn].sqPx, o[cn].vectors.sq, o[cn].flow.sq, o[cn].retry.sq, o[cn].vectors.ghost, o[cn].flow.ghost, o[cn].retry.ghost,
+                    o[cn].vectors.all, o[cn].flow.all, o[cn].retry.all, o[cn].flow.blocks, o[cn].retry.blocks]))
+            .table("why it is not the default: a wall scrolling behind a turning knot", ["arm", "frame dB", "wall interior dB", "wall interior px", "blocks changed", "blocks"],
+                [["the flow", w.flow.all, w.flow.wall, w.innerPx, 0, w.blocks], ["retrying", w.retry.all, w.retry.wall, w.innerPx, w.changed, w.blocks]]).write();
         ok(`*** [webgpu] on a wall whose texture scrolls behind a turning knot the retry changes ${w.changed} block of ${w.blocks} and costs the wall's clear interior ${d(w.retry.wall, w.flow.wall)} dB, the frame ${d(w.retry.all, w.flow.all)} -- so \`flow: { retryRadius: 8 }\` is there and is not the default ***`,
            w.changed >= 1 && w.changed <= 4 && w.retry.wall - w.flow.wall < -3,
            "a block at the knot's edge, the knot turning and the wall beside it moving 3 px: its window answered neither, and the retry found an offset that scores lower and is neither either, at a higher confidence -- which the reconciliation reads 3 x 3 blocks about each pixel, so it reaches the wall's interior. A retry takes the lowest score, and where two motions share a block the lowest score is not the motion. " +

@@ -29,6 +29,8 @@ import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness
 import { validateWgsl } from "./wgslSpec.mjs";
 import { INTERP_WGSL, INTERP_STRIDE, NO_OWNER } from "./frameInterpWgsl.mjs";
 import { interpolateFrameCPU } from "./frameInterp.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/frameInterpGPU-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -278,6 +280,8 @@ console.log("\n3. DEPTH THAT VARIES, INCLUDING NEGATIVE -- WHERE A RAW BITCAST W
     const c = cmp("checker"), s = cmp("signed"), x = cmp("contested");
     for (const [k, v] of [["checker", c], ["signed", s], ["contested", x]])
         say(`${k.padEnd(9)} CPU ${v.cpu.holes} holes, device ${v.dev.holes}; mask differs ${v.holeDiff}; worst |vec| ${v.worstVec.toExponential(2)}, |zbuf| ${v.worstZ.toExponential(2)}, |frame| ${v.worstFrame.toExponential(2)}`);
+        REPORT.table("the device's splat against the CPU's on depth that varies", ["case", "CPU holes", "device holes", "mask differs", "worst |vec| px", "worst |zbuf|", "worst |frame|"],
+            [["checker", c], ["signed", s], ["contested", x]].map(([k, v]) => [k, v.cpu.holes, v.dev.holes, v.holeDiff, v.worstVec, v.worstZ, v.worstFrame]));
     ok("*** the device matches on alternating depths, on SIGNED depths spanning zero, and on blocks aimed into each other's footprints ***",
        [c, s, x].every((v) => v.holeDiff === 0 && v.worstVec < 1e-4 && v.nanMis === 0),
        [["checker", c], ["signed", s], ["contested", x]].map(([k, v]) => `${k}: ${v.holeDiff} mask differences`).join("; ") +
@@ -507,6 +511,7 @@ console.log("\n8. *** THE JOINED CHAIN -- SPLAT, FILL, WARP AGAIN -- AGAINST ONE
 // this entry point. Nothing in the tree would have caught it; the only thing that did was reading the function
 // being called.
 
+REPORT.write();
 console.log(`\nframeInterpGPU-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: THE CHAIN'S COST, WHICH IS THE REASON IT LOOKS LIKE THIS. Section 8 sends the " +
     "vector field host -> device -> host -> device because a joined warp-and-fill needs eleven storage bindings " +

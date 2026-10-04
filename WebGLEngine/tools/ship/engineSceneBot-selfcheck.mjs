@@ -23,7 +23,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -52,7 +52,7 @@ const srv = http.createServer((req, res) => {
 await new Promise((r) => srv.listen(0, "127.0.0.1", r));
 const port = srv.address().port;
 const browser = await chromium.launch({ executablePath: HEADLESS_SHELL,
-    args: ["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
+    args: [...webglLaunchArgs().args, "--enable-webgl", "--ignore-gpu-blocklist"] });
 const pageErrors = [];
 let R = null, bootMs = 0;
 try {

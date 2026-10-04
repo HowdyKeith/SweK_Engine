@@ -174,6 +174,21 @@ export function generatedImportArgs(src) {
         if (bare) arg = bare[1].trim();
         if (arg) out.push(arg);
     }
+    // *** RIG RUN 2 -- THE FOURTH SHAPE: A DYNAMIC import() WRITTEN INTO A PROGRAM BUILT BY CONCATENATION. ***
+    // roughDiffuseWired-selfcheck handed `node -e` the string "const M=await import(" + JSON.stringify(before) + ");",
+    // with `before` a path.join. Neither surface above reads it -- importArgs sees the `import(` inside a string
+    // literal, and generatedImportArgs looked only for `from ${...}` -- so on Keith's rig the child died on "C:" and the
+    // gate blamed git. A string literal ending in `import(` and continued by `+ EXPR +` is the call under construction.
+    const EXPR = String.raw`JSON\.stringify\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[A-Za-z_$][\w$.]*`;
+    for (const m of String(src || "").matchAll(new RegExp(String.raw`import\(\s*["'\`]\s*\+\s*(` + EXPR + String.raw`)\s*\+\s*["'\`]\s*\)`, "g"))) {
+        let arg = m[1].trim();
+        const enc = /^JSON\.stringify\s*\(([\s\S]*)\)$/.exec(arg);
+        if (enc) arg = enc[1].trim();
+        const bare = /^[A-Za-z_$][\w$]*$/.test(arg) &&
+            new RegExp("(?:const|let|var)\\s+" + arg + "\\s*=\\s*([^;\\n]*)").exec(src);
+        if (bare) arg = bare[1].trim();
+        if (arg) out.push(arg);
+    }
     return out;
 }
 
@@ -396,6 +411,18 @@ function walk(dir, out = []) {
                 'const NET = `import { reportThrows } from ${JSON.stringify(MOD)};`;') &&
        !offends('const ENG_URL = pathToFileURL(ENG).href;\nconst b = `import x from "${ENG_URL}/ui/a.mjs";`;'),
        "the file:// form and fsrPage's named-URL-const form, which is the spelling v4646 already put in the tree");
+
+    // RIG RUN 2: roughDiffuseWired's shipped line, a path imported by a program built with `+`.
+    // SABOTAGE W1: roughDiffuseWired-selfcheck's repair reverted on the real file -> 1 red, the whole-tree row, naming it:
+    // "tools/ship/roughDiffuseWired-selfcheck.mjs -> GENERATED import from path.join(...)". Restored, md5 verified.
+    const SHIPPED_ROUGH = 'const before = path.join(ENG, "physics/render/_ptBefore.mjs");\n' +
+                          'const prog = "const M=await import(" + JSON.stringify(before) + ");" + "x";';
+    ok("!! *** SABOTAGE: roughDiffuseWired's shipped line -- import( + JSON.stringify(a path) + ) in a `node -e` program -- IS an offender ***",
+       offends(SHIPPED_ROUGH),
+       "the child read \"C:\" as a URL scheme on Keith's rig, and the row it fed said git show had failed");
+    ok("...and its repair is silent",
+       !offends('const before = path.join(ENG, "a.mjs");\nconst prog = "const M=await import(" + JSON.stringify(pathToFileURL(before).href) + ");";'),
+       "pathToFileURL(before).href inside the encode");
 
     // *** AND THE CONTROL THAT COST THE FIRST DRAFT OF THIS RULE. *** Matching `from ${...}` alone flagged
     // FOUR SENTENCES on its first whole-tree run -- brain.js, KitScatter, ringFloorPhase, slugNapalm --

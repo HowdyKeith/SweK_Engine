@@ -38,7 +38,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { webgpuSkipReason } from "./webgpuHarness.mjs";
 import { prose } from "./sourceScan.mjs";
 import path from "node:path";
@@ -64,7 +64,7 @@ async function renderedPanel(file, stub) {
         res.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); res.end(fs.readFileSync(f));
     });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const read = async () => { const pg = await br.newPage({ viewport: { width: 900, height: 700 } });
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(2500);
         return pg.evaluate(() => { const el = document.getElementById("rigOnlyList");

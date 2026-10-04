@@ -19,6 +19,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { auc, aucP, N_FEATURES as N1, N_FEATURES_V2 as N2 } from "../../render/genGate.mjs";
 import { rowsOf, leaveOneOut, harvestAll, SCENES, CACHE } from "./genGateTransfer.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateTransfer-selfcheck.mjs");
 import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -149,6 +151,8 @@ console.log("\n4. C9 -- THE PER-FOLD NUMBERS, REPORTED BECAUSE THEY WERE DECLARE
     for (const k of ["v2", "v1", "shuffled"])
         say(`${k.padEnd(9)} per-fold ${RESULTS[k].perFold.map((f) => `${f.held}:${f.auc.toFixed(3)}`).join("  ")}` +
             `   (pooled ${RESULTS[k].pooled.auc.toFixed(4)} -- NOT USABLE, see section 1)`);
+            REPORT.table("C9: held-out AUC per fold, reported because declared and not promoted", ["arm", "held-out fold", "AUC"],
+                ["v2", "v1", "shuffled"].flatMap((k) => RESULTS[k].perFold.map((f) => [k, f.held, f.auc])), "the pooled AUC is not usable -- section 1");
     // *** AND THE PER-FOLD NUMBERS CANNOT BE PROMOTED TO THE PRIMARY EITHER, WHICH IS THE HARDER POINT. ***
     const shFolds = RESULTS.shuffled.perFold.map((f) => f.auc);
     const spread = Math.max(...shFolds) - Math.min(...shFolds);
@@ -222,6 +226,7 @@ console.log("\n4. C9 -- THE PER-FOLD NUMBERS, REPORTED BECAUSE THEY WERE DECLARE
 // load-bearing against the failure it was written for, and its vacuity under direct edit is the same
 // irreducible limit v4688's hardwired-[] mutation recorded -- stated rather than chased.
 
+REPORT.write();
 console.log(`\ngenGateTransfer-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: WHETHER THE SCALE-FREE FEATURES TRANSFER. That was H3 and it is NOT ANSWERED -- " +
     "the design cannot answer it, which is what this round found. A sound test needs a statistic that does not " +

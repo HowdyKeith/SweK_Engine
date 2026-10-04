@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { interpolateFrameCPU, crossFadeCPU } from "./frameInterp.mjs";
 import * as FI from "./frameInterpTsl.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/frameInterpTsl-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -217,6 +219,8 @@ else {
         };
         const rows = Object.keys(CASES).map((k) => [k, cmp(k)]);
         for (const [k, x] of rows) say(`[${mode}] ${k.padEnd(16)} CPU ${String(x.holes).padStart(4)} holes; mask differs ${x.holeDiff}, vector ${x.vecDiff}, depth ${x.zDiff}; worst |frame| ${x.frameW.toExponential(2)}`);
+        REPORT.table(`[${mode}] the TSL splat against interpolateFrameCPU`, ["case", "CPU holes", "mask differs", "vector differs", "depth differs", "worst |frame|"],
+            rows.map(([k, x]) => [k, x.holes, x.holeDiff, x.vecDiff, x.zDiff, x.frameW]));
         ok(`*** [${mode}] the SPLAT is interpolateFrameCPU's on every pixel of all ${rows.length} cases -- the hole mask, the vector and the depth it was settled on, exactly ***`,
            rows.every(([, x]) => x.holeDiff === 0 && x.vecDiff === 0 && x.zDiff === 0),
            "a depth-tested draw of one quad per block, strict less, in index order: the nearer block wins and a tie keeps the first writer, as the CPU's `d < zbuf[j]` does");
@@ -242,6 +246,8 @@ else {
                 return [k, { holeD, aD, bD, fw, holes: x.holes, filled: x.filled }];
             });
             for (const [k, x] of rowsA) say(`[${mode}] ${k.padEnd(13)} CPU ${String(x.holes).padStart(4)} holes${x.filled ? `, ${x.filled} filled` : ""}; mask differs ${x.holeD}, cur offset ${x.aD}, prev offset ${x.bD}; worst |frame| ${x.fw.toExponential(2)}`);
+            REPORT.table(`[${mode}] the TSL arc against interpolateFrameCPU({ toT })`, ["case", "CPU holes", "filled", "mask differs", "cur offset differs", "prev offset differs", "worst |frame|"],
+                rowsA.map(([k, x]) => [k, x.holes, x.filled || 0, x.holeD, x.aD, x.bD, x.fw]));
             ok(`*** [${mode}] the ARC is interpolateFrameCPU({ toT })'s on every pixel of all ${rowsA.length} cases -- the mask and BOTH offsets exactly, through the fill too, the frame to f32 ***`,
                rowsA.every(([, x]) => x.holeD === 0 && x.aD === 0 && x.bD === 0 && x.fw < 2e-6) && cpuArc.arcDeclined.holes > cpuArc.arcCurve.holes && cpuArc.arcFilled.filled > 0,
                "a second splat of the same blocks at the same depths settles the same winners, and the same fill over it chooses the same neighbours -- the blend's choice is the depth's");
@@ -273,6 +279,7 @@ else {
 // F3 is 2 and not 4 because TSL's round() and floor(x + 0.5) part only on tieHalf -- the case v4734 added to the WGSL
 // kernel's gate for the same reason.
 // v4744, the arc: A5-A11 in fx/fsr/fsrFrameGenArc-selfcheck.mjs's log redden the arc row here, two or three each.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the FILL (render/holeFill.mjs), which interpolateFrameCPU runs between the two when asked and this module does not " +
     "yet carry; depths closer than the key's ~2.4e-7, which become ties -- measured at v4757 on real fields and noted in render/frameInterpTsl.mjs, 2 pixels of 16384 at a near/far ratio of 1e5 and none at the page's; and a field on a real three.js scene, which the driver's gate draws.");

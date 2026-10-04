@@ -1,0 +1,49 @@
+{
+ "gate": "fx/fsr/fsrFlowSeed-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "a generated frame's dB: the vectors, the flow, and the flow seeded with the vectors",
+   "columns": [
+    "case",
+    "largest vector px",
+    "vectors dB",
+    "flow dB",
+    "seeded dB"
+   ],
+   "rows": [
+    [
+     "scroll27",
+     26.74156414271755,
+     25.860992666294397,
+     26.701354215185702,
+     26.975929272243246
+    ],
+    [
+     "scroll40",
+     39.77447940512189,
+     22.499046977186545,
+     19.79065768347629,
+     23.36840742223291
+    ],
+    [
+     "reflection44",
+     44.18157196044922,
+     25.360160604715325,
+     30.39511975180122,
+     32.00901317163643
+    ],
+    [
+     "slow",
+     2.0473434070523053,
+     36.831584933994904,
+     37.351121290345404,
+     37.351121290345404
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

@@ -1,0 +1,104 @@
+{
+ "gate": "render/holeFillGPU-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "the device's fill against the CPU's, every side mode and flag",
+   "columns": [
+    "mode",
+    "CPU filled",
+    "device filled",
+    "CPU abstained",
+    "device abstained",
+    "hole differs",
+    "side differs",
+    "worst |vec|"
+   ],
+   "rows": [
+    [
+     "derived",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "depth",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "blend",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "prevSide",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "curSide",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "nearer",
+     192,
+     192,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     "radius2",
+     192,
+     192,
+     96,
+     96,
+     0,
+     0,
+     0
+    ],
+    [
+     "reversed",
+     192,
+     192,
+     192,
+     192,
+     0,
+     0,
+     0
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

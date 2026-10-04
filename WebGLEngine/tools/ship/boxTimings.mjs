@@ -53,6 +53,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { boxId } from "./hostScale.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -150,7 +151,9 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
         "right); this is how a box records what IT measured without overwriting another machine's numbers. " +
         "`kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial " +
         "reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed " +
-        "-- and NOT for the ship-time budget, which still reads the shared file. See task #87.";
+        "-- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` " +
+        "holds the last three alone readings; recordReach's margin row reads it on a box that does not own the " +
+        "shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.";
     const stamp = now || new Date().toISOString();
     rec.captured = stamp;
     const wrote = [];
@@ -164,8 +167,31 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
         rec.at[g] = stamp;
         rec.kinds[g] = capped ? "capped" : "alone";
         rec.codes[g] = capped ? null : (r && typeof r.status === "number" ? r.status : null);
+        // v4781 -- and the last three ALONE readings, as the shared record keeps them (quickSweep's SERIAL_RING): one
+        // reading is an hour, not a property. A capped run is a floor, so it never enters the ring.
+        if (!capped) { rec.serialRing = rec.serialRing || {}; rec.serialRing[g] = (rec.serialRing[g] || []).concat(ms).slice(-3); }
         wrote.push({ gate: g, ms, capped, code: rec.codes[g] });
     }
     fs.writeFileSync(abs, JSON.stringify(rec, null, 1) + "\n");
     return { file: rel, host: id, wrote, total: Object.keys(rec.timings).length };
+}
+
+// *** RIG RUN 2 -- A COMMAND FOR IT. *** recordLocal had no front door, so a box whose readings a gate wants (recordReach's
+// margin row reads this box's own ring wherever another box measured the shared one) had no way to give them but code.
+//     node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]
+// runs each gate alone N times (default 3, the ring's depth) and writes this box's per-box record. Parsed by cliArgs, the
+// tree's one parser (rig run 3: the first draft read argv by hand and cliArgs-selfcheck counted it, 13 -> 14).
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+    const CLI = { values: { "--record": "string", "--times": "number" }, flags: [] };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("boxTimings", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const gates = String(cli.values["--record"] || "").split(",").map((g) => g.trim().split(path.sep).join("/")).filter(Boolean);
+    if (!gates.length) { console.log("boxTimings: usage: node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]"); process.exit(2); }
+    const times = cli.values["--times"] || 3;
+    let res = null;
+    for (let k = 0; k < times; k++) {
+        res = recordLocal(gates);
+        console.log(`boxTimings: pass ${k + 1}/${times} -> ` + res.wrote.map((w) => `${path.basename(w.gate)} ${w.ms} ms${w.capped ? " (CAPPED)" : ""}`).join(", "));
+    }
+    console.log(`boxTimings: wrote ${res.file} for ${res.host}`);
 }

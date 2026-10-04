@@ -12,7 +12,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { webgpuSkipReason } from "./webgpuHarness.mjs";
 import { buildOrrery } from "../../world/orrery.mjs";
 import { makeGitEconomy } from "../../world/gitEconomy.mjs";
@@ -73,7 +73,7 @@ else {
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     const origin = `http://127.0.0.1:${srv.address().port}`;
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const ctx = await br.newContext({ viewport: { width: 640, height: 480 } });
     const A = await ctx.newPage(), B = await ctx.newPage(); const errs = []; for (const p of [A, B]) p.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await A.goto(origin + "/orrery-gpu.html?peer=a", { waitUntil: "load" });

@@ -60,7 +60,7 @@ import { gateFiles } from "./staleness.mjs";
 // v3450 -- THE RESOLVER IS NO LONGER PRIVATE TO THIS FILE. moduleRefs.mjs is the one definition and it is
 // PROVEN ON A FIXTURE before it is pointed at anything; keeping a second copy here is how the earlier attempt
 // drifted between runs, and it is the second-declaration defect this project names more often than any other.
-import { referenceGraph } from "./moduleRefs.mjs";
+import { referenceGraph, SOURCE_EXT } from "./moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -82,7 +82,7 @@ function corpus() {
         for (const e of es) {
             const p = path.join(d, e.name);
             if (e.isDirectory()) { if (!/node_modules|\.git/.test(p)) walk(p); }
-            else if (/\.(js|mjs|html)$/.test(e.name)) all.push(p);
+            else if (SOURCE_EXT.test(e.name)) all.push(p);
         }
     })(ENG);
     const text = new Map(all.map((f) => { try { return [f, fs.readFileSync(f, "utf8")]; } catch { return [f, ""]; } }));
@@ -101,8 +101,9 @@ const { all, text } = corpus();
 // The graph is built with NO exclusions, because this file measures the exposure INCLUDING what the registers
 // rescue -- excluding them here would quietly lower the very number being ratcheted. The two established
 // exclusions are applied to the MENTION side only, below, where they mirror what graveyard actually does.
-const GRAPH = referenceGraph(all, (f) => text.get(f) || "", ENG, { exclude: new Set() });
+const GRAPH = referenceGraph(all, (f) => text.get(f) || "", ENG, { exclude: new Set(), allBases: true });
 const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) => r.from)]));
+const WHERE = GRAPH.where;
 
 /* ------------------------------------------------------------------------------------------------------------
  * 1. THE PROVEN INSTANCE -- a mention rescues a module, and the mention is a changelog line
@@ -225,7 +226,20 @@ const RESOLVED = new Map(all.map((f) => [f, (GRAPH.refs.get(f) || []).map((r) =>
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
-const RESCUED_CEILING = 288;
+// *** v4778 -- RAISED FROM 288 TO 332, BY NAME, ON KEITH'S DECISION, by the method the v4535 note above used and for its
+// reason: this gate ran over the budget, so the v4776 and v4778 merges landed unmeasured. The member list diffed
+// against a run at 5d3d8d83, the commit that set 288 (it reproduces 288 there): 49 arrived and 5 left (anim/ik,
+// tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 288 + 49 - 5 = 332. 36 of the 49 are
+// graveyard-selfcheck's arrivals over the same interval, named there. The other 13, without extensions so this note
+// rescues none of them: brain/capsuleHazard, mesh/colliderFromGLB, nav/partitionScore, nav/pathCost,
+// physics/character/groundProbe, tools/bakeConnectomeTopology, tools/bakeGfcTopology, tools/ship/backlogAbsence,
+// controllerAgreement, fixtures/tslBuilderThrows, ship, verify, wasmTeardown. Catching up to the merges, excusing none:
+// the three routes down are unchanged.
+// v4778 SABOTAGES, each on the real file, restored and md5 verified: graveyard-selfcheck's note spelling one module
+// with its extension (adapterRecord.mjs, the one arrival no prose rescued) -> 1 red, 333 against 332; a sweep closing
+// in gateSweep.mjs naming one more gate-only module (anim/reachIK.mjs) -> 1 red on the ritual row, 58 against 57,
+// naming it.
+const RESCUED_CEILING = 332;
 
 const rescued = [];
 {
@@ -242,7 +256,11 @@ const rescued = [];
         // not a consumer of them" -- and the right response is to close the CLASS rather than raise a number:
         // a file whose job is to NAME these modules is never their caller. Excluded by identity, not by a
         // hardcoded path, so it stays true if this file is ever renamed.
-        const mentions = all.filter((c) => c !== f && !EXCLUDED.has(c) && !res.includes(c) && (text.get(c) || "").includes(base));
+        // v4782: the same substring test, answered from one index over the corpus (moduleRefs.basenameHits) rather
+        // than by reading every file for every candidate -- 1,881 x 5,087 was most of this gate's ~175 s.
+        const holders = WHERE.get(base);
+        const mentions = holders ? all.filter((c) => holders.has(c) && c !== f && !EXCLUDED.has(c) && !res.includes(c))
+                                 : all.filter((c) => c !== f && !EXCLUDED.has(c) && !res.includes(c) && (text.get(c) || "").includes(base));
         if (mentions.length) rescued.push({ f: rel(f), by: mentions.map(rel) });
     }
     const freq = {};
@@ -308,7 +326,15 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
-    const RITUAL_CEILING = 39;
+    // *** v4778 -- RAISED FROM 39 TO 57, BY NAME, ON KEITH'S DECISION. *** Diffed against 5d3d8d83 (39 there): 22
+    // arrived and 4 left (tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 39 + 22 - 4 =
+    // 57. Named without extensions: from the exported-functions line, each a module its round built, gated and named
+    // in its closing -- render/dilate, flicker, luminancePyramidGPU, opticalFlowGPU, reactive, ringFloor,
+    // temporalLock, tools/ship/constantRows, fsr2Coverage, kernelReach, murmurSpeciesFrames, pageShot, realGpuRun,
+    // threePatch; and brain/agent/dispatch, math/solverFit, tools/roundhouse/androidRunner, tools/ship/budgetExile,
+    // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
+    // importer. The accrual the v4386 note predicted, one paragraph per round.
+    const RITUAL_CEILING = 57;
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",
        ritual.length <= RITUAL_CEILING,
@@ -328,10 +354,13 @@ const rescued = [];
  * 3. THE SAME DEFECT ONE LEVEL UP, WHERE ONE SENTENCE EXEMPTS A WHOLE DIRECTORY
  * --------------------------------------------------------------------------------------------------------- */
 {
-    const causes = new Map();
+    const causes = new Map(), asked = new Set();
     for (const f of all) {
         const dir = path.dirname(f), dirRel = rel(dir);
-        if (!dirRel || dirRel === "." || causes.has(dir)) continue;
+        // v4782 -- once per directory, as graveyard's twin of this loop now is: `causes.has(dir)` skipped only the
+        // directories already found named, so one nobody names was re-scanned against the corpus for every file in it.
+        if (!dirRel || dirRel === "." || asked.has(dir)) continue;
+        asked.add(dir);
         for (const c of all) {
             if (c.startsWith(dir + path.sep)) continue;
             if ((text.get(c) || "").includes(dirRel)) { causes.set(dir, rel(c)); break; }

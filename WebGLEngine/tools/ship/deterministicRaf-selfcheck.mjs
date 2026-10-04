@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { RAF_SHIM, makeRaf, makeRafNaive } from "./deterministicRaf.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -109,7 +109,7 @@ if (skip) {
         '      if (s) window.__drawSites.set(s[0], (window.__drawSites.get(s[0]) || 0) + 1); } catch (e) {}\n' +
         '    return o.call(this, m, f, c); }; })();\n' +
         '</script>';
-    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await b.newPage();
     const errs = [];
     pg.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));

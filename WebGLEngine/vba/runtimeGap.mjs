@@ -1081,11 +1081,23 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4778 -- closures 4121 -> 4125, typed arrays 1258 -> 1261 at the rtx merge: the reportLines() the six
     // BVH-CSG modules grew for their instruments rows. Closures from bvhPairOverlap, meshBoolean, triClip and
     // triTriIntersect; typed arrays from meshPointClassify, triClip and triTriIntersect. No new file.
-    // v4778 -- then tools/ship/fsrCaches.mjs and its gate, re-derived: ES modules 4276 -> 4278, closures 4125 -> 4127,
-    // async/await 1704 -> 1706, Promises 399 -> 401, fetch/XHR 249 -> 251 (the install route downloads, and its gate drives
-    // it over real HTTP); the other seven held.
-    esModules: 4278, closures: 4127, asyncAwait: 1706, typedArrays: 1261, promises: 401,
-    fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // (superseded in rig run 2) esModules: 4276, closures: 4125, asyncAwait: 1704, typedArrays: 1261, promises: 399,
+    // (superseded in rig run 2) fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 195, webgpu: 55, threads: 25, wasm: 24,
+    // rig run 2 -- four rows, each traced to the file that moved it against HEAD: realGpuRun.mjs's software-GL probe
+    // (async/await, Promises, WebGL, WebGPU: it awaits a launch, wraps a listen in a Promise, opens a webgl2 context
+    // and asks navigator.gpu); realGpuRun-selfcheck awaiting it; and windowsImport-selfcheck, whose new fixture is
+    // the string `"const M=await import(" + ...` -- the census reads string text, so a fixture that spells an await
+    // counts as one. async/await 1704 -> 1707, Promises 399 -> 400, WebGL 195 -> 196, WebGPU 55 -> 56. No new file.
+    // (superseded in rig run 4) esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1261, promises: 400,
+    // rig run 4 -- typed arrays 1261 -> 1262 alone: realGpuRun.mjs's probe now draws a triangle and reads the pixel
+    // back into a Uint8Array, the first typed array in that file. No other row moved. No new file.
+    // (superseded at the v4778 merge of the rig-fix line) esModules: 4276, closures: 4125, asyncAwait: 1707, typedArrays: 1262, promises: 400,
+    // (superseded at the v4778 merge of the rig-fix line) fetchXhr: 249, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
+    // v4778 merge -- the rig runs' rows above plus tools/ship/fsrCaches.mjs and its gate from the other line, re-derived
+    // over the merged tree: ES modules 4276 -> 4278, closures 4125 -> 4127, async/await 1707 -> 1709, Promises 400 -> 402,
+    // fetch/XHR 249 -> 251 (the install route downloads; its gate drives it over real HTTP). The other seven held.
+    esModules: 4278, closures: 4127, asyncAwait: 1709, typedArrays: 1262, promises: 402,
+    fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

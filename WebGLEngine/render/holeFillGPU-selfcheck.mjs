@@ -20,6 +20,8 @@ import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness
 import { validateWgsl, DEFAULT_LIMITS } from "./wgslSpec.mjs";
 import { FILL_WGSL, FILL_STRIDE } from "./holeFillWgsl.mjs";
 import { fillHolesCPU, SIDE_BLEND, SIDE_PREV, SIDE_CUR } from "./holeFill.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/holeFillGPU-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -200,6 +202,8 @@ console.log("\n2. *** EVERY SIDE MODE, EVERY FLAG, AND THE SIDE CODES MATCH PIXE
     for (const [k, x] of rows)
         say(`${k.padEnd(9)} filled CPU ${String(x.cpu.filled).padStart(4)} device ${String(x.dev.filled).padStart(4)};  ` +
             `abstained ${x.cpu.abstained}/${x.dev.abstained};  hole differs ${x.holeDiff}, side differs ${x.sideDiff}, worst |vec| ${x.worstVec.toExponential(1)}`);
+            REPORT.table("the device's fill against the CPU's, every side mode and flag", ["mode", "CPU filled", "device filled", "CPU abstained", "device abstained", "hole differs", "side differs", "worst |vec|"],
+                rows.map(([k, x]) => [k, x.cpu.filled, x.dev.filled, x.cpu.abstained, x.dev.abstained, x.holeDiff, x.sideDiff, x.worstVec]));
     ok("*** the device agrees with the CPU on the SIDE CODE of every pixel, in every mode -- a side is one of three integers and has no tolerance ***",
        rows.every(([, x]) => x.sideDiff === 0 && x.holeDiff === 0),
        rows.map(([k, x]) => `${k}: ${x.sideDiff} side, ${x.holeDiff} hole`).join("; "));
@@ -337,6 +341,7 @@ console.log("\n6. WHAT THE RUNNER REFUSES");
 // that grid. The same gap, in the same rule, found the same way one round apart -- which is what a mirror gate
 // inheriting a CPU gate's content inherits.
 
+REPORT.write();
 console.log(`\nholeFillGPU-selfcheck: ${fails ? `${fails} FAILED` : "ALL GREEN"}`);
 console.log("unchecked here: THE CHAIN END TO END, which is render/frameInterpGPU-selfcheck.mjs section 8's " +
     "subject and not this file's -- this gate says the fill agrees with its CPU twin, and that one says the " +

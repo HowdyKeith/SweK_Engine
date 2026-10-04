@@ -21,6 +21,8 @@ import * as RR from "./recordReach.mjs";
 import * as FR from "./frozenRecords.mjs";
 import { costOf } from "./quickSweep.mjs";
 import { stripComments as stripCode } from "../../vba/runtimeGap.mjs";
+import * as BT from "./boxTimings.mjs";
+import { boxId } from "./hostScale.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -339,9 +341,31 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
     // has now caught four times. The row below is what makes the fallback visible instead of silent.
     const RING = (t.serialRing || {});
     const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[(a.length - 1) >> 1]; };
+    // *** v4781 -- WHOSE RING. *** This read the shared record's ring alone, and the shared record is host-claimed:
+    // on any box that does not own it, nothing that box does can refresh it. The owner of this one was a cloud
+    // container that no longer exists, so after recordDrift-selfcheck went from 2,236 ms to 1,800 the row stayed red
+    // here on the old box's readings -- the "ratchet with no reachable clear state" since475 named for coverage,
+    // in a cost row. On a FOREIGN box with at least two of its own alone readings (tools/ship/boxTimings.mjs's
+    // recordLocal), those are the margin; otherwise the shared ring, as before, and the detail says which.
+    // Gate SELECTION still reads the shared record -- task #87 -- because this row reports and does not choose.
+    // SABOTAGES (v4781): this box's own ring set to [2900, 2900, 2900] -> 1 red, margin 100; the own ring ignored, i.e.
+    // the row as it was -> 1 red on this box, margin 764 off the departed box's readings.
+    // *** RIG RUN 2 -- WHOSE RING IS WHO MEASURED IT, NOT WHO MAY WRITE NEXT. *** Part 2 asked ownerOf(host), so on the rig --
+    // the record's owner by the v4778 handover -- the shared ring read as the rig's own, and Keith's run printed the retired
+    // container's [1263, 1347, 2080] "on linux-x64-4c-16096mb-142c0d" as his box's margin. Ownership says who may WRITE the
+    // record; the readings in it are the measuring box's until the owner's own sweep replaces them. So, as v4781 had it: on
+    // any box that did not measure the shared ring, its own per-box ring when it has two readings.
+    const shared = t.host || null, here = boxId();
+    // v4778 SABOTAGE R1: this box's own ring for recordDrift-selfcheck set to [2900, 2900, 2900] in
+    // sweep-timings.linux-x64-4c-16095mb-142c0d.json -> 1 red, margin 100. Restored, md5 verified. The ownerOf()
+    // change of part 2 was reverted in rig run 2 (above): driving it red needed the rig, and the rig is where it was wrong.
+    const own = (() => { try { return JSON.parse(fs.readFileSync(path.join(ENG, BT.FILES.perBox(here)), "utf8")).serialRing || {}; } catch { return {}; } })();
     const costMs = (g) => {
+        const mine = (own[g] || []).filter((n) => typeof n === "number" && n > 0);
+        if (shared && shared !== here && mine.length >= 2) return { ms: median(mine), n: mine.length, whose: "this box" };
         const r = (RING[g] || []).filter((n) => typeof n === "number" && n > 0);
-        return r.length >= 2 ? { ms: median(r), n: r.length } : { ms: cost[g].ms, n: r.length };
+        // `whose` is the box that MEASURED the shared ring -- the record's `host` -- not the box that may write it next
+        return r.length >= 2 ? { ms: median(r), n: r.length, whose: t.host || "the record" } : { ms: cost[g].ms, n: r.length, whose: t.host || "the record" };
     };
     const margin = swept.length ? Math.min(...swept.map((g) => live.budgetMs - costMs(g).ms)) : live.budgetMs;
     // *** v4778 -- `swept.length > 0` ASSERTED THAT SOME DETECTOR IS SWEPT, AND ON THE RIG NONE IS. ***
@@ -361,9 +385,13 @@ console.log("\n5. *** THE TWO GATES THIS ROUND WAS ABOUT ARE BACK INSIDE THE BUD
         `worst margin ${margin} ms of ${live.budgetMs} across the ${swept.length} swept, from ` +
         pair.map((g) => { const c = costMs(g);
             return `${path.basename(g)} ${c.ms} ms (` +
-                   (c.n >= 2 ? `median of ${c.n} serial readings [${(RING[g] || []).join(", ")}]`
+                   (c.n >= 2 ? `median of ${c.n} serial readings [${((c.whose === "this box" ? own[g] : RING[g]) || []).join(", ")}] on ${c.whose}`
                              : `${cost[g].source}, ONE reading -- the ring has ${c.n}`) +
+                   (c.whose !== "this box" && shared && shared !== here ? `, measured by ${c.whose}, not this box` : "") +
                    `, ${road(g) || "no road"})`; }).join(" and ") +
+        (pair.some((g) => costMs(g).whose !== "this box") && shared && shared !== here
+            ? `. THIS BOX HAS NOT TIMED THEM: node tools/ship/boxTimings.mjs --record ${pair.join(",")} gives it its own ring`
+            : "") +
         `. At the pre-round cost they were 446 ms and 26 ms OVER; 26 ms is close enough that a warm cache ` +
         `and a cold one land on opposite sides, which is how this drifted out unnoticed rather than failing ` +
         `loudly. A serial reading is REQUIRED here rather than merely preferred: falling back to the ` +

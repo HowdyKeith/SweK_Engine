@@ -43,7 +43,7 @@ import { createRequire } from "node:module";
 import * as A from "../../world/orreryAuthor.mjs";
 import { licenceFor } from "../../world/orrery.mjs";
 import { build, BAKE } from "./orreryAuthorScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { gateReport } from "./gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -169,7 +169,7 @@ console.log("\n5. THE PAGE ACTUALLY SHOWS IT -- an unwired bake is an orphan");
             r.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" });

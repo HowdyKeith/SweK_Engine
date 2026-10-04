@@ -10,7 +10,7 @@
 // case where WebAssembly is switched off, and checking this tree against that case found a real defect that
 // has nothing to do with polyfills.
 import { probeWasm, wasmUsable, wasmUnavailableReason, explainWasmFailure, _resetWasmProbe } from "../../engine/wasmSupport.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { codeOnly, noComments, proseHas } from "./sourceScan.mjs";
 import fs from "node:fs";
 import http from "node:http";
@@ -111,10 +111,9 @@ console.log("1. *** THE ITEM SAID '82 FILES TOUCH WASM'. THAT WAS THE LOOSEST RE
     // exported-functions line (v4739/v4766): a static server for headless page shots whose MIME table maps ".wasm"
     // to "application/wasm" -- the type instantiateStreaming refuses to compile without. +1 mention, +1 inCode;
     // comment-only stayed at 25 and callsApi and probes did not move, so the split says what it should.
-    // v4778 -- RE-TAKEN 122 -> 123 AT THE rtx MERGE, AND THIS ONE IS PROSE. physics/mesh/mikktSpace.mjs (9d6c904e)
-    // is the hand-port of MikkTSpace, and its header explains why it did not take the npm package that ships a ~41 KB
-    // .wasm binary. +1 mention, +0 inCode, so comment-only goes 25 -> 26 below: the split reads it as a sentence, which
-    // is what it is. Measured by diffing this walk over git archives of 978d26e3 and 888f776d: that file is the only one.
+    // v4778 rig run -- RE-TAKEN 122 -> 123, AND THIS ONE IS PROSE. physics/mesh/mikktSpace.mjs arrived with the rtx
+    // line's merge: its header explains why the npm port's ~41 KB .wasm build does not fit how this engine serves pages,
+    // and it hand-ports the C instead. +1 mention, 0 inCode; comment-only 25 -> 26, which is what the split is for.
     ok("!! 123 files mention .wasm or the WebAssembly API -- the item's number, and it is the loose one",
         mentions === 123, `${mentions} mention it`);
     // *** AND THIS ROW'S TITLE CARRIED A NUMBER ITS ASSERTION DOES NOT CHECK. *** It said "24 of those are
@@ -231,7 +230,7 @@ console.log("\n5. *** THE MEASUREMENT THE ROUND IS BUILT ON: A REAL BROWSER WITH
         });
         await new Promise((r) => server.listen(0, "127.0.0.1", r));
         const port = server.address().port;
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const askLoaders = async (killWasm) => {
                 const page = await browser.newPage();

@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -55,7 +55,7 @@ sec("B. IN A REAL BROWSER (the demoChrome dock): THIRTY SECONDS OF WANDER, z MOV
 const { chromium, from: pwFrom } = resolvePlaywright(require_);
 const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
 if (skip) { console.log("  SKIP  section B -- " + skip); } else {
-    const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"] });
+    const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl", "--ignore-gpu-blocklist"] });
     const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
     await page.route("**/*", (route) => {
         const u = new URL(route.request().url());

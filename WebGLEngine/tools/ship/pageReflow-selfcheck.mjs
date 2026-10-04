@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { codeOnly } from "./sourceScan.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 const ENG = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let failed = 0;
 const say = (m) => console.log("  ----  " + m);
@@ -33,7 +34,7 @@ function walk(dir, out = []) {
         const p2 = path.join(dir, f);
         let st; try { st = fs.statSync(p2); } catch { continue; }
         if (st.isDirectory()) walk(p2, out);
-        else if (/\.(js|mjs|html)$/.test(f)) out.push(p2);
+        else if (SOURCE_EXT.test(f)) out.push(p2);
     }
     return out;
 }

@@ -172,6 +172,13 @@ let browser = null;
                     catch (e) { row.video = { error: e.message }; }
                     clearInterval(timer);
                     step("probeRecording"); row.probe = REC.probeRecording(); row.h264 = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E"); row.mp4 = MediaRecorder.isTypeSupported("video/mp4");
+                    // rig run 9: where the browser offers H.264, record the TV-safe MP4 too and read what is really in it
+                    if (row.h264) { const t2 = setInterval(() => { sc.setKeyframe(kf.frames[j++ % kf.frames.length]); sc.scene.frame({ viewProj: cam.viewProj, eye: cam.eye, clear: [0.03, 0.05, 0.08, 1] }); }, 50);
+                        step("recordCanvas tvSafe");
+                        try { const tv = await within(15000, "recordCanvas tvSafe", REC.recordCanvas(cvs, 2000, 20, { tvSafe: true })); const tb = new Uint8Array(await tv.blob.arrayBuffer());
+                              row.tvVideo = { bytes: tb.length, container: tv.container, codec: tv.codec, sniff: REC.sniffContainer(tb), fourcc: REC.sniffMp4Codec(tb), playsOnTv: tv.playsOnTv }; }
+                        catch (e) { row.tvVideo = { error: e.message }; }
+                        clearInterval(t2); }
                 }
                 out.backends[bk] = row;
                 if (bk === "webgpu") { try { dev.destroy(); } catch (e) {} }   // the offscreen device is done
@@ -222,7 +229,20 @@ let browser = null;
             const v = browser.backends.webgl2.video;
             report(`video: ${v && !v.error ? `${v.bytes} bytes of ${v.codec} in ${v.container} (sniffed ${v.sniff}), plays on a TV: ${v.playsOnTv}` : "failed: " + (v && v.error)}; mp4 supported ${browser.backends.webgl2.mp4}, h264 ${browser.backends.webgl2.h264}`);
             ok("*** a WebM is recorded off the canvas here: EBML bytes and a real size ***", v && !v.error && v.bytes > 2000 && v.sniff === "webm" && v.container === "webm");
-            ok("*** and the H.264 MP4 a TV plays is refused by this browser, so it is RIG-PENDING by measurement, not by assumption ***", browser.backends.webgl2.h264 === false && v.playsOnTv === false && /RIG-PENDING|rig-pending|libx264/i.test(B.MEASURED_V4528.rigPending + " " + v.note));
+            // *** v4778 RIG RUN 9 -- THIS ROW ASSERTED THE BOX. *** "Refused by this browser" holds here and read red on Keith's
+            // rig, whose browser offers H.264 (isTypeSupported avc1 true; the WebM was still recorded, by the preference
+            // order). Rig-pending was waiting for exactly that box. So: where H.264 is refused, the row is as it was; where it
+            // is offered, the TV-safe recording is made and its bytes must BE an H.264 MP4 -- the container sniffed "mp4" and
+            // the fourcc "avc1", not the MIME's word for it (sniffMp4Codec's reason to exist: "video/mp4" handed back VP9).
+            const tvv = browser.backends.webgl2.tvVideo;
+            if (browser.backends.webgl2.h264 === false)
+                ok("*** and the H.264 MP4 a TV plays is refused by this browser, so it is RIG-PENDING by measurement, not by assumption ***", browser.backends.webgl2.h264 === false && v.playsOnTv === false && /RIG-PENDING|rig-pending|libx264/i.test(B.MEASURED_V4528.rigPending + " " + v.note));
+            else {
+                report(`the TV-safe recording: ${tvv && !tvv.error ? `${tvv.bytes} bytes, ${tvv.container} sniffed ${tvv.sniff}, fourcc ${tvv.fourcc}, plays on a TV: ${tvv.playsOnTv}` : "failed: " + (tvv && tvv.error)}`);
+                ok("*** and this browser offers the H.264 MP4 a TV plays, and recording it gives one: the bytes are an MP4 holding avc1 ***",
+                   !!tvv && !tvv.error && tvv.bytes > 2000 && tvv.sniff === "mp4" && tvv.fourcc === "avc1" && tvv.playsOnTv === true && v.playsOnTv === false,
+                   "the WebM is still what the preference order records; the TV-safe one is asked for by name -- render/blobRecorder.js recordCanvas(..., { tvSafe: true })");
+            }
             ok("the page builds its own record without a bridge, keyframes it to its own fingerprint, and says NOT REAL TIME", /no bridge: a record built here/.test(browser.page.src) && /= the record's/.test(browser.page.out) && /NOT REAL TIME/.test(browser.page.out) && /keyframe 1 of/.test(browser.page.at), browser.page.out.slice(0, 160));
         }
         if (r.pageErrors && r.pageErrors.filter((e) => !/404/.test(e)).length) report("page errors: " + r.pageErrors.filter((e) => !/404/.test(e)).slice(0, 3).join(" | "));

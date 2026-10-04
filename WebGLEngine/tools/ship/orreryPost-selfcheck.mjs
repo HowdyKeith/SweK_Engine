@@ -17,7 +17,10 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+// rig run 13: section 3 draws through BOTH routes and diffs them, so it launches with PARITY_ARGS -- on Keith's rig ANGLE on
+// SwiftShader leaves WebGPU with no adapter at all (realGpuRun's GL table), and the page fell to its WebGL2 route
+import { PARITY_ARGS } from "./webgpuHarness.mjs";
 import { EFFECTS, TEXTURE_CAPABLE_BACKENDS, postSkipReason } from "../../ui/orreryPost.mjs";
 import { UV_CONVENTION } from "../../render/badTvDevicePass.mjs";
 
@@ -82,8 +85,9 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
 {
     const requireFn = createRequire(import.meta.url);
     const pw = resolvePlaywright(requireFn);
-    if (!pw || !fs.existsSync(HEADLESS_SHELL)) {
-        console.log("  SKIP  no browser available here");
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL)) {   // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object
+        // v4778 rig: this branch never ran (its guard could not fire), so it was never noticed that it counted nothing
+        console.log("  SKIP  no browser available here -- " + (browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL) || "no headless shell")); fails++;
         report("*** NOT A PASS. *** Sections 1 and 2 read source. Only this one attaches the stage to a real " +
             "device, and 'the first consumer works' is the entire claim of the round.");
     } else {
@@ -97,8 +101,7 @@ console.log("\n3. ATTACH IT IN A BROWSER AND DRAW");
             s.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL,
-            args: ["--use-gl=swiftshader", "--enable-unsafe-webgpu"] });
+        const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...PARITY_ARGS] });
         const page = await browser.newPage();
         const errs = [];
         page.on("pageerror", (e) => errs.push(String(e).slice(0, 160)));
@@ -245,8 +248,8 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
 {
     const requireFn2 = createRequire(import.meta.url);
     const pw2 = resolvePlaywright(requireFn2);
-    if (!pw2 || !fs.existsSync(HEADLESS_SHELL)) {
-        console.log("  SKIP  no browser available here");
+    if (!pw2.chromium || !fs.existsSync(HEADLESS_SHELL)) {
+        console.log("  SKIP  no browser available here -- " + (browserSkipReason(pw2.chromium, pw2.from, HEADLESS_SHELL) || "no headless shell")); fails++;
         report("*** NOT A PASS. *** Section 4 reads the page's source. Only this one loads it, clicks the " +
             "control and looks at what appears -- which is the difference between wired and working.");
     } else {
@@ -260,7 +263,7 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             s2.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv2.listen(0, "127.0.0.1", r));
-        const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
         const perr = [];
         pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));

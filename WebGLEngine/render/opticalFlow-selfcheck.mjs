@@ -21,6 +21,8 @@
 // SABOTAGES: see the log at the foot of this file.
 "use strict";
 import { opticalFlowCPU } from "./opticalFlow.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/opticalFlow-selfcheck.mjs");
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -155,6 +157,7 @@ for (const [sx, sy] of [[3, -2], [9, -7], [14, 11]])
         rows.push({ sx, sy, L, ...score(f, sx, sy) });
     }
 for (const r of rows) say(`  shift (${r.sx}, ${r.sy}) at ${r.L} level${r.L > 1 ? "s" : " "}`, `${r.exact} of ${r.conf} exact`);
+REPORT.table("whole-pixel shifts found, by pyramid depth", ["shift x", "shift y", "levels", "blocks exact", "confident blocks"], rows.map((r) => [r.sx, r.sy, r.L, r.exact, r.conf]));
 const small1 = rows.find((r) => r.sx === 3 && r.L === 1), small3 = rows.find((r) => r.sx === 3 && r.L === 3);
 const big1 = rows.filter((r) => r.sx !== 3 && r.L === 1), big3 = rows.filter((r) => r.sx !== 3 && r.L === 3);
 ok("!! *** a displacement beyond one level's search radius is found by NOTHING at one level ***",
@@ -201,6 +204,7 @@ const pairs = FRACS.map(([sx, sy]) => {
 });
 for (const p of pairs)
     say(`  shift (${p.sx}, ${p.sy})`, `mean error ${p.off.mean.toFixed(4)} px whole-pixel -> ${p.on.mean.toFixed(4)} px refined`);
+    REPORT.table("fractional shifts: mean error, whole-pixel against refined", ["shift x", "shift y", "whole-pixel px", "refined px"], pairs.map((p) => [p.sx, p.sy, p.off.mean, p.on.mean]));
 ok("!! *** refinement beats whole pixels on EVERY fractional shift, not on average ***",
    pairs.length === 3 && pairs.every((p) => p.on.mean < p.off.mean),
    pairs.map((p) => `${p.off.mean.toFixed(3)} -> ${p.on.mean.toFixed(3)}`).join(", ") + ". A parabola " +
@@ -327,6 +331,7 @@ if (r.ok && r.result) {
 }
 }
 
+REPORT.write();
 console.log(fails ? `\nopticalFlow-selfcheck: ${fails} FAILED` : "\nopticalFlow-selfcheck: ALL GREEN");
 console.log("unchecked here: SUB-PIXEL flow ARRIVED at v4675 and the DEVICE mirror at v4674, so both of " +
             "this gate's first two unchecked items are retired -- a stated limit that outlived the limit is " +

@@ -24,7 +24,7 @@ import { models, mayVendor, licenceCoverage } from "../../gpu/khronosSamples.mjs
 import { buildOrrery, REACHED, UNPAPERED } from "../../world/orrery.mjs";
 import { extentOf } from "../../world/orreryView.mjs";
 import { stepRK4, specificEnergy, semiMajorFromEnergy, period as keplerPeriod } from "../../physics/orbits/kepler.js";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 // TWO STRIPPERS, AND THE DIFFERENCE BIT THIS FILE ON ITS FIRST RUN. sourceScan's codeOnly blanks string
 // BODIES as well as comments, which is what a purity check wants -- but it turns `from "../physics/orbits/
 // kepler.js"` into `from ""`, so the check that the law is IMPORTED went red on a file that imports it.
@@ -321,7 +321,7 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
             r.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" });

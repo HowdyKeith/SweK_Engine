@@ -71,6 +71,11 @@ for (const g of onDisk) c[SC.classify(T.timings[g])].push(g);
 // today there is exactly ONE disagreeing gate and it IS in the roll. The rule is a pure `excusedBy` now,
 // driven on hand-made input through every branch that refuses. A rule tested only against today's tree is
 // tested against one sample of it.
+//
+// ---- v4778 RIG RUN ----------------------------------------------------------------------------------------
+//   YG. the record's ring for rigidBody6dofPage-selfcheck given a second reading [20014, 19990] -- a bucket
+//       member the capture re-observed, which is what the stamp row exists to refuse -> 1 RED, "1 of 52 were
+//       re-observed". Real sweep-timings.json, restored, md5 verified.
 
 console.log("capReading-selfcheck -- the number beside a killed gate is the cap, not the gate\n");
 
@@ -355,10 +360,20 @@ console.log("\n3. THE CONSEQUENCE IS NOT MIS-COSTING -- IT IS THAT NOTHING EVER 
     // The fact itself is checkable and is checked: not one of these gates was observed by the capture that
     // wrote this file. `captured` is the sweep that just ran; an entry it ran carries that stamp in `at`.
     const undated = NV.filter((g) => (T.at || {})[g] === SC.UNKNOWN_AT);
+    // *** v4778 RIG RUN -- A GATE THE CAPTURE KILLED FOR THE FIRST TIME ENTERED THE BUCKET; IT WAS NOT
+    // RE-OBSERVED IN IT. *** The post-merge full sweep (ea94af8c) killed rigidBody6dofPage-selfcheck at the
+    // cap: the gate arrived with the rtx merge, the record had no entry for it before that commit, and its
+    // ring holds exactly that one reading [20014]. It carries the capture's stamp because that is where it came
+    // in, which says nothing against the claim. A member re-run by a later sweep has a second reading in its
+    // ring, so it is still counted below and still fails this row.
     const swept = NV.filter((g) => (T.at || {})[g] === T.captured);
+    const entered = swept.filter((g) => ((T.serialRing || {})[g] || []).length <= 1);
+    const reObserved = swept.filter((g) => !entered.includes(g));
     ok(`  and it shows: NOT ONE of the ${NV.length} was observed by the sweep that wrote this file`,
-        NV.length > 0 && swept.length === 0,
-        `${swept.length} of ${NV.length} carry the capture stamp ${T.captured}. ${undated.length} have never been ` +
+        NV.length > 0 && reObserved.length === 0,
+        `${reObserved.length} of ${NV.length} were re-observed by the capture ${T.captured}` +
+        (entered.length ? ` (${entered.length} ENTERED the bucket in it, their first and only reading a kill: ` +
+                          `${entered.map((g) => path.basename(g)).join(", ")})` : "") + `. ${undated.length} have never been ` +
         `dated at all and ${NV.filter((g) => (T.at || {})[g] === SC.KILLED_PASS_V4568.stamp).length} carry the ` +
         `killed pass's, which is a hand-run serial pass and not the rotation -- it is what the bucket being unreachable looks like`);
 }

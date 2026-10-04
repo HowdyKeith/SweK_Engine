@@ -26,7 +26,7 @@ import { EJECTA_BASELINE, PAPER_ONLY_BODIES } from "../../world/orreryEjecta.mjs
 import { buildOrrery } from "../../world/orrery.mjs";
 import { period as keplerPeriod } from "../../physics/orbits/kepler.js";
 import { fnv1a } from "../../world/orrerySeed.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 // TWO STRIPPERS, AND THE DIFFERENCE IS LOAD-BEARING IN THIS FILE. sourceScan's also blanks string BODIES, which
 // is what a purity check wants (a path inside a string is not an import either); orreryFleetScan's removes
 // comments only, which is what the ejecta scan uses and therefore the only honest way to ask what IT sees.
@@ -562,7 +562,7 @@ console.log("\n10. THE PAGE ACTUALLY DRAWS THEM -- an unwired model is an orphan
             r.end(fs.readFileSync(f));
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
         const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" });
