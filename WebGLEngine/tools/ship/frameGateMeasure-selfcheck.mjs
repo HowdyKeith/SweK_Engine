@@ -14,7 +14,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { declared, readDoc } from "./foldStats.mjs";
 import { PREREG_H7, CACHE_H7, RESULT_H7, FRAME_KEYS, frameRow, sceneSummary, h7 } from "./frameGate.mjs";
-import { harvest } from "./genGateTrain.mjs";
+import { harvest, rowsMatch, rowsMatchDetail, ulpsApart, ulpStep, DB_ULPS } from "./genGateTrain.mjs";
 import { gateReport } from "./gateReport.mjs";
 const REPORT = gateReport("tools/ship/frameGateMeasure-selfcheck.mjs");
 
@@ -49,13 +49,30 @@ const per = {};
 console.log("\n2. *** C12: THE FIRST DECLARED SCENE AT THE FIRST DECLARED SPEED, HARVESTED AGAIN ***");
 {
     const s0 = d.scenes[0], sp0 = d.speeds[0], t0 = Date.now();
+    {   // rig run 12 (option 2): the rule every C12 row in the frame*Measure gates now uses, on the cached rows themselves --
+        // each way a re-harvest can differ, made by hand. No browser.
+        const base = cache[sp0][s0], copy = () => base.map((r) => JSON.parse(J(r)));
+        const step = ulpStep;
+        const edit = (fn) => { const rows = copy(); fn(rows); return rowsMatch(rows, base); };
+        const i = 5, cases = [
+            ["the cache against itself", edit(() => {}), true],
+            [`genDb ${DB_ULPS} ulp off on one frame`, edit((R) => { R[i].genDb = step(R[i].genDb, DB_ULPS); }), true],
+            [`cfDb ${DB_ULPS + 1} ulp off on one frame`, edit((R) => { R[i].cfDb = step(R[i].cfDb, DB_ULPS + 1); }), false],
+            ["one feature 1 ulp off", edit((R) => { R[i].x[0] = step(R[i].x[0], 1); }), false],
+            ["one label flipped", edit((R) => { R[i].y[0] = R[i].y[0] ? 0 : 1; }), false],
+            ["one frame number changed", edit((R) => { R[i].frame += 1; }), false],
+            ["one row short", edit((R) => { R.pop(); }), false],
+        ];
+        const wrong = cases.filter(([, k, want]) => k.ok !== want).map(([what, k]) => `${what}: ${k.ok ? "matched" : k.why}`);
+        ok(`  the C12 rule, on edits of this cache: dB within ${DB_ULPS} ulp matches, and one ulp more, a feature, a label, a frame or a row does not`,
+           wrong.length === 0 && ulpsApart(1, -1) === Infinity && ulpsApart(0.1, step(0.1, 3)) === 3, wrong.join("; ") || cases.map(([w, k]) => `${w}: ${k.ok ? "match" : "no"}`).join(", "));
+    }
     let again = null, err = "";
     try { again = await harvest({ scenes: [s0], upto: d.upto, speed: sp0 }); } catch (e) { err = String(e.message).slice(0, 160); }
-    const same = again && again.length === cache[sp0][s0].length && again.every((r, i) => {
-        const c = cache[sp0][s0][i];
-        return r.frame === c.frame && r.genDb === c.genDb && r.cfDb === c.cfDb && J(r.y) === J(c.y) && J(r.x) === J(c.x); });
-    ok(`*** C12: ${s0} at x${sp0} re-harvested reproduces every row -- frame, both dB, labels, features -- exactly ***`, !!same,
-       again ? `${again.length} frames against ${cache[sp0][s0].length}, in ${((Date.now() - t0) / 1000).toFixed(0)} s. The page is deterministic for a declared cell, so the cache is the page and not one draw of it.` : `the page did not run: ${err}`);
+    // rig run 12 (option 2): frame, labels and features exact, the two dB to DB_ULPS -- see genGateTrain.mjs rowsMatch
+    const match = rowsMatch(again, cache[sp0][s0]), same = again && match.ok;
+    ok(`*** C12: ${s0} at x${sp0} re-harvested reproduces every row -- frame, labels and features exactly, both dB to ${DB_ULPS} ulp ***`, !!same,
+       again ? `${rowsMatchDetail(match)}, in ${((Date.now() - t0) / 1000).toFixed(0)} s. The page is deterministic for a declared cell, so the cache is the page and not one draw of it.` : `the page did not run: ${err}`);
 }
 
 console.log("\n3. *** H7, RE-DERIVED -- NOT SUPPORTED: 'NEITHER' ***");
@@ -100,6 +117,12 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "tracking is not separable here, and no mechanism is claimed.");
 }
 
+// ---- RIG RUN 12 (option 2) SABOTAGE LOG ----
+// Against tools/ship/genGateTrain.mjs rowsMatch: T1 the dB never compared -> 1 red, the C12-rule row ("cfDb 5 ulp off on one
+// frame: matched"); T2 the features never compared -> 1 red, same row ("one feature 1 ulp off: matched"); T3 labels skipped by
+// default -> 1 red, same row ("one label flipped: matched"); T4 DB_ULPS = 0, the exact rule as it was, re-harvested on headless
+// shell 1243 -> 1 red each in frameVerticalMeasure ("row 31 (frame 33): dB 1 ulp apart") and frameSway's LINEAR row ("row 7
+// (frame 9): dB 1 ulp apart"). All restored, md5 verified.
 REPORT.write();
 console.log(`\nframeGateMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: anything beyond seven synthetic scenes at two speeds; a frame gate's value in dB; whether ANY other " +

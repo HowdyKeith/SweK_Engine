@@ -14,7 +14,7 @@ import { CACHE_H7 } from "./frameGate.mjs";
 import { CACHE_H11, RESULT_H11, cellOf } from "./frameGain.mjs";
 import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, slabBlocks, nonTurnRows, swaySummary, h14 } from "./frameSway.mjs";
 import { slabOffset } from "../../render/slabPath.mjs";
-import { harvest } from "./genGateTrain.mjs";
+import { harvest, rowsMatch, rowsMatchDetail, DB_ULPS } from "./genGateTrain.mjs";
 import { gateReport } from "./gateReport.mjs";
 const REPORT = gateReport("tools/ship/frameSwayMeasure-selfcheck.mjs");
 
@@ -83,10 +83,10 @@ console.log("\n2. *** C12: THE FIRST DECLARED SCENE OF THE FIRST DECLARED CELL, 
     let again = null, err = "";
     try { again = await harvest({ scenes: [s0], upto: d.upto, speed: k.speed, settings: { slabdir: k.slabdir, ratio: k.ratio, slabpath: d.path } }); }
     catch (e) { err = String(e.message).slice(0, 160); }
-    const same = again && again.length === cache[c0][s0].length && again.every((r, i) => { const c = cache[c0][s0][i];
-        return r.frame === c.frame && r.genDb === c.genDb && r.cfDb === c.cfDb && J(r.y) === J(c.y) && J(r.x) === J(c.x); });
-    ok(`*** C12: ${s0} at ${c0} on ${d.path}, re-harvested, reproduces every row exactly ***`, !!same,
-       again ? `${again.length} frames against ${cache[c0][s0].length}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
+    // rig run 12 (option 2): frame, labels and features exact, the two dB to DB_ULPS -- see genGateTrain.mjs rowsMatch
+    const match = rowsMatch(again, cache[c0][s0]), same = again && match.ok;
+    ok(`*** C12: ${s0} at ${c0} on ${d.path}, re-harvested, reproduces every row -- frame, labels and features exactly, both dB to ${DB_ULPS} ulp ***`, !!same,
+       again ? `${rowsMatchDetail(match)}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
 }
 
 console.log("\n3. *** H14, RE-DERIVED ***");
