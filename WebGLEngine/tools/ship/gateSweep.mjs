@@ -8723,6 +8723,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4812 -- THE 416th CLOSING: NO new gate file -- a pull request text for each of the sixteen three.js issues.
+    since509: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4812", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: one pull request text per issue, each held to its issue, its patch, three's template and e2e.json's unit figures)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PULL REQUESTS, READY TO PASTE. *** docs/upstream-three/dev/pr/ holds one text per issue: a title in three's " +
+                 "'Component: What changed.' form, the branch to make in a fork and the commands that make it from the issue's own patch, " +
+                 "and a body in three's pull request template -- the problem, the fix, and what the issue's reproduction printed on dev " +
+                 "and with the patch, quoted from record.json. Each patch was linted alone on dev at 576b084 (eslint clean, all sixteen); " +
+                 "the unit and e2e figures quoted were taken with all sixteen together, and each body says so. The commands were run once " +
+                 "in a scratch checkout: a title's backticks reach the commit as backticks, escaped. Six sabotages red.",
+    }),
     // v4811 -- THE 415th CLOSING: NO new gate file -- the sixteen drafts re-checked against three's dev at 576b084.
     since508: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

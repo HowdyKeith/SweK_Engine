@@ -372,6 +372,30 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     ok(`  the README states them as e2e.json does`, !!e2e && devIndex.includes(`${e2e.unit.tests} tests, ${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.examples} WebGPU examples, ${e2e.webgpu.passed} passed and the same ${e2e.webgpu.failed}`) && devIndex.includes(`${e2e.webgl2.passed} passed and the same ${e2e.webgl2.failed} failed`) &&
         devIndex.includes(`${e2e.webgpu.screenshotsIdentical} of the ${e2e.webgpu.examples} screenshots`) && devIndex.includes("(e2e.json)"));
+    // v4812: *** THE PULL REQUESTS, ONE PER ISSUE, READY TO PASTE. *** docs/upstream-three/dev/pr/ holds the text of each: its title in
+    // three's "Component: What changed." form, the branch and the commands that make it from the issue's own patch, and a body in three's
+    // pull request template (`Related issue`, `**Description**`). Held here: one per issue and no other, each naming its own issue and
+    // patch, the title and branch the same in the commands as in the header (a title's backticks escaped there: inside double quotes the
+    // shell would run them), SABOTAGES (v4812, all red, restored by copy): a text missing -> 2; 09 applying 10's patch -> 1; a stale unit
+    // figure -> 1; a title not in three's form -> 1; a title's backticks unescaped in the commit -> 1; the issues' README not linking them -> 1.
+    // and the unit figures it quotes the ones e2e.json records.
+    {   const PR = path.join(DEV_DIR, "pr"), prs = fs.existsSync(PR) ? Object.fromEntries(fs.readdirSync(PR).filter((f) => /^\d\d-.*\.md$/.test(f)).map((f) => [f.slice(0, 2), f])) : {};
+        const prIndex = fs.existsSync(path.join(PR, "README.md")) ? fs.readFileSync(path.join(PR, "README.md"), "utf8") : "";
+        ok(`  docs/upstream-three/dev/pr/ holds a pull request text for each of the ${SLOTS.length} issues and nothing else, its README links each, and the issues' README links it`,
+            Object.keys(prs).sort().join() === SLOTS.join() && Object.values(prs).every((f) => prIndex.includes(`(${f})`)) && /DRAFTS, NOT POSTED/.test(prIndex) && devIndex.includes("(pr/README.md)"),
+            `texts ${Object.keys(prs).sort().join(",") || "none"}`);
+        const unit = e2e ? `(${e2e.unit.passed} passed, ${e2e.unit.todo} todo, ${e2e.unit.failed} failed)` : "(no e2e record)";
+        const bad = SLOTS.map((s) => { if (!prs[s]) return [s, "missing"]; const x = fs.readFileSync(path.join(PR, prs[s]), "utf8"), why = [];
+            const title = (/^- \*\*Title:\*\* `` (.+) ``$/m.exec(x) || [])[1], branch = (/^- \*\*Branch in your fork:\*\* `([^`]+)`$/m.exec(x) || [])[1];
+            if (!title || !/^[A-Z][A-Za-z0-9]*: [A-Z`].*\.$/.test(title) || !x.startsWith(`# PR ${s}: ${title}\n`) || !x.includes(`git commit -am "${title.replaceAll("`", "\\`")}"`)) why.push("title");
+            if (!branch || !x.includes(`git checkout -b ${branch}\n`) || !x.includes(`git push -u origin ${branch}\n`)) why.push("branch");
+            if (!x.includes(`(../${issues[s]})`) || !x.includes(`(../patches/${patches[s]})`) || !x.includes(`/patches/${patches[s]}\n`)) why.push("issue or patch");
+            const body = x.split("\n## Body\n")[1] || "";
+            if (!body.startsWith("\nRelated issue: #<issue number>\n\n**Description**\n")) why.push("template");
+            if (!body.includes(unit)) why.push("unit figures");
+            return why.length ? [s, why.join(", ")] : null; }).filter(Boolean);
+        ok(`*** each pull request names its own issue and patch, a title in three's form the commit uses, the branch its commands make, three's template, and the unit figures e2e.json records ${unit} ***`,
+            bad.length === 0, bad.map(([s, w]) => `${s}: ${w}`).join("; ")); }
     // v4805: *** THE ENGINE VENDORS THE RELEASE THE RECORD WAS TAKEN ON, SO THE ISSUES RUN ON IT HERE, AT EVERY SWEEP. *** Until now
     // section 6 held the record's freshness and nothing ran: r186 lived beside a three checkout, outside this tree. vendor/three-webgpu
     // is r186 now -- npm's three files, but for the one import the record names -- so each issue's reproduction runs on it on the device,

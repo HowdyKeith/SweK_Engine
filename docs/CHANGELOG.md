@@ -50,6 +50,12 @@ Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
      the marker and the murmuration line's do not, so labelling them would leave two lines that cannot be
      compared by any number at all. -->
 
+## v4812 -- the pull requests, ready to paste
+
+*** ONE PER ISSUE, IN THREE'S OWN FORM. *** `docs/upstream-three/dev/pr/` holds the text of a pull request for each of the sixteen three.js issues, for whoever posts them: a title in three's "Component: What changed." form, the branch to make in a fork of three and the commands that make it from the issue's own patch, and a body in three's pull request template (`Related issue: #...`, `**Description**`) -- the problem, the fix, and what the issue's reproduction printed on `dev` and with the patch, quoted from `record.json`. Each patch was linted alone on `dev` at `576b084` with three's own eslint config: all sixteen clean. The unit and e2e figures each body quotes were taken with all sixteen applied together, and the body says that rather than more. 11 and 14 both fix issue 11, and 08 and 16 share an import line; the texts say so. The commands were run once in a scratch checkout of three: the patch applies, and a title's backticks reach the commit message as backticks.
+
+`tools/ship/threeUpstream-selfcheck.mjs` section 6 holds them: one per issue and no other, each naming its own issue and patch, a title in three's form that its commit command uses, the branch its commands make, three's template, and the unit figures `e2e.json` records. Six sabotages red. 1882 gates.
+
 ## v4811 -- the drafts re-checked on today's dev: none fixed, two patches made again
 
 *** NOTHING THREE MERGED SINCE 2 OCTOBER FIXES ANY OF THE SIXTEEN. *** `dev` moved twelve commits, to `576b084` (4 October) -- among them changes to `RenderObject.js`, `Renderer.js`, `WebGPUBackend.js` and `NodeMaterial.js`. `tools/ship/threePatch.mjs`'s record, taken again there: every reproduction prints exactly what it printed on `1ea31f3`, on `dev`, with its own patch and with all sixteen. `DEV_COMMIT` is `576b084`, and each draft says so.

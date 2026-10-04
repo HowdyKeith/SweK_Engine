@@ -35,6 +35,8 @@ every sweep, and each must print what the record's r186 run printed. The r185 dr
    16 both edit `Instance.js`'s one import from `EventNode.js`, and three's lint forbids a second. Applied together it reads
    `import { OnAfterObjectUpdate, OnBeforeObjectUpdate } from '../utils/EventNode.js';` -- the tool makes that merge, and only
    that kind (an import line, each side's names less what either removed), and `record.json` lists it under `merged`.
+5. The pull request itself: [`pr/README.md`](pr/README.md) has one text per issue -- its title, the branch to make in your fork and
+   the commands that make it, and the body for three's pull request form. Post the issue first; its number goes in the body.
 
 ## The issues
 
