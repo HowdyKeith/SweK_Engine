@@ -1,0 +1,31 @@
+diff --git a/src/renderers/webgl-fallback/utils/WebGLState.js b/src/renderers/webgl-fallback/utils/WebGLState.js
+index 60d8e40..d7fffe9 100644
+--- a/src/renderers/webgl-fallback/utils/WebGLState.js
++++ b/src/renderers/webgl-fallback/utils/WebGLState.js
+@@ -1121,19 +1121,20 @@ class WebGLState {
+ 
+ 			currentBoundFramebuffers[ target ] = framebuffer;
+ 
+-			// gl.DRAW_FRAMEBUFFER is equivalent to gl.FRAMEBUFFER
++			// gl.FRAMEBUFFER binds the draw and the read framebuffer at once
+ 
+-			if ( target === gl.DRAW_FRAMEBUFFER ) {
++			if ( target === gl.FRAMEBUFFER ) {
+ 
+-				currentBoundFramebuffers[ gl.FRAMEBUFFER ] = framebuffer;
++				currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ] = framebuffer;
++				currentBoundFramebuffers[ gl.READ_FRAMEBUFFER ] = framebuffer;
+ 
+ 			}
+ 
+-			if ( target === gl.FRAMEBUFFER ) {
++			// so it is only cached while both are the same framebuffer: once the read or the draw binding differs, the next bind must reach GL
+ 
+-				currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ] = framebuffer;
++			const drawFramebuffer = currentBoundFramebuffers[ gl.DRAW_FRAMEBUFFER ];
+ 
+-			}
++			currentBoundFramebuffers[ gl.FRAMEBUFFER ] = ( drawFramebuffer === currentBoundFramebuffers[ gl.READ_FRAMEBUFFER ] ) ? drawFramebuffer : undefined;
+ 
+ 			return true;
+ 

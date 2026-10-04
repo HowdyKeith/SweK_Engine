@@ -288,7 +288,8 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     // frame's first render, so the second and third draw the first's matrices -- and 15 is r186's own
     // v4802: and 16, compute-written storage instance matrices -- r186's fix for 01 reaches only the CPU array
     // v4806: and 17, a transmission lens drawn into a second target showing the first's backdrop -- r186's own, bisected to #34162
-    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17"];
+    // v4808: and 18, the WebGL 2 lens frozen after a readback -- older than r185, a framebuffer bind the state cache skipped
+    const SLOTS = ["03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18"];
     const DEV_BUG = {
         "08": (r) => all(r) && r.webgpu.sameFrame && r.webgpu.one.every((n) => n > 50) && r.webgpu.many[0] === 0 && r.webgpu.many[1] === 0 && r.webgpu.many[2] > 50 && r.webgpu.manyDynamic.every((n) => n > 50),
     };
@@ -307,7 +308,12 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
         "17": {
         bug: (r) => all(r) && ["webgpu", "webgl2"].every((b) => r[b].wallMoved > 0 && r[b].lensMoved === 0),
         fixed: (r) => all(r) && ["webgpu", "webgl2"].every((b) => r[b].wallMoved > 0 && r[b].lensMoved > 0),
-        observed: (r) => `webgpu: wallMoved ${r.webgpu.wallMoved}, lensMoved ${r.webgpu.lensMoved}; webgl2: wallMoved ${r.webgl2.wallMoved}, lensMoved ${r.webgl2.lensMoved} -- of eight pixels in a row, how many changed when the wall moved` } };
+        observed: (r) => `webgpu: wallMoved ${r.webgpu.wallMoved}, lensMoved ${r.webgpu.lensMoved}; webgl2: wallMoved ${r.webgl2.wallMoved}, lensMoved ${r.webgl2.lensMoved} -- of eight pixels in a row, how many changed when the wall moved` },
+        // WebGL 2 alone: WebGPU's lens moves, WebGL 2's does not, once the target is read back between the renders
+        "18": {
+        bug: (r) => r.webgpu.wallMoved > 0 && r.webgpu.lensMoved > 0 && r.webgl2.wallMoved > 0 && r.webgl2.lensMoved === 0,
+        fixed: (r) => ["webgpu", "webgl2"].every((b) => r[b].wallMoved > 0 && r[b].lensMoved > 0),
+        observed: (r) => `webgpu: wallMoved ${r.webgpu.wallMoved}, lensMoved ${r.webgpu.lensMoved}; webgl2: wallMoved ${r.webgl2.wallMoved}, lensMoved ${r.webgl2.lensMoved} -- of eight pixels in a row, how many changed when the wall moved, the target read back after each render` } };
     const TEMPLATE = ["Description", "Reproduction steps", "Code", "Live example", "Screenshots", "Version", "Device", "Browser", "OS"];
     const issues = issueFiles(), patches = devPatches(), rec = fs.existsSync(DEV_RECORD) ? JSON.parse(fs.readFileSync(DEV_RECORD, "utf8")) : null;
     const draftOf = (slot) => Object.keys(DRAFTS).find((f) => f.startsWith(slot + "-")) || null;
@@ -393,6 +399,9 @@ console.log(`\n6. ON r186 AND dev: the issues ready to paste, held to tools/ship
     }
 }
 
+// ---- v4808 SABOTAGE LOG (section 6, issue 18) ---------------------------------------------------------------------
+// R1 patch 18 edited, the record not re-run -> 2 (stale record; the Description's patch); R2 18's observed block off by one digit -> 1;
+// R3 18 held as fixed on r186 -> 1; R4 the README not linking 18 -> 1; R5 e2e.json naming the fifteen-patch build -> 1. None green.
 // ---- v4806 SABOTAGE LOG (section 6, issue 17) ---------------------------------------------------------------------
 // S1 patch 17 edited, the record not re-run -> 2 (stale record; the Description's patch); S2 17's observed block off by one digit -> 1;
 // S3 17 held as fixed on r186 -> 1; S4 the README not linking 17 -> 1; S5 e2e.json naming the fourteen-patch build -> 1. None green.

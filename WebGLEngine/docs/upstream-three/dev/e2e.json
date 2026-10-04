@@ -1,11 +1,11 @@
 {
- "at": "v4806",
+ "at": "v4808",
  "devCommit": "1ea31f304854ee3c85df39fdb3eaec584bba6d9b",
  "builds": {
   "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
-  "all": "c796f27931ba7419829f254567c39c272de991f6097f7d90cd1a7a03e879e40a"
+  "all": "9e5fd537b3e8a17b1c1d9c0055249493b92e7e7b40afd003d678550fa1309d19"
  },
- "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev runner), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all fifteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
+ "run": "three dev at devCommit with its examples; node test/e2e/puppeteer-local.js --webgpu (../e2e/puppeteer-local.diff applied to dev runner), and again with E2E_NO_WEBGPU=1 for the WebGL 2 backend; build/ made by three rollup, plain and with all sixteen patches in order; 16 merged into 08s import line as threePatch.mjs merges it",
  "unit": {
   "tests": 1522,
   "passed": 1521,

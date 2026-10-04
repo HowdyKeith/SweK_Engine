@@ -8,7 +8,7 @@
  },
  "releaseEdit": "three.tsl.js's one import of 'three/webgpu' pointed at './three.webgpu.js' (the page has no import map); nothing else",
  "builds": {
-  "all": "c796f27931ba7419829f254567c39c272de991f6097f7d90cd1a7a03e879e40a",
+  "all": "9e5fd537b3e8a17b1c1d9c0055249493b92e7e7b40afd003d678550fa1309d19",
   "dev": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p03": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p04": "cf3a6e85d566e9e33451fd9f509da33ea9458bc0cbc95b896a571a89aa6eca7d",
@@ -25,6 +25,7 @@
   "p15": "3b1cb9d196acc5373067c12e68535e338d39bc8cec629e3781caaad879db560e",
   "p16": "6ca24eafd6b6f8b1929c39ce289d52a62eb5aa91ce697cdcd9e722f51289af59",
   "p17": "e000d7df6fa91910e342a84eed771c7c5abcadf6b9bb6d4f1501d35c65425f3d",
+  "p18": "347dc9e04caa55e1cb7863b328e80e7b2ba81937dda3d4a97a8ca4b01dc64316",
   "r186": "15cfce5c653541704fd9a3463c39d3e8b854bb6265ccd854d7cfe74090625cc6"
  },
  "browser": "headless Chromium, SwiftShader (tools/ship/webgpuHarness.mjs)",
@@ -37,6 +38,7 @@
   "15": "71ff2566af7ad8d6443045f3f52c0c3ece2ed7a81353aa83589d158a6dedf6c2",
   "16": "9a996ac3b3bc8bf7e103c5e6f9ae867644fd6e333871ff34c3da4cef81c8147c",
   "17": "c05f5d6c6402e65f5a4f4f7e644c02a1a2635b72538c34a55ef103c7411713b0",
+  "18": "ce62a01838dad1abec7162570e5431d6d1347a9e0038d1594b16cad9b04d6b69",
   "03": "7907879533d9b4071c495cd8521218fa7a05a3cb903a411e1d4656e3f938e36b",
   "04": "20d14b397fc4fdac6879efcd1199a36b63c75e53a148e2ff845a4f63d27794d4",
   "05": "549c955536325a1d1749671be585c1678cb7c4bc8b5aebd2bdd98a9154d707fe",
@@ -54,6 +56,7 @@
   "15": "f6ec405cc26a8694dfbc290d7275135677e93e7ba1dfa8db68229eb243796605",
   "16": "9216c55e269711550a40969be94eee0c766482e56d04b3eb0b214eba93d95248",
   "17": "de3d549a7f4a6295363df62eb05f4fb7f224cb3c3e681a11932ba7dc19291ce5",
+  "18": "414015515080df88970dc8ff1351793e645e9a05a2e78adfaf1762dbd78e5432",
   "03": "ed747ca7257b078ba882273d921589ae24369e57e8c0256622951fd4ce472d16",
   "04": "2fc5a4796d64196654969b9e90289cbe715ab2fcdd8a6c6fbe843dccdbaa4118",
   "05": "e9490f2082dbe2b851ec6d49557adaa32edf9d642b5f35117281622c0cdb0033",
@@ -400,6 +403,48 @@
     "webgpu": {
      "wallMoved": 4,
      "lensMoved": 0
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "all": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   },
+   "patched": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    }
+   }
+  },
+  "18": {
+   "r186": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
+    },
+    "webgl2": {
+     "wallMoved": 4,
+     "lensMoved": 0
+    }
+   },
+   "dev": {
+    "webgpu": {
+     "wallMoved": 4,
+     "lensMoved": 8
     },
     "webgl2": {
      "wallMoved": 4,

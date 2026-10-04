@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4808 -- THE 412th CLOSING: NO new gate file -- issue 18, the WebGL 2 lens frozen after a readback, drafted with its patch.
+    since505: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4808", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 18, recorded, run on the vendored r186, three's tests with all sixteen)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE ONE v4806 FOUND BESIDE ITS OWN, TRACED TO A SKIPPED BIND. *** On WebGL 2 a transmission lens rendered into a target " +
+                 "that was read back between renders keeps its first backdrop: the copy runs every render, into the right texture, and " +
+                 "reads the default framebuffer. WebGLState caches gl.FRAMEBUFFER but records only the draw side of what that binds; the " +
+                 "readback binds the read side alone and leaves it at null, so the next bind of the same target is skipped. A diagnostic " +
+                 "that read the copy back by hand made the bug vanish -- it rebound the framebuffer -- which is how the cause was found. " +
+                 "The patch caches gl.FRAMEBUFFER only while draw and read agree: lensMoved 0 -> 8 on WebGL 2, r185 to dev; three's unit " +
+                 "and e2e tests unchanged with all sixteen. Its workaround was tested before it was written. Five sabotages red.",
+    }),
     // v4807 -- THE 411th CLOSING: NO new gate file -- vendor/three, the classic build, moved to r186 beside three-webgpu.
     since504: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
