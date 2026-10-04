@@ -15,12 +15,20 @@
 //   D. the header match is unanchored, so prose ABOUT a Run: line reads as one -> RED (1 row)
 //   E. the rotation stops ordering its killed pool by cost           -> RED (1 row)
 //   F. this gate stops excluding itself from the census it runs      -> RED (1 row)
+//   v4810, section 6 -- which box's readings cost a gate (all six red, the module restored by copy):
+//   G1. same-type boxes ignored                                      -> RED (2 rows)
+//   G2. a same-type box read before this box's own                   -> RED (2 rows)
+//   G3. any box's record a witness, another type's and local.json's  -> RED (2 rows)
+//   G4. this box's one reading not pooled with its kin's             -> RED (2 rows)
+//   G5. the row's source not recorded                                -> RED (1 row)
+//   G6. timings handed in, and the box files read anyway             -> RED (1 row)
 //
 // *** AND F WAS RESTORED BY HAND AFTER `git checkout --` DID NOTHING, which is worth one line: this file was
 // UNTRACKED when it was sabotaged, so the restore silently succeeded and changed nothing, and the gate went
 // on reporting 272 against 272. A restore that cannot fail is not a restore. Backups, not checkout.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { declaredOf, census, costOf, walkGates, DECLARED_RE, ENG } from "./declaredCost.mjs";
@@ -227,6 +235,58 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4676's leak, so it " +
         "has to be a number somebody took rather than a round guess");
 
+}
+
+// ---- v4810: WHICH BOX'S READINGS COST A GATE ----------------------------------------------------------------
+//
+// *** A SAME-TYPE BOX'S ALONE READINGS COME BEFORE THE SHARED RECORD. *** Sessions here resume on two machines of one
+// type whose CPU models differ, so each keeps its own per-box record, and until v4810 a box with no alone readings of a
+// gate fell straight to the shared record -- a sweep's reading, taken eight to a core -- and a header went red on a
+// machine change rather than a cost change (v4806: statedRuntime and cloneSource, put right by timing them again).
+// Planted in a tree of its own, so the rows hold whatever the real records say today.
+console.log("\n6. *** WHICH BOX'S READINGS COST A GATE: this one, then one of its type, then the shared record ***");
+{
+    const T = fs.mkdtempSync(path.join(os.tmpdir(), "declaredCost-boxes-")), ship = path.join(T, "tools", "ship");
+    fs.mkdirSync(ship, { recursive: true });
+    const G = (n) => `tools/ship/${n}-selfcheck.mjs`;
+    for (const n of ["mine", "kin", "pooled", "shared", "newest"]) fs.writeFileSync(path.join(T, G(n)), `// ${G(n)}\n//\n// Run: node ${G(n)}   (~1s)\n`);
+    const put = (f, o) => fs.writeFileSync(path.join(ship, f), JSON.stringify(o));
+    const ME = "linux-x64-4c-16gb-aaaaaa";
+    put("sweep-timings.json", {
+        timings: { [G("mine")]: 6400, [G("kin")]: 6400, [G("pooled")]: 6400, [G("shared")]: 6400, [G("newest")]: 6400 },
+        serialRing: { [G("mine")]: [6000, 6200, 6400], [G("kin")]: [6000, 6200, 6400], [G("pooled")]: [6000, 6200, 6400], [G("shared")]: [6000, 6200, 6400] } });
+    put(`sweep-timings.${ME}.json`, { serialRing: { [G("mine")]: [1000, 1100], [G("pooled")]: [1100] } });
+    put("sweep-timings.linux-x64-4c-16gb-bbbbbb.json", { serialRing: { [G("mine")]: [3000, 3100], [G("kin")]: [1200, 1300, 1250], [G("pooled")]: [1300] } });
+    // another type of box -- eight cores -- has alone readings of the two gates that should fall to the shared record
+    put("sweep-timings.linux-x64-8c-32gb-cccccc.json", { serialRing: { [G("shared")]: [900, 950], [G("newest")]: [900, 950] } });
+    // and a record that is not a box's at all
+    put("sweep-timings.local.json", { serialRing: { [G("shared")]: [800, 850], [G("newest")]: [800, 850] } });
+    let c, rows; try { c = census(T, null, { id: ME }); rows = new Map([...c.rotted].map((r) => [r.gate, r])); } finally { fs.rmSync(T, { recursive: true, force: true }); }
+    ok("*** this box's own alone readings first, then a same-type box's, pooled when neither has two of its own -- and the gates costed by them agree with their 1 s headers ***",
+        c.agree === 3 && !rows.has(G("mine")) && !rows.has(G("kin")) && !rows.has(G("pooled")),
+        `agree ${c.agree} of 5; rotted ${[...rows.keys()].join(", ") || "none"}. mine reads this box's [1000, 1100], not the sibling's ` +
+        "3 s; kin reads the sibling's 1250; pooled has one reading on each box and reads the two together");
+    const sh = rows.get(G("shared")) || {}, nw = rows.get(G("newest")) || {};
+    ok("...a gate neither box has read falls to the shared record, and ANOTHER type of box, or a record that is no box's, is not a witness",
+        c.rotted.length === 2 && sh.recordedMs === 6200 && sh.from === "the shared record" && nw.recordedMs === 6400 && nw.from === "the shared record's newest",
+        `shared ${sh.recordedMs} ms from ${sh.from}; newest ${nw.recordedMs} ms from ${nw.from}. An eight-core box's 900 ms and ` +
+        "sweep-timings.local.json's 800 are left alone: a different machine's cost is not this one's");
+    // and the source is named on the live census's rotted rows, so a red says which record it believed
+    const live = census(ENG, null, { exclude: (g) => g === SELF_REL }).rotted;
+    ok("...and every rotted row, here and live, says which record costed it",
+        live.every((r) => ["this box", "same-type boxes", "the shared record", "the shared record's newest"].includes(r.from)),
+        `${live.length} live rotted row(s)` + (live.length ? ": " + live.map((r) => `${r.gate} from ${r.from}`).join("; ") : ""));
+}
+{
+    // a caller that hands in its own timings gets those alone, even with box records beside them
+    const T = fs.mkdtempSync(path.join(os.tmpdir(), "declaredCost-given-")), ship = path.join(T, "tools", "ship"), g = "tools/ship/given-selfcheck.mjs";
+    fs.mkdirSync(ship, { recursive: true });
+    fs.writeFileSync(path.join(T, g), `// ${g}\n//\n// Run: node ${g}   (~1s)\n`);
+    fs.writeFileSync(path.join(ship, "sweep-timings.linux-x64-4c-16gb-aaaaaa.json"), JSON.stringify({ serialRing: { [g]: [1000, 1000] } }));
+    fs.writeFileSync(path.join(ship, "sweep-timings.linux-x64-4c-16gb-bbbbbb.json"), JSON.stringify({ serialRing: { [g]: [1000, 1000] } }));
+    let c; try { c = census(T, { timings: { [g]: 6400 } }, { id: "linux-x64-4c-16gb-aaaaaa" }); } finally { fs.rmSync(T, { recursive: true, force: true }); }
+    ok("...and timings handed in are the only record read: no box's file overrides them",
+        c.rotted.length === 1 && c.rotted[0].recordedMs === 6400, `given 6400 ms, read ${(c.rotted[0] || {}).recordedMs} ms`);
 }
 
 console.log(fails ? `\ndeclaredCost-selfcheck: ${fails} FAILED` : "\ndeclaredCost-selfcheck: all checks pass");

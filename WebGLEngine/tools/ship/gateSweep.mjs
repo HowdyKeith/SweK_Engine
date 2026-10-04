@@ -8723,6 +8723,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4810 -- THE 414th CLOSING: NO new gate file -- declaredCost reads a same-type box's alone readings before the shared record.
+    since507: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4810", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (section 6: which box's readings cost a gate, planted in a tree of its own)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A BOX COSTS ITS GATES BY ITS OWN KIND, NOT BY THE SHARED RECORD'S SWEEP. *** Sessions resume on two machines of one " +
+                 "type whose CPU models differ, so each keeps its own per-box record, and a box with no alone readings of a gate fell to the " +
+                 "shared ring -- sweep readings -- and a header went red on a machine change (v4806: statedRuntime and cloneSource). census " +
+                 "now reads this box's ring, then same-type boxes' rings pooled with this box's one reading, then the shared record, and names " +
+                 "the record on each row. Measured: a box of this type that has never run a gate alone rots 0 headers; a box of another type, " +
+                 "which still reads the shared record, rots statedRuntime (1.6 s declared, 6,462 ms recorded) as v4806 did. Another type's " +
+                 "record and sweep-timings.local.json are not witnesses. Six sabotages red.",
+    }),
     // v4809 -- THE 413th CLOSING: ONE new gate file -- the engine's way around three's issues 17 and 18, until three takes the patches.
     since506: Object.freeze({
         at: "v4809", swept: 1, green: 1, red: 0,
