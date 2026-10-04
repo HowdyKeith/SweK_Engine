@@ -14,6 +14,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -100,6 +101,9 @@ else {
     if (r.ok && r.result && !r.result.webgpu.err) {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         for (const p of ["none", "midpoint", "timed"]) say(`${p.padEnd(8)} ${o[p].kinds}: each refresh against the scene at its time, mean ${f(o[p].mean)} dB (worst ${f(o[p].worst)}); judder ${f(o[p].judder)} ms of scene time; generated at t in {${o[p].ts.join(", ")}}`);
+        gateReport("fx/fsr/fsr3Pacing-selfcheck.mjs").table("each refresh against the scene at its time, by policy",
+            ["policy", "mean dB", "worst dB", "judder ms of scene time", "frames generated"],
+            ["none", "midpoint", "timed"].map((p) => [p, o[p].mean, o[p].worst, o[p].judder, o[p].ts.length])).write();
         ok(`*** timed generation shows the viewer the scene where it should be: ${f(o.timed.mean)} dB a refresh against ${f(o.midpoint.mean)} for FSR3's half-way frame (${d(o.timed.mean, o.midpoint.mean)}) and ${f(o.none.mean)} with no generation (${d(o.timed.mean, o.none.mean)}) ***`,
            o.timed.mean > o.midpoint.mean && o.midpoint.mean > o.none.mean,
            "with a real frame every third refresh the half-way frame is shown once and then shown again, and the real one after it; every refresh the scene is where it was not");

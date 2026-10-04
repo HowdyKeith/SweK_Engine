@@ -12,7 +12,9 @@ import { declared, readDoc } from "./foldStats.mjs";
 import { CACHE_H7 } from "./frameGate.mjs";
 import { spearman } from "./frameGate.mjs";
 import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, cellOf, gainRow, gainSummary, h11 } from "./frameGain.mjs";
-import { harvest } from "./genGateTrain.mjs";
+import { harvest, rowsMatch, rowsMatchDetail, DB_ULPS } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameGainMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -55,10 +57,10 @@ console.log("\n2. *** C12: THE FIRST DECLARED SCENE OF THE FIRST DECLARED CELL, 
     const c0 = d.cells[0], k = cellOf(c0), s0 = d.scenes[0], t0 = Date.now();
     let again = null, err = "";
     try { again = await harvest({ scenes: [s0], upto: d.upto, speed: k.speed, settings: { slabdir: k.slabdir, ratio: k.ratio } }); } catch (e) { err = String(e.message).slice(0, 160); }
-    const same = again && again.length === cache[c0][s0].length && again.every((r, i) => { const c = cache[c0][s0][i];
-        return r.frame === c.frame && r.genDb === c.genDb && r.cfDb === c.cfDb && J(r.y) === J(c.y) && J(r.x) === J(c.x); });
-    ok(`*** C12: ${s0} at ${c0}, re-harvested, reproduces every row exactly ***`, !!same,
-       again ? `${again.length} frames against ${cache[c0][s0].length}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
+    // rig run 12 (option 2): frame, labels and features exact, the two dB to DB_ULPS -- see genGateTrain.mjs rowsMatch
+    const match = rowsMatch(again, cache[c0][s0]), same = again && match.ok;
+    ok(`*** C12: ${s0} at ${c0}, re-harvested, reproduces every row -- frame, labels and features exactly, both dB to ${DB_ULPS} ulp ***`, !!same,
+       again ? `${rowsMatchDetail(match)}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
 }
 
 console.log("\n3. *** H11, RE-DERIVED -- NOT SUPPORTED, AND BY THE ROUTE THE DOCUMENT NAMED AS THE REASON TO EXPECT IT ***");
@@ -69,6 +71,8 @@ const pos = (c) => d.scenes.filter((s) => per[c][s].rho !== null && per[c][s].rh
     ok("*** the recomputed H11 is the recorded one ***", J(H) === J(R.h11));
     for (const c of d.cells) say(`${c}: scene rho / H6's block-mean rho / mean gain / mean advantage / wins -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${signed(p.rho)}/${signed(p.blockRho)}/${p.gain.toFixed(3)}/${signed(p.adv)}/${p.wins}`; }).join("  "));
+        REPORT.table("H11 per scene: motion's gain over standing still", ["cell", "scene", "rho", "H6's block-mean rho", "mean gain", "mean advantage dB", "wins"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.rho, p.blockRho, p.gain, p.adv, p.wins]; })));
     ok("*** H11 IS NOT SUPPORTED: both cells reportable with no scene excluded, and NEITHER clears -- not a one-scene price ***",
        H.reportable && !H.supported && d.cells.every((c) => H.cells[c].excluded.length === 0 && !H.cells[c].cleared && H.cells[c].test.sign.up <= 1),
        d.cells.map((c) => `${c}: sign ${H.cells[c].test.sign.up}/7, t mean ${signed(H.cells[c].test.t.mean)}`).join("; ") +
@@ -100,6 +104,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "moving a frame's motion and its advantage together, and nothing here separates them. No mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeGainMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: the negation, which owes its own document and fresh cells; why zone is the exception; a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);

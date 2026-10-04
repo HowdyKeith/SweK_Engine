@@ -32,7 +32,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { webgpuSkipReason } from "./webgpuHarness.mjs";
 import { parseFont } from "../../text/slugFont.js";
 import { layoutText } from "../../text/slugText.js";
@@ -98,7 +98,7 @@ else {
         if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage({ viewport: { width: 1100, height: 700 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?webgl=1&quick=1`, { waitUntil: "load" });
     let json = null; for (let i = 0; i < 180 && !json; i++) { await pg.waitForTimeout(1000); const v = await pg.evaluate(() => document.getElementById("json").value); if (v) { try { json = JSON.parse(v); } catch (e) { json = null; } } }

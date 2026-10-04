@@ -64,6 +64,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { noComments, codeHas } from "./sourceScan.mjs";
 import { MEASURED, MEASURED_RUNS, UNRESOLVED, TAIL_HEADROOM, DEFAULT_BUDGET_MS, budgetFor } from "./gateBudget.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/budgetProvenance-selfcheck.mjs");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -377,6 +379,10 @@ console.log("\n6. *** WHAT THE TABLE'S NUMBERS ACTUALLY MEASURE UP TO, WHICH IS 
                                [0.7, 1.5, "within 1.5x"], [0, 0.7, "MEASURED is LOWER"]])
         say("  " + n.padEnd(18), String(band(lo, hi)).padStart(4));
     say("worst remaining", `${rows[0].ratio.toFixed(1)}x  ${rows[0].k.split("/").pop()} (${rows[0].m} against ${rows[0].obs})`);
+    REPORT.table("MEASURED entries against an independent observation, by ratio", ["band", "from x", "below x", "entries"],
+        [[10, Infinity, "10x or more"], [3, 10, "3x - 10x"], [1.5, 3, "1.5x - 3x"], [0.7, 1.5, "within 1.5x"], [0, 0.7, "MEASURED is LOWER"]].map(([lo, hi, n]) => [n, lo, hi, band(lo, hi)]),
+        `${rows.length} of ${Object.keys(MEASURED).length} entries have an independent observation`);
+    REPORT.table("the five largest ratios remaining", ["gate", "MEASURED ms", "observed ms", "ratio"], rows.slice(0, 5).map((r) => [r.k, r.m, r.obs, r.ratio]));
 
     ok("*** no entry is more than about 3x its observed cost now, and NONE is lower ***",
         band(10, Infinity) === 0 && band(0, 0.7) === 0 && rows[0].ratio < 3.2,
@@ -427,5 +433,6 @@ console.log("\n7. configContract, REMOVED RATHER THAN CORRECTED, AND WHY THAT DI
         "believes is working -- and no instrument existed that could have disagreed with it.");
 }
 
+REPORT.write();
 console.log(fails ? `\nbudgetProvenance-selfcheck: ${fails} FAILED` : "\nbudgetProvenance-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

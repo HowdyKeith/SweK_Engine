@@ -15,7 +15,9 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launch takes PARITY_ARGS, so on Windows both backends run on the GPU
+// (tools/ship/webgpuHarness.mjs); this gate holds no row to a model of SwiftShader's rasterisation
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { ENG, BUNDLE, apply, patchTexts, rootWithBuilds } from "./threePatch.mjs";
 
 const DIR = path.join(ENG, "docs", "upstream-three");
@@ -38,7 +40,7 @@ if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS.
 else {
     const { root, dispose } = rootWithBuilds(builds);
     try {
-        const r = await runInEngineOrigin({ engineRoot: root, timeoutMs: 600000, args: { CASES }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: root, timeoutMs: 600000, args: { CASES }, script: `async (a) => {
   const out = {};
   for (const [name, slot] of a.CASES) for (const [build, dir] of [["r185", "/vendor/three-webgpu"], ["patched", "/three-patched/" + slot]]) {
     const THREE = await import(dir + "/three.webgpu.js"), T = await import(dir + "/three.tsl.js"), frame = () => new Promise((q) => requestAnimationFrame(q));

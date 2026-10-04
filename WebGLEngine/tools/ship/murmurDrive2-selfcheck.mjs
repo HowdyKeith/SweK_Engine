@@ -27,6 +27,8 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies, N3, light } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurDrive2-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -99,6 +101,8 @@ for (const r of R) r.pct = 100 * (r.r1 / r.r0 - 1);
 sec("1. *** FOUR OF THE FIVE DRAW IN, AND THE FIFTH IS THE ONE WHOSE TABLE SAYS IT SHOULD NOT ***");
 {
     for (const r of R) say(`${r.s.padEnd(6)} RMS radius ${r.r0.toFixed(4)} -> ${r.r1.toFixed(4)}  ${r.pct.toFixed(2)}%   (bytes moved ${r.moved.pct.toFixed(1)}%, worst channel ${r.moved.mx})`);
+    REPORT.table("RMS radius under drive, per species", ["species", "RMS radius before", "RMS radius after", "% change", "% of bytes moved", "worst channel"],
+        R.map((r) => [r.s, r.r0, r.r1, r.pct, r.moved.pct, r.moved.mx]));
 
     const narrowers = R.filter((r) => r.s !== "limn"), limn = R.find((r) => r.s === "limn");
     // *** THE SECOND CLAUSE WAS `r.pct < 10 * limn.pct` AND THAT RAN THE WRONG WAY. *** Both numbers are
@@ -218,6 +222,7 @@ sec("3. *** OUTSIDE RESPONDING THIS ROUND MOVES NOTHING -- measured at a frame, 
         `entry did until a census of this shape caught it.`);
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the half of st.drive that a frame can actually show. Four species draw their " +
     "light in, helix draws in while winding tighter, and limn -- the one species in the table whose lean is " +

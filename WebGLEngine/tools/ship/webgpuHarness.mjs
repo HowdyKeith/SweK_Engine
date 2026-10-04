@@ -38,7 +38,7 @@
 
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
@@ -63,9 +63,60 @@ const LAUNCH_ENV = launchEnv();
 // d3d12, and Vulkan-via-ANGLE were each tried alone and did nothing on this box. Scoped to win32 only because
 // that is the one platform this was actually measured on -- darwin's real behaviour here is still unknown and
 // guessing a flag for it would be exactly the mistake this comment is refusing to make for Linux already.
-export const LAUNCH_ARGS = Object.freeze(
-    process.platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"]
-);
+//
+// *** v4778 RIG RUN 4 -- AND ON win32 THAT PAIR PUTS WebGPU ON THE BOX'S GPU, WHICH NO GATE'S NUMBERS WERE TAKEN ON. ***
+// Keith's rig (GTX 1080) under the pair: WebGPU "nvidia / pascal", and about forty exact device rows red, each holding
+// a figure SwiftShader produced. realGpuRun --gl-flags on the same box, same headless shell 1243:
+//     --enable-unsafe-webgpu --use-angle=d3d11                                   WebGPU HARDWARE nvidia / pascal
+//     --enable-unsafe-webgpu --use-angle=d3d11 --use-webgpu-adapter=swiftshader  WebGPU SOFTWARE google / swiftshader
+// and WebGL2 stays on the GPU's ANGLE D3D11 under both, drawing. So, on Keith's decision: an ORDINARY run on win32 asks
+// for the SwiftShader adapter, which is what the device rows were measured on, and HARDWARE_ARGS is the pair -- what
+// realGpuRun.mjs hands its gates, because a real-hardware run is the one that wants the GPU. Elsewhere both are the one
+// flag they always were: Linux and darwin were not measured with the adapter flag on a GPU, and a Linux box with no GPU
+// reaches SwiftShader without it. Per platform as functions so a box can check another platform's answer.
+export function hardwareArgsFor(platform) {
+    return platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"];
+}
+export function launchArgsFor(platform) {
+    return platform === "win32" ? [...hardwareArgsFor(platform), "--use-webgpu-adapter=swiftshader"] : hardwareArgsFor(platform);
+}
+export const HARDWARE_ARGS = Object.freeze(hardwareArgsFor(process.platform));
+export const LAUNCH_ARGS = Object.freeze(launchArgsFor(process.platform));
+
+// *** v4778 RIG RUN 10 -- PARITY_ARGS: WHERE A GATE HOLDS THE TWO BACKENDS TO EACH OTHER, BOTH ON ONE RASTERISER (Keith's decision). ***
+// Since rig run 4 an ordinary win32 run puts WebGPU on SwiftShader (--use-webgpu-adapter=swiftshader) and WebGL2 stays on the
+// GPU's ANGLE D3D11 -- and no flag set measured on the rig puts both on SwiftShader: every ANGLE-on-SwiftShader set lost the
+// WebGPU adapter, the one both-software set is WARP for WebGL2 against SwiftShader for WebGPU (two rasterisers still), and
+// node-webgpu there reaches D3D12 alone (realGpuRun --gl-flags, rig run 10). So the 14 gates that went newly red at the switch --
+// each holds WebGL2 and WebGPU (or node-webgpu and the browser) to ONE picture -- launch with the pair on win32: one rasteriser,
+// the GPU, reached two ways, which is what their rows claim and how all 14 were green on the rig before the switch. Gates
+// that hold a backend to SwiftShader's own figures keep LAUNCH_ARGS. Elsewhere PARITY_ARGS is LAUNCH_ARGS: SwiftShader both.
+export function parityArgsFor(platform) {
+    return platform === "win32" ? hardwareArgsFor(platform) : launchArgsFor(platform);
+}
+export const PARITY_ARGS = Object.freeze(parityArgsFor(process.platform));
+
+/**
+ * *** v4778 RIG RUN 12 -- A ROW THAT HOLDS A BACKEND TO A MODEL OF SWIFTSHADER'S RASTERISATION IS ASSERTED ON SOFTWARE AND
+ * REPORTED ON A GPU (Keith's decision, option a). *** slugDevice/slugCurve/slugShatter fit the fragment's texcoord to a
+ * snapped-corner model of SwiftShader's rasteriser and hold every pixel to slugEval through it; gpuUniverse holds Sol's picks
+ * and tslRace a generated pipeline to a hand-written one on every pixel -- all measured where SwiftShader ran both. On the GTX
+ * 1080 the snap and the rounding are the GPU's. With the two-backend gates' PARITY_ARGS both backends are that GPU; these rows
+ * then print their figures and whether they would hold, and are not asserted. On software, or an adapter the harness cannot
+ * name, they are asserted as before -- and `asserted`/`reported` let a gate hold that scope too.
+ */
+export function softwareClaims(ok, r, say = (m) => console.log("  ----  " + m)) {
+    const name = r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown";
+    const row = (label, cond, detail) => {
+        if (r && r.software === false) { row.reported++; say(`NOT ASSERTED on a hardware adapter (${name}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${String(label).replace(/\*\*\* ?| ?\*\*\*/g, "")}${detail ? " -- " + String(detail).slice(0, 160) : ""}`); return false; }
+        row.asserted++; ok(label, cond, detail); return true;
+    };
+    row.asserted = 0; row.reported = 0; row.hardware = !!(r && r.software === false);
+    // ...and the scope held: every such row asserted on software, every one reported on hardware
+    row.held = (n) => ok(`the ${n} SwiftShader-model row(s) were ${row.hardware ? "reported on a hardware adapter" : "asserted on a software adapter"} (${name}), as decided`,
+        row.hardware ? row.asserted === 0 && row.reported === n : row.reported === 0 && row.asserted === n, `${row.asserted} asserted, ${row.reported} reported`);
+    return row;
+}
 
 // *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
 // gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded
@@ -168,7 +219,7 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
 export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
                                        workgroups = 1, compileOnly = false, timeoutMs = 60000,
                                        inputs = null, outInit = null,
-                                       outBinding = 0, uniformBinding = 1 }) {
+                                       outBinding = 0, uniformBinding = 1, launchArgs = null }) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
@@ -183,7 +234,7 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
         const page = await browser.newPage();
         await page.goto(url);
         const out = await page.evaluate(async (a) => {
@@ -413,7 +464,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
 
     const n = srcSize;
     const src = new Uint8Array(n * n * 4);
@@ -444,7 +495,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     // process that must be killed from outside.
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
         let timer = null;
         const out = await Promise.race([page.evaluate(async (a) => {
@@ -592,7 +643,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
     const three = path.join(engineRoot, "vendor/three/three.module.js");
     if (!fs.existsSync(three)) return { ok: false, skipped: true, reason: "no vendored three at " + three, pixels: null };
 
@@ -617,7 +668,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));

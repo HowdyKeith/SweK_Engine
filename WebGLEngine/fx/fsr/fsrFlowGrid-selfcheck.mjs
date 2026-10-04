@@ -23,6 +23,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
 import { flowCostModel } from "../../render/flowCost.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -108,6 +109,13 @@ else {
            CASES.every((cn) => o[cn].level >= o[cn].block - 0.03) && o.scroll.level - o.scroll.block >= 0.1 && o.panScroll.level - o.panScroll.block >= 0.1,
            "the block grid's coarse patch measured the motion 12 pixels from its block (render/flowCost-selfcheck.mjs's zoom, turn and two motions); here is what that cost a generated frame");
         for (const cn of ["scroll", "panScroll", "dollyScroll"]) say(`${cn.padEnd(12)} the wall's clear interior (${o[cn].innerPx} px): block grid ${f(o[cn].wall.block)} dB, level grid ${f(o[cn].wall.level)} (${d(o[cn].wall.level, o[cn].wall.block)}), refining within 2 ${f(o[cn].wall.levelR2)}`);
+        gateReport("fx/fsr/fsrFlowGrid-selfcheck.mjs")
+            .table("a generated frame's dB, block grid against each level on its own", ["case", "block grid dB", "level grid dB", "level grid refining within 2 dB"],
+                CASES.map((cn) => [cn, o[cn].block, o[cn].level, o[cn].levelR2]))
+            .table("the scrolling wall's clear interior", ["case", "interior px", "block grid dB", "level grid dB", "level grid refining within 2 dB"],
+                ["scroll", "panScroll", "dollyScroll"].map((cn) => [cn, o[cn].innerPx, o[cn].wall.block, o[cn].wall.level, o[cn].wall.levelR2]))
+            .table("the search's reads against the block grid's", ["setting", "share of the reads"],
+                [["level grid", share({ grid: "level" })], ["level grid, refining within 2", share({ grid: "level", refineRadius: 2 })]]).write();
         ok(`*** [webgpu] v4754: and it gives back the scrolling wall's interior that the still-surface margin gave up -- ${["scroll", "panScroll", "dollyScroll"].map((cn) => `${cn} ${d(o[cn].wall.level, o[cn].wall.block)}`).join(", ")} dB over the block grid there ***`,
            ["scroll", "panScroll"].every((cn) => o[cn].wall.level - o[cn].wall.block >= 2) && o.dollyScroll.wall.level >= o.dollyScroll.wall.block - 0.1,
            "v4745's split margin cost the interior 7 dB on the block grid (+10.9 at 0.9, +3.9 split); v4749 went after it with the flows of the 2 x 2 nearest blocks and found them mixed, and v4754 measured them again on this grid (render/flowReconcile.mjs's note). The grid alone gives it back");

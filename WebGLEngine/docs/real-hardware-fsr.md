@@ -13,8 +13,10 @@ From `WebGLEngine/`, with the repository's usual `npm install` done (it brings P
 node tools/ship/realGpuRun.mjs --out real-gpu-run.json
 ```
 
-- **Windows**: nothing more. The harness already launches with `--enable-unsafe-webgpu --use-angle=d3d11`, the pair measured
-  necessary and sufficient on a D3D12 machine (tools/ship/webgpuHarness.mjs, LAUNCH_ARGS).
+- **Windows**: nothing more. This run launches its gates with `--enable-unsafe-webgpu --use-angle=d3d11`, the pair measured
+  necessary and sufficient on a D3D12 machine (tools/ship/webgpuHarness.mjs, HARDWARE_ARGS), which reaches the GPU. An
+  ordinary gate run on Windows adds `--use-webgpu-adapter=swiftshader` (LAUNCH_ARGS) since v4778 rig run 4, because the
+  device rows were measured on SwiftShader; realGpuRun does not, so its report names the GPU.
 - **Linux with a GPU**: if the report's first line says SOFTWARE ADAPTER, the browser fell back to SwiftShader. Try
   `SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan" node tools/ship/realGpuRun.mjs`.
 - **macOS**: `--enable-unsafe-webgpu` (the default) reaches Metal.
@@ -32,7 +34,7 @@ RUN**. A software run's times say nothing about a GPU. Then, per gate, its kind:
 |---|---|---|
 | **exact** | the device against a CPU mirror, backend against backend, bit for bit or to f32 | must hold. A red row is a bug on that GPU -- the report keeps the row's text |
 | **quality** | dB against a truth frame, with a margin | should hold. A different GPU's f32 and rasterisation can move a figure by hundredths of a dB; a red row with a small miss is the margin, a large one is a finding |
-| **timing** | what the GPU takes: the flow's cost, FSR3 on the browser's clock, pass timings | the point of the run. These are the numbers SwiftShader cannot give |
+| **timing** | what the GPU takes: the flow's cost, FSR3 on the browser's clock, pass timings | the point of the run. These are the numbers SwiftShader cannot give. A row that asserts SwiftShader's COST MODEL (fsrFlowCost, fsrFrameGenLayerCost, fsrFrameGenReach) is printed with its figures and "NOT ASSERTED on a hardware adapter" there, by decision at v4778: on a GTX 1080 a fixed cost of a few ms swallowed every proportion they hold |
 
 The kinds are read from each gate's source (`categorize` in the runner: a gate that reads a clock is timing, one that grades
 in dB is quality, the rest exact), and every FSR gate is in the run (`gateList`); `tools/ship/realGpuRun-selfcheck.mjs` holds

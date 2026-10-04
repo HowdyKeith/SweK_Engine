@@ -37,6 +37,8 @@ import * as K from "../../render/murmurKit.mjs";
 import { createPresenceState, STATES, STATE_INDEX } from "../../render/aiPresenceOrbState.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurClock2-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -140,6 +142,8 @@ sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: SIX AND TWENTY-NINE RADIANS IN 
         say(`${kind === "mist" ? "tempest's cloud drift" : "helix's strand climb"}, worst ONE-FRAME advance as its signal goes to full:`);
         for (const r of rows)
             say(`   after ${String(r.s).padStart(4)}s:  integrated ${r.wI.toFixed(6)}    murmur's drift*F ${r.wN.toFixed(4)}    ${(r.wN / r.wI).toFixed(0)}x`);
+            REPORT.table(`${kind === "mist" ? "tempest's cloud drift" : "helix's strand climb"}: worst one-frame advance as its signal goes to full`, ["session s", "integrated", "murmur's drift*F", "ratio"],
+                rows.map((r) => [r.s, r.wI, r.wN, r.wN / r.wI]));
 
         // THE CEILING IS DERIVED AND NOT CHOSEN. The secular phase advances at most base * (1 + sum of the
         // coefficients times the SUP of each conditioned signal) per second of shader time, and the state the
@@ -383,6 +387,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the three clocks whose OUTPUT is multiplied by a live signal rather than whose " +
     "rate is -- nebula's and tempest's cloud drift, flux's stream, and helix's climb. Two of them were " +

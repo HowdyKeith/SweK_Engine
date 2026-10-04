@@ -12,7 +12,8 @@
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import { CAPABILITIES } from "../../gfx/device.js";
@@ -60,7 +61,7 @@ console.log("\n2. ON THE GPU: BUILD THE PYRAMID, CULL WITH IT, AND CHANGE NOTHIN
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, CAM, scene: Array.from(records) }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, CAM, scene: Array.from(records) }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const records = new Float32Array(a.scene);
         const lods = () => [{ name: "coarse", mesh: G.quadMesh(1, [1, 0, 0, 1]) }, { name: "fine", mesh: G.quadMesh(2, [0, 1, 0, 1]) }];
@@ -137,7 +138,7 @@ else {
     // hidden. A single phase culls them (the picture is wrong for a frame); the second phase re-tests them
     // against THIS frame's pyramid and draws them on top. The reference is the same frame with no occlusion.
     const CAM2 = { ...CAM, eye: [3, 0, 3], target: [3, 0, -5] };
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, CAM, CAM2, scene: Array.from(records) }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, CAM, CAM2, scene: Array.from(records) }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const records = new Float32Array(a.scene);
         const lods = () => [{ name: "coarse", mesh: G.quadMesh(1, [1, 0, 0, 1]) }, { name: "fine", mesh: G.quadMesh(2, [0, 1, 0, 1]) }];

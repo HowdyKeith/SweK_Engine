@@ -78,6 +78,12 @@ export const SHELL_LEAVES = Object.freeze([
     path.join("chrome-linux", "headless_shell"),
     path.join("chrome-win", "headless_shell.exe"),
     path.join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
+    // v4778 rig run 4: and the SAME rename on Linux and macOS, which v4617 measured only on Windows. Playwright 1.63's
+    // chromium_headless_shell-1243 unpacks on Linux to chrome-headless-shell-linux64/chrome-headless-shell (installed and
+    // listed in this sandbox), so a Linux box with a current Playwright resolved an older build or nothing at all.
+    path.join("chrome-headless-shell-linux64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-arm64", "chrome-headless-shell"),
+    path.join("chrome-headless-shell-mac-x64", "chrome-headless-shell"),
     path.join("chrome-mac", "headless_shell"),
     path.join("chrome-linux", "chrome"),
     path.join("chrome-win", "chrome.exe"),
@@ -175,14 +181,46 @@ export function resolveHeadlessShell({ env = process.env, home = os.homedir(), e
 // fix here is stronger than another global-install guess, because it does not need one: tools/render-qa's own
 // package.json is THIS TREE'S OWN declared dependency, at a path relative to this file that does not change
 // per box the way a global npm root does.
+// *** v4778 RIG RUN -- 248 GATES RED ON ONE MISSING PACKAGE, AND THIS LIST COULD NOT HAVE FOUND IT ON WINDOWS. ***
+// Keith's rig ran C:\Intel\SweK_Engine_v4778 -- a fresh copy per version, so tools/render-qa/node_modules (where
+// render-qa's package.json puts playwright) is empty in every new folder while the headless shell survives in
+// %LOCALAPPDATA%\ms-playwright. The other places a package can live on that box were never asked: the three global
+// paths below are POSIX-only, so even `npm i -g playwright` would have resolved nothing. Added, in order after the
+// in-tree install: node_modules at the engine and repo roots, the global npm root (%APPDATA%\npm on Windows,
+// npm_config_prefix anywhere), and -- last, and named as such in `from` -- the same render-qa install in a SIBLING
+// copy of this repo (C:\Intel\SweK_Engine_v4777\...), newest version first, only where one exists on disk.
+// Joined with THAT platform's separator, not this process's: asked about POSIX from a Windows box, path.join wrote
+// "\\opt\\npm\\lib\\..." (Keith's second rig run), which is neither box's path.
+export function globalNpmPaths(env = process.env, platform = process.platform) {
+    const P = platform === "win32" ? path.win32 : path.posix;
+    const out = [];
+    if (env.APPDATA) out.push(P.join(env.APPDATA, "npm", "node_modules", "playwright"));
+    if (env.npm_config_prefix) out.push(platform === "win32" ? P.join(env.npm_config_prefix, "node_modules", "playwright")
+                                                              : P.join(env.npm_config_prefix, "lib", "node_modules", "playwright"));
+    return out;
+}
+export function siblingCopies(eng = ENG, { readdir = fs.readdirSync, exists = fs.existsSync } = {}) {
+    const root = path.resolve(eng, ".."), parent = path.dirname(root), base = path.basename(root);
+    const stem = base.replace(/[_-]?v?\d+[a-z]?$/i, "");
+    if (!stem || parent === root) return [];
+    let dirs = [];
+    try { dirs = readdir(parent); } catch { return []; }
+    const ver = (d) => { const m = d.match(/(\d+)[a-z]?$/i); return m ? Number(m[1]) : -1; };
+    return dirs.filter((d) => d !== base && d.startsWith(stem)).sort((a, b) => ver(b) - ver(a))
+        .map((d) => path.join(parent, d, path.basename(eng), "tools", "render-qa", "node_modules", "playwright")).filter((c) => exists(c));
+}
 export const PLAYWRIGHT_PATHS = [
     "playwright",
     "playwright-core",
     path.join(ENG, "tools", "render-qa", "node_modules", "playwright"),
+    path.join(ENG, "node_modules", "playwright"),
+    path.join(ENG, "..", "node_modules", "playwright"),
+    ...globalNpmPaths(),
     "/opt/node22/lib/node_modules/playwright/index.js",
     "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
     "/usr/local/lib/node_modules/playwright/index.js",
-];
+    ...siblingCopies(),
+].filter((p, i, a) => a.indexOf(p) === i);
 
 /**
  * Try every known path IN ORDER and return the first that resolves, plus which one it was -- the "plus which
@@ -211,8 +249,11 @@ export function browserSkipReason(chromium, pwFrom, shell = HEADLESS_SHELL) {
     const where = HEADLESS_SHELL_TRIED.length
         ? HEADLESS_SHELL_TRIED.length + " candidate(s) under " + shellRoots().join(", ")
         : "no browser directory under " + shellRoots().join(", ");
-    if (!chromium && !shellThere) return "neither playwright (tried: " + PLAYWRIGHT_PATHS.join(", ") + ") nor a headless shell (" + where + ")";
-    if (!chromium) return "playwright is not installed here -- tried: " + PLAYWRIGHT_PATHS.join(", ") + " (a headless shell at " + shell + " IS present)";
+    if (!chromium && !shellThere) return "neither playwright (tried: " + PLAYWRIGHT_PATHS.join(", ") + ") nor a headless shell (" + where + ")" +
+        " -- to fix: cd " + path.join(ENG, "tools", "render-qa") + " && npm install (its postinstall fetches the browser)";
+    if (!chromium) return "playwright is not installed here -- tried: " + PLAYWRIGHT_PATHS.join(", ") + " (a headless shell at " + shell + " IS present)" +
+        // v4778 rig: say the one command that fixes it -- the browser is already on disk, so nothing need be downloaded
+        " -- to fix: cd " + path.join(ENG, "tools", "render-qa") + " && npm install --ignore-scripts";
     if (!shellThere) return "playwright resolved from " + pwFrom + " but no headless shell was found (" + where + ")";
     return "";
 }

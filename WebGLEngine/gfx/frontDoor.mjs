@@ -312,6 +312,24 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
         why: "ce276dff again -- the three upgrade split its core out. main.js -> physics/box3dMeshOverlay.js " +
              "-> three.module.js -> three.core.js: a file that did not exist in the version this list was " +
              "last taken against, reached through an edge that has not moved" }),
+    // *** v4778 RIG RUN -- SIX MORE, THE FOURTH TIME NOTHING RECORDED ITSELF. *** Keith's rig read 724 against
+    // 695 + 23. The walk at 5638cbe4 (the commit this list was last taken at) reaches 718, HEAD 724: six
+    // arrived and NOTHING LOST. Each chain below is the tree's own resolver's, and each is dated from the
+    // commit that added the edge. All four commits are the 2026-09-16 controller / splat / kaiju demo arc.
+    Object.freeze({ module: "world/controllerLabWorld.mjs",
+        why: "a1ec407f, task board #13's live demo. main.js -> controllerLabWorld, a static import" }),
+    Object.freeze({ module: "world/splatWalkWorld.mjs",
+        why: "078afe40, task #83's splat-walking demo. main.js -> splatWalkWorld, a static import" }),
+    Object.freeze({ module: "world/platformCarryWorld.mjs",
+        why: "5112cdc7, task #84's platform-carry demo. main.js -> platformCarryWorld, a static import" }),
+    Object.freeze({ module: "physics/character/capsuleCollide.mjs",
+        why: "5112cdc7 again: main.js imports carryOnPlatform from it directly, so the walk finds it one hop " +
+             "from the root even though the demo worlds import it too" }),
+    Object.freeze({ module: "physics/splat/splatMesh.mjs",
+        why: "5112cdc7 again: main.js imports slabCloud for the ferry's and turntable's splat clouds" }),
+    Object.freeze({ module: "world/worldColliderBVH.mjs",
+        why: "64ccd1af, task #89. main.js -> simulation/KaijuManager.js -> worldColliderBVH: kaiju ground " +
+             "positioning moved onto the real terrain collider" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

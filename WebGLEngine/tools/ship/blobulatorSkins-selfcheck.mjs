@@ -28,7 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import http from "node:http";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -75,7 +75,7 @@ const src = fs.readFileSync(path.join(ENG, "blobulator.html"), "utf8");
         });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e.message)));

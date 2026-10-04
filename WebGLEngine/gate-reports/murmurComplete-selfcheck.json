@@ -1,0 +1,83 @@
+{
+ "gate": "tools/ship/murmurComplete-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "the completion lift per species: a figure at 0.300 at the peak",
+   "columns": [
+    "species",
+    "k",
+    "over",
+    "reaches",
+    "target"
+   ],
+   "rows": [
+    [
+     "opal",
+     0.85,
+     0,
+     0.895,
+     1
+    ],
+    [
+     "sol",
+     0.85,
+     0,
+     0.895,
+     1
+    ],
+    [
+     "chorus",
+     0.9,
+     0.45,
+     1.335,
+     1.45
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "at the peak: bytes moved and the interior's mean light",
+   "columns": [
+    "species",
+    "% of bytes moved",
+    "worst channel",
+    "interior before",
+    "interior at the peak"
+   ],
+   "rows": [
+    [
+     "limn",
+     21.864149305555557,
+     196,
+     0.06488638746471477,
+     0.24285803650450496
+    ],
+    [
+     "flux",
+     22.34157986111111,
+     193,
+     0.19007983468087203,
+     1.1254858321177148
+    ],
+    [
+     "chorus",
+     21.744791666666668,
+     193,
+     0.25674836813679797,
+     0.996470145148828
+    ],
+    [
+     "sol",
+     13.856336805555555,
+     86,
+     0.16545225723025628,
+     0.36784128194840093
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

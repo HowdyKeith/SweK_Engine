@@ -47,7 +47,18 @@ console.log("redCensus-selfcheck -- what is actually red, re-measured rather tha
 
 console.log("1. *** THE CENSUS IS A MEASUREMENT, AND EVERY ENTRY CARRIES WHAT IT COST TO TAKE ***");
 {
-    ok("the census names a red set", RED_AT_V4279.length > 0, RED_AT_V4279.length + " gates");
+    // *** v4778 RIG RUN 3 -- THE LAST ENTRY WAS FIXED, AND AN EMPTY REGISTER IS THE CENSUS PAID DOWN. *** shaderRefs-selfcheck
+    // left it, so `length > 0` went red on success. Empty is accepted only when the census's own arithmetic says so: every
+    // gate it ever counted -- confirmed, recovered, recovered since -- is accounted for as fixed, by name, in the two fixed lists.
+    // SABOTAGE (rig run 3): FIXED_SINCE_V4279's shaderRefs line deleted on the real redCensus.mjs -> 3 red, this row, the
+    // five-term identity (= 0 against 1 unaccounted) and the RECOVERED row. Restored, md5 verified.
+    const everCounted = METHOD.confirmedSerially + METHOD.recoveredFromTimeoutBucket + RECOVERED_SINCE_V4279.length;
+    const paidDown = RED_AT_V4279.length === 0 && FIXED_AT_V4279.length + FIXED_SINCE_V4279.length === everCounted &&
+                     RECOVERED_SINCE_V4279.every((r) => FIXED_SINCE_V4279.some((f) => f.gate === r.gate));
+    ok("the census names a red set -- or has been PAID DOWN, every gate it ever counted fixed by name", RED_AT_V4279.length > 0 || paidDown,
+        RED_AT_V4279.length ? RED_AT_V4279.length + " gates"
+        : `0 gates: ${FIXED_AT_V4279.length} fixed at v4279 + ${FIXED_SINCE_V4279.length} fixed since = ${everCounted} ever counted ` +
+          `(${METHOD.confirmedSerially} confirmed + ${METHOD.recoveredFromTimeoutBucket} recovered + ${RECOVERED_SINCE_V4279.length} recovered since)`);
     ok("every entry names a gate FILE that exists on disk",
         RED_AT_V4279.every((e) => fs.existsSync(path.join(ENG, e.gate))),
         RED_AT_V4279.filter((e) => !fs.existsSync(path.join(ENG, e.gate))).map((e) => e.gate).join(" ") || "all present");
@@ -252,9 +263,12 @@ console.log("\n4. *** THE MEASUREMENT'S OWN FAILURE MODES, RECORDED BECAUSE BOTH
     // is the LARGER one and that the discrepancy is declared, rather than that two instruments agree when one
     // of them was cut off.
     ok("  ...and every RECOVERED gate is IN the red set and OUT of the timeout bucket, with its measurement",
+        // v4778 rig run 3: or FIXED since, by name -- shaderRefs was recovered red at v4318 and repaired in v4778's rig fixes;
+        // a recovered gate that later goes green has left the red set the only way it may, through FIXED_SINCE_V4279
         RECOVERED_SINCE_V4279.every((r) =>
-            RED_AT_V4279.some((e) => e.gate === r.gate &&
-                (e.ms === r.ms || (UNVERIFIED_LINE[r.gate] && r.ms > e.ms))) &&
+            (RED_AT_V4279.some((e) => e.gate === r.gate &&
+                (e.ms === r.ms || (UNVERIFIED_LINE[r.gate] && r.ms > e.ms))) ||
+             FIXED_SINCE_V4279.some((f) => f.gate === r.gate)) &&
             !UNCONFIRMED_SLOW.includes(r.gate) && r.ms > 0 && r.method && r.why.length > 40),
         RECOVERED_SINCE_V4279.map((r) => r.gate.split("/").pop() + " " + r.verdict + " at " +
             (r.ms / 1000).toFixed(1) + "s (" + r.round + ")").join(", ") +

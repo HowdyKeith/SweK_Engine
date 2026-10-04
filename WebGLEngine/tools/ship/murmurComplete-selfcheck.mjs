@@ -35,6 +35,8 @@ import { fileURLToPath } from "node:url";
 import * as K from "../../render/murmurKit.mjs";
 import { codeOnly } from "./sourceScan.mjs";
 import { sp, renderSpecies, interiorMeanLight, light, N3 } from "./murmurSpeciesFrames.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/murmurComplete-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -90,6 +92,7 @@ sec("2. *** THE SATURATION IS NOT A GAIN, AND chorus's TARGET GOES PAST FULL ***
     });
     for (const r of rows)
         say(`${r.s.padEnd(7)} k ${r.c.k.toFixed(2)} over ${r.c.over.toFixed(2)}: a figure at 0.300 reaches ${r.at1.toFixed(4)} at the peak, ${(100 * r.c.k).toFixed(0)}% of the way to ${r.target.toFixed(2)}`);
+        REPORT.table("the completion lift per species: a figure at 0.300 at the peak", ["species", "k", "over", "reaches", "target"], rows.map((r) => [r.s, r.c.k, r.c.over, r.at1, r.target]));
     const ch = rows.find((r) => r.s === "chorus");
     ok("!! *** chorus OVERSHOOTS PAST FULL AND THE OTHER TWO DO NOT: 1.335 against 0.895 ***",
         ch.target > 1 && rows.filter((r) => r.s !== "chorus").every((r) => r.target === 1) &&
@@ -197,6 +200,8 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
         });
         for (const r of R)
             say(`${r.s.padEnd(7)} ${r.d.pct.toFixed(1)}% of bytes move, worst ${String(r.d.mx).padStart(3)}   interior ${r.lo.toFixed(4)} -> ${r.hi.toFixed(4)}  (x${(r.hi / r.lo).toFixed(3)})`);
+            REPORT.table("at the peak: bytes moved and the interior's mean light", ["species", "% of bytes moved", "worst channel", "interior before", "interior at the peak"],
+                R.map((r) => [r.s, r.d.pct, r.d.mx, r.lo, r.hi]));
         ok("!! *** EVERY ONE OF THE FOUR BRIGHTENS AT THE PEAK, WHERE ALL FOUR MOVED ZERO BYTES BEFORE ***",
             R.every((r) => r.d.pct > 5 && r.d.mx > 50 && r.hi > r.lo * 1.02),
             `${R.map((r) => `${r.s} x${(r.hi / r.lo).toFixed(2)}`).join(", ")} of interior light, with ` +
@@ -255,6 +260,7 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
     }
 }
 
+REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the half of the SUCCESS flash that is not the travelling shell. kit.ts says the " +
     "light in a success is not an overlay -- every species multiplies its own interior by (1 + complete) -- " +

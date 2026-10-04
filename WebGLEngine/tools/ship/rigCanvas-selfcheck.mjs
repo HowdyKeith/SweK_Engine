@@ -17,7 +17,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 let fails = 0;
@@ -65,14 +65,15 @@ else {
 console.log("\n2. THE PAGE, HERE: IT LOADS, COMPARES ITSELF TO THE FILE, AND PASSES ON WebGL2");
 {
     const pw = resolvePlaywright(createRequire(import.meta.url));
-    if (!pw || !fs.existsSync(HEADLESS_SHELL) || !hist) { console.log("  SKIP  no browser or no expected file"); fails++; }
+    // v4778 rig: `!pw` is never true -- resolvePlaywright returns an object; the field is pw.chromium
+    if (!pw.chromium || !fs.existsSync(HEADLESS_SHELL) || !hist) { console.log("  SKIP  no browser or no expected file"); fails++; }
     else {
         const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
         const srv = http.createServer((q, s2) => { const u = decodeURIComponent(String(q.url).split("?")[0]); const f = path.join(ENG, u === "/" ? "gpu-rig-check.html" : u);
             if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
             s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage(); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(3000);
         const st = await pg.evaluate(() => ({ text: document.getElementById("out").textContent, json: document.getElementById("json").value }));

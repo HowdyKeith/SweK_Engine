@@ -1,0 +1,41 @@
+{
+ "gate": "fx/fsr/fsr3Hold-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "holding one pair against two, around a late real frame",
+   "columns": [
+    "policy",
+    "judder ms",
+    "dB a refresh",
+    "worst refresh dB",
+    "refused",
+    "sent back",
+    "frames from the older pair"
+   ],
+   "rows": [
+    [
+     "timed",
+     11.548004345607417,
+     21.44520458680385,
+     19.151013371324915,
+     0,
+     0,
+     0
+    ],
+    [
+     "timed2",
+     8.797688390698115,
+     21.99697954034269,
+     20.073694692300958,
+     0,
+     0,
+     10
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

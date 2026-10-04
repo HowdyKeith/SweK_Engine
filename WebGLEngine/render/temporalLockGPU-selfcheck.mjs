@@ -55,6 +55,8 @@ import { makeLumaState, pushLuma, shadingShiftCPU, lumaMean, ridgesCPU, coherent
 import { ringFloorCPU, RESOLUTION_TAU } from "./ringFloor.mjs";
 import { FLOOR_PHASE } from "./temporalLockGPU.mjs";
 import { codeOnly } from "./backendParity.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";
+const REPORT = gateReport("render/temporalLockGPU-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -350,6 +352,8 @@ if (r.ok && r.result) {
     const gFloorF = worst(R.floorFrame, cpuFloorFrame, N);
     const gFloorW = worst(R.floorWin, cpuFloorWin, N);
     say("ring floor", `frame ${gFloorF.toExponential(2)}, window ${gFloorW.toExponential(2)}`);
+    REPORT.table("the lock kernels against their CPU mirrors", ["kernel", "worst |gpu - cpu|", "disagreements"],
+        [["RING_PUSH ring", gRing, gFill], ["RING_FLOOR frame", gFloorF, "not counted"], ["RING_FLOOR window", gFloorW, "not counted"]], `the ring over ${N * F} slots; fill disagreements of ${N}`);
     ok("*** RING_FLOOR is ringFloorCPU's PER-PIXEL field in both the frame and the window form ***",
        gFloorF < 1e-6 && gFloorW < 1e-6,
        `frame ${gFloorF.toExponential(2)}, window ${gFloorW.toExponential(2)}, over ${N} pixels. Per-pixel and ` +
@@ -409,6 +413,7 @@ if (r.ok && r.result) {
 }
 }
 
+REPORT.write();
 console.log(fails ? `\ntemporalLockGPU-selfcheck: ${fails} FAILED` : "\ntemporalLockGPU-selfcheck: ALL GREEN");
 console.log("unchecked here: whether any PAGE calls this -- fsr.html runs the CPU lock path and the runner " +
             "existing does not change that, which is the next rung; the v4559 BOUNDS DIVERGENCE at an exact " +

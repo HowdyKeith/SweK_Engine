@@ -20,6 +20,8 @@ import { fileURLToPath } from "node:url";
 import { ARMS, declared, usableFolds, foldMean, h4, c11 } from "./foldStats.mjs";
 import { jointRows, fit, shuffled, ARM_SPEC, RESULT } from "./genGateFolds.mjs";
 import { N_FEATURES, N_FEATURES_V2, fitScaler, applyScaler, forward, auc } from "../../render/genGate.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/genGateFoldsMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CACHE_GZ = "tools/ship/genGate-folds7.json.gz";
@@ -100,6 +102,8 @@ const H = h4(R.results, R.meta, d);
     say("fold      base    V2      V1      SHUF_A  SHUF_B   (seed-mean held-out AUC over ten seeds)");
     for (const f of d.scenes) say(`${f.padEnd(8)}  ${(R.meta[f].pos / R.meta[f].n).toFixed(3)}  ` +
         ARMS.map((a) => foldMean(R.results[f][a]).toFixed(4)).join("  "));
+        REPORT.table("H4 per fold: base rate and each arm's seed-mean held-out AUC over ten seeds", ["fold", "base rate", ...ARMS],
+            d.scenes.map((f) => [f, R.meta[f].pos / R.meta[f].n, ...ARMS.map((a) => foldMean(R.results[f][a]))]));
     ok("*** the recomputed H4 is the recorded H4, diff for diff ***", J(H.a.diffs) === J(R.h4.a.diffs) && J(H.b.diffs) === J(R.h4.b.diffs) && H.supported === R.h4.supported);
     const rev = d.scenes.filter((f, i) => H.a.diffs[i] <= 0);
     ok("*** CLAUSE (a) FAILS AT THE PRICE THE DOCUMENT NAMED: six folds of seven, and 6 of 7 is 8/128 ***",
@@ -140,6 +144,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "render/learned-absolute-preregistration.md builds the matched one on fresh data. It is not a result here.");
 }
 
+REPORT.write();
 console.log(`\ngenGateFoldsMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: ANYTHING BEYOND SEVEN SYNTHETIC SCENES. No dB was measured -- the ranking is upstream of any " +
             "threshold, and H4 did not clear. NOTHING ABOUT FSR4, A BIGGER NETWORK, OR REAL HARDWARE.");

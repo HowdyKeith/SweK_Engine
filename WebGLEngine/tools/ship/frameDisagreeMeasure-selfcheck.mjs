@@ -15,7 +15,9 @@ import { cellOf } from "./frameGain.mjs";
 import { slabBlocks, nonTurnRows, RESULT_H14 } from "./frameSway.mjs";
 import { reversalsNear } from "./frameSwayRep.mjs";
 import { PREREG_H16, CACHE_H16, RESULT_H16, DIS_KEYS, disagreeSummary, h16 } from "./frameDisagree.mjs";
-import { harvest } from "./genGateTrain.mjs";
+import { harvest, rowsMatch, rowsMatchDetail, DB_ULPS } from "./genGateTrain.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/frameDisagreeMeasure-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -64,10 +66,10 @@ console.log("\n2. *** C12: THE FIRST DECLARED SCENE OF THE FIRST DECLARED CELL, 
     let again = null, err = "";
     try { again = await harvest({ scenes: [s0], upto: d.upto, speed: k.speed, settings: { slabdir: k.slabdir, ratio: k.ratio, slabpath: d.path } }); }
     catch (e) { err = String(e.message).slice(0, 160); }
-    const same = again && again.length === cache[c0][s0].length && again.every((r, i) => { const c = cache[c0][s0][i];
-        return r.frame === c.frame && r.genDb === c.genDb && r.cfDb === c.cfDb && J(r.y) === J(c.y) && J(r.x) === J(c.x); });
-    ok(`*** C12: ${s0} at ${c0} on ${d.path}, re-harvested, reproduces every row exactly ***`, !!same,
-       again ? `${again.length} frames against ${cache[c0][s0].length}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
+    // rig run 12 (option 2): frame, labels and features exact, the two dB to DB_ULPS -- see genGateTrain.mjs rowsMatch
+    const match = rowsMatch(again, cache[c0][s0]), same = again && match.ok;
+    ok(`*** C12: ${s0} at ${c0} on ${d.path}, re-harvested, reproduces every row -- frame, labels and features exactly, both dB to ${DB_ULPS} ulp ***`, !!same,
+       again ? `${rowsMatchDetail(match)}, in ${((Date.now() - t0) / 1000).toFixed(0)} s` : `the page did not run: ${err}`);
 }
 
 console.log("\n3. *** H16, RE-DERIVED ***");
@@ -81,6 +83,8 @@ const gainOnSway = (c) => { const q = R14.declared.cells.find((x) => cellOf(x).s
     ok("*** the recomputed H16 is the recorded one ***", J(H) === J(R.h16));
     for (const c of d.cells) say(`${c} ${d.path}: scene signal / rho with advantage / rho with H11's gain / partial given frame -- ` +
         d.scenes.map((s) => { const p = per[c][s]; return `${s} ${p.signal.toFixed(3)}/${signed(p.rho)}/${signed(p.withGain)}/${signed(p.partial)}`; }).join("  "));
+        REPORT.table("H16 per scene: the two motion estimates disagreeing", ["cell", "scene", "scene signal", "rho with advantage", "rho with H11's gain", "partial given frame"],
+            d.cells.flatMap((c) => d.scenes.map((s) => { const p = per[c][s]; return [c, s, p.signal, p.rho, p.withGain, p.partial]; })));
     ok("*** the qualifier holds: the signal is DISTINCT from H11's gain -- so whatever H16 says, it says about a different signal ***",
        H.distinct && H.meanAbsWithGain <= d.distinctMax, `mean |rho| with gain ${H.meanAbsWithGain.toFixed(3)} against a ceiling of ${d.distinctMax}`);
     ok("*** H16 IS NOT SUPPORTED: neither cell clears ***",
@@ -105,6 +109,7 @@ console.log("\n4. *** SECONDARIES -- REPORTED, NEVER PROMOTED ***");
         "qualifier measured that -- and within a scene it barely orders which frames generation wins. No mechanism is claimed.");
 }
 
+REPORT.write();
 console.log(`\nframeDisagreeMeasure-selfcheck: ${fails ? fails + " FAILED" : "ALL GREEN"}`);
 console.log("unchecked here: why the colour flow wins where it wins; a threshold, and a frame gate's value in dB.");
 process.exit(fails ? 1 : 0);

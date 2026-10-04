@@ -1,0 +1,38 @@
+{
+ "gate": "tools/ship/murmurDrive2-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "RMS radius under drive, per species",
+   "columns": [
+    "species",
+    "RMS radius before",
+    "RMS radius after",
+    "% change",
+    "% of bytes moved",
+    "worst channel"
+   ],
+   "rows": [
+    [
+     "helix",
+     0.4206542738409788,
+     0.4054885425422092,
+     -3.605272130077719,
+     19.90017361111111,
+     220
+    ],
+    [
+     "limn",
+     0.5460000827207275,
+     0.542727536343626,
+     -0.5993673775275599,
+     16.40625,
+     190
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

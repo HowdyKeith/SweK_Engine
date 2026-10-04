@@ -17,7 +17,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
-import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runWgslCompute, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 // v4647 -- the adapter's nature is READ, not asserted: this file said "a software rasteriser on both
 // sides" in two places, unconditionally, and on Keith's Intel gen-9 through D3D12 both of those are
 // false. The list lives in ONE place and is gated there (localModelProbe-selfcheck), so it is imported
@@ -104,7 +105,7 @@ let SOFT = null, ADAPTER_NAME = "(unread)";
     if (!native.ok || bSkip) { console.log("\nFAIL -- " + (++fails) + " check(s)"); process.exit(1); }
 
     const t0 = Date.now();
-    browser = await runWgslCompute({ code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
+    browser = await runWgslCompute({ launchArgs: PARITY_ARGS, code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
     tBrowser = Date.now() - t0;
     ok(browser.ok, "the browser backend runs", browser.ok ? `${browser.adapter?.vendor}/${browser.adapter?.architecture}` : browser.reason);
 

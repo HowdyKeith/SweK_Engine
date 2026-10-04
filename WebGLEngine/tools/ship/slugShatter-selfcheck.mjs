@@ -39,7 +39,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
@@ -169,7 +171,7 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-312 snapshot, nine shards mid-burs
         const PV = cameraFor(W, H);
         const rowsPerBody = gbMain.bodies.map((b, k) => k === snapshot.k ? null : Array.from(bodyRows(PV, snapshot.xf, snapshot.ids[k])));
         const shards = snapshot.shards.map((sh) => ({ cell: sh.cell, rows: Array.from(bodyRows(PV, snapshot.xf, sh.idx)) }));
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, CHARS, rowsPerBody, shards, k: snapshot.k }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, CHARS, rowsPerBody, shards, k: snapshot.k }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");
@@ -204,15 +206,16 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-312 snapshot, nine shards mid-burs
         if (r.ok && r.result.webgpu.errs.length === 0 && r.result.webgl2.errs.length === 0) {
             fd = new SlugFontDevice(nb, font, CHARS, { logWidth: r.result.webgl2.logWidth }); modelQuads = buildModelQuads();
             // the shards' spread on screen against the glyph's box: the shard quads' screen centres span wider than the glyph's quad would at the burst centre
+            const SW = softwareClaims(ok, r);
             for (const bk of ["webgpu", "webgl2"]) {
                 const o = r.result[bk], f = fit(o.cap);
                 report(`${bk}: fit -- ` + f.all.slice(0, 3).map((x) => `1/${x.Q}: ${x.worst.toExponential(2)}`).join("  ") + `; ${f.best.orphan} lit fragments outside every model quad, ${f.best.ties} tied`);
-                ok(`*** ${bk}: the perspective-correct model per quad (bodies and shards) reproduces the fragment's texcoord to 1e-5 em over ${f.best.n} fragments, none lit outside it ***`, f.best.worst < 1e-5 && f.best.n > 800 && f.best.orphan === 0, `worst ${f.best.worst.toExponential(2)} em at 1/${f.best.Q}`);
+                SW(`*** ${bk}: the perspective-correct model per quad (bodies and shards) reproduces the fragment's texcoord to 1e-5 em over ${f.best.n} fragments, none lit outside it ***`, f.best.worst < 1e-5 && f.best.n > 800 && f.best.orphan === 0, `worst ${f.best.worst.toExponential(2)} em at 1/${f.best.Q}`);
                 const key = expectedFrame(f.best.Q); let worst = 0, over = 0, exact = 0, lit = 0, shardLit = 0, ties = 0, tiesOff = 0, at = -1;
                 for (let i = 0; i < W * H; i++) { const got = o.pixels[i * 4], d = Math.abs(got - key.out[i]); if (key.out[i] > 5) lit++; if (key.shardInk[i]) shardLit++; if (d === 0) exact++;
                     if (key.tie[i]) { ties++; if (d > TOL) tiesOff++; continue; } if (d > worst) { worst = d; at = i; } if (d > TOL) over++; }
                 report(`${bk}: ${exact} of ${W * H} exact, ${over} over ${TOL}, worst ${worst} at (${at % W}, ${Math.floor(at / W)}); ${ties} on a quad edge (${tiesOff} off); ${lit} lit by the key, ${shardLit} of them shard ink`);
-                ok(`*** ${bk}: every pixel within ${TOL} of 255 of slugEval through the model, white over black stored per layer, edge ties aside ***`, over === 0 && ties < W * H * 0.005 && lit > 700 && shardLit >= 20);
+                SW(`*** ${bk}: every pixel within ${TOL} of 255 of slugEval through the model, white over black stored per layer, edge ties aside ***`, over === 0 && ties < W * H * 0.005 && lit > 700 && shardLit >= 20);
                 // the shards are apart: their ink's screen extent against the glyph's own quad placed at the burst centre (the unshattered body would be one quad there)
                 let sx0 = Infinity, sx1 = -Infinity, sy0 = Infinity, sy1 = -Infinity; for (let i = 0; i < W * H; i++) if (key.shardInk[i]) { sx0 = Math.min(sx0, i % W); sx1 = Math.max(sx1, i % W); sy0 = Math.min(sy0, Math.floor(i / W)); sy1 = Math.max(sy1, Math.floor(i / W)); }
                 const gq = quadTriangles(quadsOf(gbMain.bodies[snapshot.k].built)[0], bodyRows(PV, snapshot.xf, snapshot.ids[snapshot.k]), W, H, 16);
@@ -220,6 +223,7 @@ sec("3. THE FRAME, ON BOTH BACKENDS: the tick-312 snapshot, nine shards mid-burs
                 ok(`  ${bk}: the shards' ink spans ${sx1 - sx0} x ${sy1 - sy0} px on screen -- more than 10 px each way, wider than the whole glyph quad at this distance (about ${Math.round(0.48 * 0.22 * 320 / 4.7)} px) -- and the parked glyph draws nothing (its quad projects at y ${gq.corners[0].sy.toFixed(0)}, off the frame)`, sx1 - sx0 > 10 && sy1 - sy0 > 10 && (gq.corners[0].sy > H || gq.corners[0].sy < 0));
             }
             const G = r.result.webgpu.pixels, L = r.result.webgl2.pixels; let po = 0; for (let i = 0; i < W * H; i++) if (Math.abs(G[i * 4] - L[i * 4]) > TOL) po++;
+            SW.held(4);
             ok(`  the two backends agree within ${TOL} of 255 on all but edge ties (fewer than 0.5%)`, po < W * H * 0.005, `${po} pixels apart`);
         }
         if (r && r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));

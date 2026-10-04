@@ -15,7 +15,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, runWgslCompute, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { validateWgsl, parseBindings } from "../../render/wgslSpec.mjs";
 import * as G from "../../render/gpuDriven.mjs";
 import { nullBackend, CAPABILITIES } from "../../gfx/device.js";
@@ -86,7 +87,7 @@ else {
     const count = 768, probeRecords = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) probeRecords.set(G.probeInstance(i), i * 4);
     const uP = G.packCullUniforms({ planes: G.frustumPlanes(viewProj), eye: CAM.eye, thresholds: ranked.thresholds, count, lodCount: 3, cap: count });
-    const r = await runWgslCompute({ code: G.cullProbeWgsl(), entryPoint: "probe", outCount: count * 2, uniforms: uP, workgroups: Math.ceil(count / G.CULL_WORKGROUP) });
+    const r = await runWgslCompute({ launchArgs: PARITY_ARGS, code: G.cullProbeWgsl(), entryPoint: "probe", outCount: count * 2, uniforms: uP, workgroups: Math.ceil(count / G.CULL_WORKGROUP) });
     ok("the probe compiles and runs", r.ok, r.ok ? `adapter ${r.adapter.vendor}/${r.adapter.architecture}` : `${r.reason} ${(r.errors || []).join(" | ")}`);
     if (r.ok) {
         let lodMismatch = 0, worstMetric = 0, culled = 0, byLod = [0, 0, 0];
@@ -106,7 +107,7 @@ else {
 console.log("\n4. THE REAL THING: DISPATCH, INDIRECT DRAW, READ THE COUNTS AND THE PICTURE BACK");
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N, CAM, THRESHOLDS }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N, CAM, THRESHOLDS }, script: `async (a) => {
         const G = await import("/render/gpuDriven.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const records = G.gridScene({});
         const lods = () => [{ name: "mid", mesh: G.quadMesh(2, [0, 1, 0, 1]) }, { name: "coarse", mesh: G.quadMesh(1, [0, 0, 1, 1]) }, { name: "fine", mesh: G.quadMesh(4, [1, 0, 0, 1]) }];

@@ -47,6 +47,8 @@ import { constantRows, conditionsOf, freeIdentifiers, isConstantCondition, isPar
          CONSTANT_GLOBALS } from "./constantRows.mjs";
 import { gateFiles } from "./assertionShape.mjs";
 import { VACUITY_AT_V4459 } from "./vacuity.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/constantRows-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -103,6 +105,7 @@ for (const f of readGates(gates, ENG)) {
     }
 }
 say("loose predicate", `${loose} of ${looseScanned} (${(100 * loose / looseScanned).toFixed(1)}%)`);
+REPORT.table("the obvious predicate against this file's", ["predicate", "flagged", "conditions scanned"], [["loose", loose, looseScanned], ["this file's rows", R.expr.length, R.scanned]]);
 ok("!! *** the obvious predicate flags most of the tree, which is the objection vacuity.mjs raises ***",
    loose > looseScanned * 0.5 && R.expr.length < 50,
    `${(100 * loose / looseScanned).toFixed(1)}% against this file's ${R.expr.length} rows. vacuity.mjs " +
@@ -244,6 +247,7 @@ ok("...and the population is not degenerate, which would make every row above va
    `${R.scanned} conditions across ${gates.length} gates; the ten sit in ` +
    `${new Set(R.expr.map((x) => x.file)).size} different files, so this is not one gate's habit.`);
 
+REPORT.write();
 console.log(fails ? `\nconstantRows-selfcheck: ${fails} FAILED` : "\nconstantRows-selfcheck: ALL GREEN");
 console.log("unchecked here: whether each of the ten IS a defect, which is a judgement about intent and " +
             "not a fact this file can derive -- several are language-contract rows paired with a row that " +

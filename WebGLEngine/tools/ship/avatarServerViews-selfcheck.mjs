@@ -30,7 +30,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -314,7 +314,7 @@ console.log("\n5. *** THE REAL BROWSER: NO PILL OVER THE HEAD, NO CAMERA IN THE 
         report("live half SKIPPED -- " + skip);
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-3 read source, and source cannot show what renders");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const ctx = await b.newContext();
         const pg = await ctx.newPage();
         await pg.route("**/*", (route) => {

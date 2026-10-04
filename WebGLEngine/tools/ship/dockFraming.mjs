@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { decodePNG, subjectFraction, spread } from "./pngCoverage.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -60,7 +60,7 @@ export async function measureDock(opts = {}) {
     const { chromium, from: pwFrom } = resolvePlaywright(require_);
     const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
     if (skip) throw new Error("no browser: " + skip);
-    const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"] });
+    const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl", "--ignore-gpu-blocklist"] });
     try {
         const page = await (await browser.newContext({ viewport: o.viewport })).newPage();
         await routeFromDisk(page, o.root || ENG);

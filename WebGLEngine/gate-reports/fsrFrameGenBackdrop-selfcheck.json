@@ -1,0 +1,98 @@
+{
+ "gate": "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "dB on the lens's pixels and over the frame, against the supersampled midpoint (Infinity: exact)",
+   "columns": [
+    "case",
+    "lens px",
+    "drawn: lens",
+    "drawn: frame",
+    "flow: lens",
+    "flow: frame",
+    "skipped: lens",
+    "skipped: frame",
+    "over: lens",
+    "over: frame"
+   ],
+   "rows": [
+    [
+     "backdrop:still",
+     3598,
+     23.83,
+     29.75,
+     31.31,
+     34.67,
+     34.5,
+     36.42,
+     41.21,
+     39.82
+    ],
+    [
+     "backdrop:moving",
+     3600,
+     23.55,
+     29.78,
+     30.28,
+     34.64,
+     34.8,
+     38.63,
+     39.46,
+     45.44
+    ],
+    [
+     "backdrop:occluded",
+     2999,
+     21.33,
+     26.28,
+     26.73,
+     27.89,
+     27.94,
+     28.29,
+     29.5,
+     28.59
+    ],
+    [
+     "transmission:still",
+     3291,
+     23.39,
+     29.61,
+     34.54,
+     37.73,
+     39.06,
+     39.18,
+     40.5,
+     39.71
+    ],
+    [
+     "transmission:moving",
+     3310,
+     23.22,
+     29.71,
+     32.72,
+     38.71,
+     40.13,
+     45.3,
+     41.48,
+     47.57
+    ],
+    [
+     "transmission:occluded",
+     2730,
+     21.74,
+     26.54,
+     30.7,
+     28.34,
+     29.9,
+     28.74,
+     34.36,
+     29.11
+    ]
+   ],
+   "note": null
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

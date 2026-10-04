@@ -15,11 +15,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
 import { flowCostModel } from "../../render/flowCost.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);
+// *** v4778 RIG RUN 8 -- A COST ROW IS SWIFTSHADER'S COST MODEL, ASSERTED ON SOFTWARE AND REPORTED ON A GPU (Keith's decision). ***
+// The rows costRow carries assert how SwiftShader, a CPU rasteriser, spends its time; their own text says "SwiftShader's
+// milliseconds". On Keith's GTX 1080 (realGpuRun, three runs) a fixed cost of a few ms swallowed every proportion they hold,
+// and the readings moved run to run by more than the claims' margins. So: on an adapter the harness KNOWS is hardware, the
+// row is printed with its figures and whether it would hold, and not asserted; on software, or an adapter it cannot name,
+// it is asserted as before. A GPU cost model is a separate measurement nobody has taken.
+const adapterName = (r) => (r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown");
+const costRow = (r, label, cond, detail) => {
+    if (r && r.software === false) { say(`NOT ASSERTED on a hardware adapter (${adapterName(r)}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${label.replace(/\*\*\* ?| ?\*\*\*/g, "")}`); return false; }
+    ok(label, cond, detail); return true;
+};
+// ...and the scope is itself held: on software, the cost row WAS asserted, or the decision above has been widened by accident.
+const costHeld = (r, asserted) => ok(`the cost row was ${asserted ? "asserted" : "reported"} on a ${r && r.software === false ? "hardware" : "software"} adapter (${adapterName(r)}), as decided`,
+    asserted === !(r && r.software === false), "SwiftShader's cost model is held where it was measured and reported where it was not");
 const W = 256, H = 256, REP = 5;
 const SETTINGS = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 }, levels2: { levels: 2 },
                    level: { grid: "level" }, levelR2: { grid: "level", refineRadius: 2 } };   // v4753: each level its own grid
@@ -68,6 +83,10 @@ else {
         const o = r.result.webgpu, model = Object.fromEntries(Object.entries(SETTINGS).map(([k, s]) => [k, flowCostModel({ w: W, h: H, ...s })]));
         const rows = Object.keys(SETTINGS).map((k) => ({ k, ms: o.flow[k], reads: model[k].search + model[k].pyramid, tr: o.flow[k] / o.flow.default, rr: (model[k].search + model[k].pyramid) / (model.default.search + model.default.pyramid) }));
         for (const x of rows) say(`${x.k.padEnd(8)} ${x.ms.toFixed(1)} ms, ${(x.reads / 1e6).toFixed(1)}M reads -- ${(x.tr * 100).toFixed(0)}% of the default's time, ${(x.rr * 100).toFixed(0)}% of its reads; reach by the sum ${model[x.k].reach} px`);
+        gateReport("fx/fsr/fsrFlowCost-selfcheck.mjs").table("the flow's time on the device against its reads, by setting",
+            ["setting", "ms", "reads", "share of the default's time", "share of its reads", "reach px"],
+            rows.map((x) => [x.k, x.ms, x.reads, x.tr, x.rr, model[x.k].reach]),
+            "this device's time; the read counts are render/flowCost.mjs's model").write();
         // *** v4776 -- THE MODEL WAS PROPORTIONAL AND THE DEVICE IS AFFINE, AND THE CHEAPEST SETTING IS WHERE THAT SHOWS. ***
         // This row held each setting's share of the default's TIME to its share of the READS within 20%, which assumes
         // time = a * reads with nothing else. Found red at the v4776 merge, and it is not noise: nine alone runs on a
@@ -85,10 +104,10 @@ else {
         const fixed = my - slope * mx, fit = (x) => slope * x.reads + fixed;
         const worst = Math.max(...rows.map((x) => Math.abs(x.ms / fit(x) - 1)));
         const fixedShare = fixed / o.flow.default;
-        ok(`*** the flow's time on the device follows its read count: every setting within ${(worst * 100).toFixed(0)}% of ${(slope * 1e6).toFixed(2)} ms per million reads plus ${fixed.toFixed(1)} ms fixed (${(fixedShare * 100).toFixed(0)}% of the default's time) -- shares of time / reads: ${rows.slice(1).map((x) => `${x.k} ${(x.tr * 100).toFixed(0)}% / ${(x.rr * 100).toFixed(0)}%`).join(", ")} ***`,
+        costHeld(r, costRow(r, `*** the flow's time on the device follows its read count: every setting within ${(worst * 100).toFixed(0)}% of ${(slope * 1e6).toFixed(2)} ms per million reads plus ${fixed.toFixed(1)} ms fixed (${(fixedShare * 100).toFixed(0)}% of the default's time) -- shares of time / reads: ${rows.slice(1).map((x) => `${x.k} ${(x.tr * 100).toFixed(0)}% / ${(x.rr * 100).toFixed(0)}%`).join(", ")} ***`,
            worst < 0.2 && slope > 0 && fixedShare < 0.15 && rows.every((x) => x.ms > 0),
            "the search is texture reads plus a fixed cost per flow, so on any device its time should be a line in them; " +
-           "worst residual " + (worst * 100).toFixed(1) + "% against 20%, fixed part " + (fixedShare * 100).toFixed(1) + "% of the default against 15%");
+           "worst residual " + (worst * 100).toFixed(1) + "% against 20%, fixed part " + (fixedShare * 100).toFixed(1) + "% of the default against 15%"));
         say(`this device's proportions, reported and not asserted of the method: the flow ${o.flow.default.toFixed(0)} ms, generating a frame from the vectors alone ${o.generate.toFixed(0)} ms, rendering the scene ${o.scene.toFixed(1)} ms -- a CPU rasteriser pays for the splat's ${W * H} instanced quads what a GPU does not`);
         const pg = (o) => flowCostModel({ w: 960, h: 540, grid: "level", ...o }).total;
         ok(`  ...so the count can say what the page's flow costs a generated frame, where nothing times it: ${(pg({}) / 1e6).toFixed(0)}M at 960 x 540, ${(pg({ refineRadius: 2 }) / 1e6).toFixed(0)}M refining within 2 -- each level on its own grid, as the generator runs it since v4753 (${(flowCostModel({ w: 960, h: 540 }).total / 1e6).toFixed(0)}M on the block grid)`,
@@ -104,6 +123,10 @@ else {
 // v4776 (the affine fit): T4 again -- opticalFlowTsl.mjs's refining levels searching at searchRadius -> 1 here, BOTH
 // clauses: worst residual 59% against 20%, and the fit's fixed part 43% of the default's time against 15% (refine2 102%
 // of the default's time for 56% of its reads). The intercept bound is what stops an affine fit from absorbing it.
+// ---- v4778 RIG RUN 8 SABOTAGE LOG ------------------------------------------------------------------------------------
+// S1 costRow's scope widened to report on any adapter not known to be software -> 1 red here, the "as decided" row (run
+// against fsrFrameGenLayerCost and fsrFrameGenReach, each restored and md5 verified; the helper is the same three lines in
+// fsrFlowCost). The hardware branch is the rig's to show: this box has no GPU.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a GPU, where the splat's cost against the flow's is not this device's -- nothing in this sandbox has one; " +
     "and the time of the reconciliation and the fill, which are a few reads a pixel and were not worth timing against the search.");

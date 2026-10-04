@@ -1,0 +1,44 @@
+{
+ "gate": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
+ "at": "2026-10-02",
+ "tables": [
+  {
+   "title": "a UI that moves: dB by how it is composited",
+   "columns": [
+    "UI",
+    "whole frame dB",
+    "translucent panels dB",
+    "moving marker dB"
+   ],
+   "rows": [
+    [
+     "baked",
+     31.68777370767853,
+     37.98050841886311,
+     11.533858238118714
+    ],
+    [
+     "newer",
+     31.719258394040267,
+     42.5940847024449,
+     10.04999798215553
+    ],
+    [
+     "older",
+     31.680416952355,
+     42.5940847024449,
+     9.993837479958135
+    ],
+    [
+     "atT",
+     36.80892649686627,
+     42.5940847024449,
+     72.8412682822612
+    ]
+   ],
+   "note": "panels 3286 px, marker 77 px"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}

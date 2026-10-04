@@ -21,7 +21,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as THREE from "../../vendor/three-webgpu/three.webgpu.js";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
 import { poseAt } from "../../render/temporalTsl.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenArc-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -55,6 +57,7 @@ console.log("\n1. WITHOUT A DEVICE: the pose on the arc, and how far the arc is 
             const e = Math.hypot(M[0] - (A[0] + B[0]) / 2, M[1] - (A[1] + B[1]) / 2); sum += e; mx = Math.max(mx, e); n++; }
         sag[spin] = { mean: sum / n, worst: mx }; }
     say(`the knot's half-way point off its chord's midpoint, mean (worst), pixels: ${Object.entries(sag).map(([k, x]) => `${k}x ${x.mean.toFixed(3)} (${x.worst.toFixed(2)})`).join(", ")}`);
+    REPORT.table("the knot's half-way point off its chord's midpoint", ["spin, x the page's", "mean px", "worst px"], Object.entries(sag).map(([k, x]) => [+k, x.mean, x.worst]));
     ok(`*** at the page's rates the arc is not the error: ${sag[6].mean.toFixed(3)} pixels at 6x, the rate v4741 blamed it at -- and ${sag[60].mean.toFixed(2)} at 60x, where it is ***`,
        sag[6].mean < 0.02 && sag[12].mean < 0.1 && sag[60].mean > 0.5, "the sagitta grows as the square of the angle turned; a hundredth of a pixel is noise against every other error a generated frame carries");
 }
@@ -136,6 +139,8 @@ else {
         ok(`the toward stage's ends: at t = 0 it IS the ordinary motion field (worst ${o.ends.w0.toExponential(2)} px) and at t = 1 nothing moves (worst ${o.ends.w1.toExponential(2)} px), the knot turning at 30x under a panning camera (${o.ends.moving} pixels moving)`,
            o.ends.w0 < 1e-3 && o.ends.w1 < 1e-3 && o.ends.moving > 1000, "the previous pose is the one at time t on the arc -- the object's and the camera's -- and at the ends it is the frame itself");
         for (const [spin, c] of Object.entries(C)) say(`knot at ${String(spin).padStart(2)}x: the toward field ${c.offChord.toFixed(3)} px off half the chord on average; arc ${d(c.arc.ss, c.chord.ss)} dB against the supersampled midpoint (${c.chord.ss.toFixed(2)} -> ${c.arc.ss.toFixed(2)}), ${d(c.arc.one, c.chord.one)} against a single-sample one`);
+        REPORT.table("chord against arc, dB against the midpoint", ["spin, x the page's", "toward field off half the chord px", "chord: supersampled", "arc: supersampled", "chord: single sample", "arc: single sample"],
+            Object.entries(C).map(([spin, c]) => [+spin, c.offChord, c.chord.ss, c.arc.ss, c.chord.one, c.arc.one]));
         ok(`*** the arc pays where rotation is FAST: ${d(C[60].arc.ss, C[60].chord.ss)} dB at 60x the page's spin (${d(C[60].arc.one, C[60].chord.one)} against a single-sample render), ${d(C[30].arc.ss, C[30].chord.ss)} at 30x ***`,
            C[60].arc.ss - C[60].chord.ss > 0.4 && C[60].arc.one - C[60].chord.one > 0.4 && C[30].arc.ss > C[30].chord.ss,
            "a wheel, a fan, a spinning pickup: the chord's midpoint is off the arc by pixels, the landing and both samples with it");
@@ -158,6 +163,7 @@ else {
 // surface -- the ghost a blend paints into a gap -- was built into the warp and its mirror and read -0.30 dB at 6x, +0.21 at
 // 12x against the supersampled midpoint (-0.04 and +0.19 against a single-sample one): the knot hides its own tubes, and the
 // newer frame alone is worse there than the blend. It was taken out rather than left as a switch nothing should turn on.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the arc on FSR2's upscaled frames (fx/fsr/fsr3Tsl.mjs does not render a toward stage -- it would cost the " +
     "scene pass that driver was built not to draw) and with the optical flow, which the generator refuses; non-rigid motion -- skinning, " +

@@ -89,10 +89,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { validateWgsl } from "../../render/wgslSpec.mjs";
 import { varyingSemantics, transplantIntoShell, vertexDisplacement, stampThreeRevision } from "../../render/tslSource.mjs";
 import { lyapunovLookShell, heidlerSpriteShell, heidlerSpriteHand, spriteAtlasShell, spriteSampledShell, spriteSampledHand, inkLookShell, inkHand } from "../../render/fleetTsl.mjs";
@@ -127,7 +129,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N: 192, CHAOS }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
@@ -163,9 +165,11 @@ else {
         // be three's own generated form. (The fixture rows above still pin r178's numbers, because a fixture is a
         // recorded text and its numbers are part of what it records.)
         ok("three's vertex stage carried three varyings and said what each is: uv, normal, color -- in that order, under whatever numbers three's counter is on", Object.values(R.sem).join() === "uv,normal,color" && Object.keys(R.sem).every((k) => /^nodeVarying\d+$/.test(k)), JSON.stringify(R.sem));
+        const SW = softwareClaims(ok, r);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
-            ok(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
+            SW(`*** ${b}: the Chaos race drawn by the pipeline three GENERATED is the hand-written Chaos race on EVERY pixel (${o.same} of ${o.total}, worst 0), lit and among the other races ***`, o.backend === b && o.same === o.total && o.worst === 0 && o.lit > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.lit} lit; errors ${o.errs.length}`);
             ok(`  ${b}: the pick still names the Chaos ships (the pick pipeline is the fleet's own)`, o.chaosHits > 200, `${o.chaosHits} pixels name Chaos`); }
+        SW.held(2);
         // *** v4566 -- MERGED, NOT REPLACED, FOR THE REASON SECTIONS 5 TO 8 ARE ALREADY MERGED. ***
         // This section wrote the whole file and sections 5-8 then merged their keys back into what it left, so the
         // file's contents were "section 1, plus whichever later sections reached their own write THIS RUN". That is
@@ -205,7 +209,7 @@ else {
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
     // the page PRESENTS to a canvas, which loses a WebGPU device on this headless shell (measured at v4319 and again here), so the page
     // is loaded on the WebGL2 route as every other page gate loads its page: three's WebGL backend emits GLSL, and the swap is graded there
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage({ viewport: { width: 640, height: 480 } }); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/?tsl=1&history=0`, { waitUntil: "load" }); await pg.waitForTimeout(6000);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, tsl: window.__universe && window.__universe.tslLook, races: document.getElementById("races").textContent }));
@@ -252,7 +256,7 @@ console.log("\n4. THE VERTEX STAGE (v4324): a graph that MOVES the hull -- three
 if (skip) { console.log(`  SKIP  ${skip}`); fails++; }
 else {
     const CHAOS = RACES.findIndex((x) => x.name === "Chaos");
-    const r = await runInEngineOrigin({ engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
+    const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { N: 192, CHAOS, AMP: 0.12 }, script: `async (a) => {
         const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
         const P = await import("/render/fleetTsl.mjs"); const S = await import("/render/tslSource.mjs"); const G = await import("/render/gpuDriven.mjs"); const F = await import("/render/fleets.mjs"); const { requestDevice } = await import("/gfx/device.js");
         const em = {};
@@ -286,9 +290,11 @@ else {
     if (r.ok && r.result.webgpu && !r.result.webgpu.error && !r.result.webgl2.error) {
         const R = r.result;
         ok("three put the position node in the VERTEX stage as one statement on positionLocal, and the transplant took it", R.statement && R.statement.length === 1 && /object\.amp/.test(R.statement[0]) && R.webgpu.displaced && R.webgl2.displaced, R.statement && R.statement[0]);
+        const SW = softwareClaims(ok, r);
         for (const b of ["webgpu", "webgl2"]) { const o = R[b];
             ok(`*** ${b}: the Chaos race BREATHING by the generated vertex stage is the hand-written twin's picture on EVERY pixel (${o.same} of ${o.total}, worst 0), and it moved (${o.moved} pixels differ from the still race) ***`, o.backend === b && o.twinHasHand && o.same === o.total && o.worst === 0 && o.moved > 500 && o.errs.length === 0, `${o.same}/${o.total}, worst ${o.worst}, ${o.moved} moved; errors ${o.errs.length}`);
-            ok(`  ${b}: with amp 0 the generated vertex stage draws the still race exactly (the displacement is the only difference)`, o.stillSame === o.total, `${o.stillSame}/${o.total}`); }
+            SW(`  ${b}: with amp 0 the generated vertex stage draws the still race exactly (the displacement is the only difference)`, o.stillSame === o.total, `${o.stillSame}/${o.total}`); }
+        SW.held(2);
     }
 }
 

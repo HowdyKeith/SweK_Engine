@@ -35,6 +35,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+import { gateReport } from "./gateReport.mjs";
+const REPORT = gateReport("tools/ship/fsrPageClocks-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -175,6 +177,8 @@ if (!r.ok) {
     for (const p of pairs)
         say(`  age ${p.age} (scene time ${p.scene})`, `genuine ${p.c.gen} vs ${p.a ? p.a.gen : "?"}` +
             `   |   PSNR ${p.c.db} vs ${p.a ? p.a.db : "?"}`);
+            REPORT.table("the same scene time at two history ages: what the scene fixes and what the history does", ["history age", "scene time", "disocclusions: control", "disocclusions: other clock", "PSNR dB: control", "PSNR dB: other clock"],
+                pairs.map((p) => [p.age, p.scene, p.c.gen, p.a ? p.a.gen : "missing", p.c.db, p.a ? p.a.db : "missing"]));
     ok("!! *** the SCENE-determined counter agrees across the two configurations, to the pixel ***",
        pairs.length >= 3 && pairs.every((p) => p.a && p.c.gen !== null && p.c.gen === p.a.gen),
        `${pairs.length} ages compared. The disocclusion count is fixed by two consecutive scene times and ` +
@@ -227,6 +231,7 @@ if (!r.ok) {
 } finally { try { fs.unlinkSync(TMP); } catch {} }
 }
 
+REPORT.write();
 console.log(fails ? `\nfsrPageClocks-selfcheck: ${fails} FAILED` : "\nfsrPageClocks-selfcheck: ALL GREEN");
 console.log("unchecked here: whether the HARM follows the history's age or the scene's position, which is " +
             "what the control was built for and is the next round's -- this gate holds that the control " +

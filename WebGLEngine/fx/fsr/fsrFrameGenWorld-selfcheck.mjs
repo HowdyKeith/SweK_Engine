@@ -20,6 +20,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenWorld-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -122,6 +124,8 @@ else {
         const o = r.result.webgpu, f = (v) => v.toFixed(2), d = (x, y) => (x - y >= 0 ? "+" : "") + (x - y).toFixed(2);
         const cs = ["reflectionStill", "reflectionPan", "shadowTexturedPan", "shadowPlainPan", "floorPan"];
         for (const cn of cs) say(`${cn.padEnd(18)} screen ${f(o[cn].screen)}, world ${f(o[cn].world)} (${d(o[cn].world, o[cn].screen)} dB); still in the world: ${o[cn].still} of ${D * D} pixels`);
+        REPORT.table("a still surface judged on screen against in the world", ["case", "screen dB", "world dB", "still in the world px", "pixels"],
+            cs.map((cn) => [cn, o[cn].screen, o[cn].world, o[cn].still, D * D]));
         const R = o.reflectionPan, ST = o.shadowTexturedPan, SP = o.shadowPlainPan, F = o.floorPan;
         ok(`*** [webgpu] under a pan the world test gives back what v4745's gave with the camera still: the reflection ${d(R.world, R.screen)} dB over the screen test, the textured shadow ${d(ST.world, ST.screen)}, the plain one ${d(SP.world, SP.screen)} ***`,
            R.world - R.screen >= 2.5 && ST.world - ST.screen >= 1.2 && SP.world - SP.screen >= 0.2,
@@ -143,6 +147,7 @@ else {
 // camera target at the far plane's depth only -> 2, 1; W9 never drawn -> 1, 1. Against fx/fsr/fsrFrameGenTsl.mjs: W5 the
 // camera not handed on -> 1. fx/fsr/fsr3Tsl.mjs not asking for it (W6) -> 1; fx/fsr/fsrTemporalTsl.mjs ignoring the
 // request (W7) -> 1.
+REPORT.write();
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a surface that moves in the world AND has shading moving across it -- a shadow on a moving car -- which is " +
     "judged at 0.9 either way; skinned and morphed meshes, whose vectors the stage does not yet cover; and an orthographic camera.");

@@ -15,11 +15,27 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../../tools/ship/gateReport.mjs";
+const REPORT = gateReport("fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs");
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);
+// *** v4778 RIG RUN 8 -- A COST ROW IS SWIFTSHADER'S COST MODEL, ASSERTED ON SOFTWARE AND REPORTED ON A GPU (Keith's decision). ***
+// The rows costRow carries assert how SwiftShader, a CPU rasteriser, spends its time; their own text says "SwiftShader's
+// milliseconds". On Keith's GTX 1080 (realGpuRun, three runs) a fixed cost of a few ms swallowed every proportion they hold,
+// and the readings moved run to run by more than the claims' margins. So: on an adapter the harness KNOWS is hardware, the
+// row is printed with its figures and whether it would hold, and not asserted; on software, or an adapter it cannot name,
+// it is asserted as before. A GPU cost model is a separate measurement nobody has taken.
+const adapterName = (r) => (r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown");
+const costRow = (r, label, cond, detail) => {
+    if (r && r.software === false) { say(`NOT ASSERTED on a hardware adapter (${adapterName(r)}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${label.replace(/\*\*\* ?| ?\*\*\*/g, "")}`); return false; }
+    ok(label, cond, detail); return true;
+};
+// ...and the scope is itself held: on software, the cost row WAS asserted, or the decision above has been widened by accident.
+const costHeld = (r, asserted) => ok(`the cost row was ${asserted ? "asserted" : "reported"} on a ${r && r.software === false ? "hardware" : "software"} adapter (${adapterName(r)}), as decided`,
+    asserted === !(r && r.software === false), "SwiftShader's cost model is held where it was measured and reported where it was not");
 const D = 128;
 
 console.log("\n1. ON THE DEVICE: the layer's depth by a geometry pass and by the generator's own, in time and in dB");
@@ -97,9 +113,11 @@ else {
     if (r.ok && r.result && r.result.cost && r.result.cost.N100) {
         const { cost: c, q } = r.result, f = (v) => v.toFixed(1), d = (x) => (x >= 0 ? "+" : "") + x.toFixed(2);
         for (const n of ["N1", "N100"]) say(`${c[n].tris} triangles: a real frame ${f(c[n].realFrame)} ms, the layer with the geometry pass ${f(c[n].geometry)} ms, with the generator's depth ${f(c[n].depthAt)} ms`);
-        ok(`*** the layer's geometry pass grows with the scene as a real frame does -- ${f(c.N1.geometry)} to ${f(c.N100.geometry)} ms, a real frame ${f(c.N1.realFrame)} to ${f(c.N100.realFrame)} -- and with the generator's depth it does not: ${f(c.N1.depthAt)} to ${f(c.N100.depthAt)} ms ***`,
+        REPORT.table("the translucent layer's cost against a real frame, this device's ms", ["triangles", "real frame ms", "layer, geometry pass ms", "layer, generator's depth ms"],
+            ["N1", "N100"].map((n) => [c[n].tris, c[n].realFrame, c[n].geometry, c[n].depthAt]));
+        costHeld(r, costRow(r, `*** the layer's geometry pass grows with the scene as a real frame does -- ${f(c.N1.geometry)} to ${f(c.N100.geometry)} ms, a real frame ${f(c.N1.realFrame)} to ${f(c.N100.realFrame)} -- and with the generator's depth it does not: ${f(c.N1.depthAt)} to ${f(c.N100.depthAt)} ms ***`,
            c.N100.geometry > 10 * c.N1.geometry && c.N100.geometry > 0.5 * c.N100.realFrame && c.N100.depthAt < 2 * c.N1.depthAt + 1 && c.N100.depthAt < 0.1 * c.N100.geometry,
-           "a hundredfold scene, and one quad against a pass over a million triangles -- SwiftShader's milliseconds, the ratio the arithmetic's");
+           "a hundredfold scene, and one quad against a pass over a million triangles -- SwiftShader's milliseconds, the ratio the arithmetic's"));
         ok(`*** and on the translucent things' pixels, the generator's depth gives what the geometry pass gives: glass ${f(q.glass.depthAt.see)} against ${f(q.glass.geometry.see)} dB, a lens ${f(q.lens.depthAt.see)} against ${f(q.lens.geometry.see)} ***`,
            Math.abs(q.glass.depthAt.see - q.glass.geometry.see) < 0.01 && Math.abs(q.lens.depthAt.see - q.lens.geometry.see) < 0.01,
            "both behind a box sliding across -- where they show, they are drawn the same");
@@ -116,6 +134,11 @@ else {
 // fx/fsr/fsrFrameGenTsl.mjs, here: C6 `ui` called before the splat, so depthAt is empty -> 1. *** C5 -- depthAt the splat
 // before the fill -- IS EQUIVALENT HERE, measured: *** the four figures read the same to the hundredth (glass 34.4 dB and -0.29,
 // a lens 29.5 and -0.81); the fill changes only the holes, and the box's holes lie where it hides the pane either way.
+REPORT.write();
+// ---- v4778 RIG RUN 8 SABOTAGE LOG ------------------------------------------------------------------------------------
+// S1 costRow's scope widened to report on any adapter not known to be software -> 1 red here, the "as decided" row (run
+// against fsrFrameGenLayerCost and fsrFrameGenReach, each restored and md5 verified; the helper is the same three lines in
+// fsrFlowCost). The hardware branch is the rig's to show: this box has no GPU.
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a real GPU's times -- the run in docs/real-hardware-fsr.md times this gate with the rest; a translucent thing " +
     "in front of a surface the splat did not reach (a hole the fill left), where the generated depth is the far plane; and the " +

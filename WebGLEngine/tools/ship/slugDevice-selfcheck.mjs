@@ -47,7 +47,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 12 (option a): the two-backend launches take PARITY_ARGS, and rows that hold a backend to a model of SwiftShader's
+// rasterisation go through softwareClaims -- asserted on software, reported on a GPU (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { parseFont } from "../../text/slugFont.js";
 import { slugRender } from "../../text/slugEval.js";
@@ -188,7 +190,7 @@ console.log("\n2. THE FRAME, ON BOTH BACKENDS, AGAINST THREE KEYS");
         report("*** NOT A PASS. *** Section 1 drives the recorder. Only this one draws a glyph on a device.");
         fails++;
     } else {
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT, CHARS, CAPTURE: Object.keys(CAPTURE_INPUTS) }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, SIZE, ORIGIN, TEXT, CHARS, CAPTURE: Object.keys(CAPTURE_INPUTS) }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { parseFont } = await import("/text/slugFont.js");
             const M = await import("/render/slugDevice.mjs");
@@ -240,15 +242,16 @@ console.log("\n2. THE FRAME, ON BOTH BACKENDS, AGAINST THREE KEYS");
         if (r.ok) {
             const nb = nullBackend();
             const fd = new SlugFontDevice(nb, font, CHARS, { logWidth: r.result.webgl2.logWidth });
+            const SW = softwareClaims(ok, r);
             for (const bk of ["webgpu", "webgl2"]) {
                 const o = r.result[bk];
                 ok(`${bk}: the four capture variants compiled and drew`, o.capErrors.length === 0 && Object.keys(o.cap).length === 4, o.capErrors.join(" | ") || "tx ty fwx fwy");
                 if (o.capErrors.length) continue;
                 const fit = fitSubpixel(fd, o.cap);
                 report(`${bk}: sub-pixel fit -- ` + fit.all.map((x) => `1/${x.Q}: ${x.worst.toExponential(2)}`).join("  "));
-                ok(`*** ${bk}: a snapped-corner model reproduces the fragment's texcoord to ${MODEL_TOL_EM} em -- the rasteriser carries ${isFinite(fit.best.Q) ? Math.log2(fit.best.Q) + " sub-pixel bits" : "no snap"} ***`,
+                SW(`*** ${bk}: a snapped-corner model reproduces the fragment's texcoord to ${MODEL_TOL_EM} em -- the rasteriser carries ${isFinite(fit.best.Q) ? Math.log2(fit.best.Q) + " sub-pixel bits" : "no snap"} ***`,
                     fit.best.worst < MODEL_TOL_EM && fit.best.n > 1000, `worst ${fit.best.worst.toExponential(2)} em over ${fit.best.n} fragments, fwidth to ${fit.best.worstFw.toExponential(2)}`);
-                ok(`  ${bk}: and the exact-centre model does NOT -- the snap is real, not a tolerance`, fit.all.find((x) => x.Q === Infinity).worst > 1e-4,
+                SW(`  ${bk}: and the exact-centre model does NOT -- the snap is real, not a tolerance`, fit.all.find((x) => x.Q === Infinity).worst > 1e-4,
                     `no-snap worst ${fit.all.find((x) => x.Q === Infinity).worst.toExponential(2)} em`);
                 const key = expectedFrame(fd, fit.best.Q);
                 const lit = key.filter((v) => v > 0.02).length, partial = key.filter((v) => v > 0.02 && v < 0.98).length;
@@ -258,7 +261,7 @@ console.log("\n2. THE FRAME, ON BOTH BACKENDS, AGAINST THREE KEYS");
                     const want = Math.round(key[i] * 255), got = o.pixels[i * 4], d = Math.abs(got - want);
                     if (d === 0) exact++; if (d > TOL) over++; if (d > worst) { worst = d; worstAt = i; }
                 }
-                ok(`*** ${bk}: every pixel of the frame is within ${TOL} of 255 of slugEval through the rasteriser model ***`, over === 0,
+                SW(`*** ${bk}: every pixel of the frame is within ${TOL} of 255 of slugEval through the rasteriser model ***`, over === 0,
                     `worst ${worst} at (${worstAt % W}, ${Math.floor(worstAt / W)}), ${exact} of ${W * H} exact`);
                 ok(`  ${bk}: alpha is 1 everywhere (premultiplied over an opaque clear)`, o.pixels.every((v, i) => i % 4 !== 3 || v === 255));
                 ok(`  ${bk}: a second frame from the same batch is the same picture`, o.redrawDiff === 0, `${o.redrawDiff} bytes differ`);
@@ -271,6 +274,7 @@ console.log("\n2. THE FRAME, ON BOTH BACKENDS, AGAINST THREE KEYS");
                 `${shipDiff} bytes differ, worst ${shipWorst}; logWidth ${r.result.shipped.logWidth} both`);
             let pairWorst = 0, pairOver = 0, pairExact = 0;
             for (let i = 0; i < W * H; i++) { const d = Math.abs(G[i * 4] - L[i * 4]); if (d === 0) pairExact++; if (d > TOL) pairOver++; if (d > pairWorst) pairWorst = d; }
+            SW.held(6);
             ok(`*** and the two backends agree within ${TOL} of 255 on every pixel ***`, pairOver === 0, `worst ${pairWorst}, ${pairExact} of ${W * H} exact`);
         }
         if (r && r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
