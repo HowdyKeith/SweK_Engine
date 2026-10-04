@@ -868,8 +868,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // unknownSignature 11, suspects 0. So that branch's 91/16 were the old classifier's reading, not a
     // disagreement about the tree, and none of its hundred and five invented a forty-second spelling of ok().
     // v4779 -- 1880 -> 1881 for render/temporalTslCoverage-selfcheck.mjs -- the motion field where three draws: cut-outs, back faces, hidden, culled, grown.
-    gates: 1881, usesOk: 1860, definesOk: 1852, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1753, condFirst: 96, unknownSignature: 11,
+    // v4809 -- 1881 -> 1882 for render/threeWorkarounds-selfcheck.mjs -- the engine's two ways around r186's issues 17 and 18, held on both backends.
+    gates: 1882, usesOk: 1861, definesOk: 1853, importsOk: 0,
+    distinctDefinitions: 41, nameFirst: 1754, condFirst: 96, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

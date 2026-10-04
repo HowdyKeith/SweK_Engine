@@ -514,6 +514,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/temporalTslNodes-selfcheck.mjs",
         "render/temporalTslZoo-selfcheck.mjs",
         "render/translucentLayer-selfcheck.mjs",
+        // v4809 -- the engine's ways around r186's issues 17 and 18, held on both backends against three's own behaviour beside them.
+        "render/threeWorkarounds-selfcheck.mjs",
         // v4805 -- the engine moved to r186 and kept r185 beside it: threePatch.mjs applies the r185 patches to vendor/three-webgpu-r185
         // now (its row below), and threeUpstream-selfcheck.mjs's section 6 runs the issues on this body's r186. One gone, one arrived.
         "tools/ship/threeUpstream-selfcheck.mjs",

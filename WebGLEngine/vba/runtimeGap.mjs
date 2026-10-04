@@ -585,7 +585,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4776 -- then 4494 -> 4495 in the same round: tools/rig/run-trader-github.mjs, the trader graph's rig job (one ES module, one closure).
     // v4779 -- 4495 -> 4496 for render/temporalTslCoverage-selfcheck.mjs.
     // v4799 -- no file added; asyncAwait 1667 -> 1668, tools/ship/threePatch.mjs running the dev issues' pages (its command, folded in).
-    files: 4496,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4809 -- 4496 -> 4498 for render/threeWorkarounds.mjs and its gate.
+    files: 4498,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1076,9 +1077,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // (superseded at the v4776 merge) fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 195, webgpu: 53, threads: 23, wasm: 23,
     // v4776 -- the merged tree's own figures:
     // v4779 -- render/temporalTslCoverage-selfcheck.mjs: one ES module with closures, await, typed arrays, and forceWebGL -- five rows moved by one, seven held.
-    esModules: 4195, closures: 4048, asyncAwait: 1668, typedArrays: 1222, promises: 392,
+    // v4809 -- render/threeWorkarounds.mjs and its gate: two ES modules, two with await, two naming WebGL (isWebGLBackend, forceWebGL); the gate alone has closures and a typed array.
+    esModules: 4197, closures: 4049, asyncAwait: 1670, typedArrays: 1223, promises: 392,
     // v4791 -- tools/ship/threeUpstream-selfcheck.mjs now asks navigator.gpu for an adapter itself (raw WebGPU, no three): webgpu 55 -> 56.
-    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
+    fetchXhr: 245, performanceNow: 235, raf: 126, webgl: 198, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
