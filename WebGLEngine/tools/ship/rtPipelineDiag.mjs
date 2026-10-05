@@ -38,6 +38,8 @@ const TRACE = /^\[wgsl-trace\] launch (\d+) ms, run (\d+) ms, close (\d+) ms, (\
 // compilation info again -- while every call ran here. This mode replays the gate's first three calls exactly (the
 // v4417 monolith, then the one-sphere pipeline twice) in a FRESH session per variant, varying ONE reuse at a time, with
 // a 20 s watchdog and no fallback, so the variant that hangs is named rather than waited on for ten minutes.
+// RIG RESULT (2026-10-05): only "compile info RE-ASKED" timed out, at call 3; the other three passed with values equal to
+// call 2. The session now asks once, and the full gate on the rig ran in 61 s against 291 s one browser per call.
 if (argv.includes("--session-probe")) {
     const { openWgslSession, webgpuSkipReason } = await import("./webgpuHarness.mjs");
     const R = await import("../../physics/render/rtPipeline.mjs");

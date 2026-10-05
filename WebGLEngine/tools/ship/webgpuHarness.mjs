@@ -225,8 +225,11 @@ async function pageRun(a) {
                 if (S) { S.adapter = adapter; S.dev = dev; S.lost = false; S.mods.clear(); S.pipes.clear(); dev.lost.then(() => { S.lost = true; }); }
             }
             // v4814 rig run: the session HUNG on its third call -- the first to reuse a cached module, and the first to ask a
-            // cached module for its compilation info a second time. So the info is asked ONCE and kept with the module. The
-            // `probe` flags exist for tools/ship/rtPipelineDiag.mjs --session-probe to replay each reuse on its own.
+            // cached module for its compilation info a second time. So the info is asked ONCE and kept with the module.
+            // CONFIRMED on the rig by tools/ship/rtPipelineDiag.mjs --session-probe (HeadlessChrome 153, win32, SwiftShader
+            // WebGPU): of four variants only "compile info RE-ASKED of the cached module" hung -- call 3, killed by the 20 s
+            // watchdog -- while a reused module, a reused pipeline and a fresh module on the same device all returned values
+            // equal to call 2. A second getCompilationInfo() on one GPUShaderModule never resolves there. Do not re-ask it.
             const probe = a.probe || {};
             let ent = S && !probe.noModCache ? S.mods.get(a.code) : null;
             if (!ent) { ent = { mod: dev.createShaderModule({ code: a.code }), info: null }; if (S && !probe.noModCache) S.mods.set(a.code, ent); }
@@ -312,7 +315,8 @@ async function pageRun(a) {
  * once, keeps one adapter and device, compiles each distinct shader and pipeline once, and frees each run's buffers.
  * `run(opts)` takes runWgslCompute's options and returns its shape; `close()` must be called (a gate that exits without
  * it leaves a browser behind until the process ends). A device lost mid-session is re-acquired on the next run.
- * MEASURED v4814: rtPipeline-selfcheck 114 s -> 56 s here with its printed output byte-identical. SABOTAGED v4814: the
+ * MEASURED v4814: rtPipeline-selfcheck 114 s -> 56 s here and 291 s -> 61 s on Keith's rig (222 calls, launch 79 s -> 0.4 s,
+ * no watchdog fallback), its printed output byte-identical. SABOTAGED v4814: the
  * pipeline cache keyed by entry point alone (not the code) -> rtPipeline-selfcheck red on 5 rows, its bit-exact rows first.
  */
 export async function openWgslSession({ launchArgs = null, timeoutMs = 60000, runTimeoutMs = 60000, fallback = true } = {}) {
