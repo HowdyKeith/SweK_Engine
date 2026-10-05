@@ -585,7 +585,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4776 -- then 4494 -> 4495 in the same round: tools/rig/run-trader-github.mjs, the trader graph's rig job (one ES module, one closure).
     // v4778 -- 4495 -> 4581 at the rtx merge (86 files: its 45 gates and the modules they test), RE-DERIVED over the merged tree.
     // v4778 -- then 4581 -> 4583 for tools/ship/fsrCaches.mjs and tools/ship/fsrCaches-selfcheck.mjs -- the FSR caches in their own folder.
-    files: 4583,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4814 -- 4583 -> 4584 for tools/ship/deviceComputeDiag.mjs, the rig diagnostic for deviceCompute's two-path disagreement.
+    files: 4584,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1096,7 +1097,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4778 merge -- the rig runs' rows above plus tools/ship/fsrCaches.mjs and its gate from the other line, re-derived
     // over the merged tree: ES modules 4276 -> 4278, closures 4125 -> 4127, async/await 1707 -> 1709, Promises 400 -> 402,
     // fetch/XHR 249 -> 251 (the install route downloads; its gate drives it over real HTTP). The other seven held.
-    esModules: 4278, closures: 4127, asyncAwait: 1709, typedArrays: 1262, promises: 402,
+    // v4814 -- RE-TAKEN, one module (tools/ship/deviceComputeDiag.mjs): ES modules 4278 -> 4279, closures 4127 -> 4128,
+    // async/await 1709 -> 1710, typed arrays 1262 -> 1263; nothing else moved.
+    esModules: 4279, closures: 4128, asyncAwait: 1710, typedArrays: 1263, promises: 402,
     fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
