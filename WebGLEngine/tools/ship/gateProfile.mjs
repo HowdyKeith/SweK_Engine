@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/gateProfile.mjs -- v4814
 //
-// Run: node tools/ship/gateProfile.mjs <gate> [<gate> ...] [--top 8]
+// Run: node tools/ship/gateProfile.mjs --gates <gate>[,<gate>...] [--top 8]
 //      node tools/ship/gateProfile.mjs --rig-slow          (the five gates v4813 found 2-7x slower on the rig)
 //
 // A DIAGNOSTIC, NOT A GATE: it asserts nothing and exits 0. For each gate named, it runs the gate once as a child with
@@ -20,15 +20,20 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RIG_SLOW = ["tools/ship/citedSources-selfcheck.mjs", "tools/ship/corpusFilters-selfcheck.mjs",
                   "tools/ship/headlessGpu-selfcheck.mjs", "tools/ship/windowsImport-selfcheck.mjs",
                   "tools/ship/orreryEjecta-selfcheck.mjs"];
-const argv = process.argv.slice(2);
-const ti = argv.indexOf("--top"); const TOP = ti >= 0 ? Math.max(1, Number(argv[ti + 1]) || 8) : 8;
-const gates = argv.includes("--rig-slow") ? RIG_SLOW : argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--top");
-if (!gates.length) { console.log("usage: node tools/ship/gateProfile.mjs <gate> [...] | --rig-slow"); process.exit(0); }
+// Arguments through cliArgs.parseArgs, so a mistyped option is refused by name rather than read as nothing
+// (tools/ship/cliArgs-selfcheck.mjs counts the tools that still read argv by hand, and this one was a new one).
+const CLI = Object.freeze({ values: Object.freeze({ "--gates": "string", "--top": "number" }), flags: Object.freeze(["--rig-slow"]) });
+const cli = parseArgs(process.argv.slice(2), CLI);
+if (cli.errors.length) { for (const l of refusalLines("gateProfile", cli.errors, CLI)) console.error(l); process.exit(2); }
+const TOP = cli.values["--top"] || 8;
+const gates = cli.flags.has("--rig-slow") ? RIG_SLOW : String(cli.values["--gates"] || "").split(",").map((g) => g.trim()).filter(Boolean);
+if (!gates.length) { console.log("usage: node tools/ship/gateProfile.mjs --gates <gate>[,<gate>...] [--top 8] | --rig-slow"); process.exit(0); }
 
 // The fs hook, written to a temp file and loaded with --require, so the gate itself is not edited. Every sync call is
 // timed and charged to the first stack frame inside the engine tree; the totals are written as JSON at exit.

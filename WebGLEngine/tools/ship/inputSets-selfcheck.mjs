@@ -481,10 +481,14 @@ console.log("\n5. what the record actually bought, on the live tree");
         let touched = 0;
         for (const g of GATES) {
             const e = REC.gates[g];
-            if ((e.reads || []).includes(f)) { touched++; saved.push(e); e.hashes[f] = "0000000000000000"; }
+            if ((e.reads || []).includes(f)) { touched++; saved.push([e, e.hashes[f]]); e.hashes[f] = "0000000000000000"; }
         }
         const after = partSnap(REC).skip.length;
-        for (const e of saved) e.hashes[f] = hashFile(f);   // put it back; the cache holds the real reading
+        // *** v4814 -- PUT BACK WHAT THE RECORD HELD, NOT WHAT THE FILE HASHES TO NOW. *** This read `hashFile(f)`, which is the
+        // same value only while f is unchanged since the record was taken. v4814 rewrote tools/ship/sourceScan.mjs, one of the
+        // three hot files, and the "restored" REC then disagreed with a fresh read -- the v4725 row below went red on a
+        // fake that had not been undone. SABOTAGE: the hashFile(f) form restored -> 1 RED, that row; restored md5-identical.
+        for (const [e, h] of saved) e.hashes[f] = h;
         return { f, touched, after };
     });
     ok("  and changing a file that many gates read brings exactly those gates back, and no more",

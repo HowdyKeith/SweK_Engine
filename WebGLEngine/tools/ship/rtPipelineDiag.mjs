@@ -25,12 +25,15 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GATE = "physics/render/rtPipeline-selfcheck.mjs";
-const argv = process.argv.slice(2);
-const num = (name, d) => { const i = argv.indexOf(name); const v = i >= 0 ? Number(argv[i + 1]) : NaN; return Number.isFinite(v) && v > 0 ? v : d; };
-const CAP_MS = num("--cap-s", 600) * 1000, TOP = num("--top", 15);
+// Arguments through cliArgs.parseArgs, so a mistyped option is refused by name rather than read as the default.
+const CLI = Object.freeze({ values: Object.freeze({ "--cap-s": "number", "--top": "number" }), flags: Object.freeze(["--session-probe"]) });
+const cli = parseArgs(process.argv.slice(2), CLI);
+if (cli.errors.length) { for (const l of refusalLines("rtPipelineDiag", cli.errors, CLI)) console.error(l); process.exit(2); }
+const CAP_MS = (cli.values["--cap-s"] || 600) * 1000, TOP = cli.values["--top"] || 15;
 const TRACE = /^\[wgsl-trace\] launch (\d+) ms, run (\d+) ms, close (\d+) ms, (\d+) chars, (\d+) out(, DID NOT FINISH)?/;
 
 // *** v4814 RIG RUN 2 -- --session-probe. *** With the gate on webgpuHarness.openWgslSession, the rig HUNG on the gate's
@@ -40,7 +43,7 @@ const TRACE = /^\[wgsl-trace\] launch (\d+) ms, run (\d+) ms, close (\d+) ms, (\
 // a 20 s watchdog and no fallback, so the variant that hangs is named rather than waited on for ten minutes.
 // RIG RESULT (2026-10-05): only "compile info RE-ASKED" timed out, at call 3; the other three passed with values equal to
 // call 2. The session now asks once, and the full gate on the rig ran in 61 s against 291 s one browser per call.
-if (argv.includes("--session-probe")) {
+if (cli.flags.has("--session-probe")) {
     const { openWgslSession, webgpuSkipReason } = await import("./webgpuHarness.mjs");
     const R = await import("../../physics/render/rtPipeline.mjs");
     const { traceWgsl, traceUniforms } = await import("../../physics/render/pathTracerGpu.mjs");
