@@ -22,6 +22,7 @@ import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
 import { timingsTarget, KIND } from "./quickSweep.mjs";
+import { membershipBudgetMs } from "./recordOwner.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -284,9 +285,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const budgetMs = arg("--budget-s", 180) * 1000;
     const slots = arg("--slots", 24);
     const file = readFile();
+    // v4813: a returnee is one under the record OWNER's line -- the line the next quick sweep selects by
+    // (recordOwner.mjs) -- not under the sandbox's 3000. On the rig's record a gate reading 4,000 ms alone is
+    // in the sweep, and calling it "still over" would leave it in the pool the rotation keeps spending on.
+    const lineMs = membershipBudgetMs(file);
     if (cli.flags.has("--restore-lost")) {
         const led = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), "utf8"));
-        const { merged, restored, refused, unwitnessed } = restoreLost(file, led);
+        const { merged, restored, refused, unwitnessed } = restoreLost(file, led, { budgetMs: lineMs });
         console.log(`[rotation] --restore-lost: ${restored.length} membership number(s) restored from a reading ` +
             `that exists TWICE -- the 2026-09-09 ledger and a later serial slice -- against ${refused.length} refused ` +
             `and ${unwitnessed.length} with no second witness`);
@@ -400,7 +405,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
             `covers the pool in ${rot.roundsToCover} round(s) at this slice size`);
     }
     const rows = runSlice(picked, { capMs, onProgress: (d, t, r) => process.stderr.write(`[rotation] ${d}/${t}  ${r.gate}  ${r.ms}ms exit ${r.code}\n`) });
-    const k = classifyRows(rows, { priorMs: file.timings || {}, capMs });
+    const k = classifyRows(rows, { budgetMs: lineMs, priorMs: file.timings || {}, capMs });
     console.log(`[rotation] ran ${rows.length}: ${k.returnees.length} now UNDER budget, ${k.reds.length} red, ${k.killed.length} hit the cap, ${k.slower.length} materially slower`);
     for (const r of k.returnees) console.log(`[rotation]   returnee  ${r.gate}  ${(file.timings || {})[r.gate]} -> ${r.ms} ms`);
     for (const r of k.reds) console.log(`[rotation]   RED       ${r.gate}  exit ${r.code} in ${r.ms} ms`);
@@ -455,7 +460,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is " +
                   "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
             ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode })),
-            budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
+            budgetMs: lineMs, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
         console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);
     } else console.log("[rotation] dry run -- pass --write to record");

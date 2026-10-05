@@ -135,6 +135,7 @@ import { spawnSync } from "node:child_process";
 import { enumerateGates } from "./gateSweep.mjs";
 import * as RC from "./redCensus.mjs";
 import * as SC from "./sweepCoverage.mjs";
+import { membershipBudgetMs } from "./recordOwner.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import * as QS from "./quickSweep.mjs";
 import * as Q from "./quickSweep.mjs";
@@ -150,6 +151,12 @@ const say = (m) => console.log("  ----  " + m);
 const REPORT = gateReport("tools/ship/sweepCoverage-selfcheck.mjs");
 
 const FILE = SC.readFile();
+// *** v4813 -- TWO LINES, AND EACH NUMBER IS GRADED BY THE ONE IT WAS MEASURED AGAINST. *** The record's owner
+// moved its membership line (recordOwner.mjs: 3000 x 1.57 on the rig, Keith's decision). A LIVE reading out of
+// FILE is the owner's milliseconds and is graded against LIVE_MS; a number FROZEN into a record below (nowMs,
+// recordedMs, hereMs, loadedMs, serialNow...) was taken on the sandbox against 3000 and keeps SC.BUDGET_MS.
+// Grading either by the other's line is what turned four rows red on the rig's first record with no gate changed.
+const LIVE_MS = membershipBudgetMs(FILE);
 
 // *** v4547 -- ONE RULE FOR "IS THIS STILL-OVER ENTRY JUSTIFIED", WHERE THERE WERE THREE. ***
 // "Is it live over budget right now" is not a well-defined question for a straddler, and this round
@@ -210,15 +217,15 @@ const liveLoadedMs = (g, F = FILE) => ((F.contended || {})[g] === true ? (F.timi
 // the budget is low enough to admit a straddler and high enough to look like a bar. It is not one property
 // and no threshold makes it one. Two predicates, and `justifiedOver` is their union so the callers that
 // grade the combined roll keep working.
-const stillGenuinelyOver = (x, F = FILE) => (aloneMs(x.gate, F) ?? (F.timings || {})[x.gate] ?? 0) > SC.BUDGET_MS;
+const stillGenuinelyOver = (x, F = FILE) => (aloneMs(x.gate, F) ?? (F.timings || {})[x.gate] ?? 0) > membershipBudgetMs(F);
 const oscillates = (x, F = FILE) => {
     // The record must state the loaded side as a NUMBER. It used to live in the prose ("8-way it is 7,259"),
     // where nothing could read it -- a claim in a sentence is a claim no gate keeps honest.
     if (!Number.isFinite(x.loadedMs) || x.loadedMs <= SC.BUDGET_MS) return false;
     const alone = aloneMs(x.gate, F);
-    if (alone == null || alone > SC.BUDGET_MS * 1.15) return false;   // not cheap alone: not an oscillator
+    if (alone == null || alone > membershipBudgetMs(F) * 1.15) return false;   // not cheap alone (live, owner's line)
     const loaded = liveLoadedMs(x.gate, F);
-    return loaded == null || loaded > SC.BUDGET_MS;                   // a live loaded sample may retire it
+    return loaded == null || loaded > membershipBudgetMs(F);          // a live loaded sample may retire it
 };
 const justifiedOver = (x) => overInSomeReading(x) &&
     typeof x.why === "string" && x.why.length > 40 &&
@@ -485,7 +492,9 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
-        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g);
+        // v4813: and the owner's first readings (RETURNED_AT_V4813), held to the same justifiedOver
+        const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
+                    SC.RETURNED_AT_V4813.stillOver.find((x) => x.gate === g);
         return !!row && justifiedOver(row);
     };
     const returned = new Map([
@@ -501,7 +510,7 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
                                  ((FILE.timings || {})[r.gate] === r.recordedMs ||
-                                  (returned.has(r.gate) && (FILE.timings || {})[r.gate] < SC.BUDGET_MS) ||
+                                  (returned.has(r.gate) && (FILE.timings || {})[r.gate] < LIVE_MS) ||
                                   // v4477: the THIRD state, which the merged tree created and neither branch
                                   // had alone -- RE-MEASURED AND STILL OVER. crossBackend was re-timed at v4476
                                   // to 12,851 ms here against main's 376, a 34x disagreement between two boxes
@@ -517,6 +526,23 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        "recorded time is checked against the live file here, so a re-timing that fixes it fails this row " +
        `rather than leaving a record nobody re-derives -- AND IT DID: ${REC.returnedAt_v4461.length} were ` +
        "returned by v4461's rotation and this row fired on the next run until they were named.");
+
+    // ---- v4813: the owner's still-over roll, every entry earning its place ----
+    // A roll graded only through the row above would keep an entry whose gate left `back`, or one that came
+    // back under the line, forever. So each entry is asked directly: one of the twelve, over in a reading it
+    // carries, a reason, and LIVE over the owner's line (stillGenuinelyOver reads FILE, not the entry).
+    // SABOTAGED v4813: windowsImport's live entry set to 4,000 in a scratch copy of the record -> this row red
+    // by name (under the 4,710 line), restored byte-for-byte.
+    {
+        const R13 = SC.RETURNED_AT_V4813;
+        const off = R13.stillOver.filter((x) => !(back.some((b) => b.gate === x.gate) && justifiedOver(x) &&
+                                                  x.serialMs.length >= 2 && x.serialMs.every((m) => m > SC.BUDGET_MS)));
+        ok("!! every gate the owner's first readings put back out is one of the twelve, and live over the owner's line",
+           overNonEmpty(R13.stillOver, (x) => !off.includes(x)) && R13.lineMs === LIVE_MS,
+           off.length ? `NOT JUSTIFIED: ${off.map((x) => `${x.gate} live ${(FILE.timings || {})[x.gate]}`).join("; ")}`
+                      : `${R13.stillOver.length} named at a ${R13.lineMs} ms line (live ${LIVE_MS}): ` +
+                        R13.stillOver.map((x) => `${x.gate.split("/").pop()} ${(FILE.timings || {})[x.gate]}`).join(", "));
+    }
 
     // ---- v4529: the later still-over record is held to the same standard as v4476's ----
     // *** v4535 -- AND THE ROW HAD NO WAY TO SAY "THEY ALL CAME BACK". *** overNonEmpty rejects the empty list,
@@ -538,7 +564,7 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        overNonEmpty(SC.RETURNED_AT_V4529.stillOver, (x) => overInSomeReading(x) && oscillates(x) &&
                     x.hereMs > SC.BUDGET_MS && back.some((b) => b.gate === x.gate)) ||
        (emptyOfNonEmpty(SC.RETURNED_AT_V4529.stillOver, V29ret) &&
-        overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < SC.BUDGET_MS && x.overMs > SC.BUDGET_MS &&
+        overNonEmpty(V29ret, (x) => (FILE.timings || {})[x.gate] < LIVE_MS && x.overMs > SC.BUDGET_MS &&
                                     typeof x.why === "string" && x.why.length > 40 &&
                                     Array.isArray(x.serialNow) && x.serialNow.length >= 3 &&
                                     x.serialNow.every((ms) => ms < SC.BUDGET_MS))),

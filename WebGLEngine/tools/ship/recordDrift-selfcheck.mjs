@@ -65,6 +65,7 @@
 import { checks, drift, reportLines, sources, SOURCE_SKIP, OWES, ENG, DRIFT_AT_V4482 as REC } from "./recordDrift.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { membershipBudgetMs } from "./recordOwner.mjs";
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -545,9 +546,12 @@ console.log("\n5. *** AND SOMETHING ACTUALLY RUNS IT, WHICH FOR FIVE ROUNDS NOTH
     // the pre-flight running in the meantime -- which is why those two rows are above this one and not below.
     const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
     const mine = T.timings["tools/ship/recordDrift-selfcheck.mjs"];
+    // v4813: against the line the sweep SELECTS by (recordOwner.membershipBudgetMs), not T.budgetMs -- that field is
+    // the line the LAST sweep used, and the two differ for exactly one sweep after the owner's line moves.
+    const lineMs = membershipBudgetMs(T);
     ok("  and this gate is back UNDER the ship-time budget, so the sweep actually runs it",
-        typeof mine === "number" && mine < T.budgetMs,
-        `${mine} ms against a ${T.budgetMs} ms budget, down from 4,997. This is the RECORDED timing, which is ` +
+        typeof mine === "number" && mine < lineMs,
+        `${mine} ms against a ${lineMs} ms budget, down from 4,997. This is the RECORDED timing, which is ` +
         "what quickSweep reads to decide membership -- not a live measurement, so a run that slows the gate " +
         "without re-timing it keeps this green until the next sweepRotation --write");
 }

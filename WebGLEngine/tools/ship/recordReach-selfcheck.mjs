@@ -23,6 +23,7 @@ import { costOf } from "./quickSweep.mjs";
 import { stripComments as stripCode } from "../../vba/runtimeGap.mjs";
 import * as BT from "./boxTimings.mjs";
 import { boxId } from "./hostScale.mjs";
+import { membershipBudgetMs } from "./recordOwner.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -49,10 +50,16 @@ console.log("1. *** THE CENSUS, DERIVED EVERY RUN -- A PINNED LIST WOULD BE THIS
     // Through readTimings, NOT a second raw JSON.parse: the first draft did the latter, and on the very
     // fixture that tears the timings file this gate CRASHED with an unhandled SyntaxError before reaching
     // the row written to detect exactly that. A guard that only works on well-formed input is not a guard.
-    ok("!! ...and the budget is READ from the sweep's own timings file, not retyped here",
-        live.budgetMs === (RR.readTimings(ENG).budgetMs ?? 3000),
-        `${live.budgetMs} ms. A second declaration of the budget is a second thing to keep in sync, and this ` +
-        `gate's whole subject is a number that went stale while being recorded.`);
+    // v4813: the line is the one THE SWEEP will use -- recordOwner.membershipBudgetMs over this same file --
+    // where it was the file's `budgetMs` field, which is the line the PREVIOUS sweep used. They parted at the
+    // first rig sweep after the owner's line moved (3000 recorded, 4710 owed), and this gate runs before the
+    // sweep rewrites the file, so the field graded the next ship by the last one's line.
+    // SABOTAGED v4813: reach() back to `t.budgetMs ?? 3000` -> this row red by name (3000 against 4710).
+    const owed = membershipBudgetMs(RR.readTimings(ENG));
+    ok("!! ...and the budget is the one the SWEEP will use, read from the sweep's own function, not retyped here",
+        live.budgetMs === owed,
+        `${live.budgetMs} ms against ${owed} owed by the record's owner. A second declaration of the budget is a ` +
+        `second thing to keep in sync, and this gate's whole subject is a number that went stale while being recorded.`);
 }
 
 // =============================================================================================================
@@ -433,14 +440,25 @@ console.log("\n6. *** \"UNGUARDED\" WAS ONE WORD FOR TWO FACTS, AND THE SMALLER 
         `${R7.after.unmeasured} and, minutes earlier on the same code, ${R7.afterPriorSweep.checked}/` +
         `${R7.afterPriorSweep.overBudget}/${R7.afterPriorSweep.unmeasured} -- ${R7.contendedRecords} records ` +
         `whose class is decided by how loaded the box was when ${R7.contendedGuardian} was timed.`);
+    // *** v4813 -- THE FIVE READINGS ARE THE SANDBOX'S, AND THEY ARE GRADED AGAINST THE SANDBOX'S LINE. ***
+    // This compared v4577's serial runs against live.budgetMs, which was the same 3000 ms until the owner's line
+    // moved (recordOwner.mjs). Against 4710 all five read under and the row went red -- not because the wobble
+    // stopped but because a number from one stopwatch was graded by another's line. The claim is about v4577 and
+    // stays true about v4577, so it is asserted against the line those runs were taken against. What the LIVE
+    // line says about the same gate is reported beside it, and on the rig it is off the line (5,065 ms alone
+    // against 4,710 at edf582b6) -- the stable class the detail below asks to be told about.
+    const R7_LINE_MS = 3000;   // the sandbox's membership line at v4577, the line these five runs straddled
+    const cgLive = RR.readTimings(ENG).timings?.[R7.contendedGuardian];
     ok("!! ...and the pair of readings really does straddle the budget, so the instability is measured",
-       R7.contendedGuardianSerialMs.some((m) => m < live.budgetMs) &&
-       R7.contendedGuardianSerialMs.some((m) => m > live.budgetMs) &&
+       R7.contendedGuardianSerialMs.some((m) => m < R7_LINE_MS) &&
+       R7.contendedGuardianSerialMs.some((m) => m > R7_LINE_MS) &&
        R7.afterPriorSweep.checked !== R7.after.checked,
-       `${R7.contendedGuardian}: ${R7.contendedGuardianSerialMs.join(" / ")} ms serial against a ` +
-       `${live.budgetMs} ms budget. If this ever reads all-under or all-over, the gate has moved off the ` +
-       "line and the five records have a stable class again -- which is a repair, and this row should then " +
-       "be replaced by an assertion rather than kept as a description of a wobble that stopped");
+       `${R7.contendedGuardian}: ${R7.contendedGuardianSerialMs.join(" / ")} ms serial against the ` +
+       `${R7_LINE_MS} ms line they were taken against. LIVE: ${cgLive ?? "untimed"} ms against the owner's ` +
+       `${live.budgetMs} ms line, ${cgLive == null ? "no reading" : cgLive > live.budgetMs ? "OVER" : "under"}. ` +
+       "If the live reading ever sits clear of the live line on every sweep, the five records have a stable " +
+       "class again -- which is a repair, and this row should then be replaced by an assertion rather than " +
+       "kept as a description of a wobble that stopped");
     ok("!! ...and the three records it says moved really did leave the unguarded set",
        Object.keys(R7.moved).every((n) => {
            const row = live.rows.find((r) => r.name === n);

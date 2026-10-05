@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { membershipBudgetMs } from "./recordOwner.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const BUDGET_MS = 3000;
@@ -73,7 +74,12 @@ export function classify(ms, { budgetMs = BUDGET_MS, capMs = CAP_MS } = {}) {
 export const wasKilled = (g, { codes = {}, finished = {} } = {}) =>
     finished[g] === false || codes[g] === 124 || typeof codes[g] === "string";
 
-export function census(gates, { timings = {}, codes = {}, at = {}, finished = {} } = {}, opts = {}) {
+export function census(gates, file = {}, opts = {}) {
+    const { timings = {}, codes = {}, at = {}, finished = {} } = file || {};
+    // v4813: "over" means over the record OWNER's line (recordOwner.membershipBudgetMs), the one the sweep
+    // selects by -- 3000 for a record with no owner, which is every fixture; 4710 for the rig's. BUDGET_MS
+    // stays 3000 because every frozen record below was measured against it.
+    opts = { budgetMs: membershipBudgetMs(file || {}), ...opts };
     const set = new Set(gates);
     const buckets = { under: [], over: [], killed: [], never: [] };
     for (const g of gates) buckets[classify(timings[g], opts)].push(g);
@@ -315,6 +321,33 @@ export const RETURNED_AT_V4529 = Object.freeze({
             why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
                  "a straddle wide enough to have been the answer -- and re-measured at v4535 at 2,729 / 2,344 / " +
                  "2,659 ms with the timings file at 2,726. Under on every sample of the later run." }),
+    ]),
+});
+
+// *** v4813 -- THE FIRST OWNER-STOPWATCH READINGS PUT FIVE RETURNED GATES BACK OUT, AND THEY ARE NAMED HERE. ***
+//
+// STALE_GREENS_V4460's twelve were returned on the sandbox, and the row over them accepts an entry only while it
+// still carries its evicting reading, is named as returned AND under the line, or is named here as re-measured
+// and still over (v4477's third state). The rig's first two clone verifies of 4c904f50 timed these five ALONE,
+// twice each, over even the owner's 4,710 ms line (recordOwner.mjs). Their sandbox readings are the ones they
+// returned on, beside them -- and the ratio is the finding: the box-wide median is 1.57x and these run 1.6x to
+// 7.4x, so for at least citedSources and corpusFilters the rig is not just a slower box, it is doing something
+// these gates do badly on Windows. That is a speed round per gate; until it runs they are out of the ship-time
+// sweep on the owner's own readings and named, not hidden. An entry falls off when a live reading on the owner's
+// stopwatch is under its line -- stillGenuinelyOver in the gate decides, not this list.
+export const RETURNED_AT_V4813 = Object.freeze({
+    at: "v4813", box: "win32-x64-12c-32678mb-b70b27", lineMs: 4710, readAt: "2026-10-05T01:08:49.513Z",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/citedSources-selfcheck.mjs", hereMs: 7636, serialMs: Object.freeze([7240, 7636]), sandboxMs: 1033,
+            why: "7.4x its sandbox reading against a box median of 1.57x -- the largest gap of the five, Windows-specific cost to find" }),
+        Object.freeze({ gate: "tools/ship/corpusFilters-selfcheck.mjs", hereMs: 7899, serialMs: Object.freeze([7918, 7899]), sandboxMs: 2081,
+            why: "3.8x its sandbox reading on two alone runs 0.3% apart, so a stable cost on the rig and not a slow hour" }),
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", hereMs: 8548, serialMs: Object.freeze([8484, 8548]), sandboxMs: 2731,
+            why: "3.1x on the rig, which has a real GPU where the sandbox has SwiftShader -- plausibly more of the gate runs there" }),
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", hereMs: 5848, serialMs: Object.freeze([5830, 5848]), sandboxMs: 2889,
+            why: "2.0x on the rig, 1,138 ms over the owner's line on both alone runs -- clearly out, not a straddler" }),
+        Object.freeze({ gate: "tools/ship/windowsImport-selfcheck.mjs", hereMs: 4765, serialMs: Object.freeze([4668, 4765]), sandboxMs: 2094,
+            why: "2.3x on the rig and a STRADDLER: 4,668 and 4,765 against a 4,710 line, so expect it back on a quiet sweep" }),
     ]),
 });
 
