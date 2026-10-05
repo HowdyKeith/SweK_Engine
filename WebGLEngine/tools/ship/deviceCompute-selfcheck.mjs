@@ -181,5 +181,6 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the two rig pages RUNNING (they are read from source; hmc-bench.html's route is the runner this " +
     "gate drives and mpm-gpu-check.html's is mpmDevice-selfcheck's), the texture entries (the corpus's storage-texture " +
-    "path has no device twin yet), and real hardware.");
+    "path has no device twin yet), and hardware beyond the one adapter it has run on -- v4814, Keith's GTX 1080 over " +
+    "D3D12, ALL GREEN with 46 kernels byte-identical and 2 inside their f64 floor; any other GPU is a first reading.");
 process.exit(fails ? 1 : 0);
