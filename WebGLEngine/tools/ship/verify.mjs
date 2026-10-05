@@ -593,18 +593,14 @@ if (process.argv.indexOf("--skip-qa") < 0) {
 // costing under a second. tools/ship/quickSweep.mjs runs every gate under a time budget (from
 // tools/ship/sweep-timings.json, rewritten each run), re-runs reds alone, and reconciles against the red
 // register: a KNOWN red is reported, a NEW red fails here. Skip with SWEK_QUICKSWEEP=0 while iterating;
-// never skip it to ship. The budget is `--sweep-budget <ms>` (default: the record owner's line -- 3000 measured at v4303
-// on the sandbox, x1.57 on the rig since v4813; see tools/ship/recordOwner.mjs).
+// never skip it to ship. The budget is `--sweep-budget <ms>` (default 3000; measured at v4303).
 if (process.env.SWEK_QUICKSWEEP !== "0") {
   try {
     // "./quickSweep.mjs", not "./tools/ship/...": import() resolves against THIS file, not the cwd verify runs
     // from. The first draft had the cwd-shaped path; moduleHistory-selfcheck's missing-import scan named
     // tools/ship/tools/ship/quickSweep.mjs before verify ever ran it.
     const { runQuickSweep } = await import("./quickSweep.mjs");
-    // v4813: no --sweep-budget -> null, and the sweep takes the record OWNER's line (recordOwner.mjs). 3000 was
-    // the sandbox's; on the rig's record it is 3000 x 1.57 by Keith's v4813 decision, and the line printed below
-    // is the one the sweep actually used (r.budgetMs), not this argument.
-    const budgetMs = arg("--sweep-budget") ? Number(arg("--sweep-budget")) : null;
+    const budgetMs = Number(arg("--sweep-budget") || 3000);
     // *** v4574 -- THE SHIP-TIME SWEEP IS EXPLICITLY FULL, AND THAT IS THE POINT OF ARMING THE OTHER ONE. ***
     // quickSweep's CLI now skips gates whose recorded inputs did not move, which is worth ~5 minutes on every
     // sweep somebody runs while working. A SHIP IS NOT THAT. The saving buys iteration speed; what it spends
@@ -632,7 +628,7 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
         else if (e.stage === "slice") process.stderr.write(`[verify]   slice ${e.done}  ${clock()}  ${e.gate}\n`);
         else if (e.stage === "write") process.stderr.write(`[verify] sweep done, recording timings  ${clock()}\n`);
       } });
-    console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${r.budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
+    console.log(`[verify] quick sweep: ${r.ran} of ${r.enumerated} gates under ${budgetMs} ms in ${(r.ms / 1000).toFixed(0)} s -- ${r.green} green, ` +
       `${r.knownRed.length} known red, ${r.newRed.length} NEW red, ${r.falseReds} false red, ${r.unmeasured.length} unmeasured, ${r.dropped.length} now over budget`);
     for (const k of r.knownRed) console.log(`[verify]   known red  ${k.gate}  (${k.record})`);
     // *** v4647c -- THE FALSE REDS ARE NAMED HERE, BECAUSE A SECOND BOX REPORTED 143 AND COULD NAME NONE. ***
@@ -645,7 +641,7 @@ if (process.env.SWEK_QUICKSWEEP !== "0") {
     // that list and finds part of it over budget locally. Saying so is the difference between "the sweep is
     // green" meaning the same thing on two machines and meaning two different things in silence.
     if (r.foreignTimings) console.log(`[verify]   NOTE: the membership list came from ${r.timingsHost}, not this ` +
-      `box (${r.box}). ${r.dropped.length} of the ${r.ran} gates it named are over the ${r.budgetMs} ms budget HERE, ` +
+      `box (${r.box}). ${r.dropped.length} of the ${r.ran} gates it named are over the ${budgetMs} ms budget HERE, ` +
       `which is this machine being slower rather than those gates growing. budgetMs is a total-cost threshold ` +
       `and is deliberately not scaled per box -- a slower machine should run FEWER gates, not be given longer`);
     if (r.falseRedSplit) console.log(`[verify]   false red  ${r.falseRedSplit.capped} were KILLED AT THE CAP and ` +

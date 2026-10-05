@@ -33,7 +33,6 @@ import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
 import { boxId } from "./hostScale.mjs";
-import { RECORD_HANDOVERS, ownerOf, membershipBudgetMs } from "./recordOwner.mjs";   // v4813: moved out to break a cycle
 // The FAIL-line rule is IMPORTED, not re-spelled. tools/ship/failLines.mjs owns "what an assertion line
 // looks like" and its own header is about exactly this problem -- "AN EXIT CODE IS NOT A FINDING". Two
 // copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
@@ -258,9 +257,58 @@ export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCA
 }
 
 // *** v4778 -- THE OWNER BOX RETIRED, SO OWNERSHIP MOVES BY A DATED RECORD, NEVER BY EDITING `host`. ***
-// The table and its reasons moved to ./recordOwner.mjs at v4813 (sweepCoverage needs it, and importing this file
-// from there would be a cycle). Re-exported here so every existing import reads the same objects.
-export { RECORD_HANDOVERS, ownerOf, membershipBudgetMs, readingScale } from "./recordOwner.mjs";
+//
+// boxTimings.mjs's v4679 header saw this coming: the record's host is "a LINUX 4-core container ... ephemeral
+// and gone, and a new one hashes differently because boxId() includes an md5 of the CPU model". At v4778 it
+// happened. The container restarted mid-round as linux-x64-4c-16096mb-420793, the shared record still named
+// linux-x64-4c-16096mb-142c0d, and every writer here refused it -- correctly -- so the rotation that
+// capReading, sweepCoverage and recordReach read could no longer be recorded by anyone, on any box.
+//
+// The one-line fix, rewriting `host` to the new box, is the thing v4647 exists to forbid: it would file one
+// machine's runtimes under another's name. A handover is different in kind -- it says WHO may write next and
+// leaves every existing entry attributed to the box that measured it (each carries its own `at`). Keith chose
+// the rig as the new owner at v4778, because it is the only box that persists: a sandbox changes silicon on
+// every restart, so handing the record to one would strand it again at the next. Every other box, the retired
+// one included, keeps writing its own file.
+//
+// The chain is followed, so a later handover appends a row rather than editing this one, and a box that has
+// handed the record on is refused like any stranger -- two owners is the defect, not a convenience.
+export const RECORD_HANDOVERS = Object.freeze([
+    Object.freeze({ at: "v4778", from: "linux-x64-4c-16096mb-142c0d", to: "win32-x64-12c-32678mb-b70b27",
+        decidedBy: "Keith",
+        evidence: "142c0d is the host of every sandbox reading from v4647 to the post-merge full sweep of " +
+                  "2026-09-29T03:33Z; the container restarted at about 15:20Z and came back as 420793. The rig's " +
+                  "id is read off its own v4777 clone verify, where it reports itself 13 times." }),
+    // *** v4813 -- AND BACK, BECAUSE A RECORD THE VERIFYING BOX REWRITES ON EVERY VERIFY CANNOT HOLD STILL. ***
+    // The rig owned the record for two rounds of clone verifies. Its first full re-timing evicted 152 gates (a
+    // median 1.57x slower than the sandbox, every one confirmed alone) and three ratchets frozen on the sandbox's
+    // population went red; moving the 3000 ms line by that median (Keith's first call) cleared them, and the
+    // NEXT rig verify moved 25 more gates across it -- 16 sandbox readings re-timed for the first time, 9 rig
+    // readings within a few percent of the line -- and recordReach (54 of 50) and four sweepCoverage rows were
+    // red again. About 60 gates sit within 10% of any line chosen on the rig's record, so the history gates
+    // would flip every round. Keith chose to hand the record back to the sandbox: one stopwatch, written by the
+    // round's own sweep, with the rig reading its membership as a foreign box and writing only its .local.json --
+    // the arrangement v4777 shipped under. When a sandbox restart changes the id, the answer is another dated
+    // row here, not a hand-off to a box that rewrites the record in every verify.
+    Object.freeze({ at: "v4813", from: "win32-x64-12c-32678mb-b70b27", to: "linux-x64-4c-16095mb-142c0d",
+        decidedBy: "Keith",
+        evidence: "the rig's record at 81d33d5a, after its owner-line verify of 228ff99e: 484 of 1,926 gates outside " +
+                  "a 4,710 ms line and recordReach 54 unchecked against 50, both moved by that one verify. 16095mb-" +
+                  "142c0d is this sandbox's boxId() at v4813 -- the same CPU hash as the v4778 sender, 1 MB less " +
+                  "memory reported -- and the shared record is restored to 4c904f50's, the last the sandbox wrote." }),
+]);
+
+/** The box that may write a record whose `host` reads `host`, after following every handover. */
+export function ownerOf(host, handovers = RECORD_HANDOVERS) {
+    let h = host;
+    const seen = new Set();
+    for (;;) {
+        const next = handovers.find((x) => x.from === h);
+        if (!next || seen.has(h)) return h;
+        seen.add(h);
+        h = next.to;
+    }
+}
 
 // v4778 rig run: path.resolve, not path.join -- `--timings C:\\x.json` (or /tmp/x.json) is an ABSOLUTE path, and join
 // glued it under the tree, so the file the caller named was never the file read.
@@ -597,7 +645,7 @@ export function reclaimStrandedFixtures(root = ENG) {
  * caller nobody has written yet inherits the safe one. That is the difference between arming a tool and
  * arming everything that holds it.
  */
-export async function runQuickSweep({ budgetMs = null, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
+export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DEFAULTS.workers, capMs = DEFAULTS.capMs,
                                       timingsFile = DEFAULTS.timingsFile, root = ENG, gates = null, write = true, onProgress = null,
                                       serialSliceMs = DEFAULTS.serialSliceMs, skipUnchanged = false,
                                       onStage = null, log = (m) => console.log(m) } = {}) {
@@ -607,9 +655,6 @@ export async function runQuickSweep({ budgetMs = null, workers = DEFAULTS.worker
     if (!gates) { const gone = reclaimScratchDirs(root); if (gone.length) log(`[sweep] reclaimed ${gone.length} stranded gate scratch dir(s): ${gone.join(", ")}`); }
     const all = gates || enumerateGates(root);
     const prior = readTimings(timingsFile, root);
-    // v4813: no budget given -> the record OWNER's line (recordOwner.membershipBudgetMs), which is 3000 until a
-    // handover scales it. DEFAULTS.budgetMs stays 3000 as the base it is measured from.
-    budgetMs = budgetMs ?? membershipBudgetMs(prior);
     // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.
     // A missing or unreadable record yields an empty one, and skippable() answers "no recorded input set" for
     // every gate, so the sweep behaves exactly as it did before this parameter existed.
@@ -1203,7 +1248,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     }
     // No Number() here: parseArgs already refused anything that is not a positive finite number, so a value
     // that reaches this line is one. Converting at the point of use is how `--budget --json` became NaN.
-    const opts = { budgetMs: arg("--budget", null), workers: arg("--workers", DEFAULTS.workers),
+    const opts = { budgetMs: arg("--budget", DEFAULTS.budgetMs), workers: arg("--workers", DEFAULTS.workers),
                    capMs: arg("--cap", DEFAULTS.capMs), timingsFile: arg("--timings", DEFAULTS.timingsFile) };
     let lastPct = -1;
     // *** v4574 -- ARMED. THE DEFAULT IS NOW TO SKIP, AND --full IS HOW YOU TURN IT OFF. ***

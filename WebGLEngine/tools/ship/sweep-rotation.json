@@ -1,9 +1,9 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-10-05T12:48:54.162Z",
+ "at": "2026-09-28T19:56:43.302Z",
  "poolAt": "2026-09-22T18:55:53.815Z",
- "budgetMs": 4710,
+ "budgetMs": 3000,
  "lastRun": 1,
  "rotated": [
   {
@@ -775,13 +775,6 @@
    "code": 0,
    "priorMs": 3341,
    "at": "2026-09-09T12:57:13.333Z"
-  },
-  {
-   "gate": "tools/gunnerTraceDemo-selfcheck.mjs",
-   "ms": 7129,
-   "code": 0,
-   "priorMs": 16786,
-   "at": "2026-10-04T23:59:51.005Z"
   },
   {
    "gate": "tools/krbn/krbnCompareLive-selfcheck.mjs",
@@ -1992,17 +1985,10 @@
   },
   {
    "gate": "tools/ship/frozenRecords-selfcheck.mjs",
-   "ms": 3227,
+   "ms": 1564,
    "code": 0,
-   "priorMs": 2080,
-   "at": "2026-10-05T00:00:15.280Z"
-  },
-  {
-   "gate": "tools/ship/fsrCaches-selfcheck.mjs",
-   "ms": 17614,
-   "code": 0,
-   "priorMs": 20037,
-   "at": "2026-10-05T00:41:02.549Z"
+   "priorMs": 2126,
+   "at": "2026-09-22T15:06:36.138Z"
   },
   {
    "gate": "tools/ship/fsrPageConfirm-selfcheck.mjs",
@@ -2756,10 +2742,10 @@
   },
   {
    "gate": "tools/ship/recordDrift-selfcheck.mjs",
-   "ms": 5290,
-   "code": 1,
-   "priorMs": 4982,
-   "at": "2026-10-05T12:48:54.162Z"
+   "ms": 2073,
+   "code": 0,
+   "priorMs": 2142,
+   "at": "2026-09-22T15:06:50.685Z"
   },
   {
    "gate": "tools/ship/recordFloat-selfcheck.mjs",
@@ -2858,13 +2844,6 @@
    "code": 0,
    "priorMs": 6153,
    "at": "2026-09-21T23:27:55.277Z"
-  },
-  {
-   "gate": "tools/ship/rigidBody6dofPage-selfcheck.mjs",
-   "ms": 5038,
-   "code": 0,
-   "priorMs": 20014,
-   "at": "2026-10-04T23:59:43.388Z"
   },
   {
    "gate": "tools/ship/rootCoverage-selfcheck.mjs",

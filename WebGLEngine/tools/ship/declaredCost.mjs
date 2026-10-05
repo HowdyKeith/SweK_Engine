@@ -28,7 +28,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readingScale } from "./recordOwner.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -86,21 +85,10 @@ export function census(root = ENG, timings = null, { exclude = null } = {}) {
     const ms = (g) => T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null;
     const finished = (g) => !(T.finished && T.finished[g] === false);
     const agree = [], rotted = [], suppliesFloor = [], contradicts = [], noRecord = [];
-    // *** v4813 -- A HEADER AND A READING ARE COMPARED ON ONE STOPWATCH. *** Every header was written in the
-    // sandbox, and since the rig took the record over (recordOwner.mjs) most readings are the rig's. Compared
-    // raw, the census went from 116 rotted on the sandbox's record to 167 on the rig's with no header and no
-    // gate changed -- 58 "newly rotted", nearly all 100-300 ms gates the rig runs 2-7x slower, which is
-    // Windows process start-up and not prose decaying. So a reading is put back on the headers' stopwatch by
-    // the scale of the box that took it (readingScale: 1 for the sandbox's, the handover's 1.57 for the rig's)
-    // before the ratio is taken. `recordedMs` stays the raw reading; `claimMs` is what was compared. The scale is
-    // a median and the spread is wide (p25 1.10, p75 2.05), so this decides the COUNT honestly and individual
-    // gates near 2x can still change sides -- the count is what the ratchet holds. Measured on edf582b6: 120.
-    // SABOTAGED v4813: claimMs back to the raw reading -> section 5's ratchet red at 166 against 138.
     for (const [g, d] of declared) {
-        const raw = ms(g);
-        if (raw === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
-        const t = Math.round(raw / readingScale(T, g));
-        const row = { gate: g, declaredMs: d.ms, recordedMs: raw, claimMs: t, ratio: t > 0 ? d.ms / t : Infinity };
+        const t = ms(g);
+        if (t === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
+        const row = { gate: g, declaredMs: d.ms, recordedMs: t, ratio: t > 0 ? d.ms / t : Infinity };
         if (!finished(g)) {
             // A capped reading is a FLOOR. The header is the only measurement of this gate that exists.
             if (d.ms > t) suppliesFloor.push(row); else contradicts.push(row);

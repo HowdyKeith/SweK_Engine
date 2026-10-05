@@ -336,10 +336,17 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
         ok("  ...and a chain is followed to its end, so a later handover appends rather than edits",
            !chain.foreign && middle.foreign, `third-box ${chain.foreign ? "refused" : "owns"}, new-box ` +
            `${middle.foreign ? "refused" : "owns"}`);
+        // v4813: the record went back to a sandbox by a second dated row (Keith's decision -- see quickSweep's v4813
+        // note), so the v4778 row is asserted as history and the live owner as the END of the chain, which is the
+        // property the chain row above tests on fixtures. Pinning the rig here would have been the edit-in-place
+        // the handover table exists to forbid. SABOTAGED v4813: the v4813 row's `to` set to the rig's id -> red
+        // here by name (a handover to itself), restored.
+        const last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
         ok("!! *** the live handover names the retired sandbox and the rig, and was decided rather than assumed ***",
            RECORD_HANDOVERS.length >= 1 && RECORD_HANDOVERS.every((h) => h.at && h.from && h.to && h.decidedBy &&
                h.evidence && h.from !== h.to) &&
-           ownerOf("linux-x64-4c-16096mb-142c0d") === "win32-x64-12c-32678mb-b70b27",
+           RECORD_HANDOVERS[0].from === "linux-x64-4c-16096mb-142c0d" && RECORD_HANDOVERS[0].to === "win32-x64-12c-32678mb-b70b27" &&
+           ownerOf("linux-x64-4c-16096mb-142c0d") === last.to,
            RECORD_HANDOVERS.map((h) => `${h.at}: ${h.from} -> ${h.to} (${h.decidedBy})`).join("; "));
     }
     ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
