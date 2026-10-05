@@ -14,7 +14,7 @@
 // a mitigation nobody has watched fail is not known to be doing anything.
 "use strict";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
 // rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
@@ -152,6 +152,31 @@ sec("3. AND THE COMPARISON CAN FAIL, SO SECTION 2 IS A MEASUREMENT");
     ok(brackets === N, "and every value still brackets the f64 answer, which is the WGSL contract", `${brackets} of ${N}`);
 }
 
+// *** v4814 -- SECTION 4'S THREE CHILDREN RUN AT ONCE; 4b'S TWO STILL RUN ONE AFTER THE OTHER, AND THAT WAS MEASURED. ***
+// tools/ship/gateProfile.mjs --rig-slow put this gate at 8.7 s on Keith's Windows rig, 6.2 s of it inside spawnSync --
+// five GPU device starts in series. Section 4's three (a device held at exit, the same with exitCleanly, the harness)
+// do not depend on timing, so they overlap. 4b's per-call control DOES: it crashes only if V8 finalizes a Dawn instance
+// in the middle of a later call, and load moves that. Measured here (4 cores), the per-call probe exited 0 -- a red --
+// in 0 of 20 runs alone, 0 of 25 beside the shared probe, and 8 of 50 five at a time. So 4b stays serial, as it was.
+// *** AND THAT CONTROL WAS ALREADY LOAD-SENSITIVE BEFORE THIS CHANGE, WHICH IS A FINDING, NOT A FIX. *** Three copies of
+// the whole gate at once, ten rounds: the v4813 code went red 3 of 30 and this code 4 of 30, every red that row. Alone
+// it is 0 of 20, and the quick sweep re-runs a red alone before it counts it, so a ship does not see it; a full
+// sweep's 8-wide phase can. The assertions are unchanged; a child reaped at its cap has status null with the signal
+// set, which every row below already treats as not-zero, as spawnSync's did.
+function spawnChild(args, { timeout, env = process.env }) {
+    return new Promise((resolve) => {
+        // spawn's own timeout sends SIGTERM at the cap, as spawnSync's did; the outcome is whatever "close" reports.
+        const ch = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe"], timeout, killSignal: "SIGTERM" });
+        let stdout = "", stderr = "";
+        ch.stdout.setEncoding("utf8").on("data", (d) => { stdout += d; });
+        ch.stderr.setEncoding("utf8").on("data", (d) => { stderr += d; });
+        ch.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }));
+        ch.on("error", (e) => resolve({ status: null, signal: null, stdout, stderr: stderr + String(e) }));
+    });
+}
+const texinProbe = (perCall) => spawnChild(["--expose-gc", path.join(HERE, "textureInProbe.mjs")], { timeout: 10000,
+    env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+
 // ---------------------------------------------------------------------------------------------------------
 sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN ASSERTED");
 // ---------------------------------------------------------------------------------------------------------
@@ -181,12 +206,19 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
         const r = await HG.runWgslComputeNative({ code: ${JSON.stringify(CODE)}, outCount: 3,
             uniforms: new Float32Array(64), workgroups: 1 });
         console.log("WORK_OK:" + r.ok);`;
-    const run = (body, tail) => spawnSync(process.execPath, ["--input-type=module", "-e", body + "\n" + tail],
-                                          { encoding: "utf8", timeout: 180000 });
+    const run = (body, tail, timeout = 180000) => spawnChild(["--input-type=module", "-e", body + "\n" + tail], { timeout });
 
-    const held = run(holds, "/* exit naturally, still holding the device */");
-    const heldClean = run(holds, "HG.exitCleanly(0);");
-    const local = run(harness, "/* exit naturally; the harness released its device */");
+    // *** v4814 -- THE CHILD THAT HOLDS ITS DEVICE SOMETIMES HANGS INSTEAD OF CRASHING, AND ALWAYS COULD. *** Measured
+    // here, that child alone: 1 of 8 run one after another and 1 of 40 run five at a time slept in Dawn's exit path
+    // past a 15 s cap; the rest died by SIGABRT or SIGSEGV in under 0.6 s. Under the old 180 s cap that was a 3-minute
+    // run of this gate now and then, which the quick sweep's 20 s alone-cap reads as a red. A hang is the hazard too --
+    // the row asserts "does not exit 0", and a child reaped at its cap has status null -- so this one child gets 10 s:
+    // room for a GPU device start under load, and the WORK_OK row still requires its work to have finished first.
+    const [held, heldClean, local] = await Promise.all([
+        run(holds, "/* exit naturally, still holding the device */", 10000),
+        run(holds, "HG.exitCleanly(0);"),
+        run(harness, "/* exit naturally; the harness released its device */"),
+    ]);
 
     ok(/WORK_OK:true/.test(held.stdout), "the child holding a device COMPLETES ITS WORK",
        "which is the whole trap: the numbers are right and the process still dies");
@@ -223,11 +255,9 @@ sec("4b. ONE DAWN INSTANCE PER PROCESS, BECAUSE A FINALIZED ONE KILLED THE NEXT 
     // the absence of fail is not known to do anything. Only a non-zero exit is asserted for the control: SIGSEGV
     // and SIGABRT both occur, as they do for EXIT_HAZARD, and a hang killed at the 10 s cap reads as one too. Each
     // child takes under a second here; the cap keeps a hang inside the sweep's 20 s alone-cap.
-    const probe = path.join(HERE, "textureInProbe.mjs");
-    const runProbe = (perCall) => spawnSync(process.execPath, ["--expose-gc", probe], { encoding: "utf8", timeout: 10000,
-        env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+    // One after the other, and after section 4's children have exited -- see spawnChild above for the measurement.
     const lastMark = (r) => (String(r.stderr || "").match(/^@@ .*$/gm) || ["(no marker)"]).pop().slice(3);
-    const shared = runProbe(false), perCall = runProbe(true);
+    const shared = await texinProbe(false), perCall = await texinProbe(true);
     ok(shared.status === 0 && /all calls returned/.test(lastMark(shared)),
        "*** the gate's five calls with a forced collection after each COMPLETE, on the shared instance ***",
        `status=${shared.status} signal=${shared.signal}; last step: ${lastMark(shared)}`);

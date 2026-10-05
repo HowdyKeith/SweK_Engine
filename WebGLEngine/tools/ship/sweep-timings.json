@@ -1359,7 +1359,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": 293,
   "tools/ship/checkerCensus-selfcheck.mjs": 7784,
   "tools/ship/chipOrder-selfcheck.mjs": 1630,
-  "tools/ship/citedSources-selfcheck.mjs": 2833,
+  "tools/ship/citedSources-selfcheck.mjs": 825,
   "tools/ship/cityGenSeed-selfcheck.mjs": 2158,
   "tools/ship/claimCheck-selfcheck.mjs": 1278,
   "tools/ship/claimEvidence-selfcheck.mjs": 295,
@@ -1383,7 +1383,7 @@
   "tools/ship/controllerAgreement-selfcheck.mjs": 378,
   "tools/ship/copiedOutsideVendor-selfcheck.mjs": 16636,
   "tools/ship/copypartyRegistry-selfcheck.mjs": 298,
-  "tools/ship/corpusFilters-selfcheck.mjs": 2707,
+  "tools/ship/corpusFilters-selfcheck.mjs": 1269,
   "tools/ship/corpusText-selfcheck.mjs": 562,
   "tools/ship/coverageTriage-selfcheck.mjs": 7885,
   "tools/ship/crashDamage-selfcheck.mjs": 9229,
@@ -1532,7 +1532,7 @@
   "tools/ship/haOverlay-selfcheck.mjs": 378,
   "tools/ship/haptics-selfcheck.mjs": 139,
   "tools/ship/harnessLiveness-selfcheck.mjs": 2052,
-  "tools/ship/headlessGpu-selfcheck.mjs": 2927,
+  "tools/ship/headlessGpu-selfcheck.mjs": 2433,
   "tools/ship/hellgateManager-selfcheck.mjs": 196,
   "tools/ship/hiZ-selfcheck.mjs": 6717,
   "tools/ship/holoFoil-selfcheck.mjs": 288,
@@ -1644,7 +1644,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": 90102,
   "tools/ship/orrery-selfcheck.mjs": 13931,
   "tools/ship/orreryAuthor-selfcheck.mjs": 2823,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3175,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 2987,
   "tools/ship/orreryFleet-selfcheck.mjs": 13937,
   "tools/ship/orreryPost-selfcheck.mjs": 7464,
   "tools/ship/orreryPromotion-selfcheck.mjs": 107,
@@ -1811,7 +1811,7 @@
   "tools/ship/runnerBudget-selfcheck.mjs": 9957,
   "tools/ship/runnerGauge-selfcheck.mjs": 313,
   "tools/ship/runnerReach-selfcheck.mjs": 3818,
-  "tools/ship/runtimeGap-selfcheck.mjs": 2411,
+  "tools/ship/runtimeGap-selfcheck.mjs": 2155,
   "tools/ship/satelliteFleet-selfcheck.mjs": 219,
   "tools/ship/scanLimits-selfcheck.mjs": 384,
   "tools/ship/sceneGlb-selfcheck.mjs": 1087,
@@ -1925,7 +1925,7 @@
   "tools/ship/traderGraph-selfcheck.mjs": 2774,
   "tools/ship/traderPolicy-selfcheck.mjs": 26866,
   "tools/ship/transitionSpec-selfcheck.mjs": 2248,
-  "tools/ship/treeRead-selfcheck.mjs": 1382,
+  "tools/ship/treeRead-selfcheck.mjs": 1153,
   "tools/ship/trellisAutoRig-selfcheck.mjs": 1111,
   "tools/ship/trim-selfcheck.mjs": 207,
   "tools/ship/tsl-selfcheck.mjs": 2104,
@@ -1981,7 +1981,7 @@
   "tools/ship/wgslSpec-selfcheck.mjs": 3589,
   "tools/ship/winPathGuard-selfcheck.mjs": 2693,
   "tools/ship/windTunnel-selfcheck.mjs": 37074,
-  "tools/ship/windowsImport-selfcheck.mjs": 2707,
+  "tools/ship/windowsImport-selfcheck.mjs": 1334,
   "tools/ship/wireframeHead-selfcheck.mjs": 94,
   "tools/ship/wiringClaims-selfcheck.mjs": 2691,
   "tools/ship/worleyBiomes-selfcheck.mjs": 153,
@@ -5221,7 +5221,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/checkerCensus-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/chipOrder-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/citedSources-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/citedSources-selfcheck.mjs": "2026-10-05T19:12:43.719Z",
   "tools/ship/cityGenSeed-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/claimCheck-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/claimEvidence-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5245,7 +5245,7 @@
   "tools/ship/controllerAgreement-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/copiedOutsideVendor-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/copypartyRegistry-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/corpusFilters-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/corpusFilters-selfcheck.mjs": "2026-10-05T19:12:45.184Z",
   "tools/ship/corpusText-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/coverageTriage-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/crashDamage-selfcheck.mjs": "2026-09-21T02:12:45.124Z",
@@ -5394,7 +5394,7 @@
   "tools/ship/haOverlay-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/haptics-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/harnessLiveness-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/headlessGpu-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/headlessGpu-selfcheck.mjs": "2026-10-05T19:29:20.169Z",
   "tools/ship/hellgateManager-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/hiZ-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/holoFoil-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5506,7 +5506,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/orrery-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:00:47.062Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:12:49.879Z",
   "tools/ship/orreryFleet-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryPost-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-05T14:15:52.746Z",
@@ -5673,7 +5673,7 @@
   "tools/ship/runnerBudget-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/runnerGauge-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/runnerReach-selfcheck.mjs": "2026-09-21T23:27:55.277Z",
-  "tools/ship/runtimeGap-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/runtimeGap-selfcheck.mjs": "2026-10-05T19:12:55.249Z",
   "tools/ship/satelliteFleet-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/scanLimits-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/sceneGlb-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5787,7 +5787,7 @@
   "tools/ship/traderGraph-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/traderPolicy-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/transitionSpec-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/treeRead-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/treeRead-selfcheck.mjs": "2026-10-05T19:12:52.930Z",
   "tools/ship/trellisAutoRig-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/trim-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/tsl-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5843,7 +5843,7 @@
   "tools/ship/wgslSpec-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/winPathGuard-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/windTunnel-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "tools/ship/windowsImport-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/windowsImport-selfcheck.mjs": "2026-10-05T19:12:46.694Z",
   "tools/ship/wireframeHead-selfcheck.mjs": "2026-10-05T14:15:56.647Z",
   "tools/ship/wiringClaims-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/worleyBiomes-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -10697,7 +10697,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": 95,
   "tools/ship/checkerCensus-selfcheck.mjs": 3848,
   "tools/ship/chipOrder-selfcheck.mjs": 1630,
-  "tools/ship/citedSources-selfcheck.mjs": 1033,
+  "tools/ship/citedSources-selfcheck.mjs": 825,
   "tools/ship/cityGenSeed-selfcheck.mjs": 725,
   "tools/ship/claimCheck-selfcheck.mjs": 390,
   "tools/ship/claimEvidence-selfcheck.mjs": 113,
@@ -10720,7 +10720,7 @@
   "tools/ship/controlDossier-selfcheck.mjs": 3105,
   "tools/ship/controllerAgreement-selfcheck.mjs": 100,
   "tools/ship/copypartyRegistry-selfcheck.mjs": 149,
-  "tools/ship/corpusFilters-selfcheck.mjs": 2707,
+  "tools/ship/corpusFilters-selfcheck.mjs": 1269,
   "tools/ship/corpusText-selfcheck.mjs": 279,
   "tools/ship/coverageTriage-selfcheck.mjs": 3620,
   "tools/ship/crashDamage-selfcheck.mjs": 9229,
@@ -10835,7 +10835,7 @@
   "tools/ship/groundProbe-selfcheck.mjs": 214,
   "tools/ship/haOverlay-selfcheck.mjs": 82,
   "tools/ship/haptics-selfcheck.mjs": 52,
-  "tools/ship/headlessGpu-selfcheck.mjs": 2927,
+  "tools/ship/headlessGpu-selfcheck.mjs": 2433,
   "tools/ship/hellgateManager-selfcheck.mjs": 49,
   "tools/ship/hiZ-selfcheck.mjs": 3309,
   "tools/ship/holoFoil-selfcheck.mjs": 82,
@@ -10926,7 +10926,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": 61,
   "tools/ship/orphanResidue-selfcheck.mjs": 49,
   "tools/ship/orreryAuthor-selfcheck.mjs": 2823,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3175,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 2987,
   "tools/ship/orreryPost-selfcheck.mjs": 5560,
   "tools/ship/orreryPromotion-selfcheck.mjs": 107,
   "tools/ship/orreryUniverse-selfcheck.mjs": 61,
@@ -11071,7 +11071,7 @@
   "tools/ship/runInspector-selfcheck.mjs": 52,
   "tools/ship/runLive-selfcheck.mjs": 69,
   "tools/ship/runnerGauge-selfcheck.mjs": 52,
-  "tools/ship/runtimeGap-selfcheck.mjs": 2411,
+  "tools/ship/runtimeGap-selfcheck.mjs": 2155,
   "tools/ship/satelliteFleet-selfcheck.mjs": 57,
   "tools/ship/scanLimits-selfcheck.mjs": 140,
   "tools/ship/sceneGlb-selfcheck.mjs": 323,
@@ -11170,7 +11170,7 @@
   "tools/ship/todo-selfcheck.mjs": 179,
   "tools/ship/traderGraph-selfcheck.mjs": 2774,
   "tools/ship/transitionSpec-selfcheck.mjs": 602,
-  "tools/ship/treeRead-selfcheck.mjs": 1382,
+  "tools/ship/treeRead-selfcheck.mjs": 1153,
   "tools/ship/trellisAutoRig-selfcheck.mjs": 1111,
   "tools/ship/trim-selfcheck.mjs": 64,
   "tools/ship/tsl-selfcheck.mjs": 2104,
@@ -11222,7 +11222,7 @@
   "tools/ship/wgslLayout-selfcheck.mjs": 548,
   "tools/ship/wgslSpec-selfcheck.mjs": 3589,
   "tools/ship/winPathGuard-selfcheck.mjs": 2693,
-  "tools/ship/windowsImport-selfcheck.mjs": 2707,
+  "tools/ship/windowsImport-selfcheck.mjs": 1334,
   "tools/ship/wireframeHead-selfcheck.mjs": 94,
   "tools/ship/wiringClaims-selfcheck.mjs": 2691,
   "tools/ship/worleyBiomes-selfcheck.mjs": 100,
@@ -12409,7 +12409,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/checkerCensus-selfcheck.mjs": "2026-09-16T02:27:02.423Z",
   "tools/ship/chipOrder-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "tools/ship/citedSources-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
+  "tools/ship/citedSources-selfcheck.mjs": "2026-10-05T19:12:43.719Z",
   "tools/ship/cityGenSeed-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/claimCheck-selfcheck.mjs": "2026-09-23T00:12:13.874Z",
   "tools/ship/claimEvidence-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
@@ -12432,7 +12432,7 @@
   "tools/ship/controlDossier-selfcheck.mjs": "2026-09-16T02:27:02.423Z",
   "tools/ship/controllerAgreement-selfcheck.mjs": "2026-09-22T19:07:11.831Z",
   "tools/ship/copypartyRegistry-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/corpusFilters-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/corpusFilters-selfcheck.mjs": "2026-10-05T19:12:45.184Z",
   "tools/ship/corpusText-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/coverageTriage-selfcheck.mjs": "2026-09-16T02:27:02.423Z",
   "tools/ship/crashDamage-selfcheck.mjs": "2026-09-21T02:12:45.124Z",
@@ -12547,7 +12547,7 @@
   "tools/ship/groundProbe-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/haOverlay-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
   "tools/ship/haptics-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
-  "tools/ship/headlessGpu-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/headlessGpu-selfcheck.mjs": "2026-10-05T19:29:20.169Z",
   "tools/ship/hellgateManager-selfcheck.mjs": "2026-09-23T00:12:13.874Z",
   "tools/ship/hiZ-selfcheck.mjs": "2026-09-16T01:08:38.331Z",
   "tools/ship/holoFoil-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
@@ -12638,7 +12638,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/orphanResidue-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:00:47.062Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:12:49.879Z",
   "tools/ship/orreryPost-selfcheck.mjs": "2026-09-16T12:10:16.535Z",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-05T14:15:52.746Z",
   "tools/ship/orreryUniverse-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
@@ -12783,7 +12783,7 @@
   "tools/ship/runInspector-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/runLive-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
   "tools/ship/runnerGauge-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
-  "tools/ship/runtimeGap-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/runtimeGap-selfcheck.mjs": "2026-10-05T19:12:55.249Z",
   "tools/ship/satelliteFleet-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
   "tools/ship/scanLimits-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
   "tools/ship/sceneGlb-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
@@ -12882,7 +12882,7 @@
   "tools/ship/todo-selfcheck.mjs": "2026-09-23T14:21:46.871Z",
   "tools/ship/traderGraph-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/transitionSpec-selfcheck.mjs": "2026-09-23T00:12:13.874Z",
-  "tools/ship/treeRead-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/treeRead-selfcheck.mjs": "2026-10-05T19:12:52.930Z",
   "tools/ship/trellisAutoRig-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/trim-selfcheck.mjs": "2026-09-22T13:49:58.279Z",
   "tools/ship/tsl-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -12934,7 +12934,7 @@
   "tools/ship/wgslLayout-selfcheck.mjs": "2026-09-22T15:18:19.156Z",
   "tools/ship/wgslSpec-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/winPathGuard-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "tools/ship/windowsImport-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/windowsImport-selfcheck.mjs": "2026-10-05T19:12:46.694Z",
   "tools/ship/wireframeHead-selfcheck.mjs": "2026-10-05T14:15:56.647Z",
   "tools/ship/wiringClaims-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/worleyBiomes-selfcheck.mjs": "2026-09-22T15:18:19.156Z",
@@ -13936,9 +13936,9 @@
    1338
   ],
   "tools/ship/corpusFilters-selfcheck.mjs": [
-   2167,
    2081,
-   2707
+   2707,
+   1269
   ],
   "tools/ship/definitionGates-selfcheck.mjs": [
    2687,
@@ -14216,9 +14216,9 @@
    2823
   ],
   "tools/ship/orreryEjecta-selfcheck.mjs": [
-   2889,
    3285,
-   3175
+   3175,
+   2987
   ],
   "tools/ship/pageSections-selfcheck.mjs": [
    978,
@@ -14291,9 +14291,9 @@
    1355
   ],
   "tools/ship/runtimeGap-selfcheck.mjs": [
-   1822,
    1823,
-   2411
+   2411,
+   2155
   ],
   "tools/ship/serverShutdown-selfcheck.mjs": [
    760,
@@ -14386,9 +14386,9 @@
    2774
   ],
   "tools/ship/treeRead-selfcheck.mjs": [
-   1338,
    1308,
-   1382
+   1382,
+   1153
   ],
   "tools/ship/tsl-selfcheck.mjs": [
    1860,
@@ -15794,14 +15794,14 @@
    618
   ],
   "tools/ship/headlessGpu-selfcheck.mjs": [
-   2865,
-   2731,
-   2927
+   2927,
+   1565,
+   2433
   ],
   "tools/ship/windowsImport-selfcheck.mjs": [
-   2032,
    2094,
-   2707
+   2707,
+   1334
   ],
   "tools/ship/peerTransfer-selfcheck.mjs": [
    229
@@ -18030,7 +18030,8 @@
   ],
   "tools/ship/citedSources-selfcheck.mjs": [
    987,
-   1033
+   1033,
+   825
   ],
   "tools/ship/groundProbe-selfcheck.mjs": [
    198,
@@ -20064,7 +20065,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": true,
   "tools/ship/checkerCensus-selfcheck.mjs": false,
   "tools/ship/chipOrder-selfcheck.mjs": false,
-  "tools/ship/citedSources-selfcheck.mjs": true,
+  "tools/ship/citedSources-selfcheck.mjs": false,
   "tools/ship/cityGenSeed-selfcheck.mjs": true,
   "tools/ship/claimCheck-selfcheck.mjs": true,
   "tools/ship/claimEvidence-selfcheck.mjs": true,
@@ -21971,7 +21972,7 @@
   "tools/ship/changelogCurrency-selfcheck.mjs": "loaded",
   "tools/ship/checkerCensus-selfcheck.mjs": "alone",
   "tools/ship/chipOrder-selfcheck.mjs": "alone",
-  "tools/ship/citedSources-selfcheck.mjs": "loaded",
+  "tools/ship/citedSources-selfcheck.mjs": "alone",
   "tools/ship/cityGenSeed-selfcheck.mjs": "loaded",
   "tools/ship/claimCheck-selfcheck.mjs": "loaded",
   "tools/ship/claimEvidence-selfcheck.mjs": "loaded",

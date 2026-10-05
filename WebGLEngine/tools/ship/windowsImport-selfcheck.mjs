@@ -53,6 +53,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { codeOnly, noComments } from "./sourceScan.mjs";
+// v4814: sections 1 and 2 read the same 4,520 files; on the rig that was 3.0 s of a 4.7 s wall (gateProfile --rig-slow).
+import { readOnce } from "./treeRead.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -212,7 +214,7 @@ function walk(dir, out = []) {
     const files = walk(ENG);
     const offenders = [], loaderOffenders = [], undecidable = [];
     for (const f of files) {
-        let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        let src = ""; try { src = readOnce(f); } catch { continue; }
         // *** PRE-FILTERED ON THE RAW TEXT BEFORE LEXING, AND THAT IS A BUDGET FACT, NOT A TIDY-UP. ***
         // codeOnly is a character-by-character lexer. Running it over all 4,117 files took this gate from
         // 639 ms to 3,390 -- past the 3,000 ms ceiling, which would have stopped it running at ship time at
@@ -310,7 +312,7 @@ function walk(dir, out = []) {
     // four faces of the self-reference trap, and as this morning's readsPlantedKnob grep counting one plant
     // shape under a name that said all of them.
     for (const f of files) {
-        let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        let src = ""; try { src = readOnce(f); } catch { continue; }
         // Same lexer as section 1 above, and the same budget reason -- see the note there. Pre-filtered on
         // THIS section's own necessary condition: the ARG regex below cannot match unless one of the two flag
         // spellings appears literally, so the lexer only runs on a file that could produce a finding.

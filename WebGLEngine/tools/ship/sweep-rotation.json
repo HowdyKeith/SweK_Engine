@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-10-05T19:00:51.788Z",
+ "at": "2026-10-05T19:29:20.169Z",
  "poolAt": "2026-09-22T18:55:53.815Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -1819,6 +1819,13 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/citedSources-selfcheck.mjs",
+   "ms": 825,
+   "code": 0,
+   "priorMs": 2833,
+   "at": "2026-10-05T19:12:43.719Z"
+  },
+  {
    "gate": "tools/ship/cliArgs-selfcheck.mjs",
    "ms": 545,
    "code": 0,
@@ -1878,6 +1885,13 @@
    "code": 0,
    "priorMs": 400,
    "at": "2026-09-20T14:47:33.847Z"
+  },
+  {
+   "gate": "tools/ship/corpusFilters-selfcheck.mjs",
+   "ms": 1269,
+   "code": 0,
+   "priorMs": 2707,
+   "at": "2026-10-05T19:12:45.184Z"
   },
   {
    "gate": "tools/ship/coverageTriage-selfcheck.mjs",
@@ -2383,10 +2397,10 @@
   },
   {
    "gate": "tools/ship/headlessGpu-selfcheck.mjs",
-   "ms": 2865,
+   "ms": 2433,
    "code": 0,
-   "priorMs": 20023,
-   "at": "2026-09-28T18:58:39.328Z"
+   "priorMs": 1565,
+   "at": "2026-10-05T19:29:20.169Z"
   },
   {
    "gate": "tools/ship/hiZ-selfcheck.mjs",
@@ -2763,10 +2777,10 @@
   },
   {
    "gate": "tools/ship/orreryEjecta-selfcheck.mjs",
-   "ms": 3175,
+   "ms": 2987,
    "code": 0,
-   "priorMs": 3285,
-   "at": "2026-10-05T19:00:47.062Z"
+   "priorMs": 3175,
+   "at": "2026-10-05T19:12:49.879Z"
   },
   {
    "gate": "tools/ship/orreryPost-selfcheck.mjs",
@@ -3155,10 +3169,10 @@
   },
   {
    "gate": "tools/ship/runtimeGap-selfcheck.mjs",
-   "ms": 1873,
+   "ms": 2155,
    "code": 0,
-   "priorMs": 1832,
-   "at": "2026-09-20T14:47:33.294Z"
+   "priorMs": 2411,
+   "at": "2026-10-05T19:12:55.249Z"
   },
   {
    "gate": "tools/ship/shaderRefs-selfcheck.mjs",
@@ -3405,6 +3419,13 @@
    "at": "2026-09-09T12:57:13.333Z"
   },
   {
+   "gate": "tools/ship/treeRead-selfcheck.mjs",
+   "ms": 1153,
+   "code": 0,
+   "priorMs": 1382,
+   "at": "2026-10-05T19:12:52.930Z"
+  },
+  {
    "gate": "tools/ship/tsl-selfcheck.mjs",
    "ms": 2331,
    "code": 0,
@@ -3570,6 +3591,13 @@
    "code": 0,
    "priorMs": 20016,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/ship/windowsImport-selfcheck.mjs",
+   "ms": 1334,
+   "code": 0,
+   "priorMs": 2707,
+   "at": "2026-10-05T19:12:46.694Z"
   },
   {
    "gate": "tools/ship/wireframeHead-selfcheck.mjs",

@@ -85,16 +85,17 @@ const t0 = Date.now();
 const rows = [];       // { at, text, calls: [] }
 let pending = [];      // harness calls since the last stdout line
 let outBuf = "", errBuf = "", killed = false;
-const child = spawn(process.execPath, [GATE], { cwd: ENG, env: { ...process.env, SWEK_WGSL_TRACE: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-const timer = setTimeout(() => { killed = true; child.kill("SIGKILL"); }, CAP_MS);
+// The cap is spawn's own timeout, and "killed" is read from the close event's signal rather than assumed from having
+// sent one (boundaryLint's KILL_NOT_VERIFIED: a kill the code fires and never re-checks).
+const child = spawn(process.execPath, [GATE], { cwd: ENG, env: { ...process.env, SWEK_WGSL_TRACE: "1" }, stdio: ["ignore", "pipe", "pipe"],
+                                                 timeout: CAP_MS, killSignal: "SIGKILL" });
 const eat = (buf, chunk, onLine) => { buf += chunk; let i; while ((i = buf.indexOf("\n")) >= 0) { onLine(buf.slice(0, i)); buf = buf.slice(i + 1); } return buf; };
 child.stdout.on("data", (d) => { outBuf = eat(outBuf, String(d), (l) => { rows.push({ at: Date.now() - t0, text: l, calls: pending }); pending = []; }); });
 child.stderr.on("data", (d) => { errBuf = eat(errBuf, String(d), (l) => {
     const m = TRACE.exec(l);
     if (m) pending.push({ launch: +m[1], run: +m[2], close: +m[3], chars: +m[4], out: +m[5], unfinished: !!m[6] });
 }); });
-const code = await new Promise((r) => child.on("close", (c) => r(c)));
-clearTimeout(timer);
+const code = await new Promise((r) => child.on("close", (c, sig) => { killed = sig === "SIGKILL"; r(c); }));
 const wall = Date.now() - t0;
 if (pending.length) rows.push({ at: wall, text: "(after the last line)", calls: pending });
 
