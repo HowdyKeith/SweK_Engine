@@ -232,11 +232,16 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
     await new Promise((r) => srv.listen(0, SECURE_HOST, r));
     const url = `http://${SECURE_HOST}:${srv.address().port}/`;
 
+    // v4814: SWEK_WGSL_TRACE=1 prints, to stderr, where each call's time went -- the browser launch, the run (adapter,
+    // compile, dispatch, readback) and the close. Off by default; tools/ship/rtPipelineDiag.mjs turns it on to split a
+    // gate's wall time between this harness and its own CPU work. It changes nothing a caller receives.
+    const trace = process.env.SWEK_WGSL_TRACE ? { t0: Date.now(), launched: 0, ran: 0 } : null;
     let browser = null;
     try {
         browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
         const page = await browser.newPage();
         await page.goto(url);
+        if (trace) trace.launched = Date.now();
         const out = await page.evaluate(async (a) => {
             if (!navigator.gpu) return { ok: false, reason: "navigator.gpu absent even on a secure origin", secure: isSecureContext };
             const adapter = await navigator.gpu.requestAdapter();
@@ -312,12 +317,18 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
              outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL,
              inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
              outInit: outInit ? Array.from(storageWords(outInit)) : null });
+        if (trace) trace.ran = Date.now();
         return { skipped: false, errors: [], values: [], ...out };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
     } finally {
         try { await browser?.close(); } catch {}
         srv.close();
+        if (trace) {
+            const end = Date.now(), L = trace.launched || end, R = trace.ran || end;
+            process.stderr.write(`[wgsl-trace] launch ${L - trace.t0} ms, run ${R - L} ms, close ${end - R} ms, ` +
+                                 `${String(code).length} chars, ${outCount} out${trace.ran ? "" : ", DID NOT FINISH"}\n`);
+        }
     }
 }
 
