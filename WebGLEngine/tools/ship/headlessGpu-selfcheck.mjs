@@ -257,13 +257,28 @@ sec("4b. ONE DAWN INSTANCE PER PROCESS, BECAUSE A FINALIZED ONE KILLED THE NEXT 
     // child takes under a second here; the cap keeps a hang inside the sweep's 20 s alone-cap.
     // One after the other, and after section 4's children have exited -- see spawnChild above for the measurement.
     const lastMark = (r) => (String(r.stderr || "").match(/^@@ .*$/gm) || ["(no marker)"]).pop().slice(3);
-    const shared = await texinProbe(false), perCall = await texinProbe(true);
+    // *** v4815 -- THE CONTROL GETS UP TO THREE ATTEMPTS; THE SHARED ARM STILL GETS ONE. *** The per-call crash is a V8
+    // finalizer landing in the middle of a later call's read-back, and load moves when finalizers run. Measured here (4
+    // cores), the per-call probe exited 0 in 0 of 20 runs alone but 8 of 24 with four other probes beside it, and the
+    // whole gate, three copies at once, went red on this row 3 of 30 (v4813 code) and 4 of 30 (v4814). A fourth draft --
+    // the probe's five calls repeated three times in one child -- cut 8 of 24 to 3 of 24 and doubled the shared arm's
+    // time, so it was dropped. The claim this row carries is "per-call instances crash this sequence and the shared one
+    // does not", and that needs ONE crash, so a run that exits 0 is retried, at most twice. A retry only ever happens
+    // when the first exits 0, so the usual cost is unchanged. The shared arm is NOT retried: one crash there is red.
+    // SABOTAGE (v4815): SWEK_GPU_INSTANCE_PER_CALL removed from the control's env, so every attempt runs the shared
+    // instance -> 1 RED, this row, "3 attempt(s), every one exited 0"; restored md5-identical.
+    const shared = await texinProbe(false);
+    const attempts = [];
+    for (let k = 0; k < 3; k++) { const r = await texinProbe(true); attempts.push(r); if (r.status !== 0) break; }
+    const perCall = attempts[attempts.length - 1];
     ok(shared.status === 0 && /all calls returned/.test(lastMark(shared)),
        "*** the gate's five calls with a forced collection after each COMPLETE, on the shared instance ***",
        `status=${shared.status} signal=${shared.signal}; last step: ${lastMark(shared)}`);
     ok(perCall.status !== 0,
        "*** and the SAME run with an instance per call CRASHES, so the shared instance is the fix and not luck ***",
-       `status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`);
+       perCall.status !== 0
+           ? `attempt ${attempts.length} of at most 3: status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`
+           : `${attempts.length} attempt(s), every one exited 0 -- the per-call path no longer crashes, so the shared instance is not shown to be the fix`);
 }
 
 // ---------------------------------------------------------------------------------------------------------

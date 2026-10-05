@@ -23,6 +23,11 @@ import { fileURLToPath } from "node:url";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4815 -- runnerBudget-selfcheck's population includes this file: it spawns gates with a limit of its own (600 s). The
+// limit is not gateBudget's, on purpose, and runnerReach-selfcheck went red on the round that added it without saying so.
+export const budgetIsOwn =
+    "a diagnostic profiles ONE gate past the sweep's cap so the whole run is profiled, killed or not; 600 s is a ceiling " +
+    "against a hang, not a budget a verdict is read from, and gateProfile asserts nothing";
 const RIG_SLOW = ["tools/ship/citedSources-selfcheck.mjs", "tools/ship/corpusFilters-selfcheck.mjs",
                   "tools/ship/headlessGpu-selfcheck.mjs", "tools/ship/windowsImport-selfcheck.mjs",
                   "tools/ship/orreryEjecta-selfcheck.mjs"];
