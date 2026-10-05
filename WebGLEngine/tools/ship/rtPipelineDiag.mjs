@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/rtPipelineDiag.mjs -- v4814
 //
-// Run: node tools/ship/rtPipelineDiag.mjs [--cap-s 600] [--top 15]
+// Run: node tools/ship/rtPipelineDiag.mjs [--cap-s 600] [--top 15]     |     node tools/ship/rtPipelineDiag.mjs --session-probe
 //
 // A DIAGNOSTIC, NOT A GATE: it asserts nothing and exits 0. It answers WHERE physics/render/rtPipeline-selfcheck.mjs
 // spends its time on a given box, so the repair goes where the cost is rather than where it is guessed to be.
@@ -32,6 +32,49 @@ const argv = process.argv.slice(2);
 const num = (name, d) => { const i = argv.indexOf(name); const v = i >= 0 ? Number(argv[i + 1]) : NaN; return Number.isFinite(v) && v > 0 ? v : d; };
 const CAP_MS = num("--cap-s", 600) * 1000, TOP = num("--top", 15);
 const TRACE = /^\[wgsl-trace\] launch (\d+) ms, run (\d+) ms, close (\d+) ms, (\d+) chars, (\d+) out(, DID NOT FINISH)?/;
+
+// *** v4814 RIG RUN 2 -- --session-probe. *** With the gate on webgpuHarness.openWgslSession, the rig HUNG on the gate's
+// third GPU call -- the first to reuse a cached shader module and pipeline, and the first to ask a cached module for its
+// compilation info again -- while every call ran here. This mode replays the gate's first three calls exactly (the
+// v4417 monolith, then the one-sphere pipeline twice) in a FRESH session per variant, varying ONE reuse at a time, with
+// a 20 s watchdog and no fallback, so the variant that hangs is named rather than waited on for ten minutes.
+if (argv.includes("--session-probe")) {
+    const { openWgslSession, webgpuSkipReason } = await import("./webgpuHarness.mjs");
+    const R = await import("../../physics/render/rtPipeline.mjs");
+    const { traceWgsl, traceUniforms } = await import("../../physics/render/pathTracerGpu.mjs");
+    console.log("rtPipelineDiag --session-probe -- which reuse hangs a session on this box. A diagnostic: it asserts nothing.");
+    console.log(`node ${process.version} ${process.platform}`);
+    const skip = webgpuSkipReason(); if (skip) { console.log("SKIP " + skip); process.exit(0); }
+    const one = [R.sbtRecord({ centre: [0, 0, 0], radius: 1, albedo: 0.5 })], view = { ...R.VIEW, w: 24, h: 24 }, spp = 16, eps = 1e-4;
+    const mono = { code: traceWgsl({}), outCount: 576, uniforms: traceUniforms({ spp, view, eps }), workgroups: 9 };
+    const pipe = { code: R.pipelineWgsl({}), outCount: 576, uniforms: R.pipelineUniforms(one, { spp, view, eps }), workgroups: 9 };
+    const VARIANTS = [
+        ["v4814 default: module, its compile info and pipeline all reused", null],
+        ["compile info RE-ASKED of the cached module (the first session draft)", { reaskInfo: true }],
+        ["pipeline NOT cached (module and info reused)", { noPipeCache: true }],
+        ["nothing cached: fresh module and pipeline, same device", { noModCache: true, noPipeCache: true }],
+    ];
+    for (const [label, probe] of VARIANTS) {
+        console.log("");
+        console.log(`== ${label}`);
+        const S = await openWgslSession({ runTimeoutMs: 20000, fallback: false });
+        let ref = null;
+        for (const [i, job] of [["1 monolith", mono], ["2 pipeline", pipe], ["3 pipeline again", { ...pipe, probe }], ["4 pipeline a third time", { ...pipe, probe }]]) {
+            const t = Date.now();
+            const r = await S.run(job);
+            const ms = Date.now() - t;
+            if (i.startsWith("2") && r.ok) ref = r.values;
+            const same = ref && r.ok && i >= "3" ? (JSON.stringify(r.values) === JSON.stringify(ref) ? ", values == call 2" : ", values DIFFER from call 2") : "";
+            console.log(`   call ${i.padEnd(24)} ${r.ok ? "ok" : r.timedOut ? "TIMED OUT" : "FAILED"}  ${ms} ms${same}${r.ok || r.timedOut ? "" : "  " + r.reason}`);
+            if (!r.ok) break;
+        }
+        await S.close();
+    }
+    console.log("");
+    console.log("READING IT: the variant whose call 3 TIMES OUT is the reuse this box's WebGPU cannot survive; if every variant");
+    console.log("passes, the hang was not a reuse of these calls and the full gate run (no flag) is the next measurement.");
+    process.exit(0);
+}
 
 console.log(`rtPipelineDiag -- where ${GATE} spends its time on this box. A diagnostic: it asserts nothing.`);
 console.log(`node ${process.version} ${process.platform}; child cap ${CAP_MS / 1000} s`);

@@ -224,9 +224,17 @@ async function pageRun(a) {
                 dev = await adapter.requestDevice();
                 if (S) { S.adapter = adapter; S.dev = dev; S.lost = false; S.mods.clear(); S.pipes.clear(); dev.lost.then(() => { S.lost = true; }); }
             }
-            let mod = S ? S.mods.get(a.code) : null;
-            if (!mod) { mod = dev.createShaderModule({ code: a.code }); if (S) S.mods.set(a.code, mod); }
-            const info = await mod.getCompilationInfo();
+            // v4814 rig run: the session HUNG on its third call -- the first to reuse a cached module, and the first to ask a
+            // cached module for its compilation info a second time. So the info is asked ONCE and kept with the module. The
+            // `probe` flags exist for tools/ship/rtPipelineDiag.mjs --session-probe to replay each reuse on its own.
+            const probe = a.probe || {};
+            let ent = S && !probe.noModCache ? S.mods.get(a.code) : null;
+            if (!ent) { ent = { mod: dev.createShaderModule({ code: a.code }), info: null }; if (S && !probe.noModCache) S.mods.set(a.code, ent); }
+            if (!ent.info || probe.reaskInfo) {
+                const ci = await ent.mod.getCompilationInfo();
+                ent.info = { messages: ci.messages.map((m) => ({ type: m.type, message: m.message, lineNum: m.lineNum, linePos: m.linePos })) };
+            }
+            const mod = ent.mod, info = ent.info;
             const errors = info.messages.filter((m) => m.type === "error")
                                         .map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
             if (errors.length) return { ok: false, reason: "WGSL did not compile", errors };
@@ -271,8 +279,8 @@ async function pageRun(a) {
             // a REJECTED bind group left the read-back untouched and this function returned ok:true beside it.
             dev.pushErrorScope("validation");
             const pipeKey = a.entryPoint + "\u0000" + a.code;
-            let pipe = S ? S.pipes.get(pipeKey) : null;
-            if (!pipe) { pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: a.entryPoint } }); if (S) S.pipes.set(pipeKey, pipe); }
+            let pipe = S && !probe.noPipeCache ? S.pipes.get(pipeKey) : null;
+            if (!pipe) { pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: a.entryPoint } }); if (S && !probe.noPipeCache) S.pipes.set(pipeKey, pipe); }
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
             const enc = dev.createCommandEncoder();
             const cp = enc.beginComputePass();
@@ -307,7 +315,7 @@ async function pageRun(a) {
  * MEASURED v4814: rtPipeline-selfcheck 114 s -> 56 s here with its printed output byte-identical. SABOTAGED v4814: the
  * pipeline cache keyed by entry point alone (not the code) -> rtPipeline-selfcheck red on 5 rows, its bit-exact rows first.
  */
-export async function openWgslSession({ launchArgs = null, timeoutMs = 60000 } = {}) {
+export async function openWgslSession({ launchArgs = null, timeoutMs = 60000, runTimeoutMs = 60000, fallback = true } = {}) {
     const requireFn = createRequire(import.meta.url);
     const skip = webgpuSkipReason(requireFn);
     if (skip) return { run: async () => ({ ok: false, skipped: true, reason: skip, values: [], errors: [] }), close: async () => {} };
@@ -321,27 +329,47 @@ export async function openWgslSession({ launchArgs = null, timeoutMs = 60000 } =
     await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
     await page.evaluate(`globalThis.__swekRun = ${pageRun.toString()};`);
     if (trace) process.stderr.write(`[wgsl-trace] launch ${Date.now() - trace} ms, run 0 ms, close 0 ms, 0 chars, 0 out (session opened)\n`);
-    let closed = false;
+    let closed = false, dead = false, runs = 0;
+    // *** v4814 RIG RUN -- A SESSION MUST NOT BE ABLE TO HANG A GATE. *** Playwright's evaluate has no timeout of its own,
+    // and on Keith's rig the third run never returned: rtPipelineDiag waited 598 s on it. So every run races a watchdog.
+    // On a timeout the browser is dropped, the session is DEAD, and -- with `fallback` (the default) -- that run and every
+    // later one go through runWgslCompute, one browser each: the proven path, slower and correct. It says so on stderr
+    // every time, so a fallen-back gate is never mistaken for a fast one. `fallback: false` returns the timeout instead,
+    // which is what rtPipelineDiag's --session-probe needs to name the step that hangs.
+    const giveUp = async () => { dead = true; try { await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 5000))]); } catch {} srv.close(); };
     return {
-        async run({ code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, compileOnly = false,
-                    inputs = null, outInit = null, outBinding = 0, uniformBinding = 1 }) {
+        async run(opts) {
+            const { code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, compileOnly = false,
+                    inputs = null, outInit = null, outBinding = 0, uniformBinding = 1, probe = null } = opts;
             if (closed) return { ok: false, skipped: false, reason: "harness error: session already closed", values: [], errors: [] };
-            const t = trace ? Date.now() : 0;
+            if (dead) return fallback ? runWgslCompute(opts) : { ok: false, skipped: false, timedOut: true, reason: "harness error: session dead after a timeout", values: [], errors: [] };
+            const t = Date.now(), n = ++runs;
+            let timer = null;
             try {
-                const out = await page.evaluate((a) => globalThis.__swekRun(a), {
+                const ev = page.evaluate((a) => globalThis.__swekRun(a), {
                     code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
-                    outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: true,
+                    outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: true, probe,
                     inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
                     outInit: outInit ? Array.from(storageWords(outInit)) : null });
+                const out = await Promise.race([ev, new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error("timeout"), { timeout: true })), runTimeoutMs); })]);
                 return { skipped: false, errors: [], values: [], ...out };
             } catch (e) {
+                if (e && e.timeout) {
+                    process.stderr.write(`[wgsl-session] run ${n} did not return in ${runTimeoutMs} ms -- session dropped` +
+                                         (fallback ? "; this run and every later one fall back to one browser per call (slower, same results)" : "") + "\n");
+                    await giveUp();
+                    return fallback ? runWgslCompute(opts) : { ok: false, skipped: false, timedOut: true, reason: `harness error: session run timed out after ${runTimeoutMs} ms`, values: [], errors: [] };
+                }
                 return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
             } finally {
+                clearTimeout(timer);
                 if (trace) process.stderr.write(`[wgsl-trace] launch 0 ms, run ${Date.now() - t} ms, close 0 ms, ${String(code).length} chars, ${outCount} out\n`);
             }
         },
+        get dead() { return dead; },
         async close() {
             if (closed) return; closed = true;
+            if (dead) return;
             const t = trace ? Date.now() : 0;
             try { await browser.close(); } catch {}
             srv.close();
