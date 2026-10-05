@@ -23,9 +23,9 @@
 //   1. every entry runs --runs times on EACH path, so a path that disagrees with itself is seen as such;
 //   2. holeFill is also graded against render/holeFill.mjs's fillHolesCPU on the same inputs, so "which path is
 //      wrong" is answered by a third, independent party rather than by majority;
-//   3. a VARIANT of FILL_WGSL that writes the flag exactly ONCE on every path through the kernel runs on both
-//      paths. If the variant agrees where the original does not, the two-store sequence is what one compiler
-//      mishandles, and v4814's repair is the one-store kernel (byte-identical on the CPU's terms);
+//   3. a VARIANT of FILL_WGSL runs on both paths. Until v4814 it was the one-store form, and the rig showed it
+//      identical on both where the original was not; v4814 shipped that form, so the variant is now the OLD
+//      two-store form, kept as the standing evidence (see twoStore below);
 //   4. the two 1-ulp kernels get a ulp-distance histogram, which separates "rounding differs" from a real
 //      difference without guessing a tolerance.
 //
@@ -48,18 +48,20 @@ const ALL = argv.includes("--all");
 const TARGETS = ["holeFillWgsl.FILL_WGSL", "splitSumWgsl.BRDF_LUT_WGSL", "fresnelF82Wgsl.F82_TINT_WGSL"];
 const say = (s = "") => console.log(s);
 
-// ---- the one-store variant ---------------------------------------------------------------------------------
-// Every path through the kernel writes out[o+4] exactly once: 0.0 for a non-hole, 1.0 for a hole nothing reaches,
-// 0.0 when filled. Same values as the original on every pixel -- only the number of stores to that slot changes.
-function oneStore(code) {
+// ---- the v4813 two-store form, kept as the variant -----------------------------------------------------------
+// RIG RESULT (2026-10-05, GTX 1080 / D3D12, HeadlessChrome 153 against node-webgpu): both paths repeat themselves
+// exactly; Chromium matches fillHolesCPU and node-webgpu does not, on the eight filled holes' flags only; and the
+// ONE-STORE form was identical on both paths and matched the CPU. v4814 shipped the one-store form in
+// render/holeFillWgsl.mjs, so the variant here is now the OLD two-store form, rebuilt from the new one -- run on a
+// box that drops the second store, it should still disagree, which is the evidence the repair stands on.
+function twoStore(code) {
     const steps = [
-        ["  out[o+4u] = f32(holeIn[p]);\n", ""],
-        ["  if (holeIn[p] == 0u) { return; }", "  if (holeIn[p] == 0u) { out[o+4u] = 0.0; return; }"],
-        ["  if (bj < 0) { return; }", "  if (bj < 0) { out[o+4u] = 1.0; return; }"],
+        ["  if (holeIn[p] == 0u) { out[o+4u] = 0.0; return; }", "  out[o+4u] = f32(holeIn[p]);\n  if (holeIn[p] == 0u) { return; }"],
+        ["  if (bj < 0) { out[o+4u] = f32(holeIn[p]); return; }", "  if (bj < 0) { return; }"],
     ];
     let c = code;
     for (const [a, b] of steps) {
-        if (c.split(a).length !== 2) throw new Error(`oneStore: expected exactly one ${JSON.stringify(a.trim())} in FILL_WGSL`);
+        if (c.split(a).length !== 2) throw new Error(`twoStore: expected exactly one ${JSON.stringify(a.trim())} in FILL_WGSL`);
         c = c.replace(a, b);
     }
     return c;
@@ -118,7 +120,7 @@ if (bSkip || nSkip) { say(`SKIP  browser: ${bSkip || "ok"} | native: ${nSkip || 
 const all = corpus().filter((e) => !e.compileOnly && !e.texture);
 const picked = ALL ? all : all.filter((e) => TARGETS.includes(e.id));
 const fill = all.find((e) => e.id === "holeFillWgsl.FILL_WGSL");
-const variant = fill ? { ...fill, id: "holeFillWgsl.FILL_WGSL [one-store variant]", opts: { ...fill.opts, code: oneStore(fill.opts.code) } } : null;
+const variant = fill ? { ...fill, id: "holeFillWgsl.FILL_WGSL [v4813 two-store form]", opts: { ...fill.opts, code: twoStore(fill.opts.code) } } : null;
 const jobs = [...picked, ...(variant ? [variant] : [])];
 
 // ---- the browser path: one page, every job RUNS times ---------------------------------------------------------
@@ -199,6 +201,6 @@ for (const e of jobs) {
 
 say("");
 say("READING IT: a path that DIFFERS between its own runs is a race or uninitialised read, not a compiler; a path that");
-say("disagrees with fillHolesCPU on holeFill is the wrong one; if the one-store variant is IDENTICAL on both paths");
-say("where the original is not, one implementation mishandles two stores to one slot and the repair is the variant.");
+say("disagrees with fillHolesCPU on holeFill is the wrong one. Since v4814 the shipped kernel writes the flag once; the");
+say("v4813 two-store form beside it should still disagree on a box whose compiler drops the second store.");
 process.exit(0);

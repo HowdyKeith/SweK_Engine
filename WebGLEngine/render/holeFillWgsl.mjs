@@ -57,8 +57,13 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
   let o = p * ${FILL_STRIDE}u;
   // every pixel writes its own slot, hole or not: a caller reading the output needs no second mask
   out[o+0u] = vecIn[p*2u]; out[o+1u] = vecIn[p*2u+1u]; out[o+2u] = zbufIn[p]; out[o+3u] = SIDE_BLEND;
-  out[o+4u] = f32(holeIn[p]);
-  if (holeIn[p] == 0u) { return; }
+  // v4814 -- THE FLAG IS WRITTEN EXACTLY ONCE ON EVERY PATH, and that is a portability fix, not a style. It was written
+  // here as f32(holeIn[p]) and again as 0.0 when the hole filled; on Keith's GTX 1080 over D3D12, node-webgpu's Dawn
+  // build kept the FIRST store -- every one of the corpus's eight filled holes read 1.0 with its vector, depth and side
+  // correct -- while Chromium's Dawn and fillHolesCPU read 0.0. Both paths repeat themselves exactly over three runs
+  // (tools/ship/deviceComputeDiag.mjs, 2026-10-05), so it is a compiler dropping a later store to one slot, not a race.
+  // This form is identical on both paths there and matches the CPU on every value. No backticks in this comment.
+  if (holeIn[p] == 0u) { out[o+4u] = 0.0; return; }
 
   let W = i32(u.w); let H = i32(u.h);
   var bj:i32 = -1; var bz = 0.0;         // the chosen source, per the prefer flag
@@ -81,7 +86,7 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
       if (oj < 0 || farther(oz, z) || (z == oz && d2 < od)) { oj = k; oz = z; od = d2; }
     }
   }
-  if (bj < 0) { return; }                                // nothing within the radius; stays a hole
+  if (bj < 0) { out[o+4u] = f32(holeIn[p]); return; }   // nothing within the radius; stays a hole
   let vx = vecIn[u32(bj)*2u]; let vy = vecIn[u32(bj)*2u+1u];
   out[o+0u] = vx; out[o+1u] = vy; out[o+2u] = bz; out[o+4u] = 0.0;   // filled: no longer a hole
   atomicAdd(&stats[0], 1u);
