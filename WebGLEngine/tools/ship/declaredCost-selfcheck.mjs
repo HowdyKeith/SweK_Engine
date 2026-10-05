@@ -82,6 +82,7 @@ console.log("\n2. *** THE TWO WAYS A HEADER AND A RECORD DISAGREE ARE DIFFERENT 
     const bend = (gate, ms, finished) => {
         const t = JSON.parse(JSON.stringify(T));
         t.timings[gate] = ms; t.finished = t.finished || {}; t.finished[gate] = finished;
+        if (t.serial) delete t.serial[gate];          // these arms drive the `timings` reading; v4814's row below drives serial
         return census(ENG, t, { exclude: (g) => g === SELF_REL });
     };
     const g = pick.gate, declared = pick.declaredMs;
@@ -100,6 +101,21 @@ console.log("\n2. *** THE TWO WAYS A HEADER AND A RECORD DISAGREE ARE DIFFERENT 
         "number, half of them would be chased and the other half would be wrong to chase");
     ok("  ...and a record that agrees is in neither list",
         inAgree, "the classifier is not simply putting everything somewhere");
+    // *** v4814 -- A FINISHED GATE IS JUDGED ON ITS ALONE READING WHEN THE RECORD HAS ONE. *** The header was measured
+    // alone; `timings` is mostly a reading taken eight gates at a time (median 2.41x, quickSweep.mjs). The same gate,
+    // its loaded reading four times its header and its serial reading equal to it, must AGREE; with the serial reading
+    // four times off, it must ROT, so the row is not passing on the loaded reading being ignored altogether.
+    // SABOTAGE (v4814): census's `aloneMs` made to return null -> 2 RED: this row, and section 5's live ratchet (102
+    // against 39); restored md5-identical.
+    const loadedOnly = (serialMs) => { const t = JSON.parse(JSON.stringify(T));
+        t.timings[g] = declared * 4; t.finished = t.finished || {}; t.finished[g] = true; t.serial = t.serial || {}; t.serial[g] = serialMs;
+        return census(ENG, t, { exclude: (x) => x === SELF_REL }); };
+    const quiet = loadedOnly(declared), noisy = loadedOnly(Math.round(declared / 4));
+    const rowOf = (c) => c.rotted.find((r) => r.gate === g);
+    ok("*** a header is judged against the gate's ALONE reading, not the eight-wide one beside it ***",
+        !rowOf(quiet) && !!rowOf(noisy) && rowOf(noisy).source === "serial" && rowOf(noisy).recordedMs === Math.round(declared / 4),
+        `${g}: loaded ${declared * 4} ms, alone ${declared} ms -> agrees; alone ${Math.round(declared / 4)} ms -> rots, ` +
+        "source 'serial'. Before v4814, 84 of the 102 headers this census called rotted sat within 2x of their alone reading");
     // *** THE THIRD ARM, which the live tree has NO example of and which is the one that would be a defect. ***
     const contra = bend(g, declared * 4, false);
     ok("!! *** a header claiming a gate finishes INSIDE a cap it demonstrably died at is a CONTRADICTION ***",
@@ -156,10 +172,16 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // *** A RATCHET AND NOT A TARGET, and the reason is that 138 headers is 138 separate re-measurements --
     // each one a gate run to completion -- which is a pass of its own and not a tail-end edit. What must not
     // happen is the number growing while nobody looks, which is how it reached 138.
-    const ROTTED_AT_V4666 = 138;
+    // *** v4814 -- RE-FROZEN AT 39, BECAUSE THE QUANTITY CHANGED. *** 138 (v4666) and 102 (v4813) counted headers
+    // against `timings`, mostly eight-wide readings; census now uses the alone reading (section 2), and the same tree
+    // counts 19. The ceiling is 19 plus the 20 agreeing headers within ONE MEDIAN REPEAT SPREAD of the 2x line: the
+    // record's serialRing holds three alone readings for 322 gates over 200 ms, and their max/min is 1.22x at the
+    // median (p75 1.34, p90 1.54), so a header at 1.64-2.0x of its alone reading can cross on an ordinary re-time.
+    // A ceiling of exactly 19 would flap the way the v4710 scaled line did. Lowered when headers are re-measured.
+    const ROTTED_AT_V4666 = 138, ROTTED_AT_V4814 = 39;
     ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4666,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4666}. Each one is a gate whose header claims a ` +
+        c.rotted.length <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
+        `${c.rotted.length} against a frozen ${ROTTED_AT_V4814} (138 at v4666, against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

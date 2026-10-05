@@ -2060,7 +2060,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": 489,
   "tools/ship/wasmTeardown-selfcheck.mjs": 2299,
   "tools/ship/thrownRow-selfcheck.mjs": 2127,
-  "tools/ship/declaredCost-selfcheck.mjs": 2088,
+  "tools/ship/declaredCost-selfcheck.mjs": 911,
   "tools/ship/murmurClock-selfcheck.mjs": 2608,
   "tools/ship/murmurClock2-selfcheck.mjs": 2780,
   "tools/ship/murmurComplete-selfcheck.mjs": 3225,
@@ -5922,7 +5922,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/thrownRow-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/declaredCost-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/declaredCost-selfcheck.mjs": "2026-10-05T19:35:01.442Z",
   "tools/ship/murmurClock-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/murmurClock2-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/murmurComplete-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -11348,7 +11348,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": 85,
   "tools/ship/wasmTeardown-selfcheck.mjs": 2299,
   "tools/ship/thrownRow-selfcheck.mjs": 433,
-  "tools/ship/declaredCost-selfcheck.mjs": 708,
+  "tools/ship/declaredCost-selfcheck.mjs": 911,
   "tools/ship/murmurClock-selfcheck.mjs": 2608,
   "tools/ship/murmurClock2-selfcheck.mjs": 2780,
   "tools/ship/murmurComplete-selfcheck.mjs": 3225,
@@ -13060,7 +13060,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": "2026-09-22T19:07:11.831Z",
   "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/thrownRow-selfcheck.mjs": "2026-09-24T04:17:24.319Z",
-  "tools/ship/declaredCost-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
+  "tools/ship/declaredCost-selfcheck.mjs": "2026-10-05T19:35:01.442Z",
   "tools/ship/murmurClock-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/murmurClock2-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/murmurComplete-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -17491,7 +17491,8 @@
   ],
   "tools/ship/declaredCost-selfcheck.mjs": [
    600,
-   708
+   708,
+   911
   ],
   "tools/ship/box3dFilter-selfcheck.mjs": [
    90
@@ -20738,7 +20739,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": true,
   "tools/ship/wasmTeardown-selfcheck.mjs": false,
   "tools/ship/thrownRow-selfcheck.mjs": true,
-  "tools/ship/declaredCost-selfcheck.mjs": true,
+  "tools/ship/declaredCost-selfcheck.mjs": false,
   "tools/ship/murmurClock-selfcheck.mjs": false,
   "tools/ship/murmurClock2-selfcheck.mjs": false,
   "tools/ship/murmurComplete-selfcheck.mjs": false,
@@ -22673,7 +22674,7 @@
   "tools/ship/sweepRotation-selfcheck.mjs": "loaded",
   "tools/ship/wasmTeardown-selfcheck.mjs": "alone",
   "tools/ship/thrownRow-selfcheck.mjs": "loaded",
-  "tools/ship/declaredCost-selfcheck.mjs": "loaded",
+  "tools/ship/declaredCost-selfcheck.mjs": "alone",
   "tools/ship/murmurClock-selfcheck.mjs": "alone",
   "tools/ship/murmurClock2-selfcheck.mjs": "alone",
   "tools/ship/murmurComplete-selfcheck.mjs": "alone",

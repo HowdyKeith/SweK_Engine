@@ -83,16 +83,30 @@ export function census(root = ENG, timings = null, { exclude = null } = {}) {
         if (d) declared.set(g, d); else missing.push(g);
     }
     const ms = (g) => T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null;
+    // *** v4814 -- A HEADER IS MEASURED ALONE, SO IT IS COMPARED WITH THE ALONE READING. *** `timings[g]` is the
+    // membership number, and for most gates it is a sample taken eight gates at a time -- the record's own header
+    // (quickSweep.mjs, above costOf) measures that at a MEDIAN 2.41x the uncontended time, which is past this
+    // census's 2x line on its own. Measured at v4814: of the 102 headers this census called rotted, 85 were judged
+    // against a loaded reading, and 84 of the 102 sat within 2x of the gate's `serial` reading. The census was mostly
+    // measuring contention, and any sweep that wrote the record could move it. `serial` is the uncontended reading
+    // quickSweep keeps for exactly this question (its costOf asks it first); `timings` is the fallback where the
+    // record has no serial reading. A CAPPED gate is still judged on `timings` + `finished`, because a kill is a
+    // fact about the cap and that is the reading the floor/contradiction split is about.
+    const aloneMs = (g) => T.serial && typeof T.serial[g] === "number" ? T.serial[g] : null;
     const finished = (g) => !(T.finished && T.finished[g] === false);
     const agree = [], rotted = [], suppliesFloor = [], contradicts = [], noRecord = [];
     for (const [g, d] of declared) {
         const t = ms(g);
         if (t === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
-        const row = { gate: g, declaredMs: d.ms, recordedMs: t, ratio: t > 0 ? d.ms / t : Infinity };
         if (!finished(g)) {
+            const row = { gate: g, declaredMs: d.ms, recordedMs: t, ratio: t > 0 ? d.ms / t : Infinity, source: "cap" };
             // A capped reading is a FLOOR. The header is the only measurement of this gate that exists.
             if (d.ms > t) suppliesFloor.push(row); else contradicts.push(row);
-        } else if (d.ms > 0 && (t / d.ms > 2 || d.ms / t > 2)) rotted.push(row);
+            continue;
+        }
+        const a = aloneMs(g), r = a !== null ? a : t;
+        const row = { gate: g, declaredMs: d.ms, recordedMs: r, ratio: r > 0 ? d.ms / r : Infinity, source: a !== null ? "serial" : "timings" };
+        if (d.ms > 0 && (r / d.ms > 2 || d.ms / r > 2)) rotted.push(row);
         else agree.push(row);
     }
     const bySize = (a, b) => b.ratio - a.ratio;
