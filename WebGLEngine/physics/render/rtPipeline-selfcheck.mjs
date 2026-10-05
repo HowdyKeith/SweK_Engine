@@ -139,7 +139,17 @@
 "use strict";
 
 import { gateReport } from "../../tools/ship/gateReport.mjs";
-import { webgpuSkipReason, runWgslCompute } from "../../tools/ship/webgpuHarness.mjs";
+import { webgpuSkipReason, openWgslSession } from "../../tools/ship/webgpuHarness.mjs";
+// *** v4814 -- ONE BROWSER FOR THE WHOLE GATE. *** This file made 220 compute calls through webgpuHarness.runWgslCompute,
+// each launching its own headless browser and recompiling a path tracer it had compiled seconds before for the previous
+// seed. tools/ship/rtPipelineDiag.mjs on Keith's rig: 291 s, of which launch + close 96 s and the run in the page 160 s;
+// here 113 s, 32 s of it launch + close. A session (webgpuHarness.openWgslSession) launches once, keeps one device and
+// compiles each distinct shader once. Every call below is unchanged -- same code, same uniforms, same seeds, same spp --
+// and the gate's printed numbers are compared before and after (v4814 commit note). Opened lazily, so a section that
+// never reaches the GPU never launches a browser; closed before every exit.
+let _session = null;
+const runWgslCompute = async (opts) => (_session ||= await openWgslSession()).run(opts);
+const closeSession = async () => { if (_session) { const s = _session; _session = null; await s.close(); } };
 import { headlessGpuSkipReason, runWgslComputeNative } from "../../tools/ship/headlessGpu.mjs";
 import * as R from "./rtPipeline.mjs";
 import { baryAt, MeshBVH, trianglesFrom } from "../../mesh/meshBVH.mjs";
@@ -267,7 +277,7 @@ if (skip) {
     console.log("  SKIP  no WebGPU device: " + skip);
     console.log("pathTracer sections 2-4 NOT MEASURED -- a short report is not a clean one");
     console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass (CPU sections only)"));
-    process.exit(fails ? 1 : 0);
+    await closeSession(); process.exit(fails ? 1 : 0);
 }
 
 const gpu = async (sbt, { view, spp = 16, eps = 1e-4, shader = {} }) => {
@@ -1971,4 +1981,4 @@ console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"))
 REPORT.table("two spheres: CPU against the pipeline, per resolution and sample count", ["scene", "size", "spp", "pixels differing"], REPORT_ROWS,
     "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read.");
 REPORT.write();
-process.exit(fails ? 1 : 0);
+await closeSession(); process.exit(fails ? 1 : 0);

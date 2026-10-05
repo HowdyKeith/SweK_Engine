@@ -472,15 +472,23 @@ export const REACH_AT_V4548 = Object.freeze({
         "physics/render/transmission-selfcheck.mjs",
         "tools/ship/dockFraming-selfcheck.mjs",
         "tools/ship/budgetExile-selfcheck.mjs",
+        // *** v4814 -- A FIFTH, AND IT WAS HIDDEN BY A STALE NUMBER RATHER THAN BY THE CAP. *** The record held
+        // physics/render/rtPipeline-selfcheck.mjs at 4,199 ms -- a reading from before the rtx merge grew its sections 13
+        // and 14 -- so nothing here knew it was expensive. tools/ship/rtPipelineDiag.mjs measured it whole at 113 s
+        // (291 s on Keith's rig), webgpuHarness.openWgslSession halved it with its output byte-identical, and the
+        // rotation re-timed it at 56,770 ms exit 0. Expensive and green, like the first three.
+        "physics/render/rtPipeline-selfcheck.mjs",
     ]),
     // What v4568 measured about them, so the correction is a number rather than a retraction. v4641 added the
     // fourth: `finished` still equals `of`, because every one of them DOES end when the cap allows it -- and
     // `killed: 0` is still true. What changed is that finishing is no longer the same as passing.
-    atCapGatesFinish: Object.freeze({ of: 4, finished: 4, killed: 0,
+    // v4814: 4 -> 5 with rtPipeline-selfcheck (see atCapGates); it finished, so `finished` still equals `of`.
+    atCapGatesFinish: Object.freeze({ of: 5, finished: 5, killed: 0,
         ms: Object.freeze({ "tools/ship/redCensus-selfcheck.mjs": 45245,
                             "tools/ship/dockFraming-selfcheck.mjs": 21536,
                             "physics/render/transmission-selfcheck.mjs": 19395,
-                            "tools/ship/budgetExile-selfcheck.mjs": 40863 }) }),
+                            "tools/ship/budgetExile-selfcheck.mjs": 40863,
+                            "physics/render/rtPipeline-selfcheck.mjs": 56770 }) }),
     // *** v4548 -- AND ONE OF THE THREE HAS CROSSED BACK, BY 28 MILLISECONDS. *** The note above says
     // transmission-selfcheck is "no longer even over the cap" at 19,395 ms; one round later the rotation
     // read it at 20,026 and 20,028 and the cap KILLED it, so it moved from graded to cut off -- a 3% spread

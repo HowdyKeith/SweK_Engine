@@ -207,47 +207,25 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
     return browserSkipReason(chromium, from, HEADLESS_SHELL) || null;
 }
 
-/**
- * Compile and run one WGSL compute shader; return `outCount` f32 values from binding 0.
- *
- * `uniforms` is an optional Float32Array bound at binding 1 when present, so a caller can vary knobs without
- * rebuilding the shader text -- a shader recompiled per case would test the compiler, not the arithmetic.
- *
- * Returns { ok, values, errors, adapter } and never throws for a shader-side problem: a compilation error is a
- * RESULT a gate should report, not an exception that hides which line failed.
- */
-export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
-                                       workgroups = 1, compileOnly = false, timeoutMs = 60000,
-                                       inputs = null, outInit = null,
-                                       outBinding = 0, uniformBinding = 1, launchArgs = null }) {
-    const requireFn = createRequire(import.meta.url);
-    const skip = webgpuSkipReason(requireFn);
-    if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
-    const pw = resolvePlaywright(requireFn);
-
-    const srv = http.createServer((_q, s) => {
-        s.writeHead(200, { "Content-Type": "text/html" });
-        s.end("<!doctype html><title>wgsl-harness</title>");
-    });
-    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
-    const url = `http://${SECURE_HOST}:${srv.address().port}/`;
-
-    // v4814: SWEK_WGSL_TRACE=1 prints, to stderr, where each call's time went -- the browser launch, the run (adapter,
-    // compile, dispatch, readback) and the close. Off by default; tools/ship/rtPipelineDiag.mjs turns it on to split a
-    // gate's wall time between this harness and its own CPU work. It changes nothing a caller receives.
-    const trace = process.env.SWEK_WGSL_TRACE ? { t0: Date.now(), launched: 0, ran: 0 } : null;
-    let browser = null;
-    try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
-        const page = await browser.newPage();
-        await page.goto(url);
-        if (trace) trace.launched = Date.now();
-        const out = await page.evaluate(async (a) => {
+// v4814 -- THE PAGE'S HALF OF A COMPUTE RUN, ONCE. runWgslCompute hands it to a fresh page per call; openWgslSession installs
+// it in one page and calls it for every run. It is serialised into the browser, so it may use only browser globals
+// and its argument. Re-indented from runWgslCompute's inline body; the statements are that body's, plus the session
+// cache (see `S`) -- one implementation of what a run does, so the two entry points cannot drift apart.
+async function pageRun(a) {
+            // v4814: a SESSION (a.session) keeps one adapter and device in the page and compiles each distinct shader
+            // once; a one-shot call keeps none, exactly as before. Nothing else in this body knows which it is.
+            const S = a.session ? (globalThis.__swekWgsl ||= { dev: null, adapter: null, lost: false, mods: new Map(), pipes: new Map() }) : null;
             if (!navigator.gpu) return { ok: false, reason: "navigator.gpu absent even on a secure origin", secure: isSecureContext };
-            const adapter = await navigator.gpu.requestAdapter();
-            if (!adapter) return { ok: false, reason: "requestAdapter() returned null -- present is not capable" };
-            const dev = await adapter.requestDevice();
-            const mod = dev.createShaderModule({ code: a.code });
+            let adapter, dev;
+            if (S && S.dev && !S.lost) { adapter = S.adapter; dev = S.dev; }
+            else {
+                adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) return { ok: false, reason: "requestAdapter() returned null -- present is not capable" };
+                dev = await adapter.requestDevice();
+                if (S) { S.adapter = adapter; S.dev = dev; S.lost = false; S.mods.clear(); S.pipes.clear(); dev.lost.then(() => { S.lost = true; }); }
+            }
+            let mod = S ? S.mods.get(a.code) : null;
+            if (!mod) { mod = dev.createShaderModule({ code: a.code }); if (S) S.mods.set(a.code, mod); }
             const info = await mod.getCompilationInfo();
             const errors = info.messages.filter((m) => m.type === "error")
                                         .map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
@@ -292,8 +270,9 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             // v4572 -- the validation error scope the native harness took this round, for the same reason:
             // a REJECTED bind group left the read-back untouched and this function returned ok:true beside it.
             dev.pushErrorScope("validation");
-            const pipe = dev.createComputePipeline({ layout: "auto",
-                compute: { module: mod, entryPoint: a.entryPoint } });
+            const pipeKey = a.entryPoint + "\u0000" + a.code;
+            let pipe = S ? S.pipes.get(pipeKey) : null;
+            if (!pipe) { pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: a.entryPoint } }); if (S) S.pipes.set(pipeKey, pipe); }
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
             const enc = dev.createCommandEncoder();
             const cp = enc.beginComputePass();
@@ -308,13 +287,106 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             await readBuf.mapAsync(GPUMapMode.READ);
             const values = Array.from(new Float32Array(readBuf.getMappedRange()));
             readBuf.unmap();
+            // a session runs hundreds of calls on one device, so each call's buffers go when it is done with them
+            if (S) for (const b of [outBuf, readBuf, uniBuf, ...entries.slice(uniBuf ? 2 : 1).map((e) => e.resource.buffer)]) try { b && b.destroy(); } catch {}
             const ai = adapter.info || {};
             return { ok: true, values, errors: [],
                      wroteNothing: !a.outInit && a.outCount > 0 && values.every((v) => v === a.sentinel),
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
-        }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
-             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL,
+        }
+
+/**
+ * *** v4814 -- ONE BROWSER FOR MANY RUNS. *** runWgslCompute launches a headless browser per call, which is right for a
+ * gate that makes a handful and ruinous for one that makes hundreds: tools/ship/rtPipelineDiag.mjs measured
+ * physics/render/rtPipeline-selfcheck.mjs at 220 calls -- launch + close 96 s of 291 on Keith's rig (357 ms a launch on
+ * win32), 32 s of 113 here -- and every one of its 8-seed rows recompiling the same path tracer. A session launches
+ * once, keeps one adapter and device, compiles each distinct shader and pipeline once, and frees each run's buffers.
+ * `run(opts)` takes runWgslCompute's options and returns its shape; `close()` must be called (a gate that exits without
+ * it leaves a browser behind until the process ends). A device lost mid-session is re-acquired on the next run.
+ * MEASURED v4814: rtPipeline-selfcheck 114 s -> 56 s here with its printed output byte-identical. SABOTAGED v4814: the
+ * pipeline cache keyed by entry point alone (not the code) -> rtPipeline-selfcheck red on 5 rows, its bit-exact rows first.
+ */
+export async function openWgslSession({ launchArgs = null, timeoutMs = 60000 } = {}) {
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { run: async () => ({ ok: false, skipped: true, reason: skip, values: [], errors: [] }), close: async () => {} };
+    const pw = resolvePlaywright(requireFn);
+    const srv = http.createServer((_q, s) => { s.writeHead(200, { "Content-Type": "text/html" }); s.end("<!doctype html><title>wgsl-session</title>"); });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    const trace = process.env.SWEK_WGSL_TRACE ? Date.now() : 0;
+    const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)], env: LAUNCH_ENV });
+    const page = await browser.newPage();
+    page.setDefaultTimeout(timeoutMs);
+    await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+    await page.evaluate(`globalThis.__swekRun = ${pageRun.toString()};`);
+    if (trace) process.stderr.write(`[wgsl-trace] launch ${Date.now() - trace} ms, run 0 ms, close 0 ms, 0 chars, 0 out (session opened)\n`);
+    let closed = false;
+    return {
+        async run({ code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, compileOnly = false,
+                    inputs = null, outInit = null, outBinding = 0, uniformBinding = 1 }) {
+            if (closed) return { ok: false, skipped: false, reason: "harness error: session already closed", values: [], errors: [] };
+            const t = trace ? Date.now() : 0;
+            try {
+                const out = await page.evaluate((a) => globalThis.__swekRun(a), {
+                    code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+                    outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: true,
+                    inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
+                    outInit: outInit ? Array.from(storageWords(outInit)) : null });
+                return { skipped: false, errors: [], values: [], ...out };
+            } catch (e) {
+                return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
+            } finally {
+                if (trace) process.stderr.write(`[wgsl-trace] launch 0 ms, run ${Date.now() - t} ms, close 0 ms, ${String(code).length} chars, ${outCount} out\n`);
+            }
+        },
+        async close() {
+            if (closed) return; closed = true;
+            const t = trace ? Date.now() : 0;
+            try { await browser.close(); } catch {}
+            srv.close();
+            if (trace) process.stderr.write(`[wgsl-trace] launch 0 ms, run 0 ms, close ${Date.now() - t} ms, 0 chars, 0 out (session closed)\n`);
+        },
+    };
+}
+
+/**
+ * Compile and run one WGSL compute shader; return `outCount` f32 values from binding 0.
+ *
+ * `uniforms` is an optional Float32Array bound at binding 1 when present, so a caller can vary knobs without
+ * rebuilding the shader text -- a shader recompiled per case would test the compiler, not the arithmetic.
+ *
+ * Returns { ok, values, errors, adapter } and never throws for a shader-side problem: a compilation error is a
+ * RESULT a gate should report, not an exception that hides which line failed.
+ */
+export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
+                                       workgroups = 1, compileOnly = false, timeoutMs = 60000,
+                                       inputs = null, outInit = null,
+                                       outBinding = 0, uniformBinding = 1, launchArgs = null }) {
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
+    const pw = resolvePlaywright(requireFn);
+
+    const srv = http.createServer((_q, s) => {
+        s.writeHead(200, { "Content-Type": "text/html" });
+        s.end("<!doctype html><title>wgsl-harness</title>");
+    });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    const url = `http://${SECURE_HOST}:${srv.address().port}/`;
+
+    // v4814: SWEK_WGSL_TRACE=1 prints, to stderr, where each call's time went -- the browser launch, the run (adapter,
+    // compile, dispatch, readback) and the close. Off by default; tools/ship/rtPipelineDiag.mjs turns it on to split a
+    // gate's wall time between this harness and its own CPU work. It changes nothing a caller receives.
+    const trace = process.env.SWEK_WGSL_TRACE ? { t0: Date.now(), launched: 0, ran: 0 } : null;
+    let browser = null;
+    try {
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
+        const page = await browser.newPage();
+        await page.goto(url);
+        if (trace) trace.launched = Date.now();
+        const out = await page.evaluate(pageRun, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: false,
              inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
              outInit: outInit ? Array.from(storageWords(outInit)) : null });
         if (trace) trace.ran = Date.now();
