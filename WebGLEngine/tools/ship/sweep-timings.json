@@ -1253,7 +1253,7 @@
   "tools/roundhouse/zeroRangeSweep-selfcheck.mjs": 52818,
   "tools/roundhouse/zeta-selfcheck.mjs": 274,
   "tools/ship/__rigprogress-fixture-selfcheck.mjs": 47,
-  "tools/ship/absenceScope-selfcheck.mjs": 3123,
+  "tools/ship/absenceScope-selfcheck.mjs": 1652,
   "tools/ship/actionCache-selfcheck.mjs": 188,
   "tools/ship/activity-selfcheck.mjs": 190,
   "tools/ship/afContainer-selfcheck.mjs": 193,
@@ -1291,7 +1291,7 @@
   "tools/ship/avatarServerViews-selfcheck.mjs": 9573,
   "tools/ship/avatarZWander-selfcheck.mjs": 35312,
   "tools/ship/backendParity-selfcheck.mjs": 1378,
-  "tools/ship/backlogAbsence-selfcheck.mjs": 3117,
+  "tools/ship/backlogAbsence-selfcheck.mjs": 3017,
   "tools/ship/badTvDevicePass-selfcheck.mjs": 1557,
   "tools/ship/badTvThreeParity-selfcheck.mjs": 1703,
   "tools/ship/badTvWgsl-selfcheck.mjs": 12264,
@@ -1545,7 +1545,7 @@
   "tools/ship/img2three-selfcheck.mjs": 8405,
   "tools/ship/importClosure-selfcheck.mjs": 2346,
   "tools/ship/importHealth-selfcheck.mjs": 1445,
-  "tools/ship/importPosition-selfcheck.mjs": 3034,
+  "tools/ship/importPosition-selfcheck.mjs": 2874,
   "tools/ship/inlineHelpers-selfcheck.mjs": 526,
   "tools/ship/inputChain-selfcheck.mjs": 1949,
   "tools/ship/inputSets-selfcheck.mjs": 3010,
@@ -1644,7 +1644,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": 90102,
   "tools/ship/orrery-selfcheck.mjs": 13931,
   "tools/ship/orreryAuthor-selfcheck.mjs": 2823,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3285,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 3175,
   "tools/ship/orreryFleet-selfcheck.mjs": 13937,
   "tools/ship/orreryPost-selfcheck.mjs": 7464,
   "tools/ship/orreryPromotion-selfcheck.mjs": 107,
@@ -1770,7 +1770,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": 360,
   "tools/ship/repoLanding-selfcheck.mjs": 1343,
   "tools/ship/repoTerrain-selfcheck.mjs": 2320,
-  "tools/ship/reportDoors-selfcheck.mjs": 2005,
+  "tools/ship/reportDoors-selfcheck.mjs": 1363,
   "tools/ship/requestPathSync-selfcheck.mjs": 1737,
   "tools/ship/requestedExit-selfcheck.mjs": 2481,
   "tools/ship/reskin-selfcheck.mjs": 1355,
@@ -5115,7 +5115,7 @@
   "tools/roundhouse/zeroRangeSweep-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/zeta-selfcheck.mjs": "2026-10-05T14:16:16.452Z",
   "tools/ship/__rigprogress-fixture-selfcheck.mjs": "2026-09-03T17:39:50.680Z",
-  "tools/ship/absenceScope-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/absenceScope-selfcheck.mjs": "2026-10-05T19:00:40.618Z",
   "tools/ship/actionCache-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/activity-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/afContainer-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5153,7 +5153,7 @@
   "tools/ship/avatarServerViews-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/avatarZWander-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/backendParity-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/backlogAbsence-selfcheck.mjs": "2026-09-28T18:44:21.942Z",
+  "tools/ship/backlogAbsence-selfcheck.mjs": "2026-10-05T19:00:51.788Z",
   "tools/ship/badTvDevicePass-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/badTvThreeParity-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/badTvWgsl-selfcheck.mjs": "unknown -- before v4408",
@@ -5407,7 +5407,7 @@
   "tools/ship/img2three-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/importClosure-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/importHealth-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/importPosition-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/importPosition-selfcheck.mjs": "2026-10-05T19:00:43.697Z",
   "tools/ship/inlineHelpers-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/inputChain-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/inputSets-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -5506,7 +5506,7 @@
   "tools/ship/orphanTriage-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/orrery-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:00:47.062Z",
   "tools/ship/orreryFleet-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryPost-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-05T14:15:52.746Z",
@@ -5632,7 +5632,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/repoLanding-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/repoTerrain-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-05T19:00:48.596Z",
   "tools/ship/requestPathSync-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/requestedExit-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
   "tools/ship/reskin-selfcheck.mjs": "2026-10-05T14:11:32.974Z",
@@ -10607,7 +10607,7 @@
   "tools/roundhouse/zeroControl-selfcheck.mjs": 545,
   "tools/roundhouse/zeroRangeFull-selfcheck.mjs": 200,
   "tools/roundhouse/zeta-selfcheck.mjs": 274,
-  "tools/ship/absenceScope-selfcheck.mjs": 3123,
+  "tools/ship/absenceScope-selfcheck.mjs": 1652,
   "tools/ship/actionCache-selfcheck.mjs": 62,
   "tools/ship/activity-selfcheck.mjs": 60,
   "tools/ship/afContainer-selfcheck.mjs": 81,
@@ -10642,7 +10642,7 @@
   "tools/ship/avatarDock-selfcheck.mjs": 13002,
   "tools/ship/avatarMorph-selfcheck.mjs": 120,
   "tools/ship/backendParity-selfcheck.mjs": 524,
-  "tools/ship/backlogAbsence-selfcheck.mjs": 3117,
+  "tools/ship/backlogAbsence-selfcheck.mjs": 3017,
   "tools/ship/badTvDevicePass-selfcheck.mjs": 1557,
   "tools/ship/badTvThreeParity-selfcheck.mjs": 1703,
   "tools/ship/bakeShrinkGuard-selfcheck.mjs": 68,
@@ -10847,7 +10847,7 @@
   "tools/ship/ik-selfcheck.mjs": 57,
   "tools/ship/importClosure-selfcheck.mjs": 2147,
   "tools/ship/importHealth-selfcheck.mjs": 1445,
-  "tools/ship/importPosition-selfcheck.mjs": 3034,
+  "tools/ship/importPosition-selfcheck.mjs": 2874,
   "tools/ship/inlineHelpers-selfcheck.mjs": 151,
   "tools/ship/inputChain-selfcheck.mjs": 630,
   "tools/ship/inputSets-selfcheck.mjs": 3010,
@@ -10926,7 +10926,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": 61,
   "tools/ship/orphanResidue-selfcheck.mjs": 49,
   "tools/ship/orreryAuthor-selfcheck.mjs": 2823,
-  "tools/ship/orreryEjecta-selfcheck.mjs": 3285,
+  "tools/ship/orreryEjecta-selfcheck.mjs": 3175,
   "tools/ship/orreryPost-selfcheck.mjs": 5560,
   "tools/ship/orreryPromotion-selfcheck.mjs": 107,
   "tools/ship/orreryUniverse-selfcheck.mjs": 61,
@@ -11037,7 +11037,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": 153,
   "tools/ship/repoLanding-selfcheck.mjs": 1343,
   "tools/ship/repoTerrain-selfcheck.mjs": 593,
-  "tools/ship/reportDoors-selfcheck.mjs": 2005,
+  "tools/ship/reportDoors-selfcheck.mjs": 1363,
   "tools/ship/requestPathSync-selfcheck.mjs": 698,
   "tools/ship/requestedExit-selfcheck.mjs": 992,
   "tools/ship/reskin-selfcheck.mjs": 1355,
@@ -12319,7 +12319,7 @@
   "tools/roundhouse/zeroControl-selfcheck.mjs": "2026-10-05T14:16:07.287Z",
   "tools/roundhouse/zeroRangeFull-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
   "tools/roundhouse/zeta-selfcheck.mjs": "2026-10-05T14:16:16.452Z",
-  "tools/ship/absenceScope-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/absenceScope-selfcheck.mjs": "2026-10-05T19:00:40.618Z",
   "tools/ship/actionCache-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
   "tools/ship/activity-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
   "tools/ship/afContainer-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
@@ -12354,7 +12354,7 @@
   "tools/ship/avatarDock-selfcheck.mjs": "2026-09-21T01:57:38.909Z",
   "tools/ship/avatarMorph-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
   "tools/ship/backendParity-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/backlogAbsence-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
+  "tools/ship/backlogAbsence-selfcheck.mjs": "2026-10-05T19:00:51.788Z",
   "tools/ship/badTvDevicePass-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/badTvThreeParity-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/bakeShrinkGuard-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
@@ -12559,7 +12559,7 @@
   "tools/ship/ik-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/importClosure-selfcheck.mjs": "2026-09-24T04:17:24.319Z",
   "tools/ship/importHealth-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "tools/ship/importPosition-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/importPosition-selfcheck.mjs": "2026-10-05T19:00:43.697Z",
   "tools/ship/inlineHelpers-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/inputChain-selfcheck.mjs": "2026-09-23T14:21:46.871Z",
   "tools/ship/inputSets-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -12638,7 +12638,7 @@
   "tools/ship/orbitCamera-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/orphanResidue-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-05T19:00:47.062Z",
   "tools/ship/orreryPost-selfcheck.mjs": "2026-09-16T12:10:16.535Z",
   "tools/ship/orreryPromotion-selfcheck.mjs": "2026-10-05T14:15:52.746Z",
   "tools/ship/orreryUniverse-selfcheck.mjs": "2026-09-22T02:20:24.735Z",
@@ -12749,7 +12749,7 @@
   "tools/ship/rendererIntent-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
   "tools/ship/repoLanding-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/repoTerrain-selfcheck.mjs": "2026-09-23T14:21:46.871Z",
-  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
+  "tools/ship/reportDoors-selfcheck.mjs": "2026-10-05T19:00:48.596Z",
   "tools/ship/requestPathSync-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
   "tools/ship/requestedExit-selfcheck.mjs": "2026-09-22T13:34:23.983Z",
   "tools/ship/reskin-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -13836,9 +13836,9 @@
    1767
   ],
   "tools/ship/absenceScope-selfcheck.mjs": [
-   2498,
    2415,
-   3123
+   3123,
+   1652
   ],
   "tools/ship/aiPresenceOrb-selfcheck.mjs": [
    2837,
@@ -13881,9 +13881,9 @@
    1749
   ],
   "tools/ship/backlogAbsence-selfcheck.mjs": [
-   2724,
    3111,
-   3117
+   3117,
+   3017
   ],
   "tools/ship/badTvDevicePass-selfcheck.mjs": [
    1314,
@@ -14031,9 +14031,9 @@
    2147
   ],
   "tools/ship/importPosition-selfcheck.mjs": [
-   2650,
    2895,
-   3034
+   3034,
+   2874
   ],
   "tools/ship/inputSets-selfcheck.mjs": [
    2574,
@@ -14216,9 +14216,9 @@
    2823
   ],
   "tools/ship/orreryEjecta-selfcheck.mjs": [
-   2781,
    2889,
-   3285
+   3285,
+   3175
   ],
   "tools/ship/pageSections-selfcheck.mjs": [
    978,
@@ -14281,9 +14281,9 @@
    1351
   ],
   "tools/ship/reportDoors-selfcheck.mjs": [
-   1724,
    1656,
-   2005
+   2005,
+   1363
   ],
   "tools/ship/reskin-selfcheck.mjs": [
    1244,

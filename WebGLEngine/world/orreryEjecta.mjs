@@ -106,9 +106,14 @@ export function substance(body) {
  * `vendor/<name>/`, which cannot fire on the bare word -- see the header on why the citation count was
  * refused.
  */
+// v4814: asked once per body over the same file list, so the files that mention "vendor" at all are found once and only
+// they are searched for each body's needle -- which contains "vendor/", so no other file could match. Same answer.
+const _vendorFiles = new WeakMap();
 export function ejectaOf(name, files) {
     const needle = "vendor/" + name + "/";
-    return files.filter((f) => f.source.includes(needle)).map((f) => f.path);
+    let v = _vendorFiles.get(files);
+    if (!v) { v = files.filter((f) => f.source.includes("vendor/")); _vendorFiles.set(files, v); }
+    return v.filter((f) => f.source.includes(needle)).map((f) => f.path);
 }
 
 /**

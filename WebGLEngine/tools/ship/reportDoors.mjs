@@ -56,7 +56,18 @@ const SKIP_DIR = /^(node_modules|vendor|\.git|\.venv)$/;
 //
 // So the walk collects every gate BASENAME as it goes and answers both questions. The debt is the second
 // number, and it was hidden inside the first.
+// *** v4814 -- ONE WALK PER GATE RUN, AND ONLY WHEN THE CALLER ASKS FOR IT. *** reportDoors-selfcheck reached this
+// function three times in one process -- classify(), its own population row, and this module's reportLines() run as a
+// member of the population it counts -- and each walk read every .js/.mjs in the tree: 7,953 reads and 127 MB of the
+// gate's 2.7 s here, and the rig, slow at file reads, took the gate to 5,065 ms, over its sweep line and leaving 8
+// records unchecked at ship time. The census cannot change while that gate runs (it writes nothing into the tree), so
+// it turns the memo on. EVERYONE ELSE GETS A FRESH WALK: the bridge and server.html call reportLines() on members in
+// long-lived processes, and a census frozen at the first call would be wrong by the second. Copies are handed out, so
+// a caller that decorates a row cannot change the next caller's answer.
+let _memo = null;
+export function cachePopulation(on = true) { _memo = on ? new Map() : null; }
 export function population(root) {
+    if (_memo && _memo.has(root)) return _memo.get(root).map((r) => ({ ...r }));
     const out = [];
     const gateNames = new Set();
     const walk = (dir) => {
@@ -84,7 +95,9 @@ export function population(root) {
     // second pass, once the whole tree's gate names are known: a gate that does not sit beside its subject
     // is still a gate, and the two facts are kept apart rather than one standing in for the other
     for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs"));
-    return out.sort((a, b) => a.rel.localeCompare(b.rel));
+    out.sort((a, b) => a.rel.localeCompare(b.rel));
+    if (_memo) _memo.set(root, out.map((r) => ({ ...r })));
+    return out;
 }
 
 /** The runtime arity, which is the only one that answers "can a consumer call this with nothing?". */

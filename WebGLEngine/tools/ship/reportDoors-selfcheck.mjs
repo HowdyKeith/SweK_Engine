@@ -70,7 +70,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateComposition } from "./composeValidate.mjs";
 import { overNonEmpty, emptyOfNonEmpty } from "./vacuity.mjs";
 import { gateReport } from "./gateReport.mjs";
-import { population, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
+import { population, cachePopulation, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
          CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565,
          NO_GATE_V4540, NO_GATE_V4587, NO_GATE_V4778, UNGATED_ANYWHERE_V4565,
@@ -86,6 +86,8 @@ const say = (m) => console.log("  ----  " + m);
 
 console.log("reportDoors-selfcheck -- the front-door convention, counted and driven\n");
 
+// v4814: this run reads the tree once -- see reportDoors.cachePopulation. The census cannot move while this gate runs.
+cachePopulation(true);
 const rows = await classify(ENG);
 const CALLED = [];                      // every module this gate calls, recorded so the guard below is real
 const selfReports = rows.filter((r) => r.kind === "self-report");
