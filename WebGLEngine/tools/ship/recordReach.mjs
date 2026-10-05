@@ -378,7 +378,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // arrived with the rtx line. It arrives GUARDED -- reportDoors-selfcheck.mjs imports it and asserts over it.
     // v4778 -- 151 -> 152 at the rtx merge: COMMIT_BELT_DRIFT_V4778 in world/orreryFleet.mjs, the two bodies the rtx line
     // vendored (male-cns, mikktspace) recorded beside v4776's belt record. GUARDED -- orreryFleet-selfcheck reads it.
-    total: 152,
+    // v4813 -- 152 -> 153: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs, wgslSpec moved off the oscillator roll.
+    // GUARDED -- sweepCoverage-selfcheck grades its entry live. Re-taken in the round that added it.
+    total: 153,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -592,7 +594,8 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // guarded, and MEASURED_AT_V4418 in physics/render/rtPipeline.mjs LEFT the documentary set -- the same round's
     // definitionGates repair gave rtPipeline-selfcheck a row that reads its stage fields back against STAGES.
     // v4778 -- 151 -> 152, COMMIT_BELT_DRIFT_V4778 re-taken above; `unguarded` does not move, read off splitUnguarded().
-    structural: Object.freeze({ total: 152, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
+    // v4813 -- 152 -> 153, STILL_OVER_AT_V4813 re-taken above; `unguarded` does not move, read off splitUnguarded().
+    structural: Object.freeze({ total: 153, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

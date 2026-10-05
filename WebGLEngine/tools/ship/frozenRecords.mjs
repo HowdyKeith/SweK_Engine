@@ -754,7 +754,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4776 -- RE-TAKEN 149 -> 150 with `excluding` below, for COMMIT_BELT_DRIFT_V4776 (no field on its own lines).
     // v4778 -- RE-TAKEN 150 -> 151 with `excluding` below, at the rtx merge, for NO_GATE_V4778 (no field at all).
     // v4778 -- RE-TAKEN 151 / 72 / 399 -> 152 / 73 / 400 with `excluding` below, for COMMIT_BELT_DRIFT_V4778 (one field).
-    currentIncludingModule: Object.freeze({ records: 152, withFields: 73, fields: 400 }),
+    // v4813 -- 152 -> 153 records, fields unmoved: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs (see `excluding`).
+    currentIncludingModule: Object.freeze({ records: 153, withFields: 73, fields: 400 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -956,7 +957,11 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4778 -- 149 / 70 / 379 -> 150 / 71 / 380 at the rtx merge: COMMIT_BELT_DRIFT_V4778 in world/orreryFleet.mjs, the
     // two bodies the rtx line vendored (male-cns, mikktspace). It spreads v4776's record and carries ONE numeric field on
     // its own lines, bodiesNow: 22, so all three move by one. Re-taken in the round that added it.
-    excluding: Object.freeze({ records: 150, withFields: 71, fields: 380 }),
+    // v4813 -- RE-TAKEN: 150 / 71 / 380 -> 151 / 71 / 380. One arrival, STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs --
+    // wgslSpec leaving the oscillator roll when its alone cost crossed too. Its numbers sit inside the stillOver entry
+    // and its top line shares strings, so the per-line reader counts no field on its own lines: records moves by one,
+    // the other two do not. Re-taken in the round that added it.
+    excluding: Object.freeze({ records: 151, withFields: 71, fields: 380 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

@@ -273,13 +273,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "had; and the very next 8-way sweep filed 3,003 and flipped the row that reads this roll. " +
                  "A gate whose two measurements sit either side of the budget cannot be retired by taking " +
                  "one of them, however carefully, and this is the third attempt to prove otherwise" }),
-        Object.freeze({ loadedMs: 7087, gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 3737,
-            serialMs: Object.freeze([2688, 2698, 2927]),
-            why: "v4541 called it the least ambiguous on this roll and said no reading had ever been " +
-                 "under 3,000; v4546 retired it at 2,505-2,688 and falsified that, correctly. It is at " +
-                 "3,737 one round later, and 8-way at 7,087 against 2,688-2,927 serial. BOTH earlier " +
-                 "statements were true of the measurement each was taken with, which is the finding: the " +
-                 "gate has one cost under contention and another alone, and the file holds one field" }),
+        // v4813: wgslSpec LEFT this roll -- alone it now reads over the bar too (STILL_OVER_AT_V4813, below).
     ]),
     // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
     // sweepBudget was named still-over at v4541 on three serial readings of 3,165 / 3,266 / 3,273 ms, with the
@@ -315,6 +309,25 @@ export const RETURNED_AT_V4529 = Object.freeze({
             why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
                  "a straddle wide enough to have been the answer -- and re-measured at v4535 at 2,729 / 2,344 / " +
                  "2,659 ms with the timings file at 2,726. Under on every sample of the later run." }),
+    ]),
+});
+
+// *** v4813 -- wgslSpec LEAVES THE OSCILLATOR ROLL, BECAUSE ALONE IT IS NO LONGER CHEAP. ***
+// RETURNED_AT_V4529 held it as an oscillator: 2,688-2,927 ms alone, 7,087 eight-way, the two either side of the
+// budget. The sandbox's sweep of the v4813 tree read it alone at 2,882 / 3,056 / 3,589 (its serial ring) and
+// evicted it on the second crossing -- not the contention story any more, the alone cost itself crossed, on a
+// tree that has grown since v4546 and on a box whose median gate reads 1.15x what 4c904f50's did. So the entry
+// moves rather than staying where the oscillator row would call it false: here it is held to justifiedOver, the
+// union, because a gate at 2,882 / 3,056 / 3,589 will read either side of the bar from one sitting to the next,
+// and the roll it sits on must not decide which. The entry is a fact about where it stands, not a verdict that
+// it is slow; it falls off when a live alone reading is under 3,000 AND it is back in the sweep.
+export const STILL_OVER_AT_V4813 = Object.freeze({
+    at: "v4813", box: "linux-x64-4c-16095mb-142c0d",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", loadedMs: 7087, recordedWas: 5162, hereMs: 3589,
+            serialMs: Object.freeze([2882, 3056, 3589]),
+            why: "the oscillator roll's least ambiguous entry until its alone cost crossed too: 2,882 / 3,056 / " +
+                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546" }),
     ]),
 });
 
