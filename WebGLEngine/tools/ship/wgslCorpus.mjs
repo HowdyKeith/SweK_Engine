@@ -115,9 +115,11 @@ import * as RTP from "../../physics/render/rtPipeline.mjs";
 // native backend since v4576 with a clean one-buffer signature the corpus already knows how to drive, and
 // CAPTURED_PREFILTER_WGSL (new this round) compiles on both even though its numeric grading -- a texture input --
 // stays native-only until this corpus's browser-side runner grows the same `texture` binding headlessGpu.mjs did.
-import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND } from "../../physics/render/splitSumWgsl.mjs";
+import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND, F32_FLOOR_ABS as SPLITSUM_FLOOR } from "../../physics/render/splitSumWgsl.mjs";
+import { brdfLut } from "../../physics/render/splitSum.mjs";
 import { CAPTURED_PREFILTER_WGSL } from "../../physics/render/specularProbeCapture.mjs";
-import { F82_TINT_WGSL, packF82Params } from "../../physics/render/fresnelF82Wgsl.mjs";
+import { F82_TINT_WGSL, packF82Params, F32_FLOOR_ABS as F82_FLOOR } from "../../physics/render/fresnelF82Wgsl.mjs";
+import { f82Tint } from "../../physics/render/fresnelF82.mjs";
 const EMITTED_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted.json");
 const EMITTED = fs.existsSync(EMITTED_PATH) ? JSON.parse(fs.readFileSync(EMITTED_PATH, "utf8")) : null;
 const EMITTED_PHYS_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "tsl-emitted-physics.json");
@@ -819,7 +821,12 @@ export function corpus() {
         // case set drifting would show up as ONE gate disagreeing with itself, not two silently diverging.
         { id: "splitSumWgsl.BRDF_LUT_WGSL", from: "physics/render/splitSumWgsl.mjs",
           why: "the split-sum BRDF table, one thread per (mu, alpha) cell -- Hammersley, a GGX half-vector sample and height-correlated G2, over 256 cells; graded against splitSum.mjs's f64 table by splitSumWgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
-          opts: { code: BRDF_LUT_WGSL, outCount: 16 * 16 * 2, uniforms: Array.from(packLutParams(16, 16, 512)), workgroups: [2, 2, 1] } },
+          opts: { code: BRDF_LUT_WGSL, outCount: 16 * 16 * 2, uniforms: Array.from(packLutParams(16, 16, 512)), workgroups: [2, 2, 1] },
+          // v4814: the f64 answer this entry's own gate grades against, and that gate's floor -- read, not retyped.
+          // deviceCompute-selfcheck uses it ONLY on a hardware adapter, where two Dawn builds may round differently.
+          f64: { gate: "physics/render/splitSumWgsl-selfcheck.mjs", tol: SPLITSUM_FLOOR,
+                 expected: () => { const c = brdfLut({ K: 16, R: 16, samples: 512 }); const o = [];
+                                   for (let k = 0; k < 256; k++) o.push(c.A[k], c.B[k]); return o; } } },
         { id: "splitSumWgsl.PREFILTER_ENV_WGSL", from: "physics/render/splitSumWgsl.mjs",
           why: "the prefiltered environment over three analytic test patterns (uniform/gradient/spot) x four roughness levels x three directions -- the tangent frame and the NoL-weighted GGX convolution, graded against splitSum.prefilterEnv() by splitSumWgsl-selfcheck.mjs on the native backend",
           opts: (() => {
@@ -837,7 +844,10 @@ export function corpus() {
         // it shipped, which is what v4472's own note above says the nine-kernel and two-kernel gaps were not.
         { id: "fresnelF82Wgsl.F82_TINT_WGSL", from: "physics/render/fresnelF82Wgsl.mjs",
           why: "the F82-tint correction to Schlick's Fresnel, one thread per sampled angle -- graded against fresnelF82.mjs's f64 reference by fresnelF82Wgsl-selfcheck.mjs on the native backend, here for the second backend's compiler AND numbers",
-          opts: { code: F82_TINT_WGSL, outCount: 33, uniforms: Array.from(packF82Params(0.5, 0.9, 33)), workgroups: [1, 1, 1] } },
+          opts: { code: F82_TINT_WGSL, outCount: 33, uniforms: Array.from(packF82Params(0.5, 0.9, 33)), workgroups: [1, 1, 1] },
+          // v4814: see the BRDF table's entry -- the f64 curve fresnelF82Wgsl-selfcheck grades against, and its floor
+          f64: { gate: "physics/render/fresnelF82Wgsl-selfcheck.mjs", tol: F82_FLOOR,
+                 expected: () => Array.from({ length: 33 }, (_, i) => f82Tint(i / 32, 0.5, 0.9)) } },
         // *** v4295 -- THE TEXTURE ENTRIES, WHICH THE CORPUS HAD NONE OF. *** Seven shaders and 41,656 floats
         // of agreement, all of it through storage BUFFERS, while the only shader that writes a storage TEXTURE
         // was excluded for want of a native path. That was the worst place to have no evidence: v4287 measured
