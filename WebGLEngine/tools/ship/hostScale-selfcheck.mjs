@@ -304,13 +304,22 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
     ok("boxId is stable within a run and shaped for a filename, not for quoting",
        ME === boxId() && /^[a-z0-9]+-[a-z0-9]+-\d+c-\d+mb-[0-9a-f]{6}$/.test(ME), ME);
 
-    const mine = timingsTarget({ host: ME });
+    // *** v4813 RIG RUN -- THESE THREE ARE THE v4647 RULE, SO THEY ARE ASKED WITHOUT THE LIVE HANDOVER TABLE. ***
+    // They passed the live RECORD_HANDOVERS by default, so "a box naming itself owns the record" quietly became
+    // "...unless this box once handed the record on" -- which is the rig since v4813's handback, and was the
+    // retired sandbox after v4778. The rig's clone verify of 042b3772 went red here on exactly that: correct
+    // behaviour (a box that handed the record on IS refused, see the handover rows below) graded by a fixture
+    // that was never about handovers. The handover rules have their own fixtures; these get an empty table.
+    // REPRODUCED v4813: a scratch handover from this box to another put this row red by name here, as on the rig;
+    // with `handovers: []` the same scratch tree is green. SABOTAGED v4813: timingsTarget's own-record branch made
+    // foreign -> this row red by name, restored.
+    const mine = timingsTarget({ host: ME }, { handovers: [] });
     ok("!! *** the box that OWNS the record writes the shared file ***",
        mine.file === DEFAULTS.timingsFile && mine.foreign === false, mine.why);
-    const fresh = timingsTarget({});
+    const fresh = timingsTarget({}, { handovers: [] });
     ok("!! an UNCLAIMED record is adopted -- every record written before v4647 names no box",
        fresh.file === DEFAULTS.timingsFile && fresh.foreign === false && fresh.host === ME, fresh.why);
-    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" });
+    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" }, { handovers: [] });
     ok("!! *** CONTROL: a DIFFERENT box writes its own file and NEVER the shared one ***",
        theirs.file === LOCAL_TIMINGS && theirs.file !== DEFAULTS.timingsFile && theirs.foreign === true,
        theirs.why);
