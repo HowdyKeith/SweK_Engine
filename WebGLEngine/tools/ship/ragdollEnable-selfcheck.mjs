@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/ragdollEnable-selfcheck.mjs
 //
-// Run: node tools/ship/ragdollEnable-selfcheck.mjs   (~0.43s -- MEASURED)
+// Run: node tools/ship/ragdollEnable-selfcheck.mjs   (~0.17s -- MEASURED v4815, median of 168/170/157 alone; was ~0.43s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3236 -- THE KAIJU RAGDOLL SYSTEM HAS BEEN OFF AT STARTUP, AND NOTHING SAID SO.

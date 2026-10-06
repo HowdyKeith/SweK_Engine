@@ -368,7 +368,11 @@ console.log("\n6. *** WHAT THE TABLE'S NUMBERS ACTUALLY MEASURE UP TO, WHICH IS 
     const rows = [];
     for (const k of Object.keys(MEASURED)) {
         const g = G.timings[k];
-        const s = (S.codes[k] === 0 && S.timings[k] < S.capMs) ? S.timings[k] : null;
+        // v4815: a sweep reading counts when it FINISHED green, read from `finished` (v4568) rather than inferred from
+        // `< capMs`. redCensus finished at 45,245 ms exit 0 and this row dropped it as if it had been killed, leaving a
+        // 7,205 ms full-suite reading -- taken with the red register empty, which is when that gate has least to do --
+        // as its only observation. SABOTAGE: the `< capMs` proxy put back -> 1 red, this row (redCensus at 19.6x).
+        const s = (S.codes[k] === 0 && !(S.finished && S.finished[k] === false)) ? S.timings[k] : null;
         const obs = [g, s].filter((v) => typeof v === "number");
         if (obs.length) rows.push({ k, m: MEASURED[k], obs: Math.max(...obs), ratio: MEASURED[k] / Math.max(...obs) });
     }

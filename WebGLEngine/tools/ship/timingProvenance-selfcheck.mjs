@@ -427,9 +427,17 @@ console.log("\n8. TWO FILTERS, ONE OF WHICH WRITES");
         "went unnoticed from v3584 to here. FOUND BY RUNNING THE WRITER, not by reading it -- the 58% pass wrote " +
         "the word `true` into the file and the file was checked afterwards.");
     ok("...and the false it should have written has been put right by hand, in the record, with the reason",
-        /v4580: THE RECORD NOW SAYS HOW IT KNOWS/.test(G.captured) && G.coverage.complete === false,
+        // v4815 -- THE HISTORY IS FROZEN HERE, AND THE LIVE FLAG IS HELD TO WHAT IT MEANS. This read
+        // `G.coverage.complete === false`, the v4580 hand correction -- true only until the next FULL run, which v4815
+        // took (1903 gates) and which wrote `true` because it earned it. The incident is FILTERED_RUN_V4580 above and
+        // the reason in `captured`; the live claim now is narrower and permanent: `complete: true` only beside a
+        // timed population at least the runnable suite's. SABOTAGE: coverage set to {complete: true, timedThisRun:
+        // 953} in a copy -> 1 red, this row.
+        /v4580: THE RECORD NOW SAYS HOW IT KNOWS/.test(G.captured) &&
+            (G.coverage.complete === false || G.coverage.timedThisRun >= FILTERED_RUN_V4580.runnable),
         "correcting the flag without recording why would leave the next reader to rediscover that a 58% pass can " +
-        "write `true`. The correction is in `captured` beside the claim it corrects.");
+        "write `true`. The correction is in `captured` beside the claim it corrects. Live: complete " +
+        G.coverage.complete + " with " + G.coverage.timedThisRun + " timed this run, against " + FILTERED_RUN_V4580.runnable + " runnable at v4580");
 }
 
 // ---------------------------------------------------------------------------
