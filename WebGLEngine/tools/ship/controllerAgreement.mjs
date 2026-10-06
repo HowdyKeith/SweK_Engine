@@ -101,7 +101,9 @@ export const SITES = Object.freeze([
     // LITERAL THE CALL SITE STATES. The site is a plain number now, and the quantity still disagrees --
     // -Infinity against -55 -- for the same measured reason v4547 recorded.
     { q: "terminal", who: "player", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
-      re: /terminal:\s*(-Infinity)\s*\}\);\n\s*this\.position\.y = r\.pos\[1\]/,
+      // the kinematic-wiring round put the body's vertical sweep (_sweepBodyY) between this call and the write; the anchor
+      // follows the call to the sweep that consumes it, still the player's and only the player's
+      re: /terminal:\s*(-Infinity)\s*\}\);\n(?:\s*\/\/[^\n]*\n)*\s*const feet0 = this\.position\.y - this\._eyeHeight;/,
       sign: "explicitly none" },
     { q: "terminal", who: "kaijuDrive", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
       re: /terminal:\s*(-Infinity)\s*\}\);\n\s*k\.position\.y = kr\.pos\[1\]/,

@@ -159,6 +159,11 @@ const drive = (world, pos, keys, frames, tweak = null) => {
 // NOTHING, and this file now says so in the only way a gate can, by measuring.
 const beforeV4550 = (c) => {
     c._rivalReached = 0;
+    // *** AND THE WALKER IT SHIPPED IN HAD NO VERTICAL SWEEP. *** The kinematic-wiring round swept the airborne body
+    // with physics/character/kinematic.js against Camera.isSolidToBody, which catches this rival's fall on the water
+    // it walked into -- the rows below then graded today's sweep, not the pre-v4550 walker. The rival is the walker as
+    // it shipped, so it falls as that walker fell: the sweep passes the move through untouched.
+    c._sweepBodyY = (x, feet, z, dy) => ({ feet: feet + dy, hitCeiling: false, landed: false });
     c._bodyFitsAt = function (x, feetY, z, bodyCells) {
         this._rivalReached++;
         if (!this.world?.voxelAt) return true;

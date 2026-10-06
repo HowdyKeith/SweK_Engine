@@ -32,6 +32,18 @@
 // solid at -- so `_canStandAt(newX, THIS FRAME'S y, newZ)` refuses every step up. Measured: every ramp from
 // 14 degrees upward stopped dead and the sandbox's one-voxel auto-step stopped being climbed. Section 3 is
 // that draft, driven as a rival. The footprint and the step-up are ONE question and _stepTargetAt asks it.
+//
+// ---- THE KINEMATIC-WIRING ROUND (section 7): camera.js's air moves through physics/character/kinematic.js ----
+//
+//   S1  _sweepBodyY returns feet + dy, the sweep bypassed                     3 RED (fuzz 469 dirty frames)
+//   S2  _stepHorizontal's airborne flag ignored, the stand-height test back   2 RED (fuzz 4,280 dirty frames)
+//   S3  the FEET_BAND filter dropped, every touched cell counted              1 RED
+//   S4  the disc filter dropped, the sweep reads a square                     1 RED
+//
+// This gate alone. *** S3 AND S4 WENT ZERO RED ON THE FIRST DRAFT, WHICH HAD ONLY THE FUZZ AND THREE
+// SCENES. *** moveCharacter blocks on the DESTINATION, so a jump (0.133 a frame) clears the band's cell
+// whether or not it is counted, and no fuzzed walk ended with a block exactly diagonal to a fall. Rows (e)
+// and (f) put the body in those two places on purpose; the fuzz stays 0 with either filter removed.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -304,8 +316,98 @@ console.log("\n6. the record is what the code reports now");
         ", the cliff at " + R.cliffBetween.join("-") + ".");
 }
 
+console.log("\n7. *** THE AIRBORNE BODY, SWEPT BY physics/character/kinematic.js: NEVER INSIDE A VOXEL, UP, DOWN OR SIDEWAYS ***");
+// *** MEASURED BEFORE camera.js CALLED kinematic.js (the kinematic-wiring round). *** 60 fuzzed voxel worlds, 36,000
+// frames of walk, sprint and jump through pillars, steps, beams and thin walls: the body was inside a solid voxel on
+// 2,973 frames. Two causes, both in the AIR: the vertical move asked only where the walker's ground stops a fall, never
+// what the body passes through (a jump under a slab two voxels up put the head at 4.41, the eye above the roof); and a
+// sideways move in the air was tested at the STAND height of its destination, not where the body was (all 63 fresh
+// entries were such moves). camera.js's _sweepBodyY now sweeps the vertical move with kinematic.moveCharacter over the
+// cells the disc touches, and _stepHorizontal tests an airborne body at its own height. The invariant is
+// kinematic-selfcheck's "never inside a solid", for this body: the cylinder of radius BODY_RADIUS from the feet to the
+// eye against every solid cell, exactly, outside the 0.1 band at the feet the walker has always allowed (FEET_BAND).
+{
+    const EYE = 1.7, Rb = Camera.BODY_RADIUS;
+    const inside = (world, x, feet, z) => {
+        const hits = [];
+        for (let cx = Math.floor(x - Rb) - 1; cx <= Math.floor(x + Rb) + 1; cx++) for (let cz = Math.floor(z - Rb) - 1; cz <= Math.floor(z + Rb) + 1; cz++)
+            for (let cy = Math.floor(feet) - 1; cy <= Math.floor(feet + EYE) + 1; cy++) {
+                if (!Camera.isSolidToBody(world.voxelAt(cx, cy, cz))) continue;
+                if (cy + 1 <= feet + Camera.FEET_BAND + 1e-9 || cy >= feet + EYE - 1e-9) continue;
+                const nx = Math.max(cx, Math.min(x, cx + 1)), nz = Math.max(cz, Math.min(z, cz + 1));
+                if (Math.hypot(nx - x, nz - z) < Rb - 1e-9) hits.push([cx, cy, cz]);
+            }
+        return hits;
+    };
+    // (a) the ceiling: a slab two voxels over the floor, a standing jump under it
+    const slab = { voxelAt: (x, y, z) => (y === 0 || (y === 3 && x >= 3 && x <= 7 && z >= 3 && z <= 7) ? 1 : 0) };
+    const c = mkCam(slab, [5.5, 1 + EYE, 5.5], ["Space"]);
+    let head = 0, landedAt = null;
+    for (let f = 0; f < 90; f++) { if (f === 2) c.keys = new Set(); c._moveFP(1 / 60); head = Math.max(head, c.position.y); if (f > 4 && c._fpOnGround && landedAt === null) landedAt = f; }
+    ok(`*** a jump under a slab at y = 3 stops the HEAD at its underside -- the eye's top ${head.toFixed(4)}, the ceiling 3 -- where it reached 4.41 before, the eye above the roof ***`,
+        head <= 3 && head > 3 - 1e-3 && landedAt !== null && Math.abs(c.position.y - (1 + EYE)) < 1e-9,
+        `back on the floor at frame ${landedAt}; kinematic.stepCharacter, the same box and jump, stops at 3.00 too`);
+    // (b) landing under the EDGE of the disc: the centre over the floor, the disc over a one-voxel block
+    const step = { voxelAt: (x, y, z) => (y === 0 || (y === 1 && x === 6 && z === 5) ? 1 : 0) };
+    const d = mkCam(step, [5.85, 3 + EYE, 5.5]); d._fpOnGround = false;
+    for (let f = 0; f < 120 && !d._fpOnGround; f++) d._moveFP(1 / 60);
+    ok(`*** a body falling with its centre over the floor and its disc 0.25 over a one-voxel block lands ON the block, feet ${(d.position.y - EYE).toFixed(4)} -- the fall used to go through it to the floor under the centre ***`,
+        d._fpOnGround && Math.abs(d.position.y - EYE - 2) < 1e-3 && inside(step, d.position.x, d.position.y - EYE, d.position.z).length === 0, "the walker's ground probe reads the centre; the sweep reads the body");
+    // (c) sideways in the air, level with a beam: tested where the body is, so the beam stops it
+    const beam = { voxelAt: (x, y, z) => (y === 0 || (y === 3 && x === 8) ? 1 : 0) };
+    const e = mkCam(beam, [6.5, 1 + EYE, 5.5], ["Space", "KeyD"], 0);
+    let worst = 0; for (let f = 0; f < 60; f++) { if (f === 2) e.keys = new Set(["KeyD"]); e._moveFP(1 / 60); worst = Math.max(worst, inside(beam, e.position.x, e.position.y - EYE, e.position.z).length); }
+    ok(`*** jumping sideways at a beam at head height, the body is never inside it on any of 60 frames -- the move is tested at the body's own height in the air ***`,
+        worst === 0, `ended at x ${e.position.x.toFixed(3)}, the beam's face at 8`);
+    // (e) and (f): what the fuzz never reaches. kinematic.moveCharacter blocks any move whose DESTINATION overlaps a
+    // solid, so the sweep must leave out the cells the walker lets the feet sit in -- the 0.1 band (_bodyFitsAt tests
+    // from floor(feet + 0.1)), which an upward move shorter than the band still overlaps -- and the cells the disc does
+    // not touch, which only differ from the box's at a corner.
+    // The fuzz stays at 0 dirty frames with either filter removed (both measured), because no walk there ends with
+    // the feet in the band or a block exactly diagonal to a fall; these two rows put the body there on purpose.
+    const block = { voxelAt: (x, y, z) => (y === 0 || (y === 1 && x === 5 && z === 5) ? 1 : 0) };
+    const g = mkCam(block, [5.5, 1.95 + EYE, 5.5]);
+    const up = g._sweepBodyY(5.5, 1.95, 5.5, 0.02), dn = g._sweepBodyY(5.5, 2.25, 5.5, -0.5);
+    ok(`*** feet 0.05 into a block -- inside the band the walker allows -- a move up shorter than the band still leaves it: feet ${up.feet.toFixed(4)} after 0.02, no ceiling, and the fall comes back to ${dn.feet.toFixed(4)} ***`,
+        Math.abs(up.feet - 1.97) < 1e-6 && !up.hitCeiling && dn.landed && Math.abs(dn.feet - 2) < 1e-3,
+        "a sweep that counts the band's cell ends inside it and calls the block a ceiling");
+    const corner = { voxelAt: (x, y, z) => (y === 0 || (y === 1 && x === 6 && z === 6) ? 1 : 0) };
+    const k = mkCam(corner, [5.7, 3 + EYE, 5.7]); k._fpOnGround = false;
+    for (let f = 0; f < 120 && !k._fpOnGround; f++) k._moveFP(1 / 60);
+    const kFeet = k.position.y - EYE;
+    ok(`*** a fall with the block diagonal to the body -- the square's corner over it, the disc 0.024 clear -- reaches the floor, feet ${kFeet.toFixed(4)}, where the walker's own footprint says it stands ***`,
+        k._fpOnGround && Math.abs(kFeet - 1) < 1e-3 && k._bodyFitsAt(5.7, kFeet, 5.7, EYE),
+        "a box sweep would stand it on the block's corner, on air by the disc's measure");
+    // (d) the fuzz, smaller than the measurement's: 30 worlds, 400 frames each
+    let seed = 4242; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    let frames = 0, dirty = 0, airFrames = 0, ceilings = 0;
+    for (let w = 0; w < 30; w++) {
+        const S = 20, solid = new Set(), key = (x, y, z) => x + "," + y + "," + z;
+        for (let x = -2; x < S + 2; x++) for (let z = -2; z < S + 2; z++) { solid.add(key(x, 0, z)); for (let y = 1; y < 6; y++) if (x < 0 || z < 0 || x >= S || z >= S) solid.add(key(x, y, z)); }
+        for (let i = 0; i < 60; i++) { const x = 1 + Math.floor(rnd() * (S - 2)), z = 1 + Math.floor(rnd() * (S - 2)), r = rnd();
+            if (r < 0.35) for (let y = 1; y <= 1 + Math.floor(rnd() * 4); y++) solid.add(key(x, y, z));
+            else if (r < 0.55) solid.add(key(x, 1, z));
+            else if (r < 0.8) { const y = 2 + Math.floor(rnd() * 2); for (let k = 0; k < 4; k++) solid.add(key(x + k, y, z)); }
+            else for (let k = 0; k < 5; k++) for (let y = 1; y <= 3; y++) solid.add(rnd() < 0.5 ? key(x + k, y, z) : key(x, y, z + k)); }
+        const world = { voxelAt: (x, y, z) => (solid.has(key(x, y, z)) ? 1 : 0) };
+        let x, z, t = 0; do { x = 1 + rnd() * (S - 2); z = 1 + rnd() * (S - 2); t++; } while (inside(world, x, 1, z).length && t < 200);
+        const p = mkCam(world, [x, 1 + EYE, z]);
+        const sets = [["KeyW"], ["KeyW", "ShiftLeft"], ["KeyW", "KeyD"], ["KeyS"], ["KeyW", "Space"], ["KeyA", "Space", "ShiftLeft"], []];
+        for (let f = 0; f < 400; f++) {
+            if (f % 40 === 0) { p.keys = new Set(sets[Math.floor(rnd() * sets.length)]); p.yaw = rnd() * Math.PI * 2; }
+            const vy0 = p._fpVelY; p._moveFP(f % 97 === 0 ? 0.1 : 1 / 60); frames++;
+            if (!p._fpOnGround) airFrames++; if (vy0 > 0 && p._fpVelY === 0 && !p._fpOnGround) ceilings++;
+            if (inside(world, p.position.x, p.position.y - EYE, p.position.z).length) dirty++;
+        }
+    }
+    ok(`*** over 30 fuzzed voxel worlds and ${frames} frames -- ${airFrames} of them in the air, ${ceilings} jumps stopped by a ceiling -- the body is inside a solid voxel on ${dirty} ***`,
+        dirty === 0 && airFrames > 1000 && ceilings > 0, "the measurement this round began with read 2,973 of 36,000 on the same kind of worlds");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nnot closed here: *** THE WALK'S BILINEAR GROUND CAN STAND THE BODY INSIDE SOLID ROCK, *** and it " +
+    "\nnot closed here (written at v4549; the kinematic-wiring round's fuzz, section 7, found NO grounded entries into a " +
+    "voxel once the two airborne paths were fixed, on lattices of steps, pillars and beams -- the sentence below is the " +
+    "v4549 reading and is kept as that): *** THE WALK'S BILINEAR GROUND CAN STAND THE BODY INSIDE SOLID ROCK, *** and it " +
     "could before this round gave the body a radius to notice it with -- driven at v4548 with no radius " +
     "at all, a body at the sandbox's +z lip stands with its feet at 3.000 in a cell solid to y=3. " +
     "_canStandAt refuses that position on every horizontal move and the vertical snap never asks it. " +

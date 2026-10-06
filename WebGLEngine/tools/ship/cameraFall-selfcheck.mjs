@@ -291,8 +291,10 @@ console.log("\n7. the record is what the code reports now");
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nnot done here: physics/character/kinematic.js's stepCharacter is the fourth implementation and is " +
-    "left alone -- it is a MESH controller with its own isSolid contract and no shipping caller in this " +
-    "tree, so folding it into fallBody would be a change without a measurement behind it; the kaiju's " +
+    "left alone -- it is a MESH controller with its own isSolid contract, and folding its gravity into " +
+    "fallBody would be a change without a measurement behind it (its moveCharacter DOES ship since the " +
+    "kinematic-wiring round: camera.js's _sweepBodyY sweeps the player's air move with it, AFTER fallStep, " +
+    "so fallBody still sets the velocity and stepCharacter's gravity is still unused); the kaiju's " +
     "body is still probed as a 2-cell one though the creature stands eight units tall, which is the " +
     "capsule question and its own round; and the gravity and terminal disagreements v4547 measured are " +
     "passed through rather than resolved, for the reason section 6 gives.");
