@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "5b5e1076c815e5cbdf4b0a2a3d1f31efd1fd5dda",
+ "head": "22e53b068fcd141ce474a4a1daab18e0386ac85f",
  "bodies": {
   "box3d": [
    {
