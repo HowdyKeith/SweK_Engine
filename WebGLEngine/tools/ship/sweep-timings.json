@@ -102,7 +102,6 @@
   "tools/ship/gpuUniverse-selfcheck.mjs",
   "tools/ship/labDevices-selfcheck.mjs",
   "tools/ship/loopSearch-selfcheck.mjs",
-  "tools/ship/moduleHistory-selfcheck.mjs",
   "tools/ship/moduleRefs-selfcheck.mjs",
   "tools/ship/orphanDisposition-selfcheck.mjs",
   "tools/ship/orphanScan-selfcheck.mjs",
@@ -1162,7 +1161,7 @@
   "tools/ship/browserNodeGuard-selfcheck.mjs": 467,
   "tools/ship/browserSafety-selfcheck.mjs": 2731,
   "tools/ship/budgetEvidence-selfcheck.mjs": 393,
-  "tools/ship/budgetExile-selfcheck.mjs": 40863,
+  "tools/ship/budgetExile-selfcheck.mjs": 130537,
   "tools/ship/budgetMargin-selfcheck.mjs": 63,
   "tools/ship/budgetProvenance-selfcheck.mjs": 301,
   "tools/ship/buildEngineCatalog-selfcheck.mjs": 343,
@@ -1437,7 +1436,7 @@
   "tools/ship/mlxLifecycle-selfcheck.mjs": 457,
   "tools/ship/modelBench-selfcheck.mjs": 3941,
   "tools/ship/modelCatalogue-selfcheck.mjs": 241,
-  "tools/ship/moduleHistory-selfcheck.mjs": 19168,
+  "tools/ship/moduleHistory-selfcheck.mjs": 17301,
   "tools/ship/moduleRefs-selfcheck.mjs": 77472,
   "tools/ship/mpmDevice-selfcheck.mjs": 2079,
   "tools/ship/mpmGpuPage-selfcheck.mjs": 4652,
@@ -3093,7 +3092,7 @@
   "tools/ship/browserNodeGuard-selfcheck.mjs": 0,
   "tools/ship/browserSafety-selfcheck.mjs": 0,
   "tools/ship/budgetEvidence-selfcheck.mjs": 0,
-  "tools/ship/budgetExile-selfcheck.mjs": 1,
+  "tools/ship/budgetExile-selfcheck.mjs": 0,
   "tools/ship/budgetMargin-selfcheck.mjs": 0,
   "tools/ship/budgetProvenance-selfcheck.mjs": 0,
   "tools/ship/buildEngineCatalog-selfcheck.mjs": 0,
@@ -3368,7 +3367,7 @@
   "tools/ship/mlxLifecycle-selfcheck.mjs": 0,
   "tools/ship/modelBench-selfcheck.mjs": 0,
   "tools/ship/modelCatalogue-selfcheck.mjs": 0,
-  "tools/ship/moduleHistory-selfcheck.mjs": 1,
+  "tools/ship/moduleHistory-selfcheck.mjs": 0,
   "tools/ship/moduleRefs-selfcheck.mjs": 0,
   "tools/ship/mpmDevice-selfcheck.mjs": 0,
   "tools/ship/mpmGpuPage-selfcheck.mjs": 0,
@@ -5024,7 +5023,7 @@
   "tools/ship/browserNodeGuard-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/browserSafety-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/budgetEvidence-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
-  "tools/ship/budgetExile-selfcheck.mjs": "2026-09-17T02:01:56.523Z",
+  "tools/ship/budgetExile-selfcheck.mjs": "2026-10-06T16:53:24.583Z",
   "tools/ship/budgetMargin-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/budgetProvenance-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/buildEngineCatalog-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
@@ -5299,7 +5298,7 @@
   "tools/ship/mlxLifecycle-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/modelBench-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/modelCatalogue-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
-  "tools/ship/moduleHistory-selfcheck.mjs": "unknown -- before v4408",
+  "tools/ship/moduleHistory-selfcheck.mjs": "2026-10-06T16:54:09.803Z",
   "tools/ship/moduleRefs-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/mpmDevice-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/mpmGpuPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -7315,7 +7314,7 @@
   "tools/ship/slugRig-selfcheck.mjs": 20000,
   "tools/ship/zoomBlur-selfcheck.mjs": 20000,
   "tools/ship/voxelBodies-selfcheck.mjs": 20000,
-  "tools/ship/budgetExile-selfcheck.mjs": 90000,
+  "tools/ship/budgetExile-selfcheck.mjs": 300000,
   "tools/ship/voxelDevice-selfcheck.mjs": 20000,
   "tools/ship/slugDevice-selfcheck.mjs": 20000,
   "tools/ship/raceReplayBake-selfcheck.mjs": 20000,
@@ -7821,7 +7820,8 @@
   "brain/rl/tools/rocket-selfcheck.mjs": 20000,
   "physics/sph/rigidFloat-selfcheck.mjs": 20000,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": 20000,
-  "tools/ship/boundListener-selfcheck.mjs": 20000
+  "tools/ship/boundListener-selfcheck.mjs": 20000,
+  "tools/ship/moduleHistory-selfcheck.mjs": 120000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9745,7 +9745,8 @@
   "brain/rl/tools/rocket-selfcheck.mjs": true,
   "physics/sph/rigidFloat-selfcheck.mjs": true,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": true,
-  "tools/ship/boundListener-selfcheck.mjs": true
+  "tools/ship/boundListener-selfcheck.mjs": true,
+  "tools/ship/moduleHistory-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -10817,7 +10818,7 @@
   "tools/ship/browserNodeGuard-selfcheck.mjs": 231,
   "tools/ship/browserSafety-selfcheck.mjs": 2731,
   "tools/ship/budgetEvidence-selfcheck.mjs": 96,
-  "tools/ship/budgetExile-selfcheck.mjs": 40863,
+  "tools/ship/budgetExile-selfcheck.mjs": 130537,
   "tools/ship/budgetMargin-selfcheck.mjs": 43,
   "tools/ship/buildEngineCatalog-selfcheck.mjs": 95,
   "tools/ship/buildName-selfcheck.mjs": 84,
@@ -11765,7 +11766,8 @@
   "brain/rl/tools/rocket-selfcheck.mjs": 9480,
   "physics/sph/rigidFloat-selfcheck.mjs": 7336,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": 13336,
-  "tools/ship/boundListener-selfcheck.mjs": 655
+  "tools/ship/boundListener-selfcheck.mjs": 655,
+  "tools/ship/moduleHistory-selfcheck.mjs": 17301
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-06T12:37:26.584Z",
@@ -12636,7 +12638,7 @@
   "tools/ship/browserNodeGuard-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/browserSafety-selfcheck.mjs": "2026-10-06T14:44:54.793Z",
   "tools/ship/budgetEvidence-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/budgetExile-selfcheck.mjs": "2026-09-17T02:01:56.523Z",
+  "tools/ship/budgetExile-selfcheck.mjs": "2026-10-06T16:53:24.583Z",
   "tools/ship/budgetMargin-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/buildEngineCatalog-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/buildName-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
@@ -13584,7 +13586,8 @@
   "brain/rl/tools/rocket-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/sph/rigidFloat-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/boundListener-selfcheck.mjs": "2026-10-06T00:11:15.681Z"
+  "tools/ship/boundListener-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/moduleHistory-selfcheck.mjs": "2026-10-06T16:54:09.803Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -20861,6 +20864,12 @@
   ],
   "tools/ship/boundListener-selfcheck.mjs": [
    655
+  ],
+  "tools/ship/budgetExile-selfcheck.mjs": [
+   130537
+  ],
+  "tools/ship/moduleHistory-selfcheck.mjs": [
+   17301
   ]
  },
  "contended": {
@@ -22680,7 +22689,8 @@
   "brain/rl/tools/rocket-selfcheck.mjs": false,
   "physics/sph/rigidFloat-selfcheck.mjs": false,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": false,
-  "tools/ship/boundListener-selfcheck.mjs": true
+  "tools/ship/boundListener-selfcheck.mjs": true,
+  "tools/ship/moduleHistory-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",

@@ -194,13 +194,23 @@ console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
     // This row now counts how many exiled reds sit behind a recorded green and RATCHETS that number, so it
     // falls as gates are repaired and fails if the hiding place grows. The honest-coded ones are named rather
     // than dropped, because a record that tells the truth about a gate is the outcome this whole file wants.
-    const hiddenByRecord = unreg.filter((g) => C[g] === 0);
+    // *** v4816 -- "RED IN v4425's FROZEN CENSUS AND RECORDED GREEN" IS ALSO WHAT A REPAIR LOOKS LIKE. *** This counted
+    // unreg.filter(C[g] === 0) and went red on 2026-09-17 at 17 of 16, when a sweep honestly re-recorded wasmSupport
+    // (repaired at v4642) as 0: the count rose BECAUSE a record was corrected -- v4642's trap from the other side.
+    // Run live at v4816, ALL SEVENTEEN EXIT 0: every frozen-red gate here is repaired. A gate is HIDDEN only when the
+    // record says green and the gate says red, and the second half is a live run (v4476's rule below: the record has
+    // lied for ten gates, so it is not evidence for an eleventh). The ceiling is re-frozen at that measurement, 0.
+    // SABOTAGE: physicsReach's live code forced to 1 -> 1 red, this row ("1 ... against a ceiling of 0"); restored.
+    const liveAll = unreg.length ? measureExiled(unreg) : {};
+    const hiddenByRecord = unreg.filter((g) => C[g] === 0 && liveAll[g].code !== 0);
+    const repairedLive = unreg.filter((g) => liveAll[g].code === 0);
     const honestCode = unreg.filter((g) => C[g] !== 0);
-    const HIDDEN_CEILING = 16;   // v4642: 16 of 17 -- ratchets DOWN, never up
-    ok("*** the exile hides at most sixteen reds behind a recorded green, and the number ratchets down ***",
+    const HIDDEN_CEILING = 0;    // v4642: 16 of 17; v4816: 0, measured live -- ratchets DOWN, never up
+    ok(`*** the exile hides at most ${HIDDEN_CEILING} red(s) behind a recorded green, and the number ratchets down ***`,
         hiddenByRecord.length <= HIDDEN_CEILING && unreg.length > 0,
-        `${hiddenByRecord.length} of ${unreg.length} unregistered reds carry a recorded exit code of 0 while ` +
-        `exiting non-zero when run -- the exile working as a hiding place, against a ceiling of ${HIDDEN_CEILING}. ` +
+        `${hiddenByRecord.length} of ${unreg.length} gates red in v4425's frozen census carry a recorded exit code of 0 while ` +
+        `exiting non-zero when run NOW -- the exile working as a hiding place, against a ceiling of ${HIDDEN_CEILING}. ` +
+        `${repairedLive.length} of the ${unreg.length} exit 0 run live just now (repaired since v4425). ` +
         `The other ${honestCode.length} carry an honest non-zero code` +
         (honestCode.length ? ` (${honestCode.map((g) => g.split("/").pop().replace("-selfcheck.mjs", "") + " = " + C[g]).join(", ")})` : "") +
         `, which is what a corrected record looks like and must not read as a failure here.`);
@@ -248,7 +258,7 @@ console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
     // mean something rather than reading a field that has already been shown to lie.
     const namedInLedger = unreg.filter((g) => EXILED_REGRESSIONS.some((e) => e.gate === g));
     const unnamed = unreg.filter((g) => !EXILED_REGRESSIONS.some((e) => e.gate === g));
-    const liveChecked = unnamed.length ? measureExiled(unnamed) : {};
+    const liveChecked = liveAll;   // v4816: measured once above, for every unregistered gate, not only these
     const stillBroken = unnamed.filter((g) => liveChecked[g].code !== 0);
     if (unnamed.length) report(`${unnamed.length} unregistered red(s) outside EXILED_REGRESSIONS, run live just now: ` +
         unnamed.map((g) => g + " code " + liveChecked[g].code).join(", "));

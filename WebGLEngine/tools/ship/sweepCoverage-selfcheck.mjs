@@ -405,7 +405,14 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const REC = SC.STALE_GREENS_V4460;
 
     ok("!! *** every over-budget entry is a standing green, a standing red, or has no code -- a PARTITION ***",
-       cls.partitions && cls.green.length > 0 && cls.red.length > 0,
+       // v4816: `cls.red.length > 0` required a standing red to exist, and v4816 re-filed the last two (budgetExile,
+       // moduleHistory, both green live) so the record holds none -- a partition does not need every class inhabited.
+       // The red arm is driven on a fixture instead, so a classifier that stopped finding reds still fails here.
+       // SABOTAGE: verdictClasses made to put every coded gate in `green` -> 2 red, this row and the no-code fixture row
+       // below (its red count reads 0); restored md5-identical.
+       cls.partitions && cls.green.length > 0 &&
+       (() => { const f = SC.verdictClasses({ over: ["g", "r", "n"] }, { codes: { g: 0, r: 1 } });
+                return f.partitions && f.green.join() === "g" && f.red.join() === "r" && f.none.join() === "n"; })(),
        `${cls.green.length} green + ${cls.red.length} red + ${cls.none.length} uncoded = ${cls.sum} of ` +
        `${C.over.length}. Section 2 counted one of these three and called the answer complete.`);
     ok("...and the two verdict classes do not overlap",

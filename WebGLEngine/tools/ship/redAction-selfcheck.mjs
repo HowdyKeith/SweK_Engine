@@ -300,15 +300,9 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
     // these itself -- see below -- so the number MOVED DURING THE ROUND THAT MEASURED IT.
     if (recovered.length) say("the record is behind on", recovered.map((r) => r.rel.split("/").pop()).join(", "));
 
-    ok("*** the population is READ FROM THE RECORD, not typed into this file ***",
-        // v4815 -- `>= 10` WAS THE BACKLOG, NOT THE PROPERTY. The record held 13 exit-1 codes before v4815's full alone
-        // re-timing and 2 after it (budgetExile, moduleHistory): eleven were stale reds of gates long green. A floor on
-        // a count of REDS fails when the record improves; the fixture below is what proves the population is derived,
-        // and this keeps only the vacuity guard. SABOTAGE: standingReds() replaced by a literal two-gate list -> 1 red,
-        // this row (the fixture half); restored md5-identical.
-        pop.reds.length > 0 && drivenAll.length === pop.reds.length &&
-        // driven with a record that says something else, so a hardcoded list could not satisfy this row
-        (await (async () => {
+    // v4816: the fixture is computed once and shared by this row and the non-empty guard below -- a clean record (zero
+    // recorded reds, reached at v4816 when budgetExile and moduleHistory were re-filed green) is only accepted beside it.
+    const fixtureDerives = (await (async () => {
             const tmp = path.join(ENG, "tools", "ship", "__redpop-fixture.json");
             fs.writeFileSync(tmp, JSON.stringify({ captured: "fixture",
                 codes: { "a-selfcheck.mjs": 1, "b-selfcheck.mjs": 0, "c-selfcheck.mjs": 124, "__d-selfcheck.mjs": 1 } }));
@@ -316,7 +310,18 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
             fs.unlinkSync(tmp);
             // one red, the zero and the 124 and the __ fixture all excluded -- the three exclusions, driven
             return f.reds.length === 1 && f.reds[0] === "a-selfcheck.mjs" && f.capped === 1;
-        })()),
+        })());
+    ok("*** the population is READ FROM THE RECORD, not typed into this file ***",
+        // v4815 -- `>= 10` WAS THE BACKLOG, NOT THE PROPERTY. The record held 13 exit-1 codes before v4815's full alone
+        // re-timing and 2 after it (budgetExile, moduleHistory): eleven were stale reds of gates long green. A floor on
+        // a count of REDS fails when the record improves; the fixture below is what proves the population is derived,
+        // and this keeps only the vacuity guard. SABOTAGE: standingReds() replaced by a literal two-gate list -> 1 red,
+        // this row (the fixture half); restored md5-identical.
+        // v4816 -- AND THE VACUITY GUARD WENT TOO: the record reached ZERO recorded reds, which is the outcome this file
+        // exists for. Emptiness is accepted because the fixture proves standingReds() still derives one when there is one.
+        drivenAll.length === pop.reds.length &&
+        // driven with a record that says something else, so a hardcoded list could not satisfy this row
+        fixtureDerives,
         `${pop.reds.length} gates from sweep-timings.json against the TWO this section listed at v4585. The ` +
         "derivation is driven against a fixture record: exit 0, the SIGKILL 124 and a __ fixture are each " +
         "excluded, so replacing standingReds() with a literal list fails here rather than passing quietly.");
@@ -409,7 +414,11 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
 
     // N: emptying the population left every row above vacuously true -- the same 0-RED shape as v4585's.
     ok("...and the rows above are asked of a non-empty population, driven",
-        rows.length > 0 && drivenAll.length === pop.reds.length && bare.length >= 0,
+        // v4816: an EMPTY live population passes only when the record itself holds no red AND the fixture above derives
+        // one from a planted record -- so "nothing to look at" is a measured fact, not a derivation that broke. The
+        // classifier's arms are driven on fixture text just below (row M) for the same reason. SABOTAGE: standingReds()
+        // made to return no reds -> 2 red, the population row's fixture half and this one; restored md5-identical.
+        (rows.length > 0 || (pop.reds.length === 0 && fixtureDerives)) && drivenAll.length === pop.reds.length && bare.length >= 0,
         `${rows.length} live red(s) of ${pop.reds.length} recorded. An empty population makes every "no standing ` +
         'red..." row trivially true, which is the shape of a check that passed because it looked at nothing.');
 
