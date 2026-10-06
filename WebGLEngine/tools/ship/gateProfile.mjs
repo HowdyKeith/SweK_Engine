@@ -25,7 +25,7 @@ import { parseArgs, refusalLines } from "./cliArgs.mjs";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // v4815 -- runnerBudget-selfcheck's population includes this file: it spawns gates with a limit of its own (600 s). The
 // limit is not gateBudget's, on purpose, and runnerReach-selfcheck went red on the round that added it without saying so.
-export const budgetIsOwn =
+const budgetIsOwn =   // read from the source by runnerBudget-selfcheck, not imported -- an export with no importer made this file a referenceKind orphan (v4815)
     "a diagnostic profiles ONE gate past the sweep's cap so the whole run is profiled, killed or not; 600 s is a ceiling " +
     "against a hang, not a budget a verdict is read from, and gateProfile asserts nothing";
 const RIG_SLOW = ["tools/ship/citedSources-selfcheck.mjs", "tools/ship/corpusFilters-selfcheck.mjs",

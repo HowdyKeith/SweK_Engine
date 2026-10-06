@@ -32,7 +32,7 @@ const GATE = "physics/render/rtPipeline-selfcheck.mjs";
 // v4815 -- runnerBudget-selfcheck's population includes this file: it spawns a gate with a limit of its own (--cap-s,
 // default 600 s). The limit is not gateBudget's, on purpose, and runnerReach-selfcheck went red on the round that added
 // it without saying so.
-export const budgetIsOwn =
+const budgetIsOwn =   // read from the source by runnerBudget-selfcheck, not imported -- an export with no importer made this file a referenceKind orphan (v4815)
     "a diagnostic runs rtPipeline-selfcheck past the sweep's cap so a box where it takes minutes is profiled whole; " +
     "--cap-s (default 600 s) is a ceiling against a hang, not a budget a verdict is read from, and nothing is asserted";
 // Arguments through cliArgs.parseArgs, so a mistyped option is refused by name rather than read as the default.

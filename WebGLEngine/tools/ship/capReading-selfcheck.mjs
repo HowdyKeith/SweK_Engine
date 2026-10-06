@@ -216,13 +216,18 @@ export const LET_FINISH_V4573 = Object.freeze({
     // that confirm it; anything else is still red. The table's historical number is KEPT -- it was true when
     // it was taken, and deleting it would destroy the evidence this whole file exists to hold.
     const MOVED_AT_V4647L = Object.freeze([
-        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 14806,
-            runs: Object.freeze([15003, 15136, 16459]),
+        // v4815 -- MOVED AGAIN, AND THE RUNS ARE RE-TAKEN RATHER THAN THE OLD ONES KEPT: they have to corroborate the
+        // reading filed NOW. The full over-budget rotation filed 10,172 ms; three quiet runs read 9,193 / 9,336 / 9,246
+        // (median 9,246) and the re-filed alone reading is 9,434. v4647l's runs (15,003 / 15,136 / 16,459, against a
+        // filed 14,806) are kept in `why` as what the gate cost then. SABOTAGE: v4647l's three runs put back -> 2 red,
+        // the population row naming eulerGpu DISAGREEING AND UNNAMED, and the corroboration row; restored md5-identical.
+        Object.freeze({ gate: "tools/ship/eulerGpu-selfcheck.mjs", table: 18450, now: 9434,
+            runs: Object.freeze([9193, 9336, 9246]),
+            earlierRuns: Object.freeze([Object.freeze([15003, 15136, 16459])]),   // v4647l's minute, kept as noise evidence
             why: "18,450 at the cap pass, 17,904 at v4637 (3.0% -- the reading that set this row's tolerance), " +
-                 "and ~15,100 now across three runs in one minute. The 14,806 filed in sweep-timings came from " +
-                 "a serial re-run this session after a `--gates` typo recorded it AT the 20,000 ms cap; it is " +
-                 "2.2% from the median of the three, so the filed number is sound and the TABLE is the stale " +
-                 "one. Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
+                 "~15,100 at v4647l across three runs in one minute (15,003 / 15,136 / 16,459, filed 14,806), and " +
+                 "~9,250 at v4815 across three quiet runs, the alone reading filed 9,434 -- 2.0% from their median. " +
+                 "Kept rather than re-taken: 18,450 is what the gate cost when the cap was hiding it.",
         }),
         // v4776 -- the merge's --killed rotation let two more of the seventeen finish, both faster than the table. The
         // first confirming runs read 20-30 s and corroborated nothing: two orphaned redAction-selfcheck trees were
@@ -319,11 +324,15 @@ export const LET_FINISH_V4573 = Object.freeze({
     // number for the population. What the 10% bound needs is narrower and still true -- it is ONE bound for
     // every gate, so it has to clear the NOISIEST gate's spread, and the noisiest (eulerGpu, 9.7%) sits right
     // under it. That is the claim graded now: the widest within-minute spread in the roll is past 5%.
-    const spread = (e) => (Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs);
+    // v4815: a gate's spread is the widest of every one-minute set it has. eulerGpu's runs were re-taken to corroborate
+    // the reading filed now (1.6% spread on a quiet box); its v4647l minute (9.7%) is still a measurement of the gate's
+    // noise and is kept as `earlierRuns`, so re-taking the corroboration does not erase the evidence for the bound.
+    const one = (xs) => (Math.max(...xs) - Math.min(...xs)) / Math.min(...xs);
+    const spread = (e) => Math.max(one(e.runs), ...(e.earlierRuns || []).map(one));
     ok("!! ...and the 10% bound is at the NOISIEST gate's floor, which is why one reading cannot move a record",
         Math.max(...MOVED_AT_V4647L.map(spread)) > 0.05,
         MOVED_AT_V4647L.map((e) => `${path.basename(e.gate)} spread ` +
-            `${(((Math.max(...e.runs) - Math.min(...e.runs)) / Math.min(...e.runs)) * 100).toFixed(1)}% in one minute`).join("; ") +
+            `${(spread(e) * 100).toFixed(1)}% in one minute`).join("; ") +
             ". The 3% this row's tolerance was argued from was a sample of TWO agreeing readings, and one of " +
             "those two is the entry above.");
 }
