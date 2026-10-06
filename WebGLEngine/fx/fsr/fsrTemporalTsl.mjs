@@ -32,6 +32,16 @@
 // picture's identity and that the mask is live. `lock: false` is the chain without it. *** NOTHING ELSE IN THE TREE
 // COULD SEE THE CHANGE: *** every quality gate runs 24-40 frames at 2x, inside the sums' 63-frame warm-up, and all
 // twenty-two gates that build this driver read the same output to the digit with either default.
+// *** AND A SMALLER MASK SCALE IS WORSE, NOT BETTER -- MEASURED SO IT IS NOT TRIED AGAIN. *** The lock gates run the
+// mask at scale 0.25 where this driver leaves it at 1, so the same scene and cases were run at 1, 0.5, 0.25 and 0.125
+// (dB against no lock, frames 64-127): knot turning +0.013 / -0.020 / -0.155 / -0.340, slow pan -0.006 / -0.045 /
+// -0.166 / -0.426, light to 55% -0.010 / -0.024 / -0.065 / -0.189, dimmed to 85% -0.005 / -0.011 / -0.026 / -0.064;
+// still and the pulse unchanged. Worse at every step, including the light changes the mask exists for, and the ring at
+// 0.25 is no better (turning -0.144, light to 55% -0.129). Two reasons, both the mask's and not the sums': moving, it
+// reads reprojection blur on the floor's stripes as light (4904 of 16384 pixels firing at 0.25 with the knot turning,
+// 3038 at 1), and each pixel it fires on drops toward one jittered frame; after a real change it stays on for about
+// two periods, while its windows straddle the change, though the clamp removed the ghost within a frame or two -- so it
+// mostly discards good history for ~60 frames. Scale 1 is the least harmful setting measured, and it is neutral.
 //
 // *** `lock: "sums"` IS THE SAME TWO WINDOWS IN ONE TEXEL A PIXEL. *** render/temporalLockSums.mjs's makeLumaSums keeps
 // each window's running sum instead of its lumas: 16.6 MB at 960x540 at any ratio. At a period boundary the sums ARE
