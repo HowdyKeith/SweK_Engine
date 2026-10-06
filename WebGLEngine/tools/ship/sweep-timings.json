@@ -2224,7 +2224,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": 1949,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 925,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 424,
-  "tools/ship/fsrCaches-selfcheck.mjs": 5019
+  "tools/ship/fsrCaches-selfcheck.mjs": 5019,
+  "camera/cameraBoom-selfcheck.mjs": 342
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4155,7 +4156,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": 0,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 0,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 0,
-  "tools/ship/fsrCaches-selfcheck.mjs": 0
+  "tools/ship/fsrCaches-selfcheck.mjs": 0,
+  "camera/cameraBoom-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -6086,7 +6088,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
-  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:39.216Z"
+  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:39.216Z",
+  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7822,7 +7825,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": 20000,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 20000,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 20000,
-  "tools/ship/fsrCaches-selfcheck.mjs": 20000
+  "tools/ship/fsrCaches-selfcheck.mjs": 20000,
+  "camera/cameraBoom-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9644,7 +9648,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": true,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": true,
   "tools/ship/worldColliderBVH-selfcheck.mjs": true,
-  "tools/ship/fsrCaches-selfcheck.mjs": true
+  "tools/ship/fsrCaches-selfcheck.mjs": true,
+  "camera/cameraBoom-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11500,7 +11505,8 @@
   "tools/ship/qrBridge-selfcheck.mjs": 513,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 271,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 138,
-  "tools/ship/fsrCaches-selfcheck.mjs": 5019
+  "tools/ship/fsrCaches-selfcheck.mjs": 5019,
+  "camera/cameraBoom-selfcheck.mjs": 342
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
@@ -13212,7 +13218,8 @@
   "tools/ship/qrBridge-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:24.178Z"
+  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
+  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -19414,6 +19421,9 @@
   "tools/ship/fsrCaches-selfcheck.mjs": [
    5342,
    5019
+  ],
+  "camera/cameraBoom-selfcheck.mjs": [
+   342
   ]
  },
  "contended": {
@@ -21126,7 +21136,8 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": false,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": true,
   "tools/ship/worldColliderBVH-selfcheck.mjs": true,
-  "tools/ship/fsrCaches-selfcheck.mjs": false
+  "tools/ship/fsrCaches-selfcheck.mjs": false,
+  "camera/cameraBoom-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -23057,6 +23068,7 @@
   "tools/ship/splatWalkWorld-selfcheck.mjs": "alone",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "loaded",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "loaded",
-  "tools/ship/fsrCaches-selfcheck.mjs": "alone"
+  "tools/ship/fsrCaches-selfcheck.mjs": "alone",
+  "camera/cameraBoom-selfcheck.mjs": "alone"
  }
 }

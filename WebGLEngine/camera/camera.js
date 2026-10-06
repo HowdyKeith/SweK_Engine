@@ -18,6 +18,7 @@ import { standHeightAt, DEFAULT_BODY } from "../world/surfaceProbe.mjs";
 import { fallStep } from "../physics/character/fallBody.mjs";
 import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
 import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
+import { cameraBoom, easeBoom } from "./cameraBoom.js";
 
 /**
  * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
@@ -685,6 +686,8 @@ export class Camera {
         this._thirdPersonDistance = 4.5;
         this._thirdPersonHeight = 1.2;
         this._thirdPersonSkin = 0.3;    // stop this far short of a wall/ground hit, not exactly on it
+        this._thirdPersonHalf = 0.2;    // the voxel boom's camera box half-extent: near-plane clearance (camera/cameraBoom.js)
+        this._boomDist = undefined;     // the eased boom length; IN is instant, OUT eases (cameraBoom.easeBoom)
         this._fpFallStartTime = 0;       // diagnostic: time spent airborne
         // Round 31 — energy bar gates sprint. main.js installs ref.
         this.playerEnergy = null;
@@ -730,7 +733,7 @@ export class Camera {
         // Round #13 Stage C (task board #81) -- in third-person, the RENDER eye sits behind this.position,
         // which stays the physics anchor _move* writes exactly as it does in first person. Everything below
         // (shake, FOV kick) applies identically on top of whichever eye this resolves to.
-        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye() : this.position;
+        const eye = (this.mode === "fp" && this.viewMode === "third") ? this._thirdPersonEye(dt) : this.position;
 
         // Round 28 — shake offset. Random-jitter the position passed to
         // buildViewProj so the matrix is shaken without mutating the
@@ -1366,6 +1369,7 @@ export class Camera {
     // held-key guard and nothing else.
     toggleViewMode() {
         this.viewMode = this.viewMode === "third" ? "first" : "third";
+        this._boomDist = undefined;     // a fresh third person starts at the safe length, not last session's
         return this.viewMode;
     }
 
@@ -1377,7 +1381,14 @@ export class Camera {
     // technique _moveOrbit already uses for a voxel world, for the identical reason stated there. Neither is
     // available (a bare terrain-ground-oracle world, or no world at all) leaves the eye unclamped -- a real,
     // named limitation, not a silent one.
-    _thirdPersonEye() {
+    // *** ROUND A (THE CAMERA BOOM) -- THE VOXEL BRANCH IS camera/cameraBoom.js. *** It sampled a column's TOP at four
+    // points along the boom, which read a ceiling, bridge or overhang above the boom as ground: under any roof the eye
+    // collapsed onto the head, and the camera's own box was never asked about. cameraBoom sweeps the camera's box up the
+    // lift and back along the boom exactly, against the same isSolidToBody rule the walk uses, and stops `skin` short of
+    // the first contact. camera/cameraBoom-selfcheck.mjs holds it, this method included. The boom LENGTH is eased
+    // with `dt` in both branches -- in at once, out over time, never past the safe length -- and without `dt` (a
+    // direct call) it is the safe length, as it always was.
+    _thirdPersonEye(dt) {
         const cp = Math.cos(this.pitch);
         const bx = -Math.sin(this.yaw) * cp, by = -Math.sin(this.pitch), bz = Math.cos(this.yaw) * cp;   // -forward
         const pivot = this.position;
@@ -1388,13 +1399,16 @@ export class Camera {
             const hit = bvh.raycastFirst(pivot.x, pivot.y, pivot.z, bx, by, bz, dist);
             if (hit && hit.t < dist) dist = Math.max(0, hit.t - this._thirdPersonSkin);
         } else if (this.world?.voxelAt) {
-            const samples = 4;
-            for (let i = 1; i <= samples; i++) {
-                const t = (dist * i) / samples;
-                const topY = this._terrainTopAtBilinear(pivot.x + bx * t, pivot.z + bz * t);
-                if (pivot.y + by * t + this._thirdPersonHeight < topY + 0.5) { dist = Math.max(0, t - this._thirdPersonSkin); break; }
-            }
+            const h = this._thirdPersonHalf;
+            const r = cameraBoom({ pivot: [pivot.x, pivot.y, pivot.z], back: [bx, by, bz], dist,
+                                   lift: this._thirdPersonHeight, half: [h, h, h], skin: this._thirdPersonSkin,
+                                   isSolid: (x, y, z) => Camera.isSolidToBody(this.world.voxelAt(x, y, z)) });
+            this._boomDist = easeBoom(this._boomDist, r.dist, dt);
+            const d = this._boomDist;
+            return { x: r.start[0] + r.dir[0] * d, y: r.start[1] + r.dir[1] * d, z: r.start[2] + r.dir[2] * d };
         }
+        this._boomDist = easeBoom(this._boomDist, dist, dt);
+        dist = this._boomDist;
         return { x: pivot.x + bx * dist, y: pivot.y + by * dist + this._thirdPersonHeight, z: pivot.z + bz * dist };
     }
 

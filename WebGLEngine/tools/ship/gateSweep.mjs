@@ -8080,6 +8080,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "from the release tag and keep a file only on a sha256 match. 27 sabotages; one (both escape guards removed) was " +
                  "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
     }),
+    // Round A -- THE THIRD-PERSON CAMERA BOOM: camera/cameraBoom.js, swept and stopped short of the first voxel it would touch.
+    since478: Object.freeze({
+        at: "Round A (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["camera/cameraBoom-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE VOXEL CAMERA READ A COLUMN'S TOP, SO EVERY ROOF WAS GROUND. *** camera/camera.js's third-person eye " +
+                 "sampled four column tops along the boom: under a ceiling, a bridge or an overhang it collapsed to 0.825 of " +
+                 "4.5, and under an overhang low enough to cross the boom it left the camera's box inside a voxel. " +
+                 "camera/cameraBoom.js sweeps the camera's box up the lift and back along the boom against the voxels " +
+                 "themselves, exactly, and stops a skin short of the first contact. Its gate holds the box never inside a " +
+                 "solid (1,384 fuzzed booms over 60 worlds), every point of the path free, never further than asked, exact " +
+                 "when clear, pulled in by exactly the skin, no one-voxel wall skipped (the planted endpoint-only test goes " +
+                 "through 300 of 300), and easing that never passes the safe length; camera.js's own eye is driven in a wall, " +
+                 "an overhang, a bridge and a room. Five sabotages, all red. NOT CLOSED: the render eye adds the body's " +
+                 "vertical smoothing on top of the boom, so the guarantee is the boom's and not that offset's, as the mesh " +
+                 "branch's always was; and nothing here has been looked at on the rig.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds
