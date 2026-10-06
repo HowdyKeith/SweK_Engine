@@ -52,7 +52,9 @@
 // *** AND AT 2x THE RING DOES NOT FIT IN A TEXTURE. *** It packs ceil(2P/4) slices down one target: 16 at 2x, so 540
 // rows become 8640, past the 8192 WebGPU allowed here -- fsr-three.html's lock ring at 2x drew validation errors on
 // every frame, measured when the sums were built, and it does on the unmodified page too. The sums are one slice at
-// every ratio. The ring is not refused at that size here; a caller that wants it at 2x needs a device that allows it.
+// every ratio. *** SO THE RING IS REFUSED WHERE IT CANNOT EXIST *** (ringFitsDevice, below): the driver reads the
+// device's own 2D texture limit -- maxTextureDimension2D on WebGPU, MAX_TEXTURE_SIZE on WebGL2 -- and throws before
+// allocating anything, naming the size, the limit and "sums". A device that does not say is not refused.
 //
 // *** LOCKS ARE `lockFrom`, AND WHAT THEY BUY IS THE CONTENT'S. *** null (no locks), "frame" (newLocksCPU: the ridge test
 // over this frame's resolved luma, which needs no ring) or "ring" (lockCandidatesFromRing: over the ring's mean, which
@@ -112,6 +114,25 @@ export async function probeHalfWrite(THREE, TSL, renderer, values) {
 }
 
 /**
+ * The largest 2D texture `renderer`'s device allows, or null when it does not say -- read from three's backend as
+ * WebGPU (device.limits.maxTextureDimension2D) and WebGL2 (MAX_TEXTURE_SIZE) expose it. Call after renderer.init().
+ */
+export function maxTexture2D(renderer) {
+    const b = renderer && renderer.backend;
+    const lim = b && b.device && b.device.limits ? b.device.limits.maxTextureDimension2D : null;
+    if (lim > 0) return lim;
+    const gl = b && b.gl;
+    if (gl && typeof gl.getParameter === "function") { const v = gl.getParameter(gl.MAX_TEXTURE_SIZE); if (v > 0) return v; }
+    return null;
+}
+
+/** Whether the lock RING's packed target -- w wide, h * ceil(2 * period / 4) tall -- fits a texture of side `limit`. */
+export function ringFitsDevice(w, h, period, limit) {
+    const rows = h * Math.ceil(2 * period / 4);
+    return { rows, fits: limit == null || (w <= limit && rows <= limit) };
+}
+
+/**
  * Build the chain. `ratio` is the upscale factor the jitter's phase count is taken at (displayWidth / renderWidth
  * unless given). Returns { render(scene, camera, output), targets, jitter, memory, frames, dispose }.
  */
@@ -126,6 +147,10 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const history = lock === "sums" ? "sums" : lock ? "ring" : null;
     const rw = renderWidth, rh = renderHeight, dw = displayWidth, dh = displayHeight;
     const up = ratio == null ? dw / rw : ratio;
+    if (history === "ring") {
+        const limit = maxTexture2D(renderer), fit = ringFitsDevice(dw, dh, jitterPhaseCount(up), limit);
+        if (!fit.fits) throw new Error(`fx/fsr/fsrTemporalTsl: the lock ring at ${up}x packs into a ${dw}x${fit.rows} target, past this device's ${limit} -- lock "sums" keeps the same two windows in one texel a pixel at any ratio`);
+    }
     const colType = type == null ? THREE.HalfFloatType : type;
     const flat = () => new THREE.RenderTarget(dw, dh, { type: THREE.FloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
     const col = () => new THREE.RenderTarget(dw, dh, { type: colType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
@@ -185,6 +210,15 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
         async render(scene, camera, output = null) {
             const prev = renderer.getRenderTarget(), k = frames % 2, hist = frames > 0 ? 1 : 0;
             if (frames === 0) await draw(farScene, t.record[1]);
+            // *** THE CAMERA IN THE RENDERER'S COORDINATE SYSTEM BEFORE ITS PROJECTION IS READ. *** three switches a camera
+            // to WebGPU's clip convention (z in [0, 1]) the first time a WebGPU renderer draws it, and rebuilds its projection
+            // there -- inside the colour pass below, AFTER this driver had copied the old matrix and jittered it. So frame 0
+            // was drawn UNJITTERED (0.93 from its period's twin, the same phase; the shading mask read it as a light change
+            // for two periods), and restoreProjection then wrote the WebGL-convention matrix back onto a camera already
+            // marked WebGPU, which three never rebuilds again: every later frame on WebGPU was drawn with z in [-1, 1]
+            // (elements 10/14 -1.0040/-0.2004 where WebGPU's are -1.0020/-0.1002). WebGL2 was never affected. Measured in the
+            // lock-sums round; render/temporalLockSumsTsl-selfcheck.mjs and fx/fsr/fsrTemporalTsl-selfcheck.mjs hold both.
+            if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateProjectionMatrix(); }
             camera.updateMatrixWorld(); base.copy(camera.projectionMatrix);
             const [jx, jy] = jitterCurrent(jit);
             applyJitter(camera, base, jx, jy, rw, rh);

@@ -36,6 +36,13 @@ console.log("\n1. WITHOUT A DEVICE: the driver's refusal");
 {
     let m = null; try { FT.makeFsrTemporal({}, {}, {}, { renderWidth: 1, renderHeight: 1, displayWidth: 2, displayHeight: 2 }); } catch (e) { m = String(e.message); }
     ok("makeFsrTemporal refuses to run without a threshold, as disocclusionCPU and reactiveCPU both do", m !== null && /threshold must be a positive clip-z gap/.test(m), m || "no throw");
+    // the lock ring's packed target is h * ceil(2P/4) rows: fsr-three.html's 540 at 2x is 8640, past the 8192 WebGPU allowed
+    // on the box that measured it, and the page drew validation errors on every frame until the driver refused it
+    const a = FT.ringFitsDevice(960, 540, jitterPhaseCount(2), 8192), b = FT.ringFitsDevice(960, 540, jitterPhaseCount(1.5), 8192), c = FT.ringFitsDevice(960, 540, jitterPhaseCount(2), null);
+    ok(`[the lock-sums round] ringFitsDevice: 960x540 at 2x packs ${a.rows} rows and does NOT fit 8192; at 1.5x ${b.rows} and does; and a device that does not state a limit is not refused`,
+       a.rows === 8640 && !a.fits && b.rows === 4860 && b.fits && c.fits, "16 slices of 540 at 2x, 9 at 1.5x");
+    ok("  and maxTexture2D reads nothing from a renderer with no backend, which is 'not refused', not a guess",
+       FT.maxTexture2D({}) === null && FT.maxTexture2D(null) === null, "the device rows below read the real limit on both backends");
 }
 
 console.log("\n2. ON THE DEVICE: the chain, 40 frames, against fsr.html's order on the CPU");
@@ -51,6 +58,11 @@ else {
                 const canvas = document.createElement("canvas"); canvas.width = a.DW; canvas.height = a.DW;
                 const renderer = new THREE.WebGPURenderer({ canvas, forceWebGL: mode === "webgl2", antialias: false }); await renderer.init();
                 const o = { frames: [] };
+                // the lock-sums round: the device's own texture limit, and the ring refused one row past it, built at it
+                const b = renderer.backend; o.limit = FT.maxTexture2D(renderer);
+                o.limitDirect = b.device ? b.device.limits.maxTextureDimension2D : b.gl.getParameter(b.gl.MAX_TEXTURE_SIZE);
+                const at = (dh, lock) => { try { const f = FT.makeFsrTemporal(THREE, T, renderer, { renderWidth: 4, renderHeight: Math.ceil(dh / 2), displayWidth: 8, displayHeight: dh, ratio: 2, threshold: 0.01, lock, lockFrom: null }); f.dispose(); return null; } catch (e) { return String(e.message); } };
+                o.refusedPast = at(o.limit / 16 + 1, "ring"); o.builtAt = at(o.limit / 16, "ring"); o.sumsPast = at(o.limit / 16 + 1, "sums");
                 const read = async (t, n) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, n, n));
                 // a striped wall with a pulsing lamp (the shading mask's and the reactive mask's business), a box sliding past
                 // it (disocclusion's), and a slow pan (the whole field moves)
@@ -74,9 +86,12 @@ else {
                     pulse.value = 0.2 + 0.2 * Math.sin(0.5 * k);
                     box.position.set(-1 + 0.05 * k, 0.1 * Math.sin(0.3 * k), 0); box.rotation.set(0.2 * k, 0.3 * k, 0); box.updateMatrixWorld();
                     cam.position.set(0.01 * k, 0, 3.5); cam.lookAt(0.01 * k, 0, 0); cam.updateMatrixWorld();
-                    const phase = fsr.phase.slice(), before = cam.projectionMatrix.clone();
+                    // the projection three itself gives this camera ON THIS RENDERER -- its clip convention, not whatever
+                    // matrix the camera held before its first WebGPU frame (the lock-sums round: the driver restored that one)
+                    const own = cam.clone(); own.coordinateSystem = renderer.coordinateSystem; own.updateProjectionMatrix();
+                    const phase = fsr.phase.slice(), before = own.projectionMatrix.clone();
                     await fsr.render(scene, cam, outRT);
-                    o.restored = (o.restored === undefined ? true : o.restored) && cam.projectionMatrix.equals(before);
+                    o.restored = (o.restored === undefined ? true : o.restored) && cam.projectionMatrix.equals(before) && cam.coordinateSystem === renderer.coordinateSystem;
                     // the colour pass, redone here with applyJitter at the phase the driver reported: the SAME render,
                     // or the driver did not jitter (the CPU below resolves whatever the device drew, so it cannot tell)
                     if (k % 7 === 3) { TT.applyJitter(cam, before, phase[0], phase[1], a.RW, a.RW); renderer.setRenderTarget(refRT); await renderer.renderAsync(scene, cam);
@@ -103,6 +118,9 @@ else {
         const up = (px, n) => { if (mode === "webgpu") return new Float32Array(px); const f = []; for (let y = n - 1; y >= 0; y--) f.push(...px.slice(y * n * 4, (y + 1) * n * 4)); return new Float32Array(f); };
         const ch = (a4) => { const x = new Float32Array(a4.length / 4); for (let i = 0; i < x.length; i++) x[i] = a4[i * 4]; return x; };
         const worst = (a, b, n, c = 3) => { let w = 0; for (let i = 0; i < n; i++) for (let j = 0; j < c; j++) { const d = Math.abs(a[i * (c === 1 ? 1 : 4) + j] - b[i * (c === 1 ? 1 : 4) + j]); if (!(d <= w)) w = d; } return w; };
+        ok(`[${mode}] the driver reads the device's own 2D texture limit, ${o.limit}, as the backend states it -- and REFUSES a 2x ring one row of slices past it, naming the size, the limit and the sums`,
+           o.limit > 0 && o.limit === o.limitDirect && o.refusedPast !== null && /past this device's/.test(o.refusedPast) && /"sums"/.test(o.refusedPast) && o.builtAt === null && o.sumsPast === null,
+           `past: ${o.refusedPast}; at the limit: ${o.builtAt === null ? "built" : o.builtAt}; the sums one past it: ${o.sumsPast === null ? "built" : o.sumsPast}`);
         ok(`[${mode}] the lock ring's period is the jitter's phase count at 1.5x, ${o.period}, and its memory is reported (${(o.memory.ring / 1048576).toFixed(2)} MB here)`,
            o.period === jitterPhaseCount(1.5) && o.memory.ring > 0, "the period may not be chosen for cost -- fsr.html's rule");
         // the phases the driver rendered with ARE render/jitter.mjs's sequence, in order -- the CPU below reads the phase
@@ -111,7 +129,7 @@ else {
         o.frames.forEach((f, k) => { const want = seq[k % seq.length]; if (f.phase[0] === want[0] && f.phase[1] === want[1]) phaseOk++; });
         ok(`[${mode}] every frame's jitter is Halton(2,3)'s phase k mod ${o.period}, in order -- ${phaseOk} of ${o.frames.length}`, phaseOk === o.frames.length,
            "the sequence wraps at the phase count; each of the 18 phases is used at least twice in the run");
-        ok(`[${mode}] the colour pass IS the scene through applyJitter at the reported phase -- ${o.jitterChecks} frames redrawn, worst ${o.jitterGap} -- and the camera comes back with its own projection`,
+        ok(`[${mode}] the colour pass IS the scene through applyJitter at the reported phase -- ${o.jitterChecks} frames redrawn, worst ${o.jitterGap} -- and the camera comes back with its own projection, in the renderer's clip convention`,
            o.jitterChecks > 3 && o.jitterGap === 0 && o.restored === true, "the CPU chain resolves whatever the device drew, so it cannot see a colour pass that forgot to jitter or a motion pass that ran jittered");
         // fsr.html's order, on the CPU, from the device's renders alone
         const st = makeLumaState(DW, DW, o.period), ls = makeLockState(DW, DW);
@@ -194,6 +212,21 @@ else {
 // errors that move a picture by less than its rows can see, which is what this gate is for. D21 first reddened the
 // locks gate by CRASHING it (reading the life of a lock state that did not exist); it now reads a missing one as null
 // and the default row says so -- 8 red rather than 1.
+//
+// ---- THE LOCK-SUMS ROUND: the ring refused where it cannot exist ---------------------------------------------------
+//   R1  the refusal removed                                        -> 3 red: both backends' refusal rows, and on WebGPU
+//       the colour-pass row as well -- the over-limit ring it then built left the device in an error state that the
+//       later passes inherited. That is the case for refusing BEFORE allocating, measured.
+//   R2  maxTexture2D reading nothing (every device "unstated")     -> 3 red, the same three
+// *** BOTH SAID "3 RED, THE COLOUR-PASS ROW AS WELL" AND THAT THIRD RED WAS NOT THEIRS. *** It was red with no sabotage at
+// all once the driver first compiled the scene before frame 0, and the reason is a defect this tree had carried since
+// v4731: three switches a camera to WebGPU's clip convention on its first WebGPU frame, the driver had copied and
+// jittered the old matrix first and restored it after, and every later frame was drawn with z in [-1, 1] on a backend
+// whose clip volume is [0, 1]. This row compared against the camera's matrix from BEFORE its first frame, so it passed
+// on the wrong convention; it compares against the projection three gives the camera on this renderer now, and the
+// camera's coordinate system with it. R1 and R2 re-run against that row: 2 red each, the refusal rows only.
+//   R3  the driver's coordinate-system conversion removed          -> 1 red here, the colour-pass row on WebGPU (and 2
+//       in render/temporalLockSumsTsl-selfcheck.mjs: frame 0 is 9.1e-1 from its twin, the still mask 1.9e-2)
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: whether the chain HELPS a three.js scene, frame against truth -- fx/fsr/fsrTemporalQuality-selfcheck.mjs and " +
     "fx/fsr/fsrTemporalLocks-selfcheck.mjs measure that; HalfFloat targets, the driver's default, which this gate replaces with FloatType " +

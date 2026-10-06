@@ -189,10 +189,13 @@ console.log("\n4. ON THE DEVICE: the driver's DEFAULT is the sums, and once they
 // not asserted: measured over 128 frames at 128x128 when the default was made, -0.010 to +0.014 dB across six cases.
 //
 // *** THE STILL ROW WAS WRITTEN "TO THE BIT" AND THE DEVICE SAID NO, TWICE. *** First: the mask read 0.019 on a scene
-// where nothing moves -- the older closed window held frames 0-31, and three's FIRST renders are not its later ones
-// (pipelines still compiling); 32 frames later, or with the scene drawn twice before the driver starts, it fell to
-// 3.3e-4. So a page that has just started reads its own start-up as a light change for two periods; the scene is
-// drawn twice first here so that is not what this row measures. Second: 3.3e-4 is not 0 -- the device fetches its
+// where nothing moves -- the older closed window held frames 0-31, and the driver's frame 0 on WebGPU was drawn
+// UNJITTERED (0.93 from frame P's, the same phase; every later frame within 1e-6 of its period's twin): three switched
+// the camera's clip convention and rebuilt its projection inside the colour pass, after the driver had jittered it.
+// This fixture drew the scene twice first, which converted the camera early; then the driver compiled the scene first,
+// which did the same as a side effect and was taken for a pipeline fix. The driver converts the camera itself now
+// (fx/fsr/fsrTemporalTsl.mjs) -- the fixture's warm-up is gone and the row below holds the driver to it. Second:
+// 3.3e-4 is not 0 -- the device fetches its
 // sums bilinearly in f32 every frame even at zero motion, and the two windows' rounding differs. The mirror's still
 // picture IS exact (render/temporalLockSums-selfcheck.mjs section 3, in f64). What is asserted here is what the
 // picture can show: the mask never fires, and no output value moves by an 8-bit step.
@@ -214,14 +217,14 @@ else {
         const threshold = TC.clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]);
         const tgt = (n) => new THREE.RenderTarget(n, n, { type: THREE.FloatType }), read = async (t, n) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, n, n));
         const out = {}, o2 = tgt(a.DW), big = tgt(a.DW * 4);
-        renderer.setRenderTarget(o2); await renderer.renderAsync(scene, cam); await renderer.renderAsync(scene, cam); renderer.setRenderTarget(null);   // past three's first renders
         for (const c of ["still", "turn"]) {
             out[c] = {};
             for (const which of ["default", "off"]) {
                 const opts = { renderWidth: a.RW, renderHeight: a.RW, displayWidth: a.DW, displayHeight: a.DW, threshold, type: THREE.FloatType };
                 if (which === "off") opts.lock = false;
                 const f = FT.makeFsrTemporal(THREE, T, renderer, opts), o = { history: f.history, memory: f.memory.ring, period: f.period };
-                for (let k = 0; k < a.N8; k++) { knot.rotation.set(0.4, 0.6 + (c === "turn" ? 0.01 * k : 0), 0); knot.updateMatrixWorld(); await f.render(scene, cam, o2); }
+                for (let k = 0; k < a.N8; k++) { knot.rotation.set(0.4, 0.6 + (c === "turn" ? 0.01 * k : 0), 0); knot.updateMatrixWorld(); await f.render(scene, cam, o2);
+                    if (c === "still" && which === "default" && (k === 0 || k === f.period)) o["resolved" + k] = await read(f.targets.resolved, a.DW); }
                 o.out = await read(o2, a.DW);
                 o.fired = null; o.maskMax = null;   // no mask target at all: read as null, and the rows below say so in red
                 if (f.targets.shading) { const s = await read(f.targets.shading, a.DW); o.fired = 0; o.maskMax = 0; for (let i = 0; i < a.DW * a.DW; i++) { if (s[i * 4] >= 0.05) o.fired++; o.maskMax = Math.max(o.maskMax, s[i * 4]); } }
@@ -236,6 +239,10 @@ else {
         const { still, turn } = r.result, D = D8;
         ok(`*** the driver's DEFAULT lock is the sums: history "${still.default.history}", ${still.default.memory} bytes at ${D}x${D} -- one texel a pixel, twice -- at the 2x period ${still.default.period} ***`,
             still.default.history === "sums" && still.default.memory === 2 * D * D * 16 && still.off.history === null && still.off.memory === 0, `lock: false builds none: history ${still.off.history}`);
+        let w0 = still.default.resolved0 ? 0 : Infinity;
+        if (still.default.resolved0) for (let i = 0; i < still.default.resolved0.length; i++) w0 = Math.max(w0, Math.abs(still.default.resolved0[i] - still.default["resolved" + still.default.period][i]));
+        ok(`*** the driver's FIRST frame is the scene: frame 0's resolve against frame ${still.default.period}'s, the same jitter phase, worst ${w0.toExponential(1)} -- frame 0 was drawn unjittered, 0.93 off, until the driver put the camera in the renderer's clip convention first ***`,
+            w0 <= 1e-6, "with no warm-up of the fixture's own; the lock's older window holds frame 0 for two periods, so this is what the still row below rests on");
         let differ = 0, wOut = 0; for (let i = 0; i < still.default.out.length; i++) { if (!Object.is(still.default.out[i], still.off.out[i])) differ++; wOut = Math.max(wOut, Math.abs(still.default.out[i] - still.off.out[i])); }
         ok(`*** on a STILL scene past the warm-up (${N8} frames, the mask live from 63) the default's mask never fires -- 0.05 or above on ${still.default.fired} pixels, its largest ${still.default.maskMax === null ? "NO MASK" : still.default.maskMax.toExponential(1)} -- and no output value moves by an 8-bit step: worst ${wOut.toExponential(1)}, ${(1 / 255 / Math.max(wOut, 1e-12)).toFixed(0)}x under 1/255 ***`,
             still.default.fired === 0 && wOut < 1 / 255, `${differ} of ${still.default.out.length} values differ in f32: the device's windows round differently (see above); the mirror's are exact`);
@@ -257,9 +264,10 @@ else {
 //                                                            read as null and named)
 //   F2  the default the ring                                 1 red: the history row, 1,253,376 bytes at 48x48
 //   F3  the driver never draws the shading mask              2 red, section 3's push-and-read row and the turning row
-//   F4  (fixture) the two warm-up renders removed            1 red: the still mask reaches 1.9e-2 and the picture moves
-//                                                            5.8e-3, past an 8-bit step -- three's start-up frames read
-//                                                            as a light change, which is why the scene is drawn first
+//   F4  (as first written, against the fixture) its two warm-up renders removed -> 1 red: the still mask reached 1.9e-2
+//       and the picture moved 5.8e-3, past an 8-bit step. The fixture's warm-up is gone since; the driver compiles first.
+//   F5  the driver's coordinate-system conversion removed -> 2 red: frame 0 is 9.1e-1 from its twin and the still mask
+//       reaches 1.9e-2 again. (First run against a compileAsync that did the conversion as a side effect: the same 2.)
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the sums in fx/fsr/fsrTemporalTsl-selfcheck.mjs's whole-chain composition, which runs the ring -- section 3 grades " +

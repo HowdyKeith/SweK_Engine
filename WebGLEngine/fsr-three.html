@@ -439,8 +439,12 @@ try {
         camera.updateMatrixWorld();
         const vp = Array.from(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements);
         const threshold = clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]) || 1e-3;
-        fsr2 = makeFsrTemporal(THREE, TSL, renderer, { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH,
-                                                       ratio: k, threshold, lock, lockFrom, sharpness: Number($("sharp").value) });
+        // the driver refuses a ring that cannot fit this device's textures (16 slices of 540 rows at 2x); the page falls
+        // back to the sums, which keep the same two windows in one texel a pixel, and says so on the label
+        const build = (lk) => makeFsrTemporal(THREE, TSL, renderer, { renderWidth: Math.round(DW / k), renderHeight: Math.round(DH / k), displayWidth: DW, displayHeight: DH,
+                                                       ratio: k, threshold, lock: lk, lockFrom, sharpness: Number($("sharp").value) });
+        try { fsr2 = build(lock); }
+        catch (e) { if (lock !== "ring") throw e; fsr2 = build("sums"); $("lockMB").textContent = `(the ring is ${ringMB(k, "ring").toFixed(0)} MB in a target past this device's texture limit at ${k}x -- the sums instead, ${ringMB(k, "sums").toFixed(1)} MB)`; }
         // the locks view: FSR2's output with the clamp relaxation laid over it in red
         if (lockView) lockView.target.dispose();
         const target = new THREE.RenderTarget(DW, DH, { type: THREE.HalfFloatType });
