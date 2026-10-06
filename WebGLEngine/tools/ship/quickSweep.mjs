@@ -296,6 +296,16 @@ export const RECORD_HANDOVERS = Object.freeze([
                   "a 4,710 ms line and recordReach 54 unchecked against 50, both moved by that one verify. 16095mb-" +
                   "142c0d is this sandbox's boxId() at v4813 -- the same CPU hash as the v4778 sender, 1 MB less " +
                   "memory reported -- and the shared record is restored to 4c904f50's, the last the sandbox wrote." }),
+    // v4815 -- THE SANDBOX RESTARTED ON A DIFFERENT CLOUD HOST, AND THE ANSWER IS THE ROW THE v4813 NOTE PREDICTED. The
+    // container came back at 2026-10-06 11:49 on a Xeon @ 2.80GHz (md5 420793) where 142c0d was @ 2.10GHz, so every
+    // sweep and rotation here became a foreign box's and wrote only the .local.json. Which host sits under a session is
+    // not the session's to choose; the record follows the sandbox by a dated row, as before.
+    Object.freeze({ at: "v4815", from: "linux-x64-4c-16095mb-142c0d", to: "linux-x64-4c-16095mb-420793",
+        decidedBy: "Keith",
+        evidence: "boxId() read linux-x64-4c-16095mb-420793 after the 11:49 restart; three re-timings (capReading, " +
+                  "referenceKind, timingRecords, all exit 0) went to sweep-timings.local.json and their exit-1 codes " +
+                  "from v4815's first verdict stayed in the record, keeping redAction red. 420793 is a box the " +
+                  "record's boxLegend already knew (16075mb, 2.80GHz) at an earlier round." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

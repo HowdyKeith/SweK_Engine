@@ -1,5 +1,5 @@
 {
- "host": "linux-x64-4c-16095mb-142c0d",
+ "host": "linux-x64-4c-16095mb-420793",
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over.",
  "kindsInferred": [
   "brain/rl/dock-hazard-selfcheck.mjs",
@@ -1177,7 +1177,7 @@
   "tools/ship/cameraKeys-selfcheck.mjs": 255,
   "tools/ship/candidateKnown-selfcheck.mjs": 230,
   "tools/ship/canvasFill-selfcheck.mjs": 6148,
-  "tools/ship/capReading-selfcheck.mjs": 79,
+  "tools/ship/capReading-selfcheck.mjs": 89,
   "tools/ship/capsuleGround-selfcheck.mjs": 830,
   "tools/ship/capsuleMove-selfcheck.mjs": 638,
   "tools/ship/captionClock-selfcheck.mjs": 220,
@@ -1589,7 +1589,7 @@
   "tools/ship/redAction-selfcheck.mjs": 99319,
   "tools/ship/redCensus-selfcheck.mjs": 45245,
   "tools/ship/redCensusFresh-selfcheck.mjs": 269,
-  "tools/ship/referenceKind-selfcheck.mjs": 3130,
+  "tools/ship/referenceKind-selfcheck.mjs": 3458,
   "tools/ship/refusalStack-selfcheck.mjs": 206,
   "tools/ship/registerDrift-selfcheck.mjs": 293,
   "tools/ship/registerResidue-selfcheck.mjs": 2997,
@@ -1749,7 +1749,7 @@
   "tools/ship/timingKind-selfcheck.mjs": 521,
   "tools/ship/timingLoad-selfcheck.mjs": 166,
   "tools/ship/timingProvenance-selfcheck.mjs": 587,
-  "tools/ship/timingRecords-selfcheck.mjs": 90,
+  "tools/ship/timingRecords-selfcheck.mjs": 109,
   "tools/ship/timingSemantics-selfcheck.mjs": 258,
   "tools/ship/timingSurvivors-selfcheck.mjs": 172,
   "tools/ship/todo-selfcheck.mjs": 530,
@@ -3108,7 +3108,7 @@
   "tools/ship/cameraKeys-selfcheck.mjs": 0,
   "tools/ship/candidateKnown-selfcheck.mjs": 0,
   "tools/ship/canvasFill-selfcheck.mjs": 0,
-  "tools/ship/capReading-selfcheck.mjs": 1,
+  "tools/ship/capReading-selfcheck.mjs": 0,
   "tools/ship/capsuleGround-selfcheck.mjs": 0,
   "tools/ship/capsuleMove-selfcheck.mjs": 0,
   "tools/ship/captionClock-selfcheck.mjs": 0,
@@ -3520,7 +3520,7 @@
   "tools/ship/redAction-selfcheck.mjs": 0,
   "tools/ship/redCensus-selfcheck.mjs": 0,
   "tools/ship/redCensusFresh-selfcheck.mjs": 0,
-  "tools/ship/referenceKind-selfcheck.mjs": 1,
+  "tools/ship/referenceKind-selfcheck.mjs": 0,
   "tools/ship/refusalStack-selfcheck.mjs": 0,
   "tools/ship/registerDrift-selfcheck.mjs": 0,
   "tools/ship/registerResidue-selfcheck.mjs": 0,
@@ -3680,7 +3680,7 @@
   "tools/ship/timingKind-selfcheck.mjs": 0,
   "tools/ship/timingLoad-selfcheck.mjs": 0,
   "tools/ship/timingProvenance-selfcheck.mjs": 0,
-  "tools/ship/timingRecords-selfcheck.mjs": 1,
+  "tools/ship/timingRecords-selfcheck.mjs": 0,
   "tools/ship/timingSemantics-selfcheck.mjs": 0,
   "tools/ship/timingSurvivors-selfcheck.mjs": 0,
   "tools/ship/todo-selfcheck.mjs": 0,
@@ -5039,7 +5039,7 @@
   "tools/ship/cameraKeys-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/candidateKnown-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/canvasFill-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/capReading-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
+  "tools/ship/capReading-selfcheck.mjs": "2026-10-06T12:07:53.190Z",
   "tools/ship/capsuleGround-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/capsuleMove-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/captionClock-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
@@ -5451,7 +5451,7 @@
   "tools/ship/redAction-selfcheck.mjs": "2026-09-28T19:56:43.302Z",
   "tools/ship/redCensus-selfcheck.mjs": "2026-09-09T18:41:20.794Z",
   "tools/ship/redCensusFresh-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
-  "tools/ship/referenceKind-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
+  "tools/ship/referenceKind-selfcheck.mjs": "2026-10-06T12:07:56.845Z",
   "tools/ship/refusalStack-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/registerDrift-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/registerResidue-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
@@ -5611,7 +5611,7 @@
   "tools/ship/timingKind-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/timingLoad-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/timingProvenance-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
-  "tools/ship/timingRecords-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
+  "tools/ship/timingRecords-selfcheck.mjs": "2026-10-06T12:07:57.163Z",
   "tools/ship/timingSemantics-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/timingSurvivors-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
   "tools/ship/todo-selfcheck.mjs": "2026-10-06T00:52:04.108Z",
@@ -11360,7 +11360,7 @@
   "render/temporalRingContent-selfcheck.mjs": 1997,
   "render/temporalRingFloor-selfcheck.mjs": 2147,
   "tools/ship/budgetProvenance-selfcheck.mjs": 96,
-  "tools/ship/capReading-selfcheck.mjs": 79,
+  "tools/ship/capReading-selfcheck.mjs": 89,
   "tools/ship/harnessLiveness-selfcheck.mjs": 1692,
   "tools/ship/murmurSpecies2-selfcheck.mjs": 1786,
   "tools/ship/murmurSpecies3-selfcheck.mjs": 2063,
@@ -11371,7 +11371,7 @@
   "tools/ship/timingKind-selfcheck.mjs": 252,
   "tools/ship/timingLoad-selfcheck.mjs": 84,
   "tools/ship/timingProvenance-selfcheck.mjs": 146,
-  "tools/ship/timingRecords-selfcheck.mjs": 90,
+  "tools/ship/timingRecords-selfcheck.mjs": 109,
   "tools/ship/timingSemantics-selfcheck.mjs": 77,
   "tools/ship/timingSurvivors-selfcheck.mjs": 77,
   "tools/ship/walkerParity-selfcheck.mjs": 2801,
@@ -11586,7 +11586,7 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 271,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 138,
   "tools/ship/fsrCaches-selfcheck.mjs": 4957,
-  "tools/ship/referenceKind-selfcheck.mjs": 3130,
+  "tools/ship/referenceKind-selfcheck.mjs": 3458,
   "tools/ship/graveyard-selfcheck.mjs": 2929,
   "tools/ship/shaderRefs-selfcheck.mjs": 52546,
   "tools/ship/shippedLadder-selfcheck.mjs": 21449,
@@ -13179,7 +13179,7 @@
   "render/temporalRingContent-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "render/temporalRingFloor-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/budgetProvenance-selfcheck.mjs": "2026-09-22T19:07:11.831Z",
-  "tools/ship/capReading-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
+  "tools/ship/capReading-selfcheck.mjs": "2026-10-06T12:07:53.190Z",
   "tools/ship/harnessLiveness-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/murmurSpecies2-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/murmurSpecies3-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
@@ -13190,7 +13190,7 @@
   "tools/ship/timingKind-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/timingLoad-selfcheck.mjs": "2026-09-23T14:21:46.871Z",
   "tools/ship/timingProvenance-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
-  "tools/ship/timingRecords-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
+  "tools/ship/timingRecords-selfcheck.mjs": "2026-10-06T12:07:57.163Z",
   "tools/ship/timingSemantics-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
   "tools/ship/timingSurvivors-selfcheck.mjs": "2026-09-23T01:52:31.319Z",
   "tools/ship/walkerParity-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
@@ -13405,7 +13405,7 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/referenceKind-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
+  "tools/ship/referenceKind-selfcheck.mjs": "2026-10-06T12:07:56.845Z",
   "tools/ship/graveyard-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/shaderRefs-selfcheck.mjs": "2026-10-05T23:16:53.879Z",
   "tools/ship/shippedLadder-selfcheck.mjs": "2026-10-06T00:34:51.317Z",
@@ -17317,7 +17317,8 @@
   ],
   "tools/ship/timingRecords-selfcheck.mjs": [
    94,
-   90
+   90,
+   109
   ],
   "tools/ship/voxelAO-selfcheck.mjs": [
    57
@@ -17587,9 +17588,9 @@
    908
   ],
   "tools/ship/capReading-selfcheck.mjs": [
-   101,
    78,
-   79
+   79,
+   89
   ],
   "tools/ship/rleRegionVolume-selfcheck.mjs": [
    424
@@ -19962,7 +19963,8 @@
   ],
   "tools/ship/referenceKind-selfcheck.mjs": [
    2898,
-   3130
+   3130,
+   3458
   ],
   "tools/ship/graveyard-selfcheck.mjs": [
    2883,

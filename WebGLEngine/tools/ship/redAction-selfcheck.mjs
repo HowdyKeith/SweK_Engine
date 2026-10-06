@@ -301,7 +301,12 @@ console.log("\n4. *** THE POPULATION IS DERIVED NOW. IT WAS A LIST OF TWO, UNDER
     if (recovered.length) say("the record is behind on", recovered.map((r) => r.rel.split("/").pop()).join(", "));
 
     ok("*** the population is READ FROM THE RECORD, not typed into this file ***",
-        pop.reds.length >= 10 && drivenAll.length === pop.reds.length &&
+        // v4815 -- `>= 10` WAS THE BACKLOG, NOT THE PROPERTY. The record held 13 exit-1 codes before v4815's full alone
+        // re-timing and 2 after it (budgetExile, moduleHistory): eleven were stale reds of gates long green. A floor on
+        // a count of REDS fails when the record improves; the fixture below is what proves the population is derived,
+        // and this keeps only the vacuity guard. SABOTAGE: standingReds() replaced by a literal two-gate list -> 1 red,
+        // this row (the fixture half); restored md5-identical.
+        pop.reds.length > 0 && drivenAll.length === pop.reds.length &&
         // driven with a record that says something else, so a hardcoded list could not satisfy this row
         (await (async () => {
             const tmp = path.join(ENG, "tools", "ship", "__redpop-fixture.json");
