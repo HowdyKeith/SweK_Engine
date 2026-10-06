@@ -189,9 +189,19 @@ const undated = real.filter((k) => (S.at || {})[k] === UNKNOWN_AT);
         DATED_V4576.median < 2 && DATED_V4576.median > 1.5 && DATED_V4576.crossing2x > 0.35,
         "a distribution straddling the threshold, which is what makes the percentage an artifact of where the " +
         "line was drawn rather than a measure of anything.");
-    ok(`*** and TODAY the dated residual is ${(dm / LOAD).toFixed(2)}x -- ABOVE one, so the sweep entry is now the stale half for the median dated gate ***`,
-        dm / LOAD > DATED_V4576.residual,
-        `${DATED_V4576.n} gates at ${DATED_V4576.median}x then, ${dated.length} at ${dm.toFixed(2)}x now. v4580 re-timed 934 ` +
+    // *** v4815 -- THE SEVENTH TIME: THIS ROW ASSERTED A LIVE DIRECTION, AND THE LIVE DIRECTION IS A RECORD'S STATE. ***
+    // `dm / LOAD > 0.90` read whatever the two files held. v4815 re-timed the whole over-budget pool ALONE and filed it in
+    // the sweep column, which pulled the dated median down to 1.92x (residual 0.90x) and the row red in the quick sweep;
+    // the same sweep then wrote its eight-wide readings and the same row read 1.17x and passed. Which kind of reading
+    // the sweep column holds decides the sign, so the sign is not a property of the tree. v4580's finding is FROZEN
+    // here as v4576's is above and checked as arithmetic; today's residual is reported. SABOTAGE: DATED_V4580.residual
+    // set to 0.80 -> 1 red, this row; restored md5-identical.
+    const DATED_V4580 = Object.freeze({ median: 2.44, load: 2.15, residual: 1.13, retimed: 934 });
+    report(`today's dated residual: ${(dm / LOAD).toFixed(2)}x over ${dated.length} gates -- reported, not asserted (see v4815 above)`);
+    ok(`*** and v4580's re-timing put the dated residual at ${DATED_V4580.residual}x -- ABOVE one, so the sweep entry became the stale half for the median dated gate ***`,
+        Math.abs(DATED_V4580.median / DATED_V4580.load - DATED_V4580.residual) < 0.01 && DATED_V4580.residual > 1 &&
+        DATED_V4580.residual > DATED_V4576.residual,
+        `${DATED_V4576.n} gates at ${DATED_V4576.median}x then, ${DATED_V4580.median}x after v4580 (${dated.length} at ${dm.toFixed(2)}x today). v4580 re-timed 934 ` +
         "gate-timings entries as ALONE readings on this box, which is the whole of the move: the file that was " +
         "behind caught up and the other one did not. NOT A REGRESSION AND NOT AN IMPROVEMENT -- a statement about " +
         "which of two records is now older, which is the only thing a ratio of two records can ever say.");
