@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9058b8a7008056cac32dfa5eb74eecb3c9d16593",
+ "head": "0e3d9e5900f47a319e13790cf6488fad33d97add",
  "bodies": {
   "box3d": [
    {
@@ -721,7 +721,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3443126,
+    "bytes": 3445976,
     "sha": "f12471d7304fd6bf6b2f6ad1507cd6a616418ba1"
    },
    {
@@ -822,7 +822,7 @@
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
     "bytes": 19494,
-    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+    "sha": "0e3d9e5900f47a319e13790cf6488fad33d97add"
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
@@ -964,7 +964,7 @@
    {
     "path": "fx/fsr/fsrFlowCost-selfcheck.mjs",
     "bytes": 15660,
-    "sha": "bf438a5ca20eccb70423e0c5343f66afb16354e8"
+    "sha": "0e3d9e5900f47a319e13790cf6488fad33d97add"
    },
    {
     "path": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
