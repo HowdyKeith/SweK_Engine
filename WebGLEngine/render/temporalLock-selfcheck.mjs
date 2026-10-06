@@ -44,6 +44,7 @@ function vpAt(camX) {
 //   "chequer" -- a texture AT THE PIXEL SCALE (cell 1.13 px), which is what v4552 established matters
 //   "line"    -- a feature THINNER THAN A PIXEL (0.4 px) on a flat ground, which is what a lock is for
 //   "bar"     -- a thin bright bar over the chequer, which is where the two collide
+//   "smooth"  -- low-frequency shading (a period of ~7 world units), where a bilinear reprojection is faithful
 function renderFrame({ camX = 0, kind = "chequer", light = 1, occX = -9 } = {}) {
     const colour = new Float32Array(W * H * 4), depth = new Float32Array(W * H);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -53,6 +54,7 @@ function renderFrame({ camX = 0, kind = "chequer", light = 1, occX = -9 } = {}) 
         if (kind === "line") { const v = Math.abs(wx - 0.37) < 0.4 * PXW / 2 ? 0.95 : 0.05; r = g = b = v; }
         else if (kind === "bar" && Math.abs(wx - occX) < 0.10 && Math.abs(wy) < 2.2) { r = g = b = 0.95; z = Z_OCC; }
         else if (kind === "bar") { const v = ((Math.floor(wx * 5.3) + Math.floor(wy * 5.3)) & 1) ? 0.30 : 0.10; r = g = b = v; }
+        else if (kind === "smooth") { r = 0.5 + 0.4 * Math.sin(wx * 0.9) * Math.cos(wy * 0.7); g = r * 0.55 + 0.03; b = 1 - r; }
         else { const c = ((Math.floor(wx * 5.3) + Math.floor(wy * 5.3)) & 1) ? 0.92 : 0.06; r = c; g = c * 0.55 + 0.03; b = 1 - c; }
         colour[o] = r * light; colour[o + 1] = g * light; colour[o + 2] = b * light; colour[o + 3] = 1;
         depth[i] = (z - NEAR) / (FAR - NEAR);
@@ -181,26 +183,50 @@ let STATIC = {};
 console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE CAMERA");
 
 {
-    // a camera that MOVES, so a screen-indexed ring would average over different surfaces
-    const step = 0.6;
-    const build = (reproject) => {
+    // a camera that MOVES, so a screen-indexed ring would average over different surfaces.
+    //
+    // *** THIS ROW JUDGED NO PIXELS FROM v4553 UNTIL THE LOCK-RING ROUND REPAIRED IT, AND PASSED ON ZEROS. *** It drove the
+    // camera at 0.6 world units a frame -- 3.6 px on a 48 px frame -- so after 2P+2 = 18 frames every pixel's
+    // history had walked off the frame edge (18 x 3.6 = 65 px) and been reset, the ring was unfilled
+    // everywhere, and shadingShiftCPU reported 0 for every pixel as UNKNOWN. "0 with reprojection, 1.26e-1
+    // without" was "nothing judged" against "a screen-indexed ring that never resets". It still caught BX (no
+    // reprojection at all, which also removes the resets), but a reprojection with the WRONG offset resets the
+    // same pixels and passed. The rows below say how many pixels they judge and average over those only.
+    const step = 0.6;                                   // kept for the double-buffer rows, which compare slots, not the detector
+    const SLOW = 0.2;                                   // 1.2 px a frame: 18 frames walk 21.6 px, so most pixels keep their history
+    const build = (reproject, kind, at = SLOW) => {
         const ls = makeLumaState(W, H, P);
         for (let f = 0; f < 2 * P + 2; f++) {
-            const camX = f * step;
-            const fr = renderFrame({ camX });
-            const m = motionFor(fr.depth, camX, camX - step);
+            const camX = f * at;
+            const fr = renderFrame({ camX, kind });
+            const m = motionFor(fr.depth, camX, camX - at);
             pushLuma(ls, { current: fr.colour, motion: reproject ? m : null, w: W, h: H });
         }
-        return shadingShiftCPU(ls, { scale: 0.25 });
+        return { shift: shadingShiftCPU(ls, { scale: 0.25 }), filled: ls.filled, frames: ls.frames };
     };
-    const withRe = build(true), without = build(false);
-    let sw = 0, so = 0;
-    for (let i = 0; i < W * H; i++) { sw += withRe.data[i] / (W * H); so += without.data[i] / (W * H); }
-    report(`camera translating ${step} world units per frame; mean shading shift reported across the frame`);
+    // mean over the pixels the reprojected ring JUDGED -- the same set for both, so the comparison is like for like
+    const judgedMean = (judgedBy, field) => { let s = 0, n = 0;
+        for (let i = 0; i < W * H; i++) if (judgedBy.filled[i] >= judgedBy.frames) { s += field.shift.data[i]; n++; }
+        return { mean: n ? s / n : NaN, n }; };
+    const old = build(true, "chequer", step);
+    report(`the old drive -- ${step} world units (${(step / PXW).toFixed(1)} px) a frame for ${2 * P + 2} frames -- leaves ${W * H - old.shift.unknown} of ${W * H} pixels with a full ring; that is what the row used to average`);
+    const withRe = build(true, "smooth"), without = build(false, "smooth");
+    const sw = judgedMean(withRe, withRe), so = judgedMean(withRe, without);
+    report(`camera translating ${SLOW} world units (${(SLOW / PXW).toFixed(1)} px) a frame over smooth shading; mean shading shift over the ${sw.n} pixels the reprojected ring judges`);
+    ok(`the detector row JUDGES most of the frame -- ${sw.n} of ${W * H} pixels have a full ring -- so a zero below is a measurement and not an absence`,
+        sw.n >= (W * H) / 2, `${sw.n} judged, ${W * H - sw.n} unknown (the strip the camera has uncovered in the last ${2 * P} frames)`);
     // NOTHING in this sequence changes its shading -- the camera moves and the scene does not. Every unit of
     // shift a screen-indexed ring reports is the scene sliding past, read as a change in the light.
-    ok(`*** with reprojection the detector reports ${sw.toExponential(2)} on a scene whose shading never changes; WITHOUT it, ${so.toExponential(2)} -- ${(so / Math.max(sw, 1e-12)).toExponential(1)}x, and all of it is the camera ***`,
-        so > sw * 10 && sw < 0.05, `with ${sw.toExponential(3)}, without ${so.toExponential(3)}`);
+    ok(`*** with reprojection the detector reports ${sw.mean.toExponential(2)} on a scene whose shading never changes; WITHOUT it, ${so.mean.toExponential(2)} -- ${(so.mean / Math.max(sw.mean, 1e-12)).toExponential(1)}x, and all of it is the camera ***`,
+        sw.n > 0 && so.mean > sw.mean * 10 && sw.mean < 0.05, `with ${sw.mean.toExponential(3)}, without ${so.mean.toExponential(3)}, over ${sw.n} pixels`);
+    // *** AND THE LIMIT, STATED AS A NUMBER. *** On the pixel-scale chequer the reprojection is NOT faithful: each
+    // bilinear fetch blurs a 1.13 px texture, the older period has been fetched 8 more times than the newer, and
+    // the difference between a more-blurred and a less-blurred chequer is read as a change in the light. Measured
+    // when this row was repaired: 1.0e-1 at this speed, and 7.6e-2 / 2.2e-1 at 0.3 / 0.08 px a frame -- as large
+    // as a ring that does not reproject at all. It is reported, not asserted: it is a property of bilinear
+    // history on content at the pixel scale, which this module does not claim to handle.
+    const chqRun = build(true, "chequer"), chq = judgedMean(chqRun, chqRun);
+    report(`the same drive over the pixel-scale chequer reads ${chq.mean.toExponential(2)} over ${chq.n} judged pixels -- a false shading change from reprojection blur, recorded, not hidden`);
 
     // ---- *** THE DOUBLE BUFFER, WHICH WENT 0-RED AND IS THE REASON THIS BLOCK EXISTS. *** ------------------
     // pushLuma swaps a scratch pair rather than allocating a fresh ring each frame -- an optimisation made
@@ -506,13 +532,24 @@ else {
 //      held by tools/ship/sweep-timings.json and the sweep's budget, not by a correctness row, and a gate that
 //      went red on a slower-but-identical implementation would be asserting something it cannot measure.
 //   No 0-RED among the ten once CG's rows exist, and CH's zero is a property rather than a hole.
+//
+// ADDED WHEN SECTION 3's DETECTOR ROW WAS FOUND TO JUDGE NO PIXELS (the lock-ring round), this gate only, files
+// restored and md5-verified, baseline 0 red:
+//   CI the reprojection's SIGN flipped (CPU) -> 5 red now. THE OLD ROW PASSED IT, reading 0.00e+0 "with
+//      reprojection" because every pixel had reset to unknown; it was caught only by the double-buffer row
+//      (whose naive copy reprojects with the right sign) and the device-parity rows. The repaired row reads
+//      2.58e-1 against 1.77e-1 without reprojection.
+//   CJ the detector row driven at the old 0.6 world units a frame -> 2 red: 0 of 2304 pixels judged, and a NaN
+//      mean, which is the vacuous row made visible instead of passing.
+//   BX re-run against the repaired row -> 5 red (it reads 1.86e-1 with and without -- 1.0x).
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a lock detector that CAN separate a thin feature from a pixel-scale texture -- " +
     "section 5 shows luma alone cannot, and FSR2 leans on depth and on material information this tree does not " +
     "carry into the pass; the ring at an upscale ratio other than 1, where jitterPhaseCount is larger and the " +
     "ring costs 2*P floats per pixel; a MOVING object rather than a moving camera, since motion vectors here " +
-    "come from camera translation only; and the memory this rung spends, which is 2*P scalars per pixel and " +
+    "come from camera translation only; the shading detector on PIXEL-SCALE content under motion, where bilinear " +
+    "reprojection blurs the older period more than the newer and section 3 records the false change it reads; and the memory this rung spends, which is 2*P scalars per pixel and " +
     "is the reason FSR2 uses 4 rather than the phase count -- section 1 prices that choice but nothing here " +
     "argues the other side of it.");
 // ================================================================================================

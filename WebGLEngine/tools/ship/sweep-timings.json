@@ -874,7 +874,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 2745,
+  "render/temporalLock-selfcheck.mjs": 3162,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -4738,7 +4738,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T16:09:01.048Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -11272,7 +11272,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 2745,
+  "render/temporalLock-selfcheck.mjs": 3162,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -12985,7 +12985,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T16:09:01.048Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
@@ -13648,9 +13648,9 @@
    2880
   ],
   "render/temporalLock-selfcheck.mjs": [
-   3145,
-   2590,
-   2745
+   2745,
+   3477,
+   3162
   ],
   "render/temporalReject-selfcheck.mjs": [
    2191,

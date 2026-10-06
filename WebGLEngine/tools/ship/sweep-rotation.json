@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-10-06T14:46:06.708Z",
+ "at": "2026-10-06T16:09:01.048Z",
  "poolAt": "2026-09-22T18:55:53.815Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -739,6 +739,13 @@
    "code": 0,
    "priorMs": 1292,
    "at": "2026-09-20T12:39:52.283Z"
+  },
+  {
+   "gate": "render/temporalLock-selfcheck.mjs",
+   "ms": 3162,
+   "code": 0,
+   "priorMs": 3477,
+   "at": "2026-10-06T16:09:01.048Z"
   },
   {
    "gate": "rig/cinematicShot-selfcheck.mjs",
