@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 import { makeLumaSums, pushLumaSums, lumaSumsMean, lumaSumsShiftCPU } from "./temporalLockSums.mjs";
 import * as TL from "./temporalLockSumsTsl.mjs";
+const report = (s) => console.log(`  ----  ${s}`);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -180,7 +181,85 @@ else {
     }
 }
 
-// SABOTAGE LOG -- see render/temporalLockSums-selfcheck.mjs's, which runs both gates for each.
+console.log("\n4. ON THE DEVICE: the driver's DEFAULT is the sums, and once they are warm it is the chain without them where nothing changes");
+// *** EVERY OTHER GATE THAT BUILDS THE DRIVER RUNS INSIDE THE WARM-UP. *** At 2x the period is 32 and the sums know nothing
+// before frame 63; the quality gates run 24-40 frames, so flipping the default moved none of them by a digit -- an
+// absence, not a measurement. This section runs past it, on fsr-three.html's scene, 24 -> 48 at 2x: still, and with
+// the knot turning (the mask must fire, or the run is as blind as the others). What the mask is WORTH there is reported,
+// not asserted: measured over 128 frames at 128x128 when the default was made, -0.010 to +0.014 dB across six cases.
+//
+// *** THE STILL ROW WAS WRITTEN "TO THE BIT" AND THE DEVICE SAID NO, TWICE. *** First: the mask read 0.019 on a scene
+// where nothing moves -- the older closed window held frames 0-31, and three's FIRST renders are not its later ones
+// (pipelines still compiling); 32 frames later, or with the scene drawn twice before the driver starts, it fell to
+// 3.3e-4. So a page that has just started reads its own start-up as a light change for two periods; the scene is
+// drawn twice first here so that is not what this row measures. Second: 3.3e-4 is not 0 -- the device fetches its
+// sums bilinearly in f32 every frame even at zero motion, and the two windows' rounding differs. The mirror's still
+// picture IS exact (render/temporalLockSums-selfcheck.mjs section 3, in f64). What is asserted here is what the
+// picture can show: the mask never fires, and no output value moves by an 8-bit step.
+if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. ***"); fails++; }
+else {
+    const N8 = 68, D8 = 48;   // 2x: two closed periods by frame 63, then five frames with the mask live; 48 px kept the gate under its cap
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { N8, DW: D8, RW: D8 / 2 }, script: `async (a) => {
+        const THREE = await import("/vendor/three-webgpu/three.webgpu.js"); const T = await import("/vendor/three-webgpu/three.tsl.js");
+        const FT = await import("/fx/fsr/fsrTemporalTsl.mjs"); const TC = await import("/render/temporalClipTsl.mjs");
+        const canvas = document.createElement("canvas"); canvas.width = a.DW; canvas.height = a.DW;
+        const renderer = new THREE.WebGPURenderer({ canvas, antialias: false }); await renderer.init();
+        const scene = new THREE.Scene(); scene.background = new THREE.Color(0.02, 0.03, 0.06);
+        const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.9, 0.28, 220, 24), new THREE.MeshNormalNodeMaterial()); scene.add(knot);
+        const st = new THREE.MeshBasicNodeMaterial();
+        st.colorNode = T.Fn(() => { const s = T.floor(T.uv().x.mul(48.0).add(T.uv().y.mul(9.0))).mod(2.0); return T.mix(T.vec3(0.05, 0.08, 0.14), T.vec3(0.95, 0.72, 0.3), s); })();
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, 5), st); floor.rotation.x = -Math.PI / 2; floor.position.y = -1.3; scene.add(floor);
+        const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 50); cam.position.set(0, 0.6, 5.2); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+        const vp = Array.from(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements);
+        const threshold = TC.clipGapThreshold(vp, [0, 0, 1.2], [0, -1.3, -1.0]);
+        const tgt = (n) => new THREE.RenderTarget(n, n, { type: THREE.FloatType }), read = async (t, n) => Array.from(await renderer.readRenderTargetPixelsAsync(t, 0, 0, n, n));
+        const out = {}, o2 = tgt(a.DW), big = tgt(a.DW * 4);
+        renderer.setRenderTarget(o2); await renderer.renderAsync(scene, cam); await renderer.renderAsync(scene, cam); renderer.setRenderTarget(null);   // past three's first renders
+        for (const c of ["still", "turn"]) {
+            out[c] = {};
+            for (const which of ["default", "off"]) {
+                const opts = { renderWidth: a.RW, renderHeight: a.RW, displayWidth: a.DW, displayHeight: a.DW, threshold, type: THREE.FloatType };
+                if (which === "off") opts.lock = false;
+                const f = FT.makeFsrTemporal(THREE, T, renderer, opts), o = { history: f.history, memory: f.memory.ring, period: f.period };
+                for (let k = 0; k < a.N8; k++) { knot.rotation.set(0.4, 0.6 + (c === "turn" ? 0.01 * k : 0), 0); knot.updateMatrixWorld(); await f.render(scene, cam, o2); }
+                o.out = await read(o2, a.DW);
+                o.fired = null; o.maskMax = null;   // no mask target at all: read as null, and the rows below say so in red
+                if (f.targets.shading) { const s = await read(f.targets.shading, a.DW); o.fired = 0; o.maskMax = 0; for (let i = 0; i < a.DW * a.DW; i++) { if (s[i * 4] >= 0.05) o.fired++; o.maskMax = Math.max(o.maskMax, s[i * 4]); } }
+                f.dispose(); out[c][which] = o;
+            }
+            renderer.setRenderTarget(big); await renderer.renderAsync(scene, cam); renderer.setRenderTarget(null); out[c].truth4 = await read(big, a.DW * 4);
+        }
+        renderer.dispose(); return out;
+    }` });
+    ok("the harness ran the driver's default and the chain without a lock", r.ok && r.result, r.ok ? "ok" : (r.reason || (r.pageErrors || []).join("; ")));
+    if (r.ok && r.result) {
+        const { still, turn } = r.result, D = D8;
+        ok(`*** the driver's DEFAULT lock is the sums: history "${still.default.history}", ${still.default.memory} bytes at ${D}x${D} -- one texel a pixel, twice -- at the 2x period ${still.default.period} ***`,
+            still.default.history === "sums" && still.default.memory === 2 * D * D * 16 && still.off.history === null && still.off.memory === 0, `lock: false builds none: history ${still.off.history}`);
+        let differ = 0, wOut = 0; for (let i = 0; i < still.default.out.length; i++) { if (!Object.is(still.default.out[i], still.off.out[i])) differ++; wOut = Math.max(wOut, Math.abs(still.default.out[i] - still.off.out[i])); }
+        ok(`*** on a STILL scene past the warm-up (${N8} frames, the mask live from 63) the default's mask never fires -- 0.05 or above on ${still.default.fired} pixels, its largest ${still.default.maskMax === null ? "NO MASK" : still.default.maskMax.toExponential(1)} -- and no output value moves by an 8-bit step: worst ${wOut.toExponential(1)}, ${(1 / 255 / Math.max(wOut, 1e-12)).toFixed(0)}x under 1/255 ***`,
+            still.default.fired === 0 && wOut < 1 / 255, `${differ} of ${still.default.out.length} values differ in f32: the device's windows round differently (see above); the mirror's are exact`);
+        const t4 = turn.truth4, truth = new Float32Array(D * D * 3), cl = (v) => Math.min(1, Math.max(0, v));
+        for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) for (let c = 0; c < 3; c++) { let s = 0;
+            for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++) s += t4[((y * 4 + sy) * D * 4 + x * 4 + sx) * 4 + c]; truth[(y * D + x) * 3 + c] = s / 16; }
+        const psnr = (b) => { let q = 0; for (let i = 0; i < D * D; i++) for (let c = 0; c < 3; c++) q += (cl(b[i * 4 + c]) - cl(truth[i * 3 + c])) ** 2; return 10 * Math.log10(1 / (q / (D * D * 3))); };
+        let moved = 0; for (let i = 0; i < turn.default.out.length; i++) if (!Object.is(turn.default.out[i], turn.off.out[i])) moved++;
+        ok(`*** with the knot TURNING the default's mask is live -- ${turn.default.fired} pixels at 0.05 or above on the last frame, ${moved} output values moved -- so this run is past the warm-up the other gates sit in ***`,
+            turn.default.fired > 0 && moved > 0, "a run inside the warm-up reads 0 and 0 here, which is what every other gate building the driver reads");
+        report(`and what it is worth there: ${psnr(turn.default.out).toFixed(3)} dB against the supersampled last frame, ${psnr(turn.off.out).toFixed(3)} without it -- neutral, as measured over six cases when the default was made`);
+    }
+}
+
+// SABOTAGE LOG -- see render/temporalLockSums-selfcheck.mjs's, which runs both gates for each. Section 4's, when the
+// driver's default became the sums, against fx/fsr/fsrTemporalTsl.mjs and this gate's own fixture, baseline 0 red:
+//   F1  the default back to no lock                          3 red (it first CRASHED the gate on a missing mask, which
+//                                                            is red but hides the rows behind it; a missing mask is now
+//                                                            read as null and named)
+//   F2  the default the ring                                 1 red: the history row, 1,253,376 bytes at 48x48
+//   F3  the driver never draws the shading mask              2 red, section 3's push-and-read row and the turning row
+//   F4  (fixture) the two warm-up renders removed            1 red: the still mask reaches 1.9e-2 and the picture moves
+//                                                            5.8e-3, past an 8-bit step -- three's start-up frames read
+//                                                            as a light change, which is why the scene is drawn first
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the sums in fx/fsr/fsrTemporalTsl-selfcheck.mjs's whole-chain composition, which runs the ring -- section 3 grades " +

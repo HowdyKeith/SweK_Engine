@@ -8114,7 +8114,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "tumble, so a light drop is caught at the end of its period, exactly P - 1 - phase frames later. On the " +
                  "device (render/temporalLockSumsTsl.mjs), both backends, to 1.8e-7, and fx/fsr/fsrTemporalTsl.mjs takes " +
                  "lock: \"sums\". 14 sabotages, all red; one (the mean a period stale) only by a row written for it. " +
-                 "NOT DECIDED: whether the driver's lock default turns on now that it is affordable.",
+                 "The driver's lock DEFAULTS to the sums since: measured past the 63-frame warm-up every other gate sits " +
+                 "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
+                 "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***

@@ -52,7 +52,7 @@
     </select></label>
     <label>sharpness <input id="sharp" type="range" min="0" max="1" step="0.05" value="0.8"> <span id="sharpV">0.80</span></label>
     <label><input id="denoise" type="checkbox"> denoise</label>
-    <label title="FSR2's lock stage as fsr.html runs it: two jitter periods of luma, reprojected, whose newer period against its older is the shading mask. The RING keeps every luma, so it is large; the SUMS keep each period's running sum, one texel a pixel at any scale, and see a change of light up to a period later (render/temporalLockSums-selfcheck.mjs). The figure is its float memory at this scale."><input id="lock" type="checkbox"> lock <select id="lockHistory">
+    <label title="FSR2's lock stage as fsr.html runs it: two jitter periods of luma, reprojected, whose newer period against its older is the shading mask. The RING keeps every luma, so it is large; the SUMS keep each period's running sum, one texel a pixel at any scale, and see a change of light up to a period later (render/temporalLockSums-selfcheck.mjs). The figure is its float memory at this scale."><input id="lock" type="checkbox" checked> lock <select id="lockHistory">
       <option value="sums" selected>sums</option>
       <option value="ring">ring</option>
     </select> <span id="lockMB"></span></label>

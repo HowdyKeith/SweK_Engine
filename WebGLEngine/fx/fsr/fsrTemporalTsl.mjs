@@ -18,10 +18,20 @@
 // Every pass is graded against its CPU mirror in its own gate; fx/fsr/fsrTemporalTsl-selfcheck.mjs grades the
 // COMPOSITION -- the whole chain run on the CPU from the device's renders, frame by frame, against the device.
 //
-// *** THE LOCK RING IS OFF BY DEFAULT, AND ITS COST IS WHY. *** Its period must be the jitter's phase count or the
+// *** THE LOCK RING WAS OFF BY DEFAULT, AND ITS COST WAS WHY. *** Its period must be the jitter's phase count or the
 // mask reads sampling as shading (fsr.html: "may not be chosen for cost"), which at 2x is 64 lumas a pixel: 265 MB of
 // float at 960x540 across the ping-pong pair. render/temporalLock.mjs keeps every luma where FSR2 keeps a lock and a
-// short history. `lock: true` (or "ring") turns it on and `memory` reports what it costs.
+// short history. `lock: true` (or "ring") builds it and `memory` reports what it costs.
+// *** THE DEFAULT IS NOW THE SUMS (`lock: "sums"`), AND WHAT IT BUYS WAS MEASURED BEFORE IT WAS MADE ONE. *** On
+// fsr-three.html's scene at 2x, 128 frames, PSNR against a 4x4-supersampled render every 4th frame from 64 (the mask
+// is unknown everywhere before 63): still -- the same picture to the bit, the mask never fires; the knot turning,
+// +0.014 dB; a slow pan, -0.006; the knot's light dropped to 55%, -0.010; dimmed to 85%, -0.005; pulsing 15% with a
+// period near the jitter's, nothing, because a whole window averages the pulse out. The clamp and the reactive mask
+// already discard what the shading mask would, so on this scene it is NEUTRAL -- the default costs 16.6 MB at 960x540
+// and two full-screen passes a frame for it, and render/temporalLockSumsTsl-selfcheck.mjs section 4 holds the still
+// picture's identity and that the mask is live. `lock: false` is the chain without it. *** NOTHING ELSE IN THE TREE
+// COULD SEE THE CHANGE: *** every quality gate runs 24-40 frames at 2x, inside the sums' 63-frame warm-up, and all
+// twenty-two gates that build this driver read the same output to the digit with either default.
 //
 // *** `lock: "sums"` IS THE SAME TWO WINDOWS IN ONE TEXEL A PIXEL. *** render/temporalLockSums.mjs's makeLumaSums keeps
 // each window's running sum instead of its lumas: 16.6 MB at 960x540 at any ratio. At a period boundary the sums ARE
@@ -96,7 +106,7 @@ export async function probeHalfWrite(THREE, TSL, renderer, values) {
  * unless given). Returns { render(scene, camera, output), targets, jitter, memory, frames, dispose }.
  */
 export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeight, displayWidth, displayHeight, ratio = null,
-                                                         threshold, alpha = 0.1, reactive = true, lock = false,
+                                                         threshold, alpha = 0.1, reactive = true, lock = "sums",
                                                          lockFrom = "frame", lockLife = 8, lockMargin = 0.05,
                                                          sharpness = 0.5, rcas = true, type = null, cameraMotion = false } = {}) {
     if (!(threshold > 0)) throw new Error("fx/fsr/fsrTemporalTsl: threshold must be a positive clip-z gap -- see clipGapThreshold in render/temporalClipTsl.mjs");

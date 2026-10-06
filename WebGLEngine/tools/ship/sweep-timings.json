@@ -2227,7 +2227,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
   "camera/cameraBoom-selfcheck.mjs": 342,
   "render/temporalLockSums-selfcheck.mjs": 1540,
-  "render/temporalLockSumsTsl-selfcheck.mjs": 11169
+  "render/temporalLockSumsTsl-selfcheck.mjs": 16005
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -6095,7 +6095,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:39.216Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:28:56.212Z",
-  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:59:54.141Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -11518,7 +11518,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
   "camera/cameraBoom-selfcheck.mjs": 342,
   "render/temporalLockSums-selfcheck.mjs": 1540,
-  "render/temporalLockSumsTsl-selfcheck.mjs": 11169
+  "render/temporalLockSumsTsl-selfcheck.mjs": 16005
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
@@ -13233,7 +13233,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:28:56.212Z",
-  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:59:54.141Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -19445,9 +19445,9 @@
    1540
   ],
   "render/temporalLockSumsTsl-selfcheck.mjs": [
-   11848,
    11163,
-   11169
+   11169,
+   16005
   ]
  },
  "contended": {
