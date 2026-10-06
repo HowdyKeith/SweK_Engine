@@ -8098,6 +8098,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "vertical smoothing on top of the boom, so the guarantee is the boom's and not that offset's, as the mesh " +
                  "branch's always was; and nothing here has been looked at on the rig.",
     }),
+    // the lock-sums round -- THE LOCK's TWO WINDOWS AS RUNNING SUMS: render/temporalLock.mjs's makeLumaSums and its TSL port.
+    since479: Object.freeze({
+        at: "the lock-sums round (unshipped)", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalLockSums-selfcheck.mjs", "render/temporalLockSumsTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLock-selfcheck.mjs (its moving-camera detector row judged 0 of 2304 pixels and passed on zeros; repaired the round before)"]),
+        verdict: "*** THE LOCK WAS OFF BECAUSE IT KEPT EVERY LUMA. *** The ring holds 2 x period lumas a pixel -- 282 MB on " +
+                 "the device at 2x at 960x540, in a target 8640 rows tall that WebGPU refused here (fsr-three.html's lock " +
+                 "ring at 2x drew validation errors every frame, on the unmodified page too) -- and both of its outputs are " +
+                 "sums of them. render/temporalLockSums.mjs keeps three running sums and the fill count in one float " +
+                 "texel: 16.6 MB at any ratio. Bilinear reprojection is linear, so at every period boundary the sums ARE " +
+                 "the ring's two halves summed -- held within frames x 2^-24, still and moving -- and the still picture and " +
+                 "the lock on a 0.4 px line come out identical. What it gives up is when a change is seen: the windows " +
+                 "tumble, so a light drop is caught at the end of its period, exactly P - 1 - phase frames later. On the " +
+                 "device (render/temporalLockSumsTsl.mjs), both backends, to 1.8e-7, and fx/fsr/fsrTemporalTsl.mjs takes " +
+                 "lock: \"sums\". 14 sabotages, all red; one (the mean a period stale) only by a row written for it. " +
+                 "NOT DECIDED: whether the driver's lock default turns on now that it is affordable.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds

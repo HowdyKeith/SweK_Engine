@@ -193,13 +193,18 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     // reprojection at all, which also removes the resets), but a reprojection with the WRONG offset resets the
     // same pixels and passed. The rows below say how many pixels they judge and average over those only.
     const step = 0.6;                                   // kept for the double-buffer rows, which compare slots, not the detector
+    // a camera translating at a constant speed over a flat wall has ONE field for every frame: drawn once per speed. The
+    // detector row's repair doubled this section's sequences and took the gate over the sweep's 3 s budget (2745 -> 3162
+    // ms) until the field stopped being re-derived every frame and the old drive and the chequer stopped being re-run
+    // to print numbers that are recorded below.
+    const fieldAt = new Map(), fieldFor = (depth, speed) => fieldAt.get(speed) || fieldAt.set(speed, motionFor(depth, speed, 0)).get(speed);
     const SLOW = 0.2;                                   // 1.2 px a frame: 18 frames walk 21.6 px, so most pixels keep their history
     const build = (reproject, kind, at = SLOW) => {
         const ls = makeLumaState(W, H, P);
         for (let f = 0; f < 2 * P + 2; f++) {
             const camX = f * at;
             const fr = renderFrame({ camX, kind });
-            const m = motionFor(fr.depth, camX, camX - at);
+            const m = fieldFor(fr.depth, at);
             pushLuma(ls, { current: fr.colour, motion: reproject ? m : null, w: W, h: H });
         }
         return { shift: shadingShiftCPU(ls, { scale: 0.25 }), filled: ls.filled, frames: ls.frames };
@@ -208,8 +213,8 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     const judgedMean = (judgedBy, field) => { let s = 0, n = 0;
         for (let i = 0; i < W * H; i++) if (judgedBy.filled[i] >= judgedBy.frames) { s += field.shift.data[i]; n++; }
         return { mean: n ? s / n : NaN, n }; };
-    const old = build(true, "chequer", step);
-    report(`the old drive -- ${step} world units (${(step / PXW).toFixed(1)} px) a frame for ${2 * P + 2} frames -- leaves ${W * H - old.shift.unknown} of ${W * H} pixels with a full ring; that is what the row used to average`);
+    // the old drive, 0.6 a frame for 2P+2 frames, leaves 0 of 2304 pixels with a full ring -- what the row used to
+    // average. Sabotage CJ below puts the row back on it and reads that zero as two reds.
     const withRe = build(true, "smooth"), without = build(false, "smooth");
     const sw = judgedMean(withRe, withRe), so = judgedMean(withRe, without);
     report(`camera translating ${SLOW} world units (${(SLOW / PXW).toFixed(1)} px) a frame over smooth shading; mean shading shift over the ${sw.n} pixels the reprojected ring judges`);
@@ -222,11 +227,11 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     // *** AND THE LIMIT, STATED AS A NUMBER. *** On the pixel-scale chequer the reprojection is NOT faithful: each
     // bilinear fetch blurs a 1.13 px texture, the older period has been fetched 8 more times than the newer, and
     // the difference between a more-blurred and a less-blurred chequer is read as a change in the light. Measured
-    // when this row was repaired: 1.0e-1 at this speed, and 7.6e-2 / 2.2e-1 at 0.3 / 0.08 px a frame -- as large
-    // as a ring that does not reproject at all. It is reported, not asserted: it is a property of bilinear
-    // history on content at the pixel scale, which this module does not claim to handle.
-    const chqRun = build(true, "chequer"), chq = judgedMean(chqRun, chqRun);
-    report(`the same drive over the pixel-scale chequer reads ${chq.mean.toExponential(2)} over ${chq.n} judged pixels -- a false shading change from reprojection blur, recorded, not hidden`);
+    // when this row was repaired: 1.0e-1 at this speed over the 1536 judged pixels, and 7.6e-2 / 2.2e-1 at 0.3 /
+    // 0.08 px a frame -- as large as a ring that does not reproject at all. It is recorded here and not re-run: it is
+    // a property of bilinear history on content at the pixel scale, which this module does not claim to handle, and
+    // re-running it took this gate over the sweep's 3 s budget. render/temporalLockSums-selfcheck.mjs section 5
+    // measures the same drive for the sums each run.
 
     // ---- *** THE DOUBLE BUFFER, WHICH WENT 0-RED AND IS THE REASON THIS BLOCK EXISTS. *** ------------------
     // pushLuma swaps a scratch pair rather than allocating a fresh ring each frame -- an optimisation made
@@ -240,7 +245,7 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
         const st2 = makeLumaState(W, H, P);
         for (let f = 0; f < 2 * P + 2; f++) {
             const camX = f * step, fr = renderFrame({ camX });
-            const m = motionFor(fr.depth, camX, camX - step);
+            const m = fieldFor(fr.depth, step);
             const F = st2.frames, out = new Float32Array(W * H * F), fill = new Uint8Array(W * H);
             for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
                 const i = y * W + x, o2 = i * 4;
@@ -265,7 +270,7 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     })();
     const swapped = (() => { const st3 = makeLumaState(W, H, P);
         for (let f = 0; f < 2 * P + 2; f++) { const camX = f * step, fr = renderFrame({ camX });
-            pushLuma(st3, { current: fr.colour, motion: motionFor(fr.depth, camX, camX - step), w: W, h: H }); }
+            pushLuma(st3, { current: fr.colour, motion: fieldFor(fr.depth, step), w: W, h: H }); }
         return st3; })();
     let wRing = 0; for (let i = 0; i < W * H * 2 * P; i++) wRing = Math.max(wRing, Math.abs(swapped.ring[i] - naive.ring[i]));
     ok(`*** the swapped ring is BIT-IDENTICAL to one allocated fresh every frame over ${2 * P + 2} frames of a moving camera -- worst ${wRing} -- so the optimisation is a control, not a hope ***`,

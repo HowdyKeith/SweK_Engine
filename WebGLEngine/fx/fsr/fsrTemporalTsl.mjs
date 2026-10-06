@@ -21,7 +21,18 @@
 // *** THE LOCK RING IS OFF BY DEFAULT, AND ITS COST IS WHY. *** Its period must be the jitter's phase count or the
 // mask reads sampling as shading (fsr.html: "may not be chosen for cost"), which at 2x is 64 lumas a pixel: 265 MB of
 // float at 960x540 across the ping-pong pair. render/temporalLock.mjs keeps every luma where FSR2 keeps a lock and a
-// short history. `lock: true` turns it on and `memory` reports what it costs.
+// short history. `lock: true` (or "ring") turns it on and `memory` reports what it costs.
+//
+// *** `lock: "sums"` IS THE SAME TWO WINDOWS IN ONE TEXEL A PIXEL. *** render/temporalLockSums.mjs's makeLumaSums keeps
+// each window's running sum instead of its lumas: 16.6 MB at 960x540 at any ratio. At a period boundary the sums ARE
+// the ring's two halves summed (bilinear reprojection is linear), so the mean and the mask agree with the ring's there
+// to f32 rounding; between boundaries the sums' windows have not moved, so a light change is reported up to P - 1
+// frames late. render/temporalLockSums-selfcheck.mjs holds both. `lockFrom: "ring"` reads whichever history `lock`
+// built -- the ring's newer period, or the sums' last closed one.
+// *** AND AT 2x THE RING DOES NOT FIT IN A TEXTURE. *** It packs ceil(2P/4) slices down one target: 16 at 2x, so 540
+// rows become 8640, past the 8192 WebGPU allowed here -- fsr-three.html's lock ring at 2x drew validation errors on
+// every frame, measured when the sums were built, and it does on the unmodified page too. The sums are one slice at
+// every ratio. The ring is not refused at that size here; a caller that wants it at 2x needs a device that allows it.
 //
 // *** LOCKS ARE `lockFrom`, AND WHAT THEY BUY IS THE CONTENT'S. *** null (no locks), "frame" (newLocksCPU: the ridge test
 // over this frame's resolved luma, which needs no ring) or "ring" (lockCandidatesFromRing: over the ring's mean, which
@@ -50,6 +61,7 @@ import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from 
 import { applyJitter, restoreProjection, glClip, makeMotionStage, resolveNode, accumulateNode } from "../../render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, historyFactorNode } from "../../render/temporalClipTsl.mjs";
 import { makeLumaRing, makeLockLife, ridgesNode, newLocksNode } from "../../render/temporalLockTsl.mjs";
+import { makeLumaSums } from "../../render/temporalLockSumsTsl.mjs";
 import { reactiveNode } from "../../render/reactiveTsl.mjs";
 import { rcasNode } from "./fsrTsl.mjs";
 
@@ -89,7 +101,9 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
                                                          sharpness = 0.5, rcas = true, type = null, cameraMotion = false } = {}) {
     if (!(threshold > 0)) throw new Error("fx/fsr/fsrTemporalTsl: threshold must be a positive clip-z gap -- see clipGapThreshold in render/temporalClipTsl.mjs");
     if (![null, "frame", "ring"].includes(lockFrom)) throw new Error(`fx/fsr/fsrTemporalTsl: lockFrom must be null, "frame" or "ring" -- got ${JSON.stringify(lockFrom)}`);
+    if (![false, true, "ring", "sums"].includes(lock)) throw new Error(`fx/fsr/fsrTemporalTsl: lock must be false, true (the ring), "ring" or "sums" -- got ${JSON.stringify(lock)}`);
     if (lockFrom === "ring" && !lock) throw new Error('fx/fsr/fsrTemporalTsl: lockFrom "ring" reads the lock ring, which is what lock: true builds -- pass it, or lockFrom "frame", which needs no ring');
+    const history = lock === "sums" ? "sums" : lock ? "ring" : null;
     const rw = renderWidth, rh = renderHeight, dw = displayWidth, dh = displayHeight;
     const up = ratio == null ? dw / rw : ratio;
     const colType = type == null ? THREE.HalfFloatType : type;
@@ -112,7 +126,7 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const dil = dilateNodes(TSL, stage.depth.texture, stage.motion.texture, { w: dw, h: dh });
     const res = resolveNode(TSL, t.colour.texture, { rw, rh, dw, dh });
     const period = jitterPhaseCount(up);
-    const ring = lock ? makeLumaRing(THREE, TSL, { w: dw, h: dh, period, currentTex: t.resolved.texture, motionTex: t.dMotion.texture }) : null;
+    const ring = !history ? null : (history === "sums" ? makeLumaSums : makeLumaRing)(THREE, TSL, { w: dw, h: dh, period, currentTex: t.resolved.texture, motionTex: t.dMotion.texture });
     // one graph per ping-pong direction: frame k writes record[k % 2] and history[k % 2] and reads the other two
     const rx = reactive ? [0, 1].map((k) => reactiveNode(TSL, { current: t.resolved.texture, history: t.history[1 - k].texture, motion: t.dMotion.texture, prevDepth: t.record[1 - k].texture },
                                                           { w: dw, h: dh, threshold })) : null;
@@ -139,11 +153,11 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const draw = async (scene, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(scene, ortho); };
     const px = dw * dh, floatBytes = 16;
     return {
-        targets: t, stage, ring, locks, lockFrom, jitter: jit, period,
+        targets: t, stage, ring, history, locks, lockFrom, jitter: jit, period,
         uniforms: { resolve: res.uniforms, accumulate: acc.map((x) => x.uniforms), rcas: sharp ? sharp.map((x) => x.uniforms) : null, reactive: rx ? rx.map((x) => x.uniforms) : null,
                     candidates: cand ? cand.uniforms : null },
-        /** What the chain's float state costs in bytes, the ring separately because it is the part that is large. */
-        memory: { ring: lock ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : 0, period,
+        /** What the chain's float state costs in bytes, the lock history (`ring`, whichever `lock` built) separately because it can be large. */
+        memory: { ring: history === "ring" ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : history === "sums" ? 2 * px * floatBytes : 0, period, history,
                   locks: lockFrom ? (lockFrom === "ring" ? 5 : 4) * px * floatBytes : 0 },
         get frames() { return frames; },
         /** This frame's jitter, as the colour pass will be offset by it -- [jx, jy] in render pixels. */

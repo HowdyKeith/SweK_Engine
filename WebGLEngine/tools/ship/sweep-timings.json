@@ -874,7 +874,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 3162,
+  "render/temporalLock-selfcheck.mjs": 2779,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -2225,7 +2225,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 925,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 424,
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
-  "camera/cameraBoom-selfcheck.mjs": 342
+  "camera/cameraBoom-selfcheck.mjs": 342,
+  "render/temporalLockSums-selfcheck.mjs": 2339,
+  "render/temporalLockSumsTsl-selfcheck.mjs": 11169
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4157,7 +4159,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 0,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 0,
   "tools/ship/fsrCaches-selfcheck.mjs": 0,
-  "camera/cameraBoom-selfcheck.mjs": 0
+  "camera/cameraBoom-selfcheck.mjs": 0,
+  "render/temporalLockSums-selfcheck.mjs": 0,
+  "render/temporalLockSumsTsl-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -4738,7 +4742,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-06T16:09:01.048Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:09:04.778Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -6089,7 +6093,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:39.216Z",
-  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z"
+  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
+  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:09:07.281Z",
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7826,7 +7832,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 20000,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 20000,
   "tools/ship/fsrCaches-selfcheck.mjs": 20000,
-  "camera/cameraBoom-selfcheck.mjs": 20000
+  "camera/cameraBoom-selfcheck.mjs": 20000,
+  "render/temporalLockSums-selfcheck.mjs": 20000,
+  "render/temporalLockSumsTsl-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9649,7 +9657,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": true,
   "tools/ship/worldColliderBVH-selfcheck.mjs": true,
   "tools/ship/fsrCaches-selfcheck.mjs": true,
-  "camera/cameraBoom-selfcheck.mjs": true
+  "camera/cameraBoom-selfcheck.mjs": true,
+  "render/temporalLockSums-selfcheck.mjs": true,
+  "render/temporalLockSumsTsl-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11272,7 +11282,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 3162,
+  "render/temporalLock-selfcheck.mjs": 2779,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -11506,7 +11516,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 271,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 138,
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
-  "camera/cameraBoom-selfcheck.mjs": 342
+  "camera/cameraBoom-selfcheck.mjs": 342,
+  "render/temporalLockSums-selfcheck.mjs": 2339,
+  "render/temporalLockSumsTsl-selfcheck.mjs": 11169
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
@@ -12985,7 +12997,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-06T16:09:01.048Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:09:04.778Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
@@ -13219,7 +13231,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
-  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z"
+  "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
+  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:09:07.281Z",
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -13648,9 +13662,9 @@
    2880
   ],
   "render/temporalLock-selfcheck.mjs": [
-   2745,
-   3477,
-   3162
+   3162,
+   2426,
+   2779
   ],
   "render/temporalReject-selfcheck.mjs": [
    2191,
@@ -19424,6 +19438,16 @@
   ],
   "camera/cameraBoom-selfcheck.mjs": [
    342
+  ],
+  "render/temporalLockSums-selfcheck.mjs": [
+   8279,
+   1933,
+   2339
+  ],
+  "render/temporalLockSumsTsl-selfcheck.mjs": [
+   11848,
+   11163,
+   11169
   ]
  },
  "contended": {
@@ -21137,7 +21161,9 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": true,
   "tools/ship/worldColliderBVH-selfcheck.mjs": true,
   "tools/ship/fsrCaches-selfcheck.mjs": false,
-  "camera/cameraBoom-selfcheck.mjs": false
+  "camera/cameraBoom-selfcheck.mjs": false,
+  "render/temporalLockSums-selfcheck.mjs": false,
+  "render/temporalLockSumsTsl-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -23069,6 +23095,8 @@
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "loaded",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "loaded",
   "tools/ship/fsrCaches-selfcheck.mjs": "alone",
-  "camera/cameraBoom-selfcheck.mjs": "alone"
+  "camera/cameraBoom-selfcheck.mjs": "alone",
+  "render/temporalLockSums-selfcheck.mjs": "alone",
+  "render/temporalLockSumsTsl-selfcheck.mjs": "alone"
  }
 }
