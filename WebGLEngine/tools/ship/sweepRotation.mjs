@@ -21,7 +21,7 @@ import { runGate } from "./redCensus.mjs";
 import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
-import { timingsTarget, KIND } from "./quickSweep.mjs";
+import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -35,6 +35,10 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // run is the drift kindsInferred exists to prevent.
         try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; } catch { code = 1; }
         const ms = Date.now() - t0;
+        // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
+        // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
+        // quickSweep reclaims at this point (v4692); the rotation did not.
+        if (code !== 0) { const gone = reclaimStrandedFixtures(); if (gone.length) console.log(`[rotation] reclaimed after ${g}: ${gone.join(", ")}`); }
         // *** v4568 -- WHETHER THE PROCESS FINISHED IS RECORDED, NOT INFERRED FROM THE NUMBER. ***
         // The whole defect in the killed bucket is that "at or over the cap" was read as "no verdict", so a
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns

@@ -114,14 +114,20 @@ export function restoreMutation(rel) {
  * between a mutation and its restore -- which is a corrupted tree, not a tidy-up, and the caller should say
  * so out loud rather than swallow it.
  */
-export function reclaimMutations() {
+// v4815 -- `deadOnly`: restore only what a process that has EXITED left behind. The sweep reclaims between gates and a
+// programmatic whole-tree sweep can run inside a gate while others are live, so a mutation whose owner is still running
+// is left to its owner. A process that cannot be signalled for any reason but ESRCH counts as alive: leaving a live
+// mutation alone is the safe side. Without the option nothing changes for the existing callers.
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return !(e && e.code === "ESRCH"); } };
+export function reclaimMutations({ deadOnly = false } = {}) {
     const led = readLedger();
-    const back = [];
+    const back = [], keep = {};
     for (const [rel, rec] of Object.entries(led)) {
         if (!rec || typeof rec.original !== "string") continue;
-        try { fs.writeFileSync(fixtureAbs(rel), rec.original); back.push(rel); } catch {}
+        if (deadOnly && Number.isInteger(rec.pid) && rec.pid !== process.pid && alive(rec.pid)) { keep[rel] = rec; continue; }
+        try { fs.writeFileSync(fixtureAbs(rel), rec.original); back.push(rel); } catch { keep[rel] = rec; }
     }
-    writeLedger({});
+    writeLedger(keep);
     return back;
 }
 
@@ -145,7 +151,12 @@ export const PROBE_RAW = FIXTURE_DIR + "/" + PROBE_PREFIX + "rawprobe_fixture.tx
 if (pathToFileURL(process.argv[1] || "").href === import.meta.url) {
     reclaimStranded();
     armExitSweep();
-    if (process.argv[2] === "mutate-kill" || process.argv[2] === "rawmutate-kill") {
+    if (process.argv[2] === "mutate-hold") {
+        // v4815: ledger a mutation and STAY ALIVE, so a deadOnly reclaim can be shown to leave a live owner's edit alone.
+        mutateFile(process.argv[3], "MUTATED BY THE LITTER PROBE\n");
+        fs.writeSync(1, "HOLDING\n");
+        setInterval(() => {}, 1000);
+    } else if (process.argv[2] === "mutate-kill" || process.argv[2] === "rawmutate-kill") {
         // The death a finally cannot survive, on the real mechanism: ledger a mutation and take SIGKILL.
         // The `rawmutate` twin writes the same bytes WITHOUT ledgering, which is what the code did before
         // v4649 -- it is the control that proves the ledger is what brings the file back.
@@ -154,5 +165,5 @@ if (pathToFileURL(process.argv[1] || "").href === import.meta.url) {
         process.kill(process.pid, "SIGKILL");
     } else if (process.argv[2] === "raw") fs.writeFileSync(fixtureAbs(PROBE_RAW), "unregistered\n");
     else writeFixture(PROBE_REG, "registered\n");
-    throw new Error("litter probe: dying with a fixture on disk");
+    if (process.argv[2] !== "mutate-hold") throw new Error("litter probe: dying with a fixture on disk");
 }

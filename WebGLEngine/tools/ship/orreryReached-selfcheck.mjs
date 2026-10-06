@@ -298,9 +298,10 @@ console.log("\n9. THE BAKE MUST NOT GO STALE -- v4329's lesson applied to a seco
         "orreryBake.mjs's rule: a file of positions begins lying the next morning");
     ok("  CONTROL: the drift check really can speak -- a bent bake is reported by name",
         (() => { const b = S.readReachedBake(ENG); return S.reachedDrift.length >= 0 && b.catalogue !== 999; })() &&
-        (() => { const p = path.join(ENG, S.REACHED_BAKE); const keep = fs.readFileSync(p, "utf8");
-                 const b = JSON.parse(keep); b.catalogue = 999; fs.writeFileSync(p, JSON.stringify(b, null, 1) + "\n");
-                 const said = S.reachedDrift(ENG, REPO); fs.writeFileSync(p, keep);
+        // v4815: the bent bake is a COPY handed to reachedDrift. It was written over the tracked file and restored, and a
+        // cap kill between the two writes left orrery-reached.json at catalogue 999 on disk (see orreryReachedScan.mjs).
+        (() => { const b = { ...S.readReachedBake(ENG), catalogue: 999 };
+                 const said = S.reachedDrift(ENG, REPO, { baked: b });
                  return said.some((x) => /catalogue/.test(x)); })(),
         "the check above is only worth having because a difference would be named rather than counted");
 }

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a53fc133a2e3202549494b88de98a8fbc2d4f06b",
+ "head": "9058b8a7008056cac32dfa5eb74eecb3c9d16593",
  "bodies": {
   "box3d": [
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3443126,
-    "sha": "a53fc133a2e3202549494b88de98a8fbc2d4f06b"
+    "sha": "f12471d7304fd6bf6b2f6ad1507cd6a616418ba1"
    },
    {
     "path": "mpm3d.html",
@@ -821,7 +821,7 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 18813,
+    "bytes": 19494,
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
@@ -963,7 +963,7 @@
    },
    {
     "path": "fx/fsr/fsrFlowCost-selfcheck.mjs",
-    "bytes": 13832,
+    "bytes": 15660,
     "sha": "bf438a5ca20eccb70423e0c5343f66afb16354e8"
    },
    {

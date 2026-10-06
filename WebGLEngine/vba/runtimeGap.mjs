@@ -1105,7 +1105,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // 1710 -> 1711, Promises 402 -> 403; nothing else moved.
     // v4814 -- and tools/ship/gateProfile.mjs: ES modules 4280 -> 4281, closures 4129 -> 4130; nothing else moved.
     // v4814 -- and headlessGpu-selfcheck's five children now overlap through a promise-wrapped spawn: Promises 403 -> 404.
-    esModules: 4281, closures: 4130, asyncAwait: 1711, typedArrays: 1263, promises: 404,
+    // v4815 -- inputSets-selfcheck's live-owner row awaits a held child through a promise: async/await 1711 -> 1712,
+    // Promises 404 -> 405; nothing else moved.
+    esModules: 4281, closures: 4130, asyncAwait: 1712, typedArrays: 1263, promises: 405,
     fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

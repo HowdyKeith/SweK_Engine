@@ -40,7 +40,7 @@ import { boxId } from "./hostScale.mjs";
 import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecordCached as readInputRecord } from "./inputSets.mjs";   // v4725: read once per process while unchanged
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES } from "./gateSweep.mjs";
-import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
+import { FIXTURE_DIRS, FIXTURE_PREFIX, reclaimMutations } from "./fixtureLitter.mjs";
 import { sweepStrays } from "./exitBusy.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
@@ -629,6 +629,10 @@ export function reclaimStrandedFixtures(root = ENG) {
         }
     }
     for (const q of sweepStrays(root)) gone.push(path.relative(root, q).split(path.sep).join("/"));
+    // v4815 -- AND A TRACKED FILE A KILLED GATE WAS HALF-WAY THROUGH BENDING. fixtureLitter's mutation ledger has held the
+    // original of every ledgered edit since v4692, but only rigRunner's own next run ever read it back. The ledger lives
+    // beside the real tree, so this is the real tree only, and only for owners that have exited (deadOnly).
+    if (path.resolve(root) === path.resolve(ENG)) for (const rel of reclaimMutations({ deadOnly: true })) gone.push(rel + " (put back from the mutation ledger)");
     return gone;
 }
 

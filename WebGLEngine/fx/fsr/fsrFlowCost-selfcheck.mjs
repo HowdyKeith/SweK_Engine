@@ -2,7 +2,7 @@
 // WebGLEngine/fx/fsr/fsrFlowCost-selfcheck.mjs -- v4748
 //
 // WHAT THE OPTICAL FLOW COSTS ON THE DEVICE, HELD TO render/flowCost.mjs's COUNT. Each setting's flow -- both pyramids and the
-// search, render/opticalFlowTsl.mjs -- timed at 256 x 256 as the median of five, the queue drained before and after
+// search, render/opticalFlowTsl.mjs -- timed at 256 x 256 as the median of nine rounds, every setting once per round (v4815), the queue drained before and after
 // (GPUQueue.onSubmittedWorkDone), and its time against the default's held to its reads against the default's.
 //
 // *** THIS DEVICE IS SWIFTSHADER, A CPU RASTERISER, AND THE MILLISECONDS ARE ITS OWN. *** They are not a GPU's, and one
@@ -35,7 +35,7 @@ const costRow = (r, label, cond, detail) => {
 // ...and the scope is itself held: on software, the cost row WAS asserted, or the decision above has been widened by accident.
 const costHeld = (r, asserted) => ok(`the cost row was ${asserted ? "asserted" : "reported"} on a ${r && r.software === false ? "hardware" : "software"} adapter (${adapterName(r)}), as decided`,
     asserted === !(r && r.software === false), "SwiftShader's cost model is held where it was measured and reported where it was not");
-const W = 256, H = 256, REP = 5;
+const W = 256, H = 256, REP = 9;
 const SETTINGS = { default: {}, refine2: { refineRadius: 2 }, refine1: { refineRadius: 1 }, radius2: { searchRadius: 2 }, levels2: { levels: 2 },
                    level: { grid: "level" }, levelR2: { grid: "level", refineRadius: 2 } };   // v4753: each level its own grid
 
@@ -63,10 +63,16 @@ else {
                 setT(0); renderer.setRenderTarget(A); await renderer.renderAsync(scene, cam); await stage.render(renderer, scene, cam);
                 setT(1); renderer.setRenderTarget(B); await renderer.renderAsync(scene, cam); await stage.render(renderer, scene, cam);
                 const o = { flow: {} };
-                for (const [nm, s] of Object.entries(a.SETTINGS)) {
-                    const F = OF.makeOpticalFlow(THREE, T, { w: W, h: H, ...s });
-                    o.flow[nm] = await median(() => F.flow(renderer, B.texture, A.texture)); F.dispose();
+                // v4815 -- INTERLEAVED: one timing of every setting per round, REP rounds, then each setting's median. Timing a
+                // setting REP times back to back put any drift across the run (the box, the JIT, the collector) onto
+                // whichever settings it happened to land on, and the affine row's residual is a comparison BETWEEN settings.
+                const flows = Object.entries(a.SETTINGS).map(([nm, s]) => [nm, OF.makeOpticalFlow(THREE, T, { w: W, h: H, ...s })]);
+                const xs = Object.fromEntries(flows.map(([nm]) => [nm, []]));
+                for (const [, F] of flows) await F.flow(renderer, B.texture, A.texture);          // each warmed once, as median() did
+                for (let i = 0; i < a.REP; i++) for (const [nm, F] of flows) {
+                    await drained(); const t0 = performance.now(); await F.flow(renderer, B.texture, A.texture); await drained(); xs[nm].push(performance.now() - t0);
                 }
+                for (const [nm, F] of flows) { const v = xs[nm].sort((p, q) => p - q); o.flow[nm] = v[v.length >> 1]; F.dispose(); }
                 // the generator itself, vectors only, and the scene's own render: this device's proportions, reported
                 const g = FG.makeFrameGen(THREE, T, { w: W, h: H }), inputs = { prev: A.texture, cur: B.texture, motion: stage.motion.texture, depth: stage.depth.texture };
                 await g.generate(renderer, inputs, outT);
@@ -123,6 +129,14 @@ else {
 // v4776 (the affine fit): T4 again -- opticalFlowTsl.mjs's refining levels searching at searchRadius -> 1 here, BOTH
 // clauses: worst residual 59% against 20%, and the fit's fixed part 43% of the default's time against 15% (refine2 102%
 // of the default's time for 56% of its reads). The intercept bound is what stops an affine fit from absorbing it.
+// ---- v4815 -- THE AFFINE ROW WAS A FLAKE, AND THE MEASUREMENT WAS FIXED RATHER THAN THE 20% ------------------------------
+// The full over-budget rotation found this gate red alone: worst residual 22.5% against 20%. Six alone runs of the v4814
+// code read 13.3..22.5% (2 red); each setting was timed five times back to back, so drift across a run (one run read
+// `level` at 72 ms and another at 94) fell on whichever settings it landed on. Interleaved -- every setting once per
+// round -- ten runs read a median 7.8% and still 2 red, each from a single setting's outlier in a median of five. Nine
+// interleaved rounds: twelve runs, worst 3.1..11.5%, none red; the gate costs 13.5 s against 11.3. The 20% is unchanged.
+// SABOTAGE re-run on the new measurement: T4 (refining levels searching at searchRadius) -> 1 red, both clauses,
+// residual 55% and fixed part 34% of the default; render/opticalFlowTsl.mjs restored md5-identical.
 // ---- v4778 RIG RUN 8 SABOTAGE LOG ------------------------------------------------------------------------------------
 // S1 costRow's scope widened to report on any adapter not known to be software -> 1 red here, the "as decided" row (run
 // against fsrFrameGenLayerCost and fsrFrameGenReach, each restored and md5 verified; the helper is the same three lines in

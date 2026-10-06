@@ -752,6 +752,25 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
        wasKilled(rawKilled) && rawReclaimed.length === 0 && rawAfter !== ORIGINAL,
        `reclaimed ${rawReclaimed.length}, file still ${JSON.stringify(rawAfter.slice(0, 24))}. This is what the ` +
        "code did before the ledger, and it is exactly the state Keith's tree was left in");
+    // *** v4815 -- THE SWEEP NOW RECLAIMS THE LEDGER BETWEEN GATES, SO IT MUST LEAVE A LIVE OWNER'S EDIT ALONE. ***
+    // quickSweep.reclaimStrandedFixtures and sweepRotation call reclaimMutations({ deadOnly: true }) after a killed run;
+    // a gate still running beside them (or a sweep run INSIDE a gate) must not have its mutation pulled out from under
+    // it. A real child ledgers an edit and holds; the reclaim leaves it; the child takes SIGKILL; the reclaim restores.
+    // SABOTAGE (v4815): the `alive(rec.pid)` test removed from deadOnly -> 1 RED, this row (reclaimed while the owner
+    // was alive); restored md5-identical.
+    fs.writeFileSync(scratch, ORIGINAL);
+    const { spawn } = await import("node:child_process");
+    const holder = spawn(process.execPath, [LITTER, "mutate-hold", scratch], { stdio: ["ignore", "pipe", "ignore"] });
+    await new Promise((res) => { let b = ""; holder.stdout.on("data", (d) => { b += d; if (b.includes("HOLDING")) res(); }); setTimeout(res, 15000); });
+    const whileAlive = reclaimMutations({ deadOnly: true }), heldText = fs.readFileSync(scratch, "utf8");
+    holder.kill("SIGKILL");
+    await new Promise((res) => holder.on("close", res));
+    const afterDeath = reclaimMutations({ deadOnly: true }), backText = fs.readFileSync(scratch, "utf8");
+    try { fs.unlinkSync(scratch); } catch {}
+    ok("*** a deadOnly reclaim leaves a LIVE owner's mutation alone, and restores it once the owner is dead ***",
+       !whileAlive.includes(scratch) && heldText !== ORIGINAL && afterDeath.includes(scratch) && backText === ORIGINAL,
+       `while the child held: ${whileAlive.includes(scratch) ? "RECLAIMED (wrong)" : "left alone"}; after its SIGKILL: ` +
+       `${afterDeath.includes(scratch) ? "put back byte for byte" : "NOT put back"}`);
     ok("  and the ledger is gone once it has been acted on, so a repaired tree does not report itself forever",
        !fs.existsSync(MUTATION_LEDGER) && reclaimMutations().length === 0,
        `${MUTATION_LEDGER} -- outside the engine tree, beside the captures, because a record quoting source ` +
