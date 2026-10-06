@@ -591,7 +591,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // Round A -- 4586 -> 4588 for camera/cameraBoom.js and camera/cameraBoom-selfcheck.mjs, the third-person camera boom.
     // the rtPipeline cache round -- 4588 -> 4589 for physics/render/rtCpuCache.mjs.
     // the lock-sums round -- 4589 -> 4593 for render/temporalLockSums.mjs, render/temporalLockSumsTsl.mjs and their two gates.
-    files: 4593,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the splat-collision round -- 4593 -> 4595 for world/splatVoxelWorld.mjs and tools/ship/splatVoxelWorld-selfcheck.mjs.
+    files: 4595,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1121,7 +1122,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the kinematic-wiring round -- physics/character/kinematic.js hands fallStep an empty surface oracle, `() => null`,
     // its first function value: closures 4137 -> 4138. Its import of fallBody.mjs and camera.js's of kinematic.js move no
     // row (both were ES modules already); nothing else moved.
-    esModules: 4288, closures: 4138, asyncAwait: 1715, typedArrays: 1267, promises: 405,
+    // the splat-collision round -- world/splatVoxelWorld.mjs and its gate: files 4593 -> 4595, ES modules 4288 -> 4290,
+    // closures 4138 -> 4140, typed arrays 1267 -> 1269 (the fine shell and the walker grid; the gate's loader-shaped
+    // clouds), async/await 1715 -> 1716 (the gate awaits its imports); nothing else moved. main.js's new demo moves none.
+    esModules: 4290, closures: 4140, asyncAwait: 1716, typedArrays: 1269, promises: 405,
     fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

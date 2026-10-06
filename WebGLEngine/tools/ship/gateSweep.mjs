@@ -8118,6 +8118,27 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
+    since480: Object.freeze({
+        at: "the splat-collision round (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/splatVoxelWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A SURFACE LIES ON A CELL BOUNDARY, SO 'THE CELL A SPLAT IS IN' STANDS THE BODY ONE VOXEL HIGH. *** " +
+                 "Measured on a 24 x 8 x 24 level captured as splats on every face a camera could see: the centre-cell " +
+                 "rule put 566 of 576 columns at the wrong height and every-touched-cell 576. world/splatVoxelWorld.mjs " +
+                 "stamps each splat's ellipsoid into a grid four times finer and scans every fine column top-down for " +
+                 "PARITY -- a run of shell is one crossing -- then takes a walker cell as solid when half its fine cells " +
+                 "are: 0 wrong, 0 fall-through. Holes stay local and EVERY column a body would fall through is listed " +
+                 "(7 of 7 for a 1.5-unit floor hole, 26 of 26 and 85 of 85 for sparse captures); fillHoles closes them " +
+                 "at the height most of the rim agrees on. Opaque floaters are dropped as small shell components; " +
+                 "loader-shaped clouds (alpha opacity, float and packed quaternions) build the same world. camera.js's " +
+                 "walker lands on every probe at the level's height and is inside a captured voxel on 0 of 4,800 fuzzed " +
+                 "frames. main.js's splat_voxel_walk demo is the live consumer, booted headless with 0 page errors. " +
+                 "12 sabotages, all red -- two only after rows were written for them, and V8's row found the fill's " +
+                 "real defect (ring by ring raised a step out of the floor beside the block). NOT CLOSED: unseen " +
+                 "undersides read solid (pinned at +40 cells), and no real .ply has been through it.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds

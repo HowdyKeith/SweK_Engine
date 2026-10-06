@@ -6824,6 +6824,7 @@ import { Camera }         from "./camera/camera.js";
 import { VOXEL }          from "./world/voxelFormat.js";
 import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
 import { buildSplatWalkWorld, cloudToParsedSplats, SPAWN as SPLAT_WALK_SPAWN } from "./world/splatWalkWorld.mjs";   // task board #83's live demo
+import { voxelizeSplats, captureLevel } from "./world/splatVoxelWorld.mjs";   // the splat-collision round's live demo (splat_voxel_walk)
 import { platformWorldAt, ferryTransformAt, turntableTransformAt, onDeck, platformCarryVoxelColumns,
          FERRY, TURNTABLE, SPAWN as PLATFORM_CARRY_SPAWN, RESPAWN_Y as PLATFORM_CARRY_RESPAWN_Y } from "./world/platformCarryWorld.mjs";   // task board #84's live demo
 import { carryOnPlatform } from "./physics/character/capsuleCollide.mjs";
@@ -16964,6 +16965,68 @@ const DEMO_MODES = [
             const state = camera.movementAnimState();
             const view = camera.viewMode === "third" ? "Third-person" : "First-person";
             hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // The splat-collision round. splat_walk walks a splat cloud as a MESH (capsule against a BVH); this walks one
+        // as VOXELS -- world/splatVoxelWorld.mjs turns the cloud into a `voxelAt` world, so camera.js takes its voxel
+        // branch, the one playerBody-selfcheck section 7 holds never-inside. The cloud is captureLevel()'s: splats on
+        // every face of a small level (floor, block, stairs, pillar, wall, table) a camera could see, with a 1.5-unit
+        // patch of floor the capture MISSED. tools/ship/splatVoxelWorld-selfcheck.mjs measures this exact build: the
+        // hole is 7 columns, every one listed, and fillHoles closes them at the floor's height -- the HUD says so.
+        id: "splat_voxel_walk",
+        autoplay: false,
+        label: "SPLAT VOXEL WALK — a Gaussian-splat level walked as a voxel world, its capture holes counted",
+        hint: "the splat-collision round: the same cloud is rendered as splats and turned into voxels the walker stands in; the HUD lists the holes the capture left",
+        controls: [
+            "WASD — walk (the voxel walker: step-up 1.2, never inside a voxel) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint · V — toggle first/third person",
+            "The stairs, the block and the table top are all standable at the heights the level was built with",
+            "Near the far corner the capture missed a patch of floor: its columns are listed in the HUD and filled at the floor's height",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            const cloud = captureLevel({ holes: [[20.5, 3.5, 1.5, 1]] });
+            const vworld = voxelizeSplats(cloud, { fillHoles: true });
+            splatScene.loadParsed(cloudToParsedSplats(cloud), "splatVoxelWalk", "splatVoxelWalkDemo");
+            window._splatVoxelWorld = vworld;
+            camera.setWorld(vworld);
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = 2.5; camera.position.z = 2.5;
+            camera.position.y = 1 + 3 + camera._eyeHeight;   // three voxels above the floor, falling onto it
+            camera.yaw = Math.PI / 4; camera.pitch = 0;
+            camera._fpOnGround = false; camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "splatVoxelWalkHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._splatVoxelWalkHud = hud;
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") { camera.setMode("observer"); camera.setWorld(world); }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._splatVoxelWalkEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._splatVoxelWalkEscHandler) window.removeEventListener("keydown", window._splatVoxelWalkEscHandler); } catch {}
+            window._splatVoxelWalkEscHandler = null;
+            try { window._splatVoxelWalkHud?.remove(); } catch {}
+            window._splatVoxelWalkHud = null;
+            window._splatVoxelWorld = null;
+            try { splatScene.removeLayer("splatVoxelWalkDemo"); } catch {}
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._splatVoxelWalkHud, vw = window._splatVoxelWorld;
+            if (!hud || !vw || camera.mode !== "fp") return;
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${camera.movementAnimState().toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"} · ` +
+                `${vw.stats.used} splats -> ${vw.stats.solidCells} voxels · ${vw.holes.length} hole columns listed, ${vw.stats.filled} filled`;
         },
     },
     {
