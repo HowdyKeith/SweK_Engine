@@ -18,10 +18,41 @@
 // Every pass is graded against its CPU mirror in its own gate; fx/fsr/fsrTemporalTsl-selfcheck.mjs grades the
 // COMPOSITION -- the whole chain run on the CPU from the device's renders, frame by frame, against the device.
 //
-// *** THE LOCK RING IS OFF BY DEFAULT, AND ITS COST IS WHY. *** Its period must be the jitter's phase count or the
+// *** THE LOCK RING WAS OFF BY DEFAULT, AND ITS COST WAS WHY. *** Its period must be the jitter's phase count or the
 // mask reads sampling as shading (fsr.html: "may not be chosen for cost"), which at 2x is 64 lumas a pixel: 265 MB of
 // float at 960x540 across the ping-pong pair. render/temporalLock.mjs keeps every luma where FSR2 keeps a lock and a
-// short history. `lock: true` turns it on and `memory` reports what it costs.
+// short history. `lock: true` (or "ring") builds it and `memory` reports what it costs.
+// *** THE DEFAULT IS NOW THE SUMS (`lock: "sums"`), AND WHAT IT BUYS WAS MEASURED BEFORE IT WAS MADE ONE. *** On
+// fsr-three.html's scene at 2x, 128 frames, PSNR against a 4x4-supersampled render every 4th frame from 64 (the mask
+// is unknown everywhere before 63): still -- the same picture to the bit, the mask never fires; the knot turning,
+// +0.014 dB; a slow pan, -0.006; the knot's light dropped to 55%, -0.010; dimmed to 85%, -0.005; pulsing 15% with a
+// period near the jitter's, nothing, because a whole window averages the pulse out. The clamp and the reactive mask
+// already discard what the shading mask would, so on this scene it is NEUTRAL -- the default costs 16.6 MB at 960x540
+// and two full-screen passes a frame for it, and render/temporalLockSumsTsl-selfcheck.mjs section 4 holds the still
+// picture's identity and that the mask is live. `lock: false` is the chain without it. *** NOTHING ELSE IN THE TREE
+// COULD SEE THE CHANGE: *** every quality gate runs 24-40 frames at 2x, inside the sums' 63-frame warm-up, and all
+// twenty-two gates that build this driver read the same output to the digit with either default.
+// *** AND A SMALLER MASK SCALE IS WORSE, NOT BETTER -- MEASURED SO IT IS NOT TRIED AGAIN. *** The lock gates run the
+// mask at scale 0.25 where this driver leaves it at 1, so the same scene and cases were run at 1, 0.5, 0.25 and 0.125
+// (dB against no lock, frames 64-127): knot turning +0.013 / -0.020 / -0.155 / -0.340, slow pan -0.006 / -0.045 /
+// -0.166 / -0.426, light to 55% -0.010 / -0.024 / -0.065 / -0.189, dimmed to 85% -0.005 / -0.011 / -0.026 / -0.064;
+// still and the pulse unchanged. Worse at every step, including the light changes the mask exists for, and the ring at
+// 0.25 is no better (turning -0.144, light to 55% -0.129). Two reasons, both the mask's and not the sums': moving, it
+// reads reprojection blur on the floor's stripes as light (4904 of 16384 pixels firing at 0.25 with the knot turning,
+// 3038 at 1), and each pixel it fires on drops toward one jittered frame; after a real change it stays on for about
+// two periods, while its windows straddle the change, though the clamp removed the ghost within a frame or two -- so it
+// mostly discards good history for ~60 frames. Scale 1 is the least harmful setting measured, and it is neutral.
+//
+// *** `lock: "sums"` IS THE SAME TWO WINDOWS IN ONE TEXEL A PIXEL. *** render/temporalLockSums.mjs's makeLumaSums keeps
+// each window's running sum instead of its lumas: 16.6 MB at 960x540 at any ratio. At a period boundary the sums ARE
+// the ring's two halves summed (bilinear reprojection is linear), so the mean and the mask agree with the ring's there
+// to f32 rounding; between boundaries the sums' windows have not moved, so a light change is reported up to P - 1
+// frames late. render/temporalLockSums-selfcheck.mjs holds both. `lockFrom: "ring"` reads whichever history `lock`
+// built -- the ring's newer period, or the sums' last closed one.
+// *** AND AT 2x THE RING DOES NOT FIT IN A TEXTURE. *** It packs ceil(2P/4) slices down one target: 16 at 2x, so 540
+// rows become 8640, past the 8192 WebGPU allowed here -- fsr-three.html's lock ring at 2x drew validation errors on
+// every frame, measured when the sums were built, and it does on the unmodified page too. The sums are one slice at
+// every ratio. The ring is not refused at that size here; a caller that wants it at 2x needs a device that allows it.
 //
 // *** LOCKS ARE `lockFrom`, AND WHAT THEY BUY IS THE CONTENT'S. *** null (no locks), "frame" (newLocksCPU: the ridge test
 // over this frame's resolved luma, which needs no ring) or "ring" (lockCandidatesFromRing: over the ring's mean, which
@@ -50,6 +81,7 @@ import { makeJitterState, jitterCurrent, advanceJitter, jitterPhaseCount } from 
 import { applyJitter, restoreProjection, glClip, makeMotionStage, resolveNode, accumulateNode } from "../../render/temporalTsl.mjs";
 import { dilateNodes, disocclusionNode, historyFactorNode } from "../../render/temporalClipTsl.mjs";
 import { makeLumaRing, makeLockLife, ridgesNode, newLocksNode } from "../../render/temporalLockTsl.mjs";
+import { makeLumaSums } from "../../render/temporalLockSumsTsl.mjs";
 import { reactiveNode } from "../../render/reactiveTsl.mjs";
 import { rcasNode } from "./fsrTsl.mjs";
 
@@ -84,12 +116,14 @@ export async function probeHalfWrite(THREE, TSL, renderer, values) {
  * unless given). Returns { render(scene, camera, output), targets, jitter, memory, frames, dispose }.
  */
 export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeight, displayWidth, displayHeight, ratio = null,
-                                                         threshold, alpha = 0.1, reactive = true, lock = false,
+                                                         threshold, alpha = 0.1, reactive = true, lock = "sums",
                                                          lockFrom = "frame", lockLife = 8, lockMargin = 0.05,
                                                          sharpness = 0.5, rcas = true, type = null, cameraMotion = false } = {}) {
     if (!(threshold > 0)) throw new Error("fx/fsr/fsrTemporalTsl: threshold must be a positive clip-z gap -- see clipGapThreshold in render/temporalClipTsl.mjs");
     if (![null, "frame", "ring"].includes(lockFrom)) throw new Error(`fx/fsr/fsrTemporalTsl: lockFrom must be null, "frame" or "ring" -- got ${JSON.stringify(lockFrom)}`);
+    if (![false, true, "ring", "sums"].includes(lock)) throw new Error(`fx/fsr/fsrTemporalTsl: lock must be false, true (the ring), "ring" or "sums" -- got ${JSON.stringify(lock)}`);
     if (lockFrom === "ring" && !lock) throw new Error('fx/fsr/fsrTemporalTsl: lockFrom "ring" reads the lock ring, which is what lock: true builds -- pass it, or lockFrom "frame", which needs no ring');
+    const history = lock === "sums" ? "sums" : lock ? "ring" : null;
     const rw = renderWidth, rh = renderHeight, dw = displayWidth, dh = displayHeight;
     const up = ratio == null ? dw / rw : ratio;
     const colType = type == null ? THREE.HalfFloatType : type;
@@ -112,7 +146,7 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const dil = dilateNodes(TSL, stage.depth.texture, stage.motion.texture, { w: dw, h: dh });
     const res = resolveNode(TSL, t.colour.texture, { rw, rh, dw, dh });
     const period = jitterPhaseCount(up);
-    const ring = lock ? makeLumaRing(THREE, TSL, { w: dw, h: dh, period, currentTex: t.resolved.texture, motionTex: t.dMotion.texture }) : null;
+    const ring = !history ? null : (history === "sums" ? makeLumaSums : makeLumaRing)(THREE, TSL, { w: dw, h: dh, period, currentTex: t.resolved.texture, motionTex: t.dMotion.texture });
     // one graph per ping-pong direction: frame k writes record[k % 2] and history[k % 2] and reads the other two
     const rx = reactive ? [0, 1].map((k) => reactiveNode(TSL, { current: t.resolved.texture, history: t.history[1 - k].texture, motion: t.dMotion.texture, prevDepth: t.record[1 - k].texture },
                                                           { w: dw, h: dh, threshold })) : null;
@@ -139,11 +173,11 @@ export function makeFsrTemporal(THREE, TSL, renderer, { renderWidth, renderHeigh
     const draw = async (scene, target) => { renderer.setRenderTarget(target); await renderer.renderAsync(scene, ortho); };
     const px = dw * dh, floatBytes = 16;
     return {
-        targets: t, stage, ring, locks, lockFrom, jitter: jit, period,
+        targets: t, stage, ring, history, locks, lockFrom, jitter: jit, period,
         uniforms: { resolve: res.uniforms, accumulate: acc.map((x) => x.uniforms), rcas: sharp ? sharp.map((x) => x.uniforms) : null, reactive: rx ? rx.map((x) => x.uniforms) : null,
                     candidates: cand ? cand.uniforms : null },
-        /** What the chain's float state costs in bytes, the ring separately because it is the part that is large. */
-        memory: { ring: lock ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : 0, period,
+        /** What the chain's float state costs in bytes, the lock history (`ring`, whichever `lock` built) separately because it can be large. */
+        memory: { ring: history === "ring" ? 2 * dw * dh * Math.ceil(2 * period / 4) * floatBytes + 2 * px * floatBytes : history === "sums" ? 2 * px * floatBytes : 0, period, history,
                   locks: lockFrom ? (lockFrom === "ring" ? 5 : 4) * px * floatBytes : 0 },
         get frames() { return frames; },
         /** This frame's jitter, as the colour pass will be offset by it -- [jx, jy] in render pixels. */

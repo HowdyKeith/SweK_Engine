@@ -588,7 +588,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4814 -- 4583 -> 4584 for tools/ship/deviceComputeDiag.mjs, the rig diagnostic for deviceCompute's two-path disagreement.
     // v4814 -- 4584 -> 4585 for tools/ship/rtPipelineDiag.mjs, where rtPipeline-selfcheck's time goes, per row.
     // v4814 -- 4585 -> 4586 for tools/ship/gateProfile.mjs, any gate's time split into filesystem-by-caller and CPU-by-function.
-    files: 4586,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // Round A -- 4586 -> 4588 for camera/cameraBoom.js and camera/cameraBoom-selfcheck.mjs, the third-person camera boom.
+    // the rtPipeline cache round -- 4588 -> 4589 for physics/render/rtCpuCache.mjs.
+    // the lock-sums round -- 4589 -> 4593 for render/temporalLockSums.mjs, render/temporalLockSumsTsl.mjs and their two gates.
+    files: 4593,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1105,10 +1108,18 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // 1710 -> 1711, Promises 402 -> 403; nothing else moved.
     // v4814 -- and tools/ship/gateProfile.mjs: ES modules 4280 -> 4281, closures 4129 -> 4130; nothing else moved.
     // v4814 -- and headlessGpu-selfcheck's five children now overlap through a promise-wrapped spawn: Promises 403 -> 404.
+    // Round A (the camera boom) -- camera/cameraBoom.js and its gate: ES modules 4281 -> 4283, closures 4130 -> 4132,
+    // async/await 1711 -> 1712 (the gate awaits camera.js's import); nothing else moved.
+    // the rtPipeline cache round -- physics/render/rtCpuCache.mjs: ES modules 4283 -> 4284, closures 4132 -> 4133, typed
+    // arrays 1263 -> 1264 (the math print reads its doubles as bytes), performance.now 240 -> 241 (it times the means it
+    // computes); nothing else moved.
+    // the lock-sums round -- its two modules and two gates: ES modules 4284 -> 4288, closures 4133 -> 4137, async/await
+    // 1712 -> 1714 (the TSL port's push and the device gate), typed arrays 1264 -> 1267 (the sums and both gates), WebGL
+    // 196 -> 197 (the device gate's webgl2 backend); nothing else moved.
     // v4815 -- inputSets-selfcheck's live-owner row awaits a held child through a promise: async/await 1711 -> 1712,
-    // Promises 404 -> 405; nothing else moved.
-    esModules: 4281, closures: 4130, asyncAwait: 1712, typedArrays: 1263, promises: 405,
-    fetchXhr: 251, performanceNow: 240, raf: 126, webgl: 196, webgpu: 56, threads: 25, wasm: 24,
+    // Promises 404 -> 405; nothing else moved. (v4816 merge: the two lines' moves add -- async/await 1714 + 1 = 1715.)
+    esModules: 4288, closures: 4137, asyncAwait: 1715, typedArrays: 1267, promises: 405,
+    fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -26,6 +26,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
+import { openCpuCache } from "../../physics/render/rtCpuCache.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GATE = "physics/render/rtPipeline-selfcheck.mjs";
@@ -156,4 +157,11 @@ console.log("");
 console.log(reds.length ? `the gate printed ${reds.length} FAIL line(s) -- first: ${reds[0].text.trim().slice(0, 140)}` : "the gate printed no FAIL line");
 console.log("READING IT: launch-heavy means the per-call browser is the cost (reuse one page); run-heavy means the box's WebGPU");
 console.log("is (fewer or smaller dispatches); cpu-heavy means the gate's own f64 references are (cache or shrink them).");
+// The means sections 13 and 14 compare against are cached now (physics/render/rtCpuCache.mjs), so a cpu-heavy reading has
+// one more question in front of it: did this box have them for its renderer and its math, or did it compute them?
+{
+    const c = openCpuCache({ write: false });
+    console.log(`the f64 mean cache for this box: renderer ${c.src.hash}, math ${c.math} -- ${c.sizes.committed} committed and ` +
+                `${c.sizes.local} local means for that pair${c.sizes.committed + c.sizes.local ? "" : " (none: this run's cpu column is the cold cost, and the gate keeps what it computes)"}`);
+}
 process.exit(0);

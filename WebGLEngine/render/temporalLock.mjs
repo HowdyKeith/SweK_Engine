@@ -64,15 +64,6 @@ export function makeLumaState(w, h, period) {
              scratchRing: new Float32Array(w * h * 2 * period), scratchFilled: new Uint8Array(w * h) };
 }
 
-/** Bilinear over one channel of a w*h scalar field, edge-clamped. */
-function sampleScalar(buf, w, h, u, v, stride = 1, off = 0) {
-    const x = u * w - 0.5, y = v * h - 0.5;
-    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
-    const at = (xx, yy) => buf[(clamp(yy, 0, h - 1) * w + clamp(xx, 0, w - 1)) * stride + off];
-    return at(x0, y0) * (1 - fx) * (1 - fy) + at(x0 + 1, y0) * fx * (1 - fy)
-         + at(x0, y0 + 1) * (1 - fx) * fy + at(x0 + 1, y0 + 1) * fx * fy;
-}
-
 /**
  * Push this frame's luma, REPROJECTING the ring first.
  *
@@ -119,7 +110,15 @@ export function pushLuma(st, { current, motion, w, h }) {
             nextFilled[i] = 0;
             continue;
         }
-        for (let k = 0; k < F - 1; k++) nextRing[i * F + k] = sampleScalar(st.ring, w, h, hu, hv, F, k + 1);
+        // THE BILINEAR FETCH, edge-clamped: its four taps and weights found once a pixel and applied to every slot. Until
+        // the lock-sums round this was a function, sampleScalar, called once a SLOT -- a third of temporalLock-selfcheck's
+        // CPU time. The arithmetic and its order are unchanged, so each slot is bit-identical to what it was; that gate's
+        // double-buffer row holds the ring to a naive copy that evaluates the formula per slot.
+        const bx = hu * w - 0.5, by = hv * h - 0.5, x0 = Math.floor(bx), y0 = Math.floor(by), fx = bx - x0, fy = by - y0;
+        const cx0 = clamp(x0, 0, w - 1), cx1 = clamp(x0 + 1, 0, w - 1), cy0 = clamp(y0, 0, h - 1), cy1 = clamp(y0 + 1, 0, h - 1);
+        const t00 = (cy0 * w + cx0) * F, t10 = (cy0 * w + cx1) * F, t01 = (cy1 * w + cx0) * F, t11 = (cy1 * w + cx1) * F, R = st.ring;
+        for (let k = 0; k < F - 1; k++) { const o = k + 1;
+            nextRing[i * F + k] = R[t00 + o] * (1 - fx) * (1 - fy) + R[t10 + o] * fx * (1 - fy) + R[t01 + o] * (1 - fx) * fy + R[t11 + o] * fx * fy; }
         nextRing[i * F + F - 1] = l;
         nextFilled[i] = Math.min(255, sampleScalarFilled(st.filled, w, h, hu, hv) + 1);
     }

@@ -8080,6 +8080,44 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "from the release tag and keep a file only on a sha256 match. 27 sabotages; one (both escape guards removed) was " +
                  "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
     }),
+    // Round A -- THE THIRD-PERSON CAMERA BOOM: camera/cameraBoom.js, swept and stopped short of the first voxel it would touch.
+    since478: Object.freeze({
+        at: "Round A (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["camera/cameraBoom-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE VOXEL CAMERA READ A COLUMN'S TOP, SO EVERY ROOF WAS GROUND. *** camera/camera.js's third-person eye " +
+                 "sampled four column tops along the boom: under a ceiling, a bridge or an overhang it collapsed to 0.825 of " +
+                 "4.5, and under an overhang low enough to cross the boom it left the camera's box inside a voxel. " +
+                 "camera/cameraBoom.js sweeps the camera's box up the lift and back along the boom against the voxels " +
+                 "themselves, exactly, and stops a skin short of the first contact. Its gate holds the box never inside a " +
+                 "solid (1,384 fuzzed booms over 60 worlds), every point of the path free, never further than asked, exact " +
+                 "when clear, pulled in by exactly the skin, no one-voxel wall skipped (the planted endpoint-only test goes " +
+                 "through 300 of 300), and easing that never passes the safe length; camera.js's own eye is driven in a wall, " +
+                 "an overhang, a bridge and a room. Five sabotages, all red. NOT CLOSED: the render eye adds the body's " +
+                 "vertical smoothing on top of the boom, so the guarantee is the boom's and not that offset's, as the mesh " +
+                 "branch's always was; and nothing here has been looked at on the rig.",
+    }),
+    // the lock-sums round -- THE LOCK's TWO WINDOWS AS RUNNING SUMS: render/temporalLock.mjs's makeLumaSums and its TSL port.
+    since479: Object.freeze({
+        at: "the lock-sums round (unshipped)", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalLockSums-selfcheck.mjs", "render/temporalLockSumsTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLock-selfcheck.mjs (its moving-camera detector row judged 0 of 2304 pixels and passed on zeros; repaired the round before)"]),
+        verdict: "*** THE LOCK WAS OFF BECAUSE IT KEPT EVERY LUMA. *** The ring holds 2 x period lumas a pixel -- 282 MB on " +
+                 "the device at 2x at 960x540, in a target 8640 rows tall that WebGPU refused here (fsr-three.html's lock " +
+                 "ring at 2x drew validation errors every frame, on the unmodified page too) -- and both of its outputs are " +
+                 "sums of them. render/temporalLockSums.mjs keeps three running sums and the fill count in one float " +
+                 "texel: 16.6 MB at any ratio. Bilinear reprojection is linear, so at every period boundary the sums ARE " +
+                 "the ring's two halves summed -- held within frames x 2^-24, still and moving -- and the still picture and " +
+                 "the lock on a 0.4 px line come out identical. What it gives up is when a change is seen: the windows " +
+                 "tumble, so a light drop is caught at the end of its period, exactly P - 1 - phase frames later. On the " +
+                 "device (render/temporalLockSumsTsl.mjs), both backends, to 1.8e-7, and fx/fsr/fsrTemporalTsl.mjs takes " +
+                 "lock: \"sums\". 14 sabotages, all red; one (the mean a period stale) only by a row written for it. " +
+                 "The driver's lock DEFAULTS to the sums since: measured past the 63-frame warm-up every other gate sits " +
+                 "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
+                 "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds

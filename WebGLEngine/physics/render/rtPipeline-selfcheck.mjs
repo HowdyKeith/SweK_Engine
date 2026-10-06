@@ -157,6 +157,9 @@ import { traceWgsl, traceUniforms } from "./pathTracerGpu.mjs";
 import { render as renderCpuMesh } from "./pathTracer.mjs";
 import { captureBaseCubemap, packCapturedAtlas, sampleCapturedCubemap, captureAtlasHalves } from "./specularProbeCapture.mjs";
 import { buildTable } from "./energyCompensation.mjs";
+// The f64 reference means, kept between runs and checked on every one -- see rtCpuCache.mjs's header.
+import { openCpuCache, sourceClosure, mathPrint, keyOf } from "./rtCpuCache.mjs";
+const CPU_CACHE = openCpuCache();
 const REPORT = gateReport("physics/render/rtPipeline-selfcheck.mjs");
 const REPORT_ROWS = [];
 
@@ -1067,10 +1070,10 @@ say("11. NEXT-EVENT ESTIMATION -- cone sampling, shadow ray, double-count guard,
         if (!r.ok) throw new Error("nee GPU render failed: " + r.reason);
         let sum = 0; for (const v of r.values) sum += v; return sum / r.values.length;
     };
-    const cpuMean = (scene, view, spp, seed) => {
+    const cpuMean = (scene, view, spp, seed) => CPU_CACHE.mean(["renderSbtCpu", "sum/length", scene, { spp, view, seed, nee: true }], () => {
         const img = R.renderSbtCpu(scene, { spp, view, seed, nee: true });
         let sum = 0; for (const v of img) sum += v; return sum / img.length;
-    };
+    });
     // Same discipline as section 9: N independently-seeded runs per side, GPU offset +2000 from CPU so the two
     // share no random draws (samplerCheck.mjs's "a shared sampler agrees with itself and is perfectly wrong").
     const agree = async (label, scene, view, spp) => {
@@ -1481,7 +1484,8 @@ say("13. RTX ROUND 8: THE MICROFACET (GGX) MATERIAL");
         if (!r.ok) throw new Error("microfacet GPU render failed: " + r.reason);
         return meanOf(Array.from(r.values));
     };
-    const cpuMean = (scene, view, spp, seed, opts) => meanOf(Array.from(R.renderSbtCpu(scene, { spp, view, seed, ...opts })));
+    const cpuMean = (scene, view, spp, seed, opts) => CPU_CACHE.mean(["renderSbtCpu", "meanOf", scene, { spp, view, seed, ...opts }],
+        () => meanOf(Array.from(R.renderSbtCpu(scene, { spp, view, seed, ...opts }))));
     const agreeMf = async (label, scene, view, spp, shader, cpuOpts, N = 8) => {
         const cpuVals = [], gpuVals = [];
         for (let s = 1; s <= N; s++) cpuVals.push(cpuMean(scene, view, spp, s, cpuOpts));
@@ -1772,7 +1776,8 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
         if (!r.ok) throw new Error("msComp GPU render failed: " + r.reason);
         return meanOf(Array.from(r.values));
     };
-    const cpuMeanMs = (scene, view, spp, seed, opts) => meanOf(Array.from(R.renderSbtCpu(scene, { spp, view, seed, ...opts })));
+    const cpuMeanMs = (scene, view, spp, seed, opts) => CPU_CACHE.mean(["renderSbtCpu", "meanOf", scene, { spp, view, seed, ...opts }],
+        () => meanOf(Array.from(R.renderSbtCpu(scene, { spp, view, seed, ...opts }))));
     const agreeMs = async (label, scene, view, spp, shader, cpuOpts, T, N = 8) => {
         const cpuVals = [], gpuVals = [];
         for (let s = 1; s <= N; s++) cpuVals.push(cpuMeanMs(scene, view, spp, s, cpuOpts));
@@ -1975,6 +1980,41 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
             "correctness for THIS combination is gated by 14a's own JS-side validation tests, not a statistical render; " +
             "this only proves the WGSL actually compiles and executes the four-way combination without NaN/Inf/a blank frame");
     }
+}
+
+// ---- THE CACHE'S OWN ROWS ---------------------------------------------------------------------------------------------
+{
+    const st = CPU_CACHE.stats;
+    console.log("\nthe f64 reference cache (physics/render/rtCpuCache.mjs)");
+    say(`renderer ${CPU_CACHE.src.hash} over ${CPU_CACHE.src.files.length} files, math ${CPU_CACHE.math}: ${st.hits} means served, ${st.misses} computed and kept, ` +
+        `${st.uncacheable} with a callback computed every time; ${st.msComputed.toFixed(0)} ms spent computing means this run`);
+    ok("!! *** every cached mean this run recomputed came back bit for bit ***", st.mismatched.length === 0,
+       st.mismatched.length ? st.mismatched.slice(0, 3).map((m) => `${m.key}: cached ${m.cached} now ${m.now}`).join("; ")
+                            : `${st.checked} recomputed (slice ${st.slice} of 8, rotating), 0 differ`);
+    ok("  ...and a run that served from the cache checked some of what it served", st.hits === 0 || st.checked > 0,
+       `${st.checked} of ${st.hits} served were recomputed`);
+    // what the key must cover, each shown to move it
+    const closure = CPU_CACHE.src.files, oracle = ["physics/render/pathTracer.mjs", "physics/render/microfacet.mjs", "physics/render/nee.mjs", "physics/render/energyCompensation.mjs"];
+    ok("!! the key's renderer is the CPU oracle's whole static closure, not rtPipeline.mjs alone", oracle.every((f) => closure.includes(f)),
+       `${closure.length} files; ${oracle.filter((f) => !closure.includes(f)).join(", ") || "all four of pathTracer, microfacet, nee and energyCompensation in it"}`);
+    const fsRead = (await import("node:fs")).readFileSync;
+    const nudged = sourceClosure(undefined, undefined, (p) => fsRead(p, "utf8") + (p.endsWith("microfacet.mjs") ? "\n// one byte more" : ""));
+    ok("  ...and one byte more in microfacet.mjs is a different renderer", nudged.hash !== CPU_CACHE.src.hash, `${CPU_CACHE.src.hash} -> ${nudged.hash}`);
+    const ulp = (x) => { const f = new Float64Array([x]), b = new BigInt64Array(f.buffer); b[0] += 1n; return f[0]; };
+    const otherMath = mathPrint(Object.assign(Object.create(Math), { sin: (x) => ulp(Math.sin(x)) }));
+    ok("!! a V8 whose sin differs by one ulp has a different math print, so it can never read this one's means", otherMath !== CPU_CACHE.math,
+       `${CPU_CACHE.math} -> ${otherMath}`);
+    const base = ["renderSbtCpu", "meanOf", [], { spp: 16, view: { w: 8 }, seed: 1 }];
+    ok("  ...and a seed, a view or a helper that averages differently is a different key",
+       new Set([keyOf(base), keyOf([...base.slice(0, 3), { ...base[3], seed: 2 }]), keyOf([...base.slice(0, 3), { ...base[3], view: { w: 9 } }]),
+                keyOf(["renderSbtCpu", "sum/length", ...base.slice(2)])]).size === 4);
+    CPU_CACHE.finish();
+    // SABOTAGE (the cache's round), each against the real file, restored and md5-verified: C1 every cached mean in the
+    // committed and local files one ulp up -> 1 red, the bit-for-bit row (the slice's recomputes disagree). C2 the key
+    // dropping the seed -> 1 red on the run that fills it (the key row), 8 on the next (every per-seed row reads a 0.000%
+    // relSd off one cached mean, and the bit-for-bit row). C3 the closure stopping at rtPipeline.mjs's own imports -> 2
+    // red (7 files; and a byte in microfacet.mjs no longer moves the hash). C4 the math print ignoring the Math handed
+    // to it -> 1 red.
 }
 
 console.log("rtPipeline-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d5b8295fe9b72794293722c5c9341ca9425f961a",
+ "head": "736035fa83c8519f6d6b45f3d429d7072c36a80e",
  "bodies": {
   "box3d": [
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3450417,
-    "sha": "52c767e48c18b3e5476ccdf8ea17058d8576b43c"
+    "sha": "dc299c509c47841c246603f6c5e8cdc76318c967"
    },
    {
     "path": "mpm3d.html",
@@ -928,7 +928,7 @@
    },
    {
     "path": "fsr-three.html",
-    "bytes": 47736,
+    "bytes": 48211,
     "sha": "47807238e171e699e1e0df49bd51ca6d1238eedc"
    },
    {
@@ -1110,6 +1110,11 @@
     "path": "render/temporalClipTsl-selfcheck.mjs",
     "bytes": 14629,
     "sha": "d8cd5872e8d09b71741f1f78bb9b7872125aed07"
+   },
+   {
+    "path": "render/temporalLockSumsTsl-selfcheck.mjs",
+    "bytes": 26558,
+    "sha": null
    },
    {
     "path": "render/temporalLockTsl-selfcheck.mjs",

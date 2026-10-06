@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-06T17:45:02.715Z",
+ "at": "2026-10-06T17:59:54.141Z",
  "poolAt": "2026-10-06T17:10:46.473Z",
  "poolHorizon": "2026-10-06T17:10:46.473Z",
  "budgetMs": 3000,
@@ -160,6 +160,12 @@
    "code": 0,
    "priorMs": 17208,
    "at": "2026-10-06T00:11:15.681Z"
+  },
+  {
+   "gate": "camera/cameraBoom-selfcheck.mjs",
+   "ms": 342,
+   "code": 0,
+   "at": "2026-10-06T14:46:06.708Z"
   },
   {
    "gate": "ev/esFleetSize-selfcheck.mjs",
@@ -1213,10 +1219,10 @@
   },
   {
    "gate": "render/ringFloorCost-selfcheck.mjs",
-   "ms": 1302,
+   "ms": 2177,
    "code": 0,
-   "priorMs": 1292,
-   "at": "2026-09-20T12:39:52.283Z"
+   "priorMs": 1881,
+   "at": "2026-10-06T17:42:32.588Z"
   },
   {
    "gate": "render/temporalClipTsl-selfcheck.mjs",
@@ -1234,10 +1240,24 @@
   },
   {
    "gate": "render/temporalLock-selfcheck.mjs",
-   "ms": 3887,
+   "ms": 2719,
    "code": 0,
-   "priorMs": 3481,
-   "at": "2026-10-06T14:10:34.212Z"
+   "priorMs": 2779,
+   "at": "2026-10-06T17:28:52.428Z"
+  },
+  {
+   "gate": "render/temporalLockSums-selfcheck.mjs",
+   "ms": 1540,
+   "code": 0,
+   "priorMs": 2339,
+   "at": "2026-10-06T17:28:56.212Z"
+  },
+  {
+   "gate": "render/temporalLockSumsTsl-selfcheck.mjs",
+   "ms": 16005,
+   "code": 0,
+   "priorMs": 11169,
+   "at": "2026-10-06T17:59:54.141Z"
   },
   {
    "gate": "render/temporalLockTsl-selfcheck.mjs",

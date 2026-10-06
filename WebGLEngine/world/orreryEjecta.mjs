@@ -534,6 +534,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // rig run 2 -- threeUpstream-selfcheck's section 4 reads three.core.js through the overlay where a file symlink
         // is refused, and compares it with the vendored copy: a real read of this body, by name.
         "tools/ship/threeUpstream-selfcheck.mjs",
+        // the lock-sums round -- render/temporalLockSumsTsl-selfcheck.mjs drives the sums' TSL port on both backends, the
+        // same import of three.webgpu.js and three.tsl.js as render/temporalLockTsl-selfcheck.mjs above. One arrival.
+        "render/temporalLockSumsTsl-selfcheck.mjs",
     ]),
     "wasm": Object.freeze([
         "ai-bridge/wasmDemoBridge.js",

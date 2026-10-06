@@ -875,8 +875,13 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4778 -- 1925 -> 1926 for tools/ship/fsrCaches-selfcheck.mjs -- the FSR caches in their own folder, out of the
     // release zip, installable on request. usesOk 1904 -> 1905, definesOk 1896 -> 1897, nameFirst 1796 -> 1797; the
     // rest hold (measured with census()).
-    gates: 1926, usesOk: 1905, definesOk: 1897, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1797, condFirst: 97, unknownSignature: 11,
+    // Round A (the camera boom) -- 1926 -> 1927 for camera/cameraBoom-selfcheck.mjs. usesOk 1905 -> 1906, definesOk
+    // 1897 -> 1898, nameFirst 1797 -> 1798, the same four rows by one; the rest hold (measured with census(), and the
+    // gate's own drift row named exactly these four).
+    // the lock-sums round -- 1927 -> 1929 for render/temporalLockSums-selfcheck.mjs and render/temporalLockSumsTsl-selfcheck.mjs.
+    // usesOk, definesOk and nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
+    gates: 1929, usesOk: 1908, definesOk: 1900, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1800, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
