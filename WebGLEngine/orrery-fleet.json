@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "6b556dafb16d75fadf477dbfbcbce56ae4492fb9",
+ "head": "3010997dd290281cd20dbf19cbffe2823d6e18b9",
  "bodies": {
   "box3d": [
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3451961,
-    "sha": "6b556dafb16d75fadf477dbfbcbce56ae4492fb9"
+    "sha": "bc608056cd4e51318cceb454098f5e075272610e"
    },
    {
     "path": "mpm3d.html",
@@ -928,8 +928,8 @@
    },
    {
     "path": "fsr-three.html",
-    "bytes": 48211,
-    "sha": "5b5e1076c815e5cbdf4b0a2a3d1f31efd1fd5dda"
+    "bytes": 48758,
+    "sha": "3010997dd290281cd20dbf19cbffe2823d6e18b9"
    },
    {
     "path": "fx/fsr/fsr3Hold-selfcheck.mjs",
@@ -1068,8 +1068,8 @@
    },
    {
     "path": "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
-    "bytes": 20451,
-    "sha": "655b0baf30931515958ddc8c42c12ec550c8920b"
+    "bytes": 24845,
+    "sha": "3010997dd290281cd20dbf19cbffe2823d6e18b9"
    },
    {
     "path": "fx/fsr/fsrTsl-selfcheck.mjs",
@@ -1113,8 +1113,8 @@
    },
    {
     "path": "render/temporalLockSumsTsl-selfcheck.mjs",
-    "bytes": 26558,
-    "sha": "5b5e1076c815e5cbdf4b0a2a3d1f31efd1fd5dda"
+    "bytes": 27647,
+    "sha": "3010997dd290281cd20dbf19cbffe2823d6e18b9"
    },
    {
     "path": "render/temporalLockTsl-selfcheck.mjs",
