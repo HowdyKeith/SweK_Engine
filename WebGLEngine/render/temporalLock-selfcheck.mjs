@@ -195,8 +195,8 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     const step = 0.6;                                   // kept for the double-buffer rows, which compare slots, not the detector
     // a camera translating at a constant speed over a flat wall has ONE field for every frame: drawn once per speed. The
     // detector row's repair doubled this section's sequences and took the gate over the sweep's 3 s budget (2745 -> 3162
-    // ms) until the field stopped being re-derived every frame and the old drive and the chequer stopped being re-run
-    // to print numbers that are recorded below.
+    // ms) until the field stopped being re-derived every frame and pushLuma found its bilinear taps once a pixel
+    // instead of once a slot (render/temporalLock.mjs; render/ringFloorCost-selfcheck.mjs section 2 measures it).
     const fieldAt = new Map(), fieldFor = (depth, speed) => fieldAt.get(speed) || fieldAt.set(speed, motionFor(depth, speed, 0)).get(speed);
     const SLOW = 0.2;                                   // 1.2 px a frame: 18 frames walk 21.6 px, so most pixels keep their history
     const build = (reproject, kind, at = SLOW) => {
@@ -227,11 +227,11 @@ console.log("\n3. THE RING REPROJECTS, AND A RING THAT DOES NOT IS MEASURING THE
     // *** AND THE LIMIT, STATED AS A NUMBER. *** On the pixel-scale chequer the reprojection is NOT faithful: each
     // bilinear fetch blurs a 1.13 px texture, the older period has been fetched 8 more times than the newer, and
     // the difference between a more-blurred and a less-blurred chequer is read as a change in the light. Measured
-    // when this row was repaired: 1.0e-1 at this speed over the 1536 judged pixels, and 7.6e-2 / 2.2e-1 at 0.3 /
-    // 0.08 px a frame -- as large as a ring that does not reproject at all. It is recorded here and not re-run: it is
-    // a property of bilinear history on content at the pixel scale, which this module does not claim to handle, and
-    // re-running it took this gate over the sweep's 3 s budget. render/temporalLockSums-selfcheck.mjs section 5
-    // measures the same drive for the sums each run.
+    // when this row was repaired: 1.0e-1 at this speed, and 7.6e-2 / 2.2e-1 at 0.3 / 0.08 px a frame -- as large
+    // as a ring that does not reproject at all. It is reported, not asserted: it is a property of bilinear
+    // history on content at the pixel scale, which this module does not claim to handle.
+    const chqRun = build(true, "chequer"), chq = judgedMean(chqRun, chqRun);
+    report(`the same drive over the pixel-scale chequer reads ${chq.mean.toExponential(2)} over ${chq.n} judged pixels -- a false shading change from reprojection blur, recorded, not hidden`);
 
     // ---- *** THE DOUBLE BUFFER, WHICH WENT 0-RED AND IS THE REASON THIS BLOCK EXISTS. *** ------------------
     // pushLuma swaps a scratch pair rather than allocating a fresh ring each frame -- an optimisation made
@@ -547,6 +547,10 @@ else {
 //   CJ the detector row driven at the old 0.6 world units a frame -> 2 red: 0 of 2304 pixels judged, and a NaN
 //      mean, which is the vacuous row made visible instead of passing.
 //   BX re-run against the repaired row -> 5 red (it reads 1.86e-1 with and without -- 1.0x).
+//   CK (the lock-sums round, when pushLuma's bilinear taps were hoisted out of the slot loop) one tap's weight wrong,
+//      (1 - fx) where fx belongs -> 7 red, the double-buffer row among them: its naive copy still evaluates the formula
+//      per slot. The hoist itself was checked bit for bit against the per-slot function over 9.5 million slots
+//      (odd frame sizes, both axes clamped, periods 8 to 32, still and moving) -- 0 differ.
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: a lock detector that CAN separate a thin feature from a pixel-scale texture -- " +

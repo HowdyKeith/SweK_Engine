@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
- "at": "2026-10-06T17:09:18.630Z",
+ "at": "2026-10-06T17:42:32.588Z",
  "poolAt": "2026-09-22T18:55:53.815Z",
  "budgetMs": 3000,
  "lastRun": 1,
@@ -735,24 +735,24 @@
   },
   {
    "gate": "render/ringFloorCost-selfcheck.mjs",
-   "ms": 1302,
+   "ms": 2177,
    "code": 0,
-   "priorMs": 1292,
-   "at": "2026-09-20T12:39:52.283Z"
+   "priorMs": 1881,
+   "at": "2026-10-06T17:42:32.588Z"
   },
   {
    "gate": "render/temporalLock-selfcheck.mjs",
-   "ms": 2779,
+   "ms": 2719,
    "code": 0,
-   "priorMs": 2426,
-   "at": "2026-10-06T17:09:04.778Z"
+   "priorMs": 2779,
+   "at": "2026-10-06T17:28:52.428Z"
   },
   {
    "gate": "render/temporalLockSums-selfcheck.mjs",
-   "ms": 2339,
+   "ms": 1540,
    "code": 0,
-   "priorMs": 1933,
-   "at": "2026-10-06T17:09:07.281Z"
+   "priorMs": 2339,
+   "at": "2026-10-06T17:28:56.212Z"
   },
   {
    "gate": "render/temporalLockSumsTsl-selfcheck.mjs",

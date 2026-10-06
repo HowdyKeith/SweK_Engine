@@ -856,7 +856,7 @@
   "render/retroRaster-selfcheck.mjs": 287,
   "render/ringFloor-selfcheck.mjs": 1204,
   "render/ringFloorControl-selfcheck.mjs": 663,
-  "render/ringFloorCost-selfcheck.mjs": 1380,
+  "render/ringFloorCost-selfcheck.mjs": 2177,
   "render/ringFloorDevice-selfcheck.mjs": 1610,
   "render/ringFloorLight-selfcheck.mjs": 1312,
   "render/ringFloorMargin-selfcheck.mjs": 771,
@@ -874,7 +874,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 2779,
+  "render/temporalLock-selfcheck.mjs": 2719,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -2226,7 +2226,7 @@
   "tools/ship/worldColliderBVH-selfcheck.mjs": 424,
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
   "camera/cameraBoom-selfcheck.mjs": 342,
-  "render/temporalLockSums-selfcheck.mjs": 2339,
+  "render/temporalLockSums-selfcheck.mjs": 1540,
   "render/temporalLockSumsTsl-selfcheck.mjs": 11169
  },
  "codes": {
@@ -4724,7 +4724,7 @@
   "render/retroRaster-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/ringFloor-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/ringFloorControl-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
-  "render/ringFloorCost-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
+  "render/ringFloorCost-selfcheck.mjs": "2026-10-06T17:42:32.588Z",
   "render/ringFloorDevice-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/ringFloorLight-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/ringFloorMargin-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -4742,7 +4742,7 @@
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:09:04.778Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:28:52.428Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
@@ -6094,7 +6094,7 @@
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-10-05T20:05:48.132Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:39.216Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
-  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:09:07.281Z",
+  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:28:56.212Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
  },
  "capAt": {
@@ -11276,13 +11276,13 @@
   "world/tools/water-attacks-selfcheck.mjs": 54,
   "fx/fsr/fsr-selfcheck.mjs": 1643,
   "render/motionVectorsGPU-selfcheck.mjs": 1691,
-  "render/ringFloorCost-selfcheck.mjs": 1380,
+  "render/ringFloorCost-selfcheck.mjs": 2177,
   "render/ringFloorDevice-selfcheck.mjs": 1610,
   "render/temporalAccumulate-selfcheck.mjs": 1505,
   "render/temporalCoherentLock-selfcheck.mjs": 1574,
   "render/temporalDepthLock-selfcheck.mjs": 1608,
   "render/temporalGPU-selfcheck.mjs": 2880,
-  "render/temporalLock-selfcheck.mjs": 2779,
+  "render/temporalLock-selfcheck.mjs": 2719,
   "render/temporalReject-selfcheck.mjs": 2056,
   "render/temporalRejectGPU-selfcheck.mjs": 2298,
   "render/temporalResolve-selfcheck.mjs": 1462,
@@ -11517,7 +11517,7 @@
   "tools/ship/worldColliderBVH-selfcheck.mjs": 138,
   "tools/ship/fsrCaches-selfcheck.mjs": 5019,
   "camera/cameraBoom-selfcheck.mjs": 342,
-  "render/temporalLockSums-selfcheck.mjs": 2339,
+  "render/temporalLockSums-selfcheck.mjs": 1540,
   "render/temporalLockSumsTsl-selfcheck.mjs": 11169
  },
  "serialAt": {
@@ -12991,13 +12991,13 @@
   "world/tools/water-attacks-selfcheck.mjs": "2026-09-22T16:15:51.924Z",
   "fx/fsr/fsr-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/motionVectorsGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
-  "render/ringFloorCost-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
+  "render/ringFloorCost-selfcheck.mjs": "2026-10-06T17:42:32.588Z",
   "render/ringFloorDevice-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalAccumulate-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalCoherentLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalDepthLock-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
-  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:09:04.778Z",
+  "render/temporalLock-selfcheck.mjs": "2026-10-06T17:28:52.428Z",
   "render/temporalReject-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalRejectGPU-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "render/temporalResolve-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
@@ -13232,7 +13232,7 @@
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
-  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:09:07.281Z",
+  "render/temporalLockSums-selfcheck.mjs": "2026-10-06T17:28:56.212Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:09:18.630Z"
  },
  "serialRing": {
@@ -13627,9 +13627,9 @@
    1204
   ],
   "render/ringFloorCost-selfcheck.mjs": [
-   1539,
-   1394,
-   1380
+   1380,
+   1881,
+   2177
   ],
   "render/ringFloorDevice-selfcheck.mjs": [
    1788,
@@ -13662,9 +13662,9 @@
    2880
   ],
   "render/temporalLock-selfcheck.mjs": [
-   3162,
    2426,
-   2779
+   2779,
+   2719
   ],
   "render/temporalReject-selfcheck.mjs": [
    2191,
@@ -19440,9 +19440,9 @@
    342
   ],
   "render/temporalLockSums-selfcheck.mjs": [
-   8279,
    1933,
-   2339
+   2339,
+   1540
   ],
   "render/temporalLockSumsTsl-selfcheck.mjs": [
    11848,
