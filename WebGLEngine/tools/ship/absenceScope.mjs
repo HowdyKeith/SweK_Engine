@@ -379,6 +379,9 @@ export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
     // directories the v4432 claim searched.
     Object.freeze({ file: "camera/camera.js", at: "v4778",
         why: "tasks #80/#81 (c98be610, 7a968cb9): the first-person camera's _capsuleWorldBVH() reads a world's colliderBVH and sweeps the capsule against it" }),
+    Object.freeze({ file: "camera/cameraBoom-selfcheck.mjs", at: "v4816",
+        why: "the camera boom round (ab583367, merged at v4816): its stub camera sets _capsuleWorldBVH to () => null, so the "+
+             "term is in CODE although the gate builds no BVH -- it switches camera.js's mesh path off to test the voxel sweep" }),
     Object.freeze({ file: "main.js", at: "v4778",
         why: "the Controller Lab, splat-walk and platform-carry wiring (a1ec407f, 078afe40, 5112cdc7) hands camera.setWorld a colliderBVH. It was in `denial` at v4435 for carrying item 10's version notes; the notes are still there, and code now answers first" }),
     Object.freeze({ file: "simulation/BotManager.js", at: "v4778",
@@ -437,6 +440,7 @@ export const BVH_AT_V4435 = Object.freeze({
         // v4778 -- the rtx merge's sixteen, placed in sorted position because the list is compared sorted;
         // each is named with its commit in OUTOFSCOPE_ARRIVALS_SINCE_V4435.
         "camera/camera.js",
+        "camera/cameraBoom-selfcheck.mjs",   // v4816 -- the boom gate stubs _capsuleWorldBVH; it builds none. Sabotage: dropped here 4 red, misnamed in the arrivals 1 red
         "fx/spritemesh/blueprint-selfcheck.mjs", "fx/spritemesh/blueprint.js",
         "main.js",   // v4778 -- out of `denial` below: its code now carries a colliderBVH
         // v4647q -- the collider-forge bridge at v4629 and its gate. Both carry the term in CODE and
