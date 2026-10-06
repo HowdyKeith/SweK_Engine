@@ -43,7 +43,11 @@
 // Z. A blocked axis does not cancel the others, which IS the slide. The order matters only in corners, and the
 // gate pins the corner case rather than leaving it to chance.
 //
-// Pure, no imports, browser-safe.
+// Pure and browser-safe. ONE import, physics/character/fallBody.mjs, which itself imports nothing: stepCharacter's
+// vertical velocity is fallBody.fallStep's integrator (see stepCharacter), so the tree's rule for "integrate a
+// vertical velocity" lives in one file and this one owns only the geometry.
+
+import { fallStep, GRAVITY, TERMINAL } from "./fallBody.mjs";
 
 export const EPS = 1e-6;                 // keeps the body a hair off the surface so the next overlap test is clean
 
@@ -198,9 +202,20 @@ export function slideVector(v, n) {
 }
 
 // A convenience for pages: gravity + ground stick, expressed in terms of the controller rather than beside it.
-export function stepCharacter({ pos, half, velocity, isSolid, dt = 1 / 60, gravity = -20, stepHeight = 0, maxSubstep = 0.4 }) {
+//
+// *** THE VERTICAL VELOCITY IS fallBody.fallStep's, AND UNTIL THE KINEMATIC-WIRING ROUND IT WAS A FOURTH COPY. ***
+// This read `v[1] += gravity * dt` with its own default of -20 -- the same number as fallBody's GRAVITY, typed
+// twice, and no terminal clamp at all where fallBody clamps at -55. camera.js's CAMERA_FALL_AT_V4548 counted it
+// among the tree's implementations of "fall" and left it standing. fallStep is now called with NO surface oracle
+// (`surfaceUnder` null everywhere, no `ceilingOver`), so it integrates and clamps and nothing else: the geometry
+// below and above the body stays moveCharacter's, which is the half this file is exact about. The integration is
+// the same semi-implicit step as before -- v += g dt, then x += v dt -- so below the clamp the result is
+// bit-identical (kinematic-selfcheck section 13 holds it to ===), and the defaults are fallBody's symbols rather
+// than copies of their values. `terminal` is new to this signature; pass -Infinity for the old unclamped fall.
+export function stepCharacter({ pos, half, velocity, isSolid, dt = 1 / 60, gravity = GRAVITY, terminal = TERMINAL,
+                                stepHeight = 0, maxSubstep = 0.4 }) {
     const v = velocity.slice();
-    v[1] += gravity * dt;
+    v[1] = fallStep({ pos, vy: v[1], surfaceUnder: () => null, dt, gravity, terminal }).vy;
     const r = moveCharacter({ pos, half, delta: [v[0] * dt, v[1] * dt, v[2] * dt], isSolid, stepHeight, maxSubstep });
     // a blocked axis kills the velocity INTO that axis only -- the rest is preserved, same rule as the slide
     for (const n of r.normals) {
