@@ -331,6 +331,25 @@ export const STILL_OVER_AT_V4813 = Object.freeze({
     ]),
 });
 
+// v4815 -- THE RECORD MOVED TO A SLOWER HOST (quickSweep's v4815 handover: Xeon @ 2.80GHz, 420793, after the sandbox
+// restarted), and two returnees went back over there, alone, three runs each on a quiet box. Named here as wgslSpec was
+// at v4813, with the readings, because a returnee that crosses back on a later box is a fact about the box. sweepBudget
+// has been here before: named at v4541 as "not the box" on 3,165-3,273, then read 2,589-2,770 at v4565 with the file
+// untouched -- "IT IS ALL THE BOX". These readings say the same of this host, and that is what they are filed as.
+export const STILL_OVER_AT_V4815 = Object.freeze({
+    at: "v4815", box: "linux-x64-4c-16095mb-420793",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", recordedWas: 4518, hereMs: 3382,
+            serialMs: Object.freeze([3072, 3224, 3247]),
+            why: "about 2.4 s alone on the 2.10 GHz host this round (2,317-2,770 ms), 3,072 / 3,224 / 3,247 alone on " +
+                 "the 2.80 GHz host that owns the record since the v4815 handover; the gate did not change between them" }),
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
+            serialMs: Object.freeze([3353, 3086, 3214]),
+            why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
+                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate" }),
+    ]),
+});
+
 export const RETURNED_AT_V4476 = Object.freeze({
     at: "v4476",
     ofTwelve: 12,

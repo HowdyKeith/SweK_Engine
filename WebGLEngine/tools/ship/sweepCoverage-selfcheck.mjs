@@ -492,7 +492,8 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
         const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
-                    SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g);   // v4813
+                    SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
+                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g);     // v4815: the host change
         return !!row && justifiedOver(row);
     };
     const returned = new Map([
@@ -1030,7 +1031,11 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     const entrantsUnmeasured = entrants.filter((g) => !c.graded.includes(g));
     const fromPopulation = c.killed.length - entrants.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       outside <= R.outsideTheSweep.before && fromPopulation <= R.remaining.killedUnreachable &&
+       // v4815 (Keith's call): the SHARE, not the count. 464 was counted over a tree of 1,617 gates; the tree holds 1,926
+       // and the record moved to a slower host (quickSweep's v4815 handover), which put 475 outside -- 24.7% against
+       // 28.7%. A count ceiling on a growing population goes red on growth alone. SABOTAGE: the comparison made
+       // `outside / gates.length <= 0.20` -> this row red by name; restored md5-identical.
+       outside / gates.length <= R.outsideTheSweep.beforePct / 100 && fromPopulation <= R.remaining.killedUnreachable &&
        entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
@@ -1522,6 +1527,14 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
        SC.STILL_OVER_AT_V4813.stillOver.length > 0 &&
        SC.STILL_OVER_AT_V4813.stillOver.every((x) => justifiedOver(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
        SC.STILL_OVER_AT_V4813.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
+    // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
+    // which consults the roll; restored md5-identical.
+    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",

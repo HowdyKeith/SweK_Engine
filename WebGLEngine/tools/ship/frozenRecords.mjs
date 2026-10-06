@@ -755,7 +755,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4778 -- RE-TAKEN 150 -> 151 with `excluding` below, at the rtx merge, for NO_GATE_V4778 (no field at all).
     // v4778 -- RE-TAKEN 151 / 72 / 399 -> 152 / 73 / 400 with `excluding` below, for COMMIT_BELT_DRIFT_V4778 (one field).
     // v4813 -- 152 -> 153 records, fields unmoved: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs (see `excluding`).
-    currentIncludingModule: Object.freeze({ records: 153, withFields: 73, fields: 400 }),
+    // v4815 -- 153 -> 154 records, fields unmoved: STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs (see `excluding`).
+    currentIncludingModule: Object.freeze({ records: 154, withFields: 73, fields: 400 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -961,7 +962,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // wgslSpec leaving the oscillator roll when its alone cost crossed too. Its numbers sit inside the stillOver entry
     // and its top line shares strings, so the per-line reader counts no field on its own lines: records moves by one,
     // the other two do not. Re-taken in the round that added it.
-    excluding: Object.freeze({ records: 151, withFields: 71, fields: 380 }),
+    // v4815 -- RE-TAKEN: 151 / 71 / 380 -> 152 / 71 / 380. One arrival, STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs --
+    // headlessGpu and sweepBudget back over on the host the record moved to. Same shape as v4813's: records by one only.
+    excluding: Object.freeze({ records: 152, withFields: 71, fields: 380 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
