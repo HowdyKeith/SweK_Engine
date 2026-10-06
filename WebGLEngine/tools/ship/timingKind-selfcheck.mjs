@@ -33,7 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIND } from "./quickSweep.mjs";
-import { ledgerStamps, selectionKind } from "./sweepCoverage.mjs";
+import { ledgerStamps, selectionKind, rotation } from "./sweepCoverage.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -158,7 +158,10 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     // it for free, and says it about gates nobody has written yet.
     // v4725: `poolAt`, not `at`. A --gate run moves `at` and selected nothing but the gates it named, so it
     // cannot have passed an arrival over; only the last unfiltered pool pass could (sweepCoverage.ledgerStamps).
-    const rotRef = (rot) => Date.parse((rot && (rot.poolAt || rot.at)) || "");
+    // v4816: `poolHorizon` over `poolAt`. A stalest-first pass of 80 over a pool of 349 cannot reach a FRESH
+    // entry, so "it ran after this entry" is not "it passed this entry over"; the horizon is how far it reached
+    // (sweepCoverage.ledgerStamps). A ledger written before the field existed reads poolAt, the v4725 rule.
+    const rotRef = (rot) => Date.parse((rot && (rot.poolHorizon || rot.poolAt || rot.at)) || "");
     const rotAt = rotRef(ROT);
     const stampOf = (g) => Date.parse((S.at || {})[g] || "");
     const BUDGET = S.budgetMs;
@@ -170,7 +173,7 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     // each time was a case rather than a note. Here the cases are synthetic, because the entries they describe
     // are ones the tree should never have: a positive control is how you test a guard whose population is zero.
     const isArrival = (ms, kind, stamp, rot) =>
-        Number.isFinite(rot) && Number.isFinite(stamp) && stamp > rot && ms > BUDGET && kind === "alone";
+        Number.isFinite(rot) && Number.isFinite(stamp) && stamp >= rot && ms > BUDGET && kind === "alone";
     const arrivedSinceRotation = (g) => isArrival(S.timings[g], S.kinds[g], stampOf(g), rotAt);
     // *** THE ACCOUNTING IS ALSO A FUNCTION, FOR THE REASON THE RULE IS. *** A sabotage replacing the live
     // `unaccounted` with an empty array scored 0 RED: every control below graded the RULE, and none of them
@@ -304,6 +307,46 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
            selectionKind({}) === "pool" && selectionKind({ gate: "registerDrift" }) === "named" &&
            selectionKind({ band: "3000-8000" }) === "named" && selectionKind({ killed: true }) === "named",
            "--band filters the pool by recorded cost, so a gate outside the band was never in its selection either");
+    }
+
+    // ---- v4816: A POOL PASS REACHES ITS STALEST N, NOT EVERYTHING STAMPED BEFORE IT RAN --------------------
+    // The v4816 rotation (80 of 349, 2026-10-06T17:10) left tools/ship/fsrPage-selfcheck.mjs "unaccounted": the
+    // quick sweep had evicted it at 14:45 (3318 ms alone, two crossings), so it was the FRESHEST entry in the
+    // pool and the stalest-first pass could not have taken it. The rule read poolAt as "should have taken it".
+    // The ledger now carries `poolHorizon`, the stamp of the first pool entry the pass did NOT take; these rows
+    // drive the selection, the writer and the reader with fixtures, because the live ledger holds one history.
+    //
+    // v4816 SABOTAGE LOG:  H1 rotation() reports no horizon (always null) -> 3 red
+    //   H2 the horizon is the LAST TAKEN entry's stamp, not the first untaken one's -> 3 red
+    //   H3 a pool pass ignores the horizon and records its own stamp -> 2 red
+    //   H4 a named write drops the horizon (falls back to poolAt) -> 1 red
+    //   H5 the reader ignores poolHorizon (reads poolAt again) -> 1 red   H6 isArrival back to `>` -> 1 red
+    {
+        const t1 = "2026-10-01T00:00:00.000Z", t2 = "2026-10-02T00:00:00.000Z", t3 = "2026-10-03T00:00:00.000Z";
+        const FX = { at: { a: t1, b: t2, c: t3 }, timings: { a: 5000, b: 5000, c: 5000 } };
+        const C = { over: ["c", "a", "b"], killed: [] };
+        const two = rotation(C, FX, { slots: 2, budgetMs: 1e9 }), all = rotation(C, FX, { slots: 9, budgetMs: 1e9 });
+        ok("  v4816: rotation() reports the stamp of the first entry it did NOT take, and null when it took the pool",
+           two.picked.join() === "a,b" && two.horizon === t3 && all.horizon === null,
+           `slice of 2 over three stamps: took ${two.picked.join(",")}, horizon ${two.horizon}; slice of 9: horizon ${all.horizon}`);
+        const ran = "2026-10-04T00:00:00.000Z", named = "2026-10-05T00:00:00.000Z";
+        const pool = ledgerStamps({ at: t1, poolAt: t1 }, ran, "pool", two.horizon);
+        const whole = ledgerStamps({ at: t1, poolAt: t1 }, ran, "pool", all.horizon);
+        const after = ledgerStamps(pool, named, "named");
+        ok("  v4816: a pool pass records its horizon, one that took the whole pool records its own stamp, and a named write carries it",
+           pool.poolAt === ran && pool.poolHorizon === t3 && whole.poolHorizon === ran &&
+           after.poolAt === ran && after.poolHorizon === t3 &&
+           ledgerStamps({ at: t1, poolAt: t2 }, named, "named").poolHorizon === t2,
+           `pool pass at ${ran}: poolHorizon ${pool.poolHorizon}; whole-pool pass: ${whole.poolHorizon}; ` +
+           `named write after it: ${after.poolHorizon}; a pre-v4816 ledger carries its poolAt`);
+        const between = Date.parse("2026-10-03T12:00:00.000Z");
+        ok("  v4816: an entry stamped past the horizon but before the pass ran is still an arrival; one before the horizon is not",
+           isArrival(3318, "alone", between, rotRef(pool)) === true &&
+           isArrival(3318, "alone", Date.parse(t3), rotRef(pool)) === true &&
+           isArrival(3318, "alone", Date.parse(t2), rotRef(pool)) === false &&
+           isArrival(3318, "alone", between, rotRef(whole)) === false,
+           "the fsrPage shape: the pass ran after it and never had it in reach. The entry AT the horizon is the one " +
+           "the pass stopped before; an entry before it was taken or passed over, and a whole-pool pass closes the ratchet.");
     }
 
     // The inference must be exactly the branch rule, or it is a third thing pretending to be the first two.

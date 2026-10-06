@@ -1452,7 +1452,13 @@ export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budget
         if (picked.length >= slots || cost + ms > budgetMs) break;
         picked.push(g); cost += ms;
     }
-    return { picked, cost, pool: pool.length, roundsToCover: roundsToCover(pool.length, picked.length) };
+    // v4816 -- `horizon`: the stamp of the first pool entry this pass did NOT take, or null when it took them all.
+    // The pick is a PREFIX of the stalest-first order, so every entry stamped earlier than the horizon was taken
+    // and no entry stamped at or after it could have been. timingKind needs that line, not the pass's own clock:
+    // see ledgerStamps below.
+    const next = pool[picked.length];
+    const horizon = next === undefined ? null : (at[next] || UNKNOWN_AT);
+    return { picked, cost, pool: pool.length, horizon, roundsToCover: roundsToCover(pool.length, picked.length) };
 }
 
 export function roundsToCover(population, perRound) {
@@ -1501,7 +1507,20 @@ export function readFile(p = path.join(ENG, "tools", "ship", "sweep-timings.json
 // reference the arrival rule already used, so the first write changes nothing about what counts.
 export const selectionKind = ({ gate = null, band = null, killed = false } = {}) =>
     (gate || band || killed ? "named" : "pool");
-export function ledgerStamps(prev, stamp, selection) {
+//
+// *** v4816 -- `poolHorizon`: HOW FAR THE POOL PASS REACHED, WHICH IS NOT WHEN IT RAN. *** The arrival rule read
+// `poolAt` as "a rotation ran after this entry, so it should have taken it". A stalest-first pass of 80 slots over
+// a pool of 349 takes the 80 STALEST and cannot take a fresh one, so an over-budget entry the quick sweep had
+// evicted three hours before the v4816 pass (tools/ship/fsrPage-selfcheck.mjs, 3318 ms alone, 14:45 against a
+// 17:10 pass) went "unaccounted" without the pass ever having had it in reach. The pass now records the stamp
+// of the first entry it did not take (rotation().horizon); an entry stamped at or after that line was never in
+// its reach and is still an arrival, and one stamped before it was taken or should have been. A pass that took
+// the whole pool records its own stamp, so the ratchet closes exactly as before. A named write carries the
+// horizon forward with poolAt; a ledger written before the field existed falls back to poolAt, the old rule.
+export function ledgerStamps(prev, stamp, selection, horizon = null) {
     const priorPool = prev ? (prev.poolAt || prev.at || null) : null;
-    return { at: stamp, poolAt: selection === "pool" ? stamp : priorPool };
+    const priorHorizon = prev ? (prev.poolHorizon || priorPool) : null;
+    return selection === "pool"
+        ? { at: stamp, poolAt: stamp, poolHorizon: horizon || stamp }
+        : { at: stamp, poolAt: priorPool, poolHorizon: priorHorizon };
 }

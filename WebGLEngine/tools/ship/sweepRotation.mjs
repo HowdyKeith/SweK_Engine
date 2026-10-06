@@ -382,6 +382,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const picked = only ? gates.filter((g) => g.includes(only))
                         : killedMode ? killedPool.slice(0, slots)
                         : rotation(c, file, pickOpts).picked;
+    const poolHorizon = only || killedMode ? null : rotation(c, file, pickOpts).horizon;
     if (killedMode) {
         console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
             `${picked.length} at a ${capMs / 1000} s cap, CHEAPEST EXPECTED FIRST. ` +
@@ -457,8 +458,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
                   "MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that " +
                   "measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is " +
-                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
-            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode })),
+                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. " +
+                  "`poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached " +
+                  "every entry stamped earlier and none stamped at or after it.",
+            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode }), poolHorizon),
             budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
         console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);
