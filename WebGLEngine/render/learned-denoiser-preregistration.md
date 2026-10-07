@@ -186,3 +186,41 @@ above left a choice open. Each is closed here, in the commit that carries the co
     - "not reported": C1, C4 or C5 fired. Nothing about H1 or H2 is claimed.
     - "not resolvable": C2 fired.
     - A hypothesis can also be "not resolvable" alone, through C3.
+
+## 12. THE HARVEST -- RUN ONCE, NOT REPORTED (C1)
+
+`node tools/denoiseStudy.mjs --harvest` at commit b023baa4, 2026-10-07 22:17-22:35Z (1,090 s). Its output,
+unedited, is `render/denoise-results.json`.
+
+- **Outcome: "not reported".** C1 fired on T1: the network beat the noisy input on 9 of 12 images, and 11 are
+  needed. The filter beat it on 12 of 12. C2 (mean d -3.89), C4 (bit-identical retrain) and C5 held.
+- Per section 7, **nothing is claimed about H1 or H2.** T1 and T2 have now been seen. No fix is ever measured on
+  them.
+- What the tables show: on every test image, every seed's network is within about 1% of the noisy input. The tuned
+  filter (sS 1, sN 0.3, sA 0.05, sI 1) cut relMSE about 5x.
+
+**Diagnosis, on the TRAINING split only** (24 scenes re-rendered from their seeds; val, T1 and T2 not touched):
+
+| Probe (seed 1, 1,500 steps, the pre-registered batch and crop) | Train relMSE, net / noisy (geometric mean) |
+|---|---|
+| the pre-registered network, lr 1e-4 / 1e-3 / 1e-2 | 1.007 / 0.998 / 1.000 |
+| one linear 3 x 3 residual layer, zero-initialised, lr 1e-3 | 0.426 |
+| a hand-set 3 x 3 box blur of the irradiance (no guides) | 1.109 |
+| the pre-registered network, last layer's weights zero | **0.182** |
+| the pre-registered network, last layer's He weights x 0.01 | **0.176** |
+
+- **The cause is the initialisation section 5 fixed.** He-normal weights in the residual's LAST layer add large
+  random noise to the image at step 0. The training loss starts at 0.050 against the identity's 0.016.
+- Adam's first ~50 steps undo that noise, and the network settles in the "add nothing" basin. The training loss
+  then holds at 0.0163 for the remaining ~1,450 steps at all three learning rates.
+- The same network, with only its last layer started at (or near) zero, fits the training set to 0.18x the noisy
+  error.
+- **The rest of the pipeline is sound:**
+  - the inputs are tame: demodulated irradiance median 0.37, p99.9 1.37, max 9.1;
+  - 6 of 16 units in layer 3 never fire, and the other layers have no dead units;
+  - fireflies do not dominate: the worst 1% of pixel-channels carry 22% of the noisy input's error;
+  - a convex model learns.
+
+Section 9's "neither" outcome does not apply: no hypothesis was tested. Any next round is a new pre-registration.
+It must use new T1 and T2 scenes from seed ranges disjoint from every range above, and it is recorded beside this
+one, not in place of it.
