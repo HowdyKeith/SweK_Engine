@@ -83,9 +83,21 @@ function pushLumaPerSlot(st, { current, motion, w, h }) {
     st.scratchRing = st.ring; st.scratchFilled = st.filled; st.ring = nextRing; st.filled = nextFilled; st.n++;
     return st;
 }
+// The index of the sorted sample that bounds the MEDIAN from above with at least 95% confidence, one-sided and
+// distribution-free: the smallest k with P(Binomial(n, 1/2) >= k+1) <= 0.05, i.e. fewer than k+1 of n samples sit above
+// the true median at that rate. For n = 11 it is the 9th (P = 67/2048 = 3.3%). Derived, not picked.
+function medianUpperIndex(n) {
+    const C = (a, b) => { let v = 1; for (let i = 1; i <= b; i++) v = v * (a - b + i) / i; return v; };
+    for (let k = Math.ceil(n / 2); k < n; k++) {
+        let tail = 0; for (let j = k + 1; j <= n; j++) tail += C(n, j);
+        if (tail / 2 ** n <= 0.05) return k;
+    }
+    return n - 1;
+}
 const time = (f, n) => { const t = process.hrtime.bigint(); for (let i = 0; i < n; i++) f(); return Number(process.hrtime.bigint() - t) / 1e6 / n; };
 /** Interleaved A/B/A: the reference is measured either side of the subjects, so drift is common to all of them. */
-function ratioAt(W, H, reps = 5) {
+const OLD_REPS = 5;
+function ratioAt(W, H, reps = 11) {
     const F = fixture(W, H, CONTENT.smooth), N = W * H;
     const push = () => pushLuma(F.st, { current: F.c, motion: F.m, w: W, h: H });
     const old = () => pushLumaPerSlot(F.old, { current: F.c, motion: F.m, w: W, h: H });
@@ -100,19 +112,46 @@ function ratioAt(W, H, reps = 5) {
     // divides by became five times cheaper, so the same number of calls measured a fifth of the time and its spread
     // grew to reach the claim's line; twice the calls of a push five times cheaper is still under half the old cost.
     for (let i = 0; i < 4; i++) { push(); old(); sums(); floor(); }
-    const n = Math.max(2, Math.round(1.2e5 / N)), r = [], q = [], pushNs = [], floorNs = [], oldNs = [], sumsNs = [];
+    // *** v4816 -- ELEVEN REPEATS OF HALF THE CALLS (1.2e5/N x 5 -> 6e4/N x 11), FOR THE ERROR BAR SECTION 1 NOW USES. ***
+    // The median's confidence bound needs order statistics to stand on, and five give none worth having; the call
+    // count is halved so the gate costs what it did (section 1 at ~2.0 s here, against ~1.5-1.8 s before).
+    const n = Math.max(2, Math.round(6e4 / N)), r = [], q = [], pushNs = [], floorNs = [], oldNs = [], sumsNs = [];
     for (let k = 0; k < reps; k++) {
         // each subject sits DIRECTLY between two pushes. The first draft of this round put all three subjects between one
         // pair, and the spread at 128x128 doubled, reaching the line on 2 of 12 runs alone: drift over a window three
         // subjects wide is not common to both ends. The interleaving is what this measurement is.
-        const a1 = time(push, n), b = time(floor, n), a2 = time(push, n), o = time(old, n), a3 = time(push, n), sm = time(sums, n), a4 = time(push, n);
+        // v4816: the per-slot control costs ~4.7 pushes a timing and its row's whole bar sits at 3.5-6x against a line at
+        // 1.0, so it keeps the five repeats it was designed with; only the floor ratio, whose bound is tight, takes eleven.
+        const withOld = k < OLD_REPS;
+        const a1 = time(push, n), b = time(floor, n), a2 = time(push, n);
+        const o = withOld ? time(old, n) : NaN, a3 = withOld ? time(push, n) : NaN;
+        const sm = time(sums, n), a4 = time(push, n);
         const a = (a1 + a2) / 2;
-        r.push(b / a); q.push(o / ((a2 + a3) / 2)); pushNs.push(a * 1e6 / N); floorNs.push(b * 1e6 / N); oldNs.push(o * 1e6 / N); sumsNs.push(sm * 1e6 / N);
+        r.push(b / a); pushNs.push(a * 1e6 / N); floorNs.push(b * 1e6 / N); sumsNs.push(sm * 1e6 / N);
+        if (withOld) { q.push(o / ((a2 + a3) / 2)); oldNs.push(o * 1e6 / N); }
     }
     for (const v of [r, q, pushNs, floorNs, oldNs, sumsNs]) v.sort((x, y) => x - y);
     const mid = (v) => v[(v.length - 1) >> 1];
-    return { median: mid(r), lo: r[0], hi: r[r.length - 1], oldMedian: mid(q), oldLo: q[0], oldHi: q[q.length - 1],
+    return { median: mid(r), lo: r[0], hi: r[r.length - 1], upper: r[medianUpperIndex(r.length)], sorted: r, oldMedian: mid(q), oldLo: q[0], oldHi: q[q.length - 1],
              pushNs: mid(pushNs), floorNs: mid(floorNs), oldNs: mid(oldNs), sumsNs: mid(sumsNs), n, reps };
+}
+
+// *** v4816 -- THE FLATNESS ROW'S TWO SIZES, INTERLEAVED THE WAY SECTION 1'S SUBJECTS ARE. *** It compared the 64x64
+// and 128x128 per-pixel push times from two ratioAt calls taken a second apart, which is a clock read twice -- exactly
+// what this header says not to assert -- and went red 1 run in 50 alone here on a 64x64 pass that was slow throughout
+// (push 175, floor 113 ns/px, then 108 and 86 at 128). Here each 128x128 timing sits between two 64x64 ones.
+function flatnessRatio(reps = 7) {
+    const A = fixture(64, 64, CONTENT.smooth), B = fixture(128, 128, CONTENT.smooth);
+    const pa = () => pushLuma(A.st, { current: A.c, motion: A.m, w: 64, h: 64 });
+    const pb = () => pushLuma(B.st, { current: B.c, motion: B.m, w: 128, h: 128 });
+    for (let i = 0; i < 4; i++) { pa(); pb(); }
+    const na = Math.max(2, Math.round(3e4 / 4096)), nb = Math.max(2, Math.round(3e4 / 16384)), q = [];
+    for (let k = 0; k < reps; k++) {
+        const a1 = time(pa, na) / 4096, b = time(pb, nb) / 16384, a2 = time(pa, na) / 4096;
+        q.push(b / ((a1 + a2) / 2));
+    }
+    q.sort((x, y) => x - y);
+    return { median: q[(q.length - 1) >> 1], lo: q[0], hi: q[q.length - 1], reps };
 }
 
 console.log("ringFloorCost-selfcheck -- what the derived floor costs, measured as a ratio and not as a clock\n");
@@ -120,7 +159,7 @@ console.log("1. THE MEASUREMENT'S OWN SPREAD, BEFORE THE MEASUREMENT IS USED FOR
 const R = {};
 {
     for (const s of [64, 128]) R[s] = ratioAt(s, s);
-    for (const s of [64, 128]) report(`${s}x${s}: ratio floor:push median ${R[s].median.toFixed(3)}, spread ${R[s].lo.toFixed(3)}..${R[s].hi.toFixed(3)} (${((R[s].hi - R[s].lo) / R[s].median * 100).toFixed(0)}% of median) over ${R[s].reps} interleaved repeats, ${R[s].n} calls each`);
+    for (const s of [64, 128]) report(`${s}x${s}: ratio floor:push median ${R[s].median.toFixed(3)}, 95% upper bound ${R[s].upper.toFixed(3)} (sample ${medianUpperIndex(R[s].reps) + 1} of ${R[s].reps}), spread ${R[s].lo.toFixed(3)}..${R[s].hi.toFixed(3)} (${((R[s].hi - R[s].lo) / R[s].median * 100).toFixed(0)}% of median) over ${R[s].reps} interleaved repeats, ${R[s].n} calls each`);
     // *** THE THRESHOLD IS THE CLAIM'S, NOT ONE I PICKED. *** "spread under 60%" would be a declared number
     // chosen to pass. What the claim below actually needs is that the error bar does not reach the line it
     // is being compared against: the spread has to be smaller than the distance from the median to that line.
@@ -130,10 +169,38 @@ const R = {};
     // fifths of its time finding the same four taps once per slot; with that gone (section 2) the floor measures
     // about 0.6 of it, and the claim that survives is the one adoption needs: it costs LESS than the push it runs
     // beside. 0.5 was never derived from anything but the old measurement, so it is not kept.
+    //
+    // *** v4816 -- THE ERROR BAR IS THE MEDIAN'S, BECAUSE THE CLAIM IS ABOUT THE MEDIAN. *** The row asked the whole
+    // min..max range of five repeats to fit between the median and the line. On the box that now owns the timing record
+    // (linux-x64-4c-16095mb-420793) the 128x128 median reads ~0.80, not the 0.55-0.69 the lock-sums round measured on
+    // 142c0d, so the headroom is ~0.2 -- and one stray repeat sets a min..max range by itself. Measured here, run alone:
+    // 5 of 10 runs red, then 4 of 12; sixty repeats in one process put a single repeat over 1.0 about once in 180, and
+    // printed in order the strays (0.45, 0.93, 1.01 ...) are scattered, not front-loaded, so more warm-up is no cure.
+    // A sample range also WIDENS with every repeat added, so "more repeats" could only make that row worse.
+    // What the claim needs is that the MEDIAN is below the line with confidence, and the order statistic above bounds
+    // it without assuming a distribution. 11 repeats of 6e4/N, bound = 9th of 11: 0 of 20 runs red, worst bound 0.850,
+    // typical 0.82 at 128x128. The line stays at 1.0. Forcing a GC before every timing was also tried and is NOT used:
+    // the 128x128 median falls to ~0.61 but single repeats reach 1.5, because the floor's own allocation is then
+    // collected inside its own timing every time.
+    // The index is derived, so it is checked where the binomial tail can be done by hand: n = 5 -> the 5th (1/32 = 3.1%),
+    // n = 9 -> the 8th (10/512 = 2.0%; the 7th would be 46/512 = 9.0%), n = 11 -> the 9th (67/2048 = 3.3%; the 8th 11.3%).
+    ok("  the bound's sample is the binomial one: 5th of 5, 8th of 9, 9th of 11 -- not the median, and not the maximum",
+        medianUpperIndex(5) === 4 && medianUpperIndex(9) === 7 && medianUpperIndex(11) === 8,
+        `n=5 -> ${medianUpperIndex(5) + 1}, n=9 -> ${medianUpperIndex(9) + 1}, n=11 -> ${medianUpperIndex(11) + 1}`);
+    ok("  ...and the live bound IS that sample of the sorted repeats, at or above the median -- not the median wearing its name",
+        [64, 128].every((s) => R[s].upper === R[s].sorted[medianUpperIndex(R[s].sorted.length)] &&
+            R[s].sorted.length === R[s].reps && R[s].sorted.every((v, i, a) => i === 0 || a[i - 1] <= v) && R[s].upper >= R[s].median),
+        [64, 128].map((s) => `${s}: bound ${R[s].upper.toFixed(3)} = sample ${medianUpperIndex(R[s].reps) + 1} of ${R[s].reps}, median ${R[s].median.toFixed(3)}`).join(", "));
     const REACH = 1.0;
-    ok("the interleaved ratio's error bar does not reach the line the claim is made against -- which is what makes a timing row safe to assert rather than merely small",
-        [64, 128].every((s) => (R[s].hi - R[s].lo) < (REACH - R[s].median)),
-        [64, 128].map((s) => `${s}: spread ${(R[s].hi - R[s].lo).toFixed(3)} vs headroom ${(REACH - R[s].median).toFixed(3)} (${((REACH - R[s].median) / ((R[s].hi - R[s].lo) || 1e-9)).toFixed(1)}x)`).join(", "));
+    // the comparison is a function so a fixture can drive it: on this box every live bound clears the line, so loosening
+    // the comparison changes no live answer (sabotage JO went 0 red before this control existed)
+    const boundsClear = (rs, line) => rs.every((x) => x.upper < line);   // a NaN bound fails too: NaN < line is false
+    ok("  CONTROL: a bound AT or over the line fails the row, one under it passes",
+        boundsClear([{ upper: 0.98 }], REACH) && !boundsClear([{ upper: 0.98 }, { upper: 1.0 }], REACH) &&
+        !boundsClear([{ upper: 1.02 }], REACH) && !boundsClear([{ upper: NaN }], REACH), "fixture bounds 0.98 / 1.00 / 1.02 / NaN against the line 1.0");
+    ok("the interleaved ratio's error bar -- the median's 95% upper bound -- does not reach the line the claim is made against, which is what makes a timing row safe to assert rather than merely small",
+        boundsClear([R[64], R[128]], REACH),
+        [64, 128].map((s) => `${s}: median ${R[s].median.toFixed(3)}, bound ${R[s].upper.toFixed(3)} vs line ${REACH} (headroom ${(REACH - R[s].upper).toFixed(3)})`).join(", "));
     // *** THIS IS THE ONE ASSERTION A TIMING GATE CAN MAKE WITHOUT BEING FLAKY. *** Not "under 2 ms" -- under
     // the reference measured beside it, by a margin larger than the spread just measured.
     ok(`*** the derived floor costs LESS than the ring push it would run beside: ${(R[128].median * 100).toFixed(1)}% of it at 128x128 ***`,
@@ -175,9 +242,10 @@ console.log("\n2. WHAT THE PUSH'S COST WAS, AND WHAT v4561 READ IT AS");
     // prediction instead: the floor's touches carry second differences, absolute values and a max, the push's a
     // multiply-add. A count of touches is not a model of either function's cost, and nothing is asserted from it.
     report(`per pixel: push ${R[128].pushNs.toFixed(0)} ns, floor ${R[128].floorNs.toFixed(0)} ns, the per-slot push ${R[128].oldNs.toFixed(0)} ns at 128x128`);
-    ok(`  the push's per-pixel cost is flat with resolution (${R[64].pushNs.toFixed(0)} -> ${R[128].pushNs.toFixed(0)} ns): it touches its own pixel's slots and four neighbours' at any frame size`,
-        Math.abs(R[128].pushNs - R[64].pushNs) / R[64].pushNs < 0.35,
-        `push ${R[64].pushNs.toFixed(0)} -> ${R[128].pushNs.toFixed(0)} ns/px, floor ${R[64].floorNs.toFixed(0)} -> ${R[128].floorNs.toFixed(0)} ns/px`);
+    const FL = flatnessRatio();
+    ok(`  the push's per-pixel cost is flat with resolution (128x128 over 64x64, interleaved: ${FL.median.toFixed(2)}x): it touches its own pixel's slots and four neighbours' at any frame size`,
+        Math.abs(FL.median - 1) < 0.35,
+        `median ${FL.median.toFixed(3)} over ${FL.reps} interleaved repeats (${FL.lo.toFixed(2)}..${FL.hi.toFixed(2)}); section 1's separate passes read push ${R[64].pushNs.toFixed(0)} -> ${R[128].pushNs.toFixed(0)} ns/px, floor ${R[64].floorNs.toFixed(0)} -> ${R[128].floorNs.toFixed(0)} ns/px`);
 }
 
 console.log("\n3. *** THE OBVIOUS OPTIMISATION IS UNSAFE, AND ITS FAILURE IS THE MOST DANGEROUS ANSWER THERE IS ***");
@@ -317,6 +385,20 @@ else {
 // spread's margin to the line 1.7x at worst; 2 of 12 had gone red before it. Before all of it, the module change itself
 // went 3 red here and nowhere else: "a fraction under half", "beats its op-count
 // prediction" and the spread against 0.5 were all statements about a push four fifths of whose time was the call.
+//
+// *** v4816 -- HARDENED ON THE BOX THAT OWNS THE TIMING RECORD, WHERE THE SPREAD ROW WENT RED 5 RUNS IN 10 ALONE. ***
+// Section 1's error bar became the median's 95% upper bound (the 9th of 11 sorted repeats, 6e4/N calls each); the line
+// stays 1.0. The flatness row's two sizes are interleaved (flatnessRatio), its 0.35 line kept. The per-slot control keeps
+// five repeats (OLD_REPS), which brings the run back to ~2.1 s. Measured here, alone: before, 5 of 10 and 4 of 12 red on
+// the spread row and 1 of 50 on the flatness row; after, 40 of 40 green, mean 2,065 ms, max 2,267 ms. Sabotage, each restored:
+//   JM  the line back at 0.5                                                        3 red (both claim rows, now the bound too)
+//   JN  medianUpperIndex returns the median's own index                              1 red, the binomial row
+//   JO  the bound comparison loosened by a whole unit                                1 red, its fixture control
+//   JQ  the live bound swapped for the median                                        1 red, the wiring row
+//   JS  the 128x128 side of the flatness interleave pushed twice                     1 red, the flatness row
+//   JR  repeats back to 5 (the bound then the maximum)                               0 red, AND CORRECTLY: these two change
+//   JT  the flatness row back on section 1's separate passes                         0 red  how OFTEN a row flakes, not what
+//       it asserts, and one run cannot measure a rate. The 5/10 and 1/50 above are those rates.
 //
 // *** AND THIS GATE'S FIRST VERSION RAN 17.4 SECONDS AGAINST A 3,000 ms BUDGET *** -- seven repeats of three
 // timings of 1.2e6/N calls, warmed by twenty more. That is the over-budget fault v4551, v4553, v4558 and
