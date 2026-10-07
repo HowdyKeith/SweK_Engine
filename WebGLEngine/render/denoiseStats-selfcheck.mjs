@@ -3,8 +3,8 @@
 // Run: node render/denoiseStats-selfcheck.mjs
 //
 // GATES render/denoiseStats.mjs -- the pre-registration's statistic and controls -- on PLANTED outcomes only. Its
-// exports, each named here: REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, relMSE, seedMean, effects, signTestUpper, holm,
-// verdict. Every verdict the function can return is planted below and has to come back.
+// exports, each named here: REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, relMSE, seedMean, effects,
+// signTestUpper, holm, trainFit, verdict. Every verdict the function can return is planted below and has to come back.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   S1  Holm does not stop at its first failure                                  1 RED
@@ -12,13 +12,16 @@
 //   S3  control C2 inverted                                                      5 RED
 //   S4  the network's error taken from its first seed only                       1 RED
 //   S5  control C3 ignored                                                       1 RED
+//   S6  C0 averages ratios arithmetically instead of geometrically                1 RED
+//   S7  C0 passes when ANY seed fits, not every seed                             2 RED
+//   S8  verdict() ignores a failed C0                                            1 RED (it crashed the gate until the row caught the throw)
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const S = await import(pathToFileURL(path.join(ENG, "render", "denoiseStats.mjs")).href);
-const { REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, relMSE, seedMean, effects, signTestUpper, holm, verdict } = S;
+const { REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, verdict } = S;
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -78,6 +81,21 @@ console.log("\n2. EVERY VERDICT, PLANTED");
     ok("!! C4 and C5: a seed that does not reproduce, or a shared render seed, and nothing is reported", g.run === "not reported" && g2.run === "not reported");
     const h = verdict({ sets: { H1: set({ wins: 12 }), H2: set({ wins: 12 }) }, determinism: true, seedsDistinct: true });
     ok("  a run that never trained the shuffled-target network cannot claim C2 passed", h.run === "not resolvable" && /not run/.test(h.reasons.join()));
+}
+
+console.log("\n3. CONTROL C0 -- THE RE-RUN'S TRAINING-FIT CHECK (pre-registration section 13)");
+{
+    ok("  the bar is 0.8 x the noisy input's error", C0_MAX_RATIO === 0.8);
+    // per seed, the GEOMETRIC mean of net / noisy over the training images: ratios 0.25 and 4 average to 1, not 2.125
+    const g = trainFit([[0.25, 4], [0.5, 0.5]], [1, 1]);
+    ok("!! the ratio is a geometric mean over images, one per seed: 0.25 and 4 make 1.000, and 0.5 and 0.5 make 0.500",
+        Math.abs(g.ratios[0] - 1) < 1e-12 && Math.abs(g.ratios[1] - 0.5) < 1e-12 && g.ok === false, g.ratios.map((r) => r.toFixed(3)).join(" / "));
+    ok("!! C0 holds only when EVERY seed fits: 0.5 / 0.79 holds, 0.5 / 0.81 does not", trainFit([[0.5], [0.79]], [1]).ok === true && trainFit([[0.5], [0.81]], [1]).ok === false);
+    ok("  an untrained identity network fits to exactly 1, which fails", (() => { const f = trainFit([[0.3, 0.2]], [0.3, 0.2]); return f.ratios[0] === 1 && !f.ok; })());
+    let stop = null, threw = null; try { stop = verdict({ c0: trainFit([[2, 2]], [2, 2]) }); } catch (e) { threw = e.message; }
+    ok("!! a failed C0 is NOT REPORTED, with no hypothesis tested and no test set needed -- verdict() never reads `sets`",
+        !!stop && stop.run === "not reported" && Object.keys(stop.hypotheses).length === 0 && /^C0: /.test(stop.reasons[0]) && stop.controls.C0.ok === false,
+        threw ? `threw: ${threw}` : stop.reasons[0]);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +

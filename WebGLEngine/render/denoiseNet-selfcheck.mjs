@@ -3,20 +3,22 @@
 // Run: node render/denoiseNet-selfcheck.mjs
 //
 // GATES render/denoiseNet.mjs -- the pre-registered network and its training -- on SYNTHETIC images only (smooth
-// irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, makeDenoiser,
-// paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
+// irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, INITS, INIT,
+// makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   L1  the residual removed: the output IS the irradiance                       1 RED
 //   L2  the loss gradient misses the albedo the output was multiplied by         1 RED
 //   L3  the batch's image chosen by Math.random -- v4698's defect, planted       1 RED (C4)
+//   L4  the default init back to "he"                                            3 RED
+//   L5  zero-last draws its weights from another stream than round 1's          2 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SHAPE, TRAIN, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser } = await imp("render/denoiseNet.mjs");
+const { SHAPE, TRAIN, INITS, INIT, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser } = await imp("render/denoiseNet.mjs");
 const { relMSE } = await imp("render/denoiseStats.mjs");
 const { CHANNELS } = await imp("render/denoiseScenes.mjs");
 
@@ -97,6 +99,20 @@ console.log("\n4. IT LEARNS -- ON A SYNTHETIC TASK, NOT THE DATASET");
     const first = R.losses.slice(0, 10).reduce((a, v) => a + v, 0) / 10, last = R.losses.slice(-10).reduce((a, v) => a + v, 0) / 10;
     ok("!! 120 steps: the training loss falls, and on a synthetic image it never saw, the network beats the noisy input",
         last < first * 0.7 && out < noisy, `loss ${first.toFixed(4)} -> ${last.toFixed(4)}; held-out relMSE noisy ${noisy.toFixed(4)}, denoised ${out.toFixed(4)}`);
+}
+
+console.log("\n5. THE RE-RUN'S INITIALISATION (pre-registration section 13)");
+{
+    ok("  two inits, \"he\" (round 1) and \"zero-last\", and the default is zero-last", INITS.join() === "he,zero-last" && INIT === "zero-last");
+    const he = makeDenoiser(4, "he"), zl = makeDenoiser(4), last = SHAPE.length - 1;
+    const sameBut = he.layers.every((L, i) => i === last ? same(Array.from(L.b), Array.from(zl.layers[i].b)) : same(Array.from(L.W), Array.from(zl.layers[i].W)) && same(Array.from(L.b), Array.from(zl.layers[i].b)));
+    ok("!! zero-last is round 1's draws with the last layer's weights set to zero: every other weight bit-identical, from the same stream",
+        sameBut && zl.layers[last].W.every((v) => v === 0) && he.layers[last].W.some((v) => v !== 0));
+    const im = synth(12, 10, 3), { y } = denoise(makeDenoiser(9), im.x, 10, 12);
+    ok("!! an untrained default network IS the identity: its image is the noisy input, bit for bit -- round 1's started as noise",
+        same(Array.from(y), Array.from(noisyRadiance(im))) && !same(Array.from(denoise(makeDenoiser(9, "he"), im.x, 10, 12).y), Array.from(noisyRadiance(im))));
+    let threw = null; try { makeDenoiser(1, "xavier"); } catch (e) { threw = e.message; }
+    ok("  an init that is neither is refused by name", /not one of he, zero-last/.test(threw || ""), threw);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

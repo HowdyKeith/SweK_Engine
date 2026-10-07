@@ -14,7 +14,21 @@ export const SHAPE = Object.freeze([Object.freeze([CHANNELS, 16, "relu"]), Objec
 /** The pre-registered schedule. */
 export const TRAIN = Object.freeze({ steps: 1500, batch: 4, crop: 32 });
 
-export const makeDenoiser = (seed) => initNet(SHAPE, seededRandom(seed));
+/**
+ * The initialisation. Round 1 drew He-normal weights for every layer ("he"); its harvest found the residual's He-drawn
+ * LAST layer adds noise at step 0 and Adam settles in the identity (pre-registration section 12). Section 13 fixes
+ * "zero-last": the same draws from the same stream, then the last layer's weights set to zero, so an untrained network
+ * is exactly the identity and every later draw (crops, batch order) is the one round 1 made.
+ */
+export const INITS = Object.freeze(["he", "zero-last"]);
+export const INIT = "zero-last";
+function initDenoiser(rand, init) {
+    if (!INITS.includes(init)) throw new Error(`denoiseNet: init "${init}" is not one of ${INITS.join(", ")}`);
+    const net = initNet(SHAPE, rand);
+    if (init === "zero-last") net.layers[net.layers.length - 1].W.fill(0);
+    return net;
+}
+export const makeDenoiser = (seed, init = INIT) => initDenoiser(seededRandom(seed), init);
 export { paramCount };
 
 /** The network's final image for a 9-channel input: (noisy irradiance + output) x max(albedo, floor), H x W x 3. */
@@ -61,10 +75,10 @@ export function cropAt(x, ref, W, cx, cy, size) {
  * the image and the crop corner drawn from the seed's stream AFTER the initial weights. The batch's gradient is the
  * mean of its crops'. Returns { net, losses } with the batch loss of every step.
  */
-export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, onStep = null } = {}) {
+export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, init = INIT, onStep = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("denoiseNet: training needs an integer seed -- it seeds the weights, the crops and the batch order");
     if (!images.length || images.some((im) => im.w < crop || im.h < crop)) throw new Error(`denoiseNet: every training image must be at least ${crop} x ${crop}`);
-    const rand = seededRandom(seed), net = initNet(SHAPE, rand), state = adamState(net), losses = [];
+    const rand = seededRandom(seed), net = initDenoiser(rand, init), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
         let loss = 0, acc = null;
         for (let b = 0; b < batch; b++) {

@@ -224,3 +224,43 @@ unedited, is `render/denoise-results.json`.
 Section 9's "neither" outcome does not apply: no hypothesis was tested. Any next round is a new pre-registration.
 It must use new T1 and T2 scenes from seed ranges disjoint from every range above, and it is recorded beside this
 one, not in place of it.
+
+## 13. THE RE-RUN -- AMENDED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of the re-run's T1 or T2 has been rendered: `renderImages()`
+refuses their seeds without `{ harvest: true }`, and nothing but the re-run's command passes it. Section 12's run
+stands as recorded; this is a second study beside it, not a replacement.
+
+**What was seen first.** The 24 training scenes, during section 12's diagnosis. The rules below were chosen knowing
+those numbers. No other scene was looked at, and val's numbers in round 1's file were never used for anything.
+
+**Three changes. Everything else in sections 3-11 holds as written.**
+
+1. **Initialisation.** He-normal weights are drawn for every layer from the run's seeded stream, exactly as in round
+   1, and then the LAST layer's weights are set to zero (its biases were already zero).
+   - An untrained network is therefore exactly the identity.
+   - Every later draw (image choice, crop corners) is the one round 1 made.
+   - In code: `render/denoiseNet.mjs`, `INIT = "zero-last"`.
+2. **Control C0, training fit.** After the three networks are trained, and BEFORE a test scene is rendered: per seed,
+   take the geometric mean over the 24 training images of relMSE(network) / relMSE(noisy input).
+   - C0 holds when every seed's is at most **0.8**.
+   - If it fires, the run is "not reported", it STOPS, and its test scenes are never rendered. A failed fit cannot
+     spend a test set again.
+   - The bar is loose on purpose: section 12's probe measured 0.18 for this initialisation and 1.00 for round 1's,
+     so C0 would have stopped round 1 before T1 and T2.
+   - In code: `trainFit()` and `C0_MAX_RATIO` in `render/denoiseStats.mjs`, and the stop in
+     `render/denoiseStudy.mjs`.
+3. **New test sets.**
+   - T1: family A, scene seeds 5000-5011.
+   - T2: family B, scene seeds 6000-6011.
+   - Neither range overlaps any earlier split, and C5 holds over both rounds together: 76 scenes, 228 distinct render
+     seeds.
+   - train (1000-1023) and val (2000-2003) are round 1's.
+   - In code: `SPLITS_R2` in `render/denoiseScenes.mjs`.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r2`.
+- It writes `render/denoise-results-r2.json`.
+- It refuses to start if that file exists, so a harvest's results are never overwritten.
+- Round 1's run is `--harvest-r1` (it was `--harvest` at b023baa4), which refuses for the same reason.
+
+**The outcomes and what each buys:** section 9's, unchanged. C0 is one more way to "not reported".

@@ -8118,6 +8118,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, the re-run's amendment -- C0, THE ZERO-LAST INIT AND NEW TEST SCENES, BEFORE ANY OF THEM EXIST.
+    since483: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
+        at: "the denoiser arc, re-run amendment (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R2: new test seeds, refused, C5 over both rounds)",
+                                "render/denoiseStats-selfcheck.mjs (C0: trainFit and the verdict that stops on it)",
+                                "render/denoiseNet-selfcheck.mjs (the zero-last init: round 1's draws, an identity at step 0)",
+                                "render/denoiseStudy-selfcheck.mjs (C0 stops the run before a test scene is rendered)"]),
+        verdict: "*** A FAILED FIT CANNOT SPEND A TEST SET AGAIN. *** The harvest (section 12) came back not reported: " +
+                 "control C1 fired because every network stayed the identity, and the diagnosis, on the training split " +
+                 "only, traced it to the He-initialised last layer of the residual (1.00x the noisy error at three " +
+                 "learning rates; 0.18x with that layer started at zero). Section 13 amends three things before the " +
+                 "re-run renders anything: the last layer starts at zero from the same draws, control C0 checks the " +
+                 "training fit (<= 0.8x for every seed) and STOPS the run before the test scenes are rendered -- the " +
+                 "gate proves it by putting the real re-run test seeds behind the stop with harvest off -- and T1/T2 " +
+                 "come from 5000 and 6000, ranges nothing has touched. A harvest's results file is never overwritten. " +
+                 "10 sabotages, all red; S8 crashed the gate until its row caught the throw.",
+    }),
     // the denoiser arc, round 2 -- THE PRE-REGISTERED STUDY AS CODE, BEFORE ANY DATA.
     since482: Object.freeze({
         at: "the denoiser arc, round 2 (unshipped)", swept: 6, green: 6, red: 0,

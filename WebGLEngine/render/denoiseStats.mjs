@@ -11,6 +11,7 @@
 export const REL_EPS = 0.01;      // relMSE's denominator offset
 export const C1_MIN_WINS = 11;    // of 12: both methods must beat the noisy input this often
 export const C3_FLOOR_FACTOR = 2; // a method within this factor of the reference floor cannot be ranked there
+export const C0_MAX_RATIO = 0.8;  // section 13: every seed's network must fit its training set to this x the noisy error
 
 /** Relative MSE over every pixel and channel: mean( (y - r)^2 / (r^2 + 0.01) ). */
 export function relMSE(y, r) {
@@ -59,14 +60,31 @@ export function holm(ps, alpha = 0.05) {
 }
 
 /**
+ * Control C0 (pre-registration section 13), decided on the TRAINING images before any test scene is rendered. Per
+ * seed, the geometric mean over the training images of relMSE(network) / relMSE(noisy input); C0 holds when every
+ * seed's is at most C0_MAX_RATIO. `netRel` is [per seed: relMSE per training image], `noisyRel` per training image.
+ */
+export function trainFit(netRel, noisyRel) {
+    if (!netRel.length || !netRel.every((s) => s.length === noisyRel.length && s.length > 0)) throw new Error("denoiseStats: C0 over mismatched sets");
+    const ratios = netRel.map((s) => Math.exp(s.reduce((a, v, i) => a + Math.log(v / noisyRel[i]), 0) / s.length));
+    return { ratios, ok: ratios.every((r) => r <= C0_MAX_RATIO) };
+}
+
+/**
  * The verdict. `sets` maps a hypothesis name to its test set's measurements, all arrays over that set's images:
  *     { noisy: relMSE of the noisy input, filter: relMSE of the filter, net: [per seed: relMSE of the network],
  *       floor: relMSE between the two references }
  * `shuffled` is the shuffled-target network's per-seed relMSE on H1's set (control C2); `determinism` (C4) and
- * `seedsDistinct` (C5) are the booleans their checks produced. Returns { run, reasons, hypotheses, controls }.
+ * `seedsDistinct` (C5) are the booleans their checks produced; `c0`, when given, is trainFit()'s result. Returns { run, reasons, hypotheses, controls }.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, alpha = 0.05, inFamily = "H1" }) {
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, alpha = 0.05, inFamily = "H1" }) {
     const reasons = [], controls = {};
+    // C0 (section 13) is decided before the test sets exist: when it fires the run stops, and there is nothing to test
+    if (c0) {
+        controls.C0 = c0;
+        if (!c0.ok) return { run: "not reported", hypotheses: {}, controls,
+            reasons: [`C0: a network fit its training set to ${c0.ratios.map((r) => r.toFixed(3)).join(" / ")} x the noisy error; every seed needs <= ${C0_MAX_RATIO}`] };
+    }
     controls.C4 = !!determinism; if (!controls.C4) reasons.push("C4: one seed twice did not give bit-identical weights");
     controls.C5 = !!seedsDistinct; if (!controls.C5) reasons.push("C5: an input and a reference shared a render seed");
     const names = Object.keys(sets);

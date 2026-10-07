@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** Every scene this gate draws is seeded from 900000 up, outside every
@@ -13,6 +13,8 @@
 //   D1  the reference rendered with the input's seed (C5 broken)                 1 RED
 //   D2  the dataset-seed refusal switched off                                    1 RED
 //   D3  family B with no microfacet sphere                                       1 RED
+//   D6  SPLITS_R2's T1 on round 1's T1 range (3000)                              2 RED
+//   D7  SPLITS_R2 left out of the refusal                                        1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -22,7 +24,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
         renderImages, inputChannels, remodulate } = D;
 
 let fails = 0;
@@ -44,6 +46,17 @@ console.log("1. THE SPLITS AND THE NUMBERS THE PRE-REGISTRATION FIXED");
     for (const s of all) { try { renderImages(SPLITS.T2.seeds.includes(s) ? "B" : "A", s, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
     ok("!! every dataset seed is REFUSED without { harvest: true } -- nothing can look at the data before the harvest round", refused === all.length, `${refused} of ${all.length} refused`);
     ok("  ...and a seed outside the splits is not", !isDatasetSeed(900000) && !isDatasetSeed(999));
+    // the re-run's splits (pre-registration section 13)
+    const r1 = new Set(all), newTests = [...SPLITS_R2.T1.seeds, ...SPLITS_R2.T2.seeds];
+    ok("!! the re-run keeps round 1's training and validation scenes and draws NEW test scenes: 12 of family A, 12 of B, on no range any split used",
+        SPLITS_R2.train === SPLITS.train && SPLITS_R2.val === SPLITS.val && SPLITS_R2.T1.family === "A" && SPLITS_R2.T2.family === "B" &&
+        SPLITS_R2.T1.seeds.length === 12 && SPLITS_R2.T2.seeds.length === 12 && new Set(newTests).size === 24 && newTests.every((s) => !r1.has(s)),
+        `T1 from ${SPLITS_R2.T1.seeds[0]}, T2 from ${SPLITS_R2.T2.seeds[0]}`);
+    let refusedR2 = 0;
+    for (const s of newTests) { try { renderImages(SPLITS_R2.T2.seeds.includes(s) ? "B" : "A", s, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refusedR2++; } }
+    const both = [...all, ...newTests].flatMap((s) => { const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
+    ok("!! the new test seeds are refused without { harvest: true } too, and C5 holds over both rounds: 76 scenes, 228 distinct render seeds",
+        refusedR2 === 24 && new Set(both).size === both.length && both.length === 228, `${refusedR2} of 24 refused`);
 }
 
 console.log("\n2. THE TWO FAMILIES, OVER 300 SCENES OF EACH");

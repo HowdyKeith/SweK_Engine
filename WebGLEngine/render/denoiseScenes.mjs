@@ -6,7 +6,7 @@
 // references' seeds distinct by construction (control C5).
 //
 // *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
-// without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// or SPLITS_R2 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -27,7 +27,17 @@ export const SPLITS = Object.freeze({
     T1: Object.freeze({ family: "A", seeds: range(3000, 12) }),
     T2: Object.freeze({ family: "B", seeds: range(4000, 12) }),
 });
-const RESERVED = new Set(Object.values(SPLITS).flatMap((s) => s.seeds));
+/**
+ * The re-run's splits (pre-registration section 13): the same training and validation scenes, and NEW test scenes on
+ * ranges no earlier split touched -- round 1's T1 and T2 were seen at its harvest and are never a test set again.
+ */
+export const SPLITS_R2 = Object.freeze({
+    train: SPLITS.train,
+    val: SPLITS.val,
+    T1: Object.freeze({ family: "A", seeds: range(5000, 12) }),
+    T2: Object.freeze({ family: "B", seeds: range(6000, 12) }),
+});
+const RESERVED = new Set([SPLITS, SPLITS_R2].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
