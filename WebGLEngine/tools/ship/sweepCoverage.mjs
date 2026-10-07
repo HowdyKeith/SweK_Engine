@@ -327,7 +327,12 @@ export const STILL_OVER_AT_V4813 = Object.freeze({
         Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", loadedMs: 7087, recordedWas: 5162, hereMs: 3589,
             serialMs: Object.freeze([2882, 3056, 3589]),
             why: "the oscillator roll's least ambiguous entry until its alone cost crossed too: 2,882 / 3,056 / " +
-                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546" }),
+                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546",
+            // v4818 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH: alone 1,713 / 1,631 / 1,625 ms on the 2.10 GHz
+            // host, and the v4818 verdict's own 8-way sample 2,981 -- under the bar loaded too, so it is neither an
+            // oscillator nor over, and it is back in the sweep. Kept here as history with the readings that retired it.
+            returned: Object.freeze({ at: "v4818", aloneMs: 1625, loadedMs: 2981,
+                serialMs: Object.freeze([1713, 1631, 1625]) }) }),
     ]),
 });
 
