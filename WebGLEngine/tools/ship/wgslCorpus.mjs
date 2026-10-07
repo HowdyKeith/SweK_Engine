@@ -95,6 +95,8 @@ import { MPM_WGSL } from "../../physics/mpm/gpuKernel.mjs";
 import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 // v4470 -- the brain's kernels, exported at last
 import * as MLP from "../../brain/mlp.js";
+// the denoiser arc, round 1 -- the convolution layer the path-tracer denoiser is built from
+import * as CONV from "../../brain/conv2d.mjs";
 import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
@@ -781,6 +783,14 @@ export function corpus() {
         { id: "mlp.mlpLayerWgsl", from: "brain/mlp.js",
           why: "the brain's batched MLP layer: a row-per-thread matmul with fused bias and relu, the kernel brain/brain.js and blobBrain.js run every tick -- graded here for the first time without regexing its source",
           opts: (() => { const P = MLP.PROBES[0], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 1 -- a 2-D convolution, direct and tiled, held to brain/conv2d.mjs's twin by
+        // brain/conv2d-selfcheck.mjs; here, both backends must give the same bytes
+        { id: "conv2d.conv2dWgsl", from: "brain/conv2d.mjs",
+          why: "the denoiser's convolution read straight from storage: a 3x3 window over 13 channels in two blocks, the canonical summation order every copy of the layer shares, with borders on every side of a 12x10 image",
+          opts: (() => { const P = CONV.PROBES[0], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        { id: "conv2d.conv2dTiledWgsl", from: "brain/conv2d.mjs",
+          why: "the same convolution out of workgroup memory -- a halo'd tile loaded per channel block between two barriers -- the first kernel in the corpus whose correctness depends on workgroupBarrier ordering",
+          opts: (() => { const P = CONV.PROBES[1], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },

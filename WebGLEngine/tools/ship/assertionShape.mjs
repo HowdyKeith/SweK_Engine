@@ -880,8 +880,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gate's own drift row named exactly these four).
     // the lock-sums round -- 1927 -> 1929 for render/temporalLockSums-selfcheck.mjs and render/temporalLockSumsTsl-selfcheck.mjs.
     // usesOk, definesOk and nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
-    gates: 1929, usesOk: 1908, definesOk: 1900, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1800, condFirst: 97, unknownSignature: 11,
+    // the denoiser arc, round 1 -- 1929 -> 1930 for brain/conv2d-selfcheck.mjs. usesOk, definesOk and nameFirst each by
+    // one; the rest hold (the gate's own drift row named exactly these four).
+    gates: 1930, usesOk: 1909, definesOk: 1901, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1801, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

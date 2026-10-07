@@ -8118,6 +8118,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 1 -- A CONVOLUTION LAYER, CPU AND DEVICE: brain/conv2d.mjs. (since480 is the splat-collision
+    // round's, on its own open branch; this slot is numbered past it so the two cannot collide when both land.)
+    since481: Object.freeze({
+        at: "the denoiser arc, round 1 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["brain/conv2d-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE TREE HAD NO CONVOLUTION, AND A DENOISER IS MADE OF NOTHING ELSE. *** brain/conv2d.mjs is a 2-D " +
+                 "convolution layer, channels last as the path tracer returns a frame: an f64 reference forward and " +
+                 "backward pass (held to central finite differences, worst 5e-10 over 573 parameters, with and without " +
+                 "relu), the f32 twin in the kernels' own order, the fused mirror, and two WGSL kernels -- direct, and " +
+                 "tiled through workgroup memory -- every cell the twin's on Dawn and byte-identical across backends. A " +
+                 "1x1 convolution is bit-identical to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so " +
+                 "no separate tiled matmul was built. The input channels are summed in blocks of 8 everywhere because " +
+                 "SwiftShader's pipeline build took 3,149 ms for an all-channels tile and 324 for an 8-channel one -- " +
+                 "measured, and the order made one order in every copy. 9 sabotages, all red; the missing barrier was " +
+                 "expected to hide on a serial device and was caught BECAUSE the device is serial. Committed with " +
+                 "render/learned-denoiser-preregistration.md, written before any dataset image, network or error exists.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds
