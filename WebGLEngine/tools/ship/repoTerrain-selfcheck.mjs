@@ -18,6 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { repoHeightfield, treemapLeaves, buildTree, isWaterEntry, biomeIdFor, boxBlur, LAKE_SPLIT_LIMIT,
          BIOME_ORDER, LANGUAGE_BIOME, DATA_EXT, DEFAULTS } from "../../world/repoHeightfield.js";
@@ -37,7 +38,28 @@ console.log("repoTerrain-selfcheck -- a source tree, walked as ground\n");
 
 // ---- 0. THE REAL SCAN, ONCE, SHARED BY EVERY SECTION BELOW ------------------------------------------------
 const t0 = Date.now();
-const scan = bridge.scanTree(REPO);
+// *** v4818 -- THE GATE MAPS THE COMMITTED TREE, NOT WHATEVER LIES IN THE CHECKOUT. *** scanTree walks the disk, so
+// an ignored or untracked file counts as ground: the rig's clone scanned ~13M lines where this tree scans ~5.4M, the
+// star catalogue fell from 3.9% of lines to 1.6%, and its lake -- smaller, so rounded by more cells on the 128 grid --
+// came in at 1.5% of cells against 1.23% expected and the 15% footprint row went red there and nowhere else. The
+// bridge's walk is right for its UI (a user maps the folder they have); a GATE must grade one tree on every box, so
+// the scan is cut to what git tracks at this commit. Untracked entries are counted and reported, not hidden.
+// REPRODUCED v4818: a 7.6M-line ignored file in WebGLEngine/tts-out/ put the raw walk at 12,984,533 lines and the
+// footprint row at "1.6% of lines -> 1.5% of cells" -- the rig's numbers exactly -- and red; with the cut, green
+// (4 entries, 7,600,910 lines left off). SABOTAGED: the cut bypassed with the junk present -> that row red. Restored.
+const rawScan = bridge.scanTree(REPO);
+const tracked = (() => {
+    try {
+        const out = execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8", maxBuffer: 64e6 });
+        const set = new Set(out.split("\0").filter(Boolean));
+        return set.size > 500 ? set : null;
+    } catch { return null; }
+})();
+const scan = tracked ? (() => {
+    const entries = rawScan.entries.filter((e) => tracked.has(e.path));
+    return { ...rawScan, entries, files: entries.length, lines: entries.reduce((a, e) => a + e.lines, 0) };
+})() : rawScan;
+const dropped = rawScan.ok ? rawScan.entries.length - scan.entries.length : 0;
 const scanMs = Date.now() - t0;
 const t1 = Date.now();
 const field = repoHeightfield(scan.entries, { grid: 128 });
@@ -47,6 +69,10 @@ const fieldMs = Date.now() - t1;
     console.log("0. THE MEASUREMENT EVERYTHING ELSE IS TAKEN AGAINST");
     ok("the bridge scanned this repository", scan.ok && scan.files > 500,
         scan.files + " files / " + scan.lines.toLocaleString() + " lines in " + scanMs + "ms");
+    // v4818: the cut to tracked files is reported, so a box whose checkout carries extra ground says how much
+    report(tracked ? `cut to the ${tracked.size} files git tracks: ${dropped} untracked or ignored entr${dropped === 1 ? "y" : "ies"} ` +
+                     `(${(rawScan.lines - scan.lines).toLocaleString()} lines) left off the map this gate grades`
+                   : "git could not list tracked files here -- graded on the raw walk, as before v4818");
     ok("the heightfield built from it", field.grid === 128 && field.heights.length === 128 * 128,
         field.stats.files + " as land, " + field.stats.lakeFiles + " as water, " + fieldMs + "ms");
     report("peak: " + (field.peaks[0] ? field.peaks[0].path + " (" + field.peaks[0].lines + " lines, " +

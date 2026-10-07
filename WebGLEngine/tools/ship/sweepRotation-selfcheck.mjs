@@ -20,10 +20,11 @@
 //
 // Run: node tools/ship/sweepRotation-selfcheck.mjs
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runSlice, classifyRows, restoreLost, rebuildFinished, mergeTimings,
-         CORROBORATION_BAND, UNDATED } from "./sweepRotation.mjs";
+         CORROBORATION_BAND, UNDATED, ledgerFile, LEDGER_FILE, LOCAL_LEDGER } from "./sweepRotation.mjs";
 import { BUDGET_MS } from "./sweepCoverage.mjs";
 import { KIND } from "./quickSweep.mjs";
 
@@ -167,6 +168,23 @@ console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDIN
     ok("...and `serial` still holds the LATEST reading, so no existing consumer changed",
        f.serial["g-selfcheck.mjs"] === 400 && f.timings["g-selfcheck.mjs"] === 400,
        "the ring is additive; costOf and every budget comparison read exactly what they read before");
+}
+
+// ---- v4818: THE LEDGER FOLLOWS THE RECORD'S OWNER ------------------------------------------------------------
+// SABOTAGED v4818: ledgerFile always the shared file -> the first row red; the CLI's write put back on the literal
+// path -> the second row red. Both restored.
+{
+    ok("v4818: a box the record refuses writes its ledger to the ignored local file, and the owner to the shared one",
+       ledgerFile({ foreign: true }) === LOCAL_LEDGER && ledgerFile({ foreign: false }) === LEDGER_FILE &&
+       LOCAL_LEDGER !== LEDGER_FILE && /\.local\.json$/.test(LOCAL_LEDGER),
+       `foreign -> ${ledgerFile({ foreign: true })}, owner -> ${ledgerFile({ foreign: false })}`);
+    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "sweepRotation.mjs"), "utf8");
+    const gi = fs.readFileSync(path.join(ENG, "..", ".gitignore"), "utf8");
+    ok("  ...and the command line's ledger write goes through it, and git ignores the local file",
+       /const ledgerOut = ledgerFile\(target\)/.test(src) && /writeFileSync\(path\.join\(ENG, ledgerOut\)/.test(src) &&
+       !/writeFileSync\(path\.join\(ENG, "tools", "ship", "sweep-rotation\.json"\)/.test(src) &&
+       gi.includes("WebGLEngine/tools/ship/sweep-rotation.local.json"),
+       "PR #12's box and the v4818 rotation each wrote the shared ledger from a box the record refused");
 }
 
 console.log("\nunchecked here: runSlice and the command line, both of which spawn gates. The CLI's argument " +

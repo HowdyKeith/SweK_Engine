@@ -23,7 +23,7 @@
  "counts": {
   "page": 478,
   "demo": 49,
-  "builtin": 37
+  "builtin": 38
  },
  "entries": [
   {
@@ -4415,6 +4415,14 @@
    "id": "splat_walk",
    "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
    "href": "/?go=splat_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_voxel_walk",
+   "display": "SPLAT VOXEL WALK — A Gaussian Splat Level Walked As A Voxel World, Its Capture Holes Counted",
+   "href": "/?go=splat_voxel_walk",
    "section": null,
    "collision": false
   },

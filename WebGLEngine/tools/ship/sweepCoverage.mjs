@@ -327,7 +327,12 @@ export const STILL_OVER_AT_V4813 = Object.freeze({
         Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", loadedMs: 7087, recordedWas: 5162, hereMs: 3589,
             serialMs: Object.freeze([2882, 3056, 3589]),
             why: "the oscillator roll's least ambiguous entry until its alone cost crossed too: 2,882 / 3,056 / " +
-                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546" }),
+                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546",
+            // v4818 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH: alone 1,713 / 1,631 / 1,625 ms on the 2.10 GHz
+            // host, and the v4818 verdict's own 8-way sample 2,981 -- under the bar loaded too, so it is neither an
+            // oscillator nor over, and it is back in the sweep. Kept here as history with the readings that retired it.
+            returned: Object.freeze({ at: "v4818", aloneMs: 1625, loadedMs: 2981,
+                serialMs: Object.freeze([1713, 1631, 1625]) }) }),
     ]),
 });
 
@@ -347,6 +352,20 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
             serialMs: Object.freeze([3353, 3086, 3214]),
             why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
                  "file is untouched since v4361, so as at v4565 the move is the box and not the gate" }),
+    ]),
+});
+
+// v4818 -- THE RECORD CAME BACK TO THE 2.10GHz HOST (quickSweep's v4818 handover, 420793 -> 142c0d), and one returnee
+// went back over there, as headlessGpu and sweepBudget went over on the other host at v4815. Named the same way, with
+// the readings: step 4b caught it, the 12-of-22 row red against the record the second v4818 verdict wrote.
+export const STILL_OVER_AT_V4818 = Object.freeze({
+    at: "v4818", box: "linux-x64-4c-16095mb-142c0d",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", recordedWas: 3314, hereMs: 3142,
+            serialMs: Object.freeze([3166, 3416, 3351]),
+            why: "returned by v4461's rotation; 2,797 / 2,996 / 2,736 ms alone in the record on the 2.80 GHz host, then " +
+                 "3,209 and 3,142 in the v4818 verdict's serial runs and 3,166 / 3,416 / 3,351 alone by hand on the " +
+                 "2.10 GHz host the record went back to -- a host move, filed as v4815's were" }),
     ]),
 });
 

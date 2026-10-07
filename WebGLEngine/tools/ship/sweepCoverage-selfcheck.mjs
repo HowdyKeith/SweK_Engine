@@ -500,7 +500,8 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const stillOverNamed = (g) => {
         const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
                     SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
-                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g);     // v4815: the host change
+                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g) ||   // v4815: the host change
+                    SC.STILL_OVER_AT_V4818.stillOver.find((x) => x.gate === g);     // v4818: and back
         return !!row && justifiedOver(row);
     };
     const returned = new Map([
@@ -1530,11 +1531,31 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // v4813: the roll an entry moves to when its ALONE cost crosses too. Graded by the union, justifiedOver, because
     // its entry straddles (2,882 / 3,056 / 3,589) and the roll must not flip with the sitting. SABOTAGED v4813:
     // wgslSpec's live serial set to 2,000 with its loaded side removed from the entry -> this row red by name.
-    ok("!! *** the v4813 still-over roll holds only gates that left the oscillator roll, each justified live ***",
+    // v4818: an entry RETIRES by the rule written above -- a live alone reading under the bar AND back in the sweep --
+    // and carries `returned` with the readings that retired it. wgslSpec did, at v4818 (alone 1,625, loaded 2,981), and
+    // the row went red at the step-4b check because it still demanded justifiedOver of every entry: the retirement
+    // path the comment promised had no branch here. A returned entry is now held to the opposite property, live, and a
+    // still-over one to the old one; the fixtures below drive both, so neither branch passes on an empty population.
+    // SABOTAGED v4818: rollEntryHolds made to refuse every entry -> 2 red, this row and the fixture row, by name; the
+    // returned branch made to accept unconditionally -> the fixture row red (returned + dear). Both restored.
+    const rollEntryHolds = (x, F = FILE) => x.returned
+        ? (aloneMs(x.gate, F) ?? Infinity) < SC.BUDGET_MS && inSweep(x.gate, F) && x.returned.aloneMs < SC.BUDGET_MS
+        : overInSomeReading(x) && typeof x.why === "string" && x.why.length > 40 && (stillGenuinelyOver(x, F) || oscillates(x, F));
+    ok("!! *** the v4813 still-over roll holds only gates that left the oscillator roll, each justified live -- or returned, live ***",
        SC.STILL_OVER_AT_V4813.stillOver.length > 0 &&
-       SC.STILL_OVER_AT_V4813.stillOver.every((x) => justifiedOver(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
-       SC.STILL_OVER_AT_V4813.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
-           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+       SC.STILL_OVER_AT_V4813.stillOver.every((x) => rollEntryHolds(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
+       SC.STILL_OVER_AT_V4813.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}` +
+           `alone ${aloneMs(x.gate)} ms, ${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+    {
+        const E = { gate: "fx", loadedMs: 7000, serialMs: [2900, 3100, 3500], why: "x".repeat(50) };
+        const cheap = { timings: { fx: 1600 }, serial: { fx: 1600 }, contended: { fx: false } };
+        const dear  = { timings: { fx: 9000 }, serial: { fx: 3600 }, contended: { fx: false } };
+        const R = { ...E, returned: { at: "vX", aloneMs: 1600 } };
+        ok("  ...and a RETURNED entry must be cheap alone and back in the sweep, a still-over one must be over or oscillating",
+           rollEntryHolds(R, cheap) === true && rollEntryHolds(R, dear) === false &&
+           rollEntryHolds(E, dear) === true && rollEntryHolds({ ...E, loadedMs: 2000 }, cheap) === false,
+           "fixture: returned+cheap holds, returned+dear does not; still-over+dear holds, still-over+cheap-everywhere does not");
+    }
 
     // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
     // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
@@ -1542,6 +1563,13 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
        SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
        SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,
+    // 2900], hereMs 2800, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row; restored.
+    ok("!! *** the v4818 still-over roll names only returnees genuinely over on the host the record came back to ***",
+       SC.STILL_OVER_AT_V4818.stillOver.length > 0 && SC.STILL_OVER_AT_V4818.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4818.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",

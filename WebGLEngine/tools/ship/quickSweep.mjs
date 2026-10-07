@@ -246,7 +246,8 @@ export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCA
     // writes, and reading that as ownership would make two owners -- the hostScale-selfcheck row caught it
     if (was === id && owner === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
     if (owner === id) {
-        const h = handovers.find((x) => x.to === id);
+        // the LAST row naming this box, since v4818 a box can be handed the record more than once
+        const h = [...handovers].reverse().find((x) => x.to === id);
         return { file, host: id, foreign: false,
                  why: `the record names ${was}, which handed it to this box (${id}) at ${h ? h.at : "?"}` };
     }
@@ -306,18 +307,28 @@ export const RECORD_HANDOVERS = Object.freeze([
                   "referenceKind, timingRecords, all exit 0) went to sweep-timings.local.json and their exit-1 codes " +
                   "from v4815's first verdict stayed in the record, keeping redAction red. 420793 is a box the " +
                   "record's boxLegend already knew (16075mb, 2.80GHz) at an earlier round." }),
+    // v4818 -- AND BACK. The container restarted onto the 2.10GHz host again (md5 142c0d), so the v4818 rotation's
+    // forty readings went to .local.json and it was reverted. Keith chose the handover over shipping read-only. This
+    // is the first row that RETURNS the record to a box that held it, which is what ownerOf's ordered walk is for.
+    Object.freeze({ at: "v4818", from: "linux-x64-4c-16095mb-420793", to: "linux-x64-4c-16095mb-142c0d",
+        decidedBy: "Keith",
+        evidence: "boxId() read linux-x64-4c-16095mb-142c0d (Xeon @ 2.10GHz) at the v4818 rotation, which wrote 40 " +
+                  "readings to sweep-timings.local.json and refused the shared record; that local file was deleted and " +
+                  "the ledger it moved was restored. 142c0d held the record from v4813 to v4815." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
+// *** v4818 -- ROWS ARE APPLIED IN THE ORDER THEY WERE DECIDED, BECAUSE A BOX CAN GET THE RECORD BACK. *** The walk
+// took the FIRST row naming the current box and stopped at a box it had already seen. That is a fine reading of a
+// chain that never revisits anybody, and the sandbox's two cloud hosts are exactly a chain that does: 142c0d handed
+// to 420793 at v4815 and 420793 hands back at v4818. Traced before the row was written, the old walk returned
+// 420793 for a record whose host is 420793 -- the handover would have been ignored, silently, and every write would
+// have kept going to .local.json. The table is append-only and dated, so its order IS the history: apply each row
+// whose `from` is the current owner, in order. On a chain that never revisits a box this is the same answer.
 export function ownerOf(host, handovers = RECORD_HANDOVERS) {
     let h = host;
-    const seen = new Set();
-    for (;;) {
-        const next = handovers.find((x) => x.from === h);
-        if (!next || seen.has(h)) return h;
-        seen.add(h);
-        h = next.to;
-    }
+    for (const x of handovers) if (x.from === h) h = x.to;
+    return h;
 }
 
 // v4778 rig run: path.resolve, not path.join -- `--timings C:\\x.json` (or /tmp/x.json) is an ABSOLUTE path, and join
