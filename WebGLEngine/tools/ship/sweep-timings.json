@@ -140,7 +140,7 @@
   "ai-bridge/envoySolar-selfcheck.mjs": 231,
   "ai-bridge/fingerprintBridge-selfcheck.mjs": 7695,
   "ai-bridge/fingerprintCache-selfcheck.mjs": 14631,
-  "ai-bridge/freshMachine-selfcheck.mjs": 5503,
+  "ai-bridge/freshMachine-selfcheck.mjs": 7845,
   "ai-bridge/homelable-selfcheck.mjs": 104,
   "ai-bridge/okfService-selfcheck.mjs": 1245,
   "ai-bridge/partialSweep-selfcheck.mjs": 550,
@@ -154,7 +154,7 @@
   "ai-bridge/services-selfcheck.mjs": 111,
   "ai-bridge/tools/boot-trace-selfcheck.mjs": 1089,
   "ai-bridge/tools/cast-selfcheck.mjs": 519,
-  "ai-bridge/tools/discovery-selfcheck.mjs": 5867,
+  "ai-bridge/tools/discovery-selfcheck.mjs": 5900,
   "ai-bridge/tools/fleet-bridge-selfcheck.mjs": 84,
   "ai-bridge/tools/kpop-handoff-selfcheck.mjs": 186,
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 721,
@@ -178,7 +178,7 @@
   "brain/agent/flow-selfcheck.mjs": 178,
   "brain/agent/ladder4-selfcheck.mjs": 284,
   "brain/astar/astar-selfcheck.mjs": 293,
-  "brain/bench/bandit-selfcheck.mjs": 5733,
+  "brain/bench/bandit-selfcheck.mjs": 6098,
   "brain/blob-policy-selfcheck.mjs": 1292,
   "brain/cs/tools/cs-selfcheck.mjs": 320,
   "brain/fieldSpace-selfcheck.mjs": 155,
@@ -198,7 +198,7 @@
   "brain/rl/memory-selfcheck.mjs": 2212,
   "brain/rl/memoryPolicy-selfcheck.mjs": 1969,
   "brain/rl/occlusion-bptt-selfcheck.mjs": 21831,
-  "brain/rl/occlusion-memory-selfcheck.mjs": 5007,
+  "brain/rl/occlusion-memory-selfcheck.mjs": 6050,
   "brain/rl/occlusionTaxonomy-selfcheck.mjs": 195,
   "brain/rl/surprise-selfcheck.mjs": 428,
   "brain/rl/tools/rocket-selfcheck.mjs": 9480,
@@ -311,7 +311,7 @@
   "physics/blackhole/kerr-selfcheck.mjs": 134,
   "physics/blackhole/kerrLadder-selfcheck.mjs": 105,
   "physics/blackhole/kerrOrbit-selfcheck.mjs": 2720,
-  "physics/blackhole/mission-selfcheck.mjs": 6497,
+  "physics/blackhole/mission-selfcheck.mjs": 6297,
   "physics/blackhole/navigate-selfcheck.mjs": 1517,
   "physics/blackhole/probe-selfcheck.mjs": 434,
   "physics/blackhole/tour-selfcheck.mjs": 2924,
@@ -345,7 +345,7 @@
   "physics/control/cartPole-selfcheck.mjs": 7061,
   "physics/control/controlMargins-selfcheck.mjs": 2590,
   "physics/control/controlStability-selfcheck.mjs": 1317,
-  "physics/control/controlStateSpace-selfcheck.mjs": 6341,
+  "physics/control/controlStateSpace-selfcheck.mjs": 7958,
   "physics/crypto/secp256k1-selfcheck.mjs": 877,
   "physics/crystal/powder-selfcheck.mjs": 396,
   "physics/crystal/structureFactor-selfcheck.mjs": 501,
@@ -431,7 +431,7 @@
   "physics/mesh/gradientJoin-selfcheck.mjs": 2008,
   "physics/mesh/manifoldCensus-selfcheck.mjs": 2292,
   "physics/mesh/marchingCubes-selfcheck.mjs": 1943,
-  "physics/mesh/meshCSG-selfcheck.mjs": 6091,
+  "physics/mesh/meshCSG-selfcheck.mjs": 8783,
   "physics/mesh/nodeGradient-selfcheck.mjs": 789,
   "physics/mesh/quadraticRecon-selfcheck.mjs": 1747,
   "physics/mesh/quadraticWall-selfcheck.mjs": 1951,
@@ -520,12 +520,12 @@
   "physics/render/pathTracerGpu-selfcheck.mjs": 4632,
   "physics/render/pathTracerNEE-selfcheck.mjs": 2229,
   "physics/render/principled-selfcheck.mjs": 1616,
-  "physics/render/renderBsdf-selfcheck.mjs": 6157,
+  "physics/render/renderBsdf-selfcheck.mjs": 7223,
   "physics/render/roulette-selfcheck.mjs": 1324,
   "physics/render/rtPipeline-selfcheck.mjs": 56770,
   "physics/render/samplerCheck-selfcheck.mjs": 8428,
   "physics/render/sdfMarch-selfcheck.mjs": 4410,
-  "physics/render/shuffleEffect-selfcheck.mjs": 5477,
+  "physics/render/shuffleEffect-selfcheck.mjs": 5983,
   "physics/render/specularIBLWgsl-selfcheck.mjs": 1220,
   "physics/render/specularProbeBake-selfcheck.mjs": 280,
   "physics/render/specularProbeCapture-selfcheck.mjs": 1968,
@@ -536,7 +536,7 @@
   "physics/render/subsurface-selfcheck.mjs": 449,
   "physics/render/transmission-selfcheck.mjs": 18254,
   "physics/render/wgslArc-selfcheck.mjs": 182,
-  "physics/scoreDirection-selfcheck.mjs": 6456,
+  "physics/scoreDirection-selfcheck.mjs": 7061,
   "physics/seismic/rays-selfcheck.mjs": 209,
   "physics/slick-selfcheck.mjs": 280,
   "physics/soft/boneField-selfcheck.mjs": 283,
@@ -751,7 +751,7 @@
   "simulation/tomo/nullspace-selfcheck.mjs": 23352,
   "text/slug-selfcheck.mjs": 13357,
   "tools/autoExtremity-selfcheck.mjs": 216,
-  "tools/bench/fleetBench-selfcheck.mjs": 6179,
+  "tools/bench/fleetBench-selfcheck.mjs": 6499,
   "tools/caseStudy-selfcheck.mjs": 2302,
   "tools/catalog/catalog-selfcheck.mjs": 2061,
   "tools/crossarchBox3d-selfcheck.mjs": 1489,
@@ -760,7 +760,7 @@
   "tools/fingerprint/fingerprint-selfcheck.mjs": 2289,
   "tools/fingerprint/libmTripwire-selfcheck.mjs": 2774,
   "tools/fingerprint/observableCompare-selfcheck.mjs": 430,
-  "tools/fingerprint/peerReport-selfcheck.mjs": 6562,
+  "tools/fingerprint/peerReport-selfcheck.mjs": 7436,
   "tools/frame-budget-selfcheck.mjs": 1998,
   "tools/frontDoor-selfcheck.mjs": 234,
   "tools/groundtruth/traceField-selfcheck.mjs": 313,
@@ -779,11 +779,11 @@
   "tools/mcp/physicsAi-selfcheck.mjs": 2338,
   "tools/mdDemo-selfcheck.mjs": 187,
   "tools/mesh/xatlasRef-selfcheck.mjs": 3176,
-  "tools/mutate/shadowedDefaults-selfcheck.mjs": 5799,
+  "tools/mutate/shadowedDefaults-selfcheck.mjs": 8182,
   "tools/okf/okf-selfcheck.mjs": 1820,
   "tools/okf/okfConsume-selfcheck.mjs": 609,
   "tools/pageReach-selfcheck.mjs": 415,
-  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": 5396,
+  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": 5702,
   "tools/render-qa/pageFingerprint-selfcheck.mjs": 188,
   "tools/render-qa/referenceScan-selfcheck.mjs": 743,
   "tools/render-qa/responsiveness-selfcheck.mjs": 119,
@@ -799,13 +799,13 @@
   "tools/roundhouse/adjointBind-selfcheck.mjs": 1068,
   "tools/roundhouse/agentTrace-selfcheck.mjs": 275,
   "tools/roundhouse/airyRefined-selfcheck.mjs": 26047,
-  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": 6504,
+  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": 7370,
   "tools/roundhouse/androidInvite-selfcheck.mjs": 405,
   "tools/roundhouse/androidPeer-selfcheck.mjs": 199,
   "tools/roundhouse/androidPeerBridge-selfcheck.mjs": 1107,
   "tools/roundhouse/androidPersistence-selfcheck.mjs": 213,
   "tools/roundhouse/androidUpdate-selfcheck.mjs": 239,
-  "tools/roundhouse/androidVerdict-selfcheck.mjs": 6340,
+  "tools/roundhouse/androidVerdict-selfcheck.mjs": 7122,
   "tools/roundhouse/applyStaged-selfcheck.mjs": 139,
   "tools/roundhouse/assumptionCoherence-selfcheck.mjs": 415,
   "tools/roundhouse/assumptionMap-selfcheck.mjs": 90103,
@@ -841,7 +841,7 @@
   "tools/roundhouse/conservation-selfcheck.mjs": 187,
   "tools/roundhouse/conservationReach-selfcheck.mjs": 1055,
   "tools/roundhouse/convergenceOrder-selfcheck.mjs": 649,
-  "tools/roundhouse/corroborate-selfcheck.mjs": 6054,
+  "tools/roundhouse/corroborate-selfcheck.mjs": 6912,
   "tools/roundhouse/corroborateFully-selfcheck.mjs": 22767,
   "tools/roundhouse/corroborationCensus-selfcheck.mjs": 90103,
   "tools/roundhouse/corroborationReach-selfcheck.mjs": 520,
@@ -869,7 +869,7 @@
   "tools/roundhouse/escTolKnob-selfcheck.mjs": 8401,
   "tools/roundhouse/escalateRoute-selfcheck.mjs": 120,
   "tools/roundhouse/escalateRouteLive-selfcheck.mjs": 125,
-  "tools/roundhouse/escapeBudget-selfcheck.mjs": 5141,
+  "tools/roundhouse/escapeBudget-selfcheck.mjs": 5082,
   "tools/roundhouse/externalLinalg-selfcheck.mjs": 318,
   "tools/roundhouse/fanKey-selfcheck.mjs": 1166,
   "tools/roundhouse/fdtd-selfcheck.mjs": 1070,
@@ -921,7 +921,7 @@
   "tools/roundhouse/khGrowthKey-selfcheck.mjs": 90095,
   "tools/roundhouse/khMichalke-selfcheck.mjs": 90029,
   "tools/roundhouse/kineticsBind-selfcheck.mjs": 5316,
-  "tools/roundhouse/knobCandidates-selfcheck.mjs": 5472,
+  "tools/roundhouse/knobCandidates-selfcheck.mjs": 5504,
   "tools/roundhouse/knobGate-selfcheck.mjs": 2469,
   "tools/roundhouse/knobLiveness-selfcheck.mjs": 90013,
   "tools/roundhouse/knobPromotions-selfcheck.mjs": 2822,
@@ -1027,10 +1027,10 @@
   "tools/roundhouse/roundhouse-selfcheck.mjs": 174,
   "tools/roundhouse/routeBench-selfcheck.mjs": 257,
   "tools/roundhouse/runDeviceRouted-selfcheck.mjs": 453,
-  "tools/roundhouse/runtimeBench-selfcheck.mjs": 5719,
+  "tools/roundhouse/runtimeBench-selfcheck.mjs": 8041,
   "tools/roundhouse/sackurTetrodeBind-selfcheck.mjs": 290,
   "tools/roundhouse/sdfMarchDevice-selfcheck.mjs": 2175,
-  "tools/roundhouse/seedSpread-selfcheck.mjs": 5379,
+  "tools/roundhouse/seedSpread-selfcheck.mjs": 5660,
   "tools/roundhouse/seedSpreadModule-selfcheck.mjs": 15632,
   "tools/roundhouse/sensitivity-selfcheck.mjs": 90102,
   "tools/roundhouse/shedOnset-selfcheck.mjs": 842,
@@ -1146,7 +1146,7 @@
   "tools/ship/bootFingerprint-selfcheck.mjs": 1188,
   "tools/ship/bossPhaseManager-selfcheck.mjs": 122,
   "tools/ship/boundListener-selfcheck.mjs": 1893,
-  "tools/ship/boundaryLint-selfcheck.mjs": 5010,
+  "tools/ship/boundaryLint-selfcheck.mjs": 5761,
   "tools/ship/box3dFilter-selfcheck.mjs": 419,
   "tools/ship/box3dRay-selfcheck.mjs": 304,
   "tools/ship/brainKernels-selfcheck.mjs": 2303,
@@ -1175,7 +1175,7 @@
   "tools/ship/cameraFall-selfcheck.mjs": 308,
   "tools/ship/cameraKeys-selfcheck.mjs": 366,
   "tools/ship/candidateKnown-selfcheck.mjs": 116,
-  "tools/ship/canvasFill-selfcheck.mjs": 6148,
+  "tools/ship/canvasFill-selfcheck.mjs": 6800,
   "tools/ship/capReading-selfcheck.mjs": 227,
   "tools/ship/capsuleGround-selfcheck.mjs": 1318,
   "tools/ship/capsuleMove-selfcheck.mjs": 700,
@@ -1188,7 +1188,7 @@
   "tools/ship/carveJudged-selfcheck.mjs": 2032,
   "tools/ship/changedPaths-selfcheck.mjs": 29382,
   "tools/ship/changelogCurrency-selfcheck.mjs": 280,
-  "tools/ship/checkerCensus-selfcheck.mjs": 5372,
+  "tools/ship/checkerCensus-selfcheck.mjs": 6328,
   "tools/ship/chipOrder-selfcheck.mjs": 1643,
   "tools/ship/citedSources-selfcheck.mjs": 2178,
   "tools/ship/cityGenSeed-selfcheck.mjs": 1935,
@@ -1212,7 +1212,7 @@
   "tools/ship/contextLeakGuard-selfcheck.mjs": 227,
   "tools/ship/controlDossier-selfcheck.mjs": 4036,
   "tools/ship/controllerAgreement-selfcheck.mjs": 403,
-  "tools/ship/copiedOutsideVendor-selfcheck.mjs": 5957,
+  "tools/ship/copiedOutsideVendor-selfcheck.mjs": 7895,
   "tools/ship/copypartyRegistry-selfcheck.mjs": 395,
   "tools/ship/corpusFilters-selfcheck.mjs": 2717,
   "tools/ship/corpusText-selfcheck.mjs": 648,
@@ -1245,7 +1245,7 @@
   "tools/ship/deterministicRaf-selfcheck.mjs": 51076,
   "tools/ship/deviceBlend-selfcheck.mjs": 2793,
   "tools/ship/deviceBridge-selfcheck.mjs": 3835,
-  "tools/ship/deviceCompute-selfcheck.mjs": 5113,
+  "tools/ship/deviceCompute-selfcheck.mjs": 6211,
   "tools/ship/deviceCritic-selfcheck.mjs": 1953,
   "tools/ship/deviceFeatures-selfcheck.mjs": 1477,
   "tools/ship/deviceFormats-selfcheck.mjs": 2445,
@@ -1277,7 +1277,7 @@
   "tools/ship/dungeonWalls-selfcheck.mjs": 305,
   "tools/ship/duplicateFiles-selfcheck.mjs": 2872,
   "tools/ship/easingCurves-selfcheck.mjs": 335,
-  "tools/ship/ecologyPage-selfcheck.mjs": 5245,
+  "tools/ship/ecologyPage-selfcheck.mjs": 5424,
   "tools/ship/economyBridge-selfcheck.mjs": 152,
   "tools/ship/economyLockstep-selfcheck.mjs": 9560,
   "tools/ship/economyProbe-selfcheck.mjs": 157,
@@ -1352,7 +1352,7 @@
   "tools/ship/gposKern-selfcheck.mjs": 87,
   "tools/ship/gpuDriven-selfcheck.mjs": 4941,
   "tools/ship/gpuGitTime-selfcheck.mjs": 2130,
-  "tools/ship/gpuOrbits-selfcheck.mjs": 5198,
+  "tools/ship/gpuOrbits-selfcheck.mjs": 5860,
   "tools/ship/gpuPick-selfcheck.mjs": 1776,
   "tools/ship/gpuTerrain-selfcheck.mjs": 5309,
   "tools/ship/gpuUniverse-selfcheck.mjs": 20094,
@@ -1409,7 +1409,7 @@
   "tools/ship/launcherLintWiring-selfcheck.mjs": 332,
   "tools/ship/launchers-selfcheck.mjs": 254,
   "tools/ship/lbmGpu-selfcheck.mjs": 6930,
-  "tools/ship/lensingPage-selfcheck.mjs": 5154,
+  "tools/ship/lensingPage-selfcheck.mjs": 5180,
   "tools/ship/licenceBodies-selfcheck.mjs": 324,
   "tools/ship/licenceSweep-selfcheck.mjs": 165,
   "tools/ship/liquefy-selfcheck.mjs": 1686,
@@ -1473,7 +1473,7 @@
   "tools/ship/orphanResidue-selfcheck.mjs": 148,
   "tools/ship/orphanScan-selfcheck.mjs": 31530,
   "tools/ship/orphanTriage-selfcheck.mjs": 90102,
-  "tools/ship/orrery-selfcheck.mjs": 6200,
+  "tools/ship/orrery-selfcheck.mjs": 6312,
   "tools/ship/orreryAuthor-selfcheck.mjs": 3086,
   "tools/ship/orreryEjecta-selfcheck.mjs": 2736,
   "tools/ship/orreryFleet-selfcheck.mjs": 20866,
@@ -1547,7 +1547,7 @@
   "tools/ship/probeConvention-selfcheck.mjs": 1163,
   "tools/ship/probeFit-selfcheck.mjs": 1691,
   "tools/ship/probeLab-selfcheck.mjs": 4071,
-  "tools/ship/probeLit-selfcheck.mjs": 5498,
+  "tools/ship/probeLit-selfcheck.mjs": 6591,
   "tools/ship/procBrush-selfcheck.mjs": 1026,
   "tools/ship/productDist-selfcheck.mjs": 574,
   "tools/ship/promptCost-selfcheck.mjs": 517,
@@ -1562,7 +1562,7 @@
   "tools/ship/quickSweep-selfcheck.mjs": 18252,
   "tools/ship/raceCar-selfcheck.mjs": 13410,
   "tools/ship/raceKnob-selfcheck.mjs": 33306,
-  "tools/ship/raceReplayBake-selfcheck.mjs": 6050,
+  "tools/ship/raceReplayBake-selfcheck.mjs": 6230,
   "tools/ship/raceTrack-selfcheck.mjs": 7465,
   "tools/ship/raceTurret-selfcheck.mjs": 10721,
   "tools/ship/racesAct-selfcheck.mjs": 2863,
@@ -1610,7 +1610,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": 14244,
   "tools/ship/rigJobDoor-selfcheck.mjs": 198,
   "tools/ship/rigJobPanel-selfcheck.mjs": 327,
-  "tools/ship/rigJobs-selfcheck.mjs": 6469,
+  "tools/ship/rigJobs-selfcheck.mjs": 6944,
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": 13336,
   "tools/ship/rigMix-selfcheck.mjs": 106,
   "tools/ship/rigProgress-selfcheck.mjs": 11592,
@@ -1628,7 +1628,7 @@
   "tools/ship/rootLayout-selfcheck.mjs": 295,
   "tools/ship/roughDiffuse-selfcheck.mjs": 1086,
   "tools/ship/roughDiffuseWired-selfcheck.mjs": 1710,
-  "tools/ship/roundTrip-selfcheck.mjs": 5509,
+  "tools/ship/roundTrip-selfcheck.mjs": 6958,
   "tools/ship/roundhouseBridge-selfcheck.mjs": 309,
   "tools/ship/roundhouseDevices-selfcheck.mjs": 667,
   "tools/ship/roundhousePanel-selfcheck.mjs": 100,
@@ -1668,7 +1668,7 @@
   "tools/ship/shipRitual-selfcheck.mjs": 944,
   "tools/ship/shipVerdict-selfcheck.mjs": 13013,
   "tools/ship/shippedLadder-selfcheck.mjs": 21449,
-  "tools/ship/shipyard-selfcheck.mjs": 5838,
+  "tools/ship/shipyard-selfcheck.mjs": 6701,
   "tools/ship/singleSource-selfcheck.mjs": 1203,
   "tools/ship/skillClaims-selfcheck.mjs": 581,
   "tools/ship/skillbookDoor-selfcheck.mjs": 1247,
@@ -1676,7 +1676,7 @@
   "tools/ship/skyStars-selfcheck.mjs": 1078,
   "tools/ship/slowCensus-selfcheck.mjs": 407,
   "tools/ship/slugCurve-selfcheck.mjs": 6869,
-  "tools/ship/slugDevice-selfcheck.mjs": 6444,
+  "tools/ship/slugDevice-selfcheck.mjs": 7335,
   "tools/ship/slugFill-selfcheck.mjs": 2101,
   "tools/ship/slugMelt-selfcheck.mjs": 3042,
   "tools/ship/slugMorph-selfcheck.mjs": 3224,
@@ -1783,7 +1783,7 @@
   "tools/ship/vehicle-selfcheck.mjs": 161,
   "tools/ship/vendoredFonts-selfcheck.mjs": 197,
   "tools/ship/vendoredLicences-selfcheck.mjs": 3261,
-  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": 5175,
+  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": 6208,
   "tools/ship/versionMarker-selfcheck.mjs": 1206,
   "tools/ship/versionPreflight-selfcheck.mjs": 250,
   "tools/ship/videoFrames-selfcheck.mjs": 2536,
@@ -1793,7 +1793,7 @@
   "tools/ship/voxelBodies-selfcheck.mjs": 5971,
   "tools/ship/voxelDDA-selfcheck.mjs": 681,
   "tools/ship/voxelDamage-selfcheck.mjs": 8339,
-  "tools/ship/voxelDevice-selfcheck.mjs": 4992,
+  "tools/ship/voxelDevice-selfcheck.mjs": 6160,
   "tools/ship/voxelEdit-selfcheck.mjs": 10514,
   "tools/ship/voxelFixture-selfcheck.mjs": 415,
   "tools/ship/voxelGlb-selfcheck.mjs": 196,
@@ -1909,19 +1909,19 @@
   "fx/fsr/fsrFlicker-selfcheck.mjs": 21968,
   "fx/fsr/fsrFlowCost-selfcheck.mjs": 13549,
   "fx/fsr/fsrFlowGrid-selfcheck.mjs": 10108,
-  "fx/fsr/fsrFlowRetry-selfcheck.mjs": 6242,
+  "fx/fsr/fsrFlowRetry-selfcheck.mjs": 7998,
   "fx/fsr/fsrFlowSeed-selfcheck.mjs": 9676,
-  "fx/fsr/fsrFlowStill-selfcheck.mjs": 5325,
+  "fx/fsr/fsrFlowStill-selfcheck.mjs": 6351,
   "fx/fsr/fsrFrameGen-selfcheck.mjs": 14139,
   "fx/fsr/fsrFrameGenArc-selfcheck.mjs": 8955,
   "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs": 9455,
   "fx/fsr/fsrFrameGenFlow-selfcheck.mjs": 21270,
-  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": 5444,
-  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": 5122,
+  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": 6567,
+  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": 6664,
   "fx/fsr/fsrFrameGenReach-selfcheck.mjs": 8174,
   "fx/fsr/fsrFrameGenScene-selfcheck.mjs": 11650,
   "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs": 9593,
-  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": 5491,
+  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": 6948,
   "fx/fsr/fsrFrameGenWorld-selfcheck.mjs": 10429,
   "fx/fsr/fsrTemporalHalf-selfcheck.mjs": 16503,
   "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs": 12529,
@@ -1933,12 +1933,12 @@
   "render/dilateGPU-selfcheck.mjs": 2537,
   "render/edgeReveal-selfcheck.mjs": 187,
   "render/flicker-selfcheck.mjs": 117,
-  "render/flowCost-selfcheck.mjs": 6331,
+  "render/flowCost-selfcheck.mjs": 6586,
   "render/flowReconcile-selfcheck.mjs": 405,
   "render/flowReconcileGPU-selfcheck.mjs": 3796,
   "render/flowReconcileTsl-selfcheck.mjs": 9879,
   "render/frameInterp-selfcheck.mjs": 435,
-  "render/frameInterpGPU-selfcheck.mjs": 5837,
+  "render/frameInterpGPU-selfcheck.mjs": 7941,
   "render/frameInterpTsl-selfcheck.mjs": 13636,
   "render/framePacer-selfcheck.mjs": 382,
   "render/genGate-selfcheck.mjs": 1723,
@@ -1960,20 +1960,20 @@
   "render/temporalTslMany-selfcheck.mjs": 5385,
   "render/temporalTslMeshes-selfcheck.mjs": 5282,
   "render/temporalTslNodes-selfcheck.mjs": 4478,
-  "render/temporalTslZoo-selfcheck.mjs": 5254,
+  "render/temporalTslZoo-selfcheck.mjs": 5565,
   "render/translucentLayer-selfcheck.mjs": 2223,
   "render/visibilityGPU-selfcheck.mjs": 1077,
   "tools/ship/boxTimings-selfcheck.mjs": 438,
   "tools/ship/cloneProvision-selfcheck.mjs": 7168,
   "tools/ship/constantRows-selfcheck.mjs": 2247,
   "tools/ship/deadlineLeak-selfcheck.mjs": 11108,
-  "tools/ship/exitBusy-selfcheck.mjs": 5108,
+  "tools/ship/exitBusy-selfcheck.mjs": 5636,
   "tools/ship/foldStats-selfcheck.mjs": 2529,
   "tools/ship/frameDisagree-selfcheck.mjs": 1291,
   "tools/ship/frameDisagreeMeasure-selfcheck.mjs": 48687,
   "tools/ship/frameGain-selfcheck.mjs": 29533,
   "tools/ship/frameGainMeasure-selfcheck.mjs": 46782,
-  "tools/ship/frameGate-selfcheck.mjs": 4990,
+  "tools/ship/frameGate-selfcheck.mjs": 5580,
   "tools/ship/frameGateMeasure-selfcheck.mjs": 41383,
   "tools/ship/frameHoled-selfcheck.mjs": 13549,
   "tools/ship/frameHoledMeasure-selfcheck.mjs": 40541,
@@ -1994,7 +1994,7 @@
   "tools/ship/fsrPageConfirm-selfcheck.mjs": 108004,
   "tools/ship/fsrPageField-selfcheck.mjs": 56868,
   "tools/ship/fsrPageGen-selfcheck.mjs": 27637,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 5325,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 5957,
   "tools/ship/fsrThreeWorld-selfcheck.mjs": 12203,
   "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs": 2291,
   "tools/ship/genGateCalibrate-selfcheck.mjs": 136263,
@@ -2026,7 +2026,7 @@
   "physics/mesh/triFragmentAccumulate-selfcheck.mjs": 2938,
   "physics/mesh/triTriIntersect-selfcheck.mjs": 114,
   "physics/obbManifold-selfcheck.mjs": 240,
-  "tools/gunnerTraceDemo-selfcheck.mjs": 5662,
+  "tools/gunnerTraceDemo-selfcheck.mjs": 6470,
   "tools/maleCnsLoader-selfcheck.mjs": 441,
   "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs": 389,
   "tools/ship/aggroHazardFeature-selfcheck.mjs": 98,
@@ -2040,7 +2040,7 @@
   "tools/ship/capsuleHazardPolicy-selfcheck.mjs": 1541,
   "tools/ship/cityChunkScene-selfcheck.mjs": 455,
   "tools/ship/controllerLabWorld-selfcheck.mjs": 308,
-  "tools/ship/flyConnectomePage-selfcheck.mjs": 5176,
+  "tools/ship/flyConnectomePage-selfcheck.mjs": 5476,
   "tools/ship/gltfConformance-selfcheck.mjs": 66,
   "tools/ship/kaijuGroundCollider-selfcheck.mjs": 329,
   "tools/ship/mikktSpace-selfcheck.mjs": 112,
@@ -2051,7 +2051,7 @@
   "tools/ship/precisionProbe-selfcheck.mjs": 2423,
   "tools/ship/qrBridge-selfcheck.mjs": 507,
   "tools/ship/rigidBody6dofPage-selfcheck.mjs": 3152,
-  "tools/ship/rtViewer-selfcheck.mjs": 6674,
+  "tools/ship/rtViewer-selfcheck.mjs": 8140,
   "tools/ship/splatWalkWorld-selfcheck.mjs": 2030,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 339,
   "tools/ship/worldColliderBVH-selfcheck.mjs": 360,
@@ -4008,7 +4008,7 @@
   "ai-bridge/envoySolar-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/fingerprintBridge-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "ai-bridge/fingerprintCache-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "ai-bridge/freshMachine-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "ai-bridge/freshMachine-selfcheck.mjs": "2026-10-07T00:46:15.244Z",
   "ai-bridge/homelable-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/okfService-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/partialSweep-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4022,7 +4022,7 @@
   "ai-bridge/services-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/tools/boot-trace-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/tools/cast-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "ai-bridge/tools/discovery-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "ai-bridge/tools/discovery-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "ai-bridge/tools/fleet-bridge-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/tools/kpop-handoff-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4046,7 +4046,7 @@
   "brain/agent/flow-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/agent/ladder4-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/astar/astar-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "brain/bench/bandit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "brain/bench/bandit-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "brain/blob-policy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/cs/tools/cs-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/fieldSpace-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4066,7 +4066,7 @@
   "brain/rl/memory-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/rl/memoryPolicy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/rl/occlusion-bptt-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "brain/rl/occlusion-memory-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "brain/rl/occlusion-memory-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "brain/rl/occlusionTaxonomy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/rl/surprise-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "brain/rl/tools/rocket-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -4179,7 +4179,7 @@
   "physics/blackhole/kerr-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/blackhole/kerrLadder-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/blackhole/kerrOrbit-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "physics/blackhole/mission-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/blackhole/mission-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/blackhole/navigate-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/blackhole/probe-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/blackhole/tour-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4213,7 +4213,7 @@
   "physics/control/cartPole-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/control/controlMargins-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/control/controlStability-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "physics/control/controlStateSpace-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/control/controlStateSpace-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/crypto/secp256k1-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/crystal/powder-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/crystal/structureFactor-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4299,7 +4299,7 @@
   "physics/mesh/gradientJoin-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/mesh/manifoldCensus-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/mesh/marchingCubes-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "physics/mesh/meshCSG-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/mesh/meshCSG-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/mesh/nodeGradient-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/mesh/quadraticRecon-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/mesh/quadraticWall-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4388,12 +4388,12 @@
   "physics/render/pathTracerGpu-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "physics/render/pathTracerNEE-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/render/principled-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "physics/render/renderBsdf-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/render/renderBsdf-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/render/roulette-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/render/rtPipeline-selfcheck.mjs": "2026-10-05T18:01:48.098Z",
   "physics/render/samplerCheck-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/render/sdfMarch-selfcheck.mjs": "2026-10-06T14:10:07.383Z",
-  "physics/render/shuffleEffect-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/render/shuffleEffect-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/render/specularIBLWgsl-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/render/specularProbeBake-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/render/specularProbeCapture-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4404,7 +4404,7 @@
   "physics/render/subsurface-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/render/transmission-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/render/wgslArc-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "physics/scoreDirection-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/scoreDirection-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/seismic/rays-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/slick-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/soft/boneField-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4619,7 +4619,7 @@
   "simulation/tomo/nullspace-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "text/slug-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/autoExtremity-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/bench/fleetBench-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/bench/fleetBench-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/caseStudy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/catalog/catalog-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/crossarchBox3d-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4628,7 +4628,7 @@
   "tools/fingerprint/fingerprint-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/fingerprint/libmTripwire-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/fingerprint/observableCompare-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/fingerprint/peerReport-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/fingerprint/peerReport-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/frame-budget-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/frontDoor-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/groundtruth/traceField-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4647,11 +4647,11 @@
   "tools/mcp/physicsAi-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/mdDemo-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/mesh/xatlasRef-selfcheck.mjs": "2026-10-06T14:10:43.698Z",
-  "tools/mutate/shadowedDefaults-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/mutate/shadowedDefaults-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/okf/okf-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/okf/okfConsume-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/pageReach-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/render-qa/pageFingerprint-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/render-qa/referenceScan-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/render-qa/responsiveness-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4667,13 +4667,13 @@
   "tools/roundhouse/adjointBind-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/agentTrace-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/airyRefined-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/androidInvite-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/androidPeer-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/androidPeerBridge-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/androidPersistence-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/androidUpdate-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/roundhouse/androidVerdict-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/androidVerdict-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/applyStaged-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/assumptionCoherence-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/assumptionMap-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
@@ -4709,7 +4709,7 @@
   "tools/roundhouse/conservation-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/conservationReach-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/convergenceOrder-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/roundhouse/corroborate-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/corroborate-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/corroborateFully-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/corroborationCensus-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/corroborationReach-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4737,7 +4737,7 @@
   "tools/roundhouse/escTolKnob-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/escalateRoute-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/escalateRouteLive-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/roundhouse/escapeBudget-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/escapeBudget-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/externalLinalg-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/fanKey-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/fdtd-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4789,7 +4789,7 @@
   "tools/roundhouse/khGrowthKey-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/khMichalke-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/kineticsBind-selfcheck.mjs": "2026-10-06T14:11:03.109Z",
-  "tools/roundhouse/knobCandidates-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/knobCandidates-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/knobGate-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/knobLiveness-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/knobPromotions-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -4895,10 +4895,10 @@
   "tools/roundhouse/roundhouse-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/routeBench-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/runDeviceRouted-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/roundhouse/runtimeBench-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/runtimeBench-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/sackurTetrodeBind-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/sdfMarchDevice-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/roundhouse/seedSpread-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/seedSpread-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/seedSpreadModule-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/sensitivity-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/roundhouse/shedOnset-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5014,7 +5014,7 @@
   "tools/ship/bootFingerprint-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/bossPhaseManager-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/boundListener-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/boundaryLint-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/boundaryLint-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/box3dFilter-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/box3dRay-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/brainKernels-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5043,7 +5043,7 @@
   "tools/ship/cameraFall-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/cameraKeys-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/candidateKnown-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/canvasFill-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/canvasFill-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/capReading-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/capsuleGround-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/capsuleMove-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5056,7 +5056,7 @@
   "tools/ship/carveJudged-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/changedPaths-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/changelogCurrency-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/checkerCensus-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/checkerCensus-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/chipOrder-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/citedSources-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/cityGenSeed-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5080,7 +5080,7 @@
   "tools/ship/contextLeakGuard-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/controlDossier-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/controllerAgreement-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/copiedOutsideVendor-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/copiedOutsideVendor-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/copypartyRegistry-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/corpusFilters-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/corpusText-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5113,7 +5113,7 @@
   "tools/ship/deterministicRaf-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/deviceBlend-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/deviceBridge-selfcheck.mjs": "2026-10-06T14:11:45.960Z",
-  "tools/ship/deviceCompute-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/deviceCompute-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/deviceCritic-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/deviceFeatures-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/deviceFormats-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5145,7 +5145,7 @@
   "tools/ship/dungeonWalls-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/duplicateFiles-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/easingCurves-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/ecologyPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/ecologyPage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/economyBridge-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/economyLockstep-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/economyProbe-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5220,7 +5220,7 @@
   "tools/ship/gposKern-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/gpuDriven-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/gpuGitTime-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/gpuOrbits-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/gpuOrbits-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/gpuPick-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/gpuTerrain-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/gpuUniverse-selfcheck.mjs": "unknown -- before v4408",
@@ -5277,7 +5277,7 @@
   "tools/ship/launcherLintWiring-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/launchers-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/lbmGpu-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/lensingPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/lensingPage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/licenceBodies-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/licenceSweep-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/liquefy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5341,7 +5341,7 @@
   "tools/ship/orphanResidue-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/orphanScan-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/orphanTriage-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "tools/ship/orrery-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/orrery-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/orreryAuthor-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/orreryEjecta-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/orreryFleet-selfcheck.mjs": "2026-10-06T00:32:14.241Z",
@@ -5415,7 +5415,7 @@
   "tools/ship/probeConvention-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/probeFit-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/probeLab-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "tools/ship/probeLit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/probeLit-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/procBrush-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/productDist-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/promptCost-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5430,7 +5430,7 @@
   "tools/ship/quickSweep-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/raceCar-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/raceKnob-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "tools/ship/raceReplayBake-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/raceReplayBake-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/raceTrack-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/racesAct-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5478,7 +5478,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/rigJobDoor-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/rigJobPanel-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/rigJobs-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/rigJobs-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/rigLabGeminiKey-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/rigMix-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/rigProgress-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -5496,7 +5496,7 @@
   "tools/ship/rootLayout-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/roughDiffuse-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/roughDiffuseWired-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/roundTrip-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/roundTrip-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/roundhouseBridge-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/roundhouseDevices-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/roundhousePanel-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5536,7 +5536,7 @@
   "tools/ship/shipRitual-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/shipVerdict-selfcheck.mjs": "2026-10-06T00:34:29.698Z",
   "tools/ship/shippedLadder-selfcheck.mjs": "2026-10-06T00:34:51.317Z",
-  "tools/ship/shipyard-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/shipyard-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/singleSource-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/skillClaims-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/skillbookDoor-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5544,7 +5544,7 @@
   "tools/ship/skyStars-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/slowCensus-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/slugCurve-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/slugDevice-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/slugDevice-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/slugFill-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/slugMelt-selfcheck.mjs": "2026-10-06T14:45:09.952Z",
   "tools/ship/slugMorph-selfcheck.mjs": "2026-10-06T14:13:06.073Z",
@@ -5651,7 +5651,7 @@
   "tools/ship/vehicle-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/vendoredFonts-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/vendoredLicences-selfcheck.mjs": "2026-10-06T14:13:25.246Z",
-  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/versionMarker-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/versionPreflight-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/videoFrames-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5661,7 +5661,7 @@
   "tools/ship/voxelBodies-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/voxelDDA-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/voxelDamage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/voxelDevice-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/voxelDevice-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/voxelEdit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/voxelFixture-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/voxelGlb-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5777,19 +5777,19 @@
   "fx/fsr/fsrFlicker-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "fx/fsr/fsrFlowCost-selfcheck.mjs": "2026-10-06T00:18:52.319Z",
   "fx/fsr/fsrFlowGrid-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFlowRetry-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFlowRetry-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFlowSeed-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFlowStill-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFlowStill-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGen-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenArc-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenFlow-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
-  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGenReach-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenScene-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGenWorld-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrTemporalHalf-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -5801,12 +5801,12 @@
   "render/dilateGPU-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/edgeReveal-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/flicker-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "render/flowCost-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/flowCost-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/flowReconcile-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/flowReconcileGPU-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/flowReconcileTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "render/frameInterp-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "render/frameInterpGPU-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/frameInterpGPU-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/frameInterpTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "render/framePacer-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/genGate-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5828,20 +5828,20 @@
   "render/temporalTslMany-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/temporalTslMeshes-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/temporalTslNodes-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "render/temporalTslZoo-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/temporalTslZoo-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/translucentLayer-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/visibilityGPU-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/boxTimings-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/constantRows-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/deadlineLeak-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/exitBusy-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/exitBusy-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/foldStats-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/frameDisagree-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/frameDisagreeMeasure-selfcheck.mjs": "2026-09-28T19:00:30.472Z",
   "tools/ship/frameGain-selfcheck.mjs": "2026-09-28T19:01:00.183Z",
   "tools/ship/frameGainMeasure-selfcheck.mjs": "2026-09-28T19:01:47.141Z",
-  "tools/ship/frameGate-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/frameGate-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/frameGateMeasure-selfcheck.mjs": "2026-09-28T19:02:28.695Z",
   "tools/ship/frameHoled-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/frameHoledMeasure-selfcheck.mjs": "2026-09-28T19:03:09.452Z",
@@ -5862,7 +5862,7 @@
   "tools/ship/fsrPageConfirm-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "tools/ship/fsrPageField-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "tools/ship/fsrPageGen-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
-  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/fsrThreeWorld-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/genGateCalibrate-selfcheck.mjs": "2026-09-28T19:10:59.227Z",
@@ -5894,7 +5894,7 @@
   "physics/mesh/triFragmentAccumulate-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/mesh/triTriIntersect-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "physics/obbManifold-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/gunnerTraceDemo-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/gunnerTraceDemo-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/maleCnsLoader-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/aggroHazardFeature-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5908,7 +5908,7 @@
   "tools/ship/capsuleHazardPolicy-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/cityChunkScene-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/controllerLabWorld-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "tools/ship/flyConnectomePage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/flyConnectomePage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/gltfConformance-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/kaijuGroundCollider-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/mikktSpace-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -5919,7 +5919,7 @@
   "tools/ship/precisionProbe-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/qrBridge-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/rigidBody6dofPage-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "tools/ship/rtViewer-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/rtViewer-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/splatWalkWorld-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "tools/ship/worldColliderBVH-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
@@ -9965,7 +9965,7 @@
   "ai-bridge/engineUpdateSource-selfcheck.mjs": 238,
   "ai-bridge/envoySolar-selfcheck.mjs": 100,
   "ai-bridge/fingerprintCache-selfcheck.mjs": 14631,
-  "ai-bridge/freshMachine-selfcheck.mjs": 5503,
+  "ai-bridge/freshMachine-selfcheck.mjs": 7845,
   "ai-bridge/homelable-selfcheck.mjs": 47,
   "ai-bridge/okfService-selfcheck.mjs": 267,
   "ai-bridge/partialSweep-selfcheck.mjs": 378,
@@ -9979,7 +9979,7 @@
   "ai-bridge/services-selfcheck.mjs": 45,
   "ai-bridge/tools/boot-trace-selfcheck.mjs": 986,
   "ai-bridge/tools/cast-selfcheck.mjs": 358,
-  "ai-bridge/tools/discovery-selfcheck.mjs": 5867,
+  "ai-bridge/tools/discovery-selfcheck.mjs": 5900,
   "ai-bridge/tools/fleet-bridge-selfcheck.mjs": 50,
   "ai-bridge/tools/kpop-handoff-selfcheck.mjs": 98,
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 491,
@@ -10018,7 +10018,7 @@
   "brain/rl/lessons-selfcheck.mjs": 92,
   "brain/rl/memory-selfcheck.mjs": 1350,
   "brain/rl/memoryPolicy-selfcheck.mjs": 1969,
-  "brain/rl/occlusion-memory-selfcheck.mjs": 5007,
+  "brain/rl/occlusion-memory-selfcheck.mjs": 6050,
   "brain/rl/occlusionTaxonomy-selfcheck.mjs": 136,
   "brain/rl/surprise-selfcheck.mjs": 87,
   "brain/room/tools/room-selfcheck.mjs": 120,
@@ -10328,7 +10328,7 @@
   "physics/render/stratified-selfcheck.mjs": 280,
   "physics/render/subsurface-selfcheck.mjs": 214,
   "physics/render/wgslArc-selfcheck.mjs": 88,
-  "physics/scoreDirection-selfcheck.mjs": 6456,
+  "physics/scoreDirection-selfcheck.mjs": 7061,
   "physics/seismic/rays-selfcheck.mjs": 86,
   "physics/slick-selfcheck.mjs": 104,
   "physics/soft/boneField-selfcheck.mjs": 136,
@@ -10711,7 +10711,7 @@
   "tools/roundhouse/runDeviceRouted-selfcheck.mjs": 334,
   "tools/roundhouse/sackurTetrodeBind-selfcheck.mjs": 284,
   "tools/roundhouse/sdfMarchDevice-selfcheck.mjs": 2175,
-  "tools/roundhouse/seedSpread-selfcheck.mjs": 5379,
+  "tools/roundhouse/seedSpread-selfcheck.mjs": 5660,
   "tools/roundhouse/seedSpreadModule-selfcheck.mjs": 15632,
   "tools/roundhouse/shedOnset-selfcheck.mjs": 307,
   "tools/roundhouse/skillCode-selfcheck.mjs": 49,
@@ -10843,7 +10843,7 @@
   "tools/ship/carViews-selfcheck.mjs": 15046,
   "tools/ship/carveJudged-selfcheck.mjs": 2032,
   "tools/ship/changelogCurrency-selfcheck.mjs": 95,
-  "tools/ship/checkerCensus-selfcheck.mjs": 5372,
+  "tools/ship/checkerCensus-selfcheck.mjs": 6328,
   "tools/ship/chipOrder-selfcheck.mjs": 1643,
   "tools/ship/citedSources-selfcheck.mjs": 825,
   "tools/ship/cityGenSeed-selfcheck.mjs": 725,
@@ -10893,7 +10893,7 @@
   "tools/ship/detectPump-selfcheck.mjs": 71,
   "tools/ship/detectionFloor-selfcheck.mjs": 13535,
   "tools/ship/deviceBlend-selfcheck.mjs": 1277,
-  "tools/ship/deviceCompute-selfcheck.mjs": 5113,
+  "tools/ship/deviceCompute-selfcheck.mjs": 6211,
   "tools/ship/deviceFeatures-selfcheck.mjs": 732,
   "tools/ship/deviceFormats-selfcheck.mjs": 1018,
   "tools/ship/deviceGravity-selfcheck.mjs": 797,
@@ -10976,7 +10976,7 @@
   "tools/ship/gposKern-selfcheck.mjs": 87,
   "tools/ship/gpuDriven-selfcheck.mjs": 4941,
   "tools/ship/gpuGitTime-selfcheck.mjs": 1182,
-  "tools/ship/gpuOrbits-selfcheck.mjs": 5198,
+  "tools/ship/gpuOrbits-selfcheck.mjs": 5860,
   "tools/ship/gpuPick-selfcheck.mjs": 1776,
   "tools/ship/grassField-selfcheck.mjs": 201,
   "tools/ship/grdpwasm-selfcheck.mjs": 112,
@@ -11025,7 +11025,7 @@
   "tools/ship/launcherLintWiring-selfcheck.mjs": 141,
   "tools/ship/launchers-selfcheck.mjs": 64,
   "tools/ship/lbmGpu-selfcheck.mjs": 6930,
-  "tools/ship/lensingPage-selfcheck.mjs": 5154,
+  "tools/ship/lensingPage-selfcheck.mjs": 5180,
   "tools/ship/licenceBodies-selfcheck.mjs": 89,
   "tools/ship/licenceSweep-selfcheck.mjs": 69,
   "tools/ship/liquefy-selfcheck.mjs": 1686,
@@ -11138,7 +11138,7 @@
   "tools/ship/probeConvention-selfcheck.mjs": 1163,
   "tools/ship/probeFit-selfcheck.mjs": 927,
   "tools/ship/probeLab-selfcheck.mjs": 4071,
-  "tools/ship/probeLit-selfcheck.mjs": 5498,
+  "tools/ship/probeLit-selfcheck.mjs": 6591,
   "tools/ship/procBrush-selfcheck.mjs": 499,
   "tools/ship/productDist-selfcheck.mjs": 202,
   "tools/ship/promptCost-selfcheck.mjs": 186,
@@ -11151,7 +11151,7 @@
   "tools/ship/qualityTiers-selfcheck.mjs": 96,
   "tools/ship/quickSweep-selfcheck.mjs": 18252,
   "tools/ship/raceCar-selfcheck.mjs": 13410,
-  "tools/ship/raceReplayBake-selfcheck.mjs": 6050,
+  "tools/ship/raceReplayBake-selfcheck.mjs": 6230,
   "tools/ship/raceTrack-selfcheck.mjs": 7465,
   "tools/ship/raceTurret-selfcheck.mjs": 10721,
   "tools/ship/racesAct-selfcheck.mjs": 1139,
@@ -11193,7 +11193,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": 14244,
   "tools/ship/rigJobDoor-selfcheck.mjs": 73,
   "tools/ship/rigJobPanel-selfcheck.mjs": 139,
-  "tools/ship/rigJobs-selfcheck.mjs": 6469,
+  "tools/ship/rigJobs-selfcheck.mjs": 6944,
   "tools/ship/rigMix-selfcheck.mjs": 61,
   "tools/ship/ritualCoherence-selfcheck.mjs": 67,
   "tools/ship/rleBrickMap-selfcheck.mjs": 391,
@@ -11248,7 +11248,7 @@
   "tools/ship/skyStars-selfcheck.mjs": 441,
   "tools/ship/slowCensus-selfcheck.mjs": 240,
   "tools/ship/slugCurve-selfcheck.mjs": 6869,
-  "tools/ship/slugDevice-selfcheck.mjs": 6444,
+  "tools/ship/slugDevice-selfcheck.mjs": 7335,
   "tools/ship/slugFill-selfcheck.mjs": 2101,
   "tools/ship/slugMelt-selfcheck.mjs": 3042,
   "tools/ship/slugMorph-selfcheck.mjs": 3224,
@@ -11343,7 +11343,7 @@
   "tools/ship/vehicle-selfcheck.mjs": 57,
   "tools/ship/vendoredFonts-selfcheck.mjs": 107,
   "tools/ship/vendoredLicences-selfcheck.mjs": 3261,
-  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": 5175,
+  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": 6208,
   "tools/ship/versionMarker-selfcheck.mjs": 514,
   "tools/ship/versionPreflight-selfcheck.mjs": 129,
   "tools/ship/videoFrames-selfcheck.mjs": 1325,
@@ -11353,7 +11353,7 @@
   "tools/ship/voxelBodies-selfcheck.mjs": 5971,
   "tools/ship/voxelDDA-selfcheck.mjs": 198,
   "tools/ship/voxelDamage-selfcheck.mjs": 8339,
-  "tools/ship/voxelDevice-selfcheck.mjs": 4992,
+  "tools/ship/voxelDevice-selfcheck.mjs": 6160,
   "tools/ship/voxelEdit-selfcheck.mjs": 10514,
   "tools/ship/voxelFixture-selfcheck.mjs": 96,
   "tools/ship/voxelGlb-selfcheck.mjs": 141,
@@ -11514,19 +11514,19 @@
   "fx/fsr/fsrFlicker-selfcheck.mjs": 21968,
   "fx/fsr/fsrFlowCost-selfcheck.mjs": 13549,
   "fx/fsr/fsrFlowGrid-selfcheck.mjs": 10108,
-  "fx/fsr/fsrFlowRetry-selfcheck.mjs": 6242,
+  "fx/fsr/fsrFlowRetry-selfcheck.mjs": 7998,
   "fx/fsr/fsrFlowSeed-selfcheck.mjs": 9676,
-  "fx/fsr/fsrFlowStill-selfcheck.mjs": 5325,
+  "fx/fsr/fsrFlowStill-selfcheck.mjs": 6351,
   "fx/fsr/fsrFrameGen-selfcheck.mjs": 14139,
   "fx/fsr/fsrFrameGenArc-selfcheck.mjs": 8955,
   "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs": 9455,
   "fx/fsr/fsrFrameGenFlow-selfcheck.mjs": 21270,
-  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": 5444,
-  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": 5122,
+  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": 6567,
+  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": 6664,
   "fx/fsr/fsrFrameGenReach-selfcheck.mjs": 8174,
   "fx/fsr/fsrFrameGenScene-selfcheck.mjs": 11650,
   "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs": 9593,
-  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": 5491,
+  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": 6948,
   "fx/fsr/fsrFrameGenWorld-selfcheck.mjs": 10429,
   "fx/fsr/fsrTemporalHalf-selfcheck.mjs": 16503,
   "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs": 12529,
@@ -11536,10 +11536,10 @@
   "fx/fsr/fsrTemporalTsl-selfcheck.mjs": 16136,
   "fx/fsr/fsrTsl-selfcheck.mjs": 4669,
   "render/dilateGPU-selfcheck.mjs": 1461,
-  "render/flowCost-selfcheck.mjs": 6331,
+  "render/flowCost-selfcheck.mjs": 6586,
   "render/flowReconcileGPU-selfcheck.mjs": 3796,
   "render/flowReconcileTsl-selfcheck.mjs": 9879,
-  "render/frameInterpGPU-selfcheck.mjs": 5837,
+  "render/frameInterpGPU-selfcheck.mjs": 7941,
   "render/frameInterpTsl-selfcheck.mjs": 13636,
   "render/holeFillGPU-selfcheck.mjs": 2406,
   "render/holeFillTsl-selfcheck.mjs": 9992,
@@ -11556,19 +11556,19 @@
   "render/temporalTslMany-selfcheck.mjs": 5385,
   "render/temporalTslMeshes-selfcheck.mjs": 5282,
   "render/temporalTslNodes-selfcheck.mjs": 4478,
-  "render/temporalTslZoo-selfcheck.mjs": 5254,
+  "render/temporalTslZoo-selfcheck.mjs": 5565,
   "render/translucentLayer-selfcheck.mjs": 2223,
   "render/visibilityGPU-selfcheck.mjs": 1077,
   "tools/ship/boxTimings-selfcheck.mjs": 93,
   "tools/ship/cloneProvision-selfcheck.mjs": 7168,
   "tools/ship/constantRows-selfcheck.mjs": 2247,
   "tools/ship/deadlineLeak-selfcheck.mjs": 11108,
-  "tools/ship/exitBusy-selfcheck.mjs": 5108,
+  "tools/ship/exitBusy-selfcheck.mjs": 5636,
   "tools/ship/frameDisagree-selfcheck.mjs": 1291,
   "tools/ship/frameDisagreeMeasure-selfcheck.mjs": 48687,
   "tools/ship/frameGain-selfcheck.mjs": 29533,
   "tools/ship/frameGainMeasure-selfcheck.mjs": 46782,
-  "tools/ship/frameGate-selfcheck.mjs": 4990,
+  "tools/ship/frameGate-selfcheck.mjs": 5580,
   "tools/ship/frameGateMeasure-selfcheck.mjs": 41383,
   "tools/ship/frameHoled-selfcheck.mjs": 13549,
   "tools/ship/frameHoledMeasure-selfcheck.mjs": 40541,
@@ -11588,7 +11588,7 @@
   "tools/ship/fsrPageConfirm-selfcheck.mjs": 108004,
   "tools/ship/fsrPageField-selfcheck.mjs": 56868,
   "tools/ship/fsrPageGen-selfcheck.mjs": 27637,
-  "tools/ship/fsrPageObjects-selfcheck.mjs": 5325,
+  "tools/ship/fsrPageObjects-selfcheck.mjs": 5957,
   "tools/ship/fsrThreeWorld-selfcheck.mjs": 12203,
   "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs": 2291,
   "tools/ship/genGateCalibrate-selfcheck.mjs": 136263,
@@ -11620,16 +11620,16 @@
   "tools/ship/loopNoise-selfcheck.mjs": 18351,
   "tools/roundhouse/sweepDevice-selfcheck.mjs": 19090,
   "physics/mesh/meshBooleanBlast-selfcheck.mjs": 7448,
-  "tools/gunnerTraceDemo-selfcheck.mjs": 5662,
+  "tools/gunnerTraceDemo-selfcheck.mjs": 6470,
   "tools/ship/aircraftPage-selfcheck.mjs": 10829,
   "tools/ship/capsuleCollideTsl-selfcheck.mjs": 2342,
-  "tools/ship/flyConnectomePage-selfcheck.mjs": 5176,
+  "tools/ship/flyConnectomePage-selfcheck.mjs": 5476,
   "tools/ship/peerBrain-selfcheck.mjs": 2373,
   "tools/ship/peerBrainFleet-selfcheck.mjs": 4646,
   "tools/ship/pilotPolicy-selfcheck.mjs": 1786,
   "tools/ship/precisionProbe-selfcheck.mjs": 2423,
   "tools/ship/rigidBody6dofPage-selfcheck.mjs": 3152,
-  "tools/ship/rtViewer-selfcheck.mjs": 6674,
+  "tools/ship/rtViewer-selfcheck.mjs": 8140,
   "tools/ship/splatWalkWorld-selfcheck.mjs": 2030,
   "brain/autopilot6dof-selfcheck.mjs": 86,
   "brain/autopilotAircraft-selfcheck.mjs": 225,
@@ -11676,14 +11676,14 @@
   "ai-bridge/deviceOffThread-selfcheck.mjs": 6944,
   "tools/ship/navalDuel-selfcheck.mjs": 4520,
   "tools/ship/gitEconomy-selfcheck.mjs": 8744,
-  "tools/roundhouse/escapeBudget-selfcheck.mjs": 5141,
+  "tools/roundhouse/escapeBudget-selfcheck.mjs": 5082,
   "tools/roundhouse/percolation-selfcheck.mjs": 4442,
   "tools/ship/img2three-selfcheck.mjs": 4732,
   "tools/roundhouse/boundKeys-selfcheck.mjs": 6318,
   "tools/ship/lagBlame-selfcheck.mjs": 2638,
-  "tools/ship/ecologyPage-selfcheck.mjs": 5245,
-  "tools/roundhouse/androidVerdict-selfcheck.mjs": 6340,
-  "tools/roundhouse/knobCandidates-selfcheck.mjs": 5472,
+  "tools/ship/ecologyPage-selfcheck.mjs": 5424,
+  "tools/roundhouse/androidVerdict-selfcheck.mjs": 7122,
+  "tools/roundhouse/knobCandidates-selfcheck.mjs": 5504,
   "tools/ship/blobulatorSkins-selfcheck.mjs": 4415,
   "tools/ship/deviceBridge-selfcheck.mjs": 3835,
   "tools/ship/fetchProgress-selfcheck.mjs": 1129,
@@ -11692,13 +11692,13 @@
   "tools/ship/gpuTerrain-selfcheck.mjs": 5309,
   "tools/ship/deviceCritic-selfcheck.mjs": 1953,
   "tools/ship/deadImportScan-selfcheck.mjs": 3725,
-  "brain/bench/bandit-selfcheck.mjs": 5733,
-  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": 5396,
+  "brain/bench/bandit-selfcheck.mjs": 6098,
+  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": 5702,
   "tools/ship/exportResolve-selfcheck.mjs": 3852,
-  "tools/bench/fleetBench-selfcheck.mjs": 6179,
+  "tools/bench/fleetBench-selfcheck.mjs": 6499,
   "tools/ship/demoChrome-selfcheck.mjs": 7402,
   "tools/ship/avatarServerViews-selfcheck.mjs": 19395,
-  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": 6504,
+  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": 7370,
   "tools/ship/qrChannel-selfcheck.mjs": 4223,
   "physics/knobRegistry-selfcheck.mjs": 10546,
   "ai-bridge/deviceWorker-selfcheck.mjs": 7074,
@@ -11706,19 +11706,19 @@
   "tools/ship/ballistics-selfcheck.mjs": 2456,
   "tools/ship/runnerBudget-selfcheck.mjs": 4435,
   "tools/ship/carve-selfcheck.mjs": 5716,
-  "physics/render/shuffleEffect-selfcheck.mjs": 5477,
+  "physics/render/shuffleEffect-selfcheck.mjs": 5983,
   "tools/ship/frameDirtyProbes-selfcheck.mjs": 10163,
-  "tools/roundhouse/corroborate-selfcheck.mjs": 6054,
+  "tools/roundhouse/corroborate-selfcheck.mjs": 6912,
   "tools/ship/fleets-selfcheck.mjs": 3791,
-  "physics/render/renderBsdf-selfcheck.mjs": 6157,
-  "tools/ship/canvasFill-selfcheck.mjs": 6148,
-  "physics/blackhole/mission-selfcheck.mjs": 6497,
+  "physics/render/renderBsdf-selfcheck.mjs": 7223,
+  "tools/ship/canvasFill-selfcheck.mjs": 6800,
+  "physics/blackhole/mission-selfcheck.mjs": 6297,
   "tools/ship/phoneQR-selfcheck.mjs": 10601,
   "physics/statmech/ising-selfcheck.mjs": 6968,
   "brain/rl/imitation-selfcheck.mjs": 6675,
-  "tools/ship/shipyard-selfcheck.mjs": 5838,
+  "tools/ship/shipyard-selfcheck.mjs": 6701,
   "tools/roundhouse/refinementKnobs-selfcheck.mjs": 8192,
-  "tools/fingerprint/peerReport-selfcheck.mjs": 6562,
+  "tools/fingerprint/peerReport-selfcheck.mjs": 7436,
   "ev/esFleetSize-selfcheck.mjs": 9122,
   "tools/roundhouse/errorPairAudit-selfcheck.mjs": 6809,
   "ai-bridge/fingerprintBridge-selfcheck.mjs": 7695,
@@ -11731,22 +11731,22 @@
   "physicsLab-selfcheck.mjs": 3950,
   "tools/ship/exitBanner-selfcheck.mjs": 77,
   "tools/roundhouse/bellBind-selfcheck.mjs": 8804,
-  "physics/mesh/meshCSG-selfcheck.mjs": 6091,
+  "physics/mesh/meshCSG-selfcheck.mjs": 8783,
   "tools/roundhouse/cartPoleBind-selfcheck.mjs": 7379,
-  "tools/ship/boundaryLint-selfcheck.mjs": 5010,
+  "tools/ship/boundaryLint-selfcheck.mjs": 5761,
   "tools/ship/economyLockstep-selfcheck.mjs": 9560,
-  "tools/ship/orrery-selfcheck.mjs": 6200,
+  "tools/ship/orrery-selfcheck.mjs": 6312,
   "tools/ship/rigProgress-selfcheck.mjs": 11592,
   "tools/ship/orreryFleet-selfcheck.mjs": 20866,
   "physics/control/cartPole-selfcheck.mjs": 7061,
-  "physics/control/controlStateSpace-selfcheck.mjs": 6341,
+  "physics/control/controlStateSpace-selfcheck.mjs": 7958,
   "tools/roundhouse/readerPlant-selfcheck.mjs": 10246,
-  "tools/mutate/shadowedDefaults-selfcheck.mjs": 5799,
+  "tools/mutate/shadowedDefaults-selfcheck.mjs": 8182,
   "tools/ship/swiftShaders-selfcheck.mjs": 15177,
   "tools/ship/duplicateFiles-selfcheck.mjs": 1495,
   "physics/diffusionKnob-selfcheck.mjs": 10356,
   "physics/sync/kuramoto-selfcheck.mjs": 9812,
-  "tools/roundhouse/runtimeBench-selfcheck.mjs": 5719,
+  "tools/roundhouse/runtimeBench-selfcheck.mjs": 8041,
   "tools/ship/cartPolePage-selfcheck.mjs": 14085,
   "physics/md/diffusion-selfcheck.mjs": 8184,
   "physics/sph/cfl-selfcheck.mjs": 8123,
@@ -11758,14 +11758,14 @@
   "physics/statmech/binderBudget-selfcheck.mjs": 8984,
   "physics/render/msDirect-selfcheck.mjs": 7750,
   "tools/ship/firewallBanner-selfcheck.mjs": 7285,
-  "tools/ship/roundTrip-selfcheck.mjs": 5509,
+  "tools/ship/roundTrip-selfcheck.mjs": 6958,
   "tools/ship/sourceScan-selfcheck.mjs": 5901,
   "tools/ship/generatedLadder-selfcheck.mjs": 23164,
   "tools/roundhouse/thermalPlants-selfcheck.mjs": 10000,
   "tools/ship/orreryReached-selfcheck.mjs": 27231,
   "tools/ship/passFootprint-selfcheck.mjs": 8297,
   "tools/ship/avatarFraming-selfcheck.mjs": 19158,
-  "tools/ship/copiedOutsideVendor-selfcheck.mjs": 5957,
+  "tools/ship/copiedOutsideVendor-selfcheck.mjs": 7895,
   "physics/vibrationKnob-selfcheck.mjs": 12095,
   "tools/ship/loopMetric-selfcheck.mjs": 10550,
   "brain/rl/tools/rocket-selfcheck.mjs": 9480,
@@ -11788,7 +11788,7 @@
   "ai-bridge/engineUpdateSource-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
   "ai-bridge/envoySolar-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
   "ai-bridge/fingerprintCache-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "ai-bridge/freshMachine-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "ai-bridge/freshMachine-selfcheck.mjs": "2026-10-07T00:46:15.244Z",
   "ai-bridge/homelable-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "ai-bridge/okfService-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "ai-bridge/partialSweep-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
@@ -11802,7 +11802,7 @@
   "ai-bridge/services-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "ai-bridge/tools/boot-trace-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "ai-bridge/tools/cast-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
-  "ai-bridge/tools/discovery-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "ai-bridge/tools/discovery-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "ai-bridge/tools/fleet-bridge-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "ai-bridge/tools/kpop-handoff-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
@@ -11841,7 +11841,7 @@
   "brain/rl/lessons-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "brain/rl/memory-selfcheck.mjs": "2026-10-06T14:44:54.793Z",
   "brain/rl/memoryPolicy-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
-  "brain/rl/occlusion-memory-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "brain/rl/occlusion-memory-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "brain/rl/occlusionTaxonomy-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "brain/rl/surprise-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "brain/room/tools/room-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
@@ -12151,7 +12151,7 @@
   "physics/render/stratified-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
   "physics/render/subsurface-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
   "physics/render/wgslArc-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
-  "physics/scoreDirection-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/scoreDirection-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/seismic/rays-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
   "physics/slick-selfcheck.mjs": "2026-10-06T18:28:33.049Z",
   "physics/soft/boneField-selfcheck.mjs": "2026-10-06T13:01:52.322Z",
@@ -12534,7 +12534,7 @@
   "tools/roundhouse/runDeviceRouted-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/roundhouse/sackurTetrodeBind-selfcheck.mjs": "2026-10-05T14:16:06.070Z",
   "tools/roundhouse/sdfMarchDevice-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
-  "tools/roundhouse/seedSpread-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/seedSpread-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/seedSpreadModule-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/shedOnset-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
   "tools/roundhouse/skillCode-selfcheck.mjs": "2026-09-28T18:44:06.925Z",
@@ -12666,7 +12666,7 @@
   "tools/ship/carViews-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/carveJudged-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/changelogCurrency-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/checkerCensus-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/checkerCensus-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/chipOrder-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/citedSources-selfcheck.mjs": "2026-10-05T19:12:43.719Z",
   "tools/ship/cityGenSeed-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -12716,7 +12716,7 @@
   "tools/ship/detectPump-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
   "tools/ship/detectionFloor-selfcheck.mjs": "2026-09-16T02:27:02.423Z",
   "tools/ship/deviceBlend-selfcheck.mjs": "2026-10-06T12:37:26.584Z",
-  "tools/ship/deviceCompute-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/deviceCompute-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/deviceFeatures-selfcheck.mjs": "2026-10-06T17:24:24.253Z",
   "tools/ship/deviceFormats-selfcheck.mjs": "2026-10-06T14:44:54.793Z",
   "tools/ship/deviceGravity-selfcheck.mjs": "2026-10-05T14:11:17.264Z",
@@ -12799,7 +12799,7 @@
   "tools/ship/gposKern-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/gpuDriven-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/gpuGitTime-selfcheck.mjs": "2026-10-06T20:02:59.243Z",
-  "tools/ship/gpuOrbits-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/gpuOrbits-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/gpuPick-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/grassField-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/grdpwasm-selfcheck.mjs": "2026-10-06T18:28:33.049Z",
@@ -12848,7 +12848,7 @@
   "tools/ship/launcherLintWiring-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/launchers-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/lbmGpu-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/lensingPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/lensingPage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/licenceBodies-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/licenceSweep-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/liquefy-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
@@ -12961,7 +12961,7 @@
   "tools/ship/probeConvention-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/probeFit-selfcheck.mjs": "2026-10-05T14:16:12.679Z",
   "tools/ship/probeLab-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "tools/ship/probeLit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/probeLit-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/procBrush-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/productDist-selfcheck.mjs": "2026-10-05T19:50:24.178Z",
   "tools/ship/promptCost-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
@@ -12974,7 +12974,7 @@
   "tools/ship/qualityTiers-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "tools/ship/quickSweep-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/raceCar-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/raceReplayBake-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/raceReplayBake-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/raceTrack-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/raceTurret-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/racesAct-selfcheck.mjs": "2026-10-06T20:02:59.243Z",
@@ -13016,7 +13016,7 @@
   "tools/ship/rigCanvas-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/rigJobDoor-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/rigJobPanel-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
-  "tools/ship/rigJobs-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/rigJobs-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/rigMix-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "tools/ship/ritualCoherence-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
   "tools/ship/rleBrickMap-selfcheck.mjs": "2026-10-05T20:05:33.108Z",
@@ -13071,7 +13071,7 @@
   "tools/ship/skyStars-selfcheck.mjs": "2026-10-06T20:02:59.243Z",
   "tools/ship/slowCensus-selfcheck.mjs": "2026-10-06T18:28:33.049Z",
   "tools/ship/slugCurve-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/slugDevice-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/slugDevice-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/slugFill-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/slugMelt-selfcheck.mjs": "2026-10-06T14:44:54.793Z",
   "tools/ship/slugMorph-selfcheck.mjs": "2026-10-06T14:13:06.073Z",
@@ -13166,7 +13166,7 @@
   "tools/ship/vehicle-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/vendoredFonts-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/vendoredLicences-selfcheck.mjs": "2026-10-06T14:13:25.246Z",
-  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/versionMarker-selfcheck.mjs": "2026-10-06T00:51:49.057Z",
   "tools/ship/versionPreflight-selfcheck.mjs": "2026-10-06T18:43:23.931Z",
   "tools/ship/videoFrames-selfcheck.mjs": "2026-10-06T14:44:54.793Z",
@@ -13176,7 +13176,7 @@
   "tools/ship/voxelBodies-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/voxelDDA-selfcheck.mjs": "2026-10-06T12:37:26.584Z",
   "tools/ship/voxelDamage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/voxelDevice-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/voxelDevice-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/voxelEdit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/voxelFixture-selfcheck.mjs": "2026-10-06T12:37:26.584Z",
   "tools/ship/voxelGlb-selfcheck.mjs": "2026-10-06T18:43:23.931Z",
@@ -13337,19 +13337,19 @@
   "fx/fsr/fsrFlicker-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "fx/fsr/fsrFlowCost-selfcheck.mjs": "2026-10-06T00:18:52.319Z",
   "fx/fsr/fsrFlowGrid-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFlowRetry-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFlowRetry-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFlowSeed-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFlowStill-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFlowStill-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGen-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenArc-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenFlow-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
-  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGenReach-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenScene-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "fx/fsr/fsrFrameGenUi-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "fx/fsr/fsrFrameGenWorld-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrTemporalHalf-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13359,10 +13359,10 @@
   "fx/fsr/fsrTemporalTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "fx/fsr/fsrTsl-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/dilateGPU-selfcheck.mjs": "2026-10-06T20:02:59.243Z",
-  "render/flowCost-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/flowCost-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/flowReconcileGPU-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/flowReconcileTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "render/frameInterpGPU-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/frameInterpGPU-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/frameInterpTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "render/holeFillGPU-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "render/holeFillTsl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13379,19 +13379,19 @@
   "render/temporalTslMany-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/temporalTslMeshes-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "render/temporalTslNodes-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "render/temporalTslZoo-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "render/temporalTslZoo-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "render/translucentLayer-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "render/visibilityGPU-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/boxTimings-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/constantRows-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/deadlineLeak-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/exitBusy-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/exitBusy-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/frameDisagree-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/frameDisagreeMeasure-selfcheck.mjs": "2026-09-28T19:00:30.472Z",
   "tools/ship/frameGain-selfcheck.mjs": "2026-09-28T19:01:00.183Z",
   "tools/ship/frameGainMeasure-selfcheck.mjs": "2026-09-28T19:01:47.141Z",
-  "tools/ship/frameGate-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/frameGate-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/frameGateMeasure-selfcheck.mjs": "2026-09-28T19:02:28.695Z",
   "tools/ship/frameHoled-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/frameHoledMeasure-selfcheck.mjs": "2026-09-28T19:03:09.452Z",
@@ -13411,7 +13411,7 @@
   "tools/ship/fsrPageConfirm-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "tools/ship/fsrPageField-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
   "tools/ship/fsrPageGen-selfcheck.mjs": "2026-09-28T18:58:39.328Z",
-  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/fsrPageObjects-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/fsrThreeWorld-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/genGateCalibrate-selfcheck.mjs": "2026-09-28T19:10:59.227Z",
@@ -13443,16 +13443,16 @@
   "tools/ship/loopNoise-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/sweepDevice-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/mesh/meshBooleanBlast-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/gunnerTraceDemo-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/gunnerTraceDemo-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/aircraftPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/capsuleCollideTsl-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
-  "tools/ship/flyConnectomePage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/flyConnectomePage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/peerBrain-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/peerBrainFleet-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/pilotPolicy-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/precisionProbe-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/rigidBody6dofPage-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "tools/ship/rtViewer-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/rtViewer-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/splatWalkWorld-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "brain/autopilot6dof-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
   "brain/autopilotAircraft-selfcheck.mjs": "2026-09-29T03:33:05.933Z",
@@ -13499,14 +13499,14 @@
   "ai-bridge/deviceOffThread-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/navalDuel-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/gitEconomy-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/escapeBudget-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/escapeBudget-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/percolation-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/img2three-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/roundhouse/boundKeys-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/lagBlame-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
-  "tools/ship/ecologyPage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/androidVerdict-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/knobCandidates-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/ecologyPage-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "tools/roundhouse/androidVerdict-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "tools/roundhouse/knobCandidates-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/blobulatorSkins-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/deviceBridge-selfcheck.mjs": "2026-10-06T14:11:45.960Z",
   "tools/ship/fetchProgress-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
@@ -13515,13 +13515,13 @@
   "tools/ship/gpuTerrain-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/deviceCritic-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/deadImportScan-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "brain/bench/bandit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "brain/bench/bandit-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "tools/render-qa/edgeBiasOracle-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/exportResolve-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "tools/bench/fleetBench-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/bench/fleetBench-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/demoChrome-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/avatarServerViews-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/airySlitAdoption-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/qrChannel-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "physics/knobRegistry-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "ai-bridge/deviceWorker-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13529,19 +13529,19 @@
   "tools/ship/ballistics-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
   "tools/ship/runnerBudget-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/carve-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "physics/render/shuffleEffect-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/render/shuffleEffect-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/frameDirtyProbes-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/corroborate-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/corroborate-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/fleets-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
-  "physics/render/renderBsdf-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/canvasFill-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "physics/blackhole/mission-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/render/renderBsdf-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "tools/ship/canvasFill-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
+  "physics/blackhole/mission-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/phoneQR-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/statmech/ising-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "brain/rl/imitation-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/shipyard-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/shipyard-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/refinementKnobs-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/fingerprint/peerReport-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/fingerprint/peerReport-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "ev/esFleetSize-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/errorPairAudit-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "ai-bridge/fingerprintBridge-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13554,22 +13554,22 @@
   "physicsLab-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/exitBanner-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/roundhouse/bellBind-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "physics/mesh/meshCSG-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/mesh/meshCSG-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/cartPoleBind-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/boundaryLint-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/boundaryLint-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/economyLockstep-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/orrery-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/orrery-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/rigProgress-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/orreryFleet-selfcheck.mjs": "2026-10-06T00:32:14.241Z",
   "physics/control/cartPole-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "physics/control/controlStateSpace-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "physics/control/controlStateSpace-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/roundhouse/readerPlant-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/mutate/shadowedDefaults-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/mutate/shadowedDefaults-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/swiftShaders-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/duplicateFiles-selfcheck.mjs": "2026-10-06T20:02:59.243Z",
   "physics/diffusionKnob-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/sync/kuramoto-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/roundhouse/runtimeBench-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/roundhouse/runtimeBench-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/cartPolePage-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/md/diffusion-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/sph/cfl-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13581,14 +13581,14 @@
   "physics/statmech/binderBudget-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "physics/render/msDirect-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/firewallBanner-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/roundTrip-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/roundTrip-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "tools/ship/sourceScan-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "tools/ship/generatedLadder-selfcheck.mjs": "2026-10-06T00:33:26.688Z",
   "tools/roundhouse/thermalPlants-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/orreryReached-selfcheck.mjs": "2026-10-06T00:33:54.087Z",
   "tools/ship/passFootprint-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/avatarFraming-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
-  "tools/ship/copiedOutsideVendor-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
+  "tools/ship/copiedOutsideVendor-selfcheck.mjs": "2026-10-07T00:45:34.954Z",
   "physics/vibrationKnob-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "tools/ship/loopMetric-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
   "brain/rl/tools/rocket-selfcheck.mjs": "2026-10-06T00:11:15.681Z",
@@ -13712,9 +13712,9 @@
    4216
   ],
   "tools/ship/deviceCompute-selfcheck.mjs": [
-   4349,
    5329,
-   5113
+   5113,
+   6211
   ],
   "tools/ship/zoomBlur-selfcheck.mjs": [
    4030,
@@ -13742,14 +13742,14 @@
    5971
   ],
   "tools/ship/voxelDevice-selfcheck.mjs": [
-   5092,
    5155,
-   4992
+   4992,
+   6160
   ],
   "tools/ship/probeLit-selfcheck.mjs": [
-   5932,
    5762,
-   5498
+   5498,
+   6591
   ],
   "brain/gunnerPolicy-selfcheck.mjs": [
    4209,
@@ -13757,19 +13757,19 @@
    5838
   ],
   "tools/ship/rigJobs-selfcheck.mjs": [
-   6344,
    6553,
-   6469
+   6469,
+   6944
   ],
   "tools/ship/slugDevice-selfcheck.mjs": [
-   5949,
    6148,
-   6444
+   6444,
+   7335
   ],
   "tools/ship/raceReplayBake-selfcheck.mjs": [
-   6929,
    6099,
-   6050
+   6050,
+   6230
   ],
   "tools/ship/releasePanelRoute-selfcheck.mjs": [
    6826,
@@ -19948,9 +19948,9 @@
    10108
   ],
   "fx/fsr/fsrFlowRetry-selfcheck.mjs": [
-   7837,
    6942,
-   6242
+   6242,
+   7998
   ],
   "fx/fsr/fsrFlowSeed-selfcheck.mjs": [
    13003,
@@ -19958,9 +19958,9 @@
    9676
   ],
   "fx/fsr/fsrFlowStill-selfcheck.mjs": [
-   7374,
    6372,
-   5325
+   5325,
+   6351
   ],
   "fx/fsr/fsrFrameGen-selfcheck.mjs": [
    18538,
@@ -19983,14 +19983,14 @@
    21270
   ],
   "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs": [
-   7068,
    6086,
-   5444
+   5444,
+   6567
   ],
   "fx/fsr/fsrFrameGenParticles-selfcheck.mjs": [
-   6497,
    6058,
-   5122
+   5122,
+   6664
   ],
   "fx/fsr/fsrFrameGenReach-selfcheck.mjs": [
    9889,
@@ -20008,9 +20008,9 @@
    9593
   ],
   "fx/fsr/fsrFrameGenUi-selfcheck.mjs": [
-   6710,
    6687,
-   5491
+   5491,
+   6948
   ],
   "fx/fsr/fsrFrameGenWorld-selfcheck.mjs": [
    11128,
@@ -20058,9 +20058,9 @@
    1461
   ],
   "render/flowCost-selfcheck.mjs": [
-   6761,
    6375,
-   6331
+   6331,
+   6586
   ],
   "render/flowReconcileGPU-selfcheck.mjs": [
    3245,
@@ -20073,9 +20073,9 @@
    9879
   ],
   "render/frameInterpGPU-selfcheck.mjs": [
-   5929,
    5706,
-   5837
+   5837,
+   7941
   ],
   "render/frameInterpTsl-selfcheck.mjs": [
    14252,
@@ -20158,9 +20158,9 @@
    4478
   ],
   "render/temporalTslZoo-selfcheck.mjs": [
-   6468,
    5757,
-   5254
+   5254,
+   5565
   ],
   "render/translucentLayer-selfcheck.mjs": [
    2269,
@@ -20193,9 +20193,9 @@
    11108
   ],
   "tools/ship/exitBusy-selfcheck.mjs": [
-   5210,
    5234,
-   5108
+   5108,
+   5636
   ],
   "tools/ship/frameDisagree-selfcheck.mjs": [
    1415,
@@ -20218,9 +20218,9 @@
    46782
   ],
   "tools/ship/frameGate-selfcheck.mjs": [
-   5538,
    5510,
-   4990
+   4990,
+   5580
   ],
   "tools/ship/frameGateMeasure-selfcheck.mjs": [
    20042,
@@ -20318,9 +20318,9 @@
    27637
   ],
   "tools/ship/fsrPageObjects-selfcheck.mjs": [
-   5934,
    5507,
-   5325
+   5325,
+   5957
   ],
   "tools/ship/fsrThreeWorld-selfcheck.mjs": [
    14383,
@@ -20515,9 +20515,9 @@
    7448
   ],
   "tools/gunnerTraceDemo-selfcheck.mjs": [
-   16786,
    6389,
-   5662
+   5662,
+   6470
   ],
   "tools/ship/aircraftPage-selfcheck.mjs": [
    10918,
@@ -20530,9 +20530,9 @@
    2342
   ],
   "tools/ship/flyConnectomePage-selfcheck.mjs": [
-   5120,
    5513,
-   5176
+   5176,
+   5476
   ],
   "tools/ship/peerBrain-selfcheck.mjs": [
    2392,
@@ -20560,9 +20560,9 @@
    3152
   ],
   "tools/ship/rtViewer-selfcheck.mjs": [
-   6720,
    7656,
-   6674
+   6674,
+   8140
   ],
   "tools/ship/splatWalkWorld-selfcheck.mjs": [
    2202,
@@ -20746,7 +20746,8 @@
    3792
   ],
   "tools/ship/gpuOrbits-selfcheck.mjs": [
-   5198
+   5198,
+   5860
   ],
   "tools/ship/shippedLadder-selfcheck.mjs": [
    20030,
@@ -20784,7 +20785,8 @@
    517
   ],
   "tools/ship/lensingPage-selfcheck.mjs": [
-   5154
+   5154,
+   5180
   ],
   "tools/roundhouse/errorSign-selfcheck.mjs": [
    4125,
@@ -20850,7 +20852,8 @@
    3077
   ],
   "ai-bridge/tools/discovery-selfcheck.mjs": [
-   5867
+   5867,
+   5900
   ],
   "tools/ship/quickSweep-selfcheck.mjs": [
    18252
@@ -20914,20 +20917,24 @@
    3078
   ],
   "physics/scoreDirection-selfcheck.mjs": [
-   6456
+   6456,
+   7061
   ],
   "tools/ship/universeWire-selfcheck.mjs": [
    4648,
    5394
   ],
   "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": [
-   5175
+   5175,
+   6208
   ],
   "tools/ship/orreryPost-selfcheck.mjs": [
    10102
   ],
   "ai-bridge/freshMachine-selfcheck.mjs": [
-   5503
+   5503,
+   20059,
+   7845
   ],
   "tools/ship/dockRows-selfcheck.mjs": [
    4284,
@@ -20938,10 +20945,12 @@
    3535
   ],
   "tools/ship/checkerCensus-selfcheck.mjs": [
-   5372
+   5372,
+   6328
   ],
   "tools/roundhouse/seedSpread-selfcheck.mjs": [
-   5379
+   5379,
+   5660
   ],
   "tools/ship/coverageTriage-selfcheck.mjs": [
    883
@@ -20952,7 +20961,8 @@
    3673
   ],
   "brain/rl/occlusion-memory-selfcheck.mjs": [
-   5007
+   5007,
+   6050
   ],
   "physics/render/directStrategy-selfcheck.mjs": [
    4267,
@@ -20977,7 +20987,8 @@
    8744
   ],
   "tools/roundhouse/escapeBudget-selfcheck.mjs": [
-   5141
+   5141,
+   5082
   ],
   "tools/roundhouse/percolation-selfcheck.mjs": [
    4506,
@@ -20997,13 +21008,16 @@
    2638
   ],
   "tools/ship/ecologyPage-selfcheck.mjs": [
-   5245
+   5245,
+   5424
   ],
   "tools/roundhouse/androidVerdict-selfcheck.mjs": [
-   6340
+   6340,
+   7122
   ],
   "tools/roundhouse/knobCandidates-selfcheck.mjs": [
-   5472
+   5472,
+   5504
   ],
   "tools/ship/blobulatorSkins-selfcheck.mjs": [
    4065,
@@ -21042,17 +21056,20 @@
    3725
   ],
   "brain/bench/bandit-selfcheck.mjs": [
-   5733
+   5733,
+   6098
   ],
   "tools/render-qa/edgeBiasOracle-selfcheck.mjs": [
-   5396
+   5396,
+   5702
   ],
   "tools/ship/exportResolve-selfcheck.mjs": [
    3207,
    3852
   ],
   "tools/bench/fleetBench-selfcheck.mjs": [
-   6179
+   6179,
+   6499
   ],
   "tools/ship/demoChrome-selfcheck.mjs": [
    7402
@@ -21061,7 +21078,8 @@
    19395
   ],
   "tools/roundhouse/airySlitAdoption-selfcheck.mjs": [
-   6504
+   6504,
+   7370
   ],
   "tools/ship/qrChannel-selfcheck.mjs": [
    3886,
@@ -21091,26 +21109,31 @@
    5716
   ],
   "physics/render/shuffleEffect-selfcheck.mjs": [
-   5477
+   5477,
+   5983
   ],
   "tools/ship/frameDirtyProbes-selfcheck.mjs": [
    10163
   ],
   "tools/roundhouse/corroborate-selfcheck.mjs": [
-   6054
+   6054,
+   6912
   ],
   "tools/ship/fleets-selfcheck.mjs": [
    3077,
    3791
   ],
   "physics/render/renderBsdf-selfcheck.mjs": [
-   6157
+   6157,
+   7223
   ],
   "tools/ship/canvasFill-selfcheck.mjs": [
-   6148
+   6148,
+   6800
   ],
   "physics/blackhole/mission-selfcheck.mjs": [
-   6497
+   6497,
+   6297
   ],
   "tools/ship/phoneQR-selfcheck.mjs": [
    10601
@@ -21122,13 +21145,15 @@
    6675
   ],
   "tools/ship/shipyard-selfcheck.mjs": [
-   5838
+   5838,
+   6701
   ],
   "tools/roundhouse/refinementKnobs-selfcheck.mjs": [
    8192
   ],
   "tools/fingerprint/peerReport-selfcheck.mjs": [
-   6562
+   6562,
+   7436
   ],
   "ev/esFleetSize-selfcheck.mjs": [
    9122
@@ -21169,19 +21194,22 @@
    8804
   ],
   "physics/mesh/meshCSG-selfcheck.mjs": [
-   6091
+   6091,
+   8783
   ],
   "tools/roundhouse/cartPoleBind-selfcheck.mjs": [
    7379
   ],
   "tools/ship/boundaryLint-selfcheck.mjs": [
-   5010
+   5010,
+   5761
   ],
   "tools/ship/economyLockstep-selfcheck.mjs": [
    9560
   ],
   "tools/ship/orrery-selfcheck.mjs": [
-   6200
+   6200,
+   6312
   ],
   "tools/ship/rigProgress-selfcheck.mjs": [
    11592
@@ -21194,13 +21222,15 @@
    7061
   ],
   "physics/control/controlStateSpace-selfcheck.mjs": [
-   6341
+   6341,
+   7958
   ],
   "tools/roundhouse/readerPlant-selfcheck.mjs": [
    10246
   ],
   "tools/mutate/shadowedDefaults-selfcheck.mjs": [
-   5799
+   5799,
+   8182
   ],
   "tools/ship/swiftShaders-selfcheck.mjs": [
    15177
@@ -21217,7 +21247,8 @@
    9812
   ],
   "tools/roundhouse/runtimeBench-selfcheck.mjs": [
-   5719
+   5719,
+   8041
   ],
   "tools/ship/cartPolePage-selfcheck.mjs": [
    14085
@@ -21255,7 +21286,8 @@
    7285
   ],
   "tools/ship/roundTrip-selfcheck.mjs": [
-   5509
+   5509,
+   6958
   ],
   "tools/ship/sourceScan-selfcheck.mjs": [
    4985,
@@ -21279,7 +21311,8 @@
    19158
   ],
   "tools/ship/copiedOutsideVendor-selfcheck.mjs": [
-   5957
+   5957,
+   7895
   ],
   "physics/vibrationKnob-selfcheck.mjs": [
    12095
