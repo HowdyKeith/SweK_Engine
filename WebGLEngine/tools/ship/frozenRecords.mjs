@@ -756,7 +756,8 @@ export const PROBE_AT_V4536 = Object.freeze({
     // v4778 -- RE-TAKEN 151 / 72 / 399 -> 152 / 73 / 400 with `excluding` below, for COMMIT_BELT_DRIFT_V4778 (one field).
     // v4813 -- 152 -> 153 records, fields unmoved: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs (see `excluding`).
     // v4815 -- 153 -> 154 records, fields unmoved: STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs (see `excluding`).
-    currentIncludingModule: Object.freeze({ records: 154, withFields: 73, fields: 400 }),
+    // v4818 -- 154 -> 155 records, fields unmoved: STILL_OVER_AT_V4818 in tools/ship/sweepCoverage.mjs (see `excluding`).
+    currentIncludingModule: Object.freeze({ records: 155, withFields: 73, fields: 400 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -964,7 +965,9 @@ export const PROBE_AT_V4536 = Object.freeze({
     // the other two do not. Re-taken in the round that added it.
     // v4815 -- RE-TAKEN: 151 / 71 / 380 -> 152 / 71 / 380. One arrival, STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs --
     // headlessGpu and sweepBudget back over on the host the record moved to. Same shape as v4813's: records by one only.
-    excluding: Object.freeze({ records: 152, withFields: 71, fields: 380 }),
+    // v4818 -- RE-TAKEN: 152 / 71 / 380 -> 153 / 71 / 380. One arrival, STILL_OVER_AT_V4818 in tools/ship/sweepCoverage.mjs --
+    // orreryEjecta back over on the host the record came back to. Same shape again: records by one only.
+    excluding: Object.freeze({ records: 153, withFields: 71, fields: 380 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,

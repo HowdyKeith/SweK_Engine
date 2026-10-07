@@ -500,7 +500,8 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const stillOverNamed = (g) => {
         const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
                     SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
-                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g);     // v4815: the host change
+                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g) ||   // v4815: the host change
+                    SC.STILL_OVER_AT_V4818.stillOver.find((x) => x.gate === g);     // v4818: and back
         return !!row && justifiedOver(row);
     };
     const returned = new Map([
@@ -1562,6 +1563,13 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
        SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
        SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,
+    // 2900], hereMs 2800, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row; restored.
+    ok("!! *** the v4818 still-over roll names only returnees genuinely over on the host the record came back to ***",
+       SC.STILL_OVER_AT_V4818.stillOver.length > 0 && SC.STILL_OVER_AT_V4818.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4818.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",

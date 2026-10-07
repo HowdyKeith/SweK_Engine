@@ -355,6 +355,20 @@ export const STILL_OVER_AT_V4815 = Object.freeze({
     ]),
 });
 
+// v4818 -- THE RECORD CAME BACK TO THE 2.10GHz HOST (quickSweep's v4818 handover, 420793 -> 142c0d), and one returnee
+// went back over there, as headlessGpu and sweepBudget went over on the other host at v4815. Named the same way, with
+// the readings: step 4b caught it, the 12-of-22 row red against the record the second v4818 verdict wrote.
+export const STILL_OVER_AT_V4818 = Object.freeze({
+    at: "v4818", box: "linux-x64-4c-16095mb-142c0d",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", recordedWas: 3314, hereMs: 3142,
+            serialMs: Object.freeze([3166, 3416, 3351]),
+            why: "returned by v4461's rotation; 2,797 / 2,996 / 2,736 ms alone in the record on the 2.80 GHz host, then " +
+                 "3,209 and 3,142 in the v4818 verdict's serial runs and 3,166 / 3,416 / 3,351 alone by hand on the " +
+                 "2.10 GHz host the record went back to -- a host move, filed as v4815's were" }),
+    ]),
+});
+
 export const RETURNED_AT_V4476 = Object.freeze({
     at: "v4476",
     ofTwelve: 12,
