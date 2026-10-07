@@ -345,6 +345,24 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
         ok("  ...and a chain is followed to its end, so a later handover appends rather than edits",
            !chain.foreign && middle.foreign, `third-box ${chain.foreign ? "refused" : "owns"}, new-box ` +
            `${middle.foreign ? "refused" : "owns"}`);
+        // v4818: a box can get the record BACK, and the walk must follow the rows in the order they were decided. The
+        // first ownerOf took the first row naming a box and stopped at a box it had seen, which on a-box -> b-box ->
+        // a-box answered b-box for a record b-box wrote -- the return handover ignored. SABOTAGED v4818: the old walk
+        // put back -> this row red by name.
+        {
+            const R = [{ at: "v1", from: "a-box", to: "b-box" }, { at: "v2", from: "b-box", to: "a-box" },
+                       { at: "v3", from: "a-box", to: "b-box" }];
+            ok("!! *** a record handed BACK goes to the box it was handed back to, in the order the rows were decided ***",
+               ownerOf("b-box", R.slice(0, 2)) === "a-box" && ownerOf("a-box", R.slice(0, 2)) === "a-box" &&
+               ownerOf("b-box", R) === "b-box" && ownerOf("a-box", R) === "b-box" && ownerOf("c-box", R) === "c-box",
+               `a->b->a: owner of a b-box record ${ownerOf("b-box", R.slice(0, 2))}; a->b->a->b: ${ownerOf("b-box", R)}`);
+            // a-box is handed the record TWICE here (v2 and v4), so the first row naming it and the last are different
+            const R4 = [...R, { at: "v4", from: "b-box", to: "a-box" }];
+            const back = timingsTarget({ host: "b-box" }, { id: "a-box", handovers: R4 });
+            ok("  ...and the writer names the handover that GAVE it the record, not the first one that ever named it",
+               !back.foreign && / at v4$/.test(back.why), back.why);
+            // SABOTAGED v4818: the old walk -> both rows red; the writer naming the first row (`find`) -> this one red.
+        }
         // v4813: the record went back to a sandbox by a second dated row (Keith's decision -- see quickSweep's v4813
         // note), so the v4778 row is asserted as history and the live owner as the END of the chain, which is the
         // property the chain row above tests on fixtures. Pinning the rig here would have been the edit-in-place

@@ -119,6 +119,15 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs =
  * REFUSES rather than guesses. A row whose two independent readings disagree by more than `band` is left
  * alone and NAMED: one of the two is wrong and this function cannot say which.
  */
+// *** v4818 -- A BOX THAT MAY NOT WRITE THE RECORD MAY NOT WRITE THE LEDGER EITHER. *** The timings went to the
+// foreign box's .local.json and the ledger went to the SHARED file regardless, so the ledger held readings the record
+// did not: PR #12's box committed a temporalLockSumsTsl row (16,176 ms) that sweep-timings.json never had, and the
+// v4818 rotation itself, run on a box the record did not name, rewrote all forty rows and moved poolAt before it was
+// caught and reverted. The ledger records what the RECORD was given, so it follows the record's owner.
+export const LEDGER_FILE = path.join("tools", "ship", "sweep-rotation.json");
+export const LOCAL_LEDGER = path.join("tools", "ship", "sweep-rotation.local.json");
+export const ledgerFile = (target) => (target && target.foreign ? LOCAL_LEDGER : LEDGER_FILE);
+
 export const CORROBORATION_BAND = 0.2;
 export const UNDATED = "unknown -- before v4408";
 
@@ -452,7 +461,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         } catch {}
         for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({
+        const ledgerOut = ledgerFile(target);
+        if (target.foreign) console.log(`[rotation] NOT writing the shared ledger either -- ${ledgerOut} instead`);
+        fs.writeFileSync(path.join(ENG, ledgerOut), JSON.stringify({
             generatedFrom: "tools/ship/sweepRotation.mjs",
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
