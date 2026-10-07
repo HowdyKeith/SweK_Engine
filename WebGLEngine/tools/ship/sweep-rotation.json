@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-07T03:49:47.629Z",
+ "at": "2026-10-07T04:48:20.727Z",
  "poolAt": "2026-10-07T00:45:34.954Z",
  "poolHorizon": "2026-10-06T00:11:15.681Z",
  "budgetMs": 3000,
@@ -79,9 +79,16 @@
   },
   {
    "gate": "brain/conv2d-selfcheck.mjs",
-   "ms": 1822,
+   "ms": 1833,
    "code": 0,
-   "at": "2026-10-07T03:49:47.629Z"
+   "priorMs": 1822,
+   "at": "2026-10-07T04:48:20.727Z"
+  },
+  {
+   "gate": "brain/convNet-selfcheck.mjs",
+   "ms": 144,
+   "code": 0,
+   "at": "2026-10-07T04:48:15.532Z"
   },
   {
    "gate": "brain/gunnerPolicy-selfcheck.mjs",
@@ -1166,6 +1173,36 @@
    "code": 0,
    "priorMs": 20461,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "render/denoiseFilter-selfcheck.mjs",
+   "ms": 279,
+   "code": 0,
+   "at": "2026-10-07T04:48:14.933Z"
+  },
+  {
+   "gate": "render/denoiseNet-selfcheck.mjs",
+   "ms": 1861,
+   "code": 0,
+   "at": "2026-10-07T04:48:17.588Z"
+  },
+  {
+   "gate": "render/denoiseScenes-selfcheck.mjs",
+   "ms": 171,
+   "code": 0,
+   "at": "2026-10-07T04:48:14.465Z"
+  },
+  {
+   "gate": "render/denoiseStats-selfcheck.mjs",
+   "ms": 50,
+   "code": 0,
+   "at": "2026-10-07T04:48:15.210Z"
+  },
+  {
+   "gate": "render/denoiseStudy-selfcheck.mjs",
+   "ms": 913,
+   "code": 0,
+   "at": "2026-10-07T04:48:18.709Z"
   },
   {
    "gate": "render/flowCost-selfcheck.mjs",

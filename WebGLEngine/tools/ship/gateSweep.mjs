@@ -8118,6 +8118,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 2 -- THE PRE-REGISTERED STUDY AS CODE, BEFORE ANY DATA.
+    since482: Object.freeze({
+        at: "the denoiser arc, round 2 (unshipped)", swept: 6, green: 6, red: 0,
+        added: Object.freeze(["render/denoiseScenes-selfcheck.mjs", "render/denoiseFilter-selfcheck.mjs", "render/denoiseStats-selfcheck.mjs",
+                              "brain/convNet-selfcheck.mjs", "render/denoiseNet-selfcheck.mjs", "render/denoiseStudy-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the backward pass reads relu's mask from a kept forward output -- same gradients, bit for bit)"]),
+        verdict: "*** EVERYTHING THE MEASUREMENT NEEDS, AND NOT ONE DATASET IMAGE. *** render/learned-denoiser-preregistration.md " +
+                 "sections 3-8 as code, each gated on synthetic data only: the two scene families on disjoint seed ranges " +
+                 "with first-hit guides and the demodulated 9-channel input; the joint bilateral filter and its train-only " +
+                 "grid tuner; a generic conv stack with seeded He init, backward to finite differences (5.6e-9) and Adam to " +
+                 "the textbook update; the pre-registered 6,387-parameter residual network, its relMSE gradient to 1.9e-7, " +
+                 "and ONE SEED TWICE IS ONE NETWORK, bit for bit -- the v4698 defect, planted as Math.random batch order, " +
+                 "goes red; the exact sign test, Holm and every verdict the controls can return, planted; and the whole " +
+                 "study as one pipeline, run end to end on a miniature seeded outside the splits. renderImages() REFUSES " +
+                 "every dataset seed without { harvest: true }, and the runner on the real splits is refused at its first " +
+                 "scene. 19 sabotages, all red; one (remodulate without the floor) only after a row was written for it. " +
+                 "Section 11 of the pre-registration closes ten gaps the code found, before any data.",
+    }),
     // the denoiser arc, round 1 -- A CONVOLUTION LAYER, CPU AND DEVICE: brain/conv2d.mjs. (since480 is the splat-collision
     // round's, on its own open branch; this slot is numbered past it so the two cannot collide when both land.)
     since481: Object.freeze({

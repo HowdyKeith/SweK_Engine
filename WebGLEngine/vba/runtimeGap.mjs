@@ -592,7 +592,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the rtPipeline cache round -- 4588 -> 4589 for physics/render/rtCpuCache.mjs.
     // the lock-sums round -- 4589 -> 4593 for render/temporalLockSums.mjs, render/temporalLockSumsTsl.mjs and their two gates.
     // the denoiser arc, round 1 -- 4593 -> 4595 for brain/conv2d.mjs and brain/conv2d-selfcheck.mjs.
-    files: 4595,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the denoiser arc, round 2 -- 4595 -> 4608: six modules, six gates, tools/denoiseStudy.mjs.
+    files: 4608,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1125,7 +1126,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, round 1 -- brain/conv2d.mjs and its gate: files 4593 -> 4595, ES modules 4288 -> 4290, closures
     // 4138 -> 4140, typed arrays 1267 -> 1269 (the layer's buffers; the gate's fixtures), async/await 1715 -> 1716 (the
     // gate awaits its imports and the device); nothing else moved.
-    esModules: 4290, closures: 4140, asyncAwait: 1716, typedArrays: 1269, promises: 405,
+    // the denoiser arc, round 2 -- six modules, six gates and the study's CLI: files 4595 -> 4608, ES modules 4290 -> 4303,
+    // closures 4140 -> 4152, async/await 1716 -> 1722 (the six gates await their imports), typed arrays 1269 -> 1278 (the
+    // images, weights and moments); nothing else moved.
+    esModules: 4303, closures: 4152, asyncAwait: 1722, typedArrays: 1278, promises: 405,
     fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

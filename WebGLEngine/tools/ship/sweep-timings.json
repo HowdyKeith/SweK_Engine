@@ -2059,7 +2059,13 @@
   "camera/cameraBoom-selfcheck.mjs": 519,
   "render/temporalLockSums-selfcheck.mjs": 1374,
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
-  "brain/conv2d-selfcheck.mjs": 1822
+  "brain/conv2d-selfcheck.mjs": 1833,
+  "render/denoiseScenes-selfcheck.mjs": 171,
+  "render/denoiseFilter-selfcheck.mjs": 279,
+  "render/denoiseStats-selfcheck.mjs": 50,
+  "brain/convNet-selfcheck.mjs": 144,
+  "render/denoiseNet-selfcheck.mjs": 1861,
+  "render/denoiseStudy-selfcheck.mjs": 913
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3994,7 +4000,13 @@
   "camera/cameraBoom-selfcheck.mjs": 0,
   "render/temporalLockSums-selfcheck.mjs": 0,
   "render/temporalLockSumsTsl-selfcheck.mjs": 0,
-  "brain/conv2d-selfcheck.mjs": 0
+  "brain/conv2d-selfcheck.mjs": 0,
+  "render/denoiseScenes-selfcheck.mjs": 0,
+  "render/denoiseFilter-selfcheck.mjs": 0,
+  "render/denoiseStats-selfcheck.mjs": 0,
+  "brain/convNet-selfcheck.mjs": 0,
+  "render/denoiseNet-selfcheck.mjs": 0,
+  "render/denoiseStudy-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T00:59:26.123Z",
@@ -5929,7 +5941,13 @@
   "camera/cameraBoom-selfcheck.mjs": "2026-10-07T00:59:26.123Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-07T00:59:26.123Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
-  "brain/conv2d-selfcheck.mjs": "2026-10-07T03:49:47.629Z"
+  "brain/conv2d-selfcheck.mjs": "2026-10-07T04:48:20.727Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-07T04:48:14.465Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-07T04:48:14.933Z",
+  "render/denoiseStats-selfcheck.mjs": "2026-10-07T04:48:15.210Z",
+  "brain/convNet-selfcheck.mjs": "2026-10-07T04:48:15.532Z",
+  "render/denoiseNet-selfcheck.mjs": "2026-10-07T04:48:17.588Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-07T04:48:18.709Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7837,7 +7855,13 @@
   "camera/cameraBoom-selfcheck.mjs": 20000,
   "render/temporalLockSums-selfcheck.mjs": 20000,
   "render/temporalLockSumsTsl-selfcheck.mjs": 90000,
-  "brain/conv2d-selfcheck.mjs": 20000
+  "brain/conv2d-selfcheck.mjs": 20000,
+  "render/denoiseScenes-selfcheck.mjs": 20000,
+  "render/denoiseFilter-selfcheck.mjs": 20000,
+  "render/denoiseStats-selfcheck.mjs": 20000,
+  "brain/convNet-selfcheck.mjs": 20000,
+  "render/denoiseNet-selfcheck.mjs": 20000,
+  "render/denoiseStudy-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9766,7 +9790,13 @@
   "camera/cameraBoom-selfcheck.mjs": true,
   "render/temporalLockSums-selfcheck.mjs": true,
   "render/temporalLockSumsTsl-selfcheck.mjs": true,
-  "brain/conv2d-selfcheck.mjs": true
+  "brain/conv2d-selfcheck.mjs": true,
+  "render/denoiseScenes-selfcheck.mjs": true,
+  "render/denoiseFilter-selfcheck.mjs": true,
+  "render/denoiseStats-selfcheck.mjs": true,
+  "brain/convNet-selfcheck.mjs": true,
+  "render/denoiseNet-selfcheck.mjs": true,
+  "render/denoiseStudy-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11779,7 +11809,13 @@
   "camera/cameraBoom-selfcheck.mjs": 342,
   "render/temporalLockSums-selfcheck.mjs": 1374,
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
-  "brain/conv2d-selfcheck.mjs": 1822
+  "brain/conv2d-selfcheck.mjs": 1833,
+  "render/denoiseScenes-selfcheck.mjs": 171,
+  "render/denoiseFilter-selfcheck.mjs": 279,
+  "render/denoiseStats-selfcheck.mjs": 50,
+  "brain/convNet-selfcheck.mjs": 144,
+  "render/denoiseNet-selfcheck.mjs": 1861,
+  "render/denoiseStudy-selfcheck.mjs": 913
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T00:59:10.887Z",
@@ -13603,7 +13639,13 @@
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-07T00:59:10.887Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
-  "brain/conv2d-selfcheck.mjs": "2026-10-07T03:49:47.629Z"
+  "brain/conv2d-selfcheck.mjs": "2026-10-07T04:48:20.727Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-07T04:48:14.465Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-07T04:48:14.933Z",
+  "render/denoiseStats-selfcheck.mjs": "2026-10-07T04:48:15.210Z",
+  "brain/convNet-selfcheck.mjs": "2026-10-07T04:48:15.532Z",
+  "render/denoiseNet-selfcheck.mjs": "2026-10-07T04:48:17.588Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-07T04:48:18.709Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -21432,7 +21474,26 @@
    18048
   ],
   "brain/conv2d-selfcheck.mjs": [
-   1822
+   1822,
+   1833
+  ],
+  "render/denoiseScenes-selfcheck.mjs": [
+   171
+  ],
+  "render/denoiseFilter-selfcheck.mjs": [
+   279
+  ],
+  "render/denoiseStats-selfcheck.mjs": [
+   50
+  ],
+  "brain/convNet-selfcheck.mjs": [
+   144
+  ],
+  "render/denoiseNet-selfcheck.mjs": [
+   1861
+  ],
+  "render/denoiseStudy-selfcheck.mjs": [
+   913
   ]
  },
  "contended": {
@@ -23257,7 +23318,13 @@
   "camera/cameraBoom-selfcheck.mjs": true,
   "render/temporalLockSums-selfcheck.mjs": false,
   "render/temporalLockSumsTsl-selfcheck.mjs": false,
-  "brain/conv2d-selfcheck.mjs": false
+  "brain/conv2d-selfcheck.mjs": false,
+  "render/denoiseScenes-selfcheck.mjs": false,
+  "render/denoiseFilter-selfcheck.mjs": false,
+  "render/denoiseStats-selfcheck.mjs": false,
+  "brain/convNet-selfcheck.mjs": false,
+  "render/denoiseNet-selfcheck.mjs": false,
+  "render/denoiseStudy-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "alone",
@@ -25192,6 +25259,12 @@
   "camera/cameraBoom-selfcheck.mjs": "loaded",
   "render/temporalLockSums-selfcheck.mjs": "alone",
   "render/temporalLockSumsTsl-selfcheck.mjs": "alone",
-  "brain/conv2d-selfcheck.mjs": "alone"
+  "brain/conv2d-selfcheck.mjs": "alone",
+  "render/denoiseScenes-selfcheck.mjs": "alone",
+  "render/denoiseFilter-selfcheck.mjs": "alone",
+  "render/denoiseStats-selfcheck.mjs": "alone",
+  "brain/convNet-selfcheck.mjs": "alone",
+  "render/denoiseNet-selfcheck.mjs": "alone",
+  "render/denoiseStudy-selfcheck.mjs": "alone"
  }
 }

@@ -145,3 +145,44 @@ A joint (cross) bilateral filter on the demodulated noisy irradiance, re-modulat
 - Per-image tables.
 - val's numbers.
 - Training and inference time.
+
+## 11. CLARIFICATIONS FIXED IN ROUND 2 -- STILL BEFORE ANY DATA
+
+Writing sections 3-8 as code (`render/denoiseScenes.mjs`, `render/denoiseFilter.mjs`, `brain/convNet.mjs`,
+`render/denoiseNet.mjs`, `render/denoiseStats.mjs`, each gated on synthetic data only) found places where the prose
+above left a choice open. Each is closed here, in the commit that carries the code, and no dataset image exists yet:
+`renderImages()` refuses every dataset seed without `{ harvest: true }`, and nothing in this round passes it.
+
+1. **Base colour, everywhere it is divided out.**
+   - Lambertian surfaces: `albedo`.
+   - Microfacet surfaces: `F0`, their colour in this tracer (white where absent).
+   - The sky and emitters: 1. Section 4 named only the sky; an emitter has no surface colour either, and its
+     albedo of 0 would have been floored to 0.01 and multiplied its radiance by 100.
+2. **Guide buffers** come from each pixel's CENTRE ray; the noisy radiance averages its jittered samples.
+   - An emitter hit keeps its surface normal; only the sky's normal is 0.
+3. **Channel order:** [irradiance rgb, albedo rgb, normal xyz]. `remodulate` multiplies by the same floored albedo
+   `inputChannels` divided by.
+4. **The scene generator's numbers,** in the code:
+   - the ground is a sphere of radius 100 centred 100 below the origin, albedo 0.3-0.7 per channel;
+   - spheres have radius 0.25-0.7, rest on the ground, are kept apart, and sit within |x|, |z| <= 1.6;
+   - the emitter has albedo 0, strength 4-12, at height 2.5-3.5;
+   - the gradient sky is a + b (y + 1) / 2, with a 0.05-0.2 and b 0.2-0.6;
+   - the band sky is hi above a horizon h and lo below, with h -0.1-0.3, hi 0.4-0.8 and lo 0.02-0.1;
+   - the eye sits on a ring of radius 4-5 at height 1-2, looking at (0, 0.4, 0);
+   - in family B, every second sphere placed is microfacet.
+5. **Render seeds:** a scene seed s renders its input with 8s + 1, its reference with 8s + 2 and its second
+   reference with 8s + 3. All 156 are distinct across the dataset (C5, asserted in the gate).
+6. **The filter's irradiance term** compares ln(1 + irradiance), so one sigma serves dim and bright regions.
+   - A sigma of Infinity switches its term off.
+   - The grid is sS {1, 2, 4}, sN {0.1, 0.3, 1}, sA {0.05, 0.2, 1}, sI {0.25, 1, 4, Infinity}: 108 settings.
+   - Ties go to the earliest setting.
+7. **Training draws.** After the initial weights, each crop of each step draws the image, then the crop's x corner,
+   then its y corner, from the same stream. The batch's loss and gradient are the means of its crops'.
+8. **Control C2's permutation:** training image i (in seed order) is paired with the reference of image
+   (i + 1) mod 24. That is a fixed derangement: no image keeps its own reference. It is trained with the same three
+   seeds as the primary network.
+9. **Control C3's "more than half"** of 12 means 7 or more.
+10. **The run-level outcomes.**
+    - "not reported": C1, C4 or C5 fired. Nothing about H1 or H2 is claimed.
+    - "not resolvable": C2 fired.
+    - A hypothesis can also be "not resolvable" alone, through C3.

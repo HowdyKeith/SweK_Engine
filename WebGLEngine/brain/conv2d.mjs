@@ -94,15 +94,21 @@ export function conv2dCpuFma(x, H, W, layer) { return forward(x, H, W, layer, tr
  * The f64 backward pass. `dY` is the loss's gradient with respect to this layer's OUTPUT (after the activation).
  * Returns { dX, dW, db } -- with respect to the input, the weights and the bias. The relu's gradient is taken as 0
  * where the pre-activation is exactly 0, the usual subgradient.
+ *
+ * `y`, when given, is this layer's own forward output for `x`, and the relu mask is read from it (y > 0 exactly when
+ * z > 0) instead of re-running the forward pass -- which a network's training loop already ran and kept. Same
+ * gradients, bit for bit (conv2d-selfcheck section 4 holds it); a third of the work.
  */
-export function conv2dBackward(x, H, W, layer, dY) {
-    const { z } = forward(x, H, W, layer, false, false, true);
+export function conv2dBackward(x, H, W, layer, dY, { y = null } = {}) {
+    check(H, W, layer);
+    const z = y ? null : forward(x, H, W, layer, false, false, true).z;
+    const live = (o) => (y ? y[o] > 0 : z[o] > 0);
     const { Cin, Cout, k } = layer, r = (k - 1) / 2, relu = String(layer.act ?? "none") === "relu";
     if (dY.length !== H * W * Cout) throw new Error(`conv2d: dY holds ${dY.length}, H*W*Cout is ${H * W * Cout}`);
     const dX = new Float64Array(H * W * Cin), dW = new Float64Array(layer.W.length), db = new Float64Array(Cout);
     for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let co = 0; co < Cout; co++) {
         const o = (py * W + px) * Cout + co;
-        const g = relu && !(z[o] > 0) ? 0 : dY[o];
+        const g = relu && !live(o) ? 0 : dY[o];
         if (g === 0) continue;
         db[co] += g;
         for (let ky = 0; ky < k; ky++) {
