@@ -2058,7 +2058,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": 7151,
   "camera/cameraBoom-selfcheck.mjs": 819,
   "render/temporalLockSums-selfcheck.mjs": 1344,
-  "render/temporalLockSumsTsl-selfcheck.mjs": 16005
+  "render/temporalLockSumsTsl-selfcheck.mjs": 18048
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -5926,7 +5926,7 @@
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-06T17:10:46.473Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-06T22:35:35.745Z",
-  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:59:54.141Z"
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7833,7 +7833,7 @@
   "tools/ship/moduleHistory-selfcheck.mjs": 120000,
   "camera/cameraBoom-selfcheck.mjs": 20000,
   "render/temporalLockSums-selfcheck.mjs": 20000,
-  "render/temporalLockSumsTsl-selfcheck.mjs": 20000
+  "render/temporalLockSumsTsl-selfcheck.mjs": 90000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -11775,7 +11775,7 @@
   "tools/ship/moduleHistory-selfcheck.mjs": 17301,
   "camera/cameraBoom-selfcheck.mjs": 342,
   "render/temporalLockSums-selfcheck.mjs": 1344,
-  "render/temporalLockSumsTsl-selfcheck.mjs": 16005
+  "render/temporalLockSumsTsl-selfcheck.mjs": 18048
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-06T12:37:26.584Z",
@@ -13598,7 +13598,7 @@
   "tools/ship/moduleHistory-selfcheck.mjs": "2026-10-06T16:54:09.803Z",
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-06T22:35:20.737Z",
-  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-06T17:59:54.141Z"
+  "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -21314,9 +21314,9 @@
    1344
   ],
   "render/temporalLockSumsTsl-selfcheck.mjs": [
-   11163,
-   11169,
-   16005
+   16005,
+   26603,
+   18048
   ]
  },
  "contended": {
