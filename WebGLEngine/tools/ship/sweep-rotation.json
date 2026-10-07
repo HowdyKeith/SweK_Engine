@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-07T00:46:15.244Z",
+ "at": "2026-10-07T03:58:40.281Z",
  "poolAt": "2026-10-07T00:45:34.954Z",
  "poolHorizon": "2026-10-06T00:11:15.681Z",
  "budgetMs": 3000,
@@ -4647,6 +4647,12 @@
    "code": 0,
    "priorMs": 3312,
    "at": "2026-09-09T12:57:13.333Z"
+  },
+  {
+   "gate": "tools/ship/splatVoxelWorld-selfcheck.mjs",
+   "ms": 1296,
+   "code": 0,
+   "at": "2026-10-07T03:58:40.281Z"
   },
   {
    "gate": "tools/ship/staleQueue-selfcheck.mjs",
