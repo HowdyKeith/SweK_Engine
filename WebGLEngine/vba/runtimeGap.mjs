@@ -1118,7 +1118,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // 196 -> 197 (the device gate's webgl2 backend); nothing else moved.
     // v4815 -- inputSets-selfcheck's live-owner row awaits a held child through a promise: async/await 1711 -> 1712,
     // Promises 404 -> 405; nothing else moved. (v4816 merge: the two lines' moves add -- async/await 1714 + 1 = 1715.)
-    esModules: 4288, closures: 4137, asyncAwait: 1715, typedArrays: 1267, promises: 405,
+    // the kinematic-wiring round -- physics/character/kinematic.js hands fallStep an empty surface oracle, `() => null`,
+    // its first function value: closures 4137 -> 4138. Its import of fallBody.mjs and camera.js's of kinematic.js move no
+    // row (both were ES modules already); nothing else moved.
+    esModules: 4288, closures: 4138, asyncAwait: 1715, typedArrays: 1267, promises: 405,
     fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

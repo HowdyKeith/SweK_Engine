@@ -19,6 +19,7 @@ import { fallStep } from "../physics/character/fallBody.mjs";
 import { autoGround, meshGround, stepTerrainFan, SURFACE } from "../physics/character/terrainWalk.mjs";
 import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
 import { cameraBoom, easeBoom } from "./cameraBoom.js";
+import { moveCharacter } from "../physics/character/kinematic.js";
 
 /**
  * *** RE-DERIVED BY tools/ship/playerGround-selfcheck.mjs ON EVERY RUN. *** Readings at v4545.
@@ -528,6 +529,10 @@ export class Camera {
      *  1 + 2r wide, so samples this far apart cannot straddle it. Larger would leave a gap a fast body can
      *  resonate through; smaller would buy nothing and cost probes. */
     static SWEEP_MAX_STEP = 1.0;
+
+    /** The band above the feet that the walker lets rest inside a surface: _bodyFitsAt has always tested from
+     *  floor(feet + 0.1), and _sweepBodyY takes the same 0.1 rather than a second number that must agree. */
+    static FEET_BAND = 0.1;
 
     /**
      * *** THE CREATURE'S HEIGHT, ONCE, FOR THE CAMERA AND FOR THE COLLISION. *** v4554 recorded the
@@ -1576,7 +1581,7 @@ export class Camera {
         // Byte-identical: the whole move if it fits, else each axis alone with the second tested against the
         // first's result. The four lines this replaces are that method's body.
         const stepped = this._stepHorizontal(this.position.x, this.position.z,
-                                             mx * speed * dt, mz * speed * dt, feetNow, this._eyeHeight);
+                                             mx * speed * dt, mz * speed * dt, feetNow, this._eyeHeight, !this._fpOnGround);
         this.position.x = stepped.x;
         this.position.z = stepped.z;
 
@@ -1727,9 +1732,22 @@ export class Camera {
             const r = fallStep({ pos: [this.position.x, this.position.y - this._eyeHeight, this.position.z],
                                  vy: this._fpVelY, surfaceUnder: this._fallSurface(),
                                  dt, gravity: -this._gravity, terminal: -Infinity });
-            this.position.y = r.pos[1] + this._eyeHeight;
-            this._fpVelY = r.vy;
-            if (r.landed) this._fpOnGround = true;
+            // fallStep decides gravity and where the walker's ground stops a fall; the BODY is swept by kinematic.js,
+            // which may stop it sooner -- at a ceiling, or on a block under the edge of the body's disc (_sweepBodyY)
+            const feet0 = this.position.y - this._eyeHeight;
+            const sw = this._sweepBodyY(this.position.x, feet0, this.position.z, r.pos[1] - feet0);
+            if (sw.hitCeiling) {
+                this.position.y = sw.feet + this._eyeHeight;
+                this._fpVelY = Math.min(0, r.vy);
+            } else if (sw.landed) {
+                this.position.y = sw.feet + this._eyeHeight;
+                this._fpVelY = 0;
+                this._fpOnGround = true;
+            } else {
+                this.position.y = r.pos[1] + this._eyeHeight;
+                this._fpVelY = r.vy;
+                if (r.landed) this._fpOnGround = true;
+            }
         }
 
         this.velocity.x = mx * speed;
@@ -2391,9 +2409,14 @@ export class Camera {
      * load-bearing: a body in an inside corner that slid along x must be asked about z FROM WHERE IT NOW IS,
      * or it slides diagonally through the corner post. Preserved deliberately rather than tidied.
      */
-    _stepHorizontal(x, z, dx, dz, feetY, bodyCells) {
+    _stepHorizontal(x, z, dx, dz, feetY, bodyCells, airborne = false) {
+        // *** A BODY IN THE AIR IS TESTED WHERE IT IS. *** The fit was always taken at the STAND height the walker
+        // would give the body at the destination -- right for a walk, which steps up or down onto it, and wrong in
+        // a jump, where the body is still up at feetY: tested standing on the floor below a beam, it moved sideways
+        // into the beam at head height. Measured: all 63 fresh entries into a solid voxel in 36,000 fuzzed frames
+        // were sideways moves made in the air, and they left bodies inside for 5,015 frames between them.
         const fits = (nx, nz) => {
-            const t = this._stepTargetAt(nx, nz, feetY);
+            const t = airborne ? null : this._stepTargetAt(nx, nz, feetY);
             return this._bodyFitsAt(nx, t === null ? feetY : t, nz, bodyCells);
         };
         // *** v4562 -- SWEPT, BECAUSE A DESTINATION TEST DOES NOT MISS A WALL BY A LITTLE, IT MISSES IT
@@ -2456,6 +2479,35 @@ export class Camera {
         if (dy > stepUp) return "blocked";          // too tall to climb: the body stays where it is
         if (dy < -cliffDrop || tooSteep) return "leave";   // a cliff edge, or ground too steep to walk down
         return "track";                             // up-steps within reach and ordinary downhill
+    }
+
+    /**
+     * *** THE BODY'S VERTICAL MOVE, SWEPT BY physics/character/kinematic.js. *** The airborne branch integrated
+     * position.y and asked only where the WALKER'S ground would stop a fall -- never what the body passes through.
+     * Measured before this existed, on 60 fuzzed voxel worlds (36,000 frames of walk, sprint and jump): the body
+     * was inside a solid voxel on 2,973 frames, and a jump under a slab two voxels up put the head at 4.41 -- the
+     * eye above the roof -- where kinematic.js stops it at 3.00. Falling past a block under the edge of the disc
+     * left the body inside the step, because the fall landed on the ground under the CENTRE.
+     *
+     * kinematic.moveCharacter sweeps an axis-aligned box, substepped and exact at voxel faces; the predicate it is
+     * given is narrowed to the cells the body's DISC touches (the walker's own exact cylinder-against-cell test,
+     * _footprint's), so the box is this body's cylinder. Only cells the move can reach are offered: going up, those
+     * above the feet's band; going down, those at or below it -- FEET_BAND being the walker's own 0.1, the nudge
+     * _bodyFitsAt has always left the feet. A body already resting inside that band lands where it is.
+     * Returns the feet reached and whether the sweep stopped on a ceiling or a floor.
+     */
+    _sweepBodyY(x, feet, z, dy) {
+        if (!this.world?.voxelAt || !(dy !== 0)) return { feet: feet + dy, hitCeiling: false, landed: false };
+        const R = Camera.BODY_RADIUS, H = this._eyeHeight, band = feet + Camera.FEET_BAND, up = dy > 0;
+        const touches = (cx, cz) => {
+            const nx = Math.min(Math.max(x, cx), cx + 1), nz = Math.min(Math.max(z, cz), cz + 1);
+            return Math.hypot(nx - x, nz - z) < R;
+        };
+        const solid = (cx, cy, cz) => (up ? cy + 1 > band : cy + 1 <= band) && touches(cx, cz)
+                                      && Camera.isSolidToBody(this.world.voxelAt(cx, cy, cz));
+        const r = moveCharacter({ pos: [x, feet + H / 2, z], half: [R, H / 2, R], delta: [0, dy, 0], isSolid: solid });
+        const reached = r.pos[1] - H / 2;
+        return { feet: reached, hitCeiling: up && r.blocked, landed: !up && r.blocked };
     }
 
     _canStandAt(x, y, z) {

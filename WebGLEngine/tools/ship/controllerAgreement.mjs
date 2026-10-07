@@ -84,8 +84,9 @@ export const SITES = Object.freeze([
     // bots should have is a physics decision, not a merge's.
     { q: "gravity", who: "botCapsule", ships: true, file: "simulation/BotManager.js", sym: "BOT_GRAVITY",
       re: /const BOT_GRAVITY\s*=\s*(-?[\d.]+)\s*;/, sign: "magnitude, subtracted" },
-    { q: "gravity", who: "kinematic", ships: false, file: "physics/character/kinematic.js", sym: "stepCharacter default",
-      re: /stepCharacter\(\{[^}]*?gravity\s*=\s*(-?[\d.]+)/s, sign: "signed, added" },
+    // the kinematic-wiring round -- the `gravity:kinematic` site is GONE, not moved: stepCharacter's default was a
+    // literal -20 typed beside fallBody's GRAVITY, and it is now `gravity = GRAVITY` imported from fallBody.mjs with
+    // its velocity integrated by fallStep. One number, one site; kinematic-selfcheck section 13 holds the identity.
     { q: "terminal", who: "fallBody", ships: true, file: "physics/character/fallBody.mjs", sym: "TERMINAL",
       re: /export const TERMINAL\s*=\s*(-?[\d.]+)\s*;/, sign: "signed floor on vy" },
     // *** AN ABSENCE IS NOT A SITE, AND THE FIRST DRAFT OF THIS CENSUS THEREFORE REPORTED `terminal` AS
@@ -101,7 +102,9 @@ export const SITES = Object.freeze([
     // LITERAL THE CALL SITE STATES. The site is a plain number now, and the quantity still disagrees --
     // -Infinity against -55 -- for the same measured reason v4547 recorded.
     { q: "terminal", who: "player", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
-      re: /terminal:\s*(-Infinity)\s*\}\);\n\s*this\.position\.y = r\.pos\[1\]/,
+      // the kinematic-wiring round put the body's vertical sweep (_sweepBodyY) between this call and the write; the anchor
+      // follows the call to the sweep that consumes it, still the player's and only the player's
+      re: /terminal:\s*(-Infinity)\s*\}\);\n(?:\s*\/\/[^\n]*\n)*\s*const feet0 = this\.position\.y - this\._eyeHeight;/,
       sign: "explicitly none" },
     { q: "terminal", who: "kaijuDrive", ships: true, file: "camera/camera.js", sym: "fallStep terminal argument",
       re: /terminal:\s*(-Infinity)\s*\}\);\n\s*k\.position\.y = kr\.pos\[1\]/,
@@ -165,7 +168,8 @@ export function characterModules() {
  */
 export const AGREEMENT_AT_V4547 = Object.freeze({
     at: "v4547",
-    sites: 20,           // v4778 -- 19 -> 20: gravity:botCapsule (the rtx merge's bot capsule path)
+    sites: 19,           // v4778 -- 19 -> 20: gravity:botCapsule (the rtx merge's bot capsule path). The kinematic-wiring
+                         // round -- 20 -> 19: gravity:kinematic, which now reads fallBody's GRAVITY (see SITES)
     quantities: 6,
     shippingSites: 13,   // v4778 -- 12 -> 13: the same site, read by any bot in a world with a collider BVH
     modules: 9,   // v4647 -- capsuleSettle.mjs; see MODULES above and the seventh quantity it brought. v4778 -- 7 -> 9, capsuleCollide and its TSL twin (the rtx merge)
@@ -178,7 +182,6 @@ export const AGREEMENT_AT_V4547 = Object.freeze({
         "gravity:player": 18,
         "gravity:botCapsule": 18,   // v4778 -- the rtx merge's bot capsule path; see its SITES entry
         "gravity:fallBody": -20,
-        "gravity:kinematic": -20,
         "terminal:fallBody": -55,
         "terminal:player": -Infinity,
         "terminal:kaijuDrive": -Infinity,

@@ -290,9 +290,12 @@ console.log("\n7. the record is what the code reports now");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nnot done here: physics/character/kinematic.js's stepCharacter is the fourth implementation and is " +
-    "left alone -- it is a MESH controller with its own isSolid contract and no shipping caller in this " +
-    "tree, so folding it into fallBody would be a change without a measurement behind it; the kaiju's " +
+    "\nnot done here: physics/character/kinematic.js's stepCharacter WAS the fourth implementation and is " +
+    "not one any more -- the kinematic-wiring round routed its vertical velocity through fallBody.fallStep " +
+    "(no surface oracle; moveCharacter keeps the geometry), bit-identical below the clamp and fallBody's -55 " +
+    "at it, so the rule has ONE integrator in physics/character/ (the record above stays at its v4548 reading, " +
+    "2 copies, because it counts what was measured then); and camera.js's _sweepBodyY sweeps the player's air " +
+    "move with moveCharacter AFTER fallStep, and the player still passes its own gravity, 18; the kaiju's " +
     "body is still probed as a 2-cell one though the creature stands eight units tall, which is the " +
     "capsule question and its own round; and the gravity and terminal disagreements v4547 measured are " +
     "passed through rather than resolved, for the reason section 6 gives.");

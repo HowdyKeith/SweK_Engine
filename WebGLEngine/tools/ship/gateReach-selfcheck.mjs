@@ -211,6 +211,11 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          record, every one of the sixteen is absent there and present at the rtx tip ea420f4b, and
     //          HEAD's population is exactly 978d26e3's union the rtx tip's -- nothing the post-merge fix
     //          commits added, nothing lost. Re-recorded with --write AFTER compare() had been read.
+    //   559 -> v4816 -- found RED by the kinematic-wiring round, which ran this gate because kinematic.js changed;
+    //          nothing at v4816 had. compare(), read BEFORE writing, reports GREW, 1 ADDED, 0 REMOVED,
+    //          reconciles:true: physics/render/rtCpuCache.mjs, the rtPipeline f64 reference cache (fdcd7395,
+    //          tier-2), absent at main 16219a44 and at fdcd7395's parent. Growth only, live work, and
+    //          gated in rtPipeline-selfcheck. Re-recorded with --write AFTER compare() had been read.
     //
     // *** AND THE ROW HAD A DEFECT OF ITS OWN, WHICH IS WHY IT NOW ASKS THE MODULE RATHER THAN THE DISK. ***
     // It read the record with fs.readFileSync("tools/ship/population-census.json") -- A RELATIVE PATH -- so
