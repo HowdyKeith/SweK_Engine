@@ -2061,12 +2061,12 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
   "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
   "brain/conv2d-selfcheck.mjs": 2161,
-  "render/denoiseScenes-selfcheck.mjs": 146,
+  "render/denoiseScenes-selfcheck.mjs": 138,
   "render/denoiseFilter-selfcheck.mjs": 257,
   "render/denoiseStats-selfcheck.mjs": 52,
   "brain/convNet-selfcheck.mjs": 177,
   "render/denoiseNet-selfcheck.mjs": 2108,
-  "render/denoiseStudy-selfcheck.mjs": 2515,
+  "render/denoiseStudy-selfcheck.mjs": 2561,
   "render/denoiseTemporal-selfcheck.mjs": 1834
  },
  "codes": {
@@ -5947,12 +5947,12 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
   "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
   "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
-  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T02:06:18.758Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T03:33:58.588Z",
   "render/denoiseFilter-selfcheck.mjs": "2026-10-08T02:06:19.497Z",
   "render/denoiseStats-selfcheck.mjs": "2026-10-08T02:06:19.023Z",
   "brain/convNet-selfcheck.mjs": "2026-10-08T02:06:24.786Z",
   "render/denoiseNet-selfcheck.mjs": "2026-10-08T02:06:21.769Z",
-  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T02:06:24.450Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T03:34:01.292Z",
   "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z"
  },
  "capAt": {
@@ -11823,12 +11823,12 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
   "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
   "brain/conv2d-selfcheck.mjs": 2161,
-  "render/denoiseScenes-selfcheck.mjs": 146,
+  "render/denoiseScenes-selfcheck.mjs": 138,
   "render/denoiseFilter-selfcheck.mjs": 257,
   "render/denoiseStats-selfcheck.mjs": 52,
   "brain/convNet-selfcheck.mjs": 177,
   "render/denoiseNet-selfcheck.mjs": 2108,
-  "render/denoiseStudy-selfcheck.mjs": 2515,
+  "render/denoiseStudy-selfcheck.mjs": 2561,
   "render/denoiseTemporal-selfcheck.mjs": 1834
  },
  "serialAt": {
@@ -13655,12 +13655,12 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
   "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
   "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
-  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T02:06:18.758Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T03:33:58.588Z",
   "render/denoiseFilter-selfcheck.mjs": "2026-10-08T02:06:19.497Z",
   "render/denoiseStats-selfcheck.mjs": "2026-10-08T02:06:19.023Z",
   "brain/convNet-selfcheck.mjs": "2026-10-08T02:06:24.786Z",
   "render/denoiseNet-selfcheck.mjs": "2026-10-08T02:06:21.769Z",
-  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T02:06:24.450Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T03:34:01.292Z",
   "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z"
  },
  "serialRing": {
@@ -21751,7 +21751,8 @@
   ],
   "render/denoiseScenes-selfcheck.mjs": [
    131,
-   146
+   146,
+   138
   ],
   "render/denoiseFilter-selfcheck.mjs": [
    265,
@@ -21771,7 +21772,8 @@
   ],
   "render/denoiseStudy-selfcheck.mjs": [
    985,
-   2515
+   2515,
+   2561
   ],
   "render/denoiseTemporal-selfcheck.mjs": [
    1834

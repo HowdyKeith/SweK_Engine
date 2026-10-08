@@ -578,3 +578,136 @@ committed), 2026-10-08 02:21:06Z to 03:04:24Z (2,597 s). Its output, unedited, i
   it was trained on (10 of 12, then 12 of 12) and does not on a family it never saw (5 of 12 both times).
 - Transfer stays the open subject.
 - The network does not go to the device on this result. Section 9 asks for both hypotheses.
+
+## 19. ROUND 5 -- THE THIRD FAMILY, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question.** Rounds 3 and 4 found the same thing twice: a kernel-predicting network beats the filter on the
+family it was trained on, and not on one it never saw.
+
+> **Trained on two families, does the network beat the filter on a third that neither it nor the filter was ever
+> tuned on?**
+
+**One deliberate change from round 3: the training set's composition.**
+- Round 3 trained and tuned on 24 scenes of family A. This round trains and tunes on **12 scenes of A and 12 of B**:
+  A 1000-1011 (round 1's first twelve) and B 11000-11011 (new).
+- Still 24, so the variety changes and the amount does not.
+- Everything else is round 3's (sections 3-11, 13 and 15):
+  - single frames; the kernel-predicting network (7,329 parameters); zero-last initialisation;
+  - 1,500 steps, batch 4, 32 x 32 crops, seeds 1, 2, 3;
+  - the filter and its 108-setting grid;
+  - the metric, the statistic, and controls C0-C5.
+
+**Family C** (`makeScene("C", seed)`, its own code path and stream):
+- the ground and every even sphere **rough diffuse** (Oren-Nayar; sigma 0.2-0.5 for the ground, 0.3-0.7 for spheres);
+- every odd sphere a **glossy dielectric reflector** (roughness 0.03-0.1, ior 1.4-1.7);
+- **two emitters** of radius 0.15-0.3, one warm (1 : 0.7 : 0.4) and one cool (0.4 : 0.6 : 1), strength 18-42;
+- a near-black uniform sky (0.01-0.05);
+- A's and B's camera ring.
+
+Neither material, the coloured lights nor the dark sky occurs in A or B. A gate pins a fingerprint of 80 A and B
+scenes, recorded before C existed, to show those two families are unchanged.
+
+**Set on scenes outside every split, before this section:**
+- **The emitter strength.** At 6-14, C's mean radiance was 0.07, against A's 0.25 and B's 0.24 (16 scenes each,
+  seeds from 950100). Under relMSE's 0.01 offset, a dark family would have been easy rather than unseen. At 18-42
+  it is 0.19.
+- **The noise and floor.** On four C scenes (from 950010), the 4-sample input's relMSE was 0.004-0.027 and the
+  reference floor 0.0001-0.0003, the same order as A's.
+
+**Splits** (`SPLITS_R5`). A split may now name a family per seed.
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 12 A + 12 B | A 1000-1011, B 11000-11011 |
+| val | 2 A + 2 B | A 2000-2001, B 12000-12001 |
+| T1 -> **H1** (held-out A and B) | 6 A + 6 B | A 13000-13005, B 14000-14005 |
+| T2 -> **H2** (the third family) | 12 C | 15000-15011 |
+
+- Every new seed is on a range no earlier split touched.
+- C5 holds over five rounds' scenes.
+- C2's shuffled-target network is measured on H1's set, as before.
+- Holm is over {H1, H2}.
+
+**What was seen first: the training scenes only.** A pilot rendered the 24 training scenes, tuned the filter and
+trained one network (seed 1). Training fit, geometric mean of relMSE / noisy:
+
+| Method | All 24 | A | B |
+|---|---|---|---|
+| filter (sS 1, sN 1, sA 0.2, sI 4) | 0.203 | 0.185 | 0.222 |
+| network, seed 1 | 0.121 | 0.157 | 0.092 |
+
+It confirmed that C0 can pass and chose nothing else. Training fit has not predicted a test verdict in this arc.
+
+**Secondary** (reported, never tested, never used to choose):
+- the filter and three networks tuned and trained on **round 3's 24 scenes of A alone**, measured on this round's
+  T1 and T2, to show what the mixed training changed;
+- 1- and 16-sample inputs;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r5` -> `render/denoise-results-r5.json`. It refuses if the
+file exists.
+
+**The outcomes:**
+- **H1 and H2 supported:** with two families behind it, the network transfers to a third. It goes to the device,
+  through `brain/conv2d.mjs`'s kernels with the head widened past `COUT_MAX` 32, beside the path tracer's page.
+- **H1 only:** variety of this size does not buy transfer; the in-family result stands.
+- **H2 only:** recorded as found. The network transfers but does not beat the filter on the mix it trained on.
+- **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.
+
+## 20. ROUND 5 -- NOT REPORTED: C1 FIRED ON THE THIRD FAMILY
+
+`node tools/denoiseStudy.mjs --harvest-r5` at commit 8671ea45, 2026-10-08 03:55:38Z to 04:43:04Z (2,846 s). Its
+output, unedited, is `render/denoise-results-r5.json`.
+
+**Outcome: "not reported".**
+- C1 fired on H2's set (family C). The **filter** beat the noisy input on 6 of 12 images and the network on 10 of 12;
+  both need 11.
+- C0 (0.121 / 0.118 / 0.122), C2 (mean d -1.75), C4 and C5 held.
+- Per section 7, **nothing is claimed about H1 or H2.**
+  - verdict() computed both statistics and they are in the file. Neither is a result.
+  - T1 and T2 of this round are now spent.
+
+**What failed, diagnosed on family-C scenes OUTSIDE every split** (seeds 950200-950207, not the test set):
+
+| | frames with a visible emitter (3 of 8) | frames without one (5 of 8) |
+|---|---|---|
+| the A+B-tuned filter (sS 1, sN 1, sA 0.2, sI 4), relMSE | 0.50-0.95 | below the noisy input in all 5 |
+| its error in SKY pixels | 99% | 0-5% |
+| the noisy input, relMSE | 0.007-0.09 | 0.008-0.04 |
+| round 3's A-only setting (sS 1, sN 0.3, sA 0.05, sI 1) | 0.005-0.05, no blow-up | -- |
+
+- **The mechanism.** An emitter and the sky both carry albedo guide 1, so the albedo term cannot separate them. The
+  normal term is weak at sN = 1, and the irradiance term is weak at sI = 4. A coloured emitter of strength 18-42 is
+  therefore averaged into neighbouring sky pixels of 0.01-0.05. relMSE divides by r^2 + 0.01 there, and the error
+  explodes.
+- **Why A and B never showed it.** Their skies are bright (0.05-0.8), so the same smear costs little, and the
+  tuning on A+B chose the wide setting.
+- **This is not a defect upstream of both methods.** It is the hand-written filter's tuned setting failing on a
+  configuration it never saw. C1, written as a sanity check, cannot tell that apart from a broken pipeline, so the
+  run stops as the rules say.
+- The network also fell below the noisy input on 2 of the 12 images.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | T1 (A+B) | T2 (C) |
+|---|---|---|
+| noisy | 0.0315 | 0.0148 |
+| filter tuned on A+B | 0.0062 | 0.0406 |
+| networks trained on A+B, seeds 1-3 | 0.0040-0.0042 | 0.0069-0.0080 |
+| filter tuned on A only (round 3's setting) | 0.0071 | 0.0053 |
+| networks trained on A only, seeds 1-3 | 0.0054-0.0061 | 0.0054-0.0066 |
+| 1-sample input: filter / networks | 0.0134 / 0.0089-0.0093 | 0.0498 / 0.0068-0.0095 |
+| 16-sample input: filter / networks | 0.0035 / 0.0025-0.0026 | 0.0368 / 0.0056-0.0078 |
+
+- val: filter 0.0051, networks 0.0037-0.0039.
+- On family C, the networks trained on A alone were no worse than those trained on A+B.
+
+**What this buys.** Per section 7, no verdict. The question of section 19 is still open, and so is transfer.
+
+A next round could take either of these, as a new pre-registration with new test scenes, and must say which:
+- **Give both methods a guide that separates emitters and sky from surfaces** (an emission mask, or first-hit
+  depth). The filter can then refuse to mix them, and so can the network.
+- **Keep the inputs and change C1:** it cannot distinguish "the baseline fails on a new family" from "the pipeline
+  is broken", and it should.

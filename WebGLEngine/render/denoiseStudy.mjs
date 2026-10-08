@@ -16,7 +16,7 @@
 // render/denoiseScenes.mjs's renderImages(), which refuses every dataset seed without it; this round commits the
 // runner and gates it on --mini's scenes, seeded outside every split. The harvest round is the first to pass the flag.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
@@ -27,6 +27,7 @@ export const RESULTS = "render/denoise-results.json";
 export const RESULTS_R2 = "render/denoise-results-r2.json";
 export const RESULTS_R3 = "render/denoise-results-r3.json";
 export const RESULTS_R4 = "render/denoise-results-r4.json";
+export const RESULTS_R5 = "render/denoise-results-r5.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -42,6 +43,13 @@ export const ROUND3 = Object.freeze({ splits: SPLITS_R3, init: INIT, c0: true, h
  */
 export const ROUND4 = Object.freeze({ splits: SPLITS_R4, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: true,
                                       compareNoHistory: true, results: RESULTS_R4 });
+/**
+ * Section 19: the third family. Round 3's single-frame kernel network trained on A and B together (24 scenes), H1 on
+ * held-out A and B, H2 on family C. Secondary: the filter and the network trained on round 3's 24 scenes of A alone,
+ * measured on the same test images.
+ */
+export const ROUND5 = Object.freeze({ splits: SPLITS_R5, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
+                                      compareTrainSplit: SPLITS.train, results: RESULTS_R5 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -76,23 +84,25 @@ export function stopBeforeTests(fit, hist, c0) {
  * measured frame's own 9-channel input, `accum` the accumulation re-modulated -- the last two for the secondaries.
  */
 export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false }) {
-    return split.seeds.map((seed) => {
+    return split.seeds.map((seed, i) => {
+        const family = familyOf(split, i);
         if (temporal) {
-            const Q = renderSequence(split.family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
+            const Q = renderSequence(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
             return { ...Q, x: temporalChannels(Q), x9: inputChannels(Q.input, Q.albedo, Q.normal, image, image), accum: remodulate(Q.A, Q.albedo) };
         }
-        const I = renderImages(split.family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
+        const I = renderImages(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
         return { ...I, x: inputChannels(I.input, I.albedo, I.normal, image, image) };
     });
 }
 
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
-                           compareNoHistory = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
+                           compareNoHistory = false, compareTrainSplit = null, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
                            secondarySpp = [1, 16], log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory,
+                     compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
     const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal }); };
@@ -164,6 +174,17 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
             accumulation: R[name].map((im) => relMSE(im.accum, im.ref)),
             filter: R[name].map((im) => relMSE(jointBilateral(im.x9, image, image, filter9), im.ref)),
             net: nets9.map((net) => R[name].map((im) => relMSE(denoise(net, im.x9, image, image).y, im.ref))),
+        };
+    }
+    // secondary (section 19): the same filter and head trained on ANOTHER training split -- round 3's family A alone --
+    // and measured on this round's test images, to say what the mixed training changed
+    if (compareTrainSplit) {
+        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
+        const filterO = tuneFilter(other, relMSE).best, netsO = seeds.map((s) => trainDenoiser(other, { seed: s, init, head, ...train }).net);
+        secondary.filterOtherTraining = filterO;
+        for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {
+            filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref)),
+            net: netsO.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))),
         };
     }
     lap("secondary");

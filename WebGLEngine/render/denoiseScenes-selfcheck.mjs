@@ -3,7 +3,8 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed, strideOf, renderSeeds, makeScene, guideBuffers,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, isDatasetSeed, strideOf,
+// renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** Every scene this gate draws is seeded from 900000 up, outside every
@@ -19,6 +20,11 @@
 //   D9  SPLITS_R3 left out of the refusal                                        1 RED
 //   D10 SPLITS_R4's T1 on the kernel round's range (7000)                        1 RED
 //   D11 strideOf accepts a stride below nine                                     1 RED
+//   D12 family C's two emitters both warm                                        1 RED
+//   D13 family C's diffuse spheres without their roughness (plain Lambertian)    1 RED
+//   D14 family A's emitter range moved (4-12 -> 4-13)                            2 RED
+//   D15 SPLITS_R5's H2 set drawn from family B                                   2 RED
+//   D16 familyOf ignores a split's per-seed families                             1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -28,8 +34,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed, strideOf, renderSeeds, makeScene, guideBuffers,
-        renderImages, inputChannels, remodulate } = D;
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, isDatasetSeed, strideOf, renderSeeds,
+        makeScene, guideBuffers, renderImages, inputChannels, remodulate } = D;
+const { intersect, cameraBasis, pixelRay } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -156,6 +163,61 @@ console.log("\n4. THE INPUT, ITS INVERSE, AND A RENDER");
     const differ = I.input.some((v, i) => v !== I.ref[i]) && I.ref.some((v, i) => v !== I.ref2[i]);
     ok("  the input and both references are independent renders, all finite and non-negative", differ && [I.input, I.ref, I.ref2].every((a) => a.every((v) => Number.isFinite(v) && v >= 0)),
         `seeds ${JSON.stringify(I.seeds)}`);
+}
+
+console.log("\n5. THE THIRD FAMILY AND THE MIXED SPLITS (pre-registration section 19)");
+{
+    // families A and B must draw exactly what they drew before family C existed: every number of 40 scenes of each, and
+    // each sky at three directions, summed with position weights. 3551749752.4726539 over 4,884 numbers, recorded
+    // before makeScene learned family C.
+    let fp = 0, k = 1;
+    const walk = (v) => { if (typeof v === "number") fp += v * ((k++ % 97) + 1); else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const key of Object.keys(v).sort()) if (key !== "sky") walk(v[key]); };
+    for (const fam of ["A", "B"]) for (let s = 900000; s < 900040; s++) { const S = makeScene(fam, s); walk(S); for (const d of [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77]]) walk(S.sky(d)); }
+    ok("!! families A and B are untouched by family C: the fingerprint of 80 scenes is the one recorded before C existed", fp.toPrecision(17) === "3551749752.4726539" && k === 4885,
+        `${fp.toPrecision(17)} over ${k - 1} numbers`);
+    let shape = true, lights = true, sky = true, mats = true, nGloss = 0, nRough = 0, noAB = true;
+    for (let s = 900000; s < 900300; s++) {
+        const S = makeScene("C", s), L = S.scene.filter((o) => o.emit), body = S.scene.slice(1).filter((o) => !o.emit);
+        shape &&= S.family === "C" && S.scene[0].radius === 100 && S.scene[0].sigma >= 0.2 && S.scene[0].sigma <= 0.5 && body.length >= 3 && body.length <= 6;
+        const warm = L[0]?.emit, cool = L[1]?.emit;
+        lights &&= L.length === 2 && L.every((o) => o.radius >= 0.15 && o.radius <= 0.3) && Array.isArray(warm) && Array.isArray(cool) &&
+            Math.abs(warm[1] / warm[0] - 0.7) < 1e-12 && Math.abs(warm[2] / warm[0] - 0.4) < 1e-12 && Math.abs(cool[0] / cool[2] - 0.4) < 1e-12 &&
+            Math.abs(cool[1] / cool[2] - 0.6) < 1e-12 && warm[0] >= 18 && warm[0] <= 42 && cool[2] >= 18 && cool[2] <= 42;
+        const kv = S.sky([0, 1, 0]); sky &&= kv >= 0.01 && kv <= 0.05 && S.sky([0.3, -0.9, 0.1]) === kv;
+        body.forEach((o, i) => {
+            if (i % 2 === 1) { mats &&= o.roughness >= 0.03 && o.roughness <= 0.1 && o.ior >= 1.4 && o.ior <= 1.7 && o.albedo === undefined; nGloss++; }
+            else { mats &&= o.sigma >= 0.3 && o.sigma <= 0.7 && Array.isArray(o.albedo) && o.roughness === undefined; nRough++; }
+        });
+        for (const fam of ["A", "B"]) noAB &&= makeScene(fam, s).scene.every((o) => o.sigma === undefined && o.ior === undefined);
+    }
+    ok("!! family C over 300 scenes: a rough-diffuse ground, 3-6 spheres alternating rough diffuse (sigma 0.3-0.7) and glossy dielectric (roughness 0.03-0.1, ior 1.4-1.7)",
+        shape && mats && nGloss > 300 && nRough > 300, `${nRough} rough-diffuse, ${nGloss} glossy`);
+    ok("!! ...lit by two emitters of radius 0.15-0.3, one warm (1 : 0.7 : 0.4) and one cool (0.4 : 0.6 : 1), strength 18-42, under a uniform sky of 0.01-0.05", lights && sky);
+    ok("  ...and neither material is anywhere in families A or B", noAB);
+    // the guide buffers on a family C scene: a rough-diffuse hit gives its albedo, a glossy hit and an emitter give 1
+    const S = makeScene("C", 900007), G = guideBuffers(S, 24, 24), B = cameraBasis(S);
+    let checked = 0, right = true;
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) {
+        const hit = intersect(S.eye, pixelRay(x, y, 0.5, 0.5, 24, 24, B), S.scene); if (!hit) continue;
+        const o = hit.sphere, want = o.emit || o.roughness !== undefined ? [1, 1, 1] : o.albedo, p = (y * 24 + x) * 3;
+        right &&= [0, 1, 2].every((c) => G.albedo[p + c] === want[c]); checked++;
+    }
+    ok("  family C's guide buffers: a rough-diffuse hit carries its albedo; a glossy hit and an emitter carry 1", right && checked > 200, `${checked} pixels`);
+    // the mixed splits
+    const T = SPLITS_R5, mixed = [T.train, T.val, T.T1];
+    const seen4 = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4].flatMap((S2) => Object.values(S2).flatMap((x) => x.seeds)));
+    const newSeeds = [...T.train.seeds.slice(12), ...T.val.seeds.slice(2), ...T.T1.seeds, ...T.T2.seeds];
+    ok("!! SPLITS_R5: train 12 A (round 1's first twelve) + 12 new B; val 2 + 2; H1's set 6 new A + 6 new B; H2's set 12 of family C -- every new seed on a range no earlier split touched",
+        T.train.seeds.length === 24 && T.train.seeds.slice(0, 12).every((s2, i) => s2 === SPLITS.train.seeds[i]) && T.train.families.filter((f) => f === "A").length === 12 &&
+        T.val.seeds.length === 4 && T.T1.seeds.length === 12 && T.T1.families.filter((f) => f === "B").length === 6 && T.T2.family === "C" && !T.T2.families &&
+        T.T2.seeds.length === 12 && newSeeds.every((s2) => !seen4.has(s2)) && mixed.every((sp) => sp.families.length === sp.seeds.length));
+    ok("  familyOf reads a mixed split's own entry per seed, and a single-family split's family", familyOf(T.train, 0) === "A" && familyOf(T.train, 23) === "B" &&
+        familyOf(T.T1, 6) === "B" && familyOf(T.T2, 3) === "C" && familyOf(SPLITS.T2, 0) === "B");
+    let refused5 = 0;
+    for (const s2 of newSeeds) { try { renderImages("C", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused5++; } }
+    const five = [...new Set([...seen4, ...newSeeds])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! every new seed is refused without harvest, and C5 holds over five rounds' scenes", refused5 === newSeeds.length && new Set(five).size === five.length,
+        `${refused5} of ${newSeeds.length} refused; ${five.length} render seeds`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

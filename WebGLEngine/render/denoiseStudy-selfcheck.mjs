@@ -4,7 +4,8 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, ROUND1, ROUND2, ROUND3, ROUND4, MINI, shuffledTargets, stopBeforeTests, renderSplit, runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
@@ -17,15 +18,18 @@
 //   R4  the comparison networks trained with the PRIMARY head                    1 RED
 //   R5  ROUND3 pointed at the re-run's spent test splits                         1 RED
 //   R6  a failed C6 does not stop the run                                        1 RED
+//   R9  renderSplit takes the split's family, not each seed's                    3 RED (the miniature threw and crashed the gate until its run was caught)
+//   R10 the other-training networks trained on the primary training set          1 RED
+//   R11 ROUND5 without its other-training comparison                             1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, ROUND1, ROUND2, ROUND3, ROUND4, MINI, shuffledTargets, stopBeforeTests, renderSplit, runStudy } =
-    await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed } = await imp("render/denoiseScenes.mjs");
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, MINI, shuffledTargets, stopBeforeTests,
+        renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
 const { trainFit, historyFit } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
@@ -114,7 +118,30 @@ console.log("\n5. THE TEMPORAL ROUND'S CONFIGURATION AND ITS STOP (pre-registrat
     ok("!! a failed C6 alone stops the run before its tests, and a passing C0 and C6 let it go on", !!stop && stop.run === "not reported" && /^C6: /.test(stop.reasons[0]) && go === null);
 }
 
+console.log("\n6. THE THIRD-FAMILY ROUND (pre-registration section 19)");
+{
+    ok("!! ROUND5 is section 19's: the mixed A+B training, H2 on family C, round 3's single-frame kernel network, zero-last, C0 on, round 3's family-A training as the comparison, results to their own file",
+        ROUND5.splits === SPLITS_R5 && ROUND5.splits.T2.family === "C" && ROUND5.head === "kernel" && ROUND5.temporal === false && ROUND5.init === "zero-last" &&
+        ROUND5.c0 === true && ROUND5.compareTrainSplit === SPLITS.train && RESULTS_R5 === "render/denoise-results-r5.json");
+    // a miniature that mixes families, seeded outside every split, 8 x 8
+    const mix = { train: { family: "A+B", families: ["A", "B", "A"], seeds: [910010, 910011, 910012] }, val: { family: "A", seeds: [920010] },
+                  T1: { family: "A+B", families: ["A", "B"], seeds: [930010, 930011] }, T2: { family: "C", seeds: [940010, 940011] } };
+    let same = false, threw = null;
+    try { const r = renderSplit(mix.T1, { harvest: false, image: 4, sppIn: 2, sppRef: 2, ref2: false });
+          same = ["A", "B"].every((f, i) => { const I = renderImages(f, mix.T1.seeds[i], { w: 4, h: 4, sppIn: 2, sppRef: 2 }); return I.input.every((v, j) => v === r[i].input[j]); }); }
+    catch (e) { threw = e.message; }
+    ok("!! a mixed split renders each scene as ITS OWN family -- bit for bit what renderImages draws for that family and seed", same, threw);
+    let out = null, runErr = null;
+    try { out = runStudy({ splits: mix, image: 8, sppIn: 4, sppRef: 16, train: { steps: 2, batch: 1, crop: 8 }, secondarySpp: [], c0: false, head: "kernel",
+                           compareTrainSplit: { family: "A", seeds: [910020, 910021] } }); } catch (e) { runErr = e.message; }
+    const O1 = out?.secondary["T1@otherTraining"], O2 = out?.secondary["T2@otherTraining"];
+    ok("!! the comparison: the filter and three networks trained on ANOTHER split, measured on the same test images, recorded beside the verdict",
+        O1 && O2 && O1.filter.length === 2 && O1.net.length === 3 && O2.net.every((a) => a.length === 2) && typeof out.secondary.filterOtherTraining.sS === "number" &&
+        out.config.compareTrain.first === 910020 && [...O1.filter, ...O1.net.flat(), ...O2.net.flat()].every((v) => Number.isFinite(v) && v > 0), runErr);
+    ok("  ...and they are other networks: their errors are not the primary's", O1 && O1.net.some((a, i) => a.some((v, j) => v !== out.tables.T1.net[i][j])));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r4` is the temporal round's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r5` is the third-family round's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);
