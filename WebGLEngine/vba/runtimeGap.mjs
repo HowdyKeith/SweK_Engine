@@ -1125,8 +1125,11 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the splat-collision round -- world/splatVoxelWorld.mjs and its gate: files 4593 -> 4595, ES modules 4288 -> 4290,
     // closures 4138 -> 4140, typed arrays 1267 -> 1269 (the fine shell and the walker grid; the gate's loader-shaped
     // clouds), async/await 1715 -> 1716 (the gate awaits its imports); nothing else moved. main.js's new demo moves none.
+    // the editable-world round -- tools/ship/raceTurret-selfcheck.mjs stubs the page's requestAnimationFrame to stop its frame loop,
+    // so the picture it reads back is a function of the world alone, and the file now names the word: requestAnimationFrame
+    // 126 -> 127; nothing else moved.
     esModules: 4290, closures: 4140, asyncAwait: 1716, typedArrays: 1269, promises: 405,
-    fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
+    fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
