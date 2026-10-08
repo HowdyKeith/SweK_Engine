@@ -971,3 +971,84 @@ been seen.
   outcomes.
 
 The results will be section 25.
+
+## 25. ROUND 7 -- NOT REPORTED: C1 FIRED ON THE FILTER, IN-DISTRIBUTION
+
+`node tools/denoiseStudy.mjs --harvest-r7 --cache <dir>` at commit e911f5fb, 2026-10-08 16:37:20Z to 18:32Z
+(6,886 s). It ran in one go: cache hits 0, misses 208, so nothing was read back from an earlier run. Its output,
+unedited, is `render/denoise-results-r7.json`, committed at c5c1e6fe before any of the diagnosis below.
+
+**Outcome: "not reported".**
+- C1 fired on H1's set (family R). The **filter** beat the noisy input on 10 of 12 images, the network on 12 of 12;
+  both need 11.
+- On H2's set (family C), C1 held: network 11 of 12, filter 12 of 12.
+- C0 (0.151 / 0.146 / 0.157), C2 (mean d -0.81), C4 and C5 (372 distinct render seeds) held.
+- Per section 7, **nothing is claimed about H1 or H2.**
+  - verdict() computed both statistics and they are in the file. Neither is a result.
+  - T1 and T2 of this round are now spent.
+
+**What failed.** Three sources were used:
+- the two images themselves, read back from the harvest's cache after the results were committed (nothing rendered);
+- the training and validation images, also from the cache;
+- 48 family-R scenes OUTSIDE every split (980000-980047), rendered for this.
+
+| Family-R images | the filter (sS 1, sN 1, sA 0.2, sI 4) loses to the noisy input |
+|---|---|
+| training split, 96 | 2 (20030, 20032) |
+| val, 4 | 0 |
+| T1, 12 | **2 (22003, 22011)** |
+| outside every split, 48 | 0 |
+| all 160 | 4 |
+
+- **It is rare.** At 4 in 160 per image, a set of 12 draws two or more about one time in thirty. T1 drew two.
+- **22011, a near-mirror.** A metal sphere of roughness 0.07 reflects the emitter beside it. The guides carry the
+  sphere's F0 and its smooth normal, not what it reflects, so the filter averages the bright reflection into dark
+  reflected pixels: true 0.06-0.12, filtered 0.31-0.48. Its metal pixels go from relMSE 0.0034 (noisy) to 0.0164.
+  Round 3's narrow setting (sS 1, sN 0.3, sA 0.05, sI 1) gives 0.0092 on this image, below the noisy 0.0173.
+- **22003, a dark horizon.** The sky at the horizon is 0.03. The filter brightens a row of sky pixels to 0.13, and
+  its sky error goes from 0.0034 to 0.0114 because relMSE divides by r^2 + 0.01. The image has little noise to
+  remove (0.014), so a small smear outweighs it, and the narrow setting does not save it either (0.0143).
+- **This is round 5's failure in a milder form.** The tuned setting is wide because, averaged over 96 training
+  scenes, wide wins. Then on the rare image whose detail none of the guides encode, it smears that detail, and
+  relMSE punishes a smear in the dark heavily.
+- **It is not a defect upstream of both methods.** The network beat the noisy input on all 12 images. C1, written as
+  a sanity check, cannot tell a baseline's rare loss apart from a broken pipeline, so the run stops as the rules say.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | T1 (R) | T2 (C) |
+|---|---|---|
+| noisy | 0.0502 | 0.0185 |
+| filter tuned on R | 0.0140 | 0.0065 |
+| networks trained on R, seeds 1-3 | 0.0070-0.0073 | 0.0070-0.0089 |
+| filter tuned on A+B (round 6's 24 scenes) -- it chose the same setting | 0.0140 | 0.0065 |
+| networks trained on A+B, seeds 1-3 | 0.0066-0.0068 | 0.0089-0.0091 |
+| 1-sample input: filter / networks | 0.0266 / 0.0171-0.0194 | 0.0121 / 0.0108-0.0132 |
+| 16-sample input: filter / networks | 0.0058 / 0.0037-0.0041 | 0.0037 / 0.0045-0.0062 |
+| the reference floor | 0.0005 | 0.0002 |
+
+- val: noisy 0.0325, filter 0.0071, networks 0.0058-0.0063.
+- Tuned on 96 scenes of R or on 24 of A and B, the filter chose the same setting.
+- On family R, the networks trained on A+B came out no worse than those trained on R itself.
+
+**What this buys.** Per section 7, no verdict. Section 23's question is still open.
+
+**C1 has now stopped two rounds, both on the filter, not the pipeline.** Round 5 stopped on a family the filter
+never saw. This round stopped in-distribution, on two rare images. Section 20 already said C1 should tell those
+apart. A next round must say which of these it takes, as a new pre-registration with new test scenes:
+- **Decide C1 before the tests, as C0 is.** Check on the TRAINING images that both methods beat the noisy input,
+  and stop there if they do not. A sanity control then never spends a test set, and a baseline's rare loss on a
+  test image counts as what it is: an image where the network beat the filter, or did not.
+- **Keep C1 as written and run section 23 again on new test scenes.** At the rate measured above, it would stop a
+  run again about one time in thirty on R's set alone.
+
+**The arc so far, as its pre-registered verdicts read:**
+
+| Round | Change | In-distribution | A family not trained on |
+|---|---|---|---|
+| 2 | residual network | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | **supported** (12/12) | not supported (5/12) |
+| 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
+| 7 | trained on 96 randomized scenes (R) | not reported (C1: the filter) | not reported |
