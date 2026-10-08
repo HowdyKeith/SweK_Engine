@@ -24,8 +24,12 @@ import { RESULT_H12 } from "./frameReverse.mjs";
 import { RESULT_H14, SWAY_KEYS } from "./frameSway.mjs";
 import { RESULT_H15 } from "./frameSwayRep.mjs";
 import { PREREG_H16, CACHE_H16, RESULT_H16, DIS_KEYS, signalCol, frameSignal, disagreeSummary, h16 } from "./frameDisagree.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameDisagree-selfcheck", [CACHE_H16, CACHE_H8]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };

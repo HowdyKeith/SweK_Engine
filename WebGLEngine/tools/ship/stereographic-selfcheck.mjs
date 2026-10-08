@@ -30,7 +30,8 @@
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { planetSpec, bakeEquirect } from "../../world/procPlanet.js";
 import { planeToDir, dirToUv, nearestTexel, pixelToPlane, littlePlanetCpu, stereographicPipelineDesc, KNOBS, DEFAULT_KNOBS } from "../../render/stereographic.mjs";
 
@@ -74,7 +75,7 @@ sec("2. THE PASS ON BOTH BACKENDS AGAINST THE CPU TWIN, texel for texel");
     const skip = webgpuSkipReason();
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
     else {
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { W, H, SEED, BW, BH, SETTINGS }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { W, H, SEED, BW, BH, SETTINGS }, script: `async (a) => {
             const { requestDevice } = await import("/gfx/device.js");
             const { planetSpec, bakeEquirect } = await import("/world/procPlanet.js");
             const { stereographicPipelineDesc, bakeTexture, drawLittlePlanet } = await import("/render/stereographic.mjs");

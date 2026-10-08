@@ -50,3 +50,8 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 /** f0, b as plain scalars (schlickF82's own convention -- call once per channel for an RGB material, the same
  *  way every Schlick consumer in this tree already does), `count` points spanning [0, 1] inclusive. */
 export function packF82Params(f0, b, count) { return new Float32Array([f0, b, count, 0]); }
+
+/** v4814 -- the f32 floor fresnelF82Wgsl-selfcheck.mjs holds the device's curve to against fresnelF82.mjs's f64 f82Tint,
+ *  as |gpu - cpu|, per angle. ONE declaration: that gate reads it, and deviceCompute-selfcheck reads it to decide whether
+ *  two WebGPU paths that round differently on a hardware adapter are BOTH still right (Keith's call). */
+export const F32_FLOOR_ABS = 1e-4;

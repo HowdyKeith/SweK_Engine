@@ -9,6 +9,15 @@ const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
 const youtubeUpload = require("./youtubeUpload.js");
+// Opt-in alternative backend for framesToMp4() below, see that function + _framesToMp4WebCodecs() for the
+// full story. A plain top-level require here is safe regardless of whether @napi-rs/webcodecs or
+// @napi-rs/canvas are actually installed/have a prebuilt binary for this platform: webcodecsBridge.js's
+// OWN top-level code (verified by reading it, not assumed) only ever does `require("fs")`/`require("path")`
+// at module scope -- both `require("@napi-rs/webcodecs")` and `require("@napi-rs/canvas")` live inside that
+// file's own _webcodecs()/_frameCanvas() functions, each wrapped in its own try/catch and called lazily,
+// matching this same file's existing unconditional `const youtubeUpload = require("./youtubeUpload.js");`
+// style immediately above.
+const webcodecsBridge = require("./webcodecsBridge.js");
 
 function _outDir() { const d = path.join(process.env.SWEK_OUT_DIR || path.join(os.homedir(), "SweK_Exports"), "youtube"); try { fs.mkdirSync(d, { recursive: true }); } catch (e) {} return d; }
 function _slug(s) { return String(s || "swek").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "swek"; }
@@ -141,6 +150,14 @@ async function handle(req, res, ctx = {}) {
 // is what the headless capture feeds: Playwright renders the scene frame-by-frame (deterministic, no live audio),
 // server-side TTS makes the narration wav, and this muxes them. Verifiable here even though the capture is on-rig.
 function framesToMp4(pattern, mp4Path, opts = {}) {
+    // *** OPT-IN ALTERNATIVE BACKEND, ADDITIVE ONLY. *** opts.backend === "webcodecs" (that exact string,
+    // checked here) is the ONLY thing that steers away from the ffmpeg-CLI path below -- undefined, unset,
+    // any other value, or `opts` itself being falsy (e.g. an explicit `null` third argument, same as this
+    // function has always tolerated -- see the unmodified Promise body below) all fall straight through to
+    // the exact same code that ran before this branch existed. See _framesToMp4WebCodecs() below for what
+    // this backend actually does and why it is reachable only by a caller who constructs
+    // { backend: "webcodecs" } directly in code -- nothing in server.js's routes does.
+    if (opts && opts.backend === "webcodecs") return _framesToMp4WebCodecs(pattern, mp4Path, opts);
     return new Promise((resolve, reject) => {
         const fps = opts.fps || 30, args = ["-y", "-framerate", String(fps), "-i", pattern];
         if (opts.audio) args.push("-i", opts.audio);
@@ -156,6 +173,52 @@ function framesToMp4(pattern, mp4Path, opts = {}) {
         ff.on("close", c => c === 0 ? resolve(mp4Path) : reject(new Error("ffmpeg exit " + c + ": " + err.slice(-400))));
     });
 }
+
+// *** THE webcodecs BACKEND ITSELF -- SPIKE CODE, NOW WIRED INTO THIS REAL PRODUCTION FUNCTION. ***
+// Selected only via framesToMp4's own `opts.backend === "webcodecs"` check immediately above. Delegates
+// the actual encode+mux work to webcodecsBridge.js's encodeFramesDirToMp4(dir, filePattern, opts) -- built,
+// adversarially reviewed twice, and independently verified (container/NAL structure + genuinely-differing
+// decoded frames) against real numbered PNG files on disk in an earlier round; see that file's own
+// docblock for the full evidence trail and its LICENCE object for the still-unresolved GPL-codec finding
+// this backend inherits by construction.
+//
+// framesToMp4's own `pattern` argument is a FULL path combining a directory and an ffmpeg printf pattern
+// (e.g. the real /export/headless call site passes path.join(capDir, "frame-%05d.png")) -- encodeFramesDirToMp4
+// wants those split apart, done here via path.dirname()/path.basename(), inside this function's own
+// try/catch so a pattern that is not a plain string (or otherwise not something path.dirname/basename can
+// handle) degrades to a rejected Promise carrying a real Error, not an uncaught throw.
+//
+// opts.audio is deliberately NOT special-cased here: encodeFramesDirToMp4() itself already checks for it
+// FIRST, before touching either native module, and returns {ok:false, error:"audio muxing is out of
+// scope..."} -- that rejection is reused below (turned into a genuine Promise rejection) rather than
+// duplicated, so audio set alongside backend:"webcodecs" fails loudly and by name, never silently ignored
+// and never silently falling back to the ffmpeg path (the caller explicitly asked for this backend).
+//
+// Matches framesToMp4's own resolve/reject contract exactly: resolves with mp4Path (a string -- the exact
+// same shape the ffmpeg branch resolves with, so a caller cannot tell which backend ran from the return
+// value's shape), rejects with a real `new Error(...)` on any failure (bad pattern, encode/mux failure,
+// a missing native module, audio requested) -- never a bare {ok:false} object or a non-Error rejection
+// escaping past this function's own boundary.
+async function _framesToMp4WebCodecs(pattern, mp4Path, opts) {
+    let dir, filePattern;
+    try {
+        dir = path.dirname(pattern);
+        filePattern = path.basename(pattern);
+    } catch (e) {
+        throw new Error("webcodecs backend: could not split pattern " + JSON.stringify(pattern) + " into dir/filePattern: " + String(e && e.message || e));
+    }
+    const result = await webcodecsBridge.encodeFramesDirToMp4(dir, filePattern, opts);
+    if (!result || result.ok !== true) {
+        throw new Error("webcodecs backend: " + (result && result.error ? result.error : "encode failed with no error detail"));
+    }
+    try {
+        fs.writeFileSync(mp4Path, result.mp4);
+    } catch (e) {
+        throw new Error("webcodecs backend: failed to write mp4 to " + mp4Path + ": " + String(e && e.message || e));
+    }
+    return mp4Path;
+}
+
 // Render the blob's own multi-voice narration for a headless plan to a single WAV, matching the on-screen
 // timeline. Each line is placed at its caption's start (cumulative dur+gap) in its line persona, summed on one
 // clock by render/blobVoiceWav.js -- pure sampleAt maths, so this needs no audio device and stays deterministic.

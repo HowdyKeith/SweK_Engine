@@ -83,11 +83,22 @@ try {
   const reclaimed = reclaimScratchDirs();
   if (reclaimed.length) console.log("[verify] NOTE  reclaimed " + reclaimed.length + " stranded gate scratch dir(s) a killed run left in the tree: " + reclaimed.join(", "));
   const RD = await import("./recordDrift.mjs");
-  const { stale } = await RD.drift();
+  const { all, stale } = await RD.drift();
   check("derived records a new module invalidates are up to date (the drift pre-flight)",
         stale.length === 0,
         stale.length ? stale.map((x) => (x.name || x.key || String(x)) + ": " + (x.detail || x.why || "")).join("; ").slice(0, 300)
                      : "");
+  // v4778 -- ...and the pre-flight's own record, which its gate checks first (recordDrift-selfcheck: "the checks
+  // cover every re-derivable record the register counts") and which therefore went unchecked at ship time on the
+  // rig, where that gate reads 4,829 ms. `all` is already in hand, so this costs nothing; see recordReach.SHIP_STEPS.
+  // v4778 review -- and the record's OTHER re-derivable count with it, the duties it admits it does not discharge:
+  // OWES carries one clause per duty, so OWES = checks run + notChecked (9 = 7 + 2 today). recordDrift-selfcheck
+  // asks this too, and it is the half of the record a `checked`-only line would leave to a gate the rig cannot sweep.
+  const owed = Object.keys(RD.OWES).length;
+  check("the drift pre-flight ran every check its own record counts",
+        all.length === RD.DRIFT_AT_V4482.checked && owed === all.length + RD.DRIFT_AT_V4482.notChecked,
+        all.length + " checks run, DRIFT_AT_V4482 records " + RD.DRIFT_AT_V4482.checked + "; " + owed +
+        " OWES clauses against " + RD.DRIFT_AT_V4482.notChecked + " admitted not checked");
   // ...and the other way a population moves without anybody editing anything: a gate killed mid-run leaves a
   // file named like a gate. One of the two is `process.exit(3)`, so it reads as a NEW RED for a file that is
   // in no commit -- measured at 1738 enumerated against 1737. Named rather than excluded; see TRANSIENT_FIXTURES.
@@ -95,7 +106,29 @@ try {
   const left = TRANSIENT_FIXTURES.filter((f) => fs.existsSync(f));
   check("no transient gate fixture was left on disk by a killed run", left.length === 0,
         left.length ? left.join(", ") + " -- delete it; it enumerates as a gate and one of them exits 3" : "");
-} catch (e) { console.log("[verify] NOTE  drift pre-flight could not run: " + String(e.message).slice(0, 120)); }
+// v4778 review -- a crash here FAILS now instead of printing a NOTE, for the reason 1c gives: this step is the
+// ship-time road recordReach.SHIP_STEPS credits with DRIFT_AT_V4482, REACH_AT_V4548 and PROBE_AT_V4536, and on
+// the rig (recordDrift-selfcheck 4,829 ms) the only one -- a NOTE would let verify pass with those records
+// counted as checked by a step that never ran.
+} catch (e) { check("the drift pre-flight could run at all", false, String((e && e.message) || e).slice(0, 120)); }
+
+// 1c. *** v4778 -- THE OTHER STALE-RECORD DETECTOR, GIVEN THE ROAD 1b GAVE recordDrift AT v4639. ***
+//
+// tools/ship/frozenRecords-selfcheck.mjs reads 5,230 ms on Keith's rig against quickSweep's 3,000 ms budget, and
+// since 9ed30746 the rig's readings decide what the sweep runs -- so at ship time on that box nothing compared
+// the census frozenRecords.mjs froze against the census the tree holds, and recordReach-selfcheck said "NO
+// ROAD". frozenRecords.stale() is that comparison without the gate's fixtures, git call or guardian search.
+// MEASURED here: 910 ms cold on its own, 3 ms after 1b's drift() in this process, because both take the same
+// census({ guardians: false }) and the module memoises it. A step that cannot run FAILS rather than noting:
+// it is the only ship-time road this detector has on the rig, and a road that crashes is not a road.
+try {
+  const FRM = await import("./frozenRecords.mjs");
+  const fr = FRM.stale();
+  check("frozen-record censuses are what the tree holds (frozenRecords' staleness check)",
+        fr.stale.length === 0,
+        fr.stale.length ? fr.stale.map((x) => x.name + ": " + x.detail).join("; ").slice(0, 300)
+                        : fr.rows.length + " readings, all current");
+} catch (e) { check("frozen-record censuses could be read at all", false, String((e && e.message) || e).slice(0, 120)); }
 
 // 1. version marker matches what we claim
 if (version) {

@@ -150,6 +150,12 @@ const say = (m) => console.log("  ----  " + m);
 const REPORT = gateReport("tools/ship/sweepCoverage-selfcheck.mjs");
 
 const FILE = SC.readFile();
+// *** v4813 -- "IN THE SWEEP" IS ASKED OF THE SWEEP. *** Since v4536 quickSweep keeps a gate after ONE crossing of the
+// budget and evicts it on the second (MIN_CROSSINGS_TO_EVICT), so a gate filed at 3,099 with one crossing is still
+// run at ship time. Rows here that read "returned and back in" or "outside the sweep" off the raw timing called it
+// out; on the v4813 tree 31 such gates sat on probation and three rows went red on gates the sweep was running.
+// The membership is the selector's, through the selector -- not a second spelling of it without the probation.
+const inSweep = (g, F = FILE) => QS.selectGates([g], F.timings || {}, SC.BUDGET_MS, { crossings: F.crossings || {} }).run.includes(g);
 
 // *** v4547 -- ONE RULE FOR "IS THIS STILL-OVER ENTRY JUSTIFIED", WHERE THERE WERE THREE. ***
 // "Is it live over budget right now" is not a well-defined question for a straddler, and this round
@@ -405,7 +411,14 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     const REC = SC.STALE_GREENS_V4460;
 
     ok("!! *** every over-budget entry is a standing green, a standing red, or has no code -- a PARTITION ***",
-       cls.partitions && cls.green.length > 0 && cls.red.length > 0,
+       // v4816: `cls.red.length > 0` required a standing red to exist, and v4816 re-filed the last two (budgetExile,
+       // moduleHistory, both green live) so the record holds none -- a partition does not need every class inhabited.
+       // The red arm is driven on a fixture instead, so a classifier that stopped finding reds still fails here.
+       // SABOTAGE: verdictClasses made to put every coded gate in `green` -> 2 red, this row and the no-code fixture row
+       // below (its red count reads 0); restored md5-identical.
+       cls.partitions && cls.green.length > 0 &&
+       (() => { const f = SC.verdictClasses({ over: ["g", "r", "n"] }, { codes: { g: 0, r: 1 } });
+                return f.partitions && f.green.join() === "g" && f.red.join() === "r" && f.none.join() === "n"; })(),
        `${cls.green.length} green + ${cls.red.length} red + ${cls.none.length} uncoded = ${cls.sum} of ` +
        `${C.over.length}. Section 2 counted one of these three and called the answer complete.`);
     ok("...and the two verdict classes do not overlap",
@@ -491,11 +504,14 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
     // v4529: a returnee can go back OVER on a later box (meshLine, 2,929 at v4476, 3,154 here), and the property holds the
     // same way crossBackend's did -- named, with a reason and a live reading that is genuinely over
     const stillOverNamed = (g) => {
-        // v4800: and a returnee genuinely over on the box that owns the record now (RETURNED_AT_V4800). SABOTAGES: the
+        // v4800: and a returnee genuinely over on the box that owned the record then (RETURNED_AT_V4800). SABOTAGES: the
         // record not consulted -> 1 red (the first verify of the re-hosted record found it so); its reason emptied -> 1;
         // its readings put under budget -> 1. And the share row: compared against afterPct instead -> 1.
         const row = V76.stillOver.find((x) => x.gate === g) || V29.stillOver.find((x) => x.gate === g) ||
-            SC.RETURNED_AT_V4800.stillOver.find((x) => x.gate === g);
+                    SC.RETURNED_AT_V4800.stillOver.find((x) => x.gate === g) ||      // v4800, the other line
+                    SC.STILL_OVER_AT_V4813.stillOver.find((x) => x.gate === g) ||   // v4813
+                    SC.STILL_OVER_AT_V4815.stillOver.find((x) => x.gate === g) ||   // v4815: the host change
+                    SC.STILL_OVER_AT_V4818.stillOver.find((x) => x.gate === g);     // v4818: and back
         return !!row && justifiedOver(row);
     };
     const returned = new Map([
@@ -511,9 +527,7 @@ console.log("\n7. *** THE MIRROR standingReds NEVER HAD: A ZERO IS AS OLD AS THE
        back.length === REC.confirmed.nowUnderBudget &&
        overNonEmpty(back, (r) => r.nowMs < SC.BUDGET_MS && r.recordedMs > SC.BUDGET_MS &&
                                  ((FILE.timings || {})[r.gate] === r.recordedMs ||
-                                  // v4782: a returnee is judged by aloneMs -- the median of its last three serial readings --
-                                  // not the newest one: headlessGpu read 11,890 alone once between 2,722 and 2,659.
-                                  (returned.has(r.gate) && (aloneMs(r.gate) ?? (FILE.timings || {})[r.gate]) < SC.BUDGET_MS) ||
+                                  (returned.has(r.gate) && inSweep(r.gate)) ||
                                   // v4477: the THIRD state, which the merged tree created and neither branch
                                   // had alone -- RE-MEASURED AND STILL OVER. crossBackend was re-timed at v4476
                                   // to 12,851 ms here against main's 376, a 34x disagreement between two boxes
@@ -1016,7 +1030,8 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
        "back is the file recording a different measurement, not the pass being wrong. *** WHAT WOULD MEAN " +
        "THE PASS BOUGHT NOTHING IS A NAME VANISHING, *** and that is what `lost` catches.");
     const gates = enumerateGates(ENG), c = SC.census(gates, t);
-    const outside = c.over.length + c.killed.length;
+    // v4813: outside means NOT SELECTED by the sweep (see inSweep) -- c.over counts a gate on probation as out
+    const outside = QS.selectGates(gates, t.timings || {}, SC.BUDGET_MS, { crossings: t.crossings || {} }).skipped.length;
     // *** v4776 -- "IT CAN ONLY SHRINK" WAS WRONG, AND THE BUCKET SAID SO AT 142. *** The ceiling below used to be
     // `c.killed.length <= 140` over the WHOLE tree, on the reasoning that nothing puts a gate back into a bucket
     // it was re-timed out of. Two things put gates in that the reasoning never counted. BIRTHS: 22 of the 142
@@ -1034,9 +1049,11 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
     const entrantsUnmeasured = entrants.filter((g) => !c.graded.includes(g));
     const fromPopulation = c.killed.length - entrants.length;
     ok("!! ...and the population outside the ship-time sweep is down by roughly what the pass moved",
-       // v4800 -- the SHARE, not the count: the record froze 464 of a 1,617-gate tree on another box, and the tree is 1,881
-       // now. Re-hosted to this box the count read 469, five more over a tree 264 larger; the share is 24.9% against 28.7%.
-       100 * outside / gates.length <= R.outsideTheSweep.beforePct && fromPopulation <= R.remaining.killedUnreachable &&
+       // v4815 (Keith's call): the SHARE, not the count. 464 was counted over a tree of 1,617 gates; the tree holds 1,926
+       // and the record moved to a slower host (quickSweep's v4815 handover), which put 475 outside -- 24.7% against
+       // 28.7%. A count ceiling on a growing population goes red on growth alone. SABOTAGE: the comparison made
+       // `outside / gates.length <= 0.20` -> this row red by name; restored md5-identical.
+       outside / gates.length <= R.outsideTheSweep.beforePct / 100 && fromPopulation <= R.remaining.killedUnreachable &&
        entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,
@@ -1521,6 +1538,49 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
        `${SC.RETURNED_AT_V4529.stillOver.length} oscillators, ${SC.RETURNED_AT_V4476.stillOver.length} ` +
        "genuinely over. A gate cheap alone and slow loaded is a different claim from a gate slow everywhere, " +
        "and one predicate for both is what forced the 0.8 fudge factor this round removed.");
+    // v4813: the roll an entry moves to when its ALONE cost crosses too. Graded by the union, justifiedOver, because
+    // its entry straddles (2,882 / 3,056 / 3,589) and the roll must not flip with the sitting. SABOTAGED v4813:
+    // wgslSpec's live serial set to 2,000 with its loaded side removed from the entry -> this row red by name.
+    // v4818: an entry RETIRES by the rule written above -- a live alone reading under the bar AND back in the sweep --
+    // and carries `returned` with the readings that retired it. wgslSpec did, at v4818 (alone 1,625, loaded 2,981), and
+    // the row went red at the step-4b check because it still demanded justifiedOver of every entry: the retirement
+    // path the comment promised had no branch here. A returned entry is now held to the opposite property, live, and a
+    // still-over one to the old one; the fixtures below drive both, so neither branch passes on an empty population.
+    // SABOTAGED v4818: rollEntryHolds made to refuse every entry -> 2 red, this row and the fixture row, by name; the
+    // returned branch made to accept unconditionally -> the fixture row red (returned + dear). Both restored.
+    const rollEntryHolds = (x, F = FILE) => x.returned
+        ? (aloneMs(x.gate, F) ?? Infinity) < SC.BUDGET_MS && inSweep(x.gate, F) && x.returned.aloneMs < SC.BUDGET_MS
+        : overInSomeReading(x) && typeof x.why === "string" && x.why.length > 40 && (stillGenuinelyOver(x, F) || oscillates(x, F));
+    ok("!! *** the v4813 still-over roll holds only gates that left the oscillator roll, each justified live -- or returned, live ***",
+       SC.STILL_OVER_AT_V4813.stillOver.length > 0 &&
+       SC.STILL_OVER_AT_V4813.stillOver.every((x) => rollEntryHolds(x) && !SC.RETURNED_AT_V4529.stillOver.some((y) => y.gate === x.gate)),
+       SC.STILL_OVER_AT_V4813.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}` +
+           `alone ${aloneMs(x.gate)} ms, ${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+    {
+        const E = { gate: "fx", loadedMs: 7000, serialMs: [2900, 3100, 3500], why: "x".repeat(50) };
+        const cheap = { timings: { fx: 1600 }, serial: { fx: 1600 }, contended: { fx: false } };
+        const dear  = { timings: { fx: 9000 }, serial: { fx: 3600 }, contended: { fx: false } };
+        const R = { ...E, returned: { at: "vX", aloneMs: 1600 } };
+        ok("  ...and a RETURNED entry must be cheap alone and back in the sweep, a still-over one must be over or oscillating",
+           rollEntryHolds(R, cheap) === true && rollEntryHolds(R, dear) === false &&
+           rollEntryHolds(E, dear) === true && rollEntryHolds({ ...E, loadedMs: 2000 }, cheap) === false,
+           "fixture: returned+cheap holds, returned+dear does not; still-over+dear holds, still-over+cheap-everywhere does not");
+    }
+
+    // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
+    // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
+    // which consults the roll; restored md5-identical.
+    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
+
+    // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,
+    // 2900], hereMs 2800, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row; restored.
+    ok("!! *** the v4818 still-over roll names only returnees genuinely over on the host the record came back to ***",
+       SC.STILL_OVER_AT_V4818.stillOver.length > 0 && SC.STILL_OVER_AT_V4818.stillOver.every((x) => justifiedOver(x)),
+       SC.STILL_OVER_AT_V4818.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+           `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     ok("!! a live CONTENDED sample that is UNDER budget retires the entry: it is fast everywhere now",
        oscillates(OSC, { timings: { osc: 2500 }, serial: { osc: 2400 }, contended: { osc: true } }) === false,

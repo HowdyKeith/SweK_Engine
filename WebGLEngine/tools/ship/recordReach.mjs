@@ -39,6 +39,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FR from "./frozenRecords.mjs";
+import { stripComments } from "../../vba/runtimeGap.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -80,24 +81,99 @@ export const CLASS = Object.freeze({
 });
 
 /**
+ * *** v4778 -- THE SECOND ROAD TO SHIP TIME, WRITTEN DOWN ONCE INSTEAD OF AS A REGEX FOR ONE GATE. ***
+ *
+ * Until now "checked at ship time" had one road in this module -- a guardian under quickSweep's budget -- and
+ * the selfcheck carried a second for exactly one detector, `/recordDrift\.mjs/.test(verify.mjs)`, which also
+ * matched verify's COMMENTS, so deleting the step and keeping its paragraph would have left the road standing.
+ * Keith's rig then read frozenRecords-selfcheck at 5,230 ms and recordDrift-selfcheck at 4,829 ms, and since
+ * 9ed30746 the rig's readings decide what the sweep runs. On that box BOTH detectors are over the budget, so
+ * every record whose guardians are those two gates fell out of `checked` -- including the three v4548 rescued --
+ * whether or not verify.mjs runs the detector's check itself.
+ *
+ * A DETECTOR WHOSE CHECK IS A verify.mjs STEP DOES RUN AT SHIP TIME, BUT ONLY FOR WHAT THE STEP ASKS. So a step
+ * is declared with the records its call actually compares, and a record counts as checked through it IF AND
+ * ONLY IF (a) verify.mjs's code -- comments stripped -- imports the module and calls the function, (b) the
+ * record is in that call's list, or is read by verify's own line beside it as a member of the module, and
+ * (c) the record's guardians include the detector's gate. (c) keeps this to the question asked: it lifts a
+ * guarded record the sweep cannot reach, and never turns an unguarded record into a checked one.
+ *
+ * The lists are DECLARED here and PROVEN by recordReach-selfcheck: frozenRecords' by handing stale() each
+ * record corrupted and watching it go stale, recordDrift's by finding each record read as a module member in
+ * recordDrift.mjs's comment-stripped code (its own gate, section 2, drives those reads stale by injection).
+ * What is deliberately absent: drift() also compares SHAPE_AT_V4480 and MEASURED_AT_V4462, but proving those
+ * here costs the two O(tree) censuses behind them; they are left to their own guardians, which under-reports
+ * rather than over-claims.
+ */
+export const SHIP_STEPS = Object.freeze([
+    Object.freeze({ detector: "tools/ship/frozenRecords-selfcheck.mjs", module: "./frozenRecords.mjs", call: "stale",
+                    records: Object.freeze(["PROBE_AT_V4536", "PROBE_AT_V4487"]), verifyReads: Object.freeze([]) }),
+    Object.freeze({ detector: "tools/ship/recordDrift-selfcheck.mjs", module: "./recordDrift.mjs", call: "drift",
+                    records: Object.freeze(["PROBE_AT_V4536", "REACH_AT_V4548"]),
+                    // compared by verify's own check() beside the call, against the `all` drift() returns
+                    verifyReads: Object.freeze(["DRIFT_AT_V4482"]) }),
+]);
+
+const _escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const _stepsMemo = new Map();
+/**
+ * Which SHIP_STEPS verify.mjs really runs, read off its code: the module bound by a dynamic import, and that
+ * binding's call. `verifySrc` is injectable so the gate can hand it a verify without the step and watch the road
+ * close. Returns each step with `live` and `checks`, the records it checks at ship time when live.
+ */
+export function shipSteps({ root = ENG, verifySrc = null } = {}) {
+    const memo = verifySrc == null;
+    if (memo && _stepsMemo.has(root)) return _stepsMemo.get(root);
+    let src = verifySrc;
+    if (src == null) { try { src = fs.readFileSync(path.join(root, "tools", "ship", "verify.mjs"), "utf8"); } catch { src = ""; } }
+    const code = stripComments(src);
+    const out = Object.freeze(SHIP_STEPS.map((s) => {
+        // `const X = <wait-for> import("./mod.mjs")` -- the binding the step's call is made through
+        const bind = new RegExp("(?:const|let|var)\\s+(\\w+)\\s*=\\s*\\w+\\s+import\\(\\s*[\"'`]" + _escRe(s.module) + "[\"'`]\\s*\\)").exec(code);
+        const binding = bind ? bind[1] : null;
+        const called = !!binding && new RegExp("\\b" + binding + "\\." + s.call + "\\s*\\(").test(code);
+        const reads = binding ? s.verifyReads.filter((n) => new RegExp("\\b" + binding + "\\." + n + "\\b").test(code)) : [];
+        const live = called;
+        return Object.freeze({ ...s, binding, called, live,
+            checks: Object.freeze(live ? [...s.records, ...reads] : []),
+            missingReads: Object.freeze(s.verifyReads.filter((n) => !reads.includes(n))) });
+    }));
+    if (memo) _stepsMemo.set(root, out);
+    return out;
+}
+
+/**
  * Join the record census to the sweep timings and classify every record.
  *
  * `timings` and `census` are injectable so the gate can hand this a world where one gate got slower and
- * watch the count move -- a ratchet that cannot be shown to move is a number nobody has tested.
+ * watch the count move -- a ratchet that cannot be shown to move is a number nobody has tested. `steps` too
+ * (v4778): [] is the sweep road alone, which is what the timing fixtures in the gate need to stay about timing.
  */
-export function reach({ budgetMs = null, timings = null, census = null, root = ENG } = {}) {
+export function reach({ budgetMs = null, timings = null, census = null, root = ENG, steps = null } = {}) {
     const t = timings || readTimings(root);
     const budget = budgetMs ?? t.budgetMs ?? 3000;
     const c = census || FR.census();
     const timed = (g) => t.timings?.[g] != null;
     const runsAtShipTime = (g) => timed(g) && t.timings[g] <= budget;
+    const st = steps ?? shipSteps({ root });
+    const stepChecks = new Map();      // record -> [detector gate whose live step checks it]
+    for (const s of st) if (s.live) for (const n of s.checks) {
+        if (!stepChecks.has(n)) stepChecks.set(n, []);
+        stepChecks.get(n).push(s.detector);
+    }
     const rows = c.records.map((r) => {
+        const steppedBy = r.guardians.length ? (stepChecks.get(r.name) || []).filter((d) => r.guardians.includes(d)) : [];
+        const swept = r.guardians.some(runsAtShipTime);
         const cls = !r.guardians.length ? CLASS.UNGUARDED
-            : r.guardians.some(runsAtShipTime) ? CLASS.CHECKED
+            : swept || steppedBy.length ? CLASS.CHECKED
             : r.guardians.some(timed) ? CLASS.OVER_BUDGET
             : CLASS.UNMEASURED;
         return Object.freeze({
             name: r.name, file: r.file, guardians: r.guardians, cls,
+            // v4778: which road makes it checked -- "swept" wins when both are open, so `stepped` counts only
+            // the records a verify step is the SOLE ship-time check of
+            road: swept ? "swept" : steppedBy.length ? "a verify step" : null,
+            steppedBy: Object.freeze(steppedBy),
             // the cheapest guardian, so a reader knows how far from the budget the record actually is
             bestMs: r.guardians.length ? Math.min(...r.guardians.map((g) => t.timings?.[g] ?? Infinity)) : null,
         });
@@ -119,6 +195,9 @@ export function reach({ budgetMs = null, timings = null, census = null, root = E
         budgetMs: budget, capMs: t.capMs ?? null,
         total: rows.length,
         checked: by(CLASS.CHECKED).length,
+        // v4778: of `checked`, how many have NO guardian under the budget and are checked only by a verify step
+        stepped: rows.filter((r) => r.road === "a verify step").length,
+        steps: st,
         overBudget: overBudget.length,
         unmeasured: unmeasured.length,
         unguarded: unguarded.length,
@@ -295,9 +374,21 @@ export const REACH_AT_V4548 = Object.freeze({
     // and whether the reds it lists are still outside the sweep -- so `unguarded` is unmoved at 17.
     // v4776 -- 149 -> 150: COMMIT_BELT_DRIFT_V4776 in world/orreryFleet.mjs, three's sixth commit (ce276dff) recorded
     // beside the v4621 record rather than over it. Re-taken in the round that added it.
+    // v4778 -- 150 -> 151 at the rtx merge: NO_GATE_V4778 in tools/ship/reportDoors.mjs, two module paths that
+    // arrived with the rtx line. It arrives GUARDED -- reportDoors-selfcheck.mjs imports it and asserts over it.
+    // v4778 -- 151 -> 152 at the rtx merge: COMMIT_BELT_DRIFT_V4778 in world/orreryFleet.mjs, the two bodies the rtx line
+    // vendored (male-cns, mikktspace) recorded beside v4776's belt record. GUARDED -- orreryFleet-selfcheck reads it.
+    // v4813 -- 152 -> 153: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs, wgslSpec moved off the oscillator roll.
+    // GUARDED -- sweepCoverage-selfcheck grades its entry live. Re-taken in the round that added it.
+    // v4815 -- 153 -> 154: STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs, two returnees back over on the new host.
+    // GUARDED -- sweepCoverage-selfcheck grades its entries live. Re-taken in the round that added it.
+    // v4818 -- 154 -> 155: STILL_OVER_AT_V4818 in tools/ship/sweepCoverage.mjs, orreryEjecta back over on the 2.10 GHz host.
+    // GUARDED -- sweepCoverage-selfcheck grades its entry live. Re-taken in the round that added it.
     // v4800 -- 150 -> 151: RETURNED_AT_V4800 in tools/ship/sweepCoverage.mjs, headlessGpu named still over on the box that
     // owns the timing record now. It arrives GUARDED -- sweepCoverage-selfcheck's returnee row reads it. Re-taken in the round that added it.
-    total: 151,
+    // v4819 -- 155 -> 156 at the merge: RETURNED_AT_V4800 in tools/ship/sweepCoverage.mjs, from the exported-functions line. GUARDED --
+    // sweepCoverage-selfcheck's returnee row reads it.
+    total: 156,
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -389,15 +480,30 @@ export const REACH_AT_V4548 = Object.freeze({
         "physics/render/transmission-selfcheck.mjs",
         "tools/ship/dockFraming-selfcheck.mjs",
         "tools/ship/budgetExile-selfcheck.mjs",
+        // *** v4814 -- A FIFTH, AND IT WAS HIDDEN BY A STALE NUMBER RATHER THAN BY THE CAP. *** The record held
+        // physics/render/rtPipeline-selfcheck.mjs at 4,199 ms -- a reading from before the rtx merge grew its sections 13
+        // and 14 -- so nothing here knew it was expensive. tools/ship/rtPipelineDiag.mjs measured it whole at 113 s
+        // (291 s on Keith's rig), webgpuHarness.openWgslSession halved it with its output byte-identical, and the
+        // rotation re-timed it at 56,770 ms exit 0. Expensive and green, like the first three.
+        "physics/render/rtPipeline-selfcheck.mjs",
+        // *** v4815 -- A SIXTH, ALSO HIDDEN BY A STALE NUMBER. *** The record held tools/ship/orreryFleet-selfcheck.mjs at
+        // 13,937 ms, a reading from before v4408. The full over-budget rotation of 2026-10-06 cut it off at the 20 s cap,
+        // and this row went red naming it unnamed. Re-timed at a 60 s cap it FINISHES, at 20,866 ms exit 0: expensive and
+        // green, 4% over the cap, like the first three.
+        "tools/ship/orreryFleet-selfcheck.mjs",
     ]),
     // What v4568 measured about them, so the correction is a number rather than a retraction. v4641 added the
     // fourth: `finished` still equals `of`, because every one of them DOES end when the cap allows it -- and
     // `killed: 0` is still true. What changed is that finishing is no longer the same as passing.
-    atCapGatesFinish: Object.freeze({ of: 4, finished: 4, killed: 0,
+    // v4814: 4 -> 5 with rtPipeline-selfcheck (see atCapGates); it finished, so `finished` still equals `of`.
+    // v4815: 5 -> 6 with orreryFleet-selfcheck; it finished, so `finished` still equals `of`.
+    atCapGatesFinish: Object.freeze({ of: 6, finished: 6, killed: 0,
         ms: Object.freeze({ "tools/ship/redCensus-selfcheck.mjs": 45245,
                             "tools/ship/dockFraming-selfcheck.mjs": 21536,
                             "physics/render/transmission-selfcheck.mjs": 19395,
-                            "tools/ship/budgetExile-selfcheck.mjs": 40863 }) }),
+                            "tools/ship/budgetExile-selfcheck.mjs": 40863,
+                            "physics/render/rtPipeline-selfcheck.mjs": 56770,
+                            "tools/ship/orreryFleet-selfcheck.mjs": 20866 }) }),
     // *** v4548 -- AND ONE OF THE THREE HAS CROSSED BACK, BY 28 MILLISECONDS. *** The note above says
     // transmission-selfcheck is "no longer even over the cap" at 19,395 ms; one round later the rotation
     // read it at 20,026 and 20,028 and the cap KILLED it, so it moved from graded to cut off -- a 3% spread
@@ -507,8 +613,16 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // named by the gate beside it.
     // v4664 -- 148 -> 149, the one arrival re-taken above; `unguarded` does not move.
     // v4776 -- 149 -> 150, the one arrival re-taken above.
+    // v4778 -- 150 -> 151 and unguarded 17 -> 16, both read off splitUnguarded(): the arrival re-taken above is
+    // guarded, and MEASURED_AT_V4418 in physics/render/rtPipeline.mjs LEFT the documentary set -- the same round's
+    // definitionGates repair gave rtPipeline-selfcheck a row that reads its stage fields back against STAGES.
+    // v4778 -- 151 -> 152, COMMIT_BELT_DRIFT_V4778 re-taken above; `unguarded` does not move, read off splitUnguarded().
+    // v4813 -- 152 -> 153, STILL_OVER_AT_V4813 re-taken above; `unguarded` does not move, read off splitUnguarded().
+    // v4815 -- 153 -> 154, STILL_OVER_AT_V4815 re-taken above; `unguarded` does not move, read off splitUnguarded().
+    // v4818 -- 154 -> 155, STILL_OVER_AT_V4818 re-taken above; `unguarded` does not move, read off splitUnguarded().
     // v4800 -- 150 -> 151, the one arrival re-taken above; `unguarded` does not move.
-    structural: Object.freeze({ total: 151, unguarded: 17, documentaryOfThose: 17, readByCodeOfThose: 0 }),
+    // v4819 -- 155 -> 156, RETURNED_AT_V4800 re-taken above; `unguarded` does not move, read off splitUnguarded().
+    structural: Object.freeze({ total: 156, unguarded: 16, documentaryOfThose: 16, readByCodeOfThose: 0 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
@@ -555,7 +669,8 @@ export function reportLines() {
     const out = [
         "[recordReach] which frozen records the ship ritual actually checks",
         `  ${r.total} records at a ${r.budgetMs} ms budget: ${r.checked} checked, ${r.overBudget} guarded only by ` +
-        `over-budget gates, ${r.unmeasured} by never-timed gates, ${r.unguarded} guarded by nothing`,
+        `over-budget gates, ${r.unmeasured} by never-timed gates, ${r.unguarded} guarded by nothing` +
+        (r.stepped ? ` (${r.stepped} of the checked are checked by a verify step alone, no guardian swept)` : ""),
         `  => ${r.unchecked} of ${r.total} (${(100 * r.unchecked / r.total).toFixed(0)}%) not checked at ship time`,
     ];
     for (const b of r.blockers.slice(0, 8))

@@ -93,12 +93,18 @@ export const CONTROL = { device: "splat", mode: "integral", field: "isoRollDevia
 // The attribution is measured, not inferred: with that one file reverted to its pre-merge bytes the census
 // re-derives to the row below EXACTLY, and with it restored it does not. Nothing here is raised to pass --
 // the numbers are re-taken from a fresh sweep, and the ratio they carry is unmoved at 31.6%.
+// v4778 -- 17800 -> 18005 swept points, 5619 -> 5684 coerced, 1228 -> 1248 collapsed ranges at the rtx merge:
+// the capsuledepenetrate device (tools/roundhouse/capsuleDepenetrateBind.mjs) arrived with the rtx line, and
+// it alone is the whole move -- 205 points, 65 coerced, 20 collapsed ranges, 0 dropped. Measured per device,
+// not inferred: the same census over a git archive of 978d26e3 (main before the merge) re-derives to the
+// v4486 row EXACTLY, and the only device whose figures differ between the two trees is capsuledepenetrate,
+// which the older tree does not have. knobDropped held at 0; the ratio is 31.6% (5684 / 18005 = 0.3157).
 export const COERCION_CENSUS_V4477 = Object.freeze({
-    measuredAt: "v4477, re-derived at v4486",
-    sweptPoints: 17800,
-    coerced: 5619,
+    measuredAt: "v4477, re-derived at v4486 and v4778",
+    sweptPoints: 18005,
+    coerced: 5684,
     knobDropped: 0,
-    collapsedRanges: 1228,
+    collapsedRanges: 1248,
     // The one that made this round: splat.integral.sigma is NOT among the collapsed ranges, because
     // knobRange(0.1) stops at 1.0. The clamp was hit by a HAND-CHOSEN range walked while reading the field,
     // not by the sweep -- which is why the mislabelling survived a full sweep at v4353 without showing itself.

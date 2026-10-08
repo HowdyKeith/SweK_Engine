@@ -867,10 +867,28 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // signatureOf). The rows that did not move are this line's: distinctDefinitions 41, condFirst 96,
     // unknownSignature 11, suspects 0. So that branch's 91/16 were the old classifier's reading, not a
     // disagreement about the tree, and none of its hundred and five invented a forty-second spelling of ok().
+    // v4778 -- AT THE RTX MERGE, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE: gates 1880 -> 1925, usesOk
+    // 1859 -> 1904, definesOk 1851 -> 1896 -- that line's 45 gates, all new files. nameFirst 1752 -> 1796 (+44) and
+    // condFirst 96 -> 97 (+1): tools/ship/gltfConformance-selfcheck.mjs defines `ok = (c, m)` and calls it that way
+    // throughout, so it is the forty-second distinct spelling (41 -> 42) and it is self-consistent, which is what the
+    // suspects row (still 0) asks. unknownSignature holds at 11.
+    // v4778 -- 1925 -> 1926 for tools/ship/fsrCaches-selfcheck.mjs -- the FSR caches in their own folder, out of the
+    // release zip, installable on request. usesOk 1904 -> 1905, definesOk 1896 -> 1897, nameFirst 1796 -> 1797; the
+    // rest hold (measured with census()).
+    // Round A (the camera boom) -- 1926 -> 1927 for camera/cameraBoom-selfcheck.mjs. usesOk 1905 -> 1906, definesOk
+    // 1897 -> 1898, nameFirst 1797 -> 1798, the same four rows by one; the rest hold (measured with census(), and the
+    // gate's own drift row named exactly these four).
+    // the lock-sums round -- 1927 -> 1929 for render/temporalLockSums-selfcheck.mjs and render/temporalLockSumsTsl-selfcheck.mjs.
+    // usesOk, definesOk and nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
+    // the splat-collision round -- 1929 -> 1930 for tools/ship/splatVoxelWorld-selfcheck.mjs. usesOk, definesOk and
+    // nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
     // v4779 -- 1880 -> 1881 for render/temporalTslCoverage-selfcheck.mjs -- the motion field where three draws: cut-outs, back faces, hidden, culled, grown.
     // v4809 -- 1881 -> 1882 for render/threeWorkarounds-selfcheck.mjs -- the engine's two ways around r186's issues 17 and 18, held on both backends.
-    gates: 1882, usesOk: 1861, definesOk: 1853, importsOk: 0,
-    distinctDefinitions: 41, nameFirst: 1754, condFirst: 96, unknownSignature: 11,
+    // v4819 -- AT THE MERGE OF THE TWO LINES, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE: main's 1930 plus the
+    // exported-functions line's two gates since the v4777 split (render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds-
+    // selfcheck.mjs) -- gates, usesOk, definesOk and nameFirst each by two; the other five rows hold (the gate's drift row named these four).
+    gates: 1932, usesOk: 1911, definesOk: 1903, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1803, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

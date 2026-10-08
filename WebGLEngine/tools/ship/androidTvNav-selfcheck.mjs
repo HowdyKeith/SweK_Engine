@@ -22,7 +22,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -143,7 +143,7 @@ console.log("\n5. *** THE ONLY WAY TO KNOW A D-PAD WORKS IS TO PRESS IT ***");
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-4 read files, and a file cannot show that Right");
         report("    lands on the control to the right.");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         await pg.route("**/*", (route) => {
             const u = new URL(route.request().url());

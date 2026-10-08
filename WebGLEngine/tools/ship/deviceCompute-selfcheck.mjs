@@ -36,7 +36,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 13: launched with PARITY_ARGS, so the device's WebGPU and node-webgpu are one adapter (see crossBackend-selfcheck)
+import { runInEngineOrigin, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 import { runWgslComputeNative, headlessGpuSkipReason, storageWords } from "./headlessGpu.mjs";
 import { nullBackend } from "../../gfx/device.js";
 import { corpus } from "./wgslCorpus.mjs";
@@ -49,6 +50,48 @@ const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond 
 const report = (s) => console.log(`  ----  ${s}`);
 const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 const codeOf = (t) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+
+// *** v4814 -- ON A HARDWARE ADAPTER, TWO DAWN BUILDS MAY ROUND DIFFERENTLY, AND "SAME BYTES" IS NOT WHAT THE SPEC
+// PROMISES THERE (Keith's call). *** The rig's GTX 1080 over D3D12 put the browser's WebGPU and node-webgpu on one
+// adapter, and three of 48 kernels disagreed (tools/ship/deviceComputeDiag.mjs, 2026-10-05). holeFill was a compiler
+// dropping a second store -- a real defect, repaired in render/holeFillWgsl.mjs and held to bytes as before. The other
+// two -- splitSum's BRDF table, 1 to 64 ulp, and the F82 tint, 1 to 2 ulp, each path repeating itself exactly -- call
+// pow, sqrt and trig, whose accuracy WGSL leaves to the implementation. So on hardware a kernel that carries an f64
+// reference (its corpus entry's `f64`, the same answer and the same floor its own gate grades the device against) may
+// differ between the paths ONLY IF BOTH PATHS SIT INSIDE THAT FLOOR. No tolerance is invented here: the floor is read
+// from the kernel's module. Everything else stays byte-exact on hardware, and EVERYTHING stays byte-exact on software,
+// where both paths are SwiftShader and the claim this gate was written for still holds.
+// SABOTAGED v4814: only the device path graded against the floor -> the EITHER-path row red; software treated as
+// hardware -> the SOFTWARE row red. Both by name, both restored byte for byte.
+function pathsAgree({ device, native, software, f64 = null }) {
+    let same = 0, worst = 0, first = -1;
+    for (let i = 0; i < native.length; i++) { if (device[i] === native[i]) same++; else { if (first < 0) first = i; worst = Math.max(worst, Math.abs(device[i] - native[i])); } }
+    const identical = same === native.length && device.length === native.length;
+    if (identical) return { ok: true, how: "identical", same, n: native.length };
+    const base = { same, n: native.length, first, worst };
+    if (software !== false || !f64) return { ok: false, how: software !== false ? "differs on software" : "differs, no f64 reference", ...base };
+    const exp = f64.expected();
+    const off = (v) => { let w = 0; for (let i = 0; i < exp.length; i++) w = Math.max(w, Math.abs(v[i] - exp[i])); return w; };
+    const wD = exp.length === device.length ? off(device) : Infinity, wN = exp.length === native.length ? off(native) : Infinity;
+    return { ok: wD <= f64.tol && wN <= f64.tol, how: "within the f64 floor on hardware", ...base, worstDevice: wD, worstNative: wN, tol: f64.tol, gate: f64.gate };
+}
+
+console.log("\n0. *** THE HARDWARE RULE, DRIVEN ON FIXTURES -- THE SANDBOX IS SOFTWARE AND NEVER REACHES IT LIVE ***");
+{
+    const ref = { gate: "fixture", tol: 1e-4, expected: () => [0.5, 0.25, 1] };
+    const a = [0.5, 0.25, 1], b = [0.50000006, 0.25, 0.99999994];
+    ok("identical paths agree everywhere", pathsAgree({ device: a, native: a, software: true }).ok && pathsAgree({ device: a, native: a, software: false }).ok);
+    ok("!! *** on SOFTWARE a one-ulp difference is still a red -- the byte claim stands where it was made ***",
+       !pathsAgree({ device: a, native: b, software: true, f64: ref }).ok, "both paths are SwiftShader there; a difference is a defect, whatever its size");
+    ok("!! on HARDWARE a rounding difference with BOTH paths inside the kernel's own f64 floor is accepted",
+       pathsAgree({ device: a, native: b, software: false, f64: ref }).ok);
+    ok("!! *** ...and refused when EITHER path leaves the floor, so the rule still has teeth ***",
+       !pathsAgree({ device: a, native: [0.5, 0.25, 0.9998], software: false, f64: ref }).ok &&
+       !pathsAgree({ device: [0.5003, 0.25, 1], native: a, software: false, f64: ref }).ok,
+       "0.9998 against 1 is 2e-4, twice the fixture's floor -- a path that drifted is not excused by the other one being right");
+    ok("!! ...and a kernel with NO f64 reference stays byte-exact on hardware -- holeFill's flags among them",
+       !pathsAgree({ device: [0, 1], native: [1, 1], software: false }).ok);
+}
 
 console.log("\n1. THE RUNNER BINDS BY NAME, REFUSES BY NAME, AND THE TWO RIG PAGES GO THROUGH THE DEVICE");
 {
@@ -88,7 +131,7 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
             // adding the thirteen to the corpus turned this into twelve reds until BOTH this line and the
             // reconstruction inside the page carried them. A field that exists is not a field that travels.
             outBinding: e.opts.outBinding ?? 0, uniformBinding: e.opts.uniformBinding ?? 1 });
-        const r = await runInEngineOrigin({ engineRoot: ENG, args: { entries: entries.map(pack) }, script: `async (a) => {
+        const r = await runInEngineOrigin({ launchArgs: PARITY_ARGS, engineRoot: ENG, args: { entries: entries.map(pack) }, script: `async (a) => {
             const C = await import("/render/computeRun.mjs"); const { requestDevice } = await import("/gfx/device.js");
             const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
             const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true });
@@ -105,19 +148,31 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
         }`, timeoutMs: 180000 });
         ok("*** the corpus ran through the device on the browser's WebGPU ***", r.ok && r.result && !r.result.noWebgpu, r.ok ? (r.result && r.result.noWebgpu ? "no webgpu: " + r.result.noWebgpu : "") : r.reason);
         if (r.ok && r.result && !r.result.noWebgpu) {
-            let allIdentical = true, floats = 0, msTotal = 0;
+            const nat0 = await runWgslComputeNative(entries[0].opts), name = (a) => a ? `${a.vendor}/${a.architecture}` : "unread";
+            ok("*** the device's WebGPU and node-webgpu report the SAME ADAPTER -- the rows below compare one rasteriser reached two ways ***",
+               !!(r.adapter && nat0.ok && nat0.adapter && r.adapter.vendor === nat0.adapter.vendor && r.adapter.architecture === nat0.adapter.architecture),
+               `device ${name(r.adapter)}, native ${nat0.ok ? name(nat0.adapter) : nat0.reason}`);
+            let allIdentical = true, floats = 0, msTotal = 0, withinF64 = [];
             for (const e of entries) {
                 const d = r.result[e.id];
                 const nat = await runWgslComputeNative(e.opts);
                 if (!d || !d.ok || !nat.ok) { ok(`runs: ${e.id}`, false, (d && d.reason) || nat.reason); allIdentical = false; continue; }
-                let same = 0, worst = 0, first = -1;
-                for (let i = 0; i < nat.values.length; i++) { if (d.values[i] === nat.values[i]) same++; else { if (first < 0) first = i; worst = Math.max(worst, Math.abs(d.values[i] - nat.values[i])); } }
-                const identical = same === nat.values.length && d.values.length === nat.values.length;
-                if (!identical) allIdentical = false;
+                // v4814: one rule, pathsAgree (section 0) -- bytes, except a kernel with an f64 reference on a hardware adapter
+                const g = pathsAgree({ device: d.values, native: nat.values, software: r.software, f64: e.f64 || null });
+                if (!g.ok) allIdentical = false;
+                if (g.ok && g.how !== "identical") withinF64.push(e.id);
                 floats += nat.values.length; msTotal += d.ms;
-                ok(`identical through the device: ${e.id}`, identical, identical ? `${same}/${nat.values.length}, ${d.ms.toFixed(0)} ms` : `${same}/${nat.values.length}, first differs at ${first}, max ${worst.toExponential(3)}`);
+                ok(`identical through the device: ${e.id}`, g.ok,
+                   g.how === "identical" ? `${g.same}/${g.n}, ${d.ms.toFixed(0)} ms`
+                   : g.how === "within the f64 floor on hardware"
+                       ? `${g.same}/${g.n} identical, first differs at ${g.first}, max ${g.worst.toExponential(3)} between the paths -- ` +
+                         `${g.ok ? "BOTH" : "NOT both"} within ${g.tol} of the f64 reference ${g.gate} grades against ` +
+                         `(device ${g.worstDevice.toExponential(3)}, native ${g.worstNative.toExponential(3)})`
+                       : `${g.same}/${g.n}, first differs at ${g.first}, max ${g.worst.toExponential(3)} -- ${g.how}`);
             }
-            ok("*** all of them: the device is a third path to the same bytes ***", allIdentical && entries.length >= 18, `${floats} floats across ${entries.length} kernels in ${msTotal.toFixed(0)} ms on the device`);
+            ok("*** all of them: the device is a third path to the same bytes ***", allIdentical && entries.length >= 18,
+               `${floats} floats across ${entries.length} kernels in ${msTotal.toFixed(0)} ms on the device` +
+               (withinF64.length ? `; on this hardware adapter ${withinF64.length} differ by rounding with both paths inside their f64 floor: ${withinF64.join(", ")}` : ""));
         }
         if (r && r.pageErrors && r.pageErrors.length) report("page errors: " + r.pageErrors.slice(0, 3).join(" | "));
     }
@@ -126,5 +181,6 @@ console.log("\n2. EVERY RUNNABLE CORPUS ENTRY THROUGH THE DEVICE, HELD TO THE HE
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");
 console.log("unchecked here: the two rig pages RUNNING (they are read from source; hmc-bench.html's route is the runner this " +
     "gate drives and mpm-gpu-check.html's is mpmDevice-selfcheck's), the texture entries (the corpus's storage-texture " +
-    "path has no device twin yet), and real hardware.");
+    "path has no device twin yet), and hardware beyond the one adapter it has run on -- v4814, Keith's GTX 1080 over " +
+    "D3D12, ALL GREEN with 46 kernels byte-identical and 2 inside their f64 floor; any other GPU is a first reading.");
 process.exit(fails ? 1 : 0);

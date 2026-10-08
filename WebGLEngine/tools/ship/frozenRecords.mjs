@@ -84,7 +84,10 @@ export const RECORD_RE = /export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Obj
 // out of the same memo rather than off the disk, so census() costs one walk however many times it is called.
 export function sources(dir = ENG) { return TR.treePaths(dir); }
 
-const rel = (p) => path.relative(ENG, p).split(path.sep).join("/");
+// v4778: memoised. It is a pure function of the path (ENG is fixed), and census() asks it of all 4,581 files per call
+// for the exclude filter alone -- path.relative resolves both sides every time, ~15 ms a census on the merged tree.
+const _rel = new Map();
+const rel = (p) => { let r = _rel.get(p); if (r === undefined) { r = path.relative(ENG, p).split(path.sep).join("/"); _rel.set(p, r); } return r; };
 
 /**
  * *** v4536 -- A RECORD'S BODY IS THE RECORD, NOT THE NEXT 6,000 CHARACTERS OF THE FILE. ***
@@ -143,7 +146,10 @@ export function recordBody(src, start) {
         }
         if (c === "(") depth++;
         else if (c === ")") depth--;
-        if (!/\s/.test(c)) prev = c;
+        // v4778: ASCII answered by char code, anything wider still asked of /\s/ -- the same set, without a regex
+        // call per character of 1.9 MB of record bodies.
+        const k = src.charCodeAt(i);
+        if (!(k < 128 ? k === 32 || (k >= 9 && k <= 13) : /\s/.test(c))) prev = c;
         i++;
     }
     return { body: src.slice(start, i), end: i, balanced: depth === 0 };
@@ -204,6 +210,9 @@ function recordsIn(f, read, cacheable = true) {
     const out = [];
     RECORD_RE.lastIndex = 0;
     let m;
+    // v4778: RECORD_RE cannot match without the literal below, and 388 of the merged tree's 4,581 files hold it, so the
+    // rest skip the regex: 56 ms of RECORD_RE over 70 MB became a 29 ms substring test plus the regex over 388 files.
+    if (src.includes(" = Object.freeze("))
     while ((m = RECORD_RE.exec(src))) {
         // v4536: m.index, not a fresh indexOf from the top of the file -- the match already knows where it
         // is, and searching again for a name that appears earlier in prose would find the prose.
@@ -293,14 +302,20 @@ export function readSites(names, { root = ENG } = {}) {
     const want = [...names];
     const out = new Map(want.map((n) => [n, []]));
     if (!want.length) return out;
-    // v4780 -- the cheap reject is ONE regex of every name, not one includes() per name: the same substring test,
-    // the same 125 files kept of 4,496, in 38 ms against 847. Asked about v4487's 77 records, the per-name scan
-    // was 40% of frozenRecords-selfcheck's time and took recordReach's budget margin under its 800 ms floor.
+    // *** v4778 -- THE CHEAP REJECT WAS THE EXPENSIVE PART. *** It read `want.some((n) => src.includes(n))`: 77 names
+    // (frozenRecords-selfcheck hands in SWEEP_COMMIT_RECORD_NAMES) times 4,581 files and 70 MB, and a file that names
+    // none of them -- nearly all of them -- paid all 77 scans. MEASURED on the merged tree: 1,018 ms, the largest
+    // self-time in frozenRecords-selfcheck, which read 2,424 ms against the 2,200 recordReach's margin row allows.
+    // ONE regex alternating the same literals asks the same question in one pass -- it matches exactly when some
+    // name is a substring -- and took 64 ms over the same files, admitting the same 126. And an ANCHOR goes first: each
+    // name's first `V<digit>`, or the whole name if it has none, so every name contains its anchor and a file holding
+    // no anchor holds no name. The 77 share one anchor, `V4`; checking it first took the reject to 20 ms.
     const anyName = new RegExp(want.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+    const anchors = [...new Set(want.map((n) => (/V\d/.exec(n) || [n])[0]))];
     for (const f of sources(root)) {
         if (!/\.(mjs|js|cjs)$/.test(f)) continue;
         let src = TR.textOf(f);
-        if (!anyName.test(src)) continue;                          // cheap reject before the expensive work
+        if (!anchors.some((a) => src.includes(a)) || !anyName.test(src)) continue;   // cheap reject before the expensive work
         src = stripComments(src);
         RECORD_RE.lastIndex = 0;
         let m;
@@ -333,9 +348,32 @@ export function guardianSearch(gateSrc, named) {
     const namesIn = (tok) => { let hit = memo.get(tok); if (!hit) { hit = names.filter((n) => tok.includes(n)); memo.set(tok, hit); } return hit; };
     for (const [g, src] of gateSrc) {
         const found = new Set();
-        for (const m of src.matchAll(/[A-Z0-9_]+/g)) if (/V\d{3}/.test(m[0])) for (const n of namesIn(m[0])) found.add(n);
+        for (const run of vRuns(src)) for (const n of namesIn(run)) found.add(n);
         for (const n of names) if (found.has(n)) named.get(n).push(g);
     }
+}
+
+// *** v4778 -- THE RUNS ARE FOUND FROM THE V, NOT BY LISTING EVERY RUN AND KEEPING THE FEW WITH A V IN THEM. ***
+// guardianSearch read `src.matchAll(/[A-Z0-9_]+/g)` and tested each match for V\d{3}. MEASURED on the merged tree:
+// 874,489 matches over the 1,925 gate sources -- every capital, every digit, every underscore run, each one a match
+// array for the collector -- to keep 275 distinct runs. That was ~180 ms a census, and frozenRecords-selfcheck takes
+// two. So the search seeks V\d{3} and widens each hit to the edges of the [A-Z0-9_]+ run it sits in: the same
+// maximal runs, the same set (a run holding two hits is taken once, the scan resuming at its end), and only the
+// runs that can hold a name are ever built. Section 5 of the gate holds this against the pairwise search.
+const V3 = /V\d{3}/g;
+const inRun = (c) => (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95;     // [A-Z0-9_]
+function vRuns(src) {
+    const out = [];
+    V3.lastIndex = 0;
+    let m;
+    while ((m = V3.exec(src))) {
+        let a = m.index, b = m.index + 4;
+        while (a > 0 && inRun(src.charCodeAt(a - 1))) a--;
+        while (b < src.length && inRun(src.charCodeAt(b))) b++;
+        out.push(src.slice(a, b));
+        V3.lastIndex = b;
+    }
+    return out;
 }
 
 /** The pairwise search guardianSearch replaces, kept so the gate can hold the two equal. */
@@ -714,8 +752,14 @@ export const PROBE_AT_V4536 = Object.freeze({
     // census run twice and must move together, because the row below asserts their difference is EXACTLY
     // this module's own two records.
     // v4776 -- RE-TAKEN 149 -> 150 with `excluding` below, for COMMIT_BELT_DRIFT_V4776 (no field on its own lines).
+    // v4778 -- RE-TAKEN 150 -> 151 with `excluding` below, at the rtx merge, for NO_GATE_V4778 (no field at all).
+    // v4778 -- RE-TAKEN 151 / 72 / 399 -> 152 / 73 / 400 with `excluding` below, for COMMIT_BELT_DRIFT_V4778 (one field).
+    // v4813 -- 152 -> 153 records, fields unmoved: STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs (see `excluding`).
+    // v4815 -- 153 -> 154 records, fields unmoved: STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs (see `excluding`).
+    // v4818 -- 154 -> 155 records, fields unmoved: STILL_OVER_AT_V4818 in tools/ship/sweepCoverage.mjs (see `excluding`).
     // v4800 -- RE-TAKEN 150 -> 151 with `excluding`, for RETURNED_AT_V4800 (no field on its own lines).
-    currentIncludingModule: Object.freeze({ records: 151, withFields: 72, fields: 399 }),
+    // v4819 -- 155 -> 156 at the merge, fields unmoved: RETURNED_AT_V4800 (the exported-functions line, no field on its own lines).
+    currentIncludingModule: Object.freeze({ records: 156, withFields: 73, fields: 400 }),
     // *** RE-TAKEN AT v4547, AND THIS ROUND IS NOT THE ROUND THAT MOVED IT. *** 90/37/146 -> 91/38/147, one
     // record: BUDGET_DRIFT_V4536, added by commit 4817a29b -- the SWEEP BUDGET round, ten rounds back -- which
     // did not re-take this reading. Nine committed rounds then shipped ALL GREEN over a stale census.
@@ -911,9 +955,25 @@ export const PROBE_AT_V4536 = Object.freeze({
     // world/orreryFleet.mjs -- built by spreading COMMIT_BELT_DRIFT_V4621 and replacing one body, so it carries
     // no numeric field ON ITS OWN LINES and the per-line reader counts none: records moves by one, the other two
     // do not. Re-taken in the round that added it.
+    // v4778 -- RE-TAKEN: 148 / 70 / 379 -> 149 / 70 / 379 at the rtx merge. One arrival, NO_GATE_V4778 in
+    // tools/ship/reportDoors.mjs -- a dated list of two module paths that came in with the rtx line, so a record
+    // with no numeric field: records moves by one, the other two do not. v4540's lesson, arriving through a merge.
+    // v4778 -- 149 / 70 / 379 -> 150 / 71 / 380 at the rtx merge: COMMIT_BELT_DRIFT_V4778 in world/orreryFleet.mjs, the
+    // two bodies the rtx line vendored (male-cns, mikktspace). It spreads v4776's record and carries ONE numeric field on
+    // its own lines, bodiesNow: 22, so all three move by one. Re-taken in the round that added it.
+    // v4813 -- RE-TAKEN: 150 / 71 / 380 -> 151 / 71 / 380. One arrival, STILL_OVER_AT_V4813 in tools/ship/sweepCoverage.mjs --
+    // wgslSpec leaving the oscillator roll when its alone cost crossed too. Its numbers sit inside the stillOver entry
+    // and its top line shares strings, so the per-line reader counts no field on its own lines: records moves by one,
+    // the other two do not. Re-taken in the round that added it.
+    // v4815 -- RE-TAKEN: 151 / 71 / 380 -> 152 / 71 / 380. One arrival, STILL_OVER_AT_V4815 in tools/ship/sweepCoverage.mjs --
+    // headlessGpu and sweepBudget back over on the host the record moved to. Same shape as v4813's: records by one only.
+    // v4818 -- RE-TAKEN: 152 / 71 / 380 -> 153 / 71 / 380. One arrival, STILL_OVER_AT_V4818 in tools/ship/sweepCoverage.mjs --
+    // orreryEjecta back over on the host the record came back to. Same shape again: records by one only.
     // v4800 -- RE-TAKEN: 148 -> 149 records, the other two unmoved. RETURNED_AT_V4800 in tools/ship/sweepCoverage.mjs --
     // its numbers sit inside an array of objects, so the per-line reader counts no field of its own. Re-taken in the round that added it.
-    excluding: Object.freeze({ records: 149, withFields: 70, fields: 379 }),
+    // v4819 -- RE-TAKEN AT THE MERGE: 153 / 71 / 380 -> 154 / 71 / 380. One arrival from the exported-functions line, RETURNED_AT_V4800
+    // in tools/ship/sweepCoverage.mjs -- records by one only, as at v4800 on that line.
+    excluding: Object.freeze({ records: 154, withFields: 71, fields: 380 }),
     // *** FOUR CLASSES, AND THEY MUST ADD UP. ***
     noticed: 83,
     unnoticed: 61,
@@ -1029,6 +1089,60 @@ export const PROBE_AT_V4487 = Object.freeze({
         why: "the guard is an inequality the +7 preserves; a guard is not a re-derivation and a probe is not a proof",
     }),
 });
+
+/**
+ * *** v4778 -- THE STALENESS QUESTION, WITHOUT THE GATE AROUND IT, SO verify.mjs CAN ASK IT. ***
+ *
+ * Keith's rig read tools/ship/frozenRecords-selfcheck.mjs at 5,230 ms against quickSweep's 3,000 ms budget, and
+ * since 9ed30746 the rig's readings are the ones that decide what the sweep runs -- so on the box that decides a
+ * ship, this module's detector did not run at all, and recordReach-selfcheck said so: "NO ROAD". v4639 met the
+ * same fact about recordDrift by giving verify.mjs a step that calls drift() in-process; this is the same road
+ * for the other detector.
+ *
+ * WHAT IT ASKS IS THE GATE'S CORE STALENESS ASSERTION AND NOTHING WIDER: the census this module froze against
+ * the census the tree holds. Section 2 of the gate asserts `excluding` against census({ exclude: /frozenRecords/ })
+ * and the v4487 population against the commit's record list; this asks those, plus `currentIncludingModule`
+ * against the census with this module in it (the gate holds that one only by its difference from `excluding`,
+ * and recordDrift's pre-flight by its record count), plus PROBE_AT_V4487's reconciliation with the replay that
+ * retired it -- the arithmetic section 3 asserts, and the only reading of that record a step can afford.
+ * What it does NOT ask is everything that needs fixtures, git, or the guardian search: the census here is
+ * census({ guardians: false }), the same cheap one recordDrift's pre-flight takes, so it is memoised already
+ * when verify runs this after drift(). The v4487 population is read off SWEEP_COMMIT_RECORD_NAMES, the frozen
+ * list the gate itself falls back to on a shallow clone, and not off git: the gate compares the two, and a
+ * step that shells out to git is a second instrument rather than a cheap one.
+ *
+ * MEASURED on this box, in-process: 518 ms for the including census cold plus 77 ms for the excluding one off
+ * the same per-file record cache. After recordDrift's drift() in the same process the including census is
+ * a memo hit; see verify.mjs step 1c for the cost there.
+ *
+ * Every input is injectable so recordReach-selfcheck can hand this a stale record and watch it say so, which
+ * is what lets that gate count the records below as checked by this step rather than merely named by it.
+ */
+export function stale({ record = PROBE_AT_V4536, old = PROBE_AT_V4487, names = SWEEP_COMMIT_RECORD_NAMES,
+                        take = census } = {}) {
+    const inc = take({ guardians: false });
+    const exc = take({ guardians: false, exclude: /frozenRecords/ });
+    const triple = (c) => `${c.records.length} / ${c.withFields} / ${c.fields}`;
+    const same = (c, f) => !!f && c.records.length === f.records && c.withFields === f.withFields && c.fields === f.fields;
+    const atCommit = new Set(names);
+    const atSweep = exc.records.filter((r) => atCommit.has(r.name)).length;
+    const R = record.v4487Recount || {}, N = R.narrowRuler || {};
+    const rows = [
+        { name: "census excluding this module", stale: !same(exc, record.excluding),
+          detail: `${triple(exc)} live, record says ${record.excluding ? `${record.excluding.records} / ${record.excluding.withFields} / ${record.excluding.fields}` : "nothing"}` +
+                  " -- a round that adds a record re-takes this" },
+        { name: "census including this module", stale: !same(inc, record.currentIncludingModule),
+          detail: `${triple(inc)} live, record says ${record.currentIncludingModule ? `${record.currentIncludingModule.records} / ${record.currentIncludingModule.withFields} / ${record.currentIncludingModule.fields}` : "nothing"}` },
+        { name: "records at the v4487 sweep's commit", stale: atSweep !== R.records,
+          detail: `${atSweep} of today's records are on the commit's list, record says ${R.records}` },
+        { name: "the v4487 record against the replay that retired it",
+          stale: !(R.fields - old.fields === R.neverProbed && R.missedByWindow + R.missedByRuler === R.neverProbed &&
+                   N.fields - old.fields === R.missedByWindow && R.fields - N.fields === R.missedByRuler &&
+                   R.records - N.records === (R.theTwoItCouldNotSee || []).length && record.commit === old.commit),
+          detail: `${old.fields} fields recorded at ${old.commit}, ${R.fields} replayed, ${R.neverProbed} never probed` },
+    ];
+    return { rows, stale: rows.filter((r) => r.stale) };
+}
 
 export function reportLines(c = null) {
     const s = c || census();

@@ -24,6 +24,9 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { REACHED_SOURCES, UNREGISTERED_CITED_BASELINE } from "../../world/reachedLicences.mjs";
+// v4814: every file read through readOnce, so the census (sections 1 and 3) and the consumer counts (section 2) share
+// one read of each file. The rig profile had this gate at 19,182 reads and 8.1 s of its 10.2 s wall; see treeRead.mjs.
+import { readOnce } from "./treeRead.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -37,7 +40,9 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
  * when they are recording a grant rather than mentioning a project in passing. A bare `owner/repo` would drag
  * in every URL and path in the tree, and a scan that flags everything teaches people to ignore it.
  */
+let _cited = null;   // v4814: sections 1 and 3 both ask; the census is the same tree, so walk it once
 function citedRepos() {
+    if (_cited) return _cited;
     const RE = /\b([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\s*\((MIT|Apache-?2\.0|BSD-?3|BSD-3-Clause|GPL-3\.0[^),]*|AGPL-3\.0|CC0)[,)]/g;
     const hits = new Map();
     const walk = (d) => {
@@ -46,7 +51,7 @@ function citedRepos() {
             const p = path.join(d, e.name);
             if (e.isDirectory()) { walk(p); continue; }
             if (!/\.(mjs|js)$/.test(e.name)) continue;
-            const s = fs.readFileSync(p, "utf8").slice(0, 6000);
+            const s = readOnce(p).slice(0, 6000);
             let m; RE.lastIndex = 0;
             while ((m = RE.exec(s))) {
                 const repo = m[1];
@@ -57,7 +62,7 @@ function citedRepos() {
         }
     };
     walk(ENG);
-    return hits;
+    return (_cited = hits);
 }
 
 console.log("citedSources-selfcheck -- whose ideas are in the code, and whether anything says so\n");
@@ -117,7 +122,7 @@ console.log("\n2. *** #53 WAS BUILT BEFORE IT WAS RECORDED, WHICH IS WHY IT SAT 
             if (e.isDirectory()) { walk(p); continue; }
             if (!/\.(mjs|js|html)$/.test(e.name)) continue;
             if (path.relative(ENG, p) === rel) continue;
-            if (fs.readFileSync(p, "utf8").includes(path.basename(rel))) n++;
+            if (readOnce(p).includes(path.basename(rel))) n++;
         } };
         walk(ENG); return n;
     };

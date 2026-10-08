@@ -14,10 +14,11 @@
 // a mitigation nobody has watched fail is not known to be doing anything.
 "use strict";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as HG from "./headlessGpu.mjs";
-import { runWgslCompute, webgpuSkipReason } from "./webgpuHarness.mjs";
+// rig run 10: launched with PARITY_ARGS -- the two backends held to one picture must be on one rasteriser (tools/ship/webgpuHarness.mjs)
+import { runWgslCompute, webgpuSkipReason, PARITY_ARGS } from "./webgpuHarness.mjs";
 // v4647 -- the adapter's nature is READ, not asserted: this file said "a software rasteriser on both
 // sides" in two places, unconditionally, and on Keith's Intel gen-9 through D3D12 both of those are
 // false. The list lives in ONE place and is gated there (localModelProbe-selfcheck), so it is imported
@@ -104,7 +105,7 @@ let SOFT = null, ADAPTER_NAME = "(unread)";
     if (!native.ok || bSkip) { console.log("\nFAIL -- " + (++fails) + " check(s)"); process.exit(1); }
 
     const t0 = Date.now();
-    browser = await runWgslCompute({ code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
+    browser = await runWgslCompute({ launchArgs: PARITY_ARGS, code: CODE, outCount: OUT, uniforms: UNI, workgroups: WG });
     tBrowser = Date.now() - t0;
     ok(browser.ok, "the browser backend runs", browser.ok ? `${browser.adapter?.vendor}/${browser.adapter?.architecture}` : browser.reason);
 
@@ -151,6 +152,31 @@ sec("3. AND THE COMPARISON CAN FAIL, SO SECTION 2 IS A MEASUREMENT");
     ok(brackets === N, "and every value still brackets the f64 answer, which is the WGSL contract", `${brackets} of ${N}`);
 }
 
+// *** v4814 -- SECTION 4'S THREE CHILDREN RUN AT ONCE; 4b'S TWO STILL RUN ONE AFTER THE OTHER, AND THAT WAS MEASURED. ***
+// tools/ship/gateProfile.mjs --rig-slow put this gate at 8.7 s on Keith's Windows rig, 6.2 s of it inside spawnSync --
+// five GPU device starts in series. Section 4's three (a device held at exit, the same with exitCleanly, the harness)
+// do not depend on timing, so they overlap. 4b's per-call control DOES: it crashes only if V8 finalizes a Dawn instance
+// in the middle of a later call, and load moves that. Measured here (4 cores), the per-call probe exited 0 -- a red --
+// in 0 of 20 runs alone, 0 of 25 beside the shared probe, and 8 of 50 five at a time. So 4b stays serial, as it was.
+// *** AND THAT CONTROL WAS ALREADY LOAD-SENSITIVE BEFORE THIS CHANGE, WHICH IS A FINDING, NOT A FIX. *** Three copies of
+// the whole gate at once, ten rounds: the v4813 code went red 3 of 30 and this code 4 of 30, every red that row. Alone
+// it is 0 of 20, and the quick sweep re-runs a red alone before it counts it, so a ship does not see it; a full
+// sweep's 8-wide phase can. The assertions are unchanged; a child reaped at its cap has status null with the signal
+// set, which every row below already treats as not-zero, as spawnSync's did.
+function spawnChild(args, { timeout, env = process.env }) {
+    return new Promise((resolve) => {
+        // spawn's own timeout sends SIGTERM at the cap, as spawnSync's did; the outcome is whatever "close" reports.
+        const ch = spawn(process.execPath, args, { env, stdio: ["ignore", "pipe", "pipe"], timeout, killSignal: "SIGTERM" });
+        let stdout = "", stderr = "";
+        ch.stdout.setEncoding("utf8").on("data", (d) => { stdout += d; });
+        ch.stderr.setEncoding("utf8").on("data", (d) => { stderr += d; });
+        ch.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }));
+        ch.on("error", (e) => resolve({ status: null, signal: null, stdout, stderr: stderr + String(e) }));
+    });
+}
+const texinProbe = (perCall) => spawnChild(["--expose-gc", path.join(HERE, "textureInProbe.mjs")], { timeout: 10000,
+    env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+
 // ---------------------------------------------------------------------------------------------------------
 sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN ASSERTED");
 // ---------------------------------------------------------------------------------------------------------
@@ -180,17 +206,19 @@ sec("4. THE EXIT HAZARD IS REAL, AND ITS EXACT CONDITION IS SPAWNED RATHER THAN 
         const r = await HG.runWgslComputeNative({ code: ${JSON.stringify(CODE)}, outCount: 3,
             uniforms: new Float32Array(64), workgroups: 1 });
         console.log("WORK_OK:" + r.ok);`;
-    const run = (body, tail, timeout = 180000) => spawnSync(process.execPath, ["--input-type=module", "-e", body + "\n" + tail],
-                                          { encoding: "utf8", timeout });
+    const run = (body, tail, timeout = 180000) => spawnChild(["--input-type=module", "-e", body + "\n" + tail], { timeout });
 
-    // v4782 -- THE HAZARD SOMETIMES HANGS INSTEAD OF CRASHING. Measured: of 15 runs of the held child, 8 ended SIGABRT,
-    // 6 SIGSEGV and 1 never exited -- and with this run's 180 s timeout the gate sat past the sweep's 20 s cap, which is
-    // what verify reported as "timed out alone" and what the 11,890 ms reading in the timing record was. A hang is the
-    // same hazard (the process does not exit cleanly after correct work), so this child alone is killed at 10 s and a
-    // kill reads as not-zero, as a crash does. The clean and harness children keep 180 s: they must exit 0.
-    const held = run(holds, "/* exit naturally, still holding the device */", 10000);
-    const heldClean = run(holds, "HG.exitCleanly(0);");
-    const local = run(harness, "/* exit naturally; the harness released its device */");
+    // *** v4814 -- THE CHILD THAT HOLDS ITS DEVICE SOMETIMES HANGS INSTEAD OF CRASHING, AND ALWAYS COULD. *** Measured
+    // here, that child alone: 1 of 8 run one after another and 1 of 40 run five at a time slept in Dawn's exit path
+    // past a 15 s cap; the rest died by SIGABRT or SIGSEGV in under 0.6 s. Under the old 180 s cap that was a 3-minute
+    // run of this gate now and then, which the quick sweep's 20 s alone-cap reads as a red. A hang is the hazard too --
+    // the row asserts "does not exit 0", and a child reaped at its cap has status null -- so this one child gets 10 s:
+    // room for a GPU device start under load, and the WORK_OK row still requires its work to have finished first.
+    const [held, heldClean, local] = await Promise.all([
+        run(holds, "/* exit naturally, still holding the device */", 10000),
+        run(holds, "HG.exitCleanly(0);"),
+        run(harness, "/* exit naturally; the harness released its device */"),
+    ]);
 
     ok(/WORK_OK:true/.test(held.stdout), "the child holding a device COMPLETES ITS WORK",
        "which is the whole trap: the numbers are right and the process still dies");
@@ -227,17 +255,30 @@ sec("4b. ONE DAWN INSTANCE PER PROCESS, BECAUSE A FINALIZED ONE KILLED THE NEXT 
     // the absence of fail is not known to do anything. Only a non-zero exit is asserted for the control: SIGSEGV
     // and SIGABRT both occur, as they do for EXIT_HAZARD, and a hang killed at the 10 s cap reads as one too. Each
     // child takes under a second here; the cap keeps a hang inside the sweep's 20 s alone-cap.
-    const probe = path.join(HERE, "textureInProbe.mjs");
-    const runProbe = (perCall) => spawnSync(process.execPath, ["--expose-gc", probe], { encoding: "utf8", timeout: 10000,
-        env: { ...process.env, SWEK_TEXIN_MODE: "order-gc", ...(perCall ? { SWEK_GPU_INSTANCE_PER_CALL: "1" } : {}) } });
+    // One after the other, and after section 4's children have exited -- see spawnChild above for the measurement.
     const lastMark = (r) => (String(r.stderr || "").match(/^@@ .*$/gm) || ["(no marker)"]).pop().slice(3);
-    const shared = runProbe(false), perCall = runProbe(true);
+    // *** v4815 -- THE CONTROL GETS UP TO THREE ATTEMPTS; THE SHARED ARM STILL GETS ONE. *** The per-call crash is a V8
+    // finalizer landing in the middle of a later call's read-back, and load moves when finalizers run. Measured here (4
+    // cores), the per-call probe exited 0 in 0 of 20 runs alone but 8 of 24 with four other probes beside it, and the
+    // whole gate, three copies at once, went red on this row 3 of 30 (v4813 code) and 4 of 30 (v4814). A fourth draft --
+    // the probe's five calls repeated three times in one child -- cut 8 of 24 to 3 of 24 and doubled the shared arm's
+    // time, so it was dropped. The claim this row carries is "per-call instances crash this sequence and the shared one
+    // does not", and that needs ONE crash, so a run that exits 0 is retried, at most twice. A retry only ever happens
+    // when the first exits 0, so the usual cost is unchanged. The shared arm is NOT retried: one crash there is red.
+    // SABOTAGE (v4815): SWEK_GPU_INSTANCE_PER_CALL removed from the control's env, so every attempt runs the shared
+    // instance -> 1 RED, this row, "3 attempt(s), every one exited 0"; restored md5-identical.
+    const shared = await texinProbe(false);
+    const attempts = [];
+    for (let k = 0; k < 3; k++) { const r = await texinProbe(true); attempts.push(r); if (r.status !== 0) break; }
+    const perCall = attempts[attempts.length - 1];
     ok(shared.status === 0 && /all calls returned/.test(lastMark(shared)),
        "*** the gate's five calls with a forced collection after each COMPLETE, on the shared instance ***",
        `status=${shared.status} signal=${shared.signal}; last step: ${lastMark(shared)}`);
     ok(perCall.status !== 0,
        "*** and the SAME run with an instance per call CRASHES, so the shared instance is the fix and not luck ***",
-       `status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`);
+       perCall.status !== 0
+           ? `attempt ${attempts.length} of at most 3: status=${perCall.status} signal=${perCall.signal}; last step: ${lastMark(perCall)}`
+           : `${attempts.length} attempt(s), every one exited 0 -- the per-call path no longer crashes, so the shared instance is not shown to be the fix`);
 }
 
 // ---------------------------------------------------------------------------------------------------------

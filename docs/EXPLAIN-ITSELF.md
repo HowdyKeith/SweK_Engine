@@ -306,6 +306,14 @@ anybody expects:
 **The narrow claim survives: the tracer has no BVH, and `rtPipeline.mjs` says so itself.** What did not survive
 is the sentence supporting it, and it was hiding the two facts that change what this item should DO.
 
+**v4778 -- and the narrow claim did not survive the rtx merge, so the claim is what changes.** The rtx line's
+71d40a6d ("Add a triangle BVH to rtPipeline, from meshBVH") packs `mesh/meshBVH.mjs`'s build into storage
+buffers and traverses it in WGSL (`rtTraverseBvh`), graded against `raycastFirst`; the NO BVH sentence became
+*"Linear over the spheres"*. The tracer HAS a BVH now, one level: a triangle mesh takes a single BLAS, the
+spheres are still a linear loop, and there is no TLAS anywhere in the file. `tools/ship/absenceScope-selfcheck.mjs`
+asserts both halves from the file itself. So half of the sentence below is done -- rtPipeline points at meshBVH --
+and the two-level half is what stays open.
+
 **So the item shrinks, and its hard part is already solved.** It is not "build a BVH" -- the tree ships one,
 with SAH, graded. It is: **make `mesh/meshBVH.mjs` two-level (a TLAS over instance transforms with a shared
 BLAS) and point `physics/render/rtPipeline.mjs`'s linear-over-geometries loop at it.**

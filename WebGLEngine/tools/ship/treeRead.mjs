@@ -116,7 +116,7 @@ let _walks = 0, _hits = 0, _reads = 0;
 export function stats() { return { walks: _walks, hits: _hits, reads: _reads, roots: _cache.size }; }
 
 /** Drop the memo. Exists for the gate, which must be able to make a cold read on purpose. */
-export function clear() { _cache.clear(); _byPath.clear(); _walks = 0; _hits = 0; _reads = 0; }
+export function clear() { _cache.clear(); _byPath.clear(); _once.clear(); _walks = 0; _hits = 0; _reads = 0; _onceReads = 0; _onceHits = 0; }
 
 function walk(dir, out, skip) {
     let ents;
@@ -204,6 +204,28 @@ export function textOf(p, root = ENG) {
     const hit = idx.get(p);
     return hit ? hit.text : fs.readFileSync(p, "utf8");
 }
+
+// *** v4814 -- ONE READ PER FILE PER PROCESS, FOR THE WALKERS THAT KEEP THEIR OWN RULES. ***
+//
+// treeFiles() serves the censuses that agree on SKIP and SOURCE_EXT. Four gates walk with rules of their own --
+// citedSources adds .html and drops GPU_Assets, windowsImport and orreryEjecta keep vendor/, corpusFilters reads
+// .wgsl and .json -- and each read the same file two or more times in one run. On the sandbox that was invisible
+// (about 0.035 ms a read); on Keith's Windows rig it is about 0.42 ms, and tools/ship/gateProfile.mjs --rig-slow
+// (v4814) measured it as the bulk of those gates' wall: citedSources 8,064 ms of fs in 10,178 (19,182 reads),
+// corpusFilters 5,404 of 8,785 (15,921), orreryEjecta 3,480 of 6,553 (2 x 5,012), windowsImport 3,046 of
+// 4,667 (2 x 4,520). Changing their walks to treeFiles' would move their populations, so they keep their walks
+// and share this memo instead: same files, same bytes, read once. Keyed by the path string the caller passes.
+const _once = new Map();
+let _onceReads = 0, _onceHits = 0;
+export function readOnce(p) {
+    const t = _once.get(p);
+    if (t !== undefined) { _onceHits++; return t; }
+    const s = fs.readFileSync(p, "utf8");
+    _onceReads++; _once.set(p, s);
+    return s;
+}
+/** readOnce's own counters: `reads` hit the disk, `hits` did not. */
+export function readOnceStats() { return { reads: _onceReads, hits: _onceHits, files: _once.size }; }
 
 /** What the last walk of `root` cost, for a gate that wants to report it rather than guess. */
 export function walkCost(root = ENG) {

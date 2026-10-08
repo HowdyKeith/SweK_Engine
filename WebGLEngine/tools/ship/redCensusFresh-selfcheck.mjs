@@ -100,11 +100,13 @@ sec("4. A BOUNDED SUBSET IS RE-RUN, AND A GATE THAT WENT GREEN MAKES THIS RED");
     // matter, this can go back to being budget-bounded; today it is not, and pretending otherwise would be
     // exactly the "pin a number that happens to be true" mistake this file's own history keeps naming.
     const { gates, costMs } = RC.cheapSubset(150000);
-    // v4789: and the register EMPTIED -- shaderRefs, the last gate in it, was repaired -- so "the whole register" is nothing
-    // to re-run; the subset must still be all of it, which is what the first term says
+    // v4778 rig run 3 -- AND THEN THE ONE GATE LEFT WAS FIXED. shaderRefs-selfcheck left the register and `>= 1` went red on
+    // the register being empty, which is the census paid down (redCensus-selfcheck's first row holds the arithmetic of that:
+    // every gate it ever counted, fixed by name). The whole register is still what is covered; it is simply nothing now.
     ok(gates.length === RC.RED_AT_V4279.length && (gates.length >= 1 || RC.RED_AT_V4279.length === 0),
        "the subset covers the ENTIRE register, because the register is now small enough that it fits",
-       `${gates.length} of ${RC.RED_AT_V4279.length} gates, ~${costMs} ms recorded`);
+       RC.RED_AT_V4279.length ? `${gates.length} of ${RC.RED_AT_V4279.length} gates, ~${costMs} ms recorded`
+                              : "the register is EMPTY -- paid down, every gate fixed by name (redCensus-selfcheck, section 1)");
     ok(JSON.stringify(RC.cheapSubset(150000).gates.map((g) => g.gate)) === JSON.stringify(gates.map((g) => g.gate)),
        "and it is DETERMINISTIC, so this gate cannot flap between runs",
        "a random sample would go red on one day and green the next for no reason in the tree");

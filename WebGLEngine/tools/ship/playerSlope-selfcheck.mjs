@@ -277,7 +277,10 @@ console.log("\n6. THE TEST ASKS ABOUT THE GROUND YOU ARE ON, AND IT ASKS IN THE 
     // one. tooSteepDown still fires. The limit is live; only the CLIFF case changed hands.
     ok("!! *** THE BODY LEAVES A RADIUS PAST THE LIP: x = 11.583, THE EDGE MINUS THE DISC, AND FOR A NEW REASON ***",
         d !== null && Math.abs(d.x - 11.583) < 1e-3 && d.slope === 0 &&
-        steepStillFires.airborne === 152 && steepStillFires.slopeDepartures === 3,
+        // 152 and 3 until the kinematic-wiring round: the airborne body now lands on a step under the EDGE of its disc
+        // (camera.js _sweepBodyY), where it used to fall through it to the ground under its centre -- so on a two-per-
+        // column staircase it lands, is too steep to walk down, and departs again, more often. The limit still fires.
+        steepStillFires.airborne === 166 && steepStillFires.slopeDepartures === 5,
         "walking -x off a ledge whose edge is at x=12.0, it leaves the ground at frame " + D("frame", "NEVER") +
         ", x=" + D("x", "-") + ", reading " + D("slope", "-") + " degrees. *** THE SLOPE AHEAD IS NOT THE SLOPE YOU ARE " +
         "ON, *** and `dy < 0` is what keeps the two apart: the probe looks a whole column forward, so it " +

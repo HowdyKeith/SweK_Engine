@@ -151,12 +151,20 @@ ok("the tree holds files whose code carries the term where the claim named two, 
    `named arrivals) against ${BVH_AT_V4435.said.length} the claim named -- not all of them build one, which ` +
    "the field's name does not say and its comment now does");
 
-// *** AND THE NARROW CLAIM SURVIVES, WHICH IS THE HALF THAT IS STILL TRUE. *** The tracer has no BVH. It is
-// asserted from the tracer's own file rather than from the absence of a hit, because an absence read as a
-// pass is v4402's defect.
+// *** AND THE NARROW CLAIM SURVIVED v4435 -- AND DID NOT SURVIVE THE rtx MERGE, SO THE CLAIM IS WHAT CHANGED. ***
+// Until v4778 this row read "the tracer really has no BVH -- rtPipeline.mjs says so in its own words", held by
+// the NO BVH sentence and a `denial` grade. The rtx line's 71d40a6d ("Add a triangle BVH to rtPipeline, from
+// meshBVH") made both false: the sentence became "Linear over the spheres", and the file now packs meshBVH's
+// build into storage buffers and traverses it in WGSL. The row went red on the true thing it could no longer
+// say. It is not deleted and not loosened; it asserts the opposite, from the same file and the same
+// grader, and the half of item 10 that is still open -- TWO-level, a TLAS over instances -- gets its own row.
 const rt = fs.readFileSync(path.join(ENG, "physics", "render", "rtPipeline.mjs"), "utf8");
-ok("the tracer really has no BVH -- rtPipeline.mjs says so in its own words",
-   /NO BVH/i.test(rt) && classifyFile(rt, "bvh") === "denial");
+ok("the tracer HAS a BVH since the rtx merge -- rtPipeline.mjs builds on meshBVH and traverses it in WGSL",
+   !/NO BVH/i.test(rt) && classifyFile(rt, "bvh") === "code" &&
+   /from "\.\.\/\.\.\/mesh\/meshBVH\.mjs"/.test(rt) && /fn rtTraverseBvh\(/.test(rt),
+   "the narrow claim v4435 kept is false as of v4778 -- see BVH_AT_V4435's v4778 note and docs/EXPLAIN-ITSELF.md item 10");
+ok("  ...and it is ONE level: no TLAS anywhere in the file, so item 10's two-level half is still open",
+   !/\btlas\b/i.test(rt), "a single BLAS per scene; the day a TLAS lands this row goes red and item 10 moves again");
 
 // ---- 4. THE FROZEN RECORD MATCHES THE TREE ---------------------------------------------------------------
 console.log("\n4. the record is a record, not a rendering");

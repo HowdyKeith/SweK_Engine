@@ -87,6 +87,18 @@ export function boxId(facts = hostFacts()) {
     return `${f.platform || "?"}-${f.arch || "?"}-${f.cpus || 0}c-${Math.round((f.totalMemMB || 0) / 1024)}gb-${m}`;
 }
 
+/**
+ * v4819 -- AN ID WRITTEN BEFORE v4796 READ IN TODAY'S FORM. Two lines of this tree met at v4819: one had carried memory in
+ * whole gigabytes since v4796, the other still in megabytes, and that one's records -- the shared timing record's `host`,
+ * quickSweep's RECORD_HANDOVERS, the per-box files -- name boxes as `linux-x64-4c-16095mb-142c0d`. The same machine is
+ * `linux-x64-4c-16gb-142c0d` here. Wherever an id from a record is compared with boxId(), it is read through this first,
+ * so a record written in either form names the same box. An id already in gigabytes, or in no known form, is returned as is.
+ */
+export function canonicalId(id) {
+    if (typeof id !== "string") return id;
+    return id.replace(/-(\d+)mb-([0-9a-f]{6})$/, (_, mb, m) => `-${Math.round(Number(mb) / 1024)}gb-${m}`);
+}
+
 // *** THE DENOMINATOR IS gateBudget.MEASURED, AND gate-timings.json IS THE WRONG FILE FOR IT. ***
 //
 // The first version of this module divided by gate-timings.json, which looks like the obvious reference and is

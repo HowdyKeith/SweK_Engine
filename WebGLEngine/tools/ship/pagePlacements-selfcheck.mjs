@@ -61,7 +61,8 @@ console.log("\n2. THE FOUR FACTS ARE INDEPENDENT, AND A PAGE CAN BE IN SEVERAL T
 
     ok("!! a page can be listed in TWO topics at once",
         r.topics.length === 2 && r.topics.includes("cosmic") && r.topics.includes("voxels"),
-        "*** SECTIONS.pages IS A PARTITION AND COULD NOT SAY THIS. *** Keith: \"a page such as Cosmic Map could " +
+        "*** SECTIONS.pages WAS A PARTITION AND COULD NOT SAY THIS (until v4778: \"There can be duplicate links in " +
+        "folder buckets\" -- two sections may now claim one page). *** Keith: \"a page such as Cosmic Map could " +
         "show some or all or none of the sections\" -- so topics is a SET, and the base registry's one-panel-" +
         "per-page shape was a limit of the storage rather than a fact about pages.");
     ok("!! bigButton and apps are independent of topics and of each other",

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 473,
+ "count": 478,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -998,6 +998,13 @@
    "p": 0
   },
   {
+   "f": "es-aircraft.html",
+   "t": "SweK &middot; Real aerodynamic flight",
+   "d": "Real aerodynamic flight: three light aircraft flying under closed-form lift/drag forces (physics/mechanics/aeroSurface.mjs's own thin-airfoil-style Cl/Cd model, summed across wing/elevator/rudder by physics/mechanics/aircraftAssembly.mjs) and integrated by the same Newtonian 6DOF substrate the space-combat pages use (physics/mechanics/rigidBody6dof.mjs) -- not the engine's kinematic flight model. brain/autopilotAircraft.mjs flies each one, a PD heading-hold controller that cycles through a sequence of fixed compass headings (not chasing a moving target point -- a real limitation this page's own header explains). Every module is independently gated before this page wires them together. Answer-key gates: aeroSurface-selfcheck, aircraftAssembly-selfcheck, autopilotAircraft-selfcheck, aircraftPage-selfcheck.",
+   "g": "rtx",
+   "p": 0
+  },
+  {
    "f": "es-away-mission.html",
    "t": "ES Away Mission",
    "d": "The raycast life-box: the GPU Brain boards a derelict and salvages it, autonomously, forever. A first-person raycast interior of corridors, rooms, and doors that open as it approaches. The brain seeks the nearest salvage, routes around walls, secures it, and when the hull is clear a new derelict is drifted in -- it never wins, it just keeps boarding, the way the Living Box never stops flying. seekTarget is the pilot; the GPU Brain drops into the same hook on-rig. Bloom, minimap, a mission ticker. Press P to take the helm.",
@@ -1009,6 +1016,13 @@
    "t": "SweK &middot; Endless Sky on Box3D &mdash; planar fight, 3D view",
    "d": "PLANAR FIGHT, 3D VIEW (the sim is unchanged, only the camera is; formerly labelled Round A): the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
    "g": "endlesssky",
+   "p": 0
+  },
+  {
+   "f": "es-box3d-6dof.html",
+   "t": "SweK &middot; Newtonian 6DOF space combat",
+   "d": "Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. brain/autopilot6dof.mjs flies them (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.",
+   "g": "rtx",
    "p": 0
   },
   {
@@ -1240,6 +1254,13 @@
    "t": "SweK &middot; FLIP/PIC Fluid (WebGPU)",
    "d": "",
    "g": "webgpu",
+   "p": 0
+  },
+  {
+   "f": "fly-connectome.html",
+   "t": "SweK &middot; Fly Connectome",
+   "d": "34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons (not a stylized model) from a one-time Neuprint fetch. Orbit the circuit, pick a neuron, and see its actual synaptic connections to the rest of the circuit. A second mode replays brain/gunnerPolicy.mjs's real turret-gunner AI -- these same 34 neurons ARE its hidden layer -- coloring each one by its real per-tick activation from a recorded duel, hand-tuned versus ES-trained.",
+   "g": "rtx",
    "p": 0
   },
   {
@@ -1534,6 +1555,13 @@
    "t": "Voxel Engine Showcase v2.6",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "install-fsr-caches.html",
+   "t": "Install FSR caches (opt-in)",
+   "d": "Install FSR caches (opt-in): the frame-generation measurement data the release zip leaves out -- twelve harvested caches, about 300 MB -- downloaded from the release tag into WebGLEngine/fsr-caches/ and kept only when each file's sha256 matches the manifest. Only the H3-H16 measurement gates read them; nothing at runtime does.",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2295,7 +2323,7 @@
   {
    "f": "race-brain.html",
    "t": "Race brain on the GPU",
-   "d": "Racing city 3: brain/drivePolicy.mjs is a driving policy in the GPU Brain's own shape -- two MLP layers (9 features, 8 relu, 2 outputs) run through the f32 twin of brain/mlp.js's kernel -- trained by the tree's (1+1)-ES against lap progress, a lap bonus and an off-asphalt penalty, judged the way brain/blobAutoTrain.mjs judges: a held-out track the store ratchets on, an audit track that never votes, and REGRET (the best audit ever seen less the held policy's audit) as the watchdog. Train runs attempts in the browser's idle time (requestIdleCallback) from the stored policy (localStorage) or the hand policy; Race puts the stored brain, the hand, a perturbed brain and the zero policy in ONE box3d world on the seeded grid track in lockstep -- every input from the poses before the step, one step, box3d's state hash folded into the race fingerprint every tick -- with the machine's box3d fingerprint breaking ties, the trucks drawn at their chassis poses on WebGPU or WebGL2. The HUD names the attempts, acceptances, held-out and audit scores, regret, the race order, laps and fingerprint. Not real time as a rule: the race runs at 60 Hz physics per frame, four steps a frame at most.",
+   "d": "Racing city 3: brain/drivePolicy.mjs is a driving policy in the GPU Brain's own shape -- 9 features into a 46-neuron hidden layer taken from a real fly connectome (Janelia's male-cns E-PG compass/ring-attractor circuit, vendor/male-cns/), run through 3 weight-tied recurrent steps over the circuit's own 842 real synapses before a 2-output decoder, all through the f32 twin of brain/mlp.js's kernel -- trained by the tree's (1+1)-ES against lap progress, a lap bonus and an off-asphalt penalty, judged the way brain/blobAutoTrain.mjs judges: a held-out track the store ratchets on, an audit track that never votes, and REGRET (the best audit ever seen less the held policy's audit) as the watchdog. Train runs attempts in the browser's idle time (requestIdleCallback) from the stored policy (localStorage) or the hand policy; Race puts the stored brain, the hand, a perturbed brain and the zero policy in ONE box3d world on the seeded grid track in lockstep -- every input from the poses before the step, one step, box3d's state hash folded into the race fingerprint every tick -- with the machine's box3d fingerprint breaking ties, the trucks drawn at their chassis poses on WebGPU or WebGL2. The HUD names the attempts, acceptances, held-out and audit scores, regret, the race order, laps and fingerprint. Not real time as a rule: the race runs at 60 Hz physics per frame, four steps a frame at most.",
    "g": "racing",
    "p": 0
   },
@@ -2493,6 +2521,13 @@
    "t": "Rock · Paper · Scissors — cyclic dominance",
    "d": "May-Leonard cyclic-competition cellular automaton.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "rtx-viewer.html",
+   "t": "RTX viewer",
+   "d": "physics/render/rtPipeline.mjs's BVH-accelerated compute kernel traces one path-traced sample per frame; render/rtViewer.mjs's accumulate kernel folds it into a running mean (a camera move restarts it at frame 1, which overwrites rather than resets to zero); a fullscreen-triangle present kernel reads that mean directly out of the storage buffer a prior compute pass wrote, with no texture and no copy. Two scenes: a Kenney pavement tile (RTX round 3), or a procedurally generated building (RTX round 5, world/CityGen.js meshed by the same greedy mesher every kaiju world's on-screen terrain already uses) -- toggle with the link in the HUD. Two materials: Lambertian (the default), or a GGX microfacet material with its own multi-scatter energy-compensation lobe (RTX rounds 8-9) -- toggle with the second link. Three skies: a gradient (the default), an analytic captured environment-map atlas baked into a real texture once at load (RTX round 11), or a REAL scene capture -- the same atlas format, baked instead by tracing real rays against the loaded scene's own BVH from its bounds center, the way a reflection probe would (RTX round 13) -- cycle with the third link. Three direct-lighting techniques for the microfacet material -- BSDF sampling (the default, sky-lit only), next-event estimation, or multiple importance sampling, the latter two adding a real light to the scene (RTX round 12) -- cycle with the fourth link. Real per-vertex colour on the procedural city (the pavement tile's own GLB has none) -- off by default (a flat albedo, as every prior round shipped), toggle on with the fifth link to see the city's own baked colour instead (RTX round 15). Drag to orbit, wheel to dolly -- either resets the accumulation, and it sharpens back up over the next second or two; the drag/dolly math itself is render/rtViewer.mjs's own dragOrbit/dollyOrbit (RTX round 16), not inline page arithmetic, so a gate can hold it without a pointer. Real PER-TRIANGLE materials on the procedural city -- one real SBT record per distinct voxel type actually used (stone/dirt/sand/snow/etc., world/chunkMesherCore.js's own PALETTE), selected per-triangle via physics/render/rtPipeline.mjs's own meshMaterials/bvhMatIdx offset (proven correct in isolation since RTX round 4, no production caller until now) -- off by default (one flat mesh-wide material, as every prior round shipped), toggle on with the sixth link (RTX round 17). WebGPU only: the kernel is compute, and WebGL2 has no compute stage to fall back to.",
+   "g": "rtx",
    "p": 0
   },
   {

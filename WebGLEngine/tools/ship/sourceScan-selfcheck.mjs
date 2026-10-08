@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { codeOnly, noComments, prose, codeHas, proseHas } from "./sourceScan.mjs";
+import { codeOnly, noComments, prose, codeHas, proseHas, regexAllowedHere, regexBody } from "./sourceScan.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => {
@@ -201,6 +201,56 @@ console.log("sourceScan-selfcheck -- the two strippers 101 files depend on, driv
     })(ENG);
     say("files checked for a line-count desync: " + filesChecked + "   mismatched: " + mismatched);
     ok("!! *** ZERO files desync tree-wide, down from 180 measured before this fix ***", mismatched === 0);
+}
+
+// *** v4814 -- codeOnly STOPPED LOOKING BACK, SO IT IS HELD TO THE ALGORITHM THAT DID. *** It used to call
+// regexAllowedHere(out) on everything emitted so far at every `/`; it now tracks the same three facts as it emits (see
+// its header). The rewrite was proven byte-identical over all 5,191 .js/.mjs/.cjs/.html files in the tree -- but that
+// proof was a one-off, and a SABOTAGE of the new rule (`<` allowed to open a regex) went ZERO RED across this gate,
+// roundTrip and gateQuality: nothing here pinned it. So the original look-back algorithm is kept below as the
+// REFERENCE, and codeOnly must equal it on fixtures that drive each branch of the rule and on a slice of the tree.
+// SABOTAGED v4814: `<` allowed in codeOnly's rule -> the fixture row red by name; restored.
+console.log("\n9. codeOnly against the look-back algorithm it replaced (v4814)");
+{
+    const reference = (src) => {
+        let out = "", i = 0, mode = null; const n = src.length;
+        while (i < n) {
+            const c = src[i], d = src[i + 1];
+            if (mode === null) {
+                if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
+                if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
+                if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
+                if (c === "/" && regexAllowedHere(out)) { const r = regexBody(src, i); if (r) { out += "/" + src.slice(r.closeAt, r.end); i = r.end; continue; } }
+                out += c; i++; continue;
+            }
+            if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
+            if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") out += "\n"; i++; continue; }
+            if (c === "\\") { i += 2; continue; }
+            if (c === mode) { out += c; mode = null; i++; continue; }
+            if (c === "\n") out += "\n";
+            i++;
+        }
+        return out;
+    };
+    const FIX = [
+        'const a = b / c / d; const r = /x\\/y/g;',            // division after an identifier, regex after `=`
+        'return /ab"c/.test(s); typeof /q/; x = foo[1] / 2;',     // keywords open a regex; `]` ends a value
+        'if (n) / 3; const k = 10 / 2 / 1;',                     // `)` ends a value; a number ends a value
+        '</label><input data="/cloud/x"> <a href="/y">',          // `<` is a closing tag, never a regex opener
+        'var w = await\n  /re/.exec(t); f(x)\n/ 2',             // whitespace and newlines between the two
+        'a.b_$c9 /d/ e; returnx /f/ g; "str" /h/ i',            // identifier runs, a keyword prefix, after a string
+    ];
+    const fixBad = FIX.filter((f) => codeOnly(f) !== reference(f));
+    ok("!! *** codeOnly equals the look-back algorithm on fixtures that drive every branch of the rule ***",
+       fixBad.length === 0, fixBad.length ? "DIFFER: " + fixBad.map((f) => JSON.stringify(f)).join(" | ") : `${FIX.length} fixtures`);
+    // and on real files: every 40th source in the tree, so a shape no fixture thought of still gets compared
+    const sample = [];
+    (function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor") continue; const q = path.join(d, e.name); if (e.isDirectory()) walk(q); else if (/\.(m?js|cjs|html)$/.test(e.name)) sample.push(q); } })(ENG);
+    sample.sort();
+    const picked = sample.filter((_, k) => k % 40 === 0);
+    const treeBad = picked.filter((f) => { const t = fs.readFileSync(f, "utf8"); return codeOnly(t) !== reference(t); });
+    ok("!! ...and on a slice of the tree: every 40th source file, compared byte for byte",
+       picked.length > 50 && treeBad.length === 0, `${picked.length} files` + (treeBad.length ? `, DIFFER: ${treeBad.slice(0, 3).map((f) => path.relative(ENG, f)).join(", ")}` : ", all equal"));
 }
 
 if (fails) { console.log("\nsourceScan-selfcheck: " + fails + " FAILURES"); process.exit(1); }

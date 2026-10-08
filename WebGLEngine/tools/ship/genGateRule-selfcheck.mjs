@@ -13,8 +13,12 @@ import { fileURLToPath } from "node:url";
 import { features, featuresV2, N_FEATURES, N_FEATURES_V2, auc } from "../../render/genGate.mjs";
 import { RULE_KEYS, declared, readDoc, minFoldsFor, seededRng } from "./foldStats.mjs";
 import { PREREG_H6, RESULT_H6, EPS, CELLS, ruleScore, checkCell, matchesMeta, loadCell, sceneAucs, h6Cell, h6 } from "./genGateRule.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("genGateRule-selfcheck", Object.values(CELLS).map((c) => c.cache));
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };

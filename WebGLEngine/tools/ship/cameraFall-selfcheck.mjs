@@ -101,10 +101,15 @@ const kaijuCopy = (feet, reach) => {
 console.log("\n1. *** FOUR IMPLEMENTATIONS OF ONE RULE, TWO OF THEM SIX LINES INSIDE A CAMERA ***");
 {
     const camSrc = fs.readFileSync(path.join(ENG, "camera", "camera.js"), "utf8");
-    const integrations = camSrc.match(/^\s*this\._(?:fpVelY|kaijuDriveVelY)\s*[-+]=\s*this\._gravity/gm) || [];
+    const integrations = camSrc.match(/this\._(?:fpVelY|kaijuDriveVelY)\s*[-+]=\s*this\._gravity/g) || [];
     const calls = camSrc.match(/fallStep\(\{/g) || [];
-    ok("!! camera.js integrates no gravity of its own, and calls the gated module twice instead",
-        integrations.length === R.integrationsInCameraAfter && calls.length === 2 &&
+    // v4778 -- 2 -> 4 CALLS AT THE RTX MERGE, AND THE PATTERN ABOVE NOW MATCHES ANYWHERE ON A LINE. The merge brought two
+    // more fall paths into camera.js: _moveFPTerrain (non-voxel height-field worlds, task #13) and _moveFPCapsule
+    // (collider-BVH worlds, task #80). The terrain path was routed through fallStep at the merge; the capsule path
+    // arrived integrating gravity inline behind an `if`, which the old line-start pattern could not see. Both now
+    // call fallStep with the camera's gravity and terminal -Infinity, so the rule holds: four calls, zero copies.
+    ok("!! camera.js integrates no gravity of its own, and calls the gated module instead (four sites since v4778)",
+        integrations.length === R.integrationsInCameraAfter && calls.length === 4 &&
         R.integrationsInCameraBefore === 2 && R.copiesAfter === R.copiesBefore - 2 &&
         /import \{ fallStep \}/.test(camSrc),
         integrations.length + " gravity integrations and " + calls.length + " fallStep calls, against " +
@@ -250,8 +255,9 @@ console.log("\n6. WHAT IS DELIBERATELY UNCHANGED, BECAUSE REMOVING A DUPLICATE M
     const camSrc = fs.readFileSync(path.join(ENG, "camera", "camera.js"), "utf8");
     const grav = camSrc.match(/gravity:\s*-this\._gravity/g) || [];
     const term = camSrc.match(/terminal:\s*-Infinity/g) || [];
-    ok("!! both calls pass the CAMERA's gravity and the camera's absent terminal, not the module's",
-        grav.length === 2 && term.length === 2 && R.gravityPassedThrough === 18 &&
+    // v4778 -- four calls since the rtx merge (see section 1); every one passes the camera's own numbers.
+    ok("!! every call passes the CAMERA's gravity and the camera's absent terminal, not the module's",
+        grav.length === 4 && term.length === 4 && R.gravityPassedThrough === 18 &&
         R.terminalPassedThrough === -Infinity,
         grav.length + " call(s) pass `gravity: -this._gravity` (" + R.gravityPassedThrough + ", the " +
         "camera's own) and " + term.length + " pass `terminal: -Infinity`. fallBody's defaults are -20 and " +
@@ -284,9 +290,12 @@ console.log("\n7. the record is what the code reports now");
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nnot done here: physics/character/kinematic.js's stepCharacter is the fourth implementation and is " +
-    "left alone -- it is a MESH controller with its own isSolid contract and no shipping caller in this " +
-    "tree, so folding it into fallBody would be a change without a measurement behind it; the kaiju's " +
+    "\nnot done here: physics/character/kinematic.js's stepCharacter WAS the fourth implementation and is " +
+    "not one any more -- the kinematic-wiring round routed its vertical velocity through fallBody.fallStep " +
+    "(no surface oracle; moveCharacter keeps the geometry), bit-identical below the clamp and fallBody's -55 " +
+    "at it, so the rule has ONE integrator in physics/character/ (the record above stays at its v4548 reading, " +
+    "2 copies, because it counts what was measured then); and camera.js's _sweepBodyY sweeps the player's air " +
+    "move with moveCharacter AFTER fallStep, and the player still passes its own gravity, 18; the kaiju's " +
     "body is still probed as a 2-cell one though the creature stands eight units tall, which is the " +
     "capsule question and its own round; and the gravity and terminal disagreements v4547 measured are " +
     "passed through rather than resolved, for the reason section 6 gives.");

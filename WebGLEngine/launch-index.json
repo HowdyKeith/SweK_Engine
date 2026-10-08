@@ -21,9 +21,9 @@
   }
  },
  "counts": {
-  "page": 473,
+  "page": 478,
   "demo": 49,
-  "builtin": 34
+  "builtin": 38
  },
  "entries": [
   {
@@ -1164,6 +1164,14 @@
   },
   {
    "kind": "page",
+   "id": "es-aircraft.html",
+   "display": "Es Aircraft",
+   "href": "/es-aircraft.html",
+   "section": "RTX",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-away-mission.html",
    "display": "Es Away Mission",
    "href": "/es-away-mission.html",
@@ -1180,10 +1188,18 @@
   },
   {
    "kind": "page",
+   "id": "es-box3d-6dof.html",
+   "display": "Es Box3d 6dof",
+   "href": "/es-box3d-6dof.html",
+   "section": "RTX",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-box3d-fly3d.html",
    "display": "Es Box3d Fly3d",
    "href": "/es-box3d-fly3d.html",
-   "section": "Game: Endless Sky",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -1440,6 +1456,14 @@
    "display": "Fluid Webgpu",
    "href": "/fluid-webgpu.html",
    "section": "WebGPU",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fly-connectome.html",
+   "display": "Fly Connectome",
+   "href": "/fly-connectome.html",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -1776,6 +1800,14 @@
    "display": "IndexPlus",
    "href": "/indexPlus.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "install-fsr-caches.html",
+   "display": "Install Fsr Caches",
+   "href": "/install-fsr-caches.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -2647,7 +2679,7 @@
    "id": "race-brain.html",
    "display": "Race Brain",
    "href": "/race-brain.html",
-   "section": "Racing City",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -2872,6 +2904,14 @@
    "display": "Rps",
    "href": "/rps.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rtx-viewer.html",
+   "display": "Rtx Viewer",
+   "href": "/rtx-viewer.html",
+   "section": "RTX",
    "collision": false
   },
   {
@@ -4359,6 +4399,38 @@
    "id": "fp_control",
    "display": "First Person CONTROL — Your World (Round 31)",
    "href": "/?go=fp_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "controller_lab",
+   "display": "CONTROLLER LAB — Non Voxel Terrain + Capsule Collision",
+   "href": "/?go=controller_lab",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_walk",
+   "display": "SPLAT WALK — Walking A Live Gaussian Splat Scene With Capsule Collision",
+   "href": "/?go=splat_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "splat_voxel_walk",
+   "display": "SPLAT VOXEL WALK — A Gaussian Splat Level Walked As A Voxel World, Its Capture Holes Counted",
+   "href": "/?go=splat_voxel_walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "platform_carry",
+   "display": "PLATFORM CARRY — Moving/Rotating Platform, Real CarryOnPlatform()",
+   "href": "/?go=platform_carry",
    "section": null,
    "collision": false
   },

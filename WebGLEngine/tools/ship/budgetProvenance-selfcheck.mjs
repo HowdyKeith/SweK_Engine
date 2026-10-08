@@ -293,8 +293,11 @@ console.log("\n4. *** THE GATE GUARDING THE TABLE CHECKED budgetFor AGAINST budg
     const MEASURED_BLOCK = GB_SRC.slice(GB_SRC.indexOf("export const MEASURED = {"));
     const spelledDerived = derived.filter((k) => new RegExp('"' + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
                                                             '":\\s*slowestRun\\(').test(MEASURED_BLOCK));
-    ok("...and the twelve entries that do carry runs are each the SLOWEST of them, computed here from the runs",
-        derived.length === 12 && derived.every((k) => MEASURED[k] === localMax(k)) &&
+    // v4778 -- 12 -> 13 at the rtx merge: tools/ship/rigidBody6dofPage-selfcheck.mjs arrived with no cost
+    // evidence and was measured into MEASURED_RUNS, four completions alone -- the row gateBudget-selfcheck says a
+    // new entry owes. A PROVENANCED ROW ARRIVING moves this count; the bare count beside it is the ratchet.
+    ok("...and the thirteen entries that do carry runs are each the SLOWEST of them, computed here from the runs",
+        derived.length === 13 && derived.every((k) => MEASURED[k] === localMax(k)) &&
         derived.every((k) => MEASURED_RUNS[k].runs.every((r) => r.code === 0)),
         `${derived.length} rows, ${derived.reduce((n, k) => n + MEASURED_RUNS[k].runs.length, 0)} recorded runs, ` +
         "every one a completion. The maximum is re-implemented in this file rather than read back through " +
@@ -303,7 +306,7 @@ console.log("\n4. *** THE GATE GUARDING THE TABLE CHECKED budgetFor AGAINST budg
         spelledDerived.length === derived.length,
         `${spelledDerived.length} of ${derived.length} written as \`slowestRun("...")\` in the table text. A ` +
         "literal typed in its place would agree on the day it was typed and drift silently after -- which is the " +
-        "difference between these twelve rows and the fifty that are bare numbers.");
+        "difference between these thirteen rows and the fifty that are bare numbers.");
 }
 
 // ---------------------------------------------------------------------------
@@ -329,14 +332,14 @@ console.log("\n5. THE SENTENCE THAT WAS FALSE, AND THE COUNT THAT MAKES IT FALSE
     ok("*** most of this table cannot say how its number was obtained ***",
         bare.length > names.length / 2 && bare.length === barBase,
         `${bare.length} of ${names.length}. "Every named budget is derived from a recorded completion, not a guess" ` +
-        "was the sentence over the retired row; it is true of twelve. The prose beside each entry often names a " +
+        "was the sentence over the retired row; it is true of thirteen. The prose beside each entry often names a " +
         "round and a stopwatch, and prose is not a field -- no check can read it, which is the whole lesson of " +
         "v4580 arriving one table over.");
 
-    ok("...and three of the twelve say outright that they were NOT observed here",
+    ok("...and three of the thirteen say outright that they were NOT observed here",
         notHere.length === 3,
         notHere.map((k) => k.split("/").pop()).join(", ") + " carry observedHere:false. So even the provenanced " +
-        "twelve are not 'all obtained the same way' -- a row-level flag cannot describe a row whose runs came " +
+        "thirteen are not 'all obtained the same way' -- a row-level flag cannot describe a row whose runs came " +
         "from different machines, which is the same shape as gate-timings' one timestamp for 1289 entries.");
 
     // *** THE CLAIM I WROTE AT v4580 AND DID NOT MEASURE. ***
@@ -365,7 +368,11 @@ console.log("\n6. *** WHAT THE TABLE'S NUMBERS ACTUALLY MEASURE UP TO, WHICH IS 
     const rows = [];
     for (const k of Object.keys(MEASURED)) {
         const g = G.timings[k];
-        const s = (S.codes[k] === 0 && S.timings[k] < S.capMs) ? S.timings[k] : null;
+        // v4815: a sweep reading counts when it FINISHED green, read from `finished` (v4568) rather than inferred from
+        // `< capMs`. redCensus finished at 45,245 ms exit 0 and this row dropped it as if it had been killed, leaving a
+        // 7,205 ms full-suite reading -- taken with the red register empty, which is when that gate has least to do --
+        // as its only observation. SABOTAGE: the `< capMs` proxy put back -> 1 red, this row (redCensus at 19.6x).
+        const s = (S.codes[k] === 0 && !(S.finished && S.finished[k] === false)) ? S.timings[k] : null;
         const obs = [g, s].filter((v) => typeof v === "number");
         if (obs.length) rows.push({ k, m: MEASURED[k], obs: Math.max(...obs), ratio: MEASURED[k] / Math.max(...obs) });
     }
@@ -389,7 +396,8 @@ console.log("\n6. *** WHAT THE TABLE'S NUMBERS ACTUALLY MEASURE UP TO, WHICH IS 
         "the rule working, not drift.");
 
     ok("...so the round's finding is about the PROCESS, not the numbers, and says which",
-        band(0.7, 1.5) >= 40 && Object.keys(MEASURED_RUNS).length === 12,
+        // v4778 -- 12 -> 13, the same arrival as section 4's count: rigidBody6dofPage's four runs.
+        band(0.7, 1.5) >= 40 && Object.keys(MEASURED_RUNS).length === 13,
         `${band(0.7, 1.5)} of ${rows.length} within 1.5x. Four repeated keys, one 24x entry and a tautological ` +
         "guard are all real; 'the table is rotten' would not have survived being measured, and this row is what " +
         "stops the round claiming it.");

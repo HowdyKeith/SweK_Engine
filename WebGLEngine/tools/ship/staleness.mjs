@@ -59,13 +59,18 @@ const GATE_FILE = /^(?!__)[^\\/]*-selfcheck\.mjs$/;
 
 /** Every gate file in the tree. The ONE definition of "a gate exists here". */
 export function gateFiles(dir = ENG, acc = []) {
+    // v4813: the directory listing carries each entry's type, so it is asked instead of a statSync per entry --
+    // 6,181 of them per walk, and the rig took recordDrift-selfcheck (two walks) to 4,982 ms against 2,238 in the
+    // sandbox, where a stat is cheap and on Windows it is not. A symlink still goes to statSync, which follows it
+    // exactly as before, so the set of gates found cannot change.
     let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return acc; }
-    for (const f of entries) {
-        const p = path.join(dir, f);
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return acc; }
+    for (const e of entries) {
+        const f = e.name, p = path.join(dir, f);
         if (SKIP.test(p)) continue;
-        let st; try { st = fs.statSync(p); } catch { continue; }
-        if (st.isDirectory()) gateFiles(p, acc);
+        let isDir = e.isDirectory();
+        if (e.isSymbolicLink()) { try { isDir = fs.statSync(p).isDirectory(); } catch { continue; } }
+        if (isDir) gateFiles(p, acc);
         else if (GATE_FILE.test(f)) acc.push(p);
     }
     return acc;

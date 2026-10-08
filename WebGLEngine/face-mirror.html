@@ -493,6 +493,7 @@ function updateReadouts(m) {
         } catch (e) {}
     }
     window.addEventListener("message", (e) => {
+        if (e.origin !== window.location.origin) return;   // demo:request-thumb hands back a live webcam frame -- only the same-origin viewer may ask
         const d = e.data;
         if (!d || typeof d !== "object") return;
         if (d.type === "demo:set") {
@@ -551,6 +552,7 @@ function updateReadouts(m) {
     const src = createMoveFaceSource();
     // the relay: the host posts {type:"swek:move"} in, because a frame cannot hear its parent's window events
     addEventListener("message", (e) => {
+      if (e.origin !== window.location.origin) return;
       const d = e && e.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "swek:move" && typeof d.move === "string") src.setMove(d.move);

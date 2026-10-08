@@ -115,10 +115,20 @@ const _esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").repla
  * Idempotent -- a page that probes twice gets one banner. Returns false when there is nothing to say.
  * @param {object} probe a describeWebGPU() result
  * @param {Document} [doc] injected rather than reached for, so the module stays testable without a browser
+ * @param {{autoHideMs?: number, dismissible?: boolean, onDismiss?: () => void, setTimeout?: Function}} [opts]
+ *   task board #75. All three default to the ORIGINAL behaviour (no auto-hide, no dismiss link, real
+ *   setTimeout) so the 16 existing callers -- none of which pass opts -- are unaffected.
+ *   autoHideMs:   > 0 removes the banner on its own after this many ms (server.html: 10000).
+ *   dismissible:  adds the "do not ask again this session" link from originHelpHtml and wires its click to
+ *                 remove the banner and call onDismiss -- what "this session" MEANS (sessionStorage, a flag,
+ *                 anything) is the CALLER's decision, kept out of this module the same way describeWebGPU's
+ *                 own header keeps every global an argument rather than reaching for one.
+ *   setTimeout:   injected so a gate can capture-and-fire the timer deterministically instead of waiting on
+ *                 a real one; defaults to the real global.
  */
-export function showOriginBanner(probe, doc) {
+export function showOriginBanner(probe, doc, opts = {}) {
     const d = doc || (typeof document !== "undefined" ? document : null);
-    const html = originHelpHtml(probe);
+    const html = originHelpHtml(probe, opts);
     if (!d || !html || !d.body) return false;
     if (d.getElementById("swek-origin-banner")) return true;
     const el = d.createElement("div");
@@ -127,23 +137,51 @@ export function showOriginBanner(probe, doc) {
     // purpose, so it is never hidden behind a page's own UI -- but that same top strip is exactly where HUD
     // bars put their own buttons (es-box3d-fly3d.html's Reset battle button lives at top:8px). A banner that
     // eats pointer events there makes every such button silently unclickable for as long as the origin stays
-    // insecure, which is worse than the thing it is warning about. The one link inside gets pointer-events:auto
-    // back explicitly, so the banner reads and its route-(1) link still clicks.
+    // insecure, which is worse than the thing it is warning about. Every link inside (the route-(1) one, and
+    // now the optional dismiss one) gets pointer-events:auto back explicitly, so the banner reads and both
+    // still click.
     el.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#1a1206;" +
         "border-bottom:1px solid #6a4d12;color:#f0dfb0;font:12px/1.55 ui-monospace,Menlo,monospace;" +
         "padding:9px 14px;box-shadow:0 2px 14px rgba(0,0,0,.5);pointer-events:none";
     el.innerHTML = html;
-    const link = el.querySelector && el.querySelector("a");
-    if (link) link.style.pointerEvents = "auto";
+    const links = el.querySelectorAll ? el.querySelectorAll("a") : (el.querySelector ? [el.querySelector("a")].filter(Boolean) : []);
+    for (const a of links) if (a) a.style.pointerEvents = "auto";
     d.body.appendChild(el);
+
+    const remove = () => { if (el.parentNode && el.parentNode.removeChild) el.parentNode.removeChild(el); };
+    if (opts.autoHideMs > 0) {
+        const timer = opts.setTimeout || (typeof setTimeout !== "undefined" ? setTimeout : null);
+        if (timer) timer(remove, opts.autoHideMs);
+    }
+    if (opts.dismissible) {
+        const dismissEl = d.getElementById && d.getElementById("swek-origin-banner-dismiss");
+        if (dismissEl && dismissEl.addEventListener) {
+            dismissEl.addEventListener("click", (e) => {
+                if (e && e.preventDefault) e.preventDefault();
+                remove();
+                if (typeof opts.onDismiss === "function") opts.onDismiss();
+            });
+        }
+    }
     return true;
 }
 
-export function originHelpHtml(probe) {
+/**
+ * @param {object} probe a describeWebGPU() result
+ * @param {{dismissible?: boolean}} [opts] task board #75 -- server.html (the page reached BEFORE any WebGPU
+ *   sub-page, so its own copy of this banner needs an escape hatch the 16 per-page callers never asked for)
+ *   passes {dismissible:true} to add a "do not ask again this session" link beside the localhost one. Every
+ *   existing caller passes no opts, so this defaults false and their HTML is byte-for-byte unchanged.
+ */
+export function originHelpHtml(probe, opts = {}) {
     if (!probe || probe.reason !== "insecure-origin" || !probe.localUrl) return "";
     const u = _esc(probe.localUrl);
+    const dismiss = opts.dismissible
+        ? ' <a href="#" id="swek-origin-banner-dismiss" style="color:#f0dfb0;text-decoration:underline;opacity:.85">Do not ask me again this session</a>'
+        : '';
     return '<b>WebGPU needs a secure origin</b>, and this page is not one \u2014 so the browser does not expose it here.' +
-        '<br><a href="' + u + '" style="color:#8fd1ff;font-weight:700">\u25b6 Click here to run it on localhost</a> ' +
+        '<br><a href="' + u + '" style="color:#8fd1ff;font-weight:700">\u25b6 Click here to run it on localhost</a>' +
+        dismiss + ' ' +
         '<span style="opacity:.72">\u2014 same page, same server, but over <code>localhost</code>, which counts as secure. ' +
         'Only works if you are AT the machine serving this page; from another device use the Public tunnel instead.</span>';
 }

@@ -1307,6 +1307,36 @@ export const REACHED_SOURCES = Object.freeze([
              "that predate this reading. So the part credited to a third party and the part taken are disjoint, " +
              "and src/collider.ts is the author\'s own code over a three.js utility.",
     },
+    {
+        // v4778 -- cited in ui/precisionProbe.mjs since v4612 on the rtx line and registered by nobody, which the
+        // merge carried onto main as debt 52 against a baseline of 51. Cleared the way v4647q cleared the entry
+        // above: a shallow clone of the upstream and its licence read first-hand, not taken from the header.
+        repo: "gkjohnson/webgl-precision", sourceUrl: "https://github.com/gkjohnson/webgl-precision",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Garrett Johnson", year: 2021,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2021 Garrett Johnson. READ FIRST-HAND at v4778 from a clone whose HEAD is " +
+             "f75d0aec16332ce6d371e75077655f08daa7b362 -- the same commit ui/precisionProbe.mjs's header pins: " +
+             "LICENSE, 21 lines, sha256 2df239f3787d174fbd6ead7bc4c748bee526564aa2e67315afcae47e15552e00, " +
+             "unmodified MIT text. The copyright line names a person and all 14 commits carry that name, so " +
+             "the chain is the GLSL-PathTracer entry's shape rather than collider-forge's. The file taken from, " +
+             "src/ComputePrecisionShader.js (133 lines, sha256 " +
+             "1db0d418643e04e09ef0ce50d575725a0e2b19dfb93ad75aaf8c8ff7dd536247), carries no licence block of its " +
+             "own; its grant is the repository root's.",
+        redistributable: true, posture: POSTURE.REACHED,
+        taken: "ONE GLSL FUNCTION, hand-adapted: computePrecision() -- add a shrinking power of two to 1.0 until " +
+             "it stops registering, shift an int or uint until it turns negative or wraps -- each run in a local " +
+             "and in a struct field, in both stages. Rewritten as GLSL ES 3.00, this tree\'s WebGL2 dialect, " +
+             "with MODE as a real #define instead of three.js\'s `defines`. No bytes vendored, and no three.js " +
+             "taken with it.",
+        takenPaths: ["ui/precisionProbe.mjs"],
+        citedPaths: ["tools/ship/precisionProbe-selfcheck.mjs"],
+        why: "*** grantorHoldsRights IS true FOR THE SAME CHECK THAT MADE IT false FOR DaveFace: WHAT THE AUTHOR " +
+             "CREDITS TO SOMEONE ELSE, AGAINST WHAT WAS TAKEN. *** The README credits ARM\'s two mobile-GPU " +
+             "precision articles, and scopes that credit to the VISUAL test shader (src/YouiPrecisionShader.js, " +
+             "whose one citation is the ARM post), and points to computePrecision, credited to nobody, for how the " +
+             "bits are counted. The part credited to a third party is the part this tree did NOT take, so the " +
+             "two are disjoint, and the function taken is the author\'s own.",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */
@@ -1363,6 +1393,10 @@ export const REACHED_SOURCES = Object.freeze([
 // HEAD commit, and two named ways the evidence is WEAKER than the GLSL-PathTracer entry's -- the copyright
 // line names no person, and the file actually read carries no licence block of its own. The debt is 51
 // again, which equals the baseline, and the baseline has still never been raised.
+//
+// v4778 -- the rtx merge brought ui/precisionProbe.mjs (v4612 on that line), citing gkjohnson/webgl-precision
+// (MIT) with no entry, and the debt read 52 against 51 again. Cleared by the same clone-and-read, entry above.
+// 51, and still never raised.
 export const UNREGISTERED_CITED_BASELINE = 51;
 
 export function validateEntry(e) {

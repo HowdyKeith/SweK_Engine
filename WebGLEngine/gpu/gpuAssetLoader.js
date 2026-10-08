@@ -1097,9 +1097,10 @@ export class GPUAssetLoader {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
         const buf = await res.arrayBuffer();
 
-        let FBXLoader, parseFbx, normalizeFbxGroup;
+        let FBXLoader, LoadingManager, parseFbx, normalizeFbxGroup;
         try {
             ({ FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js"));
+            ({ LoadingManager } = await import("/vendor/three/three.module.js"));
             ({ parseFbx, normalizeFbxGroup } = await import("./fbxLoad.js"));
         } catch (e) {
             const msg = String(e && e.message || e);
@@ -1114,8 +1115,17 @@ export class GPUAssetLoader {
             throw e;
         }
 
-        const group = await parseFbx(buf, FBXLoader, { path: url.replace(/[^/]*$/, "") });
-        const parsed = normalizeFbxGroup(group);   // task #59 -- animations mapped now
+        // v4 gap-closure round — a fresh LoadingManager per load, handed to
+        // FBXLoader (which passes it straight to its own TextureLoader calls,
+        // same as three.js's other loaders). parseFbx() awaits this manager's
+        // onLoad before returning WHEN the parsed scene actually has a texture
+        // map to wait for (see gpu/fbxLoad.js's header for why the wait is
+        // conditional and why it can't just be "await after parse()" — a
+        // three.js Texture's .image is assigned inside an async image-decode
+        // callback, not synchronously at construction).
+        const manager = new LoadingManager();
+        const group = await parseFbx(buf, FBXLoader, { path: url.replace(/[^/]*$/, ""), manager });
+        const parsed = await normalizeFbxGroup(group);   // now async -- awaits embedded-texture decode
         console.log(`[GPUAssetLoader] FBX "${name}" parsed: ${parsed.positions.length / 3} verts, ${parsed.indices.length} indices` +
             (parsed.skin ? `, rigged (${parsed.skin.joints.length} joints)` : "") +
             (parsed.animations ? `, ${parsed.animations.length} clip(s)` : ""));

@@ -73,15 +73,51 @@ export function patchTexts(dir = PATCHES) {
  * A temporary engine root: this tree by symlink, and beside it `three-patched/<slot>/` holding the given builds (three.tsl.js and
  * three.core.js import the build by a relative path, so each directory is a three of its own). Returns { root, dispose }.
  */
-export function rootWithBuilds(builds) {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "three-patched-"));
-    for (const e of fs.readdirSync(ENG)) fs.symlinkSync(path.join(ENG, e), path.join(root, e));
+export function rootWithBuilds(builds, { fsx = fs } = {}) {
+    const root = fsx.mkdtempSync(path.join(os.tmpdir(), "three-patched-"));
+    const made = [];
+    for (const e of fsx.readdirSync(ENG)) made.push(linkInto(path.join(ENG, e), path.join(root, e), fsx));
     for (const [slot, text] of Object.entries(builds)) {
-        const dir = path.join(root, "three-patched", slot); fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, "three.webgpu.js"), text);
-        for (const e of ["three.tsl.js", "three.core.js"]) fs.symlinkSync(path.join(R185_DIR, e), path.join(dir, e));
+        const dir = path.join(root, "three-patched", slot); fsx.mkdirSync(dir, { recursive: true });
+        fsx.writeFileSync(path.join(dir, "three.webgpu.js"), text);
+        // v4805: the r185 patches run on r185, kept in R185_DIR since vendor/three-webgpu moved to r186; v4778 rig run 2: linkInto, for a box
+        // that refuses file symlinks
+        for (const e of ["three.tsl.js", "three.core.js"]) made.push(linkInto(path.join(R185_DIR, e), path.join(dir, e), fsx));
     }
-    return { root, dispose: () => fs.rmSync(root, { recursive: true, force: true }) };
+    return { root, made, dispose: () => disposeRoot(root, made, fsx) };
+}
+
+/**
+ * *** RIG RUN 2 -- A FILE SYMLINK NEEDS A PRIVILEGE ON WINDOWS, AND THE OVERLAY MADE ONE PER TOP-LEVEL FILE. *** Keith's rig:
+ * "EPERM: operation not permitted, symlink '...\WebGLEngine\.gitignore'", so threeUpstream and threeUpstreamPaths died on
+ * their first line. A DIRECTORY links as a junction, which needs none; a FILE is a symlink where the box allows it, else a
+ * hardlink (same volume), else a copy -- the file only has to read the same through the overlay. Returns { at, kind }.
+ */
+export function linkInto(target, at, fsx = fs) {
+    const dir = fsx.statSync(target).isDirectory();
+    try { fsx.symlinkSync(target, at, dir ? "junction" : "file"); return { at, kind: dir ? "junction" : "symlink" }; }
+    catch (e) { if (dir || (e.code !== "EPERM" && e.code !== "EACCES")) throw e; }
+    try { fsx.linkSync(target, at); return { at, kind: "hardlink" }; }
+    catch { fsx.copyFileSync(target, at); return { at, kind: "copy" }; }
+}
+
+/**
+ * The overlay is removed LINK BY LINK before anything recursive runs, so no recursive delete ever stands on a junction into
+ * the engine tree -- whatever a platform's rm does with one, it is never asked. Anything still a link afterwards is left
+ * where it is and reported, not removed.
+ */
+export function disposeRoot(root, made, fsx = fs) {
+    for (const m of made) { try { fsx.unlinkSync(m.at); } catch { try { fsx.rmdirSync(m.at); } catch { /* reported below */ } } }
+    const left = [];
+    (function walk(d) {
+        for (const e of fsx.readdirSync(d)) {
+            const p = path.join(d, e), st = fsx.lstatSync(p);
+            if (st.isSymbolicLink()) left.push(p); else if (st.isDirectory()) walk(p);
+        }
+    })(root);
+    if (left.length) return { removed: false, left };
+    fsx.rmSync(root, { recursive: true, force: true });
+    return { removed: true, left };
 }
 
 // ---- v4799: THE ISSUES ON r186 AND dev -----------------------------------------------------------------------

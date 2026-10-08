@@ -127,7 +127,7 @@ export const UPSTREAM_CHECKED = Object.freeze([
 ]);
 
 /**
- * *** AND THREE ENTRIES WHOSE spdx IS A CLAIM RATHER THAN A TEXT, WHICH IS NOT THE SAME EVIDENCE. ***
+ * *** AND FIVE ENTRIES (THREE UNTIL v4778) WHOSE spdx IS A CLAIM RATHER THAN A TEXT, WHICH IS NOT THE SAME EVIDENCE. ***
  *
  * world/vendoredLicences.mjs types these correctly already -- NAMED_OTHER, IN_HEADER, FIRST_PARTY -- and the
  * point here is narrower: identify() cannot confirm them, because there is no licence body to read. Saying
@@ -142,4 +142,11 @@ export const NOT_A_LICENCE_BODY = Object.freeze([
         "JavaScript and correctly finds no licence body." },
     { path: "vendor/wasm", why: "first-party AssemblyScript output. There is no licence file because there " +
         "is nobody to ask." },
+    // v4778 -- two more at the rtx merge, each read off its file here rather than typed from memory.
+    { path: "vendor/male-cns", why: "the grant is one line of PROVENANCE.md recording what the Neuprint server " +
+        "declares for male-cns:v1.0 -- 'CC-BY-4.0' as a NAME, not CC-BY's text -- and the same file says the " +
+        "declaration was not re-confirmed against Janelia's own terms. Nothing here for identify() to read." },
+    { path: "vendor/mikktspace", why: "the grant is the zlib text in the header comment of mikktspace.h and " +
+        "mikktspace.c, verbatim; the upstream repository carries no LICENSE file. identify() knows the MIT, " +
+        "0BSD, OFL and Apache bodies and has no zlib clause set, so it correctly returns null here." },
 ]);

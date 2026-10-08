@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!-- es-aircraft.html -- the page wiring for physics/mechanics/aircraftAssembly.mjs and brain/autopilotAircraft.mjs,
+     the last of the three gated slices tools/ship/nextRounds.mjs's rcforge-realistic-flight-model entry scoped
+     ("aircraft assembly", "AI/autopilot", "a demo page" -- the first two shipped in prior rounds, standalone and
+     gated, before this page ever wired them together). Three light aircraft fly REAL aerodynamic forces -- lift
+     and drag from aeroSurface.mjs's own closed-form Cl/Cd model, summed across wing/elevator/rudder surfaces by
+     aircraftAssembly.mjs, integrated by physics/mechanics/rigidBody6dof.mjs -- steered by
+     brain/autopilotAircraft.mjs's PD heading-hold controller through a sequence of fixed compass headings.
+
+     WHY FIXED HEADINGS, NOT WAYPOINT POSITIONS -- a real finding from building this page, not a stylistic
+     choice. A first version of this page's own patrol logic aimed each aircraft at a fixed POINT in space and
+     advanced once "arrived". It looked fine at a distance and fell apart on approach: as a fast aircraft closes
+     on a nearby fixed point, the point's OWN bearing changes faster than autopilotAircraft.mjs's controller can
+     track (a geometric fact about chasing a point, unrelated to any tuning), degrading alignment specifically
+     DURING each close approach and occasionally leaving the aircraft with a large, slow-to-recover heading
+     error right as it should have been arriving. autopilotAircraft.mjs's OWN header already names the fix:
+     "a caller wanting to fly TOWARD a target position derives desiredForward = unit(target.pos - body.pos)
+     itself" is the WRONG pattern for a fast-closing target -- a FIXED DIRECTION has no bearing rate of its own
+     at all. This page instead cycles each aircraft through a sequence of fixed compass headings on a timer, so
+     the controller is only ever asked to acquire-and-HOLD a direction (exactly what its own gate proves works
+     well), never to chase a point.
+
+     THE PATROL STILL VISIBLY WOBBLES ON SOME TURNS, AND THAT IS HONEST, NOT A BUG -- BUT SAY PRECISELY WHAT IS
+     AND ISN'T PROVEN, an adversarial review's own correction to an earlier draft of this comment. autopilotAircraft.mjs's
+     own gate proves clean convergence at 10deg (above 0.999) and 25deg (above 0.99), and proves 120deg does NOT
+     converge (stays bounded, never diverges, but settles well below 0.9) -- this page's own 36-degree-per-turn
+     patrol sits PAST the cleanly-proven 25deg case, in territory that file's own gate does not directly test,
+     not "within the proven range" as an earlier version of this comment claimed. It was chosen there on purpose,
+     to actually SHOW the controller converging under real, watchable dynamics rather than picking turns so
+     gentle nothing interesting ever happens on screen -- but the wobble this produces is real, imperfectly
+     characterised behaviour, not a number this page can point to a gate assertion for.
+
+     Every module this page wires together is independently gated and sabotage-tested BEFORE this page existed:
+     physics/mechanics/aeroSurface-selfcheck.mjs, physics/mechanics/aircraftAssembly-selfcheck.mjs,
+     brain/autopilotAircraft-selfcheck.mjs. This file's own job is just the wiring, proven by
+     tools/ship/aircraftPage-selfcheck.mjs. There is no gravity in this physics substrate (rigidBody6dof.mjs's
+     step() is pure F=ma from an accumulator, nothing else) and no engine in aircraftAssembly.mjs itself (that
+     module is deliberately pure aerodynamic-surface assembly) -- this page adds a simple constant-thrust
+     "engine" at the page level, the same way es-box3d-6dof.html adds its own ENGINE_MOUNT/thrust for
+     rigidBody6dof.mjs ships, which also has no built-in engine concept. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Real aerodynamic flight: three light aircraft flying under closed-form lift/drag forces (physics/mechanics/aeroSurface.mjs's own thin-airfoil-style Cl/Cd model, summed across wing/elevator/rudder by physics/mechanics/aircraftAssembly.mjs) and integrated by the same Newtonian 6DOF substrate the space-combat pages use (physics/mechanics/rigidBody6dof.mjs) -- not the engine's kinematic flight model. brain/autopilotAircraft.mjs flies each one, a PD heading-hold controller that cycles through a sequence of fixed compass headings (not chasing a moving target point -- a real limitation this page's own header explains). Every module is independently gated before this page wires them together. Answer-key gates: aeroSurface-selfcheck, aircraftAssembly-selfcheck, autopilotAircraft-selfcheck, aircraftPage-selfcheck.">
+<title>SweK &middot; Real aerodynamic flight</title>
+<style>
+  html,body { margin:0; height:100%; background:#071018; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:8px; left:10px; right:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  #stat { color:#9fe6c0; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  button { background:#152136; color:#b9d4ff; border:1px solid #2f486c; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; padding:2px 9px; }
+  #hint { position:fixed; bottom:8px; left:10px; color:#5f7590; z-index:2; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#9992; Real aerodynamic flight</b>
+  <span id="stat"></span>
+  <button id="resetBtn" title="respawn the patrol now">&#8635; Reset patrol</button>
+</div>
+<div id="hint">closed-form lift/drag, not a kinematic flight model &mdash; drag to orbit, scroll to zoom</div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+import * as AC from "/physics/mechanics/aircraftAssembly.mjs";
+import { relativeAirflow, applySurfaceForce } from "/physics/mechanics/aeroSurface.mjs";
+import * as AP from "/brain/autopilotAircraft.mjs";
+
+// ---- flight constants (page-level game balance, not gated -- matching es-box3d-6dof.html's own PAGE_AUTOPILOT
+// and ENGINE_MOUNT notes) ----
+const AIRCRAFT_MASS = 600, HX = 3, HY = 3, HZ = 0.6;   // a self-consistent light-aircraft fuselage (real length/
+                                                          // height matching the wing/tail areas), not
+                                                          // aircraftAssembly.mjs's own paper-thin illustrative demo body
+const ENGINE_MOUNT = [-3, 0, 0];   // on-axis, at the tail -- thrust alone induces no torque
+const ENGINE_THRUST = 60;          // measured in scratch to settle to a sane, slowly-rising cruise speed (~30 -> ~32 m/s over several minutes), never stalling or running away
+const N_HEADINGS = 10, LEG_SECONDS = 30;   // 36deg/turn -- see this file's own header for why this sits PAST
+                                             // autopilotAircraft.mjs's own cleanly-proven 25deg case, not "within" its proven range
+const N_AIRCRAFT = 3;
+const CRUISE_SPEED = 30;
+
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+
+/** One tick: mix `controls` (autopilotAircraft.mjs's own decide() output) into aircraftAssembly.mjs's own
+ * per-surface aerodynamic forces PLUS a constant page-level engine thrust, then integrate via
+ * rigidBody6dof.mjs's own step() -- exactly the composition stepAircraft() performs internally, redone here
+ * explicitly so the page can add its own engine force to the SAME accumulator before the single integration
+ * step (stepAircraft() itself has no thrust/engine hook, deliberately -- see this file's own header). Every
+ * function called here is a real, exported, already-gated primitive; nothing about the aerodynamics or control
+ * law is reimplemented. */
+function stepAircraftWithEngine(aircraft, state, controls, dt) {
+    const deflections = AC.mixControls(aircraft, controls);
+    const flow = relativeAirflow(state);
+    const acc = AC.createAccumulator();
+    for (const name of Object.keys(aircraft.surfaces)) {
+        const live = AC.withDeflection(aircraft.surfaces[name], deflections[name]);
+        applySurfaceForce(acc, flow, live);
+    }
+    AC.applyForceAtPoint(acc, [ENGINE_THRUST, 0, 0], ENGINE_MOUNT);
+    return AC.step(state, acc, dt);
+}
+
+function headingSet(n) {
+    const out = [];
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; out.push([Math.cos(a), Math.sin(a), 0]); }
+    return out;
+}
+const HEADINGS = headingSet(N_HEADINGS);
+const LEG_TICKS = Math.round(LEG_SECONDS * 30);
+
+// ---- Three.js scene -- Z-UP, matching the physics body-frame convention aeroSurface.mjs/aircraftAssembly.mjs
+// already established (UP_BODY=[0,0,1] derived from the default span/chord Gram-Schmidt triad) -- so the
+// aircraft's own "up" reads as visually "up" on screen, rather than remapping axes at the render boundary. ----
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071018);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 20000);
+camera.up.set(0, 0, 1);
+camera.position.set(400, -900, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.target.set(0, 0, 0);
+
+scene.add(new THREE.HemisphereLight(0xafe6ff, 0x0a1420, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(300, -400, 600); scene.add(key);
+scene.add(new THREE.AmbientLight(0x223a55, 0.5));
+{
+  const N = 500, pos = new Float32Array(N * 3), rng = makeRng(11);
+  for (let i = 0; i < N; i++) { const r = 4000 + rng() * 2000, th = rng() * Math.PI * 2, ph = Math.acos(rng() * 2 - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th); pos[i * 3 + 2] = r * Math.cos(ph); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xaad4ff, size: 3, sizeAttenuation: false })));
+}
+{
+  const grid = new THREE.GridHelper(6000, 24, 0x2a4a6a, 0x152436);
+  grid.rotation.x = Math.PI / 2;   // GridHelper is built in the X-Z plane by default; rotate into this scene's X-Y "ground"
+  grid.position.z = -400;
+  scene.add(grid);
+}
+
+// materials are shared, module-level objects created ONCE (indexed by aircraft slot) and reused across every
+// newPatrol() -- matching es-box3d-6dof.html's own TEAM/GLOW pattern exactly. An earlier version of this file
+// created two brand-new THREE.MeshStandardMaterial objects INSIDE makeHull() on every call, so every "Reset
+// patrol" click (spawnFleet() -> makeHull() once per aircraft) leaked 2*N_AIRCRAFT Material objects (and their
+// compiled GPU shader programs) forever -- disposeHull() only disposed each child's geometry, which was SAFE
+// for es-box3d-6dof.html's own shared, never-recreated materials but not for materials created fresh per call.
+// Found by an adversarial review before this page was ever committed.
+const HULL_MATS = [0x8fb6d0, 0xd0b08f, 0x9fd08f].map((c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.5, roughness: 0.45 }));
+const GLOW_MATS = [0x4fd0ff, 0xff9a4f, 0x8bff6a].map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.2 }));
+// local nose = +X (aircraftAssembly.mjs's own FORWARD_BODY), span/right = +Y, up = +Z -- the same convention
+// autopilotAircraft.mjs and es-box3d-6dof.html's own hulls already use, needing no re-orientation here.
+function makeHull(idx) {
+  const hullMat = HULL_MATS[idx % HULL_MATS.length], glowMat = GLOW_MATS[idx % GLOW_MATS.length];
+  const g = new THREE.Group();
+  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 6, 12), hullMat); fuselage.rotation.z = Math.PI / 2; g.add(fuselage);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.2, 12), hullMat); nose.rotation.z = -Math.PI / 2; nose.position.x = 3.6; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.4, 6, 0.12), hullMat); g.add(wing);
+  const tailplane = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2, 0.08), hullMat); tailplane.position.x = -3.2; g.add(tailplane);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 1.2), hullMat); fin.position.set(-3.2, 0, 0.6); g.add(fin);
+  const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 10), glowMat); eng.rotation.z = Math.PI / 2; eng.position.x = -3.05; g.add(eng);
+  return g;
+}
+// materials are shared (see above) and deliberately NOT disposed here -- only each aircraft's OWN geometries
+// (6 fresh ones per makeHull() call) need disposing, or a long-running page leaks GPU buffers on every reset.
+function disposeHull(mesh) { for (const child of mesh.children) if (child.geometry) child.geometry.dispose(); }
+
+// ---- flight state ----
+let fleet = [], tick = 0;
+function spawnFleet() {
+  const list = [];
+  for (let i = 0; i < N_AIRCRAFT; i++) {
+    const aircraft = AC.createAircraft();
+    const I = RB.boxInertia({ m: AIRCRAFT_MASS, hx: HX, hy: HY, hz: HZ });
+    const pos = [0, i * 60 - (N_AIRCRAFT - 1) * 30, 0];   // side by side at the start, spread along local Y (span axis)
+    const body = RB.createBody({ mass: AIRCRAFT_MASS, I, pos, q: [1, 0, 0, 0], vel: [CRUISE_SPEED, 0, 0] });
+    const mesh = makeHull(i); scene.add(mesh);
+    // phase-offset each aircraft's heading schedule so the squadron doesn't turn in lockstep -- purely visual, not physics
+    list.push({ aircraft, body, headingIdx: 0, phaseTicks: i * Math.round(LEG_TICKS / N_AIRCRAFT), mesh });
+  }
+  return list;
+}
+function clearFleet(list) { for (const s of list) { scene.remove(s.mesh); disposeHull(s.mesh); } }
+function newPatrol() { clearFleet(fleet); tick = 0; fleet = spawnFleet(); }
+newPatrol();
+
+function stepFleet(dt) {
+  for (const s of fleet) {
+    const scheduleTick = tick + s.phaseTicks;
+    if (scheduleTick > 0 && scheduleTick % LEG_TICKS === 0) s.headingIdx = (s.headingIdx + 1) % HEADINGS.length;
+    const desiredForward = HEADINGS[s.headingIdx];
+    const d = AP.decide(s.body, desiredForward);
+    s.body = stepAircraftWithEngine(s.aircraft, s.body, d.controls, dt);
+    s.lastFacingCos = d.facingCos;
+  }
+  tick++;
+}
+
+function syncScene() {
+  for (const s of fleet) {
+    s.mesh.position.set(s.body.pos[0], s.body.pos[1], s.body.pos[2]);
+    const pq = RB.toPoseQuat(s.body.q);   // [qw,qx,qy,qz] -> Three's (x,y,z,w)
+    s.mesh.quaternion.set(pq[0], pq[1], pq[2], pq[3]);
+  }
+}
+
+function frame() {
+  const dt = 1 / 30;
+  stepFleet(dt);
+  syncScene(); controls.update();
+  renderer.render(scene, camera);
+  const lead = fleet[0];
+  document.getElementById("stat").textContent =
+    `${N_AIRCRAFT} aircraft  ·  tick ${tick}  ·  lead: heading#${lead.headingIdx}/${N_HEADINGS}  facing ${lead.lastFacingCos.toFixed(3)}  speed ${Math.hypot(...lead.body.vel).toFixed(1)} m/s`;
+  requestAnimationFrame(frame);
+}
+document.getElementById("resetBtn").onclick = () => newPatrol();
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// a small debug hook -- read back exact numeric state without scraping rendered pixels, for
+// tools/ship/aircraftPage-selfcheck.mjs's headless assertions.
+window.__aircraftDemo = {
+  state() {
+    return {
+      tick,
+      fleet: fleet.map((s) => ({ headingIdx: s.headingIdx, facingCos: s.lastFacingCos, pos: s.body.pos.slice(), q: s.body.q.slice(), vel: s.body.vel.slice() })),
+    };
+  },
+  newPatrol,
+};
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

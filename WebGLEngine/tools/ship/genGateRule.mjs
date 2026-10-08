@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { auc, N_FEATURES } from "../../render/genGate.mjs";
 import { RULE_KEYS, declared, readDoc, usableFolds } from "./foldStats.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
@@ -27,9 +28,10 @@ export const PREREG_H6 = "render/gate-rule-preregistration.md";
 export const RESULT_H6 = "tools/ship/genGate-rule-result.json";
 export const EPS = 1e-6;    // featuresV2's EPS, so the score is exactly the negation of its third column
 // The two cells the document declares, each already harvested -- by v4699 at x2 and v4701 at x4.
+// v4778 -- each cache in fsr-caches/, its path from tools/ship/fsrCaches.mjs; the results stay in tools/ship/.
 export const CELLS = Object.freeze({
-    "2": Object.freeze({ cache: "tools/ship/genGate-folds7.json.gz", result: "tools/ship/genGate-folds7-result.json" }),
-    "4": Object.freeze({ cache: "tools/ship/genGate-absolute4.json.gz", result: "tools/ship/genGate-absolute4-result.json" }),
+    "2": Object.freeze({ cache: cacheRel("genGate-folds7.json.gz"), result: "tools/ship/genGate-folds7-result.json" }),
+    "4": Object.freeze({ cache: cacheRel("genGate-absolute4.json.gz"), result: "tools/ship/genGate-absolute4-result.json" }),
 });
 
 /** The score: how much the best motion candidate beats no motion. Higher = generation more likely to win. */

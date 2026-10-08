@@ -201,7 +201,7 @@ else {
     ok("  and refuses to pretend when there is no device", /nothing can be drawn/.test(page));
     // Loaded WITHOUT WebGPU flags: this shell cannot present WebGPU to a canvas, so the page's WebGL2 fallback is
     // the route under test, and the HUD must say so. (The WebGPU route is graded in section 2, offscreen.)
-    const { resolvePlaywright, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
+    const { resolvePlaywright, HEADLESS_SHELL, webglLaunchArgs } = await import("./playwrightResolve.mjs");
     const { createRequire } = await import("node:module"); const http = await import("node:http");
     const pw = resolvePlaywright(createRequire(import.meta.url));
     const MIME = { ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".json": "application/json" };
@@ -209,7 +209,7 @@ else {
         if (!f.startsWith(ENG) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { s2.writeHead(404); return s2.end("no"); }
         s2.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" }); s2.end(fs.readFileSync(f)); });
     await new Promise((r) => srv.listen(0, "127.0.0.1", r));
-    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+    const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
     const pg = await br.newPage(); const errs = []; pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
     await pg.goto(`http://127.0.0.1:${srv.address().port}/`, { waitUntil: "load" }); await pg.waitForTimeout(1500);
     const st = await pg.evaluate(() => ({ route: document.getElementById("route").textContent, drawn: document.getElementById("drawn").textContent, t: Number(document.getElementById("t").textContent) }));

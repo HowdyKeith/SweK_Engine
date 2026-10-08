@@ -438,7 +438,29 @@ function isAnalysisRecord(full) {
 // debt with names on them; the CPU references are the case this register has no population for yet -- a module whose
 // consumer is CORRECTLY its gate, as a record's is, but which exports functions, not a measurement.
 // v4781 SABOTAGE: the PREREG_/RESULT_ widening reverted -> 1 red, 188 now vs 184 recorded.
-const ORPHAN_UTIL_BASELINE = 184;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4781 the v4776 merge caught up, four paid down by the detector (184).
+// (the exported-functions line's value, superseded at the v4819 merge) ORPHAN_UTIL_BASELINE = 184;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4781 the v4776 merge caught up, four paid down by the detector (184).
+// *** v4778 -- RAISED FROM 159 TO 188, BY NAME, ON KEITH'S DECISION. *** Over the budget, so no verify ran this over the
+// v4776 and v4778 merges, and Keith's rig run of v4778 read 192. Diffed against a run at 5d3d8d83 (the commit that set
+// 159; it read 157 there): 38 arrived and 3 left (anim/ik, tools/ship/wgslCorpus, world/vendoredLicences) -- 157 + 38
+// - 3 = 192. FOUR WERE CENSUS ERRORS, paid by RECORD_EXPORT above: frameDisagree, frameSwayRep, frameVertical,
+// genGateAbsolute. 188. The other 34 are debt with names on them, named WITHOUT extensions (referenceKind matches
+// basenames, and a note naming them would rescue them from it):
+//   the exported-functions line's CPU references its TSL/WGSL ports are held to, and the runners those ports
+//   replaced -- render/dilate, render/flicker, render/reactive, render/ringFloor, render/temporalLock,
+//   render/luminancePyramidGPU, render/opticalFlowGPU, render/visibilityGPU, render/edgeReveal, render/frameRecorder;
+//   its censuses and appliers -- tools/ship/constantRows, fsr2Coverage, runnerCallers, threePatch, kernelReach,
+//   murmurSpeciesFrames, adapterRecord, deadlineLeak, pixelWorst, thrownRow, pageShot;
+//   commands run by hand with no door -- tools/mesh/mikktRef, tools/ship/ensureDxc, realGpuRun, sweepRotation,
+//   genGateCalibrate, genGateTransfer, world/traderGraphGithub;
+//   libraries with no runtime consumer yet -- anim/reachIK, physics/character/capsuleCollideTsl and capsuleSettle,
+//   physics/mesh/meshBoolean and mikktSpace, ui/precisionProbe.
+// The ceiling catches up to the merges, as v4327's and v4535's did, and excuses none of the 34: each is still wire
+// it, delete it, or show the census wrong about it, and the number may only fall from here.
+// v4778 SABOTAGES: the PREREG_/RESULT_ widening reverted -> 1 red, 192 now vs 188 recorded.
+// v4819 -- AT THE MERGE OF THE TWO LINES, MEASURED: 188, main's ceiling, with nothing added. The exported-functions line's 184
+// are inside main's 188 by name -- main's v4778 count already took that line's modules in through the v4776 merge -- and none
+// of the line's rounds since the split (v4779-v4812) left a new orphan utility. Run over the merged tree, 188 now vs 188.
+const ORPHAN_UTIL_BASELINE = 188;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90); v4145 (92); v4153 (93); merge-of-main re-baseline (159, see above); v4778 the v4776 and v4778 merges caught up by name, four paid down by the detector (188).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

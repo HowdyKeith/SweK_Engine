@@ -30,7 +30,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 import { decodePNG } from "./pngCoverage.mjs";
 import { pngSize, jpegSize, censusTextures, decide, record, RASTER_EXTS, SKIP_DIRS, MIP_FACTOR } from "./textureBytes.mjs";
 import { TODO } from "./todo.mjs";
@@ -75,7 +75,10 @@ sec("1. THE HEADER READERS, AGAINST TWINS WITH DIFFERENT INPUTS");
     ok(`the tree has a JPEG to twin (${jpgs.length})`, jpgs.length >= 1);
     if (jpgs.length) {
         const f = jpgs[0], mine = jpegSize(fs.readFileSync(f));
-        const pw = resolvePlaywright(createRequire(import.meta.url));
+        const pw = resolvePlaywright(createRequire(import.meta.url)), skip = browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL);
+        // v4778 rig: this launched with no check at all and died at null.launch on a box without the package
+        if (skip) ok("jpegSize agrees with the browser's decode -- a browser is needed to ask", false, "SKIPPED, NOT A PASS: " + skip);
+        else {
         const srv = http.createServer((q, s2) => { s2.writeHead(200, { "Content-Type": "image/jpeg" }); s2.end(fs.readFileSync(f)); });
         await new Promise((r) => srv.listen(0, "127.0.0.1", r));
         const br = await pw.chromium.launch({ executablePath: HEADLESS_SHELL });
@@ -83,6 +86,7 @@ sec("1. THE HEADER READERS, AGAINST TWINS WITH DIFFERENT INPUTS");
         const nat = await pg.evaluate((u) => new Promise((res) => { const im = new Image(); im.onload = () => res({ width: im.naturalWidth, height: im.naturalHeight }); im.onerror = () => res(null); im.src = u; }), `http://127.0.0.1:${srv.address().port}/x.jpg`);
         await br.close(); srv.close();
         ok(`jpegSize agrees with the browser's decode of ${path.relative(ENG, f)}: ${mine && mine.width} x ${mine && mine.height}`, !!mine && !!nat && mine.width === nat.width && mine.height === nat.height && mine.width !== mine.height, `browser ${JSON.stringify(nat)}`);
+        }
     }
 }
 

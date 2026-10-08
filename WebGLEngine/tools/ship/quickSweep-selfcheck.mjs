@@ -105,6 +105,11 @@
 // repair it was testing, and SB then ran against the original file and reported 0 red as though the control
 // were dead. Sabotage restores from a copy now. A harness that cannot tell "the fix is absent" from "the fix
 // does not work" is the same defect as a sweep that cannot tell a crash from a green.
+//
+// ---- v4778 RIG RUN SABOTAGE, RESULT BY NAME -------------------------------------------------------------
+//   Q1. the CLI ignores --timings (timingsFile: DEFAULTS.timingsFile), so 8d's command reads the shared record
+//       again -> 1 RED, "ran 12 of 1925 enumerated in 101141 ms": exactly the probation list that put Keith's
+//       rig past the 120 s timeout. Restored from a copy, md5 verified.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -112,7 +117,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Q from "./quickSweep.mjs";
-import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED } from "./gateSweep.mjs";
+import { VERDICT, SWEEP_V4297, REGRESSIONS_REPAIRED, enumerateGates } from "./gateSweep.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, UNCONFIRMED_SLOW, RED_AT_V4484, RED_AT_V4531,
          RED_AT_V4535, RED_AT_V4557, RED_AT_V4562, RED_AT_V4568 } from "./redCensus.mjs";
 
@@ -627,17 +632,29 @@ sec("8c. A FILE SOMETHING ELSE WROTE IS READ, OR REFUSED -- NEVER THROWN ON");
 // ---------------------------------------------------------------------------------------------------------
 sec("8d. --out: THE TOOL WRITES ITS OWN FILE, SO THERE IS NOTHING FOR A REDIRECT TO GET WRONG");
 // ---------------------------------------------------------------------------------------------------------
-// Driven through the REAL command line at a 1 ms budget -- 0 gates run, 0.7 s -- with --no-write, so the
-// tree's timings file is not touched. A source row would pass on a build whose CLI never calls it, which is
-// exactly how the --json branch came to rot two rounds ago in this same tool.
+// Driven through the REAL command line at a 1 ms budget, with --no-write, so the tree's timings file is not
+// touched. A source row would pass on a build whose CLI never calls it, which is exactly how the --json branch
+// came to rot two rounds ago in this same tool.
+// *** v4778 RIG RUN -- "0 GATES RUN, 0.7 s" WAS A PROPERTY OF ONE BOX'S RECORD, NOT OF A 1 ms BUDGET. *** A gate
+// with ONE crossing is on probation and runs at any budget (MIN_CROSSINGS_TO_EVICT), and so does a gate with no
+// reading. The shared record here puts 12 on probation -- meshBooleanBlast and peerBrainFleet among them, both
+// killed at the 20 s cap -- so this command took 105 s on this box against the 120 s timeout, and on Keith's rig,
+// which owns the record now and fills it with its own readings, it went over: "exit null". The row asks whether
+// --out writes the file; it is handed a record of its own in which every enumerated gate is over budget with no
+// crossing, so nothing runs and the answer does not depend on which box last wrote the shared one.
 {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "qs-out-"));
     const out = path.join(tmp, "r.json");
+    const own = path.join(tmp, "timings.json");
+    fs.writeFileSync(own, JSON.stringify({ captured: null, codes: {}, observed: {},
+        timings: Object.fromEntries(enumerateGates(ENG).map((g) => [g, 1e9])) }));
     const timings = path.join(ENG, "tools", "ship", "sweep-timings.json");
     const before = fs.existsSync(timings) ? fs.statSync(timings).mtimeMs : null;
+    const t0 = Date.now();
     const r = spawnSync(process.execPath,
-        [path.join(ENG, "tools", "ship", "quickSweep.mjs"), "--budget", "1", "--no-write", "--out", out],
+        [path.join(ENG, "tools", "ship", "quickSweep.mjs"), "--budget", "1", "--no-write", "--timings", own, "--out", out],
         { cwd: ENG, encoding: "utf8", timeout: 120000 });
+    const tookMs = Date.now() - t0;
     ok(r.status === 0 && fs.existsSync(out),
        "!! *** --out writes the result itself, with no shell redirect anywhere ***",
        `exit ${r.status}. cmd, PowerShell and bash do not agree about redirects; a tool that needs one to ` +
@@ -650,6 +667,10 @@ sec("8d. --out: THE TOOL WRITES ITS OWN FILE, SO THERE IS NOTHING FOR A REDIRECT
     ok(!!parsed.result && parsed.skipped.length === 0,
        "!! ...and what it wrote reads back with NOTHING to skip",
        "the round trip is the claim: this tool's own writer against this tool's own reader");
+    ok(!!parsed.result && parsed.result.ran === 0 && parsed.result.enumerated > 0,
+       "!! ...and it read the record it was HANDED, so what this row measures is --out and not some box's probation list",
+       `ran ${parsed.result ? parsed.result.ran : "?"} of ${parsed.result ? parsed.result.enumerated : "?"} enumerated in ${tookMs} ms. ` +
+       "On the shared record the same command ran 12 gates on probation for 105 s here, and timed out on the rig");
     ok(before === null || fs.statSync(timings).mtimeMs === before,
        "!! --no-write leaves sweep-timings.json untouched",
        "a gate that rewrites the tree's timings file every run is worse than the row it buys");

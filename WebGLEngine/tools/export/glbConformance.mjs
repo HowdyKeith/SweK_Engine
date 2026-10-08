@@ -23,7 +23,8 @@
 // appears, and those are one error wearing two faces.
 //
 // What v4583 added, each proved by breaking it alone against a file that really has the feature (29 cases) or
-// against a built fixture where the tree has no subject at all (8 sparse cases, 0 of 31 files use one):
+// against a built fixture where the tree has no subject at all (8 sparse cases, 0 of 31 files used one then;
+// 1 of 34 does from the v4778 rtx merge, graded clean as a whole file in the gate's section 8):
 // extensionsRequired/Used consistency and a document-wide undeclared-extension walk; accessors with no data
 // source; sparse accessors, INCLUDING applying the override before min/max are recomputed -- without which a
 // correct sparse file reads as ACCESSOR_MIN_MISMATCH; skins and their inverse bind matrices; animation
@@ -517,6 +518,9 @@ export function validate(bytes, { checkNormals = true } = {}) {
     // A NULL RESULT ON THIS TREE and recorded as one: zero of the 31 GLBs on disk carries a sparse accessor,
     // which is precisely why the rules are written from the spec and proved against a built fixture rather
     // than against the corpus. Sparse is the opening item of the import-side round for the same reason.
+    // v4778 -- no longer null: gpu/fixtures/SimpleSparseAccessor.glb arrived with the rtx merge, grades clean
+    // here, and reads as ACCESSOR_MAX_MISMATCH with its sparse block stripped (the gate's section 8). The
+    // rules are still proved one at a time only on the built fixture, since a valid file breaks none.
     accessors.forEach((a, i) => {
         const sp = a.sparse;
         if (!sp) return;

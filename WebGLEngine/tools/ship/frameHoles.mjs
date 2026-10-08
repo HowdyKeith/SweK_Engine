@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { declared, readDoc, minFoldsFor } from "./foldStats.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
@@ -23,7 +24,8 @@ import { FRAME_KEYS, spearman } from "./frameGate.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H8 = "render/frame-holes-preregistration.md";
-export const CACHE_H8 = "tools/ship/frameHoles-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H8 = cacheRel("frameHoles-cache.json.gz");
 export const RESULT_H8 = "tools/ship/frameHoles-result.json";
 // Found by NAME, as frameGate's laplacian is.
 export const HOLE_COL = FEATURE_NAMES.indexOf("holeFrac");

@@ -101,9 +101,47 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  */
 export function trackSurface(track, { spec = CAR, kerbHeight = KERB_HEIGHT } = {}) {
     const pts = centreline(track), n = pts.length;
+    // THE BRUTE-FORCE MINIMUM, PRUNED BUT NOT CHANGED. After the rtx merge (v4778) tools/gunnerTraceDemo-selfcheck.mjs's
+    // --cpu-prof put 16-17 % of its run in this one closure (5.1 s of 31.7, 5.7 of 33.7, two re-takes at the v4778 tree):
+    // eight wheel queries and two along()s a tick, each a Math.hypot over
+    // all ~190 segments of the loop. Now each grid cell keeps, built on its first query, the segments that could be nearest to
+    // ANY point in it: U, the least over segments of the largest distance from the cell's four corners (a distance to a
+    // segment is convex, so its largest over the square is at a corner), bounds every point's minimum, and a segment whose
+    // bounding box lies farther than U + 1e-6 from the cell is strictly farther than that minimum everywhere in it -- it can
+    // neither win nor tie. The kept segments run the original arithmetic in the original index order under the original
+    // strict `<`, so { d, s } is bit-for-bit what the full loop returns (the first minimum, the same t). The proof of that is
+    // the argument above plus a direct comparison -- 3.3 M random, on-vertex and cell-boundary queries against the full loop,
+    // and 1.48 M more on 40 generated tracks in review, matched with no exceptions -- NOT gunnerTraceDemo's re-derived duel:
+    // measured, that duel goes red when the bound is 0 (only overlapping boxes kept) but stays GREEN with the bound halved
+    // (U * 0.5), so it catches a gross prune and not a subtly short one. A point off the grid (or NaN) takes the full loop.
+    // Measured: segDist's self time in that gate's profile 5.0 s -> 0.65 s (5.1 -> 0.55 s on re-take). The lists snapshot
+    // the centreline once, exactly as `pts` already did, and are
+    // built lazily because most of a race never leaves a handful of cells.
+    const segD = (i, x, z) => {
+        const a = pts[i], b = pts[(i + 1) % n], vx = b[0] - a[0], vz = b[1] - a[1], L2 = vx * vx + vz * vz || 1;
+        const t = clamp(((x - a[0]) * vx + (z - a[1]) * vz) / L2, 0, 1), px = a[0] + vx * t, pz = a[1] + vz * t;
+        return Math.hypot(x - px, z - pz);
+    };
+    const grid = Number.isInteger(track.cols) && Number.isInteger(track.rows) && track.cols > 0 && track.rows > 0;
+    const X0 = grid ? track.cols * TILE / 2 : 0, Z0 = grid ? track.rows * TILE / 2 : 0, cells = grid ? new Array(track.cols * track.rows) : [];
+    const cellSegments = (cx, cz) => {
+        const k = cz * track.cols + cx; if (cells[k]) return cells[k];
+        const x0 = cx * TILE - X0, x1 = x0 + TILE, z0 = cz * TILE - Z0, z1 = z0 + TILE; let U = Infinity;
+        for (let i = 0; i < n; i++) U = Math.min(U, Math.max(segD(i, x0, z0), segD(i, x1, z0), segD(i, x0, z1), segD(i, x1, z1)));
+        const lim = U + 1e-6, keep = [];
+        for (let i = 0; i < n; i++) {
+            const a = pts[i], b = pts[(i + 1) % n];
+            const ex = Math.max(Math.min(a[0], b[0]) - x1, 0, x0 - Math.max(a[0], b[0])), ez = Math.max(Math.min(a[1], b[1]) - z1, 0, z0 - Math.max(a[1], b[1]));
+            if (ex * ex + ez * ez <= lim * lim) keep.push(i);
+        }
+        return (cells[k] = keep);   // a plain array: a typed one here moved vba/runtimeGap.mjs's "typed arrays" row by this file
+    };
     const segDist = (x, z) => {
         let best = Infinity, bi = 0;
-        for (let i = 0; i < n; i++) {
+        const cx = Math.floor((x + X0) / TILE), cz = Math.floor((z + Z0) / TILE);
+        const keep = grid && cx >= 0 && cz >= 0 && cx < track.cols && cz < track.rows ? cellSegments(cx, cz) : null, m = keep ? keep.length : n;
+        for (let j = 0; j < m; j++) {
+            const i = keep ? keep[j] : j;
             const a = pts[i], b = pts[(i + 1) % n], vx = b[0] - a[0], vz = b[1] - a[1], L2 = vx * vx + vz * vz || 1;
             const t = clamp(((x - a[0]) * vx + (z - a[1]) * vz) / L2, 0, 1), px = a[0] + vx * t, pz = a[1] + vz * t, d = Math.hypot(x - px, z - pz);
             if (d < best) { best = d; bi = i + t; }

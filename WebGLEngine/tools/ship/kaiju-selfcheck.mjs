@@ -17,6 +17,19 @@
 // switch, with no per-state guard, and the retreat check mutates state BEFORE the switch dispatches -- so a
 // seeking/engaging -> retreating flip happens IN THE SAME TICK's dispatch, not deferred to the next one
 // (sections 4 and 5).
+//
+// *** SECTION 9, ADDED AFTER AN INDEPENDENT ADVERSARIAL-REVIEW WORKFLOW ON task #91 (real integrated
+// gravity, simulation/KaijuManager.js). *** dist here (_tickSeeking's engageRange check, _tickEngaging's
+// disengageRange check and damage exchange) is horizontal-only (x/z, no y) -- correct under #89, where y was
+// always instantly ground-snapped so a horizontal-only check could never diverge from a true 3D one. #91 gave
+// ground kaiju real integrated gravity, so a kaiju can now be _airborne (falling) for real seconds at a time
+// while horizontally close to a target -- a case this file's own sections 2/3a/3b never covered because #91
+// postdates them. Fixed by gating engageRange entry and the damage exchange on `!this._airborne`; disengage
+// range is left as-is (still horizontal-only) since it is not the safety-relevant check.
+// SABOTAGE LOG, section 9: (1) removing `&& !this._airborne` from _tickSeeking's engageRange check --
+// section 9a red by name. (2) removing the `if (this._airborne) return [];` guard from _tickEngaging --
+// sections 9b and 9c both red by name (damage landed while airborne in both). Restored, gate re-confirmed
+// ALL GREEN after each.
 "use strict";
 import { Kaiju, KAIJU_STATE, KAIJU_MACHINE } from "../../simulation/Kaiju.js";
 import { audit } from "../../ui/machine.mjs";
@@ -340,6 +353,74 @@ console.log("\n8. EXTERNAL CONTRACT: tick()'s return shape and the _lastVictim/k
     attacker.tick(0.001, EMPTY, null);
     ok("!! _lastVictim is set to the victim reference on a kaiju kill -- KaijuManager.js reads this exact " +
         "field to emit \"kaiju_victory\"; this migration does not touch it", attacker._lastVictim === victim);
+}
+
+console.log("\n9. TASK #91 ADVERSARIAL-REVIEW FIX: A GENUINELY AIRBORNE KAIJU CANNOT ENGAGE OR LAND MELEE HITS");
+{
+    // Task #91 (simulation/KaijuManager.js) gave ground kaiju real integrated gravity -- a kaiju can now sit
+    // _airborne for up to ~3s (MAX_FALL_S) while horizontally close to a target, something #89's instant
+    // ground-snap never allowed. dist here is horizontal-only (x/z, no y) -- CORRECT for #89's own behaviour,
+    // where y was always snapped instantly so a horizontal-only check could never diverge from a true 3D one.
+    // An independent adversarial review, run AFTER #91's own commit had already shipped, found the horizontal-
+    // only check was carried over unexamined into #91 and now lets a visibly falling kaiju both ENTER combat
+    // (_tickSeeking's engageRange check) and LAND MELEE HITS (_tickEngaging's damage exchange) every tick it
+    // is airborne. _airborne is set ONLY by KaijuManager._resolveGroundKaijuPosition's real-fall branch --
+    // never by flying/swimming kinds' own altitude offsets, which are a different, intentional Y gap -- so
+    // this instance field is exactly the right, narrowly-scoped signal to gate on (a true 3D distance check
+    // would have wrongly blocked flying kinds from ever engaging at all).
+    const civAt = (d) => ({ getAll: () => [{ center: { x: d, y: 0, z: 0 }, energy: 1.0 }], getById: () => null });
+
+    // 9a. entry gate: a target well within ENGAGE_RANGE, but the kaiju is airborne -- must NOT engage.
+    const kEntry = mkKaiju(60, "sky", 0, 20, 0);
+    kEntry.state = KAIJU_STATE.SEEKING;
+    kEntry._airborne = true;
+    kEntry.tick(0.001, civAt(5.9999), null);
+    ok("!! *** airborne + well within ENGAGE_RANGE: does NOT engage -- gated on _airborne, not just distance ***",
+        kEntry.state === KAIJU_STATE.SEEKING);
+
+    // control: the SAME setup, _airborne false -- must engage (proves 9a wasn't vacuously green).
+    const kEntryCtrl = mkKaiju(61, "sky", 0, 20, 0);
+    kEntryCtrl.state = KAIJU_STATE.SEEKING;
+    kEntryCtrl._airborne = false;
+    kEntryCtrl.tick(0.001, civAt(5.9999), null);
+    ok("control: grounded + well within ENGAGE_RANGE: DOES engage", kEntryCtrl.state === KAIJU_STATE.ENGAGING);
+
+    // 9b. attack-execution gate: already engaging, target in range, but airborne -- must deal NO damage, and
+    // must NOT disengage either (target kept, ready to resume the instant it lands).
+    const kAtk = mkKaiju(62, "sky", 0, 20, 0);
+    kAtk.state = KAIJU_STATE.ENGAGING;
+    kAtk._airborne = true;
+    const civAtk = { center: { x: 2, y: 0, z: 0 }, energy: 1.0 };
+    kAtk.target = { type: "civ", ref: civAtk };
+    const energyBefore = civAtk.energy;
+    kAtk.tick(0.001, EMPTY, null);
+    ok("!! *** airborne + target in range: NO damage exchanged this tick ***", civAtk.energy === energyBefore,
+        "civ.energy=" + civAtk.energy);
+    ok("!! ...and still engaging, target kept -- not disengaged just for being airborne",
+        kAtk.state === KAIJU_STATE.ENGAGING && kAtk.target !== null);
+
+    // control: the SAME setup, _airborne false -- must deal damage (proves 9b wasn't vacuously green).
+    const kAtkCtrl = mkKaiju(63, "sky", 0, 20, 0);
+    kAtkCtrl.state = KAIJU_STATE.ENGAGING;
+    kAtkCtrl._airborne = false;
+    const civAtkCtrl = { center: { x: 2, y: 0, z: 0 }, energy: 1.0 };
+    kAtkCtrl.target = { type: "civ", ref: civAtkCtrl };
+    kAtkCtrl.tick(0.001, EMPTY, null);
+    ok("control: grounded + target in range: DOES deal damage", civAtkCtrl.energy < 1.0,
+        "civ.energy=" + civAtkCtrl.energy);
+
+    // 9c. landing resumes combat immediately -- the gate is per-tick, not a one-way disengage.
+    const kResume = mkKaiju(64, "sky", 0, 20, 0);
+    kResume.state = KAIJU_STATE.ENGAGING;
+    kResume._airborne = true;
+    const civResume = { center: { x: 2, y: 0, z: 0 }, energy: 1.0 };
+    kResume.target = { type: "civ", ref: civResume };
+    kResume.tick(0.001, EMPTY, null);
+    ok("while still airborne: no damage yet", civResume.energy === 1.0);
+    kResume._airborne = false;   // lands (KaijuManager.js's own position-resolve would flip this)
+    kResume.tick(0.001, EMPTY, null);
+    ok("!! *** the instant it lands, the SAME target is attacked again -- no re-acquire needed ***",
+        civResume.energy < 1.0 && kResume.state === KAIJU_STATE.ENGAGING, "civ.energy=" + civResume.energy);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +

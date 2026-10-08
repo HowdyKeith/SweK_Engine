@@ -11,12 +11,14 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { declared, readDoc } from "./foldStats.mjs";
 import { holedContrast, h9Cell } from "./frameHoled.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H10 = "render/frame-vertical-preregistration.md";
-export const CACHE_H10 = "tools/ship/frameVertical-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H10 = cacheRel("frameVertical-cache.json.gz");
 export const RESULT_H10 = "tools/ship/frameVertical-result.json";
 export const VERT_KEYS = Object.freeze({ scenes: "list", speed: "str", slabdir: "str", alpha: "num", minFolds: "int", upto: "int", minGroup: "int" });
 

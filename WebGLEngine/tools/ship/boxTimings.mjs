@@ -52,7 +52,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -108,7 +109,7 @@ export function coverageOf(recs, { id = boxId() } = {}) {
     const by = new Map();
     for (const r of recs) {
         const host = r.host || "(unclaimed)";
-        const mine = host === id;
+        const mine = canonicalId(host) === id;   // v4819: a record naming this box in v4796's megabyte form is this box's
         for (const [gate, ms] of Object.entries(r.rec.timings || {})) {
             if (typeof ms !== "number") continue;
             const prev = by.get(gate);
@@ -173,4 +174,24 @@ export function recordLocal(gates, { root = ENG, id = boxId(), capMs = 200000, r
     }
     fs.writeFileSync(abs, JSON.stringify(rec, null, 1) + "\n");
     return { file: rel, host: id, wrote, total: Object.keys(rec.timings).length };
+}
+
+// *** RIG RUN 2 -- A COMMAND FOR IT. *** recordLocal had no front door, so a box whose readings a gate wants (recordReach's
+// margin row reads this box's own ring wherever another box measured the shared one) had no way to give them but code.
+//     node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]
+// runs each gate alone N times (default 3, the ring's depth) and writes this box's per-box record. Parsed by cliArgs, the
+// tree's one parser (rig run 3: the first draft read argv by hand and cliArgs-selfcheck counted it, 13 -> 14).
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+    const CLI = { values: { "--record": "string", "--times": "number" }, flags: [] };
+    const cli = parseArgs(process.argv.slice(2), CLI);
+    if (cli.errors.length) { for (const l of refusalLines("boxTimings", cli.errors, CLI)) console.error(l); process.exit(2); }
+    const gates = String(cli.values["--record"] || "").split(",").map((g) => g.trim().split(path.sep).join("/")).filter(Boolean);
+    if (!gates.length) { console.log("boxTimings: usage: node tools/ship/boxTimings.mjs --record <gate>,<gate>[,...] [--times N]"); process.exit(2); }
+    const times = cli.values["--times"] || 3;
+    let res = null;
+    for (let k = 0; k < times; k++) {
+        res = recordLocal(gates);
+        console.log(`boxTimings: pass ${k + 1}/${times} -> ` + res.wrote.map((w) => `${path.basename(w.gate)} ${w.ms} ms${w.capped ? " (CAPPED)" : ""}`).join(", "));
+    }
+    console.log(`boxTimings: wrote ${res.file} for ${res.host}`);
 }

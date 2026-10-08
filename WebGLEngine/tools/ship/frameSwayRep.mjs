@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { declared, readDoc } from "./foldStats.mjs";
 import { cellOf } from "./frameGain.mjs";
 import { SWAY_KEYS, swaySummary, h14, DEPTH_COL, SLAB_DEPTH_CUT } from "./frameSway.mjs";
@@ -18,7 +19,8 @@ import { N_FEATURES } from "../../render/genGate.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H15 = "render/frame-sway2-preregistration.md";
-export const CACHE_H15 = "tools/ship/frameSwayRep-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H15 = cacheRel("frameSwayRep-cache.json.gz");
 export const RESULT_H15 = "tools/ship/frameSwayRep-result.json";
 // H14's keys plus the one a replication adds: which hypothesis it replicates, whose recorded sign `direction` must be.
 export const REP_KEYS = Object.freeze({ ...SWAY_KEYS, replicates: "str" });

@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-04T11:43:00.024Z",
+ "captured": "2026-10-08T00:25:48.255Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -11,7 +11,11 @@
   "tools/ship/recordDrift-selfcheck.mjs": 1770,
   "tools/ship/statedRuntime-selfcheck.mjs": 1493,
   "tools/ship/cloneSource-selfcheck.mjs": 118,
-  "render/threeWorkarounds-selfcheck.mjs": 2331
+  "render/threeWorkarounds-selfcheck.mjs": 2331,
+  "tools/ship/gateSelection-selfcheck.mjs": 16058,
+  "tools/ship/coverageTriage-selfcheck.mjs": 1651,
+  "tools/ship/commentFalsePass-selfcheck.mjs": 3025,
+  "tools/ship/gateReport-selfcheck.mjs": 16575
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -22,7 +26,11 @@
   "tools/ship/recordDrift-selfcheck.mjs": "2026-10-01T04:45:26.425Z",
   "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-03T17:02:55.677Z",
   "tools/ship/cloneSource-selfcheck.mjs": "2026-10-04T08:40:24.493Z",
-  "render/threeWorkarounds-selfcheck.mjs": "2026-10-04T11:43:00.024Z"
+  "render/threeWorkarounds-selfcheck.mjs": "2026-10-04T11:43:00.024Z",
+  "tools/ship/gateSelection-selfcheck.mjs": "2026-10-08T00:25:48.255Z",
+  "tools/ship/coverageTriage-selfcheck.mjs": "2026-10-08T00:25:48.255Z",
+  "tools/ship/commentFalsePass-selfcheck.mjs": "2026-10-08T00:25:48.255Z",
+  "tools/ship/gateReport-selfcheck.mjs": "2026-10-08T00:25:48.255Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -33,7 +41,11 @@
   "tools/ship/recordDrift-selfcheck.mjs": "alone",
   "tools/ship/statedRuntime-selfcheck.mjs": "alone",
   "tools/ship/cloneSource-selfcheck.mjs": "alone",
-  "render/threeWorkarounds-selfcheck.mjs": "alone"
+  "render/threeWorkarounds-selfcheck.mjs": "alone",
+  "tools/ship/gateSelection-selfcheck.mjs": "alone",
+  "tools/ship/coverageTriage-selfcheck.mjs": "alone",
+  "tools/ship/commentFalsePass-selfcheck.mjs": "alone",
+  "tools/ship/gateReport-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -44,7 +56,11 @@
   "tools/ship/recordDrift-selfcheck.mjs": 0,
   "tools/ship/statedRuntime-selfcheck.mjs": 0,
   "tools/ship/cloneSource-selfcheck.mjs": 0,
-  "render/threeWorkarounds-selfcheck.mjs": 0
+  "render/threeWorkarounds-selfcheck.mjs": 0,
+  "tools/ship/gateSelection-selfcheck.mjs": 0,
+  "tools/ship/coverageTriage-selfcheck.mjs": 0,
+  "tools/ship/commentFalsePass-selfcheck.mjs": 0,
+  "tools/ship/gateReport-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -71,6 +87,26 @@
    2539,
    2201,
    2331
+  ],
+  "tools/ship/gateSelection-selfcheck.mjs": [
+   16257,
+   16432,
+   16058
+  ],
+  "tools/ship/coverageTriage-selfcheck.mjs": [
+   1438,
+   1261,
+   1651
+  ],
+  "tools/ship/commentFalsePass-selfcheck.mjs": [
+   3063,
+   3133,
+   3025
+  ],
+  "tools/ship/gateReport-selfcheck.mjs": [
+   17614,
+   16365,
+   16575
   ]
  }
 }

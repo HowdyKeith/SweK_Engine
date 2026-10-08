@@ -8063,6 +8063,90 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "fixed 0.90 where mh_present's moves to 0.96 on paper, so the HDR path compresses a paper " +
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
+    // v4778 -- THE FSR CACHES LEAVE THE ZIP FOR THEIR OWN FOLDER, AND A ROUTE BRINGS THEM BACK ON REQUEST.
+    // v4819 -- RENUMBERED since477 -> since511 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since511: Object.freeze({
+        at: "v4778", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/fsrCaches-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** TWELVE HARVESTS WERE 300 MB OF A 333 MB RELEASE ZIP, AND NOTHING AT RUNTIME READS THEM. *** Keith: \"put the FSR " +
+                 "frame caches in its own repo folder, and access /install from there if the user chooses.\" The nine frame*-cache " +
+                 "files and three genGate harvests moved with git mv into WebGLEngine/fsr-caches/, with a manifest (bytes, sha256, " +
+                 "readers derived from the imports) built by tools/ship/fsrCaches.mjs --write-manifest. The packer reads the manifest's " +
+                 "names and skips them; a real pack of the same tree, the skip off then on, went 332,679,578 -> 46,792,031 bytes " +
+                 "(6619 -> 6607 files), manifest kept. 24 reader gates now skip by " +
+                 "name, NOT a pass, when a cache is absent -- none regenerates on a miss, a harvest is a WebGPU drive of fsr.html -- " +
+                 "and all 24 ran green here with the caches present. GET/POST /install/fsr-caches and install-fsr-caches.html fetch " +
+                 "from the release tag and keep a file only on a sha256 match. 27 sabotages; one (both escape guards removed) was " +
+                 "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
+    }),
+    // Round A -- THE THIRD-PERSON CAMERA BOOM: camera/cameraBoom.js, swept and stopped short of the first voxel it would touch.
+    // v4819 -- RENUMBERED since478 -> since512 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since512: Object.freeze({
+        at: "Round A (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["camera/cameraBoom-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE VOXEL CAMERA READ A COLUMN'S TOP, SO EVERY ROOF WAS GROUND. *** camera/camera.js's third-person eye " +
+                 "sampled four column tops along the boom: under a ceiling, a bridge or an overhang it collapsed to 0.825 of " +
+                 "4.5, and under an overhang low enough to cross the boom it left the camera's box inside a voxel. " +
+                 "camera/cameraBoom.js sweeps the camera's box up the lift and back along the boom against the voxels " +
+                 "themselves, exactly, and stops a skin short of the first contact. Its gate holds the box never inside a " +
+                 "solid (1,384 fuzzed booms over 60 worlds), every point of the path free, never further than asked, exact " +
+                 "when clear, pulled in by exactly the skin, no one-voxel wall skipped (the planted endpoint-only test goes " +
+                 "through 300 of 300), and easing that never passes the safe length; camera.js's own eye is driven in a wall, " +
+                 "an overhang, a bridge and a room. Five sabotages, all red. NOT CLOSED: the render eye adds the body's " +
+                 "vertical smoothing on top of the boom, so the guarantee is the boom's and not that offset's, as the mesh " +
+                 "branch's always was; and nothing here has been looked at on the rig.",
+    }),
+    // the lock-sums round -- THE LOCK's TWO WINDOWS AS RUNNING SUMS: render/temporalLock.mjs's makeLumaSums and its TSL port.
+    // v4819 -- RENUMBERED since479 -> since513 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since513: Object.freeze({
+        at: "the lock-sums round (unshipped)", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["render/temporalLockSums-selfcheck.mjs", "render/temporalLockSumsTsl-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalLock-selfcheck.mjs (its moving-camera detector row judged 0 of 2304 pixels and passed on zeros; repaired the round before)"]),
+        verdict: "*** THE LOCK WAS OFF BECAUSE IT KEPT EVERY LUMA. *** The ring holds 2 x period lumas a pixel -- 282 MB on " +
+                 "the device at 2x at 960x540, in a target 8640 rows tall that WebGPU refused here (fsr-three.html's lock " +
+                 "ring at 2x drew validation errors every frame, on the unmodified page too) -- and both of its outputs are " +
+                 "sums of them. render/temporalLockSums.mjs keeps three running sums and the fill count in one float " +
+                 "texel: 16.6 MB at any ratio. Bilinear reprojection is linear, so at every period boundary the sums ARE " +
+                 "the ring's two halves summed -- held within frames x 2^-24, still and moving -- and the still picture and " +
+                 "the lock on a 0.4 px line come out identical. What it gives up is when a change is seen: the windows " +
+                 "tumble, so a light drop is caught at the end of its period, exactly P - 1 - phase frames later. On the " +
+                 "device (render/temporalLockSumsTsl.mjs), both backends, to 1.8e-7, and fx/fsr/fsrTemporalTsl.mjs takes " +
+                 "lock: \"sums\". 14 sabotages, all red; one (the mean a period stale) only by a row written for it. " +
+                 "The driver's lock DEFAULTS to the sums since: measured past the 63-frame warm-up every other gate sits " +
+                 "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
+                 "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
+    }),
+    // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
+    // v4819 -- RENUMBERED since480 -> since514 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since514: Object.freeze({
+        at: "the splat-collision round (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["tools/ship/splatVoxelWorld-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A SURFACE LIES ON A CELL BOUNDARY, SO 'THE CELL A SPLAT IS IN' STANDS THE BODY ONE VOXEL HIGH. *** " +
+                 "Measured on a 24 x 8 x 24 level captured as splats on every face a camera could see: the centre-cell " +
+                 "rule put 566 of 576 columns at the wrong height and every-touched-cell 576. world/splatVoxelWorld.mjs " +
+                 "stamps each splat's ellipsoid into a grid four times finer and scans every fine column top-down for " +
+                 "PARITY -- a run of shell is one crossing -- then takes a walker cell as solid when half its fine cells " +
+                 "are: 0 wrong, 0 fall-through. Holes stay local and EVERY column a body would fall through is listed " +
+                 "(7 of 7 for a 1.5-unit floor hole, 26 of 26 and 85 of 85 for sparse captures); fillHoles closes them " +
+                 "at the height most of the rim agrees on. Opaque floaters are dropped as small shell components; " +
+                 "loader-shaped clouds (alpha opacity, float and packed quaternions) build the same world. camera.js's " +
+                 "walker lands on every probe at the level's height and is inside a captured voxel on 0 of 4,800 fuzzed " +
+                 "frames. main.js's splat_voxel_walk demo is the live consumer, booted headless with 0 page errors. " +
+                 "12 sabotages, all red -- two only after rows were written for them, and V8's row found the fill's " +
+                 "real defect (ring by ring raised a step out of the floor beside the block). NOT CLOSED: unseen " +
+                 "undersides read solid (pinned at +40 cells), and no real .ply has been through it.",
+    }),
     // v4644 -- THE 255th CLOSING: the SUCCESS flash, from a constant table to a ring that travels in pixels.
     // *** since331 -- SIX GATES ARRIVED ACROSS SIX ROUNDS AND NOT ONE ROUND CLOSED THEM. ***
     // Every one was written, sabotaged and run singly in the round that added it; what none of those rounds
@@ -8075,6 +8159,67 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
+    // v4819 -- RENUMBERED since476 -> since510 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since510: Object.freeze({
+        at: "v4778", swept: 45, green: 45, red: 0,
+        added: Object.freeze([
+            "brain/autopilot6dof-selfcheck.mjs",
+            "brain/autopilotAircraft-selfcheck.mjs",
+            "brain/fleetAssign-selfcheck.mjs",
+            "physics/mechanics/aeroSurface-selfcheck.mjs",
+            "physics/mechanics/aircraftAssembly-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dof-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofCollision-selfcheck.mjs",
+            "physics/mechanics/rigidBody6dofWeapon-selfcheck.mjs",
+            "physics/mesh/bvhPairOverlap-selfcheck.mjs",
+            "physics/mesh/meshBoolean-selfcheck.mjs",
+            "physics/mesh/meshBooleanBlast-selfcheck.mjs",
+            "physics/mesh/meshPointClassify-selfcheck.mjs",
+            "physics/mesh/triClip-selfcheck.mjs",
+            "physics/mesh/triFragmentAccumulate-selfcheck.mjs",
+            "physics/mesh/triTriIntersect-selfcheck.mjs",
+            "physics/obbManifold-selfcheck.mjs",
+            "tools/gunnerTraceDemo-selfcheck.mjs",
+            "tools/maleCnsLoader-selfcheck.mjs",
+            "tools/roundhouse/capsuleDepenetrateDevice-selfcheck.mjs",
+            "tools/ship/aggroHazardFeature-selfcheck.mjs",
+            "tools/ship/aircraftPage-selfcheck.mjs",
+            "tools/ship/botCapsuleNav-selfcheck.mjs",
+            "tools/ship/cameraCapsuleWalk-selfcheck.mjs",
+            "tools/ship/cameraTerrainWalk-selfcheck.mjs",
+            "tools/ship/cameraViewMode-selfcheck.mjs",
+            "tools/ship/capsuleCollide-selfcheck.mjs",
+            "tools/ship/capsuleCollideTsl-selfcheck.mjs",
+            "tools/ship/capsuleHazardPolicy-selfcheck.mjs",
+            "tools/ship/cityChunkScene-selfcheck.mjs",
+            "tools/ship/controllerLabWorld-selfcheck.mjs",
+            "tools/ship/flyConnectomePage-selfcheck.mjs",
+            "tools/ship/gltfConformance-selfcheck.mjs",
+            "tools/ship/kaijuGroundCollider-selfcheck.mjs",
+            "tools/ship/mikktSpace-selfcheck.mjs",
+            "tools/ship/peerBrain-selfcheck.mjs",
+            "tools/ship/peerBrainFleet-selfcheck.mjs",
+            "tools/ship/pilotPolicy-selfcheck.mjs",
+            "tools/ship/platformCarryWorld-selfcheck.mjs",
+            "tools/ship/precisionProbe-selfcheck.mjs",
+            "tools/ship/qrBridge-selfcheck.mjs",
+            "tools/ship/rigidBody6dofPage-selfcheck.mjs",
+            "tools/ship/rtViewer-selfcheck.mjs",
+            "tools/ship/splatWalkWorld-selfcheck.mjs",
+            "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
+            "tools/ship/worldColliderBVH-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the rtx line's forty-five, merged at v4778 -- it never wrote closings, so this one names them all. Swept " +
+                 "three-way on the merged tree: 43 green at once. TWO ARRIVED RED AND ARE GREEN AT THE CLOSE, which is why " +
+                 "redOnArrival is empty rather than hiding them: qrBridge and webcodecsFramesToMp4 need @napi-rs/canvas " +
+                 "(and webcodecs), optionalDependencies of ai-bridge/ that nothing on the verify route installs; one " +
+                 "asserted the module was present and one died with MODULE_NOT_FOUND. With the modules installed both are " +
+                 "green; without them they now SKIP BY NAME and say 'NOT a pass'. Slowest: rigidBody6dofPage at 65 s, " +
+                 "gunnerTraceDemo 19 s, peerBrainFleet 16 s -- over the ship-time budget, so they join the pool no verify runs.",
+    }),
     since475: Object.freeze({
         at: "v4679", swept: 1, green: 1, red: 0,
         added: Object.freeze([

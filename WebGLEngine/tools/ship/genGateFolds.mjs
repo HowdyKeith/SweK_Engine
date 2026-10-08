@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { N_FEATURES, N_FEATURES_V2, fitScaler, applyScaler, forward, auc } from "../../render/genGate.mjs";
 import { MLPTrainer } from "../../brain/learn.js";
 import { ARMS, declared, seededRng, h4, c11, usableFolds } from "./foldStats.mjs";
@@ -30,7 +31,9 @@ export const ARM_SPEC = Object.freeze({
 });
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const CACHE = "tools/ship/genGate-folds7.json";
+// v4778 -- the runner still writes PLAIN JSON, now beside the committed genGate-folds7.json.gz in fsr-caches/ (the
+// round compresses it, as before); the folder comes from tools/ship/fsrCaches.mjs, so it is named once.
+export const CACHE = cacheRel("genGate-folds7.json.gz").replace(/\.gz$/, "");
 export const RESULT = "tools/ship/genGate-folds7-result.json";
 
 /** Rows usable by EVERY arm: finite in v1 AND v2. */

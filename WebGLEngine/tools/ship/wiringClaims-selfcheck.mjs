@@ -44,6 +44,16 @@ const KNOWN_CONTRAST = {
         "engine/xrSession.mjs, so nothing feeds it a real head pose'. The subject of 'not wired into' is gaze " +
         "(ui/gazeDwell.mjs) -- xrSession.mjs is the FEED IT IS MISSING, named as the target rather than as the " +
         "thing lacking a consumer, and xrSession.mjs itself has real importers elsewhere in the engine",
+    // *** v4778 -- TWO MORE, ARRIVED WITH THE rtx MERGE, AND BOTH READ BEFORE BEING ADMITTED. *** Same shape as
+    // the four above: the claim is true of a module the line does not spell as a path, and the path it does
+    // spell is the comparison.
+    "brain/policy.js": "capsuleHazard.js's header reads 'WHY THIS IS A SEPARATE FILE FROM policy.js, AND WHY IT " +
+        "IS NOT WIRED INTO brain.js'. The subject is capsuleHazard.js itself (THIS file), which only its own gate " +
+        "imports, so the claim is TRUE; policy.js is the live file it is kept apart from",
+    "gpu/SplatLoader.js": "nextRounds' splat-walk closing note reads 'not a real splat capture loaded through " +
+        "gpu/SplatLoader.js ... carryOnPlatform() ... is still not wired into any live caller'. The subject of " +
+        "'not wired into' is carryOnPlatform (task #80, wired by the very next entry, #84); SplatLoader.js is " +
+        "the loader a REAL capture would come through, named to say this cloud did not",
 };
 ok("!! *** every remaining hit is a CONTRAST LINE, adjudicated by name ***",
     claims.every((c) => KNOWN_CONTRAST[c.subject]),

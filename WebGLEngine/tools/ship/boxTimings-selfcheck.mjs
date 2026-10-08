@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/boxTimings-selfcheck.mjs -- v4679
 //
-// Run: node tools/ship/boxTimings-selfcheck.mjs      (~100 ms — re-measured v4804: 0.1 s-0.1 s alone, 0.1 s the sweep's serial median; it read ~3s)
+// Run: node tools/ship/boxTimings-selfcheck.mjs      (~0.18s -- MEASURED v4815, median of 166/181/206 alone; was ~3s)
 //
 // *** A RATCHET WITH NO REACHABLE CLEAR STATE IS NOT A CHECK. ***
 //
@@ -18,7 +18,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as BT from "./boxTimings.mjs";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
+import { ownerOf, RECORD_HANDOVERS } from "./quickSweep.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -157,19 +158,34 @@ console.log("\n5. *** THE REAL RECORDS, AND THE HALF THIS ROUND DID NOT DO ***")
     // a container whose fingerprint is the owner's, which is what linux-x64-4c-16096mb-142c0d is: four cores and
     // 16 GB hash alike. The design fact is the ATTRIBUTION: the shared record names a host, and this box's
     // readings count as its own exactly when that host is this box -- whichever box this is.
+    // *** v4778 (main) -- THIS ROW SAID "NEITHER THE RIG NOR THIS CONTAINER CAN WRITE IT", AND AT v4778 THAT BECAME
+    // THE BLOCKER RATHER THAN THE SITUATION. *** The owner container retired, and three gates that read the
+    // rotation could no longer be satisfied by any box. Keith handed the record to the rig (quickSweep.mjs's
+    // RECORD_HANDOVERS). So the row now asks the question that decides whether anyone CAN write it: does the
+    // record's owner, after handovers, resolve to the box the last handover named? A sabotage that empties the
+    // handover list leaves the owner a retired container and turns this red.
+    // v4819 -- BOTH ROWS, BECAUSE THEY ASK DIFFERENT THINGS: who may WRITE the record next (the handovers), and whose
+    // stopwatch its readings are (the `host` it names). Ids read through canonicalId: the handovers name boxes in
+    // the megabyte form the other line kept, boxId() in v4796's gigabytes.
     const shared = live.records.find((r) => r.kind === "shared");
-    const sharedMine = !!shared && [...live.entries.values()].filter((e) => e.from === shared.file).every((e) => e.mine === (shared.host === live.thisBox));
-    ok("!! the shared record is present, names its host, and counts as this box's exactly when that host is this box",
+    const owner = shared ? ownerOf(shared.host) : null, last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
+    ok("!! the shared record is present and its owner, after handovers, is a box that can still write it",
+        !!shared && !!last && owner === canonicalId(last.to),
+        `shared record names ${shared && shared.host}; its owner is ${owner}; this box is ${live.thisBox}` +
+        (owner === live.thisBox ? " and writes it" : ", so it writes its own file") + ". Coverage still reads " +
+        "every box's record, which is why it had to stop being asked of this one");
+    const sharedMine = !!shared && [...live.entries.values()].filter((e) => e.from === shared.file).every((e) => e.mine === (canonicalId(shared.host) === live.thisBox));
+    ok("!! ...and its readings count as this box's exactly when the record names this box -- whoever may write it next",
         !!shared && typeof shared.host === "string" && shared.host.length > 0 && sharedMine,
-        shared ? `shared record belongs to ${shared.host}; this box is ${live.thisBox} -- ` +
-            (shared.host === live.thisBox ? "the owner, so its readings are this box's own" :
-             "not the owner, so neither writes it and coverage had to stop being asked of it") : "no shared record");
+        shared ? `the record's readings are ${shared.host}'s; this box is ${live.thisBox} -- ` +
+            (canonicalId(shared.host) === live.thisBox ? "so they are this box's own" : "so they are a foreign box's") : "no shared record");
     // v4800 -- TASK #87 DONE IN quickSweep ITSELF: the sweep chooses its gates by THIS box's record (ownTimings), the
     // shared one where this box owns it or nobody does, else the local file this box writes. Not through this module:
     // the per-box files recordLocal writes hold a handful of entries, and choosing by one would run every gate it lacks.
+    // v4778 (main): an IMPORT, not the word -- quickSweep's handover note cites this module's header in a comment.
     {   const qs = fs.readFileSync(path.join(BT.ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
         ok("!! *** and the BUDGET reads this box's own record now -- quickSweep's ownTimings, not this module's per-box files ***",
-            /export function ownTimings\(/.test(qs) && /const prior = own\.rec;/.test(qs) && !/import[^;]*boxTimings/.test(qs),
+            /export function ownTimings\(/.test(qs) && /const prior = own\.rec;/.test(qs) && !/^\s*import[^;]*["']\.\/boxTimings\.mjs["']/m.test(qs),
             "before v4800 gate SELECTION was computed from whichever box owned the shared record -- 91 of 1,409 over " +
             "budget on the rig for that reason, ~100 at each verify of this session's box. tools/ship/quickSweep-selfcheck.mjs holds the choice"); }
 }

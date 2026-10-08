@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { turnsBetween, SLAB_PATHS } from "../../render/slabPath.mjs";
 import { declared, readDoc } from "./foldStats.mjs";
@@ -18,7 +19,8 @@ import { reverseSummary, reverseCell } from "./frameReverse.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H14 = "render/frame-sway-preregistration.md";
-export const CACHE_H14 = "tools/ship/frameSway-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H14 = cacheRel("frameSway-cache.json.gz");
 export const RESULT_H14 = "tools/ship/frameSway-result.json";
 export const SWAY_KEYS = Object.freeze({ scenes: "list", cells: "list", path: "str", direction: "int", alpha: "num", minFolds: "int", upto: "int", cvFloor: "num" });
 // The page's two planes sit at depths 0.952 (slab) and 0.977 (background); a block nearer than their midpoint is slab.

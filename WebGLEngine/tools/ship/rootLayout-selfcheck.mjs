@@ -127,7 +127,10 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
     // launcher had been moved out to make room. A count is not a property -- the fifth time this session, after
     // areaHygiene's band, caseStudy's baked total, gateBudget's SLOWEST_GENERAL and moduleHistory's 0.70.
     const RITUAL_WRITTEN = ["README.md", "BACKLOG.md", "TODO.md", "STATUS.md"];
-    const GIT_CONFIG = [".gitignore", ".gitattributes"];
+    // v4778 rig run 3: and `.git` itself where it is a FILE -- a git worktree's or submodule's pointer to its repository
+    // ("gitdir: ..."). In a plain clone it is a directory and never reaches this list; in a worktree this gate read it
+    // as a stray and went red, which redCensus-selfcheck's control then reported as a wrongly-accused gate failing.
+    const GIT_CONFIG = [".gitignore", ".gitattributes", ".git"];
     const JUSTIFIED = new Set([...KEITHS, "_SETUP.bat", ...RITUAL_WRITTEN, ...GIT_CONFIG]);
     const strays = loose.filter((f) => !JUSTIFIED.has(f));
     ok("!! every file in the root is there for a NAMED reason -- a stray one fails on arrival", strays.length === 0,

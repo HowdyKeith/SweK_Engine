@@ -58,37 +58,62 @@ console.log("1. *** A SCENE THAT SETS NO sigma IS BIT-IDENTICAL TO THE TRACER TH
     const before = path.join(ENG, "physics/render/_ptBefore.mjs");
     const REL = "WebGLEngine/physics/render/pathTracer.mjs";
     const ROOT = path.join(ENG, "..");
-    let ran = false, beforeSha = null, rev = null, beforeSrc = null;
+    let ran = false, beforeSha = null, rev = null, beforeSrc = null, why = "";
+    // *** v4816 -- A SHALLOW CLONE HAS NO PRE-WIRING REVISION TO FIND. *** The walk below needs history back to
+    // 66db97c4, the root of this tree's record, and a --depth clone ends long before it: the rig's clone went red here
+    // the round this gate came back under the sweep's line (3050 -> 1810 ms) after a round where it was never run. The
+    // publish route clones --depth 1, so it would go red there too. The answer is v4776's for frozenRecords: git's
+    // answer where git has it, a frozen copy where it does not, and a row holding the copy to git wherever git CAN
+    // answer. The copy is the SOURCE, not a render hash, so the two tracers still render side by side on the box that
+    // grades them -- an f64 hash frozen on one machine's V8 is a different claim on another's.
+    const FIX = JSON.parse(fs.readFileSync(path.join(ENG, "tools/ship/roughDiffuseWired-fixture.json"), "utf8"));
+    const shallow = (() => { try { return execFileSync("git", ["rev-parse", "--is-shallow-repository"],
+        { cwd: ROOT, encoding: "utf8" }).trim() === "true"; } catch { return false; } })();
+    let fromGit = false;
     try {
         const revs = execFileSync("git", ["log", "--format=%H", "--", REL],
-                                  { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 }).trim().split("\n");
+                                  { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 }).trim().split("\n").filter(Boolean);
         for (const r of revs) {
             const t = execFileSync("git", ["show", `${r}:${REL}`],
                                    { cwd: ROOT, encoding: "utf8", maxBuffer: 8e6 });
-            if (!/roughDiffuse\.mjs/.test(t)) { rev = r; beforeSrc = t; break; }
+            if (!/roughDiffuse\.mjs/.test(t)) { rev = r; beforeSrc = t; fromGit = true; break; }
         }
+        if (!rev && shallow) { rev = FIX.rev; beforeSrc = FIX.source; }
         if (!rev) throw new Error("no revision of the tracer predates the roughDiffuse import");
         const src = beforeSrc;
         fs.writeFileSync(before, src);
-        const prog = "const M=await import(" + JSON.stringify(before) + ");" +
+        // pathToFileURL, not the path (rig run 2): on Windows `import("C:\\...")` reads "C:" as a URL scheme, so the child
+        // died and this row said "git show failed" -- git show had worked
+        const prog = "const M=await import(" + JSON.stringify(pathToFileURL(before).href) + ");" +
             "const b=M.render([{centre:[0,0,0],radius:1.6,albedo:0.8,emit:0},{centre:[3,4,3],radius:1,albedo:0,emit:8}]," +
             JSON.stringify(OPTS) + ");" +
             "const c=await import('node:crypto');" +
             "process.stdout.write(c.createHash('sha256').update(Buffer.from(Float64Array.from(b).buffer)).digest('hex').slice(0,16));";
         beforeSha = execFileSync(process.execPath, ["--input-type=module", "-e", prog], { encoding: "utf8" });
         ran = true;
-    } catch (e) { report("could not run the committed tracer: " + String(e).slice(0, 90)); }
+    } catch (e) {
+        why = (rev ? "the pre-wiring tracer (" + rev.slice(0, 12) + ") did not run: " : "git could not supply it: ") +
+              String((e && e.stderr) || e).trim().split("\n").slice(-2).join(" ").slice(0, 240);
+        report("could not run the committed tracer -- " + why);
+    }
     finally { try { fs.unlinkSync(before); } catch {} }
 
     const now = shot(undefined);
     // *** THE GUARD AGAINST A VACUOUS PASS. *** If the two sources are the same bytes, the hash comparison
     // below is a tautology no matter what it prints, so the difference is asserted BEFORE the agreement is.
     const nowSrc = fs.readFileSync(path.join(ENG, "physics/render/pathTracer.mjs"), "utf8");
+    // the frozen copy is git's, byte for byte, wherever git can say so -- and on a FULL checkout git must say so: the
+    // copy is a fallback for missing history, never a substitute for a walk that failed
+    const fixSha = crypto.createHash("sha256").update(FIX.source).digest("hex");
+    ok("  the frozen pre-wiring source is git's, byte for byte, where git can answer -- and only a shallow clone may use it",
+        fixSha === FIX.sha256 && (fromGit ? FIX.source === beforeSrc && FIX.rev === rev : shallow && rev === FIX.rev),
+        fromGit ? `git walk found ${rev.slice(0, 12)}; the fixture ${FIX.source === beforeSrc ? "equals" : "DIFFERS FROM"} it (${FIX.bytes} bytes)`
+                : `UNCHECKED HERE: ${shallow ? "a shallow clone" : "NOT a shallow clone, and the walk failed"} -- the frozen ${FIX.rev.slice(0, 12)} was ${shallow ? "used" : "refused"}; its own sha256 ${fixSha === FIX.sha256 ? "matches" : "DOES NOT MATCH"} its record`);
     ok("CONTROL: the reference revision is genuinely a DIFFERENT file, not this one",
         ran && beforeSrc !== null && beforeSrc !== nowSrc && !/roughDiffuse\.mjs/.test(beforeSrc),
         ran ? `${rev.slice(0, 12)}, ${beforeSrc.length} chars against ${nowSrc.length}` : "not reached");
     ok("*** the pre-wiring tracer and the patched one render the same bits ***", ran && beforeSha === now.sha,
-        !ran ? "SKIPPED -- git show failed, so this proves nothing"
+        !ran ? "SKIPPED -- " + why + " -- so this proves nothing"
              : beforeSha === now.sha ? `both ${now.sha}`
              : `committed ${beforeSha} against patched ${now.sha}`);
     ok("  and an explicit sigma of 0 is the same bits again", shot(0).sha === now.sha,
@@ -233,6 +258,15 @@ console.log("\n4. THE WIRING, READ FROM THE TRACER'S OWN SOURCE");
 //      INCAPABLE OF FAILING THE INSTANT v4282 WAS COMMITTED, AND IT WENT ON PRINTING A HASH AND THE WORD
 //      PASS. *** Nothing in the run looked wrong. Only the control that asserts the two sources DIFFER
 //      before asserting they AGREE says anything at all, which is why it exists and why it runs first.
+//
+// v4816 -- THE SHALLOW-CLONE FALLBACK (tools/ship/roughDiffuseWired-fixture.json), sabotaged on a full checkout AND in
+// a --depth 1 clone, where the committed gate went red exactly as the rig's did ("no revision of the tracer predates"):
+//   S1  one word of the fixture's source changed                     full 1 red, shallow 1 red (its sha256 row)
+//   S3  the fallback taken whenever the walk fails, shallow or not,
+//       with the walk broken (a wrong path)                          full 1 red -- a full checkout must walk git
+//   S4  the fixture replaced by the CURRENT tracer, sha re-signed     full 1 red (not git's), shallow 1 red (CONTROL)
+// The fallback is a copy of SOURCE, not a frozen render hash: the two tracers still render side by side on the box
+// grading them, because an f64 hash taken on one machine's V8 is a different claim on another's.
 //
 // None went 0 RED. B, E and F are the trio worth keeping: B proves section 2's prose is load-bearing, E is
 // the only one small enough that a tolerance would have shrugged at it, and F is the one where the gate was

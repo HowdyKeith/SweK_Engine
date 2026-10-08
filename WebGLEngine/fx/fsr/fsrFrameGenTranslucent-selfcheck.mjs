@@ -78,6 +78,8 @@ else {
                     // the translucent things' pixels, and the frame really rendered at the midpoint at this resolution
                     await draw(0.5, o2, true); const nov = await read(o2, D); await draw(0.5, o2); const truth1 = await read(o2, D);
                     const mk = Uint8Array.from({ length: D * D }, (_, i) => (Math.abs(truth1[i * 4] - nov[i * 4]) + Math.abs(truth1[i * 4 + 1] - nov[i * 4 + 1]) + Math.abs(truth1[i * 4 + 2] - nov[i * 4 + 2]) > 0.03 ? 1 : 0));
+                    // rig run 5: and HOW a frame differs from one, where PSNR says only how much -- the worst value and how many
+                    const wd = (img, tr, m) => { let w = 0, n = 0, t = 0; for (let i = 0; i < D * D; i++) { if (m && !m[i]) continue; for (let c = 0; c < 3; c++) { const d = Math.abs(cl(img[i * 4 + c]) - cl(tr[i * 4 + c])); t++; if (d > 0) n++; w = Math.max(w, d); } } return { worst: w, off: n, of: t }; };
                     const ps = (img, tr, m) => { let q = 0, n = 0; for (let i = 0; i < D * D; i++) { if (m && !m[i]) continue; n++; for (let c = 0; c < 3; c++) q += (cl(img[i * 4 + c]) - cl(tr[i * 4 + c])) ** 2; } return 10 * Math.log10(1 / (q / (n * 3))); };
                     const c = { px: mk.reduce((q, v) => q + v, 0) };
                     // one stage pass for the arms on the field drawn with them (drawn, flow), one for those on the field without them
@@ -90,7 +92,7 @@ else {
                         for (const n of names) {
                             const ui = n === "layered" ? async (t) => { setT(t); await layer.render(renderer, scene, cam); return layer.texture; } : null;
                             await gen[n].generate(renderer, { prev: fr(n)[0].texture, cur: fr(n)[1].texture, motion: stage.motion.texture, depth: stage.depth.texture, depthPrev: older.texture, camera: cm(gen[n]), ui }, o2);
-                            const img = await read(o2, D); c[n] = { all: ps(img, truth), see: ps(img, truth, mk), see1: ps(img, truth1, mk) };
+                            const img = await read(o2, D); c[n] = { all: ps(img, truth), see: ps(img, truth, mk), see1: ps(img, truth1, mk), diff1: wd(img, truth1, mk) };
                         }
                     }
                     o[cn] = c;
@@ -118,12 +120,24 @@ else {
         ok(`*** the LAYER beats the best field on every case's translucent pixels -- ${CASES.map((cn) => `${cn} ${d(o[cn].layered.see, best(cn))}`).join(", ")} -- and over the frame, ${CASES.map((cn) => d(o[cn].layered.all, bestAll(cn))).join(", ")} ***`,
            CASES.every((cn) => o[cn].layered.see - best(cn) > 2 && o[cn].layered.all - bestAll(cn) > 0.5),
            "frames and the stage's pass without them; render/translucentLayer.mjs's layer drawn at t, through the generator's `ui` as a function of t");
-        ok(`  ...and against the frame rendered at the midpoint at this resolution, the moving pane over a still wall is ${f(o.window.layered.see1)}, the etched pane over a moving one ${f(o.etched.layered.see1)} against ${f(o.etched.layered.see)} supersampled`,
-           o.window.layered.see1 === Infinity && o.etched.layered.see1 - o.etched.layered.see > 20,
+        // *** v4778 RIG RUN 6: "IS THE REAL ONE" TO ONE f32 ULP, NOT TO THE BIT. *** This row asserted PSNR === Infinity --
+        // bit-identical, which SwiftShader is. The GTX 1080 read 153.54 dB, and the line below, added at rig run 5 to say
+        // what that was made of, read on it: 2,082 of 10,800 values differ, worst 5.960e-8 -- 2^-24, ONE f32 ulp of a colour
+        // in [0.5, 1). The two frames come out of two different passes, and a GPU free to fuse or reorder an f32 multiply-add
+        // lands the last bit either side; that is "the same arithmetic", and what docs/real-hardware-fsr.md calls exact --
+        // "bit for bit or to f32". So the row holds no value off by more than 2^-24, and still says when it is to the bit.
+        // A whole pixel wrong, or two ulps anywhere, is red. Loosened from the bit on that measurement; Keith may take it back.
+        const d1 = o.window.layered.diff1;
+        if (d1) console.log(`  ----  the moving pane over a still wall against the midpoint frame: ${d1.off} of ${d1.of} values differ, worst ${d1.worst.toExponential(3)} (${(d1.worst * 2 ** 24).toFixed(1)} f32 ulps at 1.0)`);
+        ok(`  ...and against the frame rendered at the midpoint at this resolution, the moving pane over a still wall is ${f(o.window.layered.see1)}${d1 && d1.off ? ` (${d1.off} values differ, worst ${d1.worst.toExponential(2)} against one f32 ulp's 5.96e-8)` : ""}, the etched pane over a moving one ${f(o.etched.layered.see1)} against ${f(o.etched.layered.see)} supersampled`,
+           !!d1 && d1.worst <= 2 ** -24 && o.etched.layered.see1 - o.etched.layered.see > 20,
            "where what is behind stands still the generated frame IS the real one; what the layer loses against the supersampled truth is the pane's own aliasing, which a real frame has");
     }
 }
 
+// ---- v4778 RIG RUN 6 SABOTAGE LOG ------------------------------------------------------------------------------------
+// U2 every generated value shifted 2^-23 (two ulps) -> 1 red, the midpoint row ("worst 1.19e-7"); U1 the same by 2^-24
+// (one ulp, the rig's worst) -> green, as the bound says. Restored, md5 verified.
 // ---- v4760 SABOTAGE LOG ----------------------------------------------------------------------------------------
 // The module's seventeen are in render/translucentLayer-selfcheck.mjs's log, with what each reads here: the depth pass, the
 // additive swap (the sparks' pixels 7.92 dB, -14.55 against the best field), a layer cleared opaque, the background drawn into

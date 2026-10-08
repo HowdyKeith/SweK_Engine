@@ -17,8 +17,12 @@ import { jointRows } from "./genGateFolds.mjs";
 import { N_FEATURES, N_FEATURES_V2, auc } from "../../render/genGate.mjs";
 import { gateReport } from "./gateReport.mjs";
 const REPORT = gateReport("tools/ship/genGateRuleMeasure-selfcheck.mjs");
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("genGateRuleMeasure-selfcheck", Object.values(CELLS).map((c) => c.cache));
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const say = (s) => console.log(`  ----  ${s}`);

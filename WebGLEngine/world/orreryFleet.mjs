@@ -610,3 +610,25 @@ export const COMMIT_BELT_DRIFT_V4776 = Object.freeze({
         }),
     }),
 });
+
+// *** v4778 -- TWO BODIES ARRIVED THROUGH A MERGE, AND THE LINE THAT VENDORED THEM NEVER RE-BAKED. ***
+// The rtx line (claude/shader-porting-swek-ozgvb0) vendored vendor/male-cns and vendor/mikktspace and left
+// orrery.json and orrery-fleet.json as they were, so the merge at 888f776d carried two directories no record
+// held. Hashes read with `git log --format=%H -- WebGLEngine/vendor/<name>`, newest first, not off the gate's
+// failure text. Same rule as every record above: v4776's is a claim about v4776 and is not rewritten.
+export const COMMIT_BELT_DRIFT_V4778 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4776,
+    at: "v4778",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4776.arrivedSince4475,
+        "male-cns": Object.freeze({ now: Object.freeze(["bb162233", "46cc1d5c"]),
+            why: "Janelia FlyEM's male-cns connectome, baked to two circuits for the fly-connectome demo: the " +
+                 "Giant Fiber Circuit at 46cc1d5c and the EPG compass at bb162233 -- data, not code, CC-BY-4.0 " +
+                 "as its PROVENANCE.md records the server declaring it" }),
+        mikktspace: Object.freeze({ now: Object.freeze(["9d6c904e"]),
+            why: "mmikk/MikkTSpace's two C files, vendored as a REFERENCE ORACLE for physics/mesh/mikktSpace.mjs " +
+                 "the way xatlas is for uvLscm -- compiled natively by tools/mesh/mikktRef.mjs, loaded by nothing " +
+                 "the engine ships" }),
+    }),
+    bodiesNow: 22,
+});

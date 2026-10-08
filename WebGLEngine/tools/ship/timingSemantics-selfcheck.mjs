@@ -119,7 +119,13 @@ console.log("\n2. *** AND THE POPULATION SPLITS AT THE BUDGET, EXACTLY AS THE CO
     // result over a tree of 1,736 gates. Asserted as: the size is reported, and the claim is qualified.
     ok(`  and the over-budget group is reported rather than assumed away -- n=${over.length}, ` +
        (over.length < 20 ? "a handful" : over.length < 200 ? "no longer a handful and still not a population result" : "a population"),
-        over.length > 0 && over.length < 200,
+        // v4815 -- AND IT WAS RE-PINNED TO n < 200, WHICH IS THE SAME MISTAKE ONE DECADE UP. v4815's full over-budget
+        // rotation timed the pool alone and put 273 in the group; the row went red for the reason the note above says it
+        // must never go red. The wording already has a branch for 200 and over; the assertion keeps only what is
+        // claimed -- the group exists and its size is printed. SABOTAGE: the over-budget filter emptied -> the gate exits 1,
+        // but on a TypeError at the median report two rows up (med of nothing), before this row is reached: a crash, not a
+        // named red. Recorded as found; the empty case cannot reach this assertion while that report line precedes it.
+        over.length > 0,
         `n=${over.length} of ${Object.keys(S.timings).length} gates. The direction was predicted from quickSweep's ` +
         "source BEFORE it was measured, and a bigger confirming sample strengthens that -- so this row reports " +
         "the size and qualifies the sentence rather than failing when the evidence improves.");

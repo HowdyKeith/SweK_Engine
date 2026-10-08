@@ -201,8 +201,10 @@ export const MEASURED_AT_V4432 = Object.freeze({
     languageTranspiled: 2,
     languagePaperwork: 1,
     languageAssets: 2,       // Racing city 0: kenney-city and kenney-racing, .glb and .png only
-    languageUnmeasured: 2,   // Racing city 0: morphicons; draco-encoder (Task 53, vendored with a PROVENANCE.txt
+    languageUnmeasured: 3,   // Racing city 0: morphicons; draco-encoder (Task 53, vendored with a PROVENANCE.txt
                              // naming google/draco) joined it -- neither upstream has a row in orrery-universe.json,
                              // which is fetched by a round with GitHub reach and cannot be re-fetched here
+                             // v4778 -- 2 -> 3 at the rtx merge: mikktspace, whose PROVENANCE.txt names mmikk/MikkTSpace,
+                             // arrived with the rtx line and owes its row the same way. male-cns names no GitHub upstream
     languageUnexplained: 0,
 });

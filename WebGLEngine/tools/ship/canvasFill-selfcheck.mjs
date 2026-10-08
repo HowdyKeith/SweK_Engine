@@ -25,7 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { noComments } from "./sourceScan.mjs";   // v4052 -- strings kept, comments dropped: see the JS sweep's own note
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -306,7 +306,7 @@ const ALL = FIELD.concat(PLOT);
     if (skip) {
         console.log("  ----  browser half of the section-7 fix SKIPPED -- " + skip);
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args, "--enable-webgl"] });
         for (const page of ["graph_viewer.html", "glb_viewer.html"]) {
             const ctx = await b.newContext();
             const pg = await ctx.newPage();

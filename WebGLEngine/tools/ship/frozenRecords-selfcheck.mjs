@@ -30,9 +30,33 @@ import { census, reportLines, sources, RECORD_RE, recordBody, FIELD_RE,
 import { stripComments } from "../../vba/runtimeGap.mjs";
 import * as TR from "./treeRead.mjs";
 import fs from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// *** v4778 -- THE GIT CALL IS STARTED HERE AND READ IN SECTION 2, BECAUSE IT WAS A THIRD OF THIS GATE SPENT WAITING. ***
+// Section 2 asks git which records v4487's commit declared: a `git grep` over every blob of an old tree. It was an
+// execFileSync in the middle of the gate, and MEASURED on the merged tree it was 620 ms of a 3,100 ms profile with
+// this process doing nothing but blocking on it. Nothing before section 2 can change what it answers -- it reads a
+// COMMIT, and the fixtures sections 1 and 1b write are in the working tree -- so the same command, with the same
+// arguments, the same buffer, stderr discarded and every failure read as "git cannot say", now runs on another core
+// while sections 1 and 1b do their work. EVERYTHING FROM SECTION 2 ON IS THEREFORE fromSection2(), which git's exit
+// calls with what it printed (null when it could not answer): the rows run in the order they always did, and the
+// cold census those two sections take -- the bulk of this gate -- is what git overlaps with. A CALLBACK AND NOT AN
+// `await`, on purpose: vba/runtimeGap.mjs counts files that await or build a Promise, and the first draft of this
+// change moved that census by one in each row -- recordDrift-selfcheck went red on it. A gate getting faster is not
+// a reason for the tree's capability census to move.
+// *** AND IT COSTS ONE INSTRUMENT ITS VIEW OF THIS GATE, SAID HERE SO NOBODY FINDS IT AS A SURPRISE. ***
+// tools/ship/exitBusy.mjs can only screen a gate whose LAST STATEMENT is its process.exit(), and this file's exit now
+// sits inside fromSection2's closing brace -- so its screenable population read 1,557 of 1,925 at HEAD and 1,556 with
+// this change, a REPORTED fraction and no verdict moved. Taken by hand instead, the same two 300 ms windows exitBusy
+// opens, placed where fromSection2 exits: win1 0.44-0.49 ms, win2 0.24-0.27 ms, three runs -- QUIET, under its 5 ms
+// floor, as HEAD's copy measured through exitBusy itself (0.70-1.12 ms). The git child has exited before its callback
+// runs, so nothing of it is live when this process leaves.
+execFile("git", ["grep", "-h", "-E",
+    "export const [A-Z][A-Z0-9_]*V[0-9]{3,4}[A-Z0-9_]* = Object\\.freeze\\(", REC.commit],
+    { cwd: ENG, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    (err, stdout) => fromSection2(err ? null : stdout));
 
 let fails = 0;
 const ok = (n, c, d = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${n}${d ? "   " + d : ""}`); };
@@ -361,426 +385,428 @@ console.log("1. what counts as a record, and who counts as its guardian");
        `DERIVED_AT_V4325 -> [${other.join(", ")}]`);
 }
 
-// ---- 2. *** THE FILE IS ITSELF A RECORD, SO IT MOVED THE COUNT IT MEASURES *** -----------------------------------
-console.log("\n2. the observer effect, checked to be exactly one");
+// Called once, by the git child's exit callback at the top of this file -- see the note there.
+function fromSection2(gitOut) {
+    // ---- 2. *** THE FILE IS ITSELF A RECORD, SO IT MOVED THE COUNT IT MEASURES *** -----------------------------------
+    console.log("\n2. the observer effect, checked to be exactly one");
 
-{
-    const all = census();
-    const without = census({ exclude: /frozenRecords/ });
-    // v4536: this module now carries TWO records -- the v4487 sweep and the v4536 re-run that supersedes it --
-    // so the delta is DERIVED from what the module actually declares rather than typed as a number. The row
-    // that mattered is unchanged: the count moves by exactly the records this file adds, and no more.
-    const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536"];
-    ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
-        all.records.length - without.records.length === MINE.length &&
-        MINE.every((n) => all.records.some((r) => r.name === n)) &&
-        MINE.every((n) => !without.records.some((r) => r.name === n)),
-        `sabotage D: v3453's observer effect in a file built to count the things it is an instance of. ` +
-        `'The number changed when I wrote it down' is a curiosity until somebody checks it changed by ` +
-        `exactly what this file declares -- ${all.records.length} against ${without.records.length}`);
-    // v4527 -- *** THE POPULATION THE SWEEP WAS TAKEN AGAINST IS DERIVED, NOT PINNED. *** This row compared the live
-    // census to 74 / 135 and went red the round a new version-stamped record arrived (physics/raceKnob.mjs's
-    // MEASURED_V4527), which is a count pinned to a moment -- the species this tree names most. A record whose stamp is
-    // AFTER v4487 cannot have been in a sweep taken at v4487, so the reading the sweep was taken against is the census
-    // WITHOUT those arrivals, and the arrivals are named beside it rather than counted into a number that cannot move.
-    // *** v4535 -- AND THE STAMP IS NOT THE ARRIVAL, WHICH v4534 PAID FOR AND WROTE DOWN AS OWED. ***
-    // PROBE_AT_V4487's own note: "A STAMP IN A NAME IS A CLAIM ABOUT THE SUBJECT, NOT ABOUT THE ARRIVAL, so
-    // a record written now about a past version lands in the past and is counted as having been in a sweep
-    // it could not have been in" -- corrected there by moving 74 to 76 and naming the two, with the debt
-    // stated: "the next record named for a version it merely DESCRIBES will land in the past silently
-    // again." THE NEXT ONE WAS THE NEXT ROUND. v4535 lifted KEY_DRIFT_V4460's growing ledger of key moves
-    // into KEY_MOVES_V4460 -- stamped for its subject, correctly, by that same rule -- and the count went to
-    // 77 within the hour.
-    //
-    // So the arrival is ASKED FOR rather than inferred from a name. The v4487 tree is a commit; the records
-    // that were in the sweep are the ones whose declarations appear in it, and git can be asked in one call.
-    // That dissolves BOTH hand-corrections: nothing is added to a list when a record lands in the past, and
-    // a record that vanishes from the census is caught the same way. If git cannot answer -- a shallow clone,
-    // no history -- the row says so and falls back to the stamp, because a check that cannot run is not a
-    // check that passes and it must not pretend the fallback is the measurement.
-    const stampOf = (name) => { const m = /V(\d{3,4})/.exec(name); return m ? +m[1] : 0; };
-    const sweepV = +REC.at.replace(/^v/, "");
-    // v4776: git's answer where git has the commit, the frozen list where it does not (a shallow clone -- which is
-    // what the publish route makes), and the two compared wherever both exist.
-    let atSweepNames = null, gitNames = null;
-    try {
-        const out = execFileSync("git", ["grep", "-h", "-E",
-            "export const [A-Z][A-Z0-9_]*V[0-9]{3,4}[A-Z0-9_]* = Object\\.freeze\\(", REC.commit],
-            { cwd: ENG, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
-        const set = new Set();
-        for (const m of out.matchAll(/export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Object\.freeze\(/g)) set.add(m[1]);
-        if (set.size > 0) gitNames = set;
-    } catch { gitNames = null; }
-    const frozenNames = new Set(SWEEP_COMMIT_RECORD_NAMES);
-    atSweepNames = gitNames || frozenNames;
-    const namesFrom = gitNames ? `git, at ${REC.commit}` : `SWEEP_COMMIT_RECORD_NAMES (git has no ${REC.commit} here -- a shallow clone)`;
-    const arrivals = atSweepNames
-        ? without.records.filter((r) => !atSweepNames.has(r.name))
-        : without.records.filter((r) => stampOf(r.name) > sweepV);
-    const atSweep = { records: without.records.length - arrivals.length, fields: without.fields - arrivals.reduce((a, r) => a + r.fields.length, 0) };
-    // *** v4536 -- THIS ROW WAS COMPARING TWO DIFFERENT POPULATIONS AND THE BROKEN WINDOW HID IT. ***
-    // It took today's census, removed the records that arrived after the sweep, and asserted the remainder
-    // equalled the sweep's frozen count -- for BOTH records and fields. The record half is sound: a record
-    // either existed at that commit or it did not, and git is asked. THE FIELD HALF NEVER WAS. A record that
-    // existed at v4487 and has GAINED a numeric field since moves that total without any record arriving, and
-    // editing a record is the ordinary thing this tree does all day. It read 135 = 135 only because the window
-    // was undercounting today by about as much as the tree had grown; replayed correctly the v4487 tree held
-    // 138 and those same 74 records carry 142 today. FOUR FIELDS WERE ADDED TO PRE-EXISTING RECORDS, which is
-    // not a finding -- and a row that calls it one is a row somebody will eventually switch off.
-    //
-    // So the ASSERTION is the identity that is stable under editing, and the drift is REPORTED beside it.
-    const fieldDrift = atSweep.fields - REC.v4487Recount.fields;
-    ok("!! the records that existed at the sweep's commit are still exactly the population it was taken over",
-        atSweep.records === REC.v4487Recount.records,
-        `${atSweep.records} of today's records existed at ${REC.commit}, against the ${REC.v4487Recount.records} ` +
-        `the replay counts there. Those same records carry ${atSweep.fields} numeric fields today against ` +
-        `${REC.v4487Recount.fields} then -- ${fieldDrift >= 0 ? "+" : ""}${fieldDrift} from ORDINARY EDITING of ` +
-        "records that already existed, REPORTED rather than asserted, because a record gaining a field is not " +
-        "a record arriving. " +
-        (arrivals.length ? `Arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : "Nothing has arrived since."));
-    // The whole-tree reading this round froze, checked as a pair so neither half can drift alone. It is
-    // deliberately NOT a ratchet: a round that adds a record re-takes it, which is one line and is the price
-    // of a number that means what it says.
-    ok("!! ...and this round's own reading of the whole census is what the tree still holds",
-        without.records.length === REC.excluding.records && without.fields === REC.excluding.fields &&
-        without.withFields === REC.excluding.withFields,
-        `${without.records.length} records, ${without.withFields} with fields, ${without.fields} fields ` +
-        `excluding this module, against the ${REC.excluding.records} / ${REC.excluding.withFields} / ` +
-        `${REC.excluding.fields} measured at ${REC.at}. A ROUND THAT ADDS A RECORD RE-TAKES THIS, and that is ` +
-        "the point: the alternative is a number nobody re-derives.");
-    ok("!! *** the arrivals are read out of the v4487 COMMIT, not out of the names ***",
-        !!atSweepNames && atSweepNames.size > 0 &&
-        // the derivation must actually disagree with the naive rule somewhere, or it is the naive rule
-        // wearing a git call: the two records v4534 had to name by hand are exactly the disagreement.
-        arrivals.some((r) => stampOf(r.name) <= sweepV) &&
-        // *** v4555 -- THIS READ `.endsWith(".mjs")` AND THAT WAS THE NARROW CENSUS'S ASSUMPTION WRITTEN
-        // INTO THE GATE. *** The clause was true only because the census could not see a record anywhere
-        // else; widening it to .mjs/.cjs/.js made the row red against a correct census, which is the
-        // clause doing its job in reverse. It now asserts what the census actually walks, AND that the
-        // widening reached: at least one arrival lives outside .mjs, or the fix did nothing.
-        arrivals.every((r) => /\.(mjs|cjs|js)$/.test(r.file)) &&
-        arrivals.some((r) => !r.file.endsWith(".mjs")),
-        `${atSweepNames.size} record declarations in ${REC.commit}, read from ${namesFrom}; ${arrivals.length} of the census are ` +
-            `not among them, and ${arrivals.filter((r) => stampOf(r.name) <= sweepV).length} of THOSE carry a ` +
-            "stamp at or before the sweep -- records named for the version they DESCRIBE, which the naive " +
-            "rule counts as having been present. That set is what v4534 had to name by hand. The naive rule is " +
-            "never the fallback: v4776 froze the commit's answer, because a shallow clone cannot ask for it.");
-    // v4776 -- THE FROZEN LIST IS ONLY WORTH ANYTHING IF IT IS THE COMMIT'S ANSWER. Checked against git wherever git
-    // can answer (every full checkout: the rig's tree, this sandbox), exactly, both directions. On a shallow clone the
-    // check cannot run and says so in its detail -- the list it would check is the one the row above just used, and
-    // it was verified on the full checkout the same round shipped from.
-    // v4776 -- AND THE LIST IS A MENTION, NOT A READ. readSites blanks every table NAME_TABLES names; without that, the 77
-    // names above moved seven documentary records to "read by code" in recordReach. Driven on the table's own file:
-    // for every listed name, frozenRecords.mjs may count as a reader only where the name appears OUTSIDE the table.
     {
-        const tableFile = path.join(ENG, "tools", "ship", "frozenRecords.mjs");
-        const raw = fs.readFileSync(tableFile, "utf8");
-        const at = raw.indexOf("export const SWEEP_COMMIT_RECORD_NAMES = Object.freeze(["), end = raw.indexOf("]);", at);
-        const outside = raw.slice(0, at) + raw.slice(end + 3);
-        const sites = readSites(SWEEP_COMMIT_RECORD_NAMES);
-        const wrong = SWEEP_COMMIT_RECORD_NAMES.filter((n) => (sites.get(n) || []).includes("tools/ship/frozenRecords.mjs") &&
-            !new RegExp("\\b" + n + "\\b").test(stripComments(outside)));
-        ok("!! ...and readSites does not count the frozen list as reading the records it lists (NAME_TABLES)",
-            NAME_TABLES.includes("SWEEP_COMMIT_RECORD_NAMES") && at > 0 && end > at && wrong.length === 0,
-            `${SWEEP_COMMIT_RECORD_NAMES.length} names checked; ${wrong.length} credited to frozenRecords.mjs by the table alone` +
-            (wrong.length ? ` -- ${wrong.slice(0, 5).join(", ")}` : ""));
+        const all = census();
+        const without = census({ exclude: /frozenRecords/ });
+        // v4536: this module now carries TWO records -- the v4487 sweep and the v4536 re-run that supersedes it --
+        // so the delta is DERIVED from what the module actually declares rather than typed as a number. The row
+        // that mattered is unchanged: the count moves by exactly the records this file adds, and no more.
+        const MINE = ["PROBE_AT_V4487", "PROBE_AT_V4536"];
+        ok(`!! *** counting this module adds EXACTLY ${MINE.length} records, which are ${MINE.join(" and ")} ***`,
+            all.records.length - without.records.length === MINE.length &&
+            MINE.every((n) => all.records.some((r) => r.name === n)) &&
+            MINE.every((n) => !without.records.some((r) => r.name === n)),
+            `sabotage D: v3453's observer effect in a file built to count the things it is an instance of. ` +
+            `'The number changed when I wrote it down' is a curiosity until somebody checks it changed by ` +
+            `exactly what this file declares -- ${all.records.length} against ${without.records.length}`);
+        // v4527 -- *** THE POPULATION THE SWEEP WAS TAKEN AGAINST IS DERIVED, NOT PINNED. *** This row compared the live
+        // census to 74 / 135 and went red the round a new version-stamped record arrived (physics/raceKnob.mjs's
+        // MEASURED_V4527), which is a count pinned to a moment -- the species this tree names most. A record whose stamp is
+        // AFTER v4487 cannot have been in a sweep taken at v4487, so the reading the sweep was taken against is the census
+        // WITHOUT those arrivals, and the arrivals are named beside it rather than counted into a number that cannot move.
+        // *** v4535 -- AND THE STAMP IS NOT THE ARRIVAL, WHICH v4534 PAID FOR AND WROTE DOWN AS OWED. ***
+        // PROBE_AT_V4487's own note: "A STAMP IN A NAME IS A CLAIM ABOUT THE SUBJECT, NOT ABOUT THE ARRIVAL, so
+        // a record written now about a past version lands in the past and is counted as having been in a sweep
+        // it could not have been in" -- corrected there by moving 74 to 76 and naming the two, with the debt
+        // stated: "the next record named for a version it merely DESCRIBES will land in the past silently
+        // again." THE NEXT ONE WAS THE NEXT ROUND. v4535 lifted KEY_DRIFT_V4460's growing ledger of key moves
+        // into KEY_MOVES_V4460 -- stamped for its subject, correctly, by that same rule -- and the count went to
+        // 77 within the hour.
+        //
+        // So the arrival is ASKED FOR rather than inferred from a name. The v4487 tree is a commit; the records
+        // that were in the sweep are the ones whose declarations appear in it, and git can be asked in one call.
+        // That dissolves BOTH hand-corrections: nothing is added to a list when a record lands in the past, and
+        // a record that vanishes from the census is caught the same way. If git cannot answer -- a shallow clone,
+        // no history -- the row says so and falls back to the stamp, because a check that cannot run is not a
+        // check that passes and it must not pretend the fallback is the measurement.
+        const stampOf = (name) => { const m = /V(\d{3,4})/.exec(name); return m ? +m[1] : 0; };
+        const sweepV = +REC.at.replace(/^v/, "");
+        // v4776: git's answer where git has the commit, the frozen list where it does not (a shallow clone -- which is
+        // what the publish route makes), and the two compared wherever both exist.
+        let atSweepNames = null, gitNames = null;
+        try {
+            const out = gitOut;                     // git's output, handed in by the exit callback; null when it could not answer
+            if (out === null) throw new Error("git has no answer");
+            const set = new Set();
+            for (const m of out.matchAll(/export const ([A-Z][A-Z0-9_]*V\d{3,4}[A-Z0-9_]*) = Object\.freeze\(/g)) set.add(m[1]);
+            if (set.size > 0) gitNames = set;
+        } catch { gitNames = null; }
+        const frozenNames = new Set(SWEEP_COMMIT_RECORD_NAMES);
+        atSweepNames = gitNames || frozenNames;
+        const namesFrom = gitNames ? `git, at ${REC.commit}` : `SWEEP_COMMIT_RECORD_NAMES (git has no ${REC.commit} here -- a shallow clone)`;
+        const arrivals = atSweepNames
+            ? without.records.filter((r) => !atSweepNames.has(r.name))
+            : without.records.filter((r) => stampOf(r.name) > sweepV);
+        const atSweep = { records: without.records.length - arrivals.length, fields: without.fields - arrivals.reduce((a, r) => a + r.fields.length, 0) };
+        // *** v4536 -- THIS ROW WAS COMPARING TWO DIFFERENT POPULATIONS AND THE BROKEN WINDOW HID IT. ***
+        // It took today's census, removed the records that arrived after the sweep, and asserted the remainder
+        // equalled the sweep's frozen count -- for BOTH records and fields. The record half is sound: a record
+        // either existed at that commit or it did not, and git is asked. THE FIELD HALF NEVER WAS. A record that
+        // existed at v4487 and has GAINED a numeric field since moves that total without any record arriving, and
+        // editing a record is the ordinary thing this tree does all day. It read 135 = 135 only because the window
+        // was undercounting today by about as much as the tree had grown; replayed correctly the v4487 tree held
+        // 138 and those same 74 records carry 142 today. FOUR FIELDS WERE ADDED TO PRE-EXISTING RECORDS, which is
+        // not a finding -- and a row that calls it one is a row somebody will eventually switch off.
+        //
+        // So the ASSERTION is the identity that is stable under editing, and the drift is REPORTED beside it.
+        const fieldDrift = atSweep.fields - REC.v4487Recount.fields;
+        ok("!! the records that existed at the sweep's commit are still exactly the population it was taken over",
+            atSweep.records === REC.v4487Recount.records,
+            `${atSweep.records} of today's records existed at ${REC.commit}, against the ${REC.v4487Recount.records} ` +
+            `the replay counts there. Those same records carry ${atSweep.fields} numeric fields today against ` +
+            `${REC.v4487Recount.fields} then -- ${fieldDrift >= 0 ? "+" : ""}${fieldDrift} from ORDINARY EDITING of ` +
+            "records that already existed, REPORTED rather than asserted, because a record gaining a field is not " +
+            "a record arriving. " +
+            (arrivals.length ? `Arrived since: ${arrivals.map((r) => r.name + " (" + r.fields.length + " fields)").join(", ")}` : "Nothing has arrived since."));
+        // The whole-tree reading this round froze, checked as a pair so neither half can drift alone. It is
+        // deliberately NOT a ratchet: a round that adds a record re-takes it, which is one line and is the price
+        // of a number that means what it says.
+        ok("!! ...and this round's own reading of the whole census is what the tree still holds",
+            without.records.length === REC.excluding.records && without.fields === REC.excluding.fields &&
+            without.withFields === REC.excluding.withFields,
+            `${without.records.length} records, ${without.withFields} with fields, ${without.fields} fields ` +
+            `excluding this module, against the ${REC.excluding.records} / ${REC.excluding.withFields} / ` +
+            `${REC.excluding.fields} measured at ${REC.at}. A ROUND THAT ADDS A RECORD RE-TAKES THIS, and that is ` +
+            "the point: the alternative is a number nobody re-derives.");
+        ok("!! *** the arrivals are read out of the v4487 COMMIT, not out of the names ***",
+            !!atSweepNames && atSweepNames.size > 0 &&
+            // the derivation must actually disagree with the naive rule somewhere, or it is the naive rule
+            // wearing a git call: the two records v4534 had to name by hand are exactly the disagreement.
+            arrivals.some((r) => stampOf(r.name) <= sweepV) &&
+            // *** v4555 -- THIS READ `.endsWith(".mjs")` AND THAT WAS THE NARROW CENSUS'S ASSUMPTION WRITTEN
+            // INTO THE GATE. *** The clause was true only because the census could not see a record anywhere
+            // else; widening it to .mjs/.cjs/.js made the row red against a correct census, which is the
+            // clause doing its job in reverse. It now asserts what the census actually walks, AND that the
+            // widening reached: at least one arrival lives outside .mjs, or the fix did nothing.
+            arrivals.every((r) => /\.(mjs|cjs|js)$/.test(r.file)) &&
+            arrivals.some((r) => !r.file.endsWith(".mjs")),
+            `${atSweepNames.size} record declarations in ${REC.commit}, read from ${namesFrom}; ${arrivals.length} of the census are ` +
+                `not among them, and ${arrivals.filter((r) => stampOf(r.name) <= sweepV).length} of THOSE carry a ` +
+                "stamp at or before the sweep -- records named for the version they DESCRIBE, which the naive " +
+                "rule counts as having been present. That set is what v4534 had to name by hand. The naive rule is " +
+                "never the fallback: v4776 froze the commit's answer, because a shallow clone cannot ask for it.");
+        // v4776 -- THE FROZEN LIST IS ONLY WORTH ANYTHING IF IT IS THE COMMIT'S ANSWER. Checked against git wherever git
+        // can answer (every full checkout: the rig's tree, this sandbox), exactly, both directions. On a shallow clone the
+        // check cannot run and says so in its detail -- the list it would check is the one the row above just used, and
+        // it was verified on the full checkout the same round shipped from.
+        // v4776 -- AND THE LIST IS A MENTION, NOT A READ. readSites blanks every table NAME_TABLES names; without that, the 77
+        // names above moved seven documentary records to "read by code" in recordReach. Driven on the table's own file:
+        // for every listed name, frozenRecords.mjs may count as a reader only where the name appears OUTSIDE the table.
+        {
+            const tableFile = path.join(ENG, "tools", "ship", "frozenRecords.mjs");
+            const raw = fs.readFileSync(tableFile, "utf8");
+            const at = raw.indexOf("export const SWEEP_COMMIT_RECORD_NAMES = Object.freeze(["), end = raw.indexOf("]);", at);
+            const outside = raw.slice(0, at) + raw.slice(end + 3);
+            const sites = readSites(SWEEP_COMMIT_RECORD_NAMES);
+            const wrong = SWEEP_COMMIT_RECORD_NAMES.filter((n) => (sites.get(n) || []).includes("tools/ship/frozenRecords.mjs") &&
+                !new RegExp("\\b" + n + "\\b").test(stripComments(outside)));
+            ok("!! ...and readSites does not count the frozen list as reading the records it lists (NAME_TABLES)",
+                NAME_TABLES.includes("SWEEP_COMMIT_RECORD_NAMES") && at > 0 && end > at && wrong.length === 0,
+                `${SWEEP_COMMIT_RECORD_NAMES.length} names checked; ${wrong.length} credited to frozenRecords.mjs by the table alone` +
+                (wrong.length ? ` -- ${wrong.slice(0, 5).join(", ")}` : ""));
+        }
+        ok("!! ...and the frozen list of the commit's records IS the commit's list, wherever git can say",
+            !gitNames || (gitNames.size === frozenNames.size && [...gitNames].every((n) => frozenNames.has(n))),
+            gitNames ? `${frozenNames.size} frozen, ${gitNames.size} in ${REC.commit} per git, ` +
+                       `${[...gitNames].filter((n) => !frozenNames.has(n)).length} missing and ` +
+                       `${[...frozenNames].filter((n) => !gitNames.has(n)).length} extra`
+                     : `UNCHECKED HERE: git has no ${REC.commit} (a shallow clone); ${frozenNames.size} frozen names were used above, ` +
+                       "and every full checkout compares them against the commit");
+        say(reportLines(without).join("\n  ----  "));
     }
-    ok("!! ...and the frozen list of the commit's records IS the commit's list, wherever git can say",
-        !gitNames || (gitNames.size === frozenNames.size && [...gitNames].every((n) => frozenNames.has(n))),
-        gitNames ? `${frozenNames.size} frozen, ${gitNames.size} in ${REC.commit} per git, ` +
-                   `${[...gitNames].filter((n) => !frozenNames.has(n)).length} missing and ` +
-                   `${[...frozenNames].filter((n) => !gitNames.has(n)).length} extra`
-                 : `UNCHECKED HERE: git has no ${REC.commit} (a shallow clone); ${frozenNames.size} frozen names were used above, ` +
-                   "and every full checkout compares them against the commit");
-    say(reportLines(without).join("\n  ----  "));
-}
 
-// ---- 3. THE FROZEN SWEEP'S OWN ARITHMETIC ------------------------------------------------------------------------
-console.log("\n3. the record the sweep left behind");
+    // ---- 3. THE FROZEN SWEEP'S OWN ARITHMETIC ------------------------------------------------------------------------
+    console.log("\n3. the record the sweep left behind");
 
-// *** v4536 -- FOUR CLASSES, AND THE FOURTH AND THIRD ARE THE POINT. *** v4487 split 135 fields into
-// noticed and unnoticed and nothing else, so a field whose only guardian gate was ALREADY RED scored as
-// unnoticed, and so did a field whose record no gate names at all. A bump cannot redden what is already red
-// and there is nothing to run when nothing names the record; neither is evidence that nobody is watching.
-// v4408's rule, which this file keeps re-learning: 'never observed' and 'observed green' are different, and
-// one bucket for both is how the second becomes the first.
-ok("!! *** all FOUR classes account for every field in the population ***",
-    REC.noticed + REC.unnoticed + REC.unmeasurable + REC.noGuardianAtAll === REC.fields,
-    `sabotage E: ${REC.noticed} noticed + ${REC.unnoticed} unnoticed + ${REC.unmeasurable} unmeasurable + ` +
-    `${REC.noGuardianAtAll} with no guardian = ${REC.fields}. The unnoticed rate is ${REC.unnoticed} of the ` +
-    `${REC.noticed + REC.unnoticed} that COULD be measured, ` +
-    `${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}%, against v4487's ${OLD.unnoticed} ` +
-    `of ${OLD.fields} = ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}%. A headline beside a list that ` +
-    "does not add up is v4296's mistake, and it is the cheapest of all of these to check");
-// *** THE PROBE RAN IN TWO PASSES AND BOTH ARE KEPT, SO THE MOVE IS CHECKABLE RATHER THAN ASSERTED. ***
-// The first pass could not measure seventeen fields: their only guardian gates were red before a bump, and
-// a bump cannot redden what is already red. Both blockers went green while the round ran -- one of them
-// BECAUSE of it -- and the seventeen were re-probed. Keeping only the final figures would leave "0
-// unmeasurable" looking like a property of the tree when it is the outcome of a repair, so the first pass,
-// the re-probe and the total are all recorded and required to reconcile.
-{
-    const U = REC.unmeasurableFirstPass || {};
-    const F1 = U.firstPass || {}, RP = U.reProbed || {};
-    ok("!! *** the first pass, the re-probe and the total reconcile -- and the seventeen did not vanish ***",
-        F1.noticed + F1.unnoticed + F1.unmeasurable + F1.noGuardianAtAll === REC.fields &&
-        RP.noticed + RP.unnoticed + RP.unmeasurable === F1.unmeasurable &&
-        F1.noticed + RP.noticed === REC.noticed && F1.unnoticed + RP.unnoticed === REC.unnoticed &&
-        REC.unmeasurable === 0 && Array.isArray(U.blockedBy) && U.blockedBy.length === 2,
-        `first pass ${F1.noticed}/${F1.unnoticed}/${F1.unmeasurable}/${F1.noGuardianAtAll}; the ` +
-        `${F1.unmeasurable} unmeasurable re-probed as ${RP.noticed} noticed and ${RP.unnoticed} unnoticed; ` +
-        `total ${REC.noticed}/${REC.unnoticed}/${REC.unmeasurable}/${REC.noGuardianAtAll} of ${REC.fields}. ` +
-        `Blocked by ${(U.blockedBy || []).map((g) => g.replace(/^tools\/ship\//, "")).join(" and ")} -- both ` +
-        "green now, so the class is EMPTY BECAUSE THE OBSTACLE WAS REMOVED, not because it never existed");
-}
+    // *** v4536 -- FOUR CLASSES, AND THE FOURTH AND THIRD ARE THE POINT. *** v4487 split 135 fields into
+    // noticed and unnoticed and nothing else, so a field whose only guardian gate was ALREADY RED scored as
+    // unnoticed, and so did a field whose record no gate names at all. A bump cannot redden what is already red
+    // and there is nothing to run when nothing names the record; neither is evidence that nobody is watching.
+    // v4408's rule, which this file keeps re-learning: 'never observed' and 'observed green' are different, and
+    // one bucket for both is how the second becomes the first.
+    ok("!! *** all FOUR classes account for every field in the population ***",
+        REC.noticed + REC.unnoticed + REC.unmeasurable + REC.noGuardianAtAll === REC.fields,
+        `sabotage E: ${REC.noticed} noticed + ${REC.unnoticed} unnoticed + ${REC.unmeasurable} unmeasurable + ` +
+        `${REC.noGuardianAtAll} with no guardian = ${REC.fields}. The unnoticed rate is ${REC.unnoticed} of the ` +
+        `${REC.noticed + REC.unnoticed} that COULD be measured, ` +
+        `${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}%, against v4487's ${OLD.unnoticed} ` +
+        `of ${OLD.fields} = ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}%. A headline beside a list that ` +
+        "does not add up is v4296's mistake, and it is the cheapest of all of these to check");
+    // *** THE PROBE RAN IN TWO PASSES AND BOTH ARE KEPT, SO THE MOVE IS CHECKABLE RATHER THAN ASSERTED. ***
+    // The first pass could not measure seventeen fields: their only guardian gates were red before a bump, and
+    // a bump cannot redden what is already red. Both blockers went green while the round ran -- one of them
+    // BECAUSE of it -- and the seventeen were re-probed. Keeping only the final figures would leave "0
+    // unmeasurable" looking like a property of the tree when it is the outcome of a repair, so the first pass,
+    // the re-probe and the total are all recorded and required to reconcile.
+    {
+        const U = REC.unmeasurableFirstPass || {};
+        const F1 = U.firstPass || {}, RP = U.reProbed || {};
+        ok("!! *** the first pass, the re-probe and the total reconcile -- and the seventeen did not vanish ***",
+            F1.noticed + F1.unnoticed + F1.unmeasurable + F1.noGuardianAtAll === REC.fields &&
+            RP.noticed + RP.unnoticed + RP.unmeasurable === F1.unmeasurable &&
+            F1.noticed + RP.noticed === REC.noticed && F1.unnoticed + RP.unnoticed === REC.unnoticed &&
+            REC.unmeasurable === 0 && Array.isArray(U.blockedBy) && U.blockedBy.length === 2,
+            `first pass ${F1.noticed}/${F1.unnoticed}/${F1.unmeasurable}/${F1.noGuardianAtAll}; the ` +
+            `${F1.unmeasurable} unmeasurable re-probed as ${RP.noticed} noticed and ${RP.unnoticed} unnoticed; ` +
+            `total ${REC.noticed}/${REC.unnoticed}/${REC.unmeasurable}/${REC.noGuardianAtAll} of ${REC.fields}. ` +
+            `Blocked by ${(U.blockedBy || []).map((g) => g.replace(/^tools\/ship\//, "")).join(" and ")} -- both ` +
+            "green now, so the class is EMPTY BECAUSE THE OBSTACLE WAS REMOVED, not because it never existed");
+    }
 
-// *** AND THE OLD RECORD IS HELD TO THE REPLAY THAT RETIRED IT. *** Not a re-derivation and it says so: the
-// replay was run once, over 75f0c033's tree with the balanced extractor, and its result is recorded above.
-// What is checked here is that the recount and the record it corrects are consistent with each other and
-// with the count of fields the v4487 sweep therefore never probed.
-// *** v4555 -- THE RELATIONSHIP THIS ROW CHECKS MOVED WHEN THE CENSUS'S RULER DID, AND THE NEW ONE IS
-// STRICTLY MORE INFORMATIVE. *** Under the .mjs-only census the replay matched the v4487 record on RECORDS
-// (74) and differed on FIELDS. Widened to .mjs/.cjs/.js it differs on records too -- 76 against 74 -- and
-// AGREES on withFields at 36, because the one newly-visible record that carries fields replaces the one the
-// broken window had over-credited. So the row now asserts the DECOMPOSITION rather than the old pair: the
-// six fields the v4487 sweep never probed are 3 the window missed plus 3 the ruler could not see, and the
-// two extra records are named in the record. An arithmetic identity that survives both instruments changing
-// is worth more than one that pinned the coincidence of a single ruler.
-ok("!! the v4487 record is superseded by a REPLAY at its own commit, and the arithmetic of that is checked",
-    REC.v4487Recount.fields - OLD.fields === REC.v4487Recount.neverProbed &&
-    REC.v4487Recount.missedByWindow + REC.v4487Recount.missedByRuler === REC.v4487Recount.neverProbed &&
-    REC.v4487Recount.narrowRuler.fields - OLD.fields === REC.v4487Recount.missedByWindow &&
-    REC.v4487Recount.fields - REC.v4487Recount.narrowRuler.fields === REC.v4487Recount.missedByRuler &&
-    REC.v4487Recount.records - REC.v4487Recount.narrowRuler.records === REC.v4487Recount.theTwoItCouldNotSee.length &&
-    REC.commit === OLD.commit,
-    `replayed at ${REC.commit} with a balanced extraction the v4487 tree held ${REC.v4487Recount.records} ` +
-    `records, ${REC.v4487Recount.withFields} with fields, ${REC.v4487Recount.fields} fields; the record ` +
-    `says ${REC.v4487Recount.recordSays}. SO ${REC.v4487Recount.neverProbed} FIELDS IN THAT TREE WERE NEVER ` +
-    "PROBED and one record was credited with fields it does not have. THIS IS A CONSISTENCY CHECK ON A " +
-    "REPLAY RECORDED HERE, NOT A RE-RUN OF IT -- re-walking a 1,500-file tree at another commit is not " +
-    "what a gate can afford, and a check pretending to be a re-derivation is the worse of the two failures");
-ok("...and the counted subsets do not exceed the population they are drawn from",
-    REC.nothingNoticesAnyField <= REC.withFields && REC.fullyGuarded <= REC.withFields &&
-    REC.noGateNamesIt <= REC.records && REC.caughtByANonSiblingGate <= REC.noticed &&
-    REC.unmeasurableRecords.length <= REC.withFields && REC.baselineRedGates.length <= REC.guardianGates &&
-    // v4548: against the LIVE counterpart, not against the frozen v4536 reading -- see the note beside
-    // currentIncludingModule. This row went red at v4548 because excluding (re-taken, 92) passed records
-    // (frozen at v4536, 91), which is the tree growing rather than a subset escaping its population.
-    REC.excluding.fields <= REC.currentIncludingModule.fields &&
-    REC.excluding.records <= REC.currentIncludingModule.records &&
-    REC.excluding.withFields <= REC.currentIncludingModule.withFields);
-// ...and the live counterpart is genuinely live: it must be exactly this module's own records ahead of the
-// excluding reading, which is the only difference between the two censuses that produced them.
-{
-    const F = REC;
-    ok("!! the with-module and without-module readings differ by exactly this module's own records",
-        F.currentIncludingModule.records - F.excluding.records === 2 &&
-        F.currentIncludingModule.withFields - F.excluding.withFields === 2,
-        `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
-        "PROBE_AT_V4536 and PROBE_AT_V4487, the two records this file holds. A pair of numbers that drifted " +
-        "apart by anything else would mean the exclude pattern had stopped matching this module.");
-}
-ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",
-    /bump one integer field by 7/.test(String(REC.method)) && /every gate that NAMES/.test(String(REC.method)) &&
-    /ALREADY RED/.test(String(REC.method)),
-    "v4536 adds the baseline to the stated method, because a sweep that does not take one cannot tell " +
-    "UNMEASURABLE from UNNOTICED and will report the difference as debt");
-// *** v4536 -- AND THIS ROW ITSELF CRASHED THE GATE, WHICH IS THE FIFTH INSTANCE OF THE SHAPE IT WARNS
-// ABOUT TWELVE LINES DOWN. *** Pointing REC at the v4536 record left `REC.firstSweepUsedSiblingsOnly`
-// undefined and the row threw before `ok` was ever called -- no FAIL line, exit 1, and a count of FAIL lines
-// reading a crash as a clean zero. A CRASH IS NOT A VERDICT. The two records are named separately now, and
-// every field read off either one is guarded, so a missing field FAILS this row instead of taking the gate
-// down. There are now THREE readings kept, not two, and the trend across them is the evidence:
-//     first sweep, siblings assumed      37.0% unnoticed of 135, guardian set a GUESS
-//     v4487, guardians derived           38.5% unnoticed of 135, enumerated by a 6,000-character window
-//     v4536, window replaced, baselined  43.3% unnoticed of the 127 that COULD be measured
-const FIRST = (OLD && OLD.firstSweepUsedSiblingsOnly) || {};
-ok("!! ...and EVERY earlier sweep is kept, with what was wrong with each",
-    FIRST.unnoticedPct === 37.0 && /assumed/.test(String(FIRST.wrong)) &&
-    OLD.at === "v4487" && OLD.fields === 135 && REC.at === "v4536",
-    `${FIRST.unnoticedPct || "?"}% (siblings assumed) -> ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}% ` +
-    `(guardians derived, window enumerated) -> ${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}% ` +
-    "(window replaced, baseline taken). THE HEADLINE BARELY MOVES AND WHAT IS UNDER IT MOVES ENORMOUSLY, " +
-    "every time. A discarded reading is evidence about the method, and these three say a defensible number " +
-    "can rest on a guess, then on a broken ruler, and still look like progress");
-// *** THE DETAIL IS COMPUTED DEFENSIVELY, AND THAT IS THE FOURTH TIME THIS SESSION. *** Reading the field
-// eagerly here means a sabotage that DELETES it throws before `ok` is called, no FAIL line prints, and a
-// count of FAIL lines reads the crash as a clean zero -- which is what sabotage F did on the first run.
-// v4485's gate had it, v4486's runner grew a load-check for it, changedPaths was repaired for it, and it
-// arrived again here. FOUR INSTANCES, ONE SHAPE: a detail string that assumes the thing the condition is
-// about to say may be missing.
-const LIMIT = (OLD && OLD.probeCatchesOneDirection) || {};
-ok("!! *** and the limit is DEMONSTRATED on a real repair, not merely asserted ***",
-    !!(OLD && OLD.probeCatchesOneDirection) && LIMIT.stillUnnoticed === true &&
-    /TAINT_AT_V4479/.test(String(LIMIT.shown)),
-    `sabotage F: ${LIMIT.why || "NO LIMIT RECORDED"}. The guard added to that record catches a DOWNWARD ` +
-    "corruption; the probe applies an UPWARD one; so a real guard reads here as no guard, and the field " +
-    "stays in the unnoticed count rather than being argued out of it");
-ok("both records are frozen", Object.isFrozen(REC) && Object.isFrozen(OLD) && Object.isFrozen(LIMIT) &&
-   Object.isFrozen(REC.excluding) && Object.isFrozen(REC.windowFailures) && Object.isFrozen(REC.v4487Recount));
+    // *** AND THE OLD RECORD IS HELD TO THE REPLAY THAT RETIRED IT. *** Not a re-derivation and it says so: the
+    // replay was run once, over 75f0c033's tree with the balanced extractor, and its result is recorded above.
+    // What is checked here is that the recount and the record it corrects are consistent with each other and
+    // with the count of fields the v4487 sweep therefore never probed.
+    // *** v4555 -- THE RELATIONSHIP THIS ROW CHECKS MOVED WHEN THE CENSUS'S RULER DID, AND THE NEW ONE IS
+    // STRICTLY MORE INFORMATIVE. *** Under the .mjs-only census the replay matched the v4487 record on RECORDS
+    // (74) and differed on FIELDS. Widened to .mjs/.cjs/.js it differs on records too -- 76 against 74 -- and
+    // AGREES on withFields at 36, because the one newly-visible record that carries fields replaces the one the
+    // broken window had over-credited. So the row now asserts the DECOMPOSITION rather than the old pair: the
+    // six fields the v4487 sweep never probed are 3 the window missed plus 3 the ruler could not see, and the
+    // two extra records are named in the record. An arithmetic identity that survives both instruments changing
+    // is worth more than one that pinned the coincidence of a single ruler.
+    ok("!! the v4487 record is superseded by a REPLAY at its own commit, and the arithmetic of that is checked",
+        REC.v4487Recount.fields - OLD.fields === REC.v4487Recount.neverProbed &&
+        REC.v4487Recount.missedByWindow + REC.v4487Recount.missedByRuler === REC.v4487Recount.neverProbed &&
+        REC.v4487Recount.narrowRuler.fields - OLD.fields === REC.v4487Recount.missedByWindow &&
+        REC.v4487Recount.fields - REC.v4487Recount.narrowRuler.fields === REC.v4487Recount.missedByRuler &&
+        REC.v4487Recount.records - REC.v4487Recount.narrowRuler.records === REC.v4487Recount.theTwoItCouldNotSee.length &&
+        REC.commit === OLD.commit,
+        `replayed at ${REC.commit} with a balanced extraction the v4487 tree held ${REC.v4487Recount.records} ` +
+        `records, ${REC.v4487Recount.withFields} with fields, ${REC.v4487Recount.fields} fields; the record ` +
+        `says ${REC.v4487Recount.recordSays}. SO ${REC.v4487Recount.neverProbed} FIELDS IN THAT TREE WERE NEVER ` +
+        "PROBED and one record was credited with fields it does not have. THIS IS A CONSISTENCY CHECK ON A " +
+        "REPLAY RECORDED HERE, NOT A RE-RUN OF IT -- re-walking a 1,500-file tree at another commit is not " +
+        "what a gate can afford, and a check pretending to be a re-derivation is the worse of the two failures");
+    ok("...and the counted subsets do not exceed the population they are drawn from",
+        REC.nothingNoticesAnyField <= REC.withFields && REC.fullyGuarded <= REC.withFields &&
+        REC.noGateNamesIt <= REC.records && REC.caughtByANonSiblingGate <= REC.noticed &&
+        REC.unmeasurableRecords.length <= REC.withFields && REC.baselineRedGates.length <= REC.guardianGates &&
+        // v4548: against the LIVE counterpart, not against the frozen v4536 reading -- see the note beside
+        // currentIncludingModule. This row went red at v4548 because excluding (re-taken, 92) passed records
+        // (frozen at v4536, 91), which is the tree growing rather than a subset escaping its population.
+        REC.excluding.fields <= REC.currentIncludingModule.fields &&
+        REC.excluding.records <= REC.currentIncludingModule.records &&
+        REC.excluding.withFields <= REC.currentIncludingModule.withFields);
+    // ...and the live counterpart is genuinely live: it must be exactly this module's own records ahead of the
+    // excluding reading, which is the only difference between the two censuses that produced them.
+    {
+        const F = REC;
+        ok("!! the with-module and without-module readings differ by exactly this module's own records",
+            F.currentIncludingModule.records - F.excluding.records === 2 &&
+            F.currentIncludingModule.withFields - F.excluding.withFields === 2,
+            `${F.currentIncludingModule.records} including against ${F.excluding.records} excluding -- ` +
+            "PROBE_AT_V4536 and PROBE_AT_V4487, the two records this file holds. A pair of numbers that drifted " +
+            "apart by anything else would mean the exclude pattern had stopped matching this module.");
+    }
+    ok("!! *** the method is stated, so a later sweep can be compared rather than merely disagreed with ***",
+        /bump one integer field by 7/.test(String(REC.method)) && /every gate that NAMES/.test(String(REC.method)) &&
+        /ALREADY RED/.test(String(REC.method)),
+        "v4536 adds the baseline to the stated method, because a sweep that does not take one cannot tell " +
+        "UNMEASURABLE from UNNOTICED and will report the difference as debt");
+    // *** v4536 -- AND THIS ROW ITSELF CRASHED THE GATE, WHICH IS THE FIFTH INSTANCE OF THE SHAPE IT WARNS
+    // ABOUT TWELVE LINES DOWN. *** Pointing REC at the v4536 record left `REC.firstSweepUsedSiblingsOnly`
+    // undefined and the row threw before `ok` was ever called -- no FAIL line, exit 1, and a count of FAIL lines
+    // reading a crash as a clean zero. A CRASH IS NOT A VERDICT. The two records are named separately now, and
+    // every field read off either one is guarded, so a missing field FAILS this row instead of taking the gate
+    // down. There are now THREE readings kept, not two, and the trend across them is the evidence:
+    //     first sweep, siblings assumed      37.0% unnoticed of 135, guardian set a GUESS
+    //     v4487, guardians derived           38.5% unnoticed of 135, enumerated by a 6,000-character window
+    //     v4536, window replaced, baselined  43.3% unnoticed of the 127 that COULD be measured
+    const FIRST = (OLD && OLD.firstSweepUsedSiblingsOnly) || {};
+    ok("!! ...and EVERY earlier sweep is kept, with what was wrong with each",
+        FIRST.unnoticedPct === 37.0 && /assumed/.test(String(FIRST.wrong)) &&
+        OLD.at === "v4487" && OLD.fields === 135 && REC.at === "v4536",
+        `${FIRST.unnoticedPct || "?"}% (siblings assumed) -> ${(100 * OLD.unnoticed / OLD.fields).toFixed(1)}% ` +
+        `(guardians derived, window enumerated) -> ${(100 * REC.unnoticed / (REC.noticed + REC.unnoticed)).toFixed(1)}% ` +
+        "(window replaced, baseline taken). THE HEADLINE BARELY MOVES AND WHAT IS UNDER IT MOVES ENORMOUSLY, " +
+        "every time. A discarded reading is evidence about the method, and these three say a defensible number " +
+        "can rest on a guess, then on a broken ruler, and still look like progress");
+    // *** THE DETAIL IS COMPUTED DEFENSIVELY, AND THAT IS THE FOURTH TIME THIS SESSION. *** Reading the field
+    // eagerly here means a sabotage that DELETES it throws before `ok` is called, no FAIL line prints, and a
+    // count of FAIL lines reads the crash as a clean zero -- which is what sabotage F did on the first run.
+    // v4485's gate had it, v4486's runner grew a load-check for it, changedPaths was repaired for it, and it
+    // arrived again here. FOUR INSTANCES, ONE SHAPE: a detail string that assumes the thing the condition is
+    // about to say may be missing.
+    const LIMIT = (OLD && OLD.probeCatchesOneDirection) || {};
+    ok("!! *** and the limit is DEMONSTRATED on a real repair, not merely asserted ***",
+        !!(OLD && OLD.probeCatchesOneDirection) && LIMIT.stillUnnoticed === true &&
+        /TAINT_AT_V4479/.test(String(LIMIT.shown)),
+        `sabotage F: ${LIMIT.why || "NO LIMIT RECORDED"}. The guard added to that record catches a DOWNWARD ` +
+        "corruption; the probe applies an UPWARD one; so a real guard reads here as no guard, and the field " +
+        "stays in the unnoticed count rather than being argued out of it");
+    ok("both records are frozen", Object.isFrozen(REC) && Object.isFrozen(OLD) && Object.isFrozen(LIMIT) &&
+       Object.isFrozen(REC.excluding) && Object.isFrozen(REC.windowFailures) && Object.isFrozen(REC.v4487Recount));
 
-// ---- 4. THE TWO REPAIRS THIS ROUND SHIPPED ------------------------------------------------------------------------
-console.log("\n4. what was closed, checked against the files rather than claimed");
+    // ---- 4. THE TWO REPAIRS THIS ROUND SHIPPED ------------------------------------------------------------------------
+    console.log("\n4. what was closed, checked against the files rather than claimed");
 
-{
-    const shape = fs.readFileSync(path.join(ENG, "tools/ship/assertionShape-selfcheck.mjs"), "utf8");
-    ok("!! *** assertionShape compares ALL NINE rows of its census, where it compared four ***",
-        /\["gates", REC\.gates/.test(shape) && /\["usesOk", REC\.usesOk/.test(shape) &&
-        /\["nameFirst", REC\.nameFirst/.test(shape) && /\["unknownSignature"/.test(shape),
-        "gates, usesOk, nameFirst, distinctDefinitions and unknownSignature were re-taken by hand every " +
-        "round with nothing checking them -- and vba/runtimeGap.mjs found the IDENTICAL defect in itself at " +
-        "v4462, eighteen rounds earlier. The lesson did not travel");
-    const taint = fs.readFileSync(path.join(ENG, "tools/roundhouse/observableTaint-selfcheck.mjs"), "utf8");
-    ok("...and observableTaint's build counts are at least consistent, which is SAID to be less than derived",
-        /buildsWhereNothingMoved <= REC\.builds/.test(taint) && /NOT a re-derivation/.test(taint),
-        "the sweep those numbers came from is 40 builds, so a gate cannot re-run it -- and a consistency " +
-        "check that pretended to be a re-derivation would be the worse of the two failures");
-}
+    {
+        const shape = fs.readFileSync(path.join(ENG, "tools/ship/assertionShape-selfcheck.mjs"), "utf8");
+        ok("!! *** assertionShape compares ALL NINE rows of its census, where it compared four ***",
+            /\["gates", REC\.gates/.test(shape) && /\["usesOk", REC\.usesOk/.test(shape) &&
+            /\["nameFirst", REC\.nameFirst/.test(shape) && /\["unknownSignature"/.test(shape),
+            "gates, usesOk, nameFirst, distinctDefinitions and unknownSignature were re-taken by hand every " +
+            "round with nothing checking them -- and vba/runtimeGap.mjs found the IDENTICAL defect in itself at " +
+            "v4462, eighteen rounds earlier. The lesson did not travel");
+        const taint = fs.readFileSync(path.join(ENG, "tools/roundhouse/observableTaint-selfcheck.mjs"), "utf8");
+        ok("...and observableTaint's build counts are at least consistent, which is SAID to be less than derived",
+            /buildsWhereNothingMoved <= REC\.builds/.test(taint) && /NOT a re-derivation/.test(taint),
+            "the sweep those numbers came from is 40 builds, so a gate cannot re-run it -- and a consistency " +
+            "check that pretended to be a re-derivation would be the worse of the two failures");
+    }
 
-console.log("\n5. v4715: the guardian search, taken by the runs a name can live in, gives the pairwise answer");
-{
-    // Placed ABOVE the cheap-census and cache sections for the budget reason the cheap-census block gives: the
-    // cache section ends in clearScanCache(), so a census() taken after it would be cold and pay the full scan again.
-    // Every record name in the tree, and every tenth gate's comment-stripped source: the full pairwise pass costs about
-    // half a second, which is the headroom this change bought, so it was run once at v4715 (census byte-identical) and
-    // is held here on a tenth of the live gates plus the cases that could split the two methods.
-    // The names are census()'s own records and the texts come through treeRead's memo, which census() already filled:
-    // the first draft re-read 4,000 files from disk here and gave back 280 ms of the headroom this change bought.
-    const names = new Set(census().records.map((r) => r.name));
-    const gates = sources().filter((f) => /-selfcheck\.mjs$/.test(f)).filter((_, i) => i % 10 === 0)
-        .map((f) => [path.relative(ENG, f), stripComments(TR.textOf(f))]);
-    const n0 = [...names][0], n1 = [...names].find((n) => n !== n0);
-    const edge = [["edge/inside", `x = ${n0}_GATES;`], ["edge/lower", `a${n0}b`], ["edge/digits", `9${n0}9`],
-                  ["edge/both", `${n0}${n1}`], ["edge/punct", `(${n0}).x`], ["edge/none", "V4715 and v4715 and nothing"]];
-    const run = (fn, src) => { const named = new Map([...names].map((n) => [n, []])); fn(src, named);
-        return JSON.stringify([...named].filter(([, g]) => g.length)); };
-    const live = run(guardianSearch, gates) === run(guardianSearchNaive, gates);
-    const fast = JSON.parse(run(guardianSearch, edge)), slow = run(guardianSearchNaive, edge);
-    ok("*** the run-based search and the pairwise one agree on every tenth live gate and on every edge case ***",
-       live && JSON.stringify(fast) === slow && fast.some(([n, g]) => n === n0 && g.includes("edge/inside") && g.includes("edge/lower") && g.includes("edge/both")),
-       `${gates.length} live gates x ${names.size} names; edge cases: a name inside a longer identifier, between lowercase ` +
-       `letters, between digits, run into another name, and in punctuation -- the last must match nothing`);
-}
+    console.log("\n5. v4715: the guardian search, taken by the runs a name can live in, gives the pairwise answer");
+    {
+        // Placed ABOVE the cheap-census and cache sections for the budget reason the cheap-census block gives: the
+        // cache section ends in clearScanCache(), so a census() taken after it would be cold and pay the full scan again.
+        // Every record name in the tree, and every tenth gate's comment-stripped source: the full pairwise pass costs about
+        // half a second, which is the headroom this change bought, so it was run once at v4715 (census byte-identical) and
+        // is held here on a tenth of the live gates plus the cases that could split the two methods.
+        // The names are census()'s own records and the texts come through treeRead's memo, which census() already filled:
+        // the first draft re-read 4,000 files from disk here and gave back 280 ms of the headroom this change bought.
+        const names = new Set(census().records.map((r) => r.name));
+        const gates = sources().filter((f) => /-selfcheck\.mjs$/.test(f)).filter((_, i) => i % 10 === 0)
+            .map((f) => [path.relative(ENG, f), stripComments(TR.textOf(f))]);
+        const n0 = [...names][0], n1 = [...names].find((n) => n !== n0);
+        const edge = [["edge/inside", `x = ${n0}_GATES;`], ["edge/lower", `a${n0}b`], ["edge/digits", `9${n0}9`],
+                      ["edge/both", `${n0}${n1}`], ["edge/punct", `(${n0}).x`], ["edge/none", "V4715 and v4715 and nothing"]];
+        const run = (fn, src) => { const named = new Map([...names].map((n) => [n, []])); fn(src, named);
+            return JSON.stringify([...named].filter(([, g]) => g.length)); };
+        const live = run(guardianSearch, gates) === run(guardianSearchNaive, gates);
+        const fast = JSON.parse(run(guardianSearch, edge)), slow = run(guardianSearchNaive, edge);
+        ok("*** the run-based search and the pairwise one agree on every tenth live gate and on every edge case ***",
+           live && JSON.stringify(fast) === slow && fast.some(([n, g]) => n === n0 && g.includes("edge/inside") && g.includes("edge/lower") && g.includes("edge/both")),
+           `${gates.length} live gates x ${names.size} names; edge cases: a name inside a longer identifier, between lowercase ` +
+           `letters, between digits, run into another name, and in punctuation -- the last must match nothing`);
+    }
 
-// ---- THE CHEAP CENSUS, v4664 --------------------------------------------------------------------------------
-{
-    // *** census({ guardians: false }) SKIPS THE GATE SCAN, AND THE MEMO MUST NOT SERVE IT TO A CALLER THAT
-    // ASKED FOR GUARDIANS. *** That is the shape v4647r found one level down in this same file: a cache key
-    // too coarse to tell two questions apart. The key carries the flag; these rows drive both directions.
+    // ---- THE CHEAP CENSUS, v4664 --------------------------------------------------------------------------------
+    {
+        // *** census({ guardians: false }) SKIPS THE GATE SCAN, AND THE MEMO MUST NOT SERVE IT TO A CALLER THAT
+        // ASKED FOR GUARDIANS. *** That is the shape v4647r found one level down in this same file: a cache key
+        // too coarse to tell two questions apart. The key carries the flag; these rows drive both directions.
+        //
+        // *** PLACED HERE, ABOVE THE CACHE SECTION, AND THE PLACEMENT IS A BUDGET FACT. *** Below that section
+        // every clearScanCache() has just run, so both calls would be cold: 266 ms for the cheap one plus 472
+        // for the full, and the gate went 1,495 -> 2,126 ms against a 3,000 ms budget recordReach requires 800
+        // ms of headroom under. Up here the full census is already memoised by the rows above, so only the
+        // cheap one is paid. And the claim is about the KEY rather than about an empty cache -- asking both
+        // ways against a WARM one is the HARDER test, because a key too coarse to tell them apart would hand
+        // the second caller the first one's answer, which is what the last row drives.
+        const cheap = census({ guardians: false });
+        const full = census();
+        ok("!! *** the cheap census counts the SAME records and the SAME fields as the full one ***",
+            cheap.records.length === full.records.length && cheap.fields === full.fields &&
+            cheap.withFields === full.withFields,
+            `${cheap.records.length}/${cheap.withFields}/${cheap.fields} against ` +
+            `${full.records.length}/${full.withFields}/${full.fields}. What it skips is WHO GUARDS each record, ` +
+            "which is the comment strip over every gate source plus a name scan across all of them -- most of " +
+            "the 750 ms this function costs, and an answer tools/ship/recordDrift.mjs's pre-flight never reads");
+        ok("!! *** and what it did not compute comes back NULL, not EMPTY ***",
+            cheap.unguarded === null && cheap.siblingWrong === null && cheap.guardiansScanned === false &&
+            cheap.records.every((r) => r.guardians === null),
+            "an empty list means the search RAN and found nothing, which is a finding; null means it did not " +
+            "run. Returning [] here would tell a caller that all " + cheap.records.length + " records in the " +
+            "tree are unguarded -- a number that would look like a catastrophe and be an artefact of a flag");
+        ok("!! CONTROL: the FULL census still computes them, so the flag is a choice and not a removal",
+            Array.isArray(full.unguarded) && full.guardiansScanned === true &&
+            full.records.some((r) => Array.isArray(r.guardians) && r.guardians.length > 0),
+            `${full.unguarded.length} unguarded of ${full.records.length}, and at least one record names a real ` +
+            "guardian. If this ever went null the cheap path would have become the only path");
+        ok("!! *** the two answers are memoised SEPARATELY -- a cheap census is not served to a full call ***",
+            census({ guardians: false }).unguarded === null && census().unguarded !== null,
+            "asked in that order, twice each, against the warm cache. The key carries the flag; a key that did " +
+            "not would hand the second caller a census with every guardian field missing, which is v4647r's " +
+            "defect in this same file one round later");
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // THE CACHES, GRADED -- BECAUSE THREE SABOTAGES OF THEM WENT ZERO RED (v4647r)
+    // ---------------------------------------------------------------------------------------------------------
+    // v4647r made census() cheaper by caching the comment-stripped source per file, which took this gate from
+    // ~2195 ms to ~1650 ms and gave recordReach's margin row its headroom back. Then the repair was sabotaged
+    // three ways and ALL THREE WENT ZERO RED:
     //
-    // *** PLACED HERE, ABOVE THE CACHE SECTION, AND THE PLACEMENT IS A BUDGET FACT. *** Below that section
-    // every clearScanCache() has just run, so both calls would be cold: 266 ms for the cheap one plus 472
-    // for the full, and the gate went 1,495 -> 2,126 ms against a 3,000 ms budget recordReach requires 800
-    // ms of headroom under. Up here the full census is already memoised by the rows above, so only the
-    // cheap one is paid. And the claim is about the KEY rather than about an empty cache -- asking both
-    // ways against a WARM one is the HARDER test, because a key too coarse to tell them apart would hand
-    // the second caller the first one's answer, which is what the last row drives.
-    const cheap = census({ guardians: false });
-    const full = census();
-    ok("!! *** the cheap census counts the SAME records and the SAME fields as the full one ***",
-        cheap.records.length === full.records.length && cheap.fields === full.fields &&
-        cheap.withFields === full.withFields,
-        `${cheap.records.length}/${cheap.withFields}/${cheap.fields} against ` +
-        `${full.records.length}/${full.withFields}/${full.fields}. What it skips is WHO GUARDS each record, ` +
-        "which is the comment strip over every gate source plus a name scan across all of them -- most of " +
-        "the 750 ms this function costs, and an answer tools/ship/recordDrift.mjs's pre-flight never reads");
-    ok("!! *** and what it did not compute comes back NULL, not EMPTY ***",
-        cheap.unguarded === null && cheap.siblingWrong === null && cheap.guardiansScanned === false &&
-        cheap.records.every((r) => r.guardians === null),
-        "an empty list means the search RAN and found nothing, which is a finding; null means it did not " +
-        "run. Returning [] here would tell a caller that all " + cheap.records.length + " records in the " +
-        "tree are unguarded -- a number that would look like a catastrophe and be an artefact of a flag");
-    ok("!! CONTROL: the FULL census still computes them, so the flag is a choice and not a removal",
-        Array.isArray(full.unguarded) && full.guardiansScanned === true &&
-        full.records.some((r) => Array.isArray(r.guardians) && r.guardians.length > 0),
-        `${full.unguarded.length} unguarded of ${full.records.length}, and at least one record names a real ` +
-        "guardian. If this ever went null the cheap path would have become the only path");
-    ok("!! *** the two answers are memoised SEPARATELY -- a cheap census is not served to a full call ***",
-        census({ guardians: false }).unguarded === null && census().unguarded !== null,
-        "asked in that order, twice each, against the warm cache. The key carries the flag; a key that did " +
-        "not would hand the second caller a census with every guardian field missing, which is v4647r's " +
-        "defect in this same file one round later");
-}
+    //   SB-1  strippedOf() ignores `cacheable`, so an injected read is served the real file's text   0 red
+    //   SB-2  clearScanCache() stops clearing the new cache, so a cold scan is not cold              0 red
+    //   SB-3  the derivation loop's `here.length < 2` becomes `< 1`                                  0 red
+    //
+    // SB-3 is a BAD SABOTAGE and is recorded as one rather than counted: a file declaring ONE record has no
+    // OTHER record for it to be defined from, so the loop it now enters adds no edge. It does not change the
+    // subject, and "a sabotage that does not change the subject is not a sabotage".
+    //
+    // SB-1 and SB-2 are real, and they went zero for the plainest reason available: clearScanCache() is EXPORTED,
+    // its docstring says "the gate needs a cold scan to prove the warm one is not simply answering from a stale
+    // copy", AND NO GATE HAS EVER CALLED IT. The caches -- the record memo as much as this round's new one --
+    // have never been graded at all. This section is that check, and it is deliberately built on a ONE-FILE
+    // census rather than a tree-wide one, because a row that costs two full censuses to prove a saving of two
+    // full censuses would give the saving straight back.
+    {
+        const MOD  = path.join(ENG, "__fx_cache_mod.mjs");
+        const GATE = path.join(ENG, "__fx_cache-selfcheck.mjs");   // __ prefix: enumerateGates skips it (v4639)
+        const NAME = "CACHE_PROBE_AT_V4647R";
+        // FIELD_RE is /\n\s+(name):\s*\d+\s*,/ -- a NEWLINE, indentation and a TRAILING COMMA. My first
+        // fixture declared the record on one line, so RECORD_RE found it, the guardian search found it, and
+        // `fields` came back EMPTY: the record was real and carried nothing to compare. Written the way the
+        // tree's own records are written, because that is the shape the instrument reads.
+        const decl = (field) => `export const ${NAME} = Object.freeze({\n    ${field}: 1,\n});\n`;
+        const names = (yes) => yes ? `import { ${NAME} } from "./__fx_cache_mod.mjs";\nconsole.log(${NAME});\n`
+                                   : `console.log("this gate names no record at all");\n`;
+        const guardiansOf = (c) => ((c.records.find((r) => r.name === NAME) || {}).guardians || []);
+        const fieldsOf    = (c) => ((c.records.find((r) => r.name === NAME) || {}).fields || []);
+        try {
+            fs.writeFileSync(MOD, decl("alpha"));
+            fs.writeFileSync(GATE, names(true));
+            const cold1 = census({ files: [MOD, GATE], exclude: null });
+            ok("!! the one-file census sees the record and its guardian to begin with",
+               fieldsOf(cold1).join(",") === "alpha" && guardiansOf(cold1).some((g) => /__fx_cache-selfcheck/.test(g)),
+               `fields [${fieldsOf(cold1).join(", ")}], guardians [${guardiansOf(cold1).join(", ")}] -- without ` +
+               `this the rows below could pass on a census that never found anything`);
 
-// ---------------------------------------------------------------------------------------------------------
-// THE CACHES, GRADED -- BECAUSE THREE SABOTAGES OF THEM WENT ZERO RED (v4647r)
-// ---------------------------------------------------------------------------------------------------------
-// v4647r made census() cheaper by caching the comment-stripped source per file, which took this gate from
-// ~2195 ms to ~1650 ms and gave recordReach's margin row its headroom back. Then the repair was sabotaged
-// three ways and ALL THREE WENT ZERO RED:
-//
-//   SB-1  strippedOf() ignores `cacheable`, so an injected read is served the real file's text   0 red
-//   SB-2  clearScanCache() stops clearing the new cache, so a cold scan is not cold              0 red
-//   SB-3  the derivation loop's `here.length < 2` becomes `< 1`                                  0 red
-//
-// SB-3 is a BAD SABOTAGE and is recorded as one rather than counted: a file declaring ONE record has no
-// OTHER record for it to be defined from, so the loop it now enters adds no edge. It does not change the
-// subject, and "a sabotage that does not change the subject is not a sabotage".
-//
-// SB-1 and SB-2 are real, and they went zero for the plainest reason available: clearScanCache() is EXPORTED,
-// its docstring says "the gate needs a cold scan to prove the warm one is not simply answering from a stale
-// copy", AND NO GATE HAS EVER CALLED IT. The caches -- the record memo as much as this round's new one --
-// have never been graded at all. This section is that check, and it is deliberately built on a ONE-FILE
-// census rather than a tree-wide one, because a row that costs two full censuses to prove a saving of two
-// full censuses would give the saving straight back.
-{
-    const MOD  = path.join(ENG, "__fx_cache_mod.mjs");
-    const GATE = path.join(ENG, "__fx_cache-selfcheck.mjs");   // __ prefix: enumerateGates skips it (v4639)
-    const NAME = "CACHE_PROBE_AT_V4647R";
-    // FIELD_RE is /\n\s+(name):\s*\d+\s*,/ -- a NEWLINE, indentation and a TRAILING COMMA. My first
-    // fixture declared the record on one line, so RECORD_RE found it, the guardian search found it, and
-    // `fields` came back EMPTY: the record was real and carried nothing to compare. Written the way the
-    // tree's own records are written, because that is the shape the instrument reads.
-    const decl = (field) => `export const ${NAME} = Object.freeze({\n    ${field}: 1,\n});\n`;
-    const names = (yes) => yes ? `import { ${NAME} } from "./__fx_cache_mod.mjs";\nconsole.log(${NAME});\n`
-                               : `console.log("this gate names no record at all");\n`;
-    const guardiansOf = (c) => ((c.records.find((r) => r.name === NAME) || {}).guardians || []);
-    const fieldsOf    = (c) => ((c.records.find((r) => r.name === NAME) || {}).fields || []);
-    try {
-        fs.writeFileSync(MOD, decl("alpha"));
-        fs.writeFileSync(GATE, names(true));
-        const cold1 = census({ files: [MOD, GATE], exclude: null });
-        ok("!! the one-file census sees the record and its guardian to begin with",
-           fieldsOf(cold1).join(",") === "alpha" && guardiansOf(cold1).some((g) => /__fx_cache-selfcheck/.test(g)),
-           `fields [${fieldsOf(cold1).join(", ")}], guardians [${guardiansOf(cold1).join(", ")}] -- without ` +
-           `this the rows below could pass on a census that never found anything`);
+            // Both files change on disk. WITHOUT a clear, the caches must still answer with the OLD text --
+            // that is what proves a cache is actually in play and these rows are not testing a no-op.
+            fs.writeFileSync(MOD, decl("beta"));
+            fs.writeFileSync(GATE, names(false));
+            const warm = census({ files: [MOD, GATE], exclude: null });
+            ok("CONTROL: with no clear, the WARM caches still answer with the superseded text",
+               fieldsOf(warm).join(",") === "alpha" && guardiansOf(warm).length === guardiansOf(cold1).length,
+               `fields [${fieldsOf(warm).join(", ")}] -- still the pre-rewrite answer. If this row went the other ` +
+               `way the caches would not be caching, and every row below would pass for the wrong reason`);
 
-        // Both files change on disk. WITHOUT a clear, the caches must still answer with the OLD text --
-        // that is what proves a cache is actually in play and these rows are not testing a no-op.
-        fs.writeFileSync(MOD, decl("beta"));
-        fs.writeFileSync(GATE, names(false));
-        const warm = census({ files: [MOD, GATE], exclude: null });
-        ok("CONTROL: with no clear, the WARM caches still answer with the superseded text",
-           fieldsOf(warm).join(",") === "alpha" && guardiansOf(warm).length === guardiansOf(cold1).length,
-           `fields [${fieldsOf(warm).join(", ")}] -- still the pre-rewrite answer. If this row went the other ` +
-           `way the caches would not be caching, and every row below would pass for the wrong reason`);
+            clearScanCache();
+            const cold2 = census({ files: [MOD, GATE], exclude: null });
+            ok("!! *** clearScanCache() really does make the next scan COLD -- records AND stripped source ***",
+               fieldsOf(cold2).join(",") === "beta" && !guardiansOf(cold2).some((g) => /__fx_cache-selfcheck/.test(g)),
+               `fields [${fieldsOf(cold2).join(", ")}], guardians [${guardiansOf(cold2).join(", ") || "none"}]. ` +
+               `The FIELD comes from the record memo and the GUARDIAN from the comment-stripped source, so this ` +
+               `row needs BOTH caches cleared -- sabotage SB-2 dropped only the strip cache from the clear and ` +
+               `this is the row that now refuses it`);
 
-        clearScanCache();
-        const cold2 = census({ files: [MOD, GATE], exclude: null });
-        ok("!! *** clearScanCache() really does make the next scan COLD -- records AND stripped source ***",
-           fieldsOf(cold2).join(",") === "beta" && !guardiansOf(cold2).some((g) => /__fx_cache-selfcheck/.test(g)),
-           `fields [${fieldsOf(cold2).join(", ")}], guardians [${guardiansOf(cold2).join(", ") || "none"}]. ` +
-           `The FIELD comes from the record memo and the GUARDIAN from the comment-stripped source, so this ` +
-           `row needs BOTH caches cleared -- sabotage SB-2 dropped only the strip cache from the clear and ` +
-           `this is the row that now refuses it`);
-
-        // An INJECTED read is a fixture, and a fixture's content is not a property of its path.
-        clearScanCache();
-        census({ files: [MOD, GATE], exclude: null });          // warm the path caches from the real files
-        const injected = census({ files: [MOD, GATE], exclude: null,
-                                  read: (f) => (f === MOD ? decl("gamma") : names(true)) });
-        ok("!! *** a census handed its own `read` is NOT served from the path-keyed caches ***",
-           fieldsOf(injected).join(",") === "gamma" &&
-           guardiansOf(injected).some((g) => /__fx_cache-selfcheck/.test(g)),
-           `fields [${fieldsOf(injected).join(", ")}], guardians [${guardiansOf(injected).join(", ") || "none"}] ` +
-           `-- the injected text, not the file's. Before v4647r the bypass was written ` +
-           `\`memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)\`, which is the SAME CALL twice: ` +
-           `.call(null, ...) changes nothing about which cache the body reaches. It was a bypass that did ` +
-           `not bypass, and sabotage SB-1 is the strip cache repeating it`);
-    } finally {
-        for (const f of [MOD, GATE]) { try { fs.unlinkSync(f); } catch { /* reported by the rows above */ } }
-        clearScanCache();   // never leave the tree's real entries shadowed by a fixture's
+            // An INJECTED read is a fixture, and a fixture's content is not a property of its path.
+            clearScanCache();
+            census({ files: [MOD, GATE], exclude: null });          // warm the path caches from the real files
+            const injected = census({ files: [MOD, GATE], exclude: null,
+                                      read: (f) => (f === MOD ? decl("gamma") : names(true)) });
+            ok("!! *** a census handed its own `read` is NOT served from the path-keyed caches ***",
+               fieldsOf(injected).join(",") === "gamma" &&
+               guardiansOf(injected).some((g) => /__fx_cache-selfcheck/.test(g)),
+               `fields [${fieldsOf(injected).join(", ")}], guardians [${guardiansOf(injected).join(", ") || "none"}] ` +
+               `-- the injected text, not the file's. Before v4647r the bypass was written ` +
+               `\`memoable ? recordsIn(f, rd) : recordsIn.call(null, f, rd)\`, which is the SAME CALL twice: ` +
+               `.call(null, ...) changes nothing about which cache the body reaches. It was a bypass that did ` +
+               `not bypass, and sabotage SB-1 is the strip cache repeating it`);
+        } finally {
+            for (const f of [MOD, GATE]) { try { fs.unlinkSync(f); } catch { /* reported by the rows above */ } }
+            clearScanCache();   // never leave the tree's real entries shadowed by a fixture's
+        }
     }
-}
 
-console.log(`\nfrozenRecords-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
-process.exit(fails === 0 ? 0 : 1);
+    console.log(`\nfrozenRecords-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+    process.exit(fails === 0 ? 0 : 1);
+}

@@ -11,13 +11,15 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { declared, readDoc, minFoldsFor } from "./foldStats.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
 import { holeRow } from "./frameHoles.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H9 = "render/frame-holed-preregistration.md";
-export const CACHE_H9 = "tools/ship/frameHoled-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H9 = cacheRel("frameHoled-cache.json.gz");
 export const RESULT_H9 = "tools/ship/frameHoled-result.json";
 export const HOLED_KEYS = Object.freeze({ scenes: "list", speed: "str", ratios: "list", alpha: "num", minFolds: "int", upto: "int", minGroup: "int" });
 

@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { declared, readDoc } from "./foldStats.mjs";
 import { spearman } from "./frameGate.mjs";
@@ -21,7 +22,8 @@ import { nonTurnRows } from "./frameSway.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H16 = "render/frame-disagree-preregistration.md";
-export const CACHE_H16 = "tools/ship/frameDisagree-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H16 = cacheRel("frameDisagree-cache.json.gz");
 export const RESULT_H16 = "tools/ship/frameDisagree-result.json";
 export const DIS_KEYS = Object.freeze({ scenes: "list", cells: "list", path: "str", signal: "str", direction: "int", distinctMax: "num",
                                         alpha: "num", minFolds: "int", upto: "int", cvFloor: "num" });

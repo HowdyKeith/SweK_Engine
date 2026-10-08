@@ -28,7 +28,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { codeOnly, noComments } from "./sourceScan.mjs";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import { UPSTREAM, ARTEFACTS, WEIGHTS, UPSTREAM_BENCH, MEASURED_HERE, REFUSED, STAGES,
          hasSubtleCrypto, isSecure, INSECURE_WHY,
          gb, humanBytes, humanDuration, estimateWallClock, initialState, nextStep,
@@ -268,7 +268,7 @@ console.log("\n8. *** SOURCE CANNOT PROVE A PAGE DOWNLOADS NOTHING. INTERCEPT IT
         report("*** THAT IS A SKIP AND NOT A PASS: sections 1-7 read source and state, and neither can show");
         report("    what a loaded page actually puts on the wire.");
     } else {
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = [], asked = [];
         pg.on("pageerror", (e) => errs.push(String(e.message)));
@@ -473,7 +473,7 @@ console.log("\n10. *** ON SweK'S OWN LAN ORIGIN, HALF THE WEB PLATFORM IS UNDEFI
         });
         await new Promise((r) => srv.listen(0, "0.0.0.0", r));
         const port = srv.address().port;
-        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await (await b.newContext()).newPage();
         const errs = [];
         pg.on("pageerror", (e) => errs.push(String(e.message)));

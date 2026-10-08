@@ -6559,7 +6559,14 @@
 // const ENGINE_VERSION = "v4563";   // v4563 -- *** THE FILED NUMBER WAS 43, THE LIVE ONE WAS 45, AND NEITHER MEASURED WHAT THE FIELD'S NAME CLAIMS. *** `siblingWrong` counts records that some gate names but their SIBLING does not, and the rule computing that sibling was wrong in two mechanical ways -- so the figure was mostly a description of this tree's own layout, published as a debt. *** (1) THE REPLACE WAS A NO-OP ON A .js FILE. *** The sibling was built with `.replace(/\.mjs$/, "-selfcheck.mjs")`, which leaves a .js name unchanged, so from v4555 -- the round that widened this census to .js and .cjs -- every record in a .js file had its sibling computed as THE FILE ITSELF, a thing no gate can ever be. Nine records wrong by construction, including all seven of camera/camera.js's, and the widening round is the one that created them. *** (2) IT COMPARED FULL PATHS, SO IT LOOKED FOR THE GATE BESIDE THE MODULE, AND THIS TREE KEEPS ITS GATES IN tools/ship/. *** MEASURED: 17 of the 45 are guarded by a gate with EXACTLY THE RIGHT NAME, and every one of those 17 is in tools/ship/. The heuristic was looking in the wrong place and filing its own miss as a finding. The question is now "does the gate NAMED FOR THIS MODULE name this record, wherever it lives", which is what the field always claimed: 45 becomes 28, with the 17 kept as `siblingElsewhere` so the layout fact is a number rather than part of a defect count. *** AND THE REMAINING 28 ARE NOT A DEBT EITHER, WHICH IS WHY THIS SHIPS AS A REPORT AND NOT A RATCHET. *** They are overwhelmingly records in files that hold SEVERAL SUBJECTS -- camera/camera.js holds seven, each guarded by its own topic gate, playerGround, playerSlope, cameraFall, playerBody, playerWater, walkGround and kaijuGround -- so a `camera-selfcheck.mjs` neither exists nor should. v4487 settled the principle and this is it arriving in the arithmetic: A SIBLING FILE IS NOT THE CRITERION, THE IMPORT GRAPH IS. The row asserts a ceiling and reports the split; 28 + 17 = 45 is asserted too, because a repair that quietly loses records would read the same as one that reclassifies them. *** THE FIXTURE COULD NOT EXPRESS EITHER DEFECT, WHICH IS WHY BOTH SURVIVED. *** frozenRecords-selfcheck's harness keys its fixtures by BARE NAME and puts every file in the engine root, so a sibling is always `__fx_mod-selfcheck.mjs` beside `__fx_mod.mjs` -- same directory, same suffix, every time. A rule whose two faults are about WHERE and WHAT EXTENSION cannot be caught by a fixture that has one of each. `runAt` takes real relative paths and real suffixes, and the two new rows are a .js record in deep/ and a .mjs record whose gate is in tools/ship/. THREE SABOTAGES, ALL RED BY NAME: reverting the extension rule reddens the .js row, reverting to full-path comparison reddens the layout row AND the split row -- which then reads "45 + 0 = 45", exactly reproducing the old number and proving the two halves account for it -- and folding siblingElsewhere back to zero reddens the split at "28 + 0 = 45". NOT CLAIMED: that 28 is a target. Nothing here argues any of those records SHOULD be guarded by a differently-named gate or that a multi-subject file should be split; the count is what the tree looks like, and the round's work is making it say so. UNCHECKED: whether `guardians` itself is complete -- it is derived from gates that NAME the record, and a gate that reads a record through an intermediate module names nothing, which is the same limit every name-based census in this tree carries. 34 checks, 1,913 ms. The tree stands at 1642 gates.
 // const ENGINE_VERSION = "v4622";   // v4622 -- *** TWO FEATURES AND A LONG-UNSHIPPED BRANCH'S BOOKKEEPING, PAID DOWN TOGETHER. *** This round wires browser-side H.264 export via ffmpeg.wasm (ai-bridge/ffmpegWasmBridge.js, render/ffmpegWasmExport.mjs) as a second, platform-independent road to the same destination render/blobRecorder.js's own conclusion already named -- the existing server-side road (ai-bridge/ffmpegStatic.js) is macOS-only by its own design, and this one runs in the page's own Worker on every platform. Verified end-to-end in a real headless Chromium: a genuine WebM recording transcodes to an MP4 whose avcC box a hand-written ISO-BMFF walker finds at the correct nested path (moov/trak/mdia/minf/stbl/stsd/avc1/avcC). And it re-vendors vendor/three from r160 to 0.185.1 -- three.core.js split out from three.module.js, GLTFLoader/FBXLoader/KTX2Loader, the basis/KTX2 transcoder chain, OrbitControls and the GLTFExporter -- with one real API break fixed (view.html's outputEncoding/sRGBEncoding, fully removed at 0.185.1, to outputColorSpace/SRGBColorSpace) and confirmed byte-identical against a fresh ensureThree.js fetch plus real-browser screenshots of the four pages that load three directly. *** THE SECOND HALF OF THE ROUND IS WHAT A LONG-UNSHIPPED BRANCH LOOKS LIKE WHEN IT FINALLY IS. *** v4535 was the last version shipped anywhere in this branch's history; the tree had grown from 1594 to 1656 gates since, 134 commits deep, with nobody running the ritual in between -- and every hand-maintained census this tree keeps (assertionShape's signature counts, frozenRecords' field census, gateSweep's swept-population equality, glbConformance's file/accessor totals, recordDrift's own fixture-isolation checks, recordReach's unchecked-record ceiling, runtimeGap's per-feature file counts, orreryAuthor/orreryEjecta's baked ledgers, wasmSupport's WebAssembly-mention count, case-study's baked gate count) had drifted in step. None of it was a functional regression: every one of these gates is a census comparing a frozen number to a live re-measurement, and the numbers moved because the tree grew, not because anything broke -- confirmed directly for the two gates a first read made look most like real bugs (backendParity, frontDoor) by re-running them at the commit immediately before this round's own two features and finding byte-identical failures already there. The one census that WAS a real, round-caused gap: wasmSupport-selfcheck's file-mention count (113 -> 118) is this round's own five new WebAssembly-touching files, and reading past the number turned up that render/ffmpegWasmExport.mjs -- a browser-side, user-triggered WASM loader exactly like physics/box3d/box3dLoader.js and physics/jolt/joltLoader.js -- had never been wired through wasmSupport.mjs's probeWasm()/explainWasmFailure(), unlike its two siblings; it is now, so a browser with WebAssembly switched off (Lockdown Mode) or a CSP missing 'wasm-unsafe-eval') gets the true cause instead of whatever raw error ffmpeg.js's own worker throws. Every drifted census above was re-measured and its frozen record corrected to match, following each gate's own established convention for doing so. The tree stands at 1656 gates.
 // const ENGINE_VERSION = "v4648";   // v4648 -- *** v4647 SHIPPED GREEN AND LEFT A GATE RED BEHIND IT, AND THE REASON IS THAT THE SHIP'S OWN VERIFY WROTE THE NUMBER THAT FAILED IT. *** recordReach's margin row asks whether the two gates it depends on keep 800 ms of headroom under the 3,000 ms sweep budget. It read `serial[g]` -- the single MOST RECENT uncontended reading -- against a hard cutoff, and that reading is taken at the tail of a 1,398-gate sweep on a hot box. Measured on recordDrift-selfcheck across consecutive sweeps on ONE machine: 2092 / 2150 / 2233 ms, a 7% spread straddling the 2,200 ms line. So the row went red or green on which sweep happened to write last, and v4647's verify passed the gate on 2092 and then filed 2233 after it had already run. *** THE TREE HAD ALREADY SETTLED THIS QUESTION FOR THE BUDGET AND THIS ROW WAS NOT USING THE ANSWER. *** quickSweep.MIN_CROSSINGS_TO_EVICT is 2, and its own note says why -- "a gate that straddles crosses about half the time" -- so the budget refuses to evict on one reading while the row guarding it was both stricter and less evidenced. The repair is corroboration and NOT a widened threshold: quickSweep and sweepRotation now keep a three-deep ring of serial readings per gate, and the margin row takes the MEDIAN. Three sabotages say which of those two it is -- all three readings genuinely over the line goes RED, one hot sweep among three stays GREEN (the exact case that failed v4647), and an EMPTY ring with a single over-budget reading still goes RED, so the fallback can still fail. The 800 ms is untouched and a gate that is really over it fails exactly as before. The ring is bounded at three on purpose: unbounded, a real regression would be averaged into the past forever, which is the opposite failure. Filled for the two named gates by running them alone three times each and filing the readings through mergeTimings -- the sanctioned writer -- rather than editing a derived record by hand; those alone-readings are 2117/2129/2143, visibly tighter than the 2092-2233 the sweep tail produced, which is the diagnosis confirming itself. *** AND THE ROUND'S OTHER HALF WAS FOUND BY KEITH ON THE RIG RATHER THAN BY ANY GATE HERE. *** `node tools/ship/refreshReleases.mjs` printed NOTHING on Windows -- no fetch, no write, no error, exit 0 -- because its entire CLI hangs off `import.meta.url === "file://" + process.argv[1]`. On POSIX argv[1] is /a/b.mjs and the concatenation accidentally produces the same three-slash URL Node did; on Windows argv[1] is C:\a\b.mjs, so it builds file://C:\a\b.mjs against an import.meta.url of file:///C:/a/b.mjs -- backslashes, a missing slash and a drive letter -- and the comparison can never be true. THE ONE BOX HOLDING THE TOKEN TO REFRESH THE RELEASE LEDGER IS THE ONE BOX WHERE THE TOOL DOES NOTHING, which is why that ledger has been hand-ingested twice. winPathGuard-selfcheck exists for exactly this bug and describes it verbatim in its own header, and it matched ONE SPELLING OF THREE: ten files carried it as string concatenation or as the same broken string handed to new URL(), which looks careful and repairs nothing, while the gate reported "the tree is clean". A zero from a detector that reads one spelling is a count standing in for a property, and this file's own item 3 already records the lesson from the last time -- "THE SAME BUG WEARING A DIFFERENT SPELLING, and this gate did not know about it for a thousand versions". All ten repaired, six with pathToFileURL and four with the anchored basename form because they import no node: module and adding one would make a browser-importable file node-only by accident. *** FIVE THINGS THIS ROUND GOT WRONG, AND FOUR OF THEM WERE CAUGHT BY ITS OWN CHECKS RATHER THAN BY READING. *** I first added a fifth detector class to posixAssumption.mjs, a SECOND instrument for a question winPathGuard already owns, and reverted it. My widened patterns then matched the FRAGMENT rather than the comparison and instantly reported two gates whose evidence STRINGS quote this bug -- v3936's trap, re-entered by the round widening the detector that holds it. Sabotage SC-3 reintroduced the ORIGINAL backtick spelling and went ZERO RED, because under codeOnly that form is a comparison against a bare empty literal and all three of my confirmations demanded a concatenation or a new URL: a widening that drops the case it was widening FROM is worse than none, since the old coverage still looks intact. In sweepRotation I wrote the ring into a variable that is not in scope in that function, which would have thrown at runtime rather than reported. And the margin row's first draft read live.serialRing, which is undefined -- the record is `t` -- so the row PASSED while printing "the ring has 0", a change that was inert and still green, the fourth time this session. WHAT IS NOT CLAIMED: that the Windows repair is verified on Windows -- this box cannot run it, the old form is demonstrated dead on a win32-shaped path here and the fix is the spelling thirty-odd physics modules already use, and the rig is the instrument for the rest; that the ring is full for any gate but the two named ones, since it fills one reading per sweep and every other gate still falls back to its single sample and SAYS SO in the row's own output; or that task #68 is closed -- sweepCoverage and timingKind still read the timings file a sweep is rewriting underneath them, and this round fixes the consequence for one row rather than the shape. The tree stands at 1759 gates.
-const ENGINE_VERSION = "v4812";   // v4812 -- *** THE PULL REQUESTS, READY TO PASTE. *** One text per three.js issue in docs/upstream-three/dev/pr/: title, branch, commands, and a body in three's template; lint clean on each patch alone.
+const ENGINE_VERSION = "v4819";   // v4819 -- *** THE TWO LINES MEET AGAIN. *** MERGE-NOTE-PLACEHOLDER
+// const ENGINE_VERSION = "v4818";   // v4818 -- *** PR #13 IS MERGED: A SPLAT CLOUD BECOMES A VOXEL WORLD THE WALKER STANDS IN, AND EVERY COLUMN A BODY WOULD FALL THROUGH IS LISTED. *** world/splatVoxelWorld.mjs turns a splat cloud into a voxelAt world, so camera.js takes the voxel branch v4817 made never-inside. A splat is a surface sample, and the rule that set the design was measured: marking the cell each splat's centre falls in put 566 of the test level's 576 columns at the wrong stand height, marking every cell a splat touches put 576, and scanning each splat's 1-sigma shell on a 4x fine grid top-down for parity puts 0, with 0 fall-through. Holes stay local and every fall-through column is listed (7/7, 26/26, 85/85 on three degraded captures); fillHoles closes them at the height most of the rim agrees on; floaters under 64 fine cells are dropped. New gate tools/ship/splatVoxelWorld-selfcheck.mjs, twelve sabotages all red, and a splat_voxel_walk demo at index.html?go=splat_voxel_walk. Unchecked and said plainly, as the PR said it: no real .ply has been through it, an underside no camera saw reads solid, and the boxCover hand-off is not yet driven through a box3d world. THE ROUND'S OTHER WORK WAS THE TIMING RECORD, AND IT FOUND TWO DEFECTS ON THE WAY. The container restarted onto the 2.10GHz host (142c0d) and the record belonged to 420793 since v4815, so Keith handed it back by a dated row. Traced before the row was written, ownerOf would have IGNORED it: the walk took the first row naming a box and stopped at a box it had already seen, so on 142c0d -> 420793 -> 142c0d it answered 420793 and every write would have gone on going to .local.json. Rows are now applied in the order they were decided, and the writer names the last row that gave it the record rather than the first that ever named it; hostScale-selfcheck drives both on fixtures (sabotaged 2 red and 1 red). And the rotation wrote the SHARED ledger from a box the record refused -- the cause of the temporalLockSumsTsl ledger row PR #12's box committed without a reading, and of this round's own first rotation, which rewrote forty rows and moved poolAt before it was reverted. ledgerFile() now sends a refused box to the ignored sweep-rotation.local.json (sweepRotation-selfcheck, sabotaged 1 and 1 red). The rotation re-run as owner took 40 of 337 over-budget gates in its 300 s: none came back under the line and none was red. Step 4b then caught the one thing the verdict could not: sweepCoverage went red against the record that verdict wrote, because wgslSpec -- on the v4813 still-over roll since its alone cost crossed -- now reads 1,625 ms alone and 2,981 ms in the verdict's own 8-way sample, under the bar both ways, and the row demanded every entry still be over. The roll's comment had promised the entry would fall off when it came back; the row had no branch for it. The entry now carries `returned` with the readings that retired it, and the row holds a returned entry to the opposite property, live, with fixtures for both branches (sabotaged 2 red and 1 red). The second verdict's record then went red in the 12-of-22 row the same way, from the other direction: orreryEjecta, returned to the sweep by v4461's rotation, read 2,797 / 2,996 / 2,736 ms alone on the 2.80 GHz host and 3,209 and 3,142 in that verdict's serial runs here (3,166 / 3,416 / 3,351 alone by hand), so it left the sweep with no roll naming it. It is filed in STILL_OVER_AT_V4818 with those readings, as v4815 filed headlessGpu and sweepBudget after the opposite move, and the frozen-record censuses are re-taken for the arrival (153 / 71 / 380 and 155 / 73 / 400; recordReach 155). THE RIG'S FIRST v4818 VERIFY WENT RED ON A GATE THAT GRADED THE CHECKOUT RATHER THAN THE COMMIT: repoTerrain-selfcheck maps the repository through ai-bridge/repoTerrainBridge.js, whose walk counts ignored and untracked files, so the rig's clone scanned about 13M lines against 5.4M here, the star catalogue fell from 3.9% of lines to 1.6%, and its smaller lake rounded to 1.5% of cells against 1.23% expected -- past the row's 15%. Reproduced here exactly (a 7.6M-line ignored file: 12,984,533 lines, 1.6% -> 1.5%, red). The gate now grades the files git tracks at the commit and reports what it left off; the bridge's walk is unchanged, because a user mapping a folder means the folder. The tree stands at 1930 gates.
+// const ENGINE_VERSION = "v4817";   // v4817 -- *** PR #12 IS MERGED: THE PLAYER IS NEVER INSIDE A VOXEL, THERE IS ONE FALL INTEGRATOR, AND FSR2'S FIRST FRAME IS JITTERED IN THE RIGHT CLIP CONVENTION. *** claude/kinematic-game-view was cut from b3e9c091, a v4816 commit on this branch, so it brings four commits. The FSR2 driver (fx/fsr/fsrTemporalTsl.mjs) now puts the camera in the renderer's clip convention before jittering it: three r185 switches camera.coordinateSystem on a camera's first WebGPU render, so frame 0 was drawn unjittered and every later frame was jittered in the WebGL depth convention, latent since v4731; FSR2's first frame reads 22.47 dB where it read 21.83. The lock ring is refused where the packed target would exceed the device's 2D texture limit (maxTexture2D, ringFitsDevice), and fsr-three.html falls back to the sums and says so; the default stays the sums. camera/camera.js now sweeps the player's vertical and airborne horizontal moves through physics/character/kinematic.js: over 60 fuzzed voxel worlds and 36,000 frames the body was inside a solid voxel on 2,973 frames, all in the air, and now on 0, and a jump under a slab stops the head at 3.00 where it reached 4.41. kinematic.stepCharacter's vertical velocity is now fallBody.fallStep's, so the fourth copy of "fall" CAMERA_FALL_AT_V4548 counted is gone: bit-identical to the old integrator below the clamp over 2,000 random steps, -55 at terminal, and controllerAgreement's sites go 20 -> 19. ONE THING THE MERGE CARRIED IN THAT WAS NOT IN THE PR'S DIFF: its --gate re-timings ran on another box, whose readings went to that box's .local.json while the shared rotation ledger rows were committed, so render/temporalLockSumsTsl-selfcheck.mjs had a ledger reading (16,176 ms) the record did not hold. It was re-timed here: one run killed at the 20 s cap at 26.6 s, then 18,048 ms exit 0 at --cap-s 90. The gates the merge touched -- the FSR2 driver, kinematic, the lock sums, playerBody/Slope/Water, cameraFall, gateReach, controllerAgreement and the census and record gates, 19 in all -- are green. The ritual's rotation took 52 of 339 over-budget gates in its 300 s and is the first pool pass to write a live poolHorizon (2026-10-06T00:11:15Z): none came back under the line and none was red. ai-bridge/freshMachine-selfcheck.mjs hit the 20 s cap there once, ran 7.5 s twice alone, and was re-timed at 7,845 ms. Unchecked and said plainly, as the PR said it: the player still falls at 18 and everything else at 20, which is a game-feel decision and not changed here. The tree stands at 1929 gates.
+// const ENGINE_VERSION = "v4816";   // v4816 -- *** budgetExile IS GREEN FOR THE FIRST TIME SINCE 2026-09-17, AND THE TIMING RECORD NOW CARRIES NO STANDING RED. *** budgetExile counted gates red in v4425's frozen census, on no register and recorded green, as reds hiding behind a stale green -- but a repaired gate re-recorded green looks identical, and that is how it went red at 17 of 16 when a sweep honestly re-recorded wasmSupport, repaired at v4642. Run live at v4816, all seventeen exit 0: the hiding place was empty and the count was measuring stale verdicts. A gate is hidden now only when the record says green AND a live run says red; all seventeen are measured once per run, and the ceiling is re-frozen at the measurement, 16 -> 0. The record's last two exit-1 codes, budgetExile and moduleHistory, were re-filed green alone (130.5 s and 17.3 s). Two rows assumed the record always holds a red and now ask for proof instead of a population: redAction accepts an empty population only beside the fixture that derives one red from a planted record, and sweepCoverage's partition row drives the red arm on a fixture. Each change was sabotaged red by name. The ritual's rotation (80 slots) found no red and returned one gate under the line. AND THE LESSON v4815 PAID FOR IS IN THE RITUAL NOW: step 4b of the ship skill re-runs every gate that reads the timing record against the record the verdict WROTE, before the rig is asked, because the verdict grades the record from before its own sweep and the rig grades the one committed. THE SECOND VERDICT WENT RED TWICE, AND ONE OF THE TWO WAS A RULE OF MINE: timingKind called tools/ship/fsrPage-selfcheck.mjs unaccounted because its arrival rule read the rotation ledger's poolAt as 'a rotation ran after this entry, so it should have taken it' -- and a stalest-first pass of 80 over a pool of 349 cannot take an entry the quick sweep had evicted three hours earlier. rotation() now reports the stamp of the first entry it did not take, the ledger keeps it as poolHorizon, and timingKind reads it, with three fixture rows sabotaged H1-H6 (3, 3, 2, 1, 1, 1 red); fsrPage was re-timed through --gate at 2882 ms alone and is back in the sweep. The other red was ringFloorCost, and the fix is Keith's: claude/tier-2-keys-patch-4lwhzk is merged whole by his decision -- pushLuma finds its taps once a pixel (about five times faster, bit for bit over 9.5 million slots) and the gate's 'bandwidth-bound' finding is retracted, with the temporal lock's running sums and their TSL port, FSR2's lock default, the third-person camera boom and rtPipeline's f64 reference cache riding with it. The timing record and the rotation ledger were merged per gate, newest reading wins; runtimeGap's census adds both lines' moves. The third verdict found one red the merge brought: absenceScope counts files whose code carries the BVH term, and camera/cameraBoom-selfcheck.mjs stubs _capsuleWorldBVH to switch camera.js's mesh path off, so it is named in both out-of-scope lists as a carrier that builds none (dropping either name: 4 red and 1 red). AND ringFloorCost, GREEN IN THE FOURTH VERDICT, WAS NOT READY FOR THE RIG: run alone on the box that owns the timing record it went red 5 times in 10, because the 128x128 floor-to-push median reads ~0.80 here against the 0.55-0.69 measured on 142c0d, and the row asked a five-repeat min..max range to fit in the ~0.2 left below the line -- a range one stray repeat sets by itself, and one that only widens with more repeats. At Keith's request it is hardened here: the error bar is now the median's distribution-free 95% upper bound (the 9th of 11 sorted repeats), the line stays 1.0, the flatness row's two sizes are interleaved rather than read a second apart (it had gone red 1 run in 50), and the per-slot control keeps its five repeats so the run stays ~2.1 s. 40 of 40 runs alone green; sabotaged JM/JN/JO/JQ/JS red, and JR/JT 0 red because they change a rate, not an assertion. THE RIG'S FIRST v4816 VERIFY WENT RED ON A GATE NO ROUND HAD RUN THERE: roughDiffuseWired finds the path tracer as it was before the roughDiffuse wiring by walking git history back to 66db97c4, the root of this tree's record, and the rig's clone does not reach it. At v4815 the record held the gate at 3050 ms, over the line, so the rig never ran it; the v4816 verdict re-timed it at 1810 ms and it came back. The publish route clones --depth 1, so it would have gone red there too. The answer is v4776's for frozenRecords: the pre-wiring SOURCE is frozen in tools/ship/roughDiffuseWired-fixture.json and used only on a shallow clone, and on every full checkout the walk must succeed and the copy must equal git's byte for byte. It is source and not a render hash, so both tracers still render side by side on the box that grades them. Reproduced in a --depth 1 clone (the committed gate red, the fixed one green); sabotaged S1/S3/S4 red on both a full and a shallow checkout. The tree stands at 1929 gates.
+// const ENGINE_VERSION = "v4815";   // v4815 -- *** THE CORRECTION FIRST: v4814 SHIPPED WITH A RED OF ITS OWN MAKING, AND NO SHIP-TIME STEP COULD SEE IT. *** Its two new diagnostics, gateProfile and rtPipelineDiag, spawn gates under a 600 s limit of their own and did not say why, so runnerBudget counted 2 silent runners of 20 and runnerReach-selfcheck went red. Both gates sit over the quick sweep's 3000 ms line, as did boundaryLint and cliArgs, which the same two files tripped at v4814 and which the first sandbox verdict happened to catch. The ritual's own rotation step found this one; both files now export budgetIsOwn (a diagnostic's cap is a ceiling against a hang, not a budget a verdict is read from). SO THE WHOLE OVER-BUDGET POOL WAS RE-TIMED ALONE, 321 gates: 49 are back under the line, and two more reds were in it. fsrFlowCost's affine device-cost row read a worst residual of 13 to 22.5% against 20% (red 2 of 6 alone): each setting was timed five times back to back, so drift across a run fell on whichever settings it landed on. It now takes nine interleaved rounds, every setting once per round; twelve runs read 3.1 to 11.5%, the 20% is unchanged, and v4776's sabotage still goes red on both clauses. orreryReached was killed at the cap between its CONTROL's two writes, which left the tracked orrery-reached.json at catalogue 999 on disk, where the ritual's git add -A would have shipped it; the control now bends a copy. THE MUTATION LEDGER WAS ONLY EVER READ BY ONE GATE: fixtureLitter has recorded every ledgered edit's original outside the tree since v4692, but only rigRunner's own next run read it back. The quick sweep's reclaim and the rotation (after any run that does not exit 0) now restore ledgered edits whose owner has exited; a live owner keeps its edit, shown with a real child that holds one and is then SIGKILLed. pageFingerprint and artefactWriters, which edited tracked files in place, now write through the ledger, and boundaryLint no longer counts process.kill(pid, 0), which sends no signal, as an unverified kill. Seven gates were cut off at the 20 s cap on readings from before v4408 or from September; re-timed at a 60 s cap, all seven finish green in 13 to 27 s, and orreryFleet (20,866 ms) joins recordReach's guardians that are expensive and green. headlessGpu's per-call control, which must crash and under load sometimes did not, gets up to three attempts while the shared arm still gets one: five copies of the gate at once for six rounds, 10 of 30 needed a retry and none went red. AND THE STANDING REDS ON THE LIST WERE ALREADY GONE: gateReport, referenceKind, graveyard and shaderRefs were repaired in the v4778 rig runs and are green; referenceKind and graveyard, kept out of the ship-time sweep by 90 s cap kills from 2026-09-09, are back in at 2.9 s each. THE FIRST v4815 VERDICT SAID DO NOT SHIP ON THREE REDS, AND THE THIRD TOOK A FULL SUITE RUN. referenceKind rose 332 -> 334 because `export const budgetIsOwn` made both diagnostics exporting modules with no importer; runnerBudget reads that declaration from the source, so it is a plain const now. capReading's eulerGpu entry moved again (about 9.3 s, from 15 s) and carries today's three runs, with v4647l's kept as noise evidence. timingRecords compared the sweep's record against gate-timings.json, whose unstamped legacy entries were the stale side. Keith chose a full selfchecks.mjs run, its only sanctioned writer, over excusing them: 1903 gates in 5.6 h, complete:true for the first time, unprovenanced entries 686 -> 10. THE REFRESH THEN TURNED ROWS RED IN FIVE GATES THAT TOLD HISTORY BY READING THE LIVE FILE, and Keith chose to freeze that history in the gates rather than edit it to match. Seven hand medians the run had overwritten with single samples are put back; timingProvenance's v4580 flag, timingRecords' v4576-v4578 corrections and shaderCensus's v4575 re-time are frozen constants now, with the live file held only to what is true today; budgetProvenance reads `finished` instead of the cap proxy; eight budget bases are lowered to their observed cost and SLOWEST_GENERAL is re-pinned to genGateMeasure (217,392 ms alone; default budget 500 -> 652 s); three stated headers are corrected from medians of three; timingSemantics and redAction each had a floor or cap on a count that failed when the evidence improved (n < 200, reds >= 10, after the full re-timing cleared eleven stale red codes), and both now assert only the property. AND THE SANDBOX RESTARTED ON ANOTHER HOST: a Xeon at 2.80 GHz (box ...420793) where the record's owner was 2.10 GHz (...142c0d), so this session's sweeps went foreign; by Keith's decision a dated v4815 row hands the record to the new box. budgetExile is red as it has been since 2026-09-17. AND KEITH'S RIG VERIFY FOUND THE ONE THING THE THIRD SANDBOX VERDICT COULD NOT: sweepCoverage red on the record that verdict had just WRITTEN, which is the record the rig grades -- the sandbox ran the gate against the record from before its own sweep. The new host runs about 30% slower for gates near the line; its two eight-wide verdicts evicted 64, and re-timed alone 8 came back and 56 are genuinely over 3 s here. headlessGpu and sweepBudget, two of the twelve returnees that row grades, went back over (3.07 to 3.35 s alone, three runs each) and are named in STILL_OVER_AT_V4815, as wgslSpec was at v4813; and by Keith's decision the row holds the SHARE of gates outside the sweep (24.7% now, against v4568's 28.7%) rather than the count 464, which was taken over a tree of 1,617 gates and now 1,926. Every gate that reads the timing record is now re-run against the record a verdict writes, before the rig is asked. The tree stands at 1926 gates.
+// const ENGINE_VERSION = "v4814";   // v4814 -- *** THE CORRECTION FIRST: rtPipeline-selfcheck NEVER TOOK 4.2 s HERE. *** Early in this round I said it did, and that the rig was the slow box. 4,199 ms was the record's entry from before the rtx merge grew the gate's sections 13 and 14; run whole here it took 114 s, and on Keith's rig 291 s. The round then followed the rig's three red classes to their causes, with a diagnostic first each time (the diagnostics assert nothing). DEVICECOMPUTE: deviceComputeDiag ran both WebGPU paths on the rig's GTX 1080, and two different things were wrong. node-webgpu dropped the second of two stores holeFill's kernel made to the same hole flag, so the kernel now writes the flag once, on every path. And the two rounding kernels (BRDF_LUT, F82_TINT) differ between the browser and node paths in their last bits on hardware. Keith's call: on a hardware adapter, a kernel with an f64 reference passes when BOTH paths sit within F32_FLOOR_ABS = 1e-4 of it; software stays byte-exact, as does any kernel with no f64 reference. RTPIPELINE: rtPipelineDiag split the gate's time per row into browser launch, run in the page and the gate's own CPU work. The launch was the cost: 220 headless browsers per run. webgpuHarness.openWgslSession gives a gate one browser and one device for every call, and the output is byte-identical. The first session HUNG on the rig, and rtPipelineDiag --session-probe named the reuse: on the rig's Chromium, a second getCompilationInfo() on the same shader module never resolves. The session asks once and caches the answer, and a 60 s watchdog falls back to a fresh browser per call, so a session cannot hang a gate. 114 s to 56 s here, and 291 s to 61 s on the rig. THE WINDOWS-SLOW GATES: gateProfile splits any gate's wall time into file calls by call site and CPU by function, and --rig-slow on the rig showed file reads dominating four gates, at about 0.42 ms a read there against 0.035 ms here. They now read each file once per process, through treeRead.readOnce (or a memo in corpusFilters). Rig, before and after: citedSources 10.2 s to 3.0 s, corpusFilters 8.8 to 2.4, orreryEjecta 6.6 to 4.8, windowsImport 4.7 to 3.1, with output identical. headlessGpu's five child processes ran one after another; section 4's three now overlap, giving 8.7 s to 7.5 s on the rig. Section 4b's two cannot overlap: its per-call control must crash, and five children at once let it exit 0 in 8 of 50 runs. The shared lexer (sourceScan.codeOnly) stopped re-scanning backwards at every slash and is 2.5x faster, checked against the old algorithm on fixtures and on every 40th file. That brought three near-line gates back under the line: recordReach 49 to 45 unchecked, against its ceiling of 50. DECLAREDCOST measured contention, not rot: it compared each header, measured alone, with a reading mostly taken eight gates at a time (median 2.41x). 84 of the 102 headers it called rotted sat within 2x of the gate's own alone reading. A finished gate is now judged on that reading, and 19 rot. The ratchet is re-frozen at 39: the 19, plus the 20 headers within one median repeat spread (1.22x) of the 2x line, so an ordinary re-time cannot flap it. THE FIRST SANDBOX VERDICT SAID DO NOT SHIP, ON TWO REDS OF THIS ROUND'S MAKING: gateProfile and rtPipelineDiag read their arguments by hand (cliArgs counts those tools, 15 against 13 recorded), and both now go through cliArgs.parseArgs, so gateProfile's gates are --gates a,b; and inputSets-selfcheck undid a fake by writing back each hot file's CURRENT hash instead of the one the record held, which went red the moment this round edited sourceScan.mjs, one of the three -- it now restores what it saved. UNCHECKED, AND SAID: headlessGpu's per-call control was ALREADY load-sensitive before this round. Three copies of the gate at once went red 3 of 30 on the v4813 code and 4 of 30 on this code; alone it is 0 of 20, and the quick sweep re-runs a red alone, so a ship does not see it, but a full sweep's eight-wide phase can. Its held-device child sometimes hangs instead of crashing (1 of 8 here), so it is now capped at 10 s, not 180. The tree stands at 1926 gates.
+// const ENGINE_VERSION = "v4813";   // v4813 -- *** THE NUMBER JUMPS FROM v4778 TO v4813, AND THE CONTENT DID NOT CHANGE NUMBERS -- THE RULE DID. *** v4778 was staged and pushed, and before Keith's rig could pass it the rig-fix line taught versionPreflight to read every pushed branch: claude/exported-functions-mesh-render-exui0d has spent changelog headings up to v4812, so any number at or below that is refused, and v4778's own entry is now spent on claude/code-review-nr3a01 as well. Keith chose to supersede forward, as v4776 became v4777; the v4778 entry below is kept byte for byte as it was pushed. v4813 is v4778 and what followed it. AFTER THE FIRST RIG VERIFIES: Keith's rig found four more reds and each was fixed at its cause -- mikktRef keyed its hashes with Windows backslashes; rtViewer asserted JavaScript's tie rule against a GPU's unorm8 write (the rig rounds 127.5 down, SwiftShader up, and Vulkan and D3D allow either); peerBrainFleet waited on real peer addresses that never answer, and two ai-bridge gates wrote test peers into the user's real peer list; frozenRecords gained a verify step beside recordDrift's. The parallel rig-fix line (22 commits, claude/v4778-rig-fixes and claude/code-review-nr3a01) is folded in; fifteen files conflicted, all import blocks or the runtimeGap census, which was re-derived over the merged tree. And three of Keith's calls: an RTX drawer for the rtx line's four pages; a page may sit in more than one drawer, so a Fruit Fly Brain drawer holds the three pages built on the connectome; and the FSR frame caches -- 300 MB of a 333 MB release zip -- move to their own folder, leave the zip (46.8 MB measured) and install on demand from install-fsr-caches.html, sha256-verified against a manifest that ships, with redirects refused. AFTER THE SECOND AND THIRD RIG VERIFIES, AND ONE DECISION TAKEN BACK: since v4778 the rig owned the shared timing record, and its first full re-timing evicted 152 gates -- every one confirmed alone, a median 1.57x slower than the sandbox -- so three ratchets frozen on the sandbox's population went red with no gate changed (recordReach 76 unchecked against 50, declaredCost 167 against 138, sweepCoverage on four rows). Keith first chose to move the 3000 ms line by that median, to 4710 ms on the rig's record; it cleared all three, and the next rig verify moved 25 more gates across it (16 sandbox readings re-timed for the first time, 9 rig readings within a few percent of the line) and put recordReach at 54 and four sweepCoverage rows red again. About 60 gates sit within 10% of any line chosen on the rig's record, so the history gates would flip every round. Keith then handed the record back to the sandbox by a second dated handover row: one stopwatch, written by the round's own sweep, with the rig reading its membership as a foreign box and writing only its .local.json -- the arrangement v4777 shipped under. The 4710 ms line is backed out and the shared record is 4c904f50's, re-timed here -- and the sandbox's own sweep of the grown tree (a median 1.15x 4c904f50's readings) tripped the same history rows, which is what found their real defect: since v4536 the sweep keeps a gate on probation after one crossing and evicts it on the second, and two sweepCoverage rows read membership off the raw reading, calling 31 gates the sweep was still running outside it. They ask the sweep's own selector now (453 outside, against 464), and wgslSpec, whose alone cost crossed too (2,882 / 3,056 / 3,589 ms), moved off the oscillator roll to a dated still-over roll. The rig's clone verify of that tree then found one more, its only red: hostScale-selfcheck's three v4647 fixture rows asked the LIVE handover table, so on a box that has handed the record on -- the rig since this handback -- 'a box naming itself owns the record' went red on correct behaviour; they run on an empty table now, the handover rules keeping their own fixtures. declaredCost read 144 stale headers against 138 because 42 headers measured alone were being compared with eight-way samples; the rotation re-timed those 42 alone and it reads 102. Kept: the two tree walks every gate lister shares now ask the directory listing for each entry's type instead of a statSync (12,355 calls a run to 0, same 1926 gates found). WHAT THE RIG FOUND THAT STANDS: deviceCompute-selfcheck, run on the rig's GPU for the first time, finds the browser's WebGPU and node-webgpu disagreeing on one adapter -- holeFill's hole flag in 8 of 320 values, and splitSum's BRDF LUT and the F82 tint by one float ulp -- and rtPipeline-selfcheck does not finish alone inside the 20 s cap there (4.2 s here); both are outside the sandbox's sweep by their own cost, and the first is v4814's opening work, with a rig diagnostic; five gates run 2-7x their sandbox time on the rig (citedSources 7.4x, corpusFilters 3.8x, headlessGpu 3.1x, windowsImport 2.3x, orreryEjecta 2.0x). UNCHECKED, AND SAID PLAINLY: which of the two Dawn builds is wrong about holeFill, and what rtPipeline costs on the rig's GPU; recordReach stands at 49 of 50 on this box's readings; redAction-selfcheck, over budget on both boxes, finds three recorded reds still red when it drives them eight-wide while each is green alone; a release install without the caches runs the FSR gates as named SKIPs, not passes; gateReport, referenceKind, graveyard and shaderRefs stay standing reds on both parents. The tree stands at 1926 gates.
+// const ENGINE_VERSION = "v4812";   // v4812 -- *** THE PULL REQUESTS, READY TO PASTE. *** One text per three.js issue in docs/upstream-three/dev/pr/: title, branch, commands, and a body in three's template; lint clean on each patch alone.
 // const ENGINE_VERSION = "v4811";   // v4811 -- *** THE DRAFTS RE-CHECKED ON TODAY'S dev. *** 576b084, twelve commits on: none fixed upstream, every reproduction prints as before, 09 and 16 made again on dev's own files, three's tests unchanged.
 // const ENGINE_VERSION = "v4810";   // v4810 -- *** A BOX COSTS ITS GATES BY ITS OWN KIND. *** declaredCost reads a same-type box's alone readings before the shared record's sweep readings; six sabotages red.
 // const ENGINE_VERSION = "v4809";   // v4809 -- *** GLASS DRAWN RIGHT ON r186, BY THE ENGINE. *** Workarounds for three's issues 17 and 18; fsrFrameGenBackdrop on both backends, all six cases.
@@ -6593,6 +6600,7 @@ const ENGINE_VERSION = "v4812";   // v4812 -- *** THE PULL REQUESTS, READY TO PA
 // const ENGINE_VERSION = "v4781";   // v4781 -- *** TWO ORPHAN RATCHETS THE MERGE LANDED OVER UNMEASURED, CAUGHT UP BY NAME. *** graveyard 184, referenceKind 324 and 58, each arrival named in its gate.
 // const ENGINE_VERSION = "v4780";   // v4780 -- *** 55 GATES PRINTED TABLES OF NUMBERS AND EMITTED NO REPORT, AND NO VERIFY SAW IT. *** Each prints its table into a report now; 86 gates emit (tools/ship/gateReport-selfcheck.mjs).
 // const ENGINE_VERSION = "v4779";   // v4779 -- *** THE MOTION FIELD COVERED PIXELS THREE NEVER DREW AND MISSED PIXELS IT DID. *** Alpha-tested and double-sided meshes, undrawn objects and grown batches in the motion stage (render/temporalTslCoverage-selfcheck.mjs).
+// const ENGINE_VERSION = "v4778";   // v4778 -- *** THE rtx LINE IS MERGED, AND ITS LAST BLOCKER WAS NOT IN ITS CODE: THE SHARED TIMING RECORD'S OWNER CONTAINER RETIRED MID-ROUND, SO OWNERSHIP MOVES TO THE RIG BY A DATED RECORD RATHER THAN BY EDITING WHOSE NAME IS ON IT. *** claude/shader-porting-swek-ozgvb0 (90 commits, 45 gates, branched at 82ebd940) lands on v4777: the RTX path tracer (rtPipeline's BVH trace, rtx-viewer.html), the Newtonian 6DOF and aerodynamic substrate with its two pages, the BVH-CSG line, the male-cns connectome, MikkTSpace as a reference oracle, and the capsule controller's fall and landing unification -- camera.js's conflicts resolved so a rising capsule still lands, and flying bots take no gravity. Main's gates then graded code that predates them, and three reviewed passes cleared what they found. CORRECTIONS FIRST: my own commit of an incremental sweep's timing record (4af9e8ec) left timingKind red -- 783 entries on the capture stamp, 856 observed entries on older stamps with no rotation behind them -- and it is backed out to the full post-merge sweep; and a first-pass draft listed a gate that retyped fly-connectome's shaders as a fourth device consumer instead of fixing the gate, which review reversed. Real rtx defects are fixed where they live: rtx-viewer.html blamed a missing WebGPU without asking about the origin; flyConnectomePage graded retyped copies of the page's shaders; the webcodecs gate called `which` on every platform; rigidBody6dofPage waited for 150 ticks that one battle can no longer reach -- since fleetAssign gave every ship its own opposite number, each battle is a mutual wipe in 84-119 ticks -- so it always rode its 60 s ceiling and read whichever battle was on, red 3 runs in 7; it now follows one battle to its end, 65 s -> 3.4 s. ribbonRoad's tolerance derivation left out the plane step between adjacent samples, 0.299 m of the 0.428 m worst, so TOL now follows from the corrected bound -- looser than 0.4, and derived rather than fitted. Claims the merge made false were changed rather than the gates: rtPipeline now has a triangle BVH (absenceScope flips; the TLAS half stays open); the parser reads sparse accessors and gpu/fixtures/SimpleSparseAccessor.glb is the first one on disk; gpu-pathtracer-render-mode's grounds were false when written and the entry now says so. Doors: the six BVH-CSG modules and eight 6DOF and aircraft modules get instrument rows whose reportLines() their own gates read back, which holds physicsReach at 7 and definitionGates at 79 without moving either line. Licences: vendor/male-cns is declared CC-BY-4.0 as the Neuprint server states it, carrying its own file's caveat that nobody re-confirmed that against Janelia's terms; vendor/mikktspace is zlib, read off both headers; the orrery grows 20 -> 22 bodies and asks the register rather than filenames. Records re-taken where measured and attributed against 978d26e3: devices 129 -> 130 (capsuledepenetrate), gateReach 542 -> 558, posix separators 166 -> 171, glbConformance 33 -> 34 files, zeroControl's coercion census, backendParity, importPosition, orreryEjecta, the backlog's absence floor 9 -> 11 with both sentences named. THE TIMING RECORD: its owner, linux-x64-4c-16096mb-142c0d, retired when this container restarted as a different box, every writer refused the record correctly, and so capReading, sweepCoverage and recordReach could be satisfied by no box at all. Keith chose the rig; RECORD_HANDOVERS in quickSweep.mjs names from, to, who decided and the evidence, the box that handed it on is refused like any stranger, and no entry is re-attributed. UNCHECKED, AND SAID PLAINLY: those three rows are red here and go green only when the rig's rotation writes the record it now owns; four rtx pages wait in UNPLACED for Keith's drawer call; the 6dof page's balance -- every battle a mutual wipe -- is filed, not tuned; qrBridge and webcodecsFramesToMp4 skip by name on a box without ai-bridge's optional packages; gateReport, referenceKind, graveyard and shaderRefs stay standing reds on both parents. The tree stands at 1925 gates.
 // const ENGINE_VERSION = "v4777";   // v4777 -- *** v4776 SHIPPED TO MAIN AND ITS OWN PUBLISH ROUTE COULD NOT PASS IT, SO THE FIX IS A NEW NUMBER RATHER THAN A SECOND BUILD WEARING THE FIRST'S. *** The clone-verify that gates every publish clones with `git clone --depth 1`, and there frozenRecords-selfcheck was red by design: it asks git which records existed at v4487's commit (75f0c033), a shallow clone has no such commit, and the gate refuses to pass on the name-stamp fallback. Keith's verify of the full checkout had been green; the clone was the first place it could fail. The question has one answer forever, so the answer is frozen -- SWEEP_COMMIT_RECORD_NAMES, 77 names read from git -- checked against git on every full checkout (dropping one reads 76 against 77, red) and used where git has no history. Freezing it moved seven documentary records to "read by code" in recordReach, because readSites counted names in a string list as reads; NAME_TABLES now blanks the table the way a record body is blanked, and frozenRecords-selfcheck drives that (an empty NAME_TABLES credits 72 names to the list alone, red). The first cut of that export was named by no gate, and definitionGates' any-shape ratchet read 704 against 703 on the next clone-verify -- mine, caught by the verify it was meant to unblock. A branch clone also has no origin/main, so versionPreflight could not read main's version; the route for a branch now fetches main into the clone. Rehearsed here on a --depth 1 clone of this branch with main fetched, and that rehearsal is what caught the last one: verify's first row refuses a version origin/main already carries, and main carries v4776 over different bytes -- two builds with one name. So this is v4777. v4776 stays on main unpublished, the fleet gets v4777, the rtx merge moves to v4778 and the resumed FSR line starts at v4779. The only other reds in the rehearsal were this sandbox's own: boxTimings (its box id is the shared record's) and traderGraph (a file:// remote has no owner to derive). The tree stands at 1880 gates.
 // const ENGINE_VERSION = "v4776";   // v4776 -- *** THE exported-functions-mesh LINE IS MERGED: 196 COMMITS LABELLED v4646-v4775 THAT NEVER BUMPED A MARKER, NOW ONE VERSION ABOVE ITS OWN HIGHEST LABEL. *** That line ran beside this one for 130 labels with ENGINE_VERSION, brain.js and the changelog frozen at v4645 -- its own verifies ended "only the two build markers fail" every round -- and its labels v4668-v4697 name different rounds from main's shipped v4668-v4697. So nothing on it could ship, and the next number that reuses none of its labels or main's is v4776. What it carried: the temporal arc's motion vectors for things that move (v4646) and the id buffer they needed; FSR1, FSR2's primary path, the lock ring and FSR3's frame generation on three.js scenes as TSL nodes held to the CPU references (v4726-v4742); a pre-registered series on frame generation, with hypotheses measured and reported as "neither" and "not supported" where they were (v4698-v4722); flicker between real and generated frames judged in the world rather than on the screen; particles a compute pass moves carried through the motion stage; and three.js drafts and patches taken through three's own build, lint and unit tests (v4770-v4775). Paused at 45c85211 by Keith for the merge. *** The merge, as measured. *** Eighteen files conflicted. Eleven code files were resolved one agent to a file and read back by a critic against both sides: devicePresent took the other line's v4739 C-capture (a separate frame with no read, copied in the same task) because it was exercised on WebGPU there and its gate's prose describes that shape, with this line's 1080 Ti finding kept as its reason; temporalResolve keeps both the per-adapter confidence record and the tie-phase pass; assertionShape and runtimeGap were RE-DERIVED over the merged tree rather than picked -- 1880 gates, and 4494 files where the lines read 4316 and 4453 because they share files -- with both histories kept as comments. inputSets-selfcheck had auto-merged into two `import os` lines, a syntax error git called clean; the critic caught it. The timing records were NOT merged: newest-reading-per-gate turned timingKind and sweepCoverage red where neither side's own record did, so this line's sweep-timings.json and sweep-rotation.json are kept whole and the other line's 105 new gates arrive as new gates, which every sweep measures. knowledge-index, case-study and launch-index are regenerated, not merged. splatSort's footer now says what its code does (best of nine for the radix side). UNCHECKED until the rig runs it: the other line's 105 gates on Windows -- they have only ever been verified on that line's own box. *** AND THEN THE POOL NO VERIFY RUNS WAS RUN, AND IT HELD REDS FROM BOTH LINES. *** After the rotation every gate that reads the timing records was re-run, then all 445 gates outside the ship-time sweep, three-way, for verdicts only, and every red re-run alone. Fixed: universeWire's key moved 0322b336 -> 37739d8c at ce276dff (three r160 -> 0.185.1) with no drift entry, and v4697 shipped past it -- the field is `files` (22 -> 24), and reverting only that gives the old key exactly; orreryFleet's belt for three ended at b5fccadb for the same reason, red on every full clone since 2026-09-14, now recorded beside the v4621 record with a row grading the two together; krbnCompareLive pinned three's revision as the literal '160'; songButton pinned one spelling of a line cc229351 rewrote, red on both lines for two weeks; timingRecords' ratchet read 10 against 9 because my own serial re-timing brought three loop gates into its comparison, and v3851's code, checked out and run here, reads what HEAD reads -- the record is stale, not the gates, and it is named with its runs rather than hand-edited; sweepCoverage's "the killed bucket can only shrink" read 142 against 140, but 22 of the 142 did not exist when that ceiling was drawn and two read the whole tree and grow with it, so the ceiling now holds on the population it was drawn from and every entrant must carry a finished reading (25 of 25 do); capReading read one gate's noise floor as the population's; fsrFlowCost held time proportional to reads and the device is affine -- a median of fifteen left the cheapest setting exactly where a median of five had it, about 9 ms per flow that no setting avoids beside 4.0 ms per million reads -- so it fits the line, holds every setting to it within the same 20%, and bounds the fixed part at 15% of the default's time; boundaryLint (fsr.html parsed a fetch body without checking r.ok), registerResidue (fsr-three.html filed beside fsr.html), wasmSupport (pageShot.mjs's application/wasm entry, 121 -> 122) and gate-reports' index (the merge kept one side's and dropped fleetRouting). doorKinds found two CLIs with no door, one from each line: world/traderGraphGithub.mjs, mine, whose command lived only in a FAIL line's prose, now has a Run button on rig.html (the trader-github job, on the machine that reaches GitHub), and tools/ship/genGateAbsolute.mjs is REFUSED a button with its reason recorded -- it is a pre-registered test's runner, already run, and its document's re-run control is one fold reproduced bit for bit, not a press that can be repeated until the answer pleases. NOT FIXED, RED ON BOTH PARENTS, AND NOT REGISTERED: gateReport -- 55 gates argue in numbers and emit no report, 41 from the other line, 9 from this one and 5 on both -- referenceKind's two orphan ratchets, 324 against 288 and 58 against 39, and graveyard's orphaned utilities, 188 against 159 (169 and 181 on the two parents). All three sit over the budget, so the rig will not see them; they are the next round's work, said here so they are not a surprise. Sixteen more hit the 400 s cap with no verdict, as most of that population always has. v4697 was published by the rig at 19:11; releases.json cannot be refreshed from this sandbox (api.github.com answers 401), so the rig refreshes it before this verify. *** AND KEITH'S FIRST v4776 VERIFY FOUND FOUR MORE, EVERY ONE THE OTHER LINE'S GATES MEETING WINDOWS AND A REAL GPU FOR THE FIRST TIME -- the unchecked item above, checked. *** runnerCallers returned path.relative's backslashed names on win32, so its own row read "imported by undefined" and fsr2Coverage's cross-check failed with it; it joins with "/" now, and a sabotage joining with "\" reproduced both rig failures word for word. holeFillGPU gave "this adapter allows ten" as the reason its passes are not one pipeline and the rig's adapter reports sixteen; the reason was always portability, eleven bindings against the spec's guaranteed eight, and that is what is asserted. translucentLayer's "to the bit" was SwiftShader's: the rig's NVIDIA blender fuses the multiply-add the layer rounds in between, and read 2^-24 -- one float32 ulp -- on 1319 and 960 values; the row counts ulps off the bits now and allows one rounding, and a 0.05% blend error reads 9792. The tree stands at 1880 gates.
 // const ENGINE_VERSION = "v4665";   // v4665 -- *** THREE GATES WERE REPORTING THE SHAPE OF THIS CHECKOUT AS A CHANGE IN THE TREE, AND BAKING THE RECORD WOULD HAVE MADE IT TRUE. *** orreryFleet, orrerySeed and orreryView are three of the seventeen reds v4664 found outside the sweep, and all three named the same fix in their own FAIL lines: run orreryBake --write. Running it would have replaced twenty correct arrival dates and twenty planet seeds with one date and one commit. THE CAUSE IS THAT THIS SESSION'S CLONE IS SHALLOW. git's first-add query does not return NOTHING for a path vendored before the graft -- it returns THE BOUNDARY COMMIT, which looks exactly like a real first-add -- so every vendored library came back as having arrived on 2026-08-31 in 6ba6776c, a commit with no parents that touches 5,226 files, and the staleness gates read twenty identical answers as vendor/ having moved. orreryScan.firstSeen's docstring has said since it was written that null is returned "when git cannot say -- WHICH IS A REAL ANSWER (A SHALLOW CLONE, or a path never committed)". It named the case and the code could not reach it, which is this session's most frequent species in its purest form: prose describing a guard that is not there. graftBoundary() finds the parentless commits of a repository git itself reports as shallow -- both facts asked once and memoised -- firstCommit refuses an answer that IS one, and the bake CARRIES THE RECORDED arrival and seed forward rather than writing nulls over them. *** AND THE FLEET'S BELT WAS THE SAME DEFECT FOR THE THIRD TIME IN ONE ROW. *** orreryFleet compares a recorded per-body commit list against git's; v4472 found it comparing COUNTS ("a count reverted to a wrong value still looks like a count"), v4534 found it comparing ABBREVIATIONS ("fourteen of fifteen bodies drifted without changing"), and this is the third: it was comparing a list git had TRUNCATED. Measured, 11 of 15 bodies agree perfectly once the graft and everything under it is dropped, and the other 4 differ because vendor/ has genuinely moved since v4475. The live list is read as a LOWER BOUND now -- what this clone can see is compared exactly and in order, what the graft swallowed is counted and reported -- and A FIFTH CLASS arrived with it, because swapping the comparator alone was WRONG IN THE OTHER DIRECTION AND THE GATE'S OWN PARTITION ROW CAUGHT IT WITHIN THE MINUTE: the new comparison returns true when nothing recorded is visible, so six bodies whose whole belt is under the boundary were credited as unchanged and so were the five with no recorded belt at all -- 16 + 4 + 5 = 25 against a fleet of 20. "What I can see agrees" and "I can see none of it" are different answers and are counted apart. 5 unchanged + 6 visible-part-agrees + 4 moved + 5 arrived = 20. THE ONE GENUINE DRIFT, found underneath all of that: orrery-fleet.json records the byte size of every file importing a vendored library, and v4663's edit of 48 gates moved eleven entries by EXACTLY 217 bytes each -- the length of the comment that round inserted -- with main.js moving 14,321. Re-baked, which is correct there because those sizes need no git at all. SABOTAGES: three, all red, 7 / 5 / 3 rows. The third is the one worth reading twice -- without the carry-forward a --write on this checkout erases the seeds, which is the v4335 accident bakeShrinkGuard exists for, one field down instead of one file. *** AND THE DRIFT PRE-FLIGHT WAS SILENT ABOUT orrery-fleet.json TOO, WHICH IS THE SECOND TIME IN TWO ROUNDS. *** v4664 taught it to ask about the record censuses after two verifies went red for want of that question; this is the same shape one file over. It is NOT added: MEASURED FIRST, orreryBake.drift() costs 2,580 ms because it runs a whole-history git query per vendored body, against a pre-flight whose seven checks total 1,130 ms. So it is written down as a duty this tool does not discharge -- notChecked 1 to 2, with an OWES clause, and a row asserting the number and the clauses agree so "not checked" cannot quietly become "not mentioned". *** AND THERE IS A REASON THAT RECORD IS STALE ON EVERY SHIPPING ROUND, WHICH NOBODY HAD WRITTEN DOWN: IT TRACKS main.js's BYTE COUNT AND main.js CARRIES THE ROUND NOTE. *** Found by running the bake twice in this round -- once after repairing the gates, and again after the version bump moved main.js by another 4,549 bytes. So orrery-fleet.json is stale BY CONSTRUCTION between the note and the bake, the bake has to be the last step before the verify, and a pre-flight check for it would report stale on every round that ships. That is a third argument against adding one, and it is the honest reason this record drifts unnoticed rather than a failure of attention. *** AND THIS ROUND WROTE A CONTROL THAT COULD NOT FAIL, WHICH THE TREE'S OWN DETECTOR CAUGHT BY NAME. *** The row added to recordDrift-selfcheck for the admitted duties was written ok(cond, message) against a file whose ok() is (name, cond) -- so the ASSERTION was a template string, always truthy, and the NAME was a boolean. It passed on every tree. Nothing in that gate noticed; assertionShape-selfcheck did, on the next full sweep, reporting `recordDrift-selfcheck.mjs boolAsName` and moving its own census suspects 0 -> 1 in the same breath. That detector exists for precisely this shape and this is its fourth catch in one session. WHAT IS NOT CLAIMED: that the arrival dates in orrery.json are verified -- they cannot be, from a history that does not reach them, and what this round does is stop a clone that cannot see them from overwriting them; that the four genuinely moved bodies are re-recorded, since the v4475 belt is a claim ABOUT v4475 and stays true about v4475, with what moved recorded beside it; or that the other twelve reds outside the sweep are touched. The tree stands at 1761 gates.
@@ -6850,6 +6858,14 @@ if (typeof window !== "undefined") {
 
 // ---- Their original imports (unchanged) ------------------------------
 import { Camera }         from "./camera/camera.js";
+import { VOXEL }          from "./world/voxelFormat.js";
+import { buildControllerLabWorld, controllerLabVoxelColumns, SPAWN as CONTROLLER_LAB_SPAWN } from "./world/controllerLabWorld.mjs";   // task board #13's live demo
+import { buildSplatWalkWorld, cloudToParsedSplats, SPAWN as SPLAT_WALK_SPAWN } from "./world/splatWalkWorld.mjs";   // task board #83's live demo
+import { voxelizeSplats, captureLevel } from "./world/splatVoxelWorld.mjs";   // the splat-collision round's live demo (splat_voxel_walk)
+import { platformWorldAt, ferryTransformAt, turntableTransformAt, onDeck, platformCarryVoxelColumns,
+         FERRY, TURNTABLE, SPAWN as PLATFORM_CARRY_SPAWN, RESPAWN_Y as PLATFORM_CARRY_RESPAWN_Y } from "./world/platformCarryWorld.mjs";   // task board #84's live demo
+import { carryOnPlatform } from "./physics/character/capsuleCollide.mjs";
+import { slabCloud } from "./physics/splat/splatMesh.mjs";
 import * as reproParams  from "./engine/reproParams.js";   // v1986 — ?seed/?cam/?preset deterministic repro
 import { makeGamepadInput } from "./input/gamepadInput.js";   // v1409 — XInput / gamepad
 import { VoxelWorld }     from "./world/world.js";
@@ -16730,6 +16746,7 @@ const DEMO_MODES = [
             "DEMO STARTS IN AUTOPLAY — the AI plays until you press a key or click",
             "WASD — move (FP camera ground-locked + collision)",
             "Mouse — aim (click canvas to engage pointer-lock)",
+            "V — toggle first/third person",
             "Click or Space — fire (HIT_RANGE=50, HIT_RADIUS=2.5)",
             "R — reload (1.5s, magazine of 30)",
             "Walk into health/ammo pickups to collect",
@@ -16790,6 +16807,7 @@ const DEMO_MODES = [
             "Q — fire current weapon · 1–8 — select weapon",
             "Shift — sprint (drains the bar) · C — hold for energy shield",
             "E — ally with a nearby civ · G — bounty shop when near an ally",
+            "V — toggle first/third person",
             "The energy bar recharges when you're not spending; fully spent = brief lockout",
             "ESC — exit back to the camera",
         ],
@@ -16800,6 +16818,390 @@ const DEMO_MODES = [
         },
         stop() { try { fpsShooter.stop(); } catch {} },
         tick() { /* fpsShooter.tick runs in the main render loop */ },
+    },
+    {
+        // Task board #13's live demo. Everything else that walks in first person in this array (fps,
+        // fp_control) does it on the SAME global voxel world through fpsShooter -- none of them exercise
+        // physics/character/capsuleCollide.mjs (task #80) or terrainWalk.mjs (task #13 Stage A) at all,
+        // because voxel worlds never take those code paths (camera.js's own _capsuleWorldBVH()/
+        // _terrainGroundOracle() both return null whenever world.voxelAt exists). This demo hands the
+        // camera a world with NO voxelAt and a colliderBVH instead, so walking it actually runs the new
+        // code -- see world/controllerLabWorld.mjs's own header for why the visible voxels and the
+        // invisible collider are two separate things built from the same numbers.
+        //
+        // Task board #85 -- two patrol bots now spawn into the SAME colliderBVH the player walks, via
+        // simulation/BotManager.js's own new _botCapsuleBVH()/_stepBotCapsule() dispatch (mirroring
+        // camera.js's _capsuleWorldBVH(), task #80). Every other bot in this engine still walks the global
+        // world/world.js voxel world via _heightAt, completely unaffected -- botManager.world is swapped to
+        // this demo's own collider only for its own duration and restored in stop().
+        id: "controller_lab",
+        autoplay: false,
+        label: "CONTROLLER LAB — non-voxel terrain + capsule collision",
+        terrain: true,       // keep the voxel visuals rendered
+        isolation: "quiet",  // a controlled space, no ambient sim competing for attention
+        hint: "task #13's ground-oracle + capsule-collision work, live: a ramp you can climb, one you can't, a wall corner, and a block that needs a jump",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision, a non-voxel world) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "Walk up the gentle ramp ahead; the steep one beside it refuses you -- same rule, same GROUND_SUPPORT_NORMAL_Y",
+            "The L-shaped wall to your left blocks you and lets you slide around the corner",
+            "The low block needs a jump -- walking into it alone does not get you on top",
+            "Two patrol bots (task #85) navigate the SAME L-corner wall -- watch them route around it, not walk through it",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            world.regenerate();
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            world.flatten({ floorY: 0 });
+            for (const [x, y, z] of controllerLabVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const { colliderBVH } = buildControllerLabWorld();
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = CONTROLLER_LAB_SPAWN.x;
+            camera.position.z = CONTROLLER_LAB_SPAWN.z;
+            camera.position.y = CONTROLLER_LAB_SPAWN.y + camera._eyeHeight;
+            camera.yaw = CONTROLLER_LAB_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            // Task #85 -- spawned near the L-corner's own inside pocket so their default random patrol
+            // (patrolTargetX/Z, +-8 units from spawn) has a real chance of needing to route around it.
+            window._controllerLabPrevBotWorld = botManager.world;
+            botManager.world = { colliderBVH };
+            window._controllerLabBotIds = [
+                botManager.spawn({ x: -14, z: -14, kind: "bot_grunt" })?.entityId,
+                botManager.spawn({ x: -12, z: -16, kind: "bot_grunt" })?.entityId,
+            ].filter((id) => id != null);
+
+            const hud = document.createElement("div");
+            hud.id = "controllerLabHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._controllerLabHud = hud;
+
+            // No fpsShooter here (it is voxel-coupled -- carve/place, weapons, dungeon spawning, none of
+            // which this demo wants), so ESC-exits-fp is this demo's own responsibility, scoped to itself
+            // and removed in stop() rather than left as a dangling global listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._controllerLabEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._controllerLabEscHandler) window.removeEventListener("keydown", window._controllerLabEscHandler); } catch {}
+            window._controllerLabEscHandler = null;
+            try { window._controllerLabHud?.remove(); } catch {}
+            window._controllerLabHud = null;
+            // Task #85 -- explicit despawn (belt+suspenders: main.js's own _hardResetEntities already clears
+            // window.bots on every demo switch) and restore botManager.world so every other bot goes back to
+            // navigating the real, persistent voxel world via _heightAt, exactly as before this round.
+            for (const id of (window._controllerLabBotIds || [])) {
+                try { if (botManager.bots.has(id)) botManager._onBotKilled(id); } catch {}
+            }
+            window._controllerLabBotIds = null;
+            botManager.world = window._controllerLabPrevBotWorld ?? world;
+            window._controllerLabPrevBotWorld = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._controllerLabHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // Task board #83. The SAME cloud buildSplatWalkWorld() rasterises into this demo's own collider (task
+        // #80's capsule-vs-BVH, via camera.js's task #13 Stage B path) is ALSO what gets rendered here, through
+        // render/SplatRenderer.js's real Gaussian-splat pipeline (gpu/SplatScene.js's splatScene singleton,
+        // already drawn every frame regardless of which demo is active) via this module's own
+        // cloudToParsedSplats() bridge -- not a voxel stand-in built from the same numbers (CONTROLLER LAB's
+        // approach, task #82), the literal same point cloud, walkable and visible because it is one dataset.
+        //
+        // No `terrain: true` here (unlike controller_lab) -- there is no voxel visual to keep, and omitting it
+        // already gives a clean, empty stage (main.js's own _applyIsolation: no terrain -> "clean" -- hides the
+        // voxel world/water/grass/kaiju/civ meshes, same effect controller_lab gets from `isolation: "quiet"`,
+        // for free) so the splat shell is the only geometry in view.
+        id: "splat_walk",
+        autoplay: false,
+        label: "SPLAT WALK — walking a live Gaussian-splat scene with capsule collision",
+        hint: "task #83: a hollow sphere of Gaussian splats, walked with the same capsule collision as CONTROLLER LAB -- the collider comes from rasterising the SAME cloud that gets rendered",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision against a splat-derived surface) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint",
+            "V — toggle first/third person",
+            "You spawn falling a few units above the floor -- gravity settles you onto the real (slightly bumpy) rasterised surface",
+            "Walk toward the wall: the curved shell behaves like any other wall until the local slope gets too steep to stand on, then you slide back down",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            const { colliderBVH, cloud } = buildSplatWalkWorld();
+            splatScene.loadParsed(cloudToParsedSplats(cloud), "splatWalk", "splatWalkDemo");
+
+            camera.setWorld({ colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = SPLAT_WALK_SPAWN.x;
+            camera.position.z = SPLAT_WALK_SPAWN.z;
+            // this module's own SPAWN.y is the camera's EYE height directly (not a feet height + eyeHeight the
+            // way CONTROLLER_LAB_SPAWN is) -- matching exactly what tools/ship/splatWalkWorld-selfcheck.mjs's
+            // own freshCamera() already drives and verifies falls + settles correctly, rather than introducing
+            // an untested offset by analogy to a different demo's convention.
+            camera.position.y = SPLAT_WALK_SPAWN.y;
+            camera.yaw = SPLAT_WALK_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = false;   // spawns mid-air on purpose -- see world/splatWalkWorld.mjs's own header
+            camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "splatWalkHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._splatWalkHud = hud;
+
+            // Same reasoning as controller_lab: no fpsShooter here, so ESC-exits-fp is this demo's own
+            // responsibility, scoped to itself and removed in stop() rather than left as a dangling listener.
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._splatWalkEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._splatWalkEscHandler) window.removeEventListener("keydown", window._splatWalkEscHandler); } catch {}
+            window._splatWalkEscHandler = null;
+            try { window._splatWalkHud?.remove(); } catch {}
+            window._splatWalkHud = null;
+            try { splatScene.removeLayer("splatWalkDemo"); } catch {}
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._splatWalkHud;
+            if (!hud || camera.mode !== "fp") return;
+            const state = camera.movementAnimState();
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+        },
+    },
+    {
+        // The splat-collision round. splat_walk walks a splat cloud as a MESH (capsule against a BVH); this walks one
+        // as VOXELS -- world/splatVoxelWorld.mjs turns the cloud into a `voxelAt` world, so camera.js takes its voxel
+        // branch, the one playerBody-selfcheck section 7 holds never-inside. The cloud is captureLevel()'s: splats on
+        // every face of a small level (floor, block, stairs, pillar, wall, table) a camera could see, with a 1.5-unit
+        // patch of floor the capture MISSED. tools/ship/splatVoxelWorld-selfcheck.mjs measures this exact build: the
+        // hole is 7 columns, every one listed, and fillHoles closes them at the floor's height -- the HUD says so.
+        id: "splat_voxel_walk",
+        autoplay: false,
+        label: "SPLAT VOXEL WALK — a Gaussian-splat level walked as a voxel world, its capture holes counted",
+        hint: "the splat-collision round: the same cloud is rendered as splats and turned into voxels the walker stands in; the HUD lists the holes the capture left",
+        controls: [
+            "WASD — walk (the voxel walker: step-up 1.2, never inside a voxel) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint · V — toggle first/third person",
+            "The stairs, the block and the table top are all standable at the heights the level was built with",
+            "Near the far corner the capture missed a patch of floor: its columns are listed in the HUD and filled at the floor's height",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            const cloud = captureLevel({ holes: [[20.5, 3.5, 1.5, 1]] });
+            const vworld = voxelizeSplats(cloud, { fillHoles: true });
+            splatScene.loadParsed(cloudToParsedSplats(cloud), "splatVoxelWalk", "splatVoxelWalkDemo");
+            window._splatVoxelWorld = vworld;
+            camera.setWorld(vworld);
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = 2.5; camera.position.z = 2.5;
+            camera.position.y = 1 + 3 + camera._eyeHeight;   // three voxels above the floor, falling onto it
+            camera.yaw = Math.PI / 4; camera.pitch = 0;
+            camera._fpOnGround = false; camera._fpVelY = 0;
+
+            const hud = document.createElement("div");
+            hud.id = "splatVoxelWalkHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._splatVoxelWalkHud = hud;
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") { camera.setMode("observer"); camera.setWorld(world); }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._splatVoxelWalkEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._splatVoxelWalkEscHandler) window.removeEventListener("keydown", window._splatVoxelWalkEscHandler); } catch {}
+            window._splatVoxelWalkEscHandler = null;
+            try { window._splatVoxelWalkHud?.remove(); } catch {}
+            window._splatVoxelWalkHud = null;
+            window._splatVoxelWorld = null;
+            try { splatScene.removeLayer("splatVoxelWalkDemo"); } catch {}
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick() {
+            const hud = window._splatVoxelWalkHud, vw = window._splatVoxelWorld;
+            if (!hud || !vw || camera.mode !== "fp") return;
+            const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+            hud.textContent = `${view} · ${camera.movementAnimState().toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"} · ` +
+                `${vw.stats.used} splats -> ${vw.stats.solidCells} voxels · ${vw.holes.length} hole columns listed, ${vw.stats.filled} filled`;
+        },
+    },
+    {
+        // Task board #84. physics/character/capsuleCollide.mjs's carryOnPlatform() (task #80) has been gated
+        // and correct since it shipped, and called from nowhere -- this demo is the live caller. A ferry
+        // TRANSLATES across a gap, a turntable ROTATES in place; carryOnPlatform's own distinguishing feature
+        // over "just add the platform's position delta" is the rotation half, which a translate-only demo
+        // would never actually exercise. camera.js and capsuleCollide.mjs are both UNMODIFIED by this demo
+        // (see capsuleCollide.mjs's own two-line qConj/qRotate export, the only change either file needed) --
+        // the carry itself runs entirely in this tick(), the same "thin main.js wiring over a gated world
+        // module" shape as controller_lab and splat_walk.
+        id: "platform_carry",
+        autoplay: false,
+        label: "PLATFORM CARRY — moving/rotating platform, real carryOnPlatform()",
+        hint: "task #84: cross a gap on a ferry, then stand on a spinning turntable -- both driven by capsuleCollide.mjs's own carryOnPlatform(), not a hand-waved position copy",
+        controls: [
+            "WASD — walk (capsule-vs-mesh collision) · Mouse — look (click canvas to lock pointer)",
+            "Space — jump · Shift — sprint · V — toggle first/third person",
+            "Walk onto the ferry while it is docked, then STAND STILL -- it carries you across the gap",
+            "Past the gap, a rotating turntable sweeps you around it if you stand off-centre and hold still",
+            "Falling into the gap resets you back to the start pad",
+            "HUD along the top shows the live view mode + movement state (idle/walk/run/jump/fall)",
+            "ESC — exit back to the camera",
+        ],
+        start() {
+            // world.js's own flatten(): floorY >= 0 blanket-fills ONE layer across every chunk, including
+            // under the gap -- exactly the solid-looking-but-not-standable-on floor this demo must not have,
+            // since camera.setWorld({colliderBVH}) makes the voxel terrain physically irrelevant regardless of
+            // what is drawn there. floorY: -1 skips that fill and leaves a clean, fully empty world instead.
+            world.flatten({ floorY: -1 });
+            renderer.meshes.clear();
+            try { persistence.clear(); } catch {}
+            for (const [x, y, z] of platformCarryVoxelColumns()) world.setVoxel(x, y, z, VOXEL.STONE);
+
+            const w = platformWorldAt(0);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            camera.setMode("fp");
+            camera.viewMode = "first";
+            camera.position.x = PLATFORM_CARRY_SPAWN.x;
+            camera.position.z = PLATFORM_CARRY_SPAWN.z;
+            camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;   // SPAWN.y is the start pad's own flat surface (feet), unlike splat_walk's eye-height convention -- the pad's exact height is known, not something to fall and settle onto.
+            camera.yaw = PLATFORM_CARRY_SPAWN.yaw;
+            camera.pitch = 0;
+            camera._fpOnGround = true;
+            camera._fpVelY = 0;
+
+            // The ferry and turntable move and rotate, so (unlike the static pads' voxel stand-in) their
+            // visual is a splatWalkWorld.mjs-style splat deck: loaded once, repositioned every tick() via the
+            // renderer's own per-layer setPosition/setRotation rather than rebuilt -- see world/
+            // platformCarryWorld.mjs's own header for why the collider (no per-instance transform) and the
+            // visual (one) use two different techniques for the same moving geometry.
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: FERRY.halfExtents, n: 400 }), { colorLow: [130, 190, 235], colorHigh: [130, 190, 235] }), "platformCarryFerry", "platformCarryFerry");
+            splatScene.loadParsed(cloudToParsedSplats(slabCloud({ halfExtents: TURNTABLE.halfExtents, n: 600 }), { colorLow: [235, 165, 110], colorHigh: [235, 165, 110] }), "platformCarryTurntable", "platformCarryTurntable");
+            splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+            splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+
+            window._platformCarryState = { time: 0, ferryXform: w.ferryXform, turntableXform: w.turntableXform };
+
+            const hud = document.createElement("div");
+            hud.id = "platformCarryHud";
+            hud.style.cssText = "position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:500; " +
+                "background:rgba(10,14,20,0.85); border:1px solid #345; border-radius:8px; padding:8px 18px; " +
+                "font-family:ui-monospace,monospace; font-size:12px; color:#cde; text-align:center; pointer-events:none;";
+            document.body.appendChild(hud);
+            window._platformCarryHud = hud;
+
+            const escHandler = (e) => {
+                if (e.key === "Escape" && camera.mode === "fp") {
+                    camera.setMode("observer");
+                    camera.setWorld(world);
+                }
+            };
+            window.addEventListener("keydown", escHandler);
+            window._platformCarryEscHandler = escHandler;
+        },
+        stop() {
+            try { if (window._platformCarryEscHandler) window.removeEventListener("keydown", window._platformCarryEscHandler); } catch {}
+            window._platformCarryEscHandler = null;
+            try { window._platformCarryHud?.remove(); } catch {}
+            window._platformCarryHud = null;
+            try { splatScene.removeLayer("platformCarryFerry"); } catch {}
+            try { splatScene.removeLayer("platformCarryTurntable"); } catch {}
+            window._platformCarryState = null;
+            camera.setMode("observer");
+            camera.setWorld(world);
+        },
+        tick(dt) {
+            const st = window._platformCarryState;
+            if (!st) return;
+
+            // The carry itself: while grounded, is the rider's own FEET within either platform's own PREVIOUS
+            // (last-resolved-against) footprint? If so, shift them by that platform's frame-to-frame delta
+            // BEFORE this frame's own gravity/input pass (already run earlier in the frame by camera.update())
+            // gets a chance to integrate on top of it next frame -- the same order tools/ship/
+            // platformCarryWorld-selfcheck.mjs's own stepWorld() helper already verified end to end.
+            if (camera._fpOnGround) {
+                const feet = [camera.position.x, camera.position.y - camera._eyeHeight, camera.position.z];
+                let xform = null;
+                if (onDeck(feet, st.ferryXform, FERRY.halfExtents)) xform = st.ferryXform;
+                else if (onDeck(feet, st.turntableXform, TURNTABLE.halfExtents)) xform = st.turntableXform;
+                if (xform) {
+                    const nextXform = xform === st.ferryXform ? ferryTransformAt(st.time + dt) : turntableTransformAt(st.time + dt);
+                    const carried = carryOnPlatform(feet, xform, nextXform);
+                    camera.position.x = carried[0];
+                    camera.position.y = carried[1] + camera._eyeHeight;
+                    camera.position.z = carried[2];
+                }
+            }
+
+            st.time += dt;
+            const w = platformWorldAt(st.time);
+            camera.setWorld({ colliderBVH: w.colliderBVH });
+            st.ferryXform = w.ferryXform;
+            st.turntableXform = w.turntableXform;
+            try {
+                splatScene.setPosition(w.ferryXform.p[0], w.ferryXform.p[1], w.ferryXform.p[2], "platformCarryFerry");
+                splatScene.setRotation(w.ferryXform.q[3], w.ferryXform.q[0], w.ferryXform.q[1], w.ferryXform.q[2], "platformCarryFerry");
+                splatScene.setPosition(w.turntableXform.p[0], w.turntableXform.p[1], w.turntableXform.p[2], "platformCarryTurntable");
+                splatScene.setRotation(w.turntableXform.q[3], w.turntableXform.q[0], w.turntableXform.q[1], w.turntableXform.q[2], "platformCarryTurntable");
+            } catch {}
+
+            // Fell into the gap -- back to the start pad, same "don't strand the player" safety controller_lab
+            // and splat_walk don't need (neither has a bottomless gap) but this demo's whole premise does.
+            if (camera.position.y - camera._eyeHeight < PLATFORM_CARRY_RESPAWN_Y) {
+                camera.position.x = PLATFORM_CARRY_SPAWN.x;
+                camera.position.y = PLATFORM_CARRY_SPAWN.y + camera._eyeHeight;
+                camera.position.z = PLATFORM_CARRY_SPAWN.z;
+                camera._fpVelY = 0;
+                camera._fpOnGround = true;
+            }
+
+            const hud = window._platformCarryHud;
+            if (hud && camera.mode === "fp") {
+                const state = camera.movementAnimState();
+                const view = camera.viewMode === "third" ? "Third-person" : "First-person";
+                hud.textContent = `${view} · ${state.toUpperCase()} · ${camera._fpOnGround ? "grounded" : "airborne"}`;
+            }
+        },
     },
     {
         // Round 220 — Voice Commander promoted to builtin. Demonstrates
@@ -27969,6 +28371,10 @@ ogreScenario._onWaveSpawned = (waveNumber, arena) => {
     _ogreTurretIds = ids || [];
     console.log(`[OgreArena] wave ${waveNumber}: ${_ogreTurretIds.length} turrets deployed`);
 };
+// Task #85 -- the raw manager, not just the wrapped window.bots API below: lets a caller (console, or a
+// live Playwright test) read an individual bot's own x/y/z/vy/onGround, matching how window.splatScene and
+// window.rigSystem already expose their own internals rather than only a curated subset.
+window._botManager = botManager;
 window.bots = {
     spawnAtPlayer: (opts) => botManager.spawnAtPlayer(opts || {}),
     spawn: (opts) => botManager.spawn(opts || {}),
@@ -29637,6 +30043,10 @@ window.addEventListener("keydown", (e) => {
     } else if (e.code === "KeyX" && camera.mode === "fp" && !e.repeat) {
         // Round 40 — emergency eject + nuclear self-destruct
         ejectSequence.trigger();
+    } else if (e.code === "KeyV" && camera.mode === "fp" && !e.repeat) {
+        // Round #13 Stage C (task board #81) — toggle first/third person.
+        const mode = camera.toggleViewMode();
+        window.toast?.show?.({ text: mode === "third" ? "Third-person" : "First-person", color: "#9cf", durationMs: 1500 });
     }
 });
 
@@ -30216,6 +30626,14 @@ function loop(t, xrFrame) {
                                              emphMode: k._emphMode === true,   // v19 -- rate-emphasis semantics (OGRE only)
                                              tier: k.absorbTier ?? 0, king: !!k.becameKing,
                                              x: k.position.x, z: k.position.z,
+                                             // Task board #90 -- real capsule-collision pressure at this kaiju's
+                                             // own live position, set every tick by KaijuManager.js's
+                                             // _resolveGroundKaijuPosition against the real per-chunk terrain
+                                             // collider (task #89). Undefined for a flying/swimming kind, or any
+                                             // kaiju that hasn't ticked through that path yet -- 0 (no hazard)
+                                             // is the same "nothing to report" default every other optional
+                                             // roster field on this object already gets.
+                                             hazard: k._hazard ?? 0,
                                              tx, tz, attacks: atks, packSize, tgtKid, tspd });
                         }
                     }

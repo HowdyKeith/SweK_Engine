@@ -481,10 +481,14 @@ console.log("\n5. what the record actually bought, on the live tree");
         let touched = 0;
         for (const g of GATES) {
             const e = REC.gates[g];
-            if ((e.reads || []).includes(f)) { touched++; saved.push(e); e.hashes[f] = "0000000000000000"; }
+            if ((e.reads || []).includes(f)) { touched++; saved.push([e, e.hashes[f]]); e.hashes[f] = "0000000000000000"; }
         }
         const after = partSnap(REC).skip.length;
-        for (const e of saved) e.hashes[f] = hashFile(f);   // put it back; the cache holds the real reading
+        // *** v4814 -- PUT BACK WHAT THE RECORD HELD, NOT WHAT THE FILE HASHES TO NOW. *** This read `hashFile(f)`, which is the
+        // same value only while f is unchanged since the record was taken. v4814 rewrote tools/ship/sourceScan.mjs, one of the
+        // three hot files, and the "restored" REC then disagreed with a fresh read -- the v4725 row below went red on a
+        // fake that had not been undone. SABOTAGE: the hashFile(f) form restored -> 1 RED, that row; restored md5-identical.
+        for (const [e, h] of saved) e.hashes[f] = h;
         return { f, touched, after };
     });
     ok("  and changing a file that many gates read brings exactly those gates back, and no more",
@@ -748,6 +752,25 @@ console.log("\n9. *** THE FIXTURES ARE RECLAIMED WHEN THE RUN DIES, DRIVEN ON RE
        wasKilled(rawKilled) && rawReclaimed.length === 0 && rawAfter !== ORIGINAL,
        `reclaimed ${rawReclaimed.length}, file still ${JSON.stringify(rawAfter.slice(0, 24))}. This is what the ` +
        "code did before the ledger, and it is exactly the state Keith's tree was left in");
+    // *** v4815 -- THE SWEEP NOW RECLAIMS THE LEDGER BETWEEN GATES, SO IT MUST LEAVE A LIVE OWNER'S EDIT ALONE. ***
+    // quickSweep.reclaimStrandedFixtures and sweepRotation call reclaimMutations({ deadOnly: true }) after a killed run;
+    // a gate still running beside them (or a sweep run INSIDE a gate) must not have its mutation pulled out from under
+    // it. A real child ledgers an edit and holds; the reclaim leaves it; the child takes SIGKILL; the reclaim restores.
+    // SABOTAGE (v4815): the `alive(rec.pid)` test removed from deadOnly -> 1 RED, this row (reclaimed while the owner
+    // was alive); restored md5-identical.
+    fs.writeFileSync(scratch, ORIGINAL);
+    const { spawn } = await import("node:child_process");
+    const holder = spawn(process.execPath, [LITTER, "mutate-hold", scratch], { stdio: ["ignore", "pipe", "ignore"] });
+    await new Promise((res) => { let b = ""; holder.stdout.on("data", (d) => { b += d; if (b.includes("HOLDING")) res(); }); setTimeout(res, 15000); });
+    const whileAlive = reclaimMutations({ deadOnly: true }), heldText = fs.readFileSync(scratch, "utf8");
+    holder.kill("SIGKILL");
+    await new Promise((res) => holder.on("close", res));
+    const afterDeath = reclaimMutations({ deadOnly: true }), backText = fs.readFileSync(scratch, "utf8");
+    try { fs.unlinkSync(scratch); } catch {}
+    ok("*** a deadOnly reclaim leaves a LIVE owner's mutation alone, and restores it once the owner is dead ***",
+       !whileAlive.includes(scratch) && heldText !== ORIGINAL && afterDeath.includes(scratch) && backText === ORIGINAL,
+       `while the child held: ${whileAlive.includes(scratch) ? "RECLAIMED (wrong)" : "left alone"}; after its SIGKILL: ` +
+       `${afterDeath.includes(scratch) ? "put back byte for byte" : "NOT put back"}`);
     ok("  and the ledger is gone once it has been acted on, so a repaired tree does not report itself forever",
        !fs.existsSync(MUTATION_LEDGER) && reclaimMutations().length === 0,
        `${MUTATION_LEDGER} -- outside the engine tree, beside the captures, because a record quoting source ` +

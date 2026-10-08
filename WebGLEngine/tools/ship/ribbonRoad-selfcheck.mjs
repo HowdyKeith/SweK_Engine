@@ -73,7 +73,32 @@ const sec = (t) => console.log("\n" + t);
 const deg = (r) => r * 180 / Math.PI;
 // TOL: a texel centre can be 0.88 m from a vertex in its texel, the road's slope over that is the grade plus the bank's tangent
 // (0.12 + 0.27 at the caps), and a byte of the field is 0.04 m: 0.88 x 0.39 + 0.04 = 0.38. The measurement is beside it.
-const SEED = 1, TOL = 0.4, DRIVE_S = 120;
+// v4778 -- 0.4 -> 0.97 at the rtx merge, and NOT because the merge's terrain is worse: the derivation above under-counted and the
+// gate had been over it (0.396 against 0.38) since the fleet bake before the merge. The rtx line's importers and the two bodies it
+// vendored re-baked orrery-fleet.json to 230 files and the worst plain vertex went 0.396 -> 0.428. MEASURED at that vertex (the
+// right kerb's outer edge, k5, sample 308, on the straight out of a right-hander): 0.114 m of its own plane's slope over the 0.84 m to its
+// texel's centre, 0.011 of rounding, 0.004 of lift -- and 0.299 m the derivation never had. cutFill gives a texel the plane of the
+// frame whose cross-line passes NEAREST it, and here that is sample 307's: the bank is running off 8.94 -> 5.96 deg between the
+// two, so at the texel's 5.63 m from the centreline the two planes part by 5.63 x (tan 8.94 - tan 5.96) = 0.299. The same term
+// read 0.298 on the fleet bakes before the merge: it is the TRACK's (seed 1's bank schedule), not the terrain's. Of 1,403
+// plain vertices 168 take the next sample's plane and none a further one. So the bound is four terms, each from a constant:
+//   the plane's slope over the reach   texel / sqrt 2 x tan(tilt), cos(tilt) = cos(maxBank) x cos(atan maxGrade)    0.884 x 0.294
+//   the next sample's plane            the bank changes at most 2 x maxBank / 5 a sample (drapeSpine's ringSmooth(phi, 2, 2)
+//                                      over +-maxBank; seed 1's S-bend at sample 33 reaches it), x sec^2(maxBank) for its
+//                                      tangent, x sqrt(1 + maxGrade^2) on a grade, at the texel centre's reach from the
+//                                      centreline, halfWidth + kerb + the lift's lean + texel / sqrt 2 = 6.00 m               0.673
+//   rounding                           half a byte, cutFill rounds: 10 m / 255 / 2                                             0.020
+//   the lift                           the slab and kerb stand (kerb + slab) / N.y, not kerb + slab: 0.4 x (1 / 0.960 - 1)     0.017
+// plus the grade's change between samples over the reach, read off the drape (0.0046 a sample at the merge, 0.004 m). 0.97 in all,
+// against 0.428 measured: the next-sample term at a plain vertex read 0.299 at most on every bake tried -- the runoff's maxBank / 5,
+// not the reversal's twice that -- which is measured and which the bound does not lean on. Sabotage C (the cut writes nothing)
+// still reads 2.73 m plain and D (a fold takes the higher road) -1.68 m buried, both past it.
+const SEED = 1, DRIVE_S = 120;
+const TEXEL = R.TERRAIN.extent / R.TERRAIN.size, REACH = TEXEL / Math.SQRT2, LIFT = R.ROAD.kerbHeight + R.ROAD.slab;
+const NY_MIN = Math.cos(R.ROAD.maxBank) * Math.cos(Math.atan(R.ROAD.maxGrade)), LEAN = Math.sqrt(1 - NY_MIN * NY_MIN);
+const BANK_STEP = 2 * R.ROAD.maxBank / 5 / Math.cos(R.ROAD.maxBank) ** 2 * Math.hypot(1, R.ROAD.maxGrade);
+const tolFor = (gradeStep) => REACH * LEAN / NY_MIN + (R.ROAD.halfWidth + R.ROAD.kerb + LIFT * LEAN + REACH) * BANK_STEP +
+    REACH * gradeStep + 0.5 * R.TERRAIN.heightScale / 255 + LIFT * (1 / NY_MIN - 1);
 const files = R.fleetFiles(JSON.parse(fs.readFileSync(path.join(ENG, "orrery-fleet.json"), "utf8")));
 const track = T.generateTrack({ seed: SEED });
 
@@ -144,6 +169,7 @@ let cf = null, mesh = null;
     ok("*** the cut and fill moves ground: hundreds of cubic metres each way, under thousands of texels ***", cf.cut > 100 && cf.fill > 100 && cf.under > 1000 && cf.worstBefore > 0.5, `cut ${cf.cut.toFixed(0)}, fill ${cf.fill.toFixed(0)}, worst ${cf.worstBefore.toFixed(2)} m`);
     ok("  nothing beyond the shoulder is touched", farTexels > 5000 && changedFar === 0, `${changedFar} of ${farTexels} far texels changed`);
     // every vertex against the terrain the shader will draw
+    const gradeStep = Math.max(...spine.grades.map((g, i) => Math.abs(spine.grades[(i + 1) % spine.count] - g))), TOL = tolFor(gradeStep);
     let worst = 0, plain = 0, foldV = 0, worstFold = 0, buried = 0, worstBuried = 0;
     for (let v = 0; v < mesh.vertexCount; v++) {
         const k = v % 6, x = mesh.positions[v * 3], y = mesh.positions[v * 3 + 1], z = mesh.positions[v * 3 + 2], lift = (k === 2 || k === 3) ? 0 : R.ROAD.kerbHeight;
@@ -152,7 +178,7 @@ let cf = null, mesh = null;
         else { plain++; worst = Math.max(worst, Math.abs(gap)); }
     }
     report(`${mesh.vertexCount} ribbon vertices (${mesh.triangles} triangles), the slab ${R.ROAD.slab} m over the cut ground: ${plain} on plain ground within ${worst.toFixed(3)} m of it, ${foldV} over folds standing up to ${worstFold.toFixed(2)} m above it`);
-    ok(`*** every ribbon vertex on plain ground is within ${TOL} m of the terrain after the cut and fill (the bound is the road's slope over a texel: 0.88 m x (0.12 grade + 0.27 bank) + a byte, 0.38; measured ${worst.toFixed(3)}) ***`, plain > mesh.vertexCount / 2 && worst <= TOL, `${plain} vertices, worst ${worst.toFixed(3)} m`);
+    ok(`*** every ribbon vertex on plain ground is within ${TOL.toFixed(2)} m of the terrain after the cut and fill (the bound is the road's plane over a texel's reach, ${(REACH * LEAN / NY_MIN).toFixed(3)}, plus the next sample's plane where the texel takes it, ${((R.ROAD.halfWidth + R.ROAD.kerb + LIFT * LEAN + REACH) * BANK_STEP).toFixed(3)}, the grade's step ${(REACH * gradeStep).toFixed(3)}, half a byte and the lift; measured ${worst.toFixed(3)}) ***`, plain > mesh.vertexCount / 2 && worst <= TOL, `${plain} vertices, worst ${worst.toFixed(3)} m`);
     ok("*** and no vertex is BURIED: over a fold the ground takes the lower road, so the higher kerb stands on a wall and never under the ground ***", buried === 0 && foldV > 0 && cf.folds > 0, `${foldV} fold vertices, ${buried} buried, worst ${worstBuried.toFixed(2)} m`);
     ok("  the kerbs stand KERB_HEIGHT over the slab, the slab over the plane, and the car's surface is the slab's top", (() => { const f = spine.frames[10]; const road = mesh.positions[(10 * 6 + 2) * 3 + 1], kerb = mesh.positions[(10 * 6 + 1) * 3 + 1], x = mesh.positions[(10 * 6 + 2) * 3], z = mesh.positions[(10 * 6 + 2) * 3 + 2]; const s = R.ribbonSurface(spine, terrain); return Math.abs(kerb - road - R.ROAD.kerbHeight * f.N[1]) < 1e-5 && Math.abs(R.planeY(f, x, z) + R.ROAD.slab / f.N[1] - road) < 1e-5 && Math.abs(s.at(f.P[0], f.P[2]).y - (f.P[1] + R.ROAD.slab)) < 1e-9; })());
     ok("  the ribbon is closed: the last sample's quads index the first sample's vertices", mesh.indices.some((i) => i < 6) && mesh.indices.some((i) => i >= (spine.count - 1) * 6) && Math.max(...mesh.indices) === mesh.vertexCount - 1);

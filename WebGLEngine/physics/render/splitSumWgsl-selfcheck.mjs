@@ -13,7 +13,7 @@
 // and not assumed to be within some tolerance picked before the device answered.
 "use strict";
 import { runWgslComputeNative, headlessGpuSkipReason } from "../../tools/ship/headlessGpu.mjs";
-import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND } from "./splitSumWgsl.mjs";
+import { BRDF_LUT_WGSL, PREFILTER_ENV_WGSL, packLutParams, packPrefilterCases, ENV_KIND, F32_FLOOR_ABS } from "./splitSumWgsl.mjs";
 import { brdfLut, prefilterEnv } from "./splitSum.mjs";
 
 let fails = 0;
@@ -46,7 +46,7 @@ async function main() {
                 if (dB > worstB) { worstB = dB; atB = `i${i} j${j}`; }
             }
             ok("!! *** DEVICE f32 AGREES WITH THE f64 CPU REFERENCE TO THE f32 FLOOR, NOT ASSUMED ***",
-               worstA < 1e-4 && worstB < 1e-4,
+               worstA < F32_FLOOR_ABS && worstB < F32_FLOOR_ABS,   // v4814: one declaration, in splitSumWgsl.mjs
                `256 cells: worst |A_gpu - A_cpu| = ${worstA.toExponential(3)} at ${atA}, worst |B_gpu - B_cpu| = ${worstB.toExponential(3)} at ${atB}. ` +
                "Same Hammersley sequence, same GGX half-vector sample, same G2 -- so a disagreement bigger than f32 rounding would name an actual algorithmic gap between the two, not a tolerance picked to pass.");
             report(`adapter: ${res.adapter ? res.adapter.description || res.adapter.vendor : "?"}`);

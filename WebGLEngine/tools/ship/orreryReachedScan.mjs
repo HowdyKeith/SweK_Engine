@@ -182,8 +182,10 @@ export function readReachedBake(engineRoot) {
  * the head commit is REPORTED rather than demanded, because the commit that ships a round cannot know its
  * own hash.
  */
-export function reachedDrift(engineRoot, repoRoot) {
-    const baked = readReachedBake(engineRoot);
+// v4815 -- `baked` may be handed in, so a control can bend a COPY. orreryReached-selfcheck's control used to write a bent
+// bake over the real orrery-reached.json and put it back; the full over-budget rotation killed it at the 20 s cap between
+// the two writes, and the tracked file stayed bent (catalogue 999) for every later run -- and for `git add -A`.
+export function reachedDrift(engineRoot, repoRoot, { baked = readReachedBake(engineRoot) } = {}) {
     if (!baked) return ["orrery-reached.json is missing"];
     const live = reachedPayload(engineRoot, repoRoot);
     const out = [];

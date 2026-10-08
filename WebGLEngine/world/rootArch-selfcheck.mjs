@@ -236,7 +236,7 @@ console.log("\n6. *** LIVE: THE PLANET PAGE PLACES THE LANDMARK ON A SOLID WORLD
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(f));
         });
         await new Promise((x) => srv.listen(0, "127.0.0.1", x));
-        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: [...pw.webglLaunchArgs().args, "--enable-webgl"] });
         try {
             const results = {};
             for (const [seed, type] of [[7, "terran"], [1, "ice"], [2, "gas"], [4, "molten"]]) {
@@ -284,7 +284,7 @@ console.log("\n7. *** LIVE: THE VOXEL ENGINE BOOTS CLEAN WITH THE LANDMARK WIRED
             rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(f));
         });
         await new Promise((x) => srv.listen(0, "127.0.0.1", x));
-        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        const b = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: [...pw.webglLaunchArgs().args, "--enable-webgl"] });
         try {
             const pg = await b.newPage();
             const errs = [];

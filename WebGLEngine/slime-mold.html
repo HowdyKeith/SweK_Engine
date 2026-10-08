@@ -190,6 +190,7 @@ glowBtn.addEventListener("click", () => { glow = !glow; glowBtn.style.opacity = 
         try { window.parent?.postMessage({ type: "demo:params", params: params.map(({ set, ...p }) => p) }, "*"); } catch (e) {}
     }
     window.addEventListener("message", (e) => {
+        if (e.origin !== window.location.origin) return;
         const d = e.data; if (!d || typeof d !== "object") return;
         if (d.type === "demo:set") {
             const p = params.find(x => x.name === d.name);

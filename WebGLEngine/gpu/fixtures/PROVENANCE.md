@@ -177,6 +177,59 @@ both immediately before the refactor (`git stash` on `gpu/gpuAssetLoader.js` alo
 after. `tools/ship/fbxIngest-selfcheck.mjs` re-runs the "after" half of that as a standing regression check,
 pinned to the values that comparison measured.
 
+## `SimpleSparseAccessor.glb` — task #7, glTF conformance fixtures (sparse accessors)
+
+A sixth file, added when `gpu/GLBParser.js`'s own `_readAccessor()` was found to silently ignore
+`accessor.sparse` entirely (zero occurrences of `sparse` anywhere in that file before this round) —
+returning the UNPATCHED base array for any accessor that combines a real `bufferView` with `sparse`
+overrides, no throw and no warning, just the wrong numbers. Unlike the other fixtures in this file, this one
+is **not self-authored and not a header-only strip** — it is the FULL, complete, working Khronos
+glTF-Sample-Assets model **"Simple Sparse Accessor"**, converted from its original `.gltf` + `.bin` pair into
+a single `.glb` container via this tree's own `tools/export/voxelGlb.mjs`'s `packGlb()` (the same packer
+`sceneGlb.mjs`/`voxelGlb.mjs` already use, so no second, independently-spelled GLB-assembly routine exists) —
+the JSON's `buffers[0].uri` was dropped and the original `.bin` bytes embedded as the GLB's own BIN chunk,
+byte-for-byte, at the SAME internal byte offsets the source model's own `bufferViews` already declare, so
+nothing about the accessor data itself was touched.
+
+**Why full, not header-only.** `ABeautifulGame-*.header.glb`, above, proves ROUTING against a real file's
+real declarations, and is deliberately unloadable — the BIN chunk is removed, so the model's `buffers`
+declare bytes that are not present. Sparse-accessor DECODING is exactly the thing a header-only fixture
+cannot prove: there is nothing to decode without the real BIN chunk, sparse index/value sub-buffers
+included. At 284 bytes of BIN data (1,056 bytes total, GLB-packed) there was no size reason to strip it
+either — the whole reason `ABeautifulGame` needed stripping (55 MB raw) does not apply to a fixture this
+small.
+
+**What it is**, read directly off the model's own JSON: a flat 2×7 vertex grid (`POSITION`, accessor 1, 14
+vertices, `VEC3`/`FLOAT`, `bufferView` 1) forming two rows along X (`y=0` and `y=1`, `z=0` throughout) before
+any sparse patch, indexed into 12 triangles (accessor 0, `bufferView` 0). The `POSITION` accessor's own
+`sparse` object overrides 3 of the 14 vertices — indices `[8, 10, 12]` (all in the `y=1` row) — with new
+values `[[1,2,0], [3,3,0], [5,4,0]]` (`bufferView` 2 for the `UNSIGNED_SHORT` indices, `bufferView` 3 for the
+`FLOAT` values, both hand-decoded directly from the raw BIN bytes before writing the gate, not assumed from
+the JSON's own `max`/`min`). The accessor's own declared `max: [6,4,0]` only becomes true once the sparse
+patch is correctly applied — the unpatched base data's own real max is `[6,1,0]` — which is itself a live,
+spec-provided regression check: a reader that ignores `sparse` produces geometry the file's own JSON says is
+wrong.
+
+**Licence.** CC-BY-4.0, per `Models/SimpleSparseAccessor/LICENSE.md` and `metadata.json` in the
+glTF-Sample-Assets repository (read directly, not assumed from Khronos publishing it — the SAME discipline
+`ABeautifulGame`'s own entry above already applies, and the same repository `BrainStem`/`Duck` are NOT
+CC-BY-4.0 in, which is exactly why this check is never skipped):
+
+> Simple Sparse Accessor — by **Marco Hutter** (https://github.com/javagl/), 2017. Licensed CC-BY-4.0:
+> https://creativecommons.org/licenses/by/4.0/legalcode
+> Source: https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SimpleSparseAccessor
+
+**What it proves, and the limit.** `tools/ship/gltfConformance-selfcheck.mjs` parses this fixture through the
+real, shipped `GLBParser.parse()` and asserts the exact patched position array — all 14 vertices, not just
+the 3 sparse-overridden ones — against the hand-decoded indices/values above. It proves the
+`bufferView`-present-AND-`sparse` shape specifically; the OTHER spec-valid shape (`bufferView` entirely
+omitted, base implicitly all-zero) has no small Khronos sample fixture and is instead exercised with a
+synthetic, inline-constructed accessor built directly in the gate itself (no file, no license question — the
+same "no bytes to license" reasoning `fbxIngest.ascii.fbx` and `regressionTri.glb` already state). It does
+not prove sparse accessors combined with `byteStride` (interleaved) bufferViews, or sparse on a non-`FLOAT`
+componentType — named as the honest remaining scope for whichever round widens this file's own feature
+matrix next, not silently assumed covered.
+
 ## `autoRigUnrigged.glb` — task #38/#39, the auto-rig-wiring fixture
 
 Self-authored, hand-built directly against the glTF 2.0 container spec (not through `writeGlb()`, which does
@@ -190,3 +243,103 @@ for exactly this kind of self-authored fixture). Deliberately carries **no** `JO
 animations — that is the entire point: it is shaped exactly like a Trellis-generated GLB
 (`ai/ComfyUIClient.js`'s image-to-3D pipeline), which lands with geometry but no skeleton. No third-party
 bytes anywhere, same "no license to verify" reasoning as the fixtures above.
+
+## `fbxMultiMaterial.ascii.fbx`, `fbxEmbeddedTexture.ascii.fbx`, `fbxMorphTarget.ascii.fbx`, `fbxRotation180.ascii.fbx` — the round that closed `fbxAnimAdvanced.ascii.fbx`'s own remaining gap list
+
+Four more files, added when the four gaps `fbxAnimAdvanced.ascii.fbx`'s entry above named as still open —
+multi-mesh/multi-material concat, embedded-texture extraction, morph-target (`DeformPercent`) animation
+tracks, and a rotation curve spanning >=180 degrees between keyframes — were closed. Same discipline as all
+five fixtures above: hand-authored, plain-ASCII FBX 7.4, written directly against
+`vendor/three/jsm/loaders/FBXLoader.js`'s own source (this round read `GeometryParser`'s
+`parseMaterialIndices`/`genGeometry` for the `LayerElementMaterial` → `geo.groups` pipeline,
+`DeformerParser`/`AnimationParser` for the `Shape`/`BlendShapeChannel`/`BlendShape` connection chain and the
+`DeformPercent` curve's own connection path, and `interpolateRotations` for the >=180-degree slerp-subdivision
+loop) — each confirmed against the real headless-Chromium harness before any gate assertion was written, not
+trusted from the reading alone. No third-party bytes anywhere, same reasoning as every fixture above.
+
+- **`fbxMultiMaterial.ascii.fbx`** — the same two-triangle quad as `fbxIngest.ascii.fbx`, split into two
+  materials via `LayerElementMaterial` (`MappingInformationType: "ByPolygon"`,
+  `ReferenceInformationType: "IndexToDirect"`, `Materials: *2 { a: 0,1 }`): triangle 0 → `Material::matA`,
+  triangle 1 → `Material::matB`. `tools/ship/fbxIngest-selfcheck.mjs` section 8 proves `normalizeFbxGroup()`'s
+  `primitiveRanges` comes back as exactly the two triangle-sized ranges FBXLoader's own `genGeometry()` derives
+  from that layer, with `materialIdx` 0 then 1 in the order the fixture's `Connections` block lists the two
+  materials — not assumed, traced against this exact fixture (see that section's own comments).
+- **`fbxEmbeddedTexture.ascii.fbx`** — the same quad, one material, one embedded base64 PNG (a hand-built,
+  original 2x2 RGB image — red/green/blue/white corners, encoded with `tools/ship/pngWrite.mjs`'s
+  `encodePNG`, the same helper `autoRigUnrigged.glb` above uses) in a `Video` node's `Content`, bound to the
+  material's `DiffuseColor` slot via a `Texture` node. Section 9 proves the full path — `parseFbx()`'s
+  `LoadingManager` wait, `createImageBitmap()`, and the real `gl.texImage2D` upload — by reading the actual GL
+  texture back with `gl.readPixels()` and asserting it matches the fixture's authored pixels exactly, plus a
+  second check (9b) that omitting the `LoadingManager` (any caller written before this round) still works
+  safely: no throw, `texture` stays `null`, reproducing v1-v3's behavior rather than breaking it.
+- **`fbxMorphTarget.ascii.fbx`** — the same quad, one `Shape` blend target (`"bulge"`, a uniform `(0,0,1)`
+  delta at all 4 control points) wired through a `BlendShape`/`BlendShapeChannel` deformer chain, animated by
+  a `DeformPercent` curve sweeping 0 → 100 over one second. Section 10 proves both halves together: the static
+  delta extraction (`readFbxMorphTargets()`, matching `GLBParser.js`'s own `_readMorphTargets` shape) and the
+  animation-curve routing (`mapFbxAnimations()`'s `MORPH_TRACK_RE` branch, producing a `morphChannels` entry
+  rather than a regular TRS channel) — against exact measured values, including the `/100` scaling FBXLoader's
+  own `generateMorphTrack` performs before this file ever sees the sampler values.
+- **`fbxRotation180.ascii.fbx`** — the same quad plus a separate, unskinned `LimbNode` (`"spinner"`) rotating
+  0 → 270 degrees about X over one second — a span FBXLoader's own `interpolateRotations()` subdivides via
+  slerp before the track ever reaches this repo's code. This fixture needed **no code change** in
+  `gpu/fbxLoad.js` (see that file's header and `tools/ship/fbxIngest-selfcheck.mjs` section 11 for why); it
+  exists purely to prove faithful pass-through, and its own construction surfaced a genuine, if surprising,
+  quirk of the currently-vendored loader: `interpolateRotations()`'s subdivision loop
+  (`for (let t = 0; t < 1; t += 1 / numSubIntervals)`) never emits a sample at `t = 1`, so with a 270-degree
+  span (`numSubIntervals = 1.5`) the fixture's own authored final keyframe value never appears in the output
+  track at all — the last sample is a partial (t≈0.667) interpolation, not the full 270-degree end state.
+  Section 11 measures this directly (comparing `normalizeFbxGroup()`'s sampler against FBXLoader's own raw
+  `group.animations` track from the same parse) rather than hand-deriving what a "clean" subdivision should
+  produce, because what the vendored loader actually produces is the only thing worth proving pass-through
+  against.
+
+**What is still not proven after this round**, named plainly rather than silently: narrower
+`LayerElementMaterial` mapping types (`ByPolygonVertex`/`ByVertice`/`AllSame`) and more than one separate Mesh
+Model in a file; non-`DiffuseColor` texture slots (bump/normal/emissive/specular/alpha) and external (non-
+embedded) texture references; more than one morph target on a mesh, or morph targets combined with skin. The
+"mixed skin scope" simplification's real severity, understated by an earlier, softer wording of this note, is
+fixed as of `fbxMixedSkinScope.ascii.fbx` below — see that entry.
+
+## `fbxMixedSkinScope.ascii.fbx` — the round that fixed the mixed-skin-scope risk an earlier round's own adversarial review found
+
+A tenth file, added when an adversarial review of the four-gap-closure round above (`fbxMultiMaterial.ascii.fbx`
+et al.) found that the pre-existing "mixed skin scope" simplification was a REAL, silent production risk that
+round's own multi-mesh support made reachable for the first time, not merely a narrower named behavior: a
+secondary mesh bound to a synthetic joint 0 inherited joint 0's ENTIRE ANIMATED MOTION at render time, so a
+static prop bundled in the same file would visibly swing with a character's root-bone animation, and a mesh
+meant to follow a different bone would visibly detach from it. Same discipline as every fixture above: hand-
+authored, plain-ASCII FBX 7.4, no third-party content, this time written directly against `gpu/
+SkeletalAnimator.js`'s own real-time joint-matrix computation (confirmed by reading that file directly, not
+assumed) to design a fix that mirrors `gpu/GLBParser.js`'s own PRIMARY `unskinnedPrims` strategy — registering
+a secondary mesh's own node as a new joint with an identity inverse-bind matrix, rather than that file's older
+fallback of baking a parent-chain-relative offset.
+
+**What it is:** the same 2-bone skinned quad as `fbxAnim.ascii.fbx` (root at the origin, child offset
+`(0,1,0)`), but with BOTH bones now animating INDEPENDENTLY — root 0 → 90 degrees about X (so joint 0, root's
+position in `skin.joints`, genuinely animates) and child ALSO 0 → 90 degrees about Y, its own separate curve
+on a separate axis — plus TWO plain, unskinned secondary meshes: `"propMesh"` (a small quad offset to
+`x=10..12`) with no parent-Model connection, so FBXLoader attaches it directly to the scene root, unrelated to
+any bone; and `"attachMesh"` (a small unit quad) WITH a parent-Model connection to `"child"`, a genuine bone
+attachment (e.g. a held item meant to track a wrist).
+
+**What it proves, and the limit:** `tools/ship/fbxIngest-selfcheck.mjs` section 12 proves the fix through the
+shipped pipeline (`skin.joints` comes back `[3, 4, 2, 5]` — root, child, then propMesh's and attachMesh's OWN
+nodes each appended as a new joint, rather than either being silently absent from `skin.joints` and bound to
+existing joint 0, v4's bug) and at RENDER TIME, two ways: propMesh's 6 corners come back EXACTLY their
+authored coordinates at the clip's midpoint (not dragged by root's rotation), and attachMesh's 6 corners match
+an INDEPENDENT three.js oracle (a plain root/child/attach `Object3D` chain, real `Quaternion.setFromAxisAngle`,
+no `FBXLoader`/`normalizeFbxGroup` involved) EXACTLY — correctly tracking CHILD's own Y-rotation composed with
+root's X-rotation, not merely root's rotation alone (what the old joint-0-only binding would give). The
+attachMesh half was added specifically because an adversarial review of this fix's first draft named
+"correctly follows a different bone" as the more discriminating, still-untested scenario next to "stays
+static" — the oracle values were built and cross-checked BEFORE being written into the gate, after a first
+hand-trigonometry attempt at them had its own rotation-order mistake (caught by the cross-check, not shipped).
+The `SHADER_JOINT_LIMIT`-exceeded fallback path (walking the real parent chain for the nearest existing joint
+ancestor and baking the relative transform) is proven separately and directly — see
+`tools/ship/fbxIngest-selfcheck.mjs` section 13, a synthetic 65-joint graph built in plain Node with no FBX
+file at all (this fixture only carries 2 real joints). That fallback's first draft had a genuine math bug an
+adversarial review caught (baking an ancestor-relative delta double-applies the ancestor's own inverse-bind
+matrix and silently drops its accumulated world offset, wrong even at rest pose); section 13 regression-gates
+the corrected formula directly. Not proven anywhere: a `SkinnedMesh` bound to a genuinely different skeleton
+than the reference, which now takes the same new-joint path (no longer dragged by a foreign character's
+motion) but loses its OWN internal multi-bone deformation, a real, narrower, named remaining gap.

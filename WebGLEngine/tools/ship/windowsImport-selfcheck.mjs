@@ -53,6 +53,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { codeOnly, noComments } from "./sourceScan.mjs";
+// v4814: sections 1 and 2 read the same 4,520 files; on the rig that was 3.0 s of a 4.7 s wall (gateProfile --rig-slow).
+import { readOnce } from "./treeRead.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -174,6 +176,21 @@ export function generatedImportArgs(src) {
         if (bare) arg = bare[1].trim();
         if (arg) out.push(arg);
     }
+    // *** RIG RUN 2 -- THE FOURTH SHAPE: A DYNAMIC import() WRITTEN INTO A PROGRAM BUILT BY CONCATENATION. ***
+    // roughDiffuseWired-selfcheck handed `node -e` the string "const M=await import(" + JSON.stringify(before) + ");",
+    // with `before` a path.join. Neither surface above reads it -- importArgs sees the `import(` inside a string
+    // literal, and generatedImportArgs looked only for `from ${...}` -- so on Keith's rig the child died on "C:" and the
+    // gate blamed git. A string literal ending in `import(` and continued by `+ EXPR +` is the call under construction.
+    const EXPR = String.raw`JSON\.stringify\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|[A-Za-z_$][\w$.]*`;
+    for (const m of String(src || "").matchAll(new RegExp(String.raw`import\(\s*["'\`]\s*\+\s*(` + EXPR + String.raw`)\s*\+\s*["'\`]\s*\)`, "g"))) {
+        let arg = m[1].trim();
+        const enc = /^JSON\.stringify\s*\(([\s\S]*)\)$/.exec(arg);
+        if (enc) arg = enc[1].trim();
+        const bare = /^[A-Za-z_$][\w$]*$/.test(arg) &&
+            new RegExp("(?:const|let|var)\\s+" + arg + "\\s*=\\s*([^;\\n]*)").exec(src);
+        if (bare) arg = bare[1].trim();
+        if (arg) out.push(arg);
+    }
     return out;
 }
 
@@ -197,7 +214,7 @@ function walk(dir, out = []) {
     const files = walk(ENG);
     const offenders = [], loaderOffenders = [], undecidable = [];
     for (const f of files) {
-        let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        let src = ""; try { src = readOnce(f); } catch { continue; }
         // *** PRE-FILTERED ON THE RAW TEXT BEFORE LEXING, AND THAT IS A BUDGET FACT, NOT A TIDY-UP. ***
         // codeOnly is a character-by-character lexer. Running it over all 4,117 files took this gate from
         // 639 ms to 3,390 -- past the 3,000 ms ceiling, which would have stopped it running at ship time at
@@ -295,7 +312,7 @@ function walk(dir, out = []) {
     // four faces of the self-reference trap, and as this morning's readsPlantedKnob grep counting one plant
     // shape under a name that said all of them.
     for (const f of files) {
-        let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        let src = ""; try { src = readOnce(f); } catch { continue; }
         // Same lexer as section 1 above, and the same budget reason -- see the note there. Pre-filtered on
         // THIS section's own necessary condition: the ARG regex below cannot match unless one of the two flag
         // spellings appears literally, so the lexer only runs on a file that could produce a finding.
@@ -396,6 +413,18 @@ function walk(dir, out = []) {
                 'const NET = `import { reportThrows } from ${JSON.stringify(MOD)};`;') &&
        !offends('const ENG_URL = pathToFileURL(ENG).href;\nconst b = `import x from "${ENG_URL}/ui/a.mjs";`;'),
        "the file:// form and fsrPage's named-URL-const form, which is the spelling v4646 already put in the tree");
+
+    // RIG RUN 2: roughDiffuseWired's shipped line, a path imported by a program built with `+`.
+    // SABOTAGE W1: roughDiffuseWired-selfcheck's repair reverted on the real file -> 1 red, the whole-tree row, naming it:
+    // "tools/ship/roughDiffuseWired-selfcheck.mjs -> GENERATED import from path.join(...)". Restored, md5 verified.
+    const SHIPPED_ROUGH = 'const before = path.join(ENG, "physics/render/_ptBefore.mjs");\n' +
+                          'const prog = "const M=await import(" + JSON.stringify(before) + ");" + "x";';
+    ok("!! *** SABOTAGE: roughDiffuseWired's shipped line -- import( + JSON.stringify(a path) + ) in a `node -e` program -- IS an offender ***",
+       offends(SHIPPED_ROUGH),
+       "the child read \"C:\" as a URL scheme on Keith's rig, and the row it fed said git show had failed");
+    ok("...and its repair is silent",
+       !offends('const before = path.join(ENG, "a.mjs");\nconst prog = "const M=await import(" + JSON.stringify(pathToFileURL(before).href) + ");";'),
+       "pathToFileURL(before).href inside the encode");
 
     // *** AND THE CONTROL THAT COST THE FIRST DRAFT OF THIS RULE. *** Matching `from ${...}` alone flagged
     // FOUR SENTENCES on its first whole-tree run -- brain.js, KitScatter, ringFloorPhase, slugNapalm --

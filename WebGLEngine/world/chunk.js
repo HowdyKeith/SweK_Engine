@@ -76,6 +76,14 @@ export class Chunk {
         if (this.voxels[i] === v) return;   // no-op write — don't dirty
         this.voxels[i] = v;
         this.dirty = true;
+        // Task board #89 -- a SEPARATE counter from `dirty` above, not a reuse of it. `dirty` is consumed and
+        // cleared by render/voxelrenderer.js's own mesh queue every frame (voxelrenderer.js:1819/1825/1840), so
+        // a second reader checking `dirty` races the renderer for the same bit: by the time a collider cache
+        // gets around to looking, render may already have flipped it back to false for a change the collider
+        // never saw. voxelGen only ever goes up, is read-only outside this file, and is compared against a
+        // per-chunk "built from" stamp world/worldColliderBVH.mjs keeps for itself -- two independent readers
+        // of one fact ("this chunk's voxels changed") instead of two readers fighting over one flag.
+        this.voxelGen = (this.voxelGen || 0) + 1;
     }
 
     isSolid(x, y, z) {

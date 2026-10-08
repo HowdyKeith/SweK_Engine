@@ -322,6 +322,39 @@ window.addEventListener("load", function () {
 </script><!-- v2771 polling discipline: installs window.SwekPoller (hidden/in-flight/cap guards) -->
 </head>
 <body>
+<script type="module">
+  // Task board #75 -- Keith: server.html serves at the LAN address by default, so navigator.gpu is absent (a
+  // secure-context rule, not a browser bug -- see ui/webgpuProbe.mjs's own header), and every WebGPU page
+  // linked below silently falls back to WebGL or worse and only explains why AFTER you have already clicked
+  // in. The launchers (Start_Everything.bat / Open-Engine.bat) already open THIS page on localhost on first
+  // launch -- ui/webgpuOrigin-selfcheck.mjs section 7 holds that. What they cannot cover is every OTHER way to
+  // land here on the LAN address: a bookmark from before that fix, a link from another device, typing the IP
+  // by hand. So THIS page explains itself immediately, rather than gating the explanation behind the first
+  // WebGPU sub-page's own fallback -- the one thing ui/originNotice.js's per-page banner cannot do, because it
+  // only ever runs on pages that ask for a device, and server.html never does.
+  //
+  // Two things server.html needs that no other page asked for, so they are opt-in parameters on the SAME
+  // showOriginBanner every other page already uses (ui/webgpuOrigin-selfcheck.mjs holds their behaviour
+  // unchanged when these are omitted): it auto-hides after 10s (Keith did not ask for a banner that sits atop
+  // the launcher forever), and it carries a "do not ask again" link that persists for the tab's sessionStorage
+  // lifetime -- a returning visitor who already knows the story is not shown it a second time this session.
+  import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
+  try {
+    const DISMISS_KEY = "swek-origin-banner-dismissed";
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem(DISMISS_KEY) === "1"; } catch {}
+    if (!dismissed) {
+      const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location });
+      if (p && p.reason === "insecure-origin") {
+        showOriginBanner(p, document, {
+          autoHideMs: 10000,
+          dismissible: true,
+          onDismiss: () => { try { sessionStorage.setItem(DISMISS_KEY, "1"); } catch {} },
+        });
+      }
+    }
+  } catch (e) { /* a diagnostic that breaks the page it diagnoses is worse than no diagnostic */ }
+</script>
   <header>
     <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span> · Peer:</span>
 <!-- v4149 -- THE WORD "Peer" IS SAID ONCE, IN THE HEADER, INSTEAD OF THREE TIMES IN A ROW. Keith: "trying to
@@ -670,6 +703,10 @@ window.addEventListener("load", function () {
             <a href="/lensing.html" target="_blank" rel="noopener" title="Gravitational Microlensing: a point mass passing in front of a background star splits it into two images and brightens it -- watch the images move and the light curve rise as the alignment tightens. Every number is read straight from physics/astroparticle/lensing.js: nothing on this page is a second copy of the physics." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Microlensing</a>
             <a href="/reactor.html" target="_blank" rel="noopener" title="Point Reactor Kinetics: pull the control rods and watch the reactor period. Delayed neutrons are 0.65% of the total and they are the only reason a reactor can be controlled at all: past $1.00 the period collapses and no operator can follow it. Scram it and watch the flux refuse to fall faster than the 56-second precursor floor, then watch xenon-135 poison the core for half a day afterwards." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Reactor Kinetics</a>
             <a href="/stellar.html" target="_blank" rel="noopener" title="Lane-Emden Polytropes: turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Lane-Emden Polytropes</a>
+            <!-- fly-connectome.html JOINS: a front door for vendor/male-cns/, 34 real traced neurons (the Giant
+                 Fiber escape circuit) fetched once from Janelia's Neuprint and vendored, drawn as their own
+                 skeletons rather than a stylized model. Same class as the five physics front doors above it. -->
+            <a href="/fly-connectome.html" target="_blank" rel="noopener" title="Fly Connectome: 34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons from a one-time Neuprint fetch. Orbit the circuit and pick a neuron to see its actual synaptic connections." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Fly Connectome</a>
             <a href="/settings.html" target="_blank" rel="noopener" title="Settings -- engine, cloud, tunnel, brain and hosting configuration; most of its controls drive other subsystems, so it is filed with the System Tools it operates.">Settings</a>
             <a href="/node-bun.html" target="_blank" rel="noopener" title="Node / Bun -- which runtime is serving this box, the Bun-vs-Node capability surface run on demand, and the one optional dependency (ws) that Bun ships built in. Filed with System Tools because it operates the rig: it reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under each runtime.">Node / Bun</a>
             <!-- v4009 -- webgpu-llm.html SHIPPED AT v4007 AND WAS NEVER LINKED. The same defect this round fixed
@@ -749,6 +786,12 @@ window.addEventListener("load", function () {
                  pagePlacements.mjs's macPages()) since diskutil/MacFUSE make it Mac-only by construction --
                  this anchor is still its one real home. -->
             <a href="/ntfs-mounter.html" target="_blank" rel="noopener" title="NTFS Mounter (opt-in, macOS only) -- an install button for zavierferodova/Mac-NTFS-Mounter, which has NO LICENSE FILE at all (checked directly, so all rights reserved by default -- automating a clone onto your own machine is still not distribution, the same reasoning as the GPL-3.0 case beside it). Needs root and touches a real disk, so unlike this tree's other install buttons it never auto-mounts: volumes are listed read-only, and mounting one needs a separate explicit confirmation naming that exact volume. Never receives, prompts for, or stores a password -- every privileged step uses `sudo -n`, which fails closed rather than prompting.">NTFS Mounter (macOS)</a>
+            <!-- v4778 -- install-fsr-caches.html JOINS the opt-in shelf, and like excel.html it is THIS engine's
+                 own work rather than a stranger's. Keith: "put the FSR frame caches in its own repo folder, and
+                 access /install from there if the user chooses." The twelve harvested FSR caches (about 300 MB) left
+                 the release zip for WebGLEngine/fsr-caches/; this page shows each one and installs the missing
+                 ones from the release tag, keeping a file only when its sha256 matches the manifest. -->
+            <a href="/install-fsr-caches.html" target="_blank" rel="noopener" title="Install FSR caches (opt-in) -- the frame-generation measurement data the release zip leaves out: twelve per-block feature harvests off fsr.html (about 300 MB) that the H3-H16 measurement gates re-derive their verdicts from. Shows each cache, what it is for, its size and whether it is here; Install downloads only the missing or damaged ones from the release tag on GitHub and keeps each file only when its sha256 matches fsr-caches/manifest.json. Nothing at runtime needs them -- without them those gates skip by name and say it is not a pass.">Install FSR Caches</a>
             <a href="/petfbi.html" target="_blank" rel="noopener" title="PetFBI -- the lost-pet posting flow.">PetFBI</a>
             <a href="/path-tracer.html" target="_blank" rel="noopener" title="Path tracer: Monte Carlo global illumination on the CPU. The furnace scene must render FLAT -- the sphere disappears -- which is the answer key six rounds of physics/render were built around.">Path Tracer</a>
             <a href="/petfbi-board.html" target="_blank" rel="noopener" title="PetFBI board -- the lost-pet board itself.">PetFBI Board</a>
@@ -767,6 +810,11 @@ window.addEventListener("load", function () {
             <a href="/es-box3d-3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D, in 3D -- real hull meshes following box3d's (x,0,z)+heading under a free OrbitControls camera, the sim unchanged and still planar: the VIEW is 3D, the fight is not.">ES Box3D 3D</a>
             <!-- v3826 -- the fight itself in 3D (v4131: was labelled "Round B"): the box3d ES fight flying in 3D (pitch/altitude). Reachable anchor; also links from the planar-view page. -->
             <a href="/es-box3d-fly3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D flying in 3D -- ships pitch, climb and dive with a 3D pursuit AI; the flight model is a strict superset of the 2D one and esBox3d runs opt-in fly3d: the FIGHT is 3D, not just the view.">ES Box3D 3D flight</a>
+            <!-- v4778 -- two pages from the rtx line that arrived linked from nowhere, which pageReach caught at the
+                 merge: the Newtonian 6DOF substrate's first page and its aerodynamic sibling. Anchors so they are
+                 reachable; left in Arriving with a line in pageSections.mjs UNPLACED, because the drawer is Keith's call. -->
+            <a href="/es-box3d-6dof.html" target="_blank" rel="noopener" title="Newtonian 6DOF space combat -- two small fleets under real force and torque (physics/mechanics/rigidBody6dof.mjs, not the kinematic flight model), flown by brain/autopilot6dof.mjs's PD attitude controller, armed with rigidBody6dofWeapon.mjs's projectiles and colliding through rigidBody6dofCollision.mjs's OBB contact and impulse response. Every module is gated before the page wires them together.">ES 6DOF combat</a>
+            <a href="/es-aircraft.html" target="_blank" rel="noopener" title="Real aerodynamic flight -- three light aircraft under closed-form lift and drag (physics/mechanics/aeroSurface.mjs, summed across wing, elevator and rudder by aircraftAssembly.mjs) on the same 6DOF substrate, each flown by brain/autopilotAircraft.mjs's PD heading-hold through a cycle of fixed compass headings. The patrol visibly wobbles on some turns; the page's header says why.">Aerodynamic flight</a>
             <!-- v3841 -- the 3D MPM loop above the transfer, drawn: an elastic block falling into a box. An <a> so it is reachable; a demo. -->
             <a href="/mpm3d.html" target="_blank" rel="noopener" title="MPM in 3D -- the 2D material-point loop lifted to 27 nodes and a 3x3 deformation gradient, an elastic block falling into a box. The centre-of-mass fall, the symmetric 3D Cauchy stress, and the inverted-particle NaN are gated (step3d-selfcheck).">MPM 3D</a>
             <!-- v3839 -- fog of war on the wearField toroidal buffer: line-of-sight shadowcasting + remembered ground. An <a> so it is reachable; a demo, not a tool. -->
@@ -795,7 +843,7 @@ window.addEventListener("load", function () {
             <a href="/kenney-kit.html" target="_blank" rel="noopener" title="Kenney kit on the GPU -- Racing city 0: every model vendored from Kenney's Starter-Kit-Racing and Starter-Kit-City-Builder (MIT, (c) Kenney; the models CC0 by each README) drawn through gfx/device.js on WebGPU or WebGL2 -- the 10-unit track tiles, finish gate, bump, tents and forest, the four trucks and the motorcycle, and the city kit's 1-unit roads, pavements, grass and small buildings at 10 x beside them. Each model parsed by gpu/GLBParser.js through gpu/glbLoad.js, its vertex colours baked from the kit's own colormap at each vertex's uv, packed into gpuDriven's lit layout, one fleet per model and the yaw as a quaternion in the extras. world/kenneyKit.mjs is the manifest with every file's bytes and hash; tools/ship/kenneyKit-selfcheck.mjs holds it to the folder and draws the grid on both backends. Click a model to name it. ?webgl=1 forces WebGL2.">Kenney kit on the GPU</a>
             <a href="/race-track.html" target="_blank" rel="noopener" title="Race track on the GPU -- Racing city 1, phase 1 on the flat: a seeded closed loop of cells on a 12 x 12 grid of 10-unit cells (a rectangle ring grown by seeded bumps, a simple cycle by construction), every cell one of Kenney's tiles turned to meet its neighbours -- straights, corners, the finish gate -- with the centreline, kerbs and checkpoints derived from the same cells and CityGen's buildings stamped on the free blocks through the sandbox's own generator into a one-voxel grass floor. Drawn on WebGPU or WebGL2 through gpuDriven: the tiles as instanced fleets, the floor and buildings as the greedy-meshed world in the same scene. Seed, bumps and buildings live; the HUD names the tiles, corners, hairpins, lap length and hash. ?webgl=1 forces WebGL2.">Race track on the GPU</a>
             <a href="/race-car.html" target="_blank" rel="noopener" title="Race car on the GPU -- Racing city 2: Kenney's truck as one box3d chassis body (the vendored wasm in the page) on four raycast wheels from physics/vehicle.mjs, the ground an analytic surface of the flat track (asphalt, the raised kerb band, grass, nothing beyond the grid), the buildings static boxes it can hit; the controller contract { throttle, steer, brake } in [-1, 1]; the pursuit driver follows the centreline and slows for the corners it sees coming, and laps. The truck drawn at the chassis pose through kitScene's quat mode beside the tiles and the world on WebGPU or WebGL2; the HUD names speed, checkpoints, laps, lap time and box3d's running fingerprint, the same for the same seed everywhere. ?webgl=1 forces WebGL2.">Race car on the GPU</a>
-            <a href="/race-brain.html" target="_blank" rel="noopener" title="Race brain on the GPU -- Racing city 3: brain/drivePolicy.mjs is a driving policy in the GPU Brain's own shape (9 features, 8 relu, 2 outputs through the f32 twin of brain/mlp.js's kernel) trained by the tree's (1+1)-ES against lap progress, a lap bonus and an off-asphalt penalty, judged as blobAutoTrain judges (a held-out track votes, an audit track never does, regret is the watchdog); Train runs attempts in idle time from the stored or the hand policy, Race puts the stored brain, the hand, a perturbed brain and the zero policy in one box3d world in lockstep with the machine's fingerprint breaking ties, the trucks drawn at their poses on WebGPU or WebGL2. Gate: tools/ship/drivePolicy-selfcheck.mjs.">Race brain on the GPU</a>
+            <a href="/race-brain.html" target="_blank" rel="noopener" title="Race brain on the GPU -- Racing city 3: brain/drivePolicy.mjs is a driving policy in the GPU Brain's own shape (9 features into a 46-neuron hidden layer taken from a real fly connectome -- Janelia's male-cns E-PG compass circuit -- 3 weight-tied recurrent steps over its own 842 real synapses, then 2 outputs, through the f32 twin of brain/mlp.js's kernel) trained by the tree's (1+1)-ES against lap progress, a lap bonus and an off-asphalt penalty, judged as blobAutoTrain judges (a held-out track votes, an audit track never does, regret is the watchdog); Train runs attempts in idle time from the stored or the hand policy, Race puts the stored brain, the hand, a perturbed brain and the zero policy in one box3d world in lockstep with the machine's fingerprint breaking ties, the trucks drawn at their poses on WebGPU or WebGL2. Gate: tools/ship/drivePolicy-selfcheck.mjs.">Race brain on the GPU</a>
             <a href="/race-replay.html" target="_blank" rel="noopener" title="Race replay, pre-rendered -- Racing city 5: world/raceReplayBake.mjs bakes a race record to voxels (the loop cells stamped from the surface the car drives on), keyframes it from its own log through drivePolicy.replay to the record's fingerprint, draws the world and the cars through gpuDriven on WebGPU or WebGL2 and reads every keyframe back; the page plays the slideshow, exports the PNG keyframes and the JSON schematic, and records a WebM off the canvas through render/blobRecorder.js. NOT REAL TIME. The H.264 MP4 a TV plays is refused by this browser and is rig-pending. Gate: tools/ship/raceReplayBake-selfcheck.mjs.">Race replay, pre-rendered</a>
             <a href="/race-terrain.html" target="_blank" rel="noopener" title="Race terrain on the GPU -- Racing city 6: world/ribbonRoad.mjs drapes the grid track over the treemap terrain of this repository's own files (repoHeightfield through bodyTerrain, drawn by gpuTerrain), resampled a metre apart by sweptSpine, graded to 12% and banked for 12 m/s with the inside edge low; the terrain is cut and filled to the road's plane one texel past the kerbs, taking the lower road where the loop folds over itself; the road is a swept ribbon with striped kerbs replacing the tiles, and raceCar's unchanged car laps it on box3d in the page, on WebGPU or WebGL2. Gate: tools/ship/ribbonRoad-selfcheck.mjs.">Race terrain on the GPU</a>
             <a href="/race-crash.html" target="_blank" rel="noopener" title="Race crash on the GPU -- Racing city 7: world/crashDamage.mjs lets the car damage CityGen's city through the sandbox's own blast (render/voxelDamage.mjs): a car that loses over 3 m/s in one step against a building carves a sphere at the first solid voxel along its heading, the debris bursts, the building is charged every voxel its footprint lost (its hit points are its standing voxels), render/rebar.mjs's cage shows as steel on the cut, and a building whose ground floor falls under 30% support is toppled by CityGen with its box parked so the car drives the rubble. Lap with the pursuit driver or ram the nearest building, on WebGPU or WebGL2. Gate: tools/ship/crashDamage-selfcheck.mjs.">Race crash on the GPU</a>
@@ -803,6 +851,8 @@ window.addEventListener("load", function () {
             <a href="/slug-rig.html" target="_blank" rel="noopener" title="Slug on the rig -- the outline-text renderer's cost on THIS machine: a wall of glyphs per vendored face (Plex, Source Sans 3, Cinzel, JetBrains Mono, and Sawarabi Gothic as the dense CJK case) at five sizes and three squashes, each frame timed by GPU timestamps where the device was granted them, beside the atlas's own curves-per-band statistics. Save the JSON as tools/ship/slug-rig.json.">Slug rig</a>
             <!-- v4462 -- the presented WebGPU frame, read back three ways; the rig's answer to canvas presentation. An <a> so it is reachable. -->
             <a href="/device-present.html" target="_blank" rel="noopener" title="Presented frame check -- a known pattern drawn through gfx/device.js on a PRESENTED canvas, read back by the device, by an offscreen frame and by a 2D drawImage of the canvas, all three compared. Rig-only for WebGPU: the build box loses the device on a presented pass.">Presented frame</a>
+            <!-- RTX round 3 -- the present path. An <a> so it is reachable. -->
+            <a href="/rtx-viewer.html" target="_blank" rel="noopener" title="RTX viewer -- physics/render/rtPipeline.mjs's BVH-accelerated, barycentric-shaded compute kernel (rounds 1-2) traces a Kenney pavement tile, render/rtViewer.mjs's accumulate kernel folds successive frames into a running mean, and a fullscreen-triangle present kernel reads that mean straight out of the storage buffer a prior compute pass wrote -- no texture, no copy. Drag to orbit, wheel to dolly; either resets the accumulation. WebGPU only.">RTX viewer</a>
             <a href="/turing.html" target="_blank" rel="noopener" title="integrates six Fourier modes and puts them on Re lambda(k) with the exact threshold">Turing</a>
             <a href="/beam.html" target="_blank" rel="noopener" title="solves and draws the real deflected centreline plus the transcendental root">Beam</a>
             <!-- v3410 -- THE INBOUND PATCH SHIPPED waveguide.html UNLINKED AND pageReach CAUGHT IT, which is the
@@ -939,7 +989,7 @@ window.addEventListener("load", function () {
             <a href="/wind-tunnel.html" target="_blank" rel="noopener" title="Drag and lift on a body in a lattice-Boltzmann channel, with the momentum-balance identity as the answer key: force on all solids MUST equal the applied body force." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Wind tunnel</a>
             <a href="/roundhouse.html" target="_blank" rel="noopener" title="The agent loop: cheap model proposes, a REAL gate verifies, escalate only on failure. Watch a claim be refused by a measurement." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Roundhouse</a>
             <a href="/policy-mass.html" target="_blank" rel="noopener" title="Does the brain put its probability mass on the options that actually WORK? An aggregate hit rate cannot tell a policy that is learning from one that has learned to lose -- two brains at an identical 45.0% scored +1.000 and -1.000. Ranks mass against merit. The demos need no captured trace." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Mass vs merit</a>
-            <a href="/device.html" target="_blank" rel="noopener" title="Point a model at a physics instrument and let the simulation judge its claim. 129 devices, three tiers -- local Ollama, Gemini, Claude -- all judged by the same gate." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Devices</a>
+            <a href="/device.html" target="_blank" rel="noopener" title="Point a model at a physics instrument and let the simulation judge its claim. 130 devices, three tiers -- local Ollama, Gemini, Claude -- all judged by the same gate." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Devices</a>
             <a href="/models.html" target="_blank" rel="noopener" title="Compare models across your fleet on the same physics. Cheap-win rate, refused rate and malformed rate kept separate, because being wrong and being unparseable have opposite fixes." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Model bench</a>
             <a href="/skillbook.html" target="_blank" rel="noopener" title="Run a real two-arm skillbook trial and read every statistic behind the verdict. The proposer is a deterministic mock and the page says so." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Skillbook</a>
             <a href="/gates.html" target="_blank" rel="noopener" title="Run the whole selfcheck suite from the browser and read the failures." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Gates</a>
@@ -1227,6 +1277,8 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="slugtext"><span class="gtabTog">&#9656;</span><span>&#9999;&#65039; Slug Text</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="rtx"><span class="gtabTog">&#9656;</span><span>&#128294; RTX</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1641,7 +1693,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="physicslab" hidden>
           <div class="gpanelHdr">&#9883; Physics Lab</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="physicslab" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
           <!-- v3329 -- SAMPLING & METHODS AS A GROUP INSIDE THIS PANEL, NOT A CHIP OF ITS OWN.
                Keith: "i meant that all the physics lab related links would want to be a link inside the
@@ -1658,12 +1710,12 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="optics" hidden>
           <div class="gpanelHdr">&#128301; PL: Optics &amp; Imaging</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="optics" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="cosmic" hidden>
           <div class="gpanelHdr">&#127756; PL: Cosmic &amp; Relativity</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="cosmic" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="em" hidden>
@@ -1714,7 +1766,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="matter" hidden>
           <div class="gpanelHdr">&#9883;&#65039; PL: Matter &amp; Chaos</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="matter" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="systools" hidden>
@@ -1746,7 +1798,7 @@ window.addEventListener("load", function () {
           <!-- v3360 -- KEEP AWAKE MOVED HERE from the top controls row. It is a SYSTEM STATE, not a page
                control: it stays on until turned off. The row it left is for things you press. -->
           <div style="padding:4px 0 6px;"><label id="kaWrap" title="Prevent Windows from sleeping while the server runs (SetThreadExecutionState). A STATE, not an action: it stays on until turned off or the server stops." style="display:inline-flex;align-items:center;gap:5px;font:inherit;color:var(--dim);cursor:pointer"><input type="checkbox" id="bKeepAwake" style="cursor:pointer"><span id="kaLabel">☕ Keep awake</span></label></div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-group-chips="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
           <!-- v4138 -- OPT-IN: SOMEBODY ELSE'S WORK. A sub-drawer of System Tools, same shape as Physics Lab's
@@ -1763,17 +1815,17 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="voxels" hidden>
           <div class="gpanelHdr">&#129482; Voxels</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The DATA: storage, meshing and traversal of voxel volumes. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The DATA: storage, meshing and traversal of voxel volumes. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="voxels" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="renders" hidden>
           <div class="gpanelHdr">&#129513; Renders</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The TECHNIQUE: passes, effects, and how a frame is made. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="renders" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="racing" hidden>
           <div class="gpanelHdr">&#127950; Racing City</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Kenney's kits, the grid track, the car on box3d, and the brains that will drive it -- docs/TSL-ROADMAP.md item 12, one page per round. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Kenney's kits, the grid track, the car on box3d, and the brains that will drive it -- docs/TSL-ROADMAP.md item 12, one page per round. Pages are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; race-brain.html is in Fruit Fly Brain as well, cloned there.</div>
           <div data-panel-pages="racing" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4379 -- THE RIG-ONLY LIST GETS A SURFACE AGAIN, ON A DIFFERENT PAGE FROM THE ONE KEITH CLEARED.
@@ -1805,22 +1857,38 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="slugtext" hidden>
           <div class="gpanelHdr">&#9999;&#65039; Slug Text</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The Slug GPU text rasteriser: curves, morphs, rigging, projective text and a device-pipeline transplant, all built on text/slugFont.js. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="slugtext" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="avatars" hidden>
           <div class="gpanelHdr">&#128100; Avatars</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Character rendering: the ASCII cluster (tools/render-qa/asciify.mjs) and the Krbn/Heerich rig family (tools/krbn/glbMesh.js). Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="avatars" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="toroidal" hidden>
           <div class="gpanelHdr">&#127760; Toroidal Buffers</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">A wraparound buffer (toroidal-wave.html), what accumulates on it (wear-field.html), and what it remembers (fog-of-war.html) -- one sequential family, built the same way. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="toroidal" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- v4778 -- Keith: "Rtx can have its own link bucket on server.html." The rtx line's four pages, filed by
+             the line that made them; the anchors stay in Arriving and pageSections.mjs moves them here. -->
+        <div class="gpanel" data-panel="rtx" hidden>
+          <div class="gpanelHdr">&#128294; RTX</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The rtx line: the path-traced viewer (rtx-viewer.html), Newtonian 6DOF combat (es-box3d-6dof.html) and aerodynamic flight (es-aircraft.html) on the same rigid-body substrate, and the fly connectome (fly-connectome.html), which Fruit Fly Brain shows too. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; a page two drawers claim is moved by the first and cloned into the second.</div>
+          <div data-panel-pages="rtx" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- v4778 -- Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link
+             bucket too." Every page built on the male-cns connectome, found by what it imports rather than by its
+             name. All three are ALSO in another drawer (RTX, Racing City, Game: Endless Sky); the first drawer moves
+             the Arriving anchor and this one gets a clone of it, so the title is still written once. -->
+        <div class="gpanel" data-panel="flybrain" hidden>
+          <div class="gpanelHdr">&#129712; Fruit Fly Brain</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages built on Janelia's male-cns connectome (vendor/male-cns/): the connectome itself, 34 traced Giant Fiber neurons (fly-connectome.html); a driving and a gunnery brain trained through the real E-PG compass and Giant Fiber circuits (race-brain.html); and a 3D dogfight piloted through the Giant Fiber circuit (es-box3d-fly3d.html). Each is also in its own subject's drawer -- a page two drawers claim is moved by the first and cloned into the second, so the link here is the same link, title and all.</div>
+          <div data-panel-pages="flybrain" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="box3d" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4327 -- WEBGPU. The membership is DERIVED (tools/ship/pageSections.mjs): a page is here because it
@@ -1830,17 +1898,17 @@ window.addEventListener("load", function () {
              subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D, opt-in). -->
         <div class="gpanel" data-panel="webgpu" hidden>
           <div class="gpanelHdr">&#9650; WebGPU</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages that ask this machine for a GPU adapter -- open one and it either answers or it does not, which is the whole test. These are the ones no other drawer owned: the rest are filed under the subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D) and stay there, and gpu-rig-check and tsl-rig went to Render TSL when main named that drawer -- a page is filed by what it is ABOUT, and this drawer does not get to keep one because it would like to. Start with <b>WebGPU Lab</b> for what the adapter is worth; the adapter's own yes/no lives in <b>Render TSL</b> (GPU rig check). All THREE FLEET KERNEL BENCHES are here -- hmc-bench, ising-bench and magmap-bench -- and each owes a real-GPU verdict: running one on a box with a real adapter submits a report and settles a debt tools/render-qa/deviceOwed.mjs has been carrying since v3339. Opening a page here does not by itself verify anything: deviceOwed is the register, this drawer is the address. MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages that ask this machine for a GPU adapter -- open one and it either answers or it does not, which is the whole test. These are the ones no other drawer owned: the rest are filed under the subject they are about (PL: Fluids, Endless Sky, GPU Brain, System Tools, Box3D) and stay there, and gpu-rig-check and tsl-rig went to Render TSL when main named that drawer -- a page is filed by what it is ABOUT, and this drawer does not get to keep one because it would like to. Start with <b>WebGPU Lab</b> for what the adapter is worth; the adapter's own yes/no lives in <b>Render TSL</b> (GPU rig check). All THREE FLEET KERNEL BENCHES are here -- hmc-bench, ising-bench and magmap-bench -- and each owes a real-GPU verdict: running one on a box with a real adapter submits a report and settles a debt tools/render-qa/deviceOwed.mjs has been carrying since v3339. Opening a page here does not by itself verify anything: deviceOwed is the register, this drawer is the address. MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="webgpu" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="blobs" hidden>
           <div class="gpanelHdr">&#129514; Blobs</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="blobs" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="face" hidden>
           <div class="gpanelHdr">&#128100; Face &amp; Population</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line -- and since v4778 (Keith: "There can be duplicate links in folder buckets") a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="face" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="gametheory" hidden>
@@ -8486,6 +8554,9 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
 // registry would put the text in two places and guarantee they drift -- the defect this session found in nine
 // files (MODES), three (the gate-file walk) and four (a mesher's liveness). Moving the node means A PAGE IS IN
 // EXACTLY ONE PLACE BECAUSE IT IS ASSIGNED, not because somebody remembered a second edit.
+// v4778 -- "EXACTLY ONE PLACE" IS NOW "WHEREVER IT IS ASSIGNED". Keith: "There can be duplicate links in folder
+// buckets." A page claimed by two sections is moved by the first and CLONED into the second -- still assigned, still
+// one source line for its title, now shown in every drawer that claims it. See the firstHome note at the loop.
 import { SECTIONS, PROFILES, sectionsFor, CHIP_GROUPS, CHIP_PINNED } from "./tools/ship/pageSections.mjs";
 
 // v3230 -- A TAILORED FRONT DOOR. The profile comes from ?profile=NAME, or from the shipped landing config, and
@@ -8615,7 +8686,15 @@ const arrivingRow = (() => {
   }
 }
 
-let moved = 0, missing = [], elsewhere = [], placed = 0;
+// v4778 -- *** A PAGE MAY NOW SIT IN MORE THAN ONE DRAWER, AND THE SECOND ONE GETS A CLONE, NOT A REWRITE. ***
+// Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link bucket too."
+// The FIRST shown section (SECTIONS order) that claims a page MOVES its Arriving anchor, exactly as before; every
+// LATER section claiming the same page gets cloneNode(true) of that moved anchor. The label and the hand-written
+// title still exist ONCE in the source -- the clone copies the node at runtime, so there is no second copy of the
+// text to drift, which is the whole reason this mover never rebuilt anchors from the registry. Arriving still loses
+// the page, because the first claim still moves it out.
+const firstHome = new Map();   // page -> the anchor the first claiming section moved out of Arriving
+let moved = 0, cloned = 0, missing = [], elsewhere = [], placed = 0;
 for (const sec of shownSections) {
   const slot = document.querySelector('[data-panel-pages="' + (sec.tab || sec.id) + '"]');
   if (!slot) { missing.push("no slot for " + sec.tab); continue; }
@@ -8633,6 +8712,16 @@ for (const sec of shownSections) {
     // never part of it, and any page with both a toolbar shortcut and an Arriving entry would have gone the same
     // way. A LOOKUP WIDER THAN ITS PURPOSE finds something eventually.
     const a = arrivingRow ? arrivingRow.querySelector('a[href="/' + page + '"]') : null;
+    const first = !a ? firstHome.get(page) : null;
+    if (first) {
+      // A LATER CLAIM: the first drawer already took the Arriving anchor, so this one shows a copy of it. An id on
+      // the copy would be a duplicate id in the document, so it is dropped from the copy and kept on the original.
+      const c = first.cloneNode(true);
+      for (const el of [c, ...c.querySelectorAll("[id]")]) el.removeAttribute("id");
+      slot.appendChild(c);
+      cloned++;
+      continue;
+    }
     if (!a) {
       // v3959 -- *** "FOUND NO LINK ON THIS PAGE" WAS FALSE, AND ALARMINGLY SO. *** Keith read the line naming
       // eleven brain and lattice-Boltzmann pages and said he was pretty sure they were already in the panels.
@@ -8661,7 +8750,8 @@ for (const sec of shownSections) {
       else elsewhere.push(page);
       continue;
     }
-    slot.appendChild(a);   // appendChild MOVES a node that already has a parent -- no clone, no duplicate
+    slot.appendChild(a);   // appendChild MOVES a node that already has a parent -- the first claim takes the original
+    firstHome.set(page, a);
     moved++;
   }
 }
@@ -8721,6 +8811,7 @@ if ((missing.length || elsewhere.length) && arrivingRow) {
   arrivingRow.appendChild(n);
 }
 console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.length + " panels" +
+            (cloned ? ", " + cloned + " cloned into a second drawer" : "") +
             (placed ? ", " + placed + " already in their panel" : "") +
             (elsewhere.length ? ", " + elsewhere.length + " linked elsewhere: " + elsewhere.join(", ") : "") +
             (missing.length ? ", " + missing.length + " with no anchor at all: " + missing.join(", ") : ""));

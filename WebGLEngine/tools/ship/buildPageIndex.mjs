@@ -31,7 +31,14 @@ import { SECTIONS } from "./pageSections.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 
-/** Which drawer claims this page, or "" -- DERIVED from the one registry, never typed beside it. */
+/**
+ * Which drawer claims this page, or "" -- DERIVED from the one registry, never typed beside it.
+ *
+ * v4778 -- THE FIRST CLAIM, ON PURPOSE. Keith: "There can be duplicate links in folder buckets." A page may now sit
+ * in several drawers, and `g` is one field, so it names the FIRST section in SECTIONS order -- the one server.html's
+ * mover MOVES the Arriving anchor into; every later drawer shows a clone of it. pageIndex-selfcheck asks the same
+ * question the same way (SECTIONS.find), so the two still cannot disagree.
+ */
 function groupOf(file) {
     for (const s of SECTIONS) if (s.pages.includes(file)) return s.id;
     return "";

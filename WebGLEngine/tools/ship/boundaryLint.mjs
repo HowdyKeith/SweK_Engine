@@ -103,6 +103,10 @@ export function scanBoundaries(src) {
     // selfcheck pin the narrowness -- killing ANY OTHER pid, including one held in a variable, still counts.
     for (const m of code.matchAll(/taskkill|Stop-Process|\.kill\s*\(\s*([A-Za-z_$][\w$.]*)?/g)) {
         if (m[1] === "process.pid") continue;
+        // v4815 -- SIGNAL 0 IS A QUESTION, NOT A KILL. process.kill(pid, 0) sends nothing: it asks whether the process
+        // exists, which is how fixtureLitter's deadOnly reclaim tells a live mutation owner from a dead one. A literal 0
+        // as the second argument and nothing else -- a signal in a variable is still counted.
+        if (m[0].startsWith(".kill") && /^\s*,\s*0\s*\)/.test(code.slice(m.index + m[0].length))) continue;
         out.push({ rule: "KILL_NOT_VERIFIED", arg: m[0].startsWith(".kill") ? ".kill(" : m[0], kind: "kill" });
     }
 

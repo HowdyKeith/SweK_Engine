@@ -23,8 +23,12 @@ import { RESULT_H9 } from "./frameHoled.mjs";
 import { RESULT_H10, VERT_KEYS } from "./frameVertical.mjs";
 import { PREREG_H11, CACHE_H11, RESULT_H11, GAIN_KEYS, cellOf, gainRow, gainSummary, h11Cell, h11 } from "./frameGain.mjs";
 import { harvest } from "./genGateTrain.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameGain-selfcheck", [CACHE_H11, CACHE_H7, CACHE_H8]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };

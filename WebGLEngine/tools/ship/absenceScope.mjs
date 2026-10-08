@@ -292,6 +292,47 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
              "height and show every downward hit is identical at both -- so it carries the term in code, " +
              "and it is a USER of the structure rather than one, the same distinction the two exclusions " +
              "below draw for this module and its own gate" }),
+    // *** v4778 -- EIGHTEEN, ALL FROM THE rtx LINE, WHICH BRANCHED FROM main BEFORE ANY OF THE ARRIVALS ABOVE WERE
+    // NAMED AND NEVER RAN THIS GATE. *** Graded on main's side of the merge the live lists equal the record
+    // exactly; graded on the merged tree they differ by these and the sixteen below, and nothing left. `at` is
+    // the merge, since that is when they reached the tree this record describes; each `why` names the rtx
+    // commit that put the term in its code. Most are USERS of meshBVH's one build -- colliders, CSG, a tracer.
+    Object.freeze({ file: "physics/character/capsuleCollide.mjs", at: "v4778",
+        why: "task #80 (c98be610), capsule against triangles ported from three-player-controller: it walks a BVH's own node and triangle arrays (triAt(bvh, tri)), a USER of meshBVH's build" }),
+    Object.freeze({ file: "physics/mesh/bvhPairOverlap.mjs", at: "v4778",
+        why: "BVH-CSG round 1 (3321172e): a dual-BVH pairwise-overlap broad phase that descends two MeshBVH trees at once -- a traversal of its own over meshBVH's node layout" }),
+    Object.freeze({ file: "physics/mesh/bvhPairOverlap-selfcheck.mjs", at: "v4778",
+        why: "its gate (3321172e), which builds MeshBVHs and holds the pair walk to a brute-force all-pairs answer" }),
+    Object.freeze({ file: "physics/mesh/meshPointClassify.mjs", at: "v4778",
+        why: "BVH-CSG round 4 (116ea857): inside/outside by ray crossing, with its own infinite-ray box test over a BVH's bounds" }),
+    Object.freeze({ file: "physics/mesh/meshPointClassify-selfcheck.mjs", at: "v4778",
+        why: "its gate (116ea857), which builds a MeshBVH over a cube and grades the crossing count against known points" }),
+    Object.freeze({ file: "physics/mesh/triFragmentAccumulate.mjs", at: "v4778",
+        why: "BVH-CSG round 5 (904767ab): accumulateFragmentsFromBVH takes two BVHs and feeds their overlapping pairs to the fragment splitter" }),
+    Object.freeze({ file: "physics/mesh/triFragmentAccumulate-selfcheck.mjs", at: "v4778",
+        why: "its gate (904767ab), importing MeshBVH to build the two trees the BVH-fed path is compared through" }),
+    Object.freeze({ file: "physics/mesh/meshBoolean.mjs", at: "v4778",
+        why: "BVH-CSG round 6 (70ae8730): whole-mesh boolean assembly, classifying each mesh against the other through the pair walk over both BVHs" }),
+    Object.freeze({ file: "physics/mesh/meshBoolean-selfcheck.mjs", at: "v4778",
+        why: "its gate (70ae8730), which builds the BVHs its fixtures are cut with" }),
+    Object.freeze({ file: "physics/mesh/meshBooleanBlast-selfcheck.mjs", at: "v4778",
+        why: "BVH-CSG round 7 (0ee1dda9): the head-to-head against meshCSG, building a MeshBVH per operand" }),
+    Object.freeze({ file: "physics/render/pathTracer.mjs", at: "v4778",
+        why: "RTX round 4 (dc256881): the CPU reference tracer's intersect() grew a mesh branch that asks s.bvh.raycastFirst -- the oracle side of the concave-scene statistical gate" }),
+    Object.freeze({ file: "physics/render/rtPipeline.mjs", at: "v4778",
+        why: "THE TRACER ITSELF, and the one that changes the claim: 'Add a triangle BVH to rtPipeline, from meshBVH' (71d40a6d) packs meshBVH's build into storage buffers and traverses it in WGSL (rtTraverseBvh). It was in `denial` at v4435 for saying NO BVH; its code now builds on one, so the narrow claim v4435 kept is false -- see the selfcheck's section 3" }),
+    Object.freeze({ file: "physics/render/rtPipeline-selfcheck.mjs", at: "v4778",
+        why: "its gate, since 71d40a6d: grades the WGSL traversal against meshBVH.mjs's raycastFirst, and since RTX round 2 (068a61b2) the vertex colour against baryAt" }),
+    Object.freeze({ file: "render/rtViewer.mjs", at: "v4778",
+        why: "RTX round 3 (d98b4f77): the present path, which builds the scene's BVH through rtPipeline's bvhBuffersFromMesh (and, since RTX round 5's 4f0c5d7a, bvhBuffersFromTriSoup) and binds it for the canvas render" }),
+    Object.freeze({ file: "world/controllerLabWorld.mjs", at: "v4778",
+        why: "the Controller Lab (a1ec407f): builds its level's colliderBVH with new MeshBVH" }),
+    Object.freeze({ file: "world/platformCarryWorld.mjs", at: "v4778",
+        why: "task #84 (5112cdc7): the platform-carry level's colliderBVH, a MeshBVH over its flattened geometry" }),
+    Object.freeze({ file: "world/splatWalkWorld.mjs", at: "v4778",
+        why: "task #83 (078afe40): a MeshBVH over the collider meshed from a Gaussian-splat scene" }),
+    Object.freeze({ file: "world/worldColliderBVH.mjs", at: "v4778",
+        why: "task #89 (0a5f69d5): per-chunk MeshBVHs over the meshed voxel terrain, cached by generation -- a builder's caller at world scale" }),
 ]);
 
 /**
@@ -333,6 +374,44 @@ export const OUTOFSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
         why: "the gate of the round that measured why terrain-controller piece (3) cannot be closed while " +
              "piece (2) is open. It reaches the ray-triangle BVH in top-level mesh/ through its module, " +
              "which none of the three searched directories can see" }),
+    // *** v4778 -- SIXTEEN, THE SAME MERGE: every one is also named in BVH_AT_V4435.outOfScope, which the
+    // selfcheck holds the two lists to. camera/, simulation/, main.js and tools/ship/ are outside all three
+    // directories the v4432 claim searched.
+    Object.freeze({ file: "camera/camera.js", at: "v4778",
+        why: "tasks #80/#81 (c98be610, 7a968cb9): the first-person camera's _capsuleWorldBVH() reads a world's colliderBVH and sweeps the capsule against it" }),
+    Object.freeze({ file: "camera/cameraBoom-selfcheck.mjs", at: "v4816",
+        why: "the camera boom round (ab583367, merged at v4816): its stub camera sets _capsuleWorldBVH to () => null, so the "+
+             "term is in CODE although the gate builds no BVH -- it switches camera.js's mesh path off to test the voxel sweep" }),
+    Object.freeze({ file: "main.js", at: "v4778",
+        why: "the Controller Lab, splat-walk and platform-carry wiring (a1ec407f, 078afe40, 5112cdc7) hands camera.setWorld a colliderBVH. It was in `denial` at v4435 for carrying item 10's version notes; the notes are still there, and code now answers first" }),
+    Object.freeze({ file: "simulation/BotManager.js", at: "v4778",
+        why: "task #85 (61eabaa3): _botCapsuleBVH() reads world.colliderBVH and raycasts it for the bots' ground" }),
+    Object.freeze({ file: "simulation/KaijuManager.js", at: "v4778",
+        why: "task #89 onward (64ccd1af): _kaijuColliderBVH() builds the terrain collider through makeWorldColliderBVH" }),
+    Object.freeze({ file: "tools/ship/botCapsuleNav-selfcheck.mjs", at: "v4778",
+        why: "task #85's gate (61eabaa3), building the MeshBVH world its bots walk" }),
+    Object.freeze({ file: "tools/ship/cameraCapsuleWalk-selfcheck.mjs", at: "v4778",
+        why: "task #80's camera gate (c98be610), building a MeshBVH world for the capsule walk" }),
+    Object.freeze({ file: "tools/ship/cameraViewMode-selfcheck.mjs", at: "v4778",
+        why: "task #81's gate (7a968cb9), building a MeshBVH wall for the view-mode checks" }),
+    Object.freeze({ file: "tools/ship/capsuleCollide-selfcheck.mjs", at: "v4778",
+        why: "task #80's module gate (c98be610): MeshBVH floors and walls the capsule is resolved against" }),
+    Object.freeze({ file: "tools/ship/cityChunkScene-selfcheck.mjs", at: "v4778",
+        why: "RTX round 5 (4f0c5d7a): builds the procedural city's BVH through bvhBuffersFromTriSoup and raycasts it" }),
+    Object.freeze({ file: "tools/ship/controllerLabWorld-selfcheck.mjs", at: "v4778",
+        why: "the Controller Lab's gate (a1ec407f), raycasting the level's colliderBVH" }),
+    Object.freeze({ file: "tools/ship/kaijuGroundCollider-selfcheck.mjs", at: "v4778",
+        why: "task #89's gate (64ccd1af), calling _kaijuColliderBVH and the collider it builds" }),
+    Object.freeze({ file: "tools/ship/platformCarryWorld-selfcheck.mjs", at: "v4778",
+        why: "task #84's gate (5112cdc7), raycasting the level's colliderBVH for its pads" }),
+    Object.freeze({ file: "tools/ship/rtViewer-selfcheck.mjs", at: "v4778",
+        why: "RTX round 3's gate (d98b4f77): builds BVH buffers through rtPipeline for the present path it drives" }),
+    Object.freeze({ file: "tools/ship/splatWalkWorld-selfcheck.mjs", at: "v4778",
+        why: "task #83's gate (078afe40), raycasting the splat collider's colliderBVH" }),
+    Object.freeze({ file: "tools/ship/wgslCorpus.mjs", at: "v4778",
+        why: "RTX rounds 3-4 (d98b4f77, dc256881): the corpus entries for rtPipeline's three BVH probes build their buffers with bvhBuffersFromMesh" }),
+    Object.freeze({ file: "tools/ship/worldColliderBVH-selfcheck.mjs", at: "v4778",
+        why: "task #89's gate (0a5f69d5), building and caching the per-chunk colliders" }),
 ]);
 
 export const BVH_AT_V4435 = Object.freeze({
@@ -358,13 +437,23 @@ export const BVH_AT_V4435 = Object.freeze({
     // grep-verified against the files on disk, not inferred from the commit message -- and fx/ is outside all
     // three searched directories, the identical shape as splatMesh-selfcheck.mjs above.
     outOfScope: Object.freeze([
+        // v4778 -- the rtx merge's sixteen, placed in sorted position because the list is compared sorted;
+        // each is named with its commit in OUTOFSCOPE_ARRIVALS_SINCE_V4435.
+        "camera/camera.js",
+        "camera/cameraBoom-selfcheck.mjs",   // v4816 -- the boom gate stubs _capsuleWorldBVH; it builds none. Sabotage: dropped here 4 red, misnamed in the arrivals 1 red
         "fx/spritemesh/blueprint-selfcheck.mjs", "fx/spritemesh/blueprint.js",
+        "main.js",   // v4778 -- out of `denial` below: its code now carries a colliderBVH
         // v4647q -- the collider-forge bridge at v4629 and its gate. Both carry the term in CODE and
         // both sit OUTSIDE physics/, render/ and world/, which is what this list is for.
         "mesh/colliderFromGLB.mjs",
-        "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js", "tools/krbn/krbnCompare.js",
+        "mesh/meshBVH.mjs", "multiplayer/wadLevelHost.js",
+        "simulation/BotManager.js", "simulation/KaijuManager.js",   // v4778
+        "tools/krbn/krbnCompare.js",
         "tools/roundhouse/neighbourBenchBind-selfcheck.mjs", "tools/roundhouse/neighbourBenchBind.mjs",
+        "tools/ship/botCapsuleNav-selfcheck.mjs",   // v4778
         "tools/ship/box3dRay-selfcheck.mjs",
+        "tools/ship/cameraCapsuleWalk-selfcheck.mjs", "tools/ship/cameraViewMode-selfcheck.mjs",   // v4778
+        "tools/ship/capsuleCollide-selfcheck.mjs",   // v4778
         // *** v4539 -- ONE ARRIVAL, NAMED: tools/ship/groundProbe-selfcheck.mjs, IN SORTED POSITION. *** The
         // gate of the round that measured why terrain-controller piece (3) cannot be closed while piece (2)
         // is open. It reaches the ray-triangle BVH in top-level mesh/ through
@@ -374,11 +463,18 @@ export const BVH_AT_V4435 = Object.freeze({
         // like against this claim, and the two lists are compared SORTED, so position is not decoration.
         "tools/ship/capsuleGround-selfcheck.mjs",
         "tools/ship/capsuleMove-selfcheck.mjs",
+        "tools/ship/cityChunkScene-selfcheck.mjs",   // v4778
         "tools/ship/colliderFromGLB-selfcheck.mjs",
+        "tools/ship/controllerLabWorld-selfcheck.mjs",   // v4778
         "tools/ship/fallBody-selfcheck.mjs",
         "tools/ship/groundProbe-selfcheck.mjs",
+        "tools/ship/kaijuGroundCollider-selfcheck.mjs",   // v4778
         "tools/ship/meshBVH-selfcheck.mjs",
-        "tools/ship/splatMesh-selfcheck.mjs", "ui/webrtxBrowser.js",
+        "tools/ship/platformCarryWorld-selfcheck.mjs", "tools/ship/rtViewer-selfcheck.mjs",   // v4778
+        "tools/ship/splatMesh-selfcheck.mjs",
+        "tools/ship/splatWalkWorld-selfcheck.mjs", "tools/ship/wgslCorpus.mjs",
+        "tools/ship/worldColliderBVH-selfcheck.mjs",   // v4778
+        "ui/webrtxBrowser.js",
     ]),
     // 2. IN THE SEARCHED DIRECTORIES AND SUMMARISED AWAY. bvhNeighbours is a Morton BVH; the bakeoff is the
     //    gate that already measured it against spatialGrid.js and concluded the GRID wins for per-step SPH.
@@ -398,9 +494,16 @@ export const BVH_AT_V4435 = Object.freeze({
     // asserts "the connector owns no rasteriser, no ray-caster, no projection and no BVH of its own" -- a
     // gate stating an absence, which is evidence FOR the claim and reads to a raw scan exactly like evidence
     // against it. The list is RE-TAKEN, not raised: the file was read and the sentence is there at line 193.
+    // *** v4778 -- RE-TAKEN AT THE rtx MERGE, AND TWO LEFT FOR THE REASON THIS LIST CAN LOSE A MEMBER. ***
+    // main.js and physics/render/rtPipeline.mjs no longer ASSERT the absence -- their code now carries the term,
+    // and codeOnly answers before prose does, so each moved to a code bucket (outOfScope and the in-scope
+    // arrivals). rtPipeline.mjs no longer says NO BVH anywhere: 71d40a6d rewrote the sentence to "Linear over
+    // the spheres", because a triangle mesh now takes its own BVH-accelerated intersection beside that loop.
+    // One arrived: tools/ship/nextRounds.mjs's task #85 entry says the bot worlds expose _heightAt, "never
+    // colliderBVH" -- an absence about bot worlds, stated in a string, and evidence for nothing about a tracer.
     denial: Object.freeze([
-        "brain/brain.js", "main.js", "physics/render/rtPipeline.mjs", "tools/ship/gateSweep.mjs",
-        "tools/ship/krbnPaint-selfcheck.mjs",
+        "brain/brain.js", "tools/ship/gateSweep.mjs", "tools/ship/krbnPaint-selfcheck.mjs",
+        "tools/ship/nextRounds.mjs",
     ]),
     // *** v4535 -- 12 -> 13, AND GOING TO LOOK FOUND THE FIELD'S NAME OVERSTATES WHAT IT HOLDS. ***
     // It is computed as keep(wide.code).length: the number of files whose CODE carries the term, which is not
@@ -421,6 +524,9 @@ export const BVH_AT_V4435 = Object.freeze({
     // grep-verified: neither file appears in `said`, `denial` or the two `exclude` entries, so both land here
     // as two more consumers of the one implementation, not two more builders.
     realImplementations: 15,
+    // v4778 -- `why` is v4435's and stays v4435's, and its first clause is no longer true of the tree: the rtx
+    // line pointed rtPipeline.mjs at meshBVH (71d40a6d). The selfcheck's section 3 row now asserts the tracer
+    // HAS one; the two-level half of item 10 is what stays open.
     why: "the tracer really has no BVH and rtPipeline.mjs says so itself, so the NARROW claim survives. What " +
          "did not survive is the sentence supporting it: it named two files where the tree holds twelve, and " +
          "hid the two that change what the item should DO -- a binned-SAH ray-triangle BVH the tree already " +

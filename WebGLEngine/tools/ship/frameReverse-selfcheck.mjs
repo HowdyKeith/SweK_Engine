@@ -20,8 +20,12 @@ import { RESULT_H9 } from "./frameHoled.mjs";
 import { RESULT_H10 } from "./frameVertical.mjs";
 import { RESULT_H11, GAIN_KEYS, cellOf } from "./frameGain.mjs";
 import { PREREG_H12, CACHE_H12, RESULT_H12, REV_KEYS, partialSpearman, reverseSummary, reverseCell, reverse } from "./frameReverse.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameReverse-selfcheck", [CACHE_H12, CACHE_H8]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };

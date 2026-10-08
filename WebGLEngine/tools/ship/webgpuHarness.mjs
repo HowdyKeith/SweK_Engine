@@ -38,7 +38,7 @@
 
 import http from "node:http";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import path from "node:path";   // used by renderThreePassToPixels, which serves the engine tree over HTTP
 import { storageWords, LIVENESS_SENTINEL } from "./headlessGpu.mjs";   // v4457 -- the storage-input packing both harnesses share; v4572 -- and the liveness fill, which must be ONE number
@@ -63,9 +63,60 @@ const LAUNCH_ENV = launchEnv();
 // d3d12, and Vulkan-via-ANGLE were each tried alone and did nothing on this box. Scoped to win32 only because
 // that is the one platform this was actually measured on -- darwin's real behaviour here is still unknown and
 // guessing a flag for it would be exactly the mistake this comment is refusing to make for Linux already.
-export const LAUNCH_ARGS = Object.freeze(
-    process.platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"]
-);
+//
+// *** v4778 RIG RUN 4 -- AND ON win32 THAT PAIR PUTS WebGPU ON THE BOX'S GPU, WHICH NO GATE'S NUMBERS WERE TAKEN ON. ***
+// Keith's rig (GTX 1080) under the pair: WebGPU "nvidia / pascal", and about forty exact device rows red, each holding
+// a figure SwiftShader produced. realGpuRun --gl-flags on the same box, same headless shell 1243:
+//     --enable-unsafe-webgpu --use-angle=d3d11                                   WebGPU HARDWARE nvidia / pascal
+//     --enable-unsafe-webgpu --use-angle=d3d11 --use-webgpu-adapter=swiftshader  WebGPU SOFTWARE google / swiftshader
+// and WebGL2 stays on the GPU's ANGLE D3D11 under both, drawing. So, on Keith's decision: an ORDINARY run on win32 asks
+// for the SwiftShader adapter, which is what the device rows were measured on, and HARDWARE_ARGS is the pair -- what
+// realGpuRun.mjs hands its gates, because a real-hardware run is the one that wants the GPU. Elsewhere both are the one
+// flag they always were: Linux and darwin were not measured with the adapter flag on a GPU, and a Linux box with no GPU
+// reaches SwiftShader without it. Per platform as functions so a box can check another platform's answer.
+export function hardwareArgsFor(platform) {
+    return platform === "win32" ? ["--enable-unsafe-webgpu", "--use-angle=d3d11"] : ["--enable-unsafe-webgpu"];
+}
+export function launchArgsFor(platform) {
+    return platform === "win32" ? [...hardwareArgsFor(platform), "--use-webgpu-adapter=swiftshader"] : hardwareArgsFor(platform);
+}
+export const HARDWARE_ARGS = Object.freeze(hardwareArgsFor(process.platform));
+export const LAUNCH_ARGS = Object.freeze(launchArgsFor(process.platform));
+
+// *** v4778 RIG RUN 10 -- PARITY_ARGS: WHERE A GATE HOLDS THE TWO BACKENDS TO EACH OTHER, BOTH ON ONE RASTERISER (Keith's decision). ***
+// Since rig run 4 an ordinary win32 run puts WebGPU on SwiftShader (--use-webgpu-adapter=swiftshader) and WebGL2 stays on the
+// GPU's ANGLE D3D11 -- and no flag set measured on the rig puts both on SwiftShader: every ANGLE-on-SwiftShader set lost the
+// WebGPU adapter, the one both-software set is WARP for WebGL2 against SwiftShader for WebGPU (two rasterisers still), and
+// node-webgpu there reaches D3D12 alone (realGpuRun --gl-flags, rig run 10). So the 14 gates that went newly red at the switch --
+// each holds WebGL2 and WebGPU (or node-webgpu and the browser) to ONE picture -- launch with the pair on win32: one rasteriser,
+// the GPU, reached two ways, which is what their rows claim and how all 14 were green on the rig before the switch. Gates
+// that hold a backend to SwiftShader's own figures keep LAUNCH_ARGS. Elsewhere PARITY_ARGS is LAUNCH_ARGS: SwiftShader both.
+export function parityArgsFor(platform) {
+    return platform === "win32" ? hardwareArgsFor(platform) : launchArgsFor(platform);
+}
+export const PARITY_ARGS = Object.freeze(parityArgsFor(process.platform));
+
+/**
+ * *** v4778 RIG RUN 12 -- A ROW THAT HOLDS A BACKEND TO A MODEL OF SWIFTSHADER'S RASTERISATION IS ASSERTED ON SOFTWARE AND
+ * REPORTED ON A GPU (Keith's decision, option a). *** slugDevice/slugCurve/slugShatter fit the fragment's texcoord to a
+ * snapped-corner model of SwiftShader's rasteriser and hold every pixel to slugEval through it; gpuUniverse holds Sol's picks
+ * and tslRace a generated pipeline to a hand-written one on every pixel -- all measured where SwiftShader ran both. On the GTX
+ * 1080 the snap and the rounding are the GPU's. With the two-backend gates' PARITY_ARGS both backends are that GPU; these rows
+ * then print their figures and whether they would hold, and are not asserted. On software, or an adapter the harness cannot
+ * name, they are asserted as before -- and `asserted`/`reported` let a gate hold that scope too.
+ */
+export function softwareClaims(ok, r, say = (m) => console.log("  ----  " + m)) {
+    const name = r && r.adapter ? [r.adapter.vendor, r.adapter.architecture].filter(Boolean).join(" ") || "unnamed" : "unknown";
+    const row = (label, cond, detail) => {
+        if (r && r.software === false) { row.reported++; say(`NOT ASSERTED on a hardware adapter (${name}), by decision -- ${cond ? "holds here too" : "does not hold here"}: ${String(label).replace(/\*\*\* ?| ?\*\*\*/g, "")}${detail ? " -- " + String(detail).slice(0, 160) : ""}`); return false; }
+        row.asserted++; ok(label, cond, detail); return true;
+    };
+    row.asserted = 0; row.reported = 0; row.hardware = !!(r && r.software === false);
+    // ...and the scope held: every such row asserted on software, every one reported on hardware
+    row.held = (n) => ok(`the ${n} SwiftShader-model row(s) were ${row.hardware ? "reported on a hardware adapter" : "asserted on a software adapter"} (${name}), as decided`,
+        row.hardware ? row.asserted === 0 && row.reported === n : row.reported === 0 && row.asserted === n, `${row.asserted} asserted, ${row.reported} reported`);
+    return row;
+}
 
 // *** v4739 -- PRESENT_ARGS: THE FLAGS UNDER WHICH THIS BOX *PRESENTS* A WebGPU CANVAS INSTEAD OF LOSING THE DEVICE. ***
 // gfx/device.js's Level 11 note measured the device lost on any pass whose attachment is the canvas, and it was recorded
@@ -156,43 +207,37 @@ export function webgpuSkipReason(requireFn = createRequire(import.meta.url)) {
     return browserSkipReason(chromium, from, HEADLESS_SHELL) || null;
 }
 
-/**
- * Compile and run one WGSL compute shader; return `outCount` f32 values from binding 0.
- *
- * `uniforms` is an optional Float32Array bound at binding 1 when present, so a caller can vary knobs without
- * rebuilding the shader text -- a shader recompiled per case would test the compiler, not the arithmetic.
- *
- * Returns { ok, values, errors, adapter } and never throws for a shader-side problem: a compilation error is a
- * RESULT a gate should report, not an exception that hides which line failed.
- */
-export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
-                                       workgroups = 1, compileOnly = false, timeoutMs = 60000,
-                                       inputs = null, outInit = null,
-                                       outBinding = 0, uniformBinding = 1 }) {
-    const requireFn = createRequire(import.meta.url);
-    const skip = webgpuSkipReason(requireFn);
-    if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
-    const pw = resolvePlaywright(requireFn);
-
-    const srv = http.createServer((_q, s) => {
-        s.writeHead(200, { "Content-Type": "text/html" });
-        s.end("<!doctype html><title>wgsl-harness</title>");
-    });
-    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
-    const url = `http://${SECURE_HOST}:${srv.address().port}/`;
-
-    let browser = null;
-    try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
-        const page = await browser.newPage();
-        await page.goto(url);
-        const out = await page.evaluate(async (a) => {
+// v4814 -- THE PAGE'S HALF OF A COMPUTE RUN, ONCE. runWgslCompute hands it to a fresh page per call; openWgslSession installs
+// it in one page and calls it for every run. It is serialised into the browser, so it may use only browser globals
+// and its argument. Re-indented from runWgslCompute's inline body; the statements are that body's, plus the session
+// cache (see `S`) -- one implementation of what a run does, so the two entry points cannot drift apart.
+async function pageRun(a) {
+            // v4814: a SESSION (a.session) keeps one adapter and device in the page and compiles each distinct shader
+            // once; a one-shot call keeps none, exactly as before. Nothing else in this body knows which it is.
+            const S = a.session ? (globalThis.__swekWgsl ||= { dev: null, adapter: null, lost: false, mods: new Map(), pipes: new Map() }) : null;
             if (!navigator.gpu) return { ok: false, reason: "navigator.gpu absent even on a secure origin", secure: isSecureContext };
-            const adapter = await navigator.gpu.requestAdapter();
-            if (!adapter) return { ok: false, reason: "requestAdapter() returned null -- present is not capable" };
-            const dev = await adapter.requestDevice();
-            const mod = dev.createShaderModule({ code: a.code });
-            const info = await mod.getCompilationInfo();
+            let adapter, dev;
+            if (S && S.dev && !S.lost) { adapter = S.adapter; dev = S.dev; }
+            else {
+                adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) return { ok: false, reason: "requestAdapter() returned null -- present is not capable" };
+                dev = await adapter.requestDevice();
+                if (S) { S.adapter = adapter; S.dev = dev; S.lost = false; S.mods.clear(); S.pipes.clear(); dev.lost.then(() => { S.lost = true; }); }
+            }
+            // v4814 rig run: the session HUNG on its third call -- the first to reuse a cached module, and the first to ask a
+            // cached module for its compilation info a second time. So the info is asked ONCE and kept with the module.
+            // CONFIRMED on the rig by tools/ship/rtPipelineDiag.mjs --session-probe (HeadlessChrome 153, win32, SwiftShader
+            // WebGPU): of four variants only "compile info RE-ASKED of the cached module" hung -- call 3, killed by the 20 s
+            // watchdog -- while a reused module, a reused pipeline and a fresh module on the same device all returned values
+            // equal to call 2. A second getCompilationInfo() on one GPUShaderModule never resolves there. Do not re-ask it.
+            const probe = a.probe || {};
+            let ent = S && !probe.noModCache ? S.mods.get(a.code) : null;
+            if (!ent) { ent = { mod: dev.createShaderModule({ code: a.code }), info: null }; if (S && !probe.noModCache) S.mods.set(a.code, ent); }
+            if (!ent.info || probe.reaskInfo) {
+                const ci = await ent.mod.getCompilationInfo();
+                ent.info = { messages: ci.messages.map((m) => ({ type: m.type, message: m.message, lineNum: m.lineNum, linePos: m.linePos })) };
+            }
+            const mod = ent.mod, info = ent.info;
             const errors = info.messages.filter((m) => m.type === "error")
                                         .map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
             if (errors.length) return { ok: false, reason: "WGSL did not compile", errors };
@@ -236,8 +281,9 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             // v4572 -- the validation error scope the native harness took this round, for the same reason:
             // a REJECTED bind group left the read-back untouched and this function returned ok:true beside it.
             dev.pushErrorScope("validation");
-            const pipe = dev.createComputePipeline({ layout: "auto",
-                compute: { module: mod, entryPoint: a.entryPoint } });
+            const pipeKey = a.entryPoint + "\u0000" + a.code;
+            let pipe = S && !probe.noPipeCache ? S.pipes.get(pipeKey) : null;
+            if (!pipe) { pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: a.entryPoint } }); if (S && !probe.noPipeCache) S.pipes.set(pipeKey, pipe); }
             const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
             const enc = dev.createCommandEncoder();
             const cp = enc.beginComputePass();
@@ -252,21 +298,141 @@ export async function runWgslCompute({ code, entryPoint = "main", outCount, unif
             await readBuf.mapAsync(GPUMapMode.READ);
             const values = Array.from(new Float32Array(readBuf.getMappedRange()));
             readBuf.unmap();
+            // a session runs hundreds of calls on one device, so each call's buffers go when it is done with them
+            if (S) for (const b of [outBuf, readBuf, uniBuf, ...entries.slice(uniBuf ? 2 : 1).map((e) => e.resource.buffer)]) try { b && b.destroy(); } catch {}
             const ai = adapter.info || {};
             return { ok: true, values, errors: [],
                      wroteNothing: !a.outInit && a.outCount > 0 && values.every((v) => v === a.sentinel),
                      adapter: { vendor: ai.vendor || null, architecture: ai.architecture || null,
                                 description: ai.description || null } };
-        }, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
-             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL,
+        }
+
+/**
+ * *** v4814 -- ONE BROWSER FOR MANY RUNS. *** runWgslCompute launches a headless browser per call, which is right for a
+ * gate that makes a handful and ruinous for one that makes hundreds: tools/ship/rtPipelineDiag.mjs measured
+ * physics/render/rtPipeline-selfcheck.mjs at 220 calls -- launch + close 96 s of 291 on Keith's rig (357 ms a launch on
+ * win32), 32 s of 113 here -- and every one of its 8-seed rows recompiling the same path tracer. A session launches
+ * once, keeps one adapter and device, compiles each distinct shader and pipeline once, and frees each run's buffers.
+ * `run(opts)` takes runWgslCompute's options and returns its shape; `close()` must be called (a gate that exits without
+ * it leaves a browser behind until the process ends). A device lost mid-session is re-acquired on the next run.
+ * MEASURED v4814: rtPipeline-selfcheck 114 s -> 56 s here and 291 s -> 61 s on Keith's rig (222 calls, launch 79 s -> 0.4 s,
+ * no watchdog fallback), its printed output byte-identical. SABOTAGED v4814: the
+ * pipeline cache keyed by entry point alone (not the code) -> rtPipeline-selfcheck red on 5 rows, its bit-exact rows first.
+ */
+export async function openWgslSession({ launchArgs = null, timeoutMs = 60000, runTimeoutMs = 60000, fallback = true } = {}) {
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { run: async () => ({ ok: false, skipped: true, reason: skip, values: [], errors: [] }), close: async () => {} };
+    const pw = resolvePlaywright(requireFn);
+    const srv = http.createServer((_q, s) => { s.writeHead(200, { "Content-Type": "text/html" }); s.end("<!doctype html><title>wgsl-session</title>"); });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    const trace = process.env.SWEK_WGSL_TRACE ? Date.now() : 0;
+    const browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)], env: LAUNCH_ENV });
+    const page = await browser.newPage();
+    page.setDefaultTimeout(timeoutMs);
+    await page.goto(`http://${SECURE_HOST}:${srv.address().port}/`);
+    await page.evaluate(`globalThis.__swekRun = ${pageRun.toString()};`);
+    if (trace) process.stderr.write(`[wgsl-trace] launch ${Date.now() - trace} ms, run 0 ms, close 0 ms, 0 chars, 0 out (session opened)\n`);
+    let closed = false, dead = false, runs = 0;
+    // *** v4814 RIG RUN -- A SESSION MUST NOT BE ABLE TO HANG A GATE. *** Playwright's evaluate has no timeout of its own,
+    // and on Keith's rig the third run never returned: rtPipelineDiag waited 598 s on it. So every run races a watchdog.
+    // On a timeout the browser is dropped, the session is DEAD, and -- with `fallback` (the default) -- that run and every
+    // later one go through runWgslCompute, one browser each: the proven path, slower and correct. It says so on stderr
+    // every time, so a fallen-back gate is never mistaken for a fast one. `fallback: false` returns the timeout instead,
+    // which is what rtPipelineDiag's --session-probe needs to name the step that hangs.
+    const giveUp = async () => { dead = true; try { await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 5000))]); } catch {} srv.close(); };
+    return {
+        async run(opts) {
+            const { code, entryPoint = "main", outCount, uniforms = null, workgroups = 1, compileOnly = false,
+                    inputs = null, outInit = null, outBinding = 0, uniformBinding = 1, probe = null } = opts;
+            if (closed) return { ok: false, skipped: false, reason: "harness error: session already closed", values: [], errors: [] };
+            if (dead) return fallback ? runWgslCompute(opts) : { ok: false, skipped: false, timedOut: true, reason: "harness error: session dead after a timeout", values: [], errors: [] };
+            const t = Date.now(), n = ++runs;
+            let timer = null;
+            try {
+                const ev = page.evaluate((a) => globalThis.__swekRun(a), {
+                    code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+                    outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: true, probe,
+                    inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
+                    outInit: outInit ? Array.from(storageWords(outInit)) : null });
+                const out = await Promise.race([ev, new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error("timeout"), { timeout: true })), runTimeoutMs); })]);
+                return { skipped: false, errors: [], values: [], ...out };
+            } catch (e) {
+                if (e && e.timeout) {
+                    process.stderr.write(`[wgsl-session] run ${n} did not return in ${runTimeoutMs} ms -- session dropped` +
+                                         (fallback ? "; this run and every later one fall back to one browser per call (slower, same results)" : "") + "\n");
+                    await giveUp();
+                    return fallback ? runWgslCompute(opts) : { ok: false, skipped: false, timedOut: true, reason: `harness error: session run timed out after ${runTimeoutMs} ms`, values: [], errors: [] };
+                }
+                return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
+            } finally {
+                clearTimeout(timer);
+                if (trace) process.stderr.write(`[wgsl-trace] launch 0 ms, run ${Date.now() - t} ms, close 0 ms, ${String(code).length} chars, ${outCount} out\n`);
+            }
+        },
+        get dead() { return dead; },
+        async close() {
+            if (closed) return; closed = true;
+            if (dead) return;
+            const t = trace ? Date.now() : 0;
+            try { await browser.close(); } catch {}
+            srv.close();
+            if (trace) process.stderr.write(`[wgsl-trace] launch 0 ms, run 0 ms, close ${Date.now() - t} ms, 0 chars, 0 out (session closed)\n`);
+        },
+    };
+}
+
+/**
+ * Compile and run one WGSL compute shader; return `outCount` f32 values from binding 0.
+ *
+ * `uniforms` is an optional Float32Array bound at binding 1 when present, so a caller can vary knobs without
+ * rebuilding the shader text -- a shader recompiled per case would test the compiler, not the arithmetic.
+ *
+ * Returns { ok, values, errors, adapter } and never throws for a shader-side problem: a compilation error is a
+ * RESULT a gate should report, not an exception that hides which line failed.
+ */
+export async function runWgslCompute({ code, entryPoint = "main", outCount, uniforms = null,
+                                       workgroups = 1, compileOnly = false, timeoutMs = 60000,
+                                       inputs = null, outInit = null,
+                                       outBinding = 0, uniformBinding = 1, launchArgs = null }) {
+    const requireFn = createRequire(import.meta.url);
+    const skip = webgpuSkipReason(requireFn);
+    if (skip) return { ok: false, skipped: true, reason: skip, values: [], errors: [] };
+    const pw = resolvePlaywright(requireFn);
+
+    const srv = http.createServer((_q, s) => {
+        s.writeHead(200, { "Content-Type": "text/html" });
+        s.end("<!doctype html><title>wgsl-harness</title>");
+    });
+    await new Promise((r) => srv.listen(0, SECURE_HOST, r));
+    const url = `http://${SECURE_HOST}:${srv.address().port}/`;
+
+    // v4814: SWEK_WGSL_TRACE=1 prints, to stderr, where each call's time went -- the browser launch, the run (adapter,
+    // compile, dispatch, readback) and the close. Off by default; tools/ship/rtPipelineDiag.mjs turns it on to split a
+    // gate's wall time between this harness and its own CPU work. It changes nothing a caller receives.
+    const trace = process.env.SWEK_WGSL_TRACE ? { t0: Date.now(), launched: 0, ran: 0 } : null;
+    let browser = null;
+    try {
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 10: a caller's own, e.g. PARITY_ARGS */, env: LAUNCH_ENV });
+        const page = await browser.newPage();
+        await page.goto(url);
+        if (trace) trace.launched = Date.now();
+        const out = await page.evaluate(pageRun, { code, entryPoint, outCount, uniforms: uniforms ? Array.from(uniforms) : null, workgroups, compileOnly,
+             outBinding, uniformBinding, sentinel: LIVENESS_SENTINEL, session: false,
              inputs: inputs ? inputs.map((i) => ({ binding: i.binding, words: Array.from(storageWords(i.data)) })) : null,
              outInit: outInit ? Array.from(storageWords(outInit)) : null });
+        if (trace) trace.ran = Date.now();
         return { skipped: false, errors: [], values: [], ...out };
     } catch (e) {
         return { ok: false, skipped: false, reason: "harness error: " + String(e).slice(0, 200), values: [], errors: [] };
     } finally {
         try { await browser?.close(); } catch {}
         srv.close();
+        if (trace) {
+            const end = Date.now(), L = trace.launched || end, R = trace.ran || end;
+            process.stderr.write(`[wgsl-trace] launch ${L - trace.t0} ms, run ${R - L} ms, close ${end - R} ms, ` +
+                                 `${String(code).length} chars, ${outCount} out${trace.ran ? "" : ", DID NOT FINISH"}\n`);
+        }
     }
 }
 
@@ -387,7 +553,7 @@ export async function renderWgslToPixels({ code, width = 64, height = 64, srcSiz
 export async function renderGlslToPixels({ vertex, fragment, width = 64, height = 64, srcSize = 64,
                                            uniforms = null, uniformNames = [], sourceTexel = null,
                                            uniformVecs = null, textures = null, uniformArrays = null,
-                                           uniformInts = null }) {
+                                           uniformInts = null, timeoutMs = 60000 }) {
     // v4288 -- `uniformInts` and the getError drain below exist because of a THIRD way a uniform can fail,
     // and it is the one the earlier two guards cannot see. COMPOSITE_FS declares `uniform int uHeatCount`;
     // this harness set every named scalar with uniform1f; getUniformLocation SUCCEEDS for an int uniform, so
@@ -413,7 +579,7 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
 
     const n = srcSize;
     const src = new Uint8Array(n * n * 4);
@@ -434,11 +600,20 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         texData[nm] = Array.from(buf);
     }
 
+    // v4612 -- task #35's own gate found this the hard way: a WHILE-LOOP shader (tools/ship/precisionProbe-
+    // selfcheck.mjs's sabotage tests) mutated into an accidental fixed point (`(value<<2)|1` on a 32-bit int
+    // cycles rather than overflowing) hung the real headless_shell GPU process at ~99% CPU for minutes, past
+    // this tool's own timeout, with no way to recover short of `pkill -9`. page.evaluate() has NO timeout of
+    // its own -- page.setDefaultTimeout() (used elsewhere in this file) does not apply to it, exactly as
+    // runInEngineOrigin's own v4528 comment already found for a different hang. Same fix here: race the
+    // evaluate against a timer, so a shader that never returns is a NAMED, bounded failure rather than a
+    // process that must be killed from outside.
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
-        const out = await page.evaluate(async (a) => {
+        let timer = null;
+        const out = await Promise.race([page.evaluate(async (a) => {
             const c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
             const gl = c.getContext("webgl2", { preserveDrawingBuffer: true });
             if (!gl) return { ok: false, reason: "no webgl2 context" };
@@ -543,7 +718,11 @@ export async function renderGlslToPixels({ vertex, fragment, width = 64, height 
         }, { vertex, fragment, width, height, srcSize: n, src: Array.from(src),
              uniforms: uniforms ? Array.from(uniforms) : [], uniformNames,
              uniformVecs: uniformVecs || {}, textures: texData, uniformArrays: uniformArrays || {},
-             uniformInts: uniformInts || {} });
+             uniformInts: uniformInts || {} }),
+            new Promise((r) => { timer = setTimeout(() => r({ ok: false, timedOut: true,
+                reason: `harness: the shader did not return within ${timeoutMs} ms (a while-loop that never terminates?)` }), timeoutMs); }),
+        ]);
+        clearTimeout(timer);
         if (!out.ok) return { skipped: false, ...out };
         // readPixels is bottom-first; flip to top-first so both harnesses hand back the same orientation.
         const flipped = new Uint8Array(width * height * 4);
@@ -579,7 +758,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
     const requireFn = createRequire(import.meta.url);
     if (!fs.existsSync(HEADLESS_SHELL)) return { ok: false, skipped: true, reason: "no headless shell", pixels: null };
     const pw = resolvePlaywright(requireFn);
-    if (!pw) return { ok: false, skipped: true, reason: "playwright not resolvable", pixels: null };
+    if (!pw.chromium) return { ok: false, skipped: true, reason: browserSkipReason(pw.chromium, pw.from, HEADLESS_SHELL), pixels: null };
     const three = path.join(engineRoot, "vendor/three/three.module.js");
     if (!fs.existsSync(three)) return { ok: false, skipped: true, reason: "no vendored three at " + three, pixels: null };
 
@@ -604,7 +783,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args], env: LAUNCH_ENV });
         const page = await browser.newPage();
         const pageErrors = [];
         page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));
@@ -662,7 +841,7 @@ export async function renderThreePassToPixels({ engineRoot, passModule, passFact
  */
 export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 64, format = "rgba16float",
                                                 uniforms = null, workgroups = 1, timeoutMs = 60000,
-                                                inputTexel = null }) {
+                                                inputTexel = null, launchArgs = null }) {
     // `inputTexel(x,y,n) -> [r,g,b,a]` uploads an rgba16float SAMPLED texture at binding 2. Half-float
     // because a bloom input carries values above 1, and an 8-bit input would clip the scene before the
     // shader ever saw it -- the same trap the output format has, one stage earlier.
@@ -699,7 +878,7 @@ export async function runWgslComputeToTexture({ code, entryPoint = "main", n = 6
 
     let browser = null;
     try {
-        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...LAUNCH_ARGS], env: LAUNCH_ENV });
+        browser = await pw.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...(launchArgs || LAUNCH_ARGS)]   /* rig run 13: crossBackend's, PARITY_ARGS */, env: LAUNCH_ENV });
         const page = await browser.newPage();
         page.setDefaultTimeout(timeoutMs);
         await page.goto(url);

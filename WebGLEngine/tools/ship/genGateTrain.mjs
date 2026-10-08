@@ -80,6 +80,54 @@ export async function harvest({ scenes = TRAIN_SCENES, upto = UPTO, speed = SPEE
     return r.result.rows;
 }
 
+// *** rig run 12, Keith's option 2: A RE-HARVEST IS HELD TO ITS CACHE WITH THE FRAME, THE LABELS AND THE FEATURES EXACT, AND
+// THE TWO dB TO DB_ULPS UNITS IN THE LAST PLACE. *** The dB is the page's own Math.log10, and V8 in Chrome 153 (headless shell
+// 1243, Keith's rig) rounds it differently in the last bit from the shell that baked every cache (1194): re-harvested there,
+// 6 of 39 frames of frameGainMeasure's C12 cell moved by at most 3.55e-15 dB, and nothing else moved -- not a frame number,
+// not a feature, not a label. Every C12 row went red on it. The frame and features still prove the page drove what it drove;
+// the dB is held as tightly as two correct libm's can be held. An ulp count, not an absolute dB, so the slack cannot grow
+// with the value, and the row prints the worst it saw. MEASURED on all ten rows that use this, re-harvested on 1243: 1 to 6
+// frames of 39 moved per cell, by at most 2 ulp (the log's last bit, carried through a subtraction); on 1194, 0 frames moved.
+// 4 is twice the worst seen. Keith's decision; widening it is his too.
+export const DB_ULPS = 4;
+const F64 = new Float64Array(1), I64 = new BigInt64Array(F64.buffer);
+const bitsOf = (v) => { F64[0] = v; return I64[0]; };
+/** The double `n` ulps from `v` (n may be negative), by its bits -- for gates that make a re-harvest's drift by hand. */
+export function ulpStep(v, n) { F64[0] = v; I64[0] += BigInt(n); return F64[0]; }
+/** Units in the last place between two doubles: 0 when equal, Infinity across a sign, a NaN or an infinity. */
+export function ulpsApart(a, b) {
+    if (a === b) return 0;
+    if (!Number.isFinite(a) || !Number.isFinite(b) || (a < 0) !== (b < 0)) return Infinity;
+    const d = bitsOf(a) - bitsOf(b);
+    return Number(d < 0n ? -d : d);
+}
+/**
+ * Hold re-harvested rows to cached ones: same count, and per row the frame, labels (y) and features (x) exact, genDb and
+ * cfDb within `ulps`. `labels: false` for a cache that stores none. Returns { ok, n, m, moved, worst, why } -- `moved`
+ * frames whose dB differed at all, `worst` the largest ulp distance, `why` the first row that broke a rule.
+ */
+export function rowsMatch(again, cached, { ulps = DB_ULPS, labels = true } = {}) {
+    const J = (x) => JSON.stringify(x);
+    const out = { ok: false, n: again ? again.length : 0, m: cached ? cached.length : 0, moved: 0, worst: 0, why: "" };
+    if (!again || !cached) { out.why = "nothing to compare"; return out; }
+    if (again.length !== cached.length) { out.why = `${again.length} rows against ${cached.length}`; return out; }
+    for (let i = 0; i < again.length; i++) {
+        const r = again[i], c = cached[i];
+        const u = Math.max(ulpsApart(r.genDb, c.genDb), ulpsApart(r.cfDb, c.cfDb));
+        if (u > 0) out.moved++;
+        out.worst = Math.max(out.worst, u);
+        if (out.why) continue;
+        if (r.frame !== c.frame) out.why = `row ${i}: frame ${r.frame} against ${c.frame}`;
+        else if (J(r.x) !== J(c.x)) out.why = `row ${i} (frame ${r.frame}): the features differ`;
+        else if (labels && J(r.y) !== J(c.y)) out.why = `row ${i} (frame ${r.frame}): the labels differ`;
+        else if (u > ulps) out.why = `row ${i} (frame ${r.frame}): dB ${u} ulp apart (${r.genDb} / ${r.cfDb} against ${c.genDb} / ${c.cfDb})`;
+    }
+    out.ok = !out.why;
+    return out;
+}
+/** The detail a C12 row prints: what matched exactly, and how far the dB moved. */
+export const rowsMatchDetail = (k) => `${k.n} frames against ${k.m}${k.why ? " -- " + k.why : ""}; dB moved on ${k.moved} frame(s), worst ${k.worst === Infinity ? "across a sign or a non-finite value" : k.worst + " ulp"} (allowed ${DB_ULPS})`;
+
 /**
  * Train the pre-registered shape: [N_FEATURES -> HIDDEN, relu] then [HIDDEN -> 1, sigmoid].
  *

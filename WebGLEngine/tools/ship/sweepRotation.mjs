@@ -21,7 +21,7 @@ import { runGate } from "./redCensus.mjs";
 import { costOf } from "./declaredCost.mjs";
 // v4647 -- whose stopwatch. A box that does not own the record writes its own file rather than
 // overwriting one produced on different silicon. See quickSweep.timingsTarget.
-import { timingsTarget, KIND } from "./quickSweep.mjs";
+import { timingsTarget, KIND, reclaimStrandedFixtures } from "./quickSweep.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
@@ -35,6 +35,10 @@ export function runSlice(picked, { capMs = CAP_MS, onProgress = null } = {}) {
         // run is the drift kindsInferred exists to prevent.
         try { const r = runGate(g, { timeoutMs: capMs }); code = r.code; skipped = !!r.skipped; } catch { code = 1; }
         const ms = Date.now() - t0;
+        // v4815 -- a run killed at the cap runs no cleanup, and the NEXT gate here would meet what it left: the 2026-10-06
+        // full rotation killed orreryReached between its control's two writes and left orrery-reached.json bent on disk.
+        // quickSweep reclaims at this point (v4692); the rotation did not.
+        if (code !== 0) { const gone = reclaimStrandedFixtures(); if (gone.length) console.log(`[rotation] reclaimed after ${g}: ${gone.join(", ")}`); }
         // *** v4568 -- WHETHER THE PROCESS FINISHED IS RECORDED, NOT INFERRED FROM THE NUMBER. ***
         // The whole defect in the killed bucket is that "at or over the cap" was read as "no verdict", so a
         // gate that ran to completion in 50 s and a gate cut off at 20 s were the same entry. runGate returns
@@ -115,6 +119,15 @@ export function classifyRows(rows, { budgetMs = BUDGET_MS, priorMs = {}, capMs =
  * REFUSES rather than guesses. A row whose two independent readings disagree by more than `band` is left
  * alone and NAMED: one of the two is wrong and this function cannot say which.
  */
+// *** v4818 -- A BOX THAT MAY NOT WRITE THE RECORD MAY NOT WRITE THE LEDGER EITHER. *** The timings went to the
+// foreign box's .local.json and the ledger went to the SHARED file regardless, so the ledger held readings the record
+// did not: PR #12's box committed a temporalLockSumsTsl row (16,176 ms) that sweep-timings.json never had, and the
+// v4818 rotation itself, run on a box the record did not name, rewrote all forty rows and moved poolAt before it was
+// caught and reverted. The ledger records what the RECORD was given, so it follows the record's owner.
+export const LEDGER_FILE = path.join("tools", "ship", "sweep-rotation.json");
+export const LOCAL_LEDGER = path.join("tools", "ship", "sweep-rotation.local.json");
+export const ledgerFile = (target) => (target && target.foreign ? LOCAL_LEDGER : LEDGER_FILE);
+
 export const CORROBORATION_BAND = 0.2;
 export const UNDATED = "unknown -- before v4408";
 
@@ -378,6 +391,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const picked = only ? gates.filter((g) => g.includes(only))
                         : killedMode ? killedPool.slice(0, slots)
                         : rotation(c, file, pickOpts).picked;
+    const poolHorizon = only || killedMode ? null : rotation(c, file, pickOpts).horizon;
     if (killedMode) {
         console.log(`[rotation] --killed: ${c.killed.length} gate(s) have hit the cap, taking ` +
             `${picked.length} at a ${capMs / 1000} s cap, CHEAPEST EXPECTED FIRST. ` +
@@ -447,14 +461,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         } catch {}
         for (const r of rows) priorLedger[r.gate] = { gate: r.gate, ms: r.ms, code: r.code, priorMs: priorMs[r.gate], at: stamp };
         const merged = Object.values(priorLedger).sort((a, b) => a.gate < b.gate ? -1 : a.gate > b.gate ? 1 : 0);
-        fs.writeFileSync(path.join(ENG, "tools", "ship", "sweep-rotation.json"), JSON.stringify({
+        const ledgerOut = ledgerFile(target);
+        if (target.foreign) console.log(`[rotation] NOT writing the shared ledger either -- ${ledgerOut} instead`);
+        fs.writeFileSync(path.join(ENG, ledgerOut), JSON.stringify({
             generatedFrom: "tools/ship/sweepRotation.mjs",
             note: "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. " +
                   "Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. " +
                   "MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that " +
                   "measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is " +
-                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it.",
-            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode })),
+                  "the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. " +
+                  "`poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached " +
+                  "every entry stamped earlier and none stamped at or after it.",
+            ...ledgerStamps(prevLedger, stamp, selectionKind({ gate: only, band, killed: killedMode }), poolHorizon),
             budgetMs: BUDGET_MS, lastRun: rows.length, rotated: merged,
         }, null, 1) + "\n");
         console.log(`[rotation] wrote ${rows.length} entries with at=${stamp} to ${target.file}`);

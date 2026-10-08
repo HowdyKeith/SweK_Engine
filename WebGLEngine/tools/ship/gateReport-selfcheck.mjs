@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateReport-selfcheck.mjs
 //
-// Run: node tools/ship/gateReport-selfcheck.mjs   (~7.5s -- MEASURED, most of it the live page)
+// Run: node tools/ship/gateReport-selfcheck.mjs   (~16.6s -- MEASURED v4819 at the merge, median of 17614/16365/16575 alone, most of it the live page; was ~7.5s)
 //
 // v4394 -- A GATE'S VERDICT IS A WORD; ITS ARGUMENT IS A TABLE, AND THE TABLE DIED WITH THE TERMINAL.
 //

@@ -799,6 +799,12 @@ function pushComfyuiLog(stream, text) {
 // in the demo-chrome gauges.
 const gaugeState = {};
 let currentAvatarUrl = null, avatarTs = 0;   // v927 — engine-published current avatar (phone mirrors it)
+// peer brain sharing ("fly peer vs fly peer"): a peer's currently-published trained drivePolicy/gunnerPolicy
+// weight vector, in brain/peerBrain.mjs's portable format -- the SAME format race-brain.html's Export button
+// already writes to a file. Keyed by policy id ("drivePolicy"/"gunnerPolicy"); one entry per policy, latest
+// publish wins (no server-side ratchet -- the client already decides what its current best is before
+// publishing). Transient in-memory mailbox, resets on bridge restart, same pattern as fpsPose above.
+const publishedBrains = new Map();
 // v1257 (#6) — FPS control path, Option C: the WebGL2 engine owns the first-person
 // camera + enemy AI (authoritative) and PUBLISHES its pose here; VBA (and any other
 // surface) MIRRORS it by reading /fps/state. Transient in-memory mailbox, latest wins.
@@ -5204,6 +5210,46 @@ const server = http.createServer((req, res) => {
               });
               return;
           }
+          // v_epg — peer brain sharing ("fly peer vs fly peer"): a peer PUBLISHES its currently-trained
+          // drivePolicy/gunnerPolicy weight vector in brain/peerBrain.mjs's portable format (the SAME format
+          // race-brain.html's Export button already writes to a file, now POSTed instead of downloaded); other
+          // peers ask what a given peer is offering (/brain/mine), and /brain/fleet aggregates that across every
+          // known peer the same way /fleet/fingerprint-check above aggregates /fingerprint/master. Validated
+          // server-side through peerBrain.mjs's own importBrain() against the real drivePolicy.mjs/gunnerPolicy.mjs
+          // shape -- the SAME check the browser already runs before it ever gets here, not a second copy of the
+          // rule that could drift from it.
+          if (req.method === "POST" && req.url === "/brain/publish") {
+              _readBody((j) => {
+                  Promise.all([_impESM("../brain/peerBrain.mjs"), _impESM("../brain/drivePolicy.mjs"), _impESM("../brain/gunnerPolicy.mjs"), _impESM("../brain/pilotPolicy.mjs")]).then(([PB, D, GP, PP]) => {
+                      const blob = j.blob, descriptors = { drivePolicy: PB.describePolicy("drivePolicy", D), gunnerPolicy: PB.describePolicy("gunnerPolicy", GP), pilotPolicy: PB.describePolicy("pilotPolicy", PP) };
+                      const desc = blob && descriptors[blob.policy];
+                      res.writeHead(200, { "Content-Type": "application/json" });
+                      if (!desc) { res.end(JSON.stringify({ ok: false, error: "no such policy: " + JSON.stringify(blob && blob.policy) })); return; }
+                      const r = PB.importBrain(desc, blob);
+                      if (!r.ok) { res.end(JSON.stringify({ ok: false, error: r.reason })); return; }
+                      publishedBrains.set(blob.policy, blob);
+                      res.end(JSON.stringify({ ok: true, policy: blob.policy }));
+                  }).catch(_fail);
+              });
+              return;
+          }
+          if (req.method === "GET" && req.url === "/brain/mine") {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: true, brains: [...publishedBrains.values()] }));
+              return;
+          }
+          if (req.method === "GET" && req.url === "/brain/fleet") {
+              (async () => {
+                  const peers = _announcePeers().map((u) => String(u).replace(/\/+$/, ""));
+                  const out = [];
+                  await Promise.all(peers.map(async (peer) => {
+                      try { const r = await _peerJSON(peer, "/brain/mine", "GET", null, 5000); if (r && r.ok && r.brains && r.brains.length) out.push({ peer, brains: r.brains }); } catch {}
+                  }));
+                  res.writeHead(200, { "Content-Type": "application/json" });
+                  res.end(JSON.stringify({ ok: true, peers: out }));
+              })().catch(_fail);
+              return;
+          }
       }
 
     // ---------------------------------------------------------------
@@ -8074,6 +8120,22 @@ ${text.replace(/'/g, "''")}
             } catch (e) { try { res.write(JSON.stringify({ error: String(e && (e.message || e)) }) + "\n"); } catch {} }
             res.end();
         });
+        return;
+    }
+
+    // v4778 -- GET/POST /install/fsr-caches. Keith: "access /install from there if the user chooses ... an install
+    // FSR caches page." The FSR frame-generation caches (WebGLEngine/fsr-caches/, about 300 MB) no longer ride in the
+    // release zip; GET reports each file present / missing / bad against fsr-caches/manifest.json with the total
+    // download, POST fetches the missing or bad ones from the release tag and keeps a file only when its sha256
+    // matches. All of it lives in tools/ship/fsrCaches.mjs so a gate drives the same handler against a local
+    // server: names outside the manifest are refused and nothing is written outside the folder.
+    // SWEK_FSR_CACHES_BASE overrides the source URL (a mirror, or a gate's fixture server).
+    if (req.url.split("?")[0] === "/install/fsr-caches" && (req.method === "GET" || req.method === "POST")) {
+        // A POST writes 300 MB into the engine folder, so it is the host's call: a tunnel session may look, not install.
+        if (req.method === "POST" && _isRemoteReq(req)) { sendJson({ ok: false, error: "not available to remote sessions" }, 403); return; }
+        import("../tools/ship/fsrCaches.mjs")
+            .then((m) => m.handleRoute(req, res, { sendJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); } catch {} });
         return;
     }
 
@@ -16478,6 +16540,30 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/sharp/install" && req.method === "POST") {
         try { sendJson(require("./sharpBridge.js").install()); }
         catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
+    // qrBridge wiring — local, server-side QR render for fabric.html's HOP 3 "remote viewer" button,
+    // which used to send the live tunnel URL to the external api.qrserver.com just to draw a QR image. Lazily
+    // required, same discipline as /sharp/*: a tree missing qrBridge.js (or @napi-rs/canvas) still
+    // boots. 503 on any failure (canvas unavailable, encode failure) is deliberate, not 404/500 —
+    // fabric.html's <img onerror> treats any non-2xx the same, so 503 ("this optional feature isn't up
+    // right now") reads correctly there and in a browser network tab alike, the same signal
+    // /immich/thumb already gives its own <img> consumer for the identical "upstream not available"
+    // shape. `data` is untrusted, GET, reachable from any origin — validated before qrBridge is ever
+    // asked to encode it: missing/empty and over-length are both a plain 400, no encode attempted.
+    if (req.method === "GET" && req.url.split("?")[0] === "/qr.png") {
+        let qrBridge;
+        try { qrBridge = require("./qrBridge.js"); }
+        catch (e) { sendJson({ ok: false, error: "qr bridge unavailable: " + String(e && e.message || e) }, 503); return; }
+        const q = new URLSearchParams(req.url.split("?")[1] || "");
+        const data = q.get("data") || "";
+        if (!data) { sendJson({ ok: false, error: "missing data" }, 400); return; }
+        if (data.length > qrBridge.MAX_DATA_LEN) { sendJson({ ok: false, error: "data too long (max " + qrBridge.MAX_DATA_LEN + " chars)" }, 400); return; }
+        qrBridge.renderQrPng(data).then(r => {
+            if (r && r.ok) { res.writeHead(200, { "Content-Type": "image/png", "Content-Length": r.png.length, "Cache-Control": "no-store" }); res.end(r.png); }
+            else { sendJson(r || { ok: false, error: "qr render failed" }, 503); }
+        }).catch(e => { try { sendJson({ ok: false, error: String(e && e.message || e) }, 503); } catch {} });
         return;
     }
 

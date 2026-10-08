@@ -27,13 +27,16 @@ const OUT = path.join(ENG, "knowledge-index.json");
 const SKIP = /node_modules|[\\/]\.git|[\\/]vendor|GPU_Assets|demos_code/;
 
 function walk(dir, test, out = []) {
+    // v4813: typed listing instead of a statSync per entry (6,174 per walk); see staleness.gateFiles, same change,
+    // same reason. A symlink still goes to statSync so the files found cannot change.
     let entries = [];
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const f of entries) {
-        const p = path.join(dir, f);
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+    for (const e of entries) {
+        const f = e.name, p = path.join(dir, f);
         if (SKIP.test(p)) continue;
-        let st; try { st = fs.statSync(p); } catch { continue; }
-        if (st.isDirectory()) walk(p, test, out);
+        let isDir = e.isDirectory();
+        if (e.isSymbolicLink()) { try { isDir = fs.statSync(p).isDirectory(); } catch { continue; } }
+        if (isDir) walk(p, test, out);
         else if (test(f)) out.push(p);
     }
     return out;

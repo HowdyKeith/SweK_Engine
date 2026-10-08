@@ -232,6 +232,12 @@ const { fail, report } = partition(all);
         "the exclusion is the literal text process.pid and nothing wider -- redCensus's group kill at " +
         "runGate is the negated pid form and stays a reported tell, which is why the baseline had to grow " +
         "for it rather than be argued away");
+    // v4815 -- signal 0 is a liveness probe and sends nothing. SABOTAGE: the signal-0 exclusion removed from
+    // boundaryLint.mjs -> 2 RED, this row and the live baseline (fixtureLitter's probe counted NEW); restored md5-identical.
+    ok("...and a SIGNAL-0 probe is not a kill -- it asks whether the process exists and sends nothing",
+        !hit("try { process.kill(rec.pid, 0); return true; } catch {}").includes("KILL_NOT_VERIFIED") &&
+        hit("process.kill(rec.pid, sig);").includes("KILL_NOT_VERIFIED") && hit("process.kill(rec.pid, 9);").includes("KILL_NOT_VERIFIED"),
+        "a literal 0 only: the same call with a signal in a variable, or 9, is still counted");
 }
 
 // ---- 4. POWER, IN BOTH DIRECTIONS ------------------------------------------------------------------------------------

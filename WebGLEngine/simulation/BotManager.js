@@ -172,6 +172,10 @@ const BOT_KINDS = {
 import { stepTerrain, stepTerrainFan, autoGround, SURFACE } from "../physics/character/terrainWalk.mjs";
 import { fallStep, voxelSurface } from "../physics/character/fallBody.mjs";
 import { standHeightAt, hasVoxels } from "../world/surfaceProbe.mjs";
+// Task board #85: capsule-vs-mesh resolution for a world that exposes a triangle-mesh collider (walls, props,
+// collider-forge-derived geometry, task #79) instead of only a ground HEIGHT -- the same primitive camera.js's
+// own _moveFPCapsule (task #80) already uses for the player. See _botCapsuleBVH()/_stepBotCapsule() below.
+import { depenetrateCapsule } from "../physics/character/capsuleCollide.mjs";
 
 /** Eye/centre offset above the feet -- the +1 this file has always added to the terrain height. */
 const BOT_EYE = 1;
@@ -180,6 +184,11 @@ const BOT_EYE = 1;
 // surface this bot is on. A probe that invented its own allowance would answer a question the controller is
 // not asking, and the two drifting apart is the kind of defect nothing would report.
 const BOT_STEP = 1.2;
+/** task #85 -- matches camera.js's own _capsuleRadius/_capsuleHeight defaults, scaled per bot.spec.scale so a
+ *  boss kaiju (scale 2.6) gets a correspondingly larger capsule rather than every kind sharing one size. */
+const BOT_CAPSULE_RADIUS = 0.4;
+const BOT_CAPSULE_HEIGHT = 1.8;
+const BOT_GRAVITY = 18;
 
 import { KAIJU_BOT_KINDS, KAIJU_BOT_KIND_NAMES, isKaijuBotKind } from "./KaijuBotKinds.js";
 // Round 234 — king-tier kaiju bots (boss roster). 7 kings with promoted
@@ -404,7 +413,17 @@ export class BotManager {
 
     spawn({ x, z, y: spawnY = null, kind = "bot_grunt", assetId = null, scale = null } = {}) {
         const spec = BOT_KINDS[kind] || BOT_KINDS.bot_grunt;
-        const y = (spawnY != null) ? spawnY : ((this.world?._heightAt?.(x, z) ?? 5) + 1);   // explicit y wins (cave dwellers); else snap to surface
+        // task #85 -- a world with a triangle-mesh collider (world.colliderBVH) has no _heightAt at all, so
+        // the old (this.world?._heightAt?.(x, z) ?? 5) fallback silently spawned every bot at a hardcoded
+        // y=5+1 there regardless of the real geometry underneath. A straight raycast down from well above any
+        // plausible level finds the real surface instead, the same "explicit y wins, else find the ground"
+        // priority as before -- just a second way of finding it.
+        let y;
+        if (spawnY != null) y = spawnY;
+        else if (this.world?.colliderBVH) {
+            const hit = this.world.colliderBVH.raycastFirst(x, 500, z, 0, -1, 0, 1000);
+            y = (hit ? hit.point[1] : 0) + 1;
+        } else y = (this.world?._heightAt?.(x, z) ?? 5) + 1;
         // Round 226 — bot kinds may carry an explicit scale (boss = 2.6)
         // v1376 — optional explicit scale (height-normalised library bodies) wins.
         const useScale = (scale != null && scale > 0) ? scale : (spec.scale ?? 1);
@@ -427,6 +446,7 @@ export class BotManager {
             hp: spec.hp, maxHp: spec.hp,
             x, y, z,
             yaw: 0,
+            vy: 0, onGround: false,   // task #85 -- only read/written on the capsule path; unused (harmless) otherwise
             path: null,
             pathIdx: 0,
             pathRequestId: 0,
@@ -1214,6 +1234,22 @@ export class BotManager {
         }
         const dx = tx - bot.x, dz = tz - bot.z;
         const dist = Math.hypot(dx, dz);
+        // Task board #85 -- a world with a triangle-mesh collider (world.colliderBVH: controllerLabWorld.mjs,
+        // splatWalkWorld.mjs, platformCarryWorld.mjs, mesh/colliderFromGLB.mjs) takes priority over the
+        // height-only oracle below, mirroring camera.js's own three-tier dispatch (task #13 Stage B beats
+        // Stage A). Every existing world this file has ever run bots in (WAD dungeons, the kaiju sandbox, OGRE)
+        // exposes _heightAt, not colliderBVH, so _botCapsuleBVH() returns null there and every line below this
+        // check runs exactly as it always has.
+        const capsuleBVH = this._botCapsuleBVH();
+        if (capsuleBVH) {
+            if (dist > 0.01) {
+                this._stepBotCapsule(bot, dx / dist, dz / dist, Math.min(dist, speed * dt), dt, capsuleBVH);
+                bot.yaw = Math.atan2(dx, dz);
+            } else {
+                this._stepBotCapsule(bot, 0, 0, 0, dt, capsuleBVH);
+            }
+            return;
+        }
         if (dist > 0.01) {
             // *** v4545 -- GROUND-FOLLOWING INSTEAD OF A HORIZONTAL MOVE FOLLOWED BY A HARD Y SNAP. ***
             //
@@ -1313,6 +1349,36 @@ export class BotManager {
                 bot.vy = f.landed ? 0 : f.vy;
             }
         }
+    }
+
+    // Task board #85 -- the world's full triangle-mesh collider, when it has one. Direct property read, the
+    // same shape as camera.js's own _capsuleWorldBVH() (task #80): no caching needed, nothing to build.
+    _botCapsuleBVH() {
+        const w = this.world;
+        return (w && w.colliderBVH) ? w.colliderBVH : null;
+    }
+
+    /**
+     * Task board #85 -- capsule-vs-mesh resolution for one bot, mirroring camera.js's own _moveFPCapsule: while
+     * airborne, gravity integrates into bot.vy; depenetrateCapsule (physics/character/capsuleCollide.mjs, task
+     * #80) resolves the capsule against the world's mesh collider -- walls, ceilings, props, arbitrary
+     * geometry, not just a ground height -- and bot.onGround persists the same way camera.js's _fpOnGround
+     * does. Called for both an actively-steering bot (wishX/wishZ, moveLen > 0) and one standing still
+     * (moveLen = 0) so a bot that stops moving still settles under gravity instead of freezing mid-air, the
+     * same "still sit on the surface" guarantee the height-oracle path already gives.
+     */
+    _stepBotCapsule(bot, wishX, wishZ, moveLen, dt, bvh) {
+        const scale = bot.spec?.scale ?? 1;
+        const radius = BOT_CAPSULE_RADIUS * scale, height = BOT_CAPSULE_HEIGHT * scale;
+        // A flying bot's height is owned by _tickBot's altitude glide, the same rule the height-oracle path
+        // below applies by skipping fallStep for bot.spec.flying: no gravity here, or a plane that is
+        // never grounded accumulates vy without bound and is dragged into the floor. It still depenetrates.
+        bot.vy = (bot.onGround || bot.spec?.flying) ? 0 : (bot.vy ?? 0) - BOT_GRAVITY * dt;
+        const feet = [bot.x + wishX * moveLen, bot.y - BOT_EYE + bot.vy * dt, bot.z + wishZ * moveLen];
+        const r = depenetrateCapsule(feet, radius, height, bvh);
+        bot.x = r.pos[0]; bot.z = r.pos[2]; bot.y = r.pos[1] + BOT_EYE;
+        bot.onGround = r.grounded;
+        if (r.grounded) bot.vy = 0;
     }
 
     /**

@@ -261,6 +261,36 @@ console.log("\n9. *** IN-TREE SCRATCH: THE WALK DOES NOT COUNT IT ***");
         TR.treePaths().length > 1000 && TR.treePaths().every((q) => !path.relative(ENG, q).split(path.sep).some((seg) => seg.startsWith("."))));
 }
 
+// ---- v4814 -- readOnce: ONE READ PER FILE PER PROCESS, FOR THE WALKERS WITH RULES OF THEIR OWN -------------
+// SABOTAGES (v4814, each restored md5-identical): A readOnce's `_once.set` removed, so every ask reads the disk ->
+// 1 RED, the memory row ("reads 2"). B orreryEjecta's section-3 walk put back on fs.readFileSync -> 1 RED, the
+// walkers row, naming orreryEjecta-selfcheck.mjs.
+console.log("\n10. *** readOnce READS A FILE ONCE, AND THREE OF THE RIG-SLOW GATES READ THROUGH IT ***");
+{
+    const os = await import("node:os");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "treeread-once-"));
+    const f = path.join(root, "a.mjs");
+    try {
+        fs.writeFileSync(f, "export const first = 1;\n");
+        TR.clear();
+        const a = TR.readOnce(f);
+        fs.writeFileSync(f, "export const second = 2;\n");      // changed on disk between the two asks
+        const b = TR.readOnce(f), st = TR.readOnceStats();
+        ok("!! *** the second ask is answered from memory: the same text, one disk read, one hit ***",
+            a === b && a.includes("first") && st.reads === 1 && st.hits === 1,
+            `reads ${st.reads}, hits ${st.hits}; a cache that re-read would have returned the edited text`);
+        TR.clear();
+        ok("...and clear() drops it, so a gate that must read cold can",
+            TR.readOnce(f).includes("second") && TR.readOnceStats().reads === 1);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); TR.clear(); }
+    // gateProfile --rig-slow (Keith's rig, v4814): these read the same files 2-4 times, 0.42 ms a read there.
+    const users = ["tools/ship/citedSources-selfcheck.mjs", "tools/ship/windowsImport-selfcheck.mjs", "tools/ship/orreryEjecta-selfcheck.mjs"];
+    const raw = users.filter((u) => { const t = fs.readFileSync(path.join(ENG, u), "utf8");
+        return !/import \{ readOnce \} from "\.\/treeRead\.mjs"/.test(t) || /readFileSync\((?:p|f), "utf8"\)/.test(t); });
+    ok("!! *** the rig-slow walkers read through readOnce, and none still reads its walked file directly ***",
+        raw.length === 0, raw.length ? "reading raw: " + raw.join(", ") : users.length + " gates, 19,182 + 9,040 + 10,024 reads on the rig before");
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nNOT claimed here: that enumerateGates in tools/ship/gateSweep.mjs was made cheap too. It was left " +
     "alone ON PURPOSE and the reason is a row in another gate: tools/ship/gateSweep-selfcheck.mjs PLANTS a " +

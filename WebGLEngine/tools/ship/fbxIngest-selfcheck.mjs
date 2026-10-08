@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v3 (task #59 remaining-gaps round added section 7)
+// WebGLEngine/tools/ship/fbxIngest-selfcheck.mjs -- v4 (closed the 4 gaps section 7's own footer named)
 //
 // Run: node tools/ship/fbxIngest-selfcheck.mjs
 //
@@ -37,37 +37,61 @@
 // that script and its output.
 //
 // ================================================================================================
+// v4 -- THE 4 GAPS SECTION 7'S OWN FOOTER NAMED, CLOSED THIS ROUND (sections 8-11)
+// ================================================================================================
+//
+// Sections 8-11 close the four items v3's closing summary named plainly as still open: multi-mesh/
+// multi-material concat, embedded-texture extraction, morph-target (DeformPercent) animation tracks, and a
+// rotation curve spanning >=180 degrees between keyframes. Three of the four needed real code in
+// gpu/fbxLoad.js (normalizeFbxGroup() rewritten to a two-pass multi-mesh/multi-material concat mirroring
+// GLBParser.js's own primData/vOff pattern, made async to await createImageBitmap()+a THREE.LoadingManager
+// wait for embedded textures, plus a new readFbxMorphTargets() and a MORPH_TRACK_RE branch in
+// mapFbxAnimations()); the fourth needed none -- see section 11's own comment for why. gpu/gpuAssetLoader.js's
+// _loadFBX() was updated to construct a LoadingManager and await the now-async normalizeFbxGroup(); no other
+// caller of either function exists in this tree (grepped before relying on that).
+//
+// Two research passes preceded the fixture-authoring: a full read of FBXLoader.js's GeometryParser
+// (parseMaterialIndices, the LayerElementMaterial -> geo.groups pipeline) and DeformerParser/AnimationParser
+// (the Shape/BlendShapeChannel/BlendShape connection chain and the DeformPercent curve's own connection
+// path), confirmed section-by-section against this round's actual fixtures and the real headless-Chromium
+// harness before a single gate assertion was written -- not trusted from the reading alone.
+//
+// ================================================================================================
 // WHAT THIS GATE DOES NOT PROVE -- READ THIS BEFORE TRUSTING A GREEN RUN, SAME STYLE AS
 // gpu/fixtures/PROVENANCE.md AND gpu/GLBParser.js's OWN HEADER
 // ================================================================================================
 //
-//   * NO MULTI-PRIMITIVE / MULTI-MESH CONCAT. normalizeFbxGroup() reads only the FIRST object in the tree
-//     with .isMesh or .isSkinnedMesh true -- single-mesh v1 scope, matching GLBParser's own original v1
-//     scope before multi-primitive concat grew in over many later rounds. A multi-mesh FBX loses everything
-//     past its first mesh this round.
-//   * NO EMBEDDED-TEXTURE EXTRACTION. `texture`, `colors`, `morphTargets`, `texturesByMaterial`, and
-//     `primitiveRanges` are all null/{} in v1. FBXLoader does put an extracted texture on
-//     `mesh.material.map` when the file carries one; converting that into something `_uploadParsedMesh` can
-//     `gl.texImage2D` from was left undone because it could not be verified against a real textured FBX (see
-//     the licensing note below) -- an unverified guess at texture-extraction code is worse than the visible
-//     gap.
-//   * ANIMATION MAPPING IS NOW PROVEN ACROSS BOTH THE COMMON CASE AND THE HARDER COMPOSITION CASES. Section 6
-//     proves: a QuaternionKeyframeTrack (rotation) resolved to its target node by name, LINEAR interpolation,
-//     a clip's `duration` trusted from THREE.AnimationClip (see gpu/fbxLoad.js's header for why that is safe
-//     rather than assumed), and skin extraction (bones, inverse-bind matrices, skinIndex/skinWeight)
-//     exercised TOGETHER with animation on the same rig. Section 7 (this round) proves, against exact
-//     measured numbers, independently cross-checked against three.js's own Quaternion/Euler classes rather
-//     than hand arithmetic: preRotation/postRotation composition and a non-default RotationOrder (enum 5,
-//     "XYZ" -- the implicit default when the property is absent is enum 0, "ZYX", NOT "XYZ"); a
-//     VectorKeyframeTrack position channel AND a VectorKeyframeTrack scale channel (generateVectorTrack, a
-//     different FBXLoader code path from generateRotationTrack, exercising raw per-axis curve values with no
-//     Euler/quaternion math); and two separate AnimationStacks/clips in one file, resolving to two distinct,
-//     correctly-named entries in mapFbxAnimations()'s output with non-overlapping channels. Still NOT
-//     covered, stated plainly rather than silently: morph-target (`DeformPercent`) animation tracks, which
-//     mapFbxAnimations() deliberately skips rather than mis-mapping (see its own comment in gpu/fbxLoad.js);
-//     and a rotation curve whose per-axis span exceeds 180 degrees between keyframes (FBXLoader's own
-//     interpolateRotations() switches to a slerp-subdivided sub-interval path above that threshold -- a
-//     genuinely different code path from either fixture's small spans, neither of which reaches it).
+//   * MULTI-MESH/MULTI-MATERIAL CONCAT (section 8) is proven for the LayerElementMaterial "ByPolygon" +
+//     "IndexToDirect" shape only (the shape real FBX exporters emit) -- "ByPolygonVertex"/"ByVertice"/
+//     "AllSame" mapping types are not exercised, and multiple separate Mesh Models in one file (as opposed to
+//     one mesh split across two materials) is exercised structurally by normalizeFbxGroup()'s two-pass concat
+//     but has no dedicated fixture proving it end to end; both are the same code path section 8 already
+//     grades, not a different one, but neither has its own committed regression fixture.
+//   * EMBEDDED-TEXTURE EXTRACTION (section 9) is proven for one embedded PNG on one material's DiffuseColor
+//     slot. Bump/normal/emissive/specular/alpha maps, an EXTERNAL (non-embedded, file-path) texture
+//     reference, and more than one texture per mesh are not exercised -- normalizeFbxGroup() only ever reads
+//     `mat.map` (DiffuseColor), matching GLBParser's own single-baseColor-map scope.
+//   * MORPH-TARGET (DeformPercent) ANIMATION TRACKS (section 10) are proven for one Shape target on one mesh,
+//     with a `Vertices`/`Indexes` position-only delta (no normal deltas -- FBXLoader's own genMorphGeometry
+//     only ever produces position deltas, confirmed by reading that function; readFbxMorphTargets()'s
+//     `normals: null` per target is a faithful reflection of that, not a narrower scope of its own). More than
+//     one Shape target on the same mesh, and a mesh with morph targets AND skin together, are not exercised.
+//   * THE >=180 DEGREE ROTATION-CURVE GAP (section 11) NEEDED NO CODE CHANGE -- VERIFICATION ONLY. FBXLoader's
+//     own interpolateRotations() (vendor/three/jsm/loaders/FBXLoader.js) does the entire slerp-subdivision
+//     before any value reaches gpu/fbxLoad.js's mapFbxAnimations(), which already made zero assumptions about
+//     a track's sample count. Section 11 proves FAITHFUL PASS-THROUGH -- normalizeFbxGroup()'s sampler
+//     compared byte-for-byte against FBXLoader's own raw group.animations track from the SAME run, not a
+//     hand-derived slerp -- and documents a genuinely surprising discovery made while building this fixture:
+//     interpolateRotations()'s own subdivision loop (`for (let t = 0; t < 1; t += 1 / numSubIntervals)`) never
+//     emits a sample at t=1, so the ORIGINAL FINAL KEYFRAME VALUE NEVER APPEARS IN THE OUTPUT TRACK when the
+//     span is >=180 degrees -- not a bug in this fixture or this round's code, a real, load-bearing quirk of
+//     the currently-vendored loader's own algorithm, confirmed by reading that loop directly (see section 11's
+//     comment for the exact trace against this fixture's 270-degree span).
+//   * ANIMATION MAPPING'S EARLIER GAPS (task #59) remain proven as sections 6-7 already established: a
+//     QuaternionKeyframeTrack (rotation) resolved to its target node by name, LINEAR interpolation, a clip's
+//     `duration` trusted from THREE.AnimationClip, skin extraction exercised together with animation on the
+//     same rig (section 6); preRotation/postRotation composition, a non-default RotationOrder, VectorKeyframeTrack
+//     position/scale channels, and two separate AnimationStacks/clips in one file (section 7).
 //   * CUBICSPLINE INTERPOLATION IS NOT A GAP -- IT IS UNREACHABLE FROM THE CURRENTLY-VENDORED FBXLoader, AND
 //     DELIBERATELY NOT ATTEMPTED. Confirmed by reading vendor/three/jsm/loaders/FBXLoader.js's
 //     AnimationParser in full: it never calls `.setInterpolation()` on any track it builds, so every track it
@@ -76,6 +100,26 @@
 //     gpu/fbxLoad.js's samplerInterpolation(). A future reader should not read a missing CUBICSPLINE fixture
 //     as an unclosed item on this list; closing it would need a patched or newer FBXLoader, which is out of
 //     this gate's scope entirely, not merely undone within it.
+//   * MIXED-SKIN SCOPE -- FIXED AND GATED (sections 12-13, v5), AFTER AN ADVERSARIAL REVIEW OF v4 FOUND THE
+//     OLD SYNTHETIC-JOINT-0 BINDING WAS A REAL, SILENT PRODUCTION RISK, NOT MERELY A NARROWER BEHAVIOR: a
+//     secondary mesh in a multi-mesh skinned file INHERITED JOINT 0'S ENTIRE ANIMATED MOTION (a static prop
+//     would visibly swing with a character's root-bone animation; a mesh meant to follow a different bone
+//     would visibly detach from it). gpu/fbxLoad.js's normalizeFbxGroup() now registers a secondary mesh's
+//     OWN node as a new joint (identity inverse-bind matrix), mirroring GLBParser.js's own primary
+//     unskinnedPrims strategy, so the mesh tracks wherever it actually lives in the scene graph -- proven at
+//     RENDER TIME (not just in the parsed shape) by section 12, both for an unrelated static prop AND a
+//     genuine bone attachment checked against an independent three.js oracle. Bounded by a 64-joint
+//     SHADER_JOINT_LIMIT; past that, section 13 proves the fallback (walk the real parent chain for the
+//     nearest existing joint ancestor, bake the FULL world-space bind position) directly, in plain Node, via
+//     a synthetic 65-joint graph -- this exact fallback's FIRST DRAFT had a real, adversarial-review-caught
+//     math bug (baking an ancestor-relative delta double-applies the ancestor's own inverse-bind matrix and
+//     silently drops its accumulated world offset, wrong even at rest pose), which section 13 now regression-
+//     gates directly against the corrected formula. STILL NOT FIXED, named plainly: a SkinnedMesh bound to a
+//     genuinely DIFFERENT skeleton than the reference takes this SAME new-joint path (no longer dragged by a
+//     foreign character's motion) but loses its OWN internal multi-bone deformation, since only a single
+//     rigid joint is registered for it -- supporting a second, fully independent, simultaneously-animated
+//     skeleton in one combined draw call would need merging skeletons into one joint array with per-mesh
+//     index remapping, a distinctly larger piece of work not attempted here.
 //
 // ================================================================================================
 // THE FIXTURES, AND WHY THEY ARE HAND-WRITTEN RATHER THAN SOURCED
@@ -116,7 +160,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { codeOnly, noComments } from "./sourceScan.mjs";
 
@@ -138,8 +182,8 @@ const indexHtmlSrc      = fs.readFileSync(path.join(ENG, "index.html"), "utf8");
 // text of a shader -- and the URL this gate is about IS a template literal: `${this.basePath}${name}.fbx`.
 // Read through codeOnly that row went red against code that is perfectly correct. noComments() is the view
 // that fits: comments gone, literals kept.
-// And the third claim is ABOUT a comment, so it reads raw and proves the text is absent from noComments --
-// which is what makes it a header rather than a string the code happens to carry.
+// And the section-2 "is documented" claims are ABOUT comments, so they read raw and prove the text is absent
+// from noComments (isHeader() there) -- which is what makes it a header rather than a string the code carries.
 const gpuAssetLoaderCode = noComments(gpuAssetLoaderSrc);
 const fbxLoadCode        = codeOnly(fbxLoadSrc);
 const fbxLoadNoComments  = noComments(fbxLoadSrc);
@@ -179,16 +223,18 @@ console.log("\n2. gpu/fbxLoad.js FOLLOWS THE SAME DEPENDENCY-INJECTION SHAPE AS 
     ok("!! normalizeFbxGroup uses ONLY duck-typing (.isMesh/.isSkinnedMesh/.isBone-shaped checks), no 'three' import",
         !/from ['"]three['"]/.test(fbxLoadSrc) &&
         /\.isMesh \|\| obj\.isSkinnedMesh/.test(fbxLoadSrc));
-    ok("!! the remaining v1 scope gaps are documented in the file's own header, GLBParser.js-header style",
-        /SINGLE MESH ONLY/.test(fbxLoadSrc) && /NO TEXTURES, NO VERTEX COLORS/.test(fbxLoadSrc));
-    // v4676 -- SPLIT, because this was one row making two claims of opposite kinds and reading raw source for
-    // both. "It is documented" is a claim ABOUT A COMMENT and must read the comments; "the function exists" is
-    // a claim about code and must not. Joined with && against raw text, the second was satisfiable by the
-    // first -- the header sentence names mapFbxAnimations, so a file with the header and no function passed.
-    ok("!! ...and task #59's animation-mapping closure is DOCUMENTED -- asserted of the comments, where it lives",
-        /ANIMATION MAPPING \(task #59\)/.test(fbxLoadSrc) && !/ANIMATION MAPPING \(task #59\)/.test(fbxLoadNoComments),
-        "present in the raw file and ABSENT once the comments are stripped: that pair is what makes it a " +
-        "header rather than a string the code happens to carry");
+    // The v1 scope-gap row ("SINGLE MESH ONLY", "NO TEXTURES, NO VERTEX COLORS") and the task #59
+    // "ANIMATION MAPPING" header row are retired: the v4 round closed those gaps and rewrote the header, so
+    // the rows below assert the header as it now stands. v4676's SPLIT is kept: a claim that something is
+    // DOCUMENTED reads the comments (present in raw source, ABSENT once comments are stripped), and a claim
+    // that a function exists reads the CODE -- a header naming mapFbxAnimations must not satisfy the latter.
+    const isHeader = (re) => re.test(fbxLoadSrc) && !re.test(fbxLoadNoComments);
+    ok("!! v4's gap closures (multi-mesh/multi-material, embedded-texture, morph-target) are documented in",
+        isHeader(/MULTI-MESH CONCAT \(v4\)/) && isHeader(/EMBEDDED-TEXTURE EXTRACTION \(v4\)/) &&
+        isHeader(/MORPH-TARGET \(DeformPercent\) TRACKS \(v4\)/),
+        "   the file's own header, GLBParser.js-header style -- asserted of the comments, where it lives");
+    ok("!! ...and what is STILL not covered after v4 is named plainly too, not silently folded in",
+        isHeader(/STILL NOT COVERED/));
     ok("!! ...and mapFbxAnimations is a real function, asserted of the CODE and not of the header naming it",
         /mapFbxAnimations/.test(fbxLoadCode),
         "the header sentence above contains the identifier, so the raw-source form of this check was passable " +
@@ -323,7 +369,7 @@ console.log("      NOT ASSUMED, AGAINST WHAT THE PIPELINE ACTUALLY RETURNS ***")
     ok("!! _uploadParsedMesh exists as its own method, taking (name, parsed, opts)",
         /_uploadParsedMesh\(name, parsed, opts\) \{/.test(gpuAssetLoaderSrc));
     ok("!! _loadFBX's normalized FBX output is uploaded through the SAME method GLB uses, not a parallel copy",
-        /_loadFBX[\s\S]{0,1600}?return this\._uploadParsedMesh\(name, parsed, \{\}\);/.test(gpuAssetLoaderSrc));
+        /_loadFBX[\s\S]{0,2600}?return this\._uploadParsedMesh\(name, parsed, \{\}\);/.test(gpuAssetLoaderSrc));
 
     const mLoad = gpuAssetLoaderSrc.match(/async _loadGLBFromBytes\(name, buf, opts\) \{([\s\S]*?)\n    \}\n\n    \/\/ v44/);
     if (mLoad) {
@@ -761,10 +807,645 @@ console.log("      INDEPENDENT three.js QUATERNION/EULER ORACLE, NOT HAND TRIGON
     }
 }
 
+// ---- 8. MULTI-MESH/MULTI-MATERIAL CONCAT -----------------------------------------------------------------------
+console.log("\n8. *** MULTI-MATERIAL CONCAT: LayerElementMaterial (ByPolygon/IndexToDirect) -> geo.groups ->");
+console.log("      normalizeFbxGroup()'s primitiveRanges, THROUGH THE REAL PIPELINE ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxMultiMaterial.ascii.fbx");
+        ok("!! the committed multi-material fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxMultiMaterial.ascii"], {
+                "fbxMultiMaterial.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxMultiMaterial.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.stack || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                vertexCount: mesh.vertexCount,
+                indexCount: mesh.indexCount,
+                primitiveRanges: mesh.primitiveRanges,
+            };
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the 2-triangle, 2-material fixture ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 200) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                // The fixture's LayerElementMaterial is Materials: *2 { a: 0,1 } -- triangle 0 [0,1,2] -> mat 0,
+                // triangle 1 [1,3,2] -> mat 1. FBXLoader's own genGeometry() derives geo.groups by walking the
+                // per-vertex materialIndex array and emitting one addGroup() per contiguous run: [{start:0,
+                // count:3,materialIndex:0},{start:3,count:3,materialIndex:1}] -- traced against this exact
+                // fixture before this fixture was authored (see this file's header). normalizeFbxGroup() reads
+                // geo.groups per mesh and resolves each group's materialIndex through its own materialIndexOf
+                // map (built by walking meshes in order and deduping Material objects by JS reference), which
+                // for a single mesh with two distinct materials is just the identity 0,1.
+                ok("!! *** vertexCount/indexCount are EXACTLY 6/6 (same quad, unaffected by the material split) ***",
+                    r.vertexCount === 6 && r.indexCount === 6,
+                    "got vertexCount=" + r.vertexCount + " indexCount=" + r.indexCount);
+                const expectRanges = [
+                    { indexStart: 0, indexCount: 3, materialIdx: 0, vertexStart: 0, vertexCount: 6 },
+                    { indexStart: 3, indexCount: 3, materialIdx: 1, vertexStart: 0, vertexCount: 6 },
+                ];
+                ok("!! *** primitiveRanges is EXACTLY 2 entries, one per triangle, materialIdx 0 then 1 ***",
+                    JSON.stringify(r.primitiveRanges) === JSON.stringify(expectRanges),
+                    JSON.stringify(r.primitiveRanges));
+                say("materialIdx ordering is NOT coincidental: the fixture's Connections block lists " +
+                    "C: \"OO\",3000000(matA),2000000(model) BEFORE C: \"OO\",3000001(matB),2000000(model) -- " +
+                    "connection order is what FBXLoader's createMesh() uses to build its materials array, and " +
+                    "that order is what normalizeFbxGroup()'s materialIndexOf map preserves as 0, 1.");
+            }
+        }
+    }
+}
+
+// ---- 9. EMBEDDED-TEXTURE EXTRACTION -----------------------------------------------------------------------------
+console.log("\n9. *** EMBEDDED-TEXTURE EXTRACTION: a base64 PNG in a Video node's Content -> parseFbx()'s");
+console.log("      LoadingManager wait -> createImageBitmap() -> REAL GL TEXTURE, PIXELS READ BACK EXACT ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxEmbeddedTexture.ascii.fbx");
+        ok("!! the committed embedded-texture fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxEmbeddedTexture.ascii"], {
+                "fbxEmbeddedTexture.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxEmbeddedTexture.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.stack || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            // Read the GL texture back via a 1x1 framebuffer-per-texel readPixels loop (2x2 here) so the
+            // assertion is against what actually reached the GPU, not just against parsed.texture pre-upload.
+            const fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, mesh.texture, 0);
+            const px = new Uint8Array(2 * 2 * 4);
+            gl.readPixels(0, 0, 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return {
+                ok: true,
+                hasTexture: mesh.hasTexture,
+                texturesByMaterialKeys: mesh.texturesByMaterial ? Object.keys(mesh.texturesByMaterial) : null,
+                pixels: Array.from(px),
+            };
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the embedded-texture fixture and uploads a real GL texture ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 200) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                ok("!! *** hasTexture is true, texturesByMaterial has exactly key \"0\" ***",
+                    r.hasTexture === true && JSON.stringify(r.texturesByMaterialKeys) === JSON.stringify(["0"]),
+                    JSON.stringify(r));
+                // The fixture's embedded PNG is a hand-built 2x2 RGB image, row-major top-to-bottom as PNG
+                // stores it: row 0 (255,0,0) red, (0,255,0) green; row 1 (0,0,255) blue, (255,255,255) white.
+                // _uploadParsedMesh uploads with UNPACK_FLIP_Y_WEBGL: false, so the source's row order is
+                // copied byte-for-byte into the texture with no flip, and readPixels() reads that same order
+                // back -- verified empirically against this exact fixture before this assertion was written
+                // (this file's own discipline: measured, not assumed from a mental model of GL's row convention).
+                const expectPixels = [
+                    255,0,0,255,   0,255,0,255,        // row 0: red, green
+                    0,0,255,255,   255,255,255,255,    // row 1: blue, white
+                ];
+                ok("!! *** the GL texture's actual readPixels() bytes are EXACTLY the fixture's authored PNG ***",
+                    JSON.stringify(r.pixels) === JSON.stringify(expectPixels), JSON.stringify(r.pixels));
+            }
+        }
+
+        // ---- 9b. WITHOUT A MANAGER, THE OLD (v1-v3) BEHAVIOR IS REPRODUCED, NOT BROKEN ----
+        say("9b. omitting opts.manager (a caller that predates this round) must NOT throw -- texture stays " +
+            "null, exactly like v1-v3's unconditional gap, not a crash on an un-awaited .image read");
+        const SCRIPT_NO_MANAGER = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const { FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js");
+            const { parseFbx, normalizeFbxGroup } = await import("/gpu/fbxLoad.js");
+            const buf = await (await fetch("/gpu/fixtures/fbxEmbeddedTexture.ascii.fbx")).arrayBuffer();
+            try {
+                const group = await parseFbx(buf, FBXLoader, { path: "/gpu/fixtures/" });   // no manager
+                const parsed = await normalizeFbxGroup(group);
+                return { ok: true, texture: parsed.texture, texturesByMaterialKeys: Object.keys(parsed.texturesByMaterial || {}) };
+            } catch (e) {
+                return { ok: false, error: String(e && e.stack || e) };
+            }
+        }`;
+        const out9b = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT_NO_MANAGER });
+        if (out9b.skipped) { say("SKIP: " + out9b.reason); fails++; }
+        else {
+            ok("!! *** no manager -> no throw, texture stays null, texturesByMaterial stays empty ***",
+                out9b.ok && out9b.result && out9b.result.ok &&
+                out9b.result.texture === null && JSON.stringify(out9b.result.texturesByMaterialKeys) === "[]",
+                out9b.ok ? JSON.stringify(out9b.result) : out9b.reason);
+        }
+    }
+}
+
+// ---- 10. MORPH-TARGET (DeformPercent) ANIMATION TRACKS ----------------------------------------------------------
+console.log("\n10. *** MORPH TARGETS: a Shape/BlendShapeChannel/BlendShape deformer chain + a DeformPercent");
+console.log("       animation curve -> readFbxMorphTargets() + mapFbxAnimations()'s morphChannels, THROUGH THE");
+console.log("       REAL PIPELINE ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxMorphTarget.ascii.fbx");
+        ok("!! the committed morph-target fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxMorphTarget.ascii"], {
+                "fbxMorphTarget.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxMorphTarget.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.stack || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                morphTargetNames: mesh.morphTargetNames,
+                morphWeights: mesh.morphWeights ? Array.from(mesh.morphWeights) : null,
+                morphVertexCount: mesh.morphVertexCount,
+                morphTargets: mesh.morphTargets ? mesh.morphTargets.map((t) => ({
+                    positions: t.positions ? Array.from(t.positions) : null,
+                    normals: t.normals,
+                })) : null,
+                animations: mesh.animations ? mesh.animations.map((c) => ({
+                    name: c.name, duration: c.duration,
+                    channels: c.channels, morphChannels: c.morphChannels || null,
+                    samplers: c.samplers.map((s) => ({ times: Array.from(s.times), values: Array.from(s.values), interpolation: s.interpolation })),
+                })) : null,
+            };
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the morph-target fixture ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 200) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                ok("!! *** morphTargetNames is EXACTLY [\"bulge\"], morphWeights EXACTLY [0], morphVertexCount 6 ***",
+                    JSON.stringify(r.morphTargetNames) === JSON.stringify(["bulge"]) &&
+                    JSON.stringify(r.morphWeights) === JSON.stringify([0]) &&
+                    r.morphVertexCount === 6,
+                    JSON.stringify({ names: r.morphTargetNames, weights: r.morphWeights, count: r.morphVertexCount }));
+                // The fixture's Shape node deltas are (0,0,1) at all 4 control points. FBXLoader expands that
+                // into the SAME 6 non-indexed polygon-vertex corners the base geometry uses (2 triangles,
+                // [0,1,2] and [1,3,2] over control points 0-3), so every one of the 6 corners' delta is (0,0,1)
+                // -- 18 values, all z=1. readFbxMorphTargets() reads geo.morphAttributes.position AFTER
+                // FBXLoader's own expansion, not the raw sparse Indexes/Vertices, so this is what a caller
+                // actually receives per output vertex, not the 4-control-point sparse form the file authored.
+                const expectDelta = [0,0,1, 0,0,1, 0,0,1, 0,0,1, 0,0,1, 0,0,1];
+                const t0 = r.morphTargets && r.morphTargets[0];
+                ok("!! *** morphTargets[0].positions is EXACTLY 6 corners x (0,0,1), normals null (position-only) ***",
+                    t0 && JSON.stringify(t0.positions) === JSON.stringify(expectDelta) && t0.normals === null,
+                    t0 ? JSON.stringify(t0) : "no morph target");
+
+                const clip = r.animations && r.animations[0];
+                ok("!! *** exactly 1 clip \"TestClip\", duration EXACTLY 1, ZERO regular channels (morph-only) ***",
+                    clip && clip.name === "TestClip" && clip.duration === 1 && clip.channels.length === 0,
+                    JSON.stringify(clip));
+                if (clip) {
+                    ok("!! *** morphChannels is EXACTLY 1 entry: samplerIdx 0, targetMeshName \"fixtureMesh\", morphIndex 0 ***",
+                        JSON.stringify(clip.morphChannels) === JSON.stringify([{ samplerIdx: 0, targetMeshName: "fixtureMesh", morphIndex: 0 }]),
+                        JSON.stringify(clip.morphChannels));
+                    // KeyValueFloat is 0,100 (DeformPercent's 0-100 convention) -- FBXLoader's own
+                    // generateMorphTrack() divides by 100 (vendor/three/jsm/loaders/FBXLoader.js), giving the
+                    // three.js 0-1 morphTargetInfluences convention. mapFbxAnimations() reads that already-
+                    // scaled value verbatim, no second scaling.
+                    ok("!! *** the morph sampler: times EXACTLY [0, 1], values EXACTLY [0, 1] (0-100 / 100), LINEAR ***",
+                        clip.samplers.length === 1 &&
+                        JSON.stringify(clip.samplers[0].times) === JSON.stringify([0, 1]) &&
+                        JSON.stringify(clip.samplers[0].values) === JSON.stringify([0, 1]) &&
+                        clip.samplers[0].interpolation === "LINEAR",
+                        JSON.stringify(clip.samplers[0]));
+                }
+            }
+        }
+    }
+}
+
+// ---- 11. ROTATION CURVE SPANNING >=180 DEGREES -- VERIFICATION ONLY, NO CODE CHANGE -----------------------------
+console.log("\n11. *** >=180 DEGREE ROTATION SPAN: FBXLoader's OWN interpolateRotations() slerp-subdivision,");
+console.log("       PROVEN AS FAITHFUL PASS-THROUGH -- mapFbxAnimations() NEEDED NO CHANGE FOR THIS GAP ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxRotation180.ascii.fbx");
+        ok("!! the committed >=180-degree-span fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        // Import parseFbx/normalizeFbxGroup DIRECTLY (rather than only through loader.loadAsset(), this
+        // section's one deliberate deviation from sections 3/6/8/9/10's style) so the raw FBXLoader-produced
+        // group.animations track and normalizeFbxGroup()'s own sampler can be compared from the SAME parse,
+        // in the SAME script -- proving pass-through empirically rather than against hand-copied numbers.
+        const SCRIPT = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const { FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js");
+            const { LoadingManager } = await import("/vendor/three/three.module.js");
+            const { parseFbx, normalizeFbxGroup } = await import("/gpu/fbxLoad.js");
+            try {
+                const buf = await (await fetch("/gpu/fixtures/fbxRotation180.ascii.fbx")).arrayBuffer();
+                const manager = new LoadingManager();
+                const group = await parseFbx(buf, FBXLoader, { path: "/gpu/fixtures/", manager });
+                const parsed = await normalizeFbxGroup(group);
+                const rawTrack = group.animations && group.animations[0] && group.animations[0].tracks[0];
+                const clip = parsed.animations && parsed.animations[0];
+                return {
+                    ok: true,
+                    rawTrack: rawTrack ? { name: rawTrack.name, times: Array.from(rawTrack.times), values: Array.from(rawTrack.values) } : null,
+                    clip: clip ? {
+                        name: clip.name, duration: clip.duration, channels: clip.channels,
+                        samplers: clip.samplers.map((s) => ({ times: Array.from(s.times), values: Array.from(s.values), interpolation: s.interpolation })),
+                    } : null,
+                };
+            } catch (e) { return { ok: false, error: String(e && e.stack || e) }; }
+        }`;
+        const out = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT });
+        if (out.skipped) { say("SKIP: " + out.reason); fails++; }
+        else {
+            ok("!! *** the fixture parses through both FBXLoader AND normalizeFbxGroup without error ***",
+                out.ok && out.result && out.result.ok,
+                out.ok ? JSON.stringify(out.result).slice(0, 300) : out.reason);
+            if (out.ok && out.result && out.result.ok) {
+                const r = out.result;
+                ok("!! *** FBXLoader's OWN raw track is named \"spinner.quaternion\" -- confirms the >=180 branch ran",
+                    r.rawTrack && r.rawTrack.name === "spinner.quaternion",
+                    r.rawTrack ? r.rawTrack.name : "no raw track");
+                // *** THE SURPRISE, CONFIRMED EMPIRICALLY, DOCUMENTED IN THIS FILE'S HEADER: *** the fixture
+                // authored a clean 2-keyframe curve (0 -> 270 degrees over 1 second), but interpolateRotations()'s
+                // own subdivision loop (numSubIntervals = 270/180 = 1.5, `for (t=0; t<1; t+=1/1.5)`) only ever
+                // executes at t=0 and t=0.6667 -- the strict `t < 1` guard means t=1 (the ORIGINAL final keyframe)
+                // is never reached, so the 3-sample track below is genuinely what FBXLoader produces, not a
+                // fixture-authoring mistake. Measured directly against this exact fixture, not hand-derived.
+                const expectTimes  = [0, 0, 0.6666666865348816];
+                const expectValues = [0,0,0,1,  0,0,0,1,  -0.5,0,0,0.8660253882408142];
+                ok("!! *** raw track: times/values EXACTLY match the measured 3-sample slerp-subdivision output ***",
+                    r.rawTrack &&
+                    JSON.stringify(r.rawTrack.times) === JSON.stringify(expectTimes) &&
+                    JSON.stringify(r.rawTrack.values) === JSON.stringify(expectValues),
+                    r.rawTrack ? JSON.stringify(r.rawTrack) : "no raw track");
+                ok("!! *** duration is EXACTLY 0.6666666865348816 (the last sample's own time, trusted from",
+                    r.clip && r.clip.duration === 0.6666666865348816,
+                    "   THREE.AnimationClip -- NOT the fixture's authored 1-second KeyTime end) " +
+                    JSON.stringify(r.clip && r.clip.duration));
+                ok("!! *** THE CENTRAL CLAIM: normalizeFbxGroup()'s sampler is BYTE-FOR-BYTE IDENTICAL to",
+                    r.clip && r.clip.samplers.length === 1 &&
+                    JSON.stringify(r.clip.samplers[0].times) === JSON.stringify(r.rawTrack.times) &&
+                    JSON.stringify(r.clip.samplers[0].values) === JSON.stringify(r.rawTrack.values) &&
+                    r.clip.samplers[0].interpolation === "LINEAR",
+                    "   FBXLoader's OWN raw track (faithful pass-through, not a re-derivation): " +
+                    (r.clip ? JSON.stringify(r.clip.samplers[0]) : "no clip"));
+                ok("!! *** the channel resolves to \"spinner\" (targetNode 2), path \"rotation\" ***",
+                    r.clip && r.clip.channels.length === 1 &&
+                    r.clip.channels[0].targetNode === 2 && r.clip.channels[0].path === "rotation",
+                    JSON.stringify(r.clip && r.clip.channels));
+            }
+        }
+    }
+}
+
+// ---- 12. MIXED-SKIN-SCOPE FIX (v5) -- A SECONDARY MESH NO LONGER DRAGS WITH JOINT 0'S MOTION -------------------
+console.log("\n12. *** MIXED-SKIN-SCOPE FIX: a plain secondary mesh in a multi-mesh skinned file now tracks its");
+console.log("       OWN real position in the scene graph, PROVEN AT RENDER TIME (SkeletalAnimator), not just in");
+console.log("       the parsed shape -- an adversarial review of the v4 round found the old synthetic-joint-0");
+console.log("       binding silently dragged it by joint 0's full animated motion ***");
+{
+    const skip = webgpuSkipReason();
+    if (skip) { say("SKIP (no headless shell / playwright): " + skip); fails++; }
+    else {
+        const fixturePath = path.join(ENG, "gpu/fixtures/fbxMixedSkinScope.ascii.fbx");
+        ok("!! the committed mixed-skin-scope fixture exists", fs.existsSync(fixturePath), fixturePath);
+
+        // ---- 12a. the SHIPPED pipeline: skin.joints gets propMesh's OWN node appended, not bound to joint 0 ----
+        const SCRIPT_PARSE = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const canvas = document.createElement("canvas");
+            const gl = canvas.getContext("webgl2");
+            if (!gl) return { ok: false, reason: "no webgl2 context in this headless page" };
+            const { GPUAssetLoader } = await import("/gpu/gpuAssetLoader.js");
+            const loader = new GPUAssetLoader(gl, { basePath: "/gpu/fixtures/" });
+            loader.primeKnownAssets(["fbxMixedSkinScope.ascii"], {
+                "fbxMixedSkinScope.ascii": { glb: false, obj: false, fbx: true, folder: false },
+            });
+            let mesh;
+            try { mesh = await loader.loadAsset("fbxMixedSkinScope.ascii"); }
+            catch (e) { return { ok: false, stage: "loadAsset threw", error: String(e && e.stack || e) }; }
+            if (!mesh) return { ok: false, reason: "loadAsset returned null" };
+            return {
+                ok: true,
+                vertexCount: mesh.vertexCount,
+                isRigged: mesh.isRigged,
+                nodeNames: mesh.nodes ? mesh.nodes.map((n) => n.name) : null,
+                skinJoints: mesh.skin ? mesh.skin.joints : null,
+            };
+        }`;
+        const outParse = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT_PARSE });
+        if (outParse.skipped) { say("SKIP: " + outParse.reason); fails++; }
+        else {
+            ok("!! *** the SHIPPED pipeline loads the 3-mesh (skinned quad + plain prop + bone attachment) fixture ***",
+                outParse.ok && outParse.result && outParse.result.ok,
+                outParse.ok ? JSON.stringify(outParse.result).slice(0, 200) : outParse.reason);
+            if (outParse.ok && outParse.result && outParse.result.ok) {
+                const r = outParse.result;
+                ok("!! *** vertexCount is EXACTLY 18 (6 each from fixtureMesh, propMesh, attachMesh, all non-",
+                    r.vertexCount === 18, "   indexed 2-triangle expansions), isRigged is true. got " + r.vertexCount);
+                ok("!! *** nodes are EXACTLY [\"\", \"fixtureMesh\", \"propMesh\", \"root\", \"child\", \"attachMesh\"] ***",
+                    JSON.stringify(r.nodeNames) === JSON.stringify(["", "fixtureMesh", "propMesh", "root", "child", "attachMesh"]),
+                    JSON.stringify(r.nodeNames));
+                // *** THE CENTRAL SHAPE CLAIM: skin.joints is [3, 4, 2, 5] -- root, child (the real skeleton,
+                // unchanged from fbxAnim.ascii.fbx's own established Cluster order), THEN propMesh's OWN node
+                // (index 2), THEN attachMesh's OWN node (index 5), each appended as a NEW joint in mesh-visit
+                // order. Under v4's bug, neither propMesh nor attachMesh would appear in skin.joints at all --
+                // both were bound to EXISTING joint 0 (root) via a synthetic all-zero joints row, never
+                // registering their own node. ***
+                ok("!! *** skin.joints is EXACTLY [3, 4, 2, 5] -- propMesh's and attachMesh's OWN nodes, NOT",
+                    JSON.stringify(r.skinJoints) === JSON.stringify([3, 4, 2, 5]),
+                    "   re-using joint 0. got " + JSON.stringify(r.skinJoints));
+            }
+        }
+
+        // ---- 12b. RENDER-TIME PROOF: drive gpu/SkeletalAnimator.js to t=0.5s (root at 45deg about X) and ----
+        // ---- confirm propMesh's vertices land EXACTLY where they were authored -- not dragged by root ----
+        const SCRIPT_RENDER = `async () => {
+            const im = document.createElement("script");
+            im.type = "importmap";
+            im.textContent = JSON.stringify({ imports: { "three": "/vendor/three/three.module.js" } });
+            document.head.appendChild(im);
+            await new Promise((r) => setTimeout(r, 10));
+            const { FBXLoader } = await import("/vendor/three/jsm/loaders/FBXLoader.js");
+            const { parseFbx, normalizeFbxGroup } = await import("/gpu/fbxLoad.js");
+            const { SkeletalAnimator } = await import("/gpu/SkeletalAnimator.js");
+            try {
+                const buf = await (await fetch("/gpu/fixtures/fbxMixedSkinScope.ascii.fbx")).arrayBuffer();
+                const group = await parseFbx(buf, FBXLoader, { path: "/gpu/fixtures/" });
+                const parsed = await normalizeFbxGroup(group);
+
+                const animator = new SkeletalAnimator(parsed);
+                animator.setClip(0, 0);
+                animator.update(0.5);   // halfway through the 1s clip -> root at 45deg about X
+
+                function applySkin(vIdx) {
+                    const px = parsed.positions[vIdx*3], py = parsed.positions[vIdx*3+1], pz = parsed.positions[vIdx*3+2];
+                    let ox = 0, oy = 0, oz = 0;
+                    for (let k = 0; k < 4; k++) {
+                        const j = parsed.joints[vIdx*4+k];
+                        const w = parsed.weights[vIdx*4+k];
+                        if (w === 0) continue;
+                        const jm = animator.jointMatrices.subarray(j*16, j*16+16);
+                        ox += w * (jm[0]*px + jm[4]*py + jm[8]*pz + jm[12]);
+                        oy += w * (jm[1]*px + jm[5]*py + jm[9]*pz + jm[13]);
+                        oz += w * (jm[2]*px + jm[6]*py + jm[10]*pz + jm[14]);
+                    }
+                    return [ox, oy, oz];
+                }
+                // fixtureMesh corners 0-5 (triangles [0,1,2],[1,3,2] over control points 0-3); propMesh
+                // corners 6-11 (same pattern, control points offset by 10 in X); attachMesh corners 12-17
+                // (control points (0,0,0),(1,0,0),(0,1,0),(1,1,0), parented under "child").
+                const skinnedRoot = applySkin(0);    // control point 0, root-bound, y=z=0 -> on the rotation
+                                                       // axis, should stay put regardless of root's rotation
+                const propCorners = [6,7,8,9,10,11].map(applySkin);
+                const attachCorners = [12,13,14,15,16,17].map(applySkin);
+                return { ok: true, skinnedRoot, propCorners, attachCorners };
+            } catch (e) { return { ok: false, error: String(e && e.stack || e) }; }
+        }`;
+        const outRender = await runInEngineOrigin({ engineRoot: ENG, script: SCRIPT_RENDER });
+        if (outRender.skipped) { say("SKIP: " + outRender.reason); fails++; }
+        else {
+            ok("!! *** the render-time probe (parseFbx/normalizeFbxGroup + a real SkeletalAnimator driven to",
+                outRender.ok && outRender.result && outRender.result.ok,
+                "   t=0.5s) runs without error: " +
+                (outRender.ok ? JSON.stringify(outRender.result).slice(0, 200) : outRender.reason));
+            if (outRender.ok && outRender.result && outRender.result.ok) {
+                const r = outRender.result;
+                ok("!! ...sanity: fixtureMesh's root-bound on-axis vertex stays at (0,0,0) -- confirms the",
+                    JSON.stringify(r.skinnedRoot) === JSON.stringify([0, 0, 0]),
+                    "   animator is actually driving something, not a silent no-op. got " + JSON.stringify(r.skinnedRoot));
+                // *** THE CENTRAL RENDER-TIME CLAIM. *** Measured directly against this exact fixture (this
+                // file's own header): under v4's bug, applying joint 0's (root's) 45-degree rotation matrix
+                // to propMesh's raw corners would move e.g. (10,2,0) -> (10, 1.4142135..., 1.4142135...) --
+                // the SAME sin(45)/cos(45) pattern fixtureMesh's own child-bound corners show above (see
+                // section 12b's earlier PASS lines). Under the v5 fix, propMesh has its OWN joint (an
+                // identity-inverse-bind-matrix entry for its own, never-animated node), so it must come back
+                // EXACTLY as authored -- not close, not approximately static, EXACT.
+                const expectProp = [
+                    [10, 0, 0], [12, 0, 0], [10, 2, 0],
+                    [12, 0, 0], [12, 2, 0], [10, 2, 0],
+                ];
+                ok("!! *** THE CENTRAL CLAIM: propMesh's 6 corners are EXACTLY their authored coordinates at",
+                    JSON.stringify(r.propCorners) === JSON.stringify(expectProp),
+                    "   t=0.5s (root mid-rotation) -- NOT dragged by joint 0. got " + JSON.stringify(r.propCorners));
+
+                // *** THE SECOND CLAIM, ADDED AFTER AN ADVERSARIAL REVIEW OF THIS FIX NAMED IT THE MORE
+                // DISCRIMINATING TEST STILL MISSING: *** attachMesh is parented under "child", and child now
+                // carries its OWN independent rotation (0->90deg about Y) SEPARATE from root's (0->90deg about
+                // X) -- so a mesh still (incorrectly) bound to joint 0 alone would show ONLY root's rotation
+                // applied to its bind-pose world position, never child's own additional Y-rotation. The
+                // expected values below are NOT hand-derived trigonometry -- they come from an INDEPENDENT
+                // three.js oracle (a plain root/child/attach Object3D chain, real Quaternion.setFromAxisAngle,
+                // real .updateMatrixWorld(), NO FBXLoader and NO normalizeFbxGroup involved at all) built
+                // specifically to check this fixture, the same "independent oracle" discipline
+                // fbxAnimAdvanced.ascii.fbx's own gate section already established in this file. A first hand-
+                // trigonometry attempt at these numbers had a rotation-order/axis-swap mistake in ITS OWN
+                // math (not in normalizeFbxGroup()) -- caught by cross-checking against this independent
+                // oracle before it was ever written into an assertion, exactly the failure mode this
+                // discipline exists to catch.
+                const expectAttach = [
+                    [0, 0.7071067690849304, 0.7071067690849304],
+                    [0.7071067690849304, 1.207106739282608, 0.2071067988872528],
+                    [0, 1.4142135381698608, 1.4142135381698608],
+                    [0.7071067690849304, 1.207106739282608, 0.2071067988872528],
+                    [0.7071067690849304, 1.9142135083675385, 0.9142135679721832],
+                    [0, 1.4142135381698608, 1.4142135381698608],
+                ];
+                ok("!! *** THE SECOND CENTRAL CLAIM: attachMesh's 6 corners match the INDEPENDENT three.js",
+                    JSON.stringify(r.attachCorners) === JSON.stringify(expectAttach),
+                    "   oracle EXACTLY -- correctly tracking child's OWN Y-rotation, not just root's X-rotation " +
+                    "alone (what joint-0-only binding would give). got " + JSON.stringify(r.attachCorners));
+            }
+        }
+    }
+}
+
+// ---- 13. THE SHADER_JOINT_LIMIT FALLBACK, DIRECTLY, IN PLAIN NODE -- NO BROWSER, NO FBX FILE NEEDED ------------
+console.log("\n13. *** THE SHADER_JOINT_LIMIT-EXCEEDED FALLBACK, EXERCISED DIRECTLY: a 65-joint reference");
+console.log("       skeleton (>= the 64 limit) forces normalizeFbxGroup() into the ancestor-reuse path -- an");
+console.log("       adversarial review of section 12's own first draft caught a REAL MATH BUG here (not merely");
+console.log("       'unproven'): the first version baked an ANCESTOR-RELATIVE delta into the vertex, which");
+console.log("       DOUBLE-APPLIES the ancestor's own inverse-bind matrix at render time and silently drops");
+console.log("       the ancestor's entire accumulated world offset -- wrong even at REST POSE ***");
+{
+    // Plain-Node, no browser, no committed .fbx fixture -- this file's own header states exactly this is the
+    // point of normalizeFbxGroup()'s duck-typing design: "can be exercised against a hand-built fake
+    // THREE.Group in plain Node." A 65-bone linear chain (bone i's world position (0,i,0), pure translation,
+    // no rotation -- simple enough to hand-verify, distinctive enough that a wrong formula produces a wrong
+    // number rather than accidentally the right one) plus a secondary mesh parented under bone 10 with a
+    // real local offset (0,1.5,0) -- mirroring the adversarial review's own live reproduction exactly,
+    // including its reported ground truth (0, 11.5, 0).
+    const fbxLoadUrl = pathToFileURL(path.join(ENG, "gpu/fbxLoad.js")).href;
+    const { normalizeFbxGroup } = await import(fbxLoadUrl);
+
+    function vec3(x, y, z) { return { x, y, z }; }
+    function quatIdentity() { return { x: 0, y: 0, z: 0, w: 1 }; }
+    function mat4Translate(x, y, z) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
+    function mat4Invert(m) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, -m[12],-m[13],-m[14],1]); }
+
+    function buildFakeGroup() {
+        const N_BONES = 65;
+        const bones = [];
+        for (let i = 0; i < N_BONES; i++) {
+            bones.push({
+                name: "bone" + i, isBone: true,
+                position: vec3(0, 1, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+                children: [], parent: null,
+                matrixWorld: { elements: mat4Translate(0, i, 0) },
+            });
+        }
+        for (let i = 1; i < N_BONES; i++) { bones[i - 1].children.push(bones[i]); bones[i].parent = bones[i - 1]; }
+        const boneInverses = bones.map((b) => ({ elements: mat4Invert(b.matrixWorld.elements) }));
+        const refMesh = {
+            name: "refMesh", isMesh: true, isSkinnedMesh: true,
+            position: vec3(0, 0, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [], parent: null,
+            matrixWorld: { elements: mat4Translate(0, 0, 0) },
+            skeleton: { bones, boneInverses },
+            geometry: {
+                attributes: {
+                    position: { array: new Float32Array([0, 0, 0]) },
+                    skinIndex: { array: new Uint16Array([0, 0, 0, 0]) },
+                    skinWeight: { array: new Float32Array([1, 0, 0, 0]) },
+                },
+            },
+            material: {},
+        };
+        const secWorldY = 10 + 1.5;
+        const secondaryMesh = {
+            name: "secondaryMesh", isMesh: true, isSkinnedMesh: false,
+            position: vec3(0, 1.5, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [], parent: bones[10],
+            matrixWorld: { elements: mat4Translate(0, secWorldY, 0) },
+            geometry: { attributes: { position: { array: new Float32Array([0, 0, 0]) } } },
+        };
+        bones[10].children.push(secondaryMesh);
+        const group = {
+            name: "", isMesh: false, isSkinnedMesh: false,
+            position: vec3(0, 0, 0), quaternion: quatIdentity(), scale: vec3(1, 1, 1),
+            children: [refMesh, bones[0]], parent: null,
+            matrixWorld: { elements: mat4Translate(0, 0, 0) },
+            updateMatrixWorld() { /* no-op -- matrixWorld already hand-set on every node above */ },
+            animations: null,
+        };
+        refMesh.parent = group; bones[0].parent = group;
+        return { group, bones };
+    }
+
+    const { group, bones } = buildFakeGroup();
+    const parsed = await normalizeFbxGroup(group);
+
+    // secondaryMesh is the SECOND mesh visited (after refMesh) -- vertex 1 (positions[3..5]).
+    const bakedPos = [parsed.positions[3], parsed.positions[4], parsed.positions[5]];
+    const secJointSlot = parsed.joints[1 * 4];
+    const secWeight = parsed.weights[1 * 4];
+
+    ok("!! *** skin.joints has 65 entries (>= SHADER_JOINT_LIMIT) and secondaryMesh's own new-joint path is",
+        parsed.skin && parsed.skin.joints.length === 65,
+        "   correctly SKIPPED (forced into the ancestor-reuse fallback). got " + (parsed.skin ? parsed.skin.joints.length : "no skin"));
+    ok("!! *** secondaryMesh is bound to joint slot 10 (bone10, the nearest REAL joint ancestor), weight 1 ***",
+        secJointSlot === 10 && secWeight === 1, "got slot=" + secJointSlot + " weight=" + secWeight);
+    // *** THE CENTRAL CLAIM: bakedPos is the mesh's FULL WORLD-SPACE bind position (0, 11.5, 0) -- bone10's
+    // own +10 world offset PLUS the mesh's own +1.5 local offset -- not an ancestor-relative delta (0, 1.5,
+    // 0), which is what the review's REJECTED first-draft formula would have produced by DROPPING bone10's
+    // own offset entirely (a bug it shares with gpu/GLBParser.js's own analogous fallback, named honestly
+    // rather than silently ported). ***
+    ok("!! *** THE CENTRAL CLAIM: bakedPos is EXACTLY [0, 11.5, 0] -- the mesh's FULL WORLD-SPACE bind",
+        JSON.stringify(bakedPos) === JSON.stringify([0, 11.5, 0]),
+        "   position, not the [0, 1.5, 0] an ancestor-relative delta would give. got " + JSON.stringify(bakedPos));
+    // Apply the skinning formula BY HAND at rest pose (bone10's runtime world == its bind-pose world, since
+    // nothing here animates): jointMatrix = boneWorld * IBM. Both are pure-translation matrices, so their
+    // product's translation is the SUM of the two translations -- and by construction (IBM is defined as
+    // boneWorld's own inverse) that sum is exactly zero, making jointMatrix the identity at rest pose. This
+    // is the SAME formula gpu/SkeletalAnimator.js itself uses (confirmed by reading it directly), not
+    // reimplemented independently here -- applying it to bakedPos should reproduce the ground truth exactly.
+    const ibm = parsed.skin.inverseBindMatrices[secJointSlot];
+    const boneWorld = bones[10].matrixWorld.elements;
+    const finalPos = [
+        bakedPos[0] + boneWorld[12] + ibm[12],
+        bakedPos[1] + boneWorld[13] + ibm[13],
+        bakedPos[2] + boneWorld[14] + ibm[14],
+    ];
+    ok("!! *** applying the real skinning formula (jointMatrix = boneWorld * IBM, at rest pose) to bakedPos",
+        JSON.stringify(finalPos) === JSON.stringify([0, 11.5, 0]),
+        "   reproduces the ground truth (0, 11.5, 0) exactly, matching the adversarial review's own live " +
+        "reproduction. got " + JSON.stringify(finalPos));
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
-    "\nSee this file's own header for the full list of what is deliberately NOT proven here: no multi-mesh/" +
-    "multi-material concat, no embedded-texture extraction, no morph-target (DeformPercent) animation tracks, " +
-    "and no rotation curve spanning >=180 degrees between keyframes on one axis (FBXLoader's slerp-subdivision " +
-    "path). CUBICSPLINE interpolation is NOT on that list as an open gap -- it is unreachable from the " +
-    "currently-vendored FBXLoader (see the header for why), not merely undone.");
+    "\nSections 1-7: task #44/#59's original scope (single-mesh ingest, skin+animation, preRotation/" +
+    "postRotation/multi-clip). Sections 8-11: multi-mesh/multi-material concat, embedded-texture extraction, " +
+    "morph-target (DeformPercent) animation tracks, and a rotation curve spanning >=180 degrees between " +
+    "keyframes (verification-only). Sections 12-13 (this round): the mixed-skin-scope fix -- a secondary mesh " +
+    "in a multi-mesh skinned file now tracks its own real position in the scene graph at render time, instead " +
+    "of silently dragging with joint 0's full animated motion (the v4 round's own real, adversarial-review-" +
+    "found risk), proven both under the 64-joint limit (section 12, a real fixture, both an unrelated static " +
+    "prop and a genuine bone attachment against an independent three.js oracle) and past it (section 13, a " +
+    "synthetic 65-joint graph in plain Node, catching a real math bug an earlier draft of this same fix had). " +
+    "See this file's header for what is still deliberately NOT proven: narrower LayerElementMaterial " +
+    "mapping types, non-DiffuseColor texture slots, multiple morph targets or morph+skin together, and a " +
+    "SkinnedMesh bound to a genuinely different skeleton losing its OWN internal deformation. " +
+    "CUBICSPLINE interpolation is NOT an open gap on that list -- it is unreachable from the currently-vendored " +
+    "FBXLoader (see the header for why).");
 process.exit(fails ? 1 : 0);

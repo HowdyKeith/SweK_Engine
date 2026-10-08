@@ -56,7 +56,18 @@ const SKIP_DIR = /^(node_modules|vendor|\.git|\.venv)$/;
 //
 // So the walk collects every gate BASENAME as it goes and answers both questions. The debt is the second
 // number, and it was hidden inside the first.
+// *** v4814 -- ONE WALK PER GATE RUN, AND ONLY WHEN THE CALLER ASKS FOR IT. *** reportDoors-selfcheck reached this
+// function three times in one process -- classify(), its own population row, and this module's reportLines() run as a
+// member of the population it counts -- and each walk read every .js/.mjs in the tree: 7,953 reads and 127 MB of the
+// gate's 2.7 s here, and the rig, slow at file reads, took the gate to 5,065 ms, over its sweep line and leaving 8
+// records unchecked at ship time. The census cannot change while that gate runs (it writes nothing into the tree), so
+// it turns the memo on. EVERYONE ELSE GETS A FRESH WALK: the bridge and server.html call reportLines() on members in
+// long-lived processes, and a census frozen at the first call would be wrong by the second. Copies are handed out, so
+// a caller that decorates a row cannot change the next caller's answer.
+let _memo = null;
+export function cachePopulation(on = true) { _memo = on ? new Map() : null; }
 export function population(root) {
+    if (_memo && _memo.has(root)) return _memo.get(root).map((r) => ({ ...r }));
     const out = [];
     const gateNames = new Set();
     const walk = (dir) => {
@@ -84,7 +95,9 @@ export function population(root) {
     // second pass, once the whole tree's gate names are known: a gate that does not sit beside its subject
     // is still a gate, and the two facts are kept apart rather than one standing in for the other
     for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs"));
-    return out.sort((a, b) => a.rel.localeCompare(b.rel));
+    out.sort((a, b) => a.rel.localeCompare(b.rel));
+    if (_memo) _memo.set(root, out.map((r) => ({ ...r })));
+    return out;
 }
 
 /** The runtime arity, which is the only one that answers "can a consumer call this with nothing?". */
@@ -377,6 +390,19 @@ export const NO_GATE_V4587 = Object.freeze([
     "physics/labHome.mjs",
 ]);
 
+// *** v4778 -- TWO ARRIVALS, THROUGH THE rtx MERGE, THE SAME SHAPE AS v4540's. *** Both grew a reportLines() on
+// the rtx line with their gate in tools/ship/ and nothing beside the module: brain/pilotPolicy.mjs (14c5b597,
+// the fly-brain pilot for the space dogfight, whose gate calls itself "THE SIBLING GATE OF brain/pilotPolicy.mjs"
+// from tools/ship/pilotPolicy-selfcheck.mjs) and world/cityChunkScene.mjs (4f0c5d7a, RTX round 5's CityGen-to-
+// ray-tracer glue, gated by tools/ship/cityChunkScene-selfcheck.mjs). Gated ANYWHERE, so UNGATED_ANYWHERE_V4565
+// stays at two; ungated BESIDE, so this list owes them names. The row was ALREADY on that line -- it branched at
+// 82ebd940 with NO_GATE_V4587 in place and never edited this file -- so it went red there as each arrived and no
+// round on that line wrote the names down; the red travelled here with the merge, v4587's finding a second time.
+export const NO_GATE_V4778 = Object.freeze([
+    "brain/pilotPolicy.mjs",
+    "world/cityChunkScene.mjs",
+]);
+
 /**
  * *** SIX OF THE SEVEN "WITHOUT A GATE" HAVE ONE, AND THE DEBT IS THE OTHER TWO. ***
  *
@@ -399,13 +425,14 @@ export const UNGATED_ANYWHERE_V4565 = Object.freeze([
     "tools/ship/morphCounter.mjs",
 ]);
 
-/** Every provider with no gate BESIDE it, across all five dated lists. Derived, so no list can drift alone.
+/** Every provider with no gate BESIDE it, across all six dated lists. Derived, so no list can drift alone.
  *  DEDUPED BY NAME: brain/fleetRouting.mjs is in BOTH NO_GATE_V4540 and NO_GATE_V4587 -- the two lines each
  *  wrote it down, v4540 when it arrived here through a merge and v4587 on main. Concatenating would count it
  *  twice and hand every future arrival a permanent credit of one, which is the fault closingCoverage was
  *  rebuilt for at v4399: freeze by NAME, not by COUNT. */
 export const NO_GATE_ALL = Object.freeze([...new Set(
-    [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587])].sort());
+    [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587,
+     ...NO_GATE_V4778])].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

@@ -144,8 +144,10 @@ console.log("\n5. *** THE ATTRIBUTE NAMES MUST MATCH, AND A MISMATCH IS SILENT *
 // ---- 6. THE PREMISE, AND THE PROOF ---------------------------------------------------------------------
 console.log("\n6. *** ASKING THE DRIVER, AND THEN COUNTING PIXELS ***");
 {
-    const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
-    const skip = browserSkipReason(require);
+    const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } = await import("./playwrightResolve.mjs");
+    // v4778 rig: this handed browserSkipReason the require function -- where the CHROMIUM object goes, which is truthy, so it
+    // never refused and the next line launched null. The two facts are resolved and handed over as the function takes them.
+    const PW = resolvePlaywright(require), skip = browserSkipReason(PW.chromium, PW.from, HEADLESS_SHELL);
     if (skip) {
         console.log("  ----  SKIPPED, WITH A REASON: " + skip);
         console.log("        Sections 1-5 gate the geometry and the shader source. What only a GL context can");
@@ -153,7 +155,7 @@ console.log("\n6. *** ASKING THE DRIVER, AND THEN COUNTING PIXELS ***");
         console.log("        the whole round rests on, so it is measured rather than asserted from a spec.");
     } else {
         const { chromium } = resolvePlaywright(require);
-        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader"] });
+        const browser = await chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         try {
             const page = await browser.newPage();
             await page.setContent("<!doctype html><body></body>");

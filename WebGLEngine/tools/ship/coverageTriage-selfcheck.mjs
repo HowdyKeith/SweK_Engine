@@ -1,10 +1,13 @@
 // WebGLEngine/tools/ship/coverageTriage-selfcheck.mjs — v3410
 //
-// Run: node tools/ship/coverageTriage-selfcheck.mjs   (~4.2s — MEASURED individually)
+// Run: node tools/ship/coverageTriage-selfcheck.mjs   (~1.4s -- MEASURED v4819 at the merge, median of 1438/1261/1651 alone; was ~4.2s)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // gateReach reported "63.3% of physics modules reachable from a gate" and was careful to call it A DENOMINATOR,
 // NOT A VERDICT. Nobody looked inside it for three versions, and the number got quoted in three changelogs.
+//
+// v4778 RIG RUN SABOTAGE: triage() files every flat scene file as non-scene (`if (false && flatSim ...)`) ->
+// 4 RED, section 1's rewritten "most of the ungated" row first ("0 of 103 ungated"). Restored, md5 verified.
 
 import { triage, triageLines, NON_SCENE, importsPhysics } from "./coverageTriage.mjs";
 
@@ -14,9 +17,15 @@ const t = triage();
 
 // ---- 1. THE POPULATION IS DOMINATED BY SCENE CODE ---------------------------------------------------------------
 {
+    // *** v4778 RIG RUN -- THIS WAS RED ON PROGRESS. *** It asserted `t.scene > 100`, a count standing in for
+    // the word "most". Task #89/#90's kaiju gates (64ccd1af, e015a568) reached simulation/KaijuManager.js,
+    // and through it KaijuRivalry, KingPack, PathPlanner and statusEffects: five scene files became GATED and
+    // the scene count fell 105 -> 100 of 103 ungated, which is exactly the direction this triage wants and
+    // read red. The row now asserts what its name says, against the ungated count it is a share of.
+    const ungated = t.scene + t.nonScene.length;
     ok("!! most of the ungated count is flat simulation scene files that import NO physics at all",
-       t.scene > 100,
-       t.scene + " of them — " + t.sceneSample.map((p) => p.split("/")[1]).join(", ") + ", ... — and the test is " +
+       t.scene > ungated / 2,
+       t.scene + " of " + ungated + " ungated — " + t.sceneSample.map((p) => p.split("/")[1]).join(", ") + ", ... — and the test is " +
        "EVIDENCE rather than taste: a file importing nothing from physics, lbm, em, tomo or cosmo is not a physics module");
     ok("...verified by import, not by directory or filename",
        t.sceneSample.every((p) => !importsPhysics(p)),

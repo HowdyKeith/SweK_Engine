@@ -179,12 +179,21 @@ console.log("\n2. handed a stale record, each check names it");
         const good = fs.readFileSync(TP, "utf8");
         const RD = await import("./recordDrift.mjs");
         let healed = null, broken = null;
+        // *** v4778 -- THE BROKEN CASE WAITS 1 ms, AND NOTHING ELSE HERE MOVED. *** These two cases were 176 ms
+        // of this gate, measured, nearly all of it waiting on timers, and half of that was the broken case: it
+        // never heals, so how long it waits between attempts proves nothing, and it waits 1 ms. Its ATTEMPT
+        // count is still the DEFAULT (`undefined`, not 3), because `tries === 3` is the only thing in this gate
+        // that pins it. The healed case keeps the 50 ms restore and the default 40 ms wait, so it still fails at
+        // 0 and 40 and heals at 80. A first draft of this cut restored at 10 ms and passed an explicit 3, and
+        // went 0-RED, measured, on three retry sabotages the old pair took red: default attempts 3 -> 2, 3 -> 5,
+        // and default wait 40 -> 8 ms. A 10 ms tear heals under any wait over 5 ms; a 50 ms one needs the
+        // default to span it. The row keeps its window, and pays about 40 ms for it.
         try {
             fs.writeFileSync(TP, good.slice(0, 300));                                  // torn
             setTimeout(() => { try { fs.writeFileSync(TP, good); } catch {} }, 50);    // ...and healed
             healed = await RD.readTimingsWithRetry(ENG);
             fs.writeFileSync(TP, good.slice(0, 300));                                  // and never healed
-            broken = await RD.readTimingsWithRetry(ENG);
+            broken = await RD.readTimingsWithRetry(ENG, undefined, 1);
         } finally { fs.writeFileSync(TP, good); }
         ok("!! *** A TORN READ HEALS ON RETRY, AND A BROKEN FILE IS NAMED RATHER THAN CRASHING ***",
             healed && healed.rec && healed.tries > 1 && broken && !broken.rec && broken.tries === 3 &&
@@ -323,10 +332,17 @@ console.log("\n2. handed a stale record, each check names it");
     //
     // gateFiles is not given a row: it takes ENG and returns a file list, no check reads it directly, and the
     // two checks that use it are both covered here and above. Said rather than left as a gap.
+    // *** v4778 -- THIS FAKE RAN THE WHOLE REAL CENSUS, SWAP SCAN INCLUDED, AND THAT WAS 907 ms OF THIS GATE. ***
+    // It read `census: () => ({ ...aReal.census(), definesOk: 1, gates: 1 })`. The bare call dropped the
+    // { shapes: false } checks() passes, so the one fixture paid for the swap scan the live check was cut
+    // loose from at v4548 -- 844 ms under --cpu-prof, of a 3,317 ms serial median on a tree the rtx merge grew
+    // to 4,581 sources and 70 MB -- and even with the flag passed through, the census it spread was 63 ms of
+    // gate walk for two fields the fake then overwrote. The check reads `definesOk` and `gates` and nothing
+    // else, so the fake returns those two, the way the runtimeGap fake above returns counts no tree could
+    // produce. What the row proves is unchanged: the fake is a different FUNCTION, and a memo keyed any
+    // coarser than the function hands it the live pass's real answer, which has no "vs 1" in it.
     const aReal = await import("./assertionShape.mjs");
-    // v4781 -- shapes:false, as recordDrift's own check asks: it reads definesOk and gates, both overridden here, and
-    // the swap scan the default census also runs was ~450 ms of this gate's 2,300 for fields nothing compares.
-    const aFake = { ...aReal, census: () => ({ ...aReal.census({ shapes: false }), definesOk: 1, gates: 1 }) };
+    const aFake = { ...aReal, census: () => ({ definesOk: 1, gates: 1 }) };
     const dA = await checks({ load: async (p) => (p.includes("assertionShape") ? aFake : import(p)), only: "assertionShape census" });
     const rA = dA.find((c) => c.name === "assertionShape census");
     ok("!! an injected assertionShape census is MEASURED, not served from the memo the live pass filled",
@@ -523,6 +539,24 @@ console.log("\n5. *** AND SOMETHING ACTUALLY RUNS IT, WHICH FOR FIVE ROUNDS NOTH
     //     drift() AGAIN -- a second full six-check pass to print a report on the one just finished.
     //     reportLines now takes the result the caller already has.
     // The rest is module import plus the two full passes this gate genuinely needs, which is the floor.
+    //
+    // *** v4778 -- AND IT CREPT BACK: 3,317 ms SERIAL MEDIAN AFTER THE rtx MERGE, AGAINST recordReach's 2,200. ***
+    // The tree had grown to 4,581 sources and 70 MB. Profiled with --cpu-prof rather than guessed, and NOT
+    // recovered by widening anything -- every sabotage in this file and its v4551 log was re-run on a scratch
+    // copy of HEAD, old gate beside new, and each took the same rows red in both:
+    //   -   907 ms: section 2's assertionShape fake called the real census with no arguments, so it ran the
+    //     swap scan the live check skips. The fake now returns the two fields the check reads.
+    //   -   ~110 ms: section 2b's second full pass re-ran closingCoverage.coverage() and registryOrphans.scan(),
+    //     both pure in the tree. They sit behind recordDrift.mjs's function-keyed memo now, and a string key
+    //     on either takes its own fixture row red, measured.
+    //   -   ~80 ms: the torn-read pair's broken case waited 40 ms between attempts that cannot heal (see its
+    //     note -- the healed case keeps its 50 ms window, because cutting it went 0-red on three retry
+    //     sabotages), and knowledge-index.json plus sweep-timings.json were parsed on calls that never read them.
+    // Serial median of seven alone after it, no other gate running: 1,994 ms with the healed window cut to
+    // 10 ms; with it kept at 50, five clean runs of eight read 1,956-2,072 ms, median 2,023. Interleaved with
+    // the old gate on a scratch copy while another agent's gates ran: 3,337 -> 2,127 ms. What is left is the live pass itself,
+    // about 1,600 ms -- the runtimeGap census over every source (~650), the index rebuild (~280), and the 70 MB
+    // read they share (~300) -- which is the tree's size, not this gate's overhead.
     //
     // So the row now asserts the live fact, in the direction where repair is green: the gate is in the sweep.
     // If it ever goes back over, THAT is the red, and the CLI plus verify.mjs's in-process call are what keep

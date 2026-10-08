@@ -33,9 +33,26 @@ const BLOCKED = ["bat", "cmd", "ps1", "vbs", "vbe", "wsf", "wsh", "hta", "lnk", 
 const BLOCKED_SET = new Set(BLOCKED);
 const SKIP_DIRS = new Set(["node_modules", ".git", "__pycache__", "asset_library", "tts-out", "doc-out", ".kpop-wav"]);
 const SKIP_FILES = new Set([".DS_Store", "Thumbs.db", "gmail.json", "github.json", "tts.json", "stt.json", "wled.json", "rgb.config.json", "discord-voice.json", "camera.json", "twitch-eventsub.json", "gen-queue.json", "processes.json", "clip-queue.json", "fallout.json", "starfield.json", "toasts.json", "uitars.json", "use_bun.flag"]);
+// v4778 -- THE FSR CACHES LEAVE THE ZIP, AND THE LIST OF THEM IS READ, NOT TYPED. Keith: "put the FSR frame
+// caches in its own repo folder, and access /install from there if the user chooses." Twelve harvested data files
+// (frame*-cache.json.gz, the genGate fold caches -- 300 MB of a 333 MB release zip, measured) moved into WebGLEngine/fsr-caches/,
+// and fsr-caches/manifest.json names every one with its bytes and sha256. This set is THAT manifest's names, so
+// there is one declaration of what a cache is and a re-harvest that adds one is excluded the moment the manifest
+// is rebuilt. manifest.json itself is not in it and ships: an installed tree must know what it lacks and what the
+// right bytes hash to, which is what install-fsr-caches.html reads. A name-keyed skip like its neighbours below;
+// tools/ship/fsrCaches-selfcheck.mjs checks no other file in the tree shares one of these names.
+// No manifest -> an empty set -> nothing extra skipped: the failure is a bigger zip, never a missing file.
+function _fsrCacheBlobs() {
+    try {
+        const m = JSON.parse(fs.readFileSync(path.join(ENGINE_ROOT, "fsr-caches", "manifest.json"), "utf8"));
+        return new Set((m.files || []).map((f) => f && f.name).filter((n) => typeof n === "string" && n && n !== "manifest.json"));
+    } catch { return new Set(); }
+}
+const FSR_CACHE_BLOBS = _fsrCacheBlobs();
 // pattern-based skips: per-run state that may hold names/emails
 function _skipFile(name) {
     if (SKIP_FILES.has(name)) return true;
+    if (FSR_CACHE_BLOBS.has(name)) return true;
     if (/\.zip$/i.test(name)) return true;
     if (/^petfbi-.*\.json$/i.test(name)) return true;
     if (/-seen\.json$/i.test(name)) return true;
@@ -539,4 +556,4 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
 // did: a gate that can only reach this file's behaviour through a full makeInstallable() run over the whole
 // real tree is a slow gate that also cannot target one edge case (an empty file, a non-ASCII name, a file
 // deflate doesn't shrink) without hoping the real tree happens to contain one today.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile, normalizeZipSeparators, _zip, _crc32 };
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, FSR_CACHE_BLOBS, _skipFile, normalizeZipSeparators, _zip, _crc32 };

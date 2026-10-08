@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { declared, readDoc, minFoldsFor } from "./foldStats.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
@@ -20,7 +21,8 @@ import { spearman } from "./frameGate.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H11 = "render/frame-gain-preregistration.md";
-export const CACHE_H11 = "tools/ship/frameGain-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H11 = cacheRel("frameGain-cache.json.gz");
 export const RESULT_H11 = "tools/ship/frameGain-result.json";
 export const GAIN_KEYS = Object.freeze({ scenes: "list", cells: "list", alpha: "num", minFolds: "int", upto: "int", cvFloor: "num" });
 // Found by NAME, so a reordering of genGate's features cannot point this at other columns.

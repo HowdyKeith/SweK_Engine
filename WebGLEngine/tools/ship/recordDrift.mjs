@@ -208,9 +208,16 @@ export async function checks({ load = null, timings = null, records = null, only
         });
     }
 
+    // *** v4778 -- coverage() AND scan() BELOW GO BEHIND `once` TOO, FOR THE REASON THE FOUR ABOVE DID. ***
+    // Both are pure functions of the tree -- gateSweep's enumeration plus its ledger, and knowledge-index.json
+    // plus the registry -- and neither reads sweep-timings.json, the one file the gate rewrites mid-run. They
+    // were re-taken on every full pass, and recordDrift-selfcheck's section 2b makes a second full pass whose
+    // fixture swaps assertionShape and nothing else: 114 ms of that pass, measured, for two answers it already
+    // had. Keyed on the function like everything else here, so the closing and registry fixtures, which hand
+    // in their own coverage and scan, are still measured.
     if (wanted("sweep closings")) {
         const C = await mod("./closingCoverage.mjs");
-        const cc = C.coverage();
+        const cc = once(C.coverage, () => C.coverage());
         out.push({
             name: "sweep closings", owes: OWES.closing,
             recorded: 0, actual: cc.summedUncovered,
@@ -231,7 +238,11 @@ export async function checks({ load = null, timings = null, records = null, only
     const gateFiles = (wanted("knowledge index") || wanted("instrument registry") || wanted("sweep timings"))
         ? once(A.gateFiles, () => A.gateFiles(ENG)) : [];
     const onDisk = gateFiles.length;
-    const K = JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8"));
+    // v4778 -- read only when a check that uses it is asked for. It was parsed on EVERY call, a 474 KB file at
+    // ~6 ms, and the gate makes eighteen calls of which four want it. Deliberately NOT memoised: this is the
+    // RECORD the rebuild is compared against, and it is read fresh each time it is judged.
+    const needK = wanted("knowledge index") || wanted("instrument registry");
+    const K = needK ? JSON.parse(fs.readFileSync(path.join(ENG, "knowledge-index.json"), "utf8")) : null;
     // *** v4587 -- THIS CHECK COMPARED A COUNT AND REPORTED "index agrees". ***
     //
     // It was `K.gates.length !== onDisk`: a POPULATION check under a name that promises agreement. Adding or
@@ -269,7 +280,7 @@ export async function checks({ load = null, timings = null, records = null, only
 
     if (wanted("instrument registry")) {
     const R = await mod("./registryOrphans.mjs");
-    const rs = R.scan();
+    const rs = once(R.scan, () => R.scan());
     out.push({
         name: "instrument registry", owes: OWES.registry,
         recorded: 0, actual: rs.narrow.length,
@@ -310,7 +321,11 @@ export async function checks({ load = null, timings = null, records = null, only
     const doTimings = wanted("sweep timings"), doGap = wanted("runtimeGap census");
     if (!doTimings && !doGap) return out;
     if (doTimings) {
-        const read = timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
+        // v4778 -- an injected `records` is the whole world (see v4680 below), so the real file is not read
+        // for it: it was parsed, 1 MB, and then thrown away, three times per gate run. A torn real file could
+        // also have answered UNREADABLE for a fixture that never asked about the disk.
+        const read = records ? { rec: {}, tries: 0, error: null }
+                   : timings ? { rec: timings, tries: 0, error: null } : await readTimingsWithRetry(ENG);
         if (!read.rec) {
             out.push({
                 name: "sweep timings", owes: OWES.timing, recorded: 0, actual: -1, stale: true,
@@ -363,8 +378,9 @@ export async function checks({ load = null, timings = null, records = null, only
             ? BT.coverageOf([{ file: BT.FILES.shared, kind: "shared", host: timings.host || null, rec: timings },
                              ...BT.records(ENG).filter((r) => r.kind !== "shared")])
             : BT.coverage(ENG);
-        const missing = gateFiles
-            .map((p) => path.relative(ENG, p).replace(/\\/g, "/"))
+        // v4778 -- the relative names are keyed on the memoised gateFiles ARRAY, so they are mapped once per
+        // walk rather than 1,925 path.relative calls on each of this gate's six timings calls.
+        const missing = once(gateFiles, () => gateFiles.map((p) => path.relative(ENG, p).replace(/\\/g, "/")))
             .filter((g) => {
                 const e = cov.entries.get(g);
                 return !e || !e.at || !e.kind;

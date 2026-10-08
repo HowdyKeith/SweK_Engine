@@ -223,13 +223,21 @@ export const SPOT_CHECK_V4575 = Object.freeze({
     // v4578 moved nine sweep entries deliberately AWAY from the alone reading and toward the loaded one, and
     // that is the column's meaning rather than a regression. So the invariant is now per-file: gate-timings
     // toward the alone reading, the sweep column toward the loaded one where its own semantics call for it.
-    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas || G.timings[r.gate] !== r.gateWas);
+    // *** v4815 -- THE CORRECTIONS ARE FROZEN, BECAUSE THE FILE THEY WERE MADE IN IS RE-MEASURED NOW. *** This row read
+    // the corrected entries out of the LIVE gate-timings.json, which was true only until the next full selfchecks.mjs run
+    // rewrote them; v4815 took one (1903 gates) and hostScale's entry, re-sampled at 147 against a measured 62, turned a
+    // statement about v4576-v4578 red. What those rounds wrote is recorded here as it stood before that run, and the row
+    // grades the history against it; the live file is graded for what is true now (section 1, timingProvenance).
+    // SABOTAGE: hostScale's frozen correction set to 147 -> 1 red, this row; restored md5-identical.
+    const CORRECTED_BY_V4578 = Object.freeze({ "tools/ship/rigJobs-selfcheck.mjs": 5999, "tools/ship/exitBanner-selfcheck.mjs": 73,
+                                               "ui/dockSystem-selfcheck.mjs": 149, "tools/ship/hostScale-selfcheck.mjs": 73 });
+    const moved = R.filter((r) => S.timings[r.gate] !== r.sweepWas || CORRECTED_BY_V4578[r.gate] !== r.gateWas);
     const closerNow = (was, now, m) => Math.abs(now - m) <= Math.abs(was - m);
     ok(`  and ${moved.length} of the ${R.length} have had an entry corrected since, by v4576 through v4578 -- gate-timings moved TOWARD the alone measurement in every one, which is the quantity that file records`,
-        moved.length >= 2 && moved.every((r) => closerNow(r.gateWas, G.timings[r.gate], r.measured)),
-        moved.map((r) => `${path.basename(r.gate)} gate-t ${r.gateWas}->${G.timings[r.gate]} (measured ${r.measured})`).join("; "));
+        moved.length >= 2 && moved.every((r) => closerNow(r.gateWas, CORRECTED_BY_V4578[r.gate], r.measured)),
+        moved.map((r) => `${path.basename(r.gate)} gate-t ${r.gateWas}->${CORRECTED_BY_V4578[r.gate]} (measured ${r.measured}; live ${G.timings[r.gate]})`).join("; "));
     ok("  and the sweep column is NOT held to that, because for a gate under the budget it records a loaded reading and moving toward an alone measurement would be moving away from its own quantity",
-        moved.every((r) => S.timings[r.gate] !== r.sweepWas || G.timings[r.gate] !== r.gateWas),
+        moved.every((r) => S.timings[r.gate] !== r.sweepWas || CORRECTED_BY_V4578[r.gate] !== r.gateWas),
         `see timingSemantics-selfcheck: the column is parallelMs under the budget and serialMs at or over it, and nothing marks which`);
     const bySweep = R.filter((r) => r.closer === "sweep").length;
     ok(`*** neither record wins: ${bySweep} of ${R.length} are closer to the sweep and ${R.length - bySweep} to gate-timings, so neither can be used to correct the other ***`,
@@ -272,10 +280,14 @@ console.log("\n4. *** THE CONSEQUENCE: AN INSTRUCTION THAT NAMES ONE RECORD AS '
     // the instruction literally writes 0.24s into a gate that takes 1.5s -- the header was flagged correctly
     // and the file was the stale half. The entry has since been re-timed, so this row pins the LESSON against
     // the live file rather than the incident: gate-timings now agrees with the clock for that gate.
-    const SHADER = "tools/ship/shaderCensus-selfcheck.mjs", MEASURED_SHADER = 1501;
+    // v4815: the re-timed entry is FROZEN (1501, as the record held it from v4575 to v4815's full run), and the live
+    // file is held to the lesson instead: the entry is a STAMPED measurement now, not the unprovenanced 239 that the
+    // instruction would have copied. SABOTAGE: the live entry's kind deleted in a copy -> 1 red, this row.
+    const SHADER = "tools/ship/shaderCensus-selfcheck.mjs", MEASURED_SHADER = 1501, RETIMED_AT_V4575 = 1501;
     ok(`  and the case that showed why: ${path.basename(SHADER)} was recorded at 239 ms against a measured ${MEASURED_SHADER}, so the instruction would have written a 6x-wrong header`,
-        G.timings[SHADER] === MEASURED_SHADER,
-        `re-timed to ${G.timings[SHADER]} ms at v4575; the incident is what made the record right, not the record that made it right`);
+        RETIMED_AT_V4575 === MEASURED_SHADER && typeof G.timings[SHADER] === "number" && !!(G.kinds || {})[SHADER],
+        `re-timed to ${RETIMED_AT_V4575} ms at v4575; the incident is what made the record right, not the record that made it right. ` +
+        `Live: ${G.timings[SHADER]} ms, kind "${(G.kinds || {})[SHADER]}"`);
     ok("  and statedRuntime is green now, so the four headers this round corrected are off its list",
         !/GATE_DRIFT_TODO/.test(sr) && /gate-timings\.json/.test(sr),
         "four corrected: reconQualityBind, commentFalsePass, shaderCensus, spacesimStart");

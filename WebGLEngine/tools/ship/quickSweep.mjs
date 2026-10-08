@@ -32,7 +32,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
 // The FAIL-line rule is IMPORTED, not re-spelled. tools/ship/failLines.mjs owns "what an assertion line
 // looks like" and its own header is about exactly this problem -- "AN EXIT CODE IS NOT A FINDING". Two
 // copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
@@ -40,7 +40,7 @@ import { boxId } from "./hostScale.mjs";
 import { FAIL_LINE } from "./failLines.mjs";
 import { skippable, readRecordCached as readInputRecord } from "./inputSets.mjs";   // v4725: read once per process while unchanged
 import { enumerateGates, classify, VERDICT, SWEEP_V4297, ENG, exitKind, exitName, EXIT_KIND, reclaimScratchDirs, TRANSIENT_FIXTURES } from "./gateSweep.mjs";
-import { FIXTURE_DIRS, FIXTURE_PREFIX } from "./fixtureLitter.mjs";
+import { FIXTURE_DIRS, FIXTURE_PREFIX, reclaimMutations } from "./fixtureLitter.mjs";
 import { sweepStrays } from "./exitBusy.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 import { RED_AT_V4279, RED_AT_V4408, RED_AT_V4424, RED_AT_V4476, RED_AT_V4484, RED_AT_V4531, RED_AT_V4535, UNCONFIRMED_SLOW, ALL_REGISTERED } from "./redCensus.mjs";
@@ -240,17 +240,109 @@ export const LOCAL_TIMINGS = "tools/ship/sweep-timings.local.json";
  * write it. That is right rather than convenient: the numbers in it were produced by whichever box has been
  * running the sweep, and that is the box about to write.
  */
-export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, id = boxId() } = {}) {
+export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, id = boxId(),
+                                        handovers = RECORD_HANDOVERS } = {}) {
     const was = prior && prior.host;
     if (!was) return { file, host: id, foreign: false, why: `no box was named in the record; ${id} adopts it` };
-    if (was === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    const owner = ownerOf(was, handovers);
+    // the handover is asked FIRST: a box that handed the record on names itself in `host` until the new owner
+    // writes, and reading that as ownership would make two owners -- the hostScale-selfcheck row caught it
+    // v4819: `was` and the rows read through canonicalId, so a record that names a box in v4796's megabyte form names it
+    if (canonicalId(was) === id && owner === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    if (owner === id) {
+        // the LAST row naming this box, since v4818 a box can be handed the record more than once
+        const h = [...handovers].reverse().find((x) => canonicalId(x.to) === id);
+        return { file, host: id, foreign: false,
+                 why: `the record names ${was}, which handed it to this box (${id}) at ${h ? h.at : "?"}` };
+    }
     return { file: local, host: id, foreign: true,
-             why: `the record belongs to ${was} and this box is ${id} -- writing ${local} instead, because two ` +
-                  `machines' runtimes in one set of fields is not a record, it is whichever ran last` };
+             // v4819: the record's host as WRITTEN where no handover moved it -- hostScale-selfcheck's "names BOTH boxes" row
+             why: `the record belongs to ${owner !== canonicalId(was) ? `${owner} (handed over from ${was})` : was} and this box ` +
+                  `is ${id} -- writing ${local} instead, because two machines' runtimes in one set of fields is ` +
+                  `not a record, it is whichever ran last` };
 }
 
+// *** v4778 -- THE OWNER BOX RETIRED, SO OWNERSHIP MOVES BY A DATED RECORD, NEVER BY EDITING `host`. ***
+//
+// boxTimings.mjs's v4679 header saw this coming: the record's host is "a LINUX 4-core container ... ephemeral
+// and gone, and a new one hashes differently because boxId() includes an md5 of the CPU model". At v4778 it
+// happened. The container restarted mid-round as linux-x64-4c-16096mb-420793, the shared record still named
+// linux-x64-4c-16096mb-142c0d, and every writer here refused it -- correctly -- so the rotation that
+// capReading, sweepCoverage and recordReach read could no longer be recorded by anyone, on any box.
+//
+// The one-line fix, rewriting `host` to the new box, is the thing v4647 exists to forbid: it would file one
+// machine's runtimes under another's name. A handover is different in kind -- it says WHO may write next and
+// leaves every existing entry attributed to the box that measured it (each carries its own `at`). Keith chose
+// the rig as the new owner at v4778, because it is the only box that persists: a sandbox changes silicon on
+// every restart, so handing the record to one would strand it again at the next. Every other box, the retired
+// one included, keeps writing its own file.
+//
+// The chain is followed, so a later handover appends a row rather than editing this one, and a box that has
+// handed the record on is refused like any stranger -- two owners is the defect, not a convenience.
+export const RECORD_HANDOVERS = Object.freeze([
+    Object.freeze({ at: "v4778", from: "linux-x64-4c-16096mb-142c0d", to: "win32-x64-12c-32678mb-b70b27",
+        decidedBy: "Keith",
+        evidence: "142c0d is the host of every sandbox reading from v4647 to the post-merge full sweep of " +
+                  "2026-09-29T03:33Z; the container restarted at about 15:20Z and came back as 420793. The rig's " +
+                  "id is read off its own v4777 clone verify, where it reports itself 13 times." }),
+    // *** v4813 -- AND BACK, BECAUSE A RECORD THE VERIFYING BOX REWRITES ON EVERY VERIFY CANNOT HOLD STILL. ***
+    // The rig owned the record for two rounds of clone verifies. Its first full re-timing evicted 152 gates (a
+    // median 1.57x slower than the sandbox, every one confirmed alone) and three ratchets frozen on the sandbox's
+    // population went red; moving the 3000 ms line by that median (Keith's first call) cleared them, and the
+    // NEXT rig verify moved 25 more gates across it -- 16 sandbox readings re-timed for the first time, 9 rig
+    // readings within a few percent of the line -- and recordReach (54 of 50) and four sweepCoverage rows were
+    // red again. About 60 gates sit within 10% of any line chosen on the rig's record, so the history gates
+    // would flip every round. Keith chose to hand the record back to the sandbox: one stopwatch, written by the
+    // round's own sweep, with the rig reading its membership as a foreign box and writing only its .local.json --
+    // the arrangement v4777 shipped under. When a sandbox restart changes the id, the answer is another dated
+    // row here, not a hand-off to a box that rewrites the record in every verify.
+    Object.freeze({ at: "v4813", from: "win32-x64-12c-32678mb-b70b27", to: "linux-x64-4c-16095mb-142c0d",
+        decidedBy: "Keith",
+        evidence: "the rig's record at 81d33d5a, after its owner-line verify of 228ff99e: 484 of 1,926 gates outside " +
+                  "a 4,710 ms line and recordReach 54 unchecked against 50, both moved by that one verify. 16095mb-" +
+                  "142c0d is this sandbox's boxId() at v4813 -- the same CPU hash as the v4778 sender, 1 MB less " +
+                  "memory reported -- and the shared record is restored to 4c904f50's, the last the sandbox wrote." }),
+    // v4815 -- THE SANDBOX RESTARTED ON A DIFFERENT CLOUD HOST, AND THE ANSWER IS THE ROW THE v4813 NOTE PREDICTED. The
+    // container came back at 2026-10-06 11:49 on a Xeon @ 2.80GHz (md5 420793) where 142c0d was @ 2.10GHz, so every
+    // sweep and rotation here became a foreign box's and wrote only the .local.json. Which host sits under a session is
+    // not the session's to choose; the record follows the sandbox by a dated row, as before.
+    Object.freeze({ at: "v4815", from: "linux-x64-4c-16095mb-142c0d", to: "linux-x64-4c-16095mb-420793",
+        decidedBy: "Keith",
+        evidence: "boxId() read linux-x64-4c-16095mb-420793 after the 11:49 restart; three re-timings (capReading, " +
+                  "referenceKind, timingRecords, all exit 0) went to sweep-timings.local.json and their exit-1 codes " +
+                  "from v4815's first verdict stayed in the record, keeping redAction red. 420793 is a box the " +
+                  "record's boxLegend already knew (16075mb, 2.80GHz) at an earlier round." }),
+    // v4818 -- AND BACK. The container restarted onto the 2.10GHz host again (md5 142c0d), so the v4818 rotation's
+    // forty readings went to .local.json and it was reverted. Keith chose the handover over shipping read-only. This
+    // is the first row that RETURNS the record to a box that held it, which is what ownerOf's ordered walk is for.
+    Object.freeze({ at: "v4818", from: "linux-x64-4c-16095mb-420793", to: "linux-x64-4c-16095mb-142c0d",
+        decidedBy: "Keith",
+        evidence: "boxId() read linux-x64-4c-16095mb-142c0d (Xeon @ 2.10GHz) at the v4818 rotation, which wrote 40 " +
+                  "readings to sweep-timings.local.json and refused the shared record; that local file was deleted and " +
+                  "the ledger it moved was restored. 142c0d held the record from v4813 to v4815." }),
+]);
+
+/** The box that may write a record whose `host` reads `host`, after following every handover. */
+// *** v4818 -- ROWS ARE APPLIED IN THE ORDER THEY WERE DECIDED, BECAUSE A BOX CAN GET THE RECORD BACK. *** The walk
+// took the FIRST row naming the current box and stopped at a box it had already seen. That is a fine reading of a
+// chain that never revisits anybody, and the sandbox's two cloud hosts are exactly a chain that does: 142c0d handed
+// to 420793 at v4815 and 420793 hands back at v4818. Traced before the row was written, the old walk returned
+// 420793 for a record whose host is 420793 -- the handover would have been ignored, silently, and every write would
+// have kept going to .local.json. The table is append-only and dated, so its order IS the history: apply each row
+// whose `from` is the current owner, in order. On a chain that never revisits a box this is the same answer.
+// v4819 -- AND EVERY ID IS READ IN ONE FORM. The rows were written while boxId() carried megabytes; the line merged in at
+// v4819 has carried whole gigabytes since v4796, so the same box is `16095mb` in a row and `16gb` in boxId(). The walk
+// compares canonicalId()s and returns one, so `ownerOf(x) === boxId()` asks the question it always asked.
+export function ownerOf(host, handovers = RECORD_HANDOVERS) {
+    let h = canonicalId(host);
+    for (const x of handovers) if (canonicalId(x.from) === h) h = canonicalId(x.to);
+    return h;
+}
+
+// v4778 rig run: path.resolve, not path.join -- `--timings C:\\x.json` (or /tmp/x.json) is an ABSOLUTE path, and join
+// glued it under the tree, so the file the caller named was never the file read.
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
-    try { return JSON.parse(fs.readFileSync(path.join(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
+    try { return JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
 }
 
 /**
@@ -270,12 +362,13 @@ export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
  * and a record that does not cover the tree would make every gate it lacks "unmeasured", run regardless of cost.
  */
 export function ownTimings(shared, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, root = ENG, id = boxId() } = {}) {
-    const was = shared && shared.host;
-    if (!was || was === id) return { rec: shared, file, own: true, why: was ? `this box (${id}) owns ${file}` : `${file} names no box; ${id} adopts it` };
+    // v4819: whose record it is is ownerOf()'s answer -- the handovers the other line keeps -- not the `host` field alone
+    const was = shared && shared.host, owner = was ? ownerOf(was) : null;
+    if (!was || owner === id) return { rec: shared, file, own: true, why: was ? `this box (${id}) owns ${file}` : `${file} names no box; ${id} adopts it` };
     const mine = readTimings(local, root);
-    if (mine.host === id && Object.keys(mine.timings || {}).length > 0)
-        return { rec: mine, file: local, own: true, why: `${file} belongs to ${was}; choosing by this box's own ${local}` };
-    return { rec: shared, file, own: false, why: `${file} belongs to ${was} and this box (${id}) has no record of its own yet; choosing by ${was}'s` };
+    if (canonicalId(mine.host) === id && Object.keys(mine.timings || {}).length > 0)
+        return { rec: mine, file: local, own: true, why: `${file} belongs to ${owner}; choosing by this box's own ${local}` };
+    return { rec: shared, file, own: false, why: `${file} belongs to ${owner} and this box (${id}) has no record of its own yet; choosing by ${owner}'s` };
 }
 
 /**
@@ -591,6 +684,10 @@ export function reclaimStrandedFixtures(root = ENG) {
         }
     }
     for (const q of sweepStrays(root)) gone.push(path.relative(root, q).split(path.sep).join("/"));
+    // v4815 -- AND A TRACKED FILE A KILLED GATE WAS HALF-WAY THROUGH BENDING. fixtureLitter's mutation ledger has held the
+    // original of every ledgered edit since v4692, but only rigRunner's own next run ever read it back. The ledger lives
+    // beside the real tree, so this is the real tree only, and only for owners that have exited (deadOnly).
+    if (path.resolve(root) === path.resolve(ENG)) for (const rel of reclaimMutations({ deadOnly: true })) gone.push(rel + " (put back from the mutation ledger)");
     return gone;
 }
 
@@ -870,7 +967,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // and inventing one per box would make two boxes' "the sweep is green" mean different things silently.
     // What changes is that it no longer means them differently in SILENCE.
     const timingsHost = prior.host || null;
-    const foreignTimings = !!timingsHost && timingsHost !== boxId();
+    const foreignTimings = !!timingsHost && canonicalId(timingsHost) !== boxId();
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         timingsHost, foreignTimings, box: boxId(), timingsFrom: own.file, timingsWhy: own.why,
@@ -910,7 +1007,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
         // result gets carried to another machine -- so under --json it was the line most likely to
         // land inside the capture and the least likely to be noticed by the box that wrote it.
         if (target.foreign) log(`[sweep] NOT writing ${timingsFile}: ${target.why}`);
-        fs.writeFileSync(path.join(root, target.file), JSON.stringify({
+        fs.writeFileSync(path.resolve(root, target.file), JSON.stringify({
             host: target.host,
             note: "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. " +
                   "*** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with " +

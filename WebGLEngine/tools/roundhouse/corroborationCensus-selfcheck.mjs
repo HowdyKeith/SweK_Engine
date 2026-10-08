@@ -18,6 +18,12 @@
 // that most of the lab's unkeyed numbers have none. The assertions below therefore mostly pin FINDINGS in place
 // so they cannot quietly improve by being forgotten: if a later round narrows the portability taint or fills in
 // refinement knobs, these numbers move and the check says so.
+//
+// v4778 RIG RUN SABOTAGE: costRecord.scaledCostFor back to `!Number.isFinite(s)` (a given NaN asks the host) ->
+// section 3e's injected-host row RED (NaN against a 2.05x host read 2.05x the raw cost), and the older
+// missing-scale row still GREEN on this box, whose own host scale is 1.0 -- the blindness the new row exists for.
+// The gate costs ~18 min here, so the sabotaged real file was graded by evaluating the two rows' exact
+// expressions against it rather than by the whole run; the unsabotaged whole run is what ships. Restored, md5.
 
 // v4130 -- the UNION of what both sides of the tier-2 merge imported. The branch added
 // measurePortabilitySampled (its new section 3b) and this side already used costVsCalls at the ms-per-Mcall
@@ -328,6 +334,14 @@ console.log("\n3e. *** A FROZEN COST IS IN THE UNITS OF THE MACHINE THAT FROZE I
     ok("   ...and a missing scale falls back to 1.0, which is what the caller had before",
         scaledCostFor("twof", "inlet", null, NaN) === raw && scaledCostFor("nosuch", "mode") === null,
         "an unreadable scale must not turn a working hint into a wrong one, and an unknown device stays null");
+    // v4778 rig run: the row above held here only because this box's host scale is 1.0; on the rig (1.22) a given
+    // NaN was replaced by the HOST's scale. Asked against a host that reads 2.05, so any box can see the difference.
+    const host205 = { readHost: () => 2.05 };
+    ok("   ...and a GIVEN scale that cannot be read is 1.0 even where the host's is not; only an ABSENT one asks the host",
+        scaledCostFor("twof", "inlet", null, NaN, host205) === raw &&
+        scaledCostFor("twof", "inlet", null, null, host205) === raw * 2.05,
+        `NaN against a 2.05x host -> ${scaledCostFor("twof", "inlet", null, NaN, host205)} (raw ${raw}); ` +
+        `absent -> ${scaledCostFor("twof", "inlet", null, null, host205)}. Keith's rig read 1.22 and the row above was red there`);
 
     report("*** AND THIS IS NOT WHAT CAUSED KEITH'S TIMEOUT -- TWICE OVER, WHICH TWO MEASUREMENTS SHOWED. ***",
         "FIRST: the obvious story was that the understated hint let twof through. Modelled at the point the " +

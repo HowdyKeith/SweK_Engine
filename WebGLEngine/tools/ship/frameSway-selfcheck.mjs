@@ -22,10 +22,14 @@ import { CACHE_H8 } from "./frameHoles.mjs";
 import { RESULT_H11, CACHE_H11, cellOf } from "./frameGain.mjs";
 import { RESULT_H12, REV_KEYS } from "./frameReverse.mjs";
 import { PREREG_H14, CACHE_H14, RESULT_H14, SWAY_KEYS, DEPTH_COL, SLAB_DEPTH_CUT, slabBlocks, nonTurnRows, swaySummary, h14 } from "./frameSway.mjs";
-import { harvest } from "./genGateTrain.mjs";
+import { harvest, rowsMatch, rowsMatchDetail, DB_ULPS } from "./genGateTrain.mjs";
 import { noComments } from "./sourceScan.mjs";
+import { skipUnlessInstalled } from "./fsrCaches.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// v4778 -- the FSR caches live in fsr-caches/ and a release install leaves them out; absent -> a named SKIP that
+// says it is NOT a pass, before any row runs. None regenerates on a miss (a harvest is a WebGPU drive of fsr.html).
+skipUnlessInstalled("frameSway-selfcheck", [CACHE_H14, CACHE_H11, CACHE_H7, CACHE_H8]);
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(String(e.message)); } };
@@ -162,9 +166,11 @@ console.log("\n4. *** THE PAGE, DRIVEN AT x1 -- A SPEED THE DOCUMENT DOES NOT DE
     let lin = null, sway = null, err = "";
     try { lin = await harvest({ scenes: ["zone"], upto: 40, speed: OFF });
           sway = await harvest({ scenes: ["zone"], upto: 40, speed: OFF, settings: { slabpath: d.path } }); } catch (e) { err = String(e.message).slice(0, 160); }
-    const same = lin && lin.every((r, i) => r.frame === cached[i].frame && r.genDb === cached[i].genDb && r.cfDb === cached[i].cfDb && J(r.x) === J(cached[i].x));
-    ok("*** the LINEAR path reproduces v4708's whole cached x1 window, features included -- the default is inert ***", !!same,
-       lin ? `${lin.length} frames bit-identical` : err);
+    // rig run 12 (option 2): frame and features exact, the two dB to DB_ULPS -- see genGateTrain.mjs rowsMatch. Labels were
+    // never compared here and are not now. The count IS compared now: every() over a shorter harvest read true.
+    const match = rowsMatch(lin, cached, { labels: false }), same = lin && match.ok;
+    ok(`*** the LINEAR path reproduces v4708's whole cached x1 window, frame and features exactly, both dB to ${DB_ULPS} ulp -- the default is inert ***`, !!same,
+       lin ? rowsMatchDetail(match) : err);
     const moved = sway && lin && sway.every((r, i) => r.frame === lin[i].frame && (r.genDb !== lin[i].genDb || r.cfDb !== lin[i].cfDb));
     ok("*** with ONLY slabpath set to sway, every frame's dB moves -- the path is honoured ***", !!moved, sway ? `${sway.length} frames` : err);
     const cnt = (rows) => rows.map(slabBlocks), cl = lin ? cnt(lin) : [], cs = sway ? cnt(sway) : [];

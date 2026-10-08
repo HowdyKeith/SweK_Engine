@@ -15,8 +15,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { hostScale, scaled, recordRun, boxId, hostFacts, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
-import { timingsTarget, LOCAL_TIMINGS, DEFAULTS } from "./quickSweep.mjs";
+import { hostScale, scaled, recordRun, boxId, hostFacts, canonicalId, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
+import { timingsTarget, LOCAL_TIMINGS, DEFAULTS, RECORD_HANDOVERS, ownerOf } from "./quickSweep.mjs";
 import { ENG as ROOT } from "./gateSweep.mjs";
 import { noComments } from "./sourceScan.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
@@ -310,18 +310,88 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
     // SABOTAGES (v4796): the id back in megabytes -> 2 (this row and the shape above); memory dropped from the id -> 1, this row,
     // 16 GB and 32 GB then one box. Rounding DOWN in place of to-nearest is equivalent at these sizes and was not counted.
 
-    const mine = timingsTarget({ host: ME });
+    // *** v4813 RIG RUN -- THESE THREE ARE THE v4647 RULE, SO THEY ARE ASKED WITHOUT THE LIVE HANDOVER TABLE. ***
+    // They passed the live RECORD_HANDOVERS by default, so "a box naming itself owns the record" quietly became
+    // "...unless this box once handed the record on" -- which is the rig since v4813's handback, and was the
+    // retired sandbox after v4778. The rig's clone verify of 042b3772 went red here on exactly that: correct
+    // behaviour (a box that handed the record on IS refused, see the handover rows below) graded by a fixture
+    // that was never about handovers. The handover rules have their own fixtures; these get an empty table.
+    // REPRODUCED v4813: a scratch handover from this box to another put this row red by name here, as on the rig;
+    // with `handovers: []` the same scratch tree is green. SABOTAGED v4813: timingsTarget's own-record branch made
+    // foreign -> this row red by name, restored.
+    const mine = timingsTarget({ host: ME }, { handovers: [] });
     ok("!! *** the box that OWNS the record writes the shared file ***",
        mine.file === DEFAULTS.timingsFile && mine.foreign === false, mine.why);
-    const fresh = timingsTarget({});
+    const fresh = timingsTarget({}, { handovers: [] });
     ok("!! an UNCLAIMED record is adopted -- every record written before v4647 names no box",
        fresh.file === DEFAULTS.timingsFile && fresh.foreign === false && fresh.host === ME, fresh.why);
-    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" });
+    const theirs = timingsTarget({ host: "win32-x64-16c-32000mb-abcdef" }, { handovers: [] });
     ok("!! *** CONTROL: a DIFFERENT box writes its own file and NEVER the shared one ***",
        theirs.file === LOCAL_TIMINGS && theirs.file !== DEFAULTS.timingsFile && theirs.foreign === true,
        theirs.why);
     ok("  ...and the refusal names BOTH boxes, because 'wrong machine' is not a thing anybody can act on",
        theirs.why.includes("win32-x64-16c-32000mb-abcdef") && theirs.why.includes(ME));
+    // *** v4778 -- A HANDOVER MOVES THE RIGHT TO WRITE, AND NOTHING ELSE. *** The owner box retired with a container
+    // restart; RECORD_HANDOVERS says who writes next. Driven on fixed names, so the rows mean the same on every box.
+    // SABOTAGED at v4778: RECORD_HANDOVERS emptied -> the live-handover row here and boxTimings' owner row both red,
+    // by name; the first draft let a retired box that named itself keep writing, and the refused-owner row caught it.
+    {
+        const H = [{ at: "vX", from: "old-box", to: "new-box" }, { at: "vY", from: "new-box", to: "third-box" }];
+        const took = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H.slice(0, 1) });
+        const left = timingsTarget({ host: "old-box" }, { id: "old-box", handovers: H.slice(0, 1) });
+        const other = timingsTarget({ host: "old-box" }, { id: "stranger", handovers: H.slice(0, 1) });
+        const chain = timingsTarget({ host: "old-box" }, { id: "third-box", handovers: H });
+        const middle = timingsTarget({ host: "old-box" }, { id: "new-box", handovers: H });
+        ok("!! *** a HANDOVER lets the named box write the shared file, and says it was handed over ***",
+           took.file === DEFAULTS.timingsFile && !took.foreign && took.host === "new-box" && /handed/.test(took.why),
+           took.why);
+        ok("!! ...and the box that handed it on is REFUSED like any stranger -- two owners is the defect",
+           left.foreign && left.file === LOCAL_TIMINGS && other.foreign && other.why.includes("new-box"),
+           left.why);
+        ok("  ...and a chain is followed to its end, so a later handover appends rather than edits",
+           !chain.foreign && middle.foreign, `third-box ${chain.foreign ? "refused" : "owns"}, new-box ` +
+           `${middle.foreign ? "refused" : "owns"}`);
+        // v4818: a box can get the record BACK, and the walk must follow the rows in the order they were decided. The
+        // first ownerOf took the first row naming a box and stopped at a box it had seen, which on a-box -> b-box ->
+        // a-box answered b-box for a record b-box wrote -- the return handover ignored. SABOTAGED v4818: the old walk
+        // put back -> this row red by name.
+        {
+            const R = [{ at: "v1", from: "a-box", to: "b-box" }, { at: "v2", from: "b-box", to: "a-box" },
+                       { at: "v3", from: "a-box", to: "b-box" }];
+            ok("!! *** a record handed BACK goes to the box it was handed back to, in the order the rows were decided ***",
+               ownerOf("b-box", R.slice(0, 2)) === "a-box" && ownerOf("a-box", R.slice(0, 2)) === "a-box" &&
+               ownerOf("b-box", R) === "b-box" && ownerOf("a-box", R) === "b-box" && ownerOf("c-box", R) === "c-box",
+               `a->b->a: owner of a b-box record ${ownerOf("b-box", R.slice(0, 2))}; a->b->a->b: ${ownerOf("b-box", R)}`);
+            // a-box is handed the record TWICE here (v2 and v4), so the first row naming it and the last are different
+            const R4 = [...R, { at: "v4", from: "b-box", to: "a-box" }];
+            const back = timingsTarget({ host: "b-box" }, { id: "a-box", handovers: R4 });
+            ok("  ...and the writer names the handover that GAVE it the record, not the first one that ever named it",
+               !back.foreign && / at v4$/.test(back.why), back.why);
+            // SABOTAGED v4818: the old walk -> both rows red; the writer naming the first row (`find`) -> this one red.
+        }
+        // v4813: the record went back to a sandbox by a second dated row (Keith's decision -- see quickSweep's v4813
+        // note), so the v4778 row is asserted as history and the live owner as the END of the chain, which is the
+        // property the chain row above tests on fixtures. Pinning the rig here would have been the edit-in-place
+        // the handover table exists to forbid. SABOTAGED v4813: the v4813 row's `to` set to the rig's id -> red
+        // here by name (a handover to itself), restored.
+        const last = RECORD_HANDOVERS[RECORD_HANDOVERS.length - 1];
+        ok("!! *** the live handover names the retired sandbox and the rig, and was decided rather than assumed ***",
+           RECORD_HANDOVERS.length >= 1 && RECORD_HANDOVERS.every((h) => h.at && h.from && h.to && h.decidedBy &&
+               h.evidence && h.from !== h.to) &&
+           RECORD_HANDOVERS[0].from === "linux-x64-4c-16096mb-142c0d" && RECORD_HANDOVERS[0].to === "win32-x64-12c-32678mb-b70b27" &&
+           ownerOf("linux-x64-4c-16096mb-142c0d") === canonicalId(last.to),
+           RECORD_HANDOVERS.map((h) => `${h.at}: ${h.from} -> ${h.to} (${h.decidedBy})`).join("; "));
+        // v4819 -- THE TWO ID FORMS NAME ONE BOX. The handovers were written while boxId() carried megabytes; the line merged
+        // in at v4819 has carried whole gigabytes since v4796. canonicalId reads the old form as the new, so the owner chain
+        // and boxId() can be compared at all -- without it no box would own the record on either line's ids.
+        ok("!! *** an id in the megabyte form names the same box as the gigabyte form, and a gigabyte id is left alone ***",
+           canonicalId("linux-x64-4c-16095mb-142c0d") === "linux-x64-4c-16gb-142c0d" &&
+           canonicalId("linux-x64-4c-16096mb-142c0d") === canonicalId("linux-x64-4c-16095mb-142c0d") &&
+           canonicalId("win32-x64-12c-32678mb-b70b27") === "win32-x64-12c-32gb-b70b27" &&
+           canonicalId(boxId()) === boxId() && canonicalId("linux-x64-4c-16gb-420793") === "linux-x64-4c-16gb-420793" &&
+           ownerOf("linux-x64-4c-16095mb-420793", [{ at: "x", from: "linux-x64-4c-16gb-420793", to: "b-box" }]) === "b-box",
+           `16095mb-142c0d reads ${canonicalId("linux-x64-4c-16095mb-142c0d")}; the live owner reads ${ownerOf((() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS.timingsFile), "utf8")).host; } catch { return null; } })())}`);
+    }
     ok("  the local file follows this tree's existing per-machine convention rather than inventing one",
        /\.local\.json$/.test(LOCAL_TIMINGS),
        "host-timings.local.json, vba-archive.local.json, services.local.json -- and .gitignore carries it, so " +
@@ -373,7 +443,8 @@ console.log("\n*** WHOSE STOPWATCH WROTE sweep-timings.json -- v4647 ***");
        "a sweep that runs one machine's list on another and reports only a verdict is two claims wearing one word");
     const qSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "quickSweep.mjs"), "utf8");
     ok("  ...and 'foreign' is decided by the record's own host against this box, not by a flag somebody passes",
-       /foreignTimings = !!timingsHost && timingsHost !== boxId\(\)/.test(qSrc),
+       // v4819: the record's host read through canonicalId -- a record naming this box in v4796's megabyte form is not foreign
+       /foreignTimings = !!timingsHost && canonicalId\(timingsHost\) !== boxId\(\)/.test(qSrc),
        "the same boxId the record is stamped with, so the two cannot disagree about which machine this is");
     ok("!! CONTROL: the sweep does NOT scale its budget per box, and that is deliberate",
        !/scaled\(/.test(qSrc),

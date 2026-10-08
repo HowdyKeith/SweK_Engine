@@ -15,13 +15,15 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cacheRel } from "./fsrCaches.mjs";
 import { FEATURE_NAMES, N_FEATURES } from "../../render/genGate.mjs";
 import { declared, readDoc, minFoldsFor } from "./foldStats.mjs";
 import { pairedBoth } from "./pairedStats.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PREREG_H7 = "render/frame-gate-preregistration.md";
-export const CACHE_H7 = "tools/ship/frameGate-cache.json.gz";
+// v4778 -- the cache lives in fsr-caches/ and its path comes from the one helper; tools/ship/fsrCaches.mjs.
+export const CACHE_H7 = cacheRel("frameGate-cache.json.gz");
 export const RESULT_H7 = "tools/ship/frameGate-result.json";
 export const FRAME_KEYS = Object.freeze({ scenes: "list", speeds: "list", alpha: "num", minFolds: "int", upto: "int", cvFloor: "num" });
 // The column is found by NAME, so a reordering of genGate's features cannot silently point this at another one.

@@ -108,20 +108,43 @@ export function census(root = ENG, timings = null, { exclude = null, id = boxId(
     const ring = (g) => { const mine = good(own[g]); if (mine.length >= 2) return { r: mine, from: "this box" };
         const kin = mine.concat(siblings.flatMap((s) => good(s[g]))); if (kin.length >= 2) return { r: kin, from: "same-type boxes" };
         return { r: good((T.serialRing || {})[g]), from: "the shared record" }; };
+    // *** v4814 -- A HEADER IS MEASURED ALONE, SO IT IS COMPARED WITH THE ALONE READING. *** `timings[g]` is the
+    // membership number, and for most gates it is a sample taken eight gates at a time -- the record's own header
+    // (quickSweep.mjs, above costOf) measures that at a MEDIAN 2.41x the uncontended time, which is past this
+    // census's 2x line on its own. Measured at v4814: of the 102 headers this census called rotted, 85 were judged
+    // against a loaded reading, and 84 of the 102 sat within 2x of the gate's `serial` reading. The census was mostly
+    // measuring contention, and any sweep that wrote the record could move it. `serial` is the uncontended reading
+    // quickSweep keeps for exactly this question (its costOf asks it first); `timings` is the fallback where the
+    // record has no serial reading. A CAPPED gate is still judged on `timings` + `finished`, because a kill is a
+    // fact about the cap and that is the reading the floor/contradiction split is about.
+    // v4819 -- THE TWO LINES' ANSWERS, IN ONE ORDER. Both lines moved this census off `timings[g]` onto alone readings, the
+    // exported-functions line to ring medians (this box's, then same-type boxes', then the shared ring) and main to the
+    // shared record's one `serial` reading. A median of three alone readings is the steadier witness, so the rings come
+    // first; the shared record's single `serial` reading next, where no ring has two; `timings` last. A CAPPED gate is
+    // judged on `timings` + `finished`, main's rule: a kill is a fact about the cap, not a runtime. `source` is main's
+    // field ("cap", "serial" for any alone reading, "timings"); `from` names the record the reading came from.
     const from = new Map();
     const ms = (g) => { const { r, from: f } = ring(g), s = r.slice().sort((x, y) => x - y);
         if (s.length >= 2) { from.set(g, f); return s[(s.length - 1) >> 1]; }
+        if (T.serial && typeof T.serial[g] === "number") { from.set(g, "the shared record's alone reading"); return T.serial[g]; }
         from.set(g, "the shared record's newest"); return T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null; };
+    const capMs = (g) => T.timings && typeof T.timings[g] === "number" ? T.timings[g] : null;
     const finished = (g) => !(T.finished && T.finished[g] === false);
     const agree = [], rotted = [], suppliesFloor = [], contradicts = [], noRecord = [];
     for (const [g, d] of declared) {
-        const t = ms(g);
-        if (t === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
-        const row = { gate: g, declaredMs: d.ms, recordedMs: t, ratio: t > 0 ? d.ms / t : Infinity, from: from.get(g) };
         if (!finished(g)) {
+            const t = capMs(g);
+            if (t === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
+            const row = { gate: g, declaredMs: d.ms, recordedMs: t, ratio: t > 0 ? d.ms / t : Infinity, source: "cap", from: "the shared record's cap" };
             // A capped reading is a FLOOR. The header is the only measurement of this gate that exists.
             if (d.ms > t) suppliesFloor.push(row); else contradicts.push(row);
-        } else if (d.ms > 0 && (t / d.ms > 2 || d.ms / t > 2)) rotted.push(row);
+            continue;
+        }
+        const r = ms(g);
+        if (r === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
+        const f = from.get(g);
+        const row = { gate: g, declaredMs: d.ms, recordedMs: r, ratio: r > 0 ? d.ms / r : Infinity, source: f === "the shared record's newest" ? "timings" : "serial", from: f };
+        if (d.ms > 0 && (r / d.ms > 2 || d.ms / r > 2)) rotted.push(row);
         else agree.push(row);
     }
     const bySize = (a, b) => b.ratio - a.ratio;

@@ -416,22 +416,55 @@ export class GLBParser {
                         jointIndexByNode.set(ownerNode, newIdx);
                         bindJointIdx = newIdx;
                     } else {
-                        // Joint limit hit — fall back: walk up to find
-                        // deepest joint ancestor + bake the relative
-                        // transform into vertices. (Older code path.)
+                        // Joint limit hit — fall back: bind to the deepest
+                        // joint ancestor, baking the mesh's FULL WORLD-SPACE
+                        // bind position into its vertices (CORRECTED — an
+                        // adversarial review of this fallback's sibling fix
+                        // in gpu/fbxLoad.js found the ORIGINAL version here
+                        // had the identical bug: it broke out of this walk
+                        // the instant an ancestor joint was found, baking
+                        // only an ANCESTOR-RELATIVE delta
+                        // (worldMat(ancestor)^-1 * worldMat(ownerNode)).
+                        // That double-applies the ancestor's own inverse-
+                        // bind matrix at render time — jointMatrix(t) =
+                        // worldMat_t(ancestor) * IBM_ancestor, and
+                        // IBM_ancestor is ALREADY worldMat_bind(ancestor)^-1
+                        // — silently dropping the ancestor's entire
+                        // accumulated world offset, wrong even at rest pose.
+                        // Verified with a live 65-joint reproduction: ground
+                        // truth (0, 11.5, 0), the old formula rendered
+                        // (0, 0.5, 0), off by exactly the ancestor's own
+                        // bind-pose offset.
+                        //
+                        // Fixed by walking ALL THE WAY to the scene root
+                        // (cur === -1) unconditionally, rather than
+                        // stopping early — since _mat4Mul(nodeMat, mat)
+                        // prepends each node's local matrix (root-most
+                        // first, ownerNode's own local last), this is
+                        // EXACTLY the pre-existing "root fallback" case's
+                        // own formula (line below, now the ONLY formula),
+                        // which was already correct: the mesh's full
+                        // world-space bind position, matching what the
+                        // PRIMARY strategy above bakes implicitly via an
+                        // identity IBM on a brand-new joint. The only thing
+                        // that still varies between "an ancestor joint was
+                        // found" and "no ancestor joint was found" is which
+                        // joint SLOT to bind to (the ancestor's real,
+                        // non-identity IBM vs. joint 0 as an ultimate last
+                        // resort) — not which matrix to bake.
                         let cur = ownerNode;
                         let mat = this._identityMat4();
+                        let foundJointIdx = null;
                         while (cur !== -1) {
-                            if (jointIndexByNode.has(cur)) {
-                                bindJointIdx = jointIndexByNode.get(cur);
-                                bakedMatrix = mat;
-                                break;
+                            if (foundJointIdx === null && jointIndexByNode.has(cur)) {
+                                foundJointIdx = jointIndexByNode.get(cur);
                             }
                             const nodeMat = this._nodeLocalMatrix(nodeSnap[cur]);
                             mat = this._mat4Mul(nodeMat, mat);
                             cur = parentByNode[cur];
                         }
-                        if (cur === -1) bakedMatrix = mat;   // root fallback
+                        bindJointIdx = foundJointIdx !== null ? foundJointIdx : 0;
+                        bakedMatrix = mat;
                     }
                 }
 
@@ -452,19 +485,34 @@ export class GLBParser {
                 } else {
                     pos = srcPos instanceof Float32Array ? srcPos.slice() : new Float32Array(srcPos);
                 }
-                // Read + transform normals (rotation part only, no translate)
+                // Read + transform normals. CORRECTED to the inverse-
+                // transpose of bakedMatrix's upper-3x3 (matching the
+                // static scene-graph walker's own v771 fix at line ~730),
+                // not a raw upper-3x3 multiply: a raw 3x3 tilts normals
+                // off the surface under NON-UNIFORM scale on an ancestor
+                // in the SHADER_JOINT_LIMIT fallback's parent chain --
+                // found by an adversarial review of the sibling fallback
+                // position/joint-slot fix, filed and fixed as its own
+                // entry (glbparser-fallback-normals-skip-inverse-
+                // transpose) rather than folded into that fix, since the
+                // two are different formulas for different attributes.
                 let norm = null;
                 if (allHaveNormals && a.NORMAL != null) {
                     const srcNorm = this._readAccessor(json, bin, a.NORMAL);
                     if (bakedMatrix) {
                         norm = new Float32Array(srcNorm.length);
+                        const nMat = GLBParser._inverseTranspose3x3(bakedMatrix);
                         for (let v = 0; v < vc; v++) {
                             const x = srcNorm[v * 3 + 0];
                             const y = srcNorm[v * 3 + 1];
                             const z = srcNorm[v * 3 + 2];
-                            norm[v * 3 + 0] = bakedMatrix[0]*x + bakedMatrix[4]*y + bakedMatrix[8] *z;
-                            norm[v * 3 + 1] = bakedMatrix[1]*x + bakedMatrix[5]*y + bakedMatrix[9] *z;
-                            norm[v * 3 + 2] = bakedMatrix[2]*x + bakedMatrix[6]*y + bakedMatrix[10]*z;
+                            let tx = nMat[0]*x + nMat[1]*y + nMat[2]*z;
+                            let ty = nMat[3]*x + nMat[4]*y + nMat[5]*z;
+                            let tz = nMat[6]*x + nMat[7]*y + nMat[8]*z;
+                            const len = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
+                            norm[v * 3 + 0] = tx / len;
+                            norm[v * 3 + 1] = ty / len;
+                            norm[v * 3 + 2] = tz / len;
                         }
                     } else {
                         norm = srcNorm instanceof Float32Array ? srcNorm.slice() : new Float32Array(srcNorm);
@@ -1208,44 +1256,95 @@ export class GLBParser {
         return false;
     }
 
+    // v#### -- SPARSE ACCESSORS. glTF 2.0 spec 5.9 (accessor.sparse): a small set of (index, value) overrides
+    // patched onto a BASE array. Two shapes, both handled: `bufferView` present (this file's own pre-existing
+    // path builds the base array exactly as before) with `sparse` ALSO present -- the base is a real array
+    // that gets some elements overwritten; or `bufferView` omitted entirely -- spec 2.10.1 defines the base as
+    // an implicit array of zeros, `sparse` being the ONLY data the accessor carries. Confirmed against the
+    // Khronos glTF-Sample-Assets repo's own "Simple Sparse Accessor" conformance fixture (CC-BY-4.0, Marco
+    // Hutter 2017): before this round, `_readAccessor` silently returned the UNPATCHED base array for a
+    // bufferView-present+sparse accessor (no throw, no warning -- the wrong 14 positions, differing from the
+    // accessor's own declared `max` the moment a real reader checks it) and would have thrown "accessor N has
+    // no bufferView" for the bufferView-omitted case, a spec-valid shape this parser had never seen.
     static _readAccessor(json, bin, accessorIdx) {
         const acc = json.accessors[accessorIdx];
         if (!acc) throw new Error(`accessor ${accessorIdx} missing`);
-        if (acc.bufferView == null) {
-            if (GLBParser._dracoBlocked(json)) {
-                throw new Error(
-                    `this GLB is Draco-compressed (KHR_draco_mesh_compression) and gpu/GLBParser.js does not ` +
-                    `decode it -- accessor ${accessorIdx} has no bufferView because its vertex data is in the ` +
-                    `compressed blob. Load it through three's GLTFLoader instead, which handles the extension ` +
-                    `in full: gpu/gltfDraco.js attaches the decoder only for files that need it.`);
-            }
-            throw new Error(`accessor ${accessorIdx} has no bufferView`);
-        }
-
-        const view = json.bufferViews[acc.bufferView];
-        if (!view) throw new Error(`bufferView ${acc.bufferView} missing`);
 
         const Ctor = COMPONENT_CTOR[acc.componentType];
         if (!Ctor) throw new Error(`unsupported componentType ${acc.componentType}`);
         const compBytes = COMPONENT_BYTES[acc.componentType];
         const compCount = TYPE_COMPS[acc.type];
         if (!compCount) throw new Error(`unsupported accessor type "${acc.type}"`);
+        const count = acc.count;
 
-        const elementBytes = compBytes * compCount;
-        const baseOffset   = (view.byteOffset || 0) + (acc.byteOffset || 0);
-        const stride       = view.byteStride || elementBytes;
-        const count        = acc.count;
+        let out;
+        if (acc.bufferView == null) {
+            if (acc.sparse) {
+                // spec 2.10.1: "the sparse accessor is initialized as an array of zeros" when bufferView is
+                // undefined -- a fresh, already-zeroed typed array satisfies that with no copy needed.
+                out = new Ctor(count * compCount);
+            } else if (GLBParser._dracoBlocked(json)) {
+                throw new Error(
+                    `this GLB is Draco-compressed (KHR_draco_mesh_compression) and gpu/GLBParser.js does not ` +
+                    `decode it -- accessor ${accessorIdx} has no bufferView because its vertex data is in the ` +
+                    `compressed blob. Load it through three's GLTFLoader instead, which handles the extension ` +
+                    `in full: gpu/gltfDraco.js attaches the decoder only for files that need it.`);
+            } else {
+                throw new Error(`accessor ${accessorIdx} has no bufferView`);
+            }
+        } else {
+            const view = json.bufferViews[acc.bufferView];
+            if (!view) throw new Error(`bufferView ${acc.bufferView} missing`);
 
-        if (stride === elementBytes) {
-            // Tightly packed — direct typed-array view onto BIN slice
-            return new Ctor(bin.buffer, bin.byteOffset + baseOffset, count * compCount);
+            const elementBytes = compBytes * compCount;
+            const baseOffset   = (view.byteOffset || 0) + (acc.byteOffset || 0);
+            const stride       = view.byteStride || elementBytes;
+
+            if (stride === elementBytes) {
+                // Tightly packed — direct typed-array view onto BIN slice
+                out = new Ctor(bin.buffer, bin.byteOffset + baseOffset, count * compCount);
+            } else {
+                // Interleaved — copy element-by-element
+                out = new Ctor(count * compCount);
+                for (let i = 0; i < count; i++) {
+                    const src = new Ctor(bin.buffer, bin.byteOffset + baseOffset + i * stride, compCount);
+                    out.set(src, i * compCount);
+                }
+            }
         }
 
-        // Interleaved — copy element-by-element
-        const out = new Ctor(count * compCount);
-        for (let i = 0; i < count; i++) {
-            const src = new Ctor(bin.buffer, bin.byteOffset + baseOffset + i * stride, compCount);
-            out.set(src, i * compCount);
+        if (acc.sparse) {
+            // The tightly-packed branch above returns a VIEW straight onto `bin`'s own ArrayBuffer (the
+            // existing zero-copy optimisation) -- patching it in place would corrupt bin itself, which other
+            // accessors may still read. Sparse accessors must own their memory before being patched; the two
+            // other branches (interleaved copy, bufferView-omitted zeros) already do.
+            if (out.buffer === bin.buffer) out = new Ctor(out);
+            out = GLBParser._applySparse(json, bin, acc.sparse, out, compCount, Ctor);
+        }
+        return out;
+    }
+
+    /** The sparse (index, value) overlay itself -- one call site, so the index/value bufferView reads and the
+     *  scatter loop are written down once, not re-derived at both of _readAccessor's two sparse branches. */
+    static _applySparse(json, bin, sparse, out, compCount, Ctor) {
+        const { count: sCount, indices, values } = sparse;
+        const idxCtor = COMPONENT_CTOR[indices.componentType];
+        if (!idxCtor) throw new Error(`unsupported sparse indices componentType ${indices.componentType}`);
+        const idxView = json.bufferViews[indices.bufferView];
+        if (!idxView) throw new Error(`sparse indices bufferView ${indices.bufferView} missing`);
+        const idxOffset = (idxView.byteOffset || 0) + (indices.byteOffset || 0);
+        const idxArr = new idxCtor(bin.buffer, bin.byteOffset + idxOffset, sCount);
+
+        const valView = json.bufferViews[values.bufferView];
+        if (!valView) throw new Error(`sparse values bufferView ${values.bufferView} missing`);
+        const valOffset = (valView.byteOffset || 0) + (values.byteOffset || 0);
+        // Per spec, accessor.sparse.values' own bufferView carries no byteStride -- sparse values are always
+        // tightly packed, unlike the base accessor data above, so this is always a direct strided read.
+        const valArr = new Ctor(bin.buffer, bin.byteOffset + valOffset, sCount * compCount);
+
+        for (let i = 0; i < sCount; i++) {
+            const dst = idxArr[i] * compCount;
+            for (let c = 0; c < compCount; c++) out[dst + c] = valArr[i * compCount + c];
         }
         return out;
     }

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/proseAudit-selfcheck.mjs — v3298
 //
-// Run: node tools/ship/proseAudit-selfcheck.mjs   (~3.4s — re-measured v4804: 2.7 s-2.8 s alone, 4.4 s the sweep's serial median; it read ~0.8s — MEASURED individually)
+// Run: node tools/ship/proseAudit-selfcheck.mjs   (~2.3s -- MEASURED v4815, median of 2407/2292/2103 alone; was ~0.8s)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE ROUND v3177 ASKED FOR AND NOTHING HAD RUN. plasticBind carries the scar: a sentence had to be moved onto

@@ -16,6 +16,7 @@
 // condition under which the refusal expires.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -23,6 +24,17 @@ import { codeOnly } from "../tools/ship/sourceScan.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// v4778 -- A SCRATCH HOME, BECAUSE THIS GATE WROTE INTO THE USER'S REAL PEER LIST. assetSync.js fixes PEERS_FILE
+// from os.homedir() when it loads, and every addPeer below that is ACCEPTED is saved there -- found when
+// peerBrainFleet's review read ~/.voxelbridge/sync-peers.json and met 192.168.11.9, 10.0.0.5, 172.16.4.4,
+// 100.64.3.4 and 172.16.0.1, test addresses nobody had removed. os.homedir() reads HOME (USERPROFILE on Windows)
+// at each call, so pointing both at a fresh mkdtemp directory BEFORE the require below gives the module a peer
+// file of its own. The real file is read, never written, and the last row says so byte for byte. SABOTAGED at
+// v4778: the HOME/USERPROFILE line removed -> that row red by name in this gate (the scratch file is never written).
+const REAL_PEERS_FILE = path.join(os.homedir(), ".voxelbridge", "sync-peers.json");
+const realPeersAtStart = fs.existsSync(REAL_PEERS_FILE) ? fs.readFileSync(REAL_PEERS_FILE, "utf8") : null;
+const SCRATCH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "discoveryTrust-home-"));
+process.env.HOME = SCRATCH_HOME; process.env.USERPROFILE = SCRATCH_HOME;
 const assetSync = require(path.join(HERE, "assetSync.js"));
 
 let fails = 0;
@@ -106,4 +118,13 @@ const kept = (url) => (assetSync.addPeer(url) || []).includes(url.replace(/\/+$/
 }
 
 console.log(fails ? "\ndiscoveryTrust-selfcheck: " + fails + " FAILED" : "\ndiscoveryTrust-selfcheck: all checks pass");
+// v4778 -- see the scratch-home note at the top: the user's real peer file is exactly as this gate found it.
+{
+    const after = fs.existsSync(REAL_PEERS_FILE) ? fs.readFileSync(REAL_PEERS_FILE, "utf8") : null;
+    ok("!! the user's real peer file is byte-for-byte as this gate found it -- every peer it added went to a scratch home",
+        after === realPeersAtStart && fs.existsSync(path.join(SCRATCH_HOME, ".voxelbridge", "sync-peers.json")),
+        REAL_PEERS_FILE + (realPeersAtStart === null ? " (absent, and still absent)" : " unchanged") + "; the peers this gate saved are in " + path.join(SCRATCH_HOME, ".voxelbridge", "sync-peers.json") +
+        " -- that file existing is what shows the writes went there, since this gate may remove what it adds");
+}
+try { fs.rmSync(SCRATCH_HOME, { recursive: true, force: true }); } catch {}
 process.exit(fails ? 1 : 0);

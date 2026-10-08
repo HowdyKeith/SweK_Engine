@@ -173,7 +173,7 @@ console.log("\n5. THE WORLD FRAME IS A SECOND ROUTE, AND IT GRADES THE HALF THE 
 // ---------------------------------------------------------------------------
 console.log("\n6. THE BACKEND GAP IS REPORTED, AND NOTHING IN box3d OR jolt IS TOUCHED");
 {
-    const g = contractGap();
+    const g = await contractGap();
     for (const [k, v] of Object.entries(g)) report(k.padEnd(16), String(v));
     ok("!! *** addShip BUILDS A CUBE -- THE ONE INERTIA TENSOR FOR WHICH THIS EFFECT CANNOT HAPPEN ***",
         g.shipIsCube,
@@ -197,7 +197,7 @@ console.log("\n6. THE BACKEND GAP IS REPORTED, AND NOTHING IN box3d OR jolt IS T
     ok("nothing here is ratcheted and no backend file is edited", !("baseline" in MEASURED_V3562),
         "this round adds an instrument and REPORTS a gap. Changing the conformance contract is Keith's call " +
         "and its own round.");
-    ok("the report prints and the tool exits zero", reportLines().length > 20,
+    ok("the report prints and the tool exits zero", (await reportLines()).length > 20,
         "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");
 }
 

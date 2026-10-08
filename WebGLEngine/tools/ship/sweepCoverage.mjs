@@ -288,13 +288,7 @@ export const RETURNED_AT_V4529 = Object.freeze({
                  "had; and the very next 8-way sweep filed 3,003 and flipped the row that reads this roll. " +
                  "A gate whose two measurements sit either side of the budget cannot be retired by taking " +
                  "one of them, however carefully, and this is the third attempt to prove otherwise" }),
-        Object.freeze({ loadedMs: 7087, gate: "tools/ship/wgslSpec-selfcheck.mjs", recordedWas: 5162, hereMs: 3737,
-            serialMs: Object.freeze([2688, 2698, 2927]),
-            why: "v4541 called it the least ambiguous on this roll and said no reading had ever been " +
-                 "under 3,000; v4546 retired it at 2,505-2,688 and falsified that, correctly. It is at " +
-                 "3,737 one round later, and 8-way at 7,087 against 2,688-2,927 serial. BOTH earlier " +
-                 "statements were true of the measurement each was taken with, which is the finding: the " +
-                 "gate has one cost under contention and another alone, and the file holds one field" }),
+        // v4813: wgslSpec LEFT this roll -- alone it now reads over the bar too (STILL_OVER_AT_V4813, below).
     ]),
     // *** v4565 -- RETIRED BY THE BAND PASS, AND IT TAKES A SENTENCE OF THE v4541 ENTRY WITH IT. ***
     // sweepBudget was named still-over at v4541 on three serial readings of 3,165 / 3,266 / 3,273 ms, with the
@@ -330,6 +324,63 @@ export const RETURNED_AT_V4529 = Object.freeze({
             why: "named still-over at v4529/v4530 on five serial readings spanning 2,719 to 3,152 ms -- itself " +
                  "a straddle wide enough to have been the answer -- and re-measured at v4535 at 2,729 / 2,344 / " +
                  "2,659 ms with the timings file at 2,726. Under on every sample of the later run." }),
+    ]),
+});
+
+// *** v4813 -- wgslSpec LEAVES THE OSCILLATOR ROLL, BECAUSE ALONE IT IS NO LONGER CHEAP. ***
+// RETURNED_AT_V4529 held it as an oscillator: 2,688-2,927 ms alone, 7,087 eight-way, the two either side of the
+// budget. The sandbox's sweep of the v4813 tree read it alone at 2,882 / 3,056 / 3,589 (its serial ring) and
+// evicted it on the second crossing -- not the contention story any more, the alone cost itself crossed, on a
+// tree that has grown since v4546 and on a box whose median gate reads 1.15x what 4c904f50's did. So the entry
+// moves rather than staying where the oscillator row would call it false: here it is held to justifiedOver, the
+// union, because a gate at 2,882 / 3,056 / 3,589 will read either side of the bar from one sitting to the next,
+// and the roll it sits on must not decide which. The entry is a fact about where it stands, not a verdict that
+// it is slow; it falls off when a live alone reading is under 3,000 AND it is back in the sweep.
+export const STILL_OVER_AT_V4813 = Object.freeze({
+    at: "v4813", box: "linux-x64-4c-16095mb-142c0d",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/wgslSpec-selfcheck.mjs", loadedMs: 7087, recordedWas: 5162, hereMs: 3589,
+            serialMs: Object.freeze([2882, 3056, 3589]),
+            why: "the oscillator roll's least ambiguous entry until its alone cost crossed too: 2,882 / 3,056 / " +
+                 "3,589 ms serial on the v4813 tree, evicted on the second crossing, against 2,688-2,927 at v4546",
+            // v4818 -- RETURNED, BY THE RULE THIS ROLL WAS WRITTEN WITH: alone 1,713 / 1,631 / 1,625 ms on the 2.10 GHz
+            // host, and the v4818 verdict's own 8-way sample 2,981 -- under the bar loaded too, so it is neither an
+            // oscillator nor over, and it is back in the sweep. Kept here as history with the readings that retired it.
+            returned: Object.freeze({ at: "v4818", aloneMs: 1625, loadedMs: 2981,
+                serialMs: Object.freeze([1713, 1631, 1625]) }) }),
+    ]),
+});
+
+// v4815 -- THE RECORD MOVED TO A SLOWER HOST (quickSweep's v4815 handover: Xeon @ 2.80GHz, 420793, after the sandbox
+// restarted), and two returnees went back over there, alone, three runs each on a quiet box. Named here as wgslSpec was
+// at v4813, with the readings, because a returnee that crosses back on a later box is a fact about the box. sweepBudget
+// has been here before: named at v4541 as "not the box" on 3,165-3,273, then read 2,589-2,770 at v4565 with the file
+// untouched -- "IT IS ALL THE BOX". These readings say the same of this host, and that is what they are filed as.
+export const STILL_OVER_AT_V4815 = Object.freeze({
+    at: "v4815", box: "linux-x64-4c-16095mb-420793",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", recordedWas: 4518, hereMs: 3382,
+            serialMs: Object.freeze([3072, 3224, 3247]),
+            why: "about 2.4 s alone on the 2.10 GHz host this round (2,317-2,770 ms), 3,072 / 3,224 / 3,247 alone on " +
+                 "the 2.80 GHz host that owns the record since the v4815 handover; the gate did not change between them" }),
+        Object.freeze({ gate: "tools/roundhouse/sweepBudget-selfcheck.mjs", recordedWas: 5526, hereMs: 3270,
+            serialMs: Object.freeze([3353, 3086, 3214]),
+            why: "2,545 ms in the record before the host change, 3,353 / 3,086 / 3,214 alone on the 2.80 GHz host; the " +
+                 "file is untouched since v4361, so as at v4565 the move is the box and not the gate" }),
+    ]),
+});
+
+// v4818 -- THE RECORD CAME BACK TO THE 2.10GHz HOST (quickSweep's v4818 handover, 420793 -> 142c0d), and one returnee
+// went back over there, as headlessGpu and sweepBudget went over on the other host at v4815. Named the same way, with
+// the readings: step 4b caught it, the 12-of-22 row red against the record the second v4818 verdict wrote.
+export const STILL_OVER_AT_V4818 = Object.freeze({
+    at: "v4818", box: "linux-x64-4c-16095mb-142c0d",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/orreryEjecta-selfcheck.mjs", recordedWas: 3314, hereMs: 3142,
+            serialMs: Object.freeze([3166, 3416, 3351]),
+            why: "returned by v4461's rotation; 2,797 / 2,996 / 2,736 ms alone in the record on the 2.80 GHz host, then " +
+                 "3,209 and 3,142 in the v4818 verdict's serial runs and 3,166 / 3,416 / 3,351 alone by hand on the " +
+                 "2.10 GHz host the record went back to -- a host move, filed as v4815's were" }),
     ]),
 });
 
@@ -1435,7 +1486,13 @@ export function rotation(c, { at = {}, timings = {} } = {}, { slots = 24, budget
         if (picked.length >= slots || cost + ms > budgetMs) break;
         picked.push(g); cost += ms;
     }
-    return { picked, cost, pool: pool.length, roundsToCover: roundsToCover(pool.length, picked.length) };
+    // v4816 -- `horizon`: the stamp of the first pool entry this pass did NOT take, or null when it took them all.
+    // The pick is a PREFIX of the stalest-first order, so every entry stamped earlier than the horizon was taken
+    // and no entry stamped at or after it could have been. timingKind needs that line, not the pass's own clock:
+    // see ledgerStamps below.
+    const next = pool[picked.length];
+    const horizon = next === undefined ? null : (at[next] || UNKNOWN_AT);
+    return { picked, cost, pool: pool.length, horizon, roundsToCover: roundsToCover(pool.length, picked.length) };
 }
 
 export function roundsToCover(population, perRound) {
@@ -1484,7 +1541,20 @@ export function readFile(p = path.join(ENG, "tools", "ship", "sweep-timings.json
 // reference the arrival rule already used, so the first write changes nothing about what counts.
 export const selectionKind = ({ gate = null, band = null, killed = false } = {}) =>
     (gate || band || killed ? "named" : "pool");
-export function ledgerStamps(prev, stamp, selection) {
+//
+// *** v4816 -- `poolHorizon`: HOW FAR THE POOL PASS REACHED, WHICH IS NOT WHEN IT RAN. *** The arrival rule read
+// `poolAt` as "a rotation ran after this entry, so it should have taken it". A stalest-first pass of 80 slots over
+// a pool of 349 takes the 80 STALEST and cannot take a fresh one, so an over-budget entry the quick sweep had
+// evicted three hours before the v4816 pass (tools/ship/fsrPage-selfcheck.mjs, 3318 ms alone, 14:45 against a
+// 17:10 pass) went "unaccounted" without the pass ever having had it in reach. The pass now records the stamp
+// of the first entry it did not take (rotation().horizon); an entry stamped at or after that line was never in
+// its reach and is still an arrival, and one stamped before it was taken or should have been. A pass that took
+// the whole pool records its own stamp, so the ratchet closes exactly as before. A named write carries the
+// horizon forward with poolAt; a ledger written before the field existed falls back to poolAt, the old rule.
+export function ledgerStamps(prev, stamp, selection, horizon = null) {
     const priorPool = prev ? (prev.poolAt || prev.at || null) : null;
-    return { at: stamp, poolAt: selection === "pool" ? stamp : priorPool };
+    const priorHorizon = prev ? (prev.poolHorizon || priorPool) : null;
+    return selection === "pool"
+        ? { at: stamp, poolAt: stamp, poolHorizon: horizon || stamp }
+        : { at: stamp, poolAt: priorPool, poolHorizon: priorHorizon };
 }

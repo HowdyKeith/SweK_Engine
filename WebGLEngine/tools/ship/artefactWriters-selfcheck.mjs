@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ARTEFACT_TOOLS } from "./reportingTools.mjs";
+import { mutateFile, restoreMutation, armExitSweep } from "./fixtureLitter.mjs";
 import { ENGINE, SELF, writesArtefact, writers, census, idempotent, mainBlock, pagesReading, MEASURED_V3609, reportLines } from "./artefactWriters.mjs";
 
 let fails = 0;
@@ -111,15 +112,18 @@ const SHIPPED_DETECTOR = /export const OUT\s*=\s*["']([^"']+)["']/;
     const orig = fs.readFileSync(target);
     const planted = Buffer.concat([orig, Buffer.from("\n")]);   // a state the regenerator will NOT reproduce
     let kiAfter = null;
+    // v4815 -- planted through fixtureLitter's ledger: the idempotence runs take seconds, a cap kill runs no `finally`,
+    // and the next sweep's reclaim puts back what the ledger holds. The restore below is still written as it was.
+    armExitSweep();
     try {
         for (const t of always) {
-            if (t === kiRow) fs.writeFileSync(target, planted);
+            if (t === kiRow) mutateFile(target, planted.toString("utf8"));
             const r = idempotent(t.rel, t.artefact);
             if (t === kiRow) kiAfter = fs.readFileSync(target);
             ok("!! " + t.label + " is IDEMPOTENT, measured by running it twice", r.ok,
                r.ok ? r.first + " -> " + r.second : (r.error || r.first + " -> " + r.second));
         }
-    } finally { fs.writeFileSync(target, orig); }
+    } finally { restoreMutation(target); fs.writeFileSync(target, orig); }
     ok("!! *** and the measurement PUTS BACK what it found -- a gate does not leave a tracked record rewritten ***",
        !!kiAfter && kiAfter.equals(planted),
        "planted a byte the regenerator would remove; it was still there after two real runs, so the run restored it");

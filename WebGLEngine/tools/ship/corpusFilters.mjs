@@ -99,7 +99,14 @@ const walk = (dir, keep) => {
     return out;
 };
 
-export const treeFiles = () => walk(ENGINE, null);
+// *** v4814 -- MEMOISED PER PROCESS, BECAUSE THE GATE ASKED FOR THE SAME TREE EIGHT TIMES. *** The selfcheck, census()
+// and reportLines() each called filterSites() and treeFiles() afresh: 15,921 file reads and 1,094 directory reads in
+// one run, which tools/ship/gateProfile.mjs --rig-slow measured as 5.4 s of the gate's 8.8 s on Keith's Windows rig
+// (about 0.3 ms a read there, about 0.03 here). The tree does not change while a census runs, so each is computed once
+// and every caller gets its own copy of the array -- a caller that sorts or filters in place cannot reach another's.
+const _memo = new Map();
+const memo = (key, f) => { if (!_memo.has(key)) _memo.set(key, f()); return _memo.get(key).slice(); };
+export const treeFiles = () => memo("tree", () => walk(ENGINE, null));
 export const extOf = (f) => { const i = f.lastIndexOf("."); return i < 0 ? "" : f.slice(i + 1); };
 
 /**
@@ -108,6 +115,9 @@ export const extOf = (f) => { const i = f.lastIndexOf("."); return i < 0 ? "" : 
  * lesson, where a sentence DESCRIBING a detector registered as an instance of it.
  */
 export function filterSites(dir = path.join(ENGINE, "tools")) {
+    return memo("sites " + dir, () => filterSitesUncached(dir));
+}
+function filterSitesUncached(dir) {
     const out = [];
     for (const rel of walk(dir, (n) => /\.mjs$/.test(n))) {
         if (rel === SELF) continue;                     // BY IDENTITY: this file quotes every spelling it finds
