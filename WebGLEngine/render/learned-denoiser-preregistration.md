@@ -385,6 +385,57 @@ file exists.
 - **H1 only:** transfer is still the open subject.
 - **Neither:** recorded, and section 16 is the temporal round, already chosen as the next change.
 
+## 16. ROUND 3 -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r3` at commit 899caac3, 2026-10-08 01:30:36Z to 02:11:31Z (2,455 s). Its
+output, unedited, is `render/denoise-results-r3.json`.
+
+**A first attempt** started at 01:07:47Z from the same commit. A container restart killed it at 272 s, after the
+training scenes were rendered and the filter was tuned, before any network was trained or any test scene rendered.
+It wrote nothing and nothing from it was read. The run is deterministic, so the second attempt is the same
+computation from the start.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0, train fit per seed | 0.141 / 0.134 / 0.137 (bar 0.8) |
+| C1 | network 12 of 12 and filter 12 of 12 against the noisy input, on T1 and on T2 |
+| C2 | shuffled-target network mean d -2.38 |
+| C3 | 0 of 12 images within 2x of the floor on either set |
+| C4 | bit-identical retrain |
+| C5 | distinct render seeds |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, in-family (T1, seeds 7000-7011) | 10 | +0.191 | 0.0193 | 0.025 | **supported** |
+| H2, transfer (T2, seeds 8000-8011) | 5 | -0.064 | 0.806 | 0.05 | **not supported** |
+
+- **In-family, the kernel-predicting network beats the tuned filter.** Its relMSE is about 20% below the filter's
+  (geometric means 0.0020 vs 0.0025), with every seed at 0.0020-0.0021.
+- **On the family it never saw, it does not.**
+  - Geometric means: network 0.0142, filter 0.0133. The filter wins on 7 of 12 images.
+  - The spread across seeds is wide: 0.0122 / 0.0146 / 0.0154.
+
+**Secondary** (reported, never tested, never used to choose). Geometric-mean relMSE on this round's test images:
+
+| | T1 | T2 |
+|---|---|---|
+| round 2's residual network, same training, same seeds | 0.0029-0.0032 | 0.0146-0.0185 |
+| this round's kernel network | 0.0020-0.0021 | 0.0122-0.0154 |
+| 1-sample input: filter / kernel networks | 0.0076 / 0.0057-0.0064 | 0.0640 / 0.0501-0.0618 |
+| 16-sample input: filter / kernel networks | 0.0013 / 0.0011-0.0012 | 0.0048 / 0.0049-0.0054 |
+
+- val: filter 0.0024, networks 0.0019-0.0020.
+- On the same scenes, the head alone moved the network from behind the filter to ahead of it in-family.
+
+**What this buys, per section 15: "H1 only".** The kernel network denoises its own family better than the filter
+and does not carry that to a new one; transfer is still the open subject.
+- The network does not go to the device on this result alone. Section 9 asks for both hypotheses.
+- Section 17, the temporal round, was fixed before this section's numbers were read, and is unchanged by them.
+
 ## 17. ROUND 4 -- THE TEMPORAL ROUND, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
 
 Committed with the code that implements it, on its own branch. No scene of this round's T1 or T2 has been rendered.
