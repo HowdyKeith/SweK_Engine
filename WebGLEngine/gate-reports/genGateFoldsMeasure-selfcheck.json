@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/genGateFoldsMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "H4 per fold: base rate and each arm's seed-mean held-out AUC over ten seeds",

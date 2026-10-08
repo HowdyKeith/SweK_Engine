@@ -314,13 +314,19 @@ export function webglLaunchArgs(env = process.env) {
     return { args: v.split(",").map((x) => x.trim()).filter(Boolean), overridden: true };
 }
 
+// *** v4821 -- KEYED ON dxcompiler.dll, BECAUSE CHROME 156 STOPPED SHIPPING dxil.dll. *** Read from the Chrome for
+// Testing 156.0.8078.4 archives' own central directories: chrome-win64 carries dxcompiler.dll and D3DCompiler_47.dll
+// and NO dxil.dll; chrome-headless-shell-win64 carries no dx*.dll at all. The rig's first v4820 clone verify then
+// died in four PARITY_ARGS gates with "DynamicLib.Open: dxcompiler.dll Windows Error: 87" -- the same fault under the
+// other file's name -- and the remedy below could not help, because it searched for the one file the new bundle no
+// longer has. dxcompiler.dll is in both generations, so it is what a source bundle is found by.
 export const DXC_LEAVES = Object.freeze([
-    path.join("chrome-win64", "dxil.dll"),
-    path.join("chrome-win", "dxil.dll"),
-    path.join("chrome-headless-shell-win64", "dxil.dll"),
+    path.join("chrome-win64", "dxcompiler.dll"),
+    path.join("chrome-win", "dxcompiler.dll"),
+    path.join("chrome-headless-shell-win64", "dxcompiler.dll"),
 ]);
 
-/** The directory holding dxil.dll, found the same way the shell is: every root, every build, newest first. */
+/** The directory holding dxcompiler.dll, found the same way the shell is: every root, every build, newest first. */
 export function resolveDxcDir({ env = process.env, home = os.homedir(), exists = fs.existsSync,
                                readdir = fs.readdirSync } = {}) {
     const tried = [];
@@ -381,7 +387,7 @@ export const DXC_FAULT = /DynamicLib\.Open|dxil\.dll|dxcompiler\.dll/i;
 export function dxcAdvice(text) {
     const joined = Array.isArray(text) ? text.filter(Boolean).join("\n") : String(text || "");
     if (!DXC_FAULT.test(joined)) return "";
-    return "Dawn could not load the DXC compiler. This browser bundle ships without dxil.dll; "
+    return "Dawn could not load the DXC compiler. This browser bundle ships without dxcompiler.dll; "
          + "run `node tools/ship/ensureDxc.mjs --write` from WebGLEngine to copy it next to the executable "
          + "(the PATH route was tried at v4646 and measured NOT to work -- see launchEnv above).";
 }

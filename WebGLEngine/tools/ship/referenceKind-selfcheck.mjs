@@ -226,6 +226,20 @@ const WHERE = GRAPH.where;
 // with slack, per this file's own rule that a ratchet with slack is a ratchet holding nothing (v3195) -- the
 // gate's own 8-slack budget check confirmed 289 - 288 = 1 is inside tolerance, but the true count is 288 and
 // there is no reason to leave a stale ceiling standing once the real number is in hand.
+// v4781 -- 288 -> 324 AFTER THE v4776 MERGE, BY THE SAME METHOD THE v4535 NOTE ABOVE USED, AND FOR ITS REASON: this
+// gate takes ~175 s, so no verify runs it and the merge of the exported-functions-mesh line landed unmeasured. 32 of
+// the 36 are graveyard's arrivals over the same interval, named there -- each a module only gates import that
+// something in the tree mentions (19 of them in vba/runtimeGap.mjs's census notes, which name the files they count).
+// The other 4 are not named here: this file prints the population's rescuers, not its members. Paying them down is
+// the same three routes one module at a time; raising the ceiling catches up to the merge and excuses none of it.
+// v4781 SABOTAGES: graveyard's new note with its module names WITH their extensions (its first draft) -> 1 red, 326
+// against 324; a sweep closing naming one more gate-only module -> 1 red on the ritual row, 59 against 58, naming it.
+// v4805 -- 324 -> 325, ONE NEW ENTRY, MEASURED BY NAME (the rescued sets of v4804 and v4805 diffed): vendor/three-webgpu-r185/
+// three.tsl.js. vendor/three-webgpu moved to r186 and its r185 files were kept beside it for the r185 drafts; three.webgpu.js is read
+// by tools/ship/threePatch.mjs and imports three.core.js, but three.tsl.js is loaded only by the upstream gates, through a path they
+// compose ("/vendor/three-webgpu-r185" + "/three.tsl.js"), and mentioned by the READMEs that say so. A gate-only module by design --
+// the r185 build exists for gates -- so the routes that pay it down are this census learning composed paths, or the r185 drafts
+// retiring and the copy going with them.
 // *** v4778 -- RAISED FROM 288 TO 332, BY NAME, ON KEITH'S DECISION, by the method the v4535 note above used and for its
 // reason: this gate ran over the budget, so the v4776 and v4778 merges landed unmeasured. The member list diffed
 // against a run at 5d3d8d83, the commit that set 288 (it reproduces 288 there): 49 arrived and 5 left (anim/ik,
@@ -239,7 +253,11 @@ const WHERE = GRAPH.where;
 // with its extension (adapterRecord.mjs, the one arrival no prose rescued) -> 1 red, 333 against 332; a sweep closing
 // in gateSweep.mjs naming one more gate-only module (anim/reachIK.mjs) -> 1 red on the ritual row, 58 against 57,
 // naming it.
-const RESCUED_CEILING = 332;
+// v4819 -- 332 -> 333 AT THE MERGE OF THE TWO LINES, MEASURED (333 over the merged tree). main's 332 already holds the
+// exported-functions line through v4775 (the v4776 merge); that line moved its own count once since, 324 -> 325 at v4805, and
+// named the one arrival: vendor/three-webgpu-r185/three.tsl.js, the r185 build kept for the r185 drafts (its note is above).
+// 332 + 1 = 333, the reading; the arithmetic of two named lists, not a member-by-member diff, and said as such.
+const RESCUED_CEILING = 333;
 
 const rescued = [];
 {
@@ -326,6 +344,13 @@ const rescued = [];
     // they would -- one paragraph per round, unmeasured because nothing forced a re-run. Paying each of the 39
     // down by the same three routes is real work and a separate round; this fixing pass added none of the 39
     // and wired none of them either, so raising the ceiling here is catching up to the merge, not excusing it.
+    // v4781 -- 39 -> 58 AFTER THE v4776 MERGE, MEASURED BY NAME. 10 from the merged line, each a module its round
+    // built, gated and named in its closing: render/dilate.mjs, render/flicker.mjs, render/luminancePyramidGPU.mjs,
+    // render/opticalFlowGPU.mjs, render/reactive.mjs, tools/ship/constantRows.mjs, tools/ship/fsr2Coverage.mjs,
+    // tools/ship/pageShot.mjs, tools/ship/realGpuRun.mjs, tools/ship/threePatch.mjs. 4 from main after the ceiling
+    // was set (fc12eefc): render/ringFloor.mjs, render/temporalLock.mjs, tools/ship/kernelReach.mjs,
+    // tools/ship/murmurSpeciesFrames.mjs. 5 older modules joined since -- named by a later closing or left without
+    // their last non-gate importer. Exactly the accrual the v4386 note predicted, one paragraph per round.
     // *** v4778 -- RAISED FROM 39 TO 57, BY NAME, ON KEITH'S DECISION. *** Diffed against 5d3d8d83 (39 there): 22
     // arrived and 4 left (tools/ship/absenceScope, recordDrift, wgslCorpus, world/vendoredLicences) -- 39 + 22 - 4 =
     // 57. Named without extensions: from the exported-functions line, each a module its round built, gated and named
@@ -334,6 +359,7 @@ const rescued = [];
     // threePatch; and brain/agent/dispatch, math/solverFit, tools/roundhouse/androidRunner, tools/ship/budgetExile,
     // gateMutation, nextRounds, ship, verify -- named by a later closing, or left without their last non-gate
     // importer. The accrual the v4386 note predicted, one paragraph per round.
+    // v4819 -- 57 at the merge, MEASURED over the merged tree: 57 against 57 (the exported-functions line alone had read 58).
     const RITUAL_CEILING = 57;
     const ritual = rescued.filter((r) => r.by.includes("tools/ship/gateSweep.mjs"));
     ok("!! *** no NEW module is hidden from the orphan census by the ship ritual's own sweep closing ***",

@@ -240,14 +240,32 @@ console.log("\n5. THE CENSUS IS A CENSUS -- NOT RATCHETED, NOT SWEPT, AND IT HAS
     // MEASUREMENT OF THE TREE, it was a measurement of a detector that could not see past 0 -- the same v3453
     // shape ("a rise is only debt if the thing being measured actually rose"), verified here by reading BOTH
     // detectors against the identical files rather than assumed.
-    const HAND_SPELLED_CEILING = 11;
+    // v4798: 11 -> 7, as roundTrip, glbTexture, wgslSpec and canvasFill import SOURCE_EXT -- by hand, one at a time, each run.
+    // v4801: 7 -> 2, as render/colourReach.mjs, mesh/greedyMesh-, tools/ship/ragdollFromSkeleton-, tools/ship/videoFrames- and
+    // ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT -- by hand, one at a time, each run. The two left are named: render/
+    // backendParity.mjs has no top-level node import and is named from browser-side code, so moduleRefs' node:fs is not
+    // pulled into it unread; tools/ship/toolFrontDoor-selfcheck.mjs is over the sweep's budget and is moved when it is run.
+    // v4801 SABOTAGES: the ceiling at 1 -> 1 red; colourReach spelling the regex by hand again -> 1.
+    // v4803: 2 -> 0. render/backendParity.mjs's census takes `isSource` beside its readers -- its gate hands in SOURCE_EXT, so
+    // the module stays free of node:fs -- and tools/ship/toolFrontDoor-selfcheck.mjs imports SOURCE_EXT, run alone (377 s).
+    // At 0 the old `> 0` bound -- proof the detector could see at all, after v4087 found it blind -- has nothing to stand on,
+    // so the proof is a CONTROL: a tree made for it, one file spelling the regex and one importing SOURCE_EXT, and the
+    // detector must name the first and only the first.
+    // v4803 SABOTAGES: backendParity spelling the regex again -> 1 red; the detector blinded -> 1 (the control names nothing).
+    const HAND_SPELLED_CEILING = 0;
     const handSpelled = handSpelledCorpusFilters();
-    ok("!! the hand-spelled corpus filters are COUNTED, not swept",
-        handSpelled.length > 0 && handSpelled.length <= HAND_SPELLED_CEILING,
-        handSpelled.length + " callers still spell /\\.(js|mjs|html)$/ by hand: " + handSpelled.join(", ") +
-        ". *** THE ANTIDOTE, WRITTEN IN ADVANCE: as callers import SOURCE_EXT this number FALLS -- DO NOT RAISE " +
-        "IT past " + HAND_SPELLED_CEILING + ", and DO NOT rewrite all of them in one script, which is v3202's " +
-        "sweep that deleted 61 live modules. ***");
+    const ctl = fs.mkdtempSync(path.join(os.tmpdir(), "handSpelled-"));
+    let control = [];
+    try {
+        fs.writeFileSync(path.join(ctl, "spells.mjs"), "export const CODE = " + "/\\.(js|mjs|html)$/" + ";\n");
+        fs.writeFileSync(path.join(ctl, "imports.mjs"), 'import { SOURCE_EXT } from "./moduleRefs.mjs";\nexport const CODE = SOURCE_EXT;\n');
+        control = handSpelledCorpusFilters({ root: ctl });
+    } finally { fs.rmSync(ctl, { recursive: true, force: true }); }
+    ok("!! the hand-spelled corpus filters are COUNTED, not swept -- and none is left",
+        handSpelled.length <= HAND_SPELLED_CEILING && control.join() === "spells.mjs",
+        handSpelled.length + " callers still spell /\\.(js|mjs|html)$/ by hand" + (handSpelled.length ? ": " + handSpelled.join(", ") : "") +
+        "; the detector, on a tree made for it, names [" + control.join(", ") + "] -- the file that spells it and not the one that imports " +
+        "SOURCE_EXT. *** THE ANTIDOTE, WRITTEN IN ADVANCE: DO NOT RAISE IT past " + HAND_SPELLED_CEILING + ". A new caller imports SOURCE_EXT. ***");
     ok("the report prints and the tool exits zero",
         reportLines().length > 20 && /REFERENCED/.test(reportLines().join("\n")),
         "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");

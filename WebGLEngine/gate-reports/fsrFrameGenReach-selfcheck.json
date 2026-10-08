@@ -1,6 +1,6 @@
 {
  "gate": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the fill's radius alone against reaching 16: dB and pixels left black",
@@ -73,17 +73,17 @@
    "rows": [
     [
      "none",
-     5.300000000046566,
-     5.600000000093132
+     4.7000000001862645,
+     5.300000000279397
     ],
     [
      "a tenth",
-     73.39999999990687,
-     72.39999999990687
+     58.700000000186265,
+     78.89999999990687
     ],
     [
      "all",
-     183,
+     109.1999999997206,
      "not timed"
     ]
    ],

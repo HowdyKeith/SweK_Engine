@@ -1,6 +1,6 @@
 {
  "gate": "fx/fsr/fsrFlowSeed-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "a generated frame's dB: the vectors, the flow, and the flow seeded with the vectors",

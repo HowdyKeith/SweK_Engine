@@ -15,12 +15,20 @@
 //   D. the header match is unanchored, so prose ABOUT a Run: line reads as one -> RED (1 row)
 //   E. the rotation stops ordering its killed pool by cost           -> RED (1 row)
 //   F. this gate stops excluding itself from the census it runs      -> RED (1 row)
+//   v4810, section 6 -- which box's readings cost a gate (all six red, the module restored by copy):
+//   G1. same-type boxes ignored                                      -> RED (2 rows)
+//   G2. a same-type box read before this box's own                   -> RED (2 rows)
+//   G3. any box's record a witness, another type's and local.json's  -> RED (2 rows)
+//   G4. this box's one reading not pooled with its kin's             -> RED (2 rows)
+//   G5. the row's source not recorded                                -> RED (1 row)
+//   G6. timings handed in, and the box files read anyway             -> RED (1 row)
 //
 // *** AND F WAS RESTORED BY HAND AFTER `git checkout --` DID NOTHING, which is worth one line: this file was
 // UNTRACKED when it was sabotaged, so the restore silently succeeded and changed nothing, and the gate went
 // on reporting 272 against 272. A restore that cannot fail is not a restore. Backups, not checkout.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { declaredOf, census, costOf, walkGates, DECLARED_RE, ENG } from "./declaredCost.mjs";
@@ -83,6 +91,7 @@ console.log("\n2. *** THE TWO WAYS A HEADER AND A RECORD DISAGREE ARE DIFFERENT 
         const t = JSON.parse(JSON.stringify(T));
         t.timings[gate] = ms; t.finished = t.finished || {}; t.finished[gate] = finished;
         if (t.serial) delete t.serial[gate];          // these arms drive the `timings` reading; v4814's row below drives serial
+        if (t.serialRing) delete t.serialRing[gate];  // v4819: and the ring, which the merged census reads before either
         return census(ENG, t, { exclude: (g) => g === SELF_REL });
     };
     const g = pick.gate, declared = pick.declaredMs;
@@ -109,6 +118,7 @@ console.log("\n2. *** THE TWO WAYS A HEADER AND A RECORD DISAGREE ARE DIFFERENT 
     // against 39); restored md5-identical.
     const loadedOnly = (serialMs) => { const t = JSON.parse(JSON.stringify(T));
         t.timings[g] = declared * 4; t.finished = t.finished || {}; t.finished[g] = true; t.serial = t.serial || {}; t.serial[g] = serialMs;
+        if (t.serialRing) delete t.serialRing[g];   // v4819: the ring is read first, so the row drives the serial reading alone
         return census(ENG, t, { exclude: (x) => x === SELF_REL }); };
     const quiet = loadedOnly(declared), noisy = loadedOnly(Math.round(declared / 4));
     const rowOf = (c) => c.rotted.find((r) => r.gate === g);
@@ -172,16 +182,45 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // *** A RATCHET AND NOT A TARGET, and the reason is that 138 headers is 138 separate re-measurements --
     // each one a gate run to completion -- which is a pass of its own and not a tail-end edit. What must not
     // happen is the number growing while nobody looks, which is how it reached 138.
-    // *** v4814 -- RE-FROZEN AT 39, BECAUSE THE QUANTITY CHANGED. *** 138 (v4666) and 102 (v4813) counted headers
+    const ROTTED_AT_V4666 = 138;
+    // *** v4801 (the exported-functions line) -- 138 -> 18, AND NOT ONE HEADER WAS RE-WRITTEN. *** The census read `timings[g]`,
+    // the newest reading, and from an 8-way sweep that is ~2.4x a gate's alone cost: most of the 138 were contention, a header
+    // stating the alone cost against a loaded reading. Judged by the alone median (declaredCost.mjs, census), 18 are more
+    // than 2x off, on the record this box's verify wrote and on the one before it alike. The ratchet stood at 18.
+    // v4801 SABOTAGE: the census back on `timings[g]` -> 1 red, 140-odd against 18.
+    // v4804 -- 18 -> 0, PAID DOWN BY RE-MEASURING. Each of the 18 was run alone three times on this box and its Run: line
+    // re-written to the geometric mean of that median and the sweep's serial median -- within 2x of both, which this census
+    // judges by -- with both readings and the old claim beside it. lagReading, the 19th, went at v4803.
+    // v4804 SABOTAGE: boundaryLint's header put back to ~2.4s -> 1 red.
+    // *** v4814 (main) -- RE-FROZEN AT 39, BECAUSE THE QUANTITY CHANGED. *** 138 (v4666) and 102 (v4813) counted headers
     // against `timings`, mostly eight-wide readings; census now uses the alone reading (section 2), and the same tree
     // counts 19. The ceiling is 19 plus the 20 agreeing headers within ONE MEDIAN REPEAT SPREAD of the 2x line: the
     // record's serialRing holds three alone readings for 322 gates over 200 ms, and their max/min is 1.22x at the
     // median (p75 1.34, p90 1.54), so a header at 1.64-2.0x of its alone reading can cross on an ordinary re-time.
     // A ceiling of exactly 19 would flap the way the v4710 scaled line did. Lowered when headers are re-measured.
-    const ROTTED_AT_V4666 = 138, ROTTED_AT_V4814 = 39;
-    ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4814} (138 at v4666, against loaded readings). Each one is a gate whose header claims a ` +
+    // v4819 -- 39 -> 0 AT THE MERGE OF THE TWO LINES, PAID BY RE-MEASURING, as v4804 paid 18. The merged census (rings, then the
+    // shared record's alone reading, then `timings`) read 4 over the 2x line: gateSelection, whose only reading was a loaded
+    // 69,346 ms (this box's alone readings recorded: 16,058-16,432 ms against its ~14s), and coverageTriage, commentFalsePass
+    // and gateReport, each run alone three times here and its Run: line re-written to the median beside the old claim.
+    // SABOTAGE (v4819): gateReport's header put back to ~7.5s -> 1 red, 1 against 0.
+    const ROTTED_AT_V4814 = 39, ROTTED_AT_V4819 = 0;
+    // *** v4820 -- v4819'S 0 WAS ONE MACHINE'S COUNT, AND THE RIG READ 2. *** Since v4810 the census reads THIS machine's alone
+    // readings first, so the count depends on which machine runs it -- and 0 was measured on the sandbox, which has its own
+    // readings of both gates below. The rig's clone verify has none, falls to the shared record, and read 2: statedRuntime
+    // (1.6 s declared, the shared ring [8646, 8651, 8956] taken on main's line at v4815 while it re-ran a stale candidate;
+    // 1,301-1,521 ms alone on both sandbox machines now) and gateSelection (14 s declared, its only reading a loaded
+    // 69,346 ms from 2026-09-09; 16,058-16,432 ms alone here). So the ratchet is held where every machine agrees: the
+    // count a machine with NO readings of its own takes, from the committed records alone -- what the rig, CI and any
+    // new box read. This machine's own count is held to the same ceiling. Paid to 0 when the record's owner re-times
+    // those two (a sweepRotation --gate on 142c0d, or a handover). SABOTAGE (v4820): gateReport's header back to ~7.5s
+    // -> 1 red, 3 against 2 with no readings of its own.
+    const ROTTED_AT_V4820 = 2;
+    const cNone = census(ENG, null, { exclude: (g) => g === SELF_REL, id: "none-x64-0c-0gb-000000" });
+    ok("*** no NEW header has rotted: the count ratchets down, never up -- on a machine with no readings of its own, and on this one ***",
+        cNone.rotted.length <= ROTTED_AT_V4820 && c.rotted.length <= ROTTED_AT_V4820 &&
+        ROTTED_AT_V4820 <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
+        `${cNone.rotted.length} with no readings of its own (${cNone.rotted.map((r) => `${r.gate.split("/").pop()} ${r.declaredMs}/${r.recordedMs} ms from ${r.from}`).join("; ") || "none"}) ` +
+        `and ${c.rotted.length} on this machine, against a frozen ${ROTTED_AT_V4820} (v4819 froze 0, this machine's count only; 39 on main at v4814; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",
@@ -238,6 +277,58 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
         "a sub-second declaration on a gate nothing has timed is exactly the shape that hid v4676's leak, so it " +
         "has to be a number somebody took rather than a round guess");
 
+}
+
+// ---- v4810: WHICH BOX'S READINGS COST A GATE ----------------------------------------------------------------
+//
+// *** A SAME-TYPE BOX'S ALONE READINGS COME BEFORE THE SHARED RECORD. *** Sessions here resume on two machines of one
+// type whose CPU models differ, so each keeps its own per-box record, and until v4810 a box with no alone readings of a
+// gate fell straight to the shared record -- a sweep's reading, taken eight to a core -- and a header went red on a
+// machine change rather than a cost change (v4806: statedRuntime and cloneSource, put right by timing them again).
+// Planted in a tree of its own, so the rows hold whatever the real records say today.
+console.log("\n6. *** WHICH BOX'S READINGS COST A GATE: this one, then one of its type, then the shared record ***");
+{
+    const T = fs.mkdtempSync(path.join(os.tmpdir(), "declaredCost-boxes-")), ship = path.join(T, "tools", "ship");
+    fs.mkdirSync(ship, { recursive: true });
+    const G = (n) => `tools/ship/${n}-selfcheck.mjs`;
+    for (const n of ["mine", "kin", "pooled", "shared", "newest"]) fs.writeFileSync(path.join(T, G(n)), `// ${G(n)}\n//\n// Run: node ${G(n)}   (~1s)\n`);
+    const put = (f, o) => fs.writeFileSync(path.join(ship, f), JSON.stringify(o));
+    const ME = "linux-x64-4c-16gb-aaaaaa";
+    put("sweep-timings.json", {
+        timings: { [G("mine")]: 6400, [G("kin")]: 6400, [G("pooled")]: 6400, [G("shared")]: 6400, [G("newest")]: 6400 },
+        serialRing: { [G("mine")]: [6000, 6200, 6400], [G("kin")]: [6000, 6200, 6400], [G("pooled")]: [6000, 6200, 6400], [G("shared")]: [6000, 6200, 6400] } });
+    put(`sweep-timings.${ME}.json`, { serialRing: { [G("mine")]: [1000, 1100], [G("pooled")]: [1100] } });
+    put("sweep-timings.linux-x64-4c-16gb-bbbbbb.json", { serialRing: { [G("mine")]: [3000, 3100], [G("kin")]: [1200, 1300, 1250], [G("pooled")]: [1300] } });
+    // another type of box -- eight cores -- has alone readings of the two gates that should fall to the shared record
+    put("sweep-timings.linux-x64-8c-32gb-cccccc.json", { serialRing: { [G("shared")]: [900, 950], [G("newest")]: [900, 950] } });
+    // and a record that is not a box's at all
+    put("sweep-timings.local.json", { serialRing: { [G("shared")]: [800, 850], [G("newest")]: [800, 850] } });
+    let c, rows; try { c = census(T, null, { id: ME }); rows = new Map([...c.rotted].map((r) => [r.gate, r])); } finally { fs.rmSync(T, { recursive: true, force: true }); }
+    ok("*** this box's own alone readings first, then a same-type box's, pooled when neither has two of its own -- and the gates costed by them agree with their 1 s headers ***",
+        c.agree === 3 && !rows.has(G("mine")) && !rows.has(G("kin")) && !rows.has(G("pooled")),
+        `agree ${c.agree} of 5; rotted ${[...rows.keys()].join(", ") || "none"}. mine reads this box's [1000, 1100], not the sibling's ` +
+        "3 s; kin reads the sibling's 1250; pooled has one reading on each box and reads the two together");
+    const sh = rows.get(G("shared")) || {}, nw = rows.get(G("newest")) || {};
+    ok("...a gate neither box has read falls to the shared record, and ANOTHER type of box, or a record that is no box's, is not a witness",
+        c.rotted.length === 2 && sh.recordedMs === 6200 && sh.from === "the shared record" && nw.recordedMs === 6400 && nw.from === "the shared record's newest",
+        `shared ${sh.recordedMs} ms from ${sh.from}; newest ${nw.recordedMs} ms from ${nw.from}. An eight-core box's 900 ms and ` +
+        "sweep-timings.local.json's 800 are left alone: a different machine's cost is not this one's");
+    // and the source is named on the live census's rotted rows, so a red says which record it believed
+    const live = census(ENG, null, { exclude: (g) => g === SELF_REL }).rotted;
+    ok("...and every rotted row, here and live, says which record costed it",
+        live.every((r) => ["this box", "same-type boxes", "the shared record", "the shared record's alone reading", "the shared record's newest"].includes(r.from)),
+        `${live.length} live rotted row(s)` + (live.length ? ": " + live.map((r) => `${r.gate} from ${r.from}`).join("; ") : ""));
+}
+{
+    // a caller that hands in its own timings gets those alone, even with box records beside them
+    const T = fs.mkdtempSync(path.join(os.tmpdir(), "declaredCost-given-")), ship = path.join(T, "tools", "ship"), g = "tools/ship/given-selfcheck.mjs";
+    fs.mkdirSync(ship, { recursive: true });
+    fs.writeFileSync(path.join(T, g), `// ${g}\n//\n// Run: node ${g}   (~1s)\n`);
+    fs.writeFileSync(path.join(ship, "sweep-timings.linux-x64-4c-16gb-aaaaaa.json"), JSON.stringify({ serialRing: { [g]: [1000, 1000] } }));
+    fs.writeFileSync(path.join(ship, "sweep-timings.linux-x64-4c-16gb-bbbbbb.json"), JSON.stringify({ serialRing: { [g]: [1000, 1000] } }));
+    let c; try { c = census(T, { timings: { [g]: 6400 } }, { id: "linux-x64-4c-16gb-aaaaaa" }); } finally { fs.rmSync(T, { recursive: true, force: true }); }
+    ok("...and timings handed in are the only record read: no box's file overrides them",
+        c.rotted.length === 1 && c.rotted[0].recordedMs === 6400, `given 6400 ms, read ${(c.rotted[0] || {}).recordedMs} ms`);
 }
 
 console.log(fails ? `\ndeclaredCost-selfcheck: ${fails} FAILED` : "\ndeclaredCost-selfcheck: all checks pass");

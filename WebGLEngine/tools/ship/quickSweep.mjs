@@ -32,7 +32,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { backfillStamps } from "./sweepCoverage.mjs";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
 // The FAIL-line rule is IMPORTED, not re-spelled. tools/ship/failLines.mjs owns "what an assertion line
 // looks like" and its own header is about exactly this problem -- "AN EXIT CODE IS NOT A FINDING". Two
 // copies of that regex is how one of them quietly stops matching, which is the defect this file has spent
@@ -228,6 +228,9 @@ export function redRegister() {
 // hostScale already exists to absorb (it scales a budget by what the local machine has actually done). What
 // changes here is only that a foreign box can no longer silently overwrite the shared record, and that the
 // record says who wrote it. Making fifteen readers host-aware is a different round with a different risk.
+// v4800 (#87): ONE OF THEM IS REDIRECTED NOW -- the sweep's own choice of gates, through ownTimings below, the one
+// whose cost was measured: ~100 gates read "now over budget" at every verify of a session whose box no record named.
+// The other readers (sweepCoverage, recordInputs, mechanical among them) still read the shared file, unchanged here.
 export const LOCAL_TIMINGS = "tools/ship/sweep-timings.local.json";
 
 /**
@@ -244,15 +247,17 @@ export function timingsTarget(prior, { file = DEFAULTS.timingsFile, local = LOCA
     const owner = ownerOf(was, handovers);
     // the handover is asked FIRST: a box that handed the record on names itself in `host` until the new owner
     // writes, and reading that as ownership would make two owners -- the hostScale-selfcheck row caught it
-    if (was === id && owner === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
+    // v4819: `was` and the rows read through canonicalId, so a record that names a box in v4796's megabyte form names it
+    if (canonicalId(was) === id && owner === id) return { file, host: id, foreign: false, why: `this box (${id}) owns the record` };
     if (owner === id) {
         // the LAST row naming this box, since v4818 a box can be handed the record more than once
-        const h = [...handovers].reverse().find((x) => x.to === id);
+        const h = [...handovers].reverse().find((x) => canonicalId(x.to) === id);
         return { file, host: id, foreign: false,
                  why: `the record names ${was}, which handed it to this box (${id}) at ${h ? h.at : "?"}` };
     }
     return { file: local, host: id, foreign: true,
-             why: `the record belongs to ${owner}${owner !== was ? ` (handed over from ${was})` : ""} and this box ` +
+             // v4819: the record's host as WRITTEN where no handover moved it -- hostScale-selfcheck's "names BOTH boxes" row
+             why: `the record belongs to ${owner !== canonicalId(was) ? `${owner} (handed over from ${was})` : was} and this box ` +
                   `is ${id} -- writing ${local} instead, because two machines' runtimes in one set of fields is ` +
                   `not a record, it is whichever ran last` };
 }
@@ -325,9 +330,12 @@ export const RECORD_HANDOVERS = Object.freeze([
 // 420793 for a record whose host is 420793 -- the handover would have been ignored, silently, and every write would
 // have kept going to .local.json. The table is append-only and dated, so its order IS the history: apply each row
 // whose `from` is the current owner, in order. On a chain that never revisits a box this is the same answer.
+// v4819 -- AND EVERY ID IS READ IN ONE FORM. The rows were written while boxId() carried megabytes; the line merged in at
+// v4819 has carried whole gigabytes since v4796, so the same box is `16095mb` in a row and `16gb` in boxId(). The walk
+// compares canonicalId()s and returns one, so `ownerOf(x) === boxId()` asks the question it always asked.
 export function ownerOf(host, handovers = RECORD_HANDOVERS) {
-    let h = host;
-    for (const x of handovers) if (x.from === h) h = x.to;
+    let h = canonicalId(host);
+    for (const x of handovers) if (canonicalId(x.from) === h) h = canonicalId(x.to);
     return h;
 }
 
@@ -335,6 +343,32 @@ export function ownerOf(host, handovers = RECORD_HANDOVERS) {
 // glued it under the tree, so the file the caller named was never the file read.
 export function readTimings(file = DEFAULTS.timingsFile, root = ENG) {
     try { return JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch { return { captured: null, timings: {}, codes: {}, observed: {} }; }
+}
+
+/**
+ * v4800 (#87) -- THE RECORD THIS BOX'S SWEEP CHOOSES ITS GATES BY. Returns { rec, file, own, why }.
+ *
+ * timingsTarget answers WHERE this box's readings go; this answers which readings choose the gates, and the two
+ * were never the same question. Until now the sweep always chose by the shared record, so a box that did not own
+ * it chose by another machine's stopwatch: ~100 gates read over budget at every verify on this session's box,
+ * because the record belonged to an id no live box has. That box's own readings were written, every sweep, to
+ * LOCAL_TIMINGS -- and never read back. They are read back now:
+ *
+ *   - the shared record, if this box owns it or nobody does (timingsTarget's own rule for who may write it);
+ *   - else LOCAL_TIMINGS, if THIS box wrote it -- a full sweep's readings, the file a foreign box writes;
+ *   - else the shared record still, said as such (`own: false`): a box's first sweep has nothing of its own.
+ *
+ * The per-box files (boxTimings.FILES.perBox) are not candidates: recordLocal writes a handful of entries there,
+ * and a record that does not cover the tree would make every gate it lacks "unmeasured", run regardless of cost.
+ */
+export function ownTimings(shared, { file = DEFAULTS.timingsFile, local = LOCAL_TIMINGS, root = ENG, id = boxId() } = {}) {
+    // v4819: whose record it is is ownerOf()'s answer -- the handovers the other line keeps -- not the `host` field alone
+    const was = shared && shared.host, owner = was ? ownerOf(was) : null;
+    if (!was || owner === id) return { rec: shared, file, own: true, why: was ? `this box (${id}) owns ${file}` : `${file} names no box; ${id} adopts it` };
+    const mine = readTimings(local, root);
+    if (canonicalId(mine.host) === id && Object.keys(mine.timings || {}).length > 0)
+        return { rec: mine, file: local, own: true, why: `${file} belongs to ${owner}; choosing by this box's own ${local}` };
+    return { rec: shared, file, own: false, why: `${file} belongs to ${owner} and this box (${id}) has no record of its own yet; choosing by ${owner}'s` };
 }
 
 /**
@@ -679,7 +713,11 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // gateSweep.TRANSIENT_DIRS). Not for a caller's own gate list -- those are fixtures in their own root.
     if (!gates) { const gone = reclaimScratchDirs(root); if (gone.length) log(`[sweep] reclaimed ${gone.length} stranded gate scratch dir(s): ${gone.join(", ")}`); }
     const all = gates || enumerateGates(root);
-    const prior = readTimings(timingsFile, root);
+    // v4800 (#87): the gates are chosen by -- and this run's readings merged into -- the record of THIS box's stopwatch
+    // (ownTimings); whose record the shared file is still decides where they are written (timingsTarget, below).
+    const shared = readTimings(timingsFile, root);
+    const own = ownTimings(shared, { file: timingsFile, root });
+    const prior = own.rec;
     // v4566 -- the input record is read once and used to COUNT, not to skip, unless skipUnchanged is set.
     // A missing or unreadable record yields an empty one, and skippable() answers "no recorded input set" for
     // every gate, so the sweep behaves exactly as it did before this parameter existed.
@@ -929,10 +967,10 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     // and inventing one per box would make two boxes' "the sweep is green" mean different things silently.
     // What changes is that it no longer means them differently in SILENCE.
     const timingsHost = prior.host || null;
-    const foreignTimings = !!timingsHost && timingsHost !== boxId();
+    const foreignTimings = !!timingsHost && canonicalId(timingsHost) !== boxId();
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
-        timingsHost, foreignTimings, box: boxId(),
+        timingsHost, foreignTimings, box: boxId(), timingsFrom: own.file, timingsWhy: own.why,
         enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
@@ -964,7 +1002,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = DE
     stage({ stage: "write", write });
     if (write) {
         // v4647 -- whose stopwatch. A foreign box writes its own file rather than overwriting this one.
-        const target = timingsTarget(prior, { file: timingsFile });
+        const target = timingsTarget(shared, { file: timingsFile });
         // v4647h: through the caller's sink. This line fires on a FOREIGN box -- the only kind whose
         // result gets carried to another machine -- so under --json it was the line most likely to
         // land inside the capture and the least likely to be noticed by the box that wrote it.

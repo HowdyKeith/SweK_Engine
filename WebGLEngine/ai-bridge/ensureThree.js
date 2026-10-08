@@ -4,7 +4,7 @@
 // pipboy-models / glb_viewer / graph_viewer / voxel-photo-cube, and the dozens of other pages and
 // real engine modules that import "three") normally SHIPS in the zip, so it loads instantly and
 // offline. This is only a safety net: if those files are ever missing (a ship-strip slip, or the
-// user deleted them), the bridge quietly re-fetches the exact 0.185.1 closure on boot so the
+// user deleted them), the bridge quietly re-fetches the exact 0.186.1 closure on boot so the
 // regression that broke the viewers before can't recur.
 //
 // *** WHY THE NPM TARBALL AND NOT PER-FILE raw.githubusercontent.com FETCHES, UNLIKE THIS FILE'S OWN
@@ -34,7 +34,7 @@ const { execFile } = require("child_process");
 // the parent of ai-bridge (the import map resolves "/vendor/three/..."). ai-bridge
 // has its OWN vendor/ (go2rtc) — do NOT confuse them.
 const DIR = path.join(__dirname, "..", "vendor", "three");
-const REV = "0.185.1";   // the npm "three" package version this directory is vendored from
+const REV = "0.186.1";   // the npm "three" package version this directory is vendored from (0.185.1 until v4807)
 const TARBALL_URL = "https://registry.npmjs.org/three/-/three-" + REV + ".tgz";
 
 // [ local path under vendor/three , path inside the npm tarball's "package/" root ]

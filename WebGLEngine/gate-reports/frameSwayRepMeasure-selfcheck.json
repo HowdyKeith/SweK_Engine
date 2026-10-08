@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/frameSwayRepMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the sway replicated, per scene, beside H14's",

@@ -1,6 +1,6 @@
 {
  "gate": "render/flowReconcileGPU-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the device's reconciliation against the CPU's, block by block",

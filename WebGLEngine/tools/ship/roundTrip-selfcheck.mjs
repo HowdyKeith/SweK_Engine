@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/roundTrip-selfcheck.mjs
 //
-// Run: node tools/ship/roundTrip-selfcheck.mjs   (~4.5s MEASURED (gate-timings.json) -- MEASURED)
+// Run: node tools/ship/roundTrip-selfcheck.mjs   (~10.5s — re-measured v4804: 6.6 s-7.0 s alone, 16.1 s the sweep's serial median; it read ~4.5s MEASURED (gate-timings.json) -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3243 -- KEITH'S SIX RULES FOR A ROUND-TRIP CONTROL, IN ONE PLACE.
@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { noComments } from "./sourceScan.mjs";
 import { roundTripCensus } from "./roundTripCensus.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";   // v4798 -- one definition of a source file, not a regex spelled by hand
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -76,7 +77,7 @@ const mod = noComments(modRaw);
             if (e.name === "node_modules" || e.name.startsWith(".") || e.name === "vendor") continue;
             const p = path.join(dir, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+            if (!SOURCE_EXT.test(e.name)) continue;
             if (p.endsWith(path.join("ui", "roundTrip.js")) || /roundTrip-selfcheck/.test(p)) continue;
             let src = ""; try { src = noComments(fs.readFileSync(p, "utf8")); } catch { continue; }
             if (/indeterminate\s*=\s*!known|__swek_unknown__/.test(src)) others.push(path.relative(ROOT, p));

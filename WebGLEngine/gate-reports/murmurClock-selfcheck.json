@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/murmurClock-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "comet's orbital phase: worst one-frame advance as the cadence goes to full",

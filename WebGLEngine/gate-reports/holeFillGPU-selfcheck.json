@@ -1,6 +1,6 @@
 {
  "gate": "render/holeFillGPU-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the device's fill against the CPU's, every side mode and flag",

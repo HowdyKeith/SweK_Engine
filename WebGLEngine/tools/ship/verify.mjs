@@ -296,6 +296,27 @@ for (const [file, label] of [
   }
 }
 
+// v4782 -- THE TWO ORPHAN RATCHETS, BY NAME, BECAUSE THE SWEEP COULD NOT SEE THEM. graveyard and referenceKind took
+// ~157 s and ~175 s, so the quick sweep never ran them and two merges landed over both unmeasured (v4781). They take
+// ~3 s each now (moduleRefs.basenameHits, and the directory test asked once per directory), but the sweep still picks
+// gates by the shared timing record -- whose owner may not be the box running this, and cannot be re-timed from one
+// that is not (task #87) -- so a fast gate can stay unselected for as long as that record is stale. Run here they
+// are seen every ship, whatever any record says. The exit code is the verdict, as for the lockstep gates above.
+for (const [file, label] of [
+  ["tools/ship/graveyard-selfcheck.mjs", "graveyard -- gate-only modules may not increase"],
+  ["tools/ship/referenceKind-selfcheck.mjs", "referenceKind -- no new orphan hidden by a mention"],
+]) {
+  try {
+    const { execFileSync } = await import("node:child_process");
+    execFileSync(process.execPath, [file], { encoding: "utf8", timeout: 180000 });
+    check("orphans — " + label, true, "exit 0");
+  } catch (e) {
+    const out = String(e.stdout || "");
+    const fail = (out.match(/^\s*FAIL\s.*$/m) || [""])[0].trim().slice(0, 140);
+    check("orphans — " + label, false, fail || "COULD NOT RUN: " + String(e.message).slice(0, 90));
+  }
+}
+
 // v2505 -- DO THE PAGES PARSE? Every other check in this gate tests a MODULE. Nothing had ever opened a PAGE, so
 // 228 pages carrying 344 inline scripts and 2.5 MB of JavaScript shipped on the strength of nobody clicking them.
 // It cost us three times in a fortnight, all caught by hand: v2492's button one-liner crashed and SHIPPED PAST THIS

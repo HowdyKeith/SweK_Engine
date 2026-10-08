@@ -1,8 +1,8 @@
 diff --git a/src/nodes/accessors/Morph.js b/src/nodes/accessors/Morph.js
-index e9b9319..9173232 100644
+index e9b9319..9892c59 100644
 --- a/src/nodes/accessors/Morph.js
 +++ b/src/nodes/accessors/Morph.js
-@@ -3,7 +3,7 @@ import { float, Fn, ivec2, int, If, uniform } from '../tsl/TSLBase.js';
+@@ -3,14 +3,15 @@ import { float, Fn, ivec2, int, If, uniform } from '../tsl/TSLBase.js';
  import { Loop } from '../utils/LoopNode.js';
  import { OnObjectUpdate } from '../utils/EventNode.js';
  import { textureLoad } from './TextureNode.js';
@@ -11,7 +11,16 @@ index e9b9319..9173232 100644
  import { normalLocal } from './Normal.js';
  import { instanceIndex, vertexIndex } from '../core/IndexNode.js';
  
-@@ -182,7 +182,7 @@ function getEntry( geometry ) {
+ import { DataArrayTexture } from '../../textures/DataArrayTexture.js';
++import { DataTexture } from '../../textures/DataTexture.js';
+ import { Vector2 } from '../../math/Vector2.js';
+ import { Vector4 } from '../../math/Vector4.js';
+-import { FloatType } from '../../constants.js';
++import { FloatType, RedFormat } from '../../constants.js';
+ import { uniformArray } from './UniformArrayNode.js';
+ 
+ const _morphTextures = /*@__PURE__*/ new WeakMap();
+@@ -182,7 +183,7 @@ function getEntry( geometry ) {
   * @function
   * @param {Mesh} mesh - The mesh.
   */
@@ -20,7 +29,7 @@ index e9b9319..9173232 100644
  
  	const { geometry } = mesh;
  
-@@ -267,6 +267,46 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+@@ -267,6 +268,87 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
  
  	} );
  
@@ -64,10 +73,51 @@ index e9b9319..9173232 100644
 +
 +	}
 +
++	// per instance, the influences are read from the mesh's morphTexture: the previous ones from a copy of the last draw's
++
++	if ( hasMorphPosition === true && builder.needsPreviousData() && perInstance === true ) {
++
++		if ( morphInfluenceData.previousMorphTexture === undefined ) {
++
++			const { data, width: w, height: h } = mesh.morphTexture.image;
++
++			morphInfluenceData.previousMorphTexture = new DataTexture( data.slice(), w, h, RedFormat, FloatType );
++			morphInfluenceData.previousMorphTexture.needsUpdate = true;
++			morphInfluenceData.lastMorph = data.slice();
++
++		}
++
++		const { previousMorphTexture } = morphInfluenceData;
++
++		// the base too: a column of its own in each instance's row, 1 less the influences' sum where the targets are absolute
++
++		positionPrevious.assign( positionPrevious.mul( textureLoad( previousMorphTexture, ivec2( int( 0 ), int( instanceIndex ) ) ).r ) );
++
++		Loop( morphTargetsCount, ( { i } ) => {
++
++			const influence = textureLoad( previousMorphTexture, ivec2( int( i ).add( 1 ), int( instanceIndex ) ) ).r.toVar();
++
++			If( influence.notEqual( 0 ), () => {
++
++				positionPrevious.assign( positionPrevious.add( getMorph( {
++					bufferMap,
++					influence,
++					stride,
++					width,
++					depth: i,
++					offset: int( 0 )
++				} ) ) );
++
++			} );
++
++		} );
++
++	}
++
  	// Update
  
  	OnObjectUpdate( ( { object } ) => {
-@@ -290,6 +330,21 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
+@@ -290,6 +372,32 @@ export const morphReference = /*@__PURE__*/ Fn( ( [ mesh ] ) => {
  
  		}
  
@@ -83,6 +133,17 @@ index e9b9319..9173232 100644
 +
 +			data.lastBase = base.value;
 +			data.lastInfluences = object.morphTargetInfluences.slice();
++
++		}
++
++		if ( data.previousMorphTexture !== undefined ) {
++
++			// the last draw's per-instance influences are this draw's previous ones; this draw's are kept for the next
++
++			data.previousMorphTexture.image.data.set( data.lastMorph );
++			data.previousMorphTexture.needsUpdate = true;
++
++			data.lastMorph.set( object.morphTexture.image.data );
 +
 +		}
 +

@@ -1,6 +1,6 @@
 {
  "gate": "render/opticalFlow-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "whole-pixel shifts found, by pyramid depth",

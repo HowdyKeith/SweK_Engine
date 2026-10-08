@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipVerdict-selfcheck.mjs
 //
-// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~4.9s -- MEASURED at v4680; was ~0.83s before section 6's live drivers)
+// Run: node tools/ship/shipVerdict-selfcheck.mjs   (~12.7s — re-measured v4804: 13.1 s alone (median of three; one run read 65.7 s), 12.3 s the sweep's serial median; it read ~4.9s -- MEASURED at v4680; was ~0.83s before section 6's live drivers)
 //
 // v4405 -- *** THE ROUND BEFORE THIS ONE SHIPPED A CONFLICT MARKER ONTO main, PAST A VERIFY THAT SAID
 // "DO NOT SHIP". ***

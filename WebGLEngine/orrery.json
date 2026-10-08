@@ -1510,11 +1510,11 @@
    "name": "three",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 3344827,
+   "bytes": 3379353,
    "files": [
     {
      "path": "jsm/controls/OrbitControls.js",
-     "bytes": 40504
+     "bytes": 40755
     },
     {
      "path": "jsm/curves/NURBSCurve.js",
@@ -1526,7 +1526,7 @@
     },
     {
      "path": "jsm/exporters/GLTFExporter.js",
-     "bytes": 92973
+     "bytes": 93570
     },
     {
      "path": "jsm/libs/basis/basis_transcoder.js",
@@ -1566,11 +1566,11 @@
     },
     {
      "path": "jsm/loaders/FBXLoader.js",
-     "bytes": 111266
+     "bytes": 113372
     },
     {
      "path": "jsm/loaders/GLTFLoader.js",
-     "bytes": 114959
+     "bytes": 117570
     },
     {
      "path": "jsm/loaders/KTX2Loader.js",
@@ -1582,7 +1582,7 @@
     },
     {
      "path": "jsm/utils/BufferGeometryUtils.js",
-     "bytes": 37621
+     "bytes": 37712
     },
     {
      "path": "jsm/utils/SkeletonUtils.js",
@@ -1598,15 +1598,15 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 14694
+     "bytes": 15888
     },
     {
      "path": "three.core.js",
-     "bytes": 1443056
+     "bytes": 1458113
     },
     {
      "path": "three.module.js",
-     "bytes": 650153
+     "bytes": 662772
     }
    ]
   },
@@ -1614,7 +1614,7 @@
    "name": "three-webgpu",
    "arrived": "2026-09-02",
    "sha": "614dbcf4e48a438ddae6123aa08eb2df45b610cd",
-   "bytes": 3654294,
+   "bytes": 3786262,
    "files": [
     {
      "path": "LICENSE",
@@ -1622,11 +1622,43 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 1302
+     "bytes": 1681
     },
     {
      "path": "README.md",
-     "bytes": 2195
+     "bytes": 3678
+    },
+    {
+     "path": "three.core.js",
+     "bytes": 1458113
+    },
+    {
+     "path": "three.tsl.js",
+     "bytes": 36859
+    },
+    {
+     "path": "three.webgpu.js",
+     "bytes": 2284850
+    }
+   ]
+  },
+  {
+   "name": "three-webgpu-r185",
+   "arrived": "2026-10-03",
+   "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211",
+   "bytes": 3653275,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1081
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 1078
+    },
+    {
+     "path": "README.md",
+     "bytes": 1400
     },
     {
      "path": "three.core.js",

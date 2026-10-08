@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/frameGainMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "H11 per scene: motion's gain over standing still",

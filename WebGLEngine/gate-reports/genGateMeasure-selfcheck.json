@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/genGateMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "H1: each arm's mean generated dB",

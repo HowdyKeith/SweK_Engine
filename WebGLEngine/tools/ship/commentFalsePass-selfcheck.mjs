@@ -1,6 +1,6 @@
 // tools/ship/commentFalsePass-selfcheck.mjs
 //
-// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~9.6s MEASURED at v4575, median of
+// Run: node tools/ship/commentFalsePass-selfcheck.mjs   (~3.1s -- MEASURED v4819 at the merge, median of 3063/3133/3025 alone; ~9.6s MEASURED at v4575, median of
 //   9369/9667/9613 -- superseding a stated ~4.2s taken from gate-timings.json, which is 2.3x under.
 //   OVER the 3,000 ms sweep budget either way, see below. sweep-timings.json has it at 20,025 ms with
 //   exit code 124, which is not a runtime at all but the SIGKILL cap v4574 counted 137 gates sitting on.

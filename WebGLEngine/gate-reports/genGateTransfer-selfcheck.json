@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/genGateTransfer-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "C9: held-out AUC per fold, reported because declared and not promoted",

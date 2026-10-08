@@ -16,6 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as R from "../../physics/ragdollFromSkeleton.mjs";
 import { qAngle } from "../../anim/retarget.mjs";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -54,7 +55,7 @@ console.log("1. *** THE GREP RESULT THAT IS THE WHOLE REASON FOR THIS ROUND, CHE
             if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor") continue;
             const f = path.join(d, e.name);
             if (e.isDirectory()) walk(f);
-            else if (/\.(js|mjs|html)$/.test(e.name)) files.push(f);
+            else if (SOURCE_EXT.test(e.name)) files.push(f);
         }
     };
     walk(ENG);

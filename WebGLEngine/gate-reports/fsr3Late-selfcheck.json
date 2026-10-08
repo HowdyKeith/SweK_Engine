@@ -1,6 +1,6 @@
 {
  "gate": "fx/fsr/fsr3Late-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "each policy around a real frame five refreshes late",

@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/budgetProvenance-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "MEASURED entries against an independent observation, by ratio",
@@ -42,7 +42,7 @@
      0
     ]
    ],
-   "note": "62 of 64 entries have an independent observation"
+   "note": "62 of 63 entries have an independent observation"
   },
   {
    "title": "the five largest ratios remaining",

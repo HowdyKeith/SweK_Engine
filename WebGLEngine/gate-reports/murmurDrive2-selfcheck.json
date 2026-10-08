@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/murmurDrive2-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "RMS radius under drive, per species",

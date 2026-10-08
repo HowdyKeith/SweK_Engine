@@ -882,10 +882,15 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // usesOk, definesOk and nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
     // the splat-collision round -- 1929 -> 1930 for tools/ship/splatVoxelWorld-selfcheck.mjs. usesOk, definesOk and
     // nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
-    // the lockstep round -- 1930 -> 1932 for brain/raceLockstep-selfcheck.mjs and tools/ship/lockstepRelay-selfcheck.mjs. usesOk, definesOk and
+    // v4779 -- 1880 -> 1881 for render/temporalTslCoverage-selfcheck.mjs -- the motion field where three draws: cut-outs, back faces, hidden, culled, grown.
+    // v4809 -- 1881 -> 1882 for render/threeWorkarounds-selfcheck.mjs -- the engine's two ways around r186's issues 17 and 18, held on both backends.
+    // v4819 -- AT THE MERGE OF THE TWO LINES, RE-DERIVED BY RUNNING census() OVER THE MERGED TREE: main's 1930 plus the
+    // exported-functions line's two gates since the v4777 split (render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds-
+    // selfcheck.mjs) -- gates, usesOk, definesOk and nameFirst each by two; the other five rows hold (the gate's drift row named these four).
+    // the lockstep round (v4822) -- main's 1932 -> 1934 for brain/raceLockstep-selfcheck.mjs and tools/ship/lockstepRelay-selfcheck.mjs. usesOk, definesOk and
     // nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
-    gates: 1932, usesOk: 1911, definesOk: 1903, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1803, condFirst: 97, unknownSignature: 11,
+    gates: 1934, usesOk: 1913, definesOk: 1905, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1805, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

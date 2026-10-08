@@ -47,6 +47,7 @@
 // the frame moves only at an occluder's edge, -0.29 and -0.81 dB where a box slides in front. From the stage's own clip depth
 // it is the geometry pass's to the bit, on both backends.
 "use strict";
+import { refreshEveryRender } from "./threeWorkarounds.mjs";
 
 const RENDERABLE = (o) => !!(o && (o.isMesh || o.isLine || o.isPoints || o.isSprite));
 const materials = (o) => (Array.isArray(o.material) ? o.material : [o.material]).filter(Boolean);
@@ -85,7 +86,11 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
     if (typeof select !== "function") throw new Error("render/translucentLayer: select must be a function of an object");
     const target = new THREE.RenderTarget(w, h, { type: type == null ? THREE.FloatType : type, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const depthOnly = new THREE.MeshBasicNodeMaterial(); depthOnly.colorWrite = false;
-    const gather = (scene) => { const tr = [], bd = [], op = []; scene.traverse((o) => { if (!RENDERABLE(o)) return; (readsBackdrop(o) ? bd : select(o) ? tr : op).push(o); }); return { tr, bd, op }; };
+    // v4809: every backdrop reader the layer meets is marked so three r186 refreshes it at every render -- drawn into the generator's
+    // targets one after another, a transmission material otherwise samples the previous target's frame (render/threeWorkarounds.mjs,
+    // docs/upstream-three/dev/17). prepare(scene) marks them before an application's first render; gather marks any that arrive later
+    const mark = (objs) => { for (const o of objs) for (const m of materials(o)) refreshEveryRender(THREE, m); return objs; };
+    const gather = (scene) => { const tr = [], bd = [], op = []; scene.traverse((o) => { if (!RENDERABLE(o)) return; (readsBackdrop(o) ? bd : select(o) ? tr : op).push(o); }); mark(bd); return { tr, bd, op }; };
     // v4765: the frame the backdrop readers are drawn over, copied in exactly (a texel a pixel), with a depth buffer of its own
     const overTarget = new THREE.RenderTarget(w, h, { type: type == null ? THREE.FloatType : type, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     const L = THREE.TSL, ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), copies = new Map(), depthQuads = new Map();
@@ -126,6 +131,8 @@ export function makeTranslucentLayer(THREE, { w, h, type = null, select = isTran
     };
     return {
         target, texture: target.texture, overTarget,
+        /** v4809: mark the scene's backdrop readers for three r186 (render/threeWorkarounds.mjs) before its first render; returns how many. */
+        prepare(scene) { return gather(scene).bd.length; },
         /** Hide the scene's translucent things and its backdrop readers: the generator's frames and the motion stage's pass are drawn so. */
         hide(scene) { const { tr, bd } = gather(scene); return hideAll([...tr, ...bd]); },
         async renderOver(renderer, scene, camera, frame, { depth = null } = {}) {

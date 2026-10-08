@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/releaseLedger-selfcheck.mjs -- v4449
 //
-// Run: node tools/ship/releaseLedger-selfcheck.mjs   (~40 ms, no network)
+// Run: node tools/ship/releaseLedger-selfcheck.mjs   (~860 ms — re-measured v4804: 0.9 s-1.0 s alone, 0.7 s the sweep's serial median; it read ~40 ms, no network)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** THE FLEET DOWNLOADS releases/latest, AND FOR 261 SHIPPED VERSIONS IT HAS DOWNLOADED THREE OF THEM. ***

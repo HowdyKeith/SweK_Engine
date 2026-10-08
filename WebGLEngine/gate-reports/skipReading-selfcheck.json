@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/skipReading-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the cost of capturing a gate's output, eight gates three times each way (frozen at v4582)",

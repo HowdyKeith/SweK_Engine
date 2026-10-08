@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/genGateAbsoluteMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "H5 per fold at x4: base rate and each arm's seed-mean held-out AUC, seeds 11-20",

@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/labHome-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the lab home page with no bridge",
@@ -17,7 +17,7 @@
      25,
      25,
      0,
-     200.60000000009313
+     203.79999999981374
     ]
    ],
    "note": null

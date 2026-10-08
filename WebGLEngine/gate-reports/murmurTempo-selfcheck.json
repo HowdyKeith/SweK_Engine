@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/murmurTempo-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "idle tempo: t*speed against the integrated phase",

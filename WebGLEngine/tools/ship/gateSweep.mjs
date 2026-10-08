@@ -8064,7 +8064,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "ground at the wrong constant. Both named in the kit, neither closed here.",
     }),
     // v4778 -- THE FSR CACHES LEAVE THE ZIP FOR THEIR OWN FOLDER, AND A ROUTE BRINGS THEM BACK ON REQUEST.
-    since477: Object.freeze({
+    // v4819 -- RENUMBERED since477 -> since511 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since511: Object.freeze({
         at: "v4778", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/fsrCaches-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -8081,7 +8083,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "green until the fixture served the hostile name's bytes -- nothing escaped only because nothing arrived.",
     }),
     // Round A -- THE THIRD-PERSON CAMERA BOOM: camera/cameraBoom.js, swept and stopped short of the first voxel it would touch.
-    since478: Object.freeze({
+    // v4819 -- RENUMBERED since478 -> since512 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since512: Object.freeze({
         at: "Round A (unshipped)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["camera/cameraBoom-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -8099,7 +8103,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "branch's always was; and nothing here has been looked at on the rig.",
     }),
     // the lock-sums round -- THE LOCK's TWO WINDOWS AS RUNNING SUMS: render/temporalLock.mjs's makeLumaSums and its TSL port.
-    since479: Object.freeze({
+    // v4819 -- RENUMBERED since479 -> since513 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since513: Object.freeze({
         at: "the lock-sums round (unshipped)", swept: 2, green: 2, red: 0,
         added: Object.freeze(["render/temporalLockSums-selfcheck.mjs", "render/temporalLockSumsTsl-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -8119,7 +8125,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
     // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
-    since480: Object.freeze({
+    // v4819 -- RENUMBERED since480 -> since514 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since514: Object.freeze({
         at: "the splat-collision round (unshipped)", swept: 1, green: 1, red: 0,
         added: Object.freeze(["tools/ship/splatVoxelWorld-selfcheck.mjs"]),
         redOnArrival: Object.freeze([]),
@@ -8151,7 +8159,9 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // murmuration line spent since334..since342 on its own arrivals while this branch spent since334..336
     // on these; the slot ordinal is a second number a round wears and it collided exactly as the version
     // did. Kept in round order beneath, newest first, so the list still reads as a sequence. ***
-    since476: Object.freeze({
+    // v4819 -- RENUMBERED since476 -> since510 at the merge of the two lines: both reached for since476..since480 in the same days,
+    // and in an object literal the later key silently wins (gateSweep-selfcheck's duplicate row, v4394). Ordinals only need to be distinct.
+    since510: Object.freeze({
         at: "v4778", swept: 45, green: 45, red: 0,
         added: Object.freeze([
             "brain/autopilot6dof-selfcheck.mjs",
@@ -8857,6 +8867,693 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "tidying pass can delete. A THIRD was caught by the gate itself: the quiet-state control " +
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
+    }),
+    // v4820 -- NO new gate file -- declaredCost's ratchet held on a machine with no readings of its own (the rig's clone read 2).
+    since515: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4820", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the ratchet counted as a machine with no readings of its own counts it, and on this one)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** v4819'S 0 WAS THE SANDBOX'S COUNT; THE RIG'S CLONE READ 2. *** The census reads the running machine's own alone " +
+                 "readings first (v4810), and the sandbox had readings of statedRuntime and gateSelection that the shared record " +
+                 "does not: its statedRuntime ring is 8.6-9.0 s from main's line, where the gate runs ~1.5 s alone now, and " +
+                 "gateSelection's only reading is a loaded 69 s. The ratchet is held on the count a machine with no readings of its " +
+                 "own takes -- frozen at 2, both named -- and on this machine's count. One sabotage red.",
+    }),
+    // v4812 -- THE 416th CLOSING: NO new gate file -- a pull request text for each of the sixteen three.js issues.
+    since509: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4812", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: one pull request text per issue, each held to its issue, its patch, three's template and e2e.json's unit figures)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PULL REQUESTS, READY TO PASTE. *** docs/upstream-three/dev/pr/ holds one text per issue: a title in three's " +
+                 "'Component: What changed.' form, the branch to make in a fork and the commands that make it from the issue's own patch, " +
+                 "and a body in three's pull request template -- the problem, the fix, and what the issue's reproduction printed on dev " +
+                 "and with the patch, quoted from record.json. Each patch was linted alone on dev at 576b084 (eslint clean, all sixteen); " +
+                 "the unit and e2e figures quoted were taken with all sixteen together, and each body says so. The commands were run once " +
+                 "in a scratch checkout: a title's backticks reach the commit as backticks, escaped. Six sabotages red.",
+    }),
+    // v4811 -- THE 415th CLOSING: NO new gate file -- the sixteen drafts re-checked against three's dev at 576b084.
+    since508: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4811", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: each patch made against dev's own blobs, each issue naming the dev it was measured on)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** NONE OF THE SIXTEEN WAS FIXED IN THE TWELVE COMMITS SINCE 1ea31f3. *** threePatch.mjs re-taken on dev at 576b084 " +
+                 "(4 October): every reproduction prints exactly what it printed on 1ea31f3 -- on dev, with its patch, with all sixteen. " +
+                 "Every patch still applied, and that hid something: 09 and 16 named blobs dev no longer holds, their hunks seven lines " +
+                 "off, in RenderObject.js, Renderer.js and WebGPUBackend.js. Both made again on dev's files; 10, made again with three " +
+                 "lines of context, no longer applied after 04, so it keeps its two. The record now holds dev's blob for each of the 23 " +
+                 "files the patches edit, and section 6 holds each patch's index line to it. Three's tests on 576b084: unit 1525, 1524 " +
+                 "passed, 1 todo, on both builds; e2e 191 of 202 on WebGPU and 148 on WebGL 2, every outcome the same on both builds and " +
+                 "as on 1ea31f3. Five sabotages red.",
+    }),
+    // v4810 -- THE 414th CLOSING: NO new gate file -- declaredCost reads a same-type box's alone readings before the shared record.
+    since507: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4810", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (section 6: which box's readings cost a gate, planted in a tree of its own)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A BOX COSTS ITS GATES BY ITS OWN KIND, NOT BY THE SHARED RECORD'S SWEEP. *** Sessions resume on two machines of one " +
+                 "type whose CPU models differ, so each keeps its own per-box record, and a box with no alone readings of a gate fell to the " +
+                 "shared ring -- sweep readings -- and a header went red on a machine change (v4806: statedRuntime and cloneSource). census " +
+                 "now reads this box's ring, then same-type boxes' rings pooled with this box's one reading, then the shared record, and names " +
+                 "the record on each row. Measured: a box of this type that has never run a gate alone rots 0 headers; a box of another type, " +
+                 "which still reads the shared record, rots statedRuntime (1.6 s declared, 6,462 ms recorded) as v4806 did. Another type's " +
+                 "record and sweep-timings.local.json are not witnesses. Six sabotages red.",
+    }),
+    // v4809 -- THE 413th CLOSING: ONE new gate file -- the engine's way around three's issues 17 and 18, until three takes the patches.
+    since506: Object.freeze({
+        at: "v4809", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "render/threeWorkarounds-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (both backends; all six cases held again; read back through readTargetPixels)",
+        ]),
+        verdict: "green, 2.2 s. *** GLASS DRAWN RIGHT ON r186, BY THE ENGINE, UNTIL THREE TAKES THE PATCHES. *** Issue 17: three forces a " +
+                 "full refresh on a material holding a node in ANY property, so render/threeWorkarounds.mjs's refreshEveryRender gives a " +
+                 "transmission material one nothing reads -- the same bytes as no mark, and every render rebinds; marked after its first " +
+                 "render it needs the rebuild, which it asks for. Issue 18: readTargetPixels reads back, then renders an empty scene into a " +
+                 "1x1 target of its own, never the canvas. The translucent layer marks every backdrop reader it meets and has prepare(scene) " +
+                 "for an application's first frame. fsrFrameGenBackdrop prints r185's figures on r186 again, on WebGPU and now on WebGL 2 -- " +
+                 "where reading back plainly would have cost its midpoint 30 dB. Three's own behaviour is held beside each workaround, so the " +
+                 "rows go red when three is fixed. Six sabotages red.",
+    }),
+    // v4808 -- THE 412th CLOSING: NO new gate file -- issue 18, the WebGL 2 lens frozen after a readback, drafted with its patch.
+    since505: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4808", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 18, recorded, run on the vendored r186, three's tests with all sixteen)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE ONE v4806 FOUND BESIDE ITS OWN, TRACED TO A SKIPPED BIND. *** On WebGL 2 a transmission lens rendered into a target " +
+                 "that was read back between renders keeps its first backdrop: the copy runs every render, into the right texture, and " +
+                 "reads the default framebuffer. WebGLState caches gl.FRAMEBUFFER but records only the draw side of what that binds; the " +
+                 "readback binds the read side alone and leaves it at null, so the next bind of the same target is skipped. A diagnostic " +
+                 "that read the copy back by hand made the bug vanish -- it rebound the framebuffer -- which is how the cause was found. " +
+                 "The patch caches gl.FRAMEBUFFER only while draw and read agree: lensMoved 0 -> 8 on WebGL 2, r185 to dev; three's unit " +
+                 "and e2e tests unchanged with all sixteen. Its workaround was tested before it was written. Five sabotages red.",
+    }),
+    // v4807 -- THE 411th CLOSING: NO new gate file -- vendor/three, the classic build, moved to r186 beside three-webgpu.
+    since504: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4807", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/gltfKtx2-selfcheck.mjs (the other fourteen upstream files of vendor/three, by digest, and nothing untabled)",
+            "tools/ship/tsl-selfcheck.mjs (vendor/three and vendor/three-webgpu the same release)",
+            "tools/krbn/krbnCompareLive-selfcheck.mjs (its provenance row reads the new line)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AGAIN, AND THIS TIME NOTHING MOVED BUT THE RECORD. *** The 305 gates whose imports " +
+                 "reach vendor/three ran on this tree and on a worktree with 0.186.1: they differ by krbnCompareLive's provenance row and " +
+                 "the orrery's bake, nothing else. Seven files changed, thirteen are byte-identical, every relative import resolves, and " +
+                 "`three` drops no export. The seven had no digest anywhere -- a GLTFLoader.js left behind would have passed every gate -- " +
+                 "so gltfKtx2 holds all twenty now, and the classic core turns out to be three-webgpu's own, byte for byte. Four sabotages red.",
+    }),
+    // v4806 -- THE 410th CLOSING: NO new gate file -- issue 17, the transmission regression, drafted with its patch.
+    since503: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4806", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 17, recorded, run on the vendored r186, three's tests with all fifteen)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (names the issue its three's-own row is)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REGRESSION v4805 HELD AS THREE'S, DRAFTED FOR THREE. *** A reproduction of thirty lines -- a striped wall, a plain " +
+                 "MeshPhysicalMaterial lens, two renders into two targets with the wall moved between -- prints lensMoved 0 on r186 and dev " +
+                 "and 8 on r185, both backends. The cause is #34162's SHARED refresh: the viewport texture node switches to the current " +
+                 "target's copy, and a shared refresh never rebinds it. The patch runs the full update for a bind group whose sampled " +
+                 "texture no longer matches its node, and only for it; lensMoved 8, alone and with the other fourteen, and three's unit and " +
+                 "e2e tests unchanged on both backends. Its first stated workaround was tested and did not work, so the issue says so. Five " +
+                 "sabotages red.",
+    }),
+    // v4805 -- THE 409th CLOSING: NO new gate file -- the engine's three-webgpu moved to r186.
+    since502: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened nine.
+        at: "v4805", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the vendored build is the record's r186, and every issue runs on it at every sweep)",
+            "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs (the rebuild where three draws it right; three's stale transmission read held as three's)",
+            "render/temporalTslMany-selfcheck.mjs (three's own colour pass past 1024 instances, r186's symptom)",
+            "tools/ship/tsl-selfcheck.mjs (revision 186, the README's heading)",
+            "tools/ship/threeProbe-selfcheck.mjs (RIG-PENDING for 0.186.1 rather than passed on 0.185.1's capture)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (r185 from vendor/three-webgpu-r185)",
+            "tools/ship/predicatePairs-selfcheck.mjs, tools/ship/orreryUniverse-selfcheck.mjs, tools/ship/referenceKind-selfcheck.mjs (the kept r185 body: 27 licences, 17 upstreams, 8 agreeing, one gate-only module named)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** MEASURED BEFORE IT WAS MOVED, AND WHAT MOVED WAS THREE. *** r186 was swapped into a scratch worktree and the 327 gates " +
+                 "that reach the bundle run on both trees: eleven went red on r186 alone. One was ours to fix (render/tslSource.mjs: r186 keys a " +
+                 "render list by the renderer's lighting); the rest were three's own behaviour changing -- issue 08's symptom on the second render " +
+                 "now, the probe and version rows -- and one regression, bisected to #34162: after renders to other targets a transmission lens " +
+                 "samples a stale copy of the frame behind it, on both backends, still so on dev. Held as three's, by a row that goes red when " +
+                 "three fixes it. The stage's own previous instance and batch matrices stay: with three's positionPrevious in their place on the " +
+                 "plain paths a batch is 32.7 px off and instances 40.8. r185 is kept for the r185 drafts. Nine sabotages red.",
+    }),
+    // v4804 -- THE 408th CLOSING: NO new gate file -- the eighteen cost headers, re-measured.
+    since501: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4804", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the rotted-header ratchet 18 -> 0)",
+            "tools/ship/statedRuntime-selfcheck.mjs (out of its own population by identity)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PAID DOWN BY RE-MEASURING, ONE GATE AT A TIME. *** The eighteen gates whose Run: line was more than 2x off " +
+                 "the alone median were each run alone three times on this box, and each line re-written to the geometric mean of " +
+                 "that median and the sweep's serial median -- within 2x of both -- with both readings and the old claim beside it: " +
+                 "~40 s became ~2.2s, ~40 ms became ~860 ms, ~11.6s became ~5.5s. The ratchet 18 -> 0. One gate re-written was " +
+                 "statedRuntime, whose new header disagreed with its own stale record: a candidate, so the gate ran itself, which " +
+                 "ran itself, until the cap -- it is out of its own population now, as declaredCost's gate is. Two sabotages red.",
+    }),
+    // v4803 -- THE 407th CLOSING: NO new gate file -- no caller spells the source regex by hand.
+    since500: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened three.
+        at: "v4803", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled ceiling 2 -> 0, a planted control in place of the > 0 bound)",
+            "tools/ship/backendParity-selfcheck.mjs (hands the census SOURCE_EXT as isSource)",
+            "tools/ship/toolFrontDoor-selfcheck.mjs (imports SOURCE_EXT; run alone, 377 s)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE LAST TWO. *** The parity census is pure on purpose -- its readers are handed in -- so it takes isSource the " +
+                 "same way, and its gate hands in SOURCE_EXT: the module stays free of node:fs and applies the one definition of a " +
+                 "source file. The front-door gate imports SOURCE_EXT and was run alone, 377 s, which is why no sweep runs it. The " +
+                 "ceiling 2 -> 0; and at 0 the old bound that the count stay above zero -- the proof, since v4087 found the detector " +
+                 "blind, that it could see -- has nothing to stand on, so a tree made for it holds that proof: one file spelling the " +
+                 "regex, one importing SOURCE_EXT, and the detector must name the first alone. Two sabotages red.",
+    }),
+    // v4802 -- THE 406th CLOSING: NO new gate file -- the fourteenth issue, and the first frame of the thirteenth.
+    since499: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4802", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: issue 16, issue 15's first frame, and the one import-line merge the all-patch build makes)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THINGS THE LAST ROUND NAMED AND DID NOT FILE. *** An InstancedMesh whose storage instance matrices a compute pass " +
+                 "writes reads 1.496 px of velocity where a plain mesh reads 5.612, on r186 and dev: r186's fix for 01 copies the previous " +
+                 "matrices from the CPU array, which a compute pass never writes. Issue 16, with a patch that keeps them on the GPU -- " +
+                 "renderer.copyBufferToBuffer, two copies before each draw -- and 5.612. And r186 makes a batch's previous-matrices copy " +
+                 "without marking it for upload, so a fresh still BatchedMesh reads 7.482 px on its first frame: issue 15 gains the row, " +
+                 "its patch already fixing it. 08 and 16 edit one import line three's lint will not let be split; the tool merges that, " +
+                 "and only that, and the record lists it. Three's e2e and unit tests on dev with all fourteen, again.",
+    }),
+    // v4801 -- THE 405th CLOSING: NO new gate file -- five more callers off a hand-spelled regex.
+    since498: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4801", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 7 -> 2, the two left named)",
+            "tools/ship/declaredCost-selfcheck.mjs (headers judged against the alone median; the ratchet 138 -> 18)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** FIVE MORE, ONE AT A TIME. *** render/colourReach (named without its extension: a closing that names a module rescues it from the orphan census), mesh/greedyMesh-selfcheck.mjs, tools/ship/ragdollFrom" +
+                 "Skeleton-selfcheck.mjs, tools/ship/videoFrames-selfcheck.mjs and ui/webgpuProbe-selfcheck.mjs import SOURCE_EXT in " +
+                 "place of the regex they spelled by hand, each edited and its gate run before the next, as the ratchet's note asks; " +
+                 "its ceiling 7 -> 2. The two left are named rather than swept: render/backendParity.mjs has no top-level node import " +
+                 "and is named from browser-side code, so moduleRefs' node:fs is not pulled into it unread; toolFrontDoor-selfcheck " +
+                 "is over the sweep's budget and moves when it is run. And the first verify on a record this box rewrites each run " +
+                 "flipped declaredCost between 144 and 136 rotted headers against a frozen 138: it judged each header against " +
+                 "the newest reading, ~2.4x the alone cost when 8-way. Judged by the alone median, 18 -- the ratchet stands " +
+                 "there, not one header re-written. Three sabotages red.",
+    }),
+    // v4800 -- THE 404th CLOSING: NO new gate file -- the sweep chooses by this box's own stopwatch, and the shared record has an owner.
+    since497: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened four.
+        at: "v4800", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/quickSweep-selfcheck.mjs (ownTimings: whose record chooses the gates, on fixtures, and that the sweep uses it)",
+            "tools/ship/boxTimings-selfcheck.mjs (the budget row states the new choice instead of pinning the old one)",
+            "tools/ship/recordReach-selfcheck.mjs (this box's own alone readings win the margin whenever there are two)",
+            "tools/ship/sweepCoverage-selfcheck.mjs (the population outside the sweep as a share of a grown tree; headlessGpu named still over on this box)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TASK #87. *** quickSweep chose its gates by the shared timing record on every box, and the shared record " +
+                 "belonged to an id no live box has: ~100 gates read \"now over budget\" at each verify this session, and this " +
+                 "box's own readings were written to its local file every sweep and never read back. ownTimings reads them " +
+                 "back -- the shared record where this box owns it or nobody does, else the local file this box wrote, else the " +
+                 "shared one, said as such -- while timingsTarget still routes the write by the shared record's owner. And the " +
+                 "shared record is re-hosted to linux-x64-4c-16gb-420793, from that local file. Three gates moved with it: " +
+                 "boxTimings had pinned the old choice; recordReach read rings the departed box had filled, now that this box " +
+                 "owns them; sweepCoverage compared a count frozen on a 1,617-gate tree -- and once this box's verify " +
+                 "rewrote the record, it found headlessGpu, returned to the sweep at v4461 on the old box's 2,700 ms, over alone " +
+                 "here at 3,240, and named it as meshLine was. Nine sabotages red.",
+    }),
+    // v4799 -- THE 403rd CLOSING: NO new gate file -- the drafts on three's latest release and its dev branch.
+    since496: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4799", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 6: the thirteen issues in docs/upstream-three/dev/, held to tools/ship/threePatch.mjs's record of r186 and dev)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE DRAFTS WERE r185'S, AND THREE HAS MOVED. *** Measured on r186 and on dev at 1ea31f3, built by three's own " +
+                 "rollup: r186 fixed 01 and 02 (#34100, #34101, #34107 -- bisected), and the WebGL 2 min/max that kept three's SSR example " +
+                 "from linking (#34018). The other twelve stand, 08 with a new symptom, and r186 brought a thirteenth: a BatchedMesh grown " +
+                 "under a velocity MRT throws on every render. Each is now an issue in three's Bug Report form, its reproduction the draft's " +
+                 "with the version swapped, its patch rebased onto dev -- five by hand, and 10 rebased as it was applied cleanly and fixed " +
+                 "nothing, the compute builder's object having moved to builder.compute. A tool runs them beside a three checkout and " +
+                 "records what each page printed; section 6 holds the issues to the record, and three's own unit and e2e tests to " +
+                 "theirs: the same on dev and with all thirteen. Sixteen sabotages red.",
+    }),
+    // v4798 -- THE 402nd CLOSING: NO new gate file -- a timing row that tolerates load, and four callers off a hand-spelled regex.
+    since495: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4798", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "render/ringFloorCost-selfcheck.mjs (the flatness row re-measures under load, up to twice, every attempt printed)",
+            "tools/ship/shaderRefs-selfcheck.mjs (the hand-spelled corpus filters' ceiling 11 -> 7)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO LEFTOVERS, EACH SMALL AND EACH A RATCHET. *** ringFloorCost's flatness row compared two absolute per-pixel " +
+                 "times taken a section apart and went red once in eight verifies under load, passing alone every time. Contention " +
+                 "only adds time, so a missed first attempt is measured again, both sizes together, up to twice, and the flattest " +
+                 "attempt is the reading -- printed, every one: a push made to slow with size fails all three. And four gates -- " +
+                 "roundTrip, glbTexture, wgslSpec, canvasFill -- import SOURCE_EXT in place of the regex they spelled by hand, each " +
+                 "edited and run on its own, as the ratchet's own note asks; its ceiling 11 -> 7. Two sabotages red.",
+    }),
+    // v4797 -- THE 401st CLOSING: NO new gate file -- recordDrift's masking witness on a world it builds.
+    since494: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4797", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/recordDrift-selfcheck.mjs (the masking witness: masked beside this box's reading, not beside another's, on a built world)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A WITNESS THAT PASSED ON NOTHING. *** Since v4791 recordDrift's masking row asked which record coverage reads for " +
+                 "a gate, and passed vacuously on any box whose own record was not that one -- every box this session. Masking is a " +
+                 "property of coverageOf, so it is shown on a world made for it: the real records, the shared one given a foreign " +
+                 "host, every other giving the gate up, and one more record that is this box's and times it. Holed, the shared entry " +
+                 "is masked by this box's reading; with the extra record foreign it is not. The first draft left the live records " +
+                 "as they stood and the control came out masked -- this box's own local timings already held the gate. Two " +
+                 "sabotages of coverageOf's precedence red, one row each.",
+    }),
+    // v4796 -- THE 400th CLOSING: NO new gate file -- one machine type, one id.
+    since493: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4796", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/hostScale-selfcheck.mjs (the id survives a megabyte of drift and still tells 16, 32 and 8 GB apart)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** ONE MACHINE TYPE HAD TWO IDS, AND A MEGABYTE DECIDED WHICH. *** boxId() carried total memory in megabytes, and " +
+                 "the same container type read 16095 in one session and 16096 in another: two per-box records for one box, and " +
+                 "recordReach red on a box whose readings sat under its twin's name. The id is in whole gigabytes now -- coarser than " +
+                 "any one machine's drift, finer than any difference between machine types this tree has met -- and the records are " +
+                 "merged under it: 16095mb-420793 and 16096mb-420793 into 16gb-420793 (six gates), 16095mb-142c0d into 16gb-142c0d. " +
+                 "EVERY COMPARISON STAYS EXACT: the shared record's host keeps the old format, so no box owns it -- as no live box " +
+                 "has -- and verify never writes the committed file. Re-hosting it is a decision of its own, not a side effect of " +
+                 "a rename. Two sabotages red.",
+    }),
+    // v4795 -- THE 399th CLOSING: NO new gate file -- draft 14, a WebGL2 compute reading a buffer of the other class.
+    since492: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4795", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 14 and its patch; both e2e records for all fourteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (the instanced-source path v4792 held under 11 removed: it is 14's reproduction)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE PATH DRAFT 11 HELD AS NOT REACHED, TAKEN TO A PATCH OF ITS OWN. *** The WebGL backend draws a compute " +
+                 "instanced only when its FIRST buffer is a StorageInstancedBufferAttribute, and every buffer it reads as a vertex " +
+                 "attribute steps by its OWN class -- so a buffer of the other class holds at its first element: r185 '1 1 1 1 1 1' " +
+                 "copying instanced into plain and plain into instanced. Patch 14 draws every compute as one point and count " +
+                 "instances, with a vertex array of its own that steps every attribute per instance: '1 2 3 4 5 6' both ways. " +
+                 "gl_InstanceID is then the invocation in every compute, so 14 fixes draft 11's reproduction by itself as well. " +
+                 "Since it changes WebGL 2 dispatch, both e2e runs again: the same pass and fail on each backend with the same " +
+                 "reasons; on WebGL 2 one more screenshot differs, gltf_transmission -- measured, not assumed: eight runs of each " +
+                 "build gave four and five different images, four shared. Three sabotages; the compute vertex array's own key is " +
+                 "reached by none and is held by the hash alone, said as such.",
+    }),
+    // v4794 -- THE 398th CLOSING: NO new gate file -- three's e2e on its WebGL 2 backend, r185 and all thirteen patches.
+    since491: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4794", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstream-selfcheck.mjs (section 5: one e2e record per backend; the WebGL 2 one)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE PATCHES CHANGE ONLY THE WebGL 2 BACKEND, AND THE e2e HAD ONLY EVER RUN ON WebGPU. *** 06, 11 and 12 are " +
+                 "WebGL-backend code no WebGPU example reaches. Run again with navigator.gpu hidden, so WebGPURenderer falls back to " +
+                 "WebGL 2: 187 examples, 135 passed and the same 52 failed on r185 and with all thirteen, each for the same reason -- 33 " +
+                 "a few percent off three's screenshots, which are WebGPU's, 15 that need WebGPU, two fetches, one video, and " +
+                 "webgpu_postprocessing_ssr, whose WebGL program does not link on r185 either -- and 184 of 187 screenshots the same " +
+                 "bytes. The other three vary between runs of ONE build: fsr1 and taau gave a different image on each of three runs " +
+                 "of each, measured before they were set down as noise. The first parse read no failures at all: the GL info logs " +
+                 "carry NUL bytes and grep took the logs for binary. Three sabotages red.",
+    }),
+    // v4793 -- THE 397th CLOSING: NO new gate file -- draft 13, per-instance morphs beside absolute targets or a mesh-level array.
+    since490: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4793", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 13 and its patch; the e2e record for all thirteen)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (13: per-instance absolute targets through velocity, a 'together' case held with every patch)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO THROWS v4784 RECORDED AND LEFT, EACH TO ITS CAUSE, IN ONE BRANCH OF Morph.js. *** Per instance three reads the " +
+                 "influences from the instance's row of morphTexture but two things beside them from the MESH: the base, a uniform set " +
+                 "from object.morphTargetInfluences -- undefined on such a mesh, so .reduce throws for absolute targets -- and the " +
+                 "influences array, updated on every draw though per instance the shader never builds it, so its value is null and " +
+                 "update() throws whenever the mesh has an array. setMorphAt already writes each instance's base into column 0 of its " +
+                 "row; nothing read it. Patch 13 reads it, makes no mesh-level array per instance, and guards the mesh-level base. The " +
+                 "reproduction reads WIDTH as well as centre: scaled by a base of 1 instead of 0.5, the absolute instance is drawn " +
+                 "half as wide again at the same centre, and a sabotage that did exactly that went unseen until width was measured. " +
+                 "Patch 03 reads its previous base from the same column, and that velocity -- which needs 13 to draw and 03 to step -- " +
+                 "is held as a 'together' path on the build with every patch: 2.817 px, the plain meshes 2.817; 13 alone -2.770. " +
+                 "three with all thirteen: build matches, lint clean, unit tests 1310 passed, e2e the same 176 of 187 and 185 " +
+                 "screenshots the same bytes. Four sabotages red.",
+    }),
+    // v4792 -- THE 396th CLOSING: NO new gate file -- draft 12, a WebGL2 storage buffer named without its count.
+    since489: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4792", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (draft 12 and its patch; the e2e record for all twelve)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: an instanced storage source into a plain output, held NOT reached)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE WebGL2 COMPUTE THAT NEVER LINKED, TAKEN TO ITS CAUSE. *** v4790's probe saw 'two transform feedback " +
+                 "varyings specify the same output variable' and set it aside. It is storage(attr, type) with the count left at 0: " +
+                 "StorageBufferNode then shares its hash through builder.globalCache keyed by the buffer, and BufferAttributeNode " +
+                 "does the same through the SAME entry -- and on WebGL2 a storage buffer is read through a BufferAttributeNode of " +
+                 "that very buffer, so the two get one hash. The attribute is never declared, the transform is registered twice, " +
+                 "the program does not link and the compute writes zeros (r185 0 0 0 0 0 0, patched 1 2 3 4 5 6). Patch 12: a slot " +
+                 "each. Forcing the hash to the node's own id fixed it before the patch was written, which is what named the cause. " +
+                 "Run on one renderer, the patched second compute's code equals the first's and meets draft 06's cached stage, so the " +
+                 "reproduction gives each case its own. And a neighbouring fault patch 11 does not reach, held as a path: a storage " +
+                 "source fetched as an attribute follows its own class, so an instanced source into a plain output reads the first " +
+                 "element everywhere. three with all twelve: build matches the applier, lint clean, unit tests 1310 passed, e2e the " +
+                 "same 176 of 187 with 185 screenshots the same bytes as r185. Three sabotages red.",
+    }),
+    // v4791 -- THE 395th CLOSING: NO new gate file -- whose the e2e's seven 3D-texture failures are.
+    since488: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4791", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: the seven '2D view of a 3D texture' failures, re-measured in raw WebGPU as this browser's)",
+            "tools/ship/recordDrift-selfcheck.mjs (the masking witness asks which record coverage reads for the gate, not whether a local one holds it)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** SEVEN OF THE e2e's ELEVEN FAILURES WERE LEFT UNASSIGNED, AND THEY ARE NOT THREE'S. *** The error names a 2D view " +
+                 "of a 3D texture, but no view is asked for in JS: wrapping createView found none, and the failing call is " +
+                 "queue.writeTexture -- three uploading a 3D texture a slice at a time, a valid call. Taken apart in raw WebGPU with no " +
+                 "three at all: this Chromium (141.0.7390.37) fails ANY writeTexture into a 3D texture with RENDER_ATTACHMENT usage, " +
+                 "every format and size tried, on a view it makes itself, and the same write without that usage succeeds. Three asks " +
+                 "for RENDER_ATTACHMENT on its 3D textures, which WebGPU allows. Held as a live row that goes red when a browser fixes " +
+                 "it, so the e2e is run again to see those seven pass. Two sabotages red. AND THE SESSION MOVED BOX UNDER IT: the " +
+                 "CPU model now hashes to 142c0d, the shared timings record's owner, and recordDrift went red at HEAD -- its " +
+                 "masking witness asked whether any local record HELD the gate, while coverage reads the first record that " +
+                 "times it unless a later one is this box's. It asks which record coverage reads now; on this box that is the " +
+                 "shared one, its own, so the witness has nothing to show here and says so by passing vacuously, as it does " +
+                 "with one record. runtimeGap's WebGPU row 55 -> 56 for the raw probe.",
+    }),
+    // v4790 -- THE 394th CLOSING: NO new gate file -- drafts 10 and 11, computeSkinning's two r185 bugs.
+    since487: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4790", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (drafts 10 and 11 with their patches; the e2e section reads the newest record)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (11: invocationLocalIndex in a WebGL2 compute writing a plain storage buffer)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE TWO BUGS v4786 STEPPED AROUND ARE DRAFTS NOW, EACH TO ITS CAUSE. *** WebGPU: needsPreviousData() asks only " +
+                 "whether the MRT has velocity, so a compute built under one gets computeSkinning's positionPrevious, which a compute " +
+                 "shader does not declare -- unresolved value, invalid pipeline, the pass skipped, the buffer zeros (velocityMRT 0, " +
+                 "noMRT 0.5). Patch 10: false for a compute build. WebGL2: a compute is drawn as points, instanced only when its first " +
+                 "buffer is instanced, yet instanceIndex is always gl_InstanceID -- 0 in the other case, so computeSkinning skins every " +
+                 "vertex from the first (1 point of a box's 8). Patch 11: gl_InstanceID + gl_VertexID in a compute, one of the two " +
+                 "always 0; reading gl_VertexID alone breaks the instanced case, which the sabotage that tried it showed through " +
+                 "draft 10's reproduction. invocationLocalIndex had the same fault: 1 distinct value of 64, patched 64. three rebuilt " +
+                 "with all eleven matches the applier, lint clean, unit tests 1310 passed, 1 todo; its e2e on the eleven: the same " +
+                 "176 of 187 pass, the same 11 fail for the same reasons, 185 screenshots the same bytes as r185. Six sabotages red.",
+    }),
+    // v4789 -- THE 393rd CLOSING: NO new gate file -- three's own e2e tests, on r185's build and with all nine patches.
+    since486: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4789", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 5: three's e2e record -- it adds up, it names the builds the gate's hashes name, and the README states it)",
+            "tools/ship/redCensus-selfcheck.mjs (an EMPTY register passes only when every gate it recovered is recorded as repaired)",
+            "tools/ship/redCensusFresh-selfcheck.mjs (the subset is still the whole register when the register is empty)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THREE'S OWN e2e TESTS HAD NEVER RUN ON THE PATCHES; THE README SAID SO. *** In a checkout of r185 with its examples, " +
+                 "three's runner drew every WebGPU example BLACK at first, and said nothing: this Chromium refuses three's string " +
+                 "swizzle on createView, the exception is uncaught, and the runner listens only to the console. With this harness's " +
+                 "presenting flags and its swizzle workaround (docs/upstream-three/e2e/puppeteer-local.diff), 187 WebGPU examples: " +
+                 "176 passed and the same 11 failed on r185 and with all nine, each for the same reason, and 185 screenshots are " +
+                 "the same bytes. The other two are not the patches': four runs of one build gave four rasterizer images, and the " +
+                 "video panorama lands on one of two frames whichever build runs it. Recorded in e2e/v4789.json against both build " +
+                 "hashes, so a changed patch has two rows to clear: the hash, then the e2e. Seven sabotages red. AND THE FIRST VERIFY " +
+                 "WAS RED FOR A REASON OLDER THAN THIS ROUND: registerDrift's audit, frozen at v4776, turned 13 rounds old. Re-" +
+                 "frozen, it said the register's ONLY gate, shaderRefs, now passes -- repaired at v4782 (six callers to SOURCE_EXT, " +
+                 "400 s -> 56 s) and carried as a standing red for seven rounds since. Moved to FIXED_SINCE_V4279; the register is " +
+                 "empty, and two census rows that assumed it never would be now accept that only when its history accounts for " +
+                 "it. Two sabotages red (the repair record deleted; the gate put back without a re-freeze).",
+    }),
+    // v4788 -- THE 392nd CLOSING: NO new gate file -- patch 03 reaches per-instance morphs.
+    since485: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4788", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (03's per-instance case: two instances drawn, one still, against two plain meshes; now held reached)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 03 STOPPED AT ONE SET OF INFLUENCES PER MESH, SO AN INSTANCED MESH'S OWN MORPHS STILL READ AS 1.871 PX OF " +
+                 "5.612. *** Per instance, three reads each influence from the mesh's morphTexture, row instanceIndex; the patch now " +
+                 "keeps a copy of that texture as it was at the last draw, swapped in the same OnObjectUpdate as the shared " +
+                 "influences, and morphs positionPrevious from it. AND THE CASE HAD TO BE MADE ABLE TO TELL. It drew one instance " +
+                 "with the second scaled to nothing, so an influence read from the wrong row could not show. With the second drawn " +
+                 "and still, held at 0.2, r185 read 2.796 against the plain meshes' 2.806: its still instance's error and its " +
+                 "moving one's averaged to the reference by coincidence. Held at -0.4: r185 -2.770, patched 2.817, the plain " +
+                 "meshes 2.817, both backends; a row-0 mutant reads 0.962. three rebuilt with all nine: its build matches the " +
+                 "applier's byte for byte, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Five sabotages red.",
+    }),
+    // v4787 -- THE 391st CLOSING: NO new gate file -- the nine three.js patches run together, not only applied together.
+    since484: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4787", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/threeUpstream-selfcheck.mjs (section 4: every reproduction on one build with all nine patches, and drafts' \"together\" blocks)",
+            "tools/ship/threeUpstreamPaths-selfcheck.mjs (2b: every path case on the all-nine build, against its own patch's)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE NINE PATCHES HAD ONLY EVER BEEN APPLIED TOGETHER AS TEXT, AND RUN ONE AT A TIME. *** Every hunk was found once " +
+                 "in the combined build and three's own build of the combined source matched it, but no reproduction had run on it. " +
+                 "Run there, eight of nine drafts and all ten path cases print exactly what their own patch prints alone. The ninth " +
+                 "is a change for the better and the gate now says so: 04's mrtSameFrame -- three renders in one frame, a skin read " +
+                 "through MRT -- reads 0.000 with 04 alone and 5.612 with all nine, a plain mesh's number, because 07 steps the bones " +
+                 "per render. Bisected: 07 alone gives 5.612, all nine without 07 give 0.000. Draft 04 had set it aside as 'another " +
+                 "matter' -- it now points at 07 and carries a \"together\" block the gate holds, and a draft may differ together " +
+                 "only by saying so. Per-instance morphs stay at 1.871 with every patch: 03 does not reach them, the next round's. " +
+                 "Six sabotages red.",
+    }),
+    // v4786 -- THE 390th CLOSING: NO new gate file -- what a skin's velocity means when a frame holds two renders.
+    since483: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4786", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/threeUpstreamPaths-selfcheck.mjs (07: two renders a frame against a plain mesh, and computeSkinning twice a frame)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** PATCH 07 MADE A SKIN'S VELOCITY MEAN SOMETHING A PLAIN MESH'S DOES NOT. *** It updated the pose every render but " +
+                 "stepped the previous bones once a frame, so with two renders in one frame the second measured from the last FRAME'S " +
+                 "pose. Measured against a plain mesh moved the same way: three steps a mesh's previous matrix in an OBJECT update, " +
+                 "once per render -- 5.612 then 0.000 px when the mesh moved once before the frame, 2.806 then 2.806 when it moved " +
+                 "again between the renders -- and the old patch read 5.612 then 5.612 and 2.806 then 5.612. Keyed on the render, both " +
+                 "hunks, the skin reads the mesh's numbers exactly on both backends. computeSkinning shares the test, and each compute " +
+                 "advances the render id: the second compute in a frame follows the bone (0.150, r185 0.000), as under the old patch, " +
+                 "which kept a second WeakMap for it; the new one is two keys changed. Its own absolute " +
+                 "output is wrong in r185 in two ways no patch here touches -- zeros on WebGPU under a velocity MRT, the first vertex " +
+                 "for every vertex on WebGL2 -- so only the step is read, and both are named for a draft of their own. three rebuilt " +
+                 "with all nine: the recorded hash updated, lint clean, unit tests 1310 passed, 1 todo, 0 failed. Three sabotages red.",
+    }),
+    // v4785 -- THE 389th CLOSING: NO new gate file -- morph targets in the hundreds and thousands, to three's own limit.
+    since482: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4785", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 3: 1, 200, L and L + 1 morph targets, L read from the renderer)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE UNROLLED ITS SUM OVER MORPH TARGETS, AND PAST A FEW HUNDRED THE VERTEX STAGE DID NOT SURVIVE IT. *** " +
+                 "One texture read per target written out in JavaScript: the field read NO motion from 150 targets on WebGPU and " +
+                 "from 256 on WebGL2, while three morphed to 256 and 2048 -- this adapter's array-texture layers, which is where " +
+                 "three keeps a geometry's targets. As a TSL Loop the field is a one-target quad's to 0 px at 1, 200 and the " +
+                 "limit, both backends. AND ONE PAST THE LIMIT THE FIELD MUST DESCRIBE WHAT THREE DREW: WebGPU draws nothing, and " +
+                 "WebGL2 draws the mesh UNMORPHED without a word, so the stage reads the renderer's own limit and morphs nothing " +
+                 "past it either -- the limit read, never assumed, since a GPU that allows more layers moves both. Bones past the " +
+                 "uniform buffer (1,100 here) are the same story without a fix to make: three draws nothing, and the field is " +
+                 "empty with it. Three sabotages red.",
+    }),
+    // v4784 -- THE 388th CLOSING: NO new gate file -- an InstancedMesh with morph targets, through the motion stage.
+    since481: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4784", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslMeshes-selfcheck.mjs (section 2: an InstancedMesh with morph targets, per instance and shared)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE'S INSTANCED BRANCH NEVER MORPHED. *** It took the bare geometry through the previous instance matrix, " +
+                 "so a morphing herd carried its morph as motion: 1.67 px wrong with influences per instance, 1.39 with the mesh's " +
+                 "own. The previous point is now the geometry morphed as three morphs it, then the previous instance matrix -- per " +
+                 "instance (three's own test, count > 1 and a morphTexture) from a copy of that texture the stage keeps, otherwise " +
+                 "from the mesh's influences as a mesh's: under 1e-5 px against plain meshes on both backends, relative and " +
+                 "absolute, and through a toward stage. AND WHAT THREE ITSELF CANNOT DRAW IS A ROW: per-instance influences over " +
+                 "absolute targets, or beside a mesh-level morphTargetInfluences, throw in r185 on both backends -- its morph " +
+                 "node updates the mesh's influences on every draw whatever the shader reads. Patch 03 still stops at per-instance " +
+                 "morphs; extending it, and a draft for the throw, wait for the round that rebuilds three with every patch. " +
+                 "Five sabotages red.",
+    }),
+    // v4783 -- THE 387th CLOSING: NO new gate file -- instance matrices a compute pass writes, through the motion stage.
+    since480: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4783", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslCompute-selfcheck.mjs (section 2: instance matrices a compute pass writes)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE STAGE KEPT THE MATRICES THE CPU LAST SET, AND A KERNEL WRITES ELSEWHERE. *** An InstancedMesh whose " +
+                 "instanceMatrix is a StorageInstancedBufferAttribute a compute pass fills leaves the array where the application " +
+                 "set it, so the stage's previous matrices were the first ones for ever: 7.48 px wrong on boxes a kernel moved. " +
+                 "The hook is userData.previousInstanceMatrix, a mat4 storage node -- makePreviousCopy keeps one when stepped " +
+                 "before the pass that moves them -- read by the instance's index: 5.4e-6 px against plain meshes on WebGPU. A " +
+                 "toward stage interpolates instance poses on the CPU and refuses GPU-kept matrices by name rather than draw a " +
+                 "chord. three's WebGL2 backend throws on a storage-matrix InstancedMesh, a row of its own. NOT WRITTEN, AND WHY: " +
+                 "the three.js side (patch 01b) -- three would have to copy the storage attribute after each draw inside its own " +
+                 "render's command stream, which is backend work no public API reaches; the copy an application makes before its " +
+                 "pass is what the stage asks for. Three sabotages red, one equivalent.",
+    }),
+    // v4782 -- THE 386th CLOSING: NO new gate file -- the orphan censuses fifty times faster, and run by name at ship.
+    since479: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened them.
+        at: "v4782", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/moduleRefs-selfcheck.mjs (basenameHits held equal to includes() case by case)",
+                                "tools/ship/graveyard-selfcheck.mjs (157 s to 2.9: the index, and the directory test once per directory)",
+                                "tools/ship/referenceKind-selfcheck.mjs (175 s to 3.1, the same two fixes)",
+                                "tools/ship/sweepCoverage-selfcheck.mjs (a returnee judged by the median of its last three alone readings)",
+                                "tools/ship/verify.mjs (the two orphan ratchets as named ship steps)",
+                                "tools/ship/headlessGpu-selfcheck.mjs (the hazard child that hangs instead of crashing is killed at 10 s)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** THE REASON NO VERIFY SAW THE ORPHAN RATCHETS WAS TWO QUADRATIC LOOPS. *** moduleRefs' referenceGraph asked " +
+                 "includes(basename) of every file for every unreferenced module -- 2,798 modules, 5,087 files, 90 MB, 107 s -- and " +
+                 "both censuses asked whether a directory is named once per FILE in it. One pass now answers the substring test " +
+                 "for every basename: each ends in .js, .mjs or .html, so each occurrence ends at that anchor, walked backwards " +
+                 "through a trie of reversed stems. Identical on the real tree, 0 of 2,798 mention lists different, 725 ms " +
+                 "against 105,555; the directory test is asked once per directory with the same answer. graveyard 157 s to " +
+                 "2.9, referenceKind 175 to 3.1, shaderRefs from a 400 s timeout to 56 -- WHICH SHOWED A RED THE TIMEOUT HAD " +
+                 "HIDDEN: 17 callers hand-spelling the corpus filter against a ceiling of 11. Six were moved to moduleRefs' " +
+                 "SOURCE_EXT by hand, the three this round touched and three in live tool code, 11 again. AND RUN BY NAME: the " +
+                 "sweep picks gates by a timing record a foreign box cannot refresh, so verify now runs both censuses as " +
+                 "steps whatever any record says. sweepCoverage's 12-of-22 row flipped on headlessGpu reading 11,890 ms alone " +
+                 "once between 2,722 and 2,659; a returnee is judged by the median of its last three alone readings, as " +
+                 "quickSweep's own ring is. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND WHERE headlessGpu's 11,890 ms CAME FROM: killed at the 20 s cap alone, in section 4. " +
+                 "The child that exits still holding a WebGPU device -- the hazard the gate proves -- ended SIGABRT 8 times, " +
+                 "SIGSEGV 6 and HUNG once in 15, under a 180 s timeout; one gate run in 20 sat past the cap. A hang is the same " +
+                 "not-clean exit, so that child alone is killed at 10 s: 30 runs green, the worst 13.3 s, and an exitCleanly() " +
+                 "in its place reddens two rows.",
+    }),
+    // v4781 -- THE 385th CLOSING: NO new gate file -- the two orphan ratchets the v4776 merge landed over unmeasured.
+    since478: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened two.
+        at: "v4781", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/graveyard-selfcheck.mjs (a pre-registration is a registration; the baseline caught up by name)",
+                                "tools/ship/referenceKind-selfcheck.mjs (both ceilings caught up by name)",
+                                "tools/ship/patchScanDoor-selfcheck.mjs (the fixture is the zips in the uploads folder, not the folder)",
+                                "tools/ship/recordDrift-selfcheck.mjs (its injected census skips the swap scan nothing compares)",
+                                "tools/ship/recordReach-selfcheck.mjs (the margin row reads THIS box's alone readings where the shared record is another box's)"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** TWO RATCHETS THE MERGE LANDED OVER, BECAUSE NOTHING THAT RUNS EVERY ROUND RUNS THEM. *** graveyard takes ~157 s " +
+                 "and referenceKind ~175, so the v4776 merge went in unmeasured and the first run read 188 orphaned utilities against " +
+                 "159, 324 prose-rescued modules against 288, and 58 hidden by sweep closings against 39. MEASURED BY NAME: 32 " +
+                 "arrived in graveyard's pile and 3 left -- 19 from the merged line, absent from main before it, and 13 from main " +
+                 "after the baselines were set; the same 32 are among the 36 prose-rescued; the closings hide 10 of this line's, 4 of " +
+                 "main's and 5 older modules. FOUR WERE PAID BY THE DETECTOR: frameDisagree, frameSwayRep, frameVertical and " +
+                 "genGateAbsolute export a pre-registration (PREREG_H*) and the result their gate re-derives (RESULT_H*), and " +
+                 "graveyard's record test knew *REGISTRATION and not that spelling -- 188 to 184. The rest are caught up and named, " +
+                 "as the v4327 and v4535 merges were, and excused by none of it. AND THE ACCOUNT FIRST HID TWO OF ITS OWN SUBJECTS: " +
+                 "graveyard's note named its modules by basename, referenceKind matches the basename, and the count read 326 -- a " +
+                 "register naming debt is not its consumer, so the note names them without their extensions. Three sabotages red. " +
+                 "THE FIRST VERIFY FOUND TWO MORE. patchScanDoor read 'the uploads folder exists' as 'Keith's patch zips are here', " +
+                 "and this container provides that folder EMPTY: three reds on a scan that correctly found nothing. Whether there " +
+                 "is anything to scan is read off the folder's listing now, never off the scanner. And recordReach's margin fell " +
+                 "to 764 ms on recordDrift-selfcheck at 2,236: its injected-census row ran the full census, swap scan included, " +
+                 "for two fields it overrides -- ~450 ms. 2,300 to 1,800. " +
+                 "*** AND THE SECOND VERIFY STAYED RED, BECAUSE THIS IS ANOTHER BOX. *** The container changed between rounds: " +
+                 "linux-x64-4c-16095mb-420793, while the shared record belongs to -142c0d, which no longer exists. So verify wrote " +
+                 "this box's timings to the ignored local file, and recordReach's margin read the old box's ring, which nothing " +
+                 "here can refresh -- the clear state since475 found unreachable for coverage, in a cost row. boxTimings' " +
+                 "recordLocal keeps the last three alone readings now, and on a box that does not own the shared record the " +
+                 "margin row reads this box's when it has two: frozenRecords 1,423 and recordDrift 1,807 here, margin 1,193. Gate " +
+                 "selection still reads the shared record (task #87). A slow own ring reddens it.",
+    }),
+    // v4780 -- THE 384th CLOSING: NO new gate file -- 55 table-printing gates' numbers reach a reader.
+    since477: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened fifty-six.
+        at: "v4780", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/gateReport-selfcheck.mjs (a non-finite or missing cell stored as its name; the arrivals row green)",
+                                "55 gates that print tables now emit them: 41 fx/fsr, render and genGate/frame*Measure gates of this line, 14 murmur and ship gates"]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A STANDING RED NO VERIFY SAW: 55 GATES PRINTED TABLES AND EMITTED NO REPORT. *** gateReport-selfcheck's arrivals row " +
+                 "names every gate outside its frozen v4399 list that argues in numbers and writes nothing a second reader can open; it " +
+                 "sits over the sweep's budget, so no verify ran it, and it had grown to 55 -- 41 of them this line's FSR, frame-generation " +
+                 "and genGate gates. Each now puts the table it already prints into a report, the numbers as numbers: 86 gates emit, 69 " +
+                 "argue and do not, exactly the frozen list. Three things the wiring found: a PSNR of identical images is Infinity and JSON " +
+                 "writes it as null, which the page shows as an empty cell -- table() stores a non-finite number as its name and a missing " +
+                 "one as \"none\"; object keys are strings, so three reports stored \"20\" and \"1.5\" as text until they were numbers " +
+                 "again; and a one-row table with a numeric first column is plotted as a single point, so those three lead with a name. " +
+                 "fsrFlowCost read 21% against its 20% band beside three other device gates and 15% alone. Four sabotages red. " +
+                 "AND THE SECOND VERIFY FOUND recordReach's budget margin at 794 ms against an 800 ms floor: frozenRecords-selfcheck is " +
+                 "O(tree), and readSites' cheap reject scanned every source once per record name -- 847 ms of its 2,100. One regex of " +
+                 "the 77 names keeps the same 125 files in 38 ms, and the gate runs in 1,350; a pre-filter that drops names reddens " +
+                 "recordReach's control.",
+    }),
+    // v4779 -- THE 383rd CLOSING: the motion field where three draws and nowhere else -- the mesh zoo's gaps.
+    since476: Object.freeze({
+        at: "v4779", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/temporalTslCoverage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/temporalTslZoo-selfcheck.mjs (the grown batch it refused by name is drawn now)",
+                               "tools/ship/boxTimings-selfcheck.mjs (the shared record's owner is asserted as attribution, not as never this box -- red on the box that owns it)"]),
+        verdict: "*** THE FIELD COVERED PIXELS THREE NEVER DREW AND MISSED PIXELS IT DID. *** An alpha-tested sprite or mesh: motion " +
+                 "on 812 pixels against the 406 its colour pass draws -- a fragmentNode skips three's diffuse and alphaTest setup, " +
+                 "an outputNode keeps it. A double-sided plane shown from behind: no motion at all on its 576 -- three copies " +
+                 "alphaTest and alphaMap to an override material, not side. A plain mesh hidden for a frame read 4.72 px wrong when " +
+                 "shown again, and a box entering from outside the frustum read none: an object not drawn never stepped its previous " +
+                 "matrix. A batch grown by setInstanceCount, which the stage refused by name, is followed now, its last matrices kept. " +
+                 "Each is held against three's own colour pass or against the same motion drawn plainly, 406 = 406, 576 = 576, 0 px, " +
+                 "7e-6 px, both backends; a re-packed batch and a batch's per-instance visibility were already right and are rows. " +
+                 "Nine sabotages red.",
     }),
     // v4775 -- THE 382nd CLOSING: NO new gate file -- three more three.js drafts: a render is not a frame.
     since457: Object.freeze({

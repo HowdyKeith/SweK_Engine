@@ -1,6 +1,6 @@
 {
  "gate": "render/luminancePyramid-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "the pyramid's mean against the direct sum, by size",

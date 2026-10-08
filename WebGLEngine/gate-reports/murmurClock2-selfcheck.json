@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/murmurClock2-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "tempest's cloud drift: worst one-frame advance as its signal goes to full",

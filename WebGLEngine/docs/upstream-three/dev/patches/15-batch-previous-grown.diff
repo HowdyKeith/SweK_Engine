@@ -1,0 +1,47 @@
+diff --git a/src/nodes/accessors/Batch.js b/src/nodes/accessors/Batch.js
+index f0b2e65..dcf6370 100644
+--- a/src/nodes/accessors/Batch.js
++++ b/src/nodes/accessors/Batch.js
+@@ -81,11 +81,24 @@ function getPreviousNode( batchMesh, id ) {
+ 
+ 	let data = _previousBatchingMatrices.get( batchMesh );
+ 
+-	if ( data === undefined ) {
++	const { image, format, type } = batchMesh._matricesTexture;
+ 
+-		const { image, format, type } = batchMesh._matricesTexture;
++	// a batch that grew (setInstanceCount) has a larger matrices texture: its copy is made again at the new size, the last
++	// draw's matrices kept as its first entries
+ 
+-		const previousMatricesTexture = new DataTexture( image.data.slice(), image.width, image.height, format, type );
++	if ( data === undefined || data.previousMatricesTexture.image.data.length !== image.data.length ) {
++
++		const array = image.data.slice();
++
++		if ( data !== undefined ) {
++
++			array.set( data.previousMatricesTexture.image.data.subarray( 0, Math.min( array.length, data.previousMatricesTexture.image.data.length ) ) );
++			data.previousMatricesTexture.dispose();
++
++		}
++
++		const previousMatricesTexture = new DataTexture( array, image.width, image.height, format, type );
++		previousMatricesTexture.needsUpdate = true;
+ 
+ 		data = {
+ 			previousMatricesTexture,
+@@ -152,8 +165,13 @@ export const batch = /*@__PURE__*/ Fn( ( [ batchMesh ], builder ) => {
+ 		OnAfterObjectUpdate( ( { object } ) => {
+ 
+ 			const previousBatchData = _previousBatchingMatrices.get( object );
++			const previous = previousBatchData.previousMatricesTexture.image.data, current = object._matricesTexture.image.data;
++
++			// until the batch's node is built again at its new size, the copy is the old size and is left as it is
++
++			if ( previous.length !== current.length ) return;
+ 
+-			previousBatchData.previousMatricesTexture.image.data.set( object._matricesTexture.image.data );
++			previous.set( current );
+ 			previousBatchData.previousMatricesTexture.needsUpdate = true;
+ 
+ 		} );

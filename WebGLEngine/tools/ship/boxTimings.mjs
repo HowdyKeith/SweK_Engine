@@ -52,7 +52,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { boxId } from "./hostScale.mjs";
+import { boxId, canonicalId } from "./hostScale.mjs";
 import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -109,7 +109,7 @@ export function coverageOf(recs, { id = boxId() } = {}) {
     const by = new Map();
     for (const r of recs) {
         const host = r.host || "(unclaimed)";
-        const mine = host === id;
+        const mine = canonicalId(host) === id;   // v4819: a record naming this box in v4796's megabyte form is this box's
         for (const [gate, ms] of Object.entries(r.rec.timings || {})) {
             if (typeof ms !== "number") continue;
             const prev = by.get(gate);

@@ -7687,6 +7687,15 @@
    "cpus": 4,
    "totalMemMB": 16095,
    "model": "Intel(R) Xeon(R) Processor @ 2.10GHz"
+  },
+  "linux-x64-4c-16gb-420793": {
+   "platform": "linux",
+   "arch": "x64",
+   "node": "v22.22.2",
+   "osRelease": "6.18.44-fc-v64",
+   "cpus": 4,
+   "totalMemMB": 16095,
+   "model": "Intel(R) Xeon(R) Processor @ 2.80GHz"
   }
  }
 }

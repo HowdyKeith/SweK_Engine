@@ -1,6 +1,6 @@
 {
  "gate": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "a UI that moves: dB by how it is composited",

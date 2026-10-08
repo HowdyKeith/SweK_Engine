@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/statedRuntime-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "stated runtimes against the record and a run",
@@ -16,18 +16,18 @@
      "tools/ship/asciify-selfcheck.mjs",
      290,
      3701,
-     439,
+     411,
      "header agrees"
     ],
     [
      "tools/ship/voxelAvatar-selfcheck.mjs",
      110,
      3472,
-     158,
+     114,
      "header agrees"
     ]
    ],
-   "note": "this box is 1x the headers' box"
+   "note": "this box is 1.15x the headers' box"
   }
  ],
  "notes": [],

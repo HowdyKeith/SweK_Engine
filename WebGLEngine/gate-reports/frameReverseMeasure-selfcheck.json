@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/frameReverseMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "per scene: raw rho, partial given frame, gain and advantage against the clock",

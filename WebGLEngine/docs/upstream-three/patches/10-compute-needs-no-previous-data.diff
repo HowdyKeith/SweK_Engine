@@ -1,0 +1,13 @@
+diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
+index be00b81..ac22310 100644
+--- a/src/nodes/core/NodeBuilder.js
++++ b/src/nodes/core/NodeBuilder.js
+@@ -3449,4 +3449,8 @@ class NodeBuilder {
+ 	needsPreviousData() {
+ 
++		// a compute pass draws nothing, so it has no motion to measure -- and positionPrevious does not exist in its shader
++
++		if ( this.object !== null && this.object.isComputeNode === true ) return false;
++
+ 		const mrt = this.renderer.getMRT();
+ 

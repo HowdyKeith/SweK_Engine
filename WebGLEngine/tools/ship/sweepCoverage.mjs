@@ -225,6 +225,21 @@ export function verdictClasses(c, { codes = {} } = {}) {
  * conclusion -- and the only reason it could be caught is that every entry carried its gate name and its
  * numbers, so eight claims could be re-run in ninety seconds.
  */
+// *** v4800 -- A RETURNEE GENUINELY OVER ON THE BOX THAT NOW OWNS THE RECORD. *** headlessGpu was put back in the sweep
+// at v4461 on readings from the box that owned sweep-timings.json then (2,722 / 2,659 alone). v4800 re-hosted the record to
+// linux-x64-4c-16gb-420793, and here it reads 3,304 / 3,240 / 3,242 alone, one after another, its ring 2,743 / 3,369 /
+// 3,138 -- over, not oscillating: cheap on one machine type and not on this one. Named, as meshLine was at v4529, rather
+// than moved: the record says which box it is over on.
+export const RETURNED_AT_V4800 = Object.freeze({
+    at: "v4800",
+    stillOver: Object.freeze([
+        Object.freeze({ gate: "tools/ship/headlessGpu-selfcheck.mjs", recordedWas: 4518, hereMs: 3242,
+            serialMs: Object.freeze([3304, 3240, 3242]),
+            why: "returned at v4461 on 2,722 / 2,659 alone on the box that owned the record then; on " +
+                 "linux-x64-4c-16gb-420793, which owns it since v4800, three runs back to back read 3,304 / " +
+                 "3,240 / 3,242 and the sweep's ring 2,743 / 3,369 / 3,138 -- over alone, on this machine type" }),
+    ]),
+});
 export const RETURNED_AT_V4529 = Object.freeze({
     at: "v4529",
     // *** v4536 -- meshLine WAS RETIRED THIS MORNING AND IS BACK BY THE EVENING, WHICH IS THE ENTRY. *** Its

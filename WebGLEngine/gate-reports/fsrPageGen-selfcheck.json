@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/fsrPageGen-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "fsr.html's generated frames against the cross-fade and holding the previous",

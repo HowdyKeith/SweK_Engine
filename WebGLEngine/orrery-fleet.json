@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "380a167606774bdaa5c75b7cbdcd3b895093e76b",
+ "head": "0c6e4ad5142afff69d5bedffe47a89b4e2b01728",
  "bodies": {
   "box3d": [
    {
@@ -430,8 +430,8 @@
    },
    {
     "path": "tools/krbn/krbnCompareLive-selfcheck.mjs",
-    "bytes": 55737,
-    "sha": "f28ec56330c6460641991acc9d68feb34275b2e5"
+    "bytes": 55876,
+    "sha": "31ab299be167ec177146d9baa49741c98b6e6df3"
    },
    {
     "path": "tools/krbnVendor-selfcheck.mjs",
@@ -521,8 +521,8 @@
   "three": [
    {
     "path": "ai-bridge/ensureThree.js",
-    "bytes": 11626,
-    "sha": "ce276dffd8af8c9e2308cb1fc8ea21f515a03eb2"
+    "bytes": 11648,
+    "sha": "31ab299be167ec177146d9baa49741c98b6e6df3"
    },
    {
     "path": "ai-bridge/server.js",
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3465172,
-    "sha": "f59ae69a82d083752468410334250b2a2cf989bf"
+    "bytes": 3479018,
+    "sha": "0c6e4ad5142afff69d5bedffe47a89b4e2b01728"
    },
    {
     "path": "mpm3d.html",
@@ -811,8 +811,8 @@
    },
    {
     "path": "tools/krbn/krbnCompareLive-selfcheck.mjs",
-    "bytes": 55737,
-    "sha": "f28ec56330c6460641991acc9d68feb34275b2e5"
+    "bytes": 55876,
+    "sha": "31ab299be167ec177146d9baa49741c98b6e6df3"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -821,7 +821,7 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 19494,
+    "bytes": 19584,
     "sha": "0e3d9e5900f47a319e13790cf6488fad33d97add"
    },
    {
@@ -856,8 +856,8 @@
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
-    "bytes": 27329,
-    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
+    "bytes": 28670,
+    "sha": "31ab299be167ec177146d9baa49741c98b6e6df3"
    },
    {
     "path": "tools/ship/webgpuHarness.mjs",
@@ -998,8 +998,8 @@
    },
    {
     "path": "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
-    "bytes": 13760,
-    "sha": "08011513d2a9686cafbef371a3cb7963fa11f47e"
+    "bytes": 16971,
+    "sha": "c6eb2fc16a028bc1690d8a518bc765c0ad38917b"
    },
    {
     "path": "fx/fsr/fsrFrameGenFlow-selfcheck.mjs",
@@ -1128,18 +1128,23 @@
    },
    {
     "path": "render/temporalTslCompute-selfcheck.mjs",
-    "bytes": 13350,
-    "sha": "9a9e88ae7b8beee664de7ab2f90fac14791c4bca"
+    "bytes": 20616,
+    "sha": "bf1268e8ca5d48923c839e81a5fb445bf7c03ac1"
+   },
+   {
+    "path": "render/temporalTslCoverage-selfcheck.mjs",
+    "bytes": 14130,
+    "sha": "ee3ccedd964249d17bb40a68307bd35dd5df8445"
    },
    {
     "path": "render/temporalTslMany-selfcheck.mjs",
-    "bytes": 15505,
-    "sha": "f37bac2d19eef51da22a9a7ac73778c37a0e021a"
+    "bytes": 15926,
+    "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211"
    },
    {
     "path": "render/temporalTslMeshes-selfcheck.mjs",
-    "bytes": 15142,
-    "sha": "aff92c43bf31183f8bcc48cd2f910a7c78f96e6b"
+    "bytes": 28735,
+    "sha": "ad0d4bd87c6f91027b92ea4b338bfb25908fec39"
    },
    {
     "path": "render/temporalTslNodes-selfcheck.mjs",
@@ -1148,8 +1153,13 @@
    },
    {
     "path": "render/temporalTslZoo-selfcheck.mjs",
-    "bytes": 26613,
-    "sha": "9a9e88ae7b8beee664de7ab2f90fac14791c4bca"
+    "bytes": 26781,
+    "sha": "ee3ccedd964249d17bb40a68307bd35dd5df8445"
+   },
+   {
+    "path": "render/threeWorkarounds-selfcheck.mjs",
+    "bytes": 9231,
+    "sha": "c6eb2fc16a028bc1690d8a518bc765c0ad38917b"
    },
    {
     "path": "render/translucentLayer-selfcheck.mjs",
@@ -1202,24 +1212,19 @@
     "sha": "bbd0dd60c9b11513aa6b6f594225ef7d9260d958"
    },
    {
-    "path": "tools/ship/threePatch.mjs",
-    "bytes": 6969,
-    "sha": "43b2117b6f129005e8ac146dccd40bcac78a1721"
-   },
-   {
     "path": "tools/ship/threeProbe-selfcheck.mjs",
-    "bytes": 22534,
-    "sha": "82a77f78f5526c14af8e96ae9c9a24eb6386ed21"
+    "bytes": 23713,
+    "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211"
    },
    {
     "path": "tools/ship/threeUpstream-selfcheck.mjs",
-    "bytes": 25501,
-    "sha": "43b2117b6f129005e8ac146dccd40bcac78a1721"
+    "bytes": 66317,
+    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    },
    {
     "path": "tools/ship/tsl-selfcheck.mjs",
-    "bytes": 27329,
-    "sha": "dcf499c9cfd86d94e34d09d91c3e25e990556171"
+    "bytes": 28670,
+    "sha": "31ab299be167ec177146d9baa49741c98b6e6df3"
    },
    {
     "path": "tools/ship/tslIsing-selfcheck.mjs",
@@ -1243,8 +1248,8 @@
    },
    {
     "path": "tools/ship/tslSource-selfcheck.mjs",
-    "bytes": 45742,
-    "sha": "d9acd6973a806bfded2c26058db3a1c146dbacd1"
+    "bytes": 45949,
+    "sha": "7462bbb6fc5007f687e7fa809e891f4e4850b211"
    },
    {
     "path": "tools/ship/tslWide-selfcheck.mjs",
@@ -1270,6 +1275,18 @@
     "path": "ui/aiPresenceOrbWidget.js",
     "bytes": 17735,
     "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
+   }
+  ],
+  "three-webgpu-r185": [
+   {
+    "path": "tools/ship/threePatch.mjs",
+    "bytes": 21193,
+    "sha": "108bd2aed5dd03dc7d8f85be07230b46c8225bee"
+   },
+   {
+    "path": "tools/ship/threeUpstream-selfcheck.mjs",
+    "bytes": 66317,
+    "sha": "6b7e4579f4006952a2a688062ad9035f7c4311c2"
    }
   ],
   "wasm": [

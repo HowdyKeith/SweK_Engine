@@ -72,6 +72,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SOURCE_EXT } from "./moduleRefs.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -90,7 +91,7 @@ export function importedModules(root = ENG) {
             if (e.name === "node_modules" || e.name.startsWith(".")) continue;
             const p = path.join(d, e.name);
             if (e.isDirectory()) { walk(p); continue; }
-            if (/\.(js|mjs|html)$/.test(e.name)) files.push(p);
+            if (SOURCE_EXT.test(e.name)) files.push(p);
         }
     };
     walk(root);

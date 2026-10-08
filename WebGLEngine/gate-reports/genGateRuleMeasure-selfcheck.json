@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/genGateRuleMeasure-selfcheck.mjs",
- "at": "2026-10-02",
+ "at": "2026-09-29",
  "tables": [
   {
    "title": "H6 at x2: the declared rule's AUC per scene",

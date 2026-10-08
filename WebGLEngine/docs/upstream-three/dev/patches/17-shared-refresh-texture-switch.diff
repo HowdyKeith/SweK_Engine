@@ -1,0 +1,48 @@
+diff --git a/src/renderers/common/Bindings.js b/src/renderers/common/Bindings.js
+index 5350ae3..c7a52aa 100644
+--- a/src/renderers/common/Bindings.js
++++ b/src/renderers/common/Bindings.js
+@@ -241,6 +241,17 @@ class Bindings extends DataMap {
+ 
+ 		for ( const bindGroup of bindings ) {
+ 
++			// a texture node can switch textures between renders, e.g. the viewport texture which keeps one copy per render target,
++			// so a bind group referring to a previous texture requires a full update
++
++			if ( this._needsTextureUpdate( bindGroup ) === true ) {
++
++				this._update( bindGroup, bindings );
++
++				continue;
++
++			}
++
+ 			for ( const binding of bindGroup.bindings ) {
+ 
+ 				if ( ( binding.isNodeUniformsGroup === true || binding.isNodeUniformBuffer === true ) && binding.groupNode.shared === true ) {
+@@ -267,6 +278,25 @@ class Bindings extends DataMap {
+ 
+ 	}
+ 
++	/**
++	 * Returns `true` if a sampled texture of the given bind group no longer refers to the current texture of its node.
++	 *
++	 * @private
++	 * @param {BindGroup} bindGroup - The bind group.
++	 * @return {boolean} Whether the bind group requires a texture update or not.
++	 */
++	_needsTextureUpdate( bindGroup ) {
++
++		for ( const binding of bindGroup.bindings ) {
++
++			if ( binding.isSampledTexture === true && binding.textureNode !== undefined && binding.texture !== binding.textureNode.value ) return true;
++
++		}
++
++		return false;
++
++	}
++
+ 	/**
+ 	 * Deletes the bindings for the given compute node.
+ 	 *

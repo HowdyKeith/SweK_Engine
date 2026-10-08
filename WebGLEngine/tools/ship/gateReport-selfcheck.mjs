@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateReport-selfcheck.mjs
 //
-// Run: node tools/ship/gateReport-selfcheck.mjs   (~7.5s -- MEASURED, most of it the live page)
+// Run: node tools/ship/gateReport-selfcheck.mjs   (~16.6s -- MEASURED v4819 at the merge, median of 17614/16365/16575 alone, most of it the live page; was ~7.5s)
 //
 // v4394 -- A GATE'S VERDICT IS A WORD; ITS ARGUMENT IS A TABLE, AND THE TABLE DIED WITH THE TERMINAL.
 //
@@ -291,7 +291,19 @@ const emits = [...new Set([...reports().map((r) => r.gate), SELF])].filter((g) =
        `${vals.length} values including a denormal and 0.1+0.2 round-trip exactly. STORING "6.31e-6" AS TEXT ` +
        "would make the reader parse a rendering of a number back into a number, which is the exact indirection " +
        "this whole thread is about");
+    // v4780 -- and the two values JSON cannot carry are stored as their names, not as the null it would write.
+    const odd = gateReport("x").table("t", ["v"], [[Infinity], [-Infinity], [NaN], [null], [undefined], [0]]).build().tables[0].rows.map((r) => r[0]);
+    ok("!! *** a non-finite number is stored as its name and a missing one as \"none\" -- never as an empty cell ***",
+       JSON.stringify(odd) === JSON.stringify(["Infinity", "-Infinity", "NaN", "none", "none", 0]),
+       `${JSON.stringify(odd)}. JSON writes Infinity, NaN and undefined as null, which the page draws as an empty cell ` +
+       "and the DOM row below cannot find; a PSNR of two identical images is Infinity, and the FSR gates' tables hold them");
 }
+// SABOTAGE LOG, v4780 -- the 55 gates' wiring. Applied, the affected report re-emitted, this gate run, restored:
+//   S1 table()'s conversion of non-finite and null cells removed -> 1 red, the DOM row (one value of 4052 missing).
+//      The row above is its direct check.
+//   S2 murmurTempo's REPORT.write() removed and its report deleted -> 1 red, ARRIVALS naming it.
+//   S3 murmurDrive's lean table storing mean.toFixed(2) -> 1 red, NEW rendering naming it (5 cells).
+//   S4 the null conversion alone removed -> 1 red, the row above ([..., null, null, 0]).
 
 /* ------------------------------------------------------------------------------------------------------------
  * 4. WHAT IS ON DISK, AND WHETHER IT IS THIS TREE'S
