@@ -655,3 +655,59 @@ file exists.
 - **H1 only:** variety of this size does not buy transfer; the in-family result stands.
 - **H2 only:** recorded as found. The network transfers but does not beat the filter on the mix it trained on.
 - **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.
+
+## 20. ROUND 5 -- NOT REPORTED: C1 FIRED ON THE THIRD FAMILY
+
+`node tools/denoiseStudy.mjs --harvest-r5` at commit 8671ea45, 2026-10-08 03:55:38Z to 04:43:04Z (2,846 s). Its
+output, unedited, is `render/denoise-results-r5.json`.
+
+**Outcome: "not reported".**
+- C1 fired on H2's set (family C). The **filter** beat the noisy input on 6 of 12 images and the network on 10 of 12;
+  both need 11.
+- C0 (0.121 / 0.118 / 0.122), C2 (mean d -1.75), C4 and C5 held.
+- Per section 7, **nothing is claimed about H1 or H2.**
+  - verdict() computed both statistics and they are in the file. Neither is a result.
+  - T1 and T2 of this round are now spent.
+
+**What failed, diagnosed on family-C scenes OUTSIDE every split** (seeds 950200-950207, not the test set):
+
+| | frames with a visible emitter (3 of 8) | frames without one (5 of 8) |
+|---|---|---|
+| the A+B-tuned filter (sS 1, sN 1, sA 0.2, sI 4), relMSE | 0.50-0.95 | below the noisy input in all 5 |
+| its error in SKY pixels | 99% | 0-5% |
+| the noisy input, relMSE | 0.007-0.09 | 0.008-0.04 |
+| round 3's A-only setting (sS 1, sN 0.3, sA 0.05, sI 1) | 0.005-0.05, no blow-up | -- |
+
+- **The mechanism.** An emitter and the sky both carry albedo guide 1, so the albedo term cannot separate them. The
+  normal term is weak at sN = 1, and the irradiance term is weak at sI = 4. A coloured emitter of strength 18-42 is
+  therefore averaged into neighbouring sky pixels of 0.01-0.05. relMSE divides by r^2 + 0.01 there, and the error
+  explodes.
+- **Why A and B never showed it.** Their skies are bright (0.05-0.8), so the same smear costs little, and the
+  tuning on A+B chose the wide setting.
+- **This is not a defect upstream of both methods.** It is the hand-written filter's tuned setting failing on a
+  configuration it never saw. C1, written as a sanity check, cannot tell that apart from a broken pipeline, so the
+  run stops as the rules say.
+- The network also fell below the noisy input on 2 of the 12 images.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | T1 (A+B) | T2 (C) |
+|---|---|---|
+| noisy | 0.0315 | 0.0148 |
+| filter tuned on A+B | 0.0062 | 0.0406 |
+| networks trained on A+B, seeds 1-3 | 0.0040-0.0042 | 0.0069-0.0080 |
+| filter tuned on A only (round 3's setting) | 0.0071 | 0.0053 |
+| networks trained on A only, seeds 1-3 | 0.0054-0.0061 | 0.0054-0.0066 |
+| 1-sample input: filter / networks | 0.0134 / 0.0089-0.0093 | 0.0498 / 0.0068-0.0095 |
+| 16-sample input: filter / networks | 0.0035 / 0.0025-0.0026 | 0.0368 / 0.0056-0.0078 |
+
+- val: filter 0.0051, networks 0.0037-0.0039.
+- On family C, the networks trained on A alone were no worse than those trained on A+B.
+
+**What this buys.** Per section 7, no verdict. The question of section 19 is still open, and so is transfer.
+
+A next round could take either of these, as a new pre-registration with new test scenes, and must say which:
+- **Give both methods a guide that separates emitters and sky from surfaces** (an emission mask, or first-hit
+  depth). The filter can then refuse to mix them, and so can the network.
+- **Keep the inputs and change C1:** it cannot distinguish "the baseline fails on a new family" from "the pipeline
+  is broken", and it should.
