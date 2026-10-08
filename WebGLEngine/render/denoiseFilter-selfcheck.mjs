@@ -9,6 +9,7 @@
 //   F1  the normal guide reads the albedo channels                               1 RED
 //   F2  the weights not normalised (a fixed 81 instead of their sum)             4 RED
 //   F3  the tuner keeps the WORST setting                                        2 RED
+//   F4  the filter reads a 13-channel input at stride 9                          1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -68,6 +69,12 @@ console.log("1. THE FILTER");
     let dInf = 0; for (let i = 0; i < inf.length; i++) dInf = Math.max(dInf, Math.abs(inf[i] - big[i]));
     ok("  a sigma of Infinity switches its term off -- the same as an enormous one", dInf < 1e-12);
     ok(`  the window is 9 x 9 (RADIUS ${RADIUS}), the network's receptive field`, RADIUS === 4);
+    // the temporal round's 13-channel input: the same first nine channels, then four the filter must not read
+    const x13 = new Float64Array(24 * 24 * 13);
+    for (let p = 0; p < 24 * 24; p++) { for (let c = 0; c < 9; c++) x13[p * 13 + c] = noisy.x[p * 9 + c]; for (let c = 9; c < 13; c++) x13[p * 13 + c] = 1e3 * (p % 7) + c; }
+    const y9 = jointBilateral(noisy.x, 24, 24, { sS: 2, sN: 0.3, sA: 0.2, sI: 1 }), y13 = jointBilateral(x13, 24, 24, { sS: 2, sN: 0.3, sA: 0.2, sI: 1 });
+    ok("!! a 13-channel input filters bit for bit as its first nine channels do -- the stride is read from the input, and the extra channels are not",
+        y9.every((v, i) => Object.is(v, y13[i])));
 }
 
 console.log("\n2. THE TUNER, ON THE TRAINING SET IT IS GIVEN AND NOTHING ELSE");

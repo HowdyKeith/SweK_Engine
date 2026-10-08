@@ -12,6 +12,7 @@ export const REL_EPS = 0.01;      // relMSE's denominator offset
 export const C1_MIN_WINS = 11;    // of 12: both methods must beat the noisy input this often
 export const C3_FLOOR_FACTOR = 2; // a method within this factor of the reference floor cannot be ranked there
 export const C0_MAX_RATIO = 0.8;  // section 13: every seed's network must fit its training set to this x the noisy error
+export const C6_MAX_RATIO = 0.8;  // section 17: the accumulated history must bring the training images to this x the noisy error
 
 /** Relative MSE over every pixel and channel: mean( (y - r)^2 / (r^2 + 0.01) ). */
 export function relMSE(y, r) {
@@ -71,14 +72,33 @@ export function trainFit(netRel, noisyRel) {
 }
 
 /**
+ * Control C6 (pre-registration section 17), decided on the TRAINING images before any test scene is rendered: the
+ * geometric mean over the training images of relMSE(accumulated history, re-modulated) / relMSE(noisy measured frame)
+ * must be at most C6_MAX_RATIO. If seven frames of reprojected history do not beat one frame, the front-end both methods
+ * share is broken and nothing measured after it means anything.
+ */
+export function historyFit(accumRel, noisyRel) {
+    if (!accumRel.length || accumRel.length !== noisyRel.length) throw new Error("denoiseStats: C6 over mismatched sets");
+    const ratio = Math.exp(accumRel.reduce((a, v, i) => a + Math.log(v / noisyRel[i]), 0) / accumRel.length);
+    return { ratio, ok: ratio <= C6_MAX_RATIO };
+}
+
+/**
  * The verdict. `sets` maps a hypothesis name to its test set's measurements, all arrays over that set's images:
  *     { noisy: relMSE of the noisy input, filter: relMSE of the filter, net: [per seed: relMSE of the network],
  *       floor: relMSE between the two references }
  * `shuffled` is the shuffled-target network's per-seed relMSE on H1's set (control C2); `determinism` (C4) and
- * `seedsDistinct` (C5) are the booleans their checks produced; `c0`, when given, is trainFit()'s result. Returns { run, reasons, hypotheses, controls }.
+ * `seedsDistinct` (C5) are the booleans their checks produced; `c0`, when given, is trainFit()'s result, and `c6`
+ * historyFit()'s. Returns { run, reasons, hypotheses, controls }.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, alpha = 0.05, inFamily = "H1" }) {
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, alpha = 0.05, inFamily = "H1" }) {
     const reasons = [], controls = {};
+    // C6 (section 17), like C0, is decided before the test sets exist
+    if (c6) {
+        controls.C6 = c6;
+        if (!c6.ok) return { run: "not reported", hypotheses: {}, controls,
+            reasons: [`C6: the accumulated history brought the training images to ${c6.ratio.toFixed(3)} x the noisy error; it needs <= ${C6_MAX_RATIO}`] };
+    }
     // C0 (section 13) is decided before the test sets exist: when it fires the run stops, and there is nothing to test
     if (c0) {
         controls.C0 = c0;

@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed, strideOf, renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** Every scene this gate draws is seeded from 900000 up, outside every
@@ -17,6 +17,8 @@
 //   D7  SPLITS_R2 left out of the refusal                                        1 RED
 //   D8  SPLITS_R3's T2 on the re-run's T2 range (6000)                           1 RED
 //   D9  SPLITS_R3 left out of the refusal                                        1 RED
+//   D10 SPLITS_R4's T1 on the kernel round's range (7000)                        1 RED
+//   D11 strideOf accepts a stride below nine                                     1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -26,7 +28,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, isDatasetSeed, renderSeeds, makeScene, guideBuffers,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed, strideOf, renderSeeds, makeScene, guideBuffers,
         renderImages, inputChannels, remodulate } = D;
 
 let fails = 0;
@@ -68,6 +70,18 @@ console.log("1. THE SPLITS AND THE NUMBERS THE PRE-REGISTRATION FIXED");
         SPLITS_R3.train === SPLITS.train && SPLITS_R3.val === SPLITS.val && SPLITS_R3.T1.family === "A" && SPLITS_R3.T2.family === "B" &&
         SPLITS_R3.T1.seeds.length === 12 && SPLITS_R3.T2.seeds.length === 12 && new Set(r3Tests).size === 24 && r3Tests.every((s) => !seen.has(s)) &&
         refusedR3 === 24 && new Set(three).size === three.length && three.length === 300, `T1 from ${SPLITS_R3.T1.seeds[0]}, T2 from ${SPLITS_R3.T2.seeds[0]}; ${refusedR3} of 24 refused`);
+    // the temporal round's splits (section 17)
+    const seen3 = new Set([...all, ...newTests, ...r3Tests]), r4Tests = [...SPLITS_R4.T1.seeds, ...SPLITS_R4.T2.seeds];
+    let refusedR4 = 0;
+    for (const s of r4Tests) { try { renderImages(SPLITS_R4.T2.seeds.includes(s) ? "B" : "A", s, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refusedR4++; } }
+    const four = [...all, ...newTests, ...r3Tests, ...r4Tests].flatMap((s) => { const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
+    ok("!! the temporal round keeps the training and validation scenes and draws NEW test scenes -- 9000 (A) and 10000 (B), on no earlier range -- refused without harvest; C5 over four rounds: 124 scenes, 372 render seeds",
+        SPLITS_R4.train === SPLITS.train && SPLITS_R4.val === SPLITS.val && SPLITS_R4.T1.family === "A" && SPLITS_R4.T2.family === "B" &&
+        SPLITS_R4.T1.seeds.length === 12 && SPLITS_R4.T2.seeds.length === 12 && new Set(r4Tests).size === 24 && r4Tests.every((s) => !seen3.has(s)) &&
+        refusedR4 === 24 && new Set(four).size === four.length && four.length === 372, `T1 from ${SPLITS_R4.T1.seeds[0]}, T2 from ${SPLITS_R4.T2.seeds[0]}; ${refusedR4} of 24 refused`);
+    const bad = [() => strideOf(new Float64Array(8 * 5), 5), () => strideOf(new Float64Array(9 * 5 + 1), 5)].filter((f) => { try { f(); return false; } catch { return true; } }).length;
+    ok("  strideOf: 9 for a single frame, 13 for the temporal input, and a stride below nine or a fraction refused",
+        strideOf(new Float64Array(9 * 6), 6) === 9 && strideOf(new Float64Array(13 * 6), 6) === 13 && bad === 2);
 }
 
 console.log("\n2. THE TWO FAMILIES, OVER 300 SCENES OF EACH");

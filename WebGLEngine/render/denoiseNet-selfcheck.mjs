@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseNet.mjs -- the pre-registered network and its training -- on SYNTHETIC images only (smooth
 // irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, INITS, INIT, HEADS,
-// KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
+// KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   L1  the residual removed: the output IS the irradiance                       1 RED
@@ -16,13 +16,15 @@
 //   K2  the kernel blends the ALBEDO channels instead of the irradiance          4 RED
 //   K3  the softmax's backward pass without its "- sum" term                     1 RED
 //   K4  zero-last not applied to the kernel head                                 1 RED
+//   K5  cropAt copies nine channels of a 13-channel input                        1 RED
+//   K6  the trainer builds a 9-channel first layer for a 13-channel input        1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt,
+const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt,
         trainDenoiser } = await imp("render/denoiseNet.mjs");
 const { cloneNet } = await imp("brain/convNet.mjs");
 const { relMSE } = await imp("render/denoiseStats.mjs");
@@ -160,6 +162,22 @@ console.log("\n6. THE KERNEL-PREDICTING HEAD (pre-registration section 15)");
     ok("  it trains: 15 steps on synthetic images lower its error on one it never saw, from where the box started", after < before, `${before.toFixed(4)} -> ${after.toFixed(4)}`);
     let threw = null; try { makeDenoiser(1, INIT, "unet"); } catch (e) { threw = e.message; }
     ok("  a head that is neither is refused by name", /not one of residual, kernel/.test(threw || ""), threw);
+}
+
+console.log("\n7. THE TEMPORAL ROUND'S 13-CHANNEL INPUT (pre-registration section 17)");
+{
+    ok("  shapeFor(head, 13): the first layer takes 13 channels and every other layer is unchanged; 9 gives the shape itself",
+        shapeFor("kernel", 9) === SHAPE_KERNEL && shapeFor("residual", 9) === SHAPE && shapeFor("kernel", 13)[0][0] === 13 &&
+        JSON.stringify(shapeFor("kernel", 13).slice(1)) === JSON.stringify(SHAPE_KERNEL.slice(1)) && paramCount(makeDenoiser(1, INIT, "kernel", 13)) === 7329 + 4 * 16 * 9);
+    const im = synth(10, 9, 4), x13 = new Float64Array(10 * 9 * 13);
+    for (let p = 0; p < 90; p++) { for (let c = 0; c < 9; c++) x13[p * 13 + c] = im.x[p * 9 + c]; for (let c = 9; c < 13; c++) x13[p * 13 + c] = p + c / 10; }
+    const C = cropAt(x13, im.ref, 10, 2, 3, 4);
+    ok("  cropAt keeps all 13 channels at their stride", C.x.length === 4 * 4 * 13 && C.x[(1 * 4 + 2) * 13 + 11] === x13[((3 + 1) * 10 + (2 + 2)) * 13 + 11] && C.x[5 * 13 + 3] === x13[(4 * 10 + 3) * 13 + 3]);
+    const y9 = denoise(makeDenoiser(3, INIT, "kernel"), im.x, 9, 10).y, y13 = denoise(makeDenoiser(3, INIT, "kernel", 13), x13, 9, 10).y;
+    ok("!! an untrained kernel head blends the same first three channels whatever the stride: 13 channels and 9 give one image, bit for bit", y9.every((v, i) => Object.is(v, y13[i])));
+    const tr = [0, 1].map((k) => { const a = synth(14, 14, k), x = new Float64Array(14 * 14 * 13); for (let p = 0; p < 196; p++) for (let c = 0; c < 9; c++) x[p * 13 + c] = a.x[p * 9 + c]; return { x, ref: a.ref, w: 14, h: 14 }; });
+    const R = trainDenoiser(tr, { seed: 2, head: "kernel", steps: 2, batch: 1, crop: 12 });
+    ok("  the trainer reads the stride from its images and builds a 13-channel first layer", R.net.layers[0].Cin === 13 && R.net.layers[0].W.length === 16 * 9 * 13);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

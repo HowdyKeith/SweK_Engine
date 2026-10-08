@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, ROUND1, ROUND2, ROUND3, MINI, shuffledTargets, renderSplit, runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
+// RESULTS_R3, RESULTS_R4, ROUND1, ROUND2, ROUND3, ROUND4, MINI, shuffledTargets, stopBeforeTests, renderSplit, runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
@@ -16,14 +16,17 @@
 //   R3  ROUND2 pointed at round 1's spent test splits                            1 RED
 //   R4  the comparison networks trained with the PRIMARY head                    1 RED
 //   R5  ROUND3 pointed at the re-run's spent test splits                         1 RED
+//   R6  a failed C6 does not stop the run                                        1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, ROUND1, ROUND2, ROUND3, MINI, shuffledTargets, renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, isDatasetSeed } = await imp("render/denoiseScenes.mjs");
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, ROUND1, ROUND2, ROUND3, ROUND4, MINI, shuffledTargets, stopBeforeTests, renderSplit, runStudy } =
+    await imp("render/denoiseStudy.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, isDatasetSeed } = await imp("render/denoiseScenes.mjs");
+const { trainFit, historyFit } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -101,7 +104,17 @@ console.log("\n4. THE KERNEL-PREDICTING ROUND (pre-registration section 15)");
         !threw && stopped.tables === null && stopped.verdict.run === "not reported" && /^C0: /.test(stopped.verdict.reasons[0]), threw || stopped.verdict.reasons[0]);
 }
 
+console.log("\n5. THE TEMPORAL ROUND'S CONFIGURATION AND ITS STOP (pre-registration section 17; the pipeline runs are render/denoiseTemporal-selfcheck.mjs's)");
+{
+    const spent = [SPLITS, SPLITS_R2, SPLITS_R3].flatMap((S) => [...S.T1.seeds, ...S.T2.seeds]);
+    ok("!! ROUND4 is section 17's: its own new test splits, sequences, the kernel head, zero-last, C0 on, the no-history comparison, results to their own file",
+        ROUND4.splits === SPLITS_R4 && ROUND4.temporal === true && ROUND4.head === "kernel" && ROUND4.init === "zero-last" && ROUND4.c0 === true &&
+        ROUND4.compareNoHistory === true && RESULTS_R4 === "render/denoise-results-r4.json" && ![...SPLITS_R4.T1.seeds, ...SPLITS_R4.T2.seeds].some((s) => spent.includes(s)));
+    const stop = stopBeforeTests(trainFit([[0.2]], [1]), historyFit([1, 1], [1, 1]), true), go = stopBeforeTests(trainFit([[0.2]], [1]), historyFit([0.2], [1]), true);
+    ok("!! a failed C6 alone stops the run before its tests, and a passing C0 and C6 let it go on", !!stop && stop.run === "not reported" && /^C6: /.test(stop.reasons[0]) && go === null);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r3` is the kernel round's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r4` is the temporal round's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

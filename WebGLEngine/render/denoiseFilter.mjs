@@ -11,7 +11,7 @@
 // and a lit wall alike. A sigma of Infinity switches its term off. The output is the weighted mean of the neighbours'
 // irradiance, re-modulated by the pixel's own albedo.
 "use strict";
-import { CHANNELS, ALBEDO_FLOOR } from "./denoiseScenes.mjs";
+import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 
 export const RADIUS = 4;   // 9 x 9, the network's receptive field
 /** The fixed grid: 3 x 3 x 3 x 4 = 108 settings. Written here, before any training scene exists. */
@@ -22,18 +22,18 @@ export const GRID = Object.freeze({
     sI: Object.freeze([0.25, 1, 4, Infinity]),
 });
 
-/** Filter one 9-channel input (H x W x CHANNELS). Returns the denoised RADIANCE, H x W x 3. */
+/** Filter one input (H x W x C, its first nine channels as denoiseScenes lays them out). Returns the denoised RADIANCE, H x W x 3. */
 export function jointBilateral(x, w, h, { sS, sN, sA, sI }) {
-    const out = new Float64Array(w * h * 3), lg = new Float64Array(w * h * 3);
-    for (let p = 0; p < w * h; p++) for (let c = 0; c < 3; c++) lg[p * 3 + c] = Math.log1p(Math.max(0, x[p * CHANNELS + c]));
+    const C = strideOf(x, w * h), out = new Float64Array(w * h * 3), lg = new Float64Array(w * h * 3);
+    for (let p = 0; p < w * h; p++) for (let c = 0; c < 3; c++) lg[p * 3 + c] = Math.log1p(Math.max(0, x[p * C + c]));
     const kS = 1 / (2 * sS * sS), kN = Number.isFinite(sN) ? 1 / (2 * sN * sN) : 0, kA = Number.isFinite(sA) ? 1 / (2 * sA * sA) : 0,
           kI = Number.isFinite(sI) ? 1 / (2 * sI * sI) : 0;
     for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
-        const p = py * w + px, P = p * CHANNELS;
+        const p = py * w + px, P = p * C;
         let W = 0, r = 0, g = 0, b = 0;
         for (let qy = Math.max(0, py - RADIUS); qy <= Math.min(h - 1, py + RADIUS); qy++)
             for (let qx = Math.max(0, px - RADIUS); qx <= Math.min(w - 1, px + RADIUS); qx++) {
-                const q = qy * w + qx, Q = q * CHANNELS;
+                const q = qy * w + qx, Q = q * C;
                 let e = ((qx - px) ** 2 + (qy - py) ** 2) * kS;
                 if (kN) e += ((x[P + 6] - x[Q + 6]) ** 2 + (x[P + 7] - x[Q + 7]) ** 2 + (x[P + 8] - x[Q + 8]) ** 2) * kN;
                 if (kA) e += ((x[P + 3] - x[Q + 3]) ** 2 + (x[P + 4] - x[Q + 4]) ** 2 + (x[P + 5] - x[Q + 5]) ** 2) * kA;

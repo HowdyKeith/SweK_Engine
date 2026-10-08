@@ -16,15 +16,17 @@
 // render/denoiseScenes.mjs's renderImages(), which refuses every dataset seed without it; this round commits the
 // runner and gates it on --mini's scenes, seeded outside every split. The harvest round is the first to pass the flag.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
-import { relMSE, verdict, trainFit } from "./denoiseStats.mjs";
+import { relMSE, verdict, trainFit, historyFit } from "./denoiseStats.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
 export const RESULTS = "render/denoise-results.json";
 export const RESULTS_R2 = "render/denoise-results-r2.json";
 export const RESULTS_R3 = "render/denoise-results-r3.json";
+export const RESULTS_R4 = "render/denoise-results-r4.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -34,6 +36,12 @@ export const ROUND1 = Object.freeze({ splits: SPLITS, init: "he", c0: false, res
 export const ROUND2 = Object.freeze({ splits: SPLITS_R2, init: INIT, c0: true, results: RESULTS_R2 });
 /** Section 15: the kernel-predicting head, new test scenes, and round 2's residual network beside it as a secondary. */
 export const ROUND3 = Object.freeze({ splits: SPLITS_R3, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze(["residual"]), results: RESULTS_R3 });
+/**
+ * Section 17: sequences. The kernel head over the accumulated history, C6 before the tests, and -- as secondaries -- the
+ * accumulation alone, and the filter and the kernel network given the measured frame without its history.
+ */
+export const ROUND4 = Object.freeze({ splits: SPLITS_R4, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: true,
+                                      compareNoHistory: true, results: RESULTS_R4 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -54,23 +62,40 @@ export function shuffledTargets(set) {
     return set.map((im, i) => ({ ...im, ref: set[(i + 1) % set.length].ref }));
 }
 
-/** Render one split's scenes and build their inputs. `ref2` for the test sets (control C3). */
-export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2 }) {
+/**
+ * The stop before the tests: the "not reported" verdict when C0 (if on) or C6 (if measured) fired on the training
+ * images, or null when the run may go on to render its test scenes. Nothing after a non-null answer is rendered.
+ */
+export function stopBeforeTests(fit, hist, c0) {
+    return (c0 && !fit.ok) || (hist && !hist.ok) ? verdict({ c0: fit, c6: hist }) : null;
+}
+
+/**
+ * Render one split's scenes and build their inputs. `ref2` for the test sets (control C3). With `temporal`, each scene
+ * is a sequence (render/denoiseTemporal.mjs): `x` is the 13-channel input over the accumulated history, `x9` the
+ * measured frame's own 9-channel input, `accum` the accumulation re-modulated -- the last two for the secondaries.
+ */
+export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false }) {
     return split.seeds.map((seed) => {
+        if (temporal) {
+            const Q = renderSequence(split.family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
+            return { ...Q, x: temporalChannels(Q), x9: inputChannels(Q.input, Q.albedo, Q.normal, image, image), accum: remodulate(Q.A, Q.albedo) };
+        }
         const I = renderImages(split.family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
         return { ...I, x: inputChannels(I.input, I.albedo, I.normal, image, image) };
     });
 }
 
-/** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 stopped it. */
-export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], harvest = false,
-                           image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS, secondarySpp = [1, 16], log = () => {} } = {}) {
+/** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
+export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
+                           compareNoHistory = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
+                           secondarySpp = [1, 16], log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
-    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads,
+    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
-    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2" }); };
+    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal }); };
     for (const name of Object.keys(splits)) if (name !== "T1" && name !== "T2") render(name);
     lap("train rendered");
     const trainSet = R.train.map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
@@ -85,12 +110,15 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // C0, on the training images, before a test scene exists
     const fit = trainFit(nets.map((net) => R.train.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))), R.train.map((im) => relMSE(noisyOf(im), im.ref)));
     lap("C0");
-    // C5 over every scene this study renders
-    const allSeeds = Object.values(splits).flatMap((s) => s.seeds).flatMap((s) => { const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
+    // C6 (temporal only), on the training images, before a test scene exists: the shared history must beat one frame
+    const hist = temporal ? historyFit(R.train.map((im) => relMSE(im.accum, im.ref)), R.train.map((im) => relMSE(noisyOf(im), im.ref))) : null;
+    if (temporal) lap("C6");
+    // C5 over every scene this study renders -- a sequence's history frames included
+    const allSeeds = Object.values(splits).flatMap((s) => s.seeds).flatMap((s) => { if (temporal) return sequenceSeeds(s); const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    if (c0 && !fit.ok) {
-        const V = verdict({ c0: fit });
-        return { verdict: V, tables: null, filter, secondary: null, timings, determinism, seedsDistinct, trainFit: fit, config };
+    const stop = stopBeforeTests(fit, hist, c0);
+    if (stop) {
+        return { verdict: stop, tables: null, filter, secondary: null, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, config };
     }
     render("T1"); render("T2");
     lap("tests rendered");
@@ -105,14 +133,14 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     });
     const tables = { T1: measure(R.T1), T2: measure(R.T2), val: R.val ? measure(R.val) : null };
     const shuffled = shuffledNets.map((net) => R.T1.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref)));
-    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null });
+    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null, c6: hist });
     lap("measured");
     // secondary: the trained networks on 1- and 16-sample inputs of the test scenes -- reported, never tested
     const secondary = {};
     for (const spp of secondarySpp) for (const name of ["T1", "T2"]) {
         // only the INPUT is new: the reference is the one the primary measurement used (a 1-sample "reference" is
         // rendered and dropped), so the secondary costs inputs, not another 1024 samples a pixel per scene
-        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
+        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false, temporal }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
         secondary[`${name}@${spp}spp`] = {
             noisy: ims.map((im) => relMSE(im.input, im.ref)),
             filter: ims.map((im) => relMSE(jointBilateral(im.x, image, image, filter), im.ref)),
@@ -125,6 +153,19 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
         const otherNets = seeds.map((s) => trainDenoiser(trainSet, { seed: s, init, head: other, ...train }).net);
         for (const name of ["T1", "T2"]) secondary[`${name}@${other}`] = { net: otherNets.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) };
     }
+    // secondary (temporal): what the history alone buys, and both methods WITHOUT it on the same measured frames -- the
+    // filter tuned again on the training scenes' single frames, and the network trained on them with the same seeds
+    if (temporal) {
+        const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
+        const filter9 = tuneFilter(train9, relMSE).best;
+        const nets9 = compareNoHistory ? seeds.map((s) => trainDenoiser(train9, { seed: s, init, head, ...train }).net) : [];
+        secondary.filterNoHistory = filter9;
+        for (const name of ["T1", "T2"]) secondary[`${name}@noHistory`] = {
+            accumulation: R[name].map((im) => relMSE(im.accum, im.ref)),
+            filter: R[name].map((im) => relMSE(jointBilateral(im.x9, image, image, filter9), im.ref)),
+            net: nets9.map((net) => R[name].map((im) => relMSE(denoise(net, im.x9, image, image).y, im.ref))),
+        };
+    }
     lap("secondary");
-    return { verdict: V, tables, filter, secondary, timings, determinism, seedsDistinct, trainFit: fit, config };
+    return { verdict: V, tables, filter, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, config };
 }

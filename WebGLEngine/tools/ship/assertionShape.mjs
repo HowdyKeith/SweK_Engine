@@ -886,8 +886,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // one; the rest hold (the gate's own drift row named exactly these four).
     // the denoiser arc, round 2 -- 1931 -> 1937 for the six gates of render/denoiseScenes, denoiseFilter, denoiseStats,
     // denoiseNet, denoiseStudy and brain/convNet. usesOk, definesOk and nameFirst each by six; the rest hold.
-    gates: 1937, usesOk: 1916, definesOk: 1908, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1808, condFirst: 97, unknownSignature: 11,
+    // the denoiser arc, round 4 -- 1937 -> 1938 for render/denoiseTemporal-selfcheck.mjs. usesOk, definesOk and nameFirst
+    // each by one; the rest hold (the gate's own drift row named exactly these four).
+    gates: 1938, usesOk: 1917, definesOk: 1909, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1809, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

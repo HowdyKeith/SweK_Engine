@@ -384,3 +384,90 @@ file exists.
   device kernels widened past `COUT_MAX` 32, or the head split into three passes.
 - **H1 only:** transfer is still the open subject.
 - **Neither:** recorded, and section 16 is the temporal round, already chosen as the next change.
+
+## 17. ROUND 4 -- THE TEMPORAL ROUND, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it, on its own branch. No scene of this round's T1 or T2 has been rendered.
+Section 15 called this round "section 16". Round 3's results take that number, so this one is 17.
+
+**Fixed before round 3's verdict was known.** This section was written while round 3's harvest was still running,
+so nothing below was chosen from round 3's numbers. The head is round 3's kernel head whatever round 3 found:
+blending real samples is how a temporal denoiser is built, and the history makes the case stronger.
+
+**The question.**
+
+> **Given the frames before the one it denoises, accumulated through the same reprojection, does a small network
+> beat the hand-written filter on scenes it was not trained on?**
+
+The history front-end is SHARED: both methods receive the same accumulated irradiance. The question is what each does
+with it.
+
+**Sequences.** Each scene becomes 8 frames (`render/denoiseTemporal.mjs`).
+- **The orbit:** the camera orbits the scene's look point on the scene's own ring and height. It steps a per-scene
+  angle of 1.5-4 degrees per frame, in a per-scene direction, drawn from a stream of its own, so the scene is
+  unchanged.
+- **The last frame is the measured one.** Its eye IS the scene's, so its 4-sample input and 1024-sample reference
+  are exactly the images rounds 1-3 measured for that seed.
+- **The seven history frames** are new 4-sample renders, with render seeds 1e7 + 8 s + f, distinct from every
+  8 s + k.
+
+**The front-end, identical for both methods.**
+- Each pixel's centre-ray first hit is projected into the previous frame's camera (the exact inverse of
+  `pixelRay`).
+- Of its four bilinear taps, only those that saw the same object, within 3 pixel footprints of the same point
+  (stretched at grazing angles), with normals within cosine 0.9, are kept and renormalised.
+- A pixel with no valid tap restarts its history. Sky pixels carry none.
+- The accumulation is a running average: n = min(n_prev + 1, 8), A = A_prev + (I - A_prev) / n.
+
+**The methods.**
+- **The filter:** section 8's joint bilateral filter, unchanged, applied to the accumulated irradiance. It is tuned
+  on the 24 training sequences over the same 108-setting grid.
+- **The network:** round 3's kernel network, with the first layer widened to **13 input channels**:
+  - [accumulated irradiance, albedo, normal] -- the nine channels every method reads;
+  - the measured frame's own noisy irradiance (3);
+  - the history length / 8 (1).
+- Its 81 weights blend the accumulated irradiance over the 9 x 9 window. 7,905 parameters. Zero-last
+  initialisation; training exactly as section 5 (1,500 steps, batch 4, 32 x 32 crops, seeds 1, 2, 3).
+
+**Splits.**
+- T1: family A, scene seeds 9000-9011.
+- T2: family B, scene seeds 10000-10011.
+- Neither range overlaps anything earlier. C5 holds over four rounds' measured frames (124 scenes, 372 seeds).
+- Train (1000-1023) and val (2000-2003) are unchanged; their measured frames are the earlier rounds' images.
+
+**Controls.**
+- C0-C5 as before. C1 and the metric are measured against the measured frame's own 4-sample input.
+- **C6 (new), history:** on the TRAINING images, before any test scene is rendered, the geometric mean of
+  relMSE(accumulation) / relMSE(noisy frame) must be at most 0.8. If it fires, the run is "not reported" and stops,
+  like C0, without rendering its tests.
+- C5 now counts every history frame's render seed.
+
+**The statistic:** sections 6 and 7, unchanged.
+
+**What was seen first: the TRAINING sequences only.** A pilot rendered the 24 training sequences and trained one
+temporal network (seed 1). Training fit, geometric mean of relMSE / noisy frame:
+
+| Method | Train fit |
+|---|---|
+| accumulation alone | 0.188 (C6 holds) |
+| the filter on it, tuned | 0.169 |
+| the temporal kernel network | 0.134 (C0 holds) |
+
+This confirmed that C0 and C6 can pass and chose nothing else. Training fit has not predicted a test verdict in
+this arc.
+
+**Secondary** (reported, never tested, never used to choose):
+- the accumulation alone on T1 and T2;
+- section 8's filter re-tuned on the training scenes' single frames and applied to the measured frame alone;
+- the kernel network trained on the single frames (round 3's setup, the same three seeds), on the same measured
+  frames;
+- 1- and 16-sample sequences;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r4` -> `render/denoise-results-r4.json`. It refuses if the
+file exists.
+
+**The outcomes, per section 9:**
+- **H1 and H2 supported:** the temporal network goes to the device beside the path tracer's page.
+- **H1 only:** transfer stays the open subject.
+- **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.
