@@ -269,11 +269,11 @@ export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, s
             }
         }
         else if (e.block !== undefined) {
-            const rec = BT.shellOnBlock(tp, e.block, e.point);
-            if (rec) {
-                const eff = A.hitEffect(e.ammo || A.AMMO.plain, 0), k = spec.hitImpulse * eff.impulseScale;
-                if (world && world.impulse) world.impulse(rec.body, [e.dir[0] * k, e.dir[1] * k, e.dir[2] * k]);
-                effects.push({ ...eff, block: e.block, owner: e.owner });
+            const eff = A.hitEffect(e.ammo || A.AMMO.plain, 0), res = BT.shellOnBlock(tp, e.block, e.point, CD.blastRadius(eff.damage));
+            if (res) {
+                const k = spec.hitImpulse * eff.impulseScale;
+                if (!res.shattered && world && world.impulse) world.impulse(res.rec.body, [e.dir[0] * k, e.dir[1] * k, e.dir[2] * k]);
+                effects.push({ ...eff, block: e.block, owner: e.owner, removed: res.removed + res.loose, hp: res.hp, shattered: res.shattered });
             }
         }
         else { turrets[e.owner].hits++; effects.push(...A.applyHit(e, { world, cars, turrets, poses, slicks, t, spec })); }
@@ -401,11 +401,11 @@ export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds
         if (cityCtx) BT.stepTopple(cityCtx.topple);   // the falling blocks' poses after the world stepped, as race-brain.html's stepRace does
         rs.forEach((r, i) => { const s1 = surface.along(r.pose.pos[0], r.pose.pos[2]).s; metres[i] += D.metresBetween(surface, s0[i], s1); s0[i] = s1; const tk = trackers[i].update(r.pose); if (tk.laps >= 1 && lapTimes[i] === null) lapTimes[i] = (t + 1) * C.CAR.dt; });
         h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); h = S.slickHash(h, slicks, C.foldHash); h = A.ammoHash(h, turrets, C.foldHash); if (field) h = A.pickupHash(h, field, C.foldHash);
-        if (cityCtx) h = cityHash(h, cityCtx.city, C.foldHash);
+        if (cityCtx) { h = cityHash(h, cityCtx.city, C.foldHash); h = BT.toppleHash(h, cityCtx.topple, C.foldHash); }
         if (onTick) onTick(t, rs.map((r) => r.pose), turrets, shells, tt.events, slicks, tt.burns, field, tt.taken, tt.effects);
     }
     const poses = cars.map((c) => C.carPose(world, c));
-    const cityOut = cityCtx ? { impacts: cityCtx.impacts.length, hp: Math.round(cityCtx.city.buildings.reduce((a, b) => a + b.hp, 0)), topple: { fallen: cityCtx.topple.fallen, shattered: cityCtx.topple.shattered, shellHits: cityCtx.topple.shellHits || 0, rubble: cityCtx.topple.rubble, bodies: cityCtx.topple.bodies.length, events: cityCtx.topple.events.map((e) => e.kind + (e.at != null ? "@" + e.at : "")) } } : null;
+    const cityOut = cityCtx ? { impacts: cityCtx.impacts.length, hp: Math.round(cityCtx.city.buildings.reduce((a, b) => a + b.hp, 0)), topple: { fallen: cityCtx.topple.fallen, shattered: cityCtx.topple.shattered, shellHits: cityCtx.topple.shellHits || 0, chipped: cityCtx.topple.chipped || 0, rubble: cityCtx.topple.rubble, bodies: cityCtx.topple.bodies.length, events: cityCtx.topple.events.map((e) => e.kind + (e.at != null ? "@" + e.at : "")) } } : null;
     world.destroy();
     const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
     const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };

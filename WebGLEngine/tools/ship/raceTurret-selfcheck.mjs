@@ -69,6 +69,8 @@
 //      never rests and never shatters: bodies 1, shattered 0). The fingerprints still agree between runtimes, as they would on any consistent bug.
 //   AF world/buildingTopple.mjs: demolitionScript shooting at a Math.random() offset              -> 2 red: node's two runs differ (8b8598c4 / 5fb0e024) and the browser's fall
 //      is not node's; the demolition row stays green, the shot still brings the building down.
+//   AG world/buildingTopple.mjs: the chip not making the mesh again (the voxels come off the record, the picture does not) -> 2 red, each backend: "a cataclysm on the
+//      falling block CHIPS it on the page" (61 removed, the hit points drop, 0 px apart). The node-level sabotages of the chip (L-P) are in world/buildingTopple-selfcheck.mjs.
 //   FINDING, THE FLAKE IN "a rebuild under a window readback in flight" (0 pending, a window read busy, 1,201 page frames in 20 s) WAS NOT A HUNG READ AND NOT THE
 //   GATE'S: it was a queue. WebGPU has no backpressure of its own and this harness's GPU is software; the page submitted a frame per animation frame to a device that
 //   draws slower than that, so frames piled up and every window readback -- which resolves when the queue has drained to its own submission -- waited behind a deeper
@@ -155,7 +157,7 @@ report(`node, the demolition race: fingerprint ${cityA.fingerprint} (${cityB.fin
 ok("!! a race through a scripted demolition is deterministic in node: two runs, one fingerprint and one city summary (the damage stream is CityGen's own seeded one)", cityA.fingerprint === cityB.fingerprint && JSON.stringify(cityA.city) === JSON.stringify(cityB.city), `${cityA.fingerprint} / ${cityB.fingerprint}`);
 const calmRace = G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 12, fleet, city: { script: null } });
 ok("...and the fingerprint CARRIES the fall: the same race through the same city with nobody shooting it gives another one (so two runtimes agreeing on it is not agreeing on nothing)", calmRace.fingerprint !== cityA.fingerprint && calmRace.city.topple.fallen === 0 && calmRace.city.impacts === 0, `${calmRace.fingerprint} vs ${cityA.fingerprint}`);
-ok("...and the demolition happened: a building toppled into a body, a shell dropped on it was a BLOCK hit, it came to rest and shattered into rubble (no body left)", cs.topple.fallen === 1 && cs.topple.shellHits === 1 && cs.topple.shattered === 1 && cs.topple.rubble > 0 && cs.topple.bodies === 0 && cs.topple.events[0] === "topple" && /^shatter@/.test(cs.topple.events[1]), JSON.stringify(cs.topple));
+ok("...and the demolition happened: a building toppled into a body, a shell dropped on it was a BLOCK hit that chipped voxels off it, it came to rest and shattered into rubble (no body left)", cs.topple.fallen === 1 && cs.topple.shellHits === 1 && cs.topple.shattered === 1 && cs.topple.chipped > 0 && cs.topple.rubble > 0 && cs.topple.bodies === 0 && cs.topple.events[0] === "topple" && /^shatter@/.test(cs.topple.events[1]), JSON.stringify(cs.topple));
 
 sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON BOTH BACKENDS, THE PAGE ITSELF");
 {
@@ -429,6 +431,14 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                     { const ns = rb.scene, nf = ns.frame; ns.frame = function (o) { if (isWindow(o)) resumed++; return nf.call(this, o); }; }
                     { const t6 = performance.now(); while (resumed === 0 && performance.now() - t6 < 25000) await rAF2(); }
                     out.hang = { hung, resumed, note: txt("viewsNote") };
+                    // A CATACLYSM ON THE BLOCK'S TOP, the sim still frozen: voxels come off it, its hit points drop, and the picture changes -- the new mesh went into the REBUILT
+                    // scene's buffer through the page's own onBlock (bindKit). Nothing else moves between the two pictures.
+                    if (T.bodies[0]) {
+                        const BTm = await import("/world/buildingTopple.mjs"), rec1 = T.bodies[0], n0 = rec1.count, chipped0 = T.chipped || 0, topAt = [rec1.pose.pos[0], rec1.pose.pos[1] + rec1.half[1], rec1.pose.pos[2]];
+                        const pic = async (tg) => Uint8Array.from((await rb.scene.frame({ ...cam2, target: tg }).pixels).pixels);
+                        const pA = await pic(ta), res = BTm.shellOnBlock(T, rec1.slot, topAt, CD.blastRadius(40)), pB = await pic(tb);
+                        out.chip = { removed: res.removed, loose: res.loose, n0, n1: rec1.count, hp: res.hp, chipped: (T.chipped || 0) - chipped0, apart: apart2(pA, pB), shattered: res.shattered };
+                    } else out.chip = { removed: 0, noBlock: true };
                     frozenT = null;   // the race runs again
                     // a shell dropped onto the falling block from above (nothing between): the PAGE's own turretTick sees a BLOCK hit, not a hole
                     if (T.bodies[0]) {
@@ -484,6 +494,7 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 ok(bk + " -- the cubes AGE on the page: a particle's age moves with the race's own sim ticks (the page steps its debris), by a tick or two and no more", q.debrisAged > 0 && q.debrisAged < 0.2, `${q.debrisAged == null ? "no particle" : q.debrisAged.toFixed(4) + " s"} after the first tick`);
                 report(`${bk}: the falling block -- building ${q.topBuilding}: ${q.topEvents.join(",")}, ${q.topBodies} body, HUD says so ${q.topHud}; the block on the picture ${q.blockApart} px, after the scene was built again (${q.topRebuilt}x) ${q.blockApartRebuilt} px; laid flat it shattered ${q.shattered}x (${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${JSON.stringify(q.shatterEvent)}), its record parked ${q.slotParked}, HUD says so ${q.hudShattered}`);
                 ok(bk + " -- !! a building a shell brings down becomes a box3d body in the PAGE's physics world (the shells took the ground floor, CityGen's topple raised the block) and the HUD says it fell over", /topple|drop/.test((q.topEvents || []).join(",")) && q.topBodies === 1 && q.topHud === true, `events ${(q.topEvents || []).join(",")}, ${q.topBodies} body`);
+                ok(bk + " -- !! a cataclysm on the falling block CHIPS it on the page: voxels come off and its hit points drop to what is left, and its PICTURE changes with the sim frozen (the new mesh reached the rebuilt scene's buffer)", q.chip.removed > 0 && q.chip.n1 === q.chip.n0 - q.chip.removed - q.chip.loose && q.chip.chipped === q.chip.removed + q.chip.loose && q.chip.apart > 200 && !q.chip.shattered, `${q.chip.removed} removed + ${q.chip.loose} loose of ${q.chip.n0}, hp ${q.chip.hp && q.chip.hp.toFixed(3)}, ${q.chip.apart} px apart`);
                 ok(bk + " -- ...and a shell dropped onto it hits the BLOCK on the page (turretTick's block hit: counted, cubes burst, no second hit on the city), not the hole the building left", q.blockShot.hits === 1 && q.blockShot.impacts === 0 && q.blockShot.cubes > 0, JSON.stringify(q.blockShot));
                 ok(bk + " -- !! a window readback that NEVER settles (hung under the scene being built again) is given up on: the windows read the NEW scene afterwards (the page does not hold viewBusy for ever), and nothing says 'view windows off'", q.hang.hung >= 1 && q.hang.resumed >= 1 && !/view windows off/.test(q.hang.note || ""), `${q.hang.hung} read(s) hung, ${q.hang.resumed} window read(s) on the new scene after; note "${(q.hang.note || "").slice(0, 60)}"`);
                 ok(bk + " -- ...the block is on the PAGE's picture: a frame with its record where the page put it differs from the same frame with the record parked", q.blockApart > 300, `${q.blockApart} px apart`);

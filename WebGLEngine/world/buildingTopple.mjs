@@ -44,6 +44,7 @@ export const TOPPLE = Object.freeze({
     meshCap: 12000,               // vertices reserved per block fleet (a 6 x 12 x 6 building with facades meshes to a few thousand)
     rest: Object.freeze({ speed: 0.05, ticks: 30, minAge: 60, maxAge: 12 * 60 }),   // at rest: under `speed` for `ticks` in a row after minAge, or maxAge
     fallenUp: 0.5,                // a block whose up vector's y is under this has fallen; one above it stands on what is left, and stays a body
+    breakFraction: 0.25,          // a block shot down to this share of the voxels it fell with comes apart where it is (v4681)
     leanUp: 0.999,                // ...unless it is tilted past this (2.6 degrees) and at rest: a lean-to on its stub and the road (measured 0.986 and 0.97), settles like a fallen one; a standing block reads 1.0000
     rubbleId: 7,                  // MaterialRegistry's RUBBLE
     debrisEvery: 3,               // one debris burst per this many voxels of a shattering block (the pool is capped at 400)
@@ -163,7 +164,8 @@ export function beginTopple(t, b, fromDirection = null, rect = null) {
     if (t.bodies.length >= t.spec.maxBodies) shatter(t, t.bodies[0]);
     let slot = t.slots.indexOf(null); if (slot < 0) slot = 0;
     const rec = { building: i, body, stubs: stubBodies, stubRects: stubs, local, centre: block.centre, half: block.half, radius: Math.hypot(block.half[0], block.half[1], block.half[2]), mass: block.mass, count: block.count, exact: block.exact,
-                  born: t.tick, restTicks: 0, slot, pose: { pos: block.centre.slice(), quat: [0, 0, 0, 1] }, over, dropped: block.dropped, fallen: false, from: fromDirection, mesh: null };
+                  born: t.tick, restTicks: 0, slot, pose: { pos: block.centre.slice(), quat: [0, 0, 0, 1] }, over, dropped: block.dropped, fallen: false, from: fromDirection, mesh: null,
+                  count0: block.count, sig: localSig(local), chipped: 0 };
     t.bodies.push(rec); t.slots[slot] = rec; t.fallen++;
     t.events.push({ kind: block.dropped ? "drop" : "topple", building: i, voxels: block.count, mass: block.mass, loose: block.others.length, stubs: stubs.length, support: stubs.reduce((a, s) => a + (s.x1 - s.x0) * (s.z1 - s.z0), 0) / (rect.w * rect.d), over, chunks: sync.chunks.length });
     if (t.onBlock) { rec.mesh = blockMesh(rec); t.onBlock(slot, rec.mesh); }
@@ -240,17 +242,66 @@ export function sceneExtras(t, G, L, { light = SUN, cap = TOPPLE.meshCap } = {})
     };
 }
 
+/** A 32-bit signature of a block's voxels (where each is, to half a metre, and what it is): the lockstep fold for chips, which no box3d state carries. */
+export function localSig(local) {
+    let h = 0x811c9dc5;
+    for (const l of local) { h ^= (Math.round(l[0] * 2) & 0xff) | ((Math.round(l[1] * 2) & 0xff) << 8) | ((Math.round(l[2] * 2) & 0xff) << 16) | ((l[3] & 0xff) << 24); h = Math.imul(h, 0x01000193); }
+    return h >>> 0;
+}
+
+/** Fold the falling blocks into a lockstep fingerprint: per slot its voxel count and signature (what has been chipped off), and the totals. */
+export function toppleHash(h, t, fold) {
+    for (let k = 0; k < t.spec.maxBodies; k++) { const r = t.slots[k]; h = fold(h, r ? r.count : 0); h = fold(h, r ? r.sig | 0 : 0); }
+    return fold(fold(fold(h, t.shellHits || 0), t.chipped || 0), t.shattered);
+}
+
 /**
- * v4681 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): the point
- * bursts cubes in the block's own colour and the hit is counted. The block's PHYSICS answer, the shell's momentum as a linear impulse
- * (box3d's, what a car gets, and next to nothing for tens of tonnes of masonry), is the caller's `world.impulse`, as for a car. No hit
- * points and no scoreboard credit: a block is what a building became, and shooting rubble is not a score. Returns the record or null.
+ * v4681 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): THE BLOCK IS CHIPPED.
+ * The hit point goes into the block's own frame (the inverse of its pose, so a block lying on its side is chipped where it is hit and not where
+ * its upright box was), every voxel within the blast radius comes off, any piece the chip cuts loose from the largest remainder comes off with it
+ * (a rigid body has no floating islands: they burst), the mesh is made again and written into the reserved buffer, and the block's hit points
+ * are the voxels it has left. Below TOPPLE.breakFraction of what it fell with (or under minVoxels) it comes apart where it is, through the same
+ * shatter a block at rest takes. Cubes burst from each voxel that came off, in its colour. What it does NOT do: shrink the box3d collider or
+ * change the body's mass -- the body stays the box it fell as, so a heavily chipped block collides as if whole. The shell's momentum as a linear
+ * impulse is the caller's `world.impulse`, as for a car. No scoreboard credit: a block is what a building became, and shooting rubble is not a
+ * score. Returns { rec, removed, loose, left, hp, shattered } or null (an empty slot).
  */
-export function shellOnBlock(t, slot, point) {
+export function shellOnBlock(t, slot, point, radius = 1.2) {
     const rec = t.slots[slot]; if (!rec) return null;
-    if (t.debris) t.debris.spawn(Math.floor(point[0]), Math.floor(point[1]), Math.floor(point[2]), rec.local.length ? rec.local[0][3] : 1);
     t.shellHits = (t.shellHits || 0) + 1;
-    return rec;
+    const { pos, quat } = rec.pose, pl = rotateQ([-quat[0], -quat[1], -quat[2], quat[3]], [point[0] - pos[0], point[1] - pos[1], point[2] - pos[2]]), r2 = radius * radius;
+    const hit = [], keep = [];
+    for (const l of rec.local) { const dx = l[0] - pl[0], dy = l[1] - pl[1], dz = l[2] - pl[2]; (dx * dx + dy * dy + dz * dz <= r2 ? hit : keep).push(l); }
+    // the largest connected piece of what is left stays the block; the rest is cut loose
+    let main = keep, loose = [];
+    if (hit.length && keep.length) {
+        const ref = keep[0], key = (l) => (Math.round(l[0] - ref[0]) + 512) * 1048576 + (Math.round(l[1] - ref[1]) + 512) * 1024 + (Math.round(l[2] - ref[2]) + 512);
+        const at = new Map(); keep.forEach((l, k) => at.set(key(l), k));
+        const seen = new Uint8Array(keep.length), comps = [];
+        for (let k = 0; k < keep.length; k++) {
+            if (seen[k]) continue;
+            const comp = [], stack = [k]; seen[k] = 1;
+            while (stack.length) {
+                const c = stack.pop(), l = keep[c]; comp.push(c);
+                for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+                    const n = at.get(key([l[0] + dx, l[1] + dy, l[2] + dz])); if (n !== undefined && !seen[n]) { seen[n] = 1; stack.push(n); }
+                }
+            }
+            comps.push(comp);
+        }
+        let best = 0; comps.forEach((c, k) => { if (c.length > comps[best].length) best = k; });
+        main = comps[best].sort((a, b) => a - b).map((k) => keep[k]);
+        const inMain = new Set(comps[best]); loose = keep.filter((_, k) => !inMain.has(k));
+    }
+    const gone = hit.concat(loose);
+    if (gone.length) {
+        rec.local = main; rec.count = main.length; rec.sig = localSig(main); rec.chipped += gone.length; t.chipped = (t.chipped || 0) + gone.length;
+        if (t.debris) for (let k = 0; k < gone.length && k < 40; k++) { const w = rotateQ(quat, [gone[k][0], gone[k][1], gone[k][2]]); t.debris.spawn(Math.floor(pos[0] + w[0]), Math.floor(pos[1] + w[1]), Math.floor(pos[2] + w[2]), gone[k][3]); }
+        if (rec.count > 0) { rec.mesh = blockMesh(rec); if (t.onBlock) t.onBlock(slot, rec.mesh); }
+    } else if (t.debris && rec.local.length) t.debris.spawn(Math.floor(point[0]), Math.floor(point[1]), Math.floor(point[2]), rec.local[0][3]);   // sparks on a hole: the box is hit, no voxel is
+    const shattered = rec.count < Math.max(t.spec.minVoxels, rec.count0 * t.spec.breakFraction);
+    if (shattered) shatter(t, rec);
+    return { rec, removed: hit.length, loose: loose.length, left: rec.count, hp: rec.count / rec.count0, shattered };
 }
 
 /**
