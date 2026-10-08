@@ -5,8 +5,8 @@
 // first-hit guide buffers, the 9-channel demodulated input and the render seeds -- with the input's and the
 // references' seeds distinct by construction (control C5).
 //
-// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS,
-// SPLITS_R2, SPLITS_R3 or SPLITS_R4 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
+// or SPLITS_R2-R5 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -57,7 +57,22 @@ export const SPLITS_R4 = Object.freeze({
     T1: Object.freeze({ family: "A", seeds: range(9000, 12) }),
     T2: Object.freeze({ family: "B", seeds: range(10000, 12) }),
 });
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+/**
+ * The third-family round's splits (pre-registration section 19). A split may now mix families, one per seed, in
+ * `families`; familyOf() reads it. Training is 12 scenes of A (round 1's first twelve) and 12 new scenes of B -- still
+ * 24, so what changes is the variety and not the amount. H1's test set is 6 new A and 6 new B; H2's is 12 of family C,
+ * which nothing is trained on.
+ */
+const rep = (f, n) => Array(n).fill(f);
+export const SPLITS_R5 = Object.freeze({
+    train: Object.freeze({ family: "A+B", families: Object.freeze([...rep("A", 12), ...rep("B", 12)]), seeds: Object.freeze([...range(1000, 12), ...range(11000, 12)]) }),
+    val: Object.freeze({ family: "A+B", families: Object.freeze(["A", "A", "B", "B"]), seeds: Object.freeze([2000, 2001, 12000, 12001]) }),
+    T1: Object.freeze({ family: "A+B", families: Object.freeze([...rep("A", 6), ...rep("B", 6)]), seeds: Object.freeze([...range(13000, 6), ...range(14000, 6)]) }),
+    T2: Object.freeze({ family: "C", seeds: range(15000, 12) }),
+});
+/** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
+export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -69,7 +84,8 @@ export function renderSeeds(seed) { return { input: seed * 8 + 1, ref: seed * 8 
  * and an emitter of radius 0.25. Spheres rest on the ground and do not overlap. Deterministic in (family, seed).
  */
 export function makeScene(family, seed) {
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A or B, got " + family);
+    if (family === "C") return makeSceneC(seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B or C, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -91,6 +107,42 @@ export function makeScene(family, seed) {
     const ang = U(0, 2 * Math.PI), ringR = U(4, 5);
     const eye = [ringR * Math.cos(ang), U(1, 2), ringR * Math.sin(ang)];
     return { family, seed, scene, sky, skyKind, lightRadius, eye, look: [0, 0.4, 0], up: [0, 1, 0], fovDeg: 40 };
+}
+
+/**
+ * Family C, the third family (pre-registration section 19), which no network in this arc is trained on. Its own code
+ * path and its own stream, so families A and B draw exactly what they always drew. A night interior:
+ * - every even sphere ROUGH diffuse (Oren-Nayar, sigma 0.3-0.7) and every odd one a GLOSSY dielectric reflector
+ *   (roughness 0.03-0.1, ior 1.4-1.7) -- neither material is in A or B, and the gloss is sharper than B's 0.1-0.5;
+ * - the ground rough diffuse too (sigma 0.2-0.5);
+ * - TWO emitters of radius 0.15-0.3, one warm and one cool, of strength 18-42, instead of one white one -- the range
+ *   set on scenes outside every split so C's mean radiance (0.19) sits near A's (0.25) and B's (0.24): at 6-14 it was
+ *   0.07, and relMSE's 0.01 offset would have made a dark family easy rather than unseen;
+ * - a near-black uniform sky (0.01-0.05).
+ * The camera ring is A's and B's.
+ */
+function makeSceneC(seed) {
+    const r = rng(((seed >>> 0) * 2654435761 + 37) >>> 0);
+    const U = (a, b) => a + (b - a) * r();
+    const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)], sigma: U(0.2, 0.5) }];
+    const n = 3 + Math.floor(r() * 4), placed = [];
+    for (let i = 0, tries = 0; placed.length < n && tries < 400; tries++) {
+        const rad = U(0.25, 0.7), x = U(-1.6, 1.6), z = U(-1.6, 1.6);
+        if (placed.some((p) => Math.hypot(p[0] - x, p[2] - z) < p[3] + rad + 0.05)) continue;
+        placed.push([x, rad, z, rad]);
+        const s = { centre: [x, rad, z], radius: rad };
+        if (i % 2 === 1) { s.roughness = U(0.03, 0.1); s.ior = U(1.4, 1.7); }
+        else { s.albedo = [U(0.1, 0.9), U(0.1, 0.9), U(0.1, 0.9)]; s.sigma = U(0.3, 0.7); }
+        scene.push(s); i++;
+    }
+    for (const tint of [[1, 0.7, 0.4], [0.4, 0.6, 1]]) {
+        const e = U(18, 42);
+        scene.push({ centre: [U(-1.8, 1.8), U(1.8, 3.2), U(-1.8, 1.8)], radius: U(0.15, 0.3), albedo: 0, emit: tint.map((t) => t * e) });
+    }
+    const k = U(0.01, 0.05), sky = () => k;
+    const ang = U(0, 2 * Math.PI), ringR = U(4, 5);
+    const eye = [ringR * Math.cos(ang), U(1, 2), ringR * Math.sin(ang)];
+    return { family: "C", seed, scene, sky, skyKind: "dark", lightRadius: null, eye, look: [0, 0.4, 0], up: [0, 1, 0], fovDeg: 40 };
 }
 
 /**

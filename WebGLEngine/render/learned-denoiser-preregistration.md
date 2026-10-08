@@ -578,3 +578,80 @@ committed), 2026-10-08 02:21:06Z to 03:04:24Z (2,597 s). Its output, unedited, i
   it was trained on (10 of 12, then 12 of 12) and does not on a family it never saw (5 of 12 both times).
 - Transfer stays the open subject.
 - The network does not go to the device on this result. Section 9 asks for both hypotheses.
+
+## 19. ROUND 5 -- THE THIRD FAMILY, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question.** Rounds 3 and 4 found the same thing twice: a kernel-predicting network beats the filter on the
+family it was trained on, and not on one it never saw.
+
+> **Trained on two families, does the network beat the filter on a third that neither it nor the filter was ever
+> tuned on?**
+
+**One deliberate change from round 3: the training set's composition.**
+- Round 3 trained and tuned on 24 scenes of family A. This round trains and tunes on **12 scenes of A and 12 of B**:
+  A 1000-1011 (round 1's first twelve) and B 11000-11011 (new).
+- Still 24, so the variety changes and the amount does not.
+- Everything else is round 3's (sections 3-11, 13 and 15):
+  - single frames; the kernel-predicting network (7,329 parameters); zero-last initialisation;
+  - 1,500 steps, batch 4, 32 x 32 crops, seeds 1, 2, 3;
+  - the filter and its 108-setting grid;
+  - the metric, the statistic, and controls C0-C5.
+
+**Family C** (`makeScene("C", seed)`, its own code path and stream):
+- the ground and every even sphere **rough diffuse** (Oren-Nayar; sigma 0.2-0.5 for the ground, 0.3-0.7 for spheres);
+- every odd sphere a **glossy dielectric reflector** (roughness 0.03-0.1, ior 1.4-1.7);
+- **two emitters** of radius 0.15-0.3, one warm (1 : 0.7 : 0.4) and one cool (0.4 : 0.6 : 1), strength 18-42;
+- a near-black uniform sky (0.01-0.05);
+- A's and B's camera ring.
+
+Neither material, the coloured lights nor the dark sky occurs in A or B. A gate pins a fingerprint of 80 A and B
+scenes, recorded before C existed, to show those two families are unchanged.
+
+**Set on scenes outside every split, before this section:**
+- **The emitter strength.** At 6-14, C's mean radiance was 0.07, against A's 0.25 and B's 0.24 (16 scenes each,
+  seeds from 950100). Under relMSE's 0.01 offset, a dark family would have been easy rather than unseen. At 18-42
+  it is 0.19.
+- **The noise and floor.** On four C scenes (from 950010), the 4-sample input's relMSE was 0.004-0.027 and the
+  reference floor 0.0001-0.0003, the same order as A's.
+
+**Splits** (`SPLITS_R5`). A split may now name a family per seed.
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 12 A + 12 B | A 1000-1011, B 11000-11011 |
+| val | 2 A + 2 B | A 2000-2001, B 12000-12001 |
+| T1 -> **H1** (held-out A and B) | 6 A + 6 B | A 13000-13005, B 14000-14005 |
+| T2 -> **H2** (the third family) | 12 C | 15000-15011 |
+
+- Every new seed is on a range no earlier split touched.
+- C5 holds over five rounds' scenes.
+- C2's shuffled-target network is measured on H1's set, as before.
+- Holm is over {H1, H2}.
+
+**What was seen first: the training scenes only.** A pilot rendered the 24 training scenes, tuned the filter and
+trained one network (seed 1). Training fit, geometric mean of relMSE / noisy:
+
+| Method | All 24 | A | B |
+|---|---|---|---|
+| filter (sS 1, sN 1, sA 0.2, sI 4) | 0.203 | 0.185 | 0.222 |
+| network, seed 1 | 0.121 | 0.157 | 0.092 |
+
+It confirmed that C0 can pass and chose nothing else. Training fit has not predicted a test verdict in this arc.
+
+**Secondary** (reported, never tested, never used to choose):
+- the filter and three networks tuned and trained on **round 3's 24 scenes of A alone**, measured on this round's
+  T1 and T2, to show what the mixed training changed;
+- 1- and 16-sample inputs;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r5` -> `render/denoise-results-r5.json`. It refuses if the
+file exists.
+
+**The outcomes:**
+- **H1 and H2 supported:** with two families behind it, the network transfers to a third. It goes to the device,
+  through `brain/conv2d.mjs`'s kernels with the head widened past `COUT_MAX` 32, beside the path tracer's page.
+- **H1 only:** variety of this size does not buy transfer; the in-family result stands.
+- **H2 only:** recorded as found. The network transfers but does not beat the filter on the mix it trained on.
+- **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.

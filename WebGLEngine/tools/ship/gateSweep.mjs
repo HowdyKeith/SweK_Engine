@@ -8118,6 +8118,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 5 -- THE THIRD FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since486: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
+        at: "the denoiser arc, round 5 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family C over 300 scenes; A and B pinned to their pre-C fingerprint; SPLITS_R5, familyOf)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND5; a mixed split renders each seed as its own family; the other-training comparison)"]),
+        verdict: "*** TRAIN ON TWO FAMILIES, TEST ON A THIRD NOBODY TRAINED ON. *** Rounds 3 and 4 won in-family and lost " +
+                 "on the family they never saw. Section 19 trains round 3's kernel network on 12 scenes of A and 12 of B -- " +
+                 "the same 24, more variety -- and tests it on held-out A+B (H1) and on family C (H2): rough-diffuse and " +
+                 "glossy-dielectric spheres, two coloured emitters, a near-black sky, none of it in A or B. Family C has its " +
+                 "own code path; a fingerprint of 80 A and B scenes recorded before C existed holds to the last digit. " +
+                 "C's emitter strength was set on scenes outside every split so its mean radiance sits near A's and B's -- " +
+                 "dark scenes would have been easy under relMSE's 0.01 offset. 8 sabotages, all red; R9 crashed the gate " +
+                 "until its miniature was caught.",
+    }),
     // the denoiser arc, round 4 -- THE TEMPORAL ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
     since485: Object.freeze({
         at: "the denoiser arc, round 4 (unshipped)", swept: 1, green: 1, red: 0,
