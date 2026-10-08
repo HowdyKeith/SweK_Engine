@@ -10,6 +10,7 @@
 
 export const REL_EPS = 0.01;      // relMSE's denominator offset
 export const C1_MIN_WINS = 11;    // of 12: both methods must beat the noisy input this often
+export const C1_OF = 12;          // ...and section 26 holds the training images to the same fraction, 11 in 12
 export const C3_FLOOR_FACTOR = 2; // a method within this factor of the reference floor cannot be ranked there
 export const C0_MAX_RATIO = 0.8;  // section 13: every seed's network must fit its training set to this x the noisy error
 export const C6_MAX_RATIO = 0.8;  // section 17: the accumulated history must bring the training images to this x the noisy error
@@ -84,14 +85,30 @@ export function historyFit(accumRel, noisyRel) {
 }
 
 /**
+ * Control C1 as section 26 decides it: on the TRAINING images, before any test scene is rendered, as C0 is. The filter
+ * and the network -- its per-image mean over seeds, as on a test set -- must each beat the noisy input on at least
+ * C1_MIN_WINS in C1_OF of them (88 of 96). C1 is a sanity check on the pipeline both methods share; decided here it can
+ * no longer spend a test set, and a test image where the filter loses to the noisy input is what it is -- an image.
+ * `filterRel` and `noisyRel` per training image, `netRel` [per seed: per training image].
+ */
+export function trainSanity(filterRel, netRel, noisyRel) {
+    const n = noisyRel.length;
+    if (!n || filterRel.length !== n || !netRel.length || !netRel.every((s) => s.length === n)) throw new Error("denoiseStats: C1 over mismatched training sets");
+    const net = seedMean(netRel), need = Math.ceil(C1_MIN_WINS * n / C1_OF);
+    const netWins = net.filter((v, i) => v < noisyRel[i]).length, filterWins = filterRel.filter((v, i) => v < noisyRel[i]).length;
+    return { n, need, netWins, filterWins, ok: netWins >= need && filterWins >= need };
+}
+
+/**
  * The verdict. `sets` maps a hypothesis name to its test set's measurements, all arrays over that set's images:
  *     { noisy: relMSE of the noisy input, filter: relMSE of the filter, net: [per seed: relMSE of the network],
  *       floor: relMSE between the two references }
  * `shuffled` is the shuffled-target network's per-seed relMSE on H1's set (control C2); `determinism` (C4) and
  * `seedsDistinct` (C5) are the booleans their checks produced; `c0`, when given, is trainFit()'s result, and `c6`
- * historyFit()'s. Returns { run, reasons, hypotheses, controls }.
+ * historyFit()'s. `c1Train`, when given, is trainSanity()'s: C1 is then decided on the training images (section 26),
+ * and each test set's wins over the noisy input are reported, not tested. Returns { run, reasons, hypotheses, controls }.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, alpha = 0.05, inFamily = "H1" }) {
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, alpha = 0.05, inFamily = "H1" }) {
     const reasons = [], controls = {};
     // C6 (section 17), like C0, is decided before the test sets exist
     if (c6) {
@@ -105,6 +122,12 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
         if (!c0.ok) return { run: "not reported", hypotheses: {}, controls,
             reasons: [`C0: a network fit its training set to ${c0.ratios.map((r) => r.toFixed(3)).join(" / ")} x the noisy error; every seed needs <= ${C0_MAX_RATIO}`] };
     }
+    // C1 as section 26 decides it, on the training images: when it fires the run stops, before the test sets exist
+    if (c1Train) {
+        controls.C1 = c1Train;
+        if (!c1Train.ok) return { run: "not reported", hypotheses: {}, controls,
+            reasons: [`C1 on the training images: the network beat the noisy input on ${c1Train.netWins} and the filter on ${c1Train.filterWins} of ${c1Train.n}; both need ${c1Train.need}`] };
+    }
     controls.C4 = !!determinism; if (!controls.C4) reasons.push("C4: one seed twice did not give bit-identical weights");
     controls.C5 = !!seedsDistinct; if (!controls.C5) reasons.push("C5: an input and a reference shared a render seed");
     const names = Object.keys(sets);
@@ -116,10 +139,12 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
         const nearFloor = net.filter((v, i) => v <= C3_FLOOR_FACTOR * S.floor[i]).length;
         const d = effects(S.filter, net), k = d.filter((v) => v > 0).length;
         H[name] = { n, meanD: d.reduce((a, v) => a + v, 0) / n, k, p: signTestUpper(k, n), d,
-                    c1: { netWins, filterWins, ok: c1 }, c3: { nearFloor, resolvable: nearFloor <= n / 2 } };
-        if (!c1) reasons.push(`C1 on ${name}: the network beat the noisy input on ${netWins} and the filter on ${filterWins} of ${n}; both need ${C1_MIN_WINS}`);
+                    // with C1 decided on the training images, a test set's wins over the noisy input are reported, never tested
+                    c1: c1Train ? { netWins, filterWins, tested: false } : { netWins, filterWins, ok: c1 }, c3: { nearFloor, resolvable: nearFloor <= n / 2 } };
+        if (!c1 && !c1Train) reasons.push(`C1 on ${name}: the network beat the noisy input on ${netWins} and the filter on ${filterWins} of ${n}; both need ${C1_MIN_WINS}`);
     }
-    controls.C1 = names.every((nm) => H[nm].c1.ok);
+    if (!c1Train) controls.C1 = names.every((nm) => H[nm].c1.ok);
+    const c1ok = c1Train ? c1Train.ok : controls.C1;
     let c2 = true;
     if (shuffled) {
         const sh = seedMean(shuffled), dS = effects(sets[inFamily].filter, sh);
@@ -134,7 +159,7 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
         h.status = !h.c3.resolvable ? "not resolvable" : (h.meanD > 0 && h.reject ? "supported" : "not supported");
     });
     let run = "reported";
-    if (!controls.C4 || !controls.C5 || !controls.C1) run = "not reported";
+    if (!controls.C4 || !controls.C5 || !c1ok) run = "not reported";
     else if (!c2) run = "not resolvable";
     if (run !== "reported") for (const nm of names) H[nm].status = run;
     return { run, reasons, hypotheses: H, controls };

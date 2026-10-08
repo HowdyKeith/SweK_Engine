@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, isDatasetSeed, strideOf,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, familyOf, isDatasetSeed, strideOf,
 // renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
@@ -31,6 +31,8 @@
 //   D20 family R's uniform sky allowed down to 0.01                              1 RED
 //   D21 family C's ground sigma range moved (0.2-0.5 -> 0.2-0.6)                 2 RED
 //   D22 SPLITS_R7's H2 set drawn from family R                                   1 RED
+//   D23 SPLITS_R8's H1 set on round 7's range (22000)                            1 RED
+//   D24 SPLITS_R8 left out of the dataset refusal                                1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -40,7 +42,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, isDatasetSeed, strideOf, renderSeeds,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, familyOf, isDatasetSeed, strideOf, renderSeeds,
         makeScene, guideBuffers, renderImages, inputChannels, remodulate } = D;
 const { intersect, cameraBasis, pixelRay } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
 
@@ -278,6 +280,20 @@ console.log("\n6. THE RANDOMIZED FAMILY AND ITS SPLITS (pre-registration section
         V.train.family === "R" && V.train.seeds.length === 96 && V.val.family === "R" && V.val.seeds.length === 4 && V.T1.family === "R" && V.T1.seeds.length === 12 &&
         V.T2.family === "C" && V.T2.seeds.length === 12 && r7.every((s2) => !seen6.has(s2)) && new Set(r7).size === r7.length && refused7 === r7.length &&
         new Set(seven).size === seven.length, `${refused7} of ${r7.length} refused; ${seven.length} render seeds`);
+}
+
+console.log("\n7. ROUND 8'S SPLITS (pre-registration section 26)");
+{
+    // round 7's training and validation scenes, the same objects; only the test scenes are new
+    const X = SPLITS_R8, seen7 = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7].flatMap((S2) => Object.values(S2).flatMap((x) => x.seeds)));
+    const r8 = [...X.T1.seeds, ...X.T2.seeds];
+    let refused8 = 0;
+    for (const s2 of r8) { try { renderImages("R", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused8++; } }
+    const eight = [...new Set([...seen7, ...r8])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_R8: round 7's training and validation scenes, and NEW test scenes -- H1 12 of R (24000), H2 12 of C (25000) -- refused without harvest; C5 over eight rounds",
+        X.train === SPLITS_R7.train && X.val === SPLITS_R7.val && X.T1.family === "R" && X.T1.seeds.length === 12 && X.T2.family === "C" && X.T2.seeds.length === 12 &&
+        r8.every((s2) => !seen7.has(s2)) && new Set(r8).size === 24 && refused8 === 24 && new Set(eight).size === eight.length,
+        `${refused8} of ${r8.length} refused; ${eight.length} render seeds`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

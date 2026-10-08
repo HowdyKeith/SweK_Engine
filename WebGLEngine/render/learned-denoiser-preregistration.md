@@ -1052,3 +1052,162 @@ apart. A next round must say which of these it takes, as a new pre-registration 
 | 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
 | 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
 | 7 | trained on 96 randomized scenes (R) | not reported (C1: the filter) | not reported |
+
+## 26. ROUND 8 -- C1 ON THE TRAINING IMAGES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question is section 23's, unchanged.**
+
+> **Trained on a broad, randomized distribution of scenes instead of two fixed families, does the network beat the
+> filter on a family that distribution never draws?**
+
+**One deliberate change from round 7: where control C1 is decided.** Keith chose it from the two options section
+25 named.
+- **As written (section 7):** both methods must beat the noisy input on at least 11 of 12 images of EACH TEST SET.
+  Twice it stopped a round, and both times because of the filter, not the pipeline (sections 20 and 25).
+- **Now:** C1 is decided on the **training images**, right after C0 and before any test scene is rendered.
+  - The filter, as tuned, and the network, as its per-image mean over seeds 1-3 (as on a test set), must each beat
+    the noisy input on at least 11 in 12 of the 96 training images: **88**.
+  - A tie is not a win.
+  - If either falls short, the run is "not reported" and STOPS. Its test scenes are never rendered.
+- **On the test sets, C1 is no longer applied.**
+  - Each set's count of images where each method beats the noisy input is reported beside the hypotheses, never
+    tested.
+  - An image where the filter loses to the noisy input enters the sign test like any other image. It is simply an
+    image the network won, or did not.
+- **Why it is still a sanity check.** C1 exists to catch a broken pipeline that both methods share (section 7). A
+  broken pipeline breaks the training images as surely as the test images, and there are 96 of those, not 12. What
+  it no longer does is mistake a baseline's loss on a rare or unseen image for a broken pipeline.
+- **What it gives up.** A failure that affects only the test images is no longer caught by C1. Against that:
+  - the test and training images are built by the same call (`renderSplit`), which is gated;
+  - C3 still bounds each test set by its reference floor.
+- **In code:** `trainSanity()` and `C1_OF` in `render/denoiseStats.mjs`, and `verdict({ c1Train })`;
+  `c1OnTraining` and the stop in `render/denoiseStudy.mjs`; `ROUND8`.
+  - Gated with planted outcomes, including round 7's case: the filter under the noisy input on 2 of 12 test images is
+    now REPORTED.
+  - A miniature whose untrained network ties the noisy input everywhere stops before the real test seeds, which sit
+    behind it with harvest off.
+  - 12 sabotages, all red.
+
+**Everything else is round 7's:**
+- the training split (the same 96 scenes of R, 20000-20095) and val (21000-21003);
+- the kernel network and its training (seeds 1, 2, 3), and the filter and its grid;
+- the emitter mask and its rule;
+- the statistic, C0 and C2-C5, Holm over {H1, H2}, and C2 on H1's set;
+- the secondaries: the A+B comparison, 1- and 16-sample inputs, val.
+
+**New test splits** (`SPLITS_R8`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train, val | round 7's | 20000-20095, 21000-21003 |
+| T1 -> **H1** | 12 of R | **24000-24011** |
+| T2 -> **H2** | 12 of family C | **25000-25011** |
+
+- No earlier split touched either test range.
+- C5 holds over eight rounds: 1,002 render seeds.
+
+**What was seen first. All of it is disclosed because none of it can be un-seen.**
+- **Everything about the training split.** Round 7 trained on it, and section 25 diagnosed on it.
+  - The code that makes the pieces before the tests (scenes, filter, networks) is unchanged since round 7 and seeded.
+    This round's filter and networks will therefore be bit for bit round 7's.
+  - Measured from round 7's cache before this was written: on the 96 training images the filter beats the noisy
+    input on 94, and the network on 96. **The new C1 will hold.** That is deliberate: C1 is a sanity check, and its
+    job is to fail only when something is broken.
+- **Round 7's test statistics.** Its results file holds both, and they were read while diagnosing section 25:
+  network wins 12 of 12 on H1 and 3 of 12 on H2. They are not results. This round's verdict is on new test scenes
+  only.
+- Nothing of either new test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r8 --cache <dir>` -> `render/denoise-results-r8.json`.
+- It refuses if the file exists.
+- If a background limit stops it, the same command resumes it (section 24).
+
+**The outcomes are section 23's:**
+- **H1 and H2 supported:** breadth buys transfer. The network goes to the device, with the head widened past
+  `COUT_MAX` 32.
+- **H1 only:** a broad randomized set of this size does not buy transfer to a family outside its support.
+- **H2 only:** recorded as found.
+- **Neither:** recorded with the controls' numbers.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+## 27. ROUND 8 -- REPORTED: H1 NOT SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r8 --cache <dir>` at commit c1558028, 2026-10-08 19:04:46Z to 21:02:52Z
+(7,086 s), in one run: cache hits 0, misses 208. Its output, unedited, is `render/denoise-results-r8.json`,
+committed at 4f60e109 before anything below was read.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0 | 0.151 / 0.146 / 0.157 (needs <= 0.8 per seed) |
+| **C1, on the training images** | network 96, filter 94 of 96 (needs 88), decided before any test scene existed |
+| C2 | shuffled-target network: mean d -1.42 (needs <= 0) |
+| C3 | no test image within 2x of its reference floor |
+| C4, C5 | held; 372 distinct render seeds |
+
+Reported, never tested: on the test sets, the network beat the noisy input on 12 and 11 images (H1, H2), the filter
+on 12 and 12. Test-time C1 as section 7 wrote it would also have held this time.
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, held-out R (24000) | 7 | +0.173 | 0.387 | 0.025 | **not supported** |
+| H2, family C (25000) | 2 | -0.217 | 0.997 | 0.05 | **not supported** |
+
+- **On held-out R the network is better on average, but not image by image.**
+  - Geometric means: network 0.0062 (seeds 0.0059-0.0064), filter 0.0074, about 16% lower.
+  - Its three large wins (d 0.58-0.74) are on the three noisiest images (noisy relMSE 0.075-0.141).
+  - On the other nine, the two methods are close to even: |d| <= 0.25, and the network wins 4 of 9.
+  - The sign test counts images, as section 6 fixed it, so 7 of 12 is not supported.
+- **On family C the filter is better.** Geometric means: network 0.0040 (seeds 0.0037-0.0044), filter 0.0032. The
+  filter wins 10 of 12 images.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | H1's set (R) | family C |
+|---|---|---|
+| noisy | 0.0357 | 0.0069 |
+| filter tuned on R | 0.0074 | 0.0032 |
+| networks trained on R, seeds 1-3 | 0.0059-0.0064 | 0.0037-0.0044 |
+| filter tuned on A+B (round 6's 24 scenes) -- it chose the same setting | 0.0074 | 0.0032 |
+| networks trained on A+B, seeds 1-3 | 0.0059-0.0063 | 0.0042-0.0044 |
+| 1-sample input: filter / networks | 0.0174 / 0.0119-0.0138 | 0.0063 / 0.0055-0.0062 |
+| 16-sample input: filter / networks | 0.0035 / 0.0038-0.0044 | 0.0021 / 0.0027-0.0034 |
+| the reference floor | 0.0004 | 0.0001 |
+
+- val: noisy 0.0325, filter 0.0071, networks 0.0058-0.0063.
+- **96 scenes of R bought nothing over 24 of A and B, even on R.** Networks trained on A+B do as well on the R test
+  images (0.0059-0.0063) as networks trained on R itself (0.0059-0.0064). The filter tuned on either chose the same
+  setting.
+- At 16 samples the filter is ahead on both sets. On family C, at 16 samples, both methods are worse than their
+  input (noisy 0.0019): they were tuned and trained on 4-sample inputs.
+
+**What this buys, per section 23: "Neither."**
+- A broad randomized training set of this size does not make this network beat the filter on a family outside its
+  support.
+- On its own distribution, the network's advantage is confined to the noisiest images and does not reach a
+  per-image majority.
+- Round 7's test statistics (H1 12 of 12, section 26), from a different 12 images, were not a result. This round's
+  are, and they say 7.
+
+**The arc so far, as its pre-registered verdicts read:**
+
+| Round | Change | In-distribution | A family not trained on |
+|---|---|---|---|
+| 2 | residual network | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | **supported** (12/12) | not supported (5/12) |
+| 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
+| 7 | trained on 96 randomized scenes (R) | not reported (C1: the filter) | not reported |
+| 8 | round 7, C1 on the training images | not supported (7/12) | not supported (2/12) |
+
+- A 7,473-parameter kernel-predicting network beats the tuned filter image by image on narrow families it was
+  trained on (A and B).
+- On a broad family it is better on average but not image by image.
+- It has not once beaten the filter on a family it never saw, trained narrow or broad.
+- The network does not go to the device on these results. Section 9 asks for both hypotheses.

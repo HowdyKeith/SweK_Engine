@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, MINI, shuffledTargets, stopBeforeTests, renderSplit,
 // runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
@@ -23,16 +23,21 @@
 //   R11 ROUND5 without its other-training comparison                             1 RED
 //   R12 ROUND6 without the mask                                                  1 RED
 //   R13 ROUND7 without its A+B comparison                                        1 RED
+//   R14 the stop before the tests ignores the training C1                        2 RED
+//   R15 the training C1 decided, but not handed to the verdict                   1 RED
+//   R16 the training C1 measures the noisy input in the filter's place           1 RED
+//   R17 ROUND8 without C1 on the training images                                 1 RED
+//   D24 SPLITS_R8 left out of the dataset refusal (in this gate)                 1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, MINI, shuffledTargets, stopBeforeTests,
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, MINI, shuffledTargets, stopBeforeTests,
         renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
-const { trainFit, historyFit } = await imp("render/denoiseStats.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { trainFit, historyFit, trainSanity } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -158,7 +163,39 @@ console.log("\n8. THE RANDOMIZED ROUND'S CONFIGURATION (pre-registration section
         ROUND7.temporal === false && ROUND7.init === "zero-last" && ROUND7.c0 === true && ROUND7.compareTrainSplit === SPLITS_R5.train && RESULTS_R7 === "render/denoise-results-r7.json");
 }
 
+console.log("\n9. C1 ON THE TRAINING IMAGES (pre-registration section 26)");
+{
+    ok("!! ROUND8 is section 26's: round 7 exactly -- its training split, network, mask and comparison -- with C1 decided on the training images, and NEW test splits",
+        ROUND8.splits === SPLITS_R8 && SPLITS_R8.train === SPLITS_R7.train && SPLITS_R8.val === SPLITS_R7.val && ROUND8.c1OnTraining === true && ROUND8.emitterMask === true &&
+        ROUND8.head === "kernel" && ROUND8.temporal === false && ROUND8.init === "zero-last" && ROUND8.c0 === true && ROUND8.compareTrainSplit === SPLITS_R5.train &&
+        !ROUND7.c1OnTraining && RESULTS_R8 === "render/denoise-results-r8.json" &&
+        ![...SPLITS_R7.T1.seeds, ...SPLITS_R7.T2.seeds].some((s) => [...SPLITS_R8.T1.seeds, ...SPLITS_R8.T2.seeds].includes(s)));
+    const fitOk = trainFit([[0.1]], [1]), good = trainSanity([0.5], [[0.5]], [1]), bad = trainSanity([2], [[0.5]], [1]);
+    ok("  the stop reads it: a failed training C1 stops the run before the tests even with C0 off; a passing one does not",
+        stopBeforeTests(fitOk, null, true, good) === null && /^C1 on the training images: /.test(stopBeforeTests(fitOk, null, true, bad)?.reasons[0] ?? "") &&
+        /^C1 on the training images: /.test(stopBeforeTests(trainFit([[2]], [1]), null, false, bad)?.reasons[0] ?? "") && stopBeforeTests(fitOk, null, true) === null);
+    // the miniature's training scenes with round 8's REAL test splits behind them and harvest off: rendering a test scene
+    // would throw, so returning at all proves the stop came first. Zero steps leave the zero-last residual network exactly
+    // the identity -- it TIES the noisy input on every training image, and a tie is not a win.
+    const probe = { ...MINI, image: 8, splits: { ...MINI.splits, T1: SPLITS_R8.T1, T2: SPLITS_R8.T2 }, train: { ...MINI.train, steps: 0, crop: 8 }, secondarySpp: [], c0: false };
+    let out = null, threw = null; try { out = runStudy({ ...probe, c1OnTraining: true }); } catch (e) { threw = e.message; }
+    ok("!! *** a network that beats the noisy input on no training image fails C1 THERE, and the run returns WITHOUT rendering a test scene ***",
+        !threw && out.verdict.run === "not reported" && /^C1 on the training images: /.test(out.verdict.reasons[0]) && out.tables === null &&
+        !("tests rendered" in out.timings) && "C1" in out.timings && out.trainSanity.netWins === 0 && out.verdict.controls.C1 === out.trainSanity, threw || out.verdict.reasons[0]);
+    let threw2 = null; try { runStudy({ ...probe, c1OnTraining: false }); } catch (e) { threw2 = e.message; }
+    ok("  ...and without it the same call goes on to the tests -- refused at round 8's first test seed, which is what the row above relies on",
+        /seed 24000 is a dataset seed/.test(threw2 || ""), threw2);
+    // and when it holds, the run goes on, and the verdict reads the training C1, not the test sets' counts. Residual head,
+    // 1-sample inputs, ten steps: the smallest miniature found to beat the noisy input on all three training images.
+    const pass = runStudy({ splits: MINI.splits, image: 8, sppIn: 1, sppRef: 16, train: { steps: 10, batch: 1, crop: 8 }, secondarySpp: [], c0: false, c1OnTraining: true });
+    const T = pass.timings, H = pass.verdict.hypotheses;
+    ok("!! when it holds the run goes on: C1 is decided after C0 and before the tests, and the verdict's C1 IS the training one -- the test sets' counts reported, never tested",
+        pass.trainSanity.ok === true && pass.verdict.controls.C1 === pass.trainSanity && T.C0 <= T.C1 && T.C1 <= T["tests rendered"] && pass.tables !== null &&
+        H.H1.c1.tested === false && H.H2.c1.tested === false && !pass.verdict.reasons.some((r) => /^C1/.test(r)) && pass.config.c1OnTraining === true,
+        `training C1 ${pass.trainSanity.netWins} / ${pass.trainSanity.filterWins} of ${pass.trainSanity.n}; run "${pass.verdict.run}"`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r7` is the randomized round's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r8 --cache <dir>` is round 8's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

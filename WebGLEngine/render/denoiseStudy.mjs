@@ -21,12 +21,12 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
-import { relMSE, verdict, trainFit, historyFit } from "./denoiseStats.mjs";
+import { relMSE, verdict, trainFit, historyFit, trainSanity } from "./denoiseStats.mjs";
 import { cached, hashArrays } from "./denoiseCache.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -37,6 +37,7 @@ export const RESULTS_R4 = "render/denoise-results-r4.json";
 export const RESULTS_R5 = "render/denoise-results-r5.json";
 export const RESULTS_R6 = "render/denoise-results-r6.json";
 export const RESULTS_R7 = "render/denoise-results-r7.json";
+export const RESULTS_R8 = "render/denoise-results-r8.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -71,6 +72,12 @@ export const ROUND6 = Object.freeze({ splits: SPLITS_R6, init: INIT, c0: true, h
  */
 export const ROUND7 = Object.freeze({ splits: SPLITS_R7, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
                                       emitterMask: true, compareTrainSplit: SPLITS_R5.train, results: RESULTS_R7 });
+/**
+ * Section 26: round 7 with control C1 decided on the TRAINING images before any test scene is rendered, as C0 is, and
+ * new test scenes. Everything else -- training split, network, filter, secondaries -- is round 7's.
+ */
+export const ROUND8 = Object.freeze({ splits: SPLITS_R8, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
+                                      emitterMask: true, compareTrainSplit: SPLITS_R5.train, c1OnTraining: true, results: RESULTS_R8 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -92,11 +99,12 @@ export function shuffledTargets(set) {
 }
 
 /**
- * The stop before the tests: the "not reported" verdict when C0 (if on) or C6 (if measured) fired on the training
- * images, or null when the run may go on to render its test scenes. Nothing after a non-null answer is rendered.
+ * The stop before the tests: the "not reported" verdict when C0 (if on), C6 (if measured) or C1 (if decided on the
+ * training images, section 26) fired, or null when the run may go on to render its test scenes. Nothing after a
+ * non-null answer is rendered.
  */
-export function stopBeforeTests(fit, hist, c0) {
-    return (c0 && !fit.ok) || (hist && !hist.ok) ? verdict({ c0: fit, c6: hist }) : null;
+export function stopBeforeTests(fit, hist, c0, c1Train = null) {
+    return (c0 && !fit.ok) || (hist && !hist.ok) || (c1Train && !c1Train.ok) ? verdict({ c0: c0 ? fit : null, c6: hist, c1Train }) : null;
 }
 
 /**
@@ -131,11 +139,11 @@ const trained = (cache, set, opts, tag = "") => cached(cache, `net-${setKey(set)
 
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
-                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
+                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, c1OnTraining = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
                            secondarySpp = [1, 16], cache = null, log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
-    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask,
+    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask, c1OnTraining,
                      compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
@@ -152,17 +160,21 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     const determinism = a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
     lap("networks trained");
     // C0, on the training images, before a test scene exists
-    const fit = trainFit(nets.map((net) => R.train.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))), R.train.map((im) => relMSE(noisyOf(im), im.ref)));
+    const netTrain = nets.map((net) => R.train.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))), noisyTrain = R.train.map((im) => relMSE(noisyOf(im), im.ref));
+    const fit = trainFit(netTrain, noisyTrain);
     lap("C0");
+    // C1 (section 26), on the training images, before a test scene exists: both methods must beat the noisy input there
+    const c1Train = c1OnTraining ? trainSanity(R.train.map((im) => relMSE(jointBilateral(im.x, image, image, filter), im.ref)), netTrain, noisyTrain) : null;
+    if (c1OnTraining) lap("C1");
     // C6 (temporal only), on the training images, before a test scene exists: the shared history must beat one frame
     const hist = temporal ? historyFit(R.train.map((im) => relMSE(im.accum, im.ref)), R.train.map((im) => relMSE(noisyOf(im), im.ref))) : null;
     if (temporal) lap("C6");
     // C5 over every scene this study renders -- a sequence's history frames included
     const allSeeds = Object.values(splits).flatMap((s) => s.seeds).flatMap((s) => { if (temporal) return sequenceSeeds(s); const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    const stop = stopBeforeTests(fit, hist, c0);
+    const stop = stopBeforeTests(fit, hist, c0, c1Train);
     if (stop) {
-        return { verdict: stop, tables: null, filter, secondary: null, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, config };
+        return { verdict: stop, tables: null, filter, secondary: null, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, trainSanity: c1Train, config };
     }
     render("T1"); render("T2");
     lap("tests rendered");
@@ -177,7 +189,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     });
     const tables = { T1: measure(R.T1), T2: measure(R.T2), val: R.val ? measure(R.val) : null };
     const shuffled = shuffledNets.map((net) => R.T1.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref)));
-    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null, c6: hist });
+    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null, c6: hist, c1Train });
     lap("measured");
     // secondary: the trained networks on 1- and 16-sample inputs of the test scenes -- reported, never tested
     const secondary = {};
@@ -233,5 +245,5 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
         };
     }
     lap("secondary");
-    return { verdict: V, tables, filter, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, config };
+    return { verdict: V, tables, filter, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, trainSanity: c1Train, config };
 }

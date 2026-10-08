@@ -90,9 +90,19 @@ export const SPLITS_R7 = Object.freeze({
     T1: Object.freeze({ family: "R", seeds: range(22000, 12) }),
     T2: Object.freeze({ family: "C", seeds: range(23000, 12) }),
 });
+/**
+ * Section 26's splits: round 7's training and validation scenes, and NEW test scenes -- H1 on 12 of R (24000), H2 on 12
+ * of family C (25000). The one change from round 7 is where C1 is decided, so everything before the tests is round 7's.
+ */
+export const SPLITS_R8 = Object.freeze({
+    train: SPLITS_R7.train,
+    val: SPLITS_R7.val,
+    T1: Object.freeze({ family: "R", seeds: range(24000, 12) }),
+    T2: Object.freeze({ family: "C", seeds: range(25000, 12) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
