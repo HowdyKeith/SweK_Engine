@@ -204,9 +204,23 @@ console.log("\n5. *** THE LIVE CENSUS, RATCHETED ***");
     // and gateReport, each run alone three times here and its Run: line re-written to the median beside the old claim.
     // SABOTAGE (v4819): gateReport's header put back to ~7.5s -> 1 red, 1 against 0.
     const ROTTED_AT_V4814 = 39, ROTTED_AT_V4819 = 0;
-    ok("*** no NEW header has rotted: the count ratchets down, never up ***",
-        c.rotted.length <= ROTTED_AT_V4819 && ROTTED_AT_V4819 <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
-        `${c.rotted.length} against a frozen ${ROTTED_AT_V4819} (39 on main at v4814 and 0 on the exported-functions line at v4804, re-paid to 0 at the v4819 merge; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
+    // *** v4820 -- v4819'S 0 WAS ONE MACHINE'S COUNT, AND THE RIG READ 2. *** Since v4810 the census reads THIS machine's alone
+    // readings first, so the count depends on which machine runs it -- and 0 was measured on the sandbox, which has its own
+    // readings of both gates below. The rig's clone verify has none, falls to the shared record, and read 2: statedRuntime
+    // (1.6 s declared, the shared ring [8646, 8651, 8956] taken on main's line at v4815 while it re-ran a stale candidate;
+    // 1,301-1,521 ms alone on both sandbox machines now) and gateSelection (14 s declared, its only reading a loaded
+    // 69,346 ms from 2026-09-09; 16,058-16,432 ms alone here). So the ratchet is held where every machine agrees: the
+    // count a machine with NO readings of its own takes, from the committed records alone -- what the rig, CI and any
+    // new box read. This machine's own count is held to the same ceiling. Paid to 0 when the record's owner re-times
+    // those two (a sweepRotation --gate on 142c0d, or a handover). SABOTAGE (v4820): gateReport's header back to ~7.5s
+    // -> 1 red, 3 against 2 with no readings of its own.
+    const ROTTED_AT_V4820 = 2;
+    const cNone = census(ENG, null, { exclude: (g) => g === SELF_REL, id: "none-x64-0c-0gb-000000" });
+    ok("*** no NEW header has rotted: the count ratchets down, never up -- on a machine with no readings of its own, and on this one ***",
+        cNone.rotted.length <= ROTTED_AT_V4820 && c.rotted.length <= ROTTED_AT_V4820 &&
+        ROTTED_AT_V4820 <= ROTTED_AT_V4814 && ROTTED_AT_V4814 < ROTTED_AT_V4666,
+        `${cNone.rotted.length} with no readings of its own (${cNone.rotted.map((r) => `${r.gate.split("/").pop()} ${r.declaredMs}/${r.recordedMs} ms from ${r.from}`).join("; ") || "none"}) ` +
+        `and ${c.rotted.length} on this machine, against a frozen ${ROTTED_AT_V4820} (v4819 froze 0, this machine's count only; 39 on main at v4814; 138 at v4666 against loaded readings). Each one is a gate whose header claims a ` +
         "cost more than 2x from what the record measured, both having finished. Paying it down means " +
         "running each gate and re-writing its line, which is a pass and not an edit");
     ok("  ...and the population it is measured over is not empty and not everything",

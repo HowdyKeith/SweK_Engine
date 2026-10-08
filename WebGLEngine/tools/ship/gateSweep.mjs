@@ -8868,6 +8868,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4820 -- NO new gate file -- declaredCost's ratchet held on a machine with no readings of its own (the rig's clone read 2).
+    since515: Object.freeze({
+        // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
+        at: "v4820", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        widened: Object.freeze([
+            "tools/ship/declaredCost-selfcheck.mjs (the ratchet counted as a machine with no readings of its own counts it, and on this one)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** v4819'S 0 WAS THE SANDBOX'S COUNT; THE RIG'S CLONE READ 2. *** The census reads the running machine's own alone " +
+                 "readings first (v4810), and the sandbox had readings of statedRuntime and gateSelection that the shared record " +
+                 "does not: its statedRuntime ring is 8.6-9.0 s from main's line, where the gate runs ~1.5 s alone now, and " +
+                 "gateSelection's only reading is a loaded 69 s. The ratchet is held on the count a machine with no readings of its " +
+                 "own takes -- frozen at 2, both named -- and on this machine's count. One sabotage red.",
+    }),
     // v4812 -- THE 416th CLOSING: NO new gate file -- a pull request text for each of the sixteen three.js issues.
     since509: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
