@@ -592,7 +592,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the rtPipeline cache round -- 4588 -> 4589 for physics/render/rtCpuCache.mjs.
     // the lock-sums round -- 4589 -> 4593 for render/temporalLockSums.mjs, render/temporalLockSumsTsl.mjs and their two gates.
     // the splat-collision round -- 4593 -> 4595 for world/splatVoxelWorld.mjs and tools/ship/splatVoxelWorld-selfcheck.mjs.
-    files: 4595,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the lockstep round -- 4595 -> 4602 for brain/raceLockstep.mjs, brain/raceLockstepPeer.mjs, brain/raceLockstep-selfcheck.mjs, tools/ship/miniWs.mjs,
+    // tools/ship/lockstepRelay.mjs, tools/ship/lockstepPeer.mjs and tools/ship/lockstepRelay-selfcheck.mjs.
+    files: 4602,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1128,7 +1130,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the editable-world round -- tools/ship/raceTurret-selfcheck.mjs stubs the page's requestAnimationFrame to stop its frame loop,
     // so the picture it reads back is a function of the world alone, and the file now names the word: requestAnimationFrame
     // 126 -> 127; nothing else moved.
-    esModules: 4290, closures: 4140, asyncAwait: 1716, typedArrays: 1269, promises: 405,
+    // the lockstep round (seven files): ES modules 4290 -> 4297, closures 4140 -> 4147, async/await 1716 -> 1721 (the peer runner, the CLI, the relay and two gates await),
+    // Promises 405 -> 410 (miniWs.connect, the gate's peerProc and its staggered start and the --serve pair, the CLI's transport); typed arrays hold at 1269 (Buffers are not typed arrays here).
+    esModules: 4297, closures: 4147, asyncAwait: 1721, typedArrays: 1269, promises: 410,
     fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

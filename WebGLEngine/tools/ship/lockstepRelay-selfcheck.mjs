@@ -22,7 +22,11 @@
 //   C  tools/ship/lockstepRelay.mjs: ready announced at the FIRST join (the barrier removed)                        -> 3 red: the ready row (peers ["A"]), and the pair that starts 1.5 s apart
 //      (A's first inputs went to an empty room; the pair times out at tick 5 / tick 0) and its replay row. Measured by hand first with 8 s timeouts.
 //   E  brain/raceLockstepPeer.mjs: no final message sent                                                           -> 2 red: the two-node-process pair and the browser-and-node pair.
+//   H  tools/ship/lockstepPeer.mjs: --serve not starting the relay (the first peer hosts nothing)                  -> 1 red: section 2b (the other machine cannot connect; exit 2/1).
 //   G  brain/raceLockstepPeer.mjs: the engine identity not announced (backendId null)                              -> 1 red: the engine row (both processes stepped on, 722 / 724 ticks).
+//   FINDING, `--serve`'s first draft closed the hosted relay the moment the host's own result was in, which can be BEFORE the guest has read the host's final message
+//   (the host often finishes second: it holds the guest's final hash the instant it has sent its own). The guest then reported "the other peer's final hash never
+//   arrived" while the fingerprints were identical -- two runs in three. The host leaves the room first now and keeps the relay up until the room has emptied.
 //   FINDING, a first draft asserted that the browser-and-node pair and the two-node pair reached THE SAME fingerprint. They do not and cannot: the policies'
 //   commands are asked for when a peer's pump reaches each tick, from whatever state the sim has then, and that depends on the scheduler, so two runs of the same
 //   race differ. What a pair has is agreement with ITSELF (every tick, and the end) and a log that replays to its fingerprint -- which is what the rows hold.
@@ -105,6 +109,23 @@ let pairFp = null;
     ok("!! and the commands the two processes exchanged are a REPLAY LOG: fed to raceWithGunners offline, with no policies, on this process's own wasm, they reach the pair's final fingerprint (the policies' commands depend on when each tick's were asked for, so two RUNS differ; a pair and its log never do)", rep2 === pairFp && a.log.length === 720 && JSON.stringify(a.log) === JSON.stringify(b.log), `replay ${rep2}, pair ${pairFp}, ${a.log && a.log.length} ticks, logs equal ${JSON.stringify(a.log) === JSON.stringify(b.log)}`);
     ok("!! two separate OS processes (the second started 1.5 s after the first), each starting its own wasm cold, racing twelve seconds through the relay on commands they exchanged over TCP: both exit 0 and agree on the same final fingerprint", a.code === 0 && b.code === 0 && a.json.agree && b.json.agree && a.json.hashHex === b.json.hashHex && a.json.tick >= 720, `exit ${a.code}/${b.code}, fingerprint ${a.json && a.json.hashHex} / ${b.json && b.json.hashHex}, ${a.json && a.json.ms} ms`);
     ok("...with the same engine identity on both (the protocol's precondition) and no desync recorded on either", a.json.fleet === b.json.fleet && !a.json.desync && !b.json.desync && !a.json.halted, `engine ${a.json.fleet}`);
+}
+
+sec("2b. ONE COMMAND ON MACHINE 1: --serve hosts the relay inside the first peer's own process");
+{
+    const probe = await startRelay({ port: 0, host: "127.0.0.1" }), port = probe.port; await probe.close();   // a free port, handed to the pair
+    const [a, b] = await Promise.all([new Promise((resolve) => {
+        const jf = path.join(tmp, "p2b-A.json"), p = spawn(process.execPath, [path.join(ENG, "tools/ship/lockstepPeer.mjs"), "--serve", "--port", String(port), "--room", "p2b", "--peer", "A", "--json", jf, "--join-timeout", "40", "--run-timeout", "40"], { cwd: ENG });
+        let out = ""; p.stdout.on("data", (d) => { out += d; }); p.stderr.on("data", (d) => { out += d; });
+        const timer = setTimeout(() => p.kill("SIGKILL"), 150000);
+        p.on("close", (code) => { clearTimeout(timer); let json = null; try { json = JSON.parse(fs.readFileSync(jf, "utf8")); } catch (e) {} resolve({ code, out, json }); });
+    }), new Promise((r) => setTimeout(r, 1500)).then(() => new Promise((resolve) => {
+        const jf = path.join(tmp, "p2b-B.json"), p = spawn(process.execPath, [path.join(ENG, "tools/ship/lockstepPeer.mjs"), "--relay", "ws://127.0.0.1:" + port, "--room", "p2b", "--peer", "B", "--json", jf, "--join-timeout", "40", "--run-timeout", "40"], { cwd: ENG });
+        let out = ""; p.stdout.on("data", (d) => { out += d; }); p.stderr.on("data", (d) => { out += d; });
+        const timer = setTimeout(() => p.kill("SIGKILL"), 150000);
+        p.on("close", (code) => { clearTimeout(timer); let json = null; try { json = JSON.parse(fs.readFileSync(jf, "utf8")); } catch (e) {} resolve({ code, out, json }); });
+    }))]);
+    ok("!! `--serve` on one machine is all it takes: peer A hosts the relay itself and prints the address the other machine uses; peer B connects to it and the pair agrees (both exit 0, one fingerprint)", a.code === 0 && b.code === 0 && a.json && b.json && a.json.hashHex === b.json.hashHex && /relay hosted here on port/.test(a.out) && new RegExp("--relay ws://\\S+:" + port).test(a.out), `exit ${a.code}/${b.code}, ${a.json && a.json.hashHex} / ${b.json && b.json.hashHex}; A: ${a.json && a.json.reason}; B: ${b.json && b.json.reason}`);
 }
 
 sec("3. A BROWSER AND A NODE PROCESS: a headless Chromium peer against a node peer through the same relay");
