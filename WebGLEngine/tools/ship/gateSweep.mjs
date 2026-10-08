@@ -8118,6 +8118,47 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 4 -- THE TEMPORAL ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since485: Object.freeze({
+        at: "the denoiser arc, round 4 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseTemporal-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (strideOf; SPLITS_R4, C5 over four rounds)",
+                                "render/denoiseStats-selfcheck.mjs (C6: historyFit and the verdict that stops on it)",
+                                "render/denoiseFilter-selfcheck.mjs (a 13-channel input filters as its first nine channels)",
+                                "render/denoiseNet-selfcheck.mjs (shapeFor, cropAt and the trainer at stride 13)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND4, stopBeforeTests on C6)"]),
+        verdict: "*** THE HISTORY IS SHARED, SO THE QUESTION IS WHAT EACH METHOD DOES WITH IT. *** Section 17: each scene " +
+                 "becomes 8 frames orbiting its look point and arriving at its own eye, so the measured frame is the image " +
+                 "rounds 1-3 measured. render/denoiseTemporal.mjs reprojects each pixel's first hit into the previous " +
+                 "camera -- the inverse of pixelRay, checked against the forward ray to 2e-15 -- keeps the bilinear taps " +
+                 "that saw the same object at the same place facing the same way, and carries a running average forward; " +
+                 "a stationary camera gives the exact mean of 8 frames. The filter and round 3's kernel network (13 input " +
+                 "channels) both read that accumulation. C6 checks the history beats one frame on the TRAINING images and " +
+                 "stops the run before the tests if not. New test scenes from 9000 and 10000. 29 sabotages across six " +
+                 "gates, all red -- three only after rows were written for them (the object test alone, the seed count, " +
+                 "finite secondaries).",
+    }),
+    // the denoiser arc, round 3 -- THE KERNEL-PREDICTING HEAD, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since484: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened five.
+        at: "the denoiser arc, round 3 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/convNet-selfcheck.mjs (a layer names its own width; a shape naming none draws what it drew)",
+                                "render/denoiseNet-selfcheck.mjs (the kernel head: box at zero-last, a distribution, one-hot copies, softmax gradient)",
+                                "render/denoiseScenes-selfcheck.mjs (SPLITS_R3: new test seeds, refused, C5 over three rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND3, the residual comparison beside it, C0 guarding seed 7000)"]),
+        verdict: "*** THE NETWORK PREDICTS THE FILTER'S WEIGHTS INSTEAD OF A CORRECTION. *** Section 14 found the residual " +
+                 "network denoises but loses to the joint bilateral filter, by more across families. Section 15 changes " +
+                 "one thing: a 1 x 1 head to 81 logits whose softmax weights the noisy irradiance over the filter's 9 x 9 " +
+                 "window -- an average of real samples, as the filter's is, 7,329 parameters against 6,387. Gated: an " +
+                 "untrained head is the box mean to 1e-16 (corners over their 25 taps), the weights are a distribution, a " +
+                 "dominant logit copies its tap, and the gradient through the softmax matches central differences to " +
+                 "1.8e-6. New test scenes from 7000 and 8000; round 2's residual network rides beside it as a secondary, " +
+                 "never tested. A training-split pilot (0.141 vs the filter's 0.192) only confirmed C0 can pass. " +
+                 "9 sabotages, all red.",
+    }),
     // the denoiser arc, the re-run's amendment -- C0, THE ZERO-LAST INIT AND NEW TEST SCENES, BEFORE ANY OF THEM EXIST.
     since483: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.

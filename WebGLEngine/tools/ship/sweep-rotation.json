@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-07T21:53:12.157Z",
+ "at": "2026-10-08T02:06:24.786Z",
  "poolAt": "2026-10-07T12:49:00.811Z",
  "poolHorizon": "2026-10-06T00:11:15.681Z",
  "budgetMs": 3000,
@@ -85,9 +85,10 @@
   },
   {
    "gate": "brain/convNet-selfcheck.mjs",
-   "ms": 133,
+   "ms": 177,
    "code": 0,
-   "at": "2026-10-07T21:53:08.911Z"
+   "priorMs": 133,
+   "at": "2026-10-08T02:06:24.786Z"
   },
   {
    "gate": "brain/gunnerPolicy-selfcheck.mjs",
@@ -1175,33 +1176,44 @@
   },
   {
    "gate": "render/denoiseFilter-selfcheck.mjs",
-   "ms": 265,
+   "ms": 257,
    "code": 0,
-   "at": "2026-10-07T21:53:08.392Z"
+   "priorMs": 265,
+   "at": "2026-10-08T02:06:19.497Z"
   },
   {
    "gate": "render/denoiseNet-selfcheck.mjs",
-   "ms": 1893,
+   "ms": 2108,
    "code": 0,
-   "at": "2026-10-07T21:53:10.957Z"
+   "priorMs": 1893,
+   "at": "2026-10-08T02:06:21.769Z"
   },
   {
    "gate": "render/denoiseScenes-selfcheck.mjs",
-   "ms": 131,
+   "ms": 146,
    "code": 0,
-   "at": "2026-10-07T21:53:07.966Z"
+   "priorMs": 131,
+   "at": "2026-10-08T02:06:18.758Z"
   },
   {
    "gate": "render/denoiseStats-selfcheck.mjs",
-   "ms": 46,
+   "ms": 52,
    "code": 0,
-   "at": "2026-10-07T21:53:08.623Z"
+   "priorMs": 46,
+   "at": "2026-10-08T02:06:19.023Z"
   },
   {
    "gate": "render/denoiseStudy-selfcheck.mjs",
-   "ms": 985,
+   "ms": 2515,
    "code": 0,
-   "at": "2026-10-07T21:53:12.157Z"
+   "priorMs": 985,
+   "at": "2026-10-08T02:06:24.450Z"
+  },
+  {
+   "gate": "render/denoiseTemporal-selfcheck.mjs",
+   "ms": 1834,
+   "code": 0,
+   "at": "2026-10-08T02:06:18.427Z"
   },
   {
    "gate": "render/flowCost-selfcheck.mjs",

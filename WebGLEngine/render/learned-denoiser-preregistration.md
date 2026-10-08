@@ -317,3 +317,264 @@ the arc stops until something changes the input.
 - What "something changes the input" could mean is a new pre-registration's question, not this one's: more training
   scenes, more steps, a wider network, a kernel-predicting output, or temporal inputs. None of them is chosen by
   looking at these test sets, which are now spent too.
+
+## 15. ROUND 3 -- THE KERNEL-PREDICTING NETWORK, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered. Sections 12-14 stand
+as recorded.
+
+**The question.** Section 14 found that a network which predicts a correction to the irradiance learns to denoise
+but loses to the filter, by more on the family it never saw. The filter's output is a weighted average of real
+samples in a 9 x 9 window. So:
+
+> **If the network predicts the weights of that average itself, per pixel, does it beat the same filter on scenes
+> it was not trained on?**
+
+**One deliberate change: the output head.** Everything else in sections 3-11 and 13 holds as written: the scenes,
+inputs, splits, metric, statistic, controls (C0-C5, with C0's bar at 0.8), seeds, optimiser, steps, batch, crop,
+the zero-last initialisation, and the filter and its tuning.
+
+- **The network:** round 2's three hidden layers, unchanged (9 -> 16 -> 16 -> 16, 3 x 3, relu), then a **1 x 1 layer
+  to 81 logits** per pixel.
+  - 7,329 parameters, against round 2's 6,387. The 1 x 1 head keeps the change to the output's meaning rather than
+    to capacity.
+- **The output:**
+  - a softmax over the logits of the taps inside the image gives each pixel weights over its 9 x 9 window (the
+    filter's window);
+  - the output irradiance is the weighted sum of the NOISY demodulated irradiance, one kernel shared by r, g and b;
+  - it is re-modulated by the pixel's albedo, as before.
+  - The output is always a convex combination of real samples.
+- **Initialisation:** zero-last, as section 13. An untrained network is therefore the 9 x 9 box mean.
+- In code: `head: "kernel"` in `render/denoiseNet.mjs` (`SHAPE_KERNEL`, `KERNEL_RADIUS`, `KERNEL_TAPS`).
+
+**New test sets.**
+- T1: family A, scene seeds 7000-7011.
+- T2: family B, scene seeds 8000-8011.
+- Neither range overlaps anything earlier. C5 holds over all three rounds: 100 scenes, 300 distinct render seeds.
+- train (1000-1023) and val (2000-2003) are unchanged.
+- In code: `SPLITS_R3`.
+
+**What was seen first: the TRAINING scenes only.** A pilot trained one kernel network (seed 1, the full schedule) on
+the 24 training scenes to confirm the head learns before committing to it. Training fit, geometric mean of
+relMSE / noisy:
+
+| Method | Train fit |
+|---|---|
+| kernel network, seed 1 | 0.141 |
+| round 2's residual network, seed 1 | 0.182 |
+| the tuned filter | 0.192 |
+
+Round 2's residual also fit the training set better than the filter and lost on test, so this predicts nothing
+about H1 or H2. It was used only to confirm that C0 can pass. No other choice was made from it. The 9 x 9 window and
+the 1 x 1 head were fixed before it ran.
+
+**Secondary** (reported, never tested, never used to choose):
+- round 2's residual network, trained identically on the same scenes with the same three seeds, measured on this
+  round's T1 and T2 beside the kernel network;
+- the 1- and 16-sample inputs as before;
+- val;
+- per seed;
+- time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r3` -> `render/denoise-results-r3.json`. It refuses if the
+file exists.
+
+**The outcomes, per section 9:**
+- **H1 and H2 supported:** the kernel network goes to the device. Its 81-wide output needs `brain/conv2d.mjs`'s
+  device kernels widened past `COUT_MAX` 32, or the head split into three passes.
+- **H1 only:** transfer is still the open subject.
+- **Neither:** recorded, and section 16 is the temporal round, already chosen as the next change.
+
+## 16. ROUND 3 -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r3` at commit 899caac3, 2026-10-08 01:30:36Z to 02:11:31Z (2,455 s). Its
+output, unedited, is `render/denoise-results-r3.json`.
+
+**A first attempt** started at 01:07:47Z from the same commit. A container restart killed it at 272 s, after the
+training scenes were rendered and the filter was tuned, before any network was trained or any test scene rendered.
+It wrote nothing and nothing from it was read. The run is deterministic, so the second attempt is the same
+computation from the start.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0, train fit per seed | 0.141 / 0.134 / 0.137 (bar 0.8) |
+| C1 | network 12 of 12 and filter 12 of 12 against the noisy input, on T1 and on T2 |
+| C2 | shuffled-target network mean d -2.38 |
+| C3 | 0 of 12 images within 2x of the floor on either set |
+| C4 | bit-identical retrain |
+| C5 | distinct render seeds |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, in-family (T1, seeds 7000-7011) | 10 | +0.191 | 0.0193 | 0.025 | **supported** |
+| H2, transfer (T2, seeds 8000-8011) | 5 | -0.064 | 0.806 | 0.05 | **not supported** |
+
+- **In-family, the kernel-predicting network beats the tuned filter.** Its relMSE is about 20% below the filter's
+  (geometric means 0.0020 vs 0.0025), with every seed at 0.0020-0.0021.
+- **On the family it never saw, it does not.**
+  - Geometric means: network 0.0142, filter 0.0133. The filter wins on 7 of 12 images.
+  - The spread across seeds is wide: 0.0122 / 0.0146 / 0.0154.
+
+**Secondary** (reported, never tested, never used to choose). Geometric-mean relMSE on this round's test images:
+
+| | T1 | T2 |
+|---|---|---|
+| round 2's residual network, same training, same seeds | 0.0029-0.0032 | 0.0146-0.0185 |
+| this round's kernel network | 0.0020-0.0021 | 0.0122-0.0154 |
+| 1-sample input: filter / kernel networks | 0.0076 / 0.0057-0.0064 | 0.0640 / 0.0501-0.0618 |
+| 16-sample input: filter / kernel networks | 0.0013 / 0.0011-0.0012 | 0.0048 / 0.0049-0.0054 |
+
+- val: filter 0.0024, networks 0.0019-0.0020.
+- On the same scenes, the head alone moved the network from behind the filter to ahead of it in-family.
+
+**What this buys, per section 15: "H1 only".** The kernel network denoises its own family better than the filter
+and does not carry that to a new one; transfer is still the open subject.
+- The network does not go to the device on this result alone. Section 9 asks for both hypotheses.
+- Section 17, the temporal round, was fixed before this section's numbers were read, and is unchanged by them.
+
+## 17. ROUND 4 -- THE TEMPORAL ROUND, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it, on its own branch. No scene of this round's T1 or T2 has been rendered.
+Section 15 called this round "section 16". Round 3's results take that number, so this one is 17.
+
+**Fixed before round 3's verdict was known.** This section was written while round 3's harvest was still running,
+so nothing below was chosen from round 3's numbers. The head is round 3's kernel head whatever round 3 found:
+blending real samples is how a temporal denoiser is built, and the history makes the case stronger.
+
+**The question.**
+
+> **Given the frames before the one it denoises, accumulated through the same reprojection, does a small network
+> beat the hand-written filter on scenes it was not trained on?**
+
+The history front-end is SHARED: both methods receive the same accumulated irradiance. The question is what each does
+with it.
+
+**Sequences.** Each scene becomes 8 frames (`render/denoiseTemporal.mjs`).
+- **The orbit:** the camera orbits the scene's look point on the scene's own ring and height. It steps a per-scene
+  angle of 1.5-4 degrees per frame, in a per-scene direction, drawn from a stream of its own, so the scene is
+  unchanged.
+- **The last frame is the measured one.** Its eye IS the scene's, so its 4-sample input and 1024-sample reference
+  are exactly the images rounds 1-3 measured for that seed.
+- **The seven history frames** are new 4-sample renders, with render seeds 1e7 + 8 s + f, distinct from every
+  8 s + k.
+
+**The front-end, identical for both methods.**
+- Each pixel's centre-ray first hit is projected into the previous frame's camera (the exact inverse of
+  `pixelRay`).
+- Of its four bilinear taps, only those that saw the same object, within 3 pixel footprints of the same point
+  (stretched at grazing angles), with normals within cosine 0.9, are kept and renormalised.
+- A pixel with no valid tap restarts its history. Sky pixels carry none.
+- The accumulation is a running average: n = min(n_prev + 1, 8), A = A_prev + (I - A_prev) / n.
+
+**The methods.**
+- **The filter:** section 8's joint bilateral filter, unchanged, applied to the accumulated irradiance. It is tuned
+  on the 24 training sequences over the same 108-setting grid.
+- **The network:** round 3's kernel network, with the first layer widened to **13 input channels**:
+  - [accumulated irradiance, albedo, normal] -- the nine channels every method reads;
+  - the measured frame's own noisy irradiance (3);
+  - the history length / 8 (1).
+- Its 81 weights blend the accumulated irradiance over the 9 x 9 window. 7,905 parameters. Zero-last
+  initialisation; training exactly as section 5 (1,500 steps, batch 4, 32 x 32 crops, seeds 1, 2, 3).
+
+**Splits.**
+- T1: family A, scene seeds 9000-9011.
+- T2: family B, scene seeds 10000-10011.
+- Neither range overlaps anything earlier. C5 holds over four rounds' measured frames (124 scenes, 372 seeds).
+- Train (1000-1023) and val (2000-2003) are unchanged; their measured frames are the earlier rounds' images.
+
+**Controls.**
+- C0-C5 as before. C1 and the metric are measured against the measured frame's own 4-sample input.
+- **C6 (new), history:** on the TRAINING images, before any test scene is rendered, the geometric mean of
+  relMSE(accumulation) / relMSE(noisy frame) must be at most 0.8. If it fires, the run is "not reported" and stops,
+  like C0, without rendering its tests.
+- C5 now counts every history frame's render seed.
+
+**The statistic:** sections 6 and 7, unchanged.
+
+**What was seen first: the TRAINING sequences only.** A pilot rendered the 24 training sequences and trained one
+temporal network (seed 1). Training fit, geometric mean of relMSE / noisy frame:
+
+| Method | Train fit |
+|---|---|
+| accumulation alone | 0.188 (C6 holds) |
+| the filter on it, tuned | 0.169 |
+| the temporal kernel network | 0.134 (C0 holds) |
+
+This confirmed that C0 and C6 can pass and chose nothing else. Training fit has not predicted a test verdict in
+this arc.
+
+**Secondary** (reported, never tested, never used to choose):
+- the accumulation alone on T1 and T2;
+- section 8's filter re-tuned on the training scenes' single frames and applied to the measured frame alone;
+- the kernel network trained on the single frames (round 3's setup, the same three seeds), on the same measured
+  frames;
+- 1- and 16-sample sequences;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r4` -> `render/denoise-results-r4.json`. It refuses if the
+file exists.
+
+**The outcomes, per section 9:**
+- **H1 and H2 supported:** the temporal network goes to the device beside the path tracer's page.
+- **H1 only:** transfer stays the open subject.
+- **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.
+
+## 18. ROUND 4 (TEMPORAL) -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r4` at commit 17da0750 (its code is ebfb1e2a's, where section 17 was
+committed), 2026-10-08 02:21:06Z to 03:04:24Z (2,597 s). Its output, unedited, is `render/denoise-results-r4.json`.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C6, history | the accumulation brought the training images to 0.188 x the noisy error (bar 0.8) |
+| C0, train fit per seed | 0.134 / 0.127 / 0.125 |
+| C1 | network 12 of 12 and filter 12 of 12 against the measured frame's noisy input, on T1 and on T2 |
+| C2 | shuffled-target network mean d -1.93 |
+| C3 | 0 of 12 images near the floor on either set |
+| C4 | bit-identical retrain |
+| C5 | 520 render seeds, all distinct: 52 scenes x 10 |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, in-family (T1, seeds 9000-9011) | 12 | +0.193 | 0.00024 | 0.025 | **supported** |
+| H2, transfer (T2, seeds 10000-10011) | 5 | -0.076 | 0.806 | 0.05 | **not supported** |
+
+- **In-family, the temporal kernel network beats the filter given the same history on every image.** Geometric
+  means: network 0.0024, filter 0.0029. Every seed is at 0.0024.
+- **On the family it never saw, it does not.**
+  - Geometric means: network 0.0119, filter 0.0110. The filter wins on 7 of 12 images.
+  - The two worst images go the filter's way by about 40%.
+
+**Secondary** (reported, never tested, never used to choose). Geometric-mean relMSE on this round's measured frames:
+
+| | T1 | T2 |
+|---|---|---|
+| the noisy measured frame | 0.0137 | 0.0717 |
+| the accumulation alone | 0.0031 | 0.0140 |
+| filter, no history (re-tuned on single frames: sS 1, sN 0.3, sA 0.05, sI 1) | 0.0028 | 0.0247 |
+| filter on the accumulation (sS 1, sN 0.1, sA 0.05, sI 0.25) | 0.0029 | 0.0110 |
+| kernel network, no history (round 3's setup, seeds 1-3) | 0.0022-0.0023 | 0.0228-0.0277 |
+| kernel network on the accumulation (this round) | 0.0024 | 0.0114-0.0121 |
+| 1-sample sequences: filter / networks | 0.0052 / 0.0044-0.0048 | 0.0404 / 0.0342-0.0363 |
+| 16-sample sequences: filter / networks | 0.0024 / 0.0018-0.0019 | 0.0043 / 0.0055-0.0062 |
+
+- val: filter 0.0021, networks 0.0017-0.0018.
+- **On family A's measured frames, the history bought neither method anything**: the filter is 0.0028 without it and
+  0.0029 with it, the network 0.0022-0.0023 without it and 0.0024 with it.
+- **On family B the history roughly halved both methods' error,** and the accumulation alone beat both single-frame
+  methods there.
+- None of this was tested. It says where to look, not what is true.
+
+**What this buys, per section 17: "H1 only".**
+- The pattern of rounds 3 and 4 is the same. A kernel-predicting network beats the hand-written filter on the family
+  it was trained on (10 of 12, then 12 of 12) and does not on a family it never saw (5 of 12 both times).
+- Transfer stays the open subject.
+- The network does not go to the device on this result. Section 9 asks for both hypotheses.

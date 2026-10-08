@@ -5,8 +5,8 @@
 // first-hit guide buffers, the 9-channel demodulated input and the render seeds -- with the input's and the
 // references' seeds distinct by construction (control C5).
 //
-// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
-// or SPLITS_R2 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS,
+// SPLITS_R2, SPLITS_R3 or SPLITS_R4 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -37,7 +37,27 @@ export const SPLITS_R2 = Object.freeze({
     T1: Object.freeze({ family: "A", seeds: range(5000, 12) }),
     T2: Object.freeze({ family: "B", seeds: range(6000, 12) }),
 });
-const RESERVED = new Set([SPLITS, SPLITS_R2].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+/**
+ * The kernel-predicting round's splits (pre-registration section 15): the same training and validation scenes again,
+ * and new test scenes on ranges no earlier split touched -- rounds 1 and 2 spent theirs.
+ */
+export const SPLITS_R3 = Object.freeze({
+    train: SPLITS.train,
+    val: SPLITS.val,
+    T1: Object.freeze({ family: "A", seeds: range(7000, 12) }),
+    T2: Object.freeze({ family: "B", seeds: range(8000, 12) }),
+});
+/**
+ * The temporal round's splits (pre-registration section 17): the same training and validation scenes -- each now the
+ * last frame of a sequence -- and new test scenes on ranges no earlier split touched.
+ */
+export const SPLITS_R4 = Object.freeze({
+    train: SPLITS.train,
+    val: SPLITS.val,
+    T1: Object.freeze({ family: "A", seeds: range(9000, 12) }),
+    T2: Object.freeze({ family: "B", seeds: range(10000, 12) }),
+});
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -105,6 +125,17 @@ export function renderImages(family, seed, { harvest = false, ref2 = false, w = 
     const out = { family, seed, w, h, seeds: rs, input: render(S.scene, opts(sppIn, rs.input)), ref: render(S.scene, opts(sppRef, rs.ref)), ...guideBuffers(S, w, h) };
     if (ref2) out.ref2 = render(S.scene, opts(sppRef, rs.ref2));
     return out;
+}
+
+/**
+ * The channel stride of an input of `n` pixels. Every input starts with the nine channels above -- [the irradiance to
+ * denoise, albedo, normal] -- and the temporal round (section 16) appends four more after them, so a filter or a head
+ * that reads the first nine reads them at this stride. Anything but a whole number of at least nine is refused.
+ */
+export function strideOf(x, n) {
+    const C = x.length / n;
+    if (!Number.isInteger(C) || C < CHANNELS) throw new Error(`denoiseScenes: ${x.length} values over ${n} pixels is not an input of at least ${CHANNELS} channels`);
+    return C;
 }
 
 /** The network's input: H x W x 9, [noisy irradiance rgb, albedo rgb, normal xyz], irradiance = radiance / max(albedo, floor). */

@@ -9,6 +9,7 @@
 //   N1  Adam without bias correction                                             1 RED
 //   N2  the backward pass reads relu's mask from the layer's INPUT               3 RED (1 here, 2 in denoiseNet-selfcheck)
 //   N3  Xavier's 1/fan-in instead of He's 2/fan-in                               1 RED
+//   N4  a layer's own width (the fourth entry) ignored                           1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -35,6 +36,10 @@ console.log("1. THE STREAM AND THE INITIALISATION");
     ok("  He-normal weights: std sqrt(2 / (3 x 3 x 9)) = 0.157 for the first layer, and zero biases", Math.abs(std - Math.sqrt(2 / 81)) < 0.01 && net.layers.every((L) => L.b.every((x) => x === 0)),
         `measured ${std.toFixed(4)}`);
     ok("  the parameter count is every weight and bias", paramCount(net) === 9 * 16 * 9 + 16 + 16 * 3 * 9 + 3);
+    const k1 = initNet([[9, 16, "relu"], [16, 81, "none", 1]], seededRandom(2)), L1 = k1.layers[1];
+    const plain = initNet([[9, 16, "relu"], [16, 3, "none"]], seededRandom(2)), named = initNet([[9, 16, "relu"], [16, 3, "none", 3]], seededRandom(2));
+    ok("  a layer may name its own width: [16, 81, \"none\", 1] is a 1 x 1 layer of 16 x 81 weights; a shape naming none draws what it always drew",
+        L1.k === 1 && L1.W.length === 16 * 81 && k1.layers[0].k === 3 && same(Array.from(plain.layers[1].W), Array.from(named.layers[1].W)));
     let threw = null; try { initNet([[9, 16, "relu"], [8, 3, "none"]], seededRandom(1)); } catch (e) { threw = e.message; }
     ok("  a stack whose channels do not chain is refused by name", /takes 8 channels/.test(threw || ""), threw);
 }

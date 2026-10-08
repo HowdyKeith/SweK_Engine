@@ -3,8 +3,8 @@
 // Run: node render/denoiseStats-selfcheck.mjs
 //
 // GATES render/denoiseStats.mjs -- the pre-registration's statistic and controls -- on PLANTED outcomes only. Its
-// exports, each named here: REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, relMSE, seedMean, effects,
-// signTestUpper, holm, trainFit, verdict. Every verdict the function can return is planted below and has to come back.
+// exports, each named here: REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects,
+// signTestUpper, holm, trainFit, historyFit, verdict. Every verdict the function can return is planted below and has to come back.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   S1  Holm does not stop at its first failure                                  1 RED
@@ -14,6 +14,8 @@
 //   S5  control C3 ignored                                                       1 RED
 //   S6  C0 averages ratios arithmetically instead of geometrically                1 RED
 //   S7  C0 passes when ANY seed fits, not every seed                             2 RED
+//   S9  verdict() ignores a failed C6                                            1 RED
+//   S10 C6 compares the accumulation with itself, not with the noisy frame       1 RED
 //   S8  verdict() ignores a failed C0                                            1 RED (it crashed the gate until the row caught the throw)
 "use strict";
 import path from "node:path";
@@ -21,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const S = await import(pathToFileURL(path.join(ENG, "render", "denoiseStats.mjs")).href);
-const { REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, verdict } = S;
+const { REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, historyFit, verdict } = S;
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -96,6 +98,16 @@ console.log("\n3. CONTROL C0 -- THE RE-RUN'S TRAINING-FIT CHECK (pre-registratio
     ok("!! a failed C0 is NOT REPORTED, with no hypothesis tested and no test set needed -- verdict() never reads `sets`",
         !!stop && stop.run === "not reported" && Object.keys(stop.hypotheses).length === 0 && /^C0: /.test(stop.reasons[0]) && stop.controls.C0.ok === false,
         threw ? `threw: ${threw}` : stop.reasons[0]);
+}
+
+console.log("\n4. CONTROL C6 -- THE TEMPORAL ROUND'S HISTORY CHECK (pre-registration section 17)");
+{
+    const h = historyFit([0.25, 4, 0.5], [1, 1, 1]);
+    ok("!! C6 is the geometric mean over training images of accumulated / noisy, against 0.8: 0.25, 4 and 0.5 make 0.794, which holds; 1, 1 does not",
+        C6_MAX_RATIO === 0.8 && Math.abs(h.ratio - 0.5 ** (1 / 3)) < 1e-12 && h.ok === true && historyFit([0.2, 0.3], [0.2, 0.3]).ok === false, h.ratio.toFixed(3));
+    let stop = null, threw = null; try { stop = verdict({ c6: historyFit([1, 1], [1, 1]), c0: trainFit([[0.1]], [1]) }); } catch (e) { threw = e.message; }
+    ok("!! a failed C6 is NOT REPORTED before anything else is read -- even with C0 passing",
+        !!stop && stop.run === "not reported" && /^C6: /.test(stop.reasons[0]) && stop.controls.C6.ok === false && Object.keys(stop.hypotheses).length === 0, threw || stop.reasons[0]);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +

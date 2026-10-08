@@ -27,13 +27,17 @@ export function seededRandom(seed) {
     return { u, gauss };
 }
 
-/** A network of k x k layers from [[Cin, Cout, act], ...]: He-normal weights (std sqrt(2 / (k k Cin))), zero biases. */
+/**
+ * A network of k x k layers from [[Cin, Cout, act], ...]: He-normal weights (std sqrt(2 / (k k Cin))), zero biases. A
+ * layer may name its own width as a fourth entry, [Cin, Cout, act, k] -- the kernel-predicting head's 1 x 1 output
+ * layer does; a shape that names none draws exactly what it drew before.
+ */
 export function initNet(shape, rand, k = 3) {
     for (let i = 1; i < shape.length; i++) if (shape[i][0] !== shape[i - 1][1]) throw new Error(`convNet: layer ${i} takes ${shape[i][0]} channels, layer ${i - 1} gives ${shape[i - 1][1]}`);
-    return { layers: shape.map(([Cin, Cout, act]) => {
-        const std = Math.sqrt(2 / (k * k * Cin)), W = new Float64Array(Cout * k * k * Cin);
+    return { layers: shape.map(([Cin, Cout, act, kl = k]) => {
+        const std = Math.sqrt(2 / (kl * kl * Cin)), W = new Float64Array(Cout * kl * kl * Cin);
         for (let i = 0; i < W.length; i++) W[i] = rand.gauss() * std;
-        return { Cin, Cout, k, W, b: new Float64Array(Cout), act };
+        return { Cin, Cout, k: kl, W, b: new Float64Array(Cout), act };
     }) };
 }
 export const paramCount = (net) => net.layers.reduce((a, L) => a + L.W.length + L.b.length, 0);

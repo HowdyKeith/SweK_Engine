@@ -3,8 +3,8 @@
 // Run: node render/denoiseNet-selfcheck.mjs
 //
 // GATES render/denoiseNet.mjs -- the pre-registered network and its training -- on SYNTHETIC images only (smooth
-// irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, INITS, INIT,
-// makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
+// irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, INITS, INIT, HEADS,
+// KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   L1  the residual removed: the output IS the irradiance                       1 RED
@@ -12,13 +12,21 @@
 //   L3  the batch's image chosen by Math.random -- v4698's defect, planted       1 RED (C4)
 //   L4  the default init back to "he"                                            3 RED
 //   L5  zero-last draws its weights from another stream than round 1's          2 RED
+//   K1  the softmax normalised over all 81 taps, outside the image included      3 RED
+//   K2  the kernel blends the ALBEDO channels instead of the irradiance          4 RED
+//   K3  the softmax's backward pass without its "- sum" term                     1 RED
+//   K4  zero-last not applied to the kernel head                                 1 RED
+//   K5  cropAt copies nine channels of a 13-channel input                        1 RED
+//   K6  the trainer builds a 9-channel first layer for a 13-channel input        1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SHAPE, TRAIN, INITS, INIT, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser } = await imp("render/denoiseNet.mjs");
+const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt,
+        trainDenoiser } = await imp("render/denoiseNet.mjs");
+const { cloneNet } = await imp("brain/convNet.mjs");
 const { relMSE } = await imp("render/denoiseStats.mjs");
 const { CHANNELS } = await imp("render/denoiseScenes.mjs");
 
@@ -113,6 +121,63 @@ console.log("\n5. THE RE-RUN'S INITIALISATION (pre-registration section 13)");
         same(Array.from(y), Array.from(noisyRadiance(im))) && !same(Array.from(denoise(makeDenoiser(9, "he"), im.x, 10, 12).y), Array.from(noisyRadiance(im))));
     let threw = null; try { makeDenoiser(1, "xavier"); } catch (e) { threw = e.message; }
     ok("  an init that is neither is refused by name", /not one of he, zero-last/.test(threw || ""), threw);
+}
+
+console.log("\n6. THE KERNEL-PREDICTING HEAD (pre-registration section 15)");
+{
+    ok("  two heads; the kernel head is the same hidden layers and a 1 x 1 layer to 81 logits -- a 9 x 9 window, 7,329 parameters",
+        HEADS.join() === "residual,kernel" && KERNEL_RADIUS === 4 && KERNEL_TAPS === 81 && JSON.stringify(SHAPE_KERNEL.slice(0, 3)) === JSON.stringify(SHAPE.slice(0, 3)) &&
+        JSON.stringify(SHAPE_KERNEL[3]) === JSON.stringify([16, 81, "none", 1]) && paramCount(makeDenoiser(1, INIT, "kernel")) === 7329);
+    const kn = makeDenoiser(2, INIT, "kernel");
+    ok("  a network's head is read from its output width, so a clone keeps it", headOf(kn) === "kernel" && headOf(cloneNet(kn)) === "kernel" && headOf(makeDenoiser(2)) === "residual");
+    // zero-last: every logit 0, so the weights are uniform over the taps INSIDE the image -- the 9 x 9 box mean
+    const H = 11, W = 12, im = synth(W, H, 5), { y, w } = denoise(kn, im.x, H, W);
+    const boxAt = (px, py) => { const out = [0, 0, 0]; let n = 0;
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= W || qy >= H) continue;
+            n++; for (let c = 0; c < 3; c++) out[c] += im.x[(qy * W + qx) * CHANNELS + c]; }
+        return out.map((v, c) => v / n * Math.max(im.x[(py * W + px) * CHANNELS + 3 + c], 0.01)); };
+    let worst = 0; for (const [px, py] of [[5, 5], [0, 0], [11, 10], [2, 9]]) { const b = boxAt(px, py); for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(y[(py * W + px) * 3 + c] - b[c])); }
+    ok("!! an untrained kernel head is the 9 x 9 box mean of the noisy irradiance -- over the 81 taps inside, and over the 25 at a corner -- re-modulated by the pixel's albedo",
+        worst < 1e-12, `worst ${worst.toExponential(1)} at the centre and three edge pixels`);
+    let wmin = Infinity, dev = 0;
+    const he = makeDenoiser(6, "he", "kernel"), hw = denoise(he, im.x, H, W).w;
+    for (let p = 0; p < H * W; p++) { let sum = 0; for (let t = 0; t < 81; t++) { sum += hw[p * 81 + t]; wmin = Math.min(wmin, hw[p * 81 + t]); } dev = Math.max(dev, Math.abs(sum - 1)); }
+    ok("  with random logits the weights are a distribution at every pixel: none negative, each pixel's summing to 1", wmin >= 0 && dev < 1e-12, `min ${wmin.toExponential(1)}, worst sum error ${dev.toExponential(1)}`);
+    // one logit far above the rest: the output is that one tap's irradiance
+    const one = makeDenoiser(2, INIT, "kernel"), t = (-1 + 4) * 9 + (2 + 4); one.layers[3].b[t] = 60;
+    const yo = denoise(one, im.x, H, W).y, p0 = 5 * W + 5, q0 = 4 * W + 7;
+    ok("  a logit 60 above the rest copies its tap: the pixel (5, 5) takes the irradiance at (7, 4)",
+        [0, 1, 2].every((c) => Math.abs(yo[p0 * 3 + c] - im.x[q0 * CHANNELS + c] * Math.max(im.x[p0 * CHANNELS + 3 + c], 0.01)) < 1e-12));
+    // the gradient through the weighted sum and the softmax, against central differences
+    const g = makeDenoiser(3, "he", "kernel"), sm = synth(8, 7, 2), Lg = lossAndGrads(g, sm.x, sm.ref, 7, 8), h = 1e-6; let wr = 0, n = 0;
+    for (const [li, idxs] of [[0, [0, 50, 1000]], [2, [5, 2000]], [3, [0, 100, 777, 1295]]]) for (const i of idxs) {
+        const Wt = g.layers[li].W, o = Wt[i]; Wt[i] = o + h; const a = lossAndGrads(g, sm.x, sm.ref, 7, 8).loss; Wt[i] = o - h; const b = lossAndGrads(g, sm.x, sm.ref, 7, 8).loss; Wt[i] = o;
+        const fd = (a - b) / (2 * h); wr = Math.max(wr, Math.abs(fd - Lg.grads[li].dW[i]) / Math.max(1e-6, Math.abs(fd))); n++; }
+    for (const i of [0, 40, 80]) { const B = g.layers[3].b, o = B[i]; B[i] = o + h; const a = lossAndGrads(g, sm.x, sm.ref, 7, 8).loss; B[i] = o - h; const b = lossAndGrads(g, sm.x, sm.ref, 7, 8).loss; B[i] = o;
+        const fd = (a - b) / (2 * h); wr = Math.max(wr, Math.abs(fd - Lg.grads[3].db[i]) / Math.max(1e-6, Math.abs(fd))); n++; }
+    ok(`!! the gradient through the softmax, the weighted sum and all four layers, against central differences: worst relative ${wr.toExponential(2)} over ${n}`, wr < 1e-4);
+    const tr = [0, 1].map((k) => synth(16, 16, k)), held = synth(16, 16, 7);
+    const KR = trainDenoiser(tr, { seed: 5, head: "kernel", steps: 15, batch: 2, crop: 12 });
+    const before = relMSE(denoise(makeDenoiser(5, INIT, "kernel"), held.x, 16, 16).y, held.ref), after = relMSE(denoise(KR.net, held.x, 16, 16).y, held.ref);
+    ok("  it trains: 15 steps on synthetic images lower its error on one it never saw, from where the box started", after < before, `${before.toFixed(4)} -> ${after.toFixed(4)}`);
+    let threw = null; try { makeDenoiser(1, INIT, "unet"); } catch (e) { threw = e.message; }
+    ok("  a head that is neither is refused by name", /not one of residual, kernel/.test(threw || ""), threw);
+}
+
+console.log("\n7. THE TEMPORAL ROUND'S 13-CHANNEL INPUT (pre-registration section 17)");
+{
+    ok("  shapeFor(head, 13): the first layer takes 13 channels and every other layer is unchanged; 9 gives the shape itself",
+        shapeFor("kernel", 9) === SHAPE_KERNEL && shapeFor("residual", 9) === SHAPE && shapeFor("kernel", 13)[0][0] === 13 &&
+        JSON.stringify(shapeFor("kernel", 13).slice(1)) === JSON.stringify(SHAPE_KERNEL.slice(1)) && paramCount(makeDenoiser(1, INIT, "kernel", 13)) === 7329 + 4 * 16 * 9);
+    const im = synth(10, 9, 4), x13 = new Float64Array(10 * 9 * 13);
+    for (let p = 0; p < 90; p++) { for (let c = 0; c < 9; c++) x13[p * 13 + c] = im.x[p * 9 + c]; for (let c = 9; c < 13; c++) x13[p * 13 + c] = p + c / 10; }
+    const C = cropAt(x13, im.ref, 10, 2, 3, 4);
+    ok("  cropAt keeps all 13 channels at their stride", C.x.length === 4 * 4 * 13 && C.x[(1 * 4 + 2) * 13 + 11] === x13[((3 + 1) * 10 + (2 + 2)) * 13 + 11] && C.x[5 * 13 + 3] === x13[(4 * 10 + 3) * 13 + 3]);
+    const y9 = denoise(makeDenoiser(3, INIT, "kernel"), im.x, 9, 10).y, y13 = denoise(makeDenoiser(3, INIT, "kernel", 13), x13, 9, 10).y;
+    ok("!! an untrained kernel head blends the same first three channels whatever the stride: 13 channels and 9 give one image, bit for bit", y9.every((v, i) => Object.is(v, y13[i])));
+    const tr = [0, 1].map((k) => { const a = synth(14, 14, k), x = new Float64Array(14 * 14 * 13); for (let p = 0; p < 196; p++) for (let c = 0; c < 9; c++) x[p * 13 + c] = a.x[p * 9 + c]; return { x, ref: a.ref, w: 14, h: 14 }; });
+    const R = trainDenoiser(tr, { seed: 2, head: "kernel", steps: 2, batch: 1, crop: 12 });
+    ok("  the trainer reads the stride from its images and builds a 13-channel first layer", R.net.layers[0].Cin === 13 && R.net.layers[0].W.length === 16 * 9 * 13);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
