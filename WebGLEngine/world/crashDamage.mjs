@@ -78,7 +78,7 @@ export function crashWorld(track, CityGen, opts = {}, slots = ROOMY) {
     const world = miniWorld();
     const { rects, city } = T.trackWorld(track, world, CityGen, opts);
     const state = editState(world, slots); world.editLog = [];   // from here on the world says where it was edited: render/voxelDamage.mjs's syncDirty re-meshes only the chunks an edit can reach
-    return { world, rects, city, state, track, colliders: null, phys: null, parked: new Set(), impacts: [] };
+    return { world, rects, city, state, track, colliders: null, phys: null, parked: new Set(), impacts: [], debris: null };   // debris: a VoxelDebrisSystem a page may hang here, burst by every blast (crashInto and shellInto read it)
 }
 
 /** The buildings' static boxes in the physics world, remembered on `g` so a collapse can park the right one. */
@@ -143,7 +143,7 @@ export function crashInto(g, i, pre, post, dv, ctx = {}, at = post.pos) {
     const b = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5), hpBefore = b ? b.hp : null, standingBefore = footprint(g.world, rect).solid;
     // charged from the first building layer (groundY + 1): a first draft passed groundY itself, and the floor voxels UNDER the
     // building -- laid by trackWorld, not the building's own -- were charged to it, eleven hit points the footprint never held
-    const blast = blastAt(g.state, { debris: ctx.debris || null, city: g.city, groundY: CRASH.groundY + 1 }, point, radius);
+    const blast = blastAt(g.state, { debris: ctx.debris || g.debris || null, city: g.city, groundY: CRASH.groundY + 1 }, point, radius);
     const charged = blast.buildings.find((row) => row.building === b) || null;
     let crumbled = 0, collapsed = false;
     if (b && b.state !== "toppled") {
@@ -174,7 +174,7 @@ export function crashInto(g, i, pre, post, dv, ctx = {}, at = post.pos) {
 export function shellInto(g, i, point, radius, dir, ctx = {}) {
     const rect = g.rects[i];
     const b = g.city.buildingAt(rect.x + 0.5, rect.z + 0.5), hpBefore = b ? b.hp : null, standingBefore = footprint(g.world, rect).solid;
-    const blast = blastAt(g.state, { debris: ctx.debris || null, city: g.city, groundY: CRASH.groundY + 1 }, point, radius);
+    const blast = blastAt(g.state, { debris: ctx.debris || g.debris || null, city: g.city, groundY: CRASH.groundY + 1 }, point, radius);
     const charged = blast.buildings.find((row) => row.building === b) || null;
     let crumbled = 0, collapsed = false;
     if (b && b.state !== "toppled") {
@@ -324,6 +324,25 @@ export function worldFleet(state, { light = SUN } = {}) {
         name: "world", mesh: wu.mesh, pipeline: litPipelineDesc({ cull: "none" }), bind: litBind(light), records: wu.record, extras: new Float32Array(4),
         install(scene) { const f = scene.fleets.find((q) => q.name === "world"); if (!f) throw new Error("crashDamage.worldFleet: the scene has no fleet named world"); wu.install(f.vbuf); },
     };
+}
+
+/**
+ * v4681 -- the debris a carve bursts, as a kitScene extra fleet (race-brain.html): render/voxelDamage.mjs's debrisRecords() and
+ * debrisLitPipelineDesc() (the cubes, the colour of the voxel each came from in the extras), `cap` records all parked until
+ * placeDebris() writes the live particles over them each frame. Visual only: the particles are a VoxelDebrisSystem hung on the city as
+ * `g.debris` (shellInto and crashInto both read it), they never reach cityHash or a physics body, and Math.random is in their burst, so
+ * two runs of one race draw different cubes and play one race.
+ */
+export function debrisFleet({ light = SUN, cap = DAMAGE.debrisCap } = {}) {
+    const parked = debrisRecords({ getInstanceData: () => ({ count: 0, data: [] }) }, cap);
+    return { name: "debris", mesh: boxMesh([1, 1, 1, 1]), pipeline: debrisLitPipelineDesc(), bind: litBind(light), records: parked.records, extras: parked.extras };
+}
+
+/** this frame's particles into a dynamic kit scene, `base` = the record index of the fleet's first cube; the number of live ones */
+export function placeDebris(scene, base, debris, cap = DAMAGE.debrisCap) {
+    const d = debrisRecords(debris, cap);
+    scene.kitRecords.set(d.records, base * 4); scene.kitExtras.set(d.extras, base * 4);
+    return d.count;
 }
 
 /** The fleets: the world's slots (record 0), the car in quat mode (record 1), the debris (the rest). state.vbuf is the slots' buffer. */

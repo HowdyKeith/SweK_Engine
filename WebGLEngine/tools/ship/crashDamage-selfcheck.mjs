@@ -70,6 +70,9 @@
 //      equivalent mutation (extra chunks re-meshed, still correct), so only a row on the log itself catches it -- it is a cost, not a defect
 //      of the picture, and a shell would re-mesh every earlier shell's chunks again.
 //   Q  crashWorld never turns the log on                                             -> 2 red: the corner row and the lone-voxel row.
+//   T  v4681, shellInto reading only ctx.debris and not the city's own g.debris        -> 1 red: "a shell's debris is visual" (0 cubes live after
+//      5 carving shells). The same row holds the other half: the barrage with a debris system removes the same voxels, charges the same hit
+//      points and folds to the same cityHash as the one without -- the cubes are drawn, never simulated.
 //
 // Run: node tools/ship/crashDamage-selfcheck.mjs      (~9 s: five cities, three rams, two browsers)
 "use strict";
@@ -80,7 +83,7 @@ import * as D from "../../world/crashDamage.mjs";
 import * as VD from "../../render/voxelDamage.mjs";
 import * as T from "../../world/raceTrack.mjs";
 import * as C from "../../physics/raceCar.mjs";
-import { CityGen } from "../../world/CityGen.js";
+import { CityGen, cityHash } from "../../world/CityGen.js";
 import { VoxelDebrisSystem } from "../../world/voxelDebrisSystem.js";
 import { packSlots, FLOATS } from "../../render/voxelDeviceEdit.mjs";
 import { rebarDistance } from "../../render/rebar.mjs";
@@ -277,6 +280,13 @@ sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FO
     const gn = makeWith(D.ROOMY); gn.world.editLog = null; gn.world.setVoxel(corner[0] + 5, 0, corner[1] + 5, 0);   // a floor voxel, so the write changes something and the chunk is dirty
     const oldRule = VD.syncDirty(gn.state);
     ok("...and a world with no edit log still re-meshes every dirty chunk's eight neighbours (the rule it always had)", oldRule.chunks.length === 9, `${oldRule.chunks.length} chunks`);
+    // THE DEBRIS OF A SHELL IS VISUAL (v4681): race-brain.html hangs a VoxelDebrisSystem on the city and draws its cubes; the barrage does not
+    // know. The same shells with and without it remove the same voxels and charge the same hit points (cityHash folds hp alone), and the cubes burst.
+    const gd0 = makeWith(D.ROOMY), gd1 = makeWith(D.ROOMY); gd1.debris = new VoxelDebrisSystem();
+    const rd0 = D.barrage(gd0, 12, { shells: 6, from: [0, 0] }), rd1 = D.barrage(gd1, 12, { shells: 6, from: [0, 0] }), fold = (h, v) => Math.imul(h ^ v, 16777619) >>> 0;
+    ok("*** a shell's debris is visual: a city with a debris system bursts cubes, and the same barrage removes the same voxels and charges the same hit points as one without ***",
+        gd1.debris.particles.length > 0 && gd1.debris.particles.length <= 400 && gd0.debris === null && rd0.every((q, k) => q.removed === rd1[k].removed && q.hp === rd1[k].hp && q.lost === rd1[k].lost) && cityHash(0x811c9dc5, gd0.city, fold) === cityHash(0x811c9dc5, gd1.city, fold),
+        `${gd1.debris.particles.length} cubes live after ${rd1.filter((q) => q.removed > 0).length} carving shells (cap 400); city hash ${cityHash(0x811c9dc5, gd1.city, fold).toString(16)} both ways`);
     ok("  barrage is deterministic: the same shells at the same building carve the same voxels", (() => { const a = makeWith(D.ROOMY), b = makeWith(D.ROOMY); const ra = D.barrage(a, 12, { shells: 8 }), rb = D.barrage(b, 12, { shells: 8 }); return ra.every((q, k) => q.removed === rb[k].removed && q.lost === rb[k].lost && q.hp === rb[k].hp); })());
 }
 

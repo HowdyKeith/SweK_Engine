@@ -16,7 +16,9 @@
 // the repack draws it, an edit after the rebuild still reaches the picture -- and on the live page, on BOTH backends (WebGPU through
 // ?offscreen=1, race-brain.html's hook for a device that never presents; the harness loses a presented WebGPU canvas): ?shell=12 lands a
 // barrage with no repack, a repack forced from outside is answered by the PAGE building its scene again, a rebuild under a window
-// readback in flight is not counted against the 3D windows, and each 3D window holds a picture read back on that backend. The two
+// readback in flight is not counted against the 3D windows, each 3D window holds a picture read back on that backend, and the cubes a
+// barrage bursts (render/voxelDamage.mjs's debris, a VoxelDebrisSystem on the city, drawn as the page's debris fleet) are on the picture,
+// placed by the page's own frame loop and aged by its sim ticks. The two
 // backends read the same pixels off the live page (54,363 for the voxels, 1,071 for the edit after the rebuild).
 //
 // SABOTAGE LOG -- v4588, each applied to the file named, the gate run (both harness browsers), the file restored.
@@ -41,6 +43,15 @@
 //      reports it did not run.
 //   S  race-brain.html: refreshViews never putting a window's pixels (putImageData off)   -> 2 red: each backend's "3D car windows each hold a
 //      picture" row (0.000 lit in all four after 20 s).
+//   T  world/crashDamage.mjs: shellInto reading only ctx.debris, not the city's g.debris          -> in crashDamage-selfcheck.mjs, 1 red there.
+//   U  race-brain.html: the frame loop never CD.placeDebris()ing                                   -> 2 red: each backend's "the cubes a shell bursts are
+//      on the PAGE's picture" (0 px apart: the page's own loop never put them in the scene; the particles are alive, the HUD says 400).
+//   V  race-brain.html: the debris system not hung on the city (cityCtx.debris unset)              -> 2 red: the same rows, 0 cubes live after the barrage.
+//   X  race-brain.html: debris.update() never called                                               -> 2 red: each backend's "the cubes AGE" (age 0.0000 s
+//      after 240 animation frames). A first version counted the cubes left a second later and PASSED this sabotage: the pool holds 400, a later
+//      shell's burst evicts the oldest, and a page that never stepped its cubes looked as if it had -- the age of one particle is the measurement.
+//   FINDING, a first draft of the cubes row aimed at the LAST whole building and read 0 px apart: it was 7 x 3 x 5, and 400 cubes inside its own
+//   crater are hidden by the wall around them. The biggest whole building shows them (about 3,000 px).
 //   FINDING, in the page half's first draft: it read the live page's scene back with a camera built OUT HERE and a frame handed to the iframe.
 //   The iframe's frame() takes viewProj and eye through its own realm's typed arrays; a matrix from this realm is not one, so the page kept its
 //   LAST camera -- a car window's -- and every frame the gate read back was a first-person view of a street. An edit that moves 1,071 px read 0,
@@ -207,7 +218,7 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
             const Gd = await import("/render/gpuDriven.mjs"), L = await import("/render/litSphere.mjs"), K = await import("/world/kenneyKit.mjs"), T = await import("/world/raceTrack.mjs");
             const C = await import("/physics/raceCar.mjs"), U = await import("/physics/turret.mjs"), RT = await import("/render/raceTurret.mjs"), V = await import("/render/voxelDevice.mjs");
             const E = await import("/render/voxelDeviceEdit.mjs"), VD = await import("/render/voxelDamage.mjs"), D = await import("/world/crashDamage.mjs");
-            const { CityGen } = await import("/world/CityGen.js");
+            const { CityGen } = await import("/world/CityGen.js"), { VoxelDebrisSystem } = await import("/world/voxelDebrisSystem.js");
             const quietLog = console.log; console.log = (...m) => { if (!/^\\\\[CityGen\\\\]/.test(String(m[0]))) quietLog(...m); };
             const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); };
             const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(p + ": HTTP " + r.status); return r.arrayBuffer(); };
@@ -223,10 +234,10 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 const cv = document.createElement("canvas"); cv.width = a.W; cv.height = a.H;
                 const dev = await requestDevice(cv, { backend, offscreen: backend === "webgpu" });
                 const errs = []; if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 300)));
-                // THE PAGE'S OWN RECIPE (race-brain.html's buildScene): the kit's placements and trucks, then the world fleet, the turrets, the slicks, the pickups
+                // THE PAGE'S OWN RECIPE (race-brain.html's buildScene): the kit's placements and trucks, then the world fleet, the debris, the turrets, the slicks, the pickups
                 const build = (state) => {
-                    const wf = D.worldFleet(state, { light: V.SUN });
-                    const sc = K.kitScene(dev, kit, [...placements, ...trucks], Gd, L, { light: V.SUN, dynamic: true, extraFleets: [wf, ...RT.turretFleets(4, U.TURRET.barrel, L, { light: V.SUN }), ...RT.slickFleets(L, { light: V.SUN }), ...RT.pickupFleets(L, { light: V.SUN })] });
+                    const wf = D.worldFleet(state, { light: V.SUN }), df = D.debrisFleet({ light: V.SUN });
+                    const sc = K.kitScene(dev, kit, [...placements, ...trucks], Gd, L, { light: V.SUN, dynamic: true, extraFleets: [wf, df, ...RT.turretFleets(4, U.TURRET.barrel, L, { light: V.SUN }), ...RT.slickFleets(L, { light: V.SUN }), ...RT.pickupFleets(L, { light: V.SUN })] });
                     wf.install(sc); return sc;
                 };
                 const g = D.crashWorld(track, CityGen, {}, D.ROOMY), rect = g.rects[0], mid = rect.z + rect.d / 2;
@@ -244,7 +255,15 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 for (let x = rect.x - 8; x <= rect.x - 6; x++) for (let z = mid; z <= mid + 2; z++) for (let y = 3; y <= 5; y++) g.world.setVoxel(x, y, z, 2);
                 VD.syncDirty(g.state); const after2 = await shoot(sc), repacksAfter = g.state.rebuilds;
                 fresh = build(E.editState(g.world, D.ROOMY)); const full2 = await shoot(fresh); fresh.destroy(); sc.destroy();
-                out[backend] = { path: sc.path, errs, before, after, full, grown, after2, full2, placed, outgrown, repacks, repacksByShells, clearedByRebuild, repacksAfter, writes: g.state.writes };
+                // THE DEBRIS: a city with a VoxelDebrisSystem on it bursts cubes when a shell carves; the frame with them placed (CD.placeDebris, what
+                // the page does each frame) differs from the same frame with them parked, and the cubes are what differ
+                globalThis.__swekStep = backend + " debris";
+                const gd = D.crashWorld(track, CityGen, {}, D.ROOMY); gd.debris = new VoxelDebrisSystem();
+                const scd = build(gd.state), dBase = placements.length + trucks.length + 1;
+                D.barrage(gd, 0, { shells: 3, from: [rect.x - 20, mid] }); const parkedPx = await shoot(scd);
+                const live = gd.debris.particles.length, placedN = D.placeDebris(scd, dBase, gd.debris), flyingPx = await shoot(scd);
+                gd.debris.particles.length = 0; D.placeDebris(scd, dBase, gd.debris); const clearedPx = await shoot(scd); scd.destroy();
+                out[backend] = { path: sc.path, errs, debris: { live, placedN, parkedPx, flyingPx, clearedPx }, before, after, full, grown, after2, full2, placed, outgrown, repacks, repacksByShells, clearedByRebuild, repacksAfter, writes: g.state.writes };
                 if (backend === "webgpu") { try { dev.destroy(); } catch (e) {} }
             }
             globalThis.__swekStep = "done";
@@ -262,6 +281,9 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 ok(`!! ${bk}: the crater written in place is EXACTLY a fresh pack of the carved world (the picture is the state)`, d.incremental === 0, `${d.incremental} pixels apart`);
                 ok(`!! ${bk}: a chunk that outgrows its slot is flagged, not written -- and the scene built again from the repacked state draws it`, b.outgrown && b.repacks - b.repacksByShells >= 1 && b.clearedByRebuild && d.cloud > 150, `${b.placed} voxels, ${d.cloud} pixels`);
                 ok(`!! ${bk}: an edit AFTER the rebuild still reaches the picture, exactly a fresh pack (the rebuilt scene's world fleet was installed)`, d.edit > 20 && d.twin2 === 0 && b.repacksAfter === b.repacks, `${d.edit} px from the rebuilt frame, ${d.twin2} from a fresh pack`);
+                const dz = b.debris, dpx = { parked: decode(dz.parkedPx), flying: decode(dz.flyingPx), cleared: decode(dz.clearedPx) }, dd = { cubes: apart(dpx.parked, dpx.flying), back: apart(dpx.parked, dpx.cleared) };
+                report(`${bk}: ${dz.live} cubes live after a 3-shell barrage, ${dz.placedN} placed; the frame with them differs from the parked one by ${dd.cubes} px, and clearing them puts it back to ${dd.back} px apart`);
+                ok(`!! ${bk}: the cubes a barrage bursts are on the picture -- the frame with them placed differs from the frame with them parked, and clearing the particles parks them again`, dz.live > 30 && dz.placedN === dz.live && dd.cubes > 100 && dd.back === 0, `${dz.live} cubes, ${dd.cubes} px, ${dd.back} px after clearing`);
             }
         }
 
@@ -270,7 +292,7 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
             // harness loses a presented WebGPU canvas, gfx/device.js Level 11): ?shell=12 puts a barrage on the building nearest
             // the lead car; then a repack is forced from OUTSIDE (isolated voxels, synced), and the page must build its scene again by itself
             const pg = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { qs }, script: `async (a) => {
-                const VD = await import("/render/voxelDamage.mjs"), Gd = await import("/render/gpuDriven.mjs");
+                const VD = await import("/render/voxelDamage.mjs"), Gd = await import("/render/gpuDriven.mjs"), CD = await import("/world/crashDamage.mjs");
                 globalThis.__swekStep = "booting race-brain.html?" + a.qs + "&shell=12 in an iframe";
                 const f = document.createElement("iframe"); f.style.width = "400px"; f.style.height = "300px"; f.src = "/race-brain.html?" + a.qs + "&shell=12"; document.body.appendChild(f);
                 await new Promise((res) => { f.onload = res; });
@@ -286,6 +308,25 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 const litOf = () => rb.views.filter((v) => v.view !== "brain").map((v) => { const d = v.ctx.getImageData(0, 0, v.canvas.width, v.canvas.height).data; let lit = 0; for (let p = 0; p < d.length; p += 4) if (Math.max(d[p], d[p + 1], d[p + 2]) > 60) lit++; return { view: v.view, lit: lit / (d.length / 4) }; });
                 const tw = performance.now(); while (performance.now() - tw < 20000 && !(litOf().length && litOf().every((w) => w.lit > 0.05))) await new Promise((res) => setTimeout(res, 100));
                 out.windows = litOf(); out.windowsMs = performance.now() - tw;
+                // THE CUBES A SHELL BURSTS ARE ON THE PAGE'S PICTURE, put there by the PAGE's own frame loop: a barrage into the BIGGEST whole building (a small one hides the
+                // cubes inside its own crater: the first try, the last building, was 7 x 3 x 5 and read 0 px apart), two animation frames of the page (it places the particles each frame), then a picture of that wall with the
+                // cubes where the page put them and another with the particles cleared and parked -- the cubes are what differ. The page's loop is running.
+                {
+                    const IW0 = f.contentWindow, whole = c.rects.map((q, k) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp ? k : -1; }).filter((k) => k >= 0), i1 = whole.reduce((a, k) => (c.rects[k].w * c.rects[k].d * c.rects[k].h > c.rects[a].w * c.rects[a].d * c.rects[a].h ? k : a), whole[0]), q1 = c.rects[i1], m1 = q1.z + q1.d / 2;
+                    const eye1 = [q1.x - 12, 6, m1 + 5], t1x = rb.device.texture({ width: 256, height: 256, render: true });
+                    const vp1 = { viewProj: IW0.Float32Array.from(Gd.multiply(Gd.perspective(0.9, 1, 0.5, 600), Gd.lookAt(eye1, [q1.x, 3, m1]))), eye: IW0.Array.from(eye1), clear: IW0.Array.from([0.03, 0.05, 0.08, 1]), target: t1x, read: true };
+                    const shot1 = async () => Uint8Array.from((await rb.scene.frame(vp1).pixels).pixels), apart1 = (A, B) => { let n = 0; for (let p = 0; p < A.length; p += 4) if (Math.abs(A[p] - B[p]) > 8 || Math.abs(A[p + 1] - B[p + 1]) > 8 || Math.abs(A[p + 2] - B[p + 2]) > 8) n++; return n; };
+                    out.debrisBefore = rb.debris.particles.length;
+                    CD.barrage(c, i1, { shells: 3, from: [q1.x - 14, m1] });
+                    await new Promise((res) => IW0.requestAnimationFrame(res)); await new Promise((res) => IW0.requestAnimationFrame(res));
+                    out.debrisLive = rb.debris.particles.length;
+                    // a particle's age moves with the page's sim ticks (VoxelDebrisSystem.update): wait for the first tick after the burst. (A count of cubes left after
+                    // a second would not do -- the pool holds 400 and a later shell's burst evicts the oldest, so a page that never stepped them would look right.)
+                    const p0 = rb.debris.particles[0], age0 = p0 ? p0.age : null; for (let k = 0; k < 240 && p0 && p0.age === age0; k++) await new Promise((res) => IW0.requestAnimationFrame(res));
+                    out.debrisAged = p0 ? p0.age - age0 : null; out.debrisHud = /debris flying/.test(txt("racing"));
+                    const pD = await shot1(); rb.debris.particles.length = 0; CD.placeDebris(rb.scene, rb.debrisBase, rb.debris); const pN = await shot1(), pN2 = await shot1();
+                    out.debrisApart = apart1(pD, pN); out.debrisNoise = apart1(pN, pN2); out.debrisBuilding = i1;
+                }
                 const i = c.rects.findIndex((q) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp; }), r0 = c.rects[i], mid = r0.z + r0.d / 2;
                 // THE CAMERA IS BUILT IN THE IFRAME'S OWN REALM: its frame() reads viewProj and eye through instanceof/typed-array checks, and a
                 // matrix made out here is another realm's Float32Array -- the page quietly kept its last camera (a car window's) and every
@@ -320,6 +361,9 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 const q = pg.result;
                 report(bk + ": the 3D car windows (lit fraction, after " + q.windowsMs.toFixed(0) + " ms) " + q.windows.map((w) => w.view + " " + w.lit.toFixed(3)).join(", "));
                 ok(bk + " -- the page's 3D car windows each hold a picture of its scene (more than a twentieth lit), read back on this backend", q.windows.length >= 2 && q.windows.every((w) => w.lit > 0.05), q.windows.map((w) => w.lit.toFixed(3)).join(" ") + ` after ${q.windowsMs.toFixed(0)} ms`);
+                report(`${bk}: the page's cubes -- ${q.debrisBefore} live before, ${q.debrisLive} after a 3-shell barrage into building ${q.debrisBuilding}, the HUD says so: ${q.debrisHud}; the wall's picture with them vs without: ${q.debrisApart} px apart (noise ${q.debrisNoise})`);
+                ok(bk + " -- the cubes AGE on the page: a particle's age moves with the race's own sim ticks (the page steps its debris), by a tick or two and no more", q.debrisAged > 0 && q.debrisAged < 0.2, `${q.debrisAged == null ? "no particle" : q.debrisAged.toFixed(4) + " s"} after the first tick`);
+                ok(bk + " -- the cubes a shell bursts are on the PAGE's picture: its own frame loop placed them, and the wall looks different with them than with the particles parked", q.debrisLive > 30 && q.debrisApart > 300 && q.debrisNoise < 100, `${q.debrisLive} cubes, ${q.debrisApart} px apart, noise ${q.debrisNoise}`);
                 report(`${bk}: the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
                 ok(bk + " -- !! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1 + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);
                 ok(bk + " -- ...and a rebuild under a window readback in flight is NOT counted as a failed readback: the 3D windows stay on (no 'view windows off' note) after the old scene's reads were made to fail", q.pending >= 1 && !/view windows off/.test(q.viewsNote || ""), `${q.pending} readback(s) pending at the rebuild; note: "${(q.viewsNote || "").slice(0, 80)}"`);
