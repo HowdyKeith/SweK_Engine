@@ -8118,6 +8118,64 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, the re-run's amendment -- C0, THE ZERO-LAST INIT AND NEW TEST SCENES, BEFORE ANY OF THEM EXIST.
+    since483: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
+        at: "the denoiser arc, re-run amendment (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R2: new test seeds, refused, C5 over both rounds)",
+                                "render/denoiseStats-selfcheck.mjs (C0: trainFit and the verdict that stops on it)",
+                                "render/denoiseNet-selfcheck.mjs (the zero-last init: round 1's draws, an identity at step 0)",
+                                "render/denoiseStudy-selfcheck.mjs (C0 stops the run before a test scene is rendered)"]),
+        verdict: "*** A FAILED FIT CANNOT SPEND A TEST SET AGAIN. *** The harvest (section 12) came back not reported: " +
+                 "control C1 fired because every network stayed the identity, and the diagnosis, on the training split " +
+                 "only, traced it to the He-initialised last layer of the residual (1.00x the noisy error at three " +
+                 "learning rates; 0.18x with that layer started at zero). Section 13 amends three things before the " +
+                 "re-run renders anything: the last layer starts at zero from the same draws, control C0 checks the " +
+                 "training fit (<= 0.8x for every seed) and STOPS the run before the test scenes are rendered -- the " +
+                 "gate proves it by putting the real re-run test seeds behind the stop with harvest off -- and T1/T2 " +
+                 "come from 5000 and 6000, ranges nothing has touched. A harvest's results file is never overwritten. " +
+                 "10 sabotages, all red; S8 crashed the gate until its row caught the throw.",
+    }),
+    // the denoiser arc, round 2 -- THE PRE-REGISTERED STUDY AS CODE, BEFORE ANY DATA.
+    since482: Object.freeze({
+        at: "the denoiser arc, round 2 (unshipped)", swept: 6, green: 6, red: 0,
+        added: Object.freeze(["render/denoiseScenes-selfcheck.mjs", "render/denoiseFilter-selfcheck.mjs", "render/denoiseStats-selfcheck.mjs",
+                              "brain/convNet-selfcheck.mjs", "render/denoiseNet-selfcheck.mjs", "render/denoiseStudy-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the backward pass reads relu's mask from a kept forward output -- same gradients, bit for bit)"]),
+        verdict: "*** EVERYTHING THE MEASUREMENT NEEDS, AND NOT ONE DATASET IMAGE. *** render/learned-denoiser-preregistration.md " +
+                 "sections 3-8 as code, each gated on synthetic data only: the two scene families on disjoint seed ranges " +
+                 "with first-hit guides and the demodulated 9-channel input; the joint bilateral filter and its train-only " +
+                 "grid tuner; a generic conv stack with seeded He init, backward to finite differences (5.6e-9) and Adam to " +
+                 "the textbook update; the pre-registered 6,387-parameter residual network, its relMSE gradient to 1.9e-7, " +
+                 "and ONE SEED TWICE IS ONE NETWORK, bit for bit -- the v4698 defect, planted as Math.random batch order, " +
+                 "goes red; the exact sign test, Holm and every verdict the controls can return, planted; and the whole " +
+                 "study as one pipeline, run end to end on a miniature seeded outside the splits. renderImages() REFUSES " +
+                 "every dataset seed without { harvest: true }, and the runner on the real splits is refused at its first " +
+                 "scene. 19 sabotages, all red; one (remodulate without the floor) only after a row was written for it. " +
+                 "Section 11 of the pre-registration closes ten gaps the code found, before any data.",
+    }),
+    // the denoiser arc, round 1 -- A CONVOLUTION LAYER, CPU AND DEVICE: brain/conv2d.mjs. (since480 is the splat-collision
+    // round's, on its own open branch; this slot is numbered past it so the two cannot collide when both land.)
+    since481: Object.freeze({
+        at: "the denoiser arc, round 1 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["brain/conv2d-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** THE TREE HAD NO CONVOLUTION, AND A DENOISER IS MADE OF NOTHING ELSE. *** brain/conv2d.mjs is a 2-D " +
+                 "convolution layer, channels last as the path tracer returns a frame: an f64 reference forward and " +
+                 "backward pass (held to central finite differences, worst 5e-10 over 573 parameters, with and without " +
+                 "relu), the f32 twin in the kernels' own order, the fused mirror, and two WGSL kernels -- direct, and " +
+                 "tiled through workgroup memory -- every cell the twin's on Dawn and byte-identical across backends. A " +
+                 "1x1 convolution is bit-identical to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so " +
+                 "no separate tiled matmul was built. The input channels are summed in blocks of 8 everywhere because " +
+                 "SwiftShader's pipeline build took 3,149 ms for an all-channels tile and 324 for an 8-channel one -- " +
+                 "measured, and the order made one order in every copy. 9 sabotages, all red; the missing barrier was " +
+                 "expected to hide on a serial device and was caught BECAUSE the device is serial. Committed with " +
+                 "render/learned-denoiser-preregistration.md, written before any dataset image, network or error exists.",
+    }),
     // the splat-collision round -- A SPLAT SCENE AS A VOXEL WORLD THE WALKER STANDS IN: world/splatVoxelWorld.mjs.
     since480: Object.freeze({
         at: "the splat-collision round (unshipped)", swept: 1, green: 1, red: 0,

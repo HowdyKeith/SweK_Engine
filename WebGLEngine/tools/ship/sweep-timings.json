@@ -2059,7 +2059,14 @@
   "camera/cameraBoom-selfcheck.mjs": 445,
   "render/temporalLockSums-selfcheck.mjs": 1340,
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
+  "brain/conv2d-selfcheck.mjs": 2161,
+  "render/denoiseScenes-selfcheck.mjs": 131,
+  "render/denoiseFilter-selfcheck.mjs": 265,
+  "render/denoiseStats-selfcheck.mjs": 46,
+  "brain/convNet-selfcheck.mjs": 133,
+  "render/denoiseNet-selfcheck.mjs": 1893,
+  "render/denoiseStudy-selfcheck.mjs": 985
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -3994,7 +4001,14 @@
   "camera/cameraBoom-selfcheck.mjs": 0,
   "render/temporalLockSums-selfcheck.mjs": 0,
   "render/temporalLockSumsTsl-selfcheck.mjs": 0,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": 0
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": 0,
+  "brain/conv2d-selfcheck.mjs": 0,
+  "render/denoiseScenes-selfcheck.mjs": 0,
+  "render/denoiseFilter-selfcheck.mjs": 0,
+  "render/denoiseStats-selfcheck.mjs": 0,
+  "brain/convNet-selfcheck.mjs": 0,
+  "render/denoiseNet-selfcheck.mjs": 0,
+  "render/denoiseStudy-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
@@ -5929,7 +5943,14 @@
   "camera/cameraBoom-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:43.172Z"
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
+  "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-07T21:53:07.966Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-07T21:53:08.392Z",
+  "render/denoiseStats-selfcheck.mjs": "2026-10-07T21:53:08.623Z",
+  "brain/convNet-selfcheck.mjs": "2026-10-07T21:53:08.911Z",
+  "render/denoiseNet-selfcheck.mjs": "2026-10-07T21:53:10.957Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-07T21:53:12.157Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7837,7 +7858,14 @@
   "camera/cameraBoom-selfcheck.mjs": 20000,
   "render/temporalLockSums-selfcheck.mjs": 20000,
   "render/temporalLockSumsTsl-selfcheck.mjs": 90000,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": 20000
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": 20000,
+  "brain/conv2d-selfcheck.mjs": 20000,
+  "render/denoiseScenes-selfcheck.mjs": 20000,
+  "render/denoiseFilter-selfcheck.mjs": 20000,
+  "render/denoiseStats-selfcheck.mjs": 20000,
+  "brain/convNet-selfcheck.mjs": 20000,
+  "render/denoiseNet-selfcheck.mjs": 20000,
+  "render/denoiseStudy-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9766,7 +9794,14 @@
   "camera/cameraBoom-selfcheck.mjs": true,
   "render/temporalLockSums-selfcheck.mjs": true,
   "render/temporalLockSumsTsl-selfcheck.mjs": true,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": true
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": true,
+  "brain/conv2d-selfcheck.mjs": true,
+  "render/denoiseScenes-selfcheck.mjs": true,
+  "render/denoiseFilter-selfcheck.mjs": true,
+  "render/denoiseStats-selfcheck.mjs": true,
+  "brain/convNet-selfcheck.mjs": true,
+  "render/denoiseNet-selfcheck.mjs": true,
+  "render/denoiseStudy-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11781,7 +11816,14 @@
   "camera/cameraBoom-selfcheck.mjs": 342,
   "render/temporalLockSums-selfcheck.mjs": 1340,
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
+  "brain/conv2d-selfcheck.mjs": 2161,
+  "render/denoiseScenes-selfcheck.mjs": 131,
+  "render/denoiseFilter-selfcheck.mjs": 265,
+  "render/denoiseStats-selfcheck.mjs": 46,
+  "brain/convNet-selfcheck.mjs": 133,
+  "render/denoiseNet-selfcheck.mjs": 1893,
+  "render/denoiseStudy-selfcheck.mjs": 985
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T13:02:00.256Z",
@@ -13605,7 +13647,14 @@
   "camera/cameraBoom-selfcheck.mjs": "2026-10-06T14:46:06.708Z",
   "render/temporalLockSums-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:28.157Z"
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
+  "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-07T21:53:07.966Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-07T21:53:08.392Z",
+  "render/denoiseStats-selfcheck.mjs": "2026-10-07T21:53:08.623Z",
+  "brain/convNet-selfcheck.mjs": "2026-10-07T21:53:08.911Z",
+  "render/denoiseNet-selfcheck.mjs": "2026-10-07T21:53:10.957Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-07T21:53:12.157Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -21689,6 +21738,27 @@
    1615,
    1378,
    1461
+  ],
+  "brain/conv2d-selfcheck.mjs": [
+   2161
+  ],
+  "render/denoiseScenes-selfcheck.mjs": [
+   131
+  ],
+  "render/denoiseFilter-selfcheck.mjs": [
+   265
+  ],
+  "render/denoiseStats-selfcheck.mjs": [
+   46
+  ],
+  "brain/convNet-selfcheck.mjs": [
+   133
+  ],
+  "render/denoiseNet-selfcheck.mjs": [
+   1893
+  ],
+  "render/denoiseStudy-selfcheck.mjs": [
+   985
   ]
  },
  "contended": {
@@ -23513,7 +23583,14 @@
   "camera/cameraBoom-selfcheck.mjs": true,
   "render/temporalLockSums-selfcheck.mjs": false,
   "render/temporalLockSumsTsl-selfcheck.mjs": false,
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": false
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": false,
+  "brain/conv2d-selfcheck.mjs": false,
+  "render/denoiseScenes-selfcheck.mjs": false,
+  "render/denoiseFilter-selfcheck.mjs": false,
+  "render/denoiseStats-selfcheck.mjs": false,
+  "brain/convNet-selfcheck.mjs": false,
+  "render/denoiseNet-selfcheck.mjs": false,
+  "render/denoiseStudy-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -25448,6 +25525,13 @@
   "camera/cameraBoom-selfcheck.mjs": "loaded",
   "render/temporalLockSums-selfcheck.mjs": "alone",
   "render/temporalLockSumsTsl-selfcheck.mjs": "alone",
-  "tools/ship/splatVoxelWorld-selfcheck.mjs": "alone"
+  "tools/ship/splatVoxelWorld-selfcheck.mjs": "alone",
+  "brain/conv2d-selfcheck.mjs": "alone",
+  "render/denoiseScenes-selfcheck.mjs": "alone",
+  "render/denoiseFilter-selfcheck.mjs": "alone",
+  "render/denoiseStats-selfcheck.mjs": "alone",
+  "brain/convNet-selfcheck.mjs": "alone",
+  "render/denoiseNet-selfcheck.mjs": "alone",
+  "render/denoiseStudy-selfcheck.mjs": "alone"
  }
 }

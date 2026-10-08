@@ -342,10 +342,13 @@ export const PARITY_BASELINE = Object.freeze({
     // which ships its GLSL and WGSL texts as exports so the three languages cannot drift apart by being
     // edited separately. It is WGSL-BEARING WITHOUT BEING A PAIR: it carries both shader texts but is not a
     // shader module, which is why wgslOnly moves with it and `both` does not.
-    wgslBearing: 108,
+    // the denoiser arc, round 1: +1, brain/conv2d.mjs -- a SHIPPING compute module, WGSL and no GLSL by construction (a
+    // convolution layer is a compute dispatch, and a compute pass has no WebGL2 half; its twin is JavaScript, conv2dCpu in
+    // the same file). pathTracerGpu's and rtPipeline's shape. The same file is why wgslOnly moves too; nothing else changed.
+    wgslBearing: 109,
     both: 24,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
     glslOnly: 138,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above)
-    wgslOnly: 84,
+    wgslOnly: 85,        // the denoiser arc, round 1: +1, brain/conv2d.mjs (see wgslBearing)
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs"]),

@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-07T12:49:00.811Z",
+ "at": "2026-10-07T21:53:12.157Z",
  "poolAt": "2026-10-07T12:49:00.811Z",
  "poolHorizon": "2026-10-06T00:11:15.681Z",
  "budgetMs": 3000,
- "lastRun": 40,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -76,6 +76,18 @@
    "code": 0,
    "priorMs": 5733,
    "at": "2026-10-07T00:45:34.954Z"
+  },
+  {
+   "gate": "brain/conv2d-selfcheck.mjs",
+   "ms": 2161,
+   "code": 0,
+   "at": "2026-10-07T21:53:07.672Z"
+  },
+  {
+   "gate": "brain/convNet-selfcheck.mjs",
+   "ms": 133,
+   "code": 0,
+   "at": "2026-10-07T21:53:08.911Z"
   },
   {
    "gate": "brain/gunnerPolicy-selfcheck.mjs",
@@ -1160,6 +1172,36 @@
    "code": 0,
    "priorMs": 20461,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "render/denoiseFilter-selfcheck.mjs",
+   "ms": 265,
+   "code": 0,
+   "at": "2026-10-07T21:53:08.392Z"
+  },
+  {
+   "gate": "render/denoiseNet-selfcheck.mjs",
+   "ms": 1893,
+   "code": 0,
+   "at": "2026-10-07T21:53:10.957Z"
+  },
+  {
+   "gate": "render/denoiseScenes-selfcheck.mjs",
+   "ms": 131,
+   "code": 0,
+   "at": "2026-10-07T21:53:07.966Z"
+  },
+  {
+   "gate": "render/denoiseStats-selfcheck.mjs",
+   "ms": 46,
+   "code": 0,
+   "at": "2026-10-07T21:53:08.623Z"
+  },
+  {
+   "gate": "render/denoiseStudy-selfcheck.mjs",
+   "ms": 985,
+   "code": 0,
+   "at": "2026-10-07T21:53:12.157Z"
   },
   {
    "gate": "render/flowCost-selfcheck.mjs",
