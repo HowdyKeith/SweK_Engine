@@ -596,7 +596,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, round 2 -- 4597 -> 4610: six modules, six gates, tools/denoiseStudy.mjs.
     // the denoiser arc, round 4 -- 4610 -> 4612 for render/denoiseTemporal.mjs and its gate.
     // the denoiser arc, round 6 -- 4612 -> 4614 for render/denoiseMask.mjs and its gate.
-    files: 4614,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the denoiser arc, round 7 -- 4614 -> 4616 for render/denoiseCache.mjs and its gate.
+    files: 4616,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1141,7 +1142,10 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, round 6 -- render/denoiseMask.mjs and its gate: files 4612 -> 4614, ES modules 4307 -> 4309,
     // closures 4156 -> 4158, async/await 1724 -> 1725 (the gate awaits its imports), typed arrays 1282 -> 1284 (the
     // coverage and the masked input); nothing else moved.
-    esModules: 4309, closures: 4158, asyncAwait: 1725, typedArrays: 1284, promises: 405,
+    // the denoiser arc, round 7 -- render/denoiseCache.mjs and its gate: files 4614 -> 4616, ES modules 4309 -> 4311,
+    // closures 4158 -> 4160, async/await 1725 -> 1726 (the gate awaits its imports), typed arrays 1284 -> 1286 (the
+    // records' arrays and the key's words); nothing else moved.
+    esModules: 4311, closures: 4160, asyncAwait: 1726, typedArrays: 1286, promises: 405,
     fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 56, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

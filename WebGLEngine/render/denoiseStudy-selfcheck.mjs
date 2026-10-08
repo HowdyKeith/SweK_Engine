@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, MINI, shuffledTargets, stopBeforeTests, renderSplit,
 // runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
@@ -22,15 +22,16 @@
 //   R10 the other-training networks trained on the primary training set          1 RED
 //   R11 ROUND5 without its other-training comparison                             1 RED
 //   R12 ROUND6 without the mask                                                  1 RED
+//   R13 ROUND7 without its A+B comparison                                        1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, MINI, shuffledTargets, stopBeforeTests,
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, MINI, shuffledTargets, stopBeforeTests,
         renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
 const { trainFit, historyFit } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
@@ -150,7 +151,14 @@ console.log("\n7. THE EMITTER-MASK ROUND'S CONFIGURATION (pre-registration secti
         ROUND6.init === "zero-last" && ROUND6.c0 === true && RESULTS_R6 === "render/denoise-results-r6.json" && SPLITS_R6.train === SPLITS_R5.train);
 }
 
+console.log("\n8. THE RANDOMIZED ROUND'S CONFIGURATION (pre-registration section 23)");
+{
+    ok("!! ROUND7 is section 23's: the 96-scene randomized training split, H2 on family C, round 6's masked kernel network, round 5/6's A+B training as the comparison",
+        ROUND7.splits === SPLITS_R7 && SPLITS_R7.train.seeds.length === 96 && SPLITS_R7.T2.family === "C" && ROUND7.emitterMask === true && ROUND7.head === "kernel" &&
+        ROUND7.temporal === false && ROUND7.init === "zero-last" && ROUND7.c0 === true && ROUND7.compareTrainSplit === SPLITS_R5.train && RESULTS_R7 === "render/denoise-results-r7.json");
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r6` is the emitter-mask round's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r7` is the randomized round's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

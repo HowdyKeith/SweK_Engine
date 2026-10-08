@@ -15,6 +15,7 @@
 //   M3  maskChannelOf finds a mask in every input of nine channels or more       3 RED
 //   M4  the coverage counts the sky as emitter too                               2 RED
 //   M7  the coverage taken from the centre ray alone (a 0/1 mask)                2 RED
+//   M8  the comparison training split rendered WITHOUT the mask (round 7's fix)  2 RED (0 until denoise() refused an input of another width: read at the wrong stride, the errors were finite)
 //   M5  withMask writes the mask over the normal's z                             4 RED
 //   M6  the no-mask networks trained on the masked inputs                        1 RED
 "use strict";
@@ -141,12 +142,16 @@ console.log("\n6. THE MASKED PIPELINE, ON A MINIATURE");
     ok("  a masked split carries the 10-channel input, its mask the emission guide, and the 9-channel input beside it",
         r.every((im) => im.x.length === 64 * 10 && im.x9.length === 64 * 9 && [...Array(64).keys()].every((p) => im.x[p * 10 + 9] === im.emission[p] && im.x[p * 10 + 4] === im.x9[p * 9 + 4])));
     let out = null, err = null;
-    try { out = runStudy({ splits: mix, image: 8, sppIn: 4, sppRef: 16, train: { steps: 2, batch: 1, crop: 8 }, secondarySpp: [], c0: false, head: "kernel", emitterMask: true, compareNoMask: true }); }
+    try { out = runStudy({ splits: mix, image: 8, sppIn: 4, sppRef: 16, train: { steps: 2, batch: 1, crop: 8 }, secondarySpp: [], c0: false, head: "kernel", emitterMask: true, compareNoMask: true,
+                           compareTrainSplit: { family: "A", seeds: [910050, 910051] } }); }
     catch (e) { err = e.message; }
     const N1 = out?.secondary["T1@noMask"], N2 = out?.secondary["T2@noMask"];
     ok("!! the no-mask comparison: the filter re-tuned and three networks trained on the 9-channel inputs, on the same test images",
         !!N1 && !!N2 && out.config.emitterMask === true && N1.filter.length === 2 && N1.net.length === 3 && typeof out.secondary.filterNoMask.sS === "number" &&
         [...N1.filter, ...N1.net.flat(), ...N2.filter, ...N2.net.flat()].every((v) => Number.isFinite(v) && v > 0), err);
+    const O1 = out?.secondary["T1@otherTraining"], O2 = out?.secondary["T2@otherTraining"];
+    ok("!! a comparison training split under the mask is rendered WITH it: its filter and networks read the same 10-channel test images and give finite errors",
+        !!O1 && !!O2 && O1.net.length === 3 && [...O1.filter, ...O1.net.flat(), ...O2.filter, ...O2.net.flat()].every((v) => Number.isFinite(v) && v > 0), err);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

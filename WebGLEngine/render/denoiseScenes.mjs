@@ -6,7 +6,7 @@
 // references' seeds distinct by construction (control C5).
 //
 // *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
-// or SPLITS_R2-R6 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// or SPLITS_R2-R7 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -80,9 +80,19 @@ export const SPLITS_R6 = Object.freeze({
     T1: Object.freeze({ family: "A+B", families: Object.freeze([...rep("A", 6), ...rep("B", 6)]), seeds: Object.freeze([...range(16000, 6), ...range(17000, 6)]) }),
     T2: Object.freeze({ family: "C", seeds: range(18000, 12) }),
 });
+/**
+ * The randomized round's splits (pre-registration section 23): 96 training scenes of family R, R for validation and
+ * for H1, and family C again for H2 -- on ranges no earlier split touched.
+ */
+export const SPLITS_R7 = Object.freeze({
+    train: Object.freeze({ family: "R", seeds: range(20000, 96) }),
+    val: Object.freeze({ family: "R", seeds: range(21000, 4) }),
+    T1: Object.freeze({ family: "R", seeds: range(22000, 12) }),
+    T2: Object.freeze({ family: "C", seeds: range(23000, 12) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -95,7 +105,8 @@ export function renderSeeds(seed) { return { input: seed * 8 + 1, ref: seed * 8 
  */
 export function makeScene(family, seed) {
     if (family === "C") return makeSceneC(seed);
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B or C, got " + family);
+    if (family === "R") return makeSceneR(seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C or R, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -153,6 +164,53 @@ function makeSceneC(seed) {
     const ang = U(0, 2 * Math.PI), ringR = U(4, 5);
     const eye = [ringR * Math.cos(ang), U(1, 2), ringR * Math.sin(ang)];
     return { family: "C", seed, scene, sky, skyKind: "dark", lightRadius: null, eye, look: [0, 0.4, 0], up: [0, 1, 0], fovDeg: 40 };
+}
+
+/**
+ * Family R, the randomized generator (pre-registration section 23). Every scene draws its own mix from a broad menu --
+ * and the menu covers families A and B -- but NOTHING that makes family C what it is, so C stays a family no R-trained
+ * method has seen:
+ * - a Lambertian ground, albedo 0.2-0.8 per channel;
+ * - 2-8 spheres of radius 0.15-0.8 resting on the ground within |x|, |z| <= 2, each either Lambertian (albedo 0.05-0.95
+ *   per channel, two in three) or a microfacet CONDUCTOR (roughness 0.05-0.8, tinted F0 0.2-1 per channel, one in three);
+ * - 1-2 WHITE emitters of radius 0.15-0.5 at height 1.5-3.5 within |x|, |z| <= 2, sharing a POWER (radius^2 x
+ *   strength) of 0.4-3 -- the span families A, B and C cover -- each of strength power / radius^2, at most 30. Drawn
+ *   first as 1-3 emitters of strength 3-30, R was four times as bright as A (mean radiance 0.96 against 0.25, on scenes
+ *   outside every split) and its noisy input up to ten times as far from its reference;
+ * - a sky that is a gradient (a 0.02-0.3, b 0.1-0.8), a band (horizon -0.2-0.4, hi 0.2-1, lo 0.02-0.2) or uniform
+ *   (0.1-0.8), a third each;
+ * - the eye on a ring of radius 3.5-5.5 at height 0.7-2.5, looking at (0, 0.4, 0), field of view 40 degrees.
+ * Never drawn: a rough-diffuse (Oren-Nayar) surface, a dielectric (ior), a coloured emitter, a near-black sky.
+ */
+function makeSceneR(seed) {
+    const r = rng(((seed >>> 0) * 2654435761 + 41) >>> 0);
+    const U = (a, b) => a + (b - a) * r();
+    const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.2, 0.8), U(0.2, 0.8), U(0.2, 0.8)] }];
+    const n = 2 + Math.floor(r() * 7), placed = [];
+    for (let tries = 0; placed.length < n && tries < 600; tries++) {
+        const rad = U(0.15, 0.8), x = U(-2, 2), z = U(-2, 2);
+        if (placed.some((p) => Math.hypot(p[0] - x, p[2] - z) < p[3] + rad + 0.05)) continue;
+        placed.push([x, rad, z, rad]);
+        const s = { centre: [x, rad, z], radius: rad };
+        if (r() < 2 / 3) s.albedo = [U(0.05, 0.95), U(0.05, 0.95), U(0.05, 0.95)];
+        else { s.roughness = U(0.05, 0.8); s.F0 = [U(0.2, 1), U(0.2, 1), U(0.2, 1)]; }
+        scene.push(s);
+    }
+    // the light is drawn as POWER (radius^2 x strength), over the span A, B and C cover (about 0.5-3), and split between
+    // one or two emitters; strength = power / radius^2, capped at 30
+    const lights = 1 + Math.floor(r() * 2), power = U(0.4, 3) / lights;
+    for (let i = 0; i < lights; i++) {
+        const rad = U(0.15, 0.5);
+        scene.push({ centre: [U(-2, 2), U(1.5, 3.5), U(-2, 2)], radius: rad, albedo: 0, emit: Math.min(30, power / (rad * rad)) });
+    }
+    let sky, skyKind;
+    const kind = r();
+    if (kind < 1 / 3) { const a = U(0.02, 0.3), b = U(0.1, 0.8); sky = (d) => a + b * 0.5 * (d[1] + 1); skyKind = "gradient"; }
+    else if (kind < 2 / 3) { const h = U(-0.2, 0.4), hi = U(0.2, 1), lo = U(0.02, 0.2); sky = (d) => (d[1] > h ? hi : lo); skyKind = "band"; }
+    else { const k = U(0.1, 0.8); sky = () => k; skyKind = "uniform"; }
+    const ang = U(0, 2 * Math.PI), ringR = U(3.5, 5.5);
+    const eye = [ringR * Math.cos(ang), U(0.7, 2.5), ringR * Math.sin(ang)];
+    return { family: "R", seed, scene, sky, skyKind, lightRadius: null, eye, look: [0, 0.4, 0], up: [0, 1, 0], fovDeg: 40 };
 }
 
 /**

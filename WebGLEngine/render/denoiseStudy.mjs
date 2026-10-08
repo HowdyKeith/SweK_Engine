@@ -15,13 +15,19 @@
 // *** WITHOUT --harvest IT WILL NOT TOUCH THE DATASET. *** runStudy() passes `harvest` through to
 // render/denoiseScenes.mjs's renderImages(), which refuses every dataset seed without it; this round commits the
 // runner and gates it on --mini's scenes, seeded outside every split. The harvest round is the first to pass the flag.
+//
+// Section 24: with `cache` (render/denoiseCache.mjs's openCache), each rendered scene, tuned filter and trained network
+// is kept, keyed by everything it depends on, and a second run of the same command resumes where the first stopped.
+// Without it everything is computed, as before; with it the result is the same, bit for bit
+// (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit } from "./denoiseStats.mjs";
+import { cached, hashArrays } from "./denoiseCache.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
 export const RESULTS = "render/denoise-results.json";
@@ -30,6 +36,7 @@ export const RESULTS_R3 = "render/denoise-results-r3.json";
 export const RESULTS_R4 = "render/denoise-results-r4.json";
 export const RESULTS_R5 = "render/denoise-results-r5.json";
 export const RESULTS_R6 = "render/denoise-results-r6.json";
+export const RESULTS_R7 = "render/denoise-results-r7.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -58,6 +65,12 @@ export const ROUND5 = Object.freeze({ splits: SPLITS_R5, init: INIT, c0: true, h
  */
 export const ROUND6 = Object.freeze({ splits: SPLITS_R6, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
                                       emitterMask: true, compareNoMask: true, results: RESULTS_R6 });
+/**
+ * Section 23: round 6 with its training split replaced by 96 scenes of the randomized family R. H1 on held-out R, H2
+ * on family C. Secondary: the filter and networks trained on round 5/6's 24 scenes of A and B, on the same test images.
+ */
+export const ROUND7 = Object.freeze({ splits: SPLITS_R7, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
+                                      emitterMask: true, compareTrainSplit: SPLITS_R5.train, results: RESULTS_R7 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -91,14 +104,16 @@ export function stopBeforeTests(fit, hist, c0) {
  * is a sequence (render/denoiseTemporal.mjs): `x` is the 13-channel input over the accumulated history, `x9` the
  * measured frame's own 9-channel input, `accum` the accumulation re-modulated -- the last two for the secondaries.
  */
-export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false, emitterMask = false }) {
+export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false, emitterMask = false, cache = null }) {
     return split.seeds.map((seed, i) => {
         const family = familyOf(split, i);
+        // the key holds every argument the render reads -- and `harvest`, so a dataset scene is never served without it
+        const key = `render-${temporal ? "seq" : "img"}-${family}-${seed}-${image}-${sppIn}-${sppRef}-${ref2 ? "ref2" : "ref1"}-${harvest ? "harvest" : "gate"}`;
         if (temporal) {
-            const Q = renderSequence(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
+            const Q = cached(cache, key, () => renderSequence(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 }));
             return { ...Q, x: temporalChannels(Q), x9: inputChannels(Q.input, Q.albedo, Q.normal, image, image), accum: remodulate(Q.A, Q.albedo) };
         }
-        const I = renderImages(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
+        const I = cached(cache, key, () => renderImages(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 }));
         const x9 = inputChannels(I.input, I.albedo, I.normal, image, image);
         if (!emitterMask) return { ...I, x: x9 };
         // section 21: the emitter coverage appended as a tenth channel; x9 kept for the no-mask secondary
@@ -107,24 +122,31 @@ export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, tempor
     });
 }
 
+// A training set's key: every input and reference, bit for bit, and the size. A filter is keyed by its set alone (the
+// grid and the statistic are fixed); a network by its set and every training option, and by a tag -- control C4's
+// second training is tagged "-again", so a resumed run still compares two trainings and never one record with itself.
+const setKey = (set) => hashArrays(set.flatMap((s) => [s.x, s.ref, s.w, s.h]));
+const tuned = (cache, set) => cached(cache, `filter-${setKey(set)}`, () => tuneFilter(set, relMSE).best);
+const trained = (cache, set, opts, tag = "") => cached(cache, `net-${setKey(set)}-${hashArrays([JSON.stringify(opts)])}${tag}`, () => trainDenoiser(set, opts).net);
+
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
                            compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
-                           secondarySpp = [1, 16], log = () => {} } = {}) {
+                           secondarySpp = [1, 16], cache = null, log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask,
                      compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
-    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal, emitterMask }); };
+    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal, emitterMask, cache }); };
     for (const name of Object.keys(splits)) if (name !== "T1" && name !== "T2") render(name);
     lap("train rendered");
     const trainSet = R.train.map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
-    const filter = tuneFilter(trainSet, relMSE).best;
+    const filter = tuned(cache, trainSet);
     lap("filter tuned");
-    const nets = seeds.map((s) => trainDenoiser(trainSet, { seed: s, init, head, ...train }).net);
-    const again = trainDenoiser(trainSet, { seed: seeds[0], init, head, ...train }).net;
+    const nets = seeds.map((s) => trained(cache, trainSet, { seed: s, init, head, ...train }));
+    const again = trained(cache, trainSet, { seed: seeds[0], init, head, ...train }, "-again");
     const flat = (net) => net.layers.flatMap((L) => [...L.W, ...L.b]);
     const a = flat(nets[0]), b = flat(again);
     const determinism = a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
@@ -145,7 +167,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     render("T1"); render("T2");
     lap("tests rendered");
     const shuffledSet = shuffledTargets(trainSet);
-    const shuffledNets = seeds.map((s) => trainDenoiser(shuffledSet, { seed: s, init, head, ...train }).net);
+    const shuffledNets = seeds.map((s) => trained(cache, shuffledSet, { seed: s, init, head, ...train }));
     lap("shuffled networks trained");
     const measure = (ims) => ({
         noisy: ims.map((im) => relMSE(noisyOf(im), im.ref)),
@@ -162,7 +184,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     for (const spp of secondarySpp) for (const name of ["T1", "T2"]) {
         // only the INPUT is new: the reference is the one the primary measurement used (a 1-sample "reference" is
         // rendered and dropped), so the secondary costs inputs, not another 1024 samples a pixel per scene
-        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false, temporal, emitterMask }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
+        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false, temporal, emitterMask, cache }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
         secondary[`${name}@${spp}spp`] = {
             noisy: ims.map((im) => relMSE(im.input, im.ref)),
             filter: ims.map((im) => relMSE(jointBilateral(im.x, image, image, filter), im.ref)),
@@ -172,15 +194,15 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // secondary: other heads, trained identically on the same scenes and measured on the same test images -- reported,
     // never tested, never used to choose (section 15's comparison with round 2's residual network)
     for (const other of compareHeads) {
-        const otherNets = seeds.map((s) => trainDenoiser(trainSet, { seed: s, init, head: other, ...train }).net);
+        const otherNets = seeds.map((s) => trained(cache, trainSet, { seed: s, init, head: other, ...train }));
         for (const name of ["T1", "T2"]) secondary[`${name}@${other}`] = { net: otherNets.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) };
     }
     // secondary (temporal): what the history alone buys, and both methods WITHOUT it on the same measured frames -- the
     // filter tuned again on the training scenes' single frames, and the network trained on them with the same seeds
     if (temporal) {
         const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
-        const filter9 = tuneFilter(train9, relMSE).best;
-        const nets9 = compareNoHistory ? seeds.map((s) => trainDenoiser(train9, { seed: s, init, head, ...train }).net) : [];
+        const filter9 = tuned(cache, train9);
+        const nets9 = compareNoHistory ? seeds.map((s) => trained(cache, train9, { seed: s, init, head, ...train })) : [];
         secondary.filterNoHistory = filter9;
         for (const name of ["T1", "T2"]) secondary[`${name}@noHistory`] = {
             accumulation: R[name].map((im) => relMSE(im.accum, im.ref)),
@@ -191,8 +213,8 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // secondary (section 19): the same filter and head trained on ANOTHER training split -- round 3's family A alone --
     // and measured on this round's test images, to say what the mixed training changed
     if (compareTrainSplit) {
-        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
-        const filterO = tuneFilter(other, relMSE).best, netsO = seeds.map((s) => trainDenoiser(other, { seed: s, init, head, ...train }).net);
+        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal, emitterMask, cache }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
+        const filterO = tuned(cache, other), netsO = seeds.map((s) => trained(cache, other, { seed: s, init, head, ...train }));
         secondary.filterOtherTraining = filterO;
         for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {
             filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref)),
@@ -203,7 +225,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // same training scenes' 9-channel inputs -- on the same test images, to say what the mask changed
     if (emitterMask && compareNoMask) {
         const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
-        const filter9 = tuneFilter(train9, relMSE).best, nets9 = seeds.map((s) => trainDenoiser(train9, { seed: s, init, head, ...train }).net);
+        const filter9 = tuned(cache, train9), nets9 = seeds.map((s) => trained(cache, train9, { seed: s, init, head, ...train }));
         secondary.filterNoMask = filter9;
         for (const name of ["T1", "T2"]) secondary[`${name}@noMask`] = {
             filter: R[name].map((im) => relMSE(jointBilateral(im.x9, image, image, filter9), im.ref)),

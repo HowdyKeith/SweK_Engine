@@ -1,0 +1,24 @@
+{
+ "host": "linux-x64-4c-16095mb-420793",
+ "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
+ "captured": "2026-10-08T16:26:35.238Z",
+ "timings": {
+  "render/denoiseCache-selfcheck.mjs": 2392
+ },
+ "at": {
+  "render/denoiseCache-selfcheck.mjs": "2026-10-08T16:26:35.238Z"
+ },
+ "kinds": {
+  "render/denoiseCache-selfcheck.mjs": "alone"
+ },
+ "codes": {
+  "render/denoiseCache-selfcheck.mjs": 0
+ },
+ "serialRing": {
+  "render/denoiseCache-selfcheck.mjs": [
+   1824,
+   2209,
+   2392
+  ]
+ }
+}

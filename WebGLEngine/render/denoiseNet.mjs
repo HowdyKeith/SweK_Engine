@@ -58,6 +58,10 @@ export { paramCount };
  * its per-pixel weights `w` (H x W x KERNEL_TAPS, zero on taps outside the image).
  */
 export function denoise(net, x, H, W) {
+    // the input's width must be the network's: a 9-channel network handed a 10-channel image would read it at the wrong
+    // stride and return finite nonsense (round 7 found exactly that, unseen, in a comparison path)
+    const C = strideOf(x, H * W);
+    if (net.layers[0].Cin !== C) throw new Error(`denoiseNet: a network of ${net.layers[0].Cin} input channels was handed an input of ${C}`);
     const acts = netForward(net, x, H, W), out = acts[acts.length - 1];
     if (headOf(net) === "kernel") return { ...kernelApply(x, out, H, W), acts };
     return { y: remodulated(x, out, H * W), acts };
