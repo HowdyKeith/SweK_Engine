@@ -264,3 +264,56 @@ those numbers. No other scene was looked at, and val's numbers in round 1's file
 - Round 1's run is `--harvest-r1` (it was `--harvest` at b023baa4), which refuses for the same reason.
 
 **The outcomes and what each buys:** section 9's, unchanged. C0 is one more way to "not reported".
+
+## 14. THE RE-RUN -- REPORTED: H1 NOT SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r2` at commit b8e475fb, 2026-10-07 23:26Z to 2026-10-08 00:12Z (2,729 s).
+Its output, unedited, is `render/denoise-results-r2.json`.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0, train fit per seed | 0.182 / 0.214 / 0.181 (bar 0.8) |
+| C1 | network 12 of 12 and filter 12 of 12 against the noisy input, on T1 and on T2 |
+| C2 | shuffled-target network mean d -3.91 |
+| C3 | 0 of 12 images within 2x of the floor on either set |
+| C4 | bit-identical retrain |
+| C5 | distinct render seeds |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, in-family (T1, seeds 5000-5011) | 2 | -0.111 | 0.9968 | 0.025 | **not supported** |
+| H2, transfer (T2, seeds 6000-6011) | 1 | -0.184 | 0.9998 | 0.05 | **not supported** |
+
+- **The network denoises.** Against the 4-sample input it cut relMSE by roughly 5x on T1 and 3-4x on T2, on every
+  image.
+- **It does it worse than the hand-written filter.** Taking the geometric mean over images, the filter's error is
+  about 11% lower than the network's on T1 and about 17% lower on T2.
+- The gap is larger on the family the network never trained on.
+- The filter wins on 10 of 12 T1 images and 11 of 12 T2 images.
+
+**Secondary** (reported, never tested, never used to choose). Geometric-mean relMSE, filter vs the three seeds'
+networks:
+
+| Input | T1: filter / networks | T2: filter / networks |
+|---|---|---|
+| 1 sample | 0.0097 / 0.0126-0.0146 | 0.0507 / 0.0502-0.0665 |
+| 16 samples | 0.0016 / 0.0015-0.0017 | 0.0071 / 0.0070-0.0083 |
+
+- val (4 scenes): the networks' relMSE was below the filter's on 3 of 4 scenes for every seed.
+- Per-seed spread is visible: seed 3 is the best network on almost every image.
+- Wall time on this box: training 1,166 s for four networks; the shuffled-target networks 813 s.
+
+**What this buys, per section 9: "Neither".** The result is recorded as such, with the controls' numbers above, and
+the arc stops until something changes the input.
+
+- The network is not taken to the device, and no page is built for it.
+- The pre-registered question has its answer. At 64 x 64, 4 samples, 6,387 parameters, 1,500 steps and 24 training
+  scenes, a small convolutional network learns to denoise this tracer, and a tuned joint bilateral filter given the
+  same guide buffers does it better, in-family and across families.
+- What "something changes the input" could mean is a new pre-registration's question, not this one's: more training
+  scenes, more steps, a wider network, a kernel-predicting output, or temporal inputs. None of them is chosen by
+  looking at these test sets, which are now spent too.
