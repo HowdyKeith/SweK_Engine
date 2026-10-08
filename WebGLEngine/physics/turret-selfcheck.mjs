@@ -28,11 +28,11 @@
 //      note above describes. The fourth row was ADDED for this sabotage, a synthetic shell with a one-step span deliberately
 //      forced past both a near car and a far wall in a single stepShells call; it reddens on the sabotage (wall reported hit,
 //      car not) and passes clean restored.
-//   H  v4681, stepShells never looking at `blocks`                           -> 4 red: the lying block, the sideways pair, the null slot, the
+//   H  v4822, stepShells never looking at `blocks`                           -> 4 red: the lying block, the sideways pair, the null slot, the
 //      near block against a far building (the near-car and near-building rows pass: a list that is never read reaches nothing).
-//   I  v4681, the blocks loop bounded by HIT_SAMPLES instead of `hitK`        -> 2 red: the near car and the near building both lose to the far block.
-//   J  v4681, the blocks' hit test given the identity quat (the pose's rotation dropped)  -> 3 red: the lying block, the sideways pair and the null slot (its hit has to land on the rotated box too).
-//   G  v4681, the `if (!bd) continue;` guard over a null buildings[] slot removed -- NOT a red row: an uncaught
+//   I  v4822, the blocks loop bounded by HIT_SAMPLES instead of `hitK`        -> 2 red: the near car and the near building both lose to the far block.
+//   J  v4822, the blocks' hit test given the identity quat (the pose's rotation dropped)  -> 3 red: the lying block, the sideways pair and the null slot (its hit has to land on the rotated box too).
+//   G  v4822, the `if (!bd) continue;` guard over a null buildings[] slot removed -- NOT a red row: an uncaught
 //      TypeError ("Cannot read properties of null (reading 'half')") at the exact line the guard used to cover, the gate
 //      exiting on a stack trace rather than printing FAIL, which is the "it died rather than found something" shape this
 //      tree's own sweep has separately had to tell apart from a real red. Measured before writing the row, not assumed.
@@ -136,7 +136,7 @@ console.log("\n4. THE SHELL FLIES AND THE SWEPT HIT TEST SEES IT");
     const offAxis = { pos: [8, 1, 10], quat: [0, 0, 0, 1], half: [1, 3, 1] };
     const missed = flyB(aimed([0, 1, 20]), [offAxis]);
     ok("a wall off the line of fire never intercepts a clean shot", missed.length === 1 && missed[0].target === 1);
-    // v4681 -- a building this round already toppled (world/crashDamage.mjs's shellInto) is a null slot, not a removed one:
+    // v4822 -- a building this round already toppled (world/crashDamage.mjs's shellInto) is a null slot, not a removed one:
     // the caller keeps every index the fixed rect it always named, so a shell must skip a falsy entry rather than read
     // `.half` off of one.
     const gone = flyB(aimed([0, 1, 20]), [null]);
@@ -148,7 +148,7 @@ console.log("\n4. THE SHELL FLIES AND THE SWEPT HIT TEST SEES IT");
     const raceShell = { x: 0, y: 1, z: 0, vx: 0, vy: 0, vz: 64, t: 0, owner: 0, ammo: "spark" };
     const raceEv = U.stepShells([raceShell], [{ index: 1, pose: still([0, 1, 8]), half: HALF }], 0.25, { groundY: -1e9, buildings: [{ pos: [0, 1, 16], quat: [0, 0, 0, 1], half: [2, 3, 2] }] });
     ok("!! forced into one step spanning both a near car and a far wall, the nearer car is hit and the wall is not", raceEv.length === 1 && raceEv[0].target === 1 && raceEv[0].building === undefined, JSON.stringify(raceEv));
-    // v4681 -- A FALLING BLOCK IS THE FOURTH THING A SHELL CAN MEET (world/buildingTopple.mjs: the building a shell brought down is a box3d body
+    // v4822 -- A FALLING BLOCK IS THE FOURTH THING A SHELL CAN MEET (world/buildingTopple.mjs: the building a shell brought down is a box3d body
     // now, in a pose that is rotated once it tips). stepShells takes `blocks` { pos, quat, half } and reports { block: slot } -- hit where the
     // block LIES, so the rows put a box on its side (a quarter turn about z turns half [3, 1, 2] into a world box 1 wide, 3 tall, 2 deep)
     // and fire a straight synthetic shell through the height that only the rotated box covers.

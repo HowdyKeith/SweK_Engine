@@ -37,7 +37,7 @@ export function colourOf(id) { return getMaterialRegistry().getColor(id) || PALE
 export function miniWorld({ chunkSize = 16, chunkHeight = 64 } = {}) {
     const chunks = new Map();
     const chunkOf = (x, z, make) => { const cx = Math.floor(x / chunkSize), cz = Math.floor(z / chunkSize), k = cx + "," + cz; let c = chunks.get(k); if (!c && make) { c = new Chunk(cx, cz, chunkSize, chunkHeight); chunks.set(k, c); } return c; };
-    // v4681 -- `editLog`, off until a caller sets it to an array: every setVoxel then appends its (x, z). render/voxelDamage.mjs's
+    // v4822 -- `editLog`, off until a caller sets it to an array: every setVoxel then appends its (x, z). render/voxelDamage.mjs's
     // syncDirty reads it to re-mesh the chunks an edit can reach and no others (a dirty flag says WHICH chunk changed, not whether the
     // edit was next to a seam, and the answer to that is what decides whether its eight neighbours have to be re-meshed too)
     const w = {

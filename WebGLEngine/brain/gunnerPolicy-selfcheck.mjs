@@ -52,15 +52,15 @@
 //   I  pursuerInfo forgetting BEHIND (any car in range is a pursuer)                      -> 2 red: the pursuerInfo row, the chase leg (5 drops).
 //   J  the adjudicator running the pursued leg twice and never the chase                 -> 2 red: 8 m/s refused, 28 m/s on both legs.
 //   K  the features dropping the slick tail (always 0, 0)                                -> 3 red: the tail row, the duel's drops, the race's drops.
-// SABOTAGE LOG -- v4681 (buildings, real damage through world/crashDamage.mjs), each against brain/gunnerPolicy.mjs, restored.
+// SABOTAGE LOG -- v4822 (buildings, real damage through world/crashDamage.mjs), each against brain/gunnerPolicy.mjs, restored.
 //   L  the toppled-building null-out dropped (`live` always the raw `buildings`)          -> 1 red: section 7's "once toppled"
 //      row alone -- the shot still reads the wall as solid and reports a building hit instead of passing through, exactly
 //      the bug physics/turret-selfcheck.mjs's own sabotage G guards from the other side (a null slot dereferenced); this is
 //      the caller never producing the null slot at all.
-//   M  v4681 (the falling block), turretTick handing stepShells `blocks: []`                -> 3 red: the block is passed through (no block event), so the
+//   M  v4822 (the falling block), turretTick handing stepShells `blocks: []`                -> 3 red: the block is passed through (no block event), so the
 //      cubes/count/effect row and the "not a second wall" row fall with the first.
-//   N  v4681, the block hit applying no world.impulse                                       -> 1 red: the "reaches the block and pushes it by the shell's momentum" row.
-//   O  v4681, buildingTopple.shellOnBlock bursting no cubes at the point                    -> 1 red: the cubes / count / effect row.
+//   N  v4822, the block hit applying no world.impulse                                       -> 1 red: the "reaches the block and pushes it by the shell's momentum" row.
+//   O  v4822, buildingTopple.shellOnBlock bursting no cubes at the point                    -> 1 red: the cubes / count / effect row.
 "use strict";
 import fs from "node:fs";
 import { initNode, mod } from "../physics/box3d/box3dNode.mjs";
@@ -228,9 +228,9 @@ console.log("\n6. THE RACE WITH GUNNERS: LOCKSTEP, DETERMINISTIC, REPLAYED FROM 
     const ordered = R.order.map((i) => R.results[i]);
     ok("the order is laps first, then metres", ordered.every((q, k) => k === 0 || ordered[k - 1].laps > q.laps || (ordered[k - 1].laps === q.laps && ordered[k - 1].metres + 1 >= q.metres)));
 }
-console.log("\n7. BUILDINGS, v4681: A SHELL GOES THROUGH world/crashDamage.mjs'S CITY THE SAME WAY A CAR CRASH DOES");
+console.log("\n7. BUILDINGS, v4822: A SHELL GOES THROUGH world/crashDamage.mjs'S CITY THE SAME WAY A CAR CRASH DOES");
 {
-    // v4680 gave stepShells a buildings list to stop a shell on; v4681 gave a building hit somewhere real to land, through
+    // v4680 gave stepShells a buildings list to stop a shell on; v4822 gave a building hit somewhere real to land, through
     // the same city a car crash damages (world/crashDamage.mjs's shellInto), wired in as turretTick's new `cityCtx`. This
     // coverage moved here from physics/spellAmmo-selfcheck.mjs's old section 6 -- pure applyBuildingHit()/buildingHash()
     // tests on a flat tally that no longer exists -- because the function that changed is turretTick, not spellAmmo's book.
@@ -274,7 +274,7 @@ console.log("\n7. BUILDINGS, v4681: A SHELL GOES THROUGH world/crashDamage.mjs'S
         effects2.filter((e) => e.building !== undefined).length === 0, JSON.stringify(effects2));
 
     // the pre-existing shape -- buildings passed but no cityCtx -- still blocks a shot (the box is real geometry regardless
-    // of the real city's now-toppled state) but touches nothing and pushes no effect, exactly as before v4681
+    // of the real city's now-toppled state) but touches nothing and pushes no effect, exactly as before v4822
     const turrets3 = [U.createTurret(), U.createTurret()]; aimAtWall(turrets3[0]);
     const shells3 = []; let effects3 = [];
     for (let t = 0; t < 60; t++) {
@@ -282,11 +282,11 @@ console.log("\n7. BUILDINGS, v4681: A SHELL GOES THROUGH world/crashDamage.mjs'S
         effects3 = effects3.concat(tt.effects);
         if (t > 0 && shells3.length === 0) break;
     }
-    ok("...buildings without a cityCtx still blocks the shot (the box is solid regardless of the real city's state) but pushes no effect, exactly as before v4681",
+    ok("...buildings without a cityCtx still blocks the shot (the box is solid regardless of the real city's state) but pushes no effect, exactly as before v4822",
         effects3.length === 0 && shells3.length === 0, `${JSON.stringify(effects3)}, ${shells3.length} shells left`);
     g.phys.destroy();
 
-    // v4681 -- THE BLOCK A TOPPLED BUILDING BECAME IS A TARGET, NOT A HOLE. With world/buildingTopple.mjs installed on the city the building
+    // v4822 -- THE BLOCK A TOPPLED BUILDING BECAME IS A TARGET, NOT A HOLE. With world/buildingTopple.mjs installed on the city the building
     // at zero hit points is a box3d body: its list slot is nulled (the wall is gone) and the body that fell out of it is the new thing in
     // the shell's way, hit in its own pose. The same wall, the same aim, on a city that falls the way race-crash.html's does.
     const BT = await import("../world/buildingTopple.mjs"), { VoxelDebrisSystem } = await import("../world/voxelDebrisSystem.js");

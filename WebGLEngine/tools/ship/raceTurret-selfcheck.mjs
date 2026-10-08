@@ -9,7 +9,7 @@
 // itself in the harness -- the page boots, says there is a turret on each car, and after a few seconds of the race its standings
 // carry hits. Over the ship-time budget, as every page-boot gate of the racing line is (drivePolicy 63 s, raceKnob 33 s).
 //
-// v4681 -- SECTION 4: THE WORLD THE PAGE DRAWS IS EDITABLE. race-brain.html draws its city from world/crashDamage.mjs's worldFleet (the
+// v4822 -- SECTION 4: THE WORLD THE PAGE DRAWS IS EDITABLE. race-brain.html draws its city from world/crashDamage.mjs's worldFleet (the
 // editable chunk slots) instead of baking it once, so a shell that carves a building (shellInto, through turretTick) is on the picture
 // the frame it lands. Section 4 holds that in the page's own scene configuration on both backends -- a barrage's crater is on the
 // picture and is EXACTLY a fresh pack of the carved world, a chunk that outgrows its slot is flagged and the scene built again from
@@ -29,7 +29,7 @@
 //   C  race-brain.html: the page never ticking the turrets                         -> 1 red: hits 0 0 0 0 on the page.
 //   D  race-brain.html: the scene without the turret fleets                        -> 2 red: the placements write past the
 //      scene's records, the frame loop throws, the standings never carry hits.
-// SABOTAGE LOG -- v4681 (section 4), each applied to the file named, the gate run, the file restored.
+// SABOTAGE LOG -- v4822 (section 4), each applied to the file named, the gate run, the file restored.
 //   E  race-brain.html: the page never building the scene again on state.outgrown       -> 2 red: the page's answer to a repack, and the
 //      rebuilt scene's picture (the cloud and the edit after it).
 //   F  race-brain.html: buildScene() without wf.install(scene)                            -> 3 red: the boot row, the page's answer (nothing is
@@ -148,7 +148,7 @@ const drivers = [D.handWeights(), D.handWeights({ speed: 0.8 }), D.zeroWeights()
 const nodeRace = G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 10, fleet });
 report(`node: fingerprint ${nodeRace.fingerprint}, order ${nodeRace.order.join(" > ")}, hits ${nodeRace.results.map((q) => q.hits + "/" + q.shots).join(" ")}`);
 ok("the hand gunners hit in ten seconds and the zero gunner never fires", nodeRace.results[0].hits + nodeRace.results[1].hits > 0 && nodeRace.results[2].shots === 0);
-// v4681 -- THE SAME RACE THROUGH A SCRIPTED DEMOLITION: the real city, shells into the biggest building's ground floor until CityGen topples it, the block a box3d body that
+// v4822 -- THE SAME RACE THROUGH A SCRIPTED DEMOLITION: the real city, shells into the biggest building's ground floor until CityGen topples it, the block a box3d body that
 // tips, rests leaning, takes a shell dropped on it and shatters into rubble -- twelve seconds, three cars, the fingerprint folding box3d's state hash, the turrets,
 // the slicks, the ammo and the city's hit points. Run twice in node here and once in the browser's wasm below: the nearest this tree has to two machines in lockstep.
 const cityRace = () => { let script = null; return G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 12, fleet, city: { script: (t, ctx) => { if (!script) script = BT.demolitionScript(ctx.cityCtx); script(t, ctx); } } }); };
@@ -253,7 +253,7 @@ sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON B
     }
 }
 
-sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE PAGE'S SCENE, AND A REPACK REBUILDS IT");
+sec("4. THE WORLD IS EDITABLE (v4822): A SHELL'S CRATER IS ON THE PICTURE IN THE PAGE'S SCENE, AND A REPACK REBUILDS IT");
 {
     const skip = webgpuSkipReason();
     if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
@@ -338,7 +338,7 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
         }
 
         for (const [bk, qs] of [["WebGL2", "webgl=1"], ["WebGPU", "offscreen=1"]]) {
-            // the page itself, on BOTH backends (v4681: WebGPU through ?offscreen=1, the page's hook for a device that never presents -- this
+            // the page itself, on BOTH backends (v4822: WebGPU through ?offscreen=1, the page's hook for a device that never presents -- this
             // harness loses a presented WebGPU canvas, gfx/device.js Level 11): ?shell=12 puts a barrage on the building nearest
             // the lead car; then a repack is forced from OUTSIDE (isolated voxels, synced), and the page must build its scene again by itself
             const pg = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { qs }, script: `async (a) => {

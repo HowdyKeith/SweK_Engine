@@ -58,7 +58,7 @@ export const CRASH = Object.freeze({
     groundY: 0,             // trackWorld stamps the city with groundY 0: building voxels from y = 1
 });
 /**
- * v4681 -- ROOM FOR A CRATER IN EVERY SLOT. voxelDeviceEdit's default slot is a quarter more than its chunk needs today, at least 256
+ * v4822 -- ROOM FOR A CRATER IN EVERY SLOT. voxelDeviceEdit's default slot is a quarter more than its chunk needs today, at least 256
  * vertices, and greedy meshing makes this city's chunks SMALL (seed 1: 62 chunks, 18 to 852 vertices, 33k in all): a single
  * cataclysm into a 228-vertex chunk adds 174 and outgrows its 285-vertex slot, and an outgrown slot repacks the whole world into a
  * buffer bigger than the scene was built with -- the scene has to be built again. Measured at seed 1: with the defaults the FIRST
@@ -163,7 +163,7 @@ export function crashInto(g, i, pre, post, dv, ctx = {}, at = post.pos) {
 }
 
 /**
- * v4681 -- the same wall, hit by a turret shell instead of a car (physics/turret.mjs's stepShells building event, brain/
+ * v4822 -- the same wall, hit by a turret shell instead of a car (physics/turret.mjs's stepShells building event, brain/
  * gunnerPolicy.mjs's turretTick). A shell already has the one thing crashInto had to raycast for: an exact point. So this
  * is crashInto's body from the blast down, unchanged, keyed on a point + radius + a caller-picked direction instead of a
  * raycast refined from a car's pre/post pose -- the same blastAt, the same crumble-beyond-the-blast bookkeeping, the same
@@ -194,7 +194,7 @@ export function shellInto(g, i, point, radius, dir, ctx = {}) {
 }
 
 /**
- * v4681 -- `shells` cataclysm-size shells at ONE building, from a shooter standing at `from` ([x, z]): the wall's face as that shooter
+ * v4822 -- `shells` cataclysm-size shells at ONE building, from a shooter standing at `from` ([x, z]): the wall's face as that shooter
  * sees it, the height and the sideways offset marching through a fixed pattern so the barrage chews the face rather than the same
  * voxels. Deterministic (no random), through shellInto exactly as turretTick calls it. It is what race-brain.html's ?shell=N puts in
  * front of a person and what the gates put in front of a repack -- one definition of "a barrage", so what the page shows is what
@@ -291,7 +291,7 @@ export function worldSphere(world) {
  * (remeshChunks, through state.vbuf), so state.vbuf is a proxy that rescales positions on their way to the device. The other
  * scenes keep the origin record; they are named in the roadmap, not touched here.
  *
- * v4681 -- NAMED ONCE, because race-brain.html draws the same world the same way now (worldFleet below) and the unit-space
+ * v4822 -- NAMED ONCE, because race-brain.html draws the same world the same way now (worldFleet below) and the unit-space
  * arithmetic is exactly the thing two copies would drift on. Returns { centre, radius, mesh, record, install } -- the mesh to
  * build the fleet from, the [centre, radius] record to draw it at, and install(vbuf) to point state.vbuf at the scene's own
  * vertex buffer once the scene exists. A chunk that outgrows its slot repacks the world (voxelDeviceEdit's remeshChunks), and
@@ -317,7 +317,7 @@ export function worldUnit(state) {
 }
 
 /**
- * v4681 -- the world as a world/kenneyKit.mjs kitScene extra fleet (race-brain.html's shape: the kit's tiles and trucks, the
+ * v4822 -- the world as a world/kenneyKit.mjs kitScene extra fleet (race-brain.html's shape: the kit's tiles and trucks, the
  * world, the turrets). Pass it in `extraFleets`, then call `.install(scene)` once the scene exists. kitScene reads name, mesh,
  * pipeline, bind, records and extras and ignores the rest, so install rides on the same object.
  */
@@ -330,7 +330,7 @@ export function worldFleet(state, { light = SUN } = {}) {
 }
 
 /**
- * v4681 -- the debris a carve bursts, as a kitScene extra fleet (race-brain.html): render/voxelDamage.mjs's debrisRecords() and
+ * v4822 -- the debris a carve bursts, as a kitScene extra fleet (race-brain.html): render/voxelDamage.mjs's debrisRecords() and
  * debrisLitPipelineDesc() (the cubes, the colour of the voxel each came from in the extras), `cap` records all parked until
  * placeDebris() writes the live particles over them each frame. Visual only: the particles are a VoxelDebrisSystem hung on the city as
  * `g.debris` (shellInto and crashInto both read it), they never reach cityHash or a physics body, and Math.random is in their burst, so

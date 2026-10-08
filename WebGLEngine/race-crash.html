@@ -66,7 +66,7 @@ function demolish() {
   return res;
 }
 
-// v4681 -- the scene is built from the state's CURRENT slots, and built again when a chunk outgrows its slot: the proxy (D.worldUnit) FLAGS
+// v4822 -- the scene is built from the state's CURRENT slots, and built again when a chunk outgrows its slot: the proxy (D.worldUnit) FLAGS
 // state.outgrown rather than write a repack bigger than the device buffer past its end, and this page answers by building from the repacked
 // state, the way race-brain.html does. Roomy slots (crashWorld's default) make it rare; they do not make it impossible.
 function buildScene() {

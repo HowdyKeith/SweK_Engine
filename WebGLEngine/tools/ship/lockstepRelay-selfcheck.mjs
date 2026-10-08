@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/lockstepRelay-selfcheck.mjs -- v4681
+// WebGLEngine/tools/ship/lockstepRelay-selfcheck.mjs -- v4822
 //
 // Run: node tools/ship/lockstepRelay-selfcheck.mjs
 //
@@ -15,7 +15,7 @@
 // peer through the same relay: the same fingerprint again. Section 4, A DIVERGENCE OVER THE WIRE: one process steps different commands at tick 100; both
 // exit 1, and the desync each reports is AT tick 100. Section 5, THE ENGINE IS PART OF THE PROTOCOL: a peer announcing another engine halts the pair, both exit 1.
 //
-// SABOTAGE LOG -- v4681, each applied to the file named, the gate run, the file restored.
+// SABOTAGE LOG -- v4822, each applied to the file named, the gate run, the file restored.
 //   A  tools/ship/miniWs.mjs: the one-byte length class ending at 127 instead of 125 (a 126-byte frame sent with the 126 marker and no length)   -> 4 red: the frame-class
 //      row (3 of 9 messages arrive), the other direction, the leave announcement and the duplicate id, all behind a stream that never recovers.
 //   B  tools/ship/lockstepRelay.mjs: a message delivered to the sender too                                         -> 1 red: "never come back to the sender".

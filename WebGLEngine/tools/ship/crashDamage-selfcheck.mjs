@@ -50,10 +50,10 @@
 //   E  the world recorded at the origin with radius 1 again                       -> 2 red (the steel not on the picture: no world drawn)
 //   F  the charge counting the floor under the building                           -> 1 red (hp 149 for 160 standing)
 //   G  race-crash.html's line without the word rebar                              -> 1 red (the page line)
-//   H  v4681, shellInto's own park-on-topple line removed                          -> 1 red: section 6's "notices the
+//   H  v4822, shellInto's own park-on-topple line removed                          -> 1 red: section 6's "notices the
 //      ALREADY-toppled building" row alone -- the rest of section 6 does not touch it, and sections 1-5, 7-9 are
 //      crashInto's own copy of the line, untouched by this sabotage.
-//   I  v4681, the proxy writing the slot without the unit-space rescale             -> 3 red: section 7's proxy row, and both backends'
+//   I  v4822, the proxy writing the slot without the unit-space rescale             -> 3 red: section 7's proxy row, and both backends'
 //      "EXACTLY a fresh pack" rows in section 9 -- the browser rows that already stood catch it too, which is the cross-check that the
 //      extraction left crashScene doing what it did.
 //   J  the proxy without its outgrown guard (the repack written past the end)        -> 1 red: "a chunk that outgrows its slot ... FLAGS it".
@@ -61,9 +61,9 @@
 //   L  ROOMY made no roomier than the defaults                                       -> 2 red: the ROOMY barrage row, and the proxy row
 //      (which wants a shell that does not repack).
 //   M  the record's radius one short                                                 -> 1 red: the unit-space row.
-//   R  v4681, race-crash.html never building its scene again on state.outgrown (the frame loop without its line)   -> 1 red: "the page answers
+//   R  v4822, race-crash.html never building its scene again on state.outgrown (the frame loop without its line)   -> 1 red: "the page answers
 //      state.outgrown" (scene built 1x -> 1x, the flag still raised).
-//   N  v4681, the narrowed remesh keeps only the edit's OWN chunk (no affectedChunks)  -> 1 red: "ONE voxel off a chunk's seam column".
+//   N  v4822, the narrowed remesh keeps only the edit's OWN chunk (no affectedChunks)  -> 1 red: "ONE voxel off a chunk's seam column".
 //      The corner row passes under N and is meant to: a carve that spans the seam dirties every chunk it spans, and the dirty flags
 //      cover that case by themselves. Only an edit that changes ONE side of a seam (a voxel gone beside a solid neighbour) needs the log.
 //   O  the narrow path never taken (syncDirty always the 3x3 rule)                   -> 4 red: the corner row's four chunks, the lone
@@ -72,11 +72,11 @@
 //      equivalent mutation (extra chunks re-meshed, still correct), so only a row on the log itself catches it -- it is a cost, not a defect
 //      of the picture, and a shell would re-mesh every earlier shell's chunks again.
 //   Q  crashWorld never turns the log on                                             -> 2 red: the corner row and the lone-voxel row.
-//   Y  v4681, worldUnit() reading state.mesh (the pack the state was BORN with) and not the current slots   -> 1 red: "a world fleet built from a state edited
+//   Y  v4822, worldUnit() reading state.mesh (the pack the state was BORN with) and not the current slots   -> 1 red: "a world fleet built from a state edited
 //      in place is the city AS IT IS". A scene built again after shells drew the city as it was before them: found by the live page's topple
 //      stage forcing a rebuild with no repack behind it (the toppled building was standing in the rebuilt scene, +7,000 lit pixels). Every
 //      earlier rebuild followed a repack, which refreshes state.mesh, so nothing had ever shown it.
-//   T  v4681, shellInto reading only ctx.debris and not the city's own g.debris        -> 1 red: "a shell's debris is visual" (0 cubes live after
+//   T  v4822, shellInto reading only ctx.debris and not the city's own g.debris        -> 1 red: "a shell's debris is visual" (0 cubes live after
 //      5 carving shells). The same row holds the other half: the barrage with a debris system removes the same voxels, charges the same hit
 //      points and folds to the same cityHash as the one without -- the cubes are drawn, never simulated.
 //
@@ -193,7 +193,7 @@ sec("5. THE COLLAPSE: 25 m/s takes the ground floor, CityGen topples it, the box
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("6. THE SAME WALL, HIT BY A SHELL INSTEAD OF A CAR (shellInto, v4681)");
+sec("6. THE SAME WALL, HIT BY A SHELL INSTEAD OF A CAR (shellInto, v4822)");
 {
     // brain/gunnerPolicy.mjs's turretTick calls this on a turret shell's building event instead of crashInto's car event --
     // the same blastAt, the same crumble bookkeeping, the same support collapse, the same rebar reveal, the same park-on-
@@ -223,7 +223,7 @@ sec("6. THE SAME WALL, HIT BY A SHELL INSTEAD OF A CAR (shellInto, v4681)");
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FOR A CRATER (ROOMY, barrage) -- v4681");
+sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FOR A CRATER (ROOMY, barrage) -- v4822");
 {
     // race-brain.html draws this world through kitScene instead of crashScene, and a shell carves it through the same shellInto: the
     // unit-space arithmetic, the proxy and the repack rule live in crashDamage.mjs once, and these rows hold them with no browser
@@ -260,7 +260,7 @@ sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FO
     ok("*** ROOMY slots take a barrage that repacks the default world on every building: the same twelve shells, three buildings, no repack ***",
         tight.every((t) => t.r >= 1) && roomy.every((t) => t.r === 0) && roomy.every((t) => t.n === 12 && t.hit > 0));
 
-    // THE REMESH IS ONLY THE CHUNKS AN EDIT CAN REACH (v4681): a dirty flag names a chunk, not whether the edit was at its seam, so the
+    // THE REMESH IS ONLY THE CHUNKS AN EDIT CAN REACH (v4822): a dirty flag names a chunk, not whether the edit was at its seam, so the
     // old rule re-meshed all eight neighbours of every dirty chunk -- nine chunks, 15-25 ms, for a shell that carved one. The world
     // keeps an edit log now and syncDirty applies affectedChunks() to each edit. The danger is a seam: a carve centred ON a chunk corner
     // must still re-mesh all four chunks around it, and the picture must be exactly a full repack's.
@@ -293,7 +293,7 @@ sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FO
     const wm = D.worldUnit(gm.state), vd = gm.state.vertexData, cap = gm.state.capacity, born = gm.state.mesh;
     let nowSame = true, bornStale = false; for (let k = 0; k < cap * 3 && (nowSame || !bornStale); k++) { const v = vd[Math.floor(k / 3) * FLOATS + (k % 3)], expect = (v - wm.centre[k % 3]) / wm.radius; if (Math.abs(wm.mesh.positions[k] - expect) > 1e-5) nowSame = false; if (born.positions[k] !== v) bornStale = true; }
     ok("*** a world fleet built from a state edited in place (no repack) is the city AS IT IS: its mesh is the current slots' unit-space image, and the born pack it replaced is stale ***", nowSame && bornStale, `${cap} vertices; matches the slots ${nowSame}; the born pack differs from them ${bornStale}`);
-    // THE DEBRIS OF A SHELL IS VISUAL (v4681): race-brain.html hangs a VoxelDebrisSystem on the city and draws its cubes; the barrage does not
+    // THE DEBRIS OF A SHELL IS VISUAL (v4822): race-brain.html hangs a VoxelDebrisSystem on the city and draws its cubes; the barrage does not
     // know. The same shells with and without it remove the same voxels and charge the same hit points (cityHash folds hp alone), and the cubes burst.
     const gd0 = makeWith(D.ROOMY), gd1 = makeWith(D.ROOMY); gd1.debris = new VoxelDebrisSystem();
     const rd0 = D.barrage(gd0, 12, { shells: 6, from: [0, 0] }), rd1 = D.barrage(gd1, 12, { shells: 6, from: [0, 0] }), fold = (h, v) => Math.imul(h ^ v, 16777619) >>> 0;
@@ -386,7 +386,7 @@ const W = 256, H = 256;
             const pt = performance.now(); let d = null;
             while (performance.now() - pt < 30000) { await new Promise((r) => setTimeout(r, 250)); d = f.contentDocument; const el = d && d.getElementById("city"); if (el && /impacts [1-9]/.test(el.textContent)) break; }
             const txt = (id) => { const el = d && d.getElementById(id); return el ? el.textContent : ""; };
-            // v4681 -- THE PAGE ANSWERS A REPACK THE DEVICE BUFFER CANNOT TAKE: the proxy raises state.outgrown instead of writing past the end of
+            // v4822 -- THE PAGE ANSWERS A REPACK THE DEVICE BUFFER CANNOT TAKE: the proxy raises state.outgrown instead of writing past the end of
             // the buffer, and race-crash.html builds its scene again from the repacked state (race-brain.html's answer, now this page's too). The
             // flag is raised from here -- ROOMY slots mean no real ram reaches it -- and the page must notice, build, clear it, and keep racing.
             const rc = f.contentWindow.__raceCrash, steps = () => +((txt("car").match(/(\\d+) steps/) || [])[1] || 0), out = { be: txt("be"), tick: txt("tick"), city: txt("city"), car: txt("car"), pageMs: performance.now() - pt };

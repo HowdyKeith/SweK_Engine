@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/miniWs.mjs -- v4681
+// WebGLEngine/tools/ship/miniWs.mjs -- v4822
 //
 // A MINIMAL WEBSOCKET, SERVER AND CLIENT, FOR NODE, WITH NO DEPENDENCY: RFC 6455's text frames, continuation, ping/pong and close, over node:http's
 // 'upgrade'. It exists for the lockstep relay (tools/ship/lockstepRelay.mjs) and its node peer (tools/ship/lockstepPeer.mjs), so the cross-machine run needs

@@ -24,7 +24,7 @@
 //                                                                                      the tier-weights hold.
 //                   D  the seed not narrowed to u32 (this.seed = seed)               -> 1 red: the u32 hold (-1 and 7.9 recorded as given).
 //                   Each restored and the baseline re-run: 0 red.
-// SABOTAGE (v4681): E  cityHash's first draft folded `state` alongside `hp`; dropping the state fold           -> 0 red on every
+// SABOTAGE (v4822): E  cityHash's first draft folded `state` alongside `hp`; dropping the state fold           -> 0 red on every
 //                      row section 4 shipped with at the time -- damageAt's crumble/topple thresholds are a pure function of
 //                      hp / maxHp (fixed for a city's whole life), so two buildings at the same hp are always at the same
 //                      state, never two different ones a replay could disagree on. cityHash folds hp alone now; state was
@@ -97,7 +97,7 @@ sec("3. THE FILE");
     ok("no Math.random remains in world/CityGen.js's code (comments aside), and it imports rng from world/procPlanet.js", !/Math\.random/.test(codeOnly(src)) && /import \{ rng \} from "\.\/procPlanet\.js"/.test(src));
 }
 
-sec("4. cityHash, v4681: THE LOCKSTEP FOLD A SHELL THAT LANDED ON A DIFFERENT WALL MUST DISAGREE ON");
+sec("4. cityHash, v4822: THE LOCKSTEP FOLD A SHELL THAT LANDED ON A DIFFERENT WALL MUST DISAGREE ON");
 {
     // world/crashDamage.mjs's shellInto (a turret shell) and its own damageAt (a car crash) both mutate hp/state on this
     // same `buildings` array through no path box3d's own state hash reaches -- brain/gunnerPolicy-selfcheck.mjs proves

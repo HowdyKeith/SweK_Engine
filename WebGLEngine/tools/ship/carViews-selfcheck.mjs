@@ -15,9 +15,9 @@
 //   C  render/carViews.mjs: the activations without the output tanh            -> 2 red: both policies' outputs.
 //   D  render/carViews.mjs: the view cycle stuck on first-person               -> 3 red: the cycle, the click on both boots.
 //   E  race-brain.html: the page never refreshing its windows                  -> 3 red: the scene, the bars, the WebGPU boot.
-//   F  v4681, world/crashDamage.mjs: the world fleet's record the radius-1 sphere at the origin again (the old page's)  -> 2 red: the first-person window on
+//   F  v4822, world/crashDamage.mjs: the world fleet's record the radius-1 sphere at the origin again (the old page's)  -> 2 red: the first-person window on
 //      both backends (about a tenth lit: the road and the bars, no buildings).
-//   FINDING, v4681: THE BAR WAS SITTING ON A BROKEN PICTURE. This gate asked for MORE than a tenth lit and main read 10.0, 10.2 and 9.7 percent across three runs --
+//   FINDING, v4822: THE BAR WAS SITTING ON A BROKEN PICTURE. This gate asked for MORE than a tenth lit and main read 10.0, 10.2 and 9.7 percent across three runs --
 //   noise round a bar, which looked like a flaky threshold. It was the old page drawing its world as ONE record at the origin with radius 1, culled whenever the
 //   origin left the camera's frustum (the same defect crashDamage-selfcheck.mjs's E and its WORLD RECORD finding name): the first-person windows showed the road
 //   and no city, and a tenth was what that looks like. With the world drawn through world/crashDamage.mjs's worldFleet the window reads 35.6 to 39.4 percent, every
@@ -123,7 +123,7 @@ sec("3. THE PAGE: ONE WINDOW PER CAR, A CLICK CYCLES IT, THE PIXELS ARE THERE");
             ok("!! a click cycles the window's view and its label says so: turret, then brain", /turret/.test(p.turretLabel) && /brain/.test(p.brainLabel), `${p.turretLabel.slice(0, 60)} -> ${p.brainLabel.slice(0, 60)}`);
             ok("...and the brain window carries the bars", p.brainLit > 0.01, `${(p.brainLit * 100).toFixed(1)} % lit`);
         }
-        // v4681 -- AND ON WEBGPU, WITH PIXELS: ?offscreen=1 gives the page a device that renders into its own texture and never presents, which this harness
+        // v4822 -- AND ON WEBGPU, WITH PIXELS: ?offscreen=1 gives the page a device that renders into its own texture and never presents, which this harness
         // reads back indefinitely, so the first-person window's picture is held on the second backend too (the presented boot below keeps its own row)
         const po = await boot("?offscreen=1");
         ok("...and on WebGPU, through ?offscreen=1, the first-person window carries the scene as well: over a quarter of it lit, no 'view windows off'", po.ok && po.result && po.result.booted && po.result.windows === 4 && po.result.firstPerson > 0.25 && !/view windows off/.test(po.result.gun), po.ok && po.result ? `${(po.result.firstPerson * 100).toFixed(1)} % lit; ${po.result.gun.slice(0, 80)}` : String(po.reason || "").slice(0, 200));

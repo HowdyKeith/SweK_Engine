@@ -110,7 +110,7 @@ export function insideBox(p, pose, half, pad = 0) {
  * { owner, target, point, dir, ammo }, a building hit { owner, building, point, dir, ammo } -- the caller tells them apart by
  * which of `target`/`building`/`block` is present, never two.
  *
- * v4681 -- A FALSY SLOT IN `buildings` IS A GONE BUILDING, NOT A MISSING ONE. A building a shell already toppled (world/
+ * v4822 -- A FALSY SLOT IN `buildings` IS A GONE BUILDING, NOT A MISSING ONE. A building a shell already toppled (world/
  * crashDamage.mjs's shellInto, through the same city a car crash damages) has nothing left standing to hit, the way its
  * box3d collider is parked rather than tested once brain/gunnerPolicy.mjs's turretTick sees it toppled -- so the caller
  * hands stepShells the same list with that index nulled rather than removed, keeping every index the fixed rect it always
@@ -122,7 +122,7 @@ export function insideBox(p, pose, half, pad = 0) {
  * otherwise have found at sample 2. Checking either list alone and then the other, unconditionally, would let whichever list
  * runs second win ties it has no business winning.
  *
- * v4681 -- `blocks`: the falling blocks of world/buildingTopple.mjs, each { pos, quat, half } in the BODY's pose (insideBox already
+ * v4822 -- `blocks`: the falling blocks of world/buildingTopple.mjs, each { pos, quat, half } in the BODY's pose (insideBox already
  * takes a rotated box -- a block lying on its side is hit where it lies, not where its upright box was), a falsy slot an empty
  * one. A block hit is { owner, block: slot, point, dir, ammo }. Without this a building a shell brought down became a hole in the
  * shell's world the moment it toppled: its list slot is nulled, and the box3d body that fell out of it was nothing to a shell.

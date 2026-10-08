@@ -15,7 +15,7 @@
 // side (measured headless: a 4 x 10 x 4 block on a far-quarter stub is flat in 3.1 s, up.y 0.00, its centre 3.9 m past the
 // face it fell toward); a block whose centre is still over its stubs stands on what is left, and says so. A tall block that tips and
 // comes to rest LEANING (a 7 x 7 x 11 building on one column of ground floor: up.y 0.97, held between its stub and the road) has fallen as far as
-// it will, and settles like a fallen one (TOPPLE.leanUp, v4681); one still within 2.6 degrees of upright stays a body. The car the block
+// it will, and settles like a fallen one (TOPPLE.leanUp, v4822); one still within 2.6 degrees of upright stays a body. The car the block
 // falls toward is a body too: it is pressed, not passed through.
 //
 // THEN IT TURNS INTO DEBRIS. When the body comes to rest (or after TOPPLE.rest.maxAge), its voxels are carried through its
@@ -44,7 +44,7 @@ export const TOPPLE = Object.freeze({
     meshCap: 12000,               // vertices reserved per block fleet (a 6 x 12 x 6 building with facades meshes to a few thousand)
     rest: Object.freeze({ speed: 0.05, ticks: 30, minAge: 60, maxAge: 12 * 60 }),   // at rest: under `speed` for `ticks` in a row after minAge, or maxAge
     fallenUp: 0.5,                // a block whose up vector's y is under this has fallen; one above it stands on what is left, and stays a body
-    breakFraction: 0.25,          // a block shot down to this share of the voxels it fell with comes apart where it is (v4681)
+    breakFraction: 0.25,          // a block shot down to this share of the voxels it fell with comes apart where it is (v4822)
     leanUp: 0.999,                // ...unless it is tilted past this (2.6 degrees) and at rest: a lean-to on its stub and the road (measured 0.986 and 0.97), settles like a fallen one; a standing block reads 1.0000
     rubbleId: 7,                  // MaterialRegistry's RUBBLE
     debrisEvery: 3,               // one debris burst per this many voxels of a shattering block (the pool is capped at 400)
@@ -182,7 +182,7 @@ export function stepTopple(t, tick = t.tick + 1) {
         const o = rec.body * 7; rec.pose = { pos: [xf[o], xf[o + 1], xf[o + 2]], quat: [xf[o + 3], xf[o + 4], xf[o + 5], xf[o + 6]] };
         const sp = Math.hypot(vel[rec.body * 3], vel[rec.body * 3 + 1], vel[rec.body * 3 + 2]), age = tick - rec.born;
         rec.restTicks = sp < t.spec.rest.speed ? rec.restTicks + 1 : 0; rec.speed = sp; rec.up = quatUp(rec.pose.quat); rec.fallen = rec.up[1] < t.spec.fallenUp;
-        // v4681 -- a block that tipped and came to rest LEANING (a tall building on one column of ground floor: 0.97 up, held between its stub and
+        // v4822 -- a block that tipped and came to rest LEANING (a tall building on one column of ground floor: 0.97 up, held between its stub and
         // the road) is not standing on what is left; it has fallen as far as it will. A block still within leanUp of upright stays a body.
         rec.leaning = !rec.fallen && !rec.dropped && rec.up[1] < t.spec.leanUp;
         // a block that stands on what is left STAYS a body (the car can still push it over); one that has fallen over, leans at rest, or dropped with
@@ -256,7 +256,7 @@ export function toppleHash(h, t, fold) {
 }
 
 /**
- * v4681 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): THE BLOCK IS CHIPPED.
+ * v4822 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): THE BLOCK IS CHIPPED.
  * The hit point goes into the block's own frame (the inverse of its pose, so a block lying on its side is chipped where it is hit and not where
  * its upright box was), every voxel within the blast radius comes off, any piece the chip cuts loose from the largest remainder comes off with it
  * (a rigid body has no floating islands: they burst), the mesh is made again and written into the reserved buffer, and the block's hit points
@@ -305,7 +305,7 @@ export function shellOnBlock(t, slot, point, radius = 1.2) {
 }
 
 /**
- * v4681 -- A SCRIPTED DEMOLITION, for a gate that holds one runtime's fall to another's (node's box3d against the browser's, the same wasm in two
+ * v4822 -- A SCRIPTED DEMOLITION, for a gate that holds one runtime's fall to another's (node's box3d against the browser's, the same wasm in two
  * JS engines -- the nearest this tree gets to two machines in lockstep): cataclysm shells into the ground floor of the biggest building from tick
  * `at`, one every `every` ticks, until CityGen topples it (the support collapse shellInto already has), then one spark shell dropped from above
  * onto the block it became. No random anywhere: the positions are the rect's, the damage stream CityGen's own seeded one. Returns script(t, ctx)
@@ -325,7 +325,7 @@ export function demolitionScript(g, { at = 40, every = 3 } = {}) {
     };
 }
 
-// ---- the same blocks in a kitScene (v4681: race-brain.html's scene is the kit's, with extra fleets, not crashScene's) ----------------
+// ---- the same blocks in a kitScene (v4822: race-brain.html's scene is the kit's, with extra fleets, not crashScene's) ----------------
 /** kitScene's extraFleets for the block slots: a fleet per slot named block0.., a reserved mesh, one record parked until a block takes it. */
 export function kitFleets(t, { light = SUN, cap = TOPPLE.meshCap } = {}) {
     const park = t.spec.park;

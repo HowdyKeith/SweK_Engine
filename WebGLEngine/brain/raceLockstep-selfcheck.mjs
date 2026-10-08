@@ -1,4 +1,4 @@
-// WebGLEngine/brain/raceLockstep-selfcheck.mjs -- v4681 (beside brain/raceLockstep.mjs)
+// WebGLEngine/brain/raceLockstep-selfcheck.mjs -- v4822 (beside brain/raceLockstep.mjs)
 //
 // Run: node brain/raceLockstep-selfcheck.mjs
 //
@@ -16,7 +16,7 @@
 // pair before a step. Section 6: the contract's small guards -- a car nobody owns coasts, a peer hash that arrives before we have stepped is kept and
 // compared, the timestep is locked.
 //
-// SABOTAGE LOG -- v4681, each applied to brain/raceLockstep.mjs, the gate run, the file restored.
+// SABOTAGE LOG -- v4822, each applied to brain/raceLockstep.mjs, the gate run, the file restored.
 //   A  a peer stepping ITS OWN policies' answer for the other peer's cars instead of what came over the wire   -> 7 red: the hashes (it computes the other peer's commands
 //      from a fresher state than the owner did, input delay and all), the owners row, the hits, the divergence rows, the lossy wire. The policies are deterministic, so a peer
 //      that ignored the wire would agree with the owner exactly if there were no input delay; the delay is what makes the exchange load-bearing.

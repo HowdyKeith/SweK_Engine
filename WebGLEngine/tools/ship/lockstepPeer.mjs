@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebGLEngine/tools/ship/lockstepPeer.mjs -- v4681
+// WebGLEngine/tools/ship/lockstepPeer.mjs -- v4822
 //
 // ONE PEER OF THE RACE LOCKSTEP, FROM THE COMMAND LINE: the cross-machine check. Run the relay on one machine, one peer on each of two machines (or both on
 // one, in two terminals), and each prints whether the other's race came out bit for bit the same as its own.

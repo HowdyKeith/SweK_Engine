@@ -31,7 +31,7 @@ export const DAMAGE = Object.freeze({ radius: 1.5, maxDist: 400, debrisCap: 400,
 /**
  * the dirty chunks plus their neighbours, re-meshed; { chunks, dirty, rebuilt, ms }
  *
- * v4681 -- WITH A WORLD THAT RECORDS ITS EDITS (world.editLog, an array: render/voxelDevice.mjs's miniWorld when a caller turns it on),
+ * v4822 -- WITH A WORLD THAT RECORDS ITS EDITS (world.editLog, an array: render/voxelDevice.mjs's miniWorld when a caller turns it on),
  * ONLY THE CHUNKS AN EDIT CAN REACH. A dirty flag names the chunk that changed and nothing about WHERE in it, so the old rule re-meshes
  * all eight neighbours of every dirty chunk on the chance the edit was at a seam -- measured on this city, nine chunks (about 2 ms each)
  * for a shell that carved one, 15 to 25 ms of a 16.7 ms frame. voxelDeviceEdit's affectedChunks() is the rule for one edit (the chunk

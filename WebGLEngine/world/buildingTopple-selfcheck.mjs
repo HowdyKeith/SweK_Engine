@@ -30,17 +30,17 @@
 //      smallest was the largest. The split-tower row (a column of air, two anchored towers, the block the larger) was added; now 1 red.
 //   G. the support polygon is the stubs themselves, not their hull          -> 5 red: the corner-stubs row, the far-quarter and both
 //      prediction rows, and the 34-building outcome row (the buildings standing on two stubs were predicted to fall)
-//   H. v4681, bindKit rewriting only a block with no mesh yet (a scene built AGAIN keeps the old buffers' empty copy)  -> 2 red: the bind rows
+//   H. v4822, bindKit rewriting only a block with no mesh yet (a scene built AGAIN keeps the old buffers' empty copy)  -> 2 red: the bind rows
 //      here (the block already in the air is not written), and raceTurret-selfcheck.mjs's "a scene built AGAIN with the block in the air still draws it" on both backends.
-//   K. v4681, bindScene writing only a block with no mesh yet (the crash scene's binder, as H did to bindKit's)  -> 1 red: its second-bind row.
-//   L. v4681 (the chip), shellOnBlock leaving the hit point unrotated into the block's frame    -> 4 red: the lying block's voxel, its hit points, the mesh row (a wrong
+//   K. v4822, bindScene writing only a block with no mesh yet (the crash scene's binder, as H did to bindKit's)  -> 1 red: its second-bind row.
+//   L. v4822 (the chip), shellOnBlock leaving the hit point unrotated into the block's frame    -> 4 red: the lying block's voxel, its hit points, the mesh row (a wrong
 //      voxel came off), the lockstep fold row.
 //   M. the chip not making the mesh again                                                         -> 1 red: the mesh row (one mesh, at birth).
 //   N. the pieces a chip cuts loose staying on the block                                           -> 1 red: the 21-voxel bar (0 loose, 20 left, 6 cubes).
 //   O. breakFraction 0 (a block shot down never comes apart)                                       -> 2 red: the early-shatter row and the empty-slot row after it.
 //   P. localSig a constant                                                                         -> 1 red: the lockstep fold row (the signature did not move).
-//   I. v4681, leanUp zeroed (a block that came to rest leaning never settles)    -> 1 red: the lean-to row ("never shattered").
-//   J. v4681, leanUp 1.01 (even a block standing at 1.0000 counts as leaning)    -> 3 red: the middle-stub block "STANDS" (both rows) and the ram's body
+//   I. v4822, leanUp zeroed (a block that came to rest leaning never settles)    -> 1 red: the lean-to row ("never shattered").
+//   J. v4822, leanUp 1.01 (even a block standing at 1.0000 counts as leaning)    -> 3 red: the middle-stub block "STANDS" (both rows) and the ram's body
 //      (the 25 m/s ram's block settles and is gone, where it was meant to be a body on its stubs).
 // The first run of this gate against the module was 14 red: the bare-rect path never parked the building's static box (D above, a real
 // bug: the block was pushed 4 m out of the box and dropped upright), the exact centre of mass is of the whole anchored component (the
@@ -137,7 +137,7 @@ let farRun;
     const midRun = settle((x) => x === 1 || x === 2); report("middle stub: " + midRun.rows.join(" | "));
     ok("!! the block over a middle stub STANDS: after 5 s up.y is 1, its centre where it was, no fall, still a body (it stays one)", midRun.body && midRun.body.up[1] > 0.999 && near(midRun.body.pose.pos[0], 12, 0.05) && !midRun.body.fallen && midRun.t.bodies.length === 1 && midRun.t.shattered === 0, midRun.body ? `up.y ${midRun.body.up[1].toFixed(4)} pos ${midRun.body.pose.pos.map((v) => v.toFixed(2))}` : "no body");
     ok("...the prediction said so: over for the middle stub, not over for the far quarter", midRun.rec.over === true && farRun.rec.over === false);
-    // v4681 -- A LEAN-TO SETTLES. A tall building on ONE column of ground floor (7 x 7 x 11, the last column of seven) tips toward -x and is held
+    // v4822 -- A LEAN-TO SETTLES. A tall building on ONE column of ground floor (7 x 7 x 11, the last column of seven) tips toward -x and is held
     // between its stub and the road at about 0.97 up: the centre is not over the stub (not "standing") and it cannot fall further (not "fallen"). It
     // used to stay a body for ever, a ruin that never turned into rubble until a car pushed it.
     const leanRun = settle((x) => x === 6, 8, { w: 7, d: 7, h: 11 }); report("lean-to: " + leanRun.rows.join(" | ") + " | events " + JSON.stringify(leanRun.t.events.map((e) => [e.kind, e.up && e.up[1], e.fell])));
@@ -230,7 +230,7 @@ sec("5. THE SCENE EXTRAS, pure: a reserved fleet per slot, records parked until 
     ok("...and its corners reach the block's own half extents over the radius (2 and 4.5 over 5.315)", near(maxX, 2 / r.radius, 1e-5) && near(maxY, 4.5 / r.radius, 1e-5), `${maxX.toFixed(4)} / ${maxY.toFixed(4)}`);
     ok("...colour and normal ride with each vertex: an alpha of 1 and a unit normal", m.data[6] === 1 && near(Math.hypot(m.data[7], m.data[8], m.data[9]), 1, 1e-5));
 
-    // v4681 -- THE SAME BLOCKS IN A kitScene (race-brain.html): kitFleets / placeBlocks / bindKit, with a stub scene standing in for the device
+    // v4822 -- THE SAME BLOCKS IN A kitScene (race-brain.html): kitFleets / placeBlocks / bindKit, with a stub scene standing in for the device
     const kf = BT.kitFleets(t);   // the default cap, which beginTopple's own blockMesh uses: a block's mesh fills the reservation exactly
     ok("kitFleets: a fleet per slot named block0..2 -- a reserved mesh of meshCap vertices, the quat-mode pipeline, one parked record, the identity quaternion", kf.length === 3 && kf.every((f, k) => f.name === "block" + k && f.mesh.positions.length === BT.TOPPLE.meshCap * 3 && JSON.stringify(f.pipeline) === quatDesc && f.records[1] === -500 && f.extras[3] === 1 && f.records.length === 4));
     const scene = { kitRecords: new Float32Array(16 * 4), kitExtras: new Float32Array(16 * 4), fleets: kf.map((f) => ({ name: f.name, vbuf: { writes: [], write(d, o) { this.writes.push([d.length, o]); } } })) };
@@ -247,7 +247,7 @@ sec("5. THE SCENE EXTRAS, pure: a reserved fleet per slot, records parked until 
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("5b. THE CHIP (v4681): a shell on a falling block takes off the voxels in its blast, in the block's own frame; what it cuts loose goes with them; a block shot down comes apart");
+sec("5b. THE CHIP (v4822): a shell on a falling block takes off the voxels in its blast, in the block's own frame; what it cuts loose goes with them; a block shot down comes apart");
 {
     const SQ = Math.SQRT1_2, fold = C.foldHash;
     const fresh = (opts = {}) => { const { g, rect, phys } = bareWorld((x) => x === 3), debris = new VoxelDebrisSystem(), t = BT.createTopple(g, { debris }), meshes = []; t.onBlock = (slot, mesh) => meshes.push(mesh); const rec = BT.beginTopple(t, null, null, rect); return { g, t, rec, debris, meshes, phys }; };

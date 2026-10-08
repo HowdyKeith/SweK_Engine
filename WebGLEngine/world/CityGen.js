@@ -472,7 +472,7 @@ export class CityGen {
     }
 }
 
-// v4681 -- a turret shell can now carry a building through the same hp/crumble/topple machinery a car crash does
+// v4822 -- a turret shell can now carry a building through the same hp/crumble/topple machinery a car crash does
 // (world/crashDamage.mjs's shellInto), so the city's own mutable state can diverge a replay the same way a car
 // impact already can. Folding `state` alongside `hp` was the first draft's instinct -- belt and suspenders -- until
 // tools/ship/cityGenSeed-selfcheck.mjs's own sabotage (dropping the state fold) came back 0 red: damageAt's

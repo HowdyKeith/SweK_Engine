@@ -1,4 +1,4 @@
-// WebGLEngine/brain/raceLockstepPeer.mjs -- v4681
+// WebGLEngine/brain/raceLockstepPeer.mjs -- v4822
 //
 // ONE PEER OF A RACE LOCKSTEP, OVER A REAL TRANSPORT, runnable the same in a browser and in node: it takes a `transport` (send / onMessage / onClose / close --
 // a browser's WebSocket wrapped, or tools/ship/miniWs.mjs's client), the box3d wasm module it will race on, and its id; it waits for the relay's

@@ -83,7 +83,7 @@ let turrets = [], gunners = [], shells = [], turretBase = 0, gunStore = null, gu
 const DRIVE_DESC = PB.describePolicy("drivePolicy", D), GUNNER_DESC = PB.describePolicy("gunnerPolicy", GP);
 let peerBrain = null, peerBrainMeta = null, peerGunnerBrain = null, peerGunnerMeta = null;
 // v4680 -- buildings as a third thing a shell can hit, not only the ground and other cars: `buildings` is each rect's box
-// (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4681 -- `cityCtx` (world/
+// (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4822 -- `cityCtx` (world/
 // crashDamage.mjs's crashWorld(), the same context race-crash.html's car crashes damage) replaces the flat damage tally
 // a shell used to leave a building with the real one: hit points, crumble, a topple that parks the collider.
 let buildings = [], cityCtx = null, debris = null, debrisBase = 0, blockBase = 0, gpuBusy = false;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
@@ -145,7 +145,7 @@ function importBlobInto(policyKind, blob) {
   return r;
 }
 
-// v4681 -- the world is drawn from the editable chunk slots (world/crashDamage.mjs's worldFleet), not baked once: a shell that
+// v4822 -- the world is drawn from the editable chunk slots (world/crashDamage.mjs's worldFleet), not baked once: a shell that
 // carves a building (shellInto, through turretTick) is on the picture the frame it lands. A chunk that outgrows its slot repacks
 // the world into something bigger than the vertex buffer this scene was built with; the proxy flags it (state.outgrown) rather
 // than write past the end, and frame() answers by building the scene again from the repacked state.
@@ -195,7 +195,7 @@ function setupRace() {
   $("tick").textContent = `${describeTrack(track)}; ${cityCtx.rects.length} buildings; ${cars.length} cars: ${names.join(", ")} (red, green, yellow, purple), a turret on each; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
 }
 
-// v4681 -- ?shell=N, the way race-crash.html has ?ram=1 and ?demolish=1: N shells of the biggest spell (CD.barrage) into the building
+// v4822 -- ?shell=N, the way race-crash.html has ?ram=1 and ?demolish=1: N shells of the biggest spell (CD.barrage) into the building
 // nearest the lead car, through the same CD.shellInto the turrets use, so a gate (or a person) can see a crater without waiting for
 // a gunner to put a wall between itself and a rival. Runs once on load, after the first setupRace(); it is not part of any race.
 function probeShells(n) {
@@ -237,7 +237,7 @@ function setupViews(n) {
     v.label.textContent = CV.windowLabel(i, names[i] || "car", v.view);
   }
 }
-// v4681 -- A WINDOW READBACK THAT NEVER SETTLES MUST NOT FREEZE THE WINDOWS FOR EVER. refreshViews holds viewBusy for the length of a readback; a scene
+// v4822 -- A WINDOW READBACK THAT NEVER SETTLES MUST NOT FREEZE THE WINDOWS FOR EVER. refreshViews holds viewBusy for the length of a readback; a scene
 // built again (a repack) destroys the one a readback was issued on, and a device that neither answers nor rejects that read left viewBusy true for the
 // rest of the page's life -- every window frozen on its last picture, no error, no note (measured on the ship harness's WebGPU: 1,201 page frames in 20 s
 // and not one more window read). The wait is bounded; a timeout is a failed read like any other, uncounted when the scene was built again under it.
@@ -447,7 +447,7 @@ function frame(t) {
   const lead = poses[order[0].i]; centre = [lead.pos[0], 0, lead.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
-  // v4681 -- BACKPRESSURE: WebGPU's queue has none of its own. A page that submits a frame per animation frame to a GPU that draws slower than that
+  // v4822 -- BACKPRESSURE: WebGPU's queue has none of its own. A page that submits a frame per animation frame to a GPU that draws slower than that
   // (the ship harness's software one: 2,700 frames in 45 s) piles frames up in the queue without bound, and every window readback -- which resolves only
   // when the queue has drained to its own submission -- waits behind a deeper one each time: measured 0.3 s, 0.9, 2.5, 4.1, 6.5 s over 33 s, until the
   // windows seemed hung. The main view is drawn only when the last one it submitted has finished; the race and the records go on at the clock's pace.

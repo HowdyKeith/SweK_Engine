@@ -48,9 +48,9 @@ import * as D from "./drivePolicy.mjs";
 import * as U from "../physics/turret.mjs";
 import * as S from "../physics/slick.mjs";
 import * as A from "../physics/spellAmmo.mjs";   // v4592 (task 81): the spellbook as ammunition, and the pickups
-import * as CD from "../world/crashDamage.mjs";   // v4681: a shell against a building is the same wall a car crash breaks
-import * as BT from "../world/buildingTopple.mjs";   // v4681: ...and a shell against the block that building became
-import { CityGen, cityHash } from "../world/CityGen.js";   // v4681: the city a raceWithGunners `city` option races through
+import * as CD from "../world/crashDamage.mjs";   // v4822: a shell against a building is the same wall a car crash breaks
+import * as BT from "../world/buildingTopple.mjs";   // v4822: ...and a shell against the block that building became
+import { CityGen, cityHash } from "../world/CityGen.js";   // v4822: the city a raceWithGunners `city` option races through
 import { worldFromModule } from "../render/slugTicker.mjs";
 
 // v4590 (task 79) -- two more features and two more outputs: the gunner sees whether a car is close BEHIND (the slick's target)
@@ -236,7 +236,7 @@ export function perturb(w, sigma, rng) { const o = Float32Array.from(w); for (le
  * fired and flown, hits turned into impulses on the target chassis; and, with a slick state, drops laid, ignitions lit, the fires
  * stepped and the burns tallied. Since v4680, `buildings` (physics/raceCar.mjs's buildingBox() per rect) gives the same shells
  * something solid to stop on besides a car -- omit it and buildings are exactly as invisible to shells as they were before
- * that round, which is what every OTHER caller of this function still gets by not passing it. Since v4681, `cityCtx`
+ * that round, which is what every OTHER caller of this function still gets by not passing it. Since v4822, `cityCtx`
  * (world/crashDamage.mjs's crashWorld() + buildingColliders(), the same context a car crash damages) turns a building hit
  * into a real one -- hit points, crumble, rebar, a topple that parks the collider -- through CD.shellInto; without it a
  * building still blocks a shot (nothing passes through) but nothing happens to the wall, same as before that round.
@@ -248,11 +248,11 @@ export function turretTick(world, cars, turrets, shells, poses, cmds, t, spec, s
     fired.forEach((f, i) => { if (f.fires) { const sh = U.fireShell(shells, poses[i], turrets[i], i, t); sh.ammo = turrets[i].ammo ? A.spendShell(turrets[i].ammo) : A.AMMO.plain; sh.ammoIndex = A.ammoIndex(sh.ammo); } });
     if (slicks) fired.forEach((f, i) => { if (f.drop && S.dropSlick(slicks, poses[i], i, t)) turrets[i].drops = (turrets[i].drops || 0) + 1; if (f.ignite) S.igniteSlick(slicks, i, t); });
     const targets = cars.map((car, i) => ({ index: i, pose: poses[i], half: car.spec.half }));
-    // v4681 -- a building cityCtx's own city has already toppled is a null slot here, not a removed one: stepShells skips a
+    // v4822 -- a building cityCtx's own city has already toppled is a null slot here, not a removed one: stepShells skips a
     // falsy entry rather than dereference it, so a shell flies through where a wall used to stand, and every OTHER index
     // still names the same rect it always did (physics/turret.mjs's stepShells doc, the same rule the caller must keep).
     const live = cityCtx ? (buildings || []).map((bx, i) => { const r = cityCtx.rects[i], b = r && cityCtx.city.buildingAt(r.x + 0.5, r.z + 0.5); return b && b.state === "toppled" ? null : bx; }) : buildings;
-    // v4681 -- and the block a toppled building became is a body in the sky that a shell hits where it LIES, in its pose, by its slot
+    // v4822 -- and the block a toppled building became is a body in the sky that a shell hits where it LIES, in its pose, by its slot
     const tp = cityCtx && cityCtx.topple, blocks = tp ? tp.slots.map((r) => (r ? { pos: r.pose.pos, quat: r.pose.quat, half: r.half } : null)) : [];
     const events = U.stepShells(shells, targets, C.CAR.dt, { groundY: T.ROAD_Y - 2, gravity: spec.gravity, spec, buildings: live || [], blocks });
     // a hit is the spell's row applied: the impulse scaled by its damage over spark's, the splash, the slow, the fire or the pool under the target;
@@ -378,14 +378,14 @@ export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds
 }
 
 /**
- * v4681 -- THE RACE AS A STEPPER: raceWithGunners's loop body made callable one tick at a time, so a lockstep (brain/raceLockstep.mjs) can hold a
+ * v4822 -- THE RACE AS A STEPPER: raceWithGunners's loop body made callable one tick at a time, so a lockstep (brain/raceLockstep.mjs) can hold a
  * tick until every peer's commands are in. raceWithGunners above is now this plus a for-loop and finish(); every fingerprint the tree records is the
  * same number it was. step(rec) takes a tick's commands per car -- null asks the policies (the original behaviour), an array of
  * { throttle, steer, brake, yaw, pitch, fire, drop, ignite } is the replay path a log takes, and a lockstep's wire takes -- and returns { tick, hash }, the
  * RUNNING fingerprint (it folds the whole history, so a divergence stays visible at every tick after it). propose(cars) is what the policies would
  * command for those cars from the state NOW, in that same raw shape: the owner of a car sends it, every peer (the owner too) steps it.
  *
- * `city` (v4681): { script(t, ctx) } races through the REAL city (world/crashDamage.mjs's crashWorld, its buildings box3d colliders, world/buildingTopple.mjs
+ * `city` (v4822): { script(t, ctx) } races through the REAL city (world/crashDamage.mjs's crashWorld, its buildings box3d colliders, world/buildingTopple.mjs
  * installed so a building at zero hit points is a falling body) with turretTick handed the city, and folds cityHash and toppleHash into the fingerprint.
  * `script` runs at the top of each tick with { world, cars, poses, shells, turrets, cityCtx } -- a scripted demolition for the gate that holds node's fall to
  * the browser's. Without it nothing changes: the same static boxes, the same hash.
