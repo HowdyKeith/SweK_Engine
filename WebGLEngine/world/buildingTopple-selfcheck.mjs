@@ -30,6 +30,8 @@
 //      smallest was the largest. The split-tower row (a column of air, two anchored towers, the block the larger) was added; now 1 red.
 //   G. the support polygon is the stubs themselves, not their hull          -> 5 red: the corner-stubs row, the far-quarter and both
 //      prediction rows, and the 34-building outcome row (the buildings standing on two stubs were predicted to fall)
+//   H. v4681, bindKit rewriting only a block with no mesh yet (a scene built AGAIN keeps the old buffers' empty copy)  -> 2 red: the bind rows
+//      here (the block already in the air is not written), and raceTurret-selfcheck.mjs's "a scene built AGAIN with the block in the air still draws it" on both backends.
 // The first run of this gate against the module was 14 red: the bare-rect path never parked the building's static box (D above, a real
 // bug: the block was pushed 4 m out of the box and dropped upright), the exact centre of mass is of the whole anchored component (the
 // stub voxels pull it toward x 13.5), the greedy mesher makes a uniform block six quads (36 vertices, not 1056), a shattered record's
@@ -210,6 +212,17 @@ sec("5. THE SCENE EXTRAS, pure: a reserved fleet per slot, records parked until 
     let maxY = 0, maxX = 0; for (let i = 0; i < m.count; i++) { maxX = Math.max(maxX, Math.abs(m.data[i * 10])); maxY = Math.max(maxY, Math.abs(m.data[i * 10 + 1])); }
     ok("...and its corners reach the block's own half extents over the radius (2 and 4.5 over 5.315)", near(maxX, 2 / r.radius, 1e-5) && near(maxY, 4.5 / r.radius, 1e-5), `${maxX.toFixed(4)} / ${maxY.toFixed(4)}`);
     ok("...colour and normal ride with each vertex: an alpha of 1 and a unit normal", m.data[6] === 1 && near(Math.hypot(m.data[7], m.data[8], m.data[9]), 1, 1e-5));
+
+    // v4681 -- THE SAME BLOCKS IN A kitScene (race-brain.html): kitFleets / placeBlocks / bindKit, with a stub scene standing in for the device
+    const kf = BT.kitFleets(t);   // the default cap, which beginTopple's own blockMesh uses: a block's mesh fills the reservation exactly
+    ok("kitFleets: a fleet per slot named block0..2 -- a reserved mesh of meshCap vertices, the quat-mode pipeline, one parked record, the identity quaternion", kf.length === 3 && kf.every((f, k) => f.name === "block" + k && f.mesh.positions.length === BT.TOPPLE.meshCap * 3 && JSON.stringify(f.pipeline) === quatDesc && f.records[1] === -500 && f.extras[3] === 1 && f.records.length === 4));
+    const scene = { kitRecords: new Float32Array(16 * 4), kitExtras: new Float32Array(16 * 4), fleets: kf.map((f) => ({ name: f.name, vbuf: { writes: [], write(d, o) { this.writes.push([d.length, o]); } } })) };
+    BT.placeBlocks(scene, 5, t);
+    ok("placeBlocks: the block in slot 0 is its pose and bounding radius at record 5, the empty slots parked at y -500", near(scene.kitRecords[5 * 4], 12) && near(scene.kitRecords[5 * 4 + 1], 6.5) && near(scene.kitRecords[5 * 4 + 3], Math.fround(r.radius)) && scene.kitRecords[6 * 4 + 1] === -500 && scene.kitRecords[7 * 4 + 1] === -500, `record 5: ${Array.from(scene.kitRecords.slice(20, 24)).map((v) => +v.toFixed(2)).join(" ")}`);
+    BT.bindKit(t, scene);
+    ok("!! bindKit writes the block already in the air into the scene's reserved buffer for its slot (a scene built AGAIN has empty buffers), and nothing into the others", scene.fleets[0].vbuf.writes.length === 1 && scene.fleets[0].vbuf.writes[0][0] === BT.TOPPLE.meshCap * 10 && scene.fleets[1].vbuf.writes.length === 0 && scene.fleets[2].vbuf.writes.length === 0, JSON.stringify(scene.fleets.map((f) => f.vbuf.writes)));
+    BT.bindKit(t, scene);
+    ok("...and a SECOND bind (the next rebuild) writes it again: a block with its mesh already made is still rewritten", scene.fleets[0].vbuf.writes.length === 2);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------

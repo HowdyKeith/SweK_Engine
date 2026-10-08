@@ -18,7 +18,9 @@
 // barrage with no repack, a repack forced from outside is answered by the PAGE building its scene again, a rebuild under a window
 // readback in flight is not counted against the 3D windows, each 3D window holds a picture read back on that backend, and the cubes a
 // barrage bursts (render/voxelDamage.mjs's debris, a VoxelDebrisSystem on the city, drawn as the page's debris fleet) are on the picture,
-// placed by the page's own frame loop and aged by its sim ticks. The two
+// placed by the page's own frame loop and aged by its sim ticks; and a building the shells bring down is a box3d body in the page's physics
+// world (world/buildingTopple.mjs, race-crash.html's since v4591), its block a reserved fleet in the page's scene: on the picture, still on it
+// after the scene is built again, and shattered into rubble and cubes once it has fallen and rests. The two
 // backends read the same pixels off the live page (54,363 for the voxels, 1,071 for the edit after the rebuild).
 //
 // SABOTAGE LOG -- v4588, each applied to the file named, the gate run (both harness browsers), the file restored.
@@ -50,6 +52,17 @@
 //   X  race-brain.html: debris.update() never called                                               -> 2 red: each backend's "the cubes AGE" (age 0.0000 s
 //      after 240 animation frames). A first version counted the cubes left a second later and PASSED this sabotage: the pool holds 400, a later
 //      shell's burst evicts the oldest, and a page that never stepped its cubes looked as if it had -- the age of one particle is the measurement.
+//   Z1 race-brain.html: BT.stepTopple never called                                                    -> 2 red: each backend's "a block fallen over and at rest SHATTERS".
+//   Z2 race-brain.html: BT.placeBlocks never called                                                   -> 4 red: each backend's "the block is on the PAGE's picture"
+//      (0 px apart) and "a scene built AGAIN ... still draws it".
+//   Z3 race-brain.html: BT.bindKit never called (the block's mesh never reaches the scene)            -> 4 red: the same rows.
+//   Z4 world/buildingTopple.mjs: bindKit writing only a block with no mesh yet                       -> 2 red: each backend's "a scene built AGAIN ... still draws it"
+//      (the rebuilt scene's buffers are empty; the block stays invisible). Also buildingTopple-selfcheck.mjs's bind rows.
+//   FINDING, the "built AGAIN" row's first run read 306 px on WebGL2 where the first read 4,342: the rebuilt scene drew the city as it stood
+//   BEFORE the shells -- the toppled building back in it -- because worldUnit() meshed state.mesh, the born pack (crashDamage-selfcheck.mjs Y).
+//   FINDING, a block that stands on what the shells left (a 7 x 7 x 11 building on one remaining column leans, up.y 0.97, on its stub and the
+//   road) never shatters: the page's block row lays it flat on the road with setTransform (fallen, up.y < 0.5) and lets the page's own
+//   rest rule shatter it (263 / 174 rubble voxels, 88 cubes). The fall itself, box3d's, is held headless by world/buildingTopple-selfcheck.mjs.
 //   FINDING, a first draft of the cubes row aimed at the LAST whole building and read 0 px apart: it was 7 x 3 x 5, and 400 cubes inside its own
 //   crater are hidden by the wall around them. The biggest whole building shows them (about 3,000 px).
 //   FINDING, in the page half's first draft: it read the live page's scene back with a camera built OUT HERE and a frame handed to the iframe.
@@ -327,6 +340,43 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                     const pD = await shot1(); rb.debris.particles.length = 0; CD.placeDebris(rb.scene, rb.debrisBase, rb.debris); const pN = await shot1(), pN2 = await shot1();
                     out.debrisApart = apart1(pD, pN); out.debrisNoise = apart1(pN, pN2); out.debrisBuilding = i1;
                 }
+                // A BUILDING A SHELL BRINGS DOWN FALLS OVER AS A BOX3D BODY (world/buildingTopple.mjs, race-crash.html's since v4591), AND THE PAGE DRAWS IT.
+                // Shells at the ground floor of the biggest whole building until CityGen topples it (the support collapse shellInto already had): the block
+                // above the ground floor is a dynamic body in the PAGE's physics world on what the shells left of the ground floor, and a reserved fleet in
+                // its scene. Three claims, the page running: (1) the block is on the picture -- a frame with its record where the page put it against a
+                // frame with the record parked, issued back to back so no page frame falls between them; (2) a scene built AGAIN (a repack) with the
+                // block in the air still draws it -- bindKit writes the block into the new scene's buffers; (3) a block that has fallen over and come to rest
+                // shatters: laid flat on the road, it becomes rubble in the world and cubes, its record is parked, and the picture changes.
+                {
+                    const IW2 = f.contentWindow, rAF2 = () => new Promise((res) => IW2.requestAnimationFrame(res));
+                    const whole2 = c.rects.map((q, k) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp ? k : -1; }).filter((k) => k >= 0), i2 = whole2.reduce((a, k) => (c.rects[k].w * c.rects[k].d * c.rects[k].h > c.rects[a].w * c.rects[a].d * c.rects[a].h ? k : a), whole2[0]), q2 = c.rects[i2], m2 = q2.z + q2.d / 2;
+                    const gy = CD.CRASH.groundY + 1.5, rr = CD.blastRadius(40), T = c.topple;
+                    for (let x = q2.x + 0.5; x < q2.x + q2.w; x += 3) for (let z = q2.z + 0.5; z < q2.z + q2.d; z += 3) { if (c.city.buildingAt(q2.x + 0.5, q2.z + 0.5).state === "toppled") break; CD.shellInto(c, i2, [x, gy, z], rr, { x: 1, z: 0 }); }
+                    out.topEvents = T.events.map((e) => e.kind); out.topBodies = T.bodies.length; out.topBuilding = i2;
+                    await rAF2(); await rAF2(); out.topHud = /fell over as bodies/.test(txt("racing"));
+                    const eye2 = [q2.x - 22, 10, m2 + 16], ta = rb.device.texture({ width: 256, height: 256, render: true }), tb = rb.device.texture({ width: 256, height: 256, render: true });
+                    const cam2 = { viewProj: IW2.Float32Array.from(Gd.multiply(Gd.perspective(0.9, 1, 0.5, 600), Gd.lookAt(eye2, [q2.x - 3, 4, m2]))), eye: IW2.Array.from(eye2), clear: IW2.Array.from([0.03, 0.05, 0.08, 1]), read: true };
+                    const apart2 = (A, B) => { let n = 0; for (let p = 0; p < A.length; p += 4) if (Math.abs(A[p] - B[p]) > 8 || Math.abs(A[p + 1] - B[p + 1]) > 8 || Math.abs(A[p + 2] - B[p + 2]) > 8) n++; return n; };
+                    // the block's picture against the same scene with its record parked, both issued before the page's next frame
+                    const blockPair = async () => {
+                        const rec = T.bodies[0]; if (!rec) return -1;
+                        const o = (rb.blockBase + rec.slot) * 4, sc = rb.scene, fa = sc.frame({ ...cam2, target: ta }); sc.kitRecords.set([0, -500, 0, 1], o); const fb = sc.frame({ ...cam2, target: tb });
+                        return apart2(Uint8Array.from((await fa.pixels).pixels), Uint8Array.from((await fb.pixels).pixels));
+                    };
+                    out.blockApart = await blockPair();
+                    const builds0 = rb.sceneBuilds; c.state.outgrown = true;   // the flag a repack raises: the page builds its scene again from the state, with the block in the air
+                    for (let k = 0; k < 120 && rb.sceneBuilds === builds0; k++) await rAF2();
+                    await rAF2(); out.topRebuilt = rb.sceneBuilds - builds0; out.blockApartRebuilt = await blockPair();
+                    // laid flat on the road beside the building: fallen (up.y < 0.5), and at rest it shatters
+                    const rec = T.bodies[0];
+                    if (rec) {
+                        rb.phys.setTransform(rec.body, [q2.x - rec.half[1] - 3, CD.CRASH.groundY + 1 + rec.half[0] + 0.1, m2], [0, 0, Math.SQRT1_2, Math.SQRT1_2]);
+                        const t5 = performance.now(); while (T.shattered < 1 && performance.now() - t5 < 40000) await rAF2();
+                        out.shattered = T.shattered; out.rubbleVoxels = T.rubble; out.burst = T.burst; out.topBodiesAfter = T.bodies.length; out.shatterEvent = T.events.filter((e) => e.kind === "shatter").map((e) => ({ fell: e.fell, rubble: e.rubble, burst: e.burst, lost: e.lost }));
+                        await rAF2(); await rAF2(); out.slotParked = rb.scene.kitRecords[(rb.blockBase + rec.slot) * 4 + 1] === -500; out.hudShattered = /shattered/.test(txt("racing"));
+                    }
+                    out.builds1b = rb.sceneBuilds;   // the scene was built again once for the block stage's flag (and boot's build): the repack stage below counts from here
+                }
                 const i = c.rects.findIndex((q) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp; }), r0 = c.rects[i], mid = r0.z + r0.d / 2;
                 // THE CAMERA IS BUILT IN THE IFRAME'S OWN REALM: its frame() reads viewProj and eye through instanceof/typed-array checks, and a
                 // matrix made out here is another realm's Float32Array -- the page quietly kept its last camera (a car window's) and every
@@ -342,7 +392,7 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 // not count one that a rebuild caused.
                 let pending = 0, rebuilt = false; const oldScene = rb.scene, origFrame = oldScene.frame;
                 oldScene.frame = function (o) { const fr = origFrame.call(this, o); if (!o || !o.target || o.target === target) return fr; pending++; return { ...fr, pixels: fr.pixels.then(async (r) => { const t = performance.now(); while (!rebuilt && performance.now() - t < 8000) await new Promise((res) => setTimeout(res, 20)); if (rebuilt) throw new Error("simulated: the old scene was destroyed under this readback"); return r; }) }; };
-                const t2 = performance.now(); while (pending === 0 && performance.now() - t2 < 8000) await new Promise((res) => setTimeout(res, 20)); out.pending = pending;
+                const t2 = performance.now(), vf0 = rb.viewFrame; while (pending === 0 && performance.now() - t2 < 20000) await new Promise((res) => setTimeout(res, 20)); out.pending = pending; out.viewDiag = { busy: rb.viewBusy, frames: rb.viewFrame - vf0, ms: Math.round(performance.now() - t2) };
                 let placed = 0; for (let x = r0.x - 9; x <= r0.x - 4; x++) for (let z = r0.z - 1; z <= r0.z + 6; z++) for (let y = 1; y <= 7; y++) if ((x + y + z) % 2 === 0) { c.world.setVoxel(x, y, z, 1); placed++; }
                 VD.syncDirty(c.state); out.placed = placed; out.outgrownNow = c.state.outgrown;
                 const e0 = txt("racing").match(/^([0-9.]+) s:/), builds0 = rb.sceneBuilds, t3 = performance.now(); while (rb.sceneBuilds === builds0 && performance.now() - t3 < 8000) await new Promise((res) => setTimeout(res, 20));
@@ -363,10 +413,15 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 ok(bk + " -- the page's 3D car windows each hold a picture of its scene (more than a twentieth lit), read back on this backend", q.windows.length >= 2 && q.windows.every((w) => w.lit > 0.05), q.windows.map((w) => w.lit.toFixed(3)).join(" ") + ` after ${q.windowsMs.toFixed(0)} ms`);
                 report(`${bk}: the page's cubes -- ${q.debrisBefore} live before, ${q.debrisLive} after a 3-shell barrage into building ${q.debrisBuilding}, the HUD says so: ${q.debrisHud}; the wall's picture with them vs without: ${q.debrisApart} px apart (noise ${q.debrisNoise})`);
                 ok(bk + " -- the cubes AGE on the page: a particle's age moves with the race's own sim ticks (the page steps its debris), by a tick or two and no more", q.debrisAged > 0 && q.debrisAged < 0.2, `${q.debrisAged == null ? "no particle" : q.debrisAged.toFixed(4) + " s"} after the first tick`);
+                report(`${bk}: the falling block -- building ${q.topBuilding}: ${q.topEvents.join(",")}, ${q.topBodies} body, HUD says so ${q.topHud}; the block on the picture ${q.blockApart} px, after the scene was built again (${q.topRebuilt}x) ${q.blockApartRebuilt} px; laid flat it shattered ${q.shattered}x (${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${JSON.stringify(q.shatterEvent)}), its record parked ${q.slotParked}, HUD says so ${q.hudShattered}`);
+                ok(bk + " -- !! a building a shell brings down becomes a box3d body in the PAGE's physics world (the shells took the ground floor, CityGen's topple raised the block) and the HUD says it fell over", /topple|drop/.test((q.topEvents || []).join(",")) && q.topBodies === 1 && q.topHud === true, `events ${(q.topEvents || []).join(",")}, ${q.topBodies} body`);
+                ok(bk + " -- ...the block is on the PAGE's picture: a frame with its record where the page put it differs from the same frame with the record parked", q.blockApart > 300, `${q.blockApart} px apart`);
+                ok(bk + " -- ...and a scene built AGAIN with the block in the air still draws it (a repack must not lose a falling building)", q.topRebuilt === 1 && q.blockApartRebuilt > 300, `scene rebuilt ${q.topRebuilt}x, ${q.blockApartRebuilt} px apart`);
+                ok(bk + " -- ...a block fallen over and at rest SHATTERS: rubble in the world and cubes, the body gone, its fleet record parked, the HUD counting it", q.shattered === 1 && q.rubbleVoxels > 0 && q.topBodiesAfter === 0 && q.slotParked === true && q.hudShattered === true, `${q.shattered} shattered, ${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${q.topBodiesAfter} bodies left, parked ${q.slotParked}`);
                 ok(bk + " -- the cubes a shell bursts are on the PAGE's picture: its own frame loop placed them, and the wall looks different with them than with the particles parked", q.debrisLive > 30 && q.debrisApart > 300 && q.debrisNoise < 100, `${q.debrisLive} cubes, ${q.debrisApart} px apart, noise ${q.debrisNoise}`);
-                report(`${bk}: the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
-                ok(bk + " -- !! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1 + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);
-                ok(bk + " -- ...and a rebuild under a window readback in flight is NOT counted as a failed readback: the 3D windows stay on (no 'view windows off' note) after the old scene's reads were made to fail", q.pending >= 1 && !/view windows off/.test(q.viewsNote || ""), `${q.pending} readback(s) pending at the rebuild; note: "${(q.viewsNote || "").slice(0, 80)}"`);
+                report(`${bk}: the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1b}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
+                ok(bk + " -- !! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1b + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1b}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);
+                ok(bk + " -- ...and a rebuild under a window readback in flight is NOT counted as a failed readback: the 3D windows stay on (no 'view windows off' note) after the old scene's reads were made to fail", q.pending >= 1 && !/view windows off/.test(q.viewsNote || ""), `${q.pending} readback(s) pending at the rebuild; note: "${(q.viewsNote || "").slice(0, 80)}"` + (q.pending >= 1 ? "" : `; page frames ${q.viewDiag.frames} in ${q.viewDiag.ms} ms, a window readback busy: ${q.viewDiag.busy}`));
                 ok(bk + " -- ...the rebuilt scene draws what repacked it (the isolated voxels light the frame), the race kept running through it, and an edit after it reaches the page's own picture", q.cloudApart > 1000 && q.noise === 0 && q.t1 > q.t0 && q.editApart > 300 && q.builds3 === q.builds2 && q.errs.length === 0, `${q.cloudApart} px for the voxels (noise ${q.noise}), clock ${q.t0} -> ${q.t1} s, ${q.editApart} px from the edit, ${q.errs.length} page errors`);
             } else report(bk + ": the page half did not run: " + String(pg.reason || (pg.result && pg.result.error) || JSON.stringify(pg)).slice(0, 300));
         }

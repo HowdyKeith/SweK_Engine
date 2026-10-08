@@ -33,7 +33,7 @@ import * as T from "./raceTrack.mjs";
 import { CAR, createCar, stepCar, carPose, addBuildings, trackSurface } from "../physics/raceCar.mjs";
 import { ROAD_Y } from "./raceTrack.mjs";
 import { blastAt, syncDirty, debrisRecords, debrisLitPipelineDesc, DAMAGE } from "../render/voxelDamage.mjs";
-import { editState, FLOATS } from "../render/voxelDeviceEdit.mjs";
+import { editState, splitMesh, FLOATS } from "../render/voxelDeviceEdit.mjs";
 import { miniWorld, SUN, raycastVoxels } from "../render/voxelDevice.mjs";
 import { isRebar } from "../render/rebar.mjs";
 import { litPipelineDesc, litBind } from "../render/litSphere.mjs";
@@ -301,7 +301,10 @@ export function worldSphere(world) {
 export function worldUnit(state) {
     const { centre, radius } = worldSphere(state.world);
     const unit = (positions) => { const out = Float32Array.from(positions); for (let i = 0; i < out.length; i += 3) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } return out; };
-    const mesh = { ...state.mesh, positions: unit(state.mesh.positions) }, record = Float32Array.from([centre[0], centre[1], centre[2], radius]);
+    // the mesh is read back from state.vertexData, the CURRENT slots, and not from state.mesh: that is the pack the state was BORN with
+    // (editState / a repack refresh it, an in-place edit does not), so a scene built from it after a few shells drew the city as it was
+    // before them -- the toppled building standing again. Found by forcing a rebuild with no repack behind it (raceTurret-selfcheck.mjs).
+    const cur = splitMesh(state.vertexData, state.capacity), mesh = { ...cur, positions: unit(cur.positions) }, record = Float32Array.from([centre[0], centre[1], centre[2], radius]);
     const install = (vbuf) => {
         const bytes = state.vertexData.byteLength; state.outgrown = false;
         state.vbuf = { write(data, byteOffset = 0) {

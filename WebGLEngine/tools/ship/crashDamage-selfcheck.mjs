@@ -70,6 +70,10 @@
 //      equivalent mutation (extra chunks re-meshed, still correct), so only a row on the log itself catches it -- it is a cost, not a defect
 //      of the picture, and a shell would re-mesh every earlier shell's chunks again.
 //   Q  crashWorld never turns the log on                                             -> 2 red: the corner row and the lone-voxel row.
+//   Y  v4681, worldUnit() reading state.mesh (the pack the state was BORN with) and not the current slots   -> 1 red: "a world fleet built from a state edited
+//      in place is the city AS IT IS". A scene built again after shells drew the city as it was before them: found by the live page's topple
+//      stage forcing a rebuild with no repack behind it (the toppled building was standing in the rebuilt scene, +7,000 lit pixels). Every
+//      earlier rebuild followed a repack, which refreshes state.mesh, so nothing had ever shown it.
 //   T  v4681, shellInto reading only ctx.debris and not the city's own g.debris        -> 1 red: "a shell's debris is visual" (0 cubes live after
 //      5 carving shells). The same row holds the other half: the barrage with a debris system removes the same voxels, charges the same hit
 //      points and folds to the same cityHash as the one without -- the cubes are drawn, never simulated.
@@ -280,6 +284,13 @@ sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FO
     const gn = makeWith(D.ROOMY); gn.world.editLog = null; gn.world.setVoxel(corner[0] + 5, 0, corner[1] + 5, 0);   // a floor voxel, so the write changes something and the chunk is dirty
     const oldRule = VD.syncDirty(gn.state);
     ok("...and a world with no edit log still re-meshes every dirty chunk's eight neighbours (the rule it always had)", oldRule.chunks.length === 9, `${oldRule.chunks.length} chunks`);
+    // A SCENE BUILT AFTER SHELLS (race-brain.html builds again on a repack) DRAWS THE CITY AS IT IS NOW. state.mesh is the pack the state was born with --
+    // an in-place edit rewrites state.vertexData and leaves it alone -- so a worldUnit() that read it put every earlier crater back. The unit-space mesh is
+    // the CURRENT slots' image (what a repack, which refreshes both, always made true; a rebuild with no repack behind it did not).
+    const gm = makeWith(D.ROOMY); D.barrage(gm, 12, { shells: 6, from: [0, 0] });
+    const wm = D.worldUnit(gm.state), vd = gm.state.vertexData, cap = gm.state.capacity, born = gm.state.mesh;
+    let nowSame = true, bornStale = false; for (let k = 0; k < cap * 3 && (nowSame || !bornStale); k++) { const v = vd[Math.floor(k / 3) * FLOATS + (k % 3)], expect = (v - wm.centre[k % 3]) / wm.radius; if (Math.abs(wm.mesh.positions[k] - expect) > 1e-5) nowSame = false; if (born.positions[k] !== v) bornStale = true; }
+    ok("*** a world fleet built from a state edited in place (no repack) is the city AS IT IS: its mesh is the current slots' unit-space image, and the born pack it replaced is stale ***", nowSame && bornStale, `${cap} vertices; matches the slots ${nowSame}; the born pack differs from them ${bornStale}`);
     // THE DEBRIS OF A SHELL IS VISUAL (v4681): race-brain.html hangs a VoxelDebrisSystem on the city and draws its cubes; the barrage does not
     // know. The same shells with and without it remove the same voxels and charge the same hit points (cityHash folds hp alone), and the cubes burst.
     const gd0 = makeWith(D.ROOMY), gd1 = makeWith(D.ROOMY); gd1.debris = new VoxelDebrisSystem();

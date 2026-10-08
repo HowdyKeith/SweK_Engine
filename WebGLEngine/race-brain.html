@@ -63,6 +63,7 @@ import { SUN } from "./render/voxelDevice.mjs";
 import { CityGen, cityHash } from "./world/CityGen.js";
 import * as CD from "./world/crashDamage.mjs";
 import { VoxelDebrisSystem } from "./world/voxelDebrisSystem.js";
+import * as BT from "./world/buildingTopple.mjs";
 import { box3d } from "./physics/box3d/box3dLoader.js";
 import { worldFromModule } from "./render/slugTicker.mjs";
 
@@ -85,7 +86,7 @@ let peerBrain = null, peerBrainMeta = null, peerGunnerBrain = null, peerGunnerMe
 // (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4681 -- `cityCtx` (world/
 // crashDamage.mjs's crashWorld(), the same context race-crash.html's car crashes damage) replaces the flat damage tally
 // a shell used to leave a building with the real one: hit points, crumble, a topple that parks the collider.
-let buildings = [], cityCtx = null, debris = null, debrisBase = 0;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
+let buildings = [], cityCtx = null, debris = null, debrisBase = 0, blockBase = 0;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
 // v4590 -- the oil slick and the Doom Fire (task 79): the gunner's drop and ignite outputs land on physics/slick.mjs's patches; the
 // wheels run on the WRAPPED surface (oil cuts the grip, fire is hot road) and the slick state is folded into the fingerprint
 let slicks = null, slickSurf = null, slickBase = 0;
@@ -153,11 +154,13 @@ function buildScene() {
   const wf = CD.worldFleet(cityCtx.state, { light: SUN });
   const df = CD.debrisFleet({ light: SUN });
   debrisBase = placements.length + trucks.length + wf.records.length / 4;             // the first debris cube's record: after the kit's placements and the world
-  turretBase = debrisBase + df.records.length / 4;                                    // the first dome's record: after the debris
+  const bf = BT.kitFleets(cityCtx.topple, { light: SUN });
+  blockBase = debrisBase + df.records.length / 4;                                     // the first falling block's record: after the debris
+  turretBase = blockBase + bf.length;                                                 // the first dome's record: after the blocks
   slickBase = turretBase + 2 * cars.length + TURRET_DRAW.maxShells;                  // the first slick record: after the domes, barrels and shells
   pickupBase = slickBase + SLICK_DRAW.maxPatches + SLICK_DRAW.maxCells;              // the first pickup record: after the slicks and the fire cells
-  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [wf, df, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN }), ...slickFleets(L, { light: SUN }), ...pickupFleets(L, { light: SUN })] });
-  wf.install(scene); sceneBuilds++;
+  scene = kitScene(device, kit, [...placements, ...trucks], G, L, { light: SUN, dynamic: true, extraFleets: [wf, df, ...bf, ...turretFleets(cars.length, U.TURRET.barrel, L, { light: SUN }), ...slickFleets(L, { light: SUN }), ...pickupFleets(L, { light: SUN })] });
+  wf.install(scene); BT.bindKit(cityCtx.topple, scene); sceneBuilds++;   // a block already in the air is written into the new scene's buffers
 }
 
 function setupRace() {
@@ -169,6 +172,7 @@ function setupRace() {
   surface = trackSurface(track);
   if (phys) phys.destroy();
   phys = worldFrom(); CD.buildingColliders(cityCtx, phys);
+  BT.toppleWorld(cityCtx, { debris });   // a building at zero hit points falls over as a box3d body on what is left of its ground floor, then shatters (race-crash.html's, v4591)
   buildings = cityCtx.rects.map((r) => buildingBox(r));
   const cur = store.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
   let brains = cur ? [cur.weights, D.handWeights(), D.perturb(cur.weights, 0.05, rng), peerBrain || D.zeroWeights()] : [D.handWeights(), D.perturb(D.handWeights(), 0.05, rng), D.perturb(D.handWeights(), 0.1, rng), peerBrain || D.zeroWeights()];
@@ -211,6 +215,7 @@ function stepRace() {
   GP.turretTick(phys, cars, turrets, shells, poses, cmds, ticks, U.TURRET, replayRec ? null : slicks, replayRec ? null : pickups, replayRec ? null : buildings, replayRec ? null : cityCtx);
   const slowed = replayRec ? inputs : inputs.map((u, i) => ({ ...u, throttle: u.throttle * A.throttleFactor(turrets[i], ticks) }));   // a frostbitten car drives at half throttle
   const rs = stepCars(phys, cars, replayRec ? surface : slickSurf, slowed, CAR.dt);   // the lab's record was driven on the bare track
+  BT.stepTopple(cityCtx.topple);   // the falling blocks' poses read back after the world stepped; one that has fallen and rests shatters into rubble and cubes
   rs.forEach((r, i) => trackers[i].update(r.pose));
   if (debris) debris.update(CAR.dt);   // sim time, so a paused page holds its cubes; visual only -- nothing below reads them
   hash = foldHash(hash, phys.stateHash()); if (!replayRec) { hash = U.turretHash(hash, turrets, shells, foldHash); hash = S.slickHash(hash, slicks, foldHash); hash = A.ammoHash(hash, turrets, foldHash); hash = A.pickupHash(hash, pickups, foldHash); hash = cityHash(hash, cityCtx.city, foldHash); } ticks++;
@@ -425,13 +430,13 @@ function frame(t) {
   if (cityCtx.state.outgrown) buildScene();
   const poses = cars.map((c) => carPose(phys, c));
   poses.forEach((p, i) => { const tp = truckPlacement(p), k = placements.length + i; scene.kitRecords.set([tp.pos[0], tp.pos[1], tp.pos[2], 1], k * 4); scene.kitExtras.set(tp.quat, k * 4); });
-  CD.placeDebris(scene, debrisBase, debris);
+  CD.placeDebris(scene, debrisBase, debris); BT.placeBlocks(scene, blockBase, cityCtx.topple);
   placeTurrets(scene, turretBase, poses, turrets, shells);
   if (slicks) placeSlicks(scene, slickBase, slicks);
   if (pickups) placePickups(scene, pickupBase, pickups, ticks);
   const order = trackers.map((tk, i) => ({ i, laps: tk.laps, hit: tk.hit })).sort((a, b) => (b.laps - a.laps) || (b.hit - a.hit));
   const bHits = cityCtx.impacts.length, bDmg = cityCtx.city.buildings.reduce((s, b) => s + (b.maxHp - b.hp), 0);
-  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots}, ${turrets[o.i].drops || 0} slicks, burned ${((turrets[o.i].burned || 0) * CAR.dt).toFixed(1)} s, ${turrets[o.i].ammo ? turrets[o.i].ammo.loaded + (Number.isFinite(turrets[o.i].ammo.count) ? " x" + turrets[o.i].ammo.count : "") : "spark"} loaded, dealt ${(turrets[o.i].damageDealt || 0).toFixed(0)} took ${(turrets[o.i].damageTaken || 0).toFixed(0)})`).join("  ") + `  -- buildings: ${bHits} hit${bHits === 1 ? "" : "s"}, ${bDmg.toFixed(0)} damage of ${buildings.length}${debris.particles.length ? `, ${debris.particles.length} debris flying` : ""}${cityCtx.state.rebuilds ? `, ${cityCtx.state.rebuilds} repack${cityCtx.state.rebuilds === 1 ? "" : "s"}` : ""}` + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  $("racing").textContent = training ? $("racing").textContent : `${(ticks * CAR.dt).toFixed(1)} s: ` + order.map((o, k) => `${k + 1}. ${names[o.i]} (${o.laps} laps, ${o.hit} checkpoints, ${turrets[o.i].hits} hits of ${turrets[o.i].shots}, ${turrets[o.i].drops || 0} slicks, burned ${((turrets[o.i].burned || 0) * CAR.dt).toFixed(1)} s, ${turrets[o.i].ammo ? turrets[o.i].ammo.loaded + (Number.isFinite(turrets[o.i].ammo.count) ? " x" + turrets[o.i].ammo.count : "") : "spark"} loaded, dealt ${(turrets[o.i].damageDealt || 0).toFixed(0)} took ${(turrets[o.i].damageTaken || 0).toFixed(0)})`).join("  ") + `  -- buildings: ${bHits} hit${bHits === 1 ? "" : "s"}, ${bDmg.toFixed(0)} damage of ${buildings.length}${debris.particles.length ? `, ${debris.particles.length} debris flying` : ""}${cityCtx.topple.fallen ? `, ${cityCtx.topple.fallen} fell over as bodies` + (cityCtx.topple.shattered ? ` (${cityCtx.topple.shattered} shattered)` : "") : ""}${cityCtx.state.rebuilds ? `, ${cityCtx.state.rebuilds} repack${cityCtx.state.rebuilds === 1 ? "" : "s"}` : ""}` + ` -- fingerprint ${(hash >>> 0).toString(16).padStart(8, "0")}`;
   const lead = poses[order[0].i]; centre = [lead.pos[0], 0, lead.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
@@ -442,7 +447,7 @@ function frame(t) {
 // read-only handles for the gates, the way brain-maze.html keeps window.__maze: tools/ship/raceTurret-selfcheck.mjs reads the live
 // scene and the city's state off the page to hold that a repack rebuilt the scene and left the world fleet installed, and reads it back
 // through a render target of its own (the page's presented canvas is redrawn by its own frame loop between a gate's frame and its readback)
-window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; } };
+window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; } };
 
 main();
 </script>

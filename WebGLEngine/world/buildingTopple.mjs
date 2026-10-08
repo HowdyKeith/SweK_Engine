@@ -234,6 +234,35 @@ export function sceneExtras(t, G, L, { light = SUN, cap = TOPPLE.meshCap } = {})
     };
 }
 
+// ---- the same blocks in a kitScene (v4681: race-brain.html's scene is the kit's, with extra fleets, not crashScene's) ----------------
+/** kitScene's extraFleets for the block slots: a fleet per slot named block0.., a reserved mesh, one record parked until a block takes it. */
+export function kitFleets(t, { light = SUN, cap = TOPPLE.meshCap } = {}) {
+    const park = t.spec.park;
+    return Array.from({ length: t.spec.maxBodies }, (_, k) => ({ name: "block" + k, mesh: reservedMesh(cap), pipeline: bodyLitPipelineDesc(), bind: litBind(light), records: new Float32Array([park[0], park[1], park[2], 1]), extras: new Float32Array([0, 0, 0, 1]) }));
+}
+
+/** This frame's block poses into a dynamic kit scene; `base` is the record index of the first block fleet. */
+export function placeBlocks(scene, base, t) {
+    const R = scene.kitRecords, E = scene.kitExtras, park = t.spec.park;
+    for (let k = 0; k < t.spec.maxBodies; k++) {
+        const r = t.slots[k], o = (base + k) * 4;
+        if (r) { R.set([r.pose.pos[0], r.pose.pos[1], r.pose.pos[2], r.radius], o); E.set(r.pose.quat, o); }
+        else { R.set([park[0], park[1], park[2], 1], o); E.set([0, 0, 0, 1], o); }
+    }
+}
+
+/**
+ * Bind the topple to a built kit scene: a falling block's mesh goes into its slot's reserved vertex buffer. A scene built AGAIN
+ * (race-brain.html rebuilds on a repack) has empty buffers, so every block already in the air is written into the new one.
+ */
+export function bindKit(t, scene) {
+    const fleetOf = (slot) => scene.fleets.find((q) => q.name === "block" + slot);
+    t.onBlock = (slot, mesh) => { const f = fleetOf(slot); if (!f || !f.vbuf) throw new Error(`buildingTopple: the scene has no reserved fleet block${slot}`); f.vbuf.write(mesh.data, 0); };
+    t.onFree = null;
+    for (const r of t.bodies) { if (!r.mesh) r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
+    return t;
+}
+
 /** Bind the topple to a built crash scene: a falling block's mesh goes into its slot's reserved vertex buffer. `base` is the first block fleet's index. */
 export function bindScene(t, sc, base = sc.extrasBase) {
     const scene = sc.scene || sc;   // crashScene's result, or the gpuDriven scene itself
