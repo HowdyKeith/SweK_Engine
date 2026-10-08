@@ -372,10 +372,25 @@ export function gunnerStore({ persist = null, restore = null } = {}) {
  * policies. Returns { order, results, fingerprint, log, ticks, seed, fleet, shellSpeed } with results[i] carrying hits and shots.
  */
 export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, inputsLog = null, onTick = null, pickups: withPickups = true, city = null } = {}) {
-    // v4681 -- `city`: { script(t, ctx) } races through the REAL city (world/crashDamage.mjs's crashWorld, its buildings box3d colliders, world/buildingTopple.mjs
-    // installed so a building at zero hit points is a falling body) with turretTick handed the city, and folds cityHash into the fingerprint. `script` runs at the
-    // top of each tick with { world, cars, poses, shells, turrets, cityCtx } -- a scripted demolition for the gate that holds node's fall to the browser's.
-    // Without it nothing below changes: the same static boxes, the same hash, every fingerprint the tree already records.
+    const race = createRace(worldFrom, drivers, gunners, { seed, seconds, fleet, gap, shellSpeed, onTick, pickups: withPickups, city });
+    for (let t = 0; t < race.ticks; t++) race.step(inputsLog ? inputsLog[t] : null);
+    return race.finish();
+}
+
+/**
+ * v4681 -- THE RACE AS A STEPPER: raceWithGunners's loop body made callable one tick at a time, so a lockstep (brain/raceLockstep.mjs) can hold a
+ * tick until every peer's commands are in. raceWithGunners above is now this plus a for-loop and finish(); every fingerprint the tree records is the
+ * same number it was. step(rec) takes a tick's commands per car -- null asks the policies (the original behaviour), an array of
+ * { throttle, steer, brake, yaw, pitch, fire, drop, ignite } is the replay path a log takes, and a lockstep's wire takes -- and returns { tick, hash }, the
+ * RUNNING fingerprint (it folds the whole history, so a divergence stays visible at every tick after it). propose(cars) is what the policies would
+ * command for those cars from the state NOW, in that same raw shape: the owner of a car sends it, every peer (the owner too) steps it.
+ *
+ * `city` (v4681): { script(t, ctx) } races through the REAL city (world/crashDamage.mjs's crashWorld, its buildings box3d colliders, world/buildingTopple.mjs
+ * installed so a building at zero hit points is a falling body) with turretTick handed the city, and folds cityHash and toppleHash into the fingerprint.
+ * `script` runs at the top of each tick with { world, cars, poses, shells, turrets, cityCtx } -- a scripted demolition for the gate that holds node's fall to
+ * the browser's. Without it nothing changes: the same static boxes, the same hash.
+ */
+export function createRace(worldFrom, drivers, gunners, { seed = 1, seconds = 60, fleet = "00000000", gap = 4, shellSpeed = U.TURRET.shellSpeed, onTick = null, pickups: withPickups = true, city = null } = {}) {
     const surface = D.surfaceFor(seed), world = worldFrom(), cp = T.checkpoints(surface.track)[0];
     let cityCtx = null, cityBoxes = null;
     if (city) { cityCtx = CD.crashWorld(surface.track, CityGen); CD.buildingColliders(cityCtx, world); BT.toppleWorld(cityCtx, {}); cityBoxes = cityCtx.rects.map((r) => C.buildingBox(r)); }
@@ -386,12 +401,14 @@ export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds
     const slicks = S.createSlicks(), surf = S.slickSurface(surface, slicks);   // v4590: the oil and the fire under the wheels
     const field = withPickups ? A.pickupField(surface, { seed }) : null; turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });   // v4592: the spellbook's pickups
     const s0 = cars.map((c, i) => surface.along(cp.x + 5 - gap * i, cp.z).s), metres = cars.map(() => 0), lapTimes = cars.map(() => null);
-    const ticks = Math.round(seconds / C.CAR.dt), log = []; let h = 0x811c9dc5;
-    for (let t = 0; t < ticks; t++) {
-        const xf = world.readTransforms(), vel = world.readVelocities(), poses = cars.map((c) => C.carPose(world, c, xf, vel));
-        const rec = inputsLog ? inputsLog[t] : null;
-        const inputs = rec ? rec.map((r) => C.clampInput(r)) : poses.map((p, i) => C.clampInput(drive[i](p)));
-        const cmds = rec ? rec.map((r) => U.clampGun(r)) : poses.map((p, i) => { const j = nearestOther(i, poses); return U.clampGun(gun[i](p, turrets[i], j === null ? null : { pose: poses[j] }, pursuerInfo(i, poses, slicks))); });
+    const ticks = Math.round(seconds / C.CAR.dt), log = []; let h = 0x811c9dc5, t = 0;
+    const readPoses = () => { const xf = world.readTransforms(), vel = world.readVelocities(); return cars.map((c) => C.carPose(world, c, xf, vel)); };
+    const driveOf = (poses, i) => C.clampInput(drive[i](poses[i]));
+    const gunOf = (poses, i) => { const j = nearestOther(i, poses); return U.clampGun(gun[i](poses[i], turrets[i], j === null ? null : { pose: poses[j] }, pursuerInfo(i, poses, slicks))); };
+    function step(rec = null) {
+        const poses = readPoses();
+        const inputs = rec ? rec.map((r) => C.clampInput(r)) : poses.map((p, i) => driveOf(poses, i));
+        const cmds = rec ? rec.map((r) => U.clampGun(r)) : poses.map((p, i) => gunOf(poses, i));
         if (city && city.script) city.script(t, { world, cars, poses, shells, turrets, cityCtx });
         const tt = cityCtx ? turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field, cityBoxes, cityCtx) : turretTick(world, cars, turrets, shells, poses, cmds, t, spec, slicks, field);
         log.push(inputs.map((u, i) => ({ throttle: u.throttle, steer: u.steer, brake: u.brake, yaw: tt.cmds[i].yaw, pitch: tt.cmds[i].pitch, fire: tt.cmds[i].fire, drop: tt.cmds[i].drop, ignite: tt.cmds[i].ignite })));
@@ -403,14 +420,23 @@ export function raceWithGunners(worldFrom, drivers, gunners, { seed = 1, seconds
         h = C.foldHash(h, world.stateHash()); h = U.turretHash(h, turrets, shells, C.foldHash); h = S.slickHash(h, slicks, C.foldHash); h = A.ammoHash(h, turrets, C.foldHash); if (field) h = A.pickupHash(h, field, C.foldHash);
         if (cityCtx) { h = cityHash(h, cityCtx.city, C.foldHash); h = BT.toppleHash(h, cityCtx.topple, C.foldHash); }
         if (onTick) onTick(t, rs.map((r) => r.pose), turrets, shells, tt.events, slicks, tt.burns, field, tt.taken, tt.effects);
+        return { tick: t++, hash: h >>> 0 };
     }
-    const poses = cars.map((c) => C.carPose(world, c));
-    const cityOut = cityCtx ? { impacts: cityCtx.impacts.length, hp: Math.round(cityCtx.city.buildings.reduce((a, b) => a + b.hp, 0)), topple: { fallen: cityCtx.topple.fallen, shattered: cityCtx.topple.shattered, shellHits: cityCtx.topple.shellHits || 0, chipped: cityCtx.topple.chipped || 0, rubble: cityCtx.topple.rubble, bodies: cityCtx.topple.bodies.length, events: cityCtx.topple.events.map((e) => e.kind + (e.at != null ? "@" + e.at : "")) } } : null;
-    world.destroy();
-    const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
-    const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };
-    const order = results.slice().sort((a, b) => (b.laps - a.laps) || (Math.abs(b.metres - a.metres) > 1 ? b.metres - a.metres : tieKey(a) - tieKey(b))).map((r) => r.car);
-    return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n, pickups: !!field, pickupCount: field ? field.pickups.length : 0, city: cityOut };
+    /** what the policies command from the state now, for these cars (all of them by default), raw: the shape step() takes and a lockstep puts on the wire */
+    function propose(carIdx = null) {
+        const poses = readPoses();
+        return (carIdx || cars.map((_, i) => i)).map((i) => ({ car: i, ...driveOf(poses, i), ...gunOf(poses, i) }));
+    }
+    function finish() {
+        const poses = cars.map((c) => C.carPose(world, c));
+        const cityOut = cityCtx ? { impacts: cityCtx.impacts.length, hp: Math.round(cityCtx.city.buildings.reduce((a, b) => a + b.hp, 0)), topple: { fallen: cityCtx.topple.fallen, shattered: cityCtx.topple.shattered, shellHits: cityCtx.topple.shellHits || 0, chipped: cityCtx.topple.chipped || 0, rubble: cityCtx.topple.rubble, bodies: cityCtx.topple.bodies.length, events: cityCtx.topple.events.map((e) => e.kind + (e.at != null ? "@" + e.at : "")) } } : null;
+        world.destroy();
+        const results = drivers.map((w, i) => ({ car: i, laps: trackers[i].laps, metres: metres[i], lapTime: lapTimes[i], hash: D.weightsHash(w), gunnerHash: D.weightsHash(gunners[i]), hits: turrets[i].hits, shots: turrets[i].shots, drops: turrets[i].drops || 0, burned: turrets[i].burned || 0, damageDealt: turrets[i].damageDealt || 0, damageTaken: turrets[i].damageTaken || 0, acid: turrets[i].acid || 0, pickups: turrets[i].ammo.taken, ammo: turrets[i].ammo.loaded, pose: poses[i] }));
+        const tieKey = (r) => { let k = 0x811c9dc5; for (const ch of fleet + r.hash + r.gunnerHash) { k ^= ch.charCodeAt(0); k = Math.imul(k, 0x01000193); } return k >>> 0; };
+        const order = results.slice().sort((a, b) => (b.laps - a.laps) || (Math.abs(b.metres - a.metres) > 1 ? b.metres - a.metres : tieKey(a) - tieKey(b))).map((r) => r.car);
+        return { order, results, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), log, ticks, seed, fleet, shellSpeed, n, pickups: !!field, pickupCount: field ? field.pickups.length : 0, city: cityOut };
+    }
+    return { step, propose, finish, ticks, n, cars, world, turrets, shells, cityCtx, get tick() { return t; }, get fingerprint() { return (h >>> 0).toString(16).padStart(8, "0"); }, poses: readPoses };
 }
 
 /** Replay a gunners' race from its log alone: the same seed, car count and shell speed, no policies. Must reach the same fingerprint. */
