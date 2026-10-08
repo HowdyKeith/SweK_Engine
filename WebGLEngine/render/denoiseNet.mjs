@@ -7,6 +7,7 @@
 "use strict";
 import { seededRandom, initNet, netForward, netBackward, adamState, adamStep, ADAM, paramCount } from "../brain/convNet.mjs";
 import { CHANNELS, ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
+import { maskChannelOf } from "./denoiseMask.mjs";
 import { REL_EPS } from "./denoiseStats.mjs";
 
 /** The pre-registered shape: [Cin, Cout, act] per 3 x 3 layer. 6,387 parameters. */
@@ -62,13 +63,15 @@ export function denoise(net, x, H, W) {
     return { y: remodulated(x, out, H * W), acts };
 }
 function kernelApply(x, logits, H, W) {
-    const C = strideOf(x, H * W), R = KERNEL_RADIUS, D = 2 * R + 1, T = KERNEL_TAPS, y = new Float64Array(H * W * 3), w = new Float64Array(H * W * T);
+    const C = strideOf(x, H * W), mc = maskChannelOf(C), R = KERNEL_RADIUS, D = 2 * R + 1, T = KERNEL_TAPS, y = new Float64Array(H * W * 3), w = new Float64Array(H * W * T);
+    // a tap the kernel may weigh: inside the image and -- with an emitter mask (section 21) -- on the pixel's own side of it
+    const ok = (p, qy, qx) => qy >= 0 && qy < H && qx >= 0 && qx < W && (mc < 0 || x[(qy * W + qx) * C + mc] === x[p * C + mc]);
     for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
         const p = py * W + px;
         let m = -Infinity;
-        for (let t = 0; t < T; t++) { const qy = py + ((t / D) | 0) - R, qx = px + (t % D) - R; if (qy >= 0 && qy < H && qx >= 0 && qx < W) m = Math.max(m, logits[p * T + t]); }
+        for (let t = 0; t < T; t++) { const qy = py + ((t / D) | 0) - R, qx = px + (t % D) - R; if (ok(p, qy, qx)) m = Math.max(m, logits[p * T + t]); }
         let sum = 0;
-        for (let t = 0; t < T; t++) { const qy = py + ((t / D) | 0) - R, qx = px + (t % D) - R; if (qy >= 0 && qy < H && qx >= 0 && qx < W) sum += (w[p * T + t] = Math.exp(logits[p * T + t] - m)); }
+        for (let t = 0; t < T; t++) { const qy = py + ((t / D) | 0) - R, qx = px + (t % D) - R; if (ok(p, qy, qx)) sum += (w[p * T + t] = Math.exp(logits[p * T + t] - m)); }
         let r = 0, g = 0, b = 0;
         for (let t = 0; t < T; t++) {
             const wt = (w[p * T + t] /= sum);

@@ -16,8 +16,9 @@
 // render/denoiseScenes.mjs's renderImages(), which refuses every dataset seed without it; this round commits the
 // runner and gates it on --mini's scenes, seeded outside every split. The harvest round is the first to pass the flag.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
+import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit } from "./denoiseStats.mjs";
@@ -28,6 +29,7 @@ export const RESULTS_R2 = "render/denoise-results-r2.json";
 export const RESULTS_R3 = "render/denoise-results-r3.json";
 export const RESULTS_R4 = "render/denoise-results-r4.json";
 export const RESULTS_R5 = "render/denoise-results-r5.json";
+export const RESULTS_R6 = "render/denoise-results-r6.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -50,6 +52,12 @@ export const ROUND4 = Object.freeze({ splits: SPLITS_R4, init: INIT, c0: true, h
  */
 export const ROUND5 = Object.freeze({ splits: SPLITS_R5, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
                                       compareTrainSplit: SPLITS.train, results: RESULTS_R5 });
+/**
+ * Section 21: round 5 again with the emitter mask -- both methods given it, and the same hard rule for it -- on new
+ * test scenes. Secondary: both methods WITHOUT the mask, tuned and trained the same way, on the same test images.
+ */
+export const ROUND6 = Object.freeze({ splits: SPLITS_R6, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
+                                      emitterMask: true, compareNoMask: true, results: RESULTS_R6 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -83,7 +91,7 @@ export function stopBeforeTests(fit, hist, c0) {
  * is a sequence (render/denoiseTemporal.mjs): `x` is the 13-channel input over the accumulated history, `x9` the
  * measured frame's own 9-channel input, `accum` the accumulation re-modulated -- the last two for the secondaries.
  */
-export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false }) {
+export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, temporal = false, emitterMask = false }) {
     return split.seeds.map((seed, i) => {
         const family = familyOf(split, i);
         if (temporal) {
@@ -91,21 +99,25 @@ export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, tempor
             return { ...Q, x: temporalChannels(Q), x9: inputChannels(Q.input, Q.albedo, Q.normal, image, image), accum: remodulate(Q.A, Q.albedo) };
         }
         const I = renderImages(family, seed, { harvest, w: image, h: image, sppIn, sppRef, ref2 });
-        return { ...I, x: inputChannels(I.input, I.albedo, I.normal, image, image) };
+        const x9 = inputChannels(I.input, I.albedo, I.normal, image, image);
+        if (!emitterMask) return { ...I, x: x9 };
+        // section 21: the emitter coverage appended as a tenth channel; x9 kept for the no-mask secondary
+        const emission = emitterCoverage(makeScene(family, seed), image, image);
+        return { ...I, emission, x: withMask(x9, emission), x9 };
     });
 }
 
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
-                           compareNoHistory = false, compareTrainSplit = null, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
+                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
                            secondarySpp = [1, 16], log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
-    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory,
+    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask,
                      compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
-    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal }); };
+    const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal, emitterMask }); };
     for (const name of Object.keys(splits)) if (name !== "T1" && name !== "T2") render(name);
     lap("train rendered");
     const trainSet = R.train.map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
@@ -150,7 +162,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     for (const spp of secondarySpp) for (const name of ["T1", "T2"]) {
         // only the INPUT is new: the reference is the one the primary measurement used (a 1-sample "reference" is
         // rendered and dropped), so the secondary costs inputs, not another 1024 samples a pixel per scene
-        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false, temporal }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
+        const ims = renderSplit(splits[name], { harvest, image, sppIn: spp, sppRef: 1, ref2: false, temporal, emitterMask }).map((im, i) => ({ ...im, ref: R[name][i].ref }));
         secondary[`${name}@${spp}spp`] = {
             noisy: ims.map((im) => relMSE(im.input, im.ref)),
             filter: ims.map((im) => relMSE(jointBilateral(im.x, image, image, filter), im.ref)),
@@ -185,6 +197,17 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
         for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {
             filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref)),
             net: netsO.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))),
+        };
+    }
+    // secondary (section 21): both methods WITHOUT the emitter mask -- the filter tuned and the network trained on the
+    // same training scenes' 9-channel inputs -- on the same test images, to say what the mask changed
+    if (emitterMask && compareNoMask) {
+        const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
+        const filter9 = tuneFilter(train9, relMSE).best, nets9 = seeds.map((s) => trainDenoiser(train9, { seed: s, init, head, ...train }).net);
+        secondary.filterNoMask = filter9;
+        for (const name of ["T1", "T2"]) secondary[`${name}@noMask`] = {
+            filter: R[name].map((im) => relMSE(jointBilateral(im.x9, image, image, filter9), im.ref)),
+            net: nets9.map((net) => R[name].map((im) => relMSE(denoise(net, im.x9, image, image).y, im.ref))),
         };
     }
     lap("secondary");

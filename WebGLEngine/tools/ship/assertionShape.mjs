@@ -888,8 +888,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // denoiseNet, denoiseStudy and brain/convNet. usesOk, definesOk and nameFirst each by six; the rest hold.
     // the denoiser arc, round 4 -- 1937 -> 1938 for render/denoiseTemporal-selfcheck.mjs. usesOk, definesOk and nameFirst
     // each by one; the rest hold (the gate's own drift row named exactly these four).
-    gates: 1938, usesOk: 1917, definesOk: 1909, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1809, condFirst: 97, unknownSignature: 11,
+    // the denoiser arc, round 6 -- 1938 -> 1939 for render/denoiseMask-selfcheck.mjs. usesOk, definesOk and nameFirst each
+    // by one; the rest hold (the gate's own drift row named exactly these four).
+    gates: 1939, usesOk: 1918, definesOk: 1910, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1810, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

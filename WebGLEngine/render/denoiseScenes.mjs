@@ -6,7 +6,7 @@
 // references' seeds distinct by construction (control C5).
 //
 // *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
-// or SPLITS_R2-R5 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// or SPLITS_R2-R6 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -70,9 +70,19 @@ export const SPLITS_R5 = Object.freeze({
     T1: Object.freeze({ family: "A+B", families: Object.freeze([...rep("A", 6), ...rep("B", 6)]), seeds: Object.freeze([...range(13000, 6), ...range(14000, 6)]) }),
     T2: Object.freeze({ family: "C", seeds: range(15000, 12) }),
 });
+/**
+ * The emitter-mask round's splits (pre-registration section 21): round 5's training and validation scenes, and new
+ * test scenes -- H1's 6 A + 6 B and H2's 12 of family C -- on ranges no earlier split touched.
+ */
+export const SPLITS_R6 = Object.freeze({
+    train: SPLITS_R5.train,
+    val: SPLITS_R5.val,
+    T1: Object.freeze({ family: "A+B", families: Object.freeze([...rep("A", 6), ...rep("B", 6)]), seeds: Object.freeze([...range(16000, 6), ...range(17000, 6)]) }),
+    T2: Object.freeze({ family: "C", seeds: range(18000, 12) }),
+});
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
