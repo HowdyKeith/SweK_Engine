@@ -522,3 +522,59 @@ file exists.
 - **H1 and H2 supported:** the temporal network goes to the device beside the path tracer's page.
 - **H1 only:** transfer stays the open subject.
 - **Neither:** recorded with the controls' numbers. The arc stops until a new pre-registration changes the input.
+
+## 18. ROUND 4 (TEMPORAL) -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r4` at commit 17da0750 (its code is ebfb1e2a's, where section 17 was
+committed), 2026-10-08 02:21:06Z to 03:04:24Z (2,597 s). Its output, unedited, is `render/denoise-results-r4.json`.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C6, history | the accumulation brought the training images to 0.188 x the noisy error (bar 0.8) |
+| C0, train fit per seed | 0.134 / 0.127 / 0.125 |
+| C1 | network 12 of 12 and filter 12 of 12 against the measured frame's noisy input, on T1 and on T2 |
+| C2 | shuffled-target network mean d -1.93 |
+| C3 | 0 of 12 images near the floor on either set |
+| C4 | bit-identical retrain |
+| C5 | 520 render seeds, all distinct: 52 scenes x 10 |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, in-family (T1, seeds 9000-9011) | 12 | +0.193 | 0.00024 | 0.025 | **supported** |
+| H2, transfer (T2, seeds 10000-10011) | 5 | -0.076 | 0.806 | 0.05 | **not supported** |
+
+- **In-family, the temporal kernel network beats the filter given the same history on every image.** Geometric
+  means: network 0.0024, filter 0.0029. Every seed is at 0.0024.
+- **On the family it never saw, it does not.**
+  - Geometric means: network 0.0119, filter 0.0110. The filter wins on 7 of 12 images.
+  - The two worst images go the filter's way by about 40%.
+
+**Secondary** (reported, never tested, never used to choose). Geometric-mean relMSE on this round's measured frames:
+
+| | T1 | T2 |
+|---|---|---|
+| the noisy measured frame | 0.0137 | 0.0717 |
+| the accumulation alone | 0.0031 | 0.0140 |
+| filter, no history (re-tuned on single frames: sS 1, sN 0.3, sA 0.05, sI 1) | 0.0028 | 0.0247 |
+| filter on the accumulation (sS 1, sN 0.1, sA 0.05, sI 0.25) | 0.0029 | 0.0110 |
+| kernel network, no history (round 3's setup, seeds 1-3) | 0.0022-0.0023 | 0.0228-0.0277 |
+| kernel network on the accumulation (this round) | 0.0024 | 0.0114-0.0121 |
+| 1-sample sequences: filter / networks | 0.0052 / 0.0044-0.0048 | 0.0404 / 0.0342-0.0363 |
+| 16-sample sequences: filter / networks | 0.0024 / 0.0018-0.0019 | 0.0043 / 0.0055-0.0062 |
+
+- val: filter 0.0021, networks 0.0017-0.0018.
+- **On family A's measured frames, the history bought neither method anything**: the filter is 0.0028 without it and
+  0.0029 with it, the network 0.0022-0.0023 without it and 0.0024 with it.
+- **On family B the history roughly halved both methods' error,** and the accumulation alone beat both single-frame
+  methods there.
+- None of this was tested. It says where to look, not what is true.
+
+**What this buys, per section 17: "H1 only".**
+- The pattern of rounds 3 and 4 is the same. A kernel-predicting network beats the hand-written filter on the family
+  it was trained on (10 of 12, then 12 of 12) and does not on a family it never saw (5 of 12 both times).
+- Transfer stays the open subject.
+- The network does not go to the device on this result. Section 9 asks for both hypotheses.
