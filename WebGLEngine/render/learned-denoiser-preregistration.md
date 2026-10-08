@@ -926,3 +926,48 @@ file exists.
 - **H1 only:** a broad randomized set of this size does not buy transfer to a family outside its support.
 - **H2 only:** recorded as found.
 - **Neither:** recorded with the controls' numbers.
+
+## 24. ROUND 7 -- THE HARVEST, INTERRUPTED, AND MADE RESUMABLE BEFORE IT RUNS AGAIN
+
+Committed with the code that implements it, before the harvest runs again. No number from round 7's test scenes has
+been seen.
+
+**What happened.**
+- Section 23's command started at 14:02Z from c1d86ab2, on a box about twice as slow as the one the gate budgets
+  are recorded on.
+- A background run in this environment is stopped at 2 hours. The harvest needs about 2.1 hours on this box, so it
+  was stopped at 7200 s. Its last stage line was "measured" (5608 s), and it was working through the secondaries.
+- The results file is written only when the run ends, so **nothing was written**.
+- The log prints only stage names and times. The verdict was computed in memory and discarded unseen. No relMSE, no
+  sign count, no control's value was printed or read.
+- The test scenes were rendered inside that process and never left it. The scenes and render seeds are fixed, and the
+  renderer is deterministic, so a second run renders the same images bit for bit. Nothing about them was learned that
+  could inform a choice.
+
+**One change, to how the run is executed. The study itself is unchanged.**
+- `render/denoiseCache.mjs` keeps every expensive deterministic piece in a directory:
+  - each rendered scene;
+  - each tuned filter;
+  - each trained network.
+- Each piece is keyed by everything it depends on:
+  - a scene by its family, seed, size, sample counts, whether it carries the second reference, and `--harvest`;
+  - a filter by every bit of its training set;
+  - a network by every bit of its training set and every training option.
+- Control C4's second training of seed 1 is its own record, so a resumed run still compares two trainings.
+- The directory is stamped with the round, the commit and the code's diff, and is refused by any other.
+- Values are stored exactly: arrays as their own bytes, -0 and non-finite numbers tagged. Anything that could not be
+  given back exactly is refused when it is saved.
+- **Gated** (`render/denoiseCache-selfcheck.mjs`) on a miniature shaped like this round: family R, the mask, the
+  kernel head, the A+B comparison, two secondaries that differ only in their input's samples. Stopped after training
+  and resumed, it gives the uninterrupted run's verdict, tables, filter and secondaries **bit for bit**. 12 sabotages;
+  11 red, and the twelfth is refused by a second line and red with both removed.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r7 --cache <dir>`.
+- If a background limit stops it again, the same command is run again, and resumes.
+- It still refuses if `render/denoise-results-r7.json` exists.
+- The results file adds one field, `cache: { hits, misses }`: how much of the finishing run was read back from an
+  earlier, interrupted one.
+- Nothing in sections 3-11 or 23 changes: splits, seeds, network, training, filter grid, statistic, controls,
+  outcomes.
+
+The results will be section 25.

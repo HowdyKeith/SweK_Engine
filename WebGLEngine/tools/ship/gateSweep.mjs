@@ -8118,6 +8118,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 7 -- THE HARVEST, RESUMABLE.
+    since489: Object.freeze({
+        at: "the denoiser arc, round 7 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseCache-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** A HARVEST LONGER THAN ONE BACKGROUND RUN, RESUMED BIT FOR BIT. *** Round 7's harvest needs about 2.1 " +
+                 "hours on a slow box and a background run is stopped at 2: the first was stopped after \"measured\", in the " +
+                 "secondaries, before its results file was written, so nothing was read. render/denoiseCache.mjs keeps each " +
+                 "rendered scene, tuned filter and trained network in a directory keyed by everything it depends on -- every " +
+                 "input bit, every option, --harvest -- stamped with the round, the commit and the code's diff; the same " +
+                 "command again resumes. Gated on a miniature shaped like round 7: stopped after training and resumed, it " +
+                 "gives the uninterrupted run's verdict, tables, filter and secondaries bit for bit; control C4's second " +
+                 "training is its own record (one ulp in it turns determinism off). 12 sabotages, 11 red; the twelfth is " +
+                 "refused by a second line, and red with both removed.",
+    }),
     // the denoiser arc, round 7 -- THE RANDOMIZED FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
     since488: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
