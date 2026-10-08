@@ -1211,3 +1211,121 @@ on 12 and 12. Test-time C1 as section 7 wrote it would also have held this time.
 - On a broad family it is better on average but not image by image.
 - It has not once beaten the filter on a family it never saw, trained narrow or broad.
 - The network does not go to the device on these results. Section 9 asks for both hypotheses.
+
+## 28. ROUND 9 -- THE LARGER NETWORK, TRAINED LONGER, TESTED BY SIZE -- FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question is section 23's, unchanged.**
+
+> **Trained on a broad, randomized distribution of scenes instead of two fixed families, does the network beat the
+> filter on a family that distribution never draws?**
+
+**Two deliberate changes from round 8, both asked for by Keith after section 27.** One is the method, one is the
+analysis. The secondaries below separate them.
+
+1. **A larger network, trained longer.**
+   - **The network:** four 3 x 3 layers of 32 (ReLU), then the same 1 x 1 head to 81 logits and the same softmax kernel
+     over the 9 x 9 window, with the mask's same-side rule.
+     - Four 3 x 3 layers give a receptive field of exactly 9 x 9: the network sees the whole window whose weights it
+       predicts. Round 8's three layers of 16 saw 7 x 7.
+     - 33,329 parameters, against 7,473.
+     - Its hidden width is the device kernel's `COUT_MAX`. The head's 81 still exceeds it.
+     - In code: `SHAPE_KERNEL_LARGE`, `size: "large"`.
+   - **The training:** 4,500 steps (`TRAIN_LONG`), three times round 8's 1,500.
+     - Everything else is unchanged: batch 4, 32 x 32 crops, Adam (lr 1e-3), zero-last initialisation, seeds 1, 2, 3.
+     - Zero-last makes the untrained large network exactly the small one: the 9 x 9 box mean, bit for bit.
+     - A run's first 1,500 steps are round 8's schedule exactly. The stream draws the same crops, and Adam has no
+       schedule.
+     - 4,500 rather than more: on this box one large training of 4,500 steps takes about 1.3 hours, and four of them,
+       side by side, must finish inside one background run (2 hours) to be kept (section 24).
+   - Control C2's shuffled-target networks and C4's second training are the large network, trained the same way.
+2. **The hypotheses are tested by how much each image is won or lost, not only by which way.**
+   - The test is the exact one-sided sign-flip test of the mean of d (`signFlipUpper`):
+     - d_i = ln relMSE(filter_i) - ln relMSE(network_i), as before;
+     - p is the fraction of all 2^12 sign assignments s whose sum of s_i |d_i| reaches the observed sum of d_i;
+     - sums that tie in exact arithmetic are not split by rounding.
+   - Holm over {H1, H2} at 0.05 as before. A hypothesis is supported when Holm rejects and the mean of d is positive.
+   - When every effect is the same size, it is the sign test exactly. A gate holds that bit for bit for every count.
+   - A single large win cannot carry it alone. With one effect of +5 and eleven of -0.1, p = 0.5.
+   - In code: `verdict({ test: "signflip" })`. Each hypothesis reports `pSign` beside the tested `p`.
+   - **Chosen after round 8**, whose count of 7 of 12 missed an average advantage carried by its three noisiest
+     images. So, applied to every reported round's results file before this was written:
+
+| Round | | Network wins | sign test p | sign-flip p | Verdict either way |
+|---|---|---|---|---|---|
+| 2 | H1 / H2 | 2 / 1 of 12 | 0.9968 / 0.9998 | 0.9890 / 0.9998 | not supported / not supported |
+| 3 | H1 / H2 | 10 / 5 | 0.0193 / 0.8062 | 0.0022 / 0.8250 | **supported** / not supported |
+| 4 | H1 / H2 | 12 / 5 | 0.0002 / 0.8062 | 0.0002 / 0.8149 | **supported** / not supported |
+| 6 | H1 / H2 | 11 / 1 | 0.0032 / 0.9998 | 0.0010 / 0.9941 | **supported** / not supported |
+| 8 | H1 / H2 | 7 / 2 | 0.3872 / 0.9968 | 0.0522 / 0.9724 | not supported / not supported |
+
+   - **It changes no earlier verdict.** Round 8's H1 comes closest: 0.052, against the 0.025 it would have needed.
+
+**Everything else is round 8's:**
+- the training split (the same 96 scenes of R) and val;
+- the filter and its grid;
+- the emitter mask and its rule;
+- C0, C1 on the training images (88 of 96), C2-C5, and the stop before the tests.
+
+**New test splits** (`SPLITS_R9`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train, val | round 7's | 20000-20095, 21000-21003 |
+| T1 -> **H1** | 12 of R | **26000-26011** |
+| T2 -> **H2** | 12 of family C | **27000-27011** |
+
+- No earlier split touched either test range.
+- C5 holds over nine rounds.
+
+**Secondary** (reported, never tested):
+- **Round 8's small network,** trained exactly as round 8 trained it (1,500 steps), on the same test images. Each
+  hypothesis's statistics for it are reported under both tests. This separates the network from the test.
+- **The sign test,** beside every sign-flip p.
+- 1- and 16-sample inputs, val, and time.
+- Round 7-8's A+B comparison is dropped. It answered its question in sections 25 and 27.
+
+**Executed in parallel, bit for bit.**
+- Seven large trainings at about 1.3 hours each would not fit one after another.
+- `render/denoisePool.mjs` trains up to four at once in worker threads. Every training is independent and seeded, and
+  a worker runs the same `trainDenoiser` on an exact copy of the same images.
+- Gated: the networks come back bit for bit the serial ones, in job order. A whole miniature study shaped like this
+  round gives the same result with workers as without, even when the workers train only what a half-filled cache
+  lacked.
+- The results record the worker count beside the cache's counts.
+
+**What was seen first.**
+- Everything about the training split (rounds 7 and 8), and rounds 2-8's test statistics (above).
+- **The pilot,** run before this was written on the 96 training images only, read from round 8's cache (nothing
+  rendered). Each network was trained once, seed 1, with its training fit (C0's ratio) and C1's count every 1,500 steps:
+
+| Steps | small network (7,473): training fit / beats noisy | large network (33,329): training fit / beats noisy |
+|---|---|---|
+| 1,500 | 0.1513 / 95 of 96 (round 8's seed 1, reproduced exactly) | 0.1286 / 96 of 96 |
+| 3,000 | 0.1280 / 96 | 0.1158 / 96 |
+| 4,500 | 0.1184 / 96 | -- (the harvest's own seed-1 training) |
+| 6,000 | 0.1129 / 96 | -- |
+
+- **Both changes help on the training images.** At 1,500 steps the large network fits 15% better than the small one,
+  and longer training keeps helping both, by less each time.
+- **C0 (<= 0.8) and C1 (88 of 96) hold** on seed 1 at every checkpoint.
+- The large pilot was stopped at 3,000 steps, at 3,108 s. The harvest's seed-1 training repeats it bit for bit and
+  goes on to 4,500. Its pace there, about 1 s a step beside the small pilot, is where the 1.3-hour figure above comes
+  from.
+
+- Nothing of either new test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r9 --cache <dir> --workers 4` ->
+`render/denoise-results-r9.json`.
+- It refuses if the file exists.
+- About 3.4 hours on this box, so expect one resume (section 24).
+
+**The outcomes are section 23's:**
+- **H1 and H2 supported:** breadth buys transfer. The network goes to the device, with the head widened past
+  `COUT_MAX` 32.
+- **H1 only:** a broad randomized set of this size does not buy transfer to a family outside its support, even for
+  the larger network.
+- **H2 only:** recorded as found.
+- **Neither:** recorded with the controls' numbers.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.

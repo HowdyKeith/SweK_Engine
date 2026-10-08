@@ -45,6 +45,27 @@ export function signTestUpper(k, n) {
 }
 
 /**
+ * Section 28's test, which weighs each image by HOW MUCH it was won or lost, not only by which way: the exact one-sided
+ * sign-flip (randomization) test of the mean of d. Under the null that the network and the filter are exchangeable,
+ * each d_i is as likely to have the opposite sign; p is the fraction of all 2^n sign assignments s whose sum of
+ * s_i |d_i| is at least the observed sum of d_i. A sum within 1e-12 of the observed (relative) counts as reaching it --
+ * sign assignments that tie in exact arithmetic must not be split by rounding.
+ */
+export function signFlipUpper(d) {
+    const n = d.length;
+    if (!n || n > 24 || !d.every(Number.isFinite)) throw new Error(`denoiseStats: a sign-flip test over ${n} effects`);
+    const a = d.map(Math.abs), obs = d.reduce((x, v) => x + v, 0), tol = 1e-12 * Math.max(1, a.reduce((x, v) => x + v, 0));
+    let hits = 0;
+    for (let m = 0; m < 2 ** n; m++) {
+        let sum = 0;
+        for (let i = 0; i < n; i++) sum += (m >>> i) & 1 ? -a[i] : a[i];
+        if (sum >= obs - tol) hits++;
+    }
+    return hits / 2 ** n;
+}
+export const TESTS = Object.freeze(["sign", "signflip"]);
+
+/**
  * Holm-Bonferroni, step-down: sort the p values ascending; the i-th smallest (from 0) is held to alpha / (m - i), and
  * the first that fails stops every later one. Returns per input index { p, threshold, reject }.
  */
@@ -106,9 +127,12 @@ export function trainSanity(filterRel, netRel, noisyRel) {
  * `shuffled` is the shuffled-target network's per-seed relMSE on H1's set (control C2); `determinism` (C4) and
  * `seedsDistinct` (C5) are the booleans their checks produced; `c0`, when given, is trainFit()'s result, and `c6`
  * historyFit()'s. `c1Train`, when given, is trainSanity()'s: C1 is then decided on the training images (section 26),
- * and each test set's wins over the noisy input are reported, not tested. Returns { run, reasons, hypotheses, controls }.
+ * and each test set's wins over the noisy input are reported, not tested. `test` picks the statistic Holm is applied
+ * to: "sign" (sections 6-27) or "signflip" (section 28); each hypothesis reports both p values, and `p` is the tested
+ * one. Returns { run, reasons, hypotheses, controls }.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, alpha = 0.05, inFamily = "H1" }) {
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, test = "sign", alpha = 0.05, inFamily = "H1" }) {
+    if (!TESTS.includes(test)) throw new Error(`denoiseStats: test "${test}" is not one of ${TESTS.join(", ")}`);
     const reasons = [], controls = {};
     // C6 (section 17), like C0, is decided before the test sets exist
     if (c6) {
@@ -137,8 +161,11 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
         const netWins = net.filter((v, i) => v < S.noisy[i]).length, filterWins = S.filter.filter((v, i) => v < S.noisy[i]).length;
         const c1 = netWins >= C1_MIN_WINS && filterWins >= C1_MIN_WINS;
         const nearFloor = net.filter((v, i) => v <= C3_FLOOR_FACTOR * S.floor[i]).length;
-        const d = effects(S.filter, net), k = d.filter((v) => v > 0).length;
-        H[name] = { n, meanD: d.reduce((a, v) => a + v, 0) / n, k, p: signTestUpper(k, n), d,
+        const d = effects(S.filter, net), k = d.filter((v) => v > 0).length, pSign = signTestUpper(k, n);
+        // section 28 tests the mean of d by sign flips; every earlier round, the count k by the sign test
+        const pFlip = test === "signflip" ? signFlipUpper(d) : null;
+        H[name] = { n, meanD: d.reduce((a, v) => a + v, 0) / n, k, p: test === "signflip" ? pFlip : pSign, d,
+                    ...(test === "signflip" ? { test, pSign, pSignFlip: pFlip } : {}),
                     // with C1 decided on the training images, a test set's wins over the noisy input are reported, never tested
                     c1: c1Train ? { netWins, filterWins, tested: false } : { netWins, filterWins, ok: c1 }, c3: { nearFloor, resolvable: nearFloor <= n / 2 } };
         if (!c1 && !c1Train) reasons.push(`C1 on ${name}: the network beat the noisy input on ${netWins} and the filter on ${filterWins} of ${n}; both need ${C1_MIN_WINS}`);

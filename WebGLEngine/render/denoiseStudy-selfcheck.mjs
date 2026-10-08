@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, MINI, shuffledTargets, stopBeforeTests, renderSplit,
 // runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
@@ -28,15 +28,18 @@
 //   R16 the training C1 measures the noisy input in the filter's place           1 RED
 //   R17 ROUND8 without C1 on the training images                                 1 RED
 //   D24 SPLITS_R8 left out of the dataset refusal (in this gate)                 1 RED
+//   R18 ROUND9 tested by the sign test                                           1 RED
+//   R19 ROUND9's small comparison trained on the longer schedule                 1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, MINI, shuffledTargets, stopBeforeTests,
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, MINI, shuffledTargets, stopBeforeTests,
         renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { TRAIN, TRAIN_LONG } = await imp("render/denoiseNet.mjs");
 const { trainFit, historyFit, trainSanity } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
@@ -195,7 +198,17 @@ console.log("\n9. C1 ON THE TRAINING IMAGES (pre-registration section 26)");
         `training C1 ${pass.trainSanity.netWins} / ${pass.trainSanity.filterWins} of ${pass.trainSanity.n}; run "${pass.verdict.run}"`);
 }
 
+console.log("\n10. THE LARGER NETWORK AND THE SIGN-FLIP TEST (pre-registration section 28; the pipeline runs are render/denoisePool-selfcheck.mjs's)");
+{
+    ok("!! ROUND9 is section 28's: round 8 with the LARGE network trained on TRAIN_LONG and the hypotheses tested by sign flips; the small network on round 8's schedule as the comparison; NEW test splits",
+        ROUND9.splits === SPLITS_R9 && SPLITS_R9.train === SPLITS_R8.train && ROUND9.size === "large" && ROUND9.train === TRAIN_LONG && ROUND9.test === "signflip" &&
+        ROUND9.compareSize.size === "small" && ROUND9.compareSize.train === TRAIN && ROUND9.c1OnTraining === true && ROUND9.c0 === true && ROUND9.emitterMask === true &&
+        ROUND9.head === "kernel" && ROUND9.init === "zero-last" && ROUND9.temporal === false && !ROUND9.compareTrainSplit && RESULTS_R9 === "render/denoise-results-r9.json" &&
+        ![...SPLITS_R8.T1.seeds, ...SPLITS_R8.T2.seeds].some((s) => [...SPLITS_R9.T1.seeds, ...SPLITS_R9.T2.seeds].includes(s)) &&
+        !ROUND8.size && !ROUND8.test);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r8 --cache <dir>` is round 8's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r9 --cache <dir> --workers 4` is round 9's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);
