@@ -285,8 +285,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4778.movedSince4475;
-    const arrived = F.COMMIT_BELT_DRIFT_V4778.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4819.movedSince4475;   // v4819: the newest record
+    const arrived = F.COMMIT_BELT_DRIFT_V4819.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -327,8 +327,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
             `agrees with the record, in order, for every body -- a full checkout is the instrument for the rest. ` : "") +
         `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash ` +
         `re-derived from git rather than trusted. ${short.size} bodies are recorded at an abbreviation shorter ` +
-        `than git now renders (${F.COMMIT_BELT_DRIFT_V4778.abbreviationWas} against ` +
-        `${F.COMMIT_BELT_DRIFT_V4778.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
+        `than git now renders (${F.COMMIT_BELT_DRIFT_V4819.abbreviationWas} against ` +
+        `${F.COMMIT_BELT_DRIFT_V4819.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
     // *** THE READ IS THE FULL IDENTITY, ASSERTED. *** Prefix-matching makes the comparison tolerant of
     // whatever length git renders, so reverting to %h no longer changes today's answer -- sabotage GB went
     // 0 RED. That tolerance is the point, and it is not a reason to read an abbreviation: %h can also get
@@ -361,14 +361,14 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     ok("!! *** EVERY RECORDED PREFIX NAMES EXACTLY ONE COMMIT IN THIS REPOSITORY -- measured, not argued ***",
        ambiguous.length === 0 && allCommits.length > 100,
        ambiguous.length ? "AMBIGUOUS: " + ambiguous.slice(0, 4).join("; ")
-         : `${Object.values(F.COMMIT_BELT_DRIFT_V4778.movedSince4475).length + names.length} bodies' prefixes ` +
+         : `${Object.values(F.COMMIT_BELT_DRIFT_V4819.movedSince4475).length + names.length} bodies' prefixes ` +
            `checked against all ${allCommits.length} commits, every one unique. A prefix short enough to name ` +
            "two commits would make the comparison above meaningless, and nothing was measuring that.");
 
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4778;
+    const D = F.COMMIT_BELT_DRIFT_V4819;   // v4819: the newest record; v4778's is graded below as history
     // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
     // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
     // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
@@ -396,6 +396,25 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            N.bodiesNow === O.bodiesNow + 2,
            `v4776 holds ${Object.keys(O.arrivedSince4475).length} arrivals, v4778 adds ${added.join(", ")}; ` +
            `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}`);
+    }
+    // SABOTAGES (v4819, on world/orreryFleet.mjs, restored by copy): the r185 arrival dropped -> 3 red (its commits, this row,
+    // the partition naming it); three's v4807 commit left out -> 2 red (its commits, this row).
+    // v4819 -- AND THE v4778 RECORD IS KEPT THE SAME WAY. COMMIT_BELT_DRIFT_V4819 spreads it, extends the two bodies the
+    // exported-functions line moved (three, three-webgpu) and adds the one it made (three-webgpu-r185); every other moved body
+    // and every earlier arrival must be v4778's own object, by reference, and each extended list v4778's with commits on top.
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4778, N = F.COMMIT_BELT_DRIFT_V4819, ext = ["three", "three-webgpu"];
+        const others = Object.keys(O.movedSince4475).filter((k) => !ext.includes(k));
+        const extended = ext.every((k) => { const a = O.movedSince4475[k].now, b = N.movedSince4475[k].now;
+            return b.length > a.length && b.slice(b.length - a.length).every((h, i) => h === a[i]); });
+        const added = Object.keys(N.arrivedSince4475).filter((k) => !(k in O.arrivedSince4475));
+        ok("!! the v4819 belt record is v4778's with two bodies extended and ONE arrival added, and v4778's own entry is unchanged",
+           others.every((k) => N.movedSince4475[k] === O.movedSince4475[k]) && extended &&
+           Object.keys(O.arrivedSince4475).every((k) => N.arrivedSince4475[k] === O.arrivedSince4475[k]) &&
+           added.join(",") === "three-webgpu-r185" && O.at === "v4778" && N.at === "v4819" && N.bodiesNow === O.bodiesNow + 1,
+           `three ${O.movedSince4475.three.now.length} -> ${N.movedSince4475.three.now.length}, three-webgpu ` +
+           `${O.movedSince4475["three-webgpu"].now.length} -> ${N.movedSince4475["three-webgpu"].now.length}; adds ${added.join(", ")}; ` +
+           `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; ${others.length} other moved bodies identical by reference`);
     }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still

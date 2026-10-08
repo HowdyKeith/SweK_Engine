@@ -632,3 +632,36 @@ export const COMMIT_BELT_DRIFT_V4778 = Object.freeze({
     }),
     bodiesNow: 22,
 });
+
+// *** v4819 -- THE EXPORTED-FUNCTIONS LINE MOVED TWO BODIES AND ADDED ONE, AND NEVER RAN THIS GATE OVER IT. ***
+// orreryFleet-selfcheck is over the quick sweep's budget, so v4805 (vendor/three-webgpu to r186, its r185 files kept
+// in a new body, vendor/three-webgpu-r185) and v4807 (vendor/three to r186, and the three-webgpu README's line about
+// it) shipped with no record of either. Found at the merge with main, once the clone was unshallowed and the prefix
+// rows could be read at all. Hashes from `git log --format=%h --abbrev=8 -- WebGLEngine/vendor/<name>`, newest first.
+// v4778's record is a claim about v4778 and is not rewritten: this one spreads it.
+export const COMMIT_BELT_DRIFT_V4819 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4778,
+    at: "v4819",
+    movedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4778.movedSince4475,
+        three: Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4778.movedSince4475.three.recorded,
+            now: Object.freeze(["31ab299b", ...COMMIT_BELT_DRIFT_V4778.movedSince4475.three.now]),
+            why: "\"v4807: the classic build follows -- vendor/three moves to r186\" (31ab299b) replaced build/three.module.js, " +
+                 "three.core.js and the jsm addons from npm's three@0.186.1, the same kind of move as ce276dff",
+        }),
+        "three-webgpu": Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4778.movedSince4475["three-webgpu"].recorded,
+            now: Object.freeze(["31ab299b", "7462bbb6", ...COMMIT_BELT_DRIFT_V4778.movedSince4475["three-webgpu"].now]),
+            why: "\"v4805: the engine's three-webgpu moves to r186, measured first\" (7462bbb6) replaced the three WebGPU " +
+                 "build files from npm's three@0.186.1; v4807 (31ab299b) edited its README's line about the classic build",
+        }),
+    }),
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4778.arrivedSince4475,
+        "three-webgpu-r185": Object.freeze({ now: Object.freeze(["7462bbb6"]),
+            why: "the r185 files vendor/three-webgpu held until v4805, moved here unchanged so the r185 drafts and their " +
+                 "patches in docs/upstream-three/ keep a build to run on -- nothing in the engine imports it" }),
+    }),
+    bodiesNow: 23,
+});
