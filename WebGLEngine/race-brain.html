@@ -295,8 +295,11 @@ function idleTrain(deadline) {
 }
 
 async function main() {
-  const forceGl = new URLSearchParams(location.search).get("webgl") === "1";
-  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : { prefer: "webgpu" }); }
+  const q = new URLSearchParams(location.search), forceGl = q.get("webgl") === "1";
+  // ?offscreen=1 is a gate's hook, not a view: on WebGPU the device renders into its own texture and never presents the canvas (gfx/device.js
+  // Level 11 -- the build box loses a presented WebGPU canvas at the first frame), so the main view stays empty and the live page can be read
+  // back on the backend the real rig runs. The 3D car windows are readbacks of their own targets and draw either way.
+  try { device = await requestDevice(cvs, forceGl ? { backend: "webgl2" } : q.get("offscreen") === "1" ? { backend: "webgpu", offscreen: true } : { prefer: "webgpu" }); }
   catch (e) { return fail("requestDevice threw: " + e.message); }
   beEl.textContent = `device: ${device.backend}`;
   try {
@@ -433,7 +436,7 @@ function frame(t) {
 // read-only handles for the gates, the way brain-maze.html keeps window.__maze: tools/ship/raceTurret-selfcheck.mjs reads the live
 // scene and the city's state off the page to hold that a repack rebuilt the scene and left the world fleet installed, and reads it back
 // through a render target of its own (the page's presented canvas is redrawn by its own frame loop between a gate's frame and its readback)
-window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; } };
+window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; } };
 
 main();
 </script>

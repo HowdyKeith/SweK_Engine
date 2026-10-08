@@ -13,9 +13,11 @@
 // editable chunk slots) instead of baking it once, so a shell that carves a building (shellInto, through turretTick) is on the picture
 // the frame it lands. Section 4 holds that in the page's own scene configuration on both backends -- a barrage's crater is on the
 // picture and is EXACTLY a fresh pack of the carved world, a chunk that outgrows its slot is flagged and the scene built again from
-// the repack draws it, an edit after the rebuild still reaches the picture -- and on the live page (WebGL2): ?shell=12 lands a
-// barrage with no repack, a repack forced from outside is answered by the PAGE building its scene again, and a rebuild under a window
-// readback in flight is not counted against the 3D windows.
+// the repack draws it, an edit after the rebuild still reaches the picture -- and on the live page, on BOTH backends (WebGPU through
+// ?offscreen=1, race-brain.html's hook for a device that never presents; the harness loses a presented WebGPU canvas): ?shell=12 lands a
+// barrage with no repack, a repack forced from outside is answered by the PAGE building its scene again, a rebuild under a window
+// readback in flight is not counted against the 3D windows, and each 3D window holds a picture read back on that backend. The two
+// backends read the same pixels off the live page (54,363 for the voxels, 1,071 for the edit after the rebuild).
 //
 // SABOTAGE LOG -- v4588, each applied to the file named, the gate run (both harness browsers), the file restored.
 //   A  render/raceTurret.mjs: the barrel record written at the dome's scale       -> 1 red: the placement row.
@@ -34,6 +36,11 @@
 //      "an edit AFTER the rebuild" rows (32,300 and 97,258 pixels apart).
 //   I  race-brain.html: refreshViews without its era guard                                -> 1 red: "a rebuild under a window readback in flight is
 //      NOT counted as a failed readback" -- the gate makes the old scene's pending window reads fail, and the page's note reads "view windows off".
+//   R  race-brain.html: ?offscreen=1 asking WebGPU for a PRESENTED device (the hook ignored)  -> 1 red: the WebGPU page's boot row (mapAsync:
+//      "A valid external Instance reference no longer exists" -- the harness lost the device at the first presented frame) and the page half
+//      reports it did not run.
+//   S  race-brain.html: refreshViews never putting a window's pixels (putImageData off)   -> 2 red: each backend's "3D car windows each hold a
+//      picture" row (0.000 lit in all four after 20 s).
 //   FINDING, in the page half's first draft: it read the live page's scene back with a camera built OUT HERE and a frame handed to the iframe.
 //   The iframe's frame() takes viewProj and eye through its own realm's typed arrays; a matrix from this realm is not one, so the page kept its
 //   LAST camera -- a car window's -- and every frame the gate read back was a first-person view of a street. An edit that moves 1,071 px read 0,
@@ -258,57 +265,67 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
             }
         }
 
-        // the page itself, WebGL2 (its presented canvas cannot be read back on WebGPU here): ?shell=12 puts a barrage on the building nearest
-        // the lead car; then a repack is forced from OUTSIDE (isolated voxels, synced), and the page must build its scene again by itself
-        const pg = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: {}, script: `async () => {
-            const VD = await import("/render/voxelDamage.mjs"), Gd = await import("/render/gpuDriven.mjs");
-            globalThis.__swekStep = "booting race-brain.html?webgl=1&shell=12 in an iframe";
-            const f = document.createElement("iframe"); f.style.width = "400px"; f.style.height = "300px"; f.src = "/race-brain.html?webgl=1&shell=12"; document.body.appendChild(f);
-            await new Promise((res) => { f.onload = res; });
-            const doc = f.contentDocument, txt = (id) => (doc.getElementById(id) || {}).textContent || "", errs = []; f.contentWindow.addEventListener("error", (e) => errs.push(String(e.message).slice(0, 200)));
-            const t1 = performance.now(); while (performance.now() - t1 < 150000 && !/a turret on each/.test(txt("tick")) && !/threw|HTTP/.test(txt("be") + txt("tick"))) await new Promise((res) => setTimeout(res, 250));
-            const booted = /a turret on each/.test(txt("tick")); await new Promise((res) => setTimeout(res, 1500));
-            const rb = f.contentWindow.__raceBrain, c = rb && rb.cityCtx, out = { booted, errs };
-            if (!rb || !c) return { ...out, error: "no window.__raceBrain" };
-            out.hud1 = txt("racing"); out.builds1 = rb.sceneBuilds; out.outgrown1 = c.state.outgrown; out.repacks1 = c.state.rebuilds; out.impacts = c.impacts.length;
-            out.world1 = rb.scene.fleets.some((q) => q.name === "world");
-            const i = c.rects.findIndex((q) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp; }), r0 = c.rects[i], mid = r0.z + r0.d / 2;
-            // THE CAMERA IS BUILT IN THE IFRAME'S OWN REALM: its frame() reads viewProj and eye through instanceof/typed-array checks, and a
-            // matrix made out here is another realm's Float32Array -- the page quietly kept its last camera (a car window's) and every
-            // "frame" this gate read back was somebody else's picture. Measured: an edit that moved 1,071 px read 0, and a page left to
-            // run seemed to drift by thousands of pixels with nothing changed.
-            const IW = f.contentWindow, eye = [r0.x - 12, 6, mid + 5], target = rb.device.texture({ width: 256, height: 256, render: true });
-            const vp = { viewProj: IW.Float32Array.from(Gd.multiply(Gd.perspective(0.9, 1, 0.5, 600), Gd.lookAt(eye, [r0.x, 3, mid]))), eye: IW.Array.from(eye), clear: IW.Array.from([0.03, 0.05, 0.08, 1]), target, read: true };
-            const shot = async () => Uint8Array.from((await rb.scene.frame(vp).pixels).pixels), apartOf = (A, B) => { let n = 0; for (let p = 0; p < A.length; p += 4) if (Math.abs(A[p] - B[p]) > 8 || Math.abs(A[p + 1] - B[p + 1]) > 8 || Math.abs(A[p + 2] - B[p + 2]) > 8) n++; return n; };
-            const P0 = await shot(); out.hasShell = c.impacts.length;
-            // A READBACK IN FLIGHT WHEN THE SCENE IS REBUILT: the page's car windows read their views back every few frames, and a rebuild destroys
-            // the scene those reads were issued on. Simulate what that does (the old scene's reads reject once it is gone) on every window read
-            // that is pending at the moment of the rebuild -- three counted failures would switch the 3D windows off for good, so the page must
-            // not count one that a rebuild caused.
-            let pending = 0, rebuilt = false; const oldScene = rb.scene, origFrame = oldScene.frame;
-            oldScene.frame = function (o) { const fr = origFrame.call(this, o); if (!o || !o.target || o.target === target) return fr; pending++; return { ...fr, pixels: fr.pixels.then(async (r) => { const t = performance.now(); while (!rebuilt && performance.now() - t < 8000) await new Promise((res) => setTimeout(res, 20)); if (rebuilt) throw new Error("simulated: the old scene was destroyed under this readback"); return r; }) }; };
-            const t2 = performance.now(); while (pending === 0 && performance.now() - t2 < 8000) await new Promise((res) => setTimeout(res, 20)); out.pending = pending;
-            let placed = 0; for (let x = r0.x - 9; x <= r0.x - 4; x++) for (let z = r0.z - 1; z <= r0.z + 6; z++) for (let y = 1; y <= 7; y++) if ((x + y + z) % 2 === 0) { c.world.setVoxel(x, y, z, 1); placed++; }
-            VD.syncDirty(c.state); out.placed = placed; out.outgrownNow = c.state.outgrown;
-            const e0 = txt("racing").match(/^([0-9.]+) s:/), builds0 = rb.sceneBuilds, t3 = performance.now(); while (rb.sceneBuilds === builds0 && performance.now() - t3 < 8000) await new Promise((res) => setTimeout(res, 20));
-            rebuilt = true; await new Promise((res) => setTimeout(res, 1500)); out.viewsNote = txt("viewsNote");
-            out.builds2 = rb.sceneBuilds; out.outgrown2 = c.state.outgrown; out.repacks2 = c.state.rebuilds; out.hud2 = txt("racing"); out.world2 = rb.scene.fleets.some((q) => q.name === "world");
-            const e1 = txt("racing").match(/^([0-9.]+) s:/); out.t0 = e0 ? +e0[1] : null; out.t1 = e1 ? +e1[1] : null;
-            // the page's own frame loop stops here, so the picture is a function of the world alone (cars, shells and real craters elsewhere in the race stop moving)
-            IW.requestAnimationFrame = () => 0; await new Promise((res) => setTimeout(res, 400));
-            const P1 = await shot(), P1b = await shot(); out.cloudApart = apartOf(P0, P1); out.noise = apartOf(P1, P1b);
-            for (let x = r0.x - 8; x <= r0.x - 6; x++) for (let z = mid; z <= mid + 2; z++) for (let y = 3; y <= 5; y++) c.world.setVoxel(x, y, z, 2);
-            VD.syncDirty(c.state); const P2 = await shot(); out.editApart = apartOf(P1b, P2); out.pixels = P1.length / 4; out.builds3 = rb.sceneBuilds;
-            return out;
-        }` });
-        ok("...and the PAGE (WebGL2) boots with ?shell=12: the barrage landed on a building, the roomy slots took it without a repack, the world fleet is in the scene", pg.ok && pg.result && !pg.result.error && pg.result.booted && /buildings: 12 hits/.test(pg.result.hud1) && !/repack/.test(pg.result.hud1) && pg.result.builds1 === 1 && pg.result.repacks1 === 0 && pg.result.outgrown1 === false && pg.result.world1, pg.ok && pg.result ? `${pg.result.error || ""} ${(pg.result.hud1 || "").slice(-90)}; scene built ${pg.result.builds1}x` : String(pg.reason || JSON.stringify(pg)).slice(0, 300));
-        if (pg.ok && pg.result && !pg.result.error) {
-            const q = pg.result;
-            report(`the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
-            ok("!! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1 + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);
-            ok("...and a rebuild under a window readback in flight is NOT counted as a failed readback: the 3D windows stay on (no 'view windows off' note) after the old scene's reads were made to fail", q.pending >= 1 && !/view windows off/.test(q.viewsNote || ""), `${q.pending} readback(s) pending at the rebuild; note: "${(q.viewsNote || "").slice(0, 80)}"`);
-            ok("...the rebuilt scene draws what repacked it (the isolated voxels light the frame), the race kept running through it, and an edit after it reaches the page's own picture", q.cloudApart > 1000 && q.noise === 0 && q.t1 > q.t0 && q.editApart > 300 && q.builds3 === q.builds2 && q.errs.length === 0, `${q.cloudApart} px for the voxels (noise ${q.noise}), clock ${q.t0} -> ${q.t1} s, ${q.editApart} px from the edit, ${q.errs.length} page errors`);
-        } else report("the page half did not run: " + String(pg.reason || (pg.result && pg.result.error) || JSON.stringify(pg)).slice(0, 300));
+        for (const [bk, qs] of [["WebGL2", "webgl=1"], ["WebGPU", "offscreen=1"]]) {
+            // the page itself, on BOTH backends (v4681: WebGPU through ?offscreen=1, the page's hook for a device that never presents -- this
+            // harness loses a presented WebGPU canvas, gfx/device.js Level 11): ?shell=12 puts a barrage on the building nearest
+            // the lead car; then a repack is forced from OUTSIDE (isolated voxels, synced), and the page must build its scene again by itself
+            const pg = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, args: { qs }, script: `async (a) => {
+                const VD = await import("/render/voxelDamage.mjs"), Gd = await import("/render/gpuDriven.mjs");
+                globalThis.__swekStep = "booting race-brain.html?" + a.qs + "&shell=12 in an iframe";
+                const f = document.createElement("iframe"); f.style.width = "400px"; f.style.height = "300px"; f.src = "/race-brain.html?" + a.qs + "&shell=12"; document.body.appendChild(f);
+                await new Promise((res) => { f.onload = res; });
+                const doc = f.contentDocument, txt = (id) => (doc.getElementById(id) || {}).textContent || "", errs = []; f.contentWindow.addEventListener("error", (e) => errs.push(String(e.message).slice(0, 200)));
+                const t1 = performance.now(); while (performance.now() - t1 < 150000 && !/a turret on each/.test(txt("tick")) && !/threw|HTTP/.test(txt("be") + txt("tick"))) await new Promise((res) => setTimeout(res, 250));
+                const booted = /a turret on each/.test(txt("tick")); await new Promise((res) => setTimeout(res, 1500));
+                const rb = f.contentWindow.__raceBrain, c = rb && rb.cityCtx, out = { booted, errs };
+                if (!rb || !c) return { ...out, error: "no window.__raceBrain" };
+                out.hud1 = txt("racing"); out.builds1 = rb.sceneBuilds; out.outgrown1 = c.state.outgrown; out.repacks1 = c.state.rebuilds; out.impacts = c.impacts.length;
+                out.world1 = rb.scene.fleets.some((q) => q.name === "world");
+                // THE CAR WINDOWS ARE READBACKS OF THE PAGE'S SCENE: every 3D window's canvas holds a picture (some of it is lit) on this backend.
+                // They fill one readback at a time, so the gate waits for the last of them (WebGPU's take longer than WebGL2's) rather than reading too soon.
+                const litOf = () => rb.views.filter((v) => v.view !== "brain").map((v) => { const d = v.ctx.getImageData(0, 0, v.canvas.width, v.canvas.height).data; let lit = 0; for (let p = 0; p < d.length; p += 4) if (Math.max(d[p], d[p + 1], d[p + 2]) > 60) lit++; return { view: v.view, lit: lit / (d.length / 4) }; });
+                const tw = performance.now(); while (performance.now() - tw < 20000 && !(litOf().length && litOf().every((w) => w.lit > 0.05))) await new Promise((res) => setTimeout(res, 100));
+                out.windows = litOf(); out.windowsMs = performance.now() - tw;
+                const i = c.rects.findIndex((q) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp; }), r0 = c.rects[i], mid = r0.z + r0.d / 2;
+                // THE CAMERA IS BUILT IN THE IFRAME'S OWN REALM: its frame() reads viewProj and eye through instanceof/typed-array checks, and a
+                // matrix made out here is another realm's Float32Array -- the page quietly kept its last camera (a car window's) and every
+                // "frame" this gate read back was somebody else's picture. Measured: an edit that moved 1,071 px read 0, and a page left to
+                // run seemed to drift by thousands of pixels with nothing changed.
+                const IW = f.contentWindow, eye = [r0.x - 12, 6, mid + 5], target = rb.device.texture({ width: 256, height: 256, render: true });
+                const vp = { viewProj: IW.Float32Array.from(Gd.multiply(Gd.perspective(0.9, 1, 0.5, 600), Gd.lookAt(eye, [r0.x, 3, mid]))), eye: IW.Array.from(eye), clear: IW.Array.from([0.03, 0.05, 0.08, 1]), target, read: true };
+                const shot = async () => Uint8Array.from((await rb.scene.frame(vp).pixels).pixels), apartOf = (A, B) => { let n = 0; for (let p = 0; p < A.length; p += 4) if (Math.abs(A[p] - B[p]) > 8 || Math.abs(A[p + 1] - B[p + 1]) > 8 || Math.abs(A[p + 2] - B[p + 2]) > 8) n++; return n; };
+                const P0 = await shot(); out.hasShell = c.impacts.length;
+                // A READBACK IN FLIGHT WHEN THE SCENE IS REBUILT: the page's car windows read their views back every few frames, and a rebuild destroys
+                // the scene those reads were issued on. Simulate what that does (the old scene's reads reject once it is gone) on every window read
+                // that is pending at the moment of the rebuild -- three counted failures would switch the 3D windows off for good, so the page must
+                // not count one that a rebuild caused.
+                let pending = 0, rebuilt = false; const oldScene = rb.scene, origFrame = oldScene.frame;
+                oldScene.frame = function (o) { const fr = origFrame.call(this, o); if (!o || !o.target || o.target === target) return fr; pending++; return { ...fr, pixels: fr.pixels.then(async (r) => { const t = performance.now(); while (!rebuilt && performance.now() - t < 8000) await new Promise((res) => setTimeout(res, 20)); if (rebuilt) throw new Error("simulated: the old scene was destroyed under this readback"); return r; }) }; };
+                const t2 = performance.now(); while (pending === 0 && performance.now() - t2 < 8000) await new Promise((res) => setTimeout(res, 20)); out.pending = pending;
+                let placed = 0; for (let x = r0.x - 9; x <= r0.x - 4; x++) for (let z = r0.z - 1; z <= r0.z + 6; z++) for (let y = 1; y <= 7; y++) if ((x + y + z) % 2 === 0) { c.world.setVoxel(x, y, z, 1); placed++; }
+                VD.syncDirty(c.state); out.placed = placed; out.outgrownNow = c.state.outgrown;
+                const e0 = txt("racing").match(/^([0-9.]+) s:/), builds0 = rb.sceneBuilds, t3 = performance.now(); while (rb.sceneBuilds === builds0 && performance.now() - t3 < 8000) await new Promise((res) => setTimeout(res, 20));
+                rebuilt = true; await new Promise((res) => setTimeout(res, 1500)); out.viewsNote = txt("viewsNote");
+                out.builds2 = rb.sceneBuilds; out.outgrown2 = c.state.outgrown; out.repacks2 = c.state.rebuilds; out.hud2 = txt("racing"); out.world2 = rb.scene.fleets.some((q) => q.name === "world");
+                const e1 = txt("racing").match(/^([0-9.]+) s:/); out.t0 = e0 ? +e0[1] : null; out.t1 = e1 ? +e1[1] : null;
+                // the page's own frame loop stops here, so the picture is a function of the world alone (cars, shells and real craters elsewhere in the race stop moving)
+                IW.requestAnimationFrame = () => 0; await new Promise((res) => setTimeout(res, 400));
+                const P1 = await shot(), P1b = await shot(); out.cloudApart = apartOf(P0, P1); out.noise = apartOf(P1, P1b);
+                for (let x = r0.x - 8; x <= r0.x - 6; x++) for (let z = mid; z <= mid + 2; z++) for (let y = 3; y <= 5; y++) c.world.setVoxel(x, y, z, 2);
+                VD.syncDirty(c.state); const P2 = await shot(); out.editApart = apartOf(P1b, P2); out.pixels = P1.length / 4; out.builds3 = rb.sceneBuilds;
+                return out;
+            }` });
+            ok(bk + " -- ...and the PAGE boots with ?shell=12: the barrage landed on a building, the roomy slots took it without a repack, the world fleet is in the scene", pg.ok && pg.result && !pg.result.error && pg.result.booted && /buildings: 12 hits/.test(pg.result.hud1) && !/repack/.test(pg.result.hud1) && pg.result.builds1 === 1 && pg.result.repacks1 === 0 && pg.result.outgrown1 === false && pg.result.world1, pg.ok && pg.result ? `${pg.result.error || ""} ${(pg.result.hud1 || "").slice(-90)}; scene built ${pg.result.builds1}x` : String(pg.reason || JSON.stringify(pg)).slice(0, 300));
+            if (pg.ok && pg.result && !pg.result.error) {
+                const q = pg.result;
+                report(bk + ": the 3D car windows (lit fraction, after " + q.windowsMs.toFixed(0) + " ms) " + q.windows.map((w) => w.view + " " + w.lit.toFixed(3)).join(", "));
+                ok(bk + " -- the page's 3D car windows each hold a picture of its scene (more than a twentieth lit), read back on this backend", q.windows.length >= 2 && q.windows.every((w) => w.lit > 0.05), q.windows.map((w) => w.lit.toFixed(3)).join(" ") + ` after ${q.windowsMs.toFixed(0)} ms`);
+                report(`${bk}: the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
+                ok(bk + " -- !! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1 + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);
+                ok(bk + " -- ...and a rebuild under a window readback in flight is NOT counted as a failed readback: the 3D windows stay on (no 'view windows off' note) after the old scene's reads were made to fail", q.pending >= 1 && !/view windows off/.test(q.viewsNote || ""), `${q.pending} readback(s) pending at the rebuild; note: "${(q.viewsNote || "").slice(0, 80)}"`);
+                ok(bk + " -- ...the rebuilt scene draws what repacked it (the isolated voxels light the frame), the race kept running through it, and an edit after it reaches the page's own picture", q.cloudApart > 1000 && q.noise === 0 && q.t1 > q.t0 && q.editApart > 300 && q.builds3 === q.builds2 && q.errs.length === 0, `${q.cloudApart} px for the voxels (noise ${q.noise}), clock ${q.t0} -> ${q.t1} s, ${q.editApart} px from the edit, ${q.errs.length} page errors`);
+            } else report(bk + ": the page half did not run: " + String(pg.reason || (pg.result && pg.result.error) || JSON.stringify(pg)).slice(0, 300));
+        }
     }
 }
 
