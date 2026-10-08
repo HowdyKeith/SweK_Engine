@@ -18,6 +18,7 @@
 //   K4  zero-last not applied to the kernel head                                 1 RED
 //   K5  cropAt copies nine channels of a 13-channel input                        1 RED
 //   K6  the trainer builds a 9-channel first layer for a 13-channel input        1 RED
+//   K7  denoise() takes an input of another width than the network's             1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -178,6 +179,8 @@ console.log("\n7. THE TEMPORAL ROUND'S 13-CHANNEL INPUT (pre-registration sectio
     const tr = [0, 1].map((k) => { const a = synth(14, 14, k), x = new Float64Array(14 * 14 * 13); for (let p = 0; p < 196; p++) for (let c = 0; c < 9; c++) x[p * 13 + c] = a.x[p * 9 + c]; return { x, ref: a.ref, w: 14, h: 14 }; });
     const R = trainDenoiser(tr, { seed: 2, head: "kernel", steps: 2, batch: 1, crop: 12 });
     ok("  the trainer reads the stride from its images and builds a 13-channel first layer", R.net.layers[0].Cin === 13 && R.net.layers[0].W.length === 16 * 9 * 13);
+    let threw = null; try { denoise(makeDenoiser(3, INIT, "kernel"), x13, 9, 10); } catch (e) { threw = e.message; }
+    ok("!! a network refuses an input of another width by name -- read at the wrong stride it would return finite nonsense", /9 input channels was handed an input of 13/.test(threw || ""), threw);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

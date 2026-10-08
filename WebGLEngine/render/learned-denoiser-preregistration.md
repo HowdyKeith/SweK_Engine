@@ -833,3 +833,96 @@ reported).
 - A small kernel-predicting network beats a tuned hand-written filter on scenes like the ones it was trained on.
 - It has not once beaten that filter on a family of scenes it never saw.
 - The network does not go to the device on these results. Section 9 asks for both hypotheses.
+
+## 23. ROUND 7 -- THE RANDOMIZED FAMILY, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question.**
+
+> **Trained on a broad, randomized distribution of scenes instead of two fixed families, does the network beat the
+> filter on a family that distribution never draws?**
+
+Rounds 3, 4 and 6 found that the kernel network wins in-distribution and never on a family it did not see. Round 6
+trained on two fixed families. This round asks whether breadth changes that.
+
+**One deliberate change from round 6: the training split.**
+- Round 6's 24 scenes of A and B are replaced by **96 scenes of family R**, a randomized generator.
+- This round changes the training set's variety AND its amount together, on purpose. The question is whether a broad
+  randomized set buys transfer. If it does, a later round can separate the two.
+- Everything else is round 6's:
+  - single frames, the emitter mask and its rule;
+  - the kernel network (10 input channels, 7,473 parameters), zero-last initialisation, training (1,500 steps,
+    batch 4, 32 x 32 crops, seeds 1, 2, 3);
+  - the filter and its grid, tuned on the training split;
+  - the statistic and controls C0-C5.
+
+**Family R** (`makeScene("R", seed)`, its own code path and stream). Every scene draws its own mix:
+
+| | Drawn |
+|---|---|
+| Ground | Lambertian, albedo 0.2-0.8 per channel |
+| Spheres | 2-8 of radius 0.15-0.8, resting, within abs(x), abs(z) <= 2 |
+| Sphere materials | Lambertian (albedo 0.05-0.95, two in three) or a microfacet conductor (roughness 0.05-0.8, F0 0.2-1, one in three) |
+| Emitters | 1-2 white, radius 0.15-0.5, sharing a power (radius^2 x strength) of 0.4-3 -- A's, B's and C's span -- strength at most 30 |
+| Sky | gradient, band or uniform (0.1-0.8), a third each |
+| Camera | ring of radius 3.5-5.5, height 0.7-2.5, field of view 40 |
+
+- R's menu covers families A and B.
+- **It never draws anything that makes family C what it is:** no rough-diffuse surface, no dielectric, no coloured
+  emitter, no sky below 0.02. A gate asserts this over 300 scenes.
+- Family C is unchanged: its fingerprint is pinned, recorded before R existed.
+
+**Set on scenes outside every split, before this section.**
+
+| R draft | Mean radiance (A: 0.25) | Noisy relMSE |
+|---|---|---|
+| 1-3 emitters of strength 3-30, half the spheres metal | 0.96 | up to 10x A's |
+| emitters drawn as power, metals one in three, strength capped at 30 (as fixed above) | 0.37 (median 0.32) | median 0.031, between A's ~0.014 and B's ~0.05-0.07 |
+
+- The metals made the noise: the tracer's light sampling skips microfacet surfaces, so a metal lit by a small bright
+  emitter is reached only by bounces.
+- One scene in twelve still carried fireflies (relMSE 1.09, 90% of it in ten pixel-channels). That is the tracer,
+  not a defect, and it stays in R.
+
+**Splits** (`SPLITS_R7`).
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 96 of R | 20000-20095 |
+| val | 4 of R | 21000-21003 |
+| T1 -> **H1** | 12 of R | 22000-22011 |
+| T2 -> **H2** | 12 of family C | 23000-23011 |
+
+- Every seed is on a range no earlier split touched.
+- C5 holds over seven rounds.
+- Holm is over {H1, H2}. C2 is measured on H1's set.
+
+**A defect found and fixed while building this round, before any data.**
+- The comparison training split (the secondary below) was rendered without the mask. Its 9-channel networks then
+  read the 10-channel test images at the wrong stride and returned FINITE errors, so nothing caught it.
+- Round 5's comparison ran without a mask and was unaffected.
+- `denoise()` now refuses an input whose width is not the network's, and a gate row holds the comparison render to
+  the mask.
+
+**What was seen first: the 96 training scenes only.**
+- The noisy input's relMSE: median 0.035, 10th-90th percentile 0.010-0.131.
+- The filter's tuning chose sS 1, sN 1, sA 0.2, sI 4 (round 6's setting), with a training fit of 0.211.
+- One network (seed 1) fit 0.151, so C0 can pass.
+- Nothing else was chosen from it. Nothing of family C was rendered for this round.
+
+**Secondary** (reported, never tested, never used to choose):
+- the filter and three networks tuned and trained on **round 6's 24 scenes of A and B** (with the mask), measured on
+  this round's test images -- the direct comparison of training distributions on the same family-C images;
+- 1- and 16-sample inputs;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r7` -> `render/denoise-results-r7.json`. It refuses if the
+file exists.
+
+**The outcomes:**
+- **H1 and H2 supported:** breadth buys transfer. The network goes to the device, with the head widened past
+  `COUT_MAX` 32.
+- **H1 only:** a broad randomized set of this size does not buy transfer to a family outside its support.
+- **H2 only:** recorded as found.
+- **Neither:** recorded with the controls' numbers.

@@ -16,7 +16,7 @@
 // render/denoiseScenes.mjs's renderImages(), which refuses every dataset seed without it; this round commits the
 // runner and gates it on --mini's scenes, seeded outside every split. The harvest round is the first to pass the flag.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -30,6 +30,7 @@ export const RESULTS_R3 = "render/denoise-results-r3.json";
 export const RESULTS_R4 = "render/denoise-results-r4.json";
 export const RESULTS_R5 = "render/denoise-results-r5.json";
 export const RESULTS_R6 = "render/denoise-results-r6.json";
+export const RESULTS_R7 = "render/denoise-results-r7.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -58,6 +59,12 @@ export const ROUND5 = Object.freeze({ splits: SPLITS_R5, init: INIT, c0: true, h
  */
 export const ROUND6 = Object.freeze({ splits: SPLITS_R6, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
                                       emitterMask: true, compareNoMask: true, results: RESULTS_R6 });
+/**
+ * Section 23: round 6 with its training split replaced by 96 scenes of the randomized family R. H1 on held-out R, H2
+ * on family C. Secondary: the filter and networks trained on round 5/6's 24 scenes of A and B, on the same test images.
+ */
+export const ROUND7 = Object.freeze({ splits: SPLITS_R7, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
+                                      emitterMask: true, compareTrainSplit: SPLITS_R5.train, results: RESULTS_R7 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -191,7 +198,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // secondary (section 19): the same filter and head trained on ANOTHER training split -- round 3's family A alone --
     // and measured on this round's test images, to say what the mixed training changed
     if (compareTrainSplit) {
-        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
+        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal, emitterMask }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
         const filterO = tuneFilter(other, relMSE).best, netsO = seeds.map((s) => trainDenoiser(other, { seed: s, init, head, ...train }).net);
         secondary.filterOtherTraining = filterO;
         for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {

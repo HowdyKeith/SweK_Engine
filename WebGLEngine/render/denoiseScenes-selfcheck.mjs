@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, isDatasetSeed, strideOf,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, isDatasetSeed, strideOf,
 // renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
@@ -26,6 +26,11 @@
 //   D15 SPLITS_R5's H2 set drawn from family B                                   2 RED
 //   D16 familyOf ignores a split's per-seed families                             1 RED
 //   D17 SPLITS_R6's H2 set on round 5's range (15000)                            1 RED
+//   D18 family R's Lambertian spheres given a roughness (sigma) -- C leaking in  1 RED
+//   D19 family R's emitters coloured                                             2 RED
+//   D20 family R's uniform sky allowed down to 0.01                              1 RED
+//   D21 family C's ground sigma range moved (0.2-0.5 -> 0.2-0.6)                 2 RED
+//   D22 SPLITS_R7's H2 set drawn from family R                                   1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -35,7 +40,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, isDatasetSeed, strideOf, renderSeeds,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, familyOf, isDatasetSeed, strideOf, renderSeeds,
         makeScene, guideBuffers, renderImages, inputChannels, remodulate } = D;
 const { intersect, cameraBasis, pixelRay } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
 
@@ -227,6 +232,52 @@ console.log("\n5. THE THIRD FAMILY AND THE MIXED SPLITS (pre-registration sectio
     ok("!! SPLITS_R6: round 5's training and validation scenes, and NEW test scenes -- H1 6 A (16000) + 6 B (17000), H2 12 of C (18000) -- refused without harvest; C5 over six rounds",
         U.train === T.train && U.val === T.val && U.T1.families.join() === T.T1.families.join() && U.T2.family === "C" && U.T2.seeds.length === 12 &&
         r6.every((s2) => !seen5.has(s2)) && new Set(r6).size === 24 && refused6 === 24 && new Set(six).size === six.length, `${six.length} render seeds`);
+}
+
+console.log("\n6. THE RANDOMIZED FAMILY AND ITS SPLITS (pre-registration section 23)");
+{
+    // family C is the test family again: it must draw exactly what rounds 5 and 6 drew. 1793200622.0119343 over 2,780
+    // numbers, recorded before makeScene learned family R.
+    let fp = 0, k = 1;
+    const walk = (v) => { if (typeof v === "number") fp += v * ((k++ % 97) + 1); else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const key of Object.keys(v).sort()) if (key !== "sky") walk(v[key]); };
+    for (let s2 = 900000; s2 < 900040; s2++) { const S = makeScene("C", s2); walk(S); for (const d of [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77]]) walk(S.sky(d)); }
+    ok("!! family C is untouched by family R: the fingerprint of 40 C scenes is the one recorded before R existed", fp.toPrecision(17) === "1793200622.0119343" && k === 2781,
+        `${fp.toPrecision(17)} over ${k - 1} numbers`);
+    let shape = true, mats = true, lights = true, sky = true, eye = true, noC = true, nLamb = 0, nMetal = 0;
+    const kinds = new Set(), lo = { alb: 1, rough: 1, rad: 1 }, hi = { alb: 0, rough: 0, rad: 0 };
+    for (let s2 = 900000; s2 < 900300; s2++) {
+        const S = makeScene("R", s2), g = S.scene[0], L = S.scene.filter((o) => o.emit), body = S.scene.slice(1).filter((o) => !o.emit);
+        shape &&= S.family === "R" && g.radius === 100 && g.albedo.every((v) => v >= 0.2 && v <= 0.8) && body.length >= 2 && body.length <= 8 &&
+            body.every((o) => o.radius >= 0.15 && o.radius <= 0.8 && Math.abs(o.centre[1] - o.radius) < 1e-12 && Math.abs(o.centre[0]) <= 2 && Math.abs(o.centre[2]) <= 2);
+        for (const o of body) {
+            if (o.roughness === undefined) { mats &&= o.albedo.every((v) => v >= 0.05 && v <= 0.95); nLamb++; lo.alb = Math.min(lo.alb, ...o.albedo); hi.alb = Math.max(hi.alb, ...o.albedo); }
+            else { mats &&= o.roughness >= 0.05 && o.roughness <= 0.8 && o.F0.every((v) => v >= 0.2 && v <= 1) && o.albedo === undefined; nMetal++; lo.rough = Math.min(lo.rough, o.roughness); hi.rough = Math.max(hi.rough, o.roughness); }
+        }
+        const power = L.reduce((a, o) => a + o.radius * o.radius * o.emit, 0);
+        lights &&= L.length >= 1 && L.length <= 2 && L.every((o) => typeof o.emit === "number" && o.emit <= 30 && o.radius >= 0.15 && o.radius <= 0.5) && power <= 3 + 1e-12;
+        for (const o of L) { lo.rad = Math.min(lo.rad, o.radius); hi.rad = Math.max(hi.rad, o.radius); }
+        kinds.add(S.skyKind);
+        if (S.skyKind === "uniform") sky &&= S.sky([0, 1, 0]) >= 0.1 && S.sky([0, 1, 0]) <= 0.8 && S.sky([0.3, -0.9, 0.1]) === S.sky([0, 1, 0]);
+        const R = Math.hypot(S.eye[0], S.eye[2]); eye &&= R >= 3.5 && R <= 5.5 && S.eye[1] >= 0.7 && S.eye[1] <= 2.5 && S.fovDeg === 40;
+        noC &&= S.scene.every((o) => o.sigma === undefined && o.ior === undefined && !Array.isArray(o.emit));
+    }
+    ok("!! family R over 300 scenes: a Lambertian ground, 2-8 resting spheres, each Lambertian (two in three) or a microfacet conductor; 1-2 white emitters sharing a power of at most 3",
+        shape && mats && lights && eye && nLamb / (nLamb + nMetal) > 0.6 && nLamb / (nLamb + nMetal) < 0.73, `${nLamb} Lambertian, ${nMetal} conductors`);
+    ok("  ...under a gradient, a band or a uniform sky -- all three drawn, the uniform one never below 0.1", sky && kinds.size === 3);
+    ok("!! ...and NOTHING of family C's: no rough diffuse, no dielectric, no coloured emitter, anywhere in 300 scenes", noC);
+    ok("  R is broad: its draws reach past A's and B's ranges -- albedo below 0.1 and above 0.9, roughness below 0.1 and above 0.7, emitter radius 0.15-0.5",
+        lo.alb < 0.1 && hi.alb > 0.9 && lo.rough < 0.1 && hi.rough > 0.7 && lo.rad < 0.17 && hi.rad > 0.48,
+        `albedo ${lo.alb.toFixed(2)}-${hi.alb.toFixed(2)}, roughness ${lo.rough.toFixed(2)}-${hi.rough.toFixed(2)}, radius ${lo.rad.toFixed(2)}-${hi.rad.toFixed(2)}`);
+    // the splits
+    const V = SPLITS_R7, seen6 = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6].flatMap((S2) => Object.values(S2).flatMap((x) => x.seeds)));
+    const r7 = Object.values(V).flatMap((x) => x.seeds);
+    let refused7 = 0;
+    for (const s2 of r7) { try { renderImages("R", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused7++; } }
+    const seven = [...new Set([...seen6, ...r7])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_R7: 96 training scenes of R, 4 for val, 12 for H1, and family C for H2 -- every seed new, refused without harvest; C5 over seven rounds",
+        V.train.family === "R" && V.train.seeds.length === 96 && V.val.family === "R" && V.val.seeds.length === 4 && V.T1.family === "R" && V.T1.seeds.length === 12 &&
+        V.T2.family === "C" && V.T2.seeds.length === 12 && r7.every((s2) => !seen6.has(s2)) && new Set(r7).size === r7.length && refused7 === r7.length &&
+        new Set(seven).size === seven.length, `${refused7} of ${r7.length} refused; ${seven.length} render seeds`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

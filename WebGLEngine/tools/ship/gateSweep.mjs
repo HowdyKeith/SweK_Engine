@@ -8118,6 +8118,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 7 -- THE RANDOMIZED FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since488: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened four.
+        at: "the denoiser arc, round 7 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (family R over 300 scenes, none of C's signature; C pinned to its pre-R fingerprint; SPLITS_R7)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND7)",
+                                "render/denoiseMask-selfcheck.mjs (a comparison training split under the mask is rendered with it)",
+                                "render/denoiseNet-selfcheck.mjs (a network refuses an input of another width)"]),
+        verdict: "*** TRAIN ON A BROAD RANDOMIZED DISTRIBUTION, TEST ON THE FAMILY TWO ROUNDS COULD NOT REACH. *** Section 23 " +
+                 "replaces round 6's 24 scenes of A and B with 96 scenes of family R -- materials, lights, skies and camera " +
+                 "drawn per scene from a menu that covers A and B but never C's rough diffuse, dielectric, coloured lights " +
+                 "or near-black sky -- and tests on held-out R (H1) and family C (H2), mask on. R's lights are drawn as " +
+                 "POWER over A-B-C's span after a first draft came out four times as bright as A, and its metals cut to one " +
+                 "in three after they dominated the noise. Building it found a silent defect: the comparison training split " +
+                 "was rendered without the mask, and a 9-channel network read the 10-channel test images at the wrong stride " +
+                 "and returned FINITE errors -- denoise() now refuses an input of another width. 8 sabotages, all red; M8 " +
+                 "stayed green until that guard existed.",
+    }),
     // the denoiser arc, round 6 -- THE EMITTER MASK, BEFORE ANY OF ITS TEST SCENES EXIST.
     since487: Object.freeze({
         at: "the denoiser arc, round 6 (unshipped)", swept: 1, green: 1, red: 0,
