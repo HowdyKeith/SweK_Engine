@@ -131,6 +131,16 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
         "tools/ship/exitBanner-selfcheck.mjs",
         "tools/ship/kernelReach-selfcheck.mjs",
     ]);
+    // v4819 -- AND THE ENTRIES A MERGE CARRIED IN. The exported-functions line's own sweep timed these two under its record's
+    // capture; at the merge the record became main's, whose owner (142c0d) did not run them, and this box is foreign, so its
+    // verify cannot re-stamp them. They are accounted ONLY while their stamp predates the record's capture: the owner's next
+    // sweep stamps them `captured` and they leave this list's population on their own, as the arrival rule does.
+    // SABOTAGE (v4819): one name removed -> this row red, naming it.
+    const MERGED_IN_V4819 = Object.freeze([
+        "render/temporalTslCoverage-selfcheck.mjs",
+        "render/threeWorkarounds-selfcheck.mjs",
+    ]);
+    const carriedIn = (g) => MERGED_IN_V4819.includes(g) && Date.parse((S.at || {})[g] || "") < Date.parse(S.captured || "");
     // SABOTAGE v4641: one of the three names removed, so a real entry falls out of the accounted set --
     // 1 RED, by name, printing the gate it could not account for. The row it replaces would have passed
     // that mutation at any count below fifty, which is the argument for the shape rather than for the list.
@@ -185,7 +195,7 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
         arrivals: entries.filter((g) => !inLedger(g) && !named(g) && arrival(g)),
     });
     const ACC = accountFor(observedElsewhere, (g) => rotated.has(g),
-                           (g) => HAND_OBSERVED_V4641.includes(g), arrivedSinceRotation);
+                           (g) => HAND_OBSERVED_V4641.includes(g) || carriedIn(g), arrivedSinceRotation);
     const unaccounted = ACC.unaccounted, arrivals = ACC.arrivals;
     ok(`*** an entry's kind is INFERRED unless the run that took its millisecond watched it, and kindsInferred is exactly that set ***`,
         inferred.size > 0 && observed.length > 0 && sweptButInferred.length === 0 &&
@@ -193,7 +203,7 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
         `${swept.length} entries carry the capture stamp and ${sweptButInferred.length} of them are still called inferred; ` +
         `${observedElsewhere.length} observed entries carry an earlier stamp -- ` +
         `${observedElsewhere.filter((g) => rotated.has(g)).length} of them are in the rotation's own ledger, ` +
-        `${observedElsewhere.filter((g) => HAND_OBSERVED_V4641.includes(g)).length} are the named hand-observed few, ` +
+        `${observedElsewhere.filter((g) => HAND_OBSERVED_V4641.includes(g) || carriedIn(g)).length} are the named hand-observed few or carried in by the v4819 merge, ` +
         `${arrivals.length} are over-budget arrivals since the last rotation (${arrivals.join(", ") || "none"}), ` +
         `and ${unaccounted.length} are unaccounted for` +
         (unaccounted.length ? ": " + unaccounted.join(", ") : "") +
@@ -249,10 +259,10 @@ console.log("\n2. AN INFERENCE IS NAMED AS ONE, ALL 1,620 OF THEM");
     // and the arithmetic wrong. This adds up rather than subtracting.
     ok("  ...and the four categories PARTITION the observed-elsewhere set, so nothing is double-counted or dropped",
        observedElsewhere.filter((g) => rotated.has(g)).length +
-       observedElsewhere.filter((g) => !rotated.has(g) && HAND_OBSERVED_V4641.includes(g)).length +
+       observedElsewhere.filter((g) => !rotated.has(g) && (HAND_OBSERVED_V4641.includes(g) || carriedIn(g))).length +
        arrivals.length + unaccounted.length === observedElsewhere.length,
        `${observedElsewhere.filter((g) => rotated.has(g)).length} + ` +
-       `${observedElsewhere.filter((g) => !rotated.has(g) && HAND_OBSERVED_V4641.includes(g)).length} + ` +
+       `${observedElsewhere.filter((g) => !rotated.has(g) && (HAND_OBSERVED_V4641.includes(g) || carriedIn(g))).length} + ` +
        `${arrivals.length} + ${unaccounted.length} against ${observedElsewhere.length}`);
 
     // ---- POSITIVE CONTROLS FOR THE ARRIVAL RULE, one per clause ----------------------------------------
