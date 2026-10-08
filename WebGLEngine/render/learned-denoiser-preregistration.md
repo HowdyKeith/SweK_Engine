@@ -772,3 +772,64 @@ the frames section 20 diagnosed on), before this section was written:
 file exists.
 
 **The outcomes:** section 19's, unchanged.
+
+## 22. ROUND 6 -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r6` at commit 88666304, 2026-10-08 06:05:46Z to 06:55:18Z (2,972 s). Its
+output, unedited, is `render/denoise-results-r6.json`.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0, train fit per seed | 0.125 / 0.121 / 0.129 |
+| C1, H1's set | network 12 of 12, filter 11 of 12 against the noisy input |
+| C1, family C | network 11 of 12, filter **12 of 12** -- round 5's failure did not recur |
+| C2 | shuffled-target network mean d -1.91 |
+| C3 | 0 near the floor |
+| C4 | bit-identical retrain |
+| C5 | distinct render seeds |
+
+**The hypotheses.**
+
+| | Network wins (of 12) | mean d | one-sided p | Holm threshold | Status |
+|---|---|---|---|---|---|
+| H1, held-out A+B (16000 / 17000) | 11 | +0.443 | 0.0032 | 0.025 | **supported** |
+| H2, family C (18000) | 1 | -0.222 | 0.9998 | 0.05 | **not supported** |
+
+- **On the families it trained on, the network beats the filter.** Geometric means: network 0.0040, filter 0.0062
+  (on the A half 0.0027 vs 0.0030; on the B half 0.0059 vs 0.0129). Every seed is at 0.0038-0.0041.
+- **On the third family, trained on two others, it does not.** Geometric means: network 0.0061, filter 0.0049. The
+  filter wins on 11 of 12 images, and all three seeds land at 0.0061.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | H1's set | family C |
+|---|---|---|
+| the filter WITHOUT the mask (the same tuned setting) | 0.0062 | 0.0253 |
+| the networks WITHOUT the mask | 0.0036-0.0039 | 0.0060-0.0073 |
+| 1-sample input: filter / networks | 0.0157 / 0.0087-0.0096 | 0.0104 / 0.0081-0.0083 |
+| 16-sample input: filter / networks | 0.0038 / 0.0024-0.0026 | 0.0031 / 0.0050-0.0051 |
+
+- **Without the mask**, the filter blew up on the same kind of image round 5 found: 0.13-1.22 on the six family-C
+  frames with a visible emitter.
+- **With the mask**, the filter has no blow-up, and on family C it is the better method.
+- The mask moved the networks little: on family C, 0.0060-0.0073 without it and 0.0061 with it.
+
+**What this buys, per section 19: "H1 only".** Variety of this size -- two families, 24 scenes -- does not buy
+transfer to a third. The in-family result stands for the fourth time (rounds 3, 4 and 6; round 5's was not
+reported).
+
+**The arc so far, as its pre-registered verdicts read:**
+
+| Round | Change | In-distribution | A family not trained on |
+|---|---|---|---|
+| 2 | residual network | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | **supported** (12/12) | not supported (5/12) |
+| 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
+
+- A small kernel-predicting network beats a tuned hand-written filter on scenes like the ones it was trained on.
+- It has not once beaten that filter on a family of scenes it never saw.
+- The network does not go to the device on these results. Section 9 asks for both hypotheses.
