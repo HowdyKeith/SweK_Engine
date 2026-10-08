@@ -1052,3 +1052,82 @@ apart. A next round must say which of these it takes, as a new pre-registration 
 | 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
 | 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
 | 7 | trained on 96 randomized scenes (R) | not reported (C1: the filter) | not reported |
+
+## 26. ROUND 8 -- C1 ON THE TRAINING IMAGES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question is section 23's, unchanged.**
+
+> **Trained on a broad, randomized distribution of scenes instead of two fixed families, does the network beat the
+> filter on a family that distribution never draws?**
+
+**One deliberate change from round 7: where control C1 is decided.** Keith chose it from the two options section
+25 named.
+- **As written (section 7):** both methods must beat the noisy input on at least 11 of 12 images of EACH TEST SET.
+  Twice it stopped a round, and both times because of the filter, not the pipeline (sections 20 and 25).
+- **Now:** C1 is decided on the **training images**, right after C0 and before any test scene is rendered.
+  - The filter, as tuned, and the network, as its per-image mean over seeds 1-3 (as on a test set), must each beat
+    the noisy input on at least 11 in 12 of the 96 training images: **88**.
+  - A tie is not a win.
+  - If either falls short, the run is "not reported" and STOPS. Its test scenes are never rendered.
+- **On the test sets, C1 is no longer applied.**
+  - Each set's count of images where each method beats the noisy input is reported beside the hypotheses, never
+    tested.
+  - An image where the filter loses to the noisy input enters the sign test like any other image. It is simply an
+    image the network won, or did not.
+- **Why it is still a sanity check.** C1 exists to catch a broken pipeline that both methods share (section 7). A
+  broken pipeline breaks the training images as surely as the test images, and there are 96 of those, not 12. What
+  it no longer does is mistake a baseline's loss on a rare or unseen image for a broken pipeline.
+- **What it gives up.** A failure that affects only the test images is no longer caught by C1. Against that:
+  - the test and training images are built by the same call (`renderSplit`), which is gated;
+  - C3 still bounds each test set by its reference floor.
+- **In code:** `trainSanity()` and `C1_OF` in `render/denoiseStats.mjs`, and `verdict({ c1Train })`;
+  `c1OnTraining` and the stop in `render/denoiseStudy.mjs`; `ROUND8`.
+  - Gated with planted outcomes, including round 7's case: the filter under the noisy input on 2 of 12 test images is
+    now REPORTED.
+  - A miniature whose untrained network ties the noisy input everywhere stops before the real test seeds, which sit
+    behind it with harvest off.
+  - 12 sabotages, all red.
+
+**Everything else is round 7's:**
+- the training split (the same 96 scenes of R, 20000-20095) and val (21000-21003);
+- the kernel network and its training (seeds 1, 2, 3), and the filter and its grid;
+- the emitter mask and its rule;
+- the statistic, C0 and C2-C5, Holm over {H1, H2}, and C2 on H1's set;
+- the secondaries: the A+B comparison, 1- and 16-sample inputs, val.
+
+**New test splits** (`SPLITS_R8`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train, val | round 7's | 20000-20095, 21000-21003 |
+| T1 -> **H1** | 12 of R | **24000-24011** |
+| T2 -> **H2** | 12 of family C | **25000-25011** |
+
+- No earlier split touched either test range.
+- C5 holds over eight rounds: 1,002 render seeds.
+
+**What was seen first. All of it is disclosed because none of it can be un-seen.**
+- **Everything about the training split.** Round 7 trained on it, and section 25 diagnosed on it.
+  - The code that makes the pieces before the tests (scenes, filter, networks) is unchanged since round 7 and seeded.
+    This round's filter and networks will therefore be bit for bit round 7's.
+  - Measured from round 7's cache before this was written: on the 96 training images the filter beats the noisy
+    input on 94, and the network on 96. **The new C1 will hold.** That is deliberate: C1 is a sanity check, and its
+    job is to fail only when something is broken.
+- **Round 7's test statistics.** Its results file holds both, and they were read while diagnosing section 25:
+  network wins 12 of 12 on H1 and 3 of 12 on H2. They are not results. This round's verdict is on new test scenes
+  only.
+- Nothing of either new test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r8 --cache <dir>` -> `render/denoise-results-r8.json`.
+- It refuses if the file exists.
+- If a background limit stops it, the same command resumes it (section 24).
+
+**The outcomes are section 23's:**
+- **H1 and H2 supported:** breadth buys transfer. The network goes to the device, with the head widened past
+  `COUT_MAX` 32.
+- **H1 only:** a broad randomized set of this size does not buy transfer to a family outside its support.
+- **H2 only:** recorded as found.
+- **Neither:** recorded with the controls' numbers.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.

@@ -3,8 +3,8 @@
 // Run: node render/denoiseStats-selfcheck.mjs
 //
 // GATES render/denoiseStats.mjs -- the pre-registration's statistic and controls -- on PLANTED outcomes only. Its
-// exports, each named here: REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects,
-// signTestUpper, holm, trainFit, historyFit, verdict. Every verdict the function can return is planted below and has to come back.
+// exports, each named here: REL_EPS, C1_MIN_WINS, C1_OF, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects,
+// signTestUpper, holm, trainFit, historyFit, trainSanity, verdict. Every verdict the function can return is planted below and has to come back.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   S1  Holm does not stop at its first failure                                  1 RED
@@ -17,13 +17,18 @@
 //   S9  verdict() ignores a failed C6                                            1 RED
 //   S10 C6 compares the accumulation with itself, not with the noisy frame       1 RED
 //   S8  verdict() ignores a failed C0                                            1 RED (it crashed the gate until the row caught the throw)
+//   S11 the training C1's bar 11 images, not 11 in 12 of them                   2 RED
+//   S12 the training C1 counts the first seed, not the mean over seeds           1 RED
+//   S13 a tie with the noisy input counted as a win                              1 RED
+//   S14 with C1 decided on the training images, the test sets still decide it    1 RED (round 7's case)
+//   S15 verdict() ignores a failed training C1                                   1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const S = await import(pathToFileURL(path.join(ENG, "render", "denoiseStats.mjs")).href);
-const { REL_EPS, C1_MIN_WINS, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, historyFit, verdict } = S;
+const { REL_EPS, C1_MIN_WINS, C1_OF, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, historyFit, trainSanity, verdict } = S;
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -47,16 +52,17 @@ console.log("1. THE PIECES");
     ok("  the constants are the pre-registration's: eps 0.01, 11 of 12 for C1, a factor 2 for C3", REL_EPS === 0.01 && C1_MIN_WINS === 11 && C3_FLOOR_FACTOR === 2);
 }
 
-// a planted test set: the network's error is `ratio` times the filter's on the images it wins, `lose` times on the rest
-const set = ({ n = 12, wins = 12, ratio = 0.5, lose = 1.2, noisy = 1, floor = 0.001, netNoisyLosses = 0 } = {}) => {
+// a planted test set: the network's error is `ratio` times the filter's on the images it wins, `lose` times on the rest.
+// `netNoisyLosses` images where both methods lose to the noisy input; `filterNoisyLosses` where only the filter does.
+const set = ({ n = 12, wins = 12, ratio = 0.5, lose = 1.2, noisy = 1, floor = 0.001, netNoisyLosses = 0, filterNoisyLosses = 0 } = {}) => {
     const filter = Array.from({ length: n }, (_, i) => 0.1 + 0.01 * i);
     const net1 = filter.map((f, i) => (i < wins ? f * ratio : f * lose));
-    const noisyArr = filter.map((f, i) => (i < netNoisyLosses ? net1[i] * 0.5 : noisy));
+    const noisyArr = filter.map((f, i) => (i < netNoisyLosses ? net1[i] * 0.5 : i < filterNoisyLosses ? f * 0.9 : noisy));
     return { noisy: noisyArr, filter, net: [net1, net1.map((v) => v * 1.01), net1.map((v) => v * 0.99)], floor: filter.map(() => floor) };
 };
 const shuffledLoses = (T) => T.filter.map(() => 0).map((_, i) => T.filter[i] * 1.5);
 const run = (sets, opts = {}) => verdict({ sets, shuffled: opts.shuffled ?? [shuffledLoses(sets.H1), shuffledLoses(sets.H1), shuffledLoses(sets.H1)],
-    determinism: opts.determinism ?? true, seedsDistinct: opts.seedsDistinct ?? true });
+    determinism: opts.determinism ?? true, seedsDistinct: opts.seedsDistinct ?? true, c1Train: opts.c1Train ?? null });
 
 console.log("\n2. EVERY VERDICT, PLANTED");
 {
@@ -108,6 +114,34 @@ console.log("\n4. CONTROL C6 -- THE TEMPORAL ROUND'S HISTORY CHECK (pre-registra
     let stop = null, threw = null; try { stop = verdict({ c6: historyFit([1, 1], [1, 1]), c0: trainFit([[0.1]], [1]) }); } catch (e) { threw = e.message; }
     ok("!! a failed C6 is NOT REPORTED before anything else is read -- even with C0 passing",
         !!stop && stop.run === "not reported" && /^C6: /.test(stop.reasons[0]) && stop.controls.C6.ok === false && Object.keys(stop.hypotheses).length === 0, threw || stop.reasons[0]);
+}
+
+console.log("\n5. CONTROL C1 ON THE TRAINING IMAGES (pre-registration section 26)");
+{
+    // k of n training images where a method beats the noisy input (error 0.5 against 1), the rest where it loses (2)
+    const wins = (k, n) => Array.from({ length: n }, (_, i) => (i < k ? 0.5 : 2)), ones = (n) => new Array(n).fill(1);
+    const at = (fk, nk, n) => trainSanity(wins(fk, n), [wins(nk, n), wins(nk, n), wins(nk, n)], ones(n));
+    ok("!! the bar is the test sets' FRACTION, 11 in 12: 88 of 96 holds and 87 does not, for either method -- and 11 of 12 is still 11",
+        C1_OF === 12 && at(88, 96, 96).ok && at(88, 96, 96).need === 88 && !at(87, 96, 96).ok && !at(96, 87, 96).ok && at(11, 11, 12).need === 11 && at(11, 11, 12).ok && !at(10, 12, 12).ok,
+        `96 images: need ${at(88, 96, 96).need}`);
+    // the network is counted as on a test set: per image, the MEAN over seeds -- one seed losing an image the mean wins costs nothing
+    const m = trainSanity([0.5, 0.5], [[1.2, 0.5], [0.5, 0.5], [0.5, 0.5]], [1, 1]);
+    ok("!! the network's count is over its per-image mean over seeds, as on a test set: a first seed that loses an image the mean wins does not cost it",
+        m.netWins === 2, `${m.netWins} of 2`);
+    ok("  a tie with the noisy input is not a win, and mismatched sets are refused", trainSanity([1, 0.5], [[0.5, 1]], [1, 1]).filterWins === 1 &&
+        trainSanity([1, 0.5], [[0.5, 1]], [1, 1]).netWins === 1 && [() => trainSanity([1], [[1, 1]], [1, 1]), () => trainSanity([1, 1], [[1]], [1, 1]), () => trainSanity([], [[]], [])]
+            .every((f) => { try { f(); return false; } catch { return true; } }));
+    // round 7's case: the filter loses to the noisy input on 2 of 12 TEST images, everything else clean
+    const T7 = { H1: set({ wins: 12, filterNoisyLosses: 2 }), H2: set({ wins: 12 }) };
+    const old = run(T7), now = run(T7, { c1Train: at(96, 96, 96) });
+    ok("!! decided on the training images, C1 no longer reads the test sets: round 7's case -- the filter under the noisy input on 2 of 12 test images -- is REPORTED, not stopped",
+        old.run === "not reported" && old.controls.C1 === false && now.run === "reported" && now.hypotheses.H1.status === "supported" && now.controls.C1.ok === true &&
+        now.hypotheses.H1.c1.filterWins === 10 && now.hypotheses.H1.c1.netWins === 12 && now.hypotheses.H1.c1.tested === false && now.reasons.length === 0,
+        `without: "${old.reasons[0]}"; with: H1 ${now.hypotheses.H1.status}, its test counts ${now.hypotheses.H1.c1.netWins} / ${now.hypotheses.H1.c1.filterWins} reported`);
+    let stop = null, threw = null; try { stop = verdict({ c0: trainFit([[0.1]], [1]), c1Train: at(87, 96, 96) }); } catch (e) { threw = e.message; }
+    ok("!! a failed training C1 is NOT REPORTED before a test set is read -- with C0 passing, and with no `sets` at all",
+        !!stop && stop.run === "not reported" && /^C1 on the training images: /.test(stop.reasons[0]) && stop.controls.C1.ok === false && stop.controls.C0.ok === true &&
+        Object.keys(stop.hypotheses).length === 0, threw || stop.reasons[0]);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +

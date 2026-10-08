@@ -8118,6 +8118,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 8 -- C1 ON THE TRAINING IMAGES, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since490: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
+        at: "the denoiser arc, round 8 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseStats-selfcheck.mjs (trainSanity, verdict({ c1Train }), round 7's case now reported)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND8; a failed training C1 stops before the real test seeds; a passing one is the verdict's C1)",
+                                "render/denoiseScenes-selfcheck.mjs (SPLITS_R8, C5 over eight rounds)"]),
+        verdict: "*** A SANITY CHECK THAT CAN NO LONGER SPEND A TEST SET. *** Control C1 stopped rounds 5 and 7, both times " +
+                 "because the hand-written filter lost to the noisy input on test images, never because the pipeline was " +
+                 "broken. Section 26 decides C1 on the 96 TRAINING images, right after C0 and before any test scene is " +
+                 "rendered: both methods must beat the noisy input on 11 in 12 of them (88). On the test sets the counts are " +
+                 "reported, never tested. Round 7's design otherwise, on new test scenes (24000 R, 25000 C). Measured " +
+                 "from round 7's cache before pre-registering: filter 94, network 96 -- it will hold, as a sanity check " +
+                 "should. 12 sabotages, all red.",
+    }),
     // the denoiser arc, round 7 -- THE HARVEST, RESUMABLE.
     since489: Object.freeze({
         at: "the denoiser arc, round 7 (unshipped)", swept: 1, green: 1, red: 0,
