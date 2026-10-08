@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, RESULTS_R5, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, MINI, shuffledTargets, stopBeforeTests, renderSplit,
 // runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
@@ -21,15 +21,16 @@
 //   R9  renderSplit takes the split's family, not each seed's                    3 RED (the miniature threw and crashed the gate until its run was caught)
 //   R10 the other-training networks trained on the primary training set          1 RED
 //   R11 ROUND5 without its other-training comparison                             1 RED
+//   R12 ROUND6 without the mask                                                  1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, MINI, shuffledTargets, stopBeforeTests,
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, MINI, shuffledTargets, stopBeforeTests,
         renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
 const { trainFit, historyFit } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
@@ -96,7 +97,8 @@ console.log("\n4. THE KERNEL-PREDICTING ROUND (pre-registration section 15)");
         ROUND3.splits === SPLITS_R3 && ROUND3.head === "kernel" && ROUND3.init === "zero-last" && ROUND3.c0 === true && ROUND3.compareHeads.join() === "residual" &&
         RESULTS_R3 === "render/denoise-results-r3.json" &&
         ![...SPLITS.T1.seeds, ...SPLITS.T2.seeds, ...SPLITS_R2.T1.seeds, ...SPLITS_R2.T2.seeds].some((s) => [...ROUND3.splits.T1.seeds, ...ROUND3.splits.T2.seeds].includes(s)));
-    const out = runStudy({ ...MINI, c0: false, head: ROUND3.head, compareHeads: ROUND3.compareHeads });
+    // 8 x 8 and two steps: what these rows hold does not depend on the size, and the gate stays inside the sweep budget
+    const out = runStudy({ ...MINI, image: 8, train: { steps: 2, batch: 1, crop: 8 }, secondarySpp: [], c0: false, head: ROUND3.head, compareHeads: ROUND3.compareHeads });
     const S1 = out.secondary["T1@residual"], S2 = out.secondary["T2@residual"];
     ok("!! the whole pipeline runs on the kernel head, and the residual networks are trained and measured beside it, on the same test images, outside the verdict",
         out.config.head === "kernel" && out.verdict.controls.C4 === true && S1 && S2 && S1.net.length === 3 && S1.net.every((a) => a.length === 2) && S2.net.length === 3 &&
@@ -141,7 +143,14 @@ console.log("\n6. THE THIRD-FAMILY ROUND (pre-registration section 19)");
     ok("  ...and they are other networks: their errors are not the primary's", O1 && O1.net.some((a, i) => a.some((v, j) => v !== out.tables.T1.net[i][j])));
 }
 
+console.log("\n7. THE EMITTER-MASK ROUND'S CONFIGURATION (pre-registration section 21; the masked pipeline runs are render/denoiseMask-selfcheck.mjs's)");
+{
+    ok("!! ROUND6 is section 21's: round 5's design on new test splits, with the emitter mask on, the no-mask comparison, results to their own file",
+        ROUND6.splits === SPLITS_R6 && ROUND6.emitterMask === true && ROUND6.compareNoMask === true && ROUND6.head === "kernel" && ROUND6.temporal === false &&
+        ROUND6.init === "zero-last" && ROUND6.c0 === true && RESULTS_R6 === "render/denoise-results-r6.json" && SPLITS_R6.train === SPLITS_R5.train);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r5` is the third-family round's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r6` is the emitter-mask round's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

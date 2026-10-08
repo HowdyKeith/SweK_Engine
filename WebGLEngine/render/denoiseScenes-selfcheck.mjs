@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, isDatasetSeed, strideOf,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, isDatasetSeed, strideOf,
 // renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
@@ -25,6 +25,7 @@
 //   D14 family A's emitter range moved (4-12 -> 4-13)                            2 RED
 //   D15 SPLITS_R5's H2 set drawn from family B                                   2 RED
 //   D16 familyOf ignores a split's per-seed families                             1 RED
+//   D17 SPLITS_R6's H2 set on round 5's range (15000)                            1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -34,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, familyOf, isDatasetSeed, strideOf, renderSeeds,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, familyOf, isDatasetSeed, strideOf, renderSeeds,
         makeScene, guideBuffers, renderImages, inputChannels, remodulate } = D;
 const { intersect, cameraBasis, pixelRay } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
 
@@ -218,6 +219,14 @@ console.log("\n5. THE THIRD FAMILY AND THE MIXED SPLITS (pre-registration sectio
     const five = [...new Set([...seen4, ...newSeeds])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
     ok("!! every new seed is refused without harvest, and C5 holds over five rounds' scenes", refused5 === newSeeds.length && new Set(five).size === five.length,
         `${refused5} of ${newSeeds.length} refused; ${five.length} render seeds`);
+    // the emitter-mask round's splits (section 21)
+    const U = SPLITS_R6, seen5 = new Set([...seen4, ...newSeeds]), r6 = [...U.T1.seeds, ...U.T2.seeds];
+    let refused6 = 0;
+    for (const s2 of r6) { try { renderImages("C", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused6++; } }
+    const six = [...new Set([...seen5, ...r6])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_R6: round 5's training and validation scenes, and NEW test scenes -- H1 6 A (16000) + 6 B (17000), H2 12 of C (18000) -- refused without harvest; C5 over six rounds",
+        U.train === T.train && U.val === T.val && U.T1.families.join() === T.T1.families.join() && U.T2.family === "C" && U.T2.seeds.length === 12 &&
+        r6.every((s2) => !seen5.has(s2)) && new Set(r6).size === 24 && refused6 === 24 && new Set(six).size === six.length, `${six.length} render seeds`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

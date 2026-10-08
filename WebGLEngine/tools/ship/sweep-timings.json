@@ -2061,13 +2061,14 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
   "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
   "brain/conv2d-selfcheck.mjs": 2161,
-  "render/denoiseScenes-selfcheck.mjs": 138,
-  "render/denoiseFilter-selfcheck.mjs": 257,
+  "render/denoiseScenes-selfcheck.mjs": 147,
+  "render/denoiseFilter-selfcheck.mjs": 266,
   "render/denoiseStats-selfcheck.mjs": 52,
   "brain/convNet-selfcheck.mjs": 177,
-  "render/denoiseNet-selfcheck.mjs": 2108,
-  "render/denoiseStudy-selfcheck.mjs": 2561,
-  "render/denoiseTemporal-selfcheck.mjs": 1834
+  "render/denoiseNet-selfcheck.mjs": 2568,
+  "render/denoiseStudy-selfcheck.mjs": 2240,
+  "render/denoiseTemporal-selfcheck.mjs": 1834,
+  "render/denoiseMask-selfcheck.mjs": 2292
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4010,7 +4011,8 @@
   "brain/convNet-selfcheck.mjs": 0,
   "render/denoiseNet-selfcheck.mjs": 0,
   "render/denoiseStudy-selfcheck.mjs": 0,
-  "render/denoiseTemporal-selfcheck.mjs": 0
+  "render/denoiseTemporal-selfcheck.mjs": 0,
+  "render/denoiseMask-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
@@ -5947,13 +5949,14 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
   "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:43.172Z",
   "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
-  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T03:33:58.588Z",
-  "render/denoiseFilter-selfcheck.mjs": "2026-10-08T02:06:19.497Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T05:57:45.359Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-08T05:57:48.973Z",
   "render/denoiseStats-selfcheck.mjs": "2026-10-08T02:06:19.023Z",
   "brain/convNet-selfcheck.mjs": "2026-10-08T02:06:24.786Z",
-  "render/denoiseNet-selfcheck.mjs": "2026-10-08T02:06:21.769Z",
-  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T03:34:01.292Z",
-  "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z"
+  "render/denoiseNet-selfcheck.mjs": "2026-10-08T05:57:51.718Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T06:05:26.399Z",
+  "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z",
+  "render/denoiseMask-selfcheck.mjs": "2026-10-08T05:57:45.005Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -7869,7 +7872,8 @@
   "brain/convNet-selfcheck.mjs": 20000,
   "render/denoiseNet-selfcheck.mjs": 20000,
   "render/denoiseStudy-selfcheck.mjs": 20000,
-  "render/denoiseTemporal-selfcheck.mjs": 20000
+  "render/denoiseTemporal-selfcheck.mjs": 20000,
+  "render/denoiseMask-selfcheck.mjs": 20000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -9806,7 +9810,8 @@
   "brain/convNet-selfcheck.mjs": true,
   "render/denoiseNet-selfcheck.mjs": true,
   "render/denoiseStudy-selfcheck.mjs": true,
-  "render/denoiseTemporal-selfcheck.mjs": true
+  "render/denoiseTemporal-selfcheck.mjs": true,
+  "render/denoiseMask-selfcheck.mjs": true
  },
  "crossings": {
   "tools/ship/engineSceneBot-selfcheck.mjs": 2,
@@ -11823,13 +11828,14 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": 18048,
   "tools/ship/splatVoxelWorld-selfcheck.mjs": 1461,
   "brain/conv2d-selfcheck.mjs": 2161,
-  "render/denoiseScenes-selfcheck.mjs": 138,
-  "render/denoiseFilter-selfcheck.mjs": 257,
+  "render/denoiseScenes-selfcheck.mjs": 147,
+  "render/denoiseFilter-selfcheck.mjs": 266,
   "render/denoiseStats-selfcheck.mjs": 52,
   "brain/convNet-selfcheck.mjs": 177,
-  "render/denoiseNet-selfcheck.mjs": 2108,
-  "render/denoiseStudy-selfcheck.mjs": 2561,
-  "render/denoiseTemporal-selfcheck.mjs": 1834
+  "render/denoiseNet-selfcheck.mjs": 2568,
+  "render/denoiseStudy-selfcheck.mjs": 2240,
+  "render/denoiseTemporal-selfcheck.mjs": 1834,
+  "render/denoiseMask-selfcheck.mjs": 2292
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-07T13:02:00.256Z",
@@ -13655,13 +13661,14 @@
   "render/temporalLockSumsTsl-selfcheck.mjs": "2026-10-07T00:30:42.194Z",
   "tools/ship/splatVoxelWorld-selfcheck.mjs": "2026-10-07T16:31:28.157Z",
   "brain/conv2d-selfcheck.mjs": "2026-10-07T21:53:07.672Z",
-  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T03:33:58.588Z",
-  "render/denoiseFilter-selfcheck.mjs": "2026-10-08T02:06:19.497Z",
+  "render/denoiseScenes-selfcheck.mjs": "2026-10-08T05:57:45.359Z",
+  "render/denoiseFilter-selfcheck.mjs": "2026-10-08T05:57:48.973Z",
   "render/denoiseStats-selfcheck.mjs": "2026-10-08T02:06:19.023Z",
   "brain/convNet-selfcheck.mjs": "2026-10-08T02:06:24.786Z",
-  "render/denoiseNet-selfcheck.mjs": "2026-10-08T02:06:21.769Z",
-  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T03:34:01.292Z",
-  "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z"
+  "render/denoiseNet-selfcheck.mjs": "2026-10-08T05:57:51.718Z",
+  "render/denoiseStudy-selfcheck.mjs": "2026-10-08T06:05:26.399Z",
+  "render/denoiseTemporal-selfcheck.mjs": "2026-10-08T02:06:18.427Z",
+  "render/denoiseMask-selfcheck.mjs": "2026-10-08T05:57:45.005Z"
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -21750,13 +21757,14 @@
    2161
   ],
   "render/denoiseScenes-selfcheck.mjs": [
-   131,
    146,
-   138
+   138,
+   147
   ],
   "render/denoiseFilter-selfcheck.mjs": [
    265,
-   257
+   257,
+   266
   ],
   "render/denoiseStats-selfcheck.mjs": [
    46,
@@ -21768,15 +21776,19 @@
   ],
   "render/denoiseNet-selfcheck.mjs": [
    1893,
-   2108
+   2108,
+   2568
   ],
   "render/denoiseStudy-selfcheck.mjs": [
-   985,
-   2515,
-   2561
+   2561,
+   2952,
+   2240
   ],
   "render/denoiseTemporal-selfcheck.mjs": [
    1834
+  ],
+  "render/denoiseMask-selfcheck.mjs": [
+   2292
   ]
  },
  "contended": {
@@ -23609,7 +23621,8 @@
   "brain/convNet-selfcheck.mjs": false,
   "render/denoiseNet-selfcheck.mjs": false,
   "render/denoiseStudy-selfcheck.mjs": false,
-  "render/denoiseTemporal-selfcheck.mjs": false
+  "render/denoiseTemporal-selfcheck.mjs": false,
+  "render/denoiseMask-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -25552,6 +25565,7 @@
   "brain/convNet-selfcheck.mjs": "alone",
   "render/denoiseNet-selfcheck.mjs": "alone",
   "render/denoiseStudy-selfcheck.mjs": "alone",
-  "render/denoiseTemporal-selfcheck.mjs": "alone"
+  "render/denoiseTemporal-selfcheck.mjs": "alone",
+  "render/denoiseMask-selfcheck.mjs": "alone"
  }
 }

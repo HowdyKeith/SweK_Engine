@@ -8118,6 +8118,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 6 -- THE EMITTER MASK, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since487: Object.freeze({
+        at: "the denoiser arc, round 6 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseMask-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R6, C5 over six rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND6)"]),
+        verdict: "*** BOTH METHODS ARE TOLD WHERE THE LIGHTS ARE, AND NEITHER MAY AVERAGE ACROSS THEM. *** Round 5 stopped " +
+                 "because the filter, tuned on A+B, smeared family C's coloured emitters into its near-black sky. Section " +
+                 "21 adds an emitter mask to both methods with one hard rule: no pixel is averaged with a neighbour whose " +
+                 "mask differs. The mask is the emitter's COVERAGE of each pixel from an 8 x 8 grid of rays, not a centre " +
+                 "ray's 0/1: measured outside every split, a 0/1 mask still let the rim pixels -- centre ray off the " +
+                 "emitter, samples on it -- smear into the sky (0.24 against a noisy 0.021), and coverage brought the same " +
+                 "frame to 0.0072. Gated: coverage sums to an emitter's analytic projected area within 0.4%; an all-zero " +
+                 "mask changes nothing, bit for bit, in either method; no weight crosses the mask. 9 sabotages, all red.",
+    }),
     // the denoiser arc, round 5 -- THE THIRD FAMILY, BEFORE ANY OF ITS TEST SCENES EXIST.
     since486: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.

@@ -711,3 +711,64 @@ A next round could take either of these, as a new pre-registration with new test
   depth). The filter can then refuse to mix them, and so can the network.
 - **Keep the inputs and change C1:** it cannot distinguish "the baseline fails on a new family" from "the pipeline
   is broken", and it should.
+
+## 21. ROUND 6 -- THE EMITTER MASK, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question is section 19's, unchanged.**
+
+> **Trained on two families, does the network beat the filter on a third that neither was ever trained or tuned on?**
+
+Round 5 could not answer it. The filter, tuned on A+B, averaged family C's coloured emitters into its near-black sky
+(section 20).
+
+**One deliberate change from round 5: an emitter mask, given to both methods, with one rule for both.**
+- **The mask** (`render/denoiseMask.mjs`, `emitterCoverage`) is the fraction of each pixel an emitter covers, from an
+  even 8 x 8 grid of rays across the pixel, so it takes values k / 64.
+  - It is a deterministic guide, like albedo and normal, not part of the render.
+  - It is appended as a tenth input channel, after the nine every method reads.
+- **The rule:** a pixel is never averaged with a neighbour whose mask value differs.
+  - The filter applies it to its 9 x 9 window.
+  - The kernel-predicting network applies it to its 9 x 9 kernel: the softmax runs over the taps on the pixel's own
+    side. The network also reads the mask as an input (its first layer takes 10 channels: 7,473 parameters).
+- An all-zero mask changes neither method, bit for bit.
+- Everything else is round 5's, including C1 as written:
+  - the A+B training split and the family-C generator;
+  - the network, its initialisation and training;
+  - the filter and its 108-setting grid, tuned on the training scenes WITH the mask;
+  - the statistic and the controls C0-C5.
+
+**Why coverage and not a 0/1 centre-ray mask.** Measured on family-C scenes OUTSIDE every split (950200-950207,
+the frames section 20 diagnosed on), before this section was written:
+- With a 0/1 mask, round 5's setting still failed on all three frames with a visible emitter (0.24, 0.14 and 0.17
+  against noisy 0.021, 0.007 and 0.11).
+- The error moved to the emitter's **rim**: pixels whose centre ray misses the emitter but whose samples hit it.
+  They are bright, carry mask 0 like the sky beside them, and smear into it.
+- With coverage, the rim carries its own value, and the same frames came to 0.0072, 0.0063 and 0.057.
+
+**Splits** (`SPLITS_R6`).
+- Train and val are round 5's.
+- H1: 6 A (16000-16005) + 6 B (17000-17005).
+- H2: 12 of family C (18000-18011).
+- Every test seed is on a range no earlier split touched. C5 holds over six rounds.
+
+**What was seen first.**
+- **The 24 training scenes, with the mask.**
+  - The filter's tuning chose sS 1, sN 1, sA 0.2, sI 4 (round 5's setting), with a training fit of 0.203.
+  - One network (seed 1) fit 0.125, so C0 can pass.
+- **A design check on the eight non-dataset C frames.** With that tuned setting and the coverage mask, the filter
+  beat the noisy input on all eight. On one (950204) the margin was thin: 0.0062 against 0.0066.
+  - C1 may still fire. If it does, the run stops as the rules say.
+  - Nothing was tuned on family C.
+
+**Secondary** (reported, never tested, never used to choose):
+- both methods WITHOUT the mask (the filter re-tuned and three networks trained on the same scenes' nine channels),
+  on the same test images, to show what the mask changed;
+- 1- and 16-sample inputs;
+- val, per seed, and time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r6` -> `render/denoise-results-r6.json`. It refuses if the
+file exists.
+
+**The outcomes:** section 19's, unchanged.
