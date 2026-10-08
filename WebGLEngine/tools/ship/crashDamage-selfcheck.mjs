@@ -61,6 +61,15 @@
 //   L  ROOMY made no roomier than the defaults                                       -> 2 red: the ROOMY barrage row, and the proxy row
 //      (which wants a shell that does not repack).
 //   M  the record's radius one short                                                 -> 1 red: the unit-space row.
+//   N  v4681, the narrowed remesh keeps only the edit's OWN chunk (no affectedChunks)  -> 1 red: "ONE voxel off a chunk's seam column".
+//      The corner row passes under N and is meant to: a carve that spans the seam dirties every chunk it spans, and the dirty flags
+//      cover that case by themselves. Only an edit that changes ONE side of a seam (a voxel gone beside a solid neighbour) needs the log.
+//   O  the narrow path never taken (syncDirty always the 3x3 rule)                   -> 4 red: the corner row's four chunks, the lone
+//      voxel's two, "a sync CONSUMES the log", and the barrage's one-to-four chunks per carving shell.
+//   P  the log never cleared by a sync                                               -> 1 red: "a sync CONSUMES the log". A picture-
+//      equivalent mutation (extra chunks re-meshed, still correct), so only a row on the log itself catches it -- it is a cost, not a defect
+//      of the picture, and a shell would re-mesh every earlier shell's chunks again.
+//   Q  crashWorld never turns the log on                                             -> 2 red: the corner row and the lone-voxel row.
 //
 // Run: node tools/ship/crashDamage-selfcheck.mjs      (~9 s: five cities, three rams, two browsers)
 "use strict";
@@ -68,6 +77,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import * as D from "../../world/crashDamage.mjs";
+import * as VD from "../../render/voxelDamage.mjs";
 import * as T from "../../world/raceTrack.mjs";
 import * as C from "../../physics/raceCar.mjs";
 import { CityGen } from "../../world/CityGen.js";
@@ -240,6 +250,33 @@ sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FO
     report(`a 12-shell barrage on buildings 0, 12, 40 -- repacks with the default slots ${tight.map((t) => t.r).join(" ")}, with ROOMY ${roomy.map((t) => t.r).join(" ")}; buffer ${wu.mesh.positions.length / 3} -> ${D.worldUnit(makeWith(D.ROOMY).state).mesh.positions.length / 3} vertices`);
     ok("*** ROOMY slots take a barrage that repacks the default world on every building: the same twelve shells, three buildings, no repack ***",
         tight.every((t) => t.r >= 1) && roomy.every((t) => t.r === 0) && roomy.every((t) => t.n === 12 && t.hit > 0));
+
+    // THE REMESH IS ONLY THE CHUNKS AN EDIT CAN REACH (v4681): a dirty flag names a chunk, not whether the edit was at its seam, so the
+    // old rule re-meshed all eight neighbours of every dirty chunk -- nine chunks, 15-25 ms, for a shell that carved one. The world
+    // keeps an edit log now and syncDirty applies affectedChunks() to each edit. The danger is a seam: a carve centred ON a chunk corner
+    // must still re-mesh all four chunks around it, and the picture must be exactly a full repack's.
+    const gs = makeWith(D.ROOMY);
+    const corner = (() => { for (let cx = -6; cx <= 6; cx++) for (let cz = -6; cz <= 6; cz++) { const x = cx * 16, z = cz * 16; if ([[-1, -1], [0, -1], [-1, 0], [0, 0]].every(([a, b]) => gs.world.voxelAt(x + a, 0, z + b))) return [x, z]; } return null; })();
+    const seamHit = corner ? VD.blastAt(gs.state, {}, [corner[0], 1, corner[1]], 3) : null, seamTwin = matchesFreshPack(gs.state);
+    ok("*** a carve centred ON a chunk corner re-meshes all four chunks around it, and the slots are exactly a fresh pack's ***",
+        !!corner && seamHit.removed.length > 0 && seamHit.sync.chunks.length === 4 && seamTwin.same, corner ? `${seamHit.removed.length} voxels at (${corner}), ${seamHit.sync.chunks.length} chunks re-meshed, ${seamTwin.bad.length} slots differ` : "no corner with floor on all four sides");
+    // ONE voxel taken from a chunk's last column: the chunk it is in is dirty, its neighbour is not, and the neighbour's mesh changes anyway
+    // (the face of the voxel beside the hole is exposed). The dirty flags alone would miss it -- the edit log is what names the neighbour.
+    const gl = makeWith(D.ROOMY), lx = corner[0] - 1, lz = corner[1] + 5;
+    const lone = gl.world.voxelAt(lx, 0, lz) && gl.world.voxelAt(lx + 1, 0, lz);
+    if (lone) gl.world.setVoxel(lx, 0, lz, 0);
+    const loneSync = lone ? VD.syncDirty(gl.state) : null, loneTwin = matchesFreshPack(gl.state);
+    ok("*** ONE voxel off a chunk's seam column re-meshes its neighbour too -- the dirty flag alone would leave the neighbour's exposed face stale ***",
+        !!lone && loneSync.chunks.length === 2 && loneTwin.same, lone ? `1 voxel at (${lx},0,${lz}), ${loneSync.chunks.length} chunks re-meshed, ${loneTwin.bad.length} slots differ from a fresh pack` : "no floor voxel pair across the seam");
+    const quiet2 = VD.syncDirty(gl.state);
+    ok("...and a sync CONSUMES the log: the next sync with nothing edited re-meshes nothing", gl.world.editLog.length === 0 && quiet2.chunks.length === 0 && !quiet2.rebuilt, `log ${gl.world.editLog.length} entries, ${quiet2.chunks.length} chunks`);
+    const gb = makeWith(D.ROOMY), perShell = D.barrage(gb, 12, { shells: 12, from: [0, 0] }).filter((q) => q.removed > 0).map((q) => q.chunks), twinB = matchesFreshPack(gb.state);
+    ok("*** a shell that carves re-meshes the chunks its edit can reach -- one to four, never the nine it used to -- and a whole barrage leaves the slots exactly a fresh pack's ***",
+        perShell.length >= 4 && perShell.every((n) => n >= 1 && n <= 4) && Math.max(...perShell) < 9 && twinB.same, `chunks per carving shell ${perShell.join(" ")} (was 9 each), ${twinB.bad.length} slots differ`);
+    // the world that does NOT record its edits (the sandbox's VoxelWorld, any miniWorld a page did not switch on) keeps the old rule
+    const gn = makeWith(D.ROOMY); gn.world.editLog = null; gn.world.setVoxel(corner[0] + 5, 0, corner[1] + 5, 0);   // a floor voxel, so the write changes something and the chunk is dirty
+    const oldRule = VD.syncDirty(gn.state);
+    ok("...and a world with no edit log still re-meshes every dirty chunk's eight neighbours (the rule it always had)", oldRule.chunks.length === 9, `${oldRule.chunks.length} chunks`);
     ok("  barrage is deterministic: the same shells at the same building carve the same voxels", (() => { const a = makeWith(D.ROOMY), b = makeWith(D.ROOMY); const ra = D.barrage(a, 12, { shells: 8 }), rb = D.barrage(b, 12, { shells: 8 }); return ra.every((q, k) => q.removed === rb[k].removed && q.lost === rb[k].lost && q.hp === rb[k].hp); })());
 }
 

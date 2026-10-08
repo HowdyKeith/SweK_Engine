@@ -64,17 +64,20 @@ export const CRASH = Object.freeze({
  * buffer bigger than the scene was built with -- the scene has to be built again. Measured at seed 1: with the defaults the FIRST
  * shell of a 12-cataclysm barrage repacked the world on every one of six different buildings; with these (a slot at least 1024
  * vertices and twice what its chunk needs) none of the six did, for 69k vertices of buffer instead of 33k (2.8 MB, the tail a run of
- * zero-area triangles that draw nothing). A page that wants shells to carve things passes this as crashWorld's `slots`.
+ * zero-area triangles that draw nothing). It is crashWorld's DEFAULT: a car crash outgrew a slot the same way (a NEIGHBOUR chunk with 54 vertices
+ * of slack grew by a few at a seam, and the world repacked under race-crash.html's scene, which never answers state.outgrown -- the
+ * scene was left stale, in 7 chunks under the old all-neighbours rule and 1 under the narrowed one, which is how the car-crash browser
+ * rows noticed: they had passed because the stale chunks happened to be out of the camera's sight). Pass `{}` for the voxelDeviceEdit defaults.
  */
 export const ROOMY = Object.freeze({ minSlot: 1024, headroom: 1.0 });
 const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /** The flat track's world with its city, plus the edit state (the slots) the device draws from. */
-export function crashWorld(track, CityGen, opts = {}, slots = {}) {
+export function crashWorld(track, CityGen, opts = {}, slots = ROOMY) {
     const world = miniWorld();
     const { rects, city } = T.trackWorld(track, world, CityGen, opts);
-    const state = editState(world, slots);
+    const state = editState(world, slots); world.editLog = [];   // from here on the world says where it was edited: render/voxelDamage.mjs's syncDirty re-meshes only the chunks an edit can reach
     return { world, rects, city, state, track, colliders: null, phys: null, parked: new Set(), impacts: [] };
 }
 
