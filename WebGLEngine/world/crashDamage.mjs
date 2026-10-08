@@ -33,7 +33,7 @@ import * as T from "./raceTrack.mjs";
 import { CAR, createCar, stepCar, carPose, addBuildings, trackSurface } from "../physics/raceCar.mjs";
 import { ROAD_Y } from "./raceTrack.mjs";
 import { blastAt, syncDirty, debrisRecords, debrisLitPipelineDesc, DAMAGE } from "../render/voxelDamage.mjs";
-import { editState } from "../render/voxelDeviceEdit.mjs";
+import { editState, FLOATS } from "../render/voxelDeviceEdit.mjs";
 import { miniWorld, SUN, raycastVoxels } from "../render/voxelDevice.mjs";
 import { isRebar } from "../render/rebar.mjs";
 import { litPipelineDesc, litBind } from "../render/litSphere.mjs";
@@ -57,14 +57,24 @@ export const CRASH = Object.freeze({
     park: Object.freeze([0, -500, 0]),
     groundY: 0,             // trackWorld stamps the city with groundY 0: building voxels from y = 1
 });
+/**
+ * v4681 -- ROOM FOR A CRATER IN EVERY SLOT. voxelDeviceEdit's default slot is a quarter more than its chunk needs today, at least 256
+ * vertices, and greedy meshing makes this city's chunks SMALL (seed 1: 62 chunks, 18 to 852 vertices, 33k in all): a single
+ * cataclysm into a 228-vertex chunk adds 174 and outgrows its 285-vertex slot, and an outgrown slot repacks the whole world into a
+ * buffer bigger than the scene was built with -- the scene has to be built again. Measured at seed 1: with the defaults the FIRST
+ * shell of a 12-cataclysm barrage repacked the world on every one of six different buildings; with these (a slot at least 1024
+ * vertices and twice what its chunk needs) none of the six did, for 69k vertices of buffer instead of 33k (2.8 MB, the tail a run of
+ * zero-area triangles that draw nothing). A page that wants shells to carve things passes this as crashWorld's `slots`.
+ */
+export const ROOMY = Object.freeze({ minSlot: 1024, headroom: 1.0 });
 const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /** The flat track's world with its city, plus the edit state (the slots) the device draws from. */
-export function crashWorld(track, CityGen, opts = {}) {
+export function crashWorld(track, CityGen, opts = {}, slots = {}) {
     const world = miniWorld();
     const { rects, city } = T.trackWorld(track, world, CityGen, opts);
-    const state = editState(world);
+    const state = editState(world, slots);
     return { world, rects, city, state, track, colliders: null, phys: null, parked: new Set(), impacts: [] };
 }
 
@@ -180,6 +190,22 @@ export function shellInto(g, i, point, radius, dir, ctx = {}) {
     return rec;
 }
 
+/**
+ * v4681 -- `shells` cataclysm-size shells at ONE building, from a shooter standing at `from` ([x, z]): the wall's face as that shooter
+ * sees it, the height and the sideways offset marching through a fixed pattern so the barrage chews the face rather than the same
+ * voxels. Deterministic (no random), through shellInto exactly as turretTick calls it. It is what race-brain.html's ?shell=N puts in
+ * front of a person and what the gates put in front of a repack -- one definition of "a barrage", so what the page shows is what
+ * the gate measured.
+ */
+export function barrage(g, i, { shells = 12, from = [0, 0], radius = blastRadius(40) } = {}) {
+    const r = g.rects[i], dx = r.x + r.w / 2 - from[0], dz = r.z + r.d / 2 - from[1], l = Math.hypot(dx, dz) || 1, out = [];
+    for (let k = 0; k < shells; k++) {
+        const y = 1.5 + ((k * 3) % Math.max(1, r.h - 1)), side = ((k * 5) % 7 - 3) * 0.8, face = contactPoint(r, [from[0], y, from[1]]);
+        out.push(shellInto(g, i, [face[0] - dz / l * side, y, face[2] + dx / l * side], radius, { x: dx / l, z: dz / l }));
+    }
+    return out;
+}
+
 /** One step of the car, then the impact test on the speed it lost. */
 export function crashStep(g, car, surface, input, ctx = {}, dt = CAR.dt) {
     // stepCar's returned pose is the one its forces were computed FROM (the pose before the step), so the pose after is read
@@ -252,8 +278,6 @@ export function worldSphere(world) {
 }
 
 /**
- * The fleets: the world's slots (record 0), the car in quat mode (record 1), the debris (the rest). state.vbuf is the slots' buffer.
- *
  * *** THE WORLD IS ONE RECORD, AND A RECORD IS A SPHERE THE CULL TESTS. *** Every device scene of the sandbox rounds draws the
  * world as one record at the origin with scale 1 (voxelScene, editScene, damageScene, and this branch's replayScene and
  * terrainScene) -- and gpuDriven's cull reads that record's w as the sphere's RADIUS. A camera whose frustum does not hold the
@@ -263,14 +287,48 @@ export function worldSphere(world) {
  * radius) drawn at the world's centre with scale = radius, so the cull sphere IS the world. The slots write world-space floats
  * (remeshChunks, through state.vbuf), so state.vbuf is a proxy that rescales positions on their way to the device. The other
  * scenes keep the origin record; they are named in the roadmap, not touched here.
+ *
+ * v4681 -- NAMED ONCE, because race-brain.html draws the same world the same way now (worldFleet below) and the unit-space
+ * arithmetic is exactly the thing two copies would drift on. Returns { centre, radius, mesh, record, install } -- the mesh to
+ * build the fleet from, the [centre, radius] record to draw it at, and install(vbuf) to point state.vbuf at the scene's own
+ * vertex buffer once the scene exists. A chunk that outgrows its slot repacks the world (voxelDeviceEdit's remeshChunks), and
+ * the repack is bigger than the buffer the scene was built with: the proxy does NOT write it past the end -- it sets
+ * state.outgrown and skips it, and the caller builds a new scene from a new worldUnit(state), the only thing that can fix it.
  */
+export function worldUnit(state) {
+    const { centre, radius } = worldSphere(state.world);
+    const unit = (positions) => { const out = Float32Array.from(positions); for (let i = 0; i < out.length; i += 3) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } return out; };
+    const mesh = { ...state.mesh, positions: unit(state.mesh.positions) }, record = Float32Array.from([centre[0], centre[1], centre[2], radius]);
+    const install = (vbuf) => {
+        const bytes = state.vertexData.byteLength; state.outgrown = false;
+        state.vbuf = { write(data, byteOffset = 0) {
+            if (byteOffset + data.byteLength > bytes) { state.outgrown = true; return; }
+            const out = Float32Array.from(data); for (let i = 0; i < out.length; i += FLOATS) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; }
+            vbuf.write(out, byteOffset);
+        } };
+    };
+    return { centre, radius, mesh, record, install };
+}
+
+/**
+ * v4681 -- the world as a world/kenneyKit.mjs kitScene extra fleet (race-brain.html's shape: the kit's tiles and trucks, the
+ * world, the turrets). Pass it in `extraFleets`, then call `.install(scene)` once the scene exists. kitScene reads name, mesh,
+ * pipeline, bind, records and extras and ignores the rest, so install rides on the same object.
+ */
+export function worldFleet(state, { light = SUN } = {}) {
+    const wu = worldUnit(state);
+    return {
+        name: "world", mesh: wu.mesh, pipeline: litPipelineDesc({ cull: "none" }), bind: litBind(light), records: wu.record, extras: new Float32Array(4),
+        install(scene) { const f = scene.fleets.find((q) => q.name === "world"); if (!f) throw new Error("crashDamage.worldFleet: the scene has no fleet named world"); wu.install(f.vbuf); },
+    };
+}
+
+/** The fleets: the world's slots (record 0), the car in quat mode (record 1), the debris (the rest). state.vbuf is the slots' buffer. */
 export function crashScene(device, state, debris, G, L, { light = SUN, cap = DAMAGE.debrisCap, colour = CAR_COLOURS[0], extras = null } = {}) {   // extras: v4591
     // v4591 (task 80): `extras` = { count, fleets, fill(rec, ext, at) } -- world/buildingTopple.mjs's reserved block fleets ride behind the debris, one record each
     const xn = extras ? extras.count : 0, count = 2 + cap + xn, fleetOf = new Uint32Array(count); fleetOf[1] = 1; for (let i = 2; i < 2 + cap; i++) fleetOf[i] = 2; for (let k = 0; k < xn; k++) fleetOf[2 + cap + k] = 3 + k;
-    const { centre, radius } = worldSphere(state.world), FLOATS = 10;   // voxelDeviceEdit's p3 + colour4 + n3
-    const unit = (positions) => { const out = Float32Array.from(positions); for (let i = 0; i < out.length; i += 3) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } return out; };
-    const worldMesh = { ...state.mesh, positions: unit(state.mesh.positions) };
-    const rec = new Float32Array(count * 4), ext = new Float32Array(count * 4); rec.set([centre[0], centre[1], centre[2], radius], 0);
+    const wu = worldUnit(state), { centre, radius } = wu, worldMesh = wu.mesh;
+    const rec = new Float32Array(count * 4), ext = new Float32Array(count * 4); rec.set(wu.record, 0);
     const carRec = new Float32Array([0, -500, 0, 1]), carExt = new Float32Array([0, 0, 0, 1]);
     const fill = () => { rec.set(carRec, 4); ext.set(carExt, 4); const d = debrisRecords(debris, cap); rec.set(d.records, 8); ext.set(d.extras, 8); if (extras) extras.fill(rec, ext, 2 + cap); };
     fill(); const buffer = device.backend === "webgpu" ? device.buffer({ data: rec, usage: "storage" }) : null;   // v4520: a moving source brings a buffer
@@ -282,9 +340,7 @@ export function crashScene(device, state, debris, G, L, { light = SUN, cap = DAM
         ...(extras ? extras.fleets : []),
     ];
     const sc = G.makeGpuDrivenScene(device, { fleets, fleetOf, thresholds: [], records, headings });
-    const vbuf = sc.fleets[0].vbuf;
-    // the proxy: the slots' world-space floats rescaled to the record's unit space on the way to the device
-    state.vbuf = { write(data, byteOffset = 0) { const out = Float32Array.from(data); for (let i = 0; i < out.length; i += FLOATS) { out[i] = (out[i] - centre[0]) / radius; out[i + 1] = (out[i + 1] - centre[1]) / radius; out[i + 2] = (out[i + 2] - centre[2]) / radius; } vbuf.write(out, byteOffset); } };
+    wu.install(sc.fleets[0].vbuf);   // the proxy: the slots' world-space floats rescaled to the record's unit space on the way to the device
     state.scene = sc;
     const setCar = (pose) => { carRec.set([pose.pos[0], pose.pos[1], pose.pos[2], 1]); carExt.set(pose.quat); };
     return { scene: sc, setCar, count, centre, radius, extrasBase: 3 };

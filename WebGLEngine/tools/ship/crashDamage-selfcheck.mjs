@@ -53,6 +53,14 @@
 //   H  v4681, shellInto's own park-on-topple line removed                          -> 1 red: section 6's "notices the
 //      ALREADY-toppled building" row alone -- the rest of section 6 does not touch it, and sections 1-5, 7-9 are
 //      crashInto's own copy of the line, untouched by this sabotage.
+//   I  v4681, the proxy writing the slot without the unit-space rescale             -> 3 red: section 7's proxy row, and both backends'
+//      "EXACTLY a fresh pack" rows in section 9 -- the browser rows that already stood catch it too, which is the cross-check that the
+//      extraction left crashScene doing what it did.
+//   J  the proxy without its outgrown guard (the repack written past the end)        -> 1 red: "a chunk that outgrows its slot ... FLAGS it".
+//   K  install() not clearing outgrown                                               -> 1 red: "...building the record again is the fix".
+//   L  ROOMY made no roomier than the defaults                                       -> 2 red: the ROOMY barrage row, and the proxy row
+//      (which wants a shell that does not repack).
+//   M  the record's radius one short                                                 -> 1 red: the unit-space row.
 //
 // Run: node tools/ship/crashDamage-selfcheck.mjs      (~9 s: five cities, three rams, two browsers)
 "use strict";
@@ -196,7 +204,47 @@ sec("6. THE SAME WALL, HIT BY A SHELL INSTEAD OF A CAR (shellInto, v4681)");
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("7. DETERMINISM: two fresh worlds, one fingerprint");
+sec("7. THE WORLD AS ONE RECORD, NAMED ONCE (worldUnit, worldFleet), AND ROOM FOR A CRATER (ROOMY, barrage) -- v4681");
+{
+    // race-brain.html draws this world through kitScene instead of crashScene, and a shell carves it through the same shellInto: the
+    // unit-space arithmetic, the proxy and the repack rule live in crashDamage.mjs once, and these rows hold them with no browser
+    const makeWith = (slots) => quiet(() => { const g = D.crashWorld(track, CityGen, {}, slots); D.buildingColliders(g, worldFromModule(mod(), [0, -9.81, 0])); return g; });
+    const fake = () => ({ writes: [], hi: 0, write(d, off = 0) { this.writes.push({ off, d: Float32Array.from(d) }); this.hi = Math.max(this.hi, off + d.byteLength); } });
+    const g0 = makeWith({}), wu = D.worldUnit(g0.state), S = D.worldSphere(g0.world), P = wu.mesh.positions, W = g0.state.mesh.positions;
+    let maxR = 0, trip = 0; for (let i = 0; i < P.length; i += 3) { maxR = Math.max(maxR, Math.hypot(P[i], P[i + 1], P[i + 2])); for (let k = 0; k < 3; k++) trip = Math.max(trip, Math.abs(P[i + k] * wu.radius + wu.centre[k] - W[i + k])); }
+    ok("*** the unit-space mesh sits inside the record's sphere, the record IS the world's sphere, and undoing it gives the world's own positions back ***",
+        maxR <= 1 + 1e-6 && trip < 1e-3 && wu.record[3] === S.radius && wu.record[0] === S.centre[0] && wu.record[1] === S.centre[1] && wu.record[2] === S.centre[2], `max |p| ${maxR.toFixed(4)}, worst round trip ${trip.toExponential(1)}, radius ${S.radius.toFixed(1)}`);
+
+    // the proxy, with slots that have room (so nothing repacks): every write is the slot's own floats with the positions in unit space
+    const gr = makeWith(D.ROOMY), wr = D.worldUnit(gr.state), f = fake(), bytes = gr.state.vertexData.byteLength; wr.install(f);
+    const imp = D.shellInto(gr, RAM, D.contactPoint(gr.rects[RAM], [gr.rects[RAM].x + 3, 1.5, gr.rects[RAM].z - 5]), D.blastRadius(40), { x: 0, z: 1 });
+    let off = 0, same = 0, bad = 0; const V = gr.state.vertexData, FL = 10;
+    // a slot can be written more than once in one shell (blastAt syncs, the topple edits, shellInto syncs again): the LAST write is the one that has to be the CPU copy
+    const lastAt = new Map(); for (const w of f.writes) lastAt.set(w.off, w);
+    for (const w of lastAt.values()) for (let j = 0; j < w.d.length / FL; j++) { const at = w.off / 40 + j; for (let k = 0; k < 3; k++) off = Math.max(off, Math.abs(w.d[j * FL + k] * wr.radius + wr.centre[k] - V[at * FL + k])); for (let k = 3; k < FL; k++) { if (w.d[j * FL + k] !== V[at * FL + k]) bad++; else same++; } }
+    ok("*** the proxy writes the slot's own floats through the record's unit space: positions undo to the CPU copy, colour and normal untouched, nothing past the buffer ***",
+        f.writes.length === imp.chunks && off < 1e-3 && bad === 0 && same > 0 && f.hi <= bytes && !gr.state.outgrown && gr.state.rebuilds === 0, `${f.writes.length} writes, ${same} colour/normal floats equal, worst position ${off.toExponential(1)}, ${f.hi} of ${bytes} bytes`);
+
+    // a chunk outgrowing its slot: the default slots repack on the first cataclysm, the repack is bigger than the buffer, and the
+    // proxy must say so rather than write it
+    const f0 = fake(), bytes0 = g0.state.vertexData.byteLength; wu.install(f0);
+    D.shellInto(g0, RAM, D.contactPoint(g0.rects[RAM], [g0.rects[RAM].x + 3, 1.5, g0.rects[RAM].z - 5]), D.blastRadius(40), { x: 0, z: 1 });
+    ok("*** a chunk that outgrows its slot repacks the world, and the proxy FLAGS it instead of writing the bigger pack past the end of the scene's buffer ***",
+        g0.state.rebuilds === 1 && g0.state.outgrown === true && f0.hi <= bytes0 && g0.state.vertexData.byteLength > bytes0, `${g0.state.vertexData.byteLength} bytes packed against a buffer of ${bytes0}; highest byte written ${f0.hi}`);
+    const wu2 = D.worldUnit(g0.state), f2 = fake(); wu2.install(f2);
+    ok("...and building the record again from the repacked state is the fix: a bigger mesh, the flag clear, writes landing again", wu2.mesh.positions.length > P.length && g0.state.outgrown === false, `${P.length / 3} -> ${wu2.mesh.positions.length / 3} vertices`);
+
+    // ROOMY: the same barrage on three different buildings, the defaults against the roomy slots
+    const tally = (slots) => [0, 12, 40].map((i) => { const g = makeWith(slots); const rec = D.barrage(g, i, { shells: 12, from: [0, 0] }); const r = g.state.rebuilds, n = rec.length, hit = rec.filter((q) => q.removed > 0).length; g.phys.destroy(); return { r, n, hit }; });
+    const tight = tally({}), roomy = tally(D.ROOMY);
+    report(`a 12-shell barrage on buildings 0, 12, 40 -- repacks with the default slots ${tight.map((t) => t.r).join(" ")}, with ROOMY ${roomy.map((t) => t.r).join(" ")}; buffer ${wu.mesh.positions.length / 3} -> ${D.worldUnit(makeWith(D.ROOMY).state).mesh.positions.length / 3} vertices`);
+    ok("*** ROOMY slots take a barrage that repacks the default world on every building: the same twelve shells, three buildings, no repack ***",
+        tight.every((t) => t.r >= 1) && roomy.every((t) => t.r === 0) && roomy.every((t) => t.n === 12 && t.hit > 0));
+    ok("  barrage is deterministic: the same shells at the same building carve the same voxels", (() => { const a = makeWith(D.ROOMY), b = makeWith(D.ROOMY); const ra = D.barrage(a, 12, { shells: 8 }), rb = D.barrage(b, 12, { shells: 8 }); return ra.every((q, k) => q.removed === rb[k].removed && q.lost === rb[k].lost && q.hp === rb[k].hp); })());
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+sec("8. DETERMINISM: two fresh worlds, one fingerprint");
 let FP = null;
 {
     const a = runOnce(15), b = runOnce(15); FP = a.r.fingerprint;
@@ -206,7 +254,7 @@ let FP = null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-sec("8. IN THE BROWSER ON BOTH BACKENDS: the crater, the steel and the debris on the picture");
+sec("9. IN THE BROWSER ON BOTH BACKENDS: the crater, the steel and the debris on the picture");
 const W = 256, H = 256;
 {
     const skip = webgpuSkipReason();
@@ -280,7 +328,7 @@ const W = 256, H = 256;
             const txt = (id) => { const el = d && d.getElementById(id); return el ? el.textContent : ""; };
             return { be: txt("be"), tick: txt("tick"), city: txt("city"), car: txt("car"), pageMs: performance.now() - pt };
         }` });
-        sec("9. THE PAGE: race-crash.html in its own browser, ramming on load");
+        sec("10. THE PAGE: race-crash.html in its own browser, ramming on load");
         if (!rp.ok) ok("the page loaded", false, rp.reason);
         else {
             const p = rp.result;
