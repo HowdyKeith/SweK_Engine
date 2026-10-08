@@ -61,6 +61,8 @@
 //   L  ROOMY made no roomier than the defaults                                       -> 2 red: the ROOMY barrage row, and the proxy row
 //      (which wants a shell that does not repack).
 //   M  the record's radius one short                                                 -> 1 red: the unit-space row.
+//   R  v4681, race-crash.html never building its scene again on state.outgrown (the frame loop without its line)   -> 1 red: "the page answers
+//      state.outgrown" (scene built 1x -> 1x, the flag still raised).
 //   N  v4681, the narrowed remesh keeps only the edit's OWN chunk (no affectedChunks)  -> 1 red: "ONE voxel off a chunk's seam column".
 //      The corner row passes under N and is meant to: a carve that spans the seam dirties every chunk it spans, and the dirty flags
 //      cover that case by themselves. Only an edit that changes ONE side of a seam (a voxel gone beside a solid neighbour) needs the log.
@@ -384,13 +386,24 @@ const W = 256, H = 256;
             const pt = performance.now(); let d = null;
             while (performance.now() - pt < 30000) { await new Promise((r) => setTimeout(r, 250)); d = f.contentDocument; const el = d && d.getElementById("city"); if (el && /impacts [1-9]/.test(el.textContent)) break; }
             const txt = (id) => { const el = d && d.getElementById(id); return el ? el.textContent : ""; };
-            return { be: txt("be"), tick: txt("tick"), city: txt("city"), car: txt("car"), pageMs: performance.now() - pt };
+            // v4681 -- THE PAGE ANSWERS A REPACK THE DEVICE BUFFER CANNOT TAKE: the proxy raises state.outgrown instead of writing past the end of
+            // the buffer, and race-crash.html builds its scene again from the repacked state (race-brain.html's answer, now this page's too). The
+            // flag is raised from here -- ROOMY slots mean no real ram reaches it -- and the page must notice, build, clear it, and keep racing.
+            const rc = f.contentWindow.__raceCrash, steps = () => +((txt("car").match(/(\\d+) steps/) || [])[1] || 0), out = { be: txt("be"), tick: txt("tick"), city: txt("city"), car: txt("car"), pageMs: performance.now() - pt };
+            if (rc) {
+                out.builds0 = rc.sceneBuilds; out.steps0 = steps(); rc.g.state.outgrown = true;
+                const t2 = performance.now(); while (rc.sceneBuilds === out.builds0 && performance.now() - t2 < 10000) await new Promise((r) => setTimeout(r, 50));
+                await new Promise((r) => setTimeout(r, 1000));
+                out.builds1 = rc.sceneBuilds; out.outgrown1 = rc.g.state.outgrown; out.world1 = rc.scene.scene.fleets.some((q) => q.name === "world"); out.steps1 = steps(); out.cityAfter = txt("city");
+            }
+            return out;
         }` });
         sec("10. THE PAGE: race-crash.html in its own browser, ramming on load");
         if (!rp.ok) ok("the page loaded", false, rp.reason);
         else {
             const p = rp.result;
             report(`${p.be} | ${p.tick.slice(0, 100)} | ${p.city.slice(0, 200)} | ${p.car.slice(0, 100)} (${p.pageMs.toFixed(0)} ms)`);
+            ok("*** the page answers state.outgrown: the scene is built AGAIN from the repacked state, the flag is clear, the world fleet is back, and the page kept running ***", p.builds0 != null && p.builds1 === p.builds0 + 1 && p.outgrown1 === false && p.world1 === true && p.steps1 > p.steps0 && /impacts [1-9]/.test(p.cityAfter || ""), `scene built ${p.builds0}x -> ${p.builds1}x, outgrown ${p.outgrown1}, steps ${p.steps0} -> ${p.steps1}`);
             ok("*** the page rams a building on load and names it: an impact, voxels removed, hit points, rebar revealed, debris ***", /device: webgl2/.test(p.be) && /impacts [1-9]/.test(p.city) && /voxels removed/.test(p.city) && /rebar/.test(p.city) && /standing/.test(p.city) && /fingerprint [0-9a-f]{8}/.test(p.car), p.city.slice(0, 120));
         }
     }

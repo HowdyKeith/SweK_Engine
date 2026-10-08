@@ -57,6 +57,10 @@
 //      row alone -- the shot still reads the wall as solid and reports a building hit instead of passing through, exactly
 //      the bug physics/turret-selfcheck.mjs's own sabotage G guards from the other side (a null slot dereferenced); this is
 //      the caller never producing the null slot at all.
+//   M  v4681 (the falling block), turretTick handing stepShells `blocks: []`                -> 3 red: the block is passed through (no block event), so the
+//      cubes/count/effect row and the "not a second wall" row fall with the first.
+//   N  v4681, the block hit applying no world.impulse                                       -> 1 red: the "reaches the block and pushes it by the shell's momentum" row.
+//   O  v4681, buildingTopple.shellOnBlock bursting no cubes at the point                    -> 1 red: the cubes / count / effect row.
 "use strict";
 import fs from "node:fs";
 import { initNode, mod } from "../physics/box3d/box3dNode.mjs";
@@ -281,6 +285,31 @@ console.log("\n7. BUILDINGS, v4681: A SHELL GOES THROUGH world/crashDamage.mjs'S
     ok("...buildings without a cityCtx still blocks the shot (the box is solid regardless of the real city's state) but pushes no effect, exactly as before v4681",
         effects3.length === 0 && shells3.length === 0, `${JSON.stringify(effects3)}, ${shells3.length} shells left`);
     g.phys.destroy();
+
+    // v4681 -- THE BLOCK A TOPPLED BUILDING BECAME IS A TARGET, NOT A HOLE. With world/buildingTopple.mjs installed on the city the building
+    // at zero hit points is a box3d body: its list slot is nulled (the wall is gone) and the body that fell out of it is the new thing in
+    // the shell's way, hit in its own pose. The same wall, the same aim, on a city that falls the way race-crash.html's does.
+    const BT = await import("../world/buildingTopple.mjs"), { VoxelDebrisSystem } = await import("../world/voxelDebrisSystem.js");
+    const g2 = CD.crashWorld(track, CityGen), phys2 = worldFrom(); CD.buildingColliders(g2, phys2);
+    const debris2 = new VoxelDebrisSystem(); BT.toppleWorld(g2, { debris: debris2 });
+    g2.city.damageAt(rect.x + 0.5, rect.z + 0.5, g2.city.buildingAt(rect.x + 0.5, rect.z + 0.5).hp, { x: 0, z: 1 });
+    const blk = g2.topple.bodies[0], buildings2 = g2.rects.map((r) => C.buildingBox(r));
+    ok("the city's topple raised the block above rect 0 as a body in a slot, and the building's own state is toppled", !!blk && g2.topple.slots[blk.slot] === blk && g2.city.buildingAt(rect.x + 0.5, rect.z + 0.5).state === "toppled", blk ? `${blk.count} voxels, slot ${blk.slot}` : "no body");
+    const turrets4 = [U.createTurret(), U.createTurret()], sol = U.aimSolution(wirePoses[0], turrets4[0], blk.pose.pos, [0, 0, 0]); turrets4[0].yaw = sol.yaw; turrets4[0].pitch = sol.pitch;
+    const shells4 = [], pushes = []; let effects4 = [], events4 = [];
+    const impactsBefore = g2.impacts.length, hpAfter = g2.city.buildingAt(rect.x + 0.5, rect.z + 0.5).hp;
+    for (let t = 0; t < 120; t++) {
+        const tt = G.turretTick({ impulse: (b, v) => pushes.push([b, v]) }, wireCars, turrets4, shells4, wirePoses, [t === 0 ? fireCmd : idleCmd, idleCmd], t, U.TURRET, null, null, buildings2, g2);
+        effects4 = effects4.concat(tt.effects); events4 = events4.concat(tt.events);
+        if (t > 0 && shells4.length === 0) break;
+    }
+    report(`block ${blk.count} voxels at ${blk.pose.pos.map((v) => v.toFixed(1)).join(",")}: events ${JSON.stringify(events4.map((e) => Object.keys(e).filter((k) => ["target", "building", "block"].includes(k))))}, effects ${effects4.length}, ${pushes.length} impulse(s), ${debris2.particles.length} cubes, shellHits ${g2.topple.shellHits}`);
+    ok("!! a shell aimed at the block reaches it THROUGH the nulled building slot and hits the BLOCK (a block event, no building, no target), pushing it by the shell's momentum -- a box3d impulse on the block's own body along the shot",
+        events4.length === 1 && events4[0].block === blk.slot && events4[0].building === undefined && events4[0].target === undefined && pushes.length === 1 && pushes[0][0] === blk.body && pushes[0][1][2] > 0, JSON.stringify(pushes));
+    ok("...the point bursts cubes in the block's colour (6 particles), the topple counts the hit, and the effect names the block", debris2.particles.length === 6 && g2.topple.shellHits === 1 && effects4.length === 1 && effects4[0].block === blk.slot && effects4[0].building === undefined, JSON.stringify(effects4));
+    ok("...and it is not a second wall: no shellInto (the impact log did not move), the building's hit points stay at zero, nobody is credited damage for shooting rubble, the far car took nothing",
+        g2.impacts.length === impactsBefore && g2.city.buildingAt(rect.x + 0.5, rect.z + 0.5).hp === hpAfter && (turrets4[0].damageDealt || 0) === 0 && turrets4[0].hits === 0 && (turrets4[1].damageTaken || 0) === 0);
+    phys2.destroy();
 }
 console.log("\n8. THE FRONT DOOR");
 {

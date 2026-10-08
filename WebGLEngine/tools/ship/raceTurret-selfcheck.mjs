@@ -58,6 +58,25 @@
 //   Z3 race-brain.html: BT.bindKit never called (the block's mesh never reaches the scene)            -> 4 red: the same rows.
 //   Z4 world/buildingTopple.mjs: bindKit writing only a block with no mesh yet                       -> 2 red: each backend's "a scene built AGAIN ... still draws it"
 //      (the rebuilt scene's buffers are empty; the block stays invisible). Also buildingTopple-selfcheck.mjs's bind rows.
+//   AA race-brain.html: no backpressure (the main view submitted every animation frame whether or not the last had finished)  -> 3 red, WebGPU: "the page does not
+//      outrun its GPU" (3 reads in 12 s, the slowest minutes behind), and both rows downstream of a window read that never comes back.
+//   AB race-brain.html: refreshViews without its readback watchdog (settleWithin)                  -> 4 red, both backends: "a window readback that NEVER settles ... is
+//      given up on" and "a rebuild under a window readback in flight" (viewBusy held for the page's life, so no read is ever in flight again).
+//   AC brain/gunnerPolicy.mjs: turretTick handing stepShells no blocks                             -> 2 red: each backend's "a shell dropped onto it hits the BLOCK".
+//   AD world/buildingTopple.mjs: leanUp 0 (a block at rest and tilted never settles)               -> 2 red: each backend's "LEANING SHATTERS by itself" (the page's block rests
+//      at up.y 0.969; the gate no longer lays it flat).
+//   AE brain/gunnerPolicy.mjs: raceWithGunners's city race never calling BT.stepTopple          -> 1 red: "the demolition happened" (the block's pose is never read back, so it
+//      never rests and never shatters: bodies 1, shattered 0). The fingerprints still agree between runtimes, as they would on any consistent bug.
+//   AF world/buildingTopple.mjs: demolitionScript shooting at a Math.random() offset              -> 2 red: node's two runs differ (8b8598c4 / 5fb0e024) and the browser's fall
+//      is not node's; the demolition row stays green, the shot still brings the building down.
+//   FINDING, THE FLAKE IN "a rebuild under a window readback in flight" (0 pending, a window read busy, 1,201 page frames in 20 s) WAS NOT A HUNG READ AND NOT THE
+//   GATE'S: it was a queue. WebGPU has no backpressure of its own and this harness's GPU is software; the page submitted a frame per animation frame to a device that
+//   draws slower than that, so frames piled up and every window readback -- which resolves when the queue has drained to its own submission -- waited behind a deeper
+//   queue than the last: 0.3, 0.9, 2.5, 4.1, 6.5 s over 33 s, until it looked stuck. Whether the gate's stage fell on a read still pending was a matter of how long the
+//   page had been running (so: two flakes in about six runs, and none in the five that ran at idle with fewer stages). The page draws its main view only when the last
+//   one it submitted has finished now (queue.onSubmittedWorkDone), and a window read takes 10 to 60 ms and comes round every four frames, 295 in twelve seconds; the
+//   sim, the records and the pace of the race are untouched. The watchdog stays: a read that never settles is a counted failure after 5 s, uncounted when the scene
+//   was built again under it.
 //   FINDING, the "built AGAIN" row's first run read 306 px on WebGL2 where the first read 4,342: the rebuilt scene drew the city as it stood
 //   BEFORE the shells -- the toppled building back in it -- because worldUnit() meshed state.mesh, the born pack (crashDamage-selfcheck.mjs Y).
 //   FINDING, a block that stands on what the shells left (a 7 x 7 x 11 building on one remaining column leans, up.y 0.97, on its stub and the
@@ -87,6 +106,7 @@ import * as D from "../../brain/drivePolicy.mjs";
 import * as G from "../../brain/gunnerPolicy.mjs";
 import * as U from "../../physics/turret.mjs";
 import * as RT from "../../render/raceTurret.mjs";
+import * as BT from "../../world/buildingTopple.mjs";
 import * as L from "../../render/litSphere.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -126,6 +146,16 @@ const drivers = [D.handWeights(), D.handWeights({ speed: 0.8 }), D.zeroWeights()
 const nodeRace = G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 10, fleet });
 report(`node: fingerprint ${nodeRace.fingerprint}, order ${nodeRace.order.join(" > ")}, hits ${nodeRace.results.map((q) => q.hits + "/" + q.shots).join(" ")}`);
 ok("the hand gunners hit in ten seconds and the zero gunner never fires", nodeRace.results[0].hits + nodeRace.results[1].hits > 0 && nodeRace.results[2].shots === 0);
+// v4681 -- THE SAME RACE THROUGH A SCRIPTED DEMOLITION: the real city, shells into the biggest building's ground floor until CityGen topples it, the block a box3d body that
+// tips, rests leaning, takes a shell dropped on it and shatters into rubble -- twelve seconds, three cars, the fingerprint folding box3d's state hash, the turrets,
+// the slicks, the ammo and the city's hit points. Run twice in node here and once in the browser's wasm below: the nearest this tree has to two machines in lockstep.
+const cityRace = () => { let script = null; return G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 12, fleet, city: { script: (t, ctx) => { if (!script) script = BT.demolitionScript(ctx.cityCtx); script(t, ctx); } } }); };
+const cityA = cityRace(), cityB = cityRace(), cs = cityA.city;
+report(`node, the demolition race: fingerprint ${cityA.fingerprint} (${cityB.fingerprint} again), ${cs.impacts} impacts, topple ${JSON.stringify(cs.topple)}`);
+ok("!! a race through a scripted demolition is deterministic in node: two runs, one fingerprint and one city summary (the damage stream is CityGen's own seeded one)", cityA.fingerprint === cityB.fingerprint && JSON.stringify(cityA.city) === JSON.stringify(cityB.city), `${cityA.fingerprint} / ${cityB.fingerprint}`);
+const calmRace = G.raceWithGunners(worldFrom, drivers, gunners, { seed: 1, seconds: 12, fleet, city: { script: null } });
+ok("...and the fingerprint CARRIES the fall: the same race through the same city with nobody shooting it gives another one (so two runtimes agreeing on it is not agreeing on nothing)", calmRace.fingerprint !== cityA.fingerprint && calmRace.city.topple.fallen === 0 && calmRace.city.impacts === 0, `${calmRace.fingerprint} vs ${cityA.fingerprint}`);
+ok("...and the demolition happened: a building toppled into a body, a shell dropped on it was a BLOCK hit, it came to rest and shattered into rubble (no body left)", cs.topple.fallen === 1 && cs.topple.shellHits === 1 && cs.topple.shattered === 1 && cs.topple.rubble > 0 && cs.topple.bodies === 0 && cs.topple.events[0] === "topple" && /^shatter@/.test(cs.topple.events[1]), JSON.stringify(cs.topple));
 
 sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON BOTH BACKENDS, THE PAGE ITSELF");
 {
@@ -155,6 +185,9 @@ sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON B
             const t0 = performance.now();
             const R = G.raceWithGunners(worldFrom, a.drivers.map((w) => Float32Array.from(w)), a.gunners.map((w) => Float32Array.from(w)), { seed: 1, seconds: 10, fleet: a.fleet });
             out.race = { fingerprint: R.fingerprint, order: R.order, hits: R.results.map((q) => q.hits), shots: R.results.map((q) => q.shots), ms: performance.now() - t0 };
+            { const BT = await import("/world/buildingTopple.mjs"); let script = null;
+              const CR = G.raceWithGunners(worldFrom, a.drivers.map((w) => Float32Array.from(w)), a.gunners.map((w) => Float32Array.from(w)), { seed: 1, seconds: 12, fleet: a.fleet, city: { script: (t, ctx) => { if (!script) script = BT.demolitionScript(ctx.cityCtx); script(t, ctx); } } });
+              out.cityRace = { fingerprint: CR.fingerprint, city: CR.city }; }
             // one frame with the turrets placed against one with them parked, on both backends
             const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(p + ": HTTP " + r.status); return r.arrayBuffer(); };
             const readImage = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(p + ": HTTP " + r.status); const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" }); const cv = document.createElement("canvas"); cv.width = bmp.width; cv.height = bmp.height; const cx = cv.getContext("2d"); cx.drawImage(bmp, 0, 0); return K.imageToColormap(cx.getImageData(0, 0, bmp.width, bmp.height)); };
@@ -202,6 +235,8 @@ sec("3. THE BROWSER: THE SAME RACE TO NODE'S FINGERPRINT, THE TURRETS DRAWN ON B
             const R = r.result;
             report(`the browser raced 10 s in ${R.race.ms.toFixed(0)} ms: fingerprint ${R.race.fingerprint} (node ${nodeRace.fingerprint}), hits ${R.race.hits.join("/")}`);
             ok("!! *** the browser's race with gunners is node's: the same fingerprint, order and hits on the browser's wasm ***", R.race.fingerprint === nodeRace.fingerprint && R.race.order.join() === nodeRace.order.join() && R.race.hits.join() === nodeRace.results.map((q) => q.hits).join());
+            report(`the browser's demolition race: fingerprint ${R.cityRace && R.cityRace.fingerprint} (node ${cityA.fingerprint}), topple ${R.cityRace && JSON.stringify(R.cityRace.city && R.cityRace.city.topple)}`);
+            ok("!! *** the browser's FALL is node's: the scripted demolition race gives the same fingerprint (box3d's state with the block and its stubs, the turrets, the city's hit points) and the same city summary -- topple, block hit, rest, shatter, rubble count -- on the browser's wasm ***", !!R.cityRace && R.cityRace.fingerprint === cityA.fingerprint && JSON.stringify(R.cityRace.city) === JSON.stringify(cityA.city), `${R.cityRace && R.cityRace.fingerprint} vs ${cityA.fingerprint}`);
             for (const bk of ["webgpu", "webgl2"]) {
                 const b = R[bk] || {};
                 ok(`!! ${bk}: the turrets and a shell DRAW -- the frame with them placed differs from the parked frame, with no device error`, b.errs && b.errs.length === 0 && b.diff > 40, `${b.diff} pixels differ${b.errs && b.errs.length ? "; errors: " + b.errs.join(" | ") : ""} (${b.path})`);
@@ -321,6 +356,16 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 const litOf = () => rb.views.filter((v) => v.view !== "brain").map((v) => { const d = v.ctx.getImageData(0, 0, v.canvas.width, v.canvas.height).data; let lit = 0; for (let p = 0; p < d.length; p += 4) if (Math.max(d[p], d[p + 1], d[p + 2]) > 60) lit++; return { view: v.view, lit: lit / (d.length / 4) }; });
                 const tw = performance.now(); while (performance.now() - tw < 20000 && !(litOf().length && litOf().every((w) => w.lit > 0.05))) await new Promise((res) => setTimeout(res, 100));
                 out.windows = litOf(); out.windowsMs = performance.now() - tw;
+                // THE PAGE HAS BACKPRESSURE: it draws its main view only once the last one it submitted has finished. WebGPU's queue has none, and on a GPU
+                // slower than the page's frame rate (this harness's software one) every frame piled up and each window readback, which resolves when the
+                // queue drains to its own submission, waited behind a deeper one: measured 0.3, 0.9, 2.5, 4.1, 6.5 s over 33 s -- the cause of a flake in
+                // the "readback in flight" row that looked like a hung read. Twelve seconds of the page's own window reads, timed from issue to answer.
+                {
+                    const sc0 = rb.scene, of0 = sc0.frame, lat = [];
+                    sc0.frame = function (o) { const fr = of0.call(this, o); if (o && o.read && fr && fr.pixels) { const t = performance.now(); fr.pixels.then(() => lat.push(performance.now() - t), () => {}); } return fr; };
+                    await new Promise((res) => setTimeout(res, 12000)); sc0.frame = of0;
+                    out.lat = { n: lat.length, max: Math.max(0, ...lat), last: lat.length ? lat[lat.length - 1] : null };
+                }
                 // THE CUBES A SHELL BURSTS ARE ON THE PAGE'S PICTURE, put there by the PAGE's own frame loop: a barrage into the BIGGEST whole building (a small one hides the
                 // cubes inside its own crater: the first try, the last building, was 7 x 3 x 5 and read 0 px apart), two animation frames of the page (it places the particles each frame), then a picture of that wall with the
                 // cubes where the page put them and another with the particles cleared and parked -- the cubes are what differ. The page's loop is running.
@@ -345,8 +390,8 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                 // above the ground floor is a dynamic body in the PAGE's physics world on what the shells left of the ground floor, and a reserved fleet in
                 // its scene. Three claims, the page running: (1) the block is on the picture -- a frame with its record where the page put it against a
                 // frame with the record parked, issued back to back so no page frame falls between them; (2) a scene built AGAIN (a repack) with the
-                // block in the air still draws it -- bindKit writes the block into the new scene's buffers; (3) a block that has fallen over and come to rest
-                // shatters: laid flat on the road, it becomes rubble in the world and cubes, its record is parked, and the picture changes.
+                // block in the air still draws it -- bindKit writes the block into the new scene's buffers; (3) a block that has fallen over or come to rest
+                // leaning shatters BY ITSELF (the rest rule; no setTransform): rubble in the world and cubes, its record parked, the HUD counting it.
                 {
                     const IW2 = f.contentWindow, rAF2 = () => new Promise((res) => IW2.requestAnimationFrame(res));
                     const whole2 = c.rects.map((q, k) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp ? k : -1; }).filter((k) => k >= 0), i2 = whole2.reduce((a, k) => (c.rects[k].w * c.rects[k].d * c.rects[k].h > c.rects[a].w * c.rects[a].d * c.rects[a].h ? k : a), whole2[0]), q2 = c.rects[i2], m2 = q2.z + q2.d / 2;
@@ -363,18 +408,41 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
                         const o = (rb.blockBase + rec.slot) * 4, sc = rb.scene, fa = sc.frame({ ...cam2, target: ta }); sc.kitRecords.set([0, -500, 0, 1], o); const fb = sc.frame({ ...cam2, target: tb });
                         return apart2(Uint8Array.from((await fa.pixels).pixels), Uint8Array.from((await fb.pixels).pixels));
                     };
+                    // THE SIM IS FROZEN THROUGH THE PICTURES, THE HUNG READ AND THE REBUILD, the page still rendering: a lean-to settles in about a second and a half
+                    // of the race's own clock, and a WebGPU readback awaited from here spans several page frames of four ticks each -- the first version of this
+                    // stage found the block shattered before it could be photographed twice. The page's rAF timestamp is held at its last real value (dt 0: no tick,
+                    // no shell flies, the block does not move), frames and window reads go on; it runs free again for the shell and the settle.
+                    const rafReal = IW2.requestAnimationFrame.bind(IW2); let lastT = 0, frozenT = null;
+                    IW2.requestAnimationFrame = (cb) => rafReal((t) => { if (frozenT === null) lastT = t; cb(frozenT === null ? t : frozenT); });
+                    await rAF2(); frozenT = lastT;
+                    const slot0 = T.bodies[0] ? T.bodies[0].slot : -1; out.leanUp = T.bodies[0] && T.bodies[0].up ? T.bodies[0].up[1] : null;
                     out.blockApart = await blockPair();
+                    // A WINDOW READBACK THAT NEVER SETTLES, under the scene the page is about to build again: a window read on the old scene is made to hang for
+                    // good (no answer, no rejection -- what the ship harness's WebGPU did to a real one, and froze the windows for the page's life: viewBusy
+                    // stuck, no read on any scene afterwards). The page must give up on it, and the windows must read the NEW scene.
+                    const oldS = rb.scene, oldFrame = oldS.frame, isWindow = (o) => o && o.target && o.target !== ta && o.target !== tb; let hung = 0, resumed = 0;
+                    oldS.frame = function (o) { if (isWindow(o)) { hung++; return { pixels: new Promise(() => {}) }; } return oldFrame.call(this, o); };
+                    for (let k = 0; k < 600 && hung === 0; k++) await rAF2();
                     const builds0 = rb.sceneBuilds; c.state.outgrown = true;   // the flag a repack raises: the page builds its scene again from the state, with the block in the air
                     for (let k = 0; k < 120 && rb.sceneBuilds === builds0; k++) await rAF2();
                     await rAF2(); out.topRebuilt = rb.sceneBuilds - builds0; out.blockApartRebuilt = await blockPair();
-                    // laid flat on the road beside the building: fallen (up.y < 0.5), and at rest it shatters
-                    const rec = T.bodies[0];
-                    if (rec) {
-                        rb.phys.setTransform(rec.body, [q2.x - rec.half[1] - 3, CD.CRASH.groundY + 1 + rec.half[0] + 0.1, m2], [0, 0, Math.SQRT1_2, Math.SQRT1_2]);
-                        const t5 = performance.now(); while (T.shattered < 1 && performance.now() - t5 < 40000) await rAF2();
-                        out.shattered = T.shattered; out.rubbleVoxels = T.rubble; out.burst = T.burst; out.topBodiesAfter = T.bodies.length; out.shatterEvent = T.events.filter((e) => e.kind === "shatter").map((e) => ({ fell: e.fell, rubble: e.rubble, burst: e.burst, lost: e.lost }));
-                        await rAF2(); await rAF2(); out.slotParked = rb.scene.kitRecords[(rb.blockBase + rec.slot) * 4 + 1] === -500; out.hudShattered = /shattered/.test(txt("racing"));
-                    }
+                    { const ns = rb.scene, nf = ns.frame; ns.frame = function (o) { if (isWindow(o)) resumed++; return nf.call(this, o); }; }
+                    { const t6 = performance.now(); while (resumed === 0 && performance.now() - t6 < 25000) await rAF2(); }
+                    out.hang = { hung, resumed, note: txt("viewsNote") };
+                    frozenT = null;   // the race runs again
+                    // a shell dropped onto the falling block from above (nothing between): the PAGE's own turretTick sees a BLOCK hit, not a hole
+                    if (T.bodies[0]) {
+                        const rec0 = T.bodies[0], p0 = rec0.pose.pos, hits0 = T.shellHits || 0, imp0 = c.impacts.length, cubes0 = rb.debris.totalSpawned;
+                        rb.shells.push({ x: p0[0], y: p0[1] + rec0.half[1] + 6, z: p0[2], vx: 0, vy: -30, vz: 0, t: 0, owner: 0, ammo: "spark" });
+                        for (let k = 0; k < 90 && (T.shellHits || 0) === hits0 && T.bodies[0]; k++) await rAF2();
+                        out.blockShot = { hits: (T.shellHits || 0) - hits0, impacts: c.impacts.length - imp0, cubes: rb.debris.totalSpawned - cubes0 };
+                    } else out.blockShot = { hits: 0, impacts: 0, cubes: 0, noBlock: true };
+                    // the block the shells left LEANING on its one column of ground floor and the road (up.y about 0.97) settles by itself: it is at rest
+                    // and tilted past TOPPLE.leanUp, so the page's own rest rule shatters it -- no help from this gate (the first version laid it flat with
+                    // setTransform, because a lean-to used to stay a body for ever)
+                    const t5 = performance.now(); while (T.shattered < 1 && performance.now() - t5 < 60000) await rAF2();
+                    out.shattered = T.shattered; out.rubbleVoxels = T.rubble; out.burst = T.burst; out.topBodiesAfter = T.bodies.length; out.shatterEvent = T.events.filter((e) => e.kind === "shatter").map((e) => ({ fell: e.fell, up: e.up && e.up[1], rubble: e.rubble, burst: e.burst, lost: e.lost }));
+                    await rAF2(); await rAF2(); out.slotParked = slot0 >= 0 && rb.scene.kitRecords[(rb.blockBase + slot0) * 4 + 1] === -500; out.hudShattered = /shattered/.test(txt("racing"));
                     out.builds1b = rb.sceneBuilds;   // the scene was built again once for the block stage's flag (and boot's build): the repack stage below counts from here
                 }
                 const i = c.rects.findIndex((q) => { const b = c.city.buildingAt(q.x + 0.5, q.z + 0.5); return b && b.hp === b.maxHp; }), r0 = c.rects[i], mid = r0.z + r0.d / 2;
@@ -410,14 +478,17 @@ sec("4. THE WORLD IS EDITABLE (v4681): A SHELL'S CRATER IS ON THE PICTURE IN THE
             if (pg.ok && pg.result && !pg.result.error) {
                 const q = pg.result;
                 report(bk + ": the 3D car windows (lit fraction, after " + q.windowsMs.toFixed(0) + " ms) " + q.windows.map((w) => w.view + " " + w.lit.toFixed(3)).join(", "));
+                ok(bk + " -- !! the page does not outrun its GPU: twelve seconds of its window readbacks all come back within 1.5 s (no queue piling up behind a slow device), and there are plenty of them", q.lat.n >= 20 && q.lat.max < 1500, `${q.lat.n} reads, slowest ${q.lat.max.toFixed(0)} ms, last ${q.lat.last == null ? "-" : q.lat.last.toFixed(0)} ms`);
                 ok(bk + " -- the page's 3D car windows each hold a picture of its scene (more than a twentieth lit), read back on this backend", q.windows.length >= 2 && q.windows.every((w) => w.lit > 0.05), q.windows.map((w) => w.lit.toFixed(3)).join(" ") + ` after ${q.windowsMs.toFixed(0)} ms`);
                 report(`${bk}: the page's cubes -- ${q.debrisBefore} live before, ${q.debrisLive} after a 3-shell barrage into building ${q.debrisBuilding}, the HUD says so: ${q.debrisHud}; the wall's picture with them vs without: ${q.debrisApart} px apart (noise ${q.debrisNoise})`);
                 ok(bk + " -- the cubes AGE on the page: a particle's age moves with the race's own sim ticks (the page steps its debris), by a tick or two and no more", q.debrisAged > 0 && q.debrisAged < 0.2, `${q.debrisAged == null ? "no particle" : q.debrisAged.toFixed(4) + " s"} after the first tick`);
                 report(`${bk}: the falling block -- building ${q.topBuilding}: ${q.topEvents.join(",")}, ${q.topBodies} body, HUD says so ${q.topHud}; the block on the picture ${q.blockApart} px, after the scene was built again (${q.topRebuilt}x) ${q.blockApartRebuilt} px; laid flat it shattered ${q.shattered}x (${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${JSON.stringify(q.shatterEvent)}), its record parked ${q.slotParked}, HUD says so ${q.hudShattered}`);
                 ok(bk + " -- !! a building a shell brings down becomes a box3d body in the PAGE's physics world (the shells took the ground floor, CityGen's topple raised the block) and the HUD says it fell over", /topple|drop/.test((q.topEvents || []).join(",")) && q.topBodies === 1 && q.topHud === true, `events ${(q.topEvents || []).join(",")}, ${q.topBodies} body`);
+                ok(bk + " -- ...and a shell dropped onto it hits the BLOCK on the page (turretTick's block hit: counted, cubes burst, no second hit on the city), not the hole the building left", q.blockShot.hits === 1 && q.blockShot.impacts === 0 && q.blockShot.cubes > 0, JSON.stringify(q.blockShot));
+                ok(bk + " -- !! a window readback that NEVER settles (hung under the scene being built again) is given up on: the windows read the NEW scene afterwards (the page does not hold viewBusy for ever), and nothing says 'view windows off'", q.hang.hung >= 1 && q.hang.resumed >= 1 && !/view windows off/.test(q.hang.note || ""), `${q.hang.hung} read(s) hung, ${q.hang.resumed} window read(s) on the new scene after; note "${(q.hang.note || "").slice(0, 60)}"`);
                 ok(bk + " -- ...the block is on the PAGE's picture: a frame with its record where the page put it differs from the same frame with the record parked", q.blockApart > 300, `${q.blockApart} px apart`);
                 ok(bk + " -- ...and a scene built AGAIN with the block in the air still draws it (a repack must not lose a falling building)", q.topRebuilt === 1 && q.blockApartRebuilt > 300, `scene rebuilt ${q.topRebuilt}x, ${q.blockApartRebuilt} px apart`);
-                ok(bk + " -- ...a block fallen over and at rest SHATTERS: rubble in the world and cubes, the body gone, its fleet record parked, the HUD counting it", q.shattered === 1 && q.rubbleVoxels > 0 && q.topBodiesAfter === 0 && q.slotParked === true && q.hudShattered === true, `${q.shattered} shattered, ${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${q.topBodiesAfter} bodies left, parked ${q.slotParked}`);
+                ok(bk + " -- ...a block that fell over or came to rest LEANING SHATTERS by itself (the page's rest rule, nobody laying it down): rubble in the world and cubes, the body gone, its fleet record parked, the HUD counting it", q.shattered === 1 && q.rubbleVoxels > 0 && q.topBodiesAfter === 0 && q.slotParked === true && q.hudShattered === true, `it came to rest at up.y ${q.shatterEvent && q.shatterEvent[0] && q.shatterEvent[0].up != null ? q.shatterEvent[0].up.toFixed(3) : "?"}, ${q.shattered} shattered, ${q.rubbleVoxels} rubble voxels, ${q.burst} cubes, ${q.topBodiesAfter} bodies left, parked ${q.slotParked}`);
                 ok(bk + " -- the cubes a shell bursts are on the PAGE's picture: its own frame loop placed them, and the wall looks different with them than with the particles parked", q.debrisLive > 30 && q.debrisApart > 300 && q.debrisNoise < 100, `${q.debrisLive} cubes, ${q.debrisApart} px apart, noise ${q.debrisNoise}`);
                 report(`${bk}: the page after ${q.placed} isolated voxels: outgrown ${q.outgrownNow} -> scene built ${q.builds1b}x -> ${q.builds2}x, repacks ${q.repacks1} -> ${q.repacks2}, the rebuilt scene is ${q.cloudApart} px from the one before (noise ${q.noise}), an edit after the rebuild moved ${q.editApart} of ${q.pixels} pixels, clock ${q.t0} -> ${q.t1} s, page errors ${q.errs.length}`);
                 ok(bk + " -- !! a chunk outgrowing its slot on the live page is answered by the PAGE: the flag was raised, the scene was built again by itself, the flag is clear and the world fleet is back", q.outgrownNow === true && q.builds2 === q.builds1b + 1 && q.outgrown2 === false && q.repacks2 === q.repacks1 + 1 && q.world2 && /1 repack/.test(q.hud2), `scene built ${q.builds1b}x -> ${q.builds2}x; HUD ${(q.hud2 || "").slice(-70)}`);

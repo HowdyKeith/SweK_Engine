@@ -86,7 +86,7 @@ let peerBrain = null, peerBrainMeta = null, peerGunnerBrain = null, peerGunnerMe
 // (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4681 -- `cityCtx` (world/
 // crashDamage.mjs's crashWorld(), the same context race-crash.html's car crashes damage) replaces the flat damage tally
 // a shell used to leave a building with the real one: hit points, crumble, a topple that parks the collider.
-let buildings = [], cityCtx = null, debris = null, debrisBase = 0, blockBase = 0;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
+let buildings = [], cityCtx = null, debris = null, debrisBase = 0, blockBase = 0, gpuBusy = false;   // debris: the cubes a shell's carve bursts, visual only (no hash, no body)
 // v4590 -- the oil slick and the Doom Fire (task 79): the gunner's drop and ignite outputs land on physics/slick.mjs's patches; the
 // wheels run on the WRAPPED surface (oil cuts the grip, fire is hot road) and the slick state is folded into the fingerprint
 let slicks = null, slickSurf = null, slickBase = 0;
@@ -237,6 +237,13 @@ function setupViews(n) {
     v.label.textContent = CV.windowLabel(i, names[i] || "car", v.view);
   }
 }
+// v4681 -- A WINDOW READBACK THAT NEVER SETTLES MUST NOT FREEZE THE WINDOWS FOR EVER. refreshViews holds viewBusy for the length of a readback; a scene
+// built again (a repack) destroys the one a readback was issued on, and a device that neither answers nor rejects that read left viewBusy true for the
+// rest of the page's life -- every window frozen on its last picture, no error, no note (measured on the ship harness's WebGPU: 1,201 page frames in 20 s
+// and not one more window read). The wait is bounded; a timeout is a failed read like any other, uncounted when the scene was built again under it.
+const READBACK_MS = 5000;
+const settleWithin = (p, ms) => new Promise((resolve, reject) => { const t = setTimeout(() => reject(new Error("the readback did not settle in " + ms + " ms")), ms); p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); }); });
+
 async function refreshViews(poses) {
   if (viewBusy || !scene) return; viewBusy = true;
   const era = sceneBuilds;
@@ -253,7 +260,7 @@ async function refreshViews(poses) {
       if (viewFailures >= 3) continue;   // the 3D windows are off after three failed readbacks; the brain windows above stay live
       const cam = CV.cameraFor(v.view, poses[i], turrets[i], G, { aspect: v.canvas.width / v.canvas.height });
       // scene.frame returns the frame handle whose .pixels is the readback promise (the gates await it the same way)
-      const fr = scene.frame({ ...cam, clear: CV.VIEW_DRAW.clear, target: v.target, read: true }), r = fr && fr.pixels ? await fr.pixels : null;
+      const fr = scene.frame({ ...cam, clear: CV.VIEW_DRAW.clear, target: v.target, read: true }), r = fr && fr.pixels ? await settleWithin(fr.pixels, READBACK_MS) : null;
       if (r && r.pixels && r.width) v.ctx.putImageData(new ImageData(new Uint8ClampedArray(r.pixels.buffer, r.pixels.byteOffset, r.pixels.length), r.width, r.height), 0, 0);
     }
   } catch (e) {
@@ -440,14 +447,22 @@ function frame(t) {
   const lead = poses[order[0].i]; centre = [lead.pos[0], 0, lead.pos[2]];
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   camNow = { viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye };
-  scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+  // v4681 -- BACKPRESSURE: WebGPU's queue has none of its own. A page that submits a frame per animation frame to a GPU that draws slower than that
+  // (the ship harness's software one: 2,700 frames in 45 s) piles frames up in the queue without bound, and every window readback -- which resolves only
+  // when the queue has drained to its own submission -- waits behind a deeper one each time: measured 0.3 s, 0.9, 2.5, 4.1, 6.5 s over 33 s, until the
+  // windows seemed hung. The main view is drawn only when the last one it submitted has finished; the race and the records go on at the clock's pace.
+  if (!gpuBusy) {
+    scene.frame({ ...camNow, clear: [0.03, 0.05, 0.08, 1] });
+    const q = device.backend === "webgpu" && device.gpu && device.gpu.queue;
+    if (q && q.onSubmittedWorkDone) { gpuBusy = true; q.onSubmittedWorkDone().then(() => { gpuBusy = false; }, () => { gpuBusy = false; }); }
+  }
   if (++viewFrame % CV.VIEW_DRAW.refreshEvery === 0) refreshViews(poses);
 }
 
 // read-only handles for the gates, the way brain-maze.html keeps window.__maze: tools/ship/raceTurret-selfcheck.mjs reads the live
 // scene and the city's state off the page to hold that a repack rebuilt the scene and left the world fleet installed, and reads it back
 // through a render target of its own (the page's presented canvas is redrawn by its own frame loop between a gate's frame and its readback)
-window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; } };
+window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; }, get shells() { return shells; } };
 
 main();
 </script>

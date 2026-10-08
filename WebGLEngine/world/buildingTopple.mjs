@@ -13,7 +13,9 @@
 // static STUBS (the support, rebar and all: the hinge), over a static slab at the road. No impulse is invented: gravity and
 // box3d's contact solver decide. A block whose centre hangs past the stubs' edge tips over that edge and lands lying on its
 // side (measured headless: a 4 x 10 x 4 block on a far-quarter stub is flat in 3.1 s, up.y 0.00, its centre 3.9 m past the
-// face it fell toward); a block whose centre is still over its stubs stands on what is left, and says so. The car the block
+// face it fell toward); a block whose centre is still over its stubs stands on what is left, and says so. A tall block that tips and
+// comes to rest LEANING (a 7 x 7 x 11 building on one column of ground floor: up.y 0.97, held between its stub and the road) has fallen as far as
+// it will, and settles like a fallen one (TOPPLE.leanUp, v4681); one still within 2.6 degrees of upright stays a body. The car the block
 // falls toward is a body too: it is pressed, not passed through.
 //
 // THEN IT TURNS INTO DEBRIS. When the body comes to rest (or after TOPPLE.rest.maxAge), its voxels are carried through its
@@ -26,7 +28,7 @@
 // Deterministic: the block, the stubs and the fall are box3d state, and the rubble is a pure function of the final pose.
 "use strict";
 import { looseFragments, massProperties } from "../physics/voxel/fracture.js";
-import { CRASH, footprint } from "./crashDamage.mjs";
+import { CRASH, footprint, shellInto, blastRadius } from "./crashDamage.mjs";
 import { syncDirty } from "../render/voxelDamage.mjs";
 import { miniWorld, meshWorld } from "../render/voxelDevice.mjs";
 import { rotateQ, bodyLitPipelineDesc } from "../render/voxelBodies.mjs";
@@ -42,6 +44,7 @@ export const TOPPLE = Object.freeze({
     meshCap: 12000,               // vertices reserved per block fleet (a 6 x 12 x 6 building with facades meshes to a few thousand)
     rest: Object.freeze({ speed: 0.05, ticks: 30, minAge: 60, maxAge: 12 * 60 }),   // at rest: under `speed` for `ticks` in a row after minAge, or maxAge
     fallenUp: 0.5,                // a block whose up vector's y is under this has fallen; one above it stands on what is left, and stays a body
+    leanUp: 0.999,                // ...unless it is tilted past this (2.6 degrees) and at rest: a lean-to on its stub and the road (measured 0.986 and 0.97), settles like a fallen one; a standing block reads 1.0000
     rubbleId: 7,                  // MaterialRegistry's RUBBLE
     debrisEvery: 3,               // one debris burst per this many voxels of a shattering block (the pool is capped at 400)
     park: Object.freeze([0, -500, 0]),
@@ -177,9 +180,12 @@ export function stepTopple(t, tick = t.tick + 1) {
         const o = rec.body * 7; rec.pose = { pos: [xf[o], xf[o + 1], xf[o + 2]], quat: [xf[o + 3], xf[o + 4], xf[o + 5], xf[o + 6]] };
         const sp = Math.hypot(vel[rec.body * 3], vel[rec.body * 3 + 1], vel[rec.body * 3 + 2]), age = tick - rec.born;
         rec.restTicks = sp < t.spec.rest.speed ? rec.restTicks + 1 : 0; rec.speed = sp; rec.up = quatUp(rec.pose.quat); rec.fallen = rec.up[1] < t.spec.fallenUp;
-        // a block that stands on what is left STAYS a body (the car can still push it over); one that has fallen over, or dropped with
+        // v4681 -- a block that tipped and came to rest LEANING (a tall building on one column of ground floor: 0.97 up, held between its stub and
+        // the road) is not standing on what is left; it has fallen as far as it will. A block still within leanUp of upright stays a body.
+        rec.leaning = !rec.fallen && !rec.dropped && rec.up[1] < t.spec.leanUp;
+        // a block that stands on what is left STAYS a body (the car can still push it over); one that has fallen over, leans at rest, or dropped with
         // nothing under it (a pancake), shatters once it rests -- or at maxAge, or off the world
-        const settled = (rec.fallen || rec.dropped) && ((age >= t.spec.rest.minAge && rec.restTicks >= t.spec.rest.ticks) || age >= t.spec.rest.maxAge);
+        const settled = (rec.fallen || rec.dropped || rec.leaning) && ((age >= t.spec.rest.minAge && rec.restTicks >= t.spec.rest.ticks) || age >= t.spec.rest.maxAge);
         if (settled || rec.pose.pos[1] < CRASH.groundY - 5) { shatter(t, rec); out.push(rec); }
     }
     return out;
@@ -234,6 +240,40 @@ export function sceneExtras(t, G, L, { light = SUN, cap = TOPPLE.meshCap } = {})
     };
 }
 
+/**
+ * v4681 -- a shell met a falling block (physics/turret.mjs's stepShells `block` hit, brain/gunnerPolicy.mjs's turretTick): the point
+ * bursts cubes in the block's own colour and the hit is counted. The block's PHYSICS answer, the shell's momentum as a linear impulse
+ * (box3d's, what a car gets, and next to nothing for tens of tonnes of masonry), is the caller's `world.impulse`, as for a car. No hit
+ * points and no scoreboard credit: a block is what a building became, and shooting rubble is not a score. Returns the record or null.
+ */
+export function shellOnBlock(t, slot, point) {
+    const rec = t.slots[slot]; if (!rec) return null;
+    if (t.debris) t.debris.spawn(Math.floor(point[0]), Math.floor(point[1]), Math.floor(point[2]), rec.local.length ? rec.local[0][3] : 1);
+    t.shellHits = (t.shellHits || 0) + 1;
+    return rec;
+}
+
+/**
+ * v4681 -- A SCRIPTED DEMOLITION, for a gate that holds one runtime's fall to another's (node's box3d against the browser's, the same wasm in two
+ * JS engines -- the nearest this tree gets to two machines in lockstep): cataclysm shells into the ground floor of the biggest building from tick
+ * `at`, one every `every` ticks, until CityGen topples it (the support collapse shellInto already has), then one spark shell dropped from above
+ * onto the block it became. No random anywhere: the positions are the rect's, the damage stream CityGen's own seeded one. Returns script(t, ctx)
+ * for raceWithGunners's `city` option; ctx = { shells, cityCtx }.
+ */
+export function demolitionScript(g, { at = 40, every = 3 } = {}) {
+    let i = 0; g.rects.forEach((r, k) => { if (r.w * r.d * r.h > g.rects[i].w * g.rects[i].d * g.rects[i].h) i = k; });
+    const r = g.rects[i], gy = CRASH.groundY + 1.5, radius = blastRadius(40), shots = [];
+    for (let x = r.x + 0.5; x < r.x + r.w; x += 3) for (let z = r.z + 0.5; z < r.z + r.d; z += 3) shots.push([x, gy, z]);
+    let k = 0, dropped = false, seen = null;
+    return (t, ctx) => {
+        const b = g.city.buildingAt(r.x + 0.5, r.z + 0.5);
+        if (b && b.state !== "toppled" && k < shots.length && t >= at && (t - at) % every === 0) shellInto(g, i, shots[k++], radius, { x: 1, z: 0 });
+        const blk = g.topple && g.topple.bodies[0];
+        if (blk && seen === null) seen = t;
+        if (blk && !dropped && t >= seen + 10) { const p = blk.pose.pos; ctx.shells.push({ x: p[0], y: p[1] + blk.half[1] + 6, z: p[2], vx: 0, vy: -30, vz: 0, t: 0, owner: 0, ammo: "spark" }); dropped = true; }
+    };
+}
+
 // ---- the same blocks in a kitScene (v4681: race-brain.html's scene is the kit's, with extra fleets, not crashScene's) ----------------
 /** kitScene's extraFleets for the block slots: a fleet per slot named block0.., a reserved mesh, one record parked until a block takes it. */
 export function kitFleets(t, { light = SUN, cap = TOPPLE.meshCap } = {}) {
@@ -268,7 +308,8 @@ export function bindScene(t, sc, base = sc.extrasBase) {
     const scene = sc.scene || sc;   // crashScene's result, or the gpuDriven scene itself
     t.onBlock = (slot, mesh) => { const f = scene.fleets[base + slot]; if (!f || !f.vbuf) throw new Error(`buildingTopple: no reserved fleet at ${base + slot} for slot ${slot}`); f.vbuf.write(mesh.data, 0); };
     t.onFree = null;
-    for (const r of t.bodies) if (!r.mesh) { r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
+    // a scene built AGAIN (race-crash.html and race-brain.html rebuild on a repack) has empty buffers: every block in the air is written, mesh made or not
+    for (const r of t.bodies) { if (!r.mesh) r.mesh = blockMesh(r); t.onBlock(r.slot, r.mesh); }
     return t;
 }
 

@@ -15,6 +15,13 @@
 //   C  render/carViews.mjs: the activations without the output tanh            -> 2 red: both policies' outputs.
 //   D  render/carViews.mjs: the view cycle stuck on first-person               -> 3 red: the cycle, the click on both boots.
 //   E  race-brain.html: the page never refreshing its windows                  -> 3 red: the scene, the bars, the WebGPU boot.
+//   F  v4681, world/crashDamage.mjs: the world fleet's record the radius-1 sphere at the origin again (the old page's)  -> 2 red: the first-person window on
+//      both backends (about a tenth lit: the road and the bars, no buildings).
+//   FINDING, v4681: THE BAR WAS SITTING ON A BROKEN PICTURE. This gate asked for MORE than a tenth lit and main read 10.0, 10.2 and 9.7 percent across three runs --
+//   noise round a bar, which looked like a flaky threshold. It was the old page drawing its world as ONE record at the origin with radius 1, culled whenever the
+//   origin left the camera's frustum (the same defect crashDamage-selfcheck.mjs's E and its WORLD RECORD finding name): the first-person windows showed the road
+//   and no city, and a tenth was what that looks like. With the world drawn through world/crashDamage.mjs's worldFleet the window reads 35.6 to 39.4 percent, every
+//   run; the bar is a quarter, which a window without its buildings cannot reach (sabotage F).
 //   FINDING, measured while writing this gate: on this harness a PRESENTED WebGPU canvas device is LOST at its first frame
 //   (device.lost: "A valid external Instance reference no longer exists"; every mapAsync after it fails), while an offscreen
 //   device reads back indefinitely and a presented WebGL2 canvas keeps reading targets back under a running loop. So the
@@ -112,10 +119,14 @@ sec("3. THE PAGE: ONE WINDOW PER CAR, A CLICK CYCLES IT, THE PIXELS ARE THERE");
             const p = pg.result;
             report(`${p.windows} windows; first-person lit ${(p.firstPerson * 100).toFixed(1)} %; brain lit ${(p.brainLit * 100).toFixed(1)} %; ${p.gun.slice(0, 80)}`);
             ok("!! one window per car, each labelled first-person to start", p.windows === 4 && p.labels.length === 4 && p.labels.every((l) => /first-person/.test(l)), p.labels.join(" | ").slice(0, 200));
-            ok("!! the first-person window carries the scene: read back from its render target into the 2D canvas, at least a tenth of it lit", p.firstPerson > 0.1 && !/view windows off/.test(p.gun), `${(p.firstPerson * 100).toFixed(1)} % lit`);
+            ok("!! the first-person window carries the scene: read back from its render target into the 2D canvas, over a quarter of it lit (the road AND the city -- a window without the buildings reads about a tenth)", p.firstPerson > 0.25 && !/view windows off/.test(p.gun), `${(p.firstPerson * 100).toFixed(1)} % lit`);
             ok("!! a click cycles the window's view and its label says so: turret, then brain", /turret/.test(p.turretLabel) && /brain/.test(p.brainLabel), `${p.turretLabel.slice(0, 60)} -> ${p.brainLabel.slice(0, 60)}`);
             ok("...and the brain window carries the bars", p.brainLit > 0.01, `${(p.brainLit * 100).toFixed(1)} % lit`);
         }
+        // v4681 -- AND ON WEBGPU, WITH PIXELS: ?offscreen=1 gives the page a device that renders into its own texture and never presents, which this harness
+        // reads back indefinitely, so the first-person window's picture is held on the second backend too (the presented boot below keeps its own row)
+        const po = await boot("?offscreen=1");
+        ok("...and on WebGPU, through ?offscreen=1, the first-person window carries the scene as well: over a quarter of it lit, no 'view windows off'", po.ok && po.result && po.result.booted && po.result.windows === 4 && po.result.firstPerson > 0.25 && !/view windows off/.test(po.result.gun), po.ok && po.result ? `${(po.result.firstPerson * 100).toFixed(1)} % lit; ${po.result.gun.slice(0, 80)}` : String(po.reason || "").slice(0, 200));
         const pw = await boot("");
         ok("...and on the WebGPU boot the windows, the labels and the click cycle are there whatever the harness does to a presented device", pw.ok && pw.result && pw.result.booted && pw.result.windows === 4 && /turret/.test(pw.result.turretLabel) && /brain/.test(pw.result.brainLabel) && pw.result.brainLit > 0.01, pw.ok && pw.result ? `${pw.result.be.slice(0, 40)}; brain lit ${(pw.result.brainLit * 100).toFixed(1)} %; ${pw.result.gun.slice(0, 110)}` : String(pw.reason || "").slice(0, 200));
         if (pw.ok && pw.result) report(`WebGPU boot, first-person window lit ${(pw.result.firstPerson * 100).toFixed(1)} % -- ${/view windows off/.test(pw.result.gun) ? "the presented device was lost on this harness, as measured; the label says so" : "the presented device survived here"}`);

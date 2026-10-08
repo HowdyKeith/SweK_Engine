@@ -108,7 +108,7 @@ export function insideBox(p, pose, half, pad = 0) {
  * exempt, so it is solid to every shell including the one its own firer sent through where it used to be empty air.
  * A shell that hits, lands (y < groundY) or expires is removed. Returns the hit events in shell order: a car hit is
  * { owner, target, point, dir, ammo }, a building hit { owner, building, point, dir, ammo } -- the caller tells them apart by
- * which of `target`/`building` is present, never both.
+ * which of `target`/`building`/`block` is present, never two.
  *
  * v4681 -- A FALSY SLOT IN `buildings` IS A GONE BUILDING, NOT A MISSING ONE. A building a shell already toppled (world/
  * crashDamage.mjs's shellInto, through the same city a car crash damages) has nothing left standing to hit, the way its
@@ -116,13 +116,18 @@ export function insideBox(p, pose, half, pad = 0) {
  * hands stepShells the same list with that index nulled rather than removed, keeping every index the fixed rect it always
  * named, and this loop skips a null slot instead of reading `.half` off of one.
  *
- * *** THE EARLIEST SAMPLE WINS ACROSS BOTH LISTS, NOT WHICHEVER LIST IS CHECKED FIRST. *** Two loops over the same four
- * samples, cars then buildings, each one refusing to report a hit at a sample `k` no earlier hit already beat -- so a wall at
+ * *** THE EARLIEST SAMPLE WINS ACROSS ALL THREE LISTS, NOT WHICHEVER LIST IS CHECKED FIRST. *** Loops over the same four
+ * samples, cars then buildings then blocks, each one refusing to report a hit at a sample `k` no earlier hit already beat -- so a wall at
  * sample 1 blocks a car at sample 3 behind it, and a car at sample 1 is not overridden by a building the second loop would
  * otherwise have found at sample 2. Checking either list alone and then the other, unconditionally, would let whichever list
  * runs second win ties it has no business winning.
+ *
+ * v4681 -- `blocks`: the falling blocks of world/buildingTopple.mjs, each { pos, quat, half } in the BODY's pose (insideBox already
+ * takes a rotated box -- a block lying on its side is hit where it lies, not where its upright box was), a falsy slot an empty
+ * one. A block hit is { owner, block: slot, point, dir, ammo }. Without this a building a shell brought down became a hole in the
+ * shell's world the moment it toppled: its list slot is nulled, and the box3d body that fell out of it was nothing to a shell.
  */
-export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.gravity, spec = TURRET, buildings = [] } = {}) {
+export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.gravity, spec = TURRET, buildings = [], blocks = [] } = {}) {
     const events = [];
     for (let i = shells.length - 1; i >= 0; i--) {
         const s0 = shells[i], s1 = stepShell(s0, dt, { gravity, drag: 0 });
@@ -142,6 +147,15 @@ export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.
             for (let k = 1; k < hitK; k++) {
                 if (!insideBox(at(k), bd, bd.half, spec.shellRadius)) continue;
                 hit = { owner: s0.owner, building: bi, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };
+                hitK = k; break;
+            }
+        }
+        for (let bk = 0; bk < blocks.length; bk++) {
+            const bl = blocks[bk];
+            if (!bl) continue;
+            for (let k = 1; k < hitK; k++) {
+                if (!insideBox(at(k), bl, bl.half, spec.shellRadius)) continue;
+                hit = { owner: s0.owner, block: bk, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };
                 hitK = k; break;
             }
         }

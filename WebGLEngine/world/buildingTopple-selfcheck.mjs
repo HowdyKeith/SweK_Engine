@@ -32,6 +32,10 @@
 //      prediction rows, and the 34-building outcome row (the buildings standing on two stubs were predicted to fall)
 //   H. v4681, bindKit rewriting only a block with no mesh yet (a scene built AGAIN keeps the old buffers' empty copy)  -> 2 red: the bind rows
 //      here (the block already in the air is not written), and raceTurret-selfcheck.mjs's "a scene built AGAIN with the block in the air still draws it" on both backends.
+//   K. v4681, bindScene writing only a block with no mesh yet (the crash scene's binder, as H did to bindKit's)  -> 1 red: its second-bind row.
+//   I. v4681, leanUp zeroed (a block that came to rest leaning never settles)    -> 1 red: the lean-to row ("never shattered").
+//   J. v4681, leanUp 1.01 (even a block standing at 1.0000 counts as leaning)    -> 3 red: the middle-stub block "STANDS" (both rows) and the ram's body
+//      (the 25 m/s ram's block settles and is gone, where it was meant to be a body on its stubs).
 // The first run of this gate against the module was 14 red: the bare-rect path never parked the building's static box (D above, a real
 // bug: the block was pushed 4 m out of the box and dropped upright), the exact centre of mass is of the whole anchored component (the
 // stub voxels pull it toward x 13.5), the greedy mesher makes a uniform block six quads (36 vertices, not 1056), a shattered record's
@@ -127,6 +131,13 @@ let farRun;
     const midRun = settle((x) => x === 1 || x === 2); report("middle stub: " + midRun.rows.join(" | "));
     ok("!! the block over a middle stub STANDS: after 5 s up.y is 1, its centre where it was, no fall, still a body (it stays one)", midRun.body && midRun.body.up[1] > 0.999 && near(midRun.body.pose.pos[0], 12, 0.05) && !midRun.body.fallen && midRun.t.bodies.length === 1 && midRun.t.shattered === 0, midRun.body ? `up.y ${midRun.body.up[1].toFixed(4)} pos ${midRun.body.pose.pos.map((v) => v.toFixed(2))}` : "no body");
     ok("...the prediction said so: over for the middle stub, not over for the far quarter", midRun.rec.over === true && farRun.rec.over === false);
+    // v4681 -- A LEAN-TO SETTLES. A tall building on ONE column of ground floor (7 x 7 x 11, the last column of seven) tips toward -x and is held
+    // between its stub and the road at about 0.97 up: the centre is not over the stub (not "standing") and it cannot fall further (not "fallen"). It
+    // used to stay a body for ever, a ruin that never turned into rubble until a car pushed it.
+    const leanRun = settle((x) => x === 6, 8, { w: 7, d: 7, h: 11 }); report("lean-to: " + leanRun.rows.join(" | ") + " | events " + JSON.stringify(leanRun.t.events.map((e) => [e.kind, e.up && e.up[1], e.fell])));
+    const leanEv = leanRun.t.events.find((e) => e.kind === "shatter");
+    ok("!! a block that tipped and came to rest LEANING (0.9 < up.y < 0.999, not flat) shatters into rubble like a fallen one: a shatter event with fell false, the body gone", !!leanEv && leanEv.fell === false && leanEv.up[1] > 0.9 && leanEv.up[1] < BT.TOPPLE.leanUp && leanRun.t.shattered === 1 && leanRun.t.bodies.length === 0 && leanEv.rubble > 0, leanEv ? `up.y ${leanEv.up[1]}, ${leanEv.rubble} rubble voxels, at tick ${leanEv.at}` : "never shattered");
+    ok("...while the block over a middle stub, still within leanUp of upright, still STANDS", midRun.body && midRun.body.up[1] > BT.TOPPLE.leanUp && midRun.t.shattered === 0);
     const dropRun = settle(() => false, 5); report("no ground floor: " + dropRun.rows.join(" | ") + " | events " + JSON.stringify(dropRun.t.events.map((e) => e.kind)));
     ok("!! with no ground floor the block DROPS onto the slab and, at rest, shatters where it stands: a drop event, no stubs, then a shatter with rubble in the footprint", dropRun.rec && dropRun.rec.dropped && dropRun.rec.stubs.length === 0 && dropRun.t.events[0].kind === "drop" && dropRun.t.shattered === 1 && dropRun.t.rubble > 100 && dropRun.t.g.world.voxelAt(11, Y0 + 2, 11) === BT.TOPPLE.rubbleId, `${dropRun.t.rubble} rubble`);
     const crumbs = (() => { const { g, rect } = bareWorld((x) => x === 1, { w: 2, d: 2, h: 2, x0: 30, z0: 30 }); const t = BT.createTopple(g, {}); const r = BT.beginTopple(t, null, null, rect); return { t, r, g }; })();
@@ -223,6 +234,10 @@ sec("5. THE SCENE EXTRAS, pure: a reserved fleet per slot, records parked until 
     ok("!! bindKit writes the block already in the air into the scene's reserved buffer for its slot (a scene built AGAIN has empty buffers), and nothing into the others", scene.fleets[0].vbuf.writes.length === 1 && scene.fleets[0].vbuf.writes[0][0] === BT.TOPPLE.meshCap * 10 && scene.fleets[1].vbuf.writes.length === 0 && scene.fleets[2].vbuf.writes.length === 0, JSON.stringify(scene.fleets.map((f) => f.vbuf.writes)));
     BT.bindKit(t, scene);
     ok("...and a SECOND bind (the next rebuild) writes it again: a block with its mesh already made is still rewritten", scene.fleets[0].vbuf.writes.length === 2);
+    // the crash scene's own binder (race-crash.html) is rebuilt on a repack too, and had the same `if (!r.mesh)` skip
+    const cscene = { extrasBase: 0, fleets: [0, 1, 2].map(() => ({ vbuf: { writes: [], write(d) { this.writes.push(d.length); } } })) };
+    BT.bindScene(t, cscene, 0); BT.bindScene(t, cscene, 0);
+    ok("bindScene (race-crash.html's) writes the block already in the air into a scene built AGAIN, every time it is bound, as bindKit does", cscene.fleets[0].vbuf.writes.length === 2 && cscene.fleets[1].vbuf.writes.length === 0, JSON.stringify(cscene.fleets.map((f) => f.vbuf.writes.length)));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
