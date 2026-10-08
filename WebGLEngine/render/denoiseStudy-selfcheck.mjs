@@ -3,8 +3,8 @@
 // Run: node render/denoiseStudy-selfcheck.mjs
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
-// outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2, ROUND1,
-// ROUND2, MINI, shuffledTargets, renderSplit, runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
+// outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
+// RESULTS_R3, ROUND1, ROUND2, ROUND3, MINI, shuffledTargets, renderSplit, runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
@@ -14,14 +14,16 @@
 //   R1  the test scenes rendered with the rest, before C0                        2 RED
 //   R2  a C0 failure ignored: the run carries on to the tests                    2 RED
 //   R3  ROUND2 pointed at round 1's spent test splits                            1 RED
+//   R4  the comparison networks trained with the PRIMARY head                    1 RED
+//   R5  ROUND3 pointed at the re-run's spent test splits                         1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, ROUND1, ROUND2, MINI, shuffledTargets, renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, isDatasetSeed } = await imp("render/denoiseScenes.mjs");
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, ROUND1, ROUND2, ROUND3, MINI, shuffledTargets, renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, isDatasetSeed } = await imp("render/denoiseScenes.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -81,7 +83,25 @@ console.log("\n3. *** THE RE-RUN: C0 STOPS THE RUN BEFORE A TEST SCENE EXISTS **
     ok("  the training-fit ratios are recorded beside the verdict, one per seed", out && out.trainFit.ratios.length === SEEDS.length && out.verdict.controls.C0 === out.trainFit);
 }
 
+console.log("\n4. THE KERNEL-PREDICTING ROUND (pre-registration section 15)");
+{
+    ok("!! ROUND3 is section 15's: its own new test splits, the kernel head, zero-last, C0 on, the residual network as the secondary comparison, results to their own file",
+        ROUND3.splits === SPLITS_R3 && ROUND3.head === "kernel" && ROUND3.init === "zero-last" && ROUND3.c0 === true && ROUND3.compareHeads.join() === "residual" &&
+        RESULTS_R3 === "render/denoise-results-r3.json" &&
+        ![...SPLITS.T1.seeds, ...SPLITS.T2.seeds, ...SPLITS_R2.T1.seeds, ...SPLITS_R2.T2.seeds].some((s) => [...ROUND3.splits.T1.seeds, ...ROUND3.splits.T2.seeds].includes(s)));
+    const out = runStudy({ ...MINI, c0: false, head: ROUND3.head, compareHeads: ROUND3.compareHeads });
+    const S1 = out.secondary["T1@residual"], S2 = out.secondary["T2@residual"];
+    ok("!! the whole pipeline runs on the kernel head, and the residual networks are trained and measured beside it, on the same test images, outside the verdict",
+        out.config.head === "kernel" && out.verdict.controls.C4 === true && S1 && S2 && S1.net.length === 3 && S1.net.every((a) => a.length === 2) && S2.net.length === 3 &&
+        !out.verdict.hypotheses.H1.d.some((v) => !Number.isFinite(v)));
+    ok("  the comparison networks ARE a different head: their errors are not the primary's", S1 && S1.net.some((a, i) => a.some((v, j) => v !== out.tables.T1.net[i][j])));
+    const probe = { ...MINI, splits: { ...MINI.splits, T1: SPLITS_R3.T1, T2: SPLITS_R3.T2 }, train: { ...MINI.train, steps: 0 }, head: "kernel" };
+    let stopped = null, threw = null; try { stopped = runStudy({ ...probe, c0: true }); } catch (e) { threw = e.message; }
+    ok("!! C0 guards this round's test scenes too: an untrained kernel head (the box blur) fails it and the run returns before seed 7000 is rendered",
+        !threw && stopped.tables === null && stopped.verdict.run === "not reported" && /^C0: /.test(stopped.verdict.reasons[0]), threw || stopped.verdict.reasons[0]);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r2` is the re-run's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r3` is the kernel round's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

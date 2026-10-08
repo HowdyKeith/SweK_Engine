@@ -5,8 +5,8 @@
 // first-hit guide buffers, the 9-channel demodulated input and the render seeds -- with the input's and the
 // references' seeds distinct by construction (control C5).
 //
-// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS
-// or SPLITS_R2 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
+// *** A DATASET SEED IS REFUSED UNLESS THE CALLER SAYS harvest. *** renderImages() throws for any seed in SPLITS,
+// SPLITS_R2 or SPLITS_R3 without { harvest: true }, so a gate, a page or a stray experiment cannot look at the data before the harvest
 // round does -- the pre-registration's whole value is that nobody saw the numbers first, and this makes "nobody"
 // checkable rather than promised. The gate renders seeds outside every split.
 "use strict";
@@ -37,7 +37,17 @@ export const SPLITS_R2 = Object.freeze({
     T1: Object.freeze({ family: "A", seeds: range(5000, 12) }),
     T2: Object.freeze({ family: "B", seeds: range(6000, 12) }),
 });
-const RESERVED = new Set([SPLITS, SPLITS_R2].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+/**
+ * The kernel-predicting round's splits (pre-registration section 15): the same training and validation scenes again,
+ * and new test scenes on ranges no earlier split touched -- rounds 1 and 2 spent theirs.
+ */
+export const SPLITS_R3 = Object.freeze({
+    train: SPLITS.train,
+    val: SPLITS.val,
+    T1: Object.freeze({ family: "A", seeds: range(7000, 12) }),
+    T2: Object.freeze({ family: "B", seeds: range(8000, 12) }),
+});
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */

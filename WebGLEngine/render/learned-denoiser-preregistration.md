@@ -317,3 +317,70 @@ the arc stops until something changes the input.
 - What "something changes the input" could mean is a new pre-registration's question, not this one's: more training
   scenes, more steps, a wider network, a kernel-predicting output, or temporal inputs. None of them is chosen by
   looking at these test sets, which are now spent too.
+
+## 15. ROUND 3 -- THE KERNEL-PREDICTING NETWORK, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered. Sections 12-14 stand
+as recorded.
+
+**The question.** Section 14 found that a network which predicts a correction to the irradiance learns to denoise
+but loses to the filter, by more on the family it never saw. The filter's output is a weighted average of real
+samples in a 9 x 9 window. So:
+
+> **If the network predicts the weights of that average itself, per pixel, does it beat the same filter on scenes
+> it was not trained on?**
+
+**One deliberate change: the output head.** Everything else in sections 3-11 and 13 holds as written: the scenes,
+inputs, splits, metric, statistic, controls (C0-C5, with C0's bar at 0.8), seeds, optimiser, steps, batch, crop,
+the zero-last initialisation, and the filter and its tuning.
+
+- **The network:** round 2's three hidden layers, unchanged (9 -> 16 -> 16 -> 16, 3 x 3, relu), then a **1 x 1 layer
+  to 81 logits** per pixel.
+  - 7,329 parameters, against round 2's 6,387. The 1 x 1 head keeps the change to the output's meaning rather than
+    to capacity.
+- **The output:**
+  - a softmax over the logits of the taps inside the image gives each pixel weights over its 9 x 9 window (the
+    filter's window);
+  - the output irradiance is the weighted sum of the NOISY demodulated irradiance, one kernel shared by r, g and b;
+  - it is re-modulated by the pixel's albedo, as before.
+  - The output is always a convex combination of real samples.
+- **Initialisation:** zero-last, as section 13. An untrained network is therefore the 9 x 9 box mean.
+- In code: `head: "kernel"` in `render/denoiseNet.mjs` (`SHAPE_KERNEL`, `KERNEL_RADIUS`, `KERNEL_TAPS`).
+
+**New test sets.**
+- T1: family A, scene seeds 7000-7011.
+- T2: family B, scene seeds 8000-8011.
+- Neither range overlaps anything earlier. C5 holds over all three rounds: 100 scenes, 300 distinct render seeds.
+- train (1000-1023) and val (2000-2003) are unchanged.
+- In code: `SPLITS_R3`.
+
+**What was seen first: the TRAINING scenes only.** A pilot trained one kernel network (seed 1, the full schedule) on
+the 24 training scenes to confirm the head learns before committing to it. Training fit, geometric mean of
+relMSE / noisy:
+
+| Method | Train fit |
+|---|---|
+| kernel network, seed 1 | 0.141 |
+| round 2's residual network, seed 1 | 0.182 |
+| the tuned filter | 0.192 |
+
+Round 2's residual also fit the training set better than the filter and lost on test, so this predicts nothing
+about H1 or H2. It was used only to confirm that C0 can pass. No other choice was made from it. The 9 x 9 window and
+the 1 x 1 head were fixed before it ran.
+
+**Secondary** (reported, never tested, never used to choose):
+- round 2's residual network, trained identically on the same scenes with the same three seeds, measured on this
+  round's T1 and T2 beside the kernel network;
+- the 1- and 16-sample inputs as before;
+- val;
+- per seed;
+- time.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r3` -> `render/denoise-results-r3.json`. It refuses if the
+file exists.
+
+**The outcomes, per section 9:**
+- **H1 and H2 supported:** the kernel network goes to the device. Its 81-wide output needs `brain/conv2d.mjs`'s
+  device kernels widened past `COUT_MAX` 32, or the head split into three passes.
+- **H1 only:** transfer is still the open subject.
+- **Neither:** recorded, and section 16 is the temporal round, already chosen as the next change.
