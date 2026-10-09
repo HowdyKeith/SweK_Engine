@@ -1,0 +1,1083 @@
+{
+ "config": {
+  "net": "render/denoise-net-r11.json",
+  "results": "render/denoise-results-r11.json",
+  "image": 64,
+  "sppIn": 4,
+  "sppRef": 1024,
+  "APPLY_TOL": 0.00001,
+  "D3_REL": 0.0001,
+  "images": 24
+ },
+ "criteria": {
+  "D0": {
+   "ok": true,
+   "what": "the shipped network on the CPU (f64) gives the harvest's seed-1 relMSE on every test image, bit for bit"
+  },
+  "D1": {
+   "ok": true,
+   "what": "every conv cell on the device is the twin's or the fused mirror's, given the device's own input to that layer",
+   "fused": 0,
+   "cells": 20545536
+  },
+  "D2": {
+   "ok": true,
+   "worst": 6.355189866946332e-7,
+   "what": "the kernel on the device within APPLY_TOL of its twin"
+  },
+  "D3": {
+   "ok": true,
+   "worst": 3.8197486151858584e-7,
+   "sameWins": true,
+   "winsDevice": {
+    "T1": 12,
+    "T2": 12
+   },
+   "winsCpu": {
+    "T1": 12,
+    "T2": 12
+   },
+   "what": "the device's relMSE within D3_REL of the f64 network's on every image, and it beats the primary filter on exactly the same images"
+  }
+ },
+ "rows": [
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34000,
+   "harvestSeed1": 0.006422441181340871,
+   "cpu": 0.006422441181340871,
+   "device": 0.006422440743248763,
+   "filter": 0.007127678952346995,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.143170058735236e-7,
+   "ms": 651.6991270000001
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34001,
+   "harvestSeed1": 0.00028168987615648683,
+   "cpu": 0.00028168987615648683,
+   "device": 0.0002816899588263062,
+   "filter": 0.0004127785411363638,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.839508084743935e-7,
+   "ms": 779.341253999999
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34002,
+   "harvestSeed1": 0.007277114250448133,
+   "cpu": 0.007277114250448133,
+   "device": 0.007277113847810484,
+   "filter": 0.012218097684141574,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 6.355189866946332e-7,
+   "ms": 729.20982
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34003,
+   "harvestSeed1": 0.0036633124112583413,
+   "cpu": 0.0036633124112583413,
+   "device": 0.003663312976046588,
+   "filter": 0.007914088147026566,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.6994336242596043e-7,
+   "ms": 688.6684150000001
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34004,
+   "harvestSeed1": 0.0029201770126475873,
+   "cpu": 0.0029201770126475873,
+   "device": 0.002920176727985772,
+   "filter": 0.005751877557362167,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.596573139809943e-7,
+   "ms": 734.2420169999968
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34005,
+   "harvestSeed1": 0.02160415634340856,
+   "cpu": 0.02160415634340856,
+   "device": 0.021604157618816854,
+   "filter": 0.052823732294815275,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.4226933111333784e-7,
+   "ms": 799.3093430000008
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34006,
+   "harvestSeed1": 0.0006821203885446041,
+   "cpu": 0.0006821203885446041,
+   "device": 0.0006821206490974451,
+   "filter": 0.0013329267949464681,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.6605880170689375e-7,
+   "ms": 675.3057039999985
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34007,
+   "harvestSeed1": 0.005120004318935663,
+   "cpu": 0.005120004318935663,
+   "device": 0.005120003472702867,
+   "filter": 0.017712559953735916,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.6548863389249123e-7,
+   "ms": 717.6759869999951
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34008,
+   "harvestSeed1": 0.0057847815155065785,
+   "cpu": 0.0057847815155065785,
+   "device": 0.005784780990664745,
+   "filter": 0.006479697721616769,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.659485390125316e-7,
+   "ms": 672.1622820000048
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34009,
+   "harvestSeed1": 0.0037662053284221683,
+   "cpu": 0.0037662053284221683,
+   "device": 0.003766205135936057,
+   "filter": 0.0060083779255430915,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.825623675667902e-7,
+   "ms": 798.1445260000182
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34010,
+   "harvestSeed1": 0.004125821059120095,
+   "cpu": 0.004125821059120095,
+   "device": 0.00412582117425716,
+   "filter": 0.007142952912747087,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 5.060807115737723e-7,
+   "ms": 766.4341120000172
+  },
+  {
+   "set": "T1",
+   "family": "R",
+   "seed": 34011,
+   "harvestSeed1": 0.009163250833054245,
+   "cpu": 0.009163250833054245,
+   "device": 0.009163250370612391,
+   "filter": 0.017700900074805674,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.7318677026572747e-7,
+   "ms": 707.3404190000147
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35000,
+   "harvestSeed1": 0.003487089341561108,
+   "cpu": 0.003487089341561108,
+   "device": 0.003487089178538004,
+   "filter": 0.011450333946562433,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.841564169946261e-7,
+   "ms": 709.3022490000003
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35001,
+   "harvestSeed1": 0.0022247020087470134,
+   "cpu": 0.0022247020087470134,
+   "device": 0.00222470236226644,
+   "filter": 0.0035364646761590524,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.775325130996122e-7,
+   "ms": 662.2045759999892
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35002,
+   "harvestSeed1": 0.001370859343406225,
+   "cpu": 0.001370859343406225,
+   "device": 0.00137085941337172,
+   "filter": 0.0023345153398855244,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 3.9259799663131286e-7,
+   "ms": 697.0131299999775
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35003,
+   "harvestSeed1": 0.003477326494009918,
+   "cpu": 0.003477326494009918,
+   "device": 0.0034773266903646866,
+   "filter": 0.004373320049823571,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.4524377244956206e-7,
+   "ms": 673.1194550000073
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35004,
+   "harvestSeed1": 0.004436881666229531,
+   "cpu": 0.004436881666229531,
+   "device": 0.004436882194893307,
+   "filter": 0.017280010465178294,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.5488686781642656e-7,
+   "ms": 653.4812759999768
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35005,
+   "harvestSeed1": 0.0017252703121043893,
+   "cpu": 0.0017252703121043893,
+   "device": 0.001725270245922778,
+   "filter": 0.006002315153334772,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 5.418874604058073e-7,
+   "ms": 725.3842010000371
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35006,
+   "harvestSeed1": 0.001693431264470012,
+   "cpu": 0.001693431264470012,
+   "device": 0.0016934311165638745,
+   "filter": 0.0023566127759728117,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.3463303823923205e-7,
+   "ms": 619.6329609999666
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35007,
+   "harvestSeed1": 0.004347130935076071,
+   "cpu": 0.004347130935076071,
+   "device": 0.004347130806965135,
+   "filter": 0.007400641639759283,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.522372970500335e-7,
+   "ms": 829.7517280000029
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35008,
+   "harvestSeed1": 0.0019087241759311964,
+   "cpu": 0.0019087241759311964,
+   "device": 0.001908724409993033,
+   "filter": 0.0035573849119634343,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.4945614009224276e-7,
+   "ms": 700.5070159999887
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35009,
+   "harvestSeed1": 0.0037909341459674076,
+   "cpu": 0.0037909341459674076,
+   "device": 0.003790934131229275,
+   "filter": 0.0046551225039358985,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.367292819995912e-7,
+   "ms": 697.2064460000256
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35010,
+   "harvestSeed1": 0.0033150087975977014,
+   "cpu": 0.0033150087975977014,
+   "device": 0.003315008647919783,
+   "filter": 0.013212860315291884,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 4.651757422324761e-7,
+   "ms": 701.6107510000002
+  },
+  {
+   "set": "T2",
+   "family": "C",
+   "seed": 35011,
+   "harvestSeed1": 0.0020110897434901013,
+   "cpu": 0.0020110897434901013,
+   "device": 0.0020110899933513337,
+   "filter": 0.005923362049796466,
+   "layers": [
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "tiled",
+     "plain": 131072,
+     "fused": 0,
+     "unexplained": 0
+    },
+    {
+     "kernel": "direct",
+     "plain": 331776,
+     "fused": 0,
+     "unexplained": 0
+    }
+   ],
+   "applyWorst": 5.38997260276926e-7,
+   "ms": 680.4306670000078
+  }
+ ],
+ "adapter": "google / swiftshader / SwiftShader driver 5.0.0",
+ "seconds": 390.785,
+ "cache": {
+  "hits": 24,
+  "misses": 0
+ }
+}
