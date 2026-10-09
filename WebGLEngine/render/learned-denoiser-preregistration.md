@@ -1329,3 +1329,95 @@ analysis. The secondaries below separate them.
 - **H2 only:** recorded as found.
 - **Neither:** recorded with the controls' numbers.
 - **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+## 29. ROUND 9 -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r9 --cache <dir> --workers 4` at commit 9fa022ec, run three times (section 24):
+- **23:32Z (2026-10-08):** stopped at the 2-hour background limit, in the shuffled-target batch. By then it had kept
+  the training renders, the filter, the four primary networks (5,655 s for the batch) and the test renders.
+- **05:28Z:** resumed from the cache, which read everything back in 118 s. Lost to a container restart in the same
+  batch.
+- **06:01Z to 06:47:47Z:** resumed again and finished. Cache hits 129, misses 54.
+
+Nothing was written or read before the last run ended. Its output, unedited, is `render/denoise-results-r9.json`,
+committed at 809c478d before anything below was read.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0 | 0.0997 / 0.0966 / 0.1040 (needs <= 0.8) |
+| C1, on the training images | network 96, filter 94 of 96 (needs 88) |
+| C2 | shuffled-target network: mean d -1.91 (needs <= 0) |
+| C3 | no test image within 2x of its reference floor |
+| C4, C5 | held; 372 distinct render seeds |
+
+Reported, never tested: on the test sets, both methods beat the noisy input on 12 of 12 images, on both sets.
+
+**The hypotheses, by the sign-flip test (section 28):**
+
+| | Network wins (of 12) | mean d | sign-flip p | (sign test p) | Holm threshold | Status |
+|---|---|---|---|---|---|---|
+| H1, held-out R (26000) | 11 | +0.739 | 0.0007 | (0.0032) | 0.025 | **supported** |
+| H2, family C (27000) | 2 | -0.247 | 0.996 | (0.997) | 0.05 | **not supported** |
+
+- **On held-out R the large network beats the filter, image by image and by a wide margin.** Geometric means:
+  network 0.0055 (seeds 0.0055-0.0056), filter 0.0116, about 52% lower. Its one loss (d -0.16) is the
+  second-least-noisy image.
+- **On family C the filter is better.** Geometric means: network 0.0042 (seeds 0.0040-0.0044), filter 0.0033. The
+  filter wins 10 of 12 images.
+- **Both tests agree on both hypotheses.** The sign test alone would have given the same verdicts.
+
+**Secondary** (reported, never tested). Geometric-mean relMSE:
+
+| | H1's set (R) | family C |
+|---|---|---|
+| noisy | 0.0641 | 0.0090 |
+| filter | 0.0116 | 0.0033 |
+| **large network** (primary), seeds 1-3 | 0.0055-0.0056 | 0.0040-0.0044 |
+| **small network** (round 8's, trained as round 8 trained it), seeds 1-3 | 0.0075-0.0080 | 0.0040-0.0054 |
+| small network's statistics against the filter | 11 of 12; sign-flip p 0.012, sign p 0.0032 | 2 of 12; p 0.997 |
+| 1-sample input: filter / large networks | 0.0344 / 0.0150-0.0159 | 0.0071 / 0.0055-0.0060 |
+| 16-sample input: filter / large networks | 0.0043 / 0.0024-0.0026 | 0.0026 / 0.0037-0.0042 |
+| the reference floor | 0.0005 | 0.0001 |
+
+- val: noisy 0.0325, filter 0.0071, large networks 0.0038-0.0039.
+- **What the larger network bought, on the same images:**
+  - On R, its error is 28% below the small network's (0.0055 against 0.0077), and it is lower on all 12 images.
+    Against the filter it is 52% below; the small network is 34% below.
+  - On family C, 8% below the small network's, and still 1.28 x the filter's (the small network: 1.39 x).
+- **What it did not buy: the verdict.** On these 12 test images of R the small network ALSO wins 11 of 12, and is
+  supported by either test.
+  - Round 8's 7 of 12 and this round's 11 of 12 are different sets of scenes. This set is about twice as noisy
+    (noisy relMSE 0.064 against 0.036). Section 27 found the network's advantage concentrated on the noisiest
+    images.
+  - So neither deliberate change can be credited with H1 being supported in this round rather than in round 8.
+- At 16 samples the large network is ahead of the filter on R (0.0025 against 0.0043), where round 8's small network
+  was behind. On family C at 16 samples the large networks are worse than their own input (0.0037-0.0042 against
+  0.0032); the filter is not (0.0026).
+
+**What this buys, per section 23: "H1 only".**
+- A broad randomized training set of this size does not make the network beat the filter on a family outside its
+  support, at four times the size and three times the training.
+- On its own distribution, the larger network beats the filter clearly, and beats the small network on every image.
+
+**The arc so far, as its pre-registered verdicts read:**
+
+| Round | Change | In-distribution | A family not trained on |
+|---|---|---|---|
+| 2 | residual network | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | **supported** (12/12) | not supported (5/12) |
+| 5 | trained on A+B, tested on C | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | **supported** (11/12) | not supported (1/12) |
+| 7 | trained on 96 randomized scenes (R) | not reported (C1: the filter) | not reported |
+| 8 | round 7, C1 on the training images | not supported (7/12) | not supported (2/12) |
+| 9 | 4x network, 3x training, sign-flip test | **supported** (11/12, p 0.0007) | not supported (2/12) |
+
+- A kernel-predicting network beats the tuned filter on families it was trained on: narrow ones (rounds 3, 4, 6),
+  and a broad one (round 9). Round 8's 7 of 12 on the broad family was one draw of twelve scenes, and round 9's
+  secondary shows the same small network winning 11 of 12 on another.
+- **In nine rounds it has never beaten the filter on a family it never saw.** That held trained narrow or broad, small
+  or large, with or without history and the mask, by count or by size. On family C the filter has won 10 or more
+  of 12 images in each of rounds 6, 8 and 9.
+- The network does not go to the device on these results. Section 9 asks for both hypotheses.
