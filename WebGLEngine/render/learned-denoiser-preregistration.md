@@ -1868,3 +1868,82 @@ Reported, never tested: on the test sets, both methods beat the noisy input on 1
   (round 8, 7 of 12 on R) was one draw of scenes (section 29).
 - **It has never beaten the filter on a family it was not trained on,** in any round that tested one.
 - **Trained on everything it is used on, it wins there**, at little cost against each family's own network.
+
+## 35. ROUND 12 -- THE DEVICE ROUND, FIXED BEFORE THE SHIPPED NETWORK RUNS ON ANY TEST IMAGE
+
+Committed with the code that implements it. The shipped network has not been run on the device on any test image.
+
+**What this round is.** Section 34 sent round 11's network to the device, for scenes of R and C, as Keith asked. This
+round tests no new hypothesis: nothing about the network changes. It asks whether the network on the device IS the
+network the harvest measured, image by image, and it puts the network on a page beside the path tracer's.
+
+**What ships.**
+- **The network:** round 11's seed 1, the seed C4 trained twice. It is exported from the harvest's cache to
+  `render/denoise-net-r11.json`:
+  - every weight, as base64 float64;
+  - the harvest's filter setting (sS 1, sN 1, sA 0.2, sI 4);
+  - where it came from.
+- **The device pass:** `render/denoiseDevice.mjs`, on any GPUDevice.
+  - The four hidden layers run on `brain/conv2d.mjs`'s tiled kernel.
+  - The 81-logit head runs on its direct kernel. `COUT_MAX` 32 limits only the tiled kernel's private accumulators;
+    the direct kernel keeps one accumulator at a time and never had the limit. So the head needed neither widening
+    nor splitting, which section 15 expected it would.
+  - A new kernel, `k_apply`, does what `render/denoiseNet.mjs`'s kernelApply does, in f32:
+    - a softmax over the 9 x 9 taps that are inside the image and on the pixel's side of the emitter mask;
+    - the weighted noisy irradiance;
+    - re-modulation by the albedo.
+- **The page:** `denoise.html`, linked beside the Path Tracer on the front door.
+  - It renders scenes of R and C only, with seeds outside every split; a dataset seed is refused.
+  - It shows the noisy input, the filter, the network and a reference.
+  - It runs the network on the viewer's device, or on the CPU without WebGPU, and says which.
+  - It checks its own device output against the f64 network.
+  - Above everything, it says the network was trained on R and C, and that no round found a network beating the
+    filter on a family it was not trained on.
+
+**Gated** (`render/denoiseDevice-selfcheck.mjs`, synthetic images and seeds outside every split):
+- **On Dawn:**
+  - every conv cell is the twin's or the fused mirror's, given the device's own input to that layer;
+  - `k_apply` is within `APPLY_TOL` of its twin. That bound is 1e-5 relative, because WGSL's `exp` and division are
+    not correctly rounded;
+  - handed every logit plus 100, `k_apply` gives the same image;
+  - the whole pass is the f64 network's within f32 rounding.
+- **In Chromium:** the page runs the network on its own device, finds it the f64 network's within f32 rounding, and
+  refuses a round 11 test seed.
+- **11 sabotages, all red.** One of them (V11: the largest logit not subtracted before `exp`) went red only after a
+  row was written for it. Until a logit passes about 88 it changes nothing measurable.
+- **One device per job.** While this was built, a Dawn device reused after the JS thread had been busy for about a
+  second crashed the process or hung. A fresh adapter and device per job, destroyed after, ran clean every time.
+
+**What was seen first.**
+- Everything in sections 1-34.
+- The device pass on synthetic images, and the shipped network on two scenes outside every split (R 975600 and
+  C 975700, 64 x 64, a 64-sample reference). None of these is a test image.
+  - Logits ran from -56 to 12.
+  - `k_apply` was 4.8e-7 and 5.5e-7 from its twin.
+  - The device's image was 8.9e-7 and 9.5e-7 from the f64 network's.
+  - The relMSE was the same to six digits.
+
+**The criteria,** on round 11's 24 test images (12 of R, 12 of C), with the shipped network:
+- **D0, the shipped file is the harvest's network:** on the CPU, in f64, its relMSE on every test image equals round
+  11's seed-1 relMSE, bit for bit.
+- **D1, the layers:** every conv cell on the device is the twin's or the fused mirror's, given the device's own input
+  to that layer. None is unexplained.
+- **D2, the kernel:** `k_apply` is within `APPLY_TOL` of its twin on every value.
+- **D3, the verdict on the device:**
+  - on every image, the device's relMSE is within 1e-4 relative of the f64 network's;
+  - the device network beats the primary filter on exactly the images the f64 network does.
+- **Reported, not criteria:** the time per 64 x 64 frame, and the adapter. This box's device is SwiftShader, a
+  software device, so its times are a JIT's cost and not a GPU's.
+
+**The command:** `node tools/denoiseDevice.mjs --measure-r12 --cache <dir>` -> `render/denoise-results-r12.json`.
+- It refuses if the file exists.
+- Its log says only that the file was written, and the file is committed before it is read.
+- Its cache starts with the harvest's test renders, hard-linked (section 33's way), so the images are the harvest's.
+  D0 would catch any that were not.
+- Each image gets its own fresh device.
+
+**The outcomes:**
+- **D0-D3 hold:** the network is on the device, and the page is the round's deliverable.
+- **D0 fails:** the shipped file is not the harvested network. Nothing else is read until it is.
+- **D1, D2 or D3 fails:** the device pass is wrong somewhere. It is found and fixed, and the measurement repeated
+  under a new section, never silently.

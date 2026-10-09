@@ -97,6 +97,7 @@ import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 import * as MLP from "../../brain/mlp.js";
 // the denoiser arc, round 1 -- the convolution layer the path-tracer denoiser is built from
 import * as CONV from "../../brain/conv2d.mjs";
+import { kernelApplyWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
 import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
@@ -791,6 +792,19 @@ export function corpus() {
         { id: "conv2d.conv2dTiledWgsl", from: "brain/conv2d.mjs",
           why: "the same convolution out of workgroup memory -- a halo'd tile loaded per channel block between two barriers -- the first kernel in the corpus whose correctness depends on workgroupBarrier ordering",
           opts: (() => { const P = CONV.PROBES[1], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 12 -- the kernel-predicting network's kernel, held to its twin (kernelApplyCpu) within
+        // APPLY_TOL by render/denoiseDevice-selfcheck.mjs; here, both backends must give the same bytes
+        { id: "denoiseDevice.kernelApplyWgsl", from: "render/denoiseDevice.mjs",
+          why: "the denoiser's per-pixel softmax over 81 taps -- exp, a division, a max -- masked by an emitter channel and the image's borders, then a weighted sum re-modulated by the albedo: the corpus's first kernel whose arithmetic is mostly transcendental",
+          opts: (() => {
+              const H = 7, W = 6, C = 10, T = 81;
+              let s = 12345; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+              const x = new Float32Array(H * W * C), L = new Float32Array(H * W * T);
+              for (let p = 0; p < H * W; p++) { for (let c = 0; c < 9; c++) x[p * C + c] = Math.fround(c < 6 ? u() * 2 : u() * 2 - 1); x[p * C + 9] = p % W < 2 ? 1 : 0; }
+              for (let i = 0; i < L.length; i++) L[i] = Math.fround(u() * 16 - 8);
+              return { code: kernelApplyWgsl(), entryPoint: "k_apply", outCount: H * W * 3, uniforms: packApplyUniforms({ H, W, C }), workgroups: [1, 1],
+                       inputs: [{ binding: 2, data: L }, { binding: 3, data: x }] };
+          })() },
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },

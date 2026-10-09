@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 478,
+  "page": 479,
   "demo": 49,
   "builtin": 38
  },
@@ -983,6 +983,14 @@
    "id": "debug.html",
    "display": "Debug",
    "href": "/debug.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "denoise.html",
+   "display": "Denoise",
+   "href": "/denoise.html",
    "section": null,
    "collision": false
   },
