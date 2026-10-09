@@ -889,8 +889,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // selfcheck.mjs) -- gates, usesOk, definesOk and nameFirst each by two; the other five rows hold (the gate's drift row named these four).
     // the lockstep round (v4822) -- main's 1932 -> 1934 for brain/raceLockstep-selfcheck.mjs and tools/ship/lockstepRelay-selfcheck.mjs. usesOk, definesOk and
     // nameFirst each by two; the rest hold (the gate's own drift row named exactly these four).
-    gates: 1934, usesOk: 1913, definesOk: 1905, importsOk: 0,
-    distinctDefinitions: 42, nameFirst: 1805, condFirst: 97, unknownSignature: 11,
+    // v4824 -- 1934 -> 1935 for ui/pick-selfcheck.mjs, the npc audit's target-scoring utility held to the hand-written loop. usesOk,
+    // definesOk and nameFirst each by one; the rest hold (the gate's own drift row named exactly these four).
+    gates: 1935, usesOk: 1914, definesOk: 1906, importsOk: 0,
+    distinctDefinitions: 42, nameFirst: 1806, condFirst: 97, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

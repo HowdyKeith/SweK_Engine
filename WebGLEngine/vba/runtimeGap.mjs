@@ -599,7 +599,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds.mjs and its gate. Re-derived over the merged tree.
     // the lockstep round (v4822) -- main's 4598 -> 4605 for brain/raceLockstep.mjs, brain/raceLockstepPeer.mjs, brain/raceLockstep-selfcheck.mjs, tools/ship/miniWs.mjs,
     // tools/ship/lockstepRelay.mjs, tools/ship/lockstepPeer.mjs and tools/ship/lockstepRelay-selfcheck.mjs.
-    files: 4605,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4824 -- 4605 -> 4607 for ui/pick.mjs and ui/pick-selfcheck.mjs.
+    files: 4607,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1148,7 +1149,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // async/await +5, Promises +5, and requestAnimationFrame 126 -> 127 for tools/ship/raceTurret-selfcheck.mjs stubbing the page's frame loop); typed arrays hold.
     // v4822 -- async/await 1725 -> 1726 at the ship's own re-take: the relay gate gained section 1b (wsTransport over the relay, the CLIs' refusals), whose awaits and
     // spawn-wrapping promise are one async/await beyond the figure taken before it; wsTransport itself MOVED from tools/ship/lockstepPeer.mjs to tools/ship/miniWs.mjs (no net change there).
-    esModules: 4300, closures: 4149, asyncAwait: 1726, typedArrays: 1271, promises: 410,
+    // v4824 -- ui/pick.mjs and its gate: ES modules +2, closures +1, async/await +2 -- the deltas runtimeGap-selfcheck's own drift
+    // row reported for those two files; the other rows hold.
+    esModules: 4302, closures: 4150, asyncAwait: 1728, typedArrays: 1271, promises: 410,
     fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
