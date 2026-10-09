@@ -268,6 +268,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const SETTLED = STATE.settled.toVar();
         const COMPLETE = STATE.complete.toVar();
         const SWEEP = STATE.sweep.toVar();
+        // v4830 -- the third and last raw reader: tempest.ts:53 reads THINKING straight off the state index,
+        // `(stateIndex > 1.5 && stateIndex < 2.5) ? 1 : 0`, and so does this, once, here beside the other two.
+        const THINK = select(uniforms.stateIndex.greaterThan(1.5).and(uniforms.stateIndex.lessThan(2.5)), float(1.0), float(0.0)).toVar();
         // *** AND `drive` ARRIVES AT v4653, THE LAST OF mh_state's FOUR. *** It ramps in over half a second
         // in RESPONDING alone "so entering the state is a lean and not a jolt", and its 45 references across
         // murmur's eighteen sources do three different things: they point a wander at a heading, they
@@ -1064,14 +1067,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const glintK = clamp(uniforms.glint, 0.0, 1.0).toVar();
         // `energy` is tempest's own term and tempest.ts calls it "the deepest reading of cadence in the
         // collection": it raises the churn, quickens the weather AND shortens both flicker slots at once.
-        // This port has no state machine (mh_state/mh_live are not ported and the port runs as idle), so the
-        // only live input it can honour is voice -- which is named here rather than quietly dropped.
-        // v4830 -- tempest.ts:53-54, the real one: cadence, THINKING (the species' home state, read off the state
-        // index directly) and the responding lean. Until v4830 this was clamp(0.85 * VOICE) -- see MH_MIST_LIVE.
+        // v4830 -- tempest.ts:53-54, the real one: cadence, THINKING (the species' home state, THINK above) and
+        // the responding lean. Until v4830 this was clamp(0.85 * VOICE), written when the port had no
+        // mh_live or mh_state and voice was the only signal it could honour -- see MH_MIST_LIVE.
         const ML = MH_MIST_LIVE[species] || MH_MIST_LIVE.nebula, MT = MH_MIST_LIVE.tempest;
-        const think = select(uniforms.stateIndex.greaterThan(1.5).and(uniforms.stateIndex.lessThan(2.5)), float(1.0), float(0.0));
         const energy = species === "tempest"
-            ? clamp(PACE.mul(MT.ePace).add(think.mul(MT.eThink)).add(DRIVE.mul(MT.eDrive)), 0.0, MT.eCap).toVar()
+            ? clamp(PACE.mul(MT.ePace).add(THINK.mul(MT.eThink)).add(DRIVE.mul(MT.eDrive)), 0.0, MT.eCap).toVar()
             : float(0.0).toVar();
         const mScale = float(MIST.scale).mul(mix(float(1.0), float(MIST.small), smallK)).toVar();
         const mWarp = float(MIST.warp).mul(mix(float(1.0), float(0.60), smallK)).toVar();
@@ -1085,11 +1086,11 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // spellings identical: base*(t + k*s*t) + (k*base*(1+k*s)/w2)*sin IS (base*t + (k*base/w2)*sin) *
         // (1 + k*s), which is why this migration moves no recorded frame.
         //
-        // THE COEFFICIENT IS FOLDED AT BUILD TIME AND THE CLAMP IS PROVEN INERT. `energy` is
-        // clamp(0.85 * VOICE, 0, 1.6) and the conditioned voice tops out at 0.999350 across every state and
-        // level, so energy reaches 0.849 and the clamp NEVER bites -- measured, not assumed, because a live
-        // clamp would make the integral of energy something other than 0.85 times the integral of VOICE and
-        // this whole factoring would stop being exact.
+        // tempest's CLAMP CAN BITE NOW AND THE INTEGRAL CARRIES IT. Until v4830 energy was clamp(0.85 * VOICE)
+        // and topped out at 0.849, so the clamp was inert and the integral could be 0.85 * voiceInt. Murmur's
+        // real energy reaches 0.85 + 0.65 + 0.55 = 2.05 against the 1.6 cap, so the host integrates the
+        // CLAMPED value itself (tempestEnergyInt in render/aiPresenceOrbState.mjs) rather than a sum of
+        // signal integrals that would overshoot it.
         const mistBase = float(MIST.drB).add(foldK.mul(MIST.drK)).toVar();
         // v4830 -- each species' own factor: nebula's three shared signals, tempest's integrated energy alone
         const MN = MH_MIST_LIVE.nebula;

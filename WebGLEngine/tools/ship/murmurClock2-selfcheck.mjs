@@ -28,6 +28,12 @@
 // whatever the exchange was doing -- on the one species whose own brief is whether somebody says "DNA" inside
 // three seconds. Two of murmur's numbers that were simply absent. Added in the integrated form, because
 // adding them as murmur spells them would have shipped a new teleport on the same afternoon as the repair.
+//
+// v4830 -- tempest's subject became tempest.ts's own energy (pace, thinking, drive; clamped) and the scaled-
+// site census grew two honest shapes (per-species branches, spinPhase's split). SABOTAGES, each restored:
+// the host integrating 0.85*voice in place of pace (RED: section 2's mist bound, section 3's spelling row);
+// tempest's secular put back on a voice ratePhase (RED: section 3's drift row, section 5's deaf row);
+// spinPhase's sp losing its drive term (RED: section 4's six-of-six row).
 "use strict";
 
 import fs from "node:fs";
@@ -51,10 +57,14 @@ console.log("murmurClock2-selfcheck -- the clocks whose OUTPUT is multiplied\n")
 const DT = 1 / 60;
 // The two subjects, written out by hand rather than read off MH_* so this file can DISAGREE with the port --
 // the v4579 distinction: a gate that re-states the formula it grades grades nothing.
-//   nebula.ts / tempest.ts:  drift(t, drB + foldK*drK, 0.45, drLane) * (1 + 0.95*energy + 0.35*live.voice)
-//                            with energy = clamp(0.85*live.voice, 0, 1.6) on tempest and 0 on nebula
+//   tempest.ts:              drift(t, drB + foldK*drK, 0.45, drLane) * (1 + 0.95*energy)
+//                            with energy = clamp(0.85*live.pace + 0.65*thinking + 0.55*st.drive, 0, 1.6)
+//   nebula.ts:               the same drift * (1 + 0.65*live.pace + 0.35*live.voice + 0.90*st.drive)
+//   (until v4830 this file wrote tempest's energy as clamp(0.85*live.voice) and gave tempest nebula's voice
+//    term -- the port's reading, not murmur's; the subject below is now tempest.ts's own)
 //   helix.ts:                drift(t, climb, 0.44, 5.0) * (1 + 0.75*live.pace + 0.85*st.drive)
-const MIST_BASE = 0.070 + 0.5 * 0.075, MIST_KV = 0.85 * 0.95 + 0.35;      // tempest at foldK 0.5
+const MIST_BASE = 0.070 + 0.5 * 0.075, MIST_KE = 0.95;      // tempest at foldK 0.5; its drift's energy coefficient
+const T_ENERGY = (pace, think, drive) => Math.min(1.6, Math.max(0, 0.85 * pace + 0.65 * think + 0.55 * drive));
 const HELIX_BASE = (0.20 + 0.5 * 0.30) * 1.0, HELIX_KP = 0.75, HELIX_KD = 0.85;
 const WOB_MIST = 0.45, WOB_HELIX = 0.44, LANE_MIST = 3.0, LANE_HELIX = 5.0;
 
@@ -66,9 +76,10 @@ function ramp(settle, kind) {
     const st = createPresenceState("idle");
     for (let i = 0; i < Math.round(settle / DT); i++) st.tick(DT, { activity: 0, voice: 0 });
     if (kind === "helix") st.setState("responding");
+    else st.setState("thinking");   // tempest's home state: THINKING opens 0.65 of its energy at once
     let pI = null, pN = null, wI = 0, wN = 0;
     for (let i = 0; i < Math.round(3.0 / DT); i++) {
-        st.tick(DT, kind === "helix" ? { activity: 1.0, voice: 0 } : { voice: 1.0, activity: 0 });
+        st.tick(DT, { activity: 1.0, voice: 0 });
         const p = st.getParams();
         const si = STATE_INDEX[p.state];
         const lv = K.mhLive(p.voice, p.activity, si), stn = K.mhState(si, p.stateTau);
@@ -77,8 +88,9 @@ function ramp(settle, kind) {
             integ = K.mhRatePhase(HELIX_BASE, p.phase, HELIX_KP, p.paceInt, 0, 0, HELIX_KD, p.driveInt);
             naive = HELIX_BASE * (1 + HELIX_KP * lv.pace + HELIX_KD * stn.drive) * p.phase;
         } else {
-            integ = K.mhRatePhase(MIST_BASE, p.phase, 0, 0, MIST_KV, p.voiceInt, 0, 0);
-            naive = MIST_BASE * (1 + MIST_KV * lv.voice) * p.phase;
+            // the host's own clamped-energy integral, against murmur's instantaneous energy times the phase
+            integ = MIST_BASE * (p.phase + MIST_KE * p.tempestEnergyInt);
+            naive = MIST_BASE * (1 + MIST_KE * T_ENERGY(lv.pace, si === 2 ? 1 : 0, stn.drive)) * p.phase;
         }
         if (pI !== null) { wI = Math.max(wI, Math.abs(integ - pI)); wN = Math.max(wN, Math.abs(naive - pN)); }
         pI = integ; pN = naive;
@@ -134,7 +146,7 @@ sec("1. *** MULTIPLYING THE WHOLE DRIFT AND INTEGRATING THE SECULAR HALF ARE THE
 }
 
 // =============================================================================================================
-sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: SIX AND TWENTY-NINE RADIANS IN A SINGLE 16.7 ms FRAME ***");
+sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: NINE AND THIRTY RADIANS IN A SINGLE 16.7 ms FRAME ***");
 {
     const SESSIONS = [5, 30, 60, 300, 1800];
     for (const kind of ["mist", "helix"]) {
@@ -150,12 +162,12 @@ sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: SIX AND TWENTY-NINE RADIANS IN 
         // ramp ends in fixes the tempo. mh_live's own conditioning is what caps the signal -- IDLE's voice
         // weight is 0.55 and only LISTENING opens it to 1.00 -- so the sup is read out of mh_live rather than
         // assumed to be 1, which is the difference between a bound that is reached and a bound that is slack.
-        const endState = kind === "helix" ? "responding" : "idle";
+        const endState = kind === "helix" ? "responding" : "thinking";
         const si = STATE_INDEX[endState], speed = STATES[endState].speed;
         const sup = K.mhLive(1, 1, si), supDrive = K.mhState(si, 999).drive;
         const cap = kind === "helix"
             ? HELIX_BASE * (1 + HELIX_KP * sup.pace + HELIX_KD * supDrive) * speed * DT
-            : MIST_BASE * (1 + MIST_KV * sup.voice) * speed * DT;
+            : MIST_BASE * (1 + MIST_KE * T_ENERGY(sup.pace, 1, supDrive)) * speed * DT;
         const worstInt = Math.max(...rows.map((r) => r.wI));
         const flat = worstInt - Math.min(...rows.map((r) => r.wI));
         ok(`!! *** ${kind}'s INTEGRATED CLOCK IS BOUNDED BY base * (1 + k*sup) * speed * dt AT EVERY SESSION LENGTH ***`,
@@ -180,58 +192,55 @@ sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: SIX AND TWENTY-NINE RADIANS IN 
 }
 
 // =============================================================================================================
-sec("3. *** THE FACTORING NEEDS tempest's CLAMP TO BE INERT, AND THE MARGIN IS READ OUT OF THE SOURCE ***");
+sec("3. *** tempest's ENERGY IS INTEGRATED AS ONE CLAMPED SIGNAL, AND THE CLAMP'S NUMBERS ARE READ OUT OF BOTH HALVES ***");
 {
-    // mist's factor is 1 + 0.95*energy + 0.35*VOICE with energy = clamp(0.85*VOICE, lo, hi). The repair folds
-    // 0.95*0.85 + 0.35 into ONE voice coefficient and sends one integral, which is only the same function if
-    // the clamp never bites -- a clamp that bit would make the integral of `energy` something other than 0.85
-    // times the integral of VOICE and this whole factoring would quietly stop being exact.
+    // v4830 REPLACED THIS SECTION'S SUBJECT. It used to prove that clamp(0.85 * VOICE) never bit, which is what
+    // let the shader fold tempest's energy into a single voice coefficient. tempest.ts never read voice: its
+    // energy is clamp(0.85*pace + 0.65*thinking + 0.55*drive, 0, 1.6). So the host now integrates THAT, clamp
+    // and all (tempestEnergyInt), and the shader spends it as mistBase * (t + 0.95 * tempestEnergyInt). Folding
+    // is gone, so nothing depends on the clamp being inert -- the row measures whether it is anyway, because
+    // the answer says whether this is a clamp murmur needs or one its state windows already make redundant.
     //
-    // BOTH NUMBERS COME OUT OF THE SHADER SOURCE. Restating 0.85 and 1.6 here would make this row a comment:
-    // change either in aiPresenceOrbTsl.mjs and this recomputes instead of agreeing with itself.
-    // `species === ""` and not `species === "tempest"` because codeOnly BLANKS string literals as well as
-    // stripping comments -- a needle that names a species has to read the raw file instead, and this one does
-    // not need to: it is after the three numbers, and the empty pair of quotes is what the ternary looks like
-    // once the scanner has been through it.
+    // BOTH SIDES ARE READ. The shader's expression and the host's must name the same four MH_MIST_LIVE fields;
+    // a host that integrated 0.85*pace while the shader drew 0.85*voice would pass every pixel row in section 5
+    // that holds the signals still. `species === ""` because codeOnly blanks string literals.
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
-    const m = /const energy = species === "" \? clamp\(VOICE\.mul\(([\d.]+)\), ([\d.-]+), ([\d.]+)\)/.exec(src);
-    ok("!! the clamp's own three numbers are still where this row thinks they are", !!m,
-        m ? `read gain ${m[1]}, floor ${m[2]}, ceiling ${m[3]} straight out of the shader source.` :
-            `could not find tempest's energy clamp in render/aiPresenceOrbTsl.mjs -- if the expression moved, ` +
-            `this row has to move with it rather than pass on a stale reading.`);
-    if (m) {
-        const gain = Number(m[1]), lo = Number(m[2]), hi = Number(m[3]);
-        // The sup of mh_live's voice over its ENTIRE domain, including levels outside [0,1] -- the function
-        // clamps its own input in both halves, so a caller cannot push it past 1 either.
-        let supV = 0, infV = 1;
-        for (const lvl of [-5, -1, -1e-9, 0, 0.001, 0.25, 0.5, 0.75, 0.999, 1, 1 + 1e-9, 2, 100]) {
-            for (const si of [0, 1, 2, 3, 4, 5]) {
-                const v = K.mhLive(lvl, 0.5, si).voice;
-                supV = Math.max(supV, v); infV = Math.min(infV, v);
-            }
-        }
-        ok("!! *** THE CLAMP CANNOT BITE AT EITHER END: 0.85 x sup(voice) = 0.85 against a ceiling of 1.6 ***",
-            gain * supV < hi && infV >= lo && supV <= 1 + 1e-12 && hi / (gain * supV) > 1.5,
-            `mh_live's voice output over 78 points of its full domain -- levels from -5 to 100, every state ` +
-            `index -- runs [${infV.toFixed(4)}, ${supV.toFixed(4)}], because the function clamps its own ` +
-            `level to [0,1] in BOTH halves of the kit and its heaviest state weight is 1.00. So energy tops ` +
-            `out at ${gain} x ${supV.toFixed(4)} = ${(gain * supV).toFixed(4)} against a ceiling of ${hi}, a ` +
-            `margin of ${(hi / (gain * supV)).toFixed(2)}x, and bottoms at ${(gain * infV).toFixed(4)} ` +
-            `against a floor of ${lo}. THIS IS WHY THE TWO COEFFICIENTS COULD BE FOLDED INTO ONE: 0.95*${gain} ` +
-            `+ 0.35 = ${(0.95 * gain + 0.35).toFixed(4)} is the voice coefficient of the WHOLE factor only ` +
-            `while energy is a linear function of voice, and the clamp is the one thing that could make it ` +
-            `not be. Measured, because "it probably never gets that loud" is not an argument about a bound.`);
+    const host = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8"));
+    const shaderE = /const energy = species === ""\s*\?\s*clamp\(PACE\.mul\(MT\.ePace\)\.add\(THINK\.mul\(MT\.eThink\)\)\.add\(DRIVE\.mul\(MT\.eDrive\)\), 0\.0, MT\.eCap\)/.test(src);
+    const hostE = /tempestEnergyInt \+= Math\.min\(ME\.eCap, Math\.max\(0, ME\.ePace \* lv\.pace \+ ME\.eThink \* \(cur === "" \? 1 : 0\)\s*\+ ME\.eDrive \* stn\.drive\)\) \* dPhase/.test(host);
+    const ML = K.MH_MIST_LIVE.tempest;
+    ok("!! *** THE SHADER AND THE HOST SPELL THE SAME CLAMPED ENERGY, OUT OF THE SAME TABLE, AND THE TABLE IS tempest.ts's ***",
+        shaderE && hostE && ML.ePace === 0.85 && ML.eThink === 0.65 && ML.eDrive === 0.55 && ML.eCap === 1.6 && ML.drE === 0.95,
+        `shader clamp(PACE*ePace + THINK*eThink + DRIVE*eDrive, 0, eCap) ${shaderE ? "found" : "NOT FOUND"}; ` +
+        `host min(eCap, max(0, ePace*pace + eThink*thinking + eDrive*drive)) * dPhase ${hostE ? "found" : "NOT FOUND"}; ` +
+        `MH_MIST_LIVE.tempest = ${ML.ePace}/${ML.eThink}/${ML.eDrive}, cap ${ML.eCap}, drift gain ${ML.drE} -- ` +
+        `tempest.ts:54 and its drift line, written here as literals so the table is checked against them.`);
 
-        // ...and the folded coefficient in the shader IS that number, for tempest and for nebula alike.
-        const folded = /const mistKV = \(species === "" \? 0\.85 \* 0\.95 : 0\) \+ 0\.35;/.test(src);
-        ok("!! ...and nebula gets 0.35 while tempest gets 1.1575, because nebula's energy is the constant zero",
-            folded && Math.abs((0.95 * gain + 0.35) - 1.1575) < 1e-12,
-            `the shader folds the coefficient at BUILD time with the same ternary that decides whether energy ` +
-            `exists at all, so the two species get ${(0.95 * gain + 0.35).toFixed(4)} and 0.3500. Folding it ` +
-            `unconditionally would have given nebula a voice term murmur does not give it -- nebula.ts has no ` +
-            `energy at all, and 0.95 times a constant zero is a term that should not appear rather than a ` +
-            `term that evaluates to nothing.`);
+    // The sup over the whole domain: every state, levels far outside [0,1], tau from 0 to a minute.
+    let sup = 0, at = "";
+    for (const si of [0, 1, 2, 3, 4, 5]) for (const lvl of [-5, 0, 0.5, 1, 2, 100]) for (const tau of [0, 0.25, 0.5, 2, 60]) {
+        const e = 0.85 * K.mhLive(lvl, lvl, si).pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * K.mhState(si, tau).drive;
+        if (e > sup) { sup = e; at = `state ${si}`; }
     }
+    ok("!! *** THE CLAMP DOES NOT BITE: THINKING AND RESPONDING ARE DIFFERENT WINDOWS, SO 0.65 AND 0.55 NEVER ADD ***",
+        sup < ML.eCap && sup > 1.45 && at === "state 2",
+        `energy's sup is ${sup.toFixed(4)} (in ${at}, THINKING: full cadence 0.85 plus the 0.65 window) against ` +
+        `the cap ${ML.eCap}. The three terms sum to 2.05 on paper, but mh_state's drive ramps only in RESPONDING ` +
+        `and THINKING is its own state, so the two never coexist and the cap has a ${(ML.eCap / sup).toFixed(3)}x ` +
+        `margin. The host integrates the CLAMPED value regardless, so the integral stays exact the day a state ` +
+        `that overlaps them arrives -- the old fold would not have.`);
+
+    // ...and each species' drift reads ITS OWN secular half. nebula: ratePhase on its three coefficients, the
+    // same three its wobble factor carries; tempest: the energy integral at drE, the same drE its factor carries.
+    const drift = /species === ""\s*\?\s*mistBase\.mul\(uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.drE\)\)\)\s*:\s*ratePhase\(mistBase, MN\.drPace, MN\.drVoice, MN\.drDrive\)/.test(src);
+    const factor = /species === ""\s*\?\s*float\(1\.0\)\.add\(energy\.mul\(MT\.drE\)\)\s*:\s*float\(1\.0\)\.add\(PACE\.mul\(MN\.drPace\)\)\.add\(VOICE\.mul\(MN\.drVoice\)\)\.add\(DRIVE\.mul\(MN\.drDrive\)\)/.test(src);
+    const MN = K.MH_MIST_LIVE.nebula;
+    ok("!! ...and nebula's drift carries ITS three terms on both halves while tempest's carries the energy alone",
+        drift && factor && MN.drPace === 0.65 && MN.drVoice === 0.35 && MN.drDrive === 0.90,
+        `secular ${drift ? "found" : "NOT FOUND"}, wobble factor ${factor ? "found" : "NOT FOUND"}: nebula ` +
+        `${MN.drPace}*pace + ${MN.drVoice}*voice + ${MN.drDrive}*drive on both, tempest ${ML.drE}*energy on both. ` +
+        `Until v4830 the shader gave BOTH species nebula's 0.35 voice term and tempest a voice-only energy, and ` +
+        `nebula no pace or drive at all.`);
 }
 
 // =============================================================================================================
@@ -278,17 +287,36 @@ sec("4. *** helix's CLIMB: TWO OF murmur's NUMBERS THAT WERE NOT ABSENT BY DESIG
         //                            the finished phase rather than living in a coefficient.
         // The first draft of this row knew only the first shape and went red on aura -- a correct subject,
         // which is the tell. Both spellings are here because both are in the file and both are right.
+        // v4830 adds two more shapes, both in the file and both right:
+        //   PER-SPECIES BRANCHES -- a ternary whose two arms are each one of the honest forms: mist's, where
+        //                           nebula takes ratePhase on its coefficients and tempest takes its base times
+        //                           (t + drE * the integrated energy).
+        //   SPLIT                -- spinPhase's wobbles, handed a ZERO secular because the helper sums its own
+        //                           secular phase beside them out of the SAME kp/kd its `sp` carries; the row
+        //                           checks that sum and that factor separately, just below.
         const mm = /^([A-Za-z_]\w*)\.mul\(([\s\S]*)\)$/.exec(args[1] || "");
         if (mm) {
-            const viaCoeff = new RegExp("^KIT\\.mhRatePhase\\(\\s*" + mm[1] + "\\s*,").test(args[0] || "");
-            const viaPhase = new RegExp("\\.mul\\(\\s*" + mm[2].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\)$").test(args[0] || "");
-            pairs.push({ base: mm[1], how: viaCoeff ? "coefficients" : viaPhase ? "whole phase" : "NEITHER", ok: viaCoeff || viaPhase });
+            const coeff = (a) => new RegExp("^(?:KIT\\.mhRatePhase|ratePhase)\\(\\s*" + mm[1] + "\\s*,").test(a);
+            const integ = (a) => new RegExp("^" + mm[1] + "\\.mul\\(uniforms\\.time\\.add\\(uniforms\\.\\w+Int\\.").test(a);
+            const a0 = args[0] || "";
+            const viaCoeff = coeff(a0);
+            const viaPhase = new RegExp("\\.mul\\(\\s*" + mm[2].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\)$").test(a0);
+            const tern = /^species === ""\s*\?\s*([\s\S]*?)\s*:\s*([\s\S]*)$/.exec(a0);
+            const viaBranch = !!tern && [tern[1], tern[2]].every((b) => coeff(b) || integ(b));
+            const viaSplit = a0 === "float(0.0)" && mm[1] === "sp";
+            const how = viaCoeff ? "coefficients" : viaPhase ? "whole phase" : viaBranch ? "branches" : viaSplit ? "split" : "NEITHER";
+            pairs.push({ base: mm[1], how, ok: how !== "NEITHER" });
         }
     }
     say(`drift sites whose wobble amplitude is a scaled base: ${pairs.map((x) => x.base + " (" + x.how + ")").join(", ")}`);
-    ok("!! *** EVERY SCALED SITE CARRIES ITS FACTOR ON BOTH HALVES -- travel and shimmer agree, four of four ***",
-        pairs.length === 4 && pairs.every((x) => x.ok) && pairs.filter((x) => x.how === "coefficients").length === 3,
-        `four sites in the file hand mhDriftPhase a wobble amplitude of the form \`X.mul(F)\`, and all four ` +
+    // the split sites' other half: spinPhase's secular sum and its instantaneous factor, on the same kp and kd
+    const splitSum = /const secular = uniforms\.time\.mul\(A\)\.add\(uniforms\.paceInt\.mul\(A \* kp\)\)\.add\(uniforms\.driveInt\.mul\(A \* kd \+ B\)\)/.test(src) &&
+        /const sp = float\(1\.0\)\.add\(PACE\.mul\(kp\)\)\.add\(DRIVE\.mul\(kd\)\)/.test(src);
+    const n = (h) => pairs.filter((x) => x.how === h).length;
+    ok("!! *** EVERY SCALED SITE CARRIES ITS FACTOR ON BOTH HALVES -- travel and shimmer agree, six of six ***",
+        pairs.length === 6 && pairs.every((x) => x.ok) && n("coefficients") === 2 && n("whole phase") === 1 &&
+        n("branches") === 1 && n("split") === 2 && splitSum,
+        `six sites in the file hand mhDriftPhase a wobble amplitude of the form \`X.mul(F)\`, and all six ` +
         `carry F on the secular half as well: ${pairs.map((x) => x.base + " via " + x.how).join(", ")}. ` +
         `murmur wrote ONE product and the repair writes TWO arguments, so there is now a way to get the ` +
         `travel right and the shimmer wrong that did not exist before this round -- passing the unscaled ` +
@@ -314,9 +342,10 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
     // those, so under murmur's spelling every one of these pairs would be byte-identical. What moves is the
     // accumulated history, which is the mechanism this round added and nothing else in the file can supply.
     const FR = [];
-    const base = { stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0 };
+    // v4830: tempest's cloud runs on tempestEnergyInt, the host's integral of its clamped energy -- see section 3
+    const base = { stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, tempestEnergyInt: 0 };
     FR.push(sp("tempest", 12.0, 0.6, { ...base }));
-    FR.push(sp("tempest", 12.0, 0.6, { ...base, voiceInt: 14.0 }));
+    FR.push(sp("tempest", 12.0, 0.6, { ...base, tempestEnergyInt: 14.0 }));
     FR.push(sp("helix", 12.0, 0.6, { ...base }));
     FR.push(sp("helix", 12.0, 0.6, { ...base, driveInt: 14.0 }));
     FR.push(sp("helix", 12.0, 0.6, { ...base, paceInt: 9.0 }));
@@ -332,6 +361,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
     FR.push(sp("flux", 12.0, 0.6, { ...base, paceInt: 14.0 }));
     FR.push(sp("flux", 12.0, 0.6, { ...base, voiceInt: 14.0 }));
     FR.push(sp("flux", 12.0, 0.6, { ...base, driveInt: 14.0 }));
+    FR.push(sp("tempest", 12.0, 0.6, { ...base, voiceInt: 14.0 }));   // [12] v4830: the integral tempest LOST
     const run = await renderSpecies(FR);
     if (!run.ok || !run.frames || run.frames.length !== FR.length) {
         ok("!! the output-multiplied clocks render at all", false,
@@ -344,15 +374,15 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         const tV = diff(run.frames[0], run.frames[1]);
         const hD = diff(run.frames[2], run.frames[3]);
         const hP = diff(run.frames[2], run.frames[4]);
-        say(`tempest voiceInt 0 -> 14: ${tV.pct.toFixed(1)}% of bytes move, worst channel ${tV.mx}`);
+        say(`tempest tempestEnergyInt 0 -> 14: ${tV.pct.toFixed(1)}% of bytes move, worst channel ${tV.mx}`);
         const fP = diff(run.frames[8], run.frames[9]);
         say(`helix   driveInt 0 -> 14: ${hD.pct.toFixed(1)}%, worst ${hD.mx}   |   helix paceInt 0 -> 9: ${hP.pct.toFixed(1)}%, worst ${hP.mx}`);
         say(`flux    paceInt  0 -> 14: ${fP.pct.toFixed(1)}% of bytes move, worst channel ${fP.mx}`);
-        ok("!! *** THE CLOUD MOVES ON voiceInt, THE STREAM ON paceInt AND THE STRANDS ON BOTH OF helix's -- WITH EVERY INSTANTANEOUS SIGNAL FIXED ***",
+        ok("!! *** THE CLOUD MOVES ON ITS ENERGY INTEGRAL, THE STREAM ON paceInt AND THE STRANDS ON BOTH OF helix's -- WITH EVERY INSTANTANEOUS SIGNAL FIXED ***",
             tV.pct > 5 && tV.mx > 50 && hD.pct > 5 && hD.mx > 50 && hP.pct > 5 && hP.mx > 50 &&
             fP.pct > 5 && fP.mx > 50,
-            `fourteen radian-seconds of accumulated voice -- what about a half-minute of somebody talking ` +
-            `produces -- moves ${tV.pct.toFixed(1)}% of tempest's bytes, worst channel ${tV.mx} of 255. ` +
+            `fourteen radian-seconds of accumulated energy -- about ten seconds of thinking at full cadence ` +
+            `-- moves ${tV.pct.toFixed(1)}% of tempest's bytes, worst channel ${tV.mx} of 255. ` +
             `helix's strands move ${hD.pct.toFixed(1)}% on the drive integral and ${hP.pct.toFixed(1)}% on ` +
             `the pace integral, and BOTH HAD TO BE MEASURED SEPARATELY: a climb wired to one of murmur's two ` +
             `coefficients and not the other passes a row that sweeps them together. flux's stream moves ` +
@@ -368,17 +398,22 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         // it, and that is a thing a frame can show. It is also the row that catches the easiest wrong repair
         // there is: folding all three integrals into one accumulated "activity" and sending it everywhere.
         const tP = diff(run.frames[0], run.frames[5]), tD = diff(run.frames[0], run.frames[6]);
-        const hV = diff(run.frames[2], run.frames[7]);
+        const hV = diff(run.frames[2], run.frames[7]), tVo = diff(run.frames[0], run.frames[12]);
         const fV = diff(run.frames[8], run.frames[10]), fD = diff(run.frames[8], run.frames[11]);
-        say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest driveInt 0 -> 14: ${tD.pct.toFixed(1)}%   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
+        say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest voiceInt 0 -> 14: ${tVo.pct.toFixed(1)}%   tempest driveInt (its ADVECTION) 0 -> 14: ${tD.pct.toFixed(1)}%   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
         say(`flux    voiceInt 0 -> 14: ${fV.pct.toFixed(1)}%   flux driveInt 0 -> 14: ${fD.pct.toFixed(1)}%`);
+        // driveInt is NOT on the deaf list for tempest any more: v4830 wired murmur's RESPONDING advection,
+        // V * k * driveInt, which streams the whole domain -- a different mechanism from the drift clock, and
+        // it has to move SOMETHING or the wiring is dead. Its own rows are in murmurDrive-selfcheck.
         ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: five sweeps, zero bytes ***",
-            tP.pct === 0 && tD.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0,
-            `the SAME fourteen radian-seconds that move ${tV.pct.toFixed(1)}% of tempest on voiceInt move ` +
-            `${tP.pct.toFixed(0)} bytes on paceInt and ${tD.pct.toFixed(0)} on driveInt, and the same sweep ` +
+            tP.pct === 0 && tVo.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0 && tD.pct > 0,
+            `the SAME fourteen radian-seconds that move ${tV.pct.toFixed(1)}% of tempest on its energy move ` +
+            `${tP.pct.toFixed(0)} bytes on paceInt and ${tVo.pct.toFixed(0)} on voiceInt (tempest.ts's energy ` +
+            `reads cadence, thinking and drive through the ONE clamped integral, never the separate ones), ` +
+            `while driveInt moves ${tD.pct.toFixed(1)}% through the advection alone, and the same sweep ` +
             `that moves ${hD.pct.toFixed(1)}% of helix on driveInt moves ${hV.pct.toFixed(0)} bytes on ` +
             `voiceInt, and flux moves ${fV.pct.toFixed(0)} and ${fD.pct.toFixed(0)} bytes on the two it does ` +
-            `not read. nebula.ts and tempest.ts scale their drift by voice alone; flux.ts scales its stream ` +
+            `not read. tempest.ts scales its drift by its clamped energy alone; flux.ts scales its stream ` +
             `by pace alone; helix.ts scales its climb by pace and drive alone. THE POSITIVE ROWS ABOVE ` +
             `CANNOT TELL THE DIFFERENCE between three wires ` +
             `and one bus -- this one can, and it is the reason the three integrals were kept as three ` +
@@ -395,10 +430,9 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "argument and these three are built the other way round. The repair puts the signal integrals in the " +
     "secular term and leaves the wobble amplitude reading the instantaneous factor, which is exactly what " +
     "murmur's product expands to." +
-    "\nWHAT IS NOT CLAIMED: the two sites that spell a bare rate * t (opal's flash drift, geode's mix " +
-    "target), the two flourish SLOT divisors (still, abyss) where a changing slot re-indexes which gesture " +
-    "plays rather than advancing a phase, duet's rate (it reads the shader's own flourish, which no host has " +
-    "an integral of), and limn's drive FACTOR (its rate is a product, so the factoring would need the " +
-    "integral of pace*drive and voice*drive rather than of each signal). Each is recorded against the " +
-    "st.drive entry in tools/ship/nextRounds.mjs.");
+    "\nWHAT IS NOT CLAIMED: nebula's drift in pixels -- its three coefficients are checked in the source " +
+    "(section 3) but a fourth species compile would put this gate over its budget, so no frame here moves " +
+    "nebula on paceInt or driveInt. opal's flash drift, geode's and fathom's spins and duet's rate are on " +
+    "the integrated clock as well since v4830 (and v4657 for duet); their rows live in murmurClock-selfcheck " +
+    "and murmurDrive-selfcheck, not here.");
 process.exit(fails ? 1 : 0);
