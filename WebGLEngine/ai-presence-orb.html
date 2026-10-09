@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SweK -- AI-presence orb (murmur-web port, "still" species)</title>
+<title>SweK -- AI-presence orb (murmur-web port, eighteen species)</title>
 <style>
   html, body { margin: 0; height: 100%; background: #050608; color: #d7e0d9; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
   #stage { display: block; width: 100vw; height: 100vh; }
@@ -14,6 +14,13 @@
   #liveRow input[type=range] { width: 100px; vertical-align: middle; }
   a { color: #9fe0b8; }
   code { color: #7fb0a0; }
+  select { background: #10151a; color: #9fe0b8; border: 1px solid #2a3a30; border-radius: 3px; padding: 3px 6px; font: inherit; }
+  /* v4827 -- embed=1 is the avatar panel's frame: the orb and the species picker, nothing else */
+  body.embed #hud { display: none; }
+  #speciesFloat { display: none; position: fixed; left: 6px; top: 6px; z-index: 2; opacity: 0.55; }
+  body.embed #speciesFloat { display: block; }
+  #speciesFloat:hover, #speciesFloat:focus-within { opacity: 1; }
+  #speciesFloat select { font-size: 11px; padding: 1px 3px; }
 </style>
 </head>
 <body>
@@ -24,16 +31,20 @@
   (render/aiPresenceOrbTsl.mjs) plus a pure-JS state machine (render/aiPresenceOrbState.mjs), the same
   "port the design, hold the render/verification to this tree's own conventions" shape
   render/swiftShaderPass.js used for this SAME author's other repo. Scope, named plainly: murmur-web has
-  18 material "species"; this page shows exactly one, "still" -- described in its own source as
-  "the minimal hero: a quiet glass sphere, one slow internal glint". render/aiPresenceOrbPresent.mjs is
+  18 material "species"; this page showed exactly one, "still" -- described in its own source as
+  "the minimal hero: a quiet glass sphere, one slow internal glint" -- until v4827, which gave it a species
+  picker (default still) and an embed=1 mode for server.html's avatar panel. render/aiPresenceOrbPresent.mjs is
   the HDR present pass (exposure/bloom/the "house knee" tone curve/dither), a second pass sampling the
   scene's own linear HDR render target -- murmur-web's own present.wgsl, hand-ported the same way.
   tools/ship/aiPresenceOrb-selfcheck.mjs and tools/ship/aiPresenceOrbPresent-selfcheck.mjs are the
   permanent gates (hand-proven envelope/colour math, a real WebGL2 render, a real sabotage, each).
 -->
 <canvas id="stage"></canvas>
+<div id="speciesFloat" title="Which of murmur's eighteen orb species to draw"><select id="speciesPickEmbed" aria-label="orb species"></select></div>
 <div id="hud">
   <div class="row"><b>SweK AI-presence orb</b> &mdash; <span id="route">starting&hellip;</span></div>
+  <div class="row">species: <select id="speciesPick" aria-label="orb species"></select>
+    <span style="color:#7c9385">(murmur's eighteen; each is its own compiled shader, so changing it reloads the page)</span></div>
   <div class="row">state: <b id="stateLabel">idle</b> &middot; glow=<span id="glowLabel">-</span> speed=<span id="speedLabel">-</span></div>
   <div class="row" id="stateButtons"></div>
   <div class="row" id="liveRow">
@@ -55,10 +66,28 @@ import * as THREE from "./vendor/three-webgpu/three.webgpu.js";
 import * as TSL from "./vendor/three-webgpu/three.tsl.js";
 import { makeAiPresenceOrbHdrPipeline } from "./render/aiPresenceOrbPresent.mjs";
 import { createPresenceState, STATE_NAMES, STATE_INDEX } from "./render/aiPresenceOrbState.mjs";
+import { ORB_SPECIES } from "./render/aiPresenceOrbTsl.mjs";
 
 const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
 const cv = document.getElementById("stage");
 const params = new URLSearchParams(location.search);
+// v4827 -- THE SPECIES: ?species= first, then this browser's last choice, then "still". A name that is not one
+// of the eighteen is refused here rather than handed to the builder, which throws on it. Changing it reloads,
+// because each species is its own compiled shader and a reload is the one teardown that cannot leak a pipeline.
+const SPECIES_KEY = "swek.orbSpecies";
+const stored = (() => { try { return localStorage.getItem(SPECIES_KEY); } catch { return null; } })();
+const species = [params.get("species"), stored, "still"].find((s) => ORB_SPECIES.includes(s));
+if (params.get("embed") === "1") document.body.classList.add("embed");
+for (const id of ["speciesPick", "speciesPickEmbed"]) {
+    const sel = document.getElementById(id);
+    for (const s of ORB_SPECIES) { const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o); }
+    sel.value = species;
+    sel.addEventListener("change", () => {
+        try { localStorage.setItem(SPECIES_KEY, sel.value); } catch {}
+        const q = new URLSearchParams(location.search); q.set("species", sel.value);
+        location.replace(location.pathname + "?" + q.toString());
+    });
+}
 function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
 size();
 
@@ -74,7 +103,7 @@ try {
 } catch (e) { say("WebGPURenderer could not start: " + e.message, true); throw e; }
 const backend = renderer.backend.isWebGPUBackend ? "WebGPU (WGSL from the TSL graph)" : "WebGL2 backend (GLSL from the TSL graph)";
 
-const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, {});
+const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, { species });
 const state = createPresenceState("idle");
 
 const stateButtons = document.getElementById("stateButtons");
@@ -101,7 +130,7 @@ window.addEventListener("engine:voiceReply", () => state.setState("responding"))
 const voiceSlider = document.getElementById("voice"), activitySlider = document.getElementById("activity");
 const stateLabel = document.getElementById("stateLabel"), glowLabel = document.getElementById("glowLabel"), speedLabel = document.getElementById("speedLabel");
 
-say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "still" orb as TSL nodes, HDR present pass (bloom/knee tonemap/dither)`);
+say(`three ${THREE.REVISION} &middot; ${backend} &middot; murmur-web's "${species}" orb as TSL nodes, HDR present pass (bloom/knee tonemap/dither)`);
 let last = performance.now();   // no t0: the clock is state.phase, which starts at 0 of its own accord
 function frame(now) {
     // *** MEASURED, NOT ASSUMED SAFE: THE VERY FIRST rAF CALLBACK'S timestamp CAN PRECEDE THE performance.now()

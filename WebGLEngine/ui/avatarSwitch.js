@@ -50,6 +50,13 @@ export const MODES = [
       src: "/avatarstage.html?voice=M1&glb=RobotExpressive&camdock=1&embed=1&pet=0&saver=0", frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
     { id: "blob", label: "\ud83e\udee7", title: "Blobulator avatar — Avataro / Avatarina, the reactive metaball avatar", kind: "frame",
       src: "/blob-avatar.html?embed=1" },
+    // v4827 -- Keith: "Are we able to place murmur on server.html as the avatar choice after blob avatar?" ...
+    // "Add it with a species dropdown, default still". The orb page draws any of murmur's eighteen species and
+    // carries its own picker in embed mode; the choice persists in this browser. It reacts to the same
+    // engine:wakeState / voiceTranscript / voiceReply events the voice layer already fires. WebGPU with a
+    // WebGL2 fallback inside the page, so unlike blobgpu it needs no needsWebGPU gate.
+    { id: "orb", label: "\ud83d\udd2e", title: "AI presence orb \u2014 murmur's eighteen orb species (picker in the panel, default still), reacting to voice state", kind: "frame",
+      src: "/ai-presence-orb.html?embed=1" },
     // v3556 -- the two heavy ones, added last on purpose. Each carries a `heavy` note so the button can say what
     // it is about to cost BEFORE the click, rather than after the download starts.
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",

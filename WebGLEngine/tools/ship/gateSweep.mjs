@@ -8868,6 +8868,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
+    // v4824 -- ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
+    since516: Object.freeze({
+        at: "v4824", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "ui/pick-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/navmesh-selfcheck.mjs (section 9: the owner-grid adjacency against an all-pairs reference)",
+            "tools/ship/dungeonAI-selfcheck.mjs (section 5b: the aggro gate as AGGRO_MACHINE)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, about 0.2 s. ui/pick.mjs's pickMin/pickMax keep the three properties every hand-written target scan had -- " +
+                 "strict comparison so the first of a tie wins, an exclusive bound that is the starting best, one key call per item " +
+                 "in order -- held by the contract, a 3,000-list differential against the loop itself, KaijuRivalry's site end to " +
+                 "end through exact distance ties, and a source census of the eight migrated scans. Four sabotages red.",
+    }),
     // v4820 -- NO new gate file -- declaredCost's ratchet held on a machine with no readings of its own (the rig's clone read 2).
     since515: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.

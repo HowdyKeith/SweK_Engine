@@ -98,8 +98,8 @@ const say = (m) => console.log("  ----  " + m);
     ok("!! the tail is stage3d -> gauges3000 -> blobgpu, the order that was asked for",
         MODES.slice(-3).map((m) => m.id).join(",") === "stage3d,gauges3000,blobgpu",
         MODES.slice(-3).map((m) => m.id).join(" -> "));
-    ok("the cycle still wraps with twelve modes",
-        MODES.length === 12 && nextMode(MODES[MODES.length - 1].id) === MODES[0].id,
+    ok("the cycle still wraps with thirteen modes (v4827 added the presence orb after blob)",
+        MODES.length === 13 && nextMode(MODES[MODES.length - 1].id) === MODES[0].id,
         MODES.length + " modes, last -> " + nextMode(MODES[MODES.length - 1].id));
     // *** AND THE STAGE MODE IS THE ONLY ONE ASKING FOR A PET, which is what stops a later edit from turning
     // the llama on in the compact rigged slots that were never meant to have it.
