@@ -24,6 +24,15 @@
 // thing that differs between those two frames is `settled`, 0.7258 -> 0.9873. That is an ISOLATED settle in
 // pixels, which nothing in this tree had before.
 //
+// *** v4826 -- AND v4826 TOOK comet TOO, BECAUSE murmur NEVER HAD A SPECIES WITHOUT A FLASH. *** comet.ts:111
+// carries (1 + 2.2 * st.complete) on its head; it was "the last control" only because the port had not
+// transcribed it. With the singles in, NO species is settle-only, so the control is no longer a species: it is
+// a PAIR OF FRAMES OF THE SAME SPECIES IN THE SAME STATE, SUCCESS at tau 0 and at tau 1.40, where mh_state's
+// complete is exactly 0 in both and settled goes 0 -> 0.9873. sweep goes 0 -> 1 between them too, and is inert
+// there because every comet read of SWEEP is under complete > 0.001 -- which was NOT true until this round: the
+// port's trail fill ran unguarded and stayed on after the breath ended. Section 4 holds both facts.
+// SABOTAGED: comet's guard put back to the bare SWEEP -> RED, section 4's settle-alone row, by name; restored.
+//
 // still has the shared shell; comet has no MH_IGNITE entry at all; and both have a settle. So the two frames sets differ in exactly the thing under test. Every brightness
 // row here has a travel row beside it and the travel rows are the claim: a port that multiplied the whole
 // interior by (1 + k * complete) and drew no ring would pass every brightness bound in this file and fail
@@ -72,6 +81,10 @@ for (const s of ["still", "comet"]) {
 // species where the settle can be weighed on its own rather than inferred from a tau past the flash.
 const SETTLE_PAIR_TAU = 0.95;
 FRAMES.push(sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: SETTLE_PAIR_TAU }));
+// v4826 -- the control pair's other end, and a frame long after it: SUCCESS at tau 0 (complete, settled and sweep
+// all exactly 0) and at tau 2.0 (complete 0, settled at its ceiling) -- see the header.
+FRAMES.push(sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 0 }));
+FRAMES.push(sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 2.0 }));
 // The quiet-state frames: a stateTau well inside SUCCESS's window, in two states that have no SUCCESS --
 // and EACH STATE IS HELD AGAINST ITSELF at tau 0, which is not a nicety. Holding a quiet state against the
 // IDLE frame instead confounds mh_state with mh_live: the sibling gate's first cut did exactly that and read
@@ -117,6 +130,8 @@ const M = [0, 1].map((si) => {
     return { base, self: flash(base, null), taus: TAUS.map((t, ti) => flash(at(si, ti), base)) };
 });
 const [ST, CO] = M;
+// v4826 -- the control pair's frames: comet in SUCCESS at tau 0 and at tau 2.0 (see the header)
+const S0 = run.frames[FRAMES.length - 5], S2 = run.frames[FRAMES.length - 4];
 const pct = (m, s) => 100 * m.sum / s.self.sum;
 
 // =============================================================================================================
@@ -128,16 +143,18 @@ sec("1. *** THE FLASH REACHES PIXELS AT ALL -- and the species with no shell say
         TAUS.map((t, i) => `tau ${t} ${pct(CO.taus[i], CO).toFixed(1)}%`).join(", "));
 
     const peak = Math.max(...ST.taus.map((m) => pct(m, ST)));
+    // v4826: the second half was "comet adds under 5%", and comet now flashes its head as murmur does. The half
+    // that excludes a shader brightening everything regardless of state is now the OPENING INSTANT of SUCCESS,
+    // where mh_state is four zeros: it must add exactly nothing, byte for byte, to a species that flashes.
+    let d0 = 0; for (let i = 0; i < S0.length; i++) if (S0[i] !== CO.base[i]) d0++;
     ok("!! *** SUCCESS PUTS LIGHT ON THE SCREEN: still's flash more than TRIPLES the light in its own frame ***",
-        peak > 250 && pct(CO.taus[0], CO) < 5,
-        `at its brightest still adds ${peak.toFixed(1)}% of its whole idle frame's linear light, while comet -- ` +
-        `which has no MH_IGNITE entry and no complete term anywhere -- adds ${pct(CO.taus[0], CO).toFixed(2)}% ` +
-        `at the same early tau. BOTH HALVES: the first alone would be passed by a port that brightened every ` +
-        `species and the second alone by one that drew nothing anywhere. THE SECOND BOUND IS 5% AND NOT THE ` +
-        `0.5% geode HELD TO: comet's early reading is not zero and must not be asserted to be, because its ` +
-        `sweep has already begun to fill the orbit behind the head at tau 0.20 -- that is comet's own figure ` +
-        `doing what section 3 of tools/ship/murmurIgniteFour-selfcheck.mjs says it does, and a bound tight ` +
-        `enough to exclude it would be a bound that denies the species.`);
+        peak > 250 && d0 === 0,
+        `at its brightest still adds ${peak.toFixed(1)}% of its whole idle frame's linear light, and comet at the ` +
+        `OPENING INSTANT of the same state differs from its idle frame in ${d0} bytes. BOTH HALVES: the first ` +
+        `alone would be passed by a port that brightened every species whatever the state said, and the second ` +
+        `alone by one that drew nothing anywhere. (Until v4826 the second half was comet adding under 5% at ` +
+        `tau 0.20, true only while comet's head flash was untranscribed; it adds ${pct(CO.taus[0], CO).toFixed(1)}% ` +
+        `there now, as comet.ts says it should.)`);
 
     // *** THE ROW THAT STOPS THIS GATE PASSING ON A SHADER THAT IGNORES THE STATE ENTIRELY. *** mh_state
     // returns four zeros in three of murmur's five states, so a swept stateTau outside SUCCESS must change
@@ -182,15 +199,18 @@ sec("2. *** WHERE THE LIGHT IS, AND WHETHER IT MOVES: the whole difference betwe
     // outright. The ratio bound is 3x rather than geode's old 4x because it is comet's number and not
     // geode's: 65.3% over 20.6%, measured, and a bound set above a measurement is a bound that has to be
     // walked back the first time somebody runs it.
-    const coMove = Math.max(...coC.slice(2)) - Math.min(...coC.slice(2));
-    const coGrow = pct(CO.taus[4], CO) / pct(CO.taus[2], CO);
-    ok("!! *** ...AND comet's SETTLE DOES NOT MOVE AT ALL WHILE IT MORE THAN TRIPLES -- a brightening is not a travel ***",
-        coMove < 0.01 && coGrow > 3 && travel[3] - travel[0] > 15 * coMove,
-        `over the last three taus comet's added light grows ${coGrow.toFixed(1)}x and its centroid moves ` +
-        `${coMove.toFixed(4)} -- against still's ${(travel[3] - travel[0]).toFixed(4)}, which is ` +
-        `${((travel[3] - travel[0]) / Math.max(coMove, 1e-6)).toFixed(0)} times as far. comet's fixed value of ` +
-        `${coC[3].toFixed(4)} is its INTERIOR's own centroid, which is what "(1 + k * st.settled) on the ` +
-        `interior" means when it is drawn: the same picture, scaled.`);
+    // v4826: read on the control PAIR (SUCCESS tau 0 -> tau 1.40, complete 0 at both), not across comet's flash
+    // taus, which carry its head now. MEASURED, and the first draft of this row guessed wrong: the settle's light
+    // does NOT sit at comet's whole-frame centroid (the rim and specular pull that outward) but well INSIDE it --
+    // it is the INTERIOR lifted in place, which is what "(1 + k * st.settled) on the interior" draws. That it
+    // then stays put is held by section 3's byte-identical tau 1.40 / tau 2.0 pair.
+    const settleOnly = flash(at(1, 4), S0), coSelf = CO.self.centroid;
+    ok("!! *** ...AND comet's SETTLE, WEIGHED ON ITS OWN, LIFTS THE INTERIOR IN PLACE -- inside the body, not at its rim ***",
+        settleOnly.centroid < coSelf - 0.05 && 100 * settleOnly.sum / CO.self.sum > 10 && travel[3] > settleOnly.centroid + 0.05,
+        `the settle alone adds ${(100 * settleOnly.sum / CO.self.sum).toFixed(1)}% of comet's idle light with its ` +
+        `centroid at ${settleOnly.centroid.toFixed(4)}, inside comet's own idle centroid of ${coSelf.toFixed(4)} -- ` +
+        `while still's flash ends its travel at ${travel[3].toFixed(4)}. A white overlay or a flat lift would sit ` +
+        `at the frame's own centroid; this sits where the interior is.`);
 
     // The white-overlay test, which murmur's own droplet.ts names as the failure it had: "the first cut added
     // a flat lift alongside it and success rendered as a solid white disc, which is precisely the white
@@ -221,18 +241,20 @@ sec("3. *** TWO DIFFERENT WINDOWS: the flash ARRIVES AND LEAVES, the settle ARRI
         `opens and closes; kit.ts: "a flash that starts at full speed and stops dead is a wipe, and a wipe is ` +
         `a UI transition rather than an arrival travelling through a material."`);
 
-    let coMono = true; for (let i = 1; i < 5; i++) if (!(coP[i] >= coP[i - 1])) coMono = false;
-    ok("!! *** THE SETTLE IS A STATE: comet's rises monotonically across all five taus and is HIGHEST at the end ***",
-        coMono && coP[4] > coP[2] * 3 && coP[0] < 5,
-        `${coP.map((v) => v.toFixed(1)).join("% -> ")}% -- never once falling, and its largest value is its ` +
-        `LAST. settled is smoothstep(0.30, 1.05, a) with no closing half, so at tau 1.40 the breath is over ` +
-        `and the body is simply left brighter than it was. The two windows are graded on the SAME five frames ` +
-        `of the same two species, which is what stops one of them being read off a curve rather than a render.`);
+    // v4826: comet flashes now, so its curve rises and falls like still's; what makes the settle a STATE is
+    // that it is still there long after, unchanged -- tau 1.40 and tau 2.0 are byte-identical frames.
+    let dS = 0; for (let i = 0; i < S2.length; i++) if (S2[i] !== at(1, 4)[i]) dS++;
+    ok("!! *** THE SETTLE IS A STATE: comet is still lifted at tau 1.40, and tau 2.0 is the SAME FRAME, byte for byte ***",
+        coP[4] > 10 && dS === 0 && coP[4] < Math.max(...coP.slice(0, 4)),
+        `${coP.map((v) => v.toFixed(1)).join("% -> ")}% -- the flash rises and falls, and what it leaves is ` +
+        `${coP[4].toFixed(1)}% that does not move again: ${dS} bytes differ between tau 1.40 and tau 2.0. settled ` +
+        `is smoothstep(0.30, 1.05, a) with no closing half, so after the breath the body is simply left brighter ` +
+        `than it was.`);
 
-    ok("!! ...and the eleven species with no shell are not left out of SUCCESS -- they get the settle too",
-        coP[4] > 10 && CO.taus[4].centroid > 0.15 && Math.abs(CO.taus[4].centroid - CO.taus[2].centroid) < 0.01,
+    ok("!! ...and every species, flash or no shell, is left with the settle when the flash has gone",
+        coP[4] > 10 && CO.taus[4].centroid > 0.15,
         `comet ends ${coP[4].toFixed(1)}% brighter than its idle frame with its added light at a centroid of ` +
-        `${CO.taus[4].centroid.toFixed(4)}, unmoved from ${CO.taus[2].centroid.toFixed(4)} two taus earlier. ` +
+        `${CO.taus[4].centroid.toFixed(4)}. ` +
         `MH_IGNITE has ${Object.keys(K.MH_IGNITE).length} entries and MH_SETTLED has ` +
         `${Object.keys(K.MH_SETTLED).length}: seven species run the shared shell and all eighteen settle. The ` +
         `other eleven spend their own `+"`complete`"+` on their own figures -- arc on its filament, limn on its ` +
@@ -247,19 +269,23 @@ sec("4. *** THE SETTLE ON ITS OWN, AND THE CENSUS THAT KEEPS THIS GATE'S CONTROL
     // smoothstep(0, 1, min(1, tau / 0.95)), so it is exactly 1 at BOTH tau 0.95 and tau 1.40; complete is
     // 0.2489 at the first and 0 at the second, and comet reads no complete anywhere, so that difference
     // cannot reach a pixel. What is left is settled, 0.7258 -> 0.9873 -- a 36% rise in the one signal.
-    const early = flash(run.frames[FRAMES.length - 4], CO.base), late = CO.taus[4];
-    const st0 = K.mhState(SUCCESS, SETTLE_PAIR_TAU), st1 = K.mhState(SUCCESS, TAUS[4]);
-    const grew = late.sum / Math.max(early.sum, 1e-9), moved = Math.abs(late.centroid - early.centroid);
-    say(`comet at tau ${SETTLE_PAIR_TAU} vs ${TAUS[4]}: sweep ${st0.sweep.toFixed(4)} -> ${st1.sweep.toFixed(4)}, ` +
-        `settled ${st0.settled.toFixed(4)} -> ${st1.settled.toFixed(4)}; added light x${grew.toFixed(3)}, centroid moves ${moved.toFixed(4)}`);
-    ok("!! *** THE SETTLE WEIGHED ALONE: the only signal that differs between these two frames is `settled` ***",
-        st0.sweep === 1 && st1.sweep === 1 && st1.settled > st0.settled && grew > 1.10 && moved < 0.01,
-        `the sweep is ${st0.sweep} in both frames -- it reached its end at 0.95 s -- and comet has no ` +
-        `complete term for the 0.2489 -> 0 in that output to act on, so settled's ${st0.settled.toFixed(4)} ` +
-        `-> ${st1.settled.toFixed(4)} is the WHOLE difference. The added light grows x${grew.toFixed(3)} and ` +
-        `its centroid moves ${moved.toFixed(4)}: it brightens and it does not travel. EVERY OTHER SETTLE ROW ` +
-        `IN THIS TREE IS AN INFERENCE FROM A TAU PAST THE FLASH -- this is the settle by itself, and it is ` +
-        `only available because exactly one species has no complete left.`);
+    // v4826: the pair is SUCCESS tau 0 -> tau 1.40, where complete is 0 at BOTH ends -- see the header
+    const early = flash(S0, CO.base), late = flash(at(1, 4), S0);
+    const st0 = K.mhState(SUCCESS, 0), st1 = K.mhState(SUCCESS, TAUS[4]);
+    const orbSrc = fs.readFileSync(path.join(ENG2, "render", "aiPresenceOrbTsl.mjs"), "utf8");
+    const cometBody = orbSrc.slice(orbSrc.indexOf("const buildComet = () => {"), orbSrc.indexOf("const build", orbSrc.indexOf("const buildComet = () => {") + 30));
+    const sweepReads = (cometBody.match(/\bSWEEP\b/g) || []).length;
+    const guarded = (cometBody.match(/select\(COMPLETE\.greaterThan\(0\.001\), SWEEP,/g) || []).length;
+    say(`comet at SUCCESS tau 0 vs ${TAUS[4]}: complete ${st0.complete} -> ${st1.complete}, sweep ${st0.sweep} -> ${st1.sweep}, ` +
+        `settled ${st0.settled} -> ${st1.settled.toFixed(4)}; added light ${(100 * late.sum / CO.self.sum).toFixed(1)}% at centroid ${late.centroid.toFixed(4)}`);
+    ok("!! *** THE SETTLE WEIGHED ALONE: complete is 0 at both ends and comet reads sweep only under complete > 0.001 ***",
+        st0.complete === 0 && st1.complete === 0 && st1.settled > 0.9 && early.sum === 0 &&
+        100 * late.sum / CO.self.sum > 10 && sweepReads === guarded && guarded >= 1,
+        `complete is exactly 0 at tau 0 and at tau ${TAUS[4]}; sweep moves 0 -> 1 between them, and comet's ` +
+        `${sweepReads} read(s) of SWEEP ${sweepReads === guarded ? "are all" : "are NOT all"} behind comet.ts's own ` +
+        `complete > 0.001 guard, so settled ${st0.settled} -> ${st1.settled.toFixed(4)} is the WHOLE difference. ` +
+        `The port's trail fill ran UNGUARDED until v4826 and stayed on after the breath -- a pair like this one ` +
+        `would have measured the trail and called it the settle.`);
 
     // *** AND THE ROW THAT WOULD HAVE CAUGHT v4660 BREAKING THIS GATE, INSTEAD OF v4660 BREAKING IT. ***
     // geode was this gate's control for fifteen rounds on the strength of a sentence -- "it is one of the
@@ -288,23 +314,21 @@ sec("4. *** THE SETTLE ON ITS OWN, AND THE CENSUS THAT KEEPS THIS GATE'S CONTROL
         !/\bCOMPLETE\b/.test(bodyOf(dispatch.get(sp2) || "")));
     say(`species with no `+"`complete`"+` anywhere: ${noFlash.length ? noFlash.join(", ") : "none"} ` +
         `(of ${ORB_SPECIES.length}; ${dispatch.size} dispatch entries read)`);
-    ok("!! *** comet IS THE ONLY SPECIES LEFT WITH NO `complete`, WHICH IS THE ONLY REASON IT CAN BE THE CONTROL ***",
-        noFlash.length === 1 && noFlash[0] === "comet" && dispatch.size === ORB_SPECIES.length,
-        `${noFlash.join(", ") || "no species"} of ${ORB_SPECIES.length}. THE DAY comet TAKES A COMPLETE TERM ` +
-        `THIS ROW GOES RED and the three settle rows above it stay green until somebody notices -- which is ` +
-        `the whole point, because the other order is what happened at v4660: geode took one, nothing said ` +
-        `so, and three rows went red about a settle when the defect was in the control. The census reads the ` +
-        `DISPATCH for each species' builder rather than matching on the name, because nebula and tempest ` +
-        `share buildMist and a name match would have called both of them unflashed.`);
+    ok("!! *** EVERY SPECIES READS `complete` NOW, AS EVERY ONE OF murmur's DOES -- which is why the control is a frame pair ***",
+        noFlash.length === 0 && dispatch.size === ORB_SPECIES.length,
+        `${noFlash.join(", ") || "no species"} of ${ORB_SPECIES.length} without one. This row read "comet is the ` +
+        `only species left" from v4660 to v4825, and said it would go red the day comet took a complete term; ` +
+        `v4826 transcribed comet.ts's head flash and it did. A species-shaped control was only ever available ` +
+        `while the port was incomplete. The census reads the DISPATCH for each species' builder rather than ` +
+        `matching on the name, because nebula and tempest share buildMist.`);
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: mh_state's SUCCESS windows reach PIXELS. The kit's own gate proves mh_ignite is " +
     "the right gaussian on a real GPU and that its peak lands on mix(lo, hi, sweep); this one proves a " +
     "rendered species actually draws it, travelling, and that the heroes without a shell still settle. THE " +
-    "CONTROL SPECIES IS comet SINCE v4660 AND SECTION 4 MEASURES WHY IT CAN BE: it is the last species in " +
-    "the roster with no `complete` term, which is also what lets this gate weigh the settle entirely on its " +
-    "own between tau 0.95 and tau 1.40. " +
+    "CONTROL IS A FRAME PAIR SINCE v4826 -- comet in SUCCESS at tau 0 and tau 1.40, complete 0 at both -- " +
+    "because every species carries a complete term now, as every one of murmur's does. " +
     "The instrument is deliberately a CENTROID and not a peak radius -- see the header for the five " +
     "non-monotone peak radii that measurement gave on these identical frames." +
     "\nWHAT IS NOT CLAIMED HERE: st.drive, the RESPONDING lean, which is unported and named in " +

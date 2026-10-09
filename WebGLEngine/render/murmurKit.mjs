@@ -981,6 +981,33 @@ export const MH_COMPLETE_LIFT = Object.freeze({
 export const MH_COMPLETE_SOL_CORE = 0.55;
 
 /**
+ * *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH ONE LINE OF ITS OWN SPECIES' FILE, AND NONE SHARING A SHAPE. ***
+ * Read off krispuckett/murmur-web's src/shaders/<species>.ts at 1c23b99, line by line:
+ *
+ *     still.ts:80     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)      the glint
+ *     comet.ts:111    headBright = (1.0 + 1.30 * live.voice) * (1.0 + 2.2 * st.complete) * ...       the head
+ *     droplet.ts:156  heart = (...) * vis * (1.0 + 0.26 * st.complete)                                the heart
+ *     duet.ts:77      r = ... * (1.0 - 0.62 * st.complete)          the ONE SHRINK: success closes the pair in
+ *     duet.ts:120     flare = 1.0 + 1.15 * st.complete             on both bodies' energy
+ *     chorus.ts:66    sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1)        alignment
+ *     prism.ts:159    beams = (e0 + e1 + e2) * bright * run * (1 + pulse) * (1.0 + 1.10 * st.complete)
+ *
+ * Each is EXACTLY a no-op at complete = 0 (a factor of 1, or an added 0), so no resting frame can move. A table
+ * and not a formula, because the backlog note that named them was right: "none of them shares a shape with
+ * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here -- see MH_COMPLETE_INTERIOR's
+ * limn entry and nextRounds.mjs's orb entry: the port applies limn's RIM factors to its interior, and
+ * transcribing the 0.90 onto that would compound the error rather than finish the job.
+ */
+export const MH_COMPLETE_SINGLES = Object.freeze({
+    still:   Object.freeze({ glint: 0.85 }),
+    comet:   Object.freeze({ head: 2.2 }),
+    droplet: Object.freeze({ heart: 0.26 }),
+    duet:    Object.freeze({ shrink: 0.62, flare: 1.15 }),
+    chorus:  Object.freeze({ sync: 0.55 }),
+    prism:   Object.freeze({ beams: 1.10 }),
+});
+
+/**
  * The saturation itself, so the three callers share one spelling and there is a pair to grade. `over` is
  * chorus's overshoot and is 0 for the other two, which makes the target 1.0 exactly.
  */

@@ -260,6 +260,59 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
     }
 }
 
+// =============================================================================================================
+sec("5. *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OWN SPECIES, AT murmur's NUMBER ***");
+{
+    // The numbers are murmur's, read off krispuckett/murmur-web src/shaders/<species>.ts at 1c23b99 and written
+    // here with the line each came from, so a change to the kit's table has to disagree with a quotation to pass.
+    // SABOTAGED, each restored: duet's flare read in buildStill instead -> RED (wrong builder); prism's 1.10 typed
+    // as 1.01 in the kit -> RED (value); comet's head factor deleted -> RED (read 0 times, and the pixel row).
+    const MURMUR = {
+        "still.glint":   ["still.ts:80",    0.85],
+        "comet.head":    ["comet.ts:111",   2.2],
+        "droplet.heart": ["droplet.ts:156", 0.26],
+        "duet.shrink":   ["duet.ts:77",     0.62],
+        "duet.flare":    ["duet.ts:120",    1.15],
+        "chorus.sync":   ["chorus.ts:66",   0.55],
+        "prism.beams":   ["prism.ts:159",   1.10],
+    };
+    const orb = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
+    const BUILDER = { still: "Still", comet: "Comet", droplet: "Droplet", duet: "Duet", chorus: "Chorus", prism: "Prism" };
+    const bodyOf = (b) => { const i = orb.indexOf(`const build${b} = () => {`); if (i < 0) return "";
+        const j = orb.indexOf("const build", i + 20); return orb.slice(i, j < 0 ? orb.length : j); };
+    const bad = [];
+    for (const [key, [where, want]] of Object.entries(MURMUR)) {
+        const [spc, k] = key.split(".");
+        const got = K.MH_COMPLETE_SINGLES?.[spc]?.[k];
+        const ref = `MH_COMPLETE_SINGLES.${spc}.${k}`;
+        const total = orb.split(ref).length - 1, inOwn = bodyOf(BUILDER[spc]).split(ref).length - 1;
+        if (got !== want || total !== 1 || inOwn !== 1) bad.push(`${key}: kit ${got} vs ${where} ${want}, read ${total}x, ${inOwn}x in build${BUILDER[spc]}`);
+    }
+    const tableKeys = Object.entries(K.MH_COMPLETE_SINGLES || {}).flatMap(([s2, o]) => Object.keys(o).map((k) => s2 + "." + k));
+    ok("!! *** each of the seven is murmur's number, read exactly once, inside its own species' builder ***",
+        bad.length === 0 && tableKeys.length === 7 && tableKeys.every((k) => k in MURMUR),
+        bad.length ? bad.join("; ") : `${tableKeys.length} singles: ` + Object.entries(MURMUR).map(([k, [w]]) => `${k} (${w})`).join(", "));
+    ok("  ...and limn's two are deliberately NOT among them, for the reason the kit's own note gives",
+        !("limn" in (K.MH_COMPLETE_SINGLES || {})),
+        "the port applies limn's RIM factors to its interior; transcribing 0.90 onto that would compound it");
+
+    // ONE OF THE SEVEN IN PIXELS: comet, whose head was its whole flash and was missing. At SUCCESS tau 0.20 the
+    // settle is still exactly 0, so what comet gains over its own tau-0 frame is the flash: the head's
+    // (1 + 2.2 * complete) and the trail filling behind it.
+    const pair = await renderSpecies([sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 0 }),
+                                      sp("comet", 0, undefined, { stateIndex: SUCCESS, stateTau: 0.20 })]);
+    if (!pair.ok) ok("!! comet's head flash renders", false, pair.reason || pair.skipped || "no frames");
+    else {
+        const [a, b] = pair.frames; let sumA = 0, sumB = 0;
+        for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) { sumA += light(a, x, y); sumB += light(b, x, y); }
+        const st = K.mhState(SUCCESS, 0.20);
+        ok("!! *** comet's HEAD FLASHES NOW: early in SUCCESS, with settled still 0, its frame gains a fifth of its light ***",
+            st.settled === 0 && st.complete > 0.5 && sumB > sumA * 1.20,
+            `complete ${st.complete.toFixed(3)}, settled ${st.settled}; total linear light ${sumA.toFixed(1)} -> ` +
+            `${sumB.toFixed(1)} (x${(sumB / sumA).toFixed(3)}).`);
+    }
+}
+
 REPORT.write();
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT THIS GATE IS FOR: the half of the SUCCESS flash that is not the travelling shell. kit.ts says the " +
@@ -275,8 +328,7 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT IS NOT CLAIMED: the eight per-species ignition FIGURES that are still missing -- comet, fathom, " +
     "geode, arc, aura, flux, prism and helix each spend complete on a gaussian of their own (arc on its " +
     "filament, aura on a von Mises that follows the sweep round its ribbons, geode on a flat lit += 0.70) " +
-    "and none is the one shape MH_IGNITE holds. Also not claimed: still's glint brightness, comet's head, " +
-    "droplet's 0.26, limn's ring and second interior, duet's flare and its one SHRINK, chorus's sync, " +
-    "prism's 1.10, fathom's per-shell weight. Counted in murmur's own sources st.complete appears 47 times; " +
+    "and none is the one shape MH_IGNITE holds. The SINGLES are section 5 since v4826, all but limn's ring " +
+    "and second interior, which wait on limn's rim/interior split. Counted in murmur's own sources st.complete appears 47 times; " +
     "this round takes 8 of them and the census in tools/ship/murmurLive-selfcheck.mjs holds the total.");
 process.exit(fails ? 1 : 0);

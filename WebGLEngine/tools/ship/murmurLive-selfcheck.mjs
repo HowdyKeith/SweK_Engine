@@ -248,7 +248,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
-        declS === 3 && readSe === 3 && readC === 14 && readSw === 8 && igAt === 6 && igMist === 2,
+        declS === 3 && readSe === 3 && readC === 22 && readSw === 8 && igAt === 6 && igMist === 2,
         `settled ${readSe} readers -- the shared interior factor, comet's headBright and droplet's coreBright, ` +
         `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
         `v4658 and 2 before it -- the shell, the mist pair's pre-multiply, and the five v4658 added: the ` +
@@ -257,13 +257,17 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `which is why sweep went from 1 reader to 5 in the same round -- AND THE THREE v4660 ADDED, which ` +
         `are the ignition figures that are NOT a gaussian on an axis: aura's von Mises going round its ` +
         `ribbons, fathom's triangular window on each shell's own turn, and geode's flat lift with no sweep ` +
-        `in it at all. SIX SPECIES MOVED ZERO BYTES ` +
+        `in it at all -- AND THE EIGHT v4826 ADDED: the seven SINGLES, each one line of its own species' file ` +
+        `(still's glint 0.85, comet's head 2.2, droplet's heart 0.26, duet's shrink 0.62 and flare 1.15, ` +
+        `chorus's sync 0.55, prism's beams 1.10, in MH_COMPLETE_SINGLES), and comet's trail-fill GUARD, ` +
+        `complete > 0.001, which murmur always had and this port did not. SIX SPECIES MOVED ZERO BYTES ` +
         `AT THE PEAK OF THEIR OWN SUCCESS STATE until v4658, because kit.ts's "every species multiplies its ` +
         `own interior energy by (1 + complete)" had no reader here at all; prism and helix STILL moved ` +
         `nothing until v4659 gave them the figure that is their whole flash, and fathom and geode still ` +
         `moved nothing until v4660 gave them theirs. sweep ${readSw} -- the shell, the four axis fronts, and ` +
         `v4660's three: aura's angle, fathom's turn and comet's trail length, which is the one figure in the ` +
-        `roster that reads the sweep and NOT the complete, because comet's flash adds no light at all. The ` +
+        `roster that reads the sweep under its own guard rather than through a figure (since v4826, under ` +
+        `complete > 0.001, as comet.ts writes it -- before that it read the sweep unguarded). The ` +
         `shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
         `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
@@ -379,7 +383,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const driveDecl = (code.match(/const DRIVE = /g) || []).length;
     ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 3 && readC === 14 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
+        readSe === 3 && readC === 22 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
         `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
         `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
         `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +

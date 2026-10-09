@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_COMPLETE_SINGLES, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -480,7 +480,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const atG = P.add(rd.mul(sG));
         const visG = KIT.mhInside(atG).mul(exp(sG.mul(-MH_EXT)));
         const glintLive = select(sG.greaterThan(0.0).and(sG.lessThan(L)),
-            exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x),
+            exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x)
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.still.glint))),   // v4826 -- still.ts:80
             float(0.0));
 
         // *** THE MARCH. *** still.ts's own loop, in its own order: the contribution is multiplied by the
@@ -675,9 +676,15 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // trail and the small mounts shorten it to two fifths -- "a full lap of smear on a 44 px badge".
         // Both are bounded multipliers on a decay rather than on a clock, so neither can teleport anything.
         const CT = MH_COMET_TRAIL;
+        // *** v4826 -- AND THE GUARD WAS NEEDED AFTER ALL. *** The note above reasoned from OUTSIDE SUCCESS, where
+        // sweep is 0. INSIDE it, sweep reaches 1 at 0.95 s and stays there while complete closes to 0 at 1.20 s,
+        // and comet.ts applies the fill only `if (st.complete > 0.001)` -- so from the end of the breath until
+        // the state changes, murmur's trail is back to its own length and this port's stayed filled at 9.0.
+        // The guard is now murmur's own threshold, as a select on the mix weight.
         const decay = mix(float(1.30).add(uniforms.trail.mul(2.60))
             .mul(float(1.0).add(DRIVE.mul(CT.driveK)))
-            .mul(mix(float(1.0), float(CT.small), smallK)), float(CT.to), SWEEP).toVar();
+            .mul(mix(float(1.0), float(CT.small), smallK)), float(CT.to),
+            select(COMPLETE.greaterThan(0.001), SWEEP, float(0.0))).toVar();
 
         const accC = float(0.0).toVar();
         // comet weights its hue by the trail's AGE rather than by depth: clamp(age/pi, 0, 1) is 0 at the head
@@ -739,6 +746,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // factor its file also carries is comet's OWN ignition figure, not the shared shell, and belongs to
         // the per-species round that follows this one.
         const headBright = float(1.0).add(VOICE.mul(1.30))
+            .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.comet.head)))   // v4826 -- comet.ts:111, the head's own flash
             .mul(float(1.0).add(SETTLED.mul(MH_SETTLED_COMET_HEAD)));
         const headE = select(sH.greaterThan(0.0).and(sH.lessThan(L)),
             exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
@@ -805,7 +813,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // sits in, the fog dims with depth because MH_EXT is in the visibility term, and the drop comes out as
         // a lamp inside a lens instead of a disc pasted on ink."
         const heart = select(sC.greaterThan(0.0).and(sC.lessThan(L)),
-            exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC), float(0.0)).toVar();
+            exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC)
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.droplet.heart))),   // v4826 -- droplet.ts:156
+            float(0.0)).toVar();
         const dropletDensity = accD.mul(4.20).add(heart).mul(uniforms.depth);
         return { density: dropletDensity, accD, accHD };
         };
@@ -2008,7 +2018,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const rSep = mix(float(DU.rNear), float(DU.rFar), sepK)
                 .mul(mix(float(1.0), float(DU.rSmall), smallK))
                 .mul(float(1.0).sub(DRIVE.mul(FORM.sep)))
-                .mul(float(1.0).sub(flD.x.mul(0.30))).toVar();
+                .mul(float(1.0).sub(flD.x.mul(0.30)))
+                // v4826 -- duet.ts:77's fourth term, "and success all the way in": the roster's one SHRINK
+                .mul(float(1.0).sub(COMPLETE.mul(MH_COMPLETE_SINGLES.duet.shrink))).toVar();
             // *** duet's RATE WAS TELEPORTING ON ITS OWN GESTURE, AND v4654 RECORDED THAT AS UNREACHABLE. ***
             // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x). This
             // port carried the FLOURISH term and neither of the other two -- so the pair sped up for its own
@@ -2069,10 +2081,12 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const occA = select(aFirst, float(1.0), exp(coreB.mul(-DU.occlude))).toVar();
             const occB = select(aFirst, exp(coreA.mul(-DU.occlude)), float(1.0)).toVar();
 
+            // v4826 -- duet.ts:120: flare = 1 + 1.15 * complete, on both bodies
+            const flareD = float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.duet.flare)).toVar();
             const eA = coreA.mul(DU.coreGain).add(KIT.mhScatter(argA, float(DU.scatterAmp)).mul(visA))
-                .mul(brA).mul(occA).toVar();
+                .mul(brA).mul(occA).mul(flareD).toVar();
             const eB = coreB.mul(DU.coreGain).add(KIT.mhScatter(argB, float(DU.scatterAmp)).mul(visB))
-                .mul(brB).mul(occB).toVar();
+                .mul(brB).mul(occB).mul(flareD).toVar();
 
             const medAmtD = mix(float(DU.medB), float(DU.medS), smallK).toVar();
             const accD = float(0.0).toVar();
@@ -2110,7 +2124,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const depthKn = clamp(uniforms.breath, 0.0, 1.0).toVar();
             const flC = KIT.mhFlourish(uniforms.time, float(CH.flourishSlot), float(CH.flourishDur)).toVar();
 
-            const sync = clamp(syncKn.mul(CH.syncK), 0.0, 1.0).toVar();
+            // v4826 -- chorus.ts:66's success term, inside the same clamp. Its 0.85 * st.drive beside it is NOT
+            // carried here, and is named in nextRounds.mjs's orb entry rather than slipped into a flash round.
+            const sync = clamp(syncKn.mul(CH.syncK).add(COMPLETE.mul(MH_COMPLETE_SINGLES.chorus.sync)), 0.0, 1.0).toVar();
             const per = float(CH.perB).sub(PACE.mul(CH.perPace)).toVar();
             const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
                 .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
@@ -2267,7 +2283,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 const pulse = flP.x.mul(PR.pulseAmp).mul(exp(pr.mul(pr).negate()))
                     .add(KIT.mhIgniteAxis(S1[1], COMPLETE, SWEEP, float(IA_P.lo), float(IA_P.hi),
                         float(IA_P.width), float(IA_P.gain), float(IA_P.flat))).toVar();
-                const beams = E[0].add(E[1]).add(E[2]).mul(brightP).mul(run).mul(float(1.0).add(pulse)).toVar();
+                const beams = E[0].add(E[1]).add(E[2]).mul(brightP).mul(run).mul(float(1.0).add(pulse))
+                    .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.prism.beams))).toVar();   // v4826 -- prism.ts:159
                 // THE SPLIT IS THE HUE: outer beams either side of the anchor, the middle one on it.
                 const hueWP = E[0].mul(PR.hueW[0]).add(E[2].mul(PR.hueW[2])).mul(brightP).mul(run).toVar();
                 const medP = KIT.mhMedium(pP, uniforms.time, float(PR.medLane)).mul(medAmtP).toVar();
