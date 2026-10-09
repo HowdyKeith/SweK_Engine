@@ -84,3 +84,10 @@ export function connect(url, { timeoutMs = 10000 } = {}) {
         req.end();
     });
 }
+
+/** The transport brain/raceLockstepPeer.mjs wants -- send(text), onMessage(fn), onClose(fn), close() -- over a connected client. Resolves once the 101 checks out. */
+export async function wsTransport(url) {
+    const ws = await connect(url), handlers = { m: [], c: [] };
+    ws.on("message", (t) => handlers.m.forEach((f) => f(t))); ws.on("close", () => handlers.c.forEach((f) => f())); ws.on("error", () => {});
+    return { send: (t) => ws.send(t), onMessage: (f) => handlers.m.push(f), onClose: (f) => handlers.c.push(f), close: () => ws.close() };
+}

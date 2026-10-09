@@ -1146,7 +1146,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // Promises 405 -> 410 (miniWs.connect, the gate's peerProc and its staggered start and the --serve pair, the CLI's transport); typed arrays hold at 1269 (Buffers are not typed arrays here).
     // v4822 -- AT THE MERGE OF THIS ROUND ONTO main's v4821, re-derived over the merged tree: main's own figures plus this round's seven files (ES modules +7, closures +7,
     // async/await +5, Promises +5, and requestAnimationFrame 126 -> 127 for tools/ship/raceTurret-selfcheck.mjs stubbing the page's frame loop); typed arrays hold.
-    esModules: 4300, closures: 4149, asyncAwait: 1725, typedArrays: 1271, promises: 410,
+    // v4822 -- async/await 1725 -> 1726 at the ship's own re-take: the relay gate gained section 1b (wsTransport over the relay, the CLIs' refusals), whose awaits and
+    // spawn-wrapping promise are one async/await beyond the figure taken before it; wsTransport itself MOVED from tools/ship/lockstepPeer.mjs to tools/ship/miniWs.mjs (no net change there).
+    esModules: 4300, closures: 4149, asyncAwait: 1726, typedArrays: 1271, promises: 410,
     fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

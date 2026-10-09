@@ -24,6 +24,10 @@
 //   E  brain/raceLockstepPeer.mjs: no final message sent                                                           -> 2 red: the two-node-process pair and the browser-and-node pair.
 //   H  tools/ship/lockstepPeer.mjs: --serve not starting the relay (the first peer hosts nothing)                  -> 1 red: section 2b (the other machine cannot connect; exit 2/1).
 //   G  brain/raceLockstepPeer.mjs: the engine identity not announced (backendId null)                              -> 1 red: the engine row (both processes stepped on, 722 / 724 ticks).
+//   I  tools/ship/miniWs.mjs: wsTransport never hands a received message to the runner                              -> 8 red: section 1b's transport row (sent true, heard false), and every
+//      pair behind it (both node processes, --serve, the browser-and-node pair, the divergence, the engine halt), none of which can hear the other peer.
+//   J  tools/ship/lockstepPeer.mjs: the CLI prints its refusal and does not exit                                  -> 1 red: the unknown-option row (exit null after 20 s: the peer carried on with --gates ignored).
+//   K  tools/ship/lockstepRelay.mjs: the CLI does not refuse                                                      -> 1 red: the relay row (a mistyped --prot started a relay on 8799, exit null).
 //   FINDING, `--serve`'s first draft closed the hosted relay the moment the host's own result was in, which can be BEFORE the guest has read the host's final message
 //   (the host often finishes second: it holds the guest's final hash the instant it has sent its own). The guest then reported "the other peer's final hash never
 //   arrived" while the fingerprints were identical -- two runs in three. The host leaves the room first now and keeps the relay up until the room has emptied.
@@ -41,7 +45,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { startRelay } from "./lockstepRelay.mjs";
-import { connect } from "./miniWs.mjs";
+import { connect, wsTransport } from "./miniWs.mjs";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { initNode, mod } from "../../physics/box3d/box3dNode.mjs";
 import { worldFromModule } from "../../render/slugTicker.mjs";
@@ -95,6 +99,26 @@ sec("1. THE RELAY AND ITS WEBSOCKET: every frame length class intact and in orde
     const bad = await connect(base + "/nonsense?peer=X"), badGot = []; bad.on("message", (t) => badGot.push(t)); await new Promise((r) => setTimeout(r, 150));
     ok("a connection to no room is told how to connect and closed", badGot.some((t) => /connect to \/room/.test(t)));
     A.ws.close(); dup.ws.close(); bad.close();
+}
+
+sec("1b. THE PEER'S TRANSPORT AND ITS COMMAND LINE: wsTransport over the relay; an unknown option refused rather than read past");
+{
+    const raw = await connect(base + "/room/t1b?peer=R&n=2"), rawGot = []; raw.on("message", (t) => rawGot.push(t));
+    const tr = await wsTransport(base + "/room/t1b?peer=T&n=2"), trGot = []; let closed = false; tr.onMessage((t) => trGot.push(t)); tr.onClose(() => { closed = true; });
+    await new Promise((r) => setTimeout(r, 150));
+    tr.send("from-transport"); raw.send("to-transport"); await new Promise((r) => setTimeout(r, 150));
+    ok("wsTransport (the transport the node peer races on) sends to the other peer, hears the other peer, and hears the room's ready", rawGot.includes("from-transport") && trGot.includes("to-transport") && trGot.some((t) => { try { return JSON.parse(t).ready === true; } catch (e) { return false; } }), `sent ${rawGot.includes("from-transport")}, heard ${trGot.includes("to-transport")}, ${trGot.length} messages`);
+    tr.close(); await new Promise((r) => setTimeout(r, 200));
+    ok("...close() leaves the room properly: the other peer is told, and onClose fires on this side", rawGot.some((t) => { try { return JSON.parse(t).left === "T"; } catch (e) { return false; } }) && closed, `left announced ${rawGot.some((t) => /"left":"T"/.test(t))}, onClose ${closed}`);
+    raw.close();
+    const run = (script, args) => new Promise((resolve) => {
+        const t0 = Date.now(), p = spawn(process.execPath, [path.join(ENG, script), ...args], { cwd: ENG }); let out = ""; p.stdout.on("data", (d) => { out += d; }); p.stderr.on("data", (d) => { out += d; });
+        const timer = setTimeout(() => p.kill("SIGKILL"), 20000); p.on("close", (code) => { clearTimeout(timer); resolve({ code, out, ms: Date.now() - t0 }); });
+    });
+    const [bp, br, np] = await Promise.all([run("tools/ship/lockstepPeer.mjs", ["--relay", base, "--peer", "A", "--gates", "1"]), run("tools/ship/lockstepRelay.mjs", ["--prot", "5"]), run("tools/ship/lockstepPeer.mjs", ["--peer", "A"])]);
+    ok("!! an option the peer CLI does not know is REFUSED (exit 2, named, nothing run) instead of read past with a default -- the species tools/ship/cliArgs.mjs exists for", bp.code === 2 && /unknown option --gates/.test(bp.out) && /nothing was run/.test(bp.out) && bp.ms < 15000, `exit ${bp.code}, ${bp.ms} ms: ${bp.out.split("\n")[0]}`);
+    ok("...and so is the relay's (a mistyped --prot is not 8799 quietly): exit 2 with the nearest spelling offered", br.code === 2 && /unknown option --prot -- did you mean --port/.test(br.out), `exit ${br.code}: ${br.out.split("\n")[0]}`);
+    ok("...and a peer given neither --relay nor --serve is told so, exit 2", np.code === 2 && /required/.test(np.out), `exit ${np.code}: ${np.out.split("\n")[0]}`);
 }
 
 sec("2. TWO NODE PROCESSES, A REAL SOCKET: the CLI as a pair of machines would run it");

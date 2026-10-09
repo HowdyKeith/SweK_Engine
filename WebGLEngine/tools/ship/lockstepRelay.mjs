@@ -16,6 +16,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { attach } from "./miniWs.mjs";
+import { parseArgs, refusalLines } from "./cliArgs.mjs";
 
 /** Start a relay. Resolves { port, host, close(), rooms } once listening (port 0 picks a free one). */
 export function startRelay({ port = 8799, host = "127.0.0.1", log = null } = {}) {
@@ -39,8 +40,12 @@ export function startRelay({ port = 8799, host = "127.0.0.1", log = null } = {})
     });
 }
 
+/** The command line, strict (tools/ship/cliArgs.mjs): an option this tool does not know is refused, not read past. */
+export const CLI_SPEC = Object.freeze({ values: Object.freeze({ "--port": "number", "--host": "string" }), flags: Object.freeze([]) });
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
-    const r = await startRelay({ port: +arg("port", 8799), host: arg("host", "0.0.0.0"), log: (...a) => console.log(new Date().toISOString().slice(11, 19), ...a) });
+    const cli = parseArgs(process.argv.slice(2), CLI_SPEC);
+    if (cli.errors.length) { for (const l of refusalLines("lockstepRelay", cli.errors, CLI_SPEC)) console.error(l); process.exit(2); }
+    const r = await startRelay({ port: cli.values["--port"] || 8799, host: cli.values["--host"] || "0.0.0.0", log: (...a) => console.log(new Date().toISOString().slice(11, 19), ...a) });
     console.log(`lockstep relay listening on ws://${r.host}:${r.port}/room/<name>?peer=<id>&n=<count>   (Ctrl-C to stop)`);
 }
