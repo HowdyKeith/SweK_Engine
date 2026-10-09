@@ -133,15 +133,19 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
     // four species in the table. The two are applied at ONE site for all eighteen, so the check is that the
     // site carries both and that the complete table is a strict SUBSET of the settled one.
     const bothApplied = /\.mul\(compF\)\.mul\(settleF\)/.test(src);
-    const subset = Object.keys(IN).every((s) => s in K.MH_SETTLED_INTERIOR);
-    ok("!! *** THE FLASH's FACTOR AND THE SETTLE's ARE APPLIED AT ONE SITE, and the four are a SUBSET of the seventeen ***",
-        bothApplied && subset && Object.keys(IN).length === 4,
-        `the interior is density * m * transmit * compF * settleF, and every species in ` +
-        `MH_COMPLETE_INTERIOR (${Object.keys(IN).join(", ")}) is also in MH_SETTLED_INTERIOR. THE SUBSET IS ` +
-        `THE RULE MADE CHECKABLE: a species earns a complete factor here only because murmur writes it on ` +
-        `the same line as the settled factor, so a species that has no settled factor on that line cannot ` +
-        `have a complete one either. droplet is the one species outside MH_SETTLED_INTERIOR and it is ` +
-        `correctly outside this table too.`);
+    // *** v4828 -- THE RULE WAS WRONG ABOUT ONE SPECIES, AND IT WAS THE ONE THE TABLE SAID 1.60 FOR. *** It read
+    // "a species earns a complete factor here only because murmur writes it on the same line as the settled
+    // factor". limn.ts's INTERIOR line (173) carries (1 + 0.9 * complete) and no settle; its settle is on the RIM
+    // line (133) beside the rim's own (1 + 1.6 * complete). The rule picked the rim line, the port then folded the
+    // rim into the interior, and both errors agreed with each other. The rule now reads murmur's INTERIOR line:
+    // three species carry both factors there, and limn carries the complete alone.
+    const subset = Object.keys(IN).filter((s) => s !== "limn").every((s) => s in K.MH_SETTLED_INTERIOR);
+    ok("!! *** THE FLASH's FACTOR AND THE SETTLE's ARE APPLIED AT ONE SITE; limn's interior carries the flash and no settle ***",
+        bothApplied && subset && Object.keys(IN).length === 4 && IN.limn === 0.90 && !("limn" in K.MH_SETTLED_INTERIOR),
+        `the interior is density * m * transmit * compF * settleF. ${Object.keys(IN).filter((s) => s !== "limn").join(", ")} ` +
+        `carry both factors on murmur's interior line; limn's interior line carries (1 + ${IN.limn} * complete) ` +
+        `and no settle, which is limn.ts:173, and limn's settle and its 1.6 live on its rim (MH_LIMN_RIM). ` +
+        `droplet is outside both tables, settling on its coreBright.`);
 
     // A MISSING KEY AND NOT A ZERO -- v4644's lesson, restated because the same sabotage exists here.
     ok("!! ...and the fourteen species without one are a MISSING KEY, read with ?? 0.0 at the site",
@@ -292,9 +296,28 @@ sec("5. *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OW
     ok("!! *** each of the seven is murmur's number, read exactly once, inside its own species' builder ***",
         bad.length === 0 && tableKeys.length === 7 && tableKeys.every((k) => k in MURMUR),
         bad.length ? bad.join("; ") : `${tableKeys.length} singles: ` + Object.entries(MURMUR).map(([k, [w]]) => `${k} (${w})`).join(", "));
-    ok("  ...and limn's two are deliberately NOT among them, for the reason the kit's own note gives",
-        !("limn" in (K.MH_COMPLETE_SINGLES || {})),
-        "the port applies limn's RIM factors to its interior; transcribing 0.90 onto that would compound it");
+    // *** v4828 -- limn's TWO, AND THE TWO GAPS v4826 RECORDED BESIDE THEM, CLOSED. *** limn's are not singles:
+    // its 0.90 is MH_COMPLETE_INTERIOR.limn on the shared interior line, and its rim's 1.6 / 0.30 / ringClose 1.20
+    // are MH_LIMN_RIM, spent in buildLimn on a rim that joins the pixel BESIDE the interior (limn.ts: e = interior
+    // + rimE + ...). still's glint takes still.ts:80's (0.90 + 0.95 * live.voice); chorus's sync takes chorus.ts:66's
+    // 0.85 * st.drive. SABOTAGED, each restored: limn's rim put back into its density -> RED; still's 0.95 typed
+    // 0.59 -> RED; chorus's drive term deleted -> RED.
+    const limnBody = bodyOf("Limn"), stillBody = bodyOf("Still"), chorusBody = bodyOf("Chorus");
+    const R = K.MH_LIMN_RIM || {};
+    const limnOk = R.complete === 1.6 && R.settled === 0.30 && R.ringClose === 1.20 && K.MH_COMPLETE_INTERIOR.limn === 0.90 &&
+        /const limnDensity = accL\.mul\(3\.0\)\.mul\(uniforms\.depth\);/.test(limnBody) &&
+        // the species name is a STRING, which codeOnly blanks -- so this one line is read from the raw source
+        /species === "limn" \? SP\.rimE : float\(0\.0\)/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")) &&
+        /interior\.add\(limnRim\)\.add\(sf\.rim\)/.test(orb);
+    ok("!! *** limn: the rim carries 1.6, 0.30 and ringClose 1.20 and joins BESIDE an interior carrying 0.90 -- limn.ts:126-173 ***",
+        limnOk, `MH_LIMN_RIM ${JSON.stringify(R)}, interior ${K.MH_COMPLETE_INTERIOR.limn}; density is accL alone and the rim is added at railE and eTotal`);
+    const G = K.MH_STILL_GLINT || {};
+    ok("!! *** still's glint answers the voice: (0.90 + 0.95 * live.voice) -- still.ts:80 ***",
+        G.base === 0.90 && G.voice === 0.95 && (stillBody.split("MH_STILL_GLINT.voice").length - 1) === 1,
+        `MH_STILL_GLINT ${JSON.stringify(G)}, read in buildStill`);
+    ok("!! *** chorus's sync leans with RESPONDING: + 0.85 * st.drive -- chorus.ts:66 ***",
+        K.MH_CHORUS.syncDrive === 0.85 && /DRIVE\.mul\(CH\.syncDrive\)/.test(chorusBody),
+        `MH_CHORUS.syncDrive ${K.MH_CHORUS.syncDrive}, read in buildChorus inside the sync clamp`);
 
     // ONE OF THE SEVEN IN PIXELS: comet, whose head was its whole flash and was missing. At SUCCESS tau 0.20 the
     // settle is still exactly 0, so what comet gains over its own tau-0 frame is the flash: the head's

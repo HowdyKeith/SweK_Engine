@@ -133,7 +133,7 @@ export const ORB_COLORS = Object.freeze({
 
 import { makeMurmurKitTsl } from "./murmurKitTsl.mjs";
 import { MH_EXT, MH_TAPS, MH_SURFACE_KNOBS, MH_SHAPE, MH_DROPLET_GAIN, MH_MIST,
-         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_COMPLETE_SINGLES, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
+         MH_TEMPEST_BOLT, MH_SLOT_SIGNAL, MH_LIMN_RATE, MH_COMPLETE_INTERIOR, MH_COMPLETE_LIFT, MH_COMPLETE_SOL_CORE, MH_COMPLETE_SINGLES, MH_LIMN_RIM, MH_STILL_GLINT, MH_IGNITE_AXIS, MH_IGNITE_LAP, MH_IGNITE_TURN, MH_IGNITE_FLAT_GEODE, MH_COMET_TRAIL, MH_FATHOM, MH_GEODE, MH_ARC, MH_SOL, MH_AURA, MH_FLUX, MH_DUET, MH_CHORUS,
          MH_PRISM, MH_HELIX, MH_TAPS_HI, MH_R, MH_SETTLED, MH_SETTLED_INTERIOR, MH_SETTLED_COMET_HEAD, MH_IGNITE,
          MH_DRIVE_HEADING, MH_DRIVE_FORM,
          mhAa } from "./murmurKit.mjs";
@@ -481,6 +481,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const visG = KIT.mhInside(atG).mul(exp(sG.mul(-MH_EXT)));
         const glintLive = select(sG.greaterThan(0.0).and(sG.lessThan(L)),
             exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x)
+                .mul(float(MH_STILL_GLINT.base).add(VOICE.mul(MH_STILL_GLINT.voice)))   // v4828 -- still.ts:80's voice term
                 .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.still.glint))),   // v4826 -- still.ts:80
             float(0.0));
 
@@ -620,8 +621,18 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             accL.addAssign(e2.mul(transL).mul(ds));
             transL.assign(transL.mul(exp(e2.mul(1.80).add(MH_EXT).mul(ds).negate())));
         });
-        const limnDensity = accL.mul(3.0).add(rimE).mul(uniforms.depth);
-        return { density: limnDensity, tailShare, rimE };
+        // *** v4828 -- THE RIM AND THE INTERIOR ARE TWO LINES, AS limn.ts WRITES THEM. *** Until v4828 the rim was
+        // added into `density`, so the shared interior line put b.m * mh_transmit and the RIM's flash and settle
+        // factors on both, and the hue numerator below counted the rim twice. The interior is now accL alone (its
+        // own 0.90 comes from MH_COMPLETE_INTERIOR on the shared line, and it has no settle); the rim carries its
+        // own (1 + 1.6c)(1 + 0.30s), then ringClose -- SUCCESS closing the circle -- is added after them, and the
+        // rim joins the pixel beside the interior rather than through it. `depth` stays on both: it is this
+        // port's state envelope, applied to every species' light, and limn's rim had it before.
+        const rimF = rimE.mul(float(1.0).add(COMPLETE.mul(MH_LIMN_RIM.complete)))
+            .mul(float(1.0).add(SETTLED.mul(MH_LIMN_RIM.settled)))
+            .add(COMPLETE.mul(band).mul(MH_LIMN_RIM.ringClose)).mul(uniforms.depth).toVar();
+        const limnDensity = accL.mul(3.0).mul(uniforms.depth);
+        return { density: limnDensity, tailShare, rimE: rimF };
         };
 
         const buildComet = () => {
@@ -2124,9 +2135,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const depthKn = clamp(uniforms.breath, 0.0, 1.0).toVar();
             const flC = KIT.mhFlourish(uniforms.time, float(CH.flourishSlot), float(CH.flourishDur)).toVar();
 
-            // v4826 -- chorus.ts:66's success term, inside the same clamp. Its 0.85 * st.drive beside it is NOT
-            // carried here, and is named in nextRounds.mjs's orb entry rather than slipped into a flash round.
-            const sync = clamp(syncKn.mul(CH.syncK).add(COMPLETE.mul(MH_COMPLETE_SINGLES.chorus.sync)), 0.0, 1.0).toVar();
+            // chorus.ts:66 whole: the knob, responding's lean (v4828) and success (v4826), inside one clamp.
+            const sync = clamp(syncKn.mul(CH.syncK).add(DRIVE.mul(CH.syncDrive))
+                .add(COMPLETE.mul(MH_COMPLETE_SINGLES.chorus.sync)), 0.0, 1.0).toVar();   // v4828 -- and its drive term
             const per = float(CH.perB).sub(PACE.mul(CH.perPace)).toVar();
             const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
                 .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
@@ -2533,7 +2544,10 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const compK = MH_COMPLETE_INTERIOR[species] ?? 0.0;
         const compF = compK === 0.0 ? float(1.0) : float(1.0).add(COMPLETE.mul(compK));
         const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).mul(compF).mul(settleF).toVar();
-        const railE = interior.add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
+        // v4828 -- limn's rim joins BESIDE the interior (limn.ts: e = interior + rimE + sf.rim + ...); every other
+        // species carries its rim-like light inside its own density, so this is limn's alone.
+        const limnRim = species === "limn" ? SP.rimE : float(0.0);
+        const railE = interior.add(limnRim).add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
         // *** THE HUE ARGUMENT WAS ZERO UNTIL v4631, AND THIS NOTE STAYED PAST ITS OWN REPAIR. *** It read
         // "THE HUE ARGUMENT IS STILL ZERO, AND THAT IS A KNOWN GAP" -- true when written, and contradicted
         // three lines later by the paragraph below, which the round that CLOSED the gap added without
@@ -2639,7 +2653,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // mh_present's own hueMix: the hue scaled by the share of THIS pixel's energy that the species says
         // carries colour. still and comet count the interior plus 0.7 of the rim, droplet 0.6 of it, limn the
         // rim energy plus the interior -- four different numerators, transcribed rather than averaged.
-        const eTotal = interior.add(sf.rim).add(sf.spec).add(sf.glow).toVar();
+        const eTotal = interior.add(limnRim).add(sf.rim).add(sf.spec).add(sf.glow).toVar();
         const hueNum = species === "limn" ? SP.rimE.add(interior)
             : species === "droplet" ? interior.add(sf.rim.mul(0.6))
             // opal and abyss weight by their OWN event energy alone -- the flashes and the passing glows --

@@ -927,8 +927,12 @@ export const MH_SETTLED_COMET_HEAD = 0.25;
  * droplet in SUCCESS. A missing key cannot be deleted by a tidying pass the way a ternary can, and a census
  * row can ask which key is missing and why, which is what tools/ship/murmurLive-selfcheck.mjs now does.
  */
+// v4828 -- AND limn IS THE SECOND MISSING KEY. limn.ts carries its settle on the RIM line, beside the rim's own
+// (1 + 1.6 * complete) -- `rimE = ... * (1.0 + 1.6 * st.complete) * (1.0 + 0.30 * st.settled) + ringClose` -- and its
+// interior line has a complete factor (0.90) and NO settle at all. Until v4828 this port put both of the rim's
+// factors on the interior; buildLimn now spends them on its rim, and the interior line carries limn's own 0.90.
 export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
-    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet")));
+    Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet" && k !== "limn")));
 
 /**
  * *** THE OTHER HALF OF THE SUCCESS FLASH: IT BRIGHTENS WHAT IS ALREADY THERE -- v4658. ***
@@ -951,8 +955,24 @@ export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
  * as "these species were considered and given nothing", which is false -- they spend their flash elsewhere.
  */
 export const MH_COMPLETE_INTERIOR = Object.freeze({
-    limn: 1.60, arc: 0.90, aura: 0.45, flux: 0.75,
+    limn: 0.90, arc: 0.90, aura: 0.45, flux: 0.75,
 });
+/**
+ * *** v4828 -- limn's ENTRY ABOVE WAS ITS RIM'S NUMBER, AND THE RIM'S NUMBERS ARE HERE NOW. *** limn.ts:
+ *
+ *     interior = acc.x * 3.00 * b.m * mh_transmit(b.fres) * (1.0 + 0.9 * st.complete);              line 173
+ *     ringClose = st.complete * band * 1.20;                                                       line 126
+ *     rimE = rimlight * arc * (1.70 + 1.15 * live.voice) * mix(1.0, 1.15, small)
+ *            * (1.0 + 1.6 * st.complete) * (1.0 + 0.30 * st.settled) + ringClose;                  lines 132-134
+ *     e = interior + rimE + sf.rim + sf.spec + sf.glow;
+ *
+ * The census rule that put 1.60 in MH_COMPLETE_INTERIOR -- "the complete factor on the line that carries the
+ * settle" -- read limn's RIM line as its interior, because the rim is the line with the settle on it. The port
+ * then folded the rim INTO the interior's density, so the interior's own line multiplied rim and interior alike
+ * by the rim's two factors and by b.m * mh_transmit, which murmur never applies to limn's rim at all. The three
+ * numbers below are the rim's; the interior's 0.90 is MH_COMPLETE_INTERIOR.limn.
+ */
+export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClose: 1.20 });
 
 /**
  * *** THE SATURATION: A FIGURE THAT IS PULLED TOWARD FULL RATHER THAN SCALED. ***
@@ -994,10 +1014,17 @@ export const MH_COMPLETE_SOL_CORE = 0.55;
  *
  * Each is EXACTLY a no-op at complete = 0 (a factor of 1, or an added 0), so no resting frame can move. A table
  * and not a formula, because the backlog note that named them was right: "none of them shares a shape with
- * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here -- see MH_COMPLETE_INTERIOR's
- * limn entry and nextRounds.mjs's orb entry: the port applies limn's RIM factors to its interior, and
- * transcribing the 0.90 onto that would compound the error rather than finish the job.
+ * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here: since v4828 the 0.90 is
+ * MH_COMPLETE_INTERIOR.limn and the ring is MH_LIMN_RIM.ringClose, after the rim was split from the interior.
  */
+/**
+ * *** v4828 -- still's GLINT HAD NO VOICE, AND THE REPAIR MOVES ITS RESTING FRAME. *** still.ts:80:
+ *     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)
+ * This port multiplied the glint by fl.x alone, so at rest (voice 0) it was 1/0.90 of murmur's and speech never
+ * brightened it -- the one hero whose whole brief is "one slow internal glint" did not answer the voice in it.
+ */
+export const MH_STILL_GLINT = Object.freeze({ base: 0.90, voice: 0.95 });
+
 export const MH_COMPLETE_SINGLES = Object.freeze({
     still:   Object.freeze({ glint: 0.85 }),
     comet:   Object.freeze({ head: 2.2 }),
@@ -1709,6 +1736,10 @@ export const MH_CHORUS = Object.freeze({
     radB: 0.082, radK: 0.038, radSmall: 1.75,
     brightB: 0.70, brightK: 0.55,
     syncK: 0.75, perB: 8.4, perPace: 2.2 * 0.6,
+    // v4828 -- chorus.ts:66: sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1). The drive
+    // term is the species' "whole gesture" -- responding pulls the seven voices most of the way into alignment --
+    // and the v4653-v4657 drive rounds wired chorus's heading, narrowing and rates without reaching this line.
+    syncDrive: 0.85,
     breatheB: 0.30, breatheK: 0.45, breatheSmall: 1.35,
     // The phase ladder sync closes: voice k sits at k * 0.897 of a full turn at sync 0, and at 0 at sync 1.
     phaseStep: 0.897,

@@ -232,8 +232,9 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    ok("!! the conditioned pair is declared once each and read 42 and 15 times, counting CODE and not comments",
-        decl === 2 && readV === 42 && readP === 15,
+    // v4828: 43 -- still's glint took murmur's (0.90 + 0.95 * live.voice), which this port had never carried.
+    ok("!! the conditioned pair is declared once each and read 43 and 15 times, counting CODE and not comments",
+        decl === 2 && readV === 43 && readP === 15,
         `${readV} readers of the conditioned voice and ${readP} of the conditioned cadence, with comments and ` +
         `strings stripped. The cadence count has moved in each of the last three rounds -- 11, then 14, then 15 ` +
         `-- and every step was an ABSENCE being filled rather than a number being invented: helix's climb ` +
@@ -248,8 +249,9 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const readSe = cc(/\bSETTLED\b/g) - 1, readC = cc(/\bCOMPLETE\b/g) - 1, readSw = cc(/\bSWEEP\b/g) - 1;
     const igAt = cc(/\bigniteAt\b/g) - 1, igMist = cc(/\bigniteMist\b/g) - 1;
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
-        declS === 3 && readSe === 3 && readC === 22 && readSw === 8 && igAt === 6 && igMist === 2,
-        `settled ${readSe} readers -- the shared interior factor, comet's headBright and droplet's coreBright, ` +
+        declS === 3 && readSe === 4 && readC === 24 && readSw === 8 && igAt === 6 && igMist === 2,
+        `settled ${readSe} readers -- the shared interior factor, comet's headBright, droplet's coreBright and ` +
+        `(since v4828) limn's RIM, where limn.ts carries its settle -- ` +
         `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
         `v4658 and 2 before it -- the shell, the mist pair's pre-multiply, and the five v4658 added: the ` +
         `shared interior BRIGHTENING beside the settle, opal's and sol's and chorus's saturations, and sol's ` +
@@ -383,7 +385,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const driveDecl = (code.match(/const DRIVE = /g) || []).length;
     ok("!! *** ALL FOUR OF mh_state's OUTPUTS ARE READ NOW -- drive was the last, and it is declared once ***",
         rawT === 1 && /KIT\.mhState\(uniforms\.stateIndex,\s*uniforms\.stateTau\)/.test(src) &&
-        readSe === 3 && readC === 22 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
+        readSe === 4 && readC === 24 && readSw === 8 && driveDecl === 1 && drive - 1 >= 10,
         `stateTau is read ${rawT} time, by mh_state, and mh_state's four outputs now reach ` +
         `${readSe + readC + readSw + (drive - 1)} sites between them: settled ${readSe}, complete ${readC}, ` +
         `sweep ${readSw}, and drive ${drive - 1} from one declaration. THE FOURTH WAS THE LARGEST AND ONLY ` +
@@ -414,8 +416,9 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // names exist, so long as it says which question it is answering.
     const interiorKeys = Object.keys(MH_SETTLED_INTERIOR), settledKeys = Object.keys(MH_SETTLED);
     const missing = settledKeys.filter((k) => !interiorKeys.includes(k));
-    ok("!! *** droplet's EXCLUSION FROM THE SHARED INTERIOR SETTLE IS A MISSING KEY, NOT A CONDITIONAL ***",
-        interiorKeys.length === 17 && missing.length === 1 && missing[0] === "droplet" &&
+    // v4828: TWO missing keys now -- droplet (settles on its coreBright) and limn (settles on its RIM, limn.ts:133)
+    ok("!! *** droplet's AND limn's EXCLUSIONS FROM THE SHARED INTERIOR SETTLE ARE MISSING KEYS, NOT CONDITIONALS ***",
+        interiorKeys.length === 16 && missing.length === 2 && missing.includes("droplet") && missing.includes("limn") &&
         /MH_SETTLED_INTERIOR\[species\]/.test(code) && !/species === "droplet" \? 0\.0/.test(code),
         `MH_SETTLED_INTERIOR has ${interiorKeys.length} of MH_SETTLED's ${settledKeys.length} keys and the one ` +
         `it is missing is ${missing.join(", ")}. THE SHAPE IS THE POINT: the exclusion first shipped as ` +

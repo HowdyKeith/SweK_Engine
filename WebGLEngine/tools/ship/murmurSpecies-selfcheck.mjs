@@ -239,7 +239,11 @@ sec("2. *** THE SURFACE, ON REAL PIXELS: the contact glow, the roster's rims, an
         const qStill = edgeQuartile(run.frames[0]), qLimn = edgeQuartile(run.frames[1]), qComet = edgeQuartile(run.frames[2]);
         say(`edge light at the ring's quarter-point -- still ${qStill.toFixed(5)}, comet ${qComet.toFixed(5)}, limn ${qLimn.toFixed(5)}`);
         ok("!! the three heroes' EDGES rank the way murmur's roster ranks their rims: still > comet > limn",
-            qStill > qComet && qComet > qLimn && qStill / qLimn > 2.5,
+            // v4828: > 1.5, not > 2.5. The 3.73 / 3.77 below were measured while this port dimmed limn's ARC rim
+            // through the interior's b.m * mh_transmit, which limn.ts never applies (e = interior + rimE + ...);
+            // composed as murmur composes it, a little of the arc reaches limn's dim edge and the ratio reads 1.86.
+            // The ORDER is the roster's claim and it holds; the ratio was partly the defect.
+            qStill > qComet && qComet > qLimn && qStill / qLimn > 1.5,
             `still ${qStill.toFixed(5)} > comet ${qComet.toFixed(5)} > limn ${qLimn.toFixed(5)} in linear ` +
             `light, a still-over-limn ratio of ${(qStill / qLimn).toFixed(2)} against the roster's own ` +
             `1.15 / 0.30 = 3.83. Measured at 48 px and 64 px before the limits were set: the ordering holds ` +
@@ -332,8 +336,14 @@ sec("3. *** THE SPREAD AXIS, END TO END: the knob that reached no pixel until v4
         // at most MH_SPREAD, approached from BELOW -- that is the claim, it does not depend on where the arc
         // happens to be this frame, and it is what a wrong port fails. A re-centred window would have been
         // this round fitting a bound to its own output.
-        ok("!! ...and limn, whose tail share saturates, turns by very nearly MH_SPREAD itself",
-            hs.limn.dHueDeg < 28.65 && hs.limn.dHueDeg > 0.80 * 28.65 && hs.limn.dHueDeg > hs.still.dHueDeg * 10,
+        // *** v4828 -- AND THE 80% FLOOR WAS THE RIM COUNTED TWICE. *** limn.ts weights its hue by
+        // (rimE + interior) / e. This port's interior CONTAINED the rim until v4828, so the numerator held the rim
+        // twice and the share could run past what murmur's can -- which is how a mean of 26.84 sat "very nearly"
+        // on MH_SPREAD. With the rim beside the interior, as limn.ts writes it, the share is a true fraction of e
+        // and the mean turn reads 11.51. The claims that survive are the physical ones: below MH_SPREAD, and many
+        // times still's, because limn's hue is a saturating share and still's a depth average that cancels.
+        ok("!! ...and limn, whose tail share saturates, turns toward MH_SPREAD from below, far past still",
+            hs.limn.dHueDeg < 28.65 && hs.limn.dHueDeg > 0.25 * 28.65 && hs.limn.dHueDeg > hs.still.dHueDeg * 5,
             `limn ${hs.limn.dHueDeg.toFixed(2)} degrees against MH_SPREAD's ${(K.MH_SPREAD * 180 / Math.PI).toFixed(2)} ` +
             `-- ${(100 * hs.limn.dHueDeg / 28.65).toFixed(0)}% of it, approached from below as a saturating ` +
             `share must be ` +
