@@ -8118,6 +8118,21 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 12 -- A GPU'S TIME, FOR THE RIG.
+    since495: Object.freeze({
+        at: "the denoiser arc, round 12, the rig's timing (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseTiming-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs (the run covers the denoiser's two gates; the timing gate is timing, the device gate exact)"]),
+        verdict: "*** EVERY TIME THE DENOISER HAD PRINTED WAS SWIFTSHADER'S. *** Section 37: render/denoiseDevice.mjs times one " +
+                 "pass of round 11's network on a ladder of sizes, 64 x 64 up to a 1080p frame -- wall clock, and the device's own " +
+                 "clock pass by pass from timestamp queries where offered -- natively and through denoise.html's new \"Time the " +
+                 "network\", and tools/ship/realGpuRun.mjs now runs both denoiser gates, so `--only denoise` on the rig carries a " +
+                 "GPU's numbers back. The timer is asserted, never the time. The first sabotage, a wall clock read without " +
+                 "awaiting the queue, ran the gate 900 s: the ladder trusted the clock it measured and climbed into minutes. It " +
+                 "now spends its budget in a guard read-back that cannot land early, under a 60 s ladder budget, and the " +
+                 "sabotage goes red in seconds. 8 sabotages, all red.",
+    }),
     // the denoiser arc, round 12 -- THE NETWORK ON THE DEVICE, BEFORE IT RUNS ON ANY TEST IMAGE.
     since494: Object.freeze({
         at: "the denoiser arc, round 12 (unshipped)", swept: 1, green: 1, red: 0,

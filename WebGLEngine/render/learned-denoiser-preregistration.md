@@ -1983,3 +1983,46 @@ Reported, not a criterion:
 - **Any scene outside R and C.** In every round that tested a family the network was not trained on, it never beat
   the filter there. The page says so, and renders nothing else.
 - **The path tracer's own scenes.** They are neither R nor C, so the page does not offer them.
+
+## 37. ROUND 12 -- A GPU'S TIME, FOR THE RIG
+
+Section 36 left one thing unshown: a GPU. Every device in this container is SwiftShader, so every time sections 35-36
+printed was a CPU's. Keith asked for a timing measurement the rig can run. This is it. It is a measurement, not a
+hypothesis: no number is pre-registered to beat.
+
+**What is timed.**
+- One pass of round 11's network (`render/denoise-net-r11.json`): the five conv layers and the kernel.
+- A ladder of sizes, from the trained 64 x 64 through 128, 256, 512 and 1024 squares to a 1920 x 1080 frame. The
+  network is fully convolutional and the kernel is per pixel, so any size runs. What a pass costs does not depend on
+  what the image shows, so the input is synthetic (`timingInput`).
+- **Two ways:**
+  - natively, on node-webgpu's default adapter (on the rig, the GTX 1080 through D3D12);
+  - through `denoise.html`'s own "Time the network", in the browser.
+
+**How.** `render/denoiseDevice.mjs`'s `time()` and `timingLadder`.
+- Each size gets a fresh device (section 35's hazard), with the storage limits raised to fit its largest buffer. A
+  size whose buffer is over the adapter's limit is skipped, and says so.
+- Two untimed passes come first (one natively), then timed ones until 30, or until 2 s of them once there are 3.
+- Per size:
+  - **wall clock:** submit to `queue.onSubmittedWorkDone()`, with no upload and no read-back;
+  - **the device's clock:** the same span, and each pass's, from timestamp queries where the adapter offers them;
+  - the median and the 10th-90th percentiles, and megapixels a second.
+- The ladder stops before a size whose pass, predicted from the last median scaled by pixels, would take over 1.5 s.
+  On SwiftShader that leaves 64 x 64 alone; on a GPU it should reach the 1080p frame.
+
+**Gated** (`render/denoiseTiming-selfcheck.mjs`, a timing gate). The timer is asserted, never the time:
+- the first size is measured, and every time is finite and positive;
+- every skip says why, and the cap skips only what the last pass predicts past it;
+- per timed pass, the device's span sits inside the wall clock and the layers inside the span (two 0.1 ms quanta
+  allowed, since a browser rounds timestamps);
+- timestamp queries are asked for wherever the adapter offers them;
+- timing changes nothing: the image a timed pass wrote is an untimed run's, bit for bit.
+
+**On the rig.** `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json` runs both denoiser gates.
+- The runner now covers them, with the device gate as exact and the timing gate as timing.
+- The report names every adapter they ran on. The native adapter is logged by the gate itself, since it does not go
+  through the browser harness.
+- `docs/real-hardware-fsr.md` says what to send back.
+
+**On this box,** for scale and nothing else: 64 x 64 took about 640 ms natively and 510 ms in the browser, and the
+three 32 -> 32 layers took most of it. That is SwiftShader, a CPU, and the report's first line says so.

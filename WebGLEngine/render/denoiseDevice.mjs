@@ -28,10 +28,11 @@ import { conv2dWgsl, conv2dTiledWgsl, packProbeUniforms, conv2dCpu, TILE, K_MAX,
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
+import { SOFTWARE_HINTS } from "../ui/localModelProbe.js";
 
 // WebGPU's flag values, from the specification -- the same numbers in a browser and in Dawn, so this module needs no
 // global GPUBufferUsage (node-webgpu keeps its globals on the module, not on globalThis)
-const BU = Object.freeze({ MAP_READ: 0x1, COPY_SRC: 0x4, COPY_DST: 0x8, UNIFORM: 0x40, STORAGE: 0x80 });
+const BU = Object.freeze({ MAP_READ: 0x1, COPY_SRC: 0x4, COPY_DST: 0x8, UNIFORM: 0x40, STORAGE: 0x80, QUERY_RESOLVE: 0x200 });
 const MAP_READ = 0x1;
 const NO_MASK = 0xffffffff;
 
@@ -201,6 +202,53 @@ export async function createDeviceDenoiser(dev, net, { H, W, C }) {
             const acts = keep ? await Promise.all(layers.map((L, i) => readBack(outs[i], H * W * L.Cout))) : null;
             return { y, acts, ms };
         },
+        /** The output buffer as it stands -- what the last run or timed pass wrote. */
+        output: () => readBack(yBuf, H * W * 3),
+        /**
+         * Time the pass (section 37): `warmup` untimed passes, then timed ones until `maxReps`, or `budgetMs` of them once
+         * there are `minReps`. Per pass, `wall` is submit to queue.onSubmittedWorkDone() -- the device's work and the
+         * queue's overhead, no upload and no read-back -- and, when the device has timestamp-query, `gpu` is the first
+         * pass's start to the last pass's end on the device's own clock, and `perPass` each layer's and the kernel's.
+         * `elapsed` is the GUARD: submit to a 4-byte read-back of the output, which cannot land before the work is done.
+         * The budget is spent in it, and the ladder predicts from it, so a clock that under-reports cannot run a slow
+         * device into sizes it would take minutes on (a sabotage did exactly that before the guard).
+         */
+        async time(x, { warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000 } = {}) {
+            if (x.length !== H * W * C) throw new Error(`denoiseDevice: an input of ${x.length} values for ${H} x ${W} x ${C}`);
+            dev.queue.writeBuffer(xBuf, 0, Float32Array.from(x));
+            const ts = !!(dev.features && dev.features.has("timestamp-query")), n = steps.length;
+            const qs = ts ? dev.createQuerySet({ type: "timestamp", count: 2 * n }) : null;
+            const resolved = ts ? dev.createBuffer({ size: 16 * n, usage: BU.QUERY_RESOLVE | BU.COPY_SRC }) : null;
+            const read = ts ? dev.createBuffer({ size: 16 * n, usage: BU.COPY_DST | BU.MAP_READ }) : null;
+            const probe = dev.createBuffer({ size: 16, usage: BU.COPY_DST | BU.MAP_READ });
+            const now = () => (globalThis.performance ?? Date).now(), wall = [], gpu = [], perPass = [], elapsed = [];
+            let spent = 0;
+            try {
+                for (let rep = 0; rep < warmup + maxReps; rep++) {
+                    const enc = dev.createCommandEncoder();
+                    steps.forEach((s, i) => {
+                        const pass = enc.beginComputePass(ts ? { timestampWrites: { querySet: qs, beginningOfPassWriteIndex: 2 * i, endOfPassWriteIndex: 2 * i + 1 } } : {});
+                        pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(groups[0], groups[1]); pass.end();
+                    });
+                    if (ts) { enc.resolveQuerySet(qs, 0, 2 * n, resolved, 0); enc.copyBufferToBuffer(resolved, 0, read, 0, 16 * n); }
+                    enc.copyBufferToBuffer(yBuf, 0, probe, 0, 4);
+                    const cb = enc.finish(), t0 = now();
+                    dev.queue.submit([cb]);
+                    await dev.queue.onSubmittedWorkDone();
+                    const t = now() - t0;
+                    await probe.mapAsync(MAP_READ); probe.unmap();
+                    const g = now() - t0;
+                    let st = null;
+                    if (ts) { await read.mapAsync(MAP_READ); st = new BigUint64Array(read.getMappedRange().slice(0)); read.unmap(); }
+                    if (rep < warmup) continue;
+                    wall.push(t); elapsed.push(g); spent += g;
+                    if (st) { gpu.push(Number(st[2 * n - 1] - st[0]) / 1e6); perPass.push(steps.map((_, i) => Number(st[2 * i + 1] - st[2 * i]) / 1e6)); }
+                    if (wall.length >= maxReps || (wall.length >= minReps && spent >= budgetMs)) break;
+                }
+            } finally { qs?.destroy(); resolved?.destroy(); read?.destroy(); probe.destroy(); }
+            return { wall, elapsed, gpu: ts ? gpu : null, perPass: ts ? perPass : null, timestamps: ts,
+                     passes: [...layers.map((L, i) => `layer ${i} (${L.kernel}, ${L.Cin} -> ${L.Cout})`), "kernel"] };
+        },
         destroy() { for (const b of owned) b.destroy(); owned.length = 0; },
     };
 }
@@ -224,4 +272,81 @@ export function decodeNet(data) {
         if (W.length !== L.Cout * L.k * L.k * L.Cin || b.length !== L.Cout) throw new Error(`denoiseDevice: layer ${i} holds ${W.length} + ${b.length} values for ${L.Cin} -> ${L.Cout}, k ${L.k}`);
         return { Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, W, b };
     }) };
+}
+
+// ---- TIMING ON A DEVICE (section 37) ---------------------------------------------------------------------------
+// Every time in sections 35-36 was SwiftShader's -- a CPU running a JIT. A GPU's time is what a real-hardware run is for
+// (tools/ship/realGpuRun.mjs, docs/real-hardware-fsr.md), so the pass is timed on a ladder of image sizes, up to a 1080p
+// frame, on whatever device it is handed: render/denoiseTiming-selfcheck.mjs in node and through the page, and the page's
+// own "Time on this device". The network is fully convolutional and the kernel is per pixel, so any size runs; what a
+// pass costs does not depend on what the image shows, so the input is synthetic.
+
+/** The sizes timed, smallest first: the trained 64 x 64 up to a 1080p frame. */
+export const TIMING_SIZES = Object.freeze([[64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024], [1920, 1080]].map((s) => Object.freeze(s)));
+/** The largest buffer a pass at H x W needs, in bytes -- the widest layer's output (the head's 81 logits). */
+export const largestBuffer = (net, H, W) => H * W * Math.max(...net.layers.map((L) => L.Cout), net.layers[0].Cin) * 4;
+/** A deterministic input of C channels: irradiance, albedo, normals and a two-valued mask, in the network's ranges. */
+export function timingInput(H, W, C = 10, seed = 1) {
+    let s = seed >>> 0; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const x = new Float32Array(H * W * C);
+    for (let p = 0; p < H * W; p++) {
+        for (let c = 0; c < 3; c++) x[p * C + c] = u() * 2;
+        for (let c = 3; c < 6; c++) x[p * C + c] = u();
+        for (let c = 6; c < 9; c++) x[p * C + c] = u() * 2 - 1;
+        if (C === 10) x[p * C + 9] = (p % W) < W / 8 ? 1 : 0;
+    }
+    return x;
+}
+/** Median and the 10th and 90th percentiles of a list of times (nearest rank). */
+export function summarize(ms) {
+    if (!ms || !ms.length) return null;
+    const s = [...ms].sort((a, b) => a - b), at = (q) => s[Math.min(s.length - 1, Math.max(0, Math.ceil(q * s.length) - 1))];
+    return { median: at(0.5), p10: at(0.1), p90: at(0.9), n: s.length };
+}
+/** An adapter's name, and whether it is CPU emulation (the report's software flag: the spec's own, else the name). */
+export function adapterOf(adapter) {
+    const i = adapter?.info || {}, name = [i.vendor, i.architecture, i.description].filter(Boolean).join(" / ") || "unnamed";
+    const software = adapter && "isFallbackAdapter" in adapter && adapter.isFallbackAdapter === true ? true : SOFTWARE_HINTS.test(name);
+    return { name, software, timestamps: !!(adapter?.features && adapter.features.has("timestamp-query")) };
+}
+/** A device from `adapter` for a pass needing `bytes` in one buffer: timestamp queries when offered, the storage limits raised to fit. */
+export async function timingDevice(adapter, bytes) {
+    const cap = Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize);
+    if (bytes > cap) return null;
+    const want = Math.max(bytes, Math.min(cap, 134217728));
+    return adapter.requestDevice({ requiredFeatures: adapter.features.has("timestamp-query") ? ["timestamp-query"] : [],
+                                   requiredLimits: { maxStorageBufferBindingSize: want, maxBufferSize: want } });
+}
+/**
+ * The ladder: each size in `sizes`, on a fresh device from `newAdapter()` (one per size -- a reused Dawn device was found to
+ * crash, section 35), timed by time() and released; a size is skipped when the adapter's buffers cannot hold it, and the
+ * ladder stops before a size whose pass, predicted from the last GUARD median (time()'s `elapsed`) scaled by pixels, would
+ * pass `capMs`, or once `totalMs` is spent. On the first size it also checks that timing changes nothing: the image a timed
+ * pass wrote is an untimed run's, bit for bit.
+ * Returns { adapter, rows: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS }], invisible }.
+ */
+export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, capMs = 1500, totalMs = 60000, C = net.layers[0].Cin, ...opts } = {}) {
+    const rows = [], start = (globalThis.performance ?? Date).now();
+    let adapter = null, last = null, invisible = null;
+    for (const [W, H] of sizes) {
+        const bytes = largestBuffer(net, H, W);
+        if ((globalThis.performance ?? Date).now() - start > totalMs) { rows.push({ H, W, skipped: true, reason: `the ladder's ${totalMs / 1000} s budget is spent` }); continue; }
+        if (last && last.ms * (H * W) / last.px > capMs) { rows.push({ H, W, skipped: true, reason: `predicted ${(last.ms * (H * W) / last.px).toFixed(0)} ms a pass, over the ${capMs} ms cap` }); continue; }
+        const a = await newAdapter();
+        adapter = adapter || adapterOf(a);
+        const dev = await timingDevice(a, bytes);
+        if (!dev) { rows.push({ H, W, skipped: true, reason: `a ${(bytes / 2 ** 20).toFixed(0)} MiB buffer is over the adapter's limit` }); continue; }
+        try {
+            const D = await createDeviceDenoiser(dev, net, { H, W, C }), x = timingInput(H, W, C);
+            const t = await D.time(x, opts);
+            if (invisible === null) { const timed = await D.output(), plain = (await D.run(x)).y; invisible = timed.length === plain.length && timed.every((v, i) => Object.is(v, plain[i])); }
+            D.destroy();
+            const wall = summarize(t.wall), gpu = summarize(t.gpu), elapsed = summarize(t.elapsed);
+            const perPass = t.perPass ? t.passes.map((name, i) => ({ name, ms: summarize(t.perPass.map((r) => r[i])).median })) : null;
+            rows.push({ H, W, skipped: false, wall, gpu, elapsed, perPass, timestamps: t.timestamps, raw: { wall: t.wall, gpu: t.gpu, perPass: t.perPass, elapsed: t.elapsed },
+                        mpxPerS: (H * W / 1e6) / (wall.median / 1000) });
+            last = { ms: elapsed.median, px: H * W };
+        } finally { dev.destroy(); }
+    }
+    return { adapter, rows, invisible };
 }

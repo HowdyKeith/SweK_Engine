@@ -40,6 +40,41 @@ The kinds are read from each gate's source (`categorize` in the runner: a gate t
 in dB is quality, the rest exact), and every FSR gate is in the run (`gateList`); `tools/ship/realGpuRun-selfcheck.mjs` holds
 both.
 
+## The denoiser (the denoiser arc, round 12)
+
+The run also covers the learned path-tracer denoiser's two device gates (`render/learned-denoiser-preregistration.md`,
+sections 35-37). To run just those:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json
+```
+
+- **`render/denoiseDevice-selfcheck.mjs`** (exact) holds round 11's network on the device to its CPU twin, cell for
+  cell, and drives `denoise.html` in the browser. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
+  twin's fused mirror); an unexplained one is a finding.
+- **`render/denoiseTiming-selfcheck.mjs`** (timing) is what the run is for. It times one pass of the network and its kernel
+  on a ladder of sizes, 64 x 64 up to a 1920 x 1080 frame, two ways:
+  - natively, on node-webgpu's default adapter (on a Windows GPU box, the GPU through D3D12);
+  - through the page's own "Time the network", in the browser.
+
+  Each size gets a fresh device, a couple of untimed passes, then up to 30 timed ones. Per size its `----` lines give:
+  - the median time and the 10th-90th percentiles, wall-clock from submit to the queue's done (no upload, no
+    read-back);
+  - the same span on the GPU's own clock, from timestamp queries where the device offers them (a browser may round
+    those to 0.1 ms);
+  - megapixels a second;
+  - the split by layer and kernel.
+
+  The ladder stops before a size whose pass would take over 1.5 s, so on SwiftShader only 64 x 64 runs. Its rows assert
+  the timer, never the time: the first size measured, the device clock nested inside the wall clock, timestamps asked for
+  where offered, and a timed pass writing the same image as an untimed one.
+
+On this box's SwiftShader, 64 x 64 takes about 640 ms natively and 510 ms in the browser. Those are a CPU's figures, and
+the report says so.
+
+The page itself has the same button: open `denoise.html` in your browser and press **Time the network**. It shows the
+table for whatever adapter the browser hands it, and says so plainly when that adapter is software.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

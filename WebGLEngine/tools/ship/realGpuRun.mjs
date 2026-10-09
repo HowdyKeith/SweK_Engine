@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // WebGLEngine/tools/ship/realGpuRun.mjs -- v4764 -- THE FSR AND FRAME-GENERATION GATES ON A REAL GPU, AND A REPORT THAT SAYS WHICH GPU.
+// (The denoiser arc's two device gates joined at its round 12: the learned denoiser on the device, and its timing.)
 //
 // Every device row in this tree has run on SwiftShader, a CPU rasteriser in a headless browser: the parity rows hold there,
 // the quality rows hold there, and every TIME any gate prints is a software renderer's. This runs the FSR and frame-generation
@@ -33,12 +34,18 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 /** The gates a real-hardware run covers, relative to the engine root, sorted. */
 export function gateList(root = ENG) {
     const pick = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).map((f) => `${dir}/${f}`) : []);
-    return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/)].sort();
+    // the denoiser arc's device round: its exact gate (the network on the device, cell for cell) and its timing gate
+    // (what a pass costs, 64 x 64 up to a 1080p frame -- render/learned-denoiser-preregistration.md section 37)
+    return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/),
+            ...pick("render", /^denoise(Device|Timing)-selfcheck\.mjs$/)].sort();
 }
 
-/** A gate's kind from its source: timing if it reads a clock, quality if it grades in dB, exact otherwise. */
+/**
+ * A gate's kind from its source: timing if it reads a clock, quality if it grades in dB, exact otherwise. The denoiser's
+ * timing gate reads its clocks inside render/denoiseDevice.mjs's timingLadder, so a call to that is a clock read too.
+ */
 export function categorize(src) {
-    if (/performance\.now|onSubmittedWorkDone|requestAnimationFrame/.test(src)) return "timing";
+    if (/performance\.now|onSubmittedWorkDone|requestAnimationFrame|timingLadder\(/.test(src)) return "timing";
     if (/\bdB\b|PSNR|Math\.log10/.test(src)) return "quality";
     return "exact";
 }

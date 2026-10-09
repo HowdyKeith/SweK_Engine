@@ -600,7 +600,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // the denoiser arc, round 9 -- 4616 -> 4618 for render/denoisePool.mjs and its gate.
     // the denoiser arc, round 12 -- 4618 -> 4621 for render/denoiseDevice.mjs, its gate and tools/denoiseDevice.mjs;
     // denoise.html and render/denoise-net-r11.json are not .js or .mjs and are not counted.
-    files: 4621,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the denoiser arc, round 12 again -- 4621 -> 4622 for render/denoiseTiming-selfcheck.mjs.
+    files: 4622,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1156,8 +1157,12 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // modules 4313 -> 4316, closures 4162 -> 4165, async/await 1727 -> 1730, typed arrays 1288 -> 1291 (the weights, the
     // read-backs), Promises 405 -> 407 (the read-backs gathered; the page-session script's waits), performance.now 241 ->
     // 242 (a pass's time), and WebGPU 56 -> 58: the module drives a GPUDevice and its gate asks Dawn and Chromium for one.
-    esModules: 4316, closures: 4165, asyncAwait: 1730, typedArrays: 1291, promises: 407,
-    fetchXhr: 251, performanceNow: 242, raf: 126, webgl: 197, webgpu: 58, threads: 26, wasm: 24,
+    // and again, for the rig's timing: render/denoiseTiming-selfcheck.mjs -- files 4621 -> 4622, ES modules 4316 -> 4317,
+    // closures 4165 -> 4166, async/await 1730 -> 1731, Promises 407 -> 408 (its page script's waits), WebGPU 58 -> 59 (it
+    // asks Dawn and Chromium for adapters) -- and performance.now 242 -> 241: render/denoiseDevice-selfcheck.mjs's page
+    // script now waits on Date, a deadline and not a measurement, so tools/ship/realGpuRun.mjs reads that gate as exact.
+    esModules: 4317, closures: 4166, asyncAwait: 1731, typedArrays: 1291, promises: 408,
+    fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 197, webgpu: 59, threads: 26, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
