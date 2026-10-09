@@ -187,6 +187,26 @@ console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDIN
        "PR #12's box and the v4818 rotation each wrote the shared ledger from a box the record refused");
 }
 
+console.log("\n*** v4825 -- THE CAP IS A KILL THE GATE CANNOT REFUSE ***");
+{
+    // runSlice's millisecond is the wall clock around redCensus.runGate, so a gate that survives the cap's signal
+    // writes ITS OWN runtime into the record as though it were the cap's. A browser gate does exactly that with
+    // SIGTERM (playwright-core's handler closes browsers and does not exit): fsrFrameGenBackdrop was filed at
+    // 311,726 ms beside a 20,000 ms cap at v4821. The stand-in below traps SIGTERM and would run 8 s; written to the
+    // OS temp directory, never into the tree, because a planted -selfcheck file is something four gates refuse.
+    // SABOTAGED: runGate's killSignal removed -> RED here, the slice reading 8,045 ms against a 1,500 ms cap when measured; restored.
+    const os = await import("node:os");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "swek-rotation-cap-"));
+    const stub = path.join(dir, "trapsSigterm.mjs");
+    fs.writeFileSync(stub, 'process.on("SIGTERM", () => {}); setTimeout(() => process.exit(0), 8000);\n');
+    try {
+        const [row] = runSlice([stub], { capMs: 600 });
+        ok("!! *** a gate that catches SIGTERM is still stopped AT the cap, and recorded as killed ***",
+            row.code === "timeout/signal" && row.finished === false && row.ms < 600 + 1400,
+            `${row.ms} ms against a 600 ms cap, code ${row.code}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
 console.log("\nunchecked here: runSlice and the command line, both of which spawn gates. The CLI's argument " +
     "handling is gated by tools/ship/cliArgs-selfcheck.mjs, which drives `--gates` against this tool's real " +
     "command line and watches it be refused; the slice runner itself is exercised every time a rotation runs.");
