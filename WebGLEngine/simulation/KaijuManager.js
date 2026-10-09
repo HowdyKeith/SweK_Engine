@@ -26,6 +26,7 @@ import { availableAttacksFor, getAttackForKind, getAttackForKaiju, KAIJU_ATTACKS
 // centipedes) actually apply acid DoT / slow / disabled / pulled.
 import { applyEffect as applyStatusEffect } from "./statusEffects.js";
 import { Kaiju } from "./Kaiju.js";
+import { pickMin } from "../ui/pick.mjs";   // v4824 -- the target scans below
 import { PathPlanner } from "./PathPlanner.js";
 import { pickKindConfig, biomeWeightedKind } from "../world/kaijuKinds.js";
 import { expandStructures } from "../world/structureBuilder.js";
@@ -543,15 +544,14 @@ export class KaijuManager {
         if (cam && cam.mode === "fp" && window.audioManager?.triggerDanger) {
             const now = performance.now();
             if (now - (this._lastDangerSting ?? -Infinity) > 8000) {
-                let nearest = Infinity;
-                for (const k of this.kaiju.values()) {
-                    if (!k.isAlive || !k.isAlive()) continue;
+                // v4824 -- ui/pick.mjs; with nothing alive the key is the bound, Infinity, as before
+                const nearest = pickMin(this.kaiju.values(), (k) => {
+                    if (!k.isAlive || !k.isAlive()) return null;
                     const dx = k.position.x - cam.position.x;
                     const dy = k.position.y - cam.position.y;
                     const dz = k.position.z - cam.position.z;
-                    const d2 = dx * dx + dy * dy + dz * dz;
-                    if (d2 < nearest) nearest = d2;
-                }
+                    return dx * dx + dy * dy + dz * dz;
+                }).key;
                 if (nearest < 25 * 25) {
                     window.audioManager.triggerDanger(2);
                     this._lastDangerSting = now;
@@ -1546,16 +1546,15 @@ export class KaijuManager {
         // normal civ/OGRE search if nothing in range.
         try {
             if (typeof window !== "undefined" && Array.isArray(window._extraRangedTargets) && window._extraRangedTargets.length) {
-                let nearest = null, bestD2 = range2;
-                for (const t of window._extraRangedTargets) {
-                    if (!t || typeof t.x !== "number") continue;
+                // v4824 -- ui/pick.mjs, same filter and exclusive range^2 bound
+                const pick = pickMin(window._extraRangedTargets, (t) => {
+                    if (!t || typeof t.x !== "number") return null;
                     const dx = t.x - k.position.x;
                     const dy = (t.y ?? 0) - k.position.y;
                     const dz = t.z - k.position.z;
-                    const d2 = dx*dx + dy*dy + dz*dz;
-                    if (d2 < bestD2) { bestD2 = d2; nearest = t; }
-                }
-                if (nearest) return nearest;
+                    return dx*dx + dy*dy + dz*dz;
+                }, range2);
+                if (pick.found) return pick.item;
             }
         } catch {}
 
@@ -1647,16 +1646,15 @@ export class KaijuManager {
         }
         // Else scan civilizations for nearest in range
         if (this.civManager?.getAll) {
-            let best = null, bestD2 = range2;
-            for (const c of this.civManager.getAll()) {
-                if (!c.center) continue;
-                if (c.id === k.allegiance) continue;     // patron civ — don't shoot
+            // v4824 -- ui/pick.mjs, same filters and exclusive range^2 bound
+            const best = pickMin(this.civManager.getAll(), (c) => {
+                if (!c.center) return null;
+                if (c.id === k.allegiance) return null;     // patron civ — don't shoot
                 const dx = c.center.x - k.position.x;
                 const dy = c.center.y - k.position.y;
                 const dz = c.center.z - k.position.z;
-                const d2 = dx * dx + dy * dy + dz * dz;
-                if (d2 < bestD2) { bestD2 = d2; best = c; }
-            }
+                return dx * dx + dy * dy + dz * dz;
+            }, range2).item;
             if (best) {
                 const orig = (d) => { best.energy = Math.max(0, (best.energy ?? 1) - d); };
                 return {
