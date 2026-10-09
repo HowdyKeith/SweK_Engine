@@ -23,6 +23,10 @@
 // slot count crosses an integer, S(t) = integral of dt/SLOT = (t + a*P + b*V + c*D)/B -- which is mhRatePhase
 // with a base of 1/B and the three integrals the host has sent since v4654. S is continuous and strictly
 // increasing, so floor(S) steps by one and a gesture keeps its own hash for the whole of its own life.
+// v4830 -- tempest's subject became tempest.ts's own clamped energy (walked in THINKING), and its slots took
+// murmur's small mix. SABOTAGES, each restored: lane 1's count on foldE in place of slotE (RED: section 4's
+// slot row and the base/length row); the small mix dropped (RED: the slot row); lane 0's count on voiceInt
+// (RED: the slot row and the base/length row). The 1.0 s floor row now RECORDS that it bites on lane 0.
 "use strict";
 
 import fs from "node:fs";
@@ -48,7 +52,9 @@ const DT = 1 / 60;
 // this file can DISAGREE with the port -- the v4579 distinction. A gate that re-states the table it grades
 // grades nothing.
 const SUBJ = {
-    tempest: { B: 2.9,   lane: 21, a: 0.00, b: 1.30 * 0.85, c: 0.00, resp: false },
+    // v4830: tempest's divisor is 1 + 1.30 * energy with tempest.ts's own energy (pace, thinking, drive;
+    // clamped), walked in THINKING -- until v4830 this subject was the port's voice-folded 1 + 1.105 * voice
+    tempest: { B: 2.9,   lane: 21, a: 0.00, b: 0.00,        c: 0.00, resp: false, energy: 1.30 },
     abyss:   { B: 17.5,  lane: 31, a: 0.35, b: 0.55,        c: 1.60, resp: true  },
     still:   { B: 10.15, lane: 5,  a: 0.30, b: 0.00,        c: 1.70, resp: true  },
 };
@@ -69,14 +75,17 @@ function walkOnce(settle, C) {
     const st = createPresenceState("idle");
     for (let i = 0; i < Math.round(settle / DT); i++) st.tick(DT, { voice: 0, activity: 0 });
     if (C.resp) st.setState("responding");
+    else if (C.energy) st.setState("thinking");
     const out = [];
     for (let i = 0; i < Math.round(4.0 / DT); i++) {
-        st.tick(DT, C.resp ? { voice: 1.0, activity: 1.0 } : { voice: 1.0, activity: 0 });
+        st.tick(DT, C.resp || C.energy ? { voice: 1.0, activity: 1.0 } : { voice: 1.0, activity: 0 });
         const p = st.getParams(), si = STATE_INDEX[p.state];
         const lv = K.mhLive(p.voice, p.activity, si), stn = K.mhState(si, p.stateTau);
-        const F = 1 + C.a * lv.pace + C.b * lv.voice + C.c * stn.drive;
+        const E = Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * stn.drive));
+        const F = C.energy ? 1 + C.energy * E : 1 + C.a * lv.pace + C.b * lv.voice + C.c * stn.drive;
         const SLOT = C.B / F, t = p.phase;
-        const S = K.mhRatePhase(1 / C.B, t, C.a, p.paceInt, C.b, p.voiceInt, C.c, p.driveInt);
+        const S = C.energy ? (t + C.energy * p.tempestEnergyInt) / C.B
+                           : K.mhRatePhase(1 / C.B, t, C.a, p.paceInt, C.b, p.voiceInt, C.c, p.driveInt);
         out.push({ t, SLOT, S,
                    murmur: K.mhFlourish(t, C.lane, SLOT), murmurSlot: Math.floor(t / Math.max(SLOT, 1)),
                    fixed: K.mhFlourishPhase(S, SLOT, C.lane), fixedSlot: Math.floor(S) });
@@ -85,7 +94,7 @@ function walkOnce(settle, C) {
 }
 
 // =============================================================================================================
-sec("1. *** THE GESTURE IS REPLACED RATHER THAN ADVANCED: the index moves 21 slots in one frame and the envelope steps 0.96 ***");
+sec("1. *** THE GESTURE IS REPLACED RATHER THAN ADVANCED: the index moves 41 slots in one frame and the envelope steps 0.99 ***");
 {
     const SESSIONS = [5, 30, 60, 120, 300, 900, 1800];
     const tally = {};
@@ -127,8 +136,9 @@ sec("1. *** THE GESTURE IS REPLACED RATHER THAN ADVANCED: the index moves 21 slo
     const worstM = Math.max(...Object.values(tally).map((t) => t.wM));
     const worstJ = Math.max(...Object.values(tally).map((t) => t.jumpM));
     const reMid = Object.values(tally).reduce((a, t) => a + t.reMid, 0);
-    ok("!! *** murmur's INDEX JUMPS BY UP TO 21 SLOTS IN ONE FRAME AND THE ENVELOPE STEPS 0.9996 OF ITS RANGE ***",
-        worstM > 0.95 && worstJ >= 20 && reMid > 0,
+    // v4830: 41, up from 21 -- tempest's real energy reaches 1.5 in THINKING where the voice fold reached 0.85
+    ok("!! *** murmur's INDEX JUMPS BY UP TO 41 SLOTS IN ONE FRAME AND THE ENVELOPE STEPS 0.9996 OF ITS RANGE ***",
+        worstM > 0.95 && worstJ >= 40 && reMid > 0,
         `across three species and seven session lengths the worst single-frame envelope step under murmur's ` +
         `spelling is ${worstM.toFixed(4)} of a 0..1 range and the worst index jump is ${worstJ} slots. That ` +
         `is not a gesture brightening: sin^2(pi u) has ZERO SLOPE at both ends by design, so an envelope ` +
@@ -143,10 +153,10 @@ sec("1. *** THE GESTURE IS REPLACED RATHER THAN ADVANCED: the index moves 21 slo
     // length flips the index and the gesture flickers rather than jumping once.
     const early = walk(30, SUBJ.tempest), late = walk(1800, SUBJ.tempest);
     const count = (w) => { let n = 0; for (let i = 1; i < w.length; i++) if (Math.abs(w[i].murmurSlot - w[i - 1].murmurSlot) > 1) n++; return n; };
-    ok("!! ...and what grows with the session is the FREQUENCY, not the size: 0 re-rolls at 30 s and 7 at half an hour",
+    ok("!! ...and what grows with the session is the FREQUENCY, not the size: 0 re-rolls at 30 s and 8 at half an hour",
         count(early) === 0 && count(late) > 4 && Math.max(...early.slice(1).map((r, i) => Math.abs(r.murmur.env - early[i].murmur.env))) > 0.9,
         `tempest's first lane re-rolls its index ${count(early)} times in the same four seconds of rising ` +
-        `voice after 30 s of running and ${count(late)} times after 1800. THE DAMAGE PER RE-ROLL IS ALREADY ` +
+        `cadence in THINKING after 30 s of running and ${count(late)} times after 1800. THE DAMAGE PER RE-ROLL IS ALREADY ` +
         `TOTAL AT THIRTY SECONDS -- the envelope step there is ` +
         `${Math.max(...early.slice(1).map((r, i) => Math.abs(r.murmur.env - early[i].murmur.env))).toFixed(4)} ` +
         `-- so this defect is NOT the phase teleport's shape, where the error is proportional to t. One ` +
@@ -225,26 +235,36 @@ sec("3. *** AND IT IS murmur's OWN FUNCTION WHEREVER THE SIGNAL IS HELD, across 
         `coefficients zeroed and only the migration in place, every one of the fifteen species gates stayed ` +
         `green, which is the same isolation v4654 ran on limn.`);
 
-    // *** THE 1.0 s GUARD HAS TO BE INERT OR THE INTEGRAL AND THE FUNCTION DISAGREE. *** mh_flourish clamps
-    // its slot to at least a second. S has no such clamp -- it cannot, it is an integral -- so if any wired
-    // lane could reach the guard, the count and the length would be measuring different clocks. Checked with
-    // the margin rather than asserted, the same move v4655 made for tempest's energy clamp.
+    // *** THE 1.0 s GUARD HAS TO BE INERT OR THE INTEGRAL AND THE FUNCTION DISAGREE -- AND ON ONE LANE IT IS
+    // NOT, which v4830 found and records rather than hides. *** mh_flourish clamps its slot to at least a
+    // second. S has no such clamp -- it cannot, it is an integral -- so where a lane reaches the guard the
+    // count runs at F/B per second while murmur's runs at 1. Until v4830 tempest's divisor was the port's
+    // 1 + 1.105 * voice, which topped at 2.105 and left lane 0 1.38x clear. tempest.ts's own divisor is
+    // 1 + 1.30 * energy, and energy reaches 1.5 in THINKING at full cadence, so lane 0's 2.9 s slot can
+    // shrink to 2.9 / 2.95 = 0.983 s. The floor bites there by 1.7%. Making it exact needs a per-lane
+    // integral of min(1 + 1.30 * energy, 2.9) -- a uniform for one lane's last 1.7% -- and is recorded in
+    // tools/ship/nextRounds.mjs instead. The small mount (5.2 s) and lane 1 (4.3 s) never reach it.
+    const eSup = 0.85 * 1.0 + 0.65;   // tempest's energy in THINKING at full cadence; drive is 0 there
     const LANES = [
         ["still",      Math.min(11.5, 7.0),    1 + 0.30 + 1.70],
         ["abyss",      Math.min(9, 26) * 0.66, 1 + 0.55 + 0.35 + 1.60],
-        ["tempest L0", 2.9,                    1 + 1.30 * 0.85],
-        ["tempest L1", 4.3,                    1 + 1.30 * 0.85],
+        ["tempest L0", 2.9,                    1 + 1.30 * eSup],
+        ["tempest L1", 4.3,                    1 + 1.30 * eSup],
+        ["tempest L0 small", 5.2,              1 + 1.30 * eSup],
     ];
     const margins = LANES.map(([n2, B, F]) => [n2, B / F]);
     say(`shortest slot each wired lane can reach: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}`);
-    ok("!! *** THE 1.0 s FLOOR CANNOT BITE ON ANY WIRED LANE -- worst margin 1.38x, on tempest's first ***",
-        margins.every(([, m]) => m > 1.0) && Math.min(...margins.map(([, m])  => m)) > 1.2,
+    const bites = margins.filter(([, m]) => m < 1.0);
+    ok("!! *** THE 1.0 s FLOOR BITES ON ONE LANE ONLY -- tempest's first, by 1.7%, in THINKING at full cadence ***",
+        bites.length === 1 && bites[0][0] === "tempest L0" && bites[0][1] > 0.98 &&
+        margins.filter(([n2]) => n2 !== "tempest L0").every(([, m]) => m > 1.4),
         `each lane's shortest possible slot is its STYLE MINIMUM over its LARGEST signal sum, so these are ` +
         `the worst cases and not samples: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}. ` +
-        `mh_flourish clamps the length to a second and the integrated count cannot, so a lane that reached ` +
-        `the floor would have its boundaries and its lead-in on two different clocks. The margin is thin ` +
-        `enough to be worth a row: tempest's first lane is 1.38x off it, and a style change that shortened ` +
-        `2.9 s would close the gap.`);
+        `Only tempest's first lane on the large mount crosses the floor, to ${bites.length ? bites[0][1].toFixed(3) : "?"} ` +
+        `s, which needs energy above ${((2.9 - 1) / 1.30).toFixed(4)} -- THINKING with cadence above ` +
+        `${(((2.9 - 1) / 1.30 - 0.65) / 0.85).toFixed(3)}. There the integrated count runs up to 1.7% fast ` +
+        `against murmur's clamped slot; the index still steps by one (section 2), so it is a drift in WHICH ` +
+        `gesture plays, not a re-roll. Every other lane clears the floor by at least 1.4x.`);
 }
 
 // =============================================================================================================
@@ -272,30 +292,27 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
     const src = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
     const raw = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
 
-    // *** AND tempest's FOLDED COEFFICIENT COMES OUT OF THE SHADER'S OWN TWO NUMBERS. *** The table says
-    // 1.30 * 0.85 and the shader spells those two separately -- 1.30 inside the bolt's own rate and 0.85
-    // inside the energy clamp. Restating 1.105 here would make this row a comment, so both are READ and
-    // multiplied: change either in the shader and this recomputes instead of agreeing with itself. A
-    // sabotage that dropped the 1.30 walked through every row in this gate, because a wrong coefficient
-    // still moves a pixel and every pixel row here asks only whether it moved.
+    // *** tempest's SLOT RATE AND ITS SLOT COUNT SPEND THE SAME 1.30 ON THE SAME ENERGY -- v4830. *** Until
+    // v4830 this row folded 1.30 * 0.85 into a VOICE coefficient, because the port's energy was clamp(0.85 *
+    // VOICE). tempest.ts's energy is pace, thinking and drive, clamped, and the host now integrates exactly
+    // that (tempestEnergyInt), so the count is (t + 1.30 * tempestEnergyInt) / slot and the length is
+    // slot / (1 + 1.30 * energy). A count on one coefficient and a length on another would re-roll on every
+    // change of energy -- the defect this whole gate is about -- and every pixel row here would still pass,
+    // because a wrong coefficient still moves a pixel. So both halves are READ and must name the same field.
+    // The slot itself is mix(slot, slotSmall, small) per tempest.ts:74-75: a MOUNT constant, not a signal.
     {
-        const raw0 = raw;
-        const mR = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(([\d.]+)\)\)\)/.exec(raw0);
-        const mE = /clamp\(VOICE\.mul\(([\d.]+)\), 0\.0, ([\d.]+)\)/.exec(raw0);
-        const T2 = K.MH_SLOT_SIGNAL.tempest;
-        ok("!! *** tempest's SLOT COEFFICIENT IS THE SHADER'S OWN 1.30 TIMES ITS OWN 0.85, read and multiplied ***",
-            !!mR && !!mE && Math.abs(T2.voice - Number(mR[1]) * Number(mE[1])) < 1e-12 &&
-            T2.pace === 0 && T2.drive === 0 && Number(mE[1]) * 1.0 < Number(mE[2]),
-            mR && mE ? `the bolt's rate divides by (1 + ${mR[1]} * energy) and energy is ` +
-                `clamp(${mE[1]} * VOICE, 0, ${mE[2]}), so the folded voice coefficient is ${mR[1]} x ` +
-                `${mE[1]} = ${(Number(mR[1]) * Number(mE[1])).toFixed(4)} against the table's ${T2.voice}. ` +
-                `THE FOLD IS ONLY VALID WHILE THE CLAMP IS INERT, and mh_live bounds voice to 1 in both ` +
-                `halves of the kit, so energy tops at ${mE[1]} against a ceiling of ${mE[2]} -- a margin of ` +
-                `${(Number(mE[2]) / Number(mE[1])).toFixed(2)}x, the same clamp v4655 measured for the drift ` +
-                `that reads it. tempest.ts gives its bolts NO cadence and NO drive, and the table's other ` +
-                `two entries are exactly 0.`
-                : `could not find the bolt rate or the energy clamp in the shader source -- if either moved, ` +
-                  `this row has to move with it rather than pass on a stale reading.`);
+        const rateOk = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(MT\.slotE\)\)\)/.test(raw);
+        const counts = (raw.match(/uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\(TB\[[01]\]\)/g) || []).length;
+        const slots = /const TB = MH_TEMPEST_BOLT\.lanes\.map\(\(ln\) => mix\(float\(ln\.slot\), float\(ln\.slotSmall\), smallK\)/.test(raw);
+        const L = K.MH_TEMPEST_BOLT.lanes, ME = K.MH_MIST_LIVE.tempest;
+        ok("!! *** tempest's SLOT COUNT AND SLOT LENGTH SPEND THE SAME 1.30 ON THE SAME CLAMPED ENERGY, on murmur's small-mixed slots ***",
+            rateOk && counts === 2 && slots && ME.slotE === 1.30 && !("tempest" in K.MH_SLOT_SIGNAL) &&
+            L[0].slot === 2.9 && L[0].slotSmall === 5.2 && L[1].slot === 4.3 && L[1].slotSmall === 7.4,
+            `length slot / (1 + slotE * energy) ${rateOk ? "found" : "NOT FOUND"}; count (t + slotE * ` +
+            `tempestEnergyInt) / slot on ${counts} of 2 lanes; slots mix(${L[0].slot}, ${L[0].slotSmall}) and ` +
+            `mix(${L[1].slot}, ${L[1].slotSmall}) on small ${slots ? "found" : "NOT FOUND"}; slotE ${ME.slotE}. ` +
+            `MH_SLOT_SIGNAL carries no tempest entry any more -- its folded 1.105 voice coefficient was the ` +
+            `port's energy, not murmur's.`);
     }
 
     // *** THE PHASE AND THE LENGTH HAVE TO BE THE BASE AND THE INSTANTANEOUS ONE, IN THAT ORDER. ***
@@ -326,8 +343,11 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
         // a term is "live" if it names a signal, or names an identifier whose declaration does
         const live = (txt) => SIG.test(txt) ||
             (txt.match(/[A-Za-z_]\w*/g) || []).some((id) => SIG.test(declOf(id, src)));
+        // v4830: tempest's count is (t + slotE * the integrated energy) / slot -- the same factoring with the
+        // energy integral in place of mhRatePhase's three, so its base is the slot it divides by
         const bm = /^KIT\.mhRatePhase\(\s*float\(1\.0\)\.div\(([\s\S]*?)\),/.exec(args[0] || "") ||
-                   /^KIT\.mhRatePhase\(\s*float\(([\s\S]*?)\),/.exec(args[0] || "");
+                   /^KIT\.mhRatePhase\(\s*float\(([\s\S]*?)\),/.exec(args[0] || "") ||
+                   /^uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\((TB\[\d\])\)$/.exec(args[0] || "");
         pairs.push({ base: bm ? bm[1].trim() : "(none)", len: (args[1] || "").trim(),
                      ok: !!bm && !live(bm[1]) && live(args[1] || "") });
     }
@@ -347,13 +367,13 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
     say(`gesture clocks in the orb: ${nPhase} integrated, ${nPlain} on the plain clock`);
     ok("!! *** THE FOUR MODULATED SLOTS USE THE INTEGRATED COUNT AND THE ELEVEN FIXED ONES DO NOT ***",
         nPhase === 4 && nPlain === 11 &&
-        /MH_SLOT_SIGNAL\.still/.test(raw) && /MH_SLOT_SIGNAL\.abyss/.test(raw) && /MH_SLOT_SIGNAL\.tempest/.test(raw),
+        /MH_SLOT_SIGNAL\.still/.test(raw) && /MH_SLOT_SIGNAL\.abyss/.test(raw) && /MT\.slotE/.test(raw),
         `${nPhase} integrated call sites -- still's one glint, abyss's three lanes written as one call in a ` +
         `loop, and tempest's two bolts -- against ${nPlain} sites still on mh_flourish, every one of which is ` +
         `handed a slot length that is a style constant. A SITE WHOSE SLOT DOES NOT MOVE HAS NO INDEX TO ` +
         `RE-ROLL, so migrating it would change nothing and risk a frame; the same reasoning v4654 used to ` +
-        `leave seventeen unmodulated drifts alone. All three species read MH_SLOT_SIGNAL rather than ` +
-        `spelling murmur's numbers at the call site. THE COUNTS ARE BOTH ASSERTED BECAUSE EITHER ` +
+        `leave seventeen unmodulated drifts alone. still and abyss read MH_SLOT_SIGNAL and tempest reads ` +
+        `MH_MIST_LIVE's slotE (v4830) rather than spelling murmur's numbers at the call site. THE COUNTS ARE BOTH ASSERTED BECAUSE EITHER ` +
         `DIRECTION IS A DEFECT: a site that acquires a moving slot without the integrated count re-rolls, ` +
         `and one migrated without needing it is a frame changed for nothing. This row was written with the ` +
         `plain count at 12 and went red at 11 -- nebula keeps the plain clock inside the same ternary whose ` +
@@ -366,7 +386,9 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
     // Every frame holds stateIndex, stateTau and voice fixed, so PACE, VOICE and DRIVE as the shader computes
     // them are IDENTICAL across each pair. Only the accumulated history differs -- which under the expression
     // this round replaced would leave the slot length untouched and every pair byte-identical.
-    const z = { stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0 };
+    // v4830: tempest's lanes count on tempestEnergyInt at 1.30. The frames keep the slot counts the voice-
+    // folded clock had at 1.105: 3.0 and 8.0 radian-seconds of voice are 2.55 and 6.8 of energy.
+    const z = { stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, tempestEnergyInt: 0 };
     const FR = [
         sp("still", 12.0, 0.6, { ...z }),                                 // 0  night
         sp("still", 12.0, 0.6, { ...z, paceInt: 12.0 }),                  // 1  glint up
@@ -375,10 +397,10 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7 }),                    // 4  third lane passing
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, voiceInt: 9.0 }),     // 5
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, driveInt: 6.0 }),     // 6
-        sp("tempest", 10.0, 0.6, { ...z, voiceInt: 3.0 }),                // 7  first bolt up
-        sp("tempest", 10.0, 0.6, { ...z, voiceInt: 8.0 }),                // 8
-        sp("tempest", 10.0, 0.6, { ...z, voiceInt: 3.0, driveInt: 9.0 }), // 9  DEAF, with the bolt ON
-        sp("tempest", 10.0, 0.6, { ...z, voiceInt: 3.0, paceInt: 9.0 }),  // 10 DEAF, with the bolt ON
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55 }),                // 7  first bolt up
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 6.8 }),                 // 8
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, voiceInt: 9.0 }), // 9  DEAF, with the bolt ON
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, paceInt: 9.0 }),  // 10 DEAF, with the bolt ON
     ];
     const run = await renderSpecies(FR);
     if (!run.ok || !run.frames || run.frames.length !== FR.length) {
@@ -395,7 +417,7 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         const tV = diff(run.frames[7], run.frames[8]);
         const tD = diff(run.frames[7], run.frames[9]), tP = diff(run.frames[7], run.frames[10]);
         say(`still   paceInt 0->12: ${sP.pct.toFixed(1)}% worst ${sP.mx}   driveInt 0->7: ${sD.pct.toFixed(1)}% worst ${sD.mx}`);
-        say(`abyss   voiceInt +9: ${aV.pct.toFixed(1)}% worst ${aV.mx}   driveInt +6: ${aD.pct.toFixed(1)}% worst ${aD.mx}   |   tempest voiceInt 3->8: ${tV.pct.toFixed(1)}% worst ${tV.mx}`);
+        say(`abyss   voiceInt +9: ${aV.pct.toFixed(1)}% worst ${aV.mx}   driveInt +6: ${aD.pct.toFixed(1)}% worst ${aD.mx}   |   tempest energyInt 2.55->6.8: ${tV.pct.toFixed(1)}% worst ${tV.mx}`);
         ok("!! *** THE ACCUMULATED HISTORY DECIDES WHETHER THE GESTURE IS ON SCREEN AT ALL, on all three species ***",
             sP.pct > 5 && sP.mx > 100 && sD.pct > 5 && sD.mx > 100 &&
             aV.pct > 5 && aV.mx > 100 && aD.pct > 5 && aD.mx > 100 && tV.pct > 5 && tV.mx > 100,
@@ -403,15 +425,17 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
             `cadence behind it, at the SAME instant and the same instantaneous cadence: ${sP.pct.toFixed(1)}% ` +
             `of bytes move, worst channel ${sP.mx} of 255. Drive does the same through its own coefficient ` +
             `(${sD.pct.toFixed(1)}%, ${sD.mx}), abyss's third lane moves on voice and drive ` +
-            `(${aV.pct.toFixed(1)}%, ${aD.pct.toFixed(1)}%) and tempest's first bolt on voice ` +
+            `(${aV.pct.toFixed(1)}%, ${aD.pct.toFixed(1)}%) and tempest's first bolt on its energy integral ` +
             `(${tV.pct.toFixed(1)}%). EVERY PAIR HOLDS stateIndex 0, stateTau 0 AND voice 0.6, so nothing ` +
             `the shader conditions from a uniform differs between the two halves -- under the expression ` +
             `this round replaced these would be five identical pictures.`);
 
-        say(`still +voiceInt 12 (glint ON): ${sV.pct.toFixed(1)}%   |   tempest +driveInt 9: ${tD.pct.toFixed(1)}%   +paceInt 9: ${tP.pct.toFixed(1)}%`);
+        say(`still +voiceInt 12 (glint ON): ${sV.pct.toFixed(1)}%   |   tempest +voiceInt 9: ${tD.pct.toFixed(1)}%   +paceInt 9: ${tP.pct.toFixed(1)}%`);
         ok("!! *** ...AND EACH SLOT IS DEAF TO THE SIGNALS murmur DOES NOT GIVE IT -- measured with the gesture ON SCREEN ***",
             sV.pct === 0 && tD.pct === 0 && tP.pct === 0,
-            `still.ts divides by pace and drive and NOT voice; tempest.ts by energy alone. Twelve ` +
+            `still.ts divides by pace and drive and NOT voice; tempest.ts by energy alone, which reads ` +
+            `cadence, thinking and drive through ONE clamped integral and never voice (v4830: the drive ` +
+            `deaf frame became a voice one, because driveInt now streams the cloud). Twelve ` +
             `radian-seconds of the signal each one does not read moves ${sV.pct.toFixed(0)}, ` +
             `${tD.pct.toFixed(0)} and ${tP.pct.toFixed(0)} bytes. THE FRAMES THESE ARE MEASURED AGAINST HAVE ` +
             `THE GESTURE UP -- still at 0.993 and tempest's first bolt at 0.981 -- which is the whole ` +
@@ -434,7 +458,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "9.0x the rate of its own progress during a transition. That is murmur's rule faithfully read rather " +
     "than an artefact of this repair, and expressing the lead-in against the BASE slot instead would make it " +
     "perfectly continuous at the price of the reduction that protects every recorded frame -- measured, and " +
-    "rejected for that reason. Also not claimed: tempest's bolt slots are missing murmur's `small` mix " +
-    "(mix(2.9, 5.2, small) and mix(4.3, 7.4, small)), which is a style transcription rather than a clock and " +
-    "is recorded against the st.drive entry in tools/ship/nextRounds.mjs.");
+    "rejected for that reason. tempest's small-mount slots (mix(2.9, 5.2, small), mix(4.3, 7.4, small)) are " +
+    "in since v4830 and checked in the source in section 4; no frame here is rendered on a small mount.");
 process.exit(fails ? 1 : 0);

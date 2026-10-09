@@ -20,6 +20,7 @@
 // and the shader needs the three running integrals, not the history. render/aiPresenceOrbState.mjs
 // accumulates them in SHADER time -- against the tempo integral, not wall seconds -- because a species' rate
 // is per second of the clock it is handed.
+// v4830 SABOTAGE, restored: geode's spin put back on a bare t * 0.30 (RED: the ten-clock census row).
 "use strict";
 
 import fs from "node:fs";
@@ -261,16 +262,22 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     const repaired = [], plainDrift = [];
     for (let k = 0; k < marks.length - 1; k++) {
         const blk = lines.slice(marks[k][0], marks[k + 1][0]).join("\n");
-        if (/KIT\.mhDriftPhase\(/.test(blk)) repaired.push(marks[k][1]);
+        // v4830: a builder is also repaired when it reaches the integrated clock through one of the two shared
+        // helpers -- ratePhase (opal's flash drift, a bare rate * t with no wobble to hand mhDriftPhase) or
+        // spinPhase (geode's and fathom's spins, whose drive MIX is integrated inside the helper).
+        if (/KIT\.mhDriftPhase\(|\bratePhase\(|\bspinPhase\(/.test(blk)) repaired.push(marks[k][1]);
         for (const call of modulatedDrifts(blk)) plainDrift.push(`${marks[k][1]}:${call.slice(0, 44)}`);
     }
     say(`species whose clocks use the integrated phase: ${repaired.join(", ")}`);
     say(`modulated rates still on murmur's rate * t: ${plainDrift.length ? plainDrift.join(", ") : "(none)"}`);
 
-    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet"].sort();
-    ok("!! *** ALL SEVEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
+    // v4830: opal, fathom and geode join -- the three clocks that were recorded against the st.drive entry as
+    // "spells a bare rate * t" (opal's drift, geode's mix target) or carried no live term at all (fathom's spin).
+    const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "opal", "fathom", "geode"].sort();
+    ok("!! *** ALL TEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
         repaired.slice().sort().join(",") === WANT.join(",") && plainDrift.length === 0,
-        `${repaired.join(", ")} build their secular phase with mhRatePhase and hand it to mhDriftPhase, and ` +
+        `${repaired.join(", ")} build their secular phase with mhRatePhase (directly, or through the ratePhase ` +
+        `and spinPhase helpers) and, where murmur's clock has a wobble, hand it to mhDriftPhase, and ` +
         `no plain mh_drift anywhere in the file reads a live signal in its rate OR its output. THE CENSUS ` +
         `SAID "(none)" AT v4654 WHILE mist AND flux WERE STILL TELEPORTING -- it inspected only the rate ` +
         `argument, and only when that argument was a bare identifier, so a drift whose OUTPUT is scaled ` +

@@ -27,6 +27,7 @@
 // so at the peak they arrive together and the differences between them close. A gain preserves every
 // difference and multiplies them; a saturation destroys them. Both are the flash, and a port that used one
 // spelling for all six would be wrong about six species in two different directions.
+// v4830 SABOTAGE, restored: opal's procession mix handed a zero weight in place of DRIVE (RED: the saturations row).
 "use strict";
 
 import fs from "node:fs";
@@ -159,7 +160,9 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
         `exploited when droplet's exclusion was a ternary.`);
 
     // The three saturation sites, named, because each is inside a different species' loop.
-    const sites = [["opal", /KIT\.mhCompleteLift\(KIT\.mhOpalLife\(/],
+    // v4830: opal's life is the RESPONDING mix murmur writes -- mix(life, procession, drive) -- and the lift
+    // saturates THAT, so the site reads the lift around the mix and not around the bare mhOpalLife.
+    const sites = [["opal", /KIT\.mhCompleteLift\(\s*mix\(KIT\.mhOpalLife\([^)]*\), uniforms\.time\), float\(OD\.procFloor\)\.add\(max\(proc, 0\.0\)\.mul\(OD\.procAmp\)\), DRIVE\)/],
                    ["sol", /KIT\.mhCompleteLift\(sn\.mul\(sn\), COMPLETE,/],
                    ["chorus", /KIT\.mhCompleteLift\(\s*life\.add\(select\(/]];
     const found = sites.filter(([, re]) => re.test(raw)).map(([s]) => s);

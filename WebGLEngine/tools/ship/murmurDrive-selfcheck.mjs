@@ -20,6 +20,8 @@
 //
 // Its sibling tools/ship/murmurDrive2-selfcheck.mjs carries the other half of the lean -- the scatter
 // collapsing around the heading -- on the five species that narrow. The split is the usual budget one.
+// v4830 SABOTAGES, restored: the clouds' advection spelled as murmur's DRIVE * k * t (RED: the z-split row and the
+// growing-phase row); mist's heading read with a fallback to a named entry (RED: the wired-set row).
 "use strict";
 
 import fs from "node:fs";
@@ -211,15 +213,22 @@ sec("2. *** THE SIX HEADINGS ARE NOT ONE VECTOR, NONE OF THEM IS A UNIT VECTOR, 
 
     // The z sign is the finding, and it is the reason the two unwired entries are carried here at all.
     const fwd = names.filter((n) => H[n].v[2] > 0), back = names.filter((n) => H[n].v[2] < 0);
-    ok("!! *** THE FOUR WIRED HEADINGS POINT ONE WAY IN DEPTH AND THE TWO CLOUDS STREAM THE OTHER ***",
+    // v4830 WIRED THE TWO ADVECTIONS, as the integral: V * k * driveInt in place of murmur's V * (drive * k * t).
+    // The z split is still the finding; what changed is that it is no longer the wired/unwired split.
+    const advSrc = codeOnly(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8"));
+    const advInt = /const mAdv = vec3\(\.\.\.AH\.v\)\.mul\(uniforms\.driveInt\.mul\(AH\.k\)\)/.test(advSrc);
+    ok("!! *** THE FOUR DIRECTION HEADINGS POINT ONE WAY IN DEPTH AND THE TWO CLOUDS STREAM THE OTHER -- all six wired, the streams as an integral ***",
         fwd.join(",") === "still,abyss,sol,droplet" && back.join(",") === "nebula,tempest" &&
-        fwd.every((n) => H[n].wired) && back.every((n) => !H[n].wired),
-        `+z: ${fwd.join(", ")}; -z: ${back.join(", ")}. The split is exactly the wired/unwired split and that ` +
-        `is a coincidence of subject, not of scheduling: the two that stream AWAY are murmur's two volumetric ` +
+        fwd.every((n) => H[n].wired) && back.every((n) => H[n].wired) && advInt,
+        `+z: ${fwd.join(", ")}; -z: ${back.join(", ")}. Until v4830 the split was exactly the wired/unwired ` +
+        `split; now all six are wired and the two -z entries reach the shader as V * k * driveInt ` +
+        `(${advInt ? "found" : "NOT FOUND"}), the running integral of drive, so the domain streams at k * drive ` +
+        `per second and cannot jump. The split was a coincidence of subject, not of scheduling: the two that stream AWAY are murmur's two volumetric ` +
         `heroes, and their headings are spelled as an ADVECTION -- adv = V * (drive * k * t) -- a displacement ` +
         `proportional to elapsed time. A drive ramping while t is large advects the domain by t * k * dDrive ` +
         `in one frame, which is the shape v4650 repaired on this orb's host clock (2.902 s in one frame after ` +
-        `a minute; 86.191 s after half an hour). This round wires only terms that are a DIRECTION or a SIZE.`);
+        `a minute; 86.191 s after half an hour). v4653 wired only terms that are a DIRECTION or a SIZE and ` +
+        `left these two until the integral existed.`);
 }
 
 // =============================================================================================================
@@ -318,16 +327,19 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     // string key from the file as written.
     const rawSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8");
     const dropletFlow = /DROPLET_FLOW/.test(src) && /species === "droplet" && HEAD/.test(rawSrc);
-    const reached = callers.concat(dropletFlow ? ["droplet"] : []).sort();
+    // v4830: mist's closure reads MH_DRIVE_HEADING[species] for the advection, which is nebula and tempest
+    const mistAdv = /const AH = MH_DRIVE_HEADING\[species\];/.test(src) && callers.indexOf("mist") === -1 &&
+        /const buildMist = [\s\S]*?const AH = MH_DRIVE_HEADING\[species\];/.test(src);
+    const reached = callers.concat(dropletFlow ? ["droplet"] : [], mistAdv ? ["nebula", "tempest"] : []).sort();
     say(`heading callers: ${callers.join(", ")}${dropletFlow ? " (+ droplet, via the body's flow deformation)" : ""}`);
-    ok("!! *** EXACTLY THE `wired` ENTRIES REACH THE SHADER, AND THE TWO ADVECTIONS REACH NOTHING ***",
-        reached.join(",") === wired.join(",") && !/MH_DRIVE_HEADING\.(nebula|tempest)/.test(src),
+    ok("!! *** EXACTLY THE `wired` ENTRIES REACH THE SHADER -- all six, the two advections through mist's own key ***",
+        reached.join(",") === wired.join(",") && wired.length === 6 && !/MH_DRIVE_HEADING\.(nebula|tempest)/.test(src),
         `the builder reads ${reached.join(", ")}; MH_DRIVE_HEADING's wired set is ${wired.join(", ")}. ` +
         `EQUALITY IN BOTH DIRECTIONS, and each direction has a failure behind it: a table entry no closure ` +
         `reads draws nothing at all (v4644's dead MH_IGNITE entry walked through every pixel gate in that ` +
-        `round), and a closure reading an entry that is not there would fault on its k. nebula's and ` +
-        `tempest's names appear nowhere in the shader, so the day somebody wires them THIS ROW GOES RED and ` +
-        `the note explaining why they were left out gets read before the jump ships.`);
+        `round), and a closure reading an entry that is not there would fault on its k. mist reads the table ` +
+        `by its own species key with NO fallback to a named entry (until v4830 the advection was unwired and ` +
+        `this row asserted nebula and tempest reached nothing).`);
 
     // *** THE RULE THIS ROUND SET ITSELF -- AND WHAT IT BECAME TWO ROUNDS LATER, WHICH IS WHY IT IS REWRITTEN
     // RATHER THAN LEFT PASSING. *** At v4653 this row read "NOTHING THIS ROUND WIRED MULTIPLIES A CLOCK" and
@@ -374,17 +386,25 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
         if (/\bDRIVE\b/.test(a[1] || "") || /\bDRIVE\b/.test(a[2] || "")) amplitudeDrive++;
     }
     // ...and the integral itself is only ever handed to mhRatePhase, so it cannot be spent as a plain factor.
+    // v4830: two more legitimate shapes, each an integral spent as a phase or a displacement and neither a
+    // plain factor -- spinPhase's secular sum (A * kd + B, the spin's own drive coefficient and its mix pull)
+    // and the clouds' advection V * k * driveInt. Each is matched by its whole expression.
     const driveIntReads = (src.match(/uniforms\.driveInt/g) || []).length;
     const driveIntInRate = (src.match(/uniforms\.driveInt\)/g) || []).length;
+    const driveIntSpin = (src.match(/\.add\(uniforms\.driveInt\.mul\(A \* kd \+ B\)\)/g) || []).length;
+    const driveIntAdv = (src.match(/vec3\(\.\.\.AH\.v\)\.mul\(uniforms\.driveInt\.mul\(AH\.k\)\)/g) || []).length;
     ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
-        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 2 && driveIntReads === driveIntInRate,
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 3 && driveIntSpin === 1 && driveIntAdv === 1 &&
+        driveIntReads === driveIntInRate + driveIntSpin + driveIntAdv,
         `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
         `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
         `helix's climb, whose whole rate murmur scales by st.drive, and limn's flattening ease, ` +
-        `mix(0.62, 0.14, st.drive), which arrived at v4657. Both are amplitudes. The ` +
+        `mix(0.62, 0.14, st.drive), which arrived at v4657, and (v4830) fathom's innermost shell, whose ` +
+        `rate fathom.ts scales by 1 + kp*pace + kd*drive. All three are amplitudes. The ` +
         `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
-        `and it reads uniforms.driveInt, which appears ${driveIntReads} times and every one of them is the ` +
-        `last argument of a mhRatePhase call. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +
+        `and it reads uniforms.driveInt, which appears ${driveIntReads} times: ${driveIntInRate} as the last ` +
+        `argument of a mhRatePhase call, ${driveIntSpin} in spinPhase's secular sum and ${driveIntAdv} as the ` +
+        `clouds' advection -- an integral every time. THIS ROW USED TO SAY THE RATE FAMILY WAS DEFERRED and tested ` +
         `that no line read DRIVE and uniforms.time together. v4654 and v4655 undeferred it, and the old test ` +
         `KEPT PASSING because helix's two reads sit on two lines -- a condition outliving its own sentence, ` +
         `which is the failure this tree finds most often and the one a green row hides best.`);

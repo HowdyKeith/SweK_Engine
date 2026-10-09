@@ -1103,7 +1103,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 : ratePhase(mistBase, MN.drPace, MN.drVoice, MN.drDrive),
             mistBase.mul(mDrFactor), float(0.45), float(MIST.drLane), uniforms.time).toVar();
         // v4830 -- "RESPONDING: the whole domain streams one way": murmur's V * (drive * k * t), as V * k * driveInt
-        const AH = MH_DRIVE_HEADING[species] || MH_DRIVE_HEADING.nebula;
+        const AH = MH_DRIVE_HEADING[species];   // mist draws only nebula and tempest, both wired
         const mAdv = vec3(...AH.v).mul(uniforms.driveInt.mul(AH.k)).toVar();
         const mAbsorb = float(MIST.absorb).mul(float(0.55).add(densityK.mul(0.85))).toVar();
         const mEmit = float(MIST.emitB).add(densityK.mul(MIST.emitK)).toVar();
