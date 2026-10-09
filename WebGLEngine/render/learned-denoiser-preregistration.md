@@ -1603,3 +1603,106 @@ Reported, never tested: on the test sets, both methods beat the noisy input on 1
   reported, and the third (round 8, 7 of 12 on R) was one draw of scenes (section 29).
 - **In ten rounds it has never beaten the filter on a family it was not trained on, in either direction.**
 - The network does not go to the device on these results. Section 9 asks for both hypotheses.
+
+## 32. ROUND 11 -- THE DEPLOYMENT ROUND: ONE NETWORK FOR BOTH FAMILIES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question changes, as Keith asked after section 31.**
+
+> **Trained once on both families it is to be used on, does one network beat one filter, tuned on the same scenes,
+> on new scenes of each?**
+
+Ten rounds found the network beating the filter wherever it was trained and nowhere else, in either direction. This
+round stops asking it to transfer. Section 9 sends the network to the device when both hypotheses hold. Here both test
+families are ones it was trained on, so meeting that rule claims no transfer, and says nothing about a family outside
+R and C.
+
+**One deliberate change from round 10: the training split is round 7's 96 scenes of R and round 10's 96 of C,
+together.**
+- They are the same 192 scenes those rounds rendered and trained on; nothing about them is new.
+- Everything else is round 10's:
+  - the large network (33,329 parameters), 4,500 steps, seeds 1, 2, 3;
+  - the filter and its grid, tuned on the training split, so now on all 192;
+  - the emitter mask and its rule;
+  - the sign-flip test, Holm over {H1, H2};
+  - C0, C1 on the training images (now 176 of 192), C2-C5, and the stop before the tests.
+- **H1 is new scenes of R; H2 is new scenes of C.** Both are in-distribution.
+- One network and one filter setting for both families. Neither method is told which family an image comes from.
+- C2's shuffled-target networks are trained on the 192 and measured on H1's set, as always.
+- The schedule is not lengthened. 4,500 steps over 192 scenes draw each scene about half as often as rounds 9 and 10
+  did. That is part of the change, and the pilot below says what it costs on the training images.
+
+**Splits** (`SPLITS_R11`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 96 of R and 96 of C | 20000-20095 (round 7's) and 30000-30095 (round 10's) |
+| val | 4 of R and 4 of C | 21000-21003 and 31000-31003 (rounds 7 and 10's) |
+| T1 -> **H1** | 12 of R | **34000-34011** |
+| T2 -> **H2** | 12 of C | **35000-35011** |
+
+- Every test seed is on a range no earlier split touched. The training and val scenes are earlier rounds', each drawn
+  as the family it was drawn as then (the gate holds that).
+- C5 holds over eleven rounds: 1,518 render seeds.
+
+**Secondary** (reported, never tested):
+- **Each family's own training, side by side.** The filter tuned, and the large network trained (seeds 1-3), on R's 96
+  alone and on C's 96 alone -- the trainings round 10 ran as its comparison and as its primary. Measured on this
+  round's test images:
+  - their networks against this round's filter, under both tests;
+  - **this round's networks against each family's own filter,** under both tests. A device that knew each image's
+    family could run that family's filter instead; this says whether the one network beats that too.
+- The sign test beside every sign-flip p.
+- 1- and 16-sample inputs, val, and time.
+
+**What was seen first.**
+- Everything in sections 1-31, including both families' test images in rounds 5-10 and every statistic on them.
+- **The pilot,** on the 192 TRAINING scenes only, before this was written. Its scenes are the ones rounds 7 and 10
+  rendered, read from round 10's cache; round 10's filters and its seed-1 networks were read from there too.
+  Each cell is the training fit (as C0 measures it, against the noisy input; lower is better), then how many images
+  beat the noisy input:
+
+| on the training scenes | all 192 | R's 96 | C's 96 |
+|---|---|---|---|
+| noisy input, relMSE median | 0.0203 | 0.0352 | 0.0127 |
+| **the filter tuned on all 192:** sS 1, sN 1, sA 0.2, sI 4 | 0.294; 189 | 0.211; 94 | 0.409; 95 |
+| C's own filter (round 10's, sI 1) | 0.361; 190 | 0.342; 94 | 0.382; 96 |
+| round 10's network trained on R alone, seed 1, 4,500 steps | 0.204; 191 | 0.100; 96 | 0.419; 95 |
+| round 10's network trained on C alone, seed 1, 4,500 steps | 0.207; 190 | 0.226; 94 | 0.189; 96 |
+| **the large network on all 192,** seed 1, 1,500 steps | 0.196; 192 | 0.145; 96 | 0.265; 96 |
+| the same, 3,000 steps | 0.174; 192 | 0.128; 96 | 0.238; 96 |
+
+- **C0 and C1 will hold.** The network's fit is well under 0.8, and both methods clear 176 of 192.
+- **Tuned on both families, the filter chooses R's setting exactly:** sI 4, as tuning on R alone chose in rounds 9
+  and 10.
+  - On C it fits 0.409, where C's own setting fits 0.382. So H2 is measured against a filter that is, on C, not the
+    best filter for C.
+  - That is what one filter for both families is. The secondary measures the network against C's own filter as
+    well.
+- **Trained on both, the network fits each family less well than that family's own network** (R 0.128 against 0.100;
+  C 0.238 against 0.189, at 3,000 steps against 4,500), and better than either filter on either family. Rounds 8 and
+  9 found training-set gaps that did not hold on the test sets, so none of this predicts H1 or H2.
+- The pilot ran 3,000 of the 4,500 steps, at 0.58 s a step on this host. The harvest's seed-1 training repeats it
+  bit for bit and goes on.
+- **Each family's half hashes to the training set round 10 had** (R's to its comparison, C's to its primary). The
+  harvest trains those networks again from nothing, in its own cache. Section 33 will say whether they came out bit
+  for bit as round 10's.
+
+- Nothing of either new test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` ->
+`render/denoise-results-r11.json`.
+- It refuses if the file exists.
+- It trains 13 large networks: the primary four (C4's second training among them), three shuffled-target networks, and
+  six for the two single-family trainings. Expect several resumes (sections 24 and 30).
+
+**The outcomes:**
+- **H1 and H2 supported:** one network, trained on both families, beats one filter on new scenes of each. It goes to
+  the device, with the head widened past `COUT_MAX` 32, for scenes of the families it was trained on. The arc's record
+  says nothing for any other family, and the device page will say so.
+- **H1 only, or H2 only:** one network does not beat one filter on both families it was trained on. It does not go
+  to the device. The single-family networks on the same images say whether that family's own training beat the
+  filter there.
+- **Neither:** recorded as found, with the single-family trainings beside it.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.

@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -41,6 +41,7 @@ export const RESULTS_R7 = "render/denoise-results-r7.json";
 export const RESULTS_R8 = "render/denoise-results-r8.json";
 export const RESULTS_R9 = "render/denoise-results-r9.json";
 export const RESULTS_R10 = "render/denoise-results-r10.json";
+export const RESULTS_R11 = "render/denoise-results-r11.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -97,6 +98,16 @@ export const ROUND9 = Object.freeze({ splits: SPLITS_R9, init: INIT, c0: true, h
  */
 export const ROUND10 = Object.freeze({ splits: SPLITS_R10, init: INIT, c0: true, head: "kernel", size: "large", train: TRAIN_LONG, compareHeads: Object.freeze([]),
                                        temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip", compareTrainSplit: SPLITS_R7.train, results: RESULTS_R10 });
+/**
+ * Section 32, the deployment round: round 10's large network, schedule, test and controls, with ONE change -- ONE network
+ * trained on both families, round 7's 96 scenes of R and round 10's 96 of C together. H1 on new scenes of R, H2 on new
+ * scenes of C: both families it was trained on. Secondary: each family's own training -- the filter tuned and the
+ * networks trained on its 96 scenes alone, as rounds 9 and 10 trained them -- on the same test images, and the primary
+ * network against each family's own filter.
+ */
+export const ROUND11 = Object.freeze({ splits: SPLITS_R11, init: INIT, c0: true, head: "kernel", size: "large", train: TRAIN_LONG, compareHeads: Object.freeze([]),
+                                       temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip",
+                                       compareTrainSplits: Object.freeze({ R: SPLITS_R7.train, C: SPLITS_R10.train }), results: RESULTS_R11 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -168,13 +179,14 @@ const trainedMany = (cache, jobs, workers, every) => {
 
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
-                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, c1OnTraining = false, size = "small", test = "sign",
+                           compareNoHistory = false, compareTrainSplit = null, compareTrainSplits = null, emitterMask = false, compareNoMask = false, c1OnTraining = false, size = "small", test = "sign",
                            compareSize = null, workers = 0, checkpointEvery = 250, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
                            secondarySpp = [1, 16], cache = null, log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask, c1OnTraining, size, test, compareSize,
                      compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
+                     ...(compareTrainSplits ? { compareTrains: Object.fromEntries(Object.entries(compareTrainSplits).map(([f, x]) => [f, { family: x.family, n: x.seeds.length, first: x.seeds[0] }])) } : {}),
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
     const render = (name) => { R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: name === "T1" || name === "T2", temporal, emitterMask, cache }); };
@@ -221,10 +233,13 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
         floor: ims.map((im) => relMSE(im.ref2 ?? im.ref, im.ref)),
     });
     const tables = { T1: measure(R.T1), T2: measure(R.T2), val: R.val ? measure(R.val) : null };
-    // a comparison network's statistics against the primary filter on each test set, as for the primary -- reported, never tested
-    const statsOf = (netsX) => {
-        const T = { T1: { ...tables.T1, net: netsX.map((net) => R.T1.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) },
-                    T2: { ...tables.T2, net: netsX.map((net) => R.T2.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) } };
+    // a comparison network's statistics against the primary filter on each test set, as for the primary -- reported, never
+    // tested. With `filterX` ({ T1, T2 }: another filter's relMSE per test image), against that filter instead; with
+    // `netsX` null, the primary networks'
+    const statsOf = (netsX, filterX = null) => {
+        const T = Object.fromEntries(["T1", "T2"].map((name) => [name, { ...tables[name],
+            ...(netsX ? { net: netsX.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) } : {}),
+            ...(filterX ? { filter: filterX[name] } : {}) }]));
         const VS = verdict({ sets: { H1: T.T1, H2: T.T2 }, shuffled: null, determinism: true, seedsDistinct: true, c1Train, test });
         return Object.fromEntries([["T1", "H1"], ["T2", "H2"]].map(([name, h]) => [name, {
             net: T[name].net, k: VS.hypotheses[h].k, meanD: VS.hypotheses[h].meanD, p: VS.hypotheses[h].p, pSign: VS.hypotheses[h].pSign ?? VS.hypotheses[h].p }]));
@@ -264,18 +279,25 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
         };
     }
     // secondary (section 19): the same filter and head trained on ANOTHER training split -- round 3's family A alone --
-    // and measured on this round's test images, to say what the mixed training changed
-    if (compareTrainSplit) {
-        const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal, emitterMask, cache }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
+    // and measured on this round's test images, to say what the mixed training changed. Section 32 names several, one per
+    // family ("trainedOnR", "trainedOnC"); one is "otherTraining", as rounds 5-10 named it
+    const others = compareTrainSplits ? Object.entries(compareTrainSplits).map(([f, x]) => [`trainedOn${f}`, x]) : compareTrainSplit ? [["otherTraining", compareTrainSplit]] : [];
+    for (const [label, split] of others) {
+        const other = renderSplit(split, { harvest, image, sppIn, sppRef, ref2: false, temporal, emitterMask, cache }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
         const filterO = tuned(cache, other), netsO = trainedMany(cache, seeds.map((s) => ({ set: other, opts: opt(s) })), workers, checkpointEvery);
-        secondary.filterOtherTraining = filterO;
+        secondary[`filter${label[0].toUpperCase()}${label.slice(1)}`] = filterO;
+        const filterRel = Object.fromEntries(["T1", "T2"].map((name) => [name, R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref))]));
         // section 30 tests by sign flips, and reports the other training's statistics as it reports the small network's in
         // section 28; every earlier round's secondary is as it was
         const SO = test === "signflip" ? statsOf(netsO) : null;
-        for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {
-            filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref)),
+        // section 32: and the PRIMARY networks against this training's filter -- each family's own, which a device that
+        // knew the family could run instead
+        const PF = compareTrainSplits && test === "signflip" ? statsOf(null, filterRel) : null;
+        for (const name of ["T1", "T2"]) secondary[`${name}@${label}`] = {
+            filter: filterRel[name],
             net: netsO.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))),
             ...(SO ? { k: SO[name].k, meanD: SO[name].meanD, p: SO[name].p, pSign: SO[name].pSign } : {}),
+            ...(PF ? { primaryVsFilter: { k: PF[name].k, meanD: PF[name].meanD, p: PF[name].p, pSign: PF[name].pSign } } : {}),
         };
     }
     // secondary (section 21): both methods WITHOUT the emitter mask -- the filter tuned and the network trained on the

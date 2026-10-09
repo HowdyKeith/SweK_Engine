@@ -1,6 +1,7 @@
 // WebGLEngine/tools/denoiseStudy.mjs -- the denoiser arc's study, from the command line
 //
-// Run:  node tools/denoiseStudy.mjs --harvest-r10  the large network trained on family C (section 30) -> render/denoise-results-r10.json
+// Run:  node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
+//       node tools/denoiseStudy.mjs --harvest-r10  the large network trained on family C (section 30) -> render/denoise-results-r10.json
 //       node tools/denoiseStudy.mjs --harvest-r9   the large network, trained longer, the sign-flip test (section 28) -> render/denoise-results-r9.json
 //       node tools/denoiseStudy.mjs --harvest-r8   round 7 with C1 on the training images (section 26) -> render/denoise-results-r8.json
 //       node tools/denoiseStudy.mjs --harvest-r7   the randomized round (section 23) -> render/denoise-results-r7.json
@@ -28,13 +29,13 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10 } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11 } from "../render/denoiseStudy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const args = process.argv.slice(2);
-    const round = args.includes("--harvest-r10") ? ROUND10 : args.includes("--harvest-r9") ? ROUND9 : args.includes("--harvest-r8") ? ROUND8 : args.includes("--harvest-r7") ? ROUND7 : args.includes("--harvest-r6") ? ROUND6 : args.includes("--harvest-r5") ? ROUND5 : args.includes("--harvest-r4") ? ROUND4 : args.includes("--harvest-r3") ? ROUND3 : args.includes("--harvest-r2") ? ROUND2 : args.includes("--harvest-r1") ? ROUND1 : null;
+    const round = args.includes("--harvest-r11") ? ROUND11 : args.includes("--harvest-r10") ? ROUND10 : args.includes("--harvest-r9") ? ROUND9 : args.includes("--harvest-r8") ? ROUND8 : args.includes("--harvest-r7") ? ROUND7 : args.includes("--harvest-r6") ? ROUND6 : args.includes("--harvest-r5") ? ROUND5 : args.includes("--harvest-r4") ? ROUND4 : args.includes("--harvest-r3") ? ROUND3 : args.includes("--harvest-r2") ? ROUND2 : args.includes("--harvest-r1") ? ROUND1 : null;
     if (args.includes("--mini")) {
         const out = runStudy({ ...MINI, c0: false, log: (m) => console.log("[denoiseStudy --mini] " + m) });
         console.log(JSON.stringify({ run: out.verdict.run, reasons: out.verdict.reasons, determinism: out.determinism }, null, 1));
@@ -59,7 +60,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         const H = out.verdict.hypotheses;
         console.log(`[denoiseStudy] run ${out.verdict.run}; H1 ${H.H1?.status ?? "not tested"}, H2 ${H.H2?.status ?? "not tested"} -> ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }
