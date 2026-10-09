@@ -33,6 +33,10 @@ const prefix = arg("prefix") || "SweK_Engine";
 
 console.log("[packRelease] the release zip, built by the same packer the GitHub panel's button calls");
 
+// v4824 -- refuse a folder the packer would not honour, BEFORE building: see packagerBridge's outDirRefusal
+const refused = packager.outDirRefusal(out);
+if (refused) { console.error("[packRelease] REFUSED: " + refused); process.exit(1); }
+
 // The version is READ, not accepted: printing it before the build means a mislabeled tag is visible in the log
 // above the artifact rather than discovered by whoever downloads it.
 const ver = packager.engineVersion();

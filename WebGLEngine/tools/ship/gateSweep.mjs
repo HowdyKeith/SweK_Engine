@@ -8891,6 +8891,22 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4824 -- since517, not since516: v4822 on main took since516 in the same days. ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
+    since517: Object.freeze({
+        at: "v4824", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "ui/pick-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([
+            "tools/ship/navmesh-selfcheck.mjs (section 9: the owner-grid adjacency against an all-pairs reference)",
+            "tools/ship/dungeonAI-selfcheck.mjs (section 5b: the aggro gate as AGGRO_MACHINE)",
+        ]),
+        redOnArrival: Object.freeze([]),
+        verdict: "green, about 0.2 s. ui/pick.mjs's pickMin/pickMax keep the three properties every hand-written target scan had -- " +
+                 "strict comparison so the first of a tie wins, an exclusive bound that is the starting best, one key call per item " +
+                 "in order -- held by the contract, a 3,000-list differential against the loop itself, KaijuRivalry's site end to " +
+                 "end through exact distance ties, and a source census of the eight migrated scans. Four sabotages red.",
+    }),
     // v4820 -- NO new gate file -- declaredCost's ratchet held on a machine with no readings of its own (the rig's clone read 2).
     since515: Object.freeze({
         // swept 0 because the ledger's invariant is added.length === swept, and this round added no gate: it widened one.
@@ -14256,6 +14272,7 @@ export const TRANSIENT_DIRS = Object.freeze([
     ["tools/ship", ".sabotage-orbpresent-"],   // aiPresenceOrbPresent-selfcheck.mjs
     ["tools/ship", ".ffwasm-gate-"],           // ffmpegWasmBridge-selfcheck.mjs
     ["tools", ".ub-"],                         // unboundBuiltin-selfcheck.mjs
+    ["", ".fsrclocks-"],                       // fsrPageClocks-selfcheck.mjs (v4824: was .fsrclocks-pre.html in the root)
 ]);
 
 /** Remove stranded TRANSIENT_DIRS under `root`. Only safe while no gate is running -- callers are verify's
@@ -14267,7 +14284,7 @@ export function reclaimScratchDirs(root = ENG) {
         try { names = fs.readdirSync(path.join(root, dir), { withFileTypes: true }); } catch { continue; }
         for (const e of names) {
             if (!e.isDirectory() || !e.name.startsWith(prefix) || e.name.length !== prefix.length + 6) continue;
-            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir + "/" + e.name); } catch {}
+            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir ? dir + "/" + e.name : e.name); } catch {}
         }
     }
     return gone;

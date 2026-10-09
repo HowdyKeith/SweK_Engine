@@ -1682,7 +1682,7 @@ export const budgetIsOwn =
 // skipReading-selfcheck asserts all THREE are equal character for character, where it used to assert two.
 const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
 
-// *** v4825 -- THE CEILING THE COMMENTS ABOVE CALL "SIGKILL" WAS A SIGTERM, AND A PLAYWRIGHT GATE CATCHES SIGTERM. ***
+// *** v4824 -- THE CEILING THE COMMENTS ABOVE CALL "SIGKILL" WAS A SIGTERM, AND A PLAYWRIGHT GATE CATCHES SIGTERM. ***
 // spawnSync's default killSignal is SIGTERM, and playwright-core's processLauncher installs a SIGTERM handler that
 // closes its browsers and does NOT exit -- so a browser gate "killed" at the cap kept running until its own timeouts
 // fired, and the rotation recorded that wall clock as the cap's: fsrFrameGenBackdrop at 311,726 ms beside a 20,000 ms

@@ -28,6 +28,8 @@
 // network. This sandbox has no bridge; every scenario except #1 is driven by monkey-patching
 // window.ai.keyStatus() to return a controlled answer, exactly as v4053's Home Assistant solar gate names its
 // own honest limit for the same reason.
+// v4824 SABOTAGE, restored: main.js's tab relabelled "RIG LAX" (RED BY NAME: 'the page builds its RIG LAB tab', exit 1 --
+// where until v4824 a missing tab was an unhandled TypeError and no row at all).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -74,7 +76,15 @@ if (skip) {
         pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
         await pg.setViewportSize({ width: 1400, height: 900 });
         await pg.goto("http://127.0.0.1:" + srv.address().port + "/index.html", { waitUntil: "load", timeout: 60000 });
-        await pg.waitForTimeout(6000);
+        // v4824 -- WAIT FOR THE TAB, NOT FOR A CLOCK. main.js builds RIG LAB as it boots, and the boot outgrew this gate's
+        // fixed 6 s sleep: measured in headless Chromium, one minitab (DOOM) at 6 s and RIG LAB among them by 10 s. The
+        // sleep then handed openRigLab an undefined tab and the gate died on `t.click` with no row printed -- found red
+        // by v4823's rotation and on the rig. A missing tab is now a named FAIL after 60 s, not a TypeError.
+        const tabUp = await pg.waitForFunction(() => [...document.querySelectorAll(".lcars-minitab, [class*=minitab]")]
+            .some((el) => /rig lab/i.test(el.textContent || "")), null, { timeout: 60000 }).then(() => true, () => false);
+        ok("!! the page builds its RIG LAB tab (waited for, up to 60 s)", tabUp,
+            tabUp ? "" : "no minitab reading 'rig lab' after 60 s -- main.js did not reach its RIG LAB block");
+        if (!tabUp) throw new Error("RIG LAB tab never appeared -- see the row above");
 
         const findNote = () => {
             const link = [...document.querySelectorAll("a")].find((a) => /set it in Settings/i.test(a.textContent || ""));
@@ -83,6 +93,7 @@ if (skip) {
         const openRigLab = () => {
             const tabs = [...document.querySelectorAll(".lcars-minitab, [class*=minitab]")];
             const t = tabs.find((el) => /rig lab/i.test(el.textContent || ""));
+            if (!t) throw new Error("no RIG LAB minitab on the page");
             t.click();
         };
         const reopenRigLab = () => { openRigLab(); openRigLab(); };   // close then reopen -> forces refreshKeyNote()

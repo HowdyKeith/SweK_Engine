@@ -187,7 +187,7 @@ console.log("\nTHE SERIAL RING: THE LAST THREE READINGS, BECAUSE ONE WAS STANDIN
        "PR #12's box and the v4818 rotation each wrote the shared ledger from a box the record refused");
 }
 
-console.log("\n*** v4825 -- THE CAP IS A KILL THE GATE CANNOT REFUSE ***");
+console.log("\n*** v4824 -- THE CAP IS A KILL THE GATE CANNOT REFUSE ***");
 {
     // runSlice's millisecond is the wall clock around redCensus.runGate, so a gate that survives the cap's signal
     // writes ITS OWN runtime into the record as though it were the cap's. A browser gate does exactly that with
