@@ -250,9 +250,16 @@ sec("2. *** TWO KNOBS, TWO EFFECTS, AND THEY DO NOT OVERLAP: one moves the shell
                 Math.abs((sh[1].base + sh[1].rk) / sh[1].base - P1) < 1e-4 &&
                 Math.abs((sh[2].base + sh[2].rk) / sh[2].base - P2) < 1e-4 &&
                 Math.abs((sh[0].base + sh[0].rk) / sh[0].base - P0) < 1e-4;
-            ok("!! ...and LAYERS moves them INWARD by the amounts its rk constants predict, to 2%",
+            // v4830: the OUTER tolerance is 5%, up from 3%. fathom's shells spin at murmur's paced rate now
+            // (rate * (1 + 0.85 * pace), MH_SPIN_DRIVE), so at this frame's instant the fold -- which bends each
+            // limb by foldAmp * sin(... ANG) -- sits at a different phase and the outer ridge reads 3.8% off
+            // the pure radius ratio -- MEASURED: with MH_SPIN_DRIVE.fathom.kp zeroed the same frames read
+            // x0.9471, 1.3% off, and with it at murmur's 0.85, x0.9231, 3.8% off. The fold is the instrument's
+            // own error, not the claim; the discriminating half is the NEGATIVE, shell 0's x1.0857, 13% from
+            // shell 1's prediction, and it still has to be more than 10% away.
+            ok("!! ...and LAYERS moves them INWARD by the amounts its rk constants predict, to 5%",
                 lVo > 1.15 && lVi > 1.15 && tableMatches &&
-                Math.abs(lRo / P1 - 1) < 0.03 && Math.abs(lRi / P2 - 1) < 0.04 &&
+                Math.abs(lRo / P1 - 1) < 0.05 && Math.abs(lRi / P2 - 1) < 0.04 &&
                 Math.abs(lRo / P0 - 1) > 0.10,
                 `layers 0->1 multiplies the ridge HEIGHTS by ${lVo.toFixed(3)} and ${lVi.toFixed(3)} -- the ` +
                 `thicker skin -- and moves their radii x${lRo.toFixed(4)} and x${lRi.toFixed(4)}, INWARD, ` +
