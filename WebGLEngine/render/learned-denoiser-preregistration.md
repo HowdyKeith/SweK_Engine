@@ -1513,3 +1513,93 @@ This round asks which of those it was: C unseen, or C hard.
 - **Neither:** family C is hard for this network even when trained on it. The filter's advantage on C does not
   come from the network never having seen C.
 - **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+## 31. ROUND 10 -- REPORTED: H1 SUPPORTED, H2 NOT SUPPORTED
+
+`node tools/denoiseStudy.mjs --harvest-r10 --cache <dir> --workers 4` at commit 0eb3451c, in two runs:
+- **09:09Z:** stopped at the 2-hour background limit. It had kept the training renders and the filter, and had
+  checkpointed the four primary trainings at steps 3,750-4,000 of 4,500.
+- **12:09Z to 14:07:38Z, on another host:** the trainings resumed from their checkpoints (456 s to finish) and the
+  run finished. Cache hits 101, misses 179.
+
+Nothing was written or read before the second run ended. Its output, unedited, is `render/denoise-results-r10.json`,
+committed at acb2b60b before anything below was read.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0 | 0.189 / 0.180 / 0.213 (needs <= 0.8) |
+| C1, on the training images | network 96, filter 96 of 96 (needs 88) |
+| C2 | shuffled-target network: mean d -2.16 (needs <= 0) |
+| C3 | no test image within 2x of its reference floor |
+| C4, C5 | held; 372 distinct render seeds |
+
+Reported, never tested: on the test sets, both methods beat the noisy input on 12 of 12 images, on both sets.
+
+**The hypotheses, by the sign-flip test:**
+
+| | Network wins (of 12) | mean d | sign-flip p | (sign test p) | Holm threshold | Status |
+|---|---|---|---|---|---|---|
+| H1, held-out C (32000) | **12** | +0.551 | 0.0002 | (0.0002) | 0.025 | **supported** |
+| H2, family R (33000), not trained on | 6 | +0.367 | 0.109 | (0.613) | 0.05 | **not supported** |
+
+- **Trained on C, the network beats the filter on C on every image.**
+  - Geometric means: network 0.0021 (seeds 0.0019-0.0022), filter tuned on C 0.0036, about 42% lower.
+  - The smallest win is d +0.34.
+- **On R, which it was not trained on, it does not.**
+  - It wins 6 of 12. Its positive mean comes from R's four noisiest images (d +0.61 to +2.50).
+  - It is also measured against a filter tuned on C, whose narrow setting (sI 1) suits R badly: 0.0109 on R, where
+    the filter tuned on R gives 0.0068.
+  - Against R's own filter (a secondary), the C-trained network is worse: 1.10 x its error, winning 4 of 12.
+
+**Secondary: the other training, on the same images** (reported, never tested). Geometric-mean relMSE:
+
+| | H1's set (C) | H2's set (R) |
+|---|---|---|
+| noisy | 0.0113 | 0.0360 |
+| filter tuned on C (the primary) | 0.0036 | 0.0109 |
+| filter tuned on R (round 9's) | 0.0036 | 0.0068 |
+| **network trained on C** (the primary), seeds 1-3 | **0.0019-0.0022** | 0.0064-0.0083 |
+| **network trained on R** (round 9's, retrained identically), seeds 1-3 | 0.0033-0.0036 | **0.0034** |
+| R-trained network against the primary filter | 6 of 12; sign-flip p 0.34 | 12 of 12; p 0.0002 |
+| 1-sample input: filter / C-trained networks | 0.0133 / 0.0039-0.0054 | 0.0339 / 0.0211-0.0237 |
+| 16-sample input: filter / C-trained networks | 0.0021 / 0.0011 | 0.0039 / 0.0028-0.0029 |
+| the reference floor | 0.0001 | 0.0003 |
+
+- val (C): noisy 0.0132, filter 0.0045, networks 0.0034-0.0039.
+- **Image by image, the training family decides it.**
+  - On C, the C-trained network beats the R-trained one on all 12 images (error 40% lower).
+  - On R, the R-trained network beats the C-trained one on all 12 (the C-trained one's error is 2.2 x).
+- On C the R-trained network is level with the filter here (0.0034 against 0.0036, 6 of 12). In rounds 8 and 9 it was
+  behind (2 of 12 each), against the filter tuned on R and on other scenes of C.
+- Tuned on C or on R, the filter is the same on C (0.0036). Tuned on C, it is worse on R. The filter transfers better
+  than the network, but it does not transfer for free.
+- At 16 samples the C-trained network is ahead of the filter on both test sets (C: 0.0011 against 0.0021; R: 0.0028
+  against 0.0039).
+
+**What this buys, per section 30: "H1 only".**
+- **Family C was unseen, not hard.** Trained on it, the network beats the filter there on every image, by a margin
+  like R's.
+- **It transfers in neither direction.** Trained on R it did not beat the filter on C (rounds 7-9). Trained on C it
+  does not beat the filter on R, and against R's own filter it loses.
+
+**The arc so far, as its pre-registered verdicts read:**
+
+| Round | Change | Trained on | In-distribution | A family not trained on |
+|---|---|---|---|---|
+| 2 | residual network | A | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | A | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | A | **supported** (12/12) | not supported (5/12) |
+| 5 | A+B, tested on C | A+B | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | A+B | **supported** (11/12) | not supported (1/12) |
+| 7 | randomized family R | R | not reported (C1: the filter) | not reported |
+| 8 | C1 on the training images | R | not supported (7/12) | not supported (2/12) |
+| 9 | 4x network, 3x training, sign-flip test | R | **supported** (11/12) | not supported (2/12) |
+| 10 | trained on family C | C | **supported** (12/12) | not supported (6/12) |
+
+- **A kernel-predicting network beats a tuned hand-written filter on the family it was trained on.** That held for
+  A, A+B, R and now C: in five of the eight rounds since the kernel head (3-10). Two of the other three were not
+  reported, and the third (round 8, 7 of 12 on R) was one draw of scenes (section 29).
+- **In ten rounds it has never beaten the filter on a family it was not trained on, in either direction.**
+- The network does not go to the device on these results. Section 9 asks for both hypotheses.
