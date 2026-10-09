@@ -108,6 +108,23 @@ export function openCache(dir, stamp) {
     return { dir, hits: 0, misses: 0 };
 }
 
+/**
+ * cached() for several keys at once: the saved records where the cache holds them, and compute(missing) -- the indices
+ * of the rest, in order -- for the others, which are then saved one by one. So several missing pieces can be computed
+ * together (render/denoisePool.mjs trains them side by side) and still be kept and counted one by one.
+ */
+export function cachedMany(cache, keys, compute) {
+    const out = keys.map((k) => (cache ? loadRecord(cache.dir, k) : null)), missing = [];
+    out.forEach((v, i) => { if (v === null) missing.push(i); });
+    if (cache) cache.hits += keys.length - missing.length;
+    if (missing.length) {
+        const vals = compute(missing);
+        if (!Array.isArray(vals) || vals.length !== missing.length) throw new Error(`denoiseCache: ${missing.length} pieces asked for, ${vals?.length} computed`);
+        missing.forEach((i, k) => { out[i] = vals[k]; if (cache) { saveRecord(cache.dir, keys[i], vals[k]); cache.misses++; } });
+    }
+    return out;
+}
+
 /** compute() once per key: the saved record when the cache holds one, else compute, save and return it. No cache, no saving. */
 export function cached(cache, key, compute) {
     if (!cache) return compute();

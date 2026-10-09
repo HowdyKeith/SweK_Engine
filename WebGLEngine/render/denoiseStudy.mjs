@@ -21,13 +21,14 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
-import { trainDenoiser, denoise, TRAIN, INIT } from "./denoiseNet.mjs";
+import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit, trainSanity } from "./denoiseStats.mjs";
-import { cached, hashArrays } from "./denoiseCache.mjs";
+import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
+import { trainParallel } from "./denoisePool.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
 export const RESULTS = "render/denoise-results.json";
@@ -38,6 +39,7 @@ export const RESULTS_R5 = "render/denoise-results-r5.json";
 export const RESULTS_R6 = "render/denoise-results-r6.json";
 export const RESULTS_R7 = "render/denoise-results-r7.json";
 export const RESULTS_R8 = "render/denoise-results-r8.json";
+export const RESULTS_R9 = "render/denoise-results-r9.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -78,6 +80,15 @@ export const ROUND7 = Object.freeze({ splits: SPLITS_R7, init: INIT, c0: true, h
  */
 export const ROUND8 = Object.freeze({ splits: SPLITS_R8, init: INIT, c0: true, head: "kernel", compareHeads: Object.freeze([]), temporal: false,
                                       emitterMask: true, compareTrainSplit: SPLITS_R5.train, c1OnTraining: true, results: RESULTS_R8 });
+/**
+ * Section 28: round 8 with two deliberate changes -- the LARGE kernel network trained three times as long, and the
+ * hypotheses tested by the sign-flip test of the mean effect instead of the sign test of the count -- on new test
+ * scenes. Secondary: round 8's small network, trained as round 8 trained it, on the same test images; the sign test
+ * beside every sign-flip p.
+ */
+export const ROUND9 = Object.freeze({ splits: SPLITS_R9, init: INIT, c0: true, head: "kernel", size: "large", train: TRAIN_LONG, compareHeads: Object.freeze([]),
+                                      temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip",
+                                      compareSize: Object.freeze({ size: "small", train: TRAIN }), results: RESULTS_R9 });
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({
@@ -135,15 +146,20 @@ export function renderSplit(split, { harvest, image, sppIn, sppRef, ref2, tempor
 // second training is tagged "-again", so a resumed run still compares two trainings and never one record with itself.
 const setKey = (set) => hashArrays(set.flatMap((s) => [s.x, s.ref, s.w, s.h]));
 const tuned = (cache, set) => cached(cache, `filter-${setKey(set)}`, () => tuneFilter(set, relMSE).best);
-const trained = (cache, set, opts, tag = "") => cached(cache, `net-${setKey(set)}-${hashArrays([JSON.stringify(opts)])}${tag}`, () => trainDenoiser(set, opts).net);
+const netKey = (set, opts, tag = "") => `net-${setKey(set)}-${hashArrays([JSON.stringify(opts)])}${tag}`;
+const trained = (cache, set, opts, tag = "") => cached(cache, netKey(set, opts, tag), () => trainDenoiser(set, opts).net);
+// several trainings at once (section 28): each kept and counted on its own, the missing ones trained side by side by
+// render/denoisePool.mjs -- bit for bit what one after another gives
+const trainedMany = (cache, jobs, workers) => cachedMany(cache, jobs.map((j) => netKey(j.set, j.opts, j.tag)), (miss) => trainParallel(miss.map((i) => jobs[i]), workers));
 
 /** The study. Returns { verdict, tables, filter, secondary, timings, config, ... }; tables is null when C0 or C6 stopped it. */
 export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUND2.c0, head = "residual", compareHeads = [], temporal = false,
-                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, c1OnTraining = false, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
+                           compareNoHistory = false, compareTrainSplit = null, emitterMask = false, compareNoMask = false, c1OnTraining = false, size = "small", test = "sign",
+                           compareSize = null, workers = 0, harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, train = TRAIN, seeds = SEEDS,
                            secondarySpp = [1, 16], cache = null, log = () => {} } = {}) {
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
-    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask, c1OnTraining,
+    const config = { image, sppIn, sppRef, train, seeds, harvest, init, c0, head, compareHeads, temporal, compareNoHistory, emitterMask, compareNoMask, c1OnTraining, size, test, compareSize,
                      compareTrain: compareTrainSplit ? { family: compareTrainSplit.family, n: compareTrainSplit.seeds.length, first: compareTrainSplit.seeds[0] } : null,
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
@@ -153,8 +169,11 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     const trainSet = R.train.map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
     const filter = tuned(cache, trainSet);
     lap("filter tuned");
-    const nets = seeds.map((s) => trained(cache, trainSet, { seed: s, init, head, ...train }));
-    const again = trained(cache, trainSet, { seed: seeds[0], init, head, ...train }, "-again");
+    // a network's options: the size is named only when it is not the small one, so a small network's options are word
+    // for word what rounds 2-8 trained with
+    const opt = (s, sz = size, tr = train, hd = head) => ({ seed: s, init, head: hd, ...tr, ...(sz !== "small" ? { size: sz } : {}) });
+    const trainedNets = trainedMany(cache, [...seeds.map((s) => ({ set: trainSet, opts: opt(s) })), { set: trainSet, opts: opt(seeds[0]), tag: "-again" }], workers);
+    const nets = trainedNets.slice(0, seeds.length), again = trainedNets[seeds.length];
     const flat = (net) => net.layers.flatMap((L) => [...L.W, ...L.b]);
     const a = flat(nets[0]), b = flat(again);
     const determinism = a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
@@ -179,7 +198,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     render("T1"); render("T2");
     lap("tests rendered");
     const shuffledSet = shuffledTargets(trainSet);
-    const shuffledNets = seeds.map((s) => trained(cache, shuffledSet, { seed: s, init, head, ...train }));
+    const shuffledNets = trainedMany(cache, seeds.map((s) => ({ set: shuffledSet, opts: opt(s) })), workers);
     lap("shuffled networks trained");
     const measure = (ims) => ({
         noisy: ims.map((im) => relMSE(noisyOf(im), im.ref)),
@@ -189,7 +208,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     });
     const tables = { T1: measure(R.T1), T2: measure(R.T2), val: R.val ? measure(R.val) : null };
     const shuffled = shuffledNets.map((net) => R.T1.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref)));
-    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null, c6: hist, c1Train });
+    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled, determinism, seedsDistinct, c0: c0 ? fit : null, c6: hist, c1Train, test });
     lap("measured");
     // secondary: the trained networks on 1- and 16-sample inputs of the test scenes -- reported, never tested
     const secondary = {};
@@ -206,7 +225,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // secondary: other heads, trained identically on the same scenes and measured on the same test images -- reported,
     // never tested, never used to choose (section 15's comparison with round 2's residual network)
     for (const other of compareHeads) {
-        const otherNets = seeds.map((s) => trained(cache, trainSet, { seed: s, init, head: other, ...train }));
+        const otherNets = seeds.map((s) => trained(cache, trainSet, opt(s, size, train, other)));
         for (const name of ["T1", "T2"]) secondary[`${name}@${other}`] = { net: otherNets.map((net) => R[name].map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) };
     }
     // secondary (temporal): what the history alone buys, and both methods WITHOUT it on the same measured frames -- the
@@ -214,7 +233,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     if (temporal) {
         const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
         const filter9 = tuned(cache, train9);
-        const nets9 = compareNoHistory ? seeds.map((s) => trained(cache, train9, { seed: s, init, head, ...train })) : [];
+        const nets9 = compareNoHistory ? seeds.map((s) => trained(cache, train9, opt(s))) : [];
         secondary.filterNoHistory = filter9;
         for (const name of ["T1", "T2"]) secondary[`${name}@noHistory`] = {
             accumulation: R[name].map((im) => relMSE(im.accum, im.ref)),
@@ -226,7 +245,7 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // and measured on this round's test images, to say what the mixed training changed
     if (compareTrainSplit) {
         const other = renderSplit(compareTrainSplit, { harvest, image, sppIn, sppRef, ref2: false, temporal, emitterMask, cache }).map((im) => ({ x: im.x, ref: im.ref, w: image, h: image }));
-        const filterO = tuned(cache, other), netsO = seeds.map((s) => trained(cache, other, { seed: s, init, head, ...train }));
+        const filterO = tuned(cache, other), netsO = seeds.map((s) => trained(cache, other, opt(s)));
         secondary.filterOtherTraining = filterO;
         for (const name of ["T1", "T2"]) secondary[`${name}@otherTraining`] = {
             filter: R[name].map((im) => relMSE(jointBilateral(im.x, image, image, filterO), im.ref)),
@@ -237,12 +256,22 @@ export function runStudy({ splits = ROUND2.splits, init = ROUND2.init, c0 = ROUN
     // same training scenes' 9-channel inputs -- on the same test images, to say what the mask changed
     if (emitterMask && compareNoMask) {
         const train9 = R.train.map((im) => ({ x: im.x9, ref: im.ref, w: image, h: image }));
-        const filter9 = tuned(cache, train9), nets9 = seeds.map((s) => trained(cache, train9, { seed: s, init, head, ...train }));
+        const filter9 = tuned(cache, train9), nets9 = seeds.map((s) => trained(cache, train9, opt(s)));
         secondary.filterNoMask = filter9;
         for (const name of ["T1", "T2"]) secondary[`${name}@noMask`] = {
             filter: R[name].map((im) => relMSE(jointBilateral(im.x9, image, image, filter9), im.ref)),
             net: nets9.map((net) => R[name].map((im) => relMSE(denoise(net, im.x9, image, image).y, im.ref))),
         };
+    }
+    // secondary (section 28): another SIZE of network, trained on the same scenes with its own schedule, on the same test
+    // images -- each hypothesis's statistics for it as for the primary, both tests, reported and never tested
+    if (compareSize) {
+        const netsS = trainedMany(cache, seeds.map((s) => ({ set: trainSet, opts: opt(s, compareSize.size, compareSize.train) })), workers);
+        const T = { T1: { ...tables.T1, net: netsS.map((net) => R.T1.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) },
+                    T2: { ...tables.T2, net: netsS.map((net) => R.T2.map((im) => relMSE(denoise(net, im.x, image, image).y, im.ref))) } };
+        const VS = verdict({ sets: { H1: T.T1, H2: T.T2 }, shuffled: null, determinism: true, seedsDistinct: true, c1Train, test });
+        for (const [name, h] of [["T1", "H1"], ["T2", "H2"]]) secondary[`${name}@${compareSize.size}`] = {
+            net: T[name].net, k: VS.hypotheses[h].k, meanD: VS.hypotheses[h].meanD, p: VS.hypotheses[h].p, pSign: VS.hypotheses[h].pSign ?? VS.hypotheses[h].p };
     }
     lap("secondary");
     return { verdict: V, tables, filter, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, trainFit: fit, historyFit: hist, trainSanity: c1Train, config };

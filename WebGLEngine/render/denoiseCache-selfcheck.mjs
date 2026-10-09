@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseCache.mjs -- the checkpoint that lets round 7's harvest, longer than one background run, resume
 // where it was stopped (pre-registration section 24). Its exports, each named here: hashArrays, saveRecord, loadRecord,
-// openCache, cached. Also held here: render/denoiseStudy.mjs's use of it -- that a study interrupted and resumed from
+// openCache, cached, cachedMany. Also held here: render/denoiseStudy.mjs's use of it -- that a study interrupted and resumed from
 // its cache gives what the same study run straight through gives, BIT FOR BIT, on a miniature shaped like round 7's
 // (family R, the emitter mask, the kernel head, the other-training comparison); that control C4 still compares two
 // trainings; and that a scene rendered under --harvest is never served to a run without it.
@@ -35,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { hashArrays, saveRecord, loadRecord, openCache, cached } = await imp("render/denoiseCache.mjs");
+const { hashArrays, saveRecord, loadRecord, openCache, cached, cachedMany } = await imp("render/denoiseCache.mjs");
 const { runStudy, renderSplit } = await imp("render/denoiseStudy.mjs");
 
 let fails = 0;
@@ -107,6 +107,15 @@ console.log("\n3. CACHED");
     const first = cached(c, "k", f), again = cached(c, "k", f), other = cached(c, "k2", f);
     ok("!! with one, each key is computed ONCE and then read back, and the cache counts which", n === 4 && first.v[0] === 3 && again.v[0] === 3 && other.v[0] === 4 &&
         c.hits === 1 && c.misses === 2);
+    // several keys at once (section 28): the held ones read back, compute() handed only the missing indices, in order
+    const c2 = openCache(dirOf("many"), { round: "mini" });
+    cached(c2, "m1", () => ({ v: Float64Array.of(1) }));
+    let asked = null;
+    const many = cachedMany(c2, ["m0", "m1", "m2"], (miss) => { asked = miss; return miss.map((i) => ({ v: Float64Array.of(10 + i) })); });
+    const again2 = cachedMany(c2, ["m0", "m1", "m2"], () => { throw new Error("computed twice"); });
+    ok("!! several keys at once: the held ones are read back, compute() is handed only the missing ones, and each is then kept and counted on its own",
+        asked?.join() === "0,2" && many.map((r) => r.v[0]).join() === "10,1,12" && again2.map((r) => r.v[0]).join() === "10,1,12" && c2.hits === 1 + 3 && c2.misses === 1 + 2 &&
+        cachedMany(null, ["a", "b"], (miss) => miss.map(() => 7)).join() === "7,7");
     ok("  a directory stamped for another run is refused -- one round's pieces are never served to another, or one commit's to the next",
         throws(() => openCache(dirOf("once"), { round: "other" })) && !throws(() => openCache(dirOf("once"), { round: "mini" })));
 }

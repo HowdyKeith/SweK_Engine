@@ -14,6 +14,8 @@ import { REL_EPS } from "./denoiseStats.mjs";
 export const SHAPE = Object.freeze([Object.freeze([CHANNELS, 16, "relu"]), Object.freeze([16, 16, "relu"]), Object.freeze([16, 16, "relu"]), Object.freeze([16, 3, "none"])]);
 /** The pre-registered schedule. */
 export const TRAIN = Object.freeze({ steps: 1500, batch: 4, crop: 32 });
+/** Section 28's longer schedule: the same batches and crops, three times the steps. */
+export const TRAIN_LONG = Object.freeze({ steps: 4500, batch: 4, crop: 32 });
 
 /**
  * The initialisation. Round 1 drew He-normal weights for every layer ("he"); its harvest found the residual's He-drawn
@@ -37,19 +39,33 @@ export const KERNEL_TAPS = (2 * KERNEL_RADIUS + 1) ** 2;
 export const SHAPE_KERNEL = Object.freeze([...SHAPE.slice(0, -1), Object.freeze([16, KERNEL_TAPS, "none", 1])]);
 export const headOf = (net) => (net.layers[net.layers.length - 1].Cout === KERNEL_TAPS ? "kernel" : "residual");
 
-/** The shape for a head and an input width: the first layer takes `cin` channels (9, or the temporal round's 13). */
-export function shapeFor(head, cin = CHANNELS) {
-    const base = head === "kernel" ? SHAPE_KERNEL : SHAPE;
+/**
+ * Section 28's larger kernel network: FOUR 3 x 3 layers of 32, so its receptive field is 9 x 9 -- exactly the window
+ * whose weights it predicts (the small one's three layers see 7 x 7) -- then the same 1 x 1 head. 33,329 parameters
+ * with the mask (the small one: 7,473). Its hidden width is the device kernel's COUT_MAX.
+ */
+export const SHAPE_KERNEL_LARGE = Object.freeze([Object.freeze([CHANNELS, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 32, "relu"]),
+                                                 Object.freeze([32, 32, "relu"]), Object.freeze([32, KERNEL_TAPS, "none", 1])]);
+export const SIZES = Object.freeze(["small", "large"]);
+
+/**
+ * The shape for a head, an input width and a size: the first layer takes `cin` channels (9, the mask's 10, or the
+ * temporal round's 13). "large" exists for the kernel head only.
+ */
+export function shapeFor(head, cin = CHANNELS, size = "small") {
+    if (!SIZES.includes(size)) throw new Error(`denoiseNet: size "${size}" is not one of ${SIZES.join(", ")}`);
+    if (size === "large" && head !== "kernel") throw new Error("denoiseNet: the large network is a kernel-predicting network");
+    const base = size === "large" ? SHAPE_KERNEL_LARGE : head === "kernel" ? SHAPE_KERNEL : SHAPE;
     return cin === CHANNELS ? base : Object.freeze([Object.freeze([cin, ...base[0].slice(1)]), ...base.slice(1)]);
 }
-function initDenoiser(rand, init, head = "residual", cin = CHANNELS) {
+function initDenoiser(rand, init, head = "residual", cin = CHANNELS, size = "small") {
     if (!INITS.includes(init)) throw new Error(`denoiseNet: init "${init}" is not one of ${INITS.join(", ")}`);
     if (!HEADS.includes(head)) throw new Error(`denoiseNet: head "${head}" is not one of ${HEADS.join(", ")}`);
-    const net = initNet(shapeFor(head, cin), rand);
+    const net = initNet(shapeFor(head, cin, size), rand);
     if (init === "zero-last") net.layers[net.layers.length - 1].W.fill(0);
     return net;
 }
-export const makeDenoiser = (seed, init = INIT, head = "residual", cin = CHANNELS) => initDenoiser(seededRandom(seed), init, head, cin);
+export const makeDenoiser = (seed, init = INIT, head = "residual", cin = CHANNELS, size = "small") => initDenoiser(seededRandom(seed), init, head, cin, size);
 export { paramCount };
 
 /**
@@ -145,10 +161,10 @@ export function cropAt(x, ref, W, cx, cy, size) {
  * the image and the crop corner drawn from the seed's stream AFTER the initial weights. The batch's gradient is the
  * mean of its crops'. Returns { net, losses } with the batch loss of every step.
  */
-export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, init = INIT, head = "residual", onStep = null } = {}) {
+export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, init = INIT, head = "residual", size = "small", onStep = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("denoiseNet: training needs an integer seed -- it seeds the weights, the crops and the batch order");
     if (!images.length || images.some((im) => im.w < crop || im.h < crop)) throw new Error(`denoiseNet: every training image must be at least ${crop} x ${crop}`);
-    const rand = seededRandom(seed), net = initDenoiser(rand, init, head, strideOf(images[0].x, images[0].w * images[0].h)), state = adamState(net), losses = [];
+    const rand = seededRandom(seed), net = initDenoiser(rand, init, head, strideOf(images[0].x, images[0].w * images[0].h), size), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
         let loss = 0, acc = null;
         for (let b = 0; b < batch; b++) {
@@ -161,7 +177,7 @@ export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN
         }
         adamStep(net, acc, state, adam);
         losses.push(loss);
-        if (onStep) onStep(step, loss);
+        if (onStep) onStep(step, loss, net);
     }
     return { net, losses };
 }

@@ -8118,6 +8118,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 9 -- THE LARGER NETWORK, TRAINED LONGER, TESTED BY SIZE AS WELL AS COUNT.
+    since491: Object.freeze({
+        at: "the denoiser arc, round 9 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoisePool-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseNet-selfcheck.mjs (the large network: a 9 x 9 field, 33,329 parameters; a longer run's first steps ARE the shorter run)",
+                                "render/denoiseStats-selfcheck.mjs (the exact sign-flip test: equal effects reduce to the sign test bit for bit)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND9)", "render/denoiseScenes-selfcheck.mjs (SPLITS_R9, C5 over nine rounds)",
+                                "render/denoiseCache-selfcheck.mjs (cachedMany)",
+                                "tools/ship/runtimeGap-selfcheck.mjs (the headline row asserts its name -- bottom two in both censuses -- not a two-file closeness proxy)"]),
+        verdict: "*** TWO DELIBERATE CHANGES, AND THE MACHINERY TO AFFORD ONE OF THEM. *** Section 28 trains a kernel network " +
+                 "four times the size -- four 3 x 3 layers of 32, a receptive field of exactly the 9 x 9 window it weighs -- " +
+                 "for three times the steps, and tests the hypotheses with the exact sign-flip test of the mean effect, so " +
+                 "each image counts by how much it was won or lost. Applied to every earlier round's file it changes no " +
+                 "verdict (round 8's H1: 0.052 against 0.025). Seven large trainings at about 1.1 hours each would not fit " +
+                 "the background limit one after another, so render/denoisePool.mjs trains them side by side in worker " +
+                 "threads, bit for bit the serial networks -- held on synthetic jobs and on a whole miniature study whose " +
+                 "workers trained only what a half-filled cache lacked. 16 sabotages red; P4 only once the cache held " +
+                 "networks from the middle of a batch.",
+    }),
     // the denoiser arc, round 8 -- C1 ON THE TRAINING IMAGES, BEFORE ANY OF ITS TEST SCENES EXIST.
     since490: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.

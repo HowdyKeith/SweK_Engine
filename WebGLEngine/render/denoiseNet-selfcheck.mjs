@@ -4,12 +4,16 @@
 //
 // GATES render/denoiseNet.mjs -- the pre-registered network and its training -- on SYNTHETIC images only (smooth
 // irradiance fields with noise, no path-traced scene). Its exports, each named here: SHAPE, TRAIN, INITS, INIT, HEADS,
-// KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt, trainDenoiser.
+// KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, SHAPE_KERNEL_LARGE, SIZES, TRAIN_LONG, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads,
+// cropAt, trainDenoiser.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   L1  the residual removed: the output IS the irradiance                       1 RED
 //   L2  the loss gradient misses the albedo the output was multiplied by         1 RED
 //   L3  the batch's image chosen by Math.random -- v4698's defect, planted       1 RED (C4)
+//   N4  the large network with three 3 x 3 layers (a 7 x 7 field)                1 RED
+//   N5  a large residual network allowed                                          1 RED
+//   N6  the longer schedule with half the batch                                   1 RED
 //   L4  the default init back to "he"                                            3 RED
 //   L5  zero-last draws its weights from another stream than round 1's          2 RED
 //   K1  the softmax normalised over all 81 taps, outside the image included      3 RED
@@ -25,8 +29,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, headOf, shapeFor, makeDenoiser, paramCount, denoise, lossAndGrads, cropAt,
-        trainDenoiser } = await imp("render/denoiseNet.mjs");
+const { SHAPE, TRAIN, INITS, INIT, HEADS, KERNEL_RADIUS, KERNEL_TAPS, SHAPE_KERNEL, SHAPE_KERNEL_LARGE, SIZES, TRAIN_LONG, headOf, shapeFor, makeDenoiser, paramCount,
+        denoise, lossAndGrads, cropAt, trainDenoiser } = await imp("render/denoiseNet.mjs");
 const { cloneNet } = await imp("brain/convNet.mjs");
 const { relMSE } = await imp("render/denoiseStats.mjs");
 const { CHANNELS } = await imp("render/denoiseScenes.mjs");
@@ -181,6 +185,30 @@ console.log("\n7. THE TEMPORAL ROUND'S 13-CHANNEL INPUT (pre-registration sectio
     ok("  the trainer reads the stride from its images and builds a 13-channel first layer", R.net.layers[0].Cin === 13 && R.net.layers[0].W.length === 16 * 9 * 13);
     let threw = null; try { denoise(makeDenoiser(3, INIT, "kernel"), x13, 9, 10); } catch (e) { threw = e.message; }
     ok("!! a network refuses an input of another width by name -- read at the wrong stride it would return finite nonsense", /9 input channels was handed an input of 13/.test(threw || ""), threw);
+}
+
+console.log("\n8. THE LARGER NETWORK, TRAINED LONGER (pre-registration section 28)");
+{
+    // four 3 x 3 layers see 2 * 4 + 1 = 9 pixels across: the window the kernel weighs. The small one's three see 7.
+    const conv3 = SHAPE_KERNEL_LARGE.filter((L) => (L[3] ?? 3) === 3).length, reach = 2 * conv3 + 1;
+    ok("!! the large network: four 3 x 3 layers of 32 -- a receptive field of exactly the 9 x 9 window it weighs -- and the same 1 x 1 head; 33,329 parameters with the mask",
+        SIZES.join() === "small,large" && conv3 === 4 && reach === 2 * KERNEL_RADIUS + 1 && SHAPE_KERNEL_LARGE.slice(0, 4).every((L) => L[1] === 32 && L[2] === "relu") &&
+        JSON.stringify(SHAPE_KERNEL_LARGE[4]) === JSON.stringify([32, 81, "none", 1]) && paramCount(makeDenoiser(1, INIT, "kernel", 10, "large")) === 33329 &&
+        paramCount(makeDenoiser(1, INIT, "kernel", 9, "large")) === 33041 && paramCount(makeDenoiser(1, INIT, "kernel", 10)) === 7473,
+        `receptive field ${reach} x ${reach}; the small one's ${2 * SHAPE_KERNEL.filter((L) => (L[3] ?? 3) === 3).length + 1}`);
+    ok("  the small network is the default everywhere, a large residual network and an unknown size are refused",
+        shapeFor("kernel", 9) === SHAPE_KERNEL && shapeFor("kernel", 9, "large") === SHAPE_KERNEL_LARGE &&
+        [() => shapeFor("residual", 9, "large"), () => shapeFor("kernel", 9, "huge")].every((f) => { try { f(); return false; } catch { return true; } }));
+    // zero-last: every logit 0 whatever the hidden layers do, so the large network starts as the small one does -- the box mean
+    const H = 10, W = 11, im = synth(W, H, 3), big = denoise(makeDenoiser(4, INIT, "kernel", CHANNELS, "large"), im.x, H, W).y, small = denoise(makeDenoiser(4, INIT, "kernel"), im.x, H, W).y;
+    ok("  untrained, the large network is exactly the small one: zero-last makes both the 9 x 9 box mean, bit for bit", same(big, small));
+    ok("  trained longer means the same batches and crops for three times the steps", TRAIN_LONG.steps === 3 * TRAIN.steps && TRAIN_LONG.batch === TRAIN.batch && TRAIN_LONG.crop === TRAIN.crop);
+    // a longer run's first N steps ARE the N-step run: the stream draws the same crops in the same order, and Adam has no schedule
+    const imgs = [synth(12, 12, 1), synth(12, 12, 2)], o = { seed: 6, init: INIT, head: "kernel", size: "large", batch: 2, crop: 8 };
+    let at3 = null;
+    const long = trainDenoiser(imgs, { ...o, steps: 5, onStep: (step, loss, net) => { if (step === 2) at3 = cloneNet(net); } }), short = trainDenoiser(imgs, { ...o, steps: 3 });
+    ok("!! a longer run's first steps ARE the shorter run, weight for weight -- and onStep hands over the network being trained",
+        !!at3 && at3.layers.every((L, i) => same(L.W, short.net.layers[i].W) && same(L.b, short.net.layers[i].b)) && !long.net.layers.every((L, i) => same(L.W, short.net.layers[i].W)));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

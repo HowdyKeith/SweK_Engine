@@ -4,7 +4,7 @@
 //
 // GATES render/denoiseStats.mjs -- the pre-registration's statistic and controls -- on PLANTED outcomes only. Its
 // exports, each named here: REL_EPS, C1_MIN_WINS, C1_OF, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects,
-// signTestUpper, holm, trainFit, historyFit, trainSanity, verdict. Every verdict the function can return is planted below and has to come back.
+// signTestUpper, signFlipUpper, TESTS, holm, trainFit, historyFit, trainSanity, verdict. Every verdict the function can return is planted below and has to come back.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   S1  Holm does not stop at its first failure                                  1 RED
@@ -22,13 +22,18 @@
 //   S13 a tie with the noisy input counted as a win                              1 RED
 //   S14 with C1 decided on the training images, the test sets still decide it    1 RED (round 7's case)
 //   S15 verdict() ignores a failed training C1                                   1 RED
+//   S16 with test "signflip", Holm still reads the sign test's p                 1 RED
+//   S17 the sign-flip test without its tie tolerance                             1 RED (equal effects of 0.1 split by rounding)
+//   S18 the sign-flip test counts only sums strictly above the observed          2 RED
+//   S19 the sign-flip test with every magnitude 1 -- the count again             4 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const S = await import(pathToFileURL(path.join(ENG, "render", "denoiseStats.mjs")).href);
-const { REL_EPS, C1_MIN_WINS, C1_OF, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, holm, trainFit, historyFit, trainSanity, verdict } = S;
+const { REL_EPS, C1_MIN_WINS, C1_OF, C3_FLOOR_FACTOR, C0_MAX_RATIO, C6_MAX_RATIO, relMSE, seedMean, effects, signTestUpper, signFlipUpper, TESTS, holm, trainFit, historyFit, trainSanity,
+        verdict } = S;
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -142,6 +147,31 @@ console.log("\n5. CONTROL C1 ON THE TRAINING IMAGES (pre-registration section 26
     ok("!! a failed training C1 is NOT REPORTED before a test set is read -- with C0 passing, and with no `sets` at all",
         !!stop && stop.run === "not reported" && /^C1 on the training images: /.test(stop.reasons[0]) && stop.controls.C1.ok === false && stop.controls.C0.ok === true &&
         Object.keys(stop.hypotheses).length === 0, threw || stop.reasons[0]);
+}
+
+console.log("\n6. THE SIGN-FLIP TEST -- EACH IMAGE WEIGHED BY HOW MUCH (pre-registration section 28)");
+{
+    // by hand: d = (1, -1). Observed sum 0; the four sign assignments sum to 2, 0, 0, -2 -- three reach it.
+    ok("  by hand: two effects of +1 and -1 -- three of the four sign assignments reach the observed sum, p = 3/4; all of twelve positive, p = 1/4096",
+        signFlipUpper([1, -1]) === 0.75 && signFlipUpper(new Array(12).fill(0.3)) === 1 / 4096 && signFlipUpper([0.5]) === 0.5 && TESTS.join() === "sign,signflip");
+    // when every image is won or lost by the SAME amount, only the count is left -- and it must be the sign test exactly,
+    // with magnitudes (0.1) whose sums round differently in different orders, so ties must not be split by rounding
+    const equal = [0, 3, 6, 9, 10, 11, 12].every((k) => signFlipUpper(Array.from({ length: 12 }, (_, i) => (i < k ? 0.1 : -0.1))) === signTestUpper(k, 12));
+    ok("!! with every effect the same size it IS the sign test, to the last bit, for every count -- a tie in exact arithmetic is not split by rounding", equal);
+    // magnitude counts: three large wins and nine near-ties lost -- round 8's H1, as its file records it
+    const d8 = [0.58, -0.02, -0.07, 0.02, 0.66, 0.04, -0.10, 0.25, 0.02, -0.01, 0.74, -0.03];
+    const flip = signFlipUpper(d8), sign = signTestUpper(d8.filter((v) => v > 0).length, 12);
+    ok("!! it weighs size: three large wins among near-ties (round 8's H1, to two places) -- 7 of 12 is p 0.39 by count, about 0.05 by size",
+        Math.abs(sign - 0.3872) < 1e-4 && flip > 0.04 && flip < 0.06, `sign ${sign.toFixed(4)}, sign-flip ${flip.toFixed(4)}`);
+    ok("  it refuses what it cannot enumerate or read: no effects, more than 24, a NaN", [[], new Array(25).fill(1), [1, NaN]].every((d) => { try { signFlipUpper(d); return false; } catch { return true; } }));
+    // in the verdict: Holm reads the chosen test's p; both are reported
+    const T = { H1: set({ wins: 12 }), H2: set({ wins: 9 }) };
+    const vs = run(T), vf = verdict({ sets: T, shuffled: [shuffledLoses(T.H1), shuffledLoses(T.H1), shuffledLoses(T.H1)], determinism: true, seedsDistinct: true, test: "signflip" });
+    const h = vf.hypotheses.H2;
+    ok("!! with test \"signflip\" Holm is applied to the sign-flip p, and the sign test's is reported beside it; the default is still the sign test",
+        h.test === "signflip" && h.p === signFlipUpper(h.d) && h.pSign === signTestUpper(h.k, 12) && h.p !== h.pSign && vs.hypotheses.H2.p === signTestUpper(9, 12) &&
+        vs.hypotheses.H2.test === undefined && vf.hypotheses.H1.status === "supported", `H2: sign-flip ${h.p.toFixed(4)}, sign ${h.pSign.toFixed(4)}`);
+    ok("  an unknown test is refused", (() => { try { verdict({ sets: T, determinism: true, seedsDistinct: true, test: "t" }); return false; } catch { return true; } })());
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +
