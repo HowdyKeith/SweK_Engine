@@ -8118,6 +8118,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 11 -- THE DEPLOYMENT ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since493: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
+        at: "the denoiser arc, round 11 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R11: rounds 7 and 10's training scenes together, each as its own family; C5 over eleven rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND11; a miniature with each family's own training, every new statistic recomputed from the tables; " +
+                                "section 13, the runner hands the study every option a round names)"]),
+        verdict: "*** ONE NETWORK FOR EVERYTHING IT WILL SEE. *** Ten rounds found the network beating the filter wherever " +
+                 "it was trained and nowhere else, in either direction. Section 32 stops asking it to transfer: round 10's " +
+                 "large network, unchanged, trained once on round 7's 96 scenes of R and round 10's 96 of C together, and " +
+                 "tested on new scenes of both -- H1 on R, H2 on C. Both supported meets section 9's rule for the device " +
+                 "without claiming transfer, and says nothing about a family it was not trained on. Secondary: each family's " +
+                 "own filter and networks, trained alone on the same scenes, on the same test images, and the one network " +
+                 "against each family's own filter. 10 sabotages, all red. The harvest then ran WITHOUT that secondary: the " +
+                 "runner passed options one by one and compareTrainSplits was not among them, and no gate ran the runner. " +
+                 "It now passes a round whole, held for every round (section 13 of the study's gate; 5 more sabotages, " +
+                 "one of them the runner as the harvest ran), and --secondary-r11 runs the secondary into its own file.",
+    }),
     // the denoiser arc, round 10 -- TRAINED ON FAMILY C, BEFORE ANY OF ITS TEST SCENES EXIST.
     since492: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.

@@ -4,12 +4,15 @@
 //
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
-// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, MINI, shuffledTargets, stopBeforeTests, renderSplit,
-// runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
+// RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests, renderSplit,
+// runStudy, HARVESTS, studyOptions. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
 // Section 3 (the re-run, pre-registration section 13): control C0 stops the run BEFORE a test scene is rendered.
+//
+// Section 13 (pre-registration section 33): the runner, tools/denoiseStudy.mjs, hands the study every option a round
+// names -- through HARVESTS and studyOptions.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   R1  the test scenes rendered with the rest, before C0                        2 RED
@@ -34,17 +37,30 @@
 //   R22 ROUND10 tested by the sign test                                          1 RED
 //   R10b R10 again on round 10's parallel path: the other training's networks     1 RED
 //       trained on the primary set
+//   R23 ROUND11's two comparison trainings swapped                               1 RED
+//   R24 ROUND11 tested by the sign test                                          1 RED
+//   R25 the primary networks against the PRIMARY filter, not each family's own   1 RED
+//   R26 a comparison training's networks trained on the primary set              1 RED
+//   R27 only the first comparison training run                                   1 RED
+//   R28 a comparison training's networks measured against its own filter, not   1 RED
+//       the primary one
+//   R29 the runner drops compareTrainSplits -- round 11's harvest, as it ran      1 RED
+//   R30 --secondary-r11 writes the harvest's own results file                    1 RED
+//   R31 --secondary-r11 runs round 10                                            1 RED
+//   R32 --harvest-r11 runs round 10                                              1 RED
+//   R33 the runner logs the verdict again                                        1 RED
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, MINI, shuffledTargets, stopBeforeTests,
-        renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
-const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
-const { TRAIN, TRAIN_LONG } = await imp("render/denoiseNet.mjs");
-const { trainFit, historyFit, trainSanity } = await imp("render/denoiseStats.mjs");
+const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests,
+        renderSplit, runStudy, HARVESTS, studyOptions } = await imp("render/denoiseStudy.mjs");
+const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
+const { TRAIN, TRAIN_LONG, INIT, trainDenoiser, denoise } = await imp("render/denoiseNet.mjs");
+const { trainFit, historyFit, trainSanity, verdict, relMSE } = await imp("render/denoiseStats.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -220,7 +236,79 @@ console.log("\n11. TRAINED ON FAMILY C (pre-registration section 30)");
         ROUND10.temporal === false && ROUND10.compareTrainSplit === SPLITS_R9.train && !ROUND10.compareSize && RESULTS_R10 === "render/denoise-results-r10.json");
 }
 
+console.log("\n12. THE DEPLOYMENT ROUND: ONE NETWORK FOR BOTH FAMILIES (pre-registration section 32)");
+{
+    ok("!! ROUND11 is section 32's: round 10's large network, schedule, test and controls, trained on SPLITS_R11's 192 scenes of R AND C, with each family's own 96 as the comparison trainings",
+        ROUND11.splits === SPLITS_R11 && SPLITS_R11.train.family === "R+C" && ROUND11.size === ROUND10.size && ROUND11.train === ROUND10.train && ROUND11.test === "signflip" &&
+        ROUND11.c1OnTraining === true && ROUND11.c0 === true && ROUND11.emitterMask === true && ROUND11.head === "kernel" && ROUND11.init === "zero-last" && ROUND11.temporal === false &&
+        Object.keys(ROUND11.compareTrainSplits).join() === "R,C" && ROUND11.compareTrainSplits.R === SPLITS_R7.train && ROUND11.compareTrainSplits.C === SPLITS_R10.train &&
+        !ROUND11.compareTrainSplit && !ROUND11.compareSize && RESULTS_R11 === "render/denoise-results-r11.json");
+    // a miniature shaped like round 11 -- a training split of both families, each family's half as a comparison training,
+    // the sign-flip test -- seeded outside every split, 8 x 8, the small network for speed
+    const tr = { R: { family: "R", seeds: [910040, 910041] }, C: { family: "C", seeds: [910042, 910043] } };
+    const mini11 = { splits: { train: { family: "R+C", families: ["R", "R", "C", "C"], seeds: [...tr.R.seeds, ...tr.C.seeds] },
+                               T1: { family: "R", seeds: [930040, 930041, 930042] }, T2: { family: "C", seeds: [940040, 940041, 940042] } },
+                     image: 8, sppIn: 4, sppRef: 16, train: { steps: 2, batch: 2, crop: 8 }, secondarySpp: [], c0: false, head: "kernel", emitterMask: true, test: "signflip" };
+    let out = null, runErr = null;
+    try { out = runStudy({ ...mini11, compareTrainSplits: tr }); } catch (e) { runErr = e.message; }
+    const S = out ? Object.fromEntries(["R", "C"].flatMap((f) => ["T1", "T2"].map((n) => [`${n}${f}`, out.secondary[`${n}@trainedOn${f}`]]))) : {};
+    ok("!! each family's own training is run and recorded: its filter, its three networks on both test sets, their statistics, and the primary networks' against its filter",
+        !!out && ["R", "C"].every((f) => typeof out.secondary[`filterTrainedOn${f}`]?.sS === "number" && ["T1", "T2"].every((n) => {
+            const X = S[`${n}${f}`];
+            return X && X.filter.length === 3 && X.net.length === 3 && X.net.every((a) => a.length === 3) && typeof X.k === "number" && typeof X.p === "number" &&
+                typeof X.pSign === "number" && typeof X.primaryVsFilter?.p === "number" && typeof X.primaryVsFilter.pSign === "number";
+        })) && out.config.compareTrains.R.first === 910040 && out.config.compareTrains.C.first === 910042 && out.config.compareTrain === null, runErr);
+    // what each statistic is, recomputed from the tables: the comparison networks against the PRIMARY filter; the primary
+    // networks against the comparison's filter
+    const stat = (sets) => verdict({ sets, shuffled: null, determinism: true, seedsDistinct: true, c1Train: null, test: "signflip" }).hypotheses;
+    const pick = (h) => ({ k: h.k, meanD: h.meanD, p: h.p, pSign: h.pSign });
+    let exact = !!out, differs = false;
+    for (const f of out ? ["R", "C"] : []) {
+        const own = stat({ H1: { ...out.tables.T1, net: S[`T1${f}`].net }, H2: { ...out.tables.T2, net: S[`T2${f}`].net } });
+        const pf = stat({ H1: { ...out.tables.T1, filter: S[`T1${f}`].filter }, H2: { ...out.tables.T2, filter: S[`T2${f}`].filter } });
+        for (const [n, h] of [["T1", "H1"], ["T2", "H2"]]) {
+            const X = S[`${n}${f}`];
+            exact &&= ["k", "meanD", "p", "pSign"].every((k) => Object.is(X[k], pick(own[h])[k]) && Object.is(X.primaryVsFilter[k], pick(pf[h])[k]));
+            differs ||= !Object.is(X.primaryVsFilter.meanD, out.verdict.hypotheses[h].meanD);
+        }
+    }
+    ok("!! ...and each statistic is the one section 32 names: a family's networks against the PRIMARY filter, the primary networks against THAT family's filter -- recomputed from the tables, exactly",
+        exact && differs, out ? `filters: R's ${JSON.stringify(out.secondary.filterTrainedOnR)}, C's ${JSON.stringify(out.secondary.filterTrainedOnC)}, the primary's ${JSON.stringify(out.filter)}` : runErr);
+    // and each family's networks are trained on ITS scenes: seed 1 trained here on R's half alone gives R's seed-1 errors
+    let own = false;
+    if (out) {
+        const half = renderSplit(tr.R, { harvest: false, image: 8, sppIn: 4, sppRef: 16, ref2: false, emitterMask: true }).map((im) => ({ x: im.x, ref: im.ref, w: 8, h: 8 }));
+        const T1 = renderSplit(mini11.splits.T1, { harvest: false, image: 8, sppIn: 4, sppRef: 16, ref2: true, emitterMask: true });
+        const net = trainDenoiser(half, { seed: 1, init: INIT, head: "kernel", ...mini11.train }).net;
+        own = T1.every((im, i) => Object.is(relMSE(denoise(net, im.x, 8, 8).y, im.ref), S.T1R.net[0][i])) && S.T1R.net[0].some((v, i) => v !== out.tables.T1.net[0][i]);
+    }
+    ok("  ...and R's networks are trained on R's scenes alone: seed 1 trained here on them gives its errors bit for bit, which are not the primary's", own);
+}
+
+console.log("\n13. THE RUNNER HANDS THE STUDY EVERY OPTION A ROUND NAMES (pre-registration section 33)");
+{
+    // round 11's harvest ran without its secondary: the runner passed options one by one, and compareTrainSplits was not one
+    const rounds = [["--harvest-r1", ROUND1], ["--harvest-r2", ROUND2], ["--harvest-r3", ROUND3], ["--harvest-r4", ROUND4], ["--harvest-r5", ROUND5], ["--harvest-r6", ROUND6],
+                    ["--harvest-r7", ROUND7], ["--harvest-r8", ROUND8], ["--harvest-r9", ROUND9], ["--harvest-r10", ROUND10], ["--harvest-r11", ROUND11]];
+    const whole = (round) => { const o = studyOptions(round), want = Object.keys(round).filter((k) => k !== "results");
+                               return Object.keys(o).sort().join() === want.sort().join() && want.every((k) => o[k] === round[k]); };
+    ok("!! *** every round's command runs THAT round, and the study is handed every option it names -- the same objects -- less only the file it writes ***",
+        rounds.every(([f, r]) => HARVESTS[f] === r && whole(r)) && "compareTrainSplits" in studyOptions(ROUND11) && !("results" in studyOptions(ROUND11)),
+        `${rounds.length} rounds; round 11 hands over ${Object.keys(studyOptions(ROUND11)).length} options`);
+    // and runStudy reads every one of them: each is a name in its parameter list
+    const params = new Set([...(runStudy.toString().match(/^function runStudy\(\{([\s\S]*?)\}\s*=\s*\{\}\)/)?.[1] ?? "").matchAll(/(\w+)\s*=/g)].map((m) => m[1]));
+    const unread = rounds.flatMap(([, r]) => Object.keys(studyOptions(r)).filter((k) => !params.has(k)));
+    ok("  ...and runStudy takes every one of them by name -- none is handed over only to be ignored", params.size > 20 && unread.length === 0, unread.join() || `${params.size} parameters`);
+    const S2 = HARVESTS["--secondary-r11"], others = Object.values(HARVESTS).filter((r) => r !== S2).map((r) => r.results);
+    ok("!! --secondary-r11 is round 11 in every option, writing its own file -- never the harvest's, never any round's",
+        whole(S2) && Object.keys(studyOptions(S2)).every((k) => S2[k] === ROUND11[k]) && Object.keys(S2).length === Object.keys(ROUND11).length &&
+        S2.results === "render/denoise-results-r11-secondary.json" && !others.includes(S2.results));
+    // the verdict is in the file, committed before it is read: the harvest branch logs no part of it
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), branch = cli.slice(cli.indexOf("} else if (round) {"), cli.indexOf("} else {", cli.indexOf("} else if (round) {")));
+    ok("  a harvest's log names no part of its verdict: the runner's harvest branch never reads it", branch.length > 500 && !/verdict|status|supported/.test(branch.replace(/\/\/.*$/gm, "")));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r10 --cache <dir> --workers 4` is round 10's one command, and " +
+    "\nnot closed here: the study itself. `node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` is round 11's one command, and " +
     "no gate runs it.");
 process.exit(fails ? 1 : 0);

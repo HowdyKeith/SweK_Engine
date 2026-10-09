@@ -1603,3 +1603,268 @@ Reported, never tested: on the test sets, both methods beat the noisy input on 1
   reported, and the third (round 8, 7 of 12 on R) was one draw of scenes (section 29).
 - **In ten rounds it has never beaten the filter on a family it was not trained on, in either direction.**
 - The network does not go to the device on these results. Section 9 asks for both hypotheses.
+
+## 32. ROUND 11 -- THE DEPLOYMENT ROUND: ONE NETWORK FOR BOTH FAMILIES, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question changes, as Keith asked after section 31.**
+
+> **Trained once on both families it is to be used on, does one network beat one filter, tuned on the same scenes,
+> on new scenes of each?**
+
+Ten rounds found the network beating the filter wherever it was trained and nowhere else, in either direction. This
+round stops asking it to transfer. Section 9 sends the network to the device when both hypotheses hold. Here both test
+families are ones it was trained on, so meeting that rule claims no transfer, and says nothing about a family outside
+R and C.
+
+**One deliberate change from round 10: the training split is round 7's 96 scenes of R and round 10's 96 of C,
+together.**
+- They are the same 192 scenes those rounds rendered and trained on; nothing about them is new.
+- Everything else is round 10's:
+  - the large network (33,329 parameters), 4,500 steps, seeds 1, 2, 3;
+  - the filter and its grid, tuned on the training split, so now on all 192;
+  - the emitter mask and its rule;
+  - the sign-flip test, Holm over {H1, H2};
+  - C0, C1 on the training images (now 176 of 192), C2-C5, and the stop before the tests.
+- **H1 is new scenes of R; H2 is new scenes of C.** Both are in-distribution.
+- One network and one filter setting for both families. Neither method is told which family an image comes from.
+- C2's shuffled-target networks are trained on the 192 and measured on H1's set, as always.
+- The schedule is not lengthened. 4,500 steps over 192 scenes draw each scene about half as often as rounds 9 and 10
+  did. That is part of the change, and the pilot below says what it costs on the training images.
+
+**Splits** (`SPLITS_R11`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 96 of R and 96 of C | 20000-20095 (round 7's) and 30000-30095 (round 10's) |
+| val | 4 of R and 4 of C | 21000-21003 and 31000-31003 (rounds 7 and 10's) |
+| T1 -> **H1** | 12 of R | **34000-34011** |
+| T2 -> **H2** | 12 of C | **35000-35011** |
+
+- Every test seed is on a range no earlier split touched. The training and val scenes are earlier rounds', each drawn
+  as the family it was drawn as then (the gate holds that).
+- C5 holds over eleven rounds: 1,518 render seeds.
+
+**Secondary** (reported, never tested):
+- **Each family's own training, side by side.** The filter tuned, and the large network trained (seeds 1-3), on R's 96
+  alone and on C's 96 alone -- the trainings round 10 ran as its comparison and as its primary. Measured on this
+  round's test images:
+  - their networks against this round's filter, under both tests;
+  - **this round's networks against each family's own filter,** under both tests. A device that knew each image's
+    family could run that family's filter instead; this says whether the one network beats that too.
+- The sign test beside every sign-flip p.
+- 1- and 16-sample inputs, val, and time.
+
+**What was seen first.**
+- Everything in sections 1-31, including both families' test images in rounds 5-10 and every statistic on them.
+- **The pilot,** on the 192 TRAINING scenes only, before this was written. Its scenes are the ones rounds 7 and 10
+  rendered, read from round 10's cache; round 10's filters and its seed-1 networks were read from there too.
+  Each cell is the training fit (as C0 measures it, against the noisy input; lower is better), then how many images
+  beat the noisy input:
+
+| on the training scenes | all 192 | R's 96 | C's 96 |
+|---|---|---|---|
+| noisy input, relMSE median | 0.0203 | 0.0352 | 0.0127 |
+| **the filter tuned on all 192:** sS 1, sN 1, sA 0.2, sI 4 | 0.294; 189 | 0.211; 94 | 0.409; 95 |
+| C's own filter (round 10's, sI 1) | 0.361; 190 | 0.342; 94 | 0.382; 96 |
+| round 10's network trained on R alone, seed 1, 4,500 steps | 0.204; 191 | 0.100; 96 | 0.419; 95 |
+| round 10's network trained on C alone, seed 1, 4,500 steps | 0.207; 190 | 0.226; 94 | 0.189; 96 |
+| **the large network on all 192,** seed 1, 1,500 steps | 0.196; 192 | 0.145; 96 | 0.265; 96 |
+| the same, 3,000 steps | 0.174; 192 | 0.128; 96 | 0.238; 96 |
+
+- **C0 and C1 will hold.** The network's fit is well under 0.8, and both methods clear 176 of 192.
+- **Tuned on both families, the filter chooses R's setting exactly:** sI 4, as tuning on R alone chose in rounds 9
+  and 10.
+  - On C it fits 0.409, where C's own setting fits 0.382. So H2 is measured against a filter that is, on C, not the
+    best filter for C.
+  - That is what one filter for both families is. The secondary measures the network against C's own filter as
+    well.
+- **Trained on both, the network fits each family less well than that family's own network** (R 0.128 against 0.100;
+  C 0.238 against 0.189, at 3,000 steps against 4,500), and better than either filter on either family. Rounds 8 and
+  9 found training-set gaps that did not hold on the test sets, so none of this predicts H1 or H2.
+- The pilot ran 3,000 of the 4,500 steps, at 0.58 s a step on this host. The harvest's seed-1 training repeats it
+  bit for bit and goes on.
+- **Each family's half hashes to the training set round 10 had** (R's to its comparison, C's to its primary). The
+  harvest trains those networks again from nothing, in its own cache. Section 33 will say whether they came out bit
+  for bit as round 10's.
+
+- Nothing of either new test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` ->
+`render/denoise-results-r11.json`.
+- It refuses if the file exists.
+- It trains 13 large networks: the primary four (C4's second training among them), three shuffled-target networks, and
+  six for the two single-family trainings. Expect several resumes (sections 24 and 30).
+
+**The outcomes:**
+- **H1 and H2 supported:** one network, trained on both families, beats one filter on new scenes of each. It goes to
+  the device, with the head widened past `COUT_MAX` 32, for scenes of the families it was trained on. The arc's record
+  says nothing for any other family, and the device page will say so.
+- **H1 only, or H2 only:** one network does not beat one filter on both families it was trained on. It does not go
+  to the device. The single-family networks on the same images say whether that family's own training beat the
+  filter there.
+- **Neither:** recorded as found, with the single-family trainings beside it.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+## 33. ROUND 11 -- THE HARVEST RAN WITHOUT ITS SECONDARY, AND HOW THE SECONDARY IS RUN
+
+Written after the harvest and before its results file was read.
+
+`node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` at 88fa9228, in two runs:
+- **16:19:57Z:** stopped at the 2-hour background limit, after the primary trainings, C0, C1 and the test renders,
+  with the shuffled-target trainings checkpointed at steps 3,750-4,000 of 4,500.
+- **18:20:08Z to 18:31:14Z:** resumed and finished. Its output, unedited, is `render/denoise-results-r11.json`,
+  committed at 3cb567e7.
+
+**What went wrong: section 32's secondary was not run.**
+- The runner, `tools/denoiseStudy.mjs`, handed `runStudy` a round's options one by one. Round 11's new option,
+  `compareTrainSplits`, was not among them, so the study ran as if no comparison training had been named.
+- The gates ran `runStudy` with the option directly (section 12 of the study's gate), never through the runner. So
+  the gates passed and the harvest did not do what they held.
+- The second run ended 57 s after its measurements, which is how it was noticed.
+- Nothing else depends on the option. The hypotheses, the controls and the other secondaries are as section 32 fixed
+  them.
+
+**What was seen.** The runner's last log line named the verdict, and the stage monitor's filter matched it. So "run
+reported; H1 supported, H2 supported" was seen before the results file was committed. No number was seen. The runner
+no longer logs any part of the verdict.
+
+**The fix, gated before anything runs again.**
+- The runner now hands the study a round's options whole, less the file it writes (`studyOptions`). It finds each
+  command's round in one table (`HARVESTS`). Both are in `render/denoiseStudy.mjs`, which the runner imports.
+- Gated (section 13 of the study's gate):
+  - every round's command runs that round;
+  - the study is handed every option the round names, and `runStudy` takes each by name;
+  - the harvest branch logs nothing of the verdict.
+- 5 sabotages, all red. One of them (R29) is the runner exactly as the harvest ran.
+
+**The secondary run:** `node tools/denoiseStudy.mjs --secondary-r11 --cache <dir> --workers 4` ->
+`render/denoise-results-r11-secondary.json`.
+- It is round 11 in every option, writing its own file. The harvest's results are never overwritten.
+- Its cache starts with every record the harvest made, hard-linked from the harvest's: the rendered scenes, the filter,
+  and the primary and shuffled-target networks.
+  - Those records were made at 88fa9228. Since then no code that makes them has changed. `render/`, `brain/` and
+    `physics/` differ only in the results file, a gate, and the runner's table and `studyOptions` added to
+    `render/denoiseStudy.mjs`, which no record reads.
+  - Each record is keyed by every input and option it depends on. A record the fixed runner asked for differently
+    would be missed and made again.
+- So it should make exactly 8 things: each family's filter and its three networks. Its file records how many it made
+  (cache misses).
+- Its primary analysis is read back from the harvest's records, so it must equal the committed file bit for bit. That
+  is checked and reported. It is not a second test.
+- The secondary is what section 32 fixed. Nothing in it is chosen now.
+
+**What follows.** Section 34 reports round 11 from both files: the hypotheses from the harvest's, the secondary from
+the second. It also says whether each family's networks came out bit for bit as round 10's, which section 32 promised
+for "section 33".
+
+## 34. ROUND 11 -- REPORTED: H1 SUPPORTED, H2 SUPPORTED
+
+Two files, both committed unedited before they were read (section 33):
+- **The harvest:** `node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` at 88fa9228, in two runs
+  (16:19:57Z, stopped at the 2-hour limit; 18:20:08Z to 18:31:14Z). `render/denoise-results-r11.json`, committed at
+  3cb567e7. The hypotheses and controls are from this file.
+- **The secondary:** `node tools/denoiseStudy.mjs --secondary-r11 --cache <dir> --workers 4` at 768fdfdd, in one run
+  (18:50:46Z to 20:25:39Z). `render/denoise-results-r11-secondary.json`, committed at e7edd957. Section 32's
+  secondary is from this file.
+- **As section 33 said it must:**
+  - The secondary file's verdict, tables, filter and controls are the harvest's bit for bit, and so are its other
+    secondaries.
+  - It made exactly 8 things (cache misses 8, hits 472): each family's filter and its three networks.
+
+**Every control held.**
+
+| Control | Result |
+|---|---|
+| C0 | 0.161 / 0.153 / 0.166 (needs <= 0.8) |
+| C1, on the training images | network 192, filter 189 of 192 (needs 176) |
+| C2 | shuffled-target network: mean d -1.86 (needs <= 0) |
+| C3 | no test image within 2x of its reference floor |
+| C4, C5 | held; 672 distinct render seeds |
+
+Reported, never tested: on the test sets, both methods beat the noisy input on 12 of 12 images, on both sets.
+
+**The hypotheses, by the sign-flip test:**
+
+| | Network wins (of 12) | mean d | sign-flip p | (sign test p) | Holm threshold | Status |
+|---|---|---|---|---|---|---|
+| H1, new scenes of R (34000) | **12** | +0.548 | 0.0002 | (0.0002) | 0.025 | **supported** |
+| H2, new scenes of C (35000) | **12** | +0.765 | 0.0002 | (0.0002) | 0.05 | **supported** |
+
+- **One network, trained on both families, beats one filter on every test image of each.**
+  - On R: network 0.0039 (seeds 0.0038-0.0042), filter 0.0068, about 42% lower. The smallest win is d +0.08.
+  - On C: network 0.0026 (all three seeds), filter 0.0056, about 53% lower. The smallest win is d +0.21.
+  - Seed by seed: seed 3 loses one image of R; every other seed wins all 24.
+- The filter is R's setting (sI 4), as the pilot found. On C, H2 is measured against a filter that is not the best
+  filter for C. The secondary below measures the network against C's own filter as well.
+
+**Geometric-mean relMSE on the test images** (reported, never tested):
+
+| | H1's set (R) | H2's set (C) |
+|---|---|---|
+| noisy | 0.0367 | 0.0160 |
+| filter tuned on all 192 (the primary; R's setting) | 0.0068 | 0.0056 |
+| **network trained on all 192** (the primary), seeds 1-3 | **0.0038-0.0042** | **0.0026** |
+| 1-sample input: filter / networks | 0.0177 / 0.0089-0.0118 | 0.0119 / 0.0042-0.0050 |
+| 16-sample input: filter / networks | 0.0035 / 0.0020-0.0026 | 0.0040 / 0.0017-0.0020 |
+| the reference floor | 0.0004 | 0.0001 |
+
+- val (4 of R, 4 of C): on R, noisy 0.0325, filter 0.0071, network 0.0045; on C, noisy 0.0132, filter 0.0052,
+  network 0.0034.
+
+**Secondary: each family's own training, on the same images** (from the second file; reported, never tested).
+
+| | H1's set (R) | H2's set (C) |
+|---|---|---|
+| filter tuned on R alone (sI 4) | 0.0068 -- the primary's setting | 0.0056 -- the primary's setting |
+| filter tuned on C alone (sI 1) | 0.0125 | 0.0052 |
+| network trained on R alone, seeds 1-3 | **0.0036-0.0038** | 0.0047-0.0052 |
+| network trained on C alone, seeds 1-3 | 0.0073-0.0082 | **0.0025-0.0031** |
+| network trained on both (the primary) | 0.0038-0.0042 | 0.0026 |
+
+- **Against each family's own filter, the one network still wins every image.**
+  - R's own filter is the primary filter: the same setting, so the same statistics as H1 and H2.
+  - C's own filter is better than the primary filter on C (10 of 12 images; 0.0052 against 0.0056). The one network
+    beats it on all 12 (mean d +0.69, sign-flip p 0.0002).
+- **Against each family's own network, the one network loses little.**
+  - On R, the R-only network is slightly better. The joint network's error is 1.07 x its own; the joint network is
+    better on 1 image of 12.
+  - On C, the two are level: the joint network's error is 0.96 x the C-only network's, and it is better on 4 of 12.
+- **Each family's own network does not transfer**, as rounds 2-10 found:
+  - trained on R, on C: 7 of 12 against the primary filter, sign-flip p 0.082;
+  - trained on C, on R: 4 of 12, p 0.92.
+  - On each family, the joint network beats the other family's network on all 12 images.
+- **Each family's filter and three networks are round 10's, bit for bit.** Section 32 promised this check.
+  - Round 10 trained them at 0eb3451c, its C networks resumed from checkpoints after a host move.
+  - This run trained them again from nothing at 768fdfdd.
+  - Every weight is the same, and so are both filter settings.
+
+**What this buys, per section 32: "H1 and H2 supported".**
+- One network, trained on both families it is to be used on, beats one filter, tuned on the same scenes, on new
+  scenes of each. It also beats each family's own filter, and it is close to each family's own network.
+- **Section 9's rule is met. The network goes to the device**, with the head widened past `COUT_MAX` 32, **for scenes
+  of R and C.** The device page will say so.
+- **No transfer is claimed.** This round tested no family the network was not trained on. Every round that did found
+  it never beat the filter there.
+
+**The arc, as its pre-registered verdicts read:**
+
+| Round | Change | Trained on | In-distribution | A family not trained on |
+|---|---|---|---|---|
+| 2 | residual network | A | not supported (2/12) | not supported (1/12) |
+| 3 | kernel-predicting head | A | **supported** (10/12) | not supported (5/12) |
+| 4 | + temporal history | A | **supported** (12/12) | not supported (5/12) |
+| 5 | A+B, tested on C | A+B | not reported (C1: the filter) | not reported |
+| 6 | + the emitter mask | A+B | **supported** (11/12) | not supported (1/12) |
+| 7 | randomized family R | R | not reported (C1: the filter) | not reported |
+| 8 | C1 on the training images | R | not supported (7/12) | not supported (2/12) |
+| 9 | 4x network, 3x training, sign-flip test | R | **supported** (11/12) | not supported (2/12) |
+| 10 | trained on family C | C | **supported** (12/12) | not supported (6/12) |
+| 11 | one network for both families | R+C | **supported** on R (12/12) and on C (12/12) | none tested |
+
+- **A kernel-predicting network beats a tuned hand-written filter on the families it was trained on.** That held in
+  six of the nine rounds since the kernel head (3-11). Two of the other three were not reported, and the third
+  (round 8, 7 of 12 on R) was one draw of scenes (section 29).
+- **It has never beaten the filter on a family it was not trained on,** in any round that tested one.
+- **Trained on everything it is used on, it wins there**, at little cost against each family's own network.
