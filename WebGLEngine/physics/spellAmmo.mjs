@@ -111,6 +111,16 @@ export function applyHit(hit, { world, cars, turrets, poses, slicks = null, t = 
 /** Is a car slowed at tick t? The throttle it may use. */
 export const throttleFactor = (turret, t) => (turret && turret.slowUntil > t ? AMMO.slowFactor : 1);
 
+// ---- buildings, v4680, superseded v4822 ----------------------------------------------------------------------------------
+// A flat per-building damageTaken/hits tally lived here through v4680: no impulse (there is no body to push), no slow, no
+// splash to a neighbour -- just the book's damage number, credited nowhere but the HUD. v4822 gave a shell the SAME wall a
+// car crash already could (world/crashDamage.mjs's shellInto, through the city world/CityGen.js generates and race-brain.
+// html now keeps rather than discards): real hit points, real crumble and topple, a collider that parks so a car drives
+// the rubble. Two damage models on one wall depending on what hit it was a bug waiting to be asked about, not a feature, so
+// this file no longer keeps one: brain/gunnerPolicy.mjs's turretTick reads hitEffect() for the scoreboard currency (damage
+// dealt, the same number a car hit credits) and hands the point, a blastRadius(damage) and the shell's own direction to
+// shellInto for what actually happens to the wall. See world/CityGen.js's cityHash for the lockstep fold this used to do.
+
 // ---- the pickups ------------------------------------------------------------------------------------------------------------
 /** A point `s` metres along the closed centreline, and the unit normal (left) there. */
 export function centrelinePoint(pts, s) {

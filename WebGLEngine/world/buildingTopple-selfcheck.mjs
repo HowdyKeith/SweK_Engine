@@ -30,6 +30,18 @@
 //      smallest was the largest. The split-tower row (a column of air, two anchored towers, the block the larger) was added; now 1 red.
 //   G. the support polygon is the stubs themselves, not their hull          -> 5 red: the corner-stubs row, the far-quarter and both
 //      prediction rows, and the 34-building outcome row (the buildings standing on two stubs were predicted to fall)
+//   H. v4822, bindKit rewriting only a block with no mesh yet (a scene built AGAIN keeps the old buffers' empty copy)  -> 2 red: the bind rows
+//      here (the block already in the air is not written), and raceTurret-selfcheck.mjs's "a scene built AGAIN with the block in the air still draws it" on both backends.
+//   K. v4822, bindScene writing only a block with no mesh yet (the crash scene's binder, as H did to bindKit's)  -> 1 red: its second-bind row.
+//   L. v4822 (the chip), shellOnBlock leaving the hit point unrotated into the block's frame    -> 4 red: the lying block's voxel, its hit points, the mesh row (a wrong
+//      voxel came off), the lockstep fold row.
+//   M. the chip not making the mesh again                                                         -> 1 red: the mesh row (one mesh, at birth).
+//   N. the pieces a chip cuts loose staying on the block                                           -> 1 red: the 21-voxel bar (0 loose, 20 left, 6 cubes).
+//   O. breakFraction 0 (a block shot down never comes apart)                                       -> 2 red: the early-shatter row and the empty-slot row after it.
+//   P. localSig a constant                                                                         -> 1 red: the lockstep fold row (the signature did not move).
+//   I. v4822, leanUp zeroed (a block that came to rest leaning never settles)    -> 1 red: the lean-to row ("never shattered").
+//   J. v4822, leanUp 1.01 (even a block standing at 1.0000 counts as leaning)    -> 3 red: the middle-stub block "STANDS" (both rows) and the ram's body
+//      (the 25 m/s ram's block settles and is gone, where it was meant to be a body on its stubs).
 // The first run of this gate against the module was 14 red: the bare-rect path never parked the building's static box (D above, a real
 // bug: the block was pushed 4 m out of the box and dropped upright), the exact centre of mass is of the whole anchored component (the
 // stub voxels pull it toward x 13.5), the greedy mesher makes a uniform block six quads (36 vertices, not 1056), a shattered record's
@@ -48,7 +60,7 @@ import { VoxelDebrisSystem } from "./voxelDebrisSystem.js";
 import { miniWorld } from "../render/voxelDevice.mjs";
 import { editState } from "../render/voxelDeviceEdit.mjs";
 import { initNode, mod } from "../physics/box3d/box3dNode.mjs";
-import { bodyLitPipelineDesc } from "../render/voxelBodies.mjs";
+import { bodyLitPipelineDesc, rotateQ } from "../render/voxelBodies.mjs";
 import { worldFromModule } from "../render/slugTicker.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -125,6 +137,13 @@ let farRun;
     const midRun = settle((x) => x === 1 || x === 2); report("middle stub: " + midRun.rows.join(" | "));
     ok("!! the block over a middle stub STANDS: after 5 s up.y is 1, its centre where it was, no fall, still a body (it stays one)", midRun.body && midRun.body.up[1] > 0.999 && near(midRun.body.pose.pos[0], 12, 0.05) && !midRun.body.fallen && midRun.t.bodies.length === 1 && midRun.t.shattered === 0, midRun.body ? `up.y ${midRun.body.up[1].toFixed(4)} pos ${midRun.body.pose.pos.map((v) => v.toFixed(2))}` : "no body");
     ok("...the prediction said so: over for the middle stub, not over for the far quarter", midRun.rec.over === true && farRun.rec.over === false);
+    // v4822 -- A LEAN-TO SETTLES. A tall building on ONE column of ground floor (7 x 7 x 11, the last column of seven) tips toward -x and is held
+    // between its stub and the road at about 0.97 up: the centre is not over the stub (not "standing") and it cannot fall further (not "fallen"). It
+    // used to stay a body for ever, a ruin that never turned into rubble until a car pushed it.
+    const leanRun = settle((x) => x === 6, 8, { w: 7, d: 7, h: 11 }); report("lean-to: " + leanRun.rows.join(" | ") + " | events " + JSON.stringify(leanRun.t.events.map((e) => [e.kind, e.up && e.up[1], e.fell])));
+    const leanEv = leanRun.t.events.find((e) => e.kind === "shatter");
+    ok("!! a block that tipped and came to rest LEANING (0.9 < up.y < 0.999, not flat) shatters into rubble like a fallen one: a shatter event with fell false, the body gone", !!leanEv && leanEv.fell === false && leanEv.up[1] > 0.9 && leanEv.up[1] < BT.TOPPLE.leanUp && leanRun.t.shattered === 1 && leanRun.t.bodies.length === 0 && leanEv.rubble > 0, leanEv ? `up.y ${leanEv.up[1]}, ${leanEv.rubble} rubble voxels, at tick ${leanEv.at}` : "never shattered");
+    ok("...while the block over a middle stub, still within leanUp of upright, still STANDS", midRun.body && midRun.body.up[1] > BT.TOPPLE.leanUp && midRun.t.shattered === 0);
     const dropRun = settle(() => false, 5); report("no ground floor: " + dropRun.rows.join(" | ") + " | events " + JSON.stringify(dropRun.t.events.map((e) => e.kind)));
     ok("!! with no ground floor the block DROPS onto the slab and, at rest, shatters where it stands: a drop event, no stubs, then a shatter with rubble in the footprint", dropRun.rec && dropRun.rec.dropped && dropRun.rec.stubs.length === 0 && dropRun.t.events[0].kind === "drop" && dropRun.t.shattered === 1 && dropRun.t.rubble > 100 && dropRun.t.g.world.voxelAt(11, Y0 + 2, 11) === BT.TOPPLE.rubbleId, `${dropRun.t.rubble} rubble`);
     const crumbs = (() => { const { g, rect } = bareWorld((x) => x === 1, { w: 2, d: 2, h: 2, x0: 30, z0: 30 }); const t = BT.createTopple(g, {}); const r = BT.beginTopple(t, null, null, rect); return { t, r, g }; })();
@@ -210,6 +229,61 @@ sec("5. THE SCENE EXTRAS, pure: a reserved fleet per slot, records parked until 
     let maxY = 0, maxX = 0; for (let i = 0; i < m.count; i++) { maxX = Math.max(maxX, Math.abs(m.data[i * 10])); maxY = Math.max(maxY, Math.abs(m.data[i * 10 + 1])); }
     ok("...and its corners reach the block's own half extents over the radius (2 and 4.5 over 5.315)", near(maxX, 2 / r.radius, 1e-5) && near(maxY, 4.5 / r.radius, 1e-5), `${maxX.toFixed(4)} / ${maxY.toFixed(4)}`);
     ok("...colour and normal ride with each vertex: an alpha of 1 and a unit normal", m.data[6] === 1 && near(Math.hypot(m.data[7], m.data[8], m.data[9]), 1, 1e-5));
+
+    // v4822 -- THE SAME BLOCKS IN A kitScene (race-brain.html): kitFleets / placeBlocks / bindKit, with a stub scene standing in for the device
+    const kf = BT.kitFleets(t);   // the default cap, which beginTopple's own blockMesh uses: a block's mesh fills the reservation exactly
+    ok("kitFleets: a fleet per slot named block0..2 -- a reserved mesh of meshCap vertices, the quat-mode pipeline, one parked record, the identity quaternion", kf.length === 3 && kf.every((f, k) => f.name === "block" + k && f.mesh.positions.length === BT.TOPPLE.meshCap * 3 && JSON.stringify(f.pipeline) === quatDesc && f.records[1] === -500 && f.extras[3] === 1 && f.records.length === 4));
+    const scene = { kitRecords: new Float32Array(16 * 4), kitExtras: new Float32Array(16 * 4), fleets: kf.map((f) => ({ name: f.name, vbuf: { writes: [], write(d, o) { this.writes.push([d.length, o]); } } })) };
+    BT.placeBlocks(scene, 5, t);
+    ok("placeBlocks: the block in slot 0 is its pose and bounding radius at record 5, the empty slots parked at y -500", near(scene.kitRecords[5 * 4], 12) && near(scene.kitRecords[5 * 4 + 1], 6.5) && near(scene.kitRecords[5 * 4 + 3], Math.fround(r.radius)) && scene.kitRecords[6 * 4 + 1] === -500 && scene.kitRecords[7 * 4 + 1] === -500, `record 5: ${Array.from(scene.kitRecords.slice(20, 24)).map((v) => +v.toFixed(2)).join(" ")}`);
+    BT.bindKit(t, scene);
+    ok("!! bindKit writes the block already in the air into the scene's reserved buffer for its slot (a scene built AGAIN has empty buffers), and nothing into the others", scene.fleets[0].vbuf.writes.length === 1 && scene.fleets[0].vbuf.writes[0][0] === BT.TOPPLE.meshCap * 10 && scene.fleets[1].vbuf.writes.length === 0 && scene.fleets[2].vbuf.writes.length === 0, JSON.stringify(scene.fleets.map((f) => f.vbuf.writes)));
+    BT.bindKit(t, scene);
+    ok("...and a SECOND bind (the next rebuild) writes it again: a block with its mesh already made is still rewritten", scene.fleets[0].vbuf.writes.length === 2);
+    // the crash scene's own binder (race-crash.html) is rebuilt on a repack too, and had the same `if (!r.mesh)` skip
+    const cscene = { extrasBase: 0, fleets: [0, 1, 2].map(() => ({ vbuf: { writes: [], write(d) { this.writes.push(d.length); } } })) };
+    BT.bindScene(t, cscene, 0); BT.bindScene(t, cscene, 0);
+    ok("bindScene (race-crash.html's) writes the block already in the air into a scene built AGAIN, every time it is bound, as bindKit does", cscene.fleets[0].vbuf.writes.length === 2 && cscene.fleets[1].vbuf.writes.length === 0, JSON.stringify(cscene.fleets.map((f) => f.vbuf.writes.length)));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+sec("5b. THE CHIP (v4822): a shell on a falling block takes off the voxels in its blast, in the block's own frame; what it cuts loose goes with them; a block shot down comes apart");
+{
+    const SQ = Math.SQRT1_2, fold = C.foldHash;
+    const fresh = (opts = {}) => { const { g, rect, phys } = bareWorld((x) => x === 3), debris = new VoxelDebrisSystem(), t = BT.createTopple(g, { debris }), meshes = []; t.onBlock = (slot, mesh) => meshes.push(mesh); const rec = BT.beginTopple(t, null, null, rect); return { g, t, rec, debris, meshes, phys }; };
+    // LAID ON ITS SIDE by hand (no physics step): a quarter turn about z at a known place. A hit on the voxel at local (a, b, c) is at pos + rotate(quat, (a, b, c)).
+    const A = fresh(), q90 = [0, 0, SQ, SQ];
+    A.rec.pose = { pos: [20, 8, 12], quat: q90 };
+    const top = A.rec.local.reduce((m, l) => (l[1] > m[1] || (l[1] === m[1] && (l[0] > m[0] || (l[0] === m[0] && l[2] > m[2]))) ? l : m)), far = A.rec.local.find((l) => l[1] === -top[1]);
+    const w = rotateQ(q90, [top[0], top[1], top[2]]), hitAt = [20 + w[0], 8 + w[1], 12 + w[2]], count0 = A.rec.count, sig0 = A.rec.sig, hash0 = BT.toppleHash(0x811c9dc5, A.t, fold);
+    const res = BT.shellOnBlock(A.t, A.rec.slot, hitAt, 0.6);
+    const stillThere = (l) => A.rec.local.some((m) => m[0] === l[0] && m[1] === l[1] && m[2] === l[2]);
+    ok("!! a shell on a block LYING on its side takes off the voxel it hit and no other: the hit point goes into the block's frame through the inverse pose (a quarter turn), so the top voxel of its upright shape, now on its side, is the one that comes off", res.removed === 1 && res.loose === 0 && !stillThere(top) && stillThere(far) && A.rec.count === count0 - 1, `${res.removed} removed of ${count0}, the top voxel (${top.slice(0, 3)}) gone ${!stillThere(top)}, the one opposite (${far.slice(0, 3)}) kept ${stillThere(far)}`);
+    ok("...its hit points are the voxels it has left (hp = count over what it fell with, the born count kept), and the block says what has come off it", A.rec.count0 === count0 && near(res.hp, (count0 - 1) / count0, 1e-12) && A.rec.chipped === 1 && A.t.chipped === 1 && A.t.shellHits === 1);
+    ok("...the mesh is made again and written into the reserved buffer (the block's picture follows its voxels): a second mesh went to the scene, on the same slot, with the same radius", A.meshes.length === 2 && A.rec.mesh === A.meshes[1] && A.meshes[1].radius === A.meshes[0].radius && A.meshes[1].data.length === A.meshes[0].data.length);
+    ok("...and cubes burst from the voxel that came off (6, in its colour), none from the rest", A.debris.particles.length === 6);
+    const hash1 = BT.toppleHash(0x811c9dc5, A.t, fold);
+    ok("!! the lockstep fold sees the chip: the fingerprint of the block moves when a voxel comes off it, and the signature is the voxels' own (a second block chipped the same way folds to the same number)", hash1 !== hash0 && A.rec.sig !== sig0 && (() => { const B = fresh(); B.rec.pose = { pos: [20, 8, 12], quat: q90 }; BT.shellOnBlock(B.t, B.rec.slot, hitAt, 0.6); return BT.toppleHash(0x811c9dc5, B.t, fold) === hash1; })(), `${hash0.toString(16)} -> ${hash1.toString(16)}`);
+    // a hit on a HOLE in the box (no voxel within the radius): the box is hit, nothing comes off, no new mesh
+    const H = fresh(); H.rec.pose = { pos: [20, 8, 12], quat: [0, 0, 0, 1] };
+    const miss = BT.shellOnBlock(H.t, H.rec.slot, [20 + 40, 8, 12], 0.6);
+    ok("a hit outside every voxel's reach (the block's box is bigger than its stone) counts as a hit and takes nothing off: no chip, no new mesh, the block whole", miss.removed === 0 && H.rec.count === H.rec.count0 && H.meshes.length === 1 && H.t.shellHits === 1 && H.t.chipped === undefined);
+
+    // WHAT THE CHIP CUTS LOOSE: a bar of 21 voxels hit in the middle is two pieces of ten; the first stays the block, the second bursts with the voxel that was hit
+    const L = fresh(); L.rec.local = Array.from({ length: 21 }, (_, k) => [0, 0, k - 10, 1]); L.rec.count = 21; L.rec.count0 = 21; L.rec.pose = { pos: [20, 8, 12], quat: [0, 0, 0, 1] }; L.debris.particles.length = 0;
+    const cut = BT.shellOnBlock(L.t, L.rec.slot, [20, 8, 12], 0.6);
+    ok("!! a chip that cuts the block in two keeps the LARGER piece (the first, on a tie) as the block and sends the other with the hit voxel: 1 removed, 10 loose, 10 left, all of them on one side, 11 voxels of cubes", cut.removed === 1 && cut.loose === 10 && cut.left === 10 && L.rec.local.every((l) => l[2] < 0) && !cut.shattered && L.debris.particles.length === 66 && L.t.chipped === 11, `${cut.removed} removed, ${cut.loose} loose, ${cut.left} left, ${L.debris.particles.length} cubes`);
+
+    // A BLOCK SHOT DOWN COMES APART: under breakFraction of what it fell with, it shatters where it is, through the same shatter a block at rest takes
+    // shot from the TOP END of the long axis, where the chip eats the block from one end and what is left stays one piece: a sphere through the middle would cut it in two
+    const topEnd = (R) => [R.rec.pose.pos[0], R.rec.pose.pos[1] + R.rec.half[1], R.rec.pose.pos[2]];
+    const sortedD = (R) => R.rec.local.map((l) => Math.hypot(l[0], l[1] - R.rec.half[1], l[2])).sort((a, b) => a - b);
+    const S1 = fresh(), d1 = sortedD(S1), r30 = d1[Math.floor(d1.length * 0.3)] + 1e-6;
+    const near70 = BT.shellOnBlock(S1.t, S1.rec.slot, topEnd(S1), r30);
+    const S2 = fresh(), d2 = sortedD(S2), r80 = d2[Math.floor(d2.length * 0.8)] + 1e-6;
+    const near80 = BT.shellOnBlock(S2.t, S2.rec.slot, topEnd(S2), r80);
+    ok(`!! taken down to ${Math.round(near70.left / near70.rec.count0 * 100)}% of its voxels a block holds together (breakFraction ${BT.TOPPLE.breakFraction}); taken down to ${Math.round(near80.left / S2.rec.count0 * 100)}% it comes apart where it is: shattered, the body parked and gone from its slot, rubble in the world, the hit points the voxels it had left`, !near70.shattered && S1.t.bodies.length === 1 && near80.shattered && S2.t.bodies.length === 0 && S2.t.slots[0] === null && S2.t.shattered === 1 && S2.t.rubble > 0 && S2.g.parked.size >= 1, `30% removed: ${near70.left} left; 80% removed: ${near80.left} left, ${S2.t.rubble} rubble voxels`);
+    ok("...and an empty slot is nothing to hit: a second shell on the shattered block's slot returns null and counts nothing", BT.shellOnBlock(S2.t, 0, [0, 0, 0]) === null && S2.t.shellHits === 1);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------

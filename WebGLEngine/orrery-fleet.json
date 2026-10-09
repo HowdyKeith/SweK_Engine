@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "8bc1a01b9ec08b68576a05193502fc307e9c9013",
+ "head": "981598130087a32aadfce9a0530590993f1882c4",
  "bodies": {
   "box3d": [
    {
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 881687,
-    "sha": "e5dbd574255e479720a4a45a5d1963e315aeef9a"
+    "bytes": 881792,
+    "sha": "6682fad31dbbe429b1ee5c47bb0088c3f2831a9b"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -442,7 +442,7 @@
   "male-cns": [
    {
     "path": "brain/gunnerPolicy-selfcheck.mjs",
-    "bytes": 27356,
+    "bytes": 38832,
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
@@ -722,7 +722,7 @@
    {
     "path": "main.js",
     "bytes": 3481125,
-    "sha": "8bc1a01b9ec08b68576a05193502fc307e9c9013"
+    "sha": "cda72c55d93d9fa27da827c086b8de7e6b3f7528"
    },
    {
     "path": "mpm3d.html",
@@ -766,8 +766,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 881687,
-    "sha": "e5dbd574255e479720a4a45a5d1963e315aeef9a"
+    "bytes": 881792,
+    "sha": "6682fad31dbbe429b1ee5c47bb0088c3f2831a9b"
    },
    {
     "path": "shipavatar.html",
@@ -923,8 +923,8 @@
   "three-webgpu": [
    {
     "path": "ai-presence-orb.html",
-    "bytes": 9528,
-    "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
+    "bytes": 11946,
+    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
    },
    {
     "path": "fsr-three.html",
@@ -1243,7 +1243,7 @@
    },
    {
     "path": "tools/ship/tslRace-selfcheck.mjs",
-    "bytes": 82949,
+    "bytes": 84598,
     "sha": "d503b6d13255216bf7fe92d70c69092bef90414d"
    },
    {
@@ -1273,8 +1273,8 @@
    },
    {
     "path": "ui/aiPresenceOrbWidget.js",
-    "bytes": 17735,
-    "sha": "10166ab69cf2ff9676c5783755c375ae95a1e9af"
+    "bytes": 18817,
+    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
    }
   ],
   "three-webgpu-r185": [

@@ -597,7 +597,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4809 -- 4496 -> 4498 for render/threeWorkarounds.mjs and its gate.
     // v4819 -- 4595 -> 4598 at the merge of the two lines: the exported-functions line's three files since the split --
     // render/temporalTslCoverage-selfcheck.mjs, render/threeWorkarounds.mjs and its gate. Re-derived over the merged tree.
-    files: 4598,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // the lockstep round (v4822) -- main's 4598 -> 4605 for brain/raceLockstep.mjs, brain/raceLockstepPeer.mjs, brain/raceLockstep-selfcheck.mjs, tools/ship/miniWs.mjs,
+    // tools/ship/lockstepRelay.mjs, tools/ship/lockstepPeer.mjs and tools/ship/lockstepRelay-selfcheck.mjs.
+    files: 4605,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1137,8 +1139,17 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // The three files above: ES modules +3, closures +2, async/await +3, typed arrays +2, WebGL +3 (forceWebGL, isWebGLBackend)
     // -- v4779's and v4809's rows. And two edits to existing files: async/await +1, tools/ship/threePatch.mjs running the dev
     // issues' pages (v4799); WebGPU +1, tools/ship/threeUpstream-selfcheck.mjs asking navigator.gpu for an adapter (v4791).
-    esModules: 4293, closures: 4142, asyncAwait: 1720, typedArrays: 1271, promises: 405,
-    fetchXhr: 251, performanceNow: 241, raf: 126, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    // the editable-world round -- tools/ship/raceTurret-selfcheck.mjs stubs the page's requestAnimationFrame to stop its frame loop,
+    // so the picture it reads back is a function of the world alone, and the file now names the word: requestAnimationFrame
+    // 126 -> 127; nothing else moved.
+    // the lockstep round (seven files): ES modules 4290 -> 4297, closures 4140 -> 4147, async/await 1716 -> 1721 (the peer runner, the CLI, the relay and two gates await),
+    // Promises 405 -> 410 (miniWs.connect, the gate's peerProc and its staggered start and the --serve pair, the CLI's transport); typed arrays hold at 1269 (Buffers are not typed arrays here).
+    // v4822 -- AT THE MERGE OF THIS ROUND ONTO main's v4821, re-derived over the merged tree: main's own figures plus this round's seven files (ES modules +7, closures +7,
+    // async/await +5, Promises +5, and requestAnimationFrame 126 -> 127 for tools/ship/raceTurret-selfcheck.mjs stubbing the page's frame loop); typed arrays hold.
+    // v4822 -- async/await 1725 -> 1726 at the ship's own re-take: the relay gate gained section 1b (wsTransport over the relay, the CLIs' refusals), whose awaits and
+    // spawn-wrapping promise are one async/await beyond the figure taken before it; wsTransport itself MOVED from tools/ship/lockstepPeer.mjs to tools/ship/miniWs.mjs (no net change there).
+    esModules: 4300, closures: 4149, asyncAwait: 1726, typedArrays: 1271, promises: 410,
+    fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

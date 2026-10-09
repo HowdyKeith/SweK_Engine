@@ -45,7 +45,7 @@ import { worldFromModule } from "./render/slugTicker.mjs";
 const cvs = document.getElementById("c"), beEl = document.getElementById("be");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 const $ = (id) => document.getElementById(id);
-let device, physMod = null, g = null, car = null, surface = null, pursuit = null, driver = null, tracker = null, sc = null, debris = null, mode = "lap";
+let device, physMod = null, g = null, car = null, surface = null, pursuit = null, driver = null, tracker = null, sc = null, debris = null, mode = "lap", sceneBuilds = 0;
 let yaw = 0.6, pitch = 0.7, dist = 60, dragging = null, centre = [0, 0, 0], hash = 0x811c9dc5, steps = 0, acc = 0, lastT = 0, removed = 0, rebar = 0;
 const fold = (h, v) => { for (let k = 0; k < 4; k++) { h ^= (v >>> (k * 8)) & 0xff; h = Math.imul(h, 0x01000193); } return h; };
 
@@ -66,6 +66,15 @@ function demolish() {
   return res;
 }
 
+// v4822 -- the scene is built from the state's CURRENT slots, and built again when a chunk outgrows its slot: the proxy (D.worldUnit) FLAGS
+// state.outgrown rather than write a repack bigger than the device buffer past its end, and this page answers by building from the repacked
+// state, the way race-brain.html does. Roomy slots (crashWorld's default) make it rare; they do not make it impossible.
+function buildScene() {
+  if (sc && sc.scene.destroy) sc.scene.destroy();
+  sc = D.crashScene(device, g.state, debris, G, L, { extras: BT.sceneExtras(g.topple, G, L) }); sc.setCar(carPose(g.phys, car)); BT.bindScene(g.topple, sc, sc.extrasBase);
+  sceneBuilds++;
+}
+
 function rebuild() {
   if (!physMod) return;
   const t0 = performance.now();
@@ -77,8 +86,7 @@ function rebuild() {
   BT.toppleWorld(g, { debris });
   const cp = checkpoints(track)[0]; car = createCar(g.phys, { x: cp.x + 5, z: cp.z, yaw: Math.PI / 2 });
   hash = 0x811c9dc5; steps = 0; acc = 0; removed = 0; rebar = 0;
-  if (sc && sc.scene.destroy) sc.scene.destroy();
-  sc = D.crashScene(device, g.state, debris, G, L, { extras: BT.sceneExtras(g.topple, G, L) }); sc.setCar(carPose(g.phys, car)); BT.bindScene(g.topple, sc, sc.extrasBase);
+  buildScene();
   lapMode();
   $("tick").textContent = `${describeTrack(track)}; ${g.rects.length} buildings as static boxes; built in ${(performance.now() - t0).toFixed(0)} ms on ${sc.scene.path}`;
   const qs = new URLSearchParams(location.search); if (qs.get("ram") === "1") ramMode();
@@ -115,6 +123,7 @@ function frame(t) {
     BT.stepTopple(g.topple, steps);
     debris.update(CAR.dt);
   }
+  if (g.state.outgrown) buildScene();   // a repack that did not fit the device buffer: the scene again from the repacked state
   const pose = carPose(g.phys, car); sc.setCar(pose);
   let standing = 0, damaged = 0, toppled = 0; for (const b of g.city.buildings) { if (b.state === "toppled") toppled++; else if (b.hp < b.maxHp) damaged++; else standing++; }
   $("city").textContent = `the city: ${g.rects.length} buildings, ${standing} standing whole, ${damaged} damaged, ${toppled} toppled; ${removed} voxels removed, ${rebar} rebar voxels revealed, ${debris.particles.length} debris live; impacts ${g.impacts.length}${g.impacts.length ? ` (last: ${g.impacts[g.impacts.length - 1].dv.toFixed(1)} m/s lost, ${g.impacts[g.impacts.length - 1].removed} voxels, hp ${g.impacts[g.impacts.length - 1].hp} of ${g.impacts[g.impacts.length - 1].maxHp}${g.impacts[g.impacts.length - 1].toppled ? ", TOPPLED" : ""})` : ""}`;
@@ -124,6 +133,9 @@ function frame(t) {
   const eye = [centre[0] + dist * Math.sin(yaw) * Math.cos(pitch), centre[1] + dist * Math.sin(pitch), centre[2] + dist * Math.cos(yaw) * Math.cos(pitch)];
   sc.scene.frame({ viewProj: G.multiply(G.perspective(0.9, w / h, 0.5, 2000), G.lookAt(eye, centre)), eye, clear: [0.03, 0.05, 0.08, 1] });
 }
+
+// read-only handles for the gate (brain-maze.html's window.__maze, race-brain.html's window.__raceBrain)
+window.__raceCrash = { get g() { return g; }, get scene() { return sc; }, get sceneBuilds() { return sceneBuilds; }, get device() { return device; } };
 
 main();
 </script>

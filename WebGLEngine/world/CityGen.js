@@ -471,3 +471,19 @@ export class CityGen {
         this._lastStamp = null;
     }
 }
+
+// v4822 -- a turret shell can now carry a building through the same hp/crumble/topple machinery a car crash does
+// (world/crashDamage.mjs's shellInto), so the city's own mutable state can diverge a replay the same way a car
+// impact already can. Folding `state` alongside `hp` was the first draft's instinct -- belt and suspenders -- until
+// tools/ship/cityGenSeed-selfcheck.mjs's own sabotage (dropping the state fold) came back 0 red: damageAt's
+// crumble/topple thresholds are a pure function of hp / maxHp, so for a fixed maxHp (fixed for the city's whole
+// life, generated once from the seed) two buildings at the same hp are ALWAYS at the same state, never two
+// different ones a replay could disagree on. hp alone is what a replay can actually diverge on; state is measured
+// history of that same number, not independent information, so it stays out of the fold rather than sit there
+// untested.
+/** The lockstep fold for the city: each building's hp, so a replay that put a shell through a different wall
+ *  disagrees with the log even though every car's own state came out the same. */
+export function cityHash(h, city, fold) {
+    for (const b of city.buildings) h = fold(h, Math.round(b.hp * 1e3) | 0);
+    return h;
+}

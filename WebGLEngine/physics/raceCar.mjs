@@ -245,9 +245,18 @@ export function carForces(world, car, surface, input, dt = car.spec.dt, poseIn =
     return { pose, input: u, wheels: info };
 }
 
+/**
+ * A building rect's world box: the centre and half-extents addBuildings() stamps into box3d for the chassis, named once so a
+ * second reader (physics/turret.mjs's shell hit test, v4680) computes the SAME box rather than a copy of this arithmetic that
+ * drifts from it the day either one changes. Axis-aligned, so the quat is the identity every box3d body already carries here.
+ */
+export function buildingBox(r, groundY = ROAD_Y - 1) {
+    return { pos: [r.x + r.w / 2, groundY + 1 + r.h / 2, r.z + r.d / 2], quat: [0, 0, 0, 1], half: [r.w / 2, r.h / 2, r.d / 2] };
+}
+
 /** The city's buildings as static boxes the chassis can hit: rects from raceTrack.cityRects, stamped from groundY up. */
 export function addBuildings(world, rects, groundY = ROAD_Y - 1) {
-    return rects.map((r) => world.addBox({ type: "static", pos: [r.x + r.w / 2, groundY + 1 + r.h / 2, r.z + r.d / 2], half: [r.w / 2, r.h / 2, r.d / 2], density: 1 }));
+    return rects.map((r) => world.addBox({ type: "static", ...buildingBox(r, groundY), density: 1 }));
 }
 
 /**

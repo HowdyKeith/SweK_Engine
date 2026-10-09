@@ -8868,8 +8868,31 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "compared LISTENING at tau 0.60 against IDLE at tau 0 and read 1,934 moved bytes, which is " +
                  "mh_live's voice window opening and not a leak -- each state is now held against ITSELF.",
     }),
-    // v4824 -- ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
+    // v4822 -- TWO new gates: the race lockstep in one process (a mock wire) and across real processes and a real socket (a relay, node peers, a headless Chromium peer).
     since516: Object.freeze({
+        at: "v4822", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["brain/raceLockstep-selfcheck.mjs", "tools/ship/lockstepRelay-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([
+            "brain/gunnerPolicy-selfcheck.mjs (raceWithGunners is a loop over createRace now; the block hit and the chip in its fingerprint)",
+            "world/buildingTopple-selfcheck.mjs (the chip: shellOnBlock, localSig, toppleHash, the demolition script)",
+            "physics/turret-selfcheck.mjs (stepShells reports a shot that lands on a falling block)",
+            "tools/ship/crashDamage-selfcheck.mjs, tools/ship/cityGenSeed-selfcheck.mjs, tools/ship/raceTurret-selfcheck.mjs, physics/spellAmmo-selfcheck.mjs, tools/ship/carViews-selfcheck.mjs",
+            "tools/ship/tslRace-selfcheck.mjs (the page row that asks the pick for a Chaos ship takes up to six picks: the fleet is 1-3 pixels of it, and one pick was red about one run in eight on main; sabotage Q, 11 red)",
+        ]),
+        verdict: "*** THE RACE NOW RUNS IN LOCKSTEP BETWEEN PROCESSES, AND THE PAIR AGREES WITH ITSELF, NOT WITH EVERY OTHER RUN. *** " +
+                 "brain/raceLockstep.mjs puts the race stepper (createRace) behind physics/box3dLockstepNet.js: inputs sent ahead and " +
+                 "redundantly, a hash of the whole sim exchanged per tick, the engine identity announced. Its gate holds the session over " +
+                 "a mock wire; tools/ship/lockstepRelay-selfcheck.mjs puts a TCP socket and an OS process boundary between the peers: " +
+                 "frames of every length class intact and in order, two cold node processes (one started 1.5 s late) agree on one " +
+                 "fingerprint and their exchanged commands replay offline to it, a headless Chromium peer and a node peer agree, a tamper " +
+                 "at tick 100 is named AT tick 100 by both, and a peer announcing another engine halts the pair before a step. Two runs of " +
+                 "the same race differ (the policies are asked for each tick when a peer's pump reaches it); a pair and its log never do. " +
+                 "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
+                 "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
+    }),
+    // v4824 -- since517, not since516: v4822 on main took since516 in the same days. ONE new gate file: ui/pick-selfcheck.mjs, the target-scoring utility the npc audit's third cluster needed.
+    since517: Object.freeze({
         at: "v4824", swept: 1, green: 1, red: 0,
         added: Object.freeze([
             "ui/pick-selfcheck.mjs",

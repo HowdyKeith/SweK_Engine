@@ -20,7 +20,7 @@
 // Not claimed: the sandbox's kaiju, its FPS shooter and the dungeon kit's grenade (their pages, not this one); debris that
 // collides (the sandbox's does not either); a topple as rigid bodies (kaijuBox3d's, opt-in there, not here).
 "use strict";
-import { remeshChunks } from "./voxelDeviceEdit.mjs";
+import { remeshChunks, affectedChunks } from "./voxelDeviceEdit.mjs";
 import { raycastVoxels, SUN } from "./voxelDevice.mjs";
 import { litBind, litWgsl, litVertexGlsl, litFragmentGlsl, litPipelineDesc } from "./litSphere.mjs";
 import { boxMesh } from "./buildingLab.mjs";
@@ -28,11 +28,28 @@ import { bodyLitPipelineDesc } from "./voxelBodies.mjs";
 
 export const DAMAGE = Object.freeze({ radius: 1.5, maxDist: 400, debrisCap: 400, park: [0, -500, 0] });
 
-/** the dirty chunks plus their neighbours, re-meshed; { chunks, dirty, rebuilt, ms } */
+/**
+ * the dirty chunks plus their neighbours, re-meshed; { chunks, dirty, rebuilt, ms }
+ *
+ * v4822 -- WITH A WORLD THAT RECORDS ITS EDITS (world.editLog, an array: render/voxelDevice.mjs's miniWorld when a caller turns it on),
+ * ONLY THE CHUNKS AN EDIT CAN REACH. A dirty flag names the chunk that changed and nothing about WHERE in it, so the old rule re-meshes
+ * all eight neighbours of every dirty chunk on the chance the edit was at a seam -- measured on this city, nine chunks (about 2 ms each)
+ * for a shell that carved one, 15 to 25 ms of a 16.7 ms frame. voxelDeviceEdit's affectedChunks() is the rule for one edit (the chunk
+ * itself, and a neighbour only when the edit is within a voxel of it: a face at the seam and the corner AO read the neighbour); the log
+ * lets it be applied to every edit this sync is covering. A chunk that is dirty with no log entry (a writer that did not go through
+ * setVoxel) is still re-meshed itself, so the worst case is the old rule's seam miss for that writer, never a chunk left stale.
+ * The fresh-pack rows in tools/ship/crashDamage-selfcheck.mjs hold the result to the picture a full repack would draw.
+ */
 export function syncDirty(state, { neighbours = true } = {}) {
-    const { world } = state, dirty = [], keys = new Set();
+    const { world } = state, dirty = [], keys = new Set(), log = world.editLog;
     for (const c of world.chunks.values()) if (c.dirty) dirty.push(c);
-    for (const c of dirty) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { if (!neighbours && (dx || dz)) continue; const k = (c.cx + dx) + "," + (c.cz + dz); if (world.chunks.has(k)) keys.add(k); }
+    if (neighbours && Array.isArray(log)) {
+        for (let i = 0; i < log.length; i += 2) for (const k of affectedChunks(world, log[i], log[i + 1])) keys.add(k);
+        log.length = 0;
+        for (const c of dirty) keys.add(c.cx + "," + c.cz);
+    } else {
+        for (const c of dirty) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { if (!neighbours && (dx || dz)) continue; const k = (c.cx + dx) + "," + (c.cz + dz); if (world.chunks.has(k)) keys.add(k); }
+    }
     if (!keys.size) return { chunks: [], dirty: 0, rebuilt: false, ms: 0 };
     const r = remeshChunks(state, [...keys]);
     for (const c of dirty) c.dirty = false;

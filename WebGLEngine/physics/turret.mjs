@@ -103,21 +103,61 @@ export function insideBox(p, pose, half, pad = 0) {
 }
 
 /**
- * One tick of every shell: vacuum flight under the world's gravity, then a swept test against each target { index, pose, half }.
- * A shell that hits, lands (y < groundY) or expires is removed. Returns the hit events [{ owner, target, point, dir }] in shell order.
+ * One tick of every shell: vacuum flight under the world's gravity, then a swept test against each target { index, pose, half }
+ * and, since v4680, each building { pos, quat, half } from physics/raceCar.mjs's buildingBox() -- a building has no owner to
+ * exempt, so it is solid to every shell including the one its own firer sent through where it used to be empty air.
+ * A shell that hits, lands (y < groundY) or expires is removed. Returns the hit events in shell order: a car hit is
+ * { owner, target, point, dir, ammo }, a building hit { owner, building, point, dir, ammo } -- the caller tells them apart by
+ * which of `target`/`building`/`block` is present, never two.
+ *
+ * v4822 -- A FALSY SLOT IN `buildings` IS A GONE BUILDING, NOT A MISSING ONE. A building a shell already toppled (world/
+ * crashDamage.mjs's shellInto, through the same city a car crash damages) has nothing left standing to hit, the way its
+ * box3d collider is parked rather than tested once brain/gunnerPolicy.mjs's turretTick sees it toppled -- so the caller
+ * hands stepShells the same list with that index nulled rather than removed, keeping every index the fixed rect it always
+ * named, and this loop skips a null slot instead of reading `.half` off of one.
+ *
+ * *** THE EARLIEST SAMPLE WINS ACROSS ALL THREE LISTS, NOT WHICHEVER LIST IS CHECKED FIRST. *** Loops over the same four
+ * samples, cars then buildings then blocks, each one refusing to report a hit at a sample `k` no earlier hit already beat -- so a wall at
+ * sample 1 blocks a car at sample 3 behind it, and a car at sample 1 is not overridden by a building the second loop would
+ * otherwise have found at sample 2. Checking either list alone and then the other, unconditionally, would let whichever list
+ * runs second win ties it has no business winning.
+ *
+ * v4822 -- `blocks`: the falling blocks of world/buildingTopple.mjs, each { pos, quat, half } in the BODY's pose (insideBox already
+ * takes a rotated box -- a block lying on its side is hit where it lies, not where its upright box was), a falsy slot an empty
+ * one. A block hit is { owner, block: slot, point, dir, ammo }. Without this a building a shell brought down became a hole in the
+ * shell's world the moment it toppled: its list slot is nulled, and the box3d body that fell out of it was nothing to a shell.
  */
-export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.gravity, spec = TURRET } = {}) {
+export function stepShells(shells, targets, dt, { groundY = 0, gravity = TURRET.gravity, spec = TURRET, buildings = [], blocks = [] } = {}) {
     const events = [];
     for (let i = shells.length - 1; i >= 0; i--) {
         const s0 = shells[i], s1 = stepShell(s0, dt, { gravity, drag: 0 });
-        let hit = null;
+        const at = (k) => { const f = k / HIT_SAMPLES; return [s0.x + (s1.x - s0.x) * f, s0.y + (s1.y - s0.y) * f, s0.z + (s1.z - s0.z) * f]; };
+        let hit = null, hitK = HIT_SAMPLES + 1;
         for (const tg of targets) {
             if (tg.index === s0.owner) continue;
-            for (let k = 1; k <= HIT_SAMPLES && !hit; k++) {
-                const f = k / HIT_SAMPLES, p = [s0.x + (s1.x - s0.x) * f, s0.y + (s1.y - s0.y) * f, s0.z + (s1.z - s0.z) * f];
-                if (insideBox(p, tg.pose, tg.half, spec.shellRadius)) hit = { owner: s0.owner, target: tg.index, point: p, dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };   // ammo: v4592, what the shell carries
+            for (let k = 1; k < hitK; k++) {
+                if (!insideBox(at(k), tg.pose, tg.half, spec.shellRadius)) continue;
+                hit = { owner: s0.owner, target: tg.index, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };   // ammo: v4592, what the shell carries
+                hitK = k; break;
             }
-            if (hit) break;
+        }
+        for (let bi = 0; bi < buildings.length; bi++) {
+            const bd = buildings[bi];
+            if (!bd) continue;
+            for (let k = 1; k < hitK; k++) {
+                if (!insideBox(at(k), bd, bd.half, spec.shellRadius)) continue;
+                hit = { owner: s0.owner, building: bi, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };
+                hitK = k; break;
+            }
+        }
+        for (let bk = 0; bk < blocks.length; bk++) {
+            const bl = blocks[bk];
+            if (!bl) continue;
+            for (let k = 1; k < hitK; k++) {
+                if (!insideBox(at(k), bl, bl.half, spec.shellRadius)) continue;
+                hit = { owner: s0.owner, block: bk, point: at(k), dir: unit([s1.vx, s1.vy, s1.vz]), ammo: s0.ammo };
+                hitK = k; break;
+            }
         }
         if (hit) { events.push(hit); shells.splice(i, 1); continue; }
         if (s1.y < groundY || s1.t >= spec.shellLife) { shells.splice(i, 1); continue; }
