@@ -74,7 +74,7 @@ const params = new URLSearchParams(location.search);
 // v4827 -- THE SPECIES: ?species= first, then this browser's last choice, then "still". A name that is not one
 // of the eighteen is refused here rather than handed to the builder, which throws on it. Changing it reloads,
 // because each species is its own compiled shader and a reload is the one teardown that cannot leak a pipeline.
-const SPECIES_KEY = "swek.orbSpecies";
+const SPECIES_KEY = "swek.orbSpecies";   // the same key ui/aiPresenceOrbWidget.js's ORB_SPECIES_KEY names
 const stored = (() => { try { return localStorage.getItem(SPECIES_KEY); } catch { return null; } })();
 const species = [params.get("species"), stored, "still"].find((s) => ORB_SPECIES.includes(s));
 if (params.get("embed") === "1") document.body.classList.add("embed");

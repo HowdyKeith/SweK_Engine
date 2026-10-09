@@ -175,6 +175,34 @@ async function main() {
         }
     }
 
+    sec("5b. *** v4829 -- THE SAME ORB AS THE AVATAR PANEL: the species the picker saved, refused if it is not one of eighteen ***");
+    {
+        // SABOTAGED, each restored: the widget's read of the saved species removed -> RED (comet mounts still);
+        // the ORB_SPECIES check removed -> RED (a bogus name reaches the builder, which throws, and nothing mounts).
+        const SPECIES_SCRIPT = `async ({ forceWebGL }) => {
+            const { mountAiPresenceOrbWidget, ORB_SPECIES_KEY } = await import("/ui/aiPresenceOrbWidget.js");
+            const out = { key: ORB_SPECIES_KEY };
+            for (const [label, saved, opt] of [["saved", "comet", null], ["bogus", "nonsense", null], ["explicit", "comet", "prism"]]) {
+                localStorage.setItem(ORB_SPECIES_KEY, saved);
+                const h = await mountAiPresenceOrbWidget(opt ? { forceWebGL, species: opt } : { forceWebGL });
+                out[label] = h ? h.species : null;
+                if (h) h.remove();
+            }
+            localStorage.removeItem(ORB_SPECIES_KEY);
+            return out;
+        }`;
+        const r6 = await runInEngineOrigin({ engineRoot: ENG, script: SPECIES_SCRIPT, args: { forceWebGL: true } });
+        const pageSrc = fs.readFileSync(path.join(ENG, "ai-presence-orb.html"), "utf8");
+        if (!r6.ok || !r6.result) ok("!! species harness ran", false, r6.reason || "no result");
+        else {
+            const R6 = r6.result;
+            ok("!! *** a saved species mounts that species; a bogus one falls back to still; an explicit option wins ***",
+               R6.saved === "comet" && R6.bogus === "still" && R6.explicit === "prism", JSON.stringify(R6));
+            ok("  ...and the page's picker saves under the very key the widget reads",
+               new RegExp(`const SPECIES_KEY = "${R6.key.replace(".", "\\.")}"`).test(pageSrc), `key ${R6.key}`);
+        }
+    }
+
     sec("6. *** WIRED INTO THE REAL ENGINE: main.js ACTUALLY CALLS mountAiPresenceOrbWidget ***");
     {
         const mainSrc = fs.readFileSync(path.join(ENG, "main.js"), "utf8");

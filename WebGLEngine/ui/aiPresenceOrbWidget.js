@@ -30,6 +30,9 @@
 "use strict";
 import { SECONDS_PER_WORD } from "./captionClock.js";
 
+/** The key ai-presence-orb.html's species picker saves under, and this widget reads. One spelling, exported. */
+export const ORB_SPECIES_KEY = "swek.orbSpecies";
+
 const DPR_CAP = 2;
 const SIZE_CSS_PX = 44;   // matches ui/miniIconStack.js's ICON_W (34) plus a visible margin -- a presence orb reads smaller than its clickable footprint
 const RAIL_LEFT_PX = 44;  // ui/miniIconStack.js's own left rail offset (v1967 -- clears the left-edge lcars-minitabs)
@@ -61,13 +64,16 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         tslPath = "../vendor/three-webgpu/three.tsl.js",
         presentPath = "../render/aiPresenceOrbPresent.mjs",
         statePath = "../render/aiPresenceOrbState.mjs",
+        orbPath = "../render/aiPresenceOrbTsl.mjs",
+        species: speciesOpt = null,
     } = opts;
 
-    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, STATE_INDEX;
+    let THREE, TSL, makeAiPresenceOrbHdrPipeline, createPresenceState, STATE_INDEX, ORB_SPECIES;
     try {
-        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, STATE_INDEX }] = await Promise.all([
+        [THREE, TSL, { makeAiPresenceOrbHdrPipeline }, { createPresenceState, STATE_INDEX }, { ORB_SPECIES }] = await Promise.all([
             import(/* @vite-ignore */ threePath), import(/* @vite-ignore */ tslPath),
             import(/* @vite-ignore */ presentPath), import(/* @vite-ignore */ statePath),
+            import(/* @vite-ignore */ orbPath),
         ]);
     } catch (e) { console.warn("[aiPresenceOrbWidget] module load failed, not mounting:", e && e.message); return null; }
 
@@ -111,7 +117,13 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         return null;
     }
 
-    const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, {});
+    // v4829 -- THE SAME ORB AS server.html's AVATAR PANEL. ai-presence-orb.html's species picker saves its choice in
+    // this browser under swek.orbSpecies; the widget reads it at mount (an explicit opts.species wins), refuses any
+    // name outside the eighteen, and draws still otherwise. Read once: a species is its own compiled shader, so a
+    // change made elsewhere arrives with the next page load rather than by rebuilding a live pipeline.
+    const stored = (() => { try { return window.localStorage.getItem(ORB_SPECIES_KEY); } catch (e) { return null; } })();
+    const species = [speciesOpt, stored, "still"].find((s) => ORB_SPECIES.includes(s));
+    const pipeline = makeAiPresenceOrbHdrPipeline(THREE, TSL, { species });
     const state = createPresenceState("idle");
 
     function resize() {
@@ -240,7 +252,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
     rafHandle = requestAnimationFrame(frame);
 
     const handle = {
-        canvas, renderer, state, pipeline,
+        canvas, renderer, state, pipeline, species,
         setState: (name) => state.setState(name),
         getState: () => state.state,
         remove() {
