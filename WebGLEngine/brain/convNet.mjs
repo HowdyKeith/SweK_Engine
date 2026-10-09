@@ -15,7 +15,11 @@ import { conv2dForward, conv2dBackward } from "./conv2d.mjs";
 /** Adam's defaults, as the pre-registration fixed them. */
 export const ADAM = Object.freeze({ lr: 1e-3, beta1: 0.9, beta2: 0.999, eps: 1e-8 });
 
-/** One deterministic stream: u() uniform in [0, 1), gauss() standard normal (Box-Muller, both values used). */
+/**
+ * One deterministic stream: u() uniform in [0, 1), gauss() standard normal (Box-Muller, both values used). state() is
+ * its exact position -- the 32-bit counter and the held-over normal -- and restore(state) puts it back there, so a
+ * training stopped and resumed draws exactly what an unbroken one would (render/denoiseNet.mjs's checkpoints).
+ */
 export function seededRandom(seed) {
     let s = (seed >>> 0) || 1, spare = null;
     const u = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -24,7 +28,12 @@ export function seededRandom(seed) {
         const a = Math.max(u(), 1e-300), b = u(), m = Math.sqrt(-2 * Math.log(a));
         spare = m * Math.sin(2 * Math.PI * b); return m * Math.cos(2 * Math.PI * b);
     };
-    return { u, gauss };
+    const state = () => ({ s, spare });
+    const restore = (st) => {
+        if (!st || !Number.isInteger(st.s) || st.s < 0 || st.s > 0xffffffff || !(st.spare === null || Number.isFinite(st.spare))) throw new Error("convNet: not a stream state");
+        s = st.s; spare = st.spare;
+    };
+    return { u, gauss, state, restore };
 }
 
 /**

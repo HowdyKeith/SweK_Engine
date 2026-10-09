@@ -10,6 +10,7 @@
 //   N2  the backward pass reads relu's mask from the layer's INPUT               3 RED (1 here, 2 in denoiseNet-selfcheck)
 //   N3  Xavier's 1/fan-in instead of He's 2/fan-in                               1 RED
 //   N4  a layer's own width (the fourth entry) ignored                           1 RED
+//   CK7 a restored stream drops its held-over normal                             1 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -77,6 +78,21 @@ console.log("\n3. ADAM, AGAINST THE UPDATE WRITTEN OUT BY HAND");
     ok("  the defaults are the pre-registration's: lr 1e-3, betas 0.9 / 0.999, eps 1e-8", ADAM.lr === 1e-3 && ADAM.beta1 === 0.9 && ADAM.beta2 === 0.999 && ADAM.eps === 1e-8);
     const c = cloneNet(net); c.layers[0].W[0] = 99;
     ok("  cloneNet copies the weights, it does not share them", net.layers[0].W[0] !== 99);
+}
+
+console.log("\nTHE STREAM'S POSITION (the denoiser arc's pre-registration section 30)");
+{
+    // stop a stream with a normal held over (an odd number of gauss() draws), restore its state into a fresh one, and both
+    // must draw the same from there on -- uniforms and normals, the held-over one first
+    const a = seededRandom(11);
+    for (let i = 0; i < 7; i++) a.gauss();
+    a.u();
+    const st = a.state(), b = seededRandom(999);
+    b.restore(JSON.parse(JSON.stringify(st)));
+    const da = [a.gauss(), a.u(), a.gauss(), a.gauss(), a.u()], db = [b.gauss(), b.u(), b.gauss(), b.gauss(), b.u()];
+    ok("!! a stream restored from its state -- through JSON, a normal held over -- draws exactly what the original draws from there",
+        st.spare !== null && da.every((v, i) => Object.is(v, db[i])), `held over ${st.spare.toFixed(6)}`);
+    ok("  a state that is not one is refused", [{ s: -1, spare: null }, { s: 1.5, spare: null }, { s: 3, spare: NaN }, null].every((x) => { try { seededRandom(1).restore(x); return false; } catch { return true; } }));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}`);

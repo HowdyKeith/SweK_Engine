@@ -1421,3 +1421,95 @@ Reported, never tested: on the test sets, both methods beat the noisy input on 1
   or large, with or without history and the mask, by count or by size. On family C the filter has won 10 or more
   of 12 images in each of rounds 6, 8 and 9.
 - The network does not go to the device on these results. Section 9 asks for both hypotheses.
+
+## 30. ROUND 10 -- TRAINED ON FAMILY C, FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered.
+
+**The question changes, as Keith asked after section 29.**
+
+> **Trained on the family it has never beaten the filter on, does the network beat the filter there? And does what it
+> learns there carry to the randomized family R?**
+
+Nine rounds found the network winning on what it was trained on and never on family C, which it was never trained on.
+This round asks which of those it was: C unseen, or C hard.
+
+**One deliberate change from round 9: the training split is 96 scenes of family C.**
+- Everything else is round 9's:
+  - the large network (33,329 parameters), 4,500 steps, seeds 1, 2, 3;
+  - the filter and its grid, tuned on the training split, so now on C;
+  - the emitter mask and its rule;
+  - the sign-flip test, Holm over {H1, H2};
+  - C0, C1 on the training images (88 of 96), C2-C5, and the stop before the tests.
+- H1 is now in-distribution on C. H2 is the family not trained on, now R.
+- C2's shuffled-target networks are trained on the C training split and measured on H1's set, as always.
+
+**Splits** (`SPLITS_R10`):
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | 96 of family C | 30000-30095 |
+| val | 4 of C | 31000-31003 |
+| T1 -> **H1** | 12 of C | **32000-32011** |
+| T2 -> **H2** | 12 of R | **33000-33011** |
+
+- Every seed is on a range no earlier split touched.
+- C5 holds over ten rounds: 1,446 render seeds.
+
+**Secondary** (reported, never tested):
+- **The other training, side by side:** the filter tuned, and the large network trained exactly as round 9 trained
+  them, on round 9's 96 scenes of R (`compareTrainSplit`). Measured on the same test images, with their statistics
+  against this round's filter under both tests. On C this is the network that lost to the filter in rounds 8 and 9,
+  trained identically, against the one trained on C, image by image.
+- The sign test beside every sign-flip p.
+- 1- and 16-sample inputs, val, and time.
+
+**What was seen first.**
+- Everything in sections 1-29, including family C's test images in rounds 5-9 and every statistic on them.
+- **The pilot,** on the 96 TRAINING scenes of C only, rendered for it before this was written:
+
+| | on the 96 training scenes of C |
+|---|---|
+| noisy input, relMSE | median 0.0127, 10th-90th percentile 0.0031-0.0523 (R's training scenes: median 0.035) |
+| the filter tuned on them | sS 1, sN 1, sA 0.2, **sI 1** (R's tuning chose sI 4); training fit 0.382; beats the noisy input on 96 of 96 |
+| R's filter setting on them | training fit 0.409; beats the noisy input on 95 of 96 |
+| the large network, seed 1, 1,500 steps | training fit 0.231; beats the noisy input on 96 of 96 |
+| the large network, seed 1, 3,000 steps | training fit 0.205; beats the noisy input on 96 of 96 |
+
+- **C0 and C1 will hold.** The network's fit is well under 0.8, and both methods clear 88 of 96.
+- **C's images are less noisy than R's,** so there is less to remove. The filter's training fit is 0.38 here, against
+  0.21 on R's training scenes.
+- **On its training images the network already fits C far better than the filter does** (0.21 against 0.38). Rounds
+  8 and 9 found a gap like that on the training set that did not hold on the test set, so this predicts nothing
+  about H1.
+- The 96 scenes took 1,518 s to render: about 16 s each, against R's 11.
+- The large pilot ran 3,000 of the 4,500 steps. The harvest's seed-1 training repeats it bit for bit and goes on.
+
+- Nothing of either new test set has been rendered.
+
+**Executed with checkpoints inside each training.**
+- This box trains at about 1.4 s a step, so one batch of four large trainings can take longer than a background run.
+- Until now a network reached the cache only when its training finished.
+- Now each training also keeps its whole state in the cache every 250 steps: weights, Adam's moments and step, the
+  random stream's position, and the losses so far. A stopped run resumes each network where it was.
+- Gated:
+  - a training stopped and resumed IS the unbroken one, every weight and loss bit for bit;
+  - a checkpoint one ulp off changes the result, so it is read;
+  - a whole miniature study, with three trainings resumed part-way inside workers, gives the uninterrupted run's
+    tables bit for bit.
+- It changes no measured value.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r10 --cache <dir> --workers 4` ->
+`render/denoise-results-r10.json`.
+- It refuses if the file exists.
+- About 5-7 hours at this box's pace, so expect several resumes (section 24).
+
+**The outcomes:**
+- **H1 and H2 supported:** trained on C, the network beats the filter on C, and what it learned carries to R. The
+  network goes to the device, with the head widened past `COUT_MAX` 32.
+- **H1 only:** C was unseen, not hard. The network wins wherever it has been trained, and transfers in neither
+  direction.
+- **H2 only:** recorded as found.
+- **Neither:** family C is hard for this network even when trained on it. The filter's advantage on C does not
+  come from the network never having seen C.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
