@@ -471,6 +471,66 @@ console.log("\n8. TWO WAYS ROUND, AND WHAT THE SUPERSAMPLE KNOB IS ACTUALLY WORT
            "purpose-built trap map (388.09 m, 10 polygons, identical corners). The heuristic dominates.");
 }
 
+console.log("\n9. *** v4824 -- THE ADJACENCY IS FOUND THROUGH AN OWNER GRID, AND IT MUST SAY EXACTLY WHAT ALL-PAIRS SAID ***");
+{
+    // The reference is the v4543 loop, kept here verbatim in effect: every (i, j) with i < j, the same edge and
+    // passability rules, the same push order. buildNavmesh now visits only the pairs an owner grid says touch, and
+    // its output must be this, byte for byte -- a faster build that drops one portal is a mesh with a wall in it.
+    // Measured when it was written, on a 760-square map with 2% pillars: 11,915 polygons and 44,734 portals,
+    // byte-identical, the build 1,640 ms -> 266 ms. Too slow for this gate's budget, so the fixture here is
+    // small and the number is the header's, not a row's.
+    // SABOTAGED, each restored: dropping the walk along each rectangle's RIGHT side -> RED here, on the ledge
+    // fixture (it went GREEN here before the ledge was added, red only in section 7); dropping the TOP side -> RED,
+    // but by section 1 throwing first, since no z-adjacency leaves no corridor; sorting the neighbour set
+    // descending -> RED here on both fixtures (push order).
+    const allPairs = (rects, conn, stride) => {
+        const adj = rects.map(() => []);
+        for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+            const A = rects[i], B = rects[j];
+            let axis = -1, lo = 0, hi = -1, aFirst = false;
+            if (A.z1 + 1 === B.z0 || B.z1 + 1 === A.z0) { axis = 1; aFirst = A.z1 + 1 === B.z0; lo = Math.max(A.x0, B.x0); hi = Math.min(A.x1, B.x1); }
+            else if (A.x1 + 1 === B.x0 || B.x1 + 1 === A.x0) { axis = 0; aFirst = A.x1 + 1 === B.x0; lo = Math.max(A.z0, B.z0); hi = Math.min(A.z1, B.z1); }
+            if (axis < 0 || hi < lo) continue;
+            const L = aFirst ? A : B, H = aFirst ? B : A, d = axis === 1 ? 1 : 0;
+            const pass = (t) => {
+                const a = axis === 1 ? L.z1 * stride + t : t * stride + L.x1, b = axis === 1 ? H.z0 * stride + t : t * stride + H.x0;
+                const f = (conn[a] >> d) & 1, bk = (conn[b] >> ((d + 2) % 4)) & 1;
+                return aFirst ? [f, bk] : [bk, f];
+            };
+            for (let t = lo; t <= hi;) {
+                const p = pass(t);
+                if (!p[0] && !p[1]) { t++; continue; }
+                let e = t; while (e + 1 <= hi) { const q = pass(e + 1); if (q[0] !== p[0] || q[1] !== p[1]) break; e++; }
+                if (p[0]) adj[i].push([j, t, e]); if (p[1]) adj[j].push([i, t, e]);
+                t = e + 1;
+            }
+        }
+        return adj;
+    };
+    const P = 192, hm = new Float32Array(P * P);
+    let s = 9;
+    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+    // a five-unit drop at x = 96: walkable off, not back up (maxStepUp 3, maxStepDown 6), so the row sweep breaks
+    // its runs there and rectangles meet SIDE BY SIDE -- flat ground alone never makes an x-adjacent pair, and the
+    // first draft of this fixture let a sabotage of the right-side walk through green for exactly that reason
+    for (let i = 0; i < P * P; i++) hm[i] = rnd() < 0.02 ? 999 : (i % P >= 96 ? -5 : 0);
+    hm[5 * P + 5] = 0;
+    for (const [name, h, opts] of [["2% pillars and a one-way ledge, " + P + " square", hm, { stride: P, seedX: 5, seedZ: 5 }],
+                                   ["the obstacle wall at r = 1", gapMap(), { stride: N, seedX: 40, seedZ: 190, radius: 1 }]]) {
+        const mesh = NM.buildNavmesh(h, opts);
+        const C = NM.connectivity(h, { stride: opts.stride, maxStepUp: 3, maxStepDown: 6 });
+        const want = allPairs(mesh.rects, C.conn, opts.stride);
+        // the reference records (to, first cell, last cell); the mesh's segment spans those cells at cellSize 1,
+        // origin 0, so it reads back as [to, first, last] exactly -- the run SPLITS are compared, not just the pairs
+        const got = mesh.adj.map((l) => l.map((p) => p.seg[0].z === p.seg[1].z
+            ? [p.to, p.seg[0].x + 0.5, p.seg[1].x - 0.5] : [p.to, p.seg[0].z + 0.5, p.seg[1].z - 0.5]));
+        const same = JSON.stringify(got) === JSON.stringify(want);
+        const ports = want.reduce((n, l) => n + l.length, 0);
+        ok("!! *** " + name + ": every portal all-pairs finds, in the same order, and no other ***",
+            same && ports > 0, mesh.rects.length + " polygons, " + ports + " portals");
+    }
+}
+
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nunchecked here: the A* COST MODEL, which no fixture above distinguishes -- see the control in section 8. " +
     "*** WIRED AT v4545: *** worker/botPathfinder.worker.js tries this module first and falls back to its " +
