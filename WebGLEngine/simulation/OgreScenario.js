@@ -14,7 +14,8 @@
 
 import { Kaiju } from "./Kaiju.js";
 import { OgreArena } from "./OgreArena.js";
-import { PathPlanner } from "./PathPlanner.js";              // round 206 — OGRE pathing
+import { PathPlanner } from "./PathPlanner.js";
+import { pickMin } from "../ui/pick.mjs";   // v4824 -- the nearest-target scans below              // round 206 — OGRE pathing
 import { TURRET_GEOM } from "../render/turretRenderer.js";    // round 49 - tube tip math
 // Round 321 — shared easing module.
 import { easeOutCubic, easeOutQuad } from "./easing.js";
@@ -1002,7 +1003,7 @@ export class OgreScenario {
                             const s = await fetch(bb + "/mp/ogre/state?room=" + encodeURIComponent(self._cmdr.room) + "&token=" + encodeURIComponent(self._cmdr.token)).then(r => r.json());
                             const st = s && s.state; if (!st) return;
                             if ((R === "driver" || R === "commander") && st.hq) { let tx = st.hq.x, tz = st.hq.z; if (st.defendersCentroid) tx += (st.hq.x - st.defendersCentroid.x) * 0.35; window.ogreCommander.steer(tx, tz); }
-                            if ((R === "gunner" || R === "commander") && Array.isArray(st.defendersList) && st.defendersList.length && st.ogre) { let bid = null, bd = Infinity; for (const d of st.defendersList) { if (d.id == null) continue; const dx = d.x - st.ogre.x, dz = d.z - st.ogre.z, dd = dx * dx + dz * dz; if (dd < bd) { bd = dd; bid = d.id; } } if (bid != null) window.ogreCommander.fire(bid); }
+                            if ((R === "gunner" || R === "commander") && Array.isArray(st.defendersList) && st.defendersList.length && st.ogre) { const near = pickMin(st.defendersList, (d) => { if (d.id == null) return null; const dx = d.x - st.ogre.x, dz = d.z - st.ogre.z; return dx * dx + dz * dz; }); if (near.found) window.ogreCommander.fire(near.item.id); }   // v4824 -- ui/pick.mjs
                             if (R === "engineer" || R === "commander") { const hurt = st.sensors && st.sensors.hp < st.sensors.maxHp * 0.85; const down = st.hardpoints && st.hardpoints.alive < st.hardpoints.total; const lowShells = st.ammo && st.ammo.shells < 20; if (hurt) window.ogreCommander.repair("auto"); else if (down) window.ogreCommander.revive(); else if (lowShells) window.ogreCommander.convert("shells"); else window.ogreCommander.repairStop(); }
                         } catch {}
                     }, 1200);
@@ -2194,14 +2195,12 @@ export class OgreScenario {
 
     _nearestDefenderSubFromPos(x, z) {
         if (!this.defenderSubs) return null;
-        let best = null, bestD2 = Infinity;
-        for (const s of this.defenderSubs) {
-            if (s.hp <= 0) continue;
+        // v4824 -- ui/pick.mjs, same filter, no bound, first-wins tie
+        return pickMin(this.defenderSubs, (s) => {
+            if (s.hp <= 0) return null;
             const dx = s.x - x, dz = s.z - z;
-            const d2 = dx * dx + dz * dz;
-            if (d2 < bestD2) { bestD2 = d2; best = s; }
-        }
-        return best;
+            return dx * dx + dz * dz;
+        }).item;
     }
 
     _tickEscortSubs(dt, t) {
@@ -2470,14 +2469,12 @@ export class OgreScenario {
             // (only if drove-over detonation — shot detonations are
             // far enough that hardpoints aren't above the explosion)
             if (!byShot && dist < 3.5) {
-                let nearestHp = null, nearestD2 = 25;     // 5u radius squared
-                for (const key of Object.keys(this.hardpoints)) {
-                    const h = this.hardpoints[key];
-                    if (h.destroyed) continue;
+                // v4824 -- ui/pick.mjs; Object.values walks the same keys in the same order Object.keys did
+                const nearestHp = pickMin(Object.values(this.hardpoints), (h) => {
+                    if (h.destroyed) return null;
                     const hdx = h.x - m.x, hdz = h.z - m.z;
-                    const d2 = hdx * hdx + hdz * hdz;
-                    if (d2 < nearestD2) { nearestD2 = d2; nearestHp = h; }
-                }
+                    return hdx * hdx + hdz * hdz;
+                }, 25).item;     // 5u radius squared
                 if (nearestHp) {
                     nearestHp.hp -= HARDPOINT_DMG;
                     if (nearestHp.hp <= 0) this._destroyHardpoint(nearestHp);
