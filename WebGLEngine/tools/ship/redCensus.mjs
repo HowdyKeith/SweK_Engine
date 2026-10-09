@@ -1682,9 +1682,16 @@ export const budgetIsOwn =
 // skipReading-selfcheck asserts all THREE are equal character for character, where it used to assert two.
 const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
 
+// *** v4825 -- THE CEILING THE COMMENTS ABOVE CALL "SIGKILL" WAS A SIGTERM, AND A PLAYWRIGHT GATE CATCHES SIGTERM. ***
+// spawnSync's default killSignal is SIGTERM, and playwright-core's processLauncher installs a SIGTERM handler that
+// closes its browsers and does NOT exit -- so a browser gate "killed" at the cap kept running until its own timeouts
+// fired, and the rotation recorded that wall clock as the cap's: fsrFrameGenBackdrop at 311,726 ms beside a 20,000 ms
+// cap at v4821, which put capReading and sweepCoverage red. Reproduced with a stand-in gate that traps SIGTERM: 9,086 ms
+// against a 3,000 ms cap before this line, the cap after it. quickSweep already kills with SIGKILL; this runner now
+// does too, and the group kill below still reaps whatever the gate spawned.
 export function runGate(rel, { timeoutMs = 120000 } = {}) {
     const r = spawnSync(process.execPath, [rel], { cwd: ENG, timeout: timeoutMs, stdio: ["ignore", "pipe", "pipe"], detached: true,
-                                                  maxBuffer: 4 * 1024 * 1024 });
+                                                  killSignal: "SIGKILL", maxBuffer: 4 * 1024 * 1024 });
     // The group is signalled whether or not this timed out: a gate that EXITS having left a child behind
     // leaks exactly as much as one that was killed, and the exit code says nothing about its children.
     if (r.pid) { try { process.kill(-r.pid, "SIGKILL"); } catch {} }
