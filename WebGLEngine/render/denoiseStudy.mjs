@@ -108,6 +108,20 @@ export const ROUND10 = Object.freeze({ splits: SPLITS_R10, init: INIT, c0: true,
 export const ROUND11 = Object.freeze({ splits: SPLITS_R11, init: INIT, c0: true, head: "kernel", size: "large", train: TRAIN_LONG, compareHeads: Object.freeze([]),
                                        temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip",
                                        compareTrainSplits: Object.freeze({ R: SPLITS_R7.train, C: SPLITS_R10.train }), results: RESULTS_R11 });
+/**
+ * tools/denoiseStudy.mjs's commands, each to its round, newest first (section 33). --secondary-r11 is round 11 exactly, writing its own file: the harvest's
+ * results (render/denoise-results-r11.json) were written without section 32's secondary, and are never overwritten.
+ */
+export const HARVESTS = Object.freeze({
+    "--secondary-r11": Object.freeze({ ...ROUND11, results: "render/denoise-results-r11-secondary.json" }),
+    "--harvest-r11": ROUND11, "--harvest-r10": ROUND10, "--harvest-r9": ROUND9, "--harvest-r8": ROUND8, "--harvest-r7": ROUND7, "--harvest-r6": ROUND6,
+    "--harvest-r5": ROUND5, "--harvest-r4": ROUND4, "--harvest-r3": ROUND3, "--harvest-r2": ROUND2, "--harvest-r1": ROUND1,
+});
+/** What runStudy is handed for a round: every option the round names, as it names it, less the file it writes. */
+export function studyOptions(round) {
+    const { results, ...opts } = round;
+    return opts;
+}
 
 /** The miniature: the same pipeline, scenes seeded outside every split, sizes small enough for a gate. */
 export const MINI = Object.freeze({

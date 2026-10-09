@@ -5,11 +5,14 @@
 // GATES render/denoiseStudy.mjs -- the pre-registered study as one pipeline (tools/denoiseStudy.mjs is its CLI) -- on its MINIATURE only (scenes seeded
 // outside every split, 16 x 16, four training steps). Its exports, each named here: SEEDS, RESULTS, RESULTS_R2,
 // RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests, renderSplit,
-// runStudy. What it holds is the PLUMBING: that every stage runs, in order, on every
+// runStudy, HARVESTS, studyOptions. What it holds is the PLUMBING: that every stage runs, in order, on every
 // split, and hands verdict() what the pre-registration says -- not any number the miniature produces, which is
 // meaningless at this size and is not looked at beyond its shape.
 //
 // Section 3 (the re-run, pre-registration section 13): control C0 stops the run BEFORE a test scene is rendered.
+//
+// Section 13 (pre-registration section 33): the runner, tools/denoiseStudy.mjs, hands the study every option a round
+// names -- through HARVESTS and studyOptions.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //   R1  the test scenes rendered with the rest, before C0                        2 RED
@@ -41,14 +44,20 @@
 //   R27 only the first comparison training run                                   1 RED
 //   R28 a comparison training's networks measured against its own filter, not   1 RED
 //       the primary one
+//   R29 the runner drops compareTrainSplits -- round 11's harvest, as it ran      1 RED
+//   R30 --secondary-r11 writes the harvest's own results file                    1 RED
+//   R31 --secondary-r11 runs round 10                                            1 RED
+//   R32 --harvest-r11 runs round 10                                              1 RED
+//   R33 the runner logs the verdict again                                        1 RED
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { SEEDS, RESULTS, RESULTS_R2, RESULTS_R3, RESULTS_R4, RESULTS_R5, RESULTS_R6, RESULTS_R7, RESULTS_R8, RESULTS_R9, RESULTS_R10, RESULTS_R11, ROUND1, ROUND2, ROUND3, ROUND4, ROUND5, ROUND6, ROUND7, ROUND8, ROUND9, ROUND10, ROUND11, MINI, shuffledTargets, stopBeforeTests,
-        renderSplit, runStudy } = await imp("render/denoiseStudy.mjs");
+        renderSplit, runStudy, HARVESTS, studyOptions } = await imp("render/denoiseStudy.mjs");
 const { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, isDatasetSeed, renderImages } = await imp("render/denoiseScenes.mjs");
 const { TRAIN, TRAIN_LONG, INIT, trainDenoiser, denoise } = await imp("render/denoiseNet.mjs");
 const { trainFit, historyFit, trainSanity, verdict, relMSE } = await imp("render/denoiseStats.mjs");
@@ -274,6 +283,29 @@ console.log("\n12. THE DEPLOYMENT ROUND: ONE NETWORK FOR BOTH FAMILIES (pre-regi
         own = T1.every((im, i) => Object.is(relMSE(denoise(net, im.x, 8, 8).y, im.ref), S.T1R.net[0][i])) && S.T1R.net[0].some((v, i) => v !== out.tables.T1.net[0][i]);
     }
     ok("  ...and R's networks are trained on R's scenes alone: seed 1 trained here on them gives its errors bit for bit, which are not the primary's", own);
+}
+
+console.log("\n13. THE RUNNER HANDS THE STUDY EVERY OPTION A ROUND NAMES (pre-registration section 33)");
+{
+    // round 11's harvest ran without its secondary: the runner passed options one by one, and compareTrainSplits was not one
+    const rounds = [["--harvest-r1", ROUND1], ["--harvest-r2", ROUND2], ["--harvest-r3", ROUND3], ["--harvest-r4", ROUND4], ["--harvest-r5", ROUND5], ["--harvest-r6", ROUND6],
+                    ["--harvest-r7", ROUND7], ["--harvest-r8", ROUND8], ["--harvest-r9", ROUND9], ["--harvest-r10", ROUND10], ["--harvest-r11", ROUND11]];
+    const whole = (round) => { const o = studyOptions(round), want = Object.keys(round).filter((k) => k !== "results");
+                               return Object.keys(o).sort().join() === want.sort().join() && want.every((k) => o[k] === round[k]); };
+    ok("!! *** every round's command runs THAT round, and the study is handed every option it names -- the same objects -- less only the file it writes ***",
+        rounds.every(([f, r]) => HARVESTS[f] === r && whole(r)) && "compareTrainSplits" in studyOptions(ROUND11) && !("results" in studyOptions(ROUND11)),
+        `${rounds.length} rounds; round 11 hands over ${Object.keys(studyOptions(ROUND11)).length} options`);
+    // and runStudy reads every one of them: each is a name in its parameter list
+    const params = new Set([...(runStudy.toString().match(/^function runStudy\(\{([\s\S]*?)\}\s*=\s*\{\}\)/)?.[1] ?? "").matchAll(/(\w+)\s*=/g)].map((m) => m[1]));
+    const unread = rounds.flatMap(([, r]) => Object.keys(studyOptions(r)).filter((k) => !params.has(k)));
+    ok("  ...and runStudy takes every one of them by name -- none is handed over only to be ignored", params.size > 20 && unread.length === 0, unread.join() || `${params.size} parameters`);
+    const S2 = HARVESTS["--secondary-r11"], others = Object.values(HARVESTS).filter((r) => r !== S2).map((r) => r.results);
+    ok("!! --secondary-r11 is round 11 in every option, writing its own file -- never the harvest's, never any round's",
+        whole(S2) && Object.keys(studyOptions(S2)).every((k) => S2[k] === ROUND11[k]) && Object.keys(S2).length === Object.keys(ROUND11).length &&
+        S2.results === "render/denoise-results-r11-secondary.json" && !others.includes(S2.results));
+    // the verdict is in the file, committed before it is read: the harvest branch logs no part of it
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), branch = cli.slice(cli.indexOf("} else if (round) {"), cli.indexOf("} else {", cli.indexOf("} else if (round) {")));
+    ok("  a harvest's log names no part of its verdict: the runner's harvest branch never reads it", branch.length > 500 && !/verdict|status|supported/.test(branch.replace(/\/\/.*$/gm, "")));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

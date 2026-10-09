@@ -1706,3 +1706,55 @@ together.**
   filter there.
 - **Neither:** recorded as found, with the single-family trainings beside it.
 - **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+## 33. ROUND 11 -- THE HARVEST RAN WITHOUT ITS SECONDARY, AND HOW THE SECONDARY IS RUN
+
+Written after the harvest and before its results file was read.
+
+`node tools/denoiseStudy.mjs --harvest-r11 --cache <dir> --workers 4` at 88fa9228, in two runs:
+- **16:19:57Z:** stopped at the 2-hour background limit, after the primary trainings, C0, C1 and the test renders,
+  with the shuffled-target trainings checkpointed at steps 3,750-4,000 of 4,500.
+- **18:20:08Z to 18:31:14Z:** resumed and finished. Its output, unedited, is `render/denoise-results-r11.json`,
+  committed at 3cb567e7.
+
+**What went wrong: section 32's secondary was not run.**
+- The runner, `tools/denoiseStudy.mjs`, handed `runStudy` a round's options one by one. Round 11's new option,
+  `compareTrainSplits`, was not among them, so the study ran as if no comparison training had been named.
+- The gates ran `runStudy` with the option directly (section 12 of the study's gate), never through the runner. So
+  the gates passed and the harvest did not do what they held.
+- The second run ended 57 s after its measurements, which is how it was noticed.
+- Nothing else depends on the option. The hypotheses, the controls and the other secondaries are as section 32 fixed
+  them.
+
+**What was seen.** The runner's last log line named the verdict, and the stage monitor's filter matched it. So "run
+reported; H1 supported, H2 supported" was seen before the results file was committed. No number was seen. The runner
+no longer logs any part of the verdict.
+
+**The fix, gated before anything runs again.**
+- The runner now hands the study a round's options whole, less the file it writes (`studyOptions`). It finds each
+  command's round in one table (`HARVESTS`). Both are in `render/denoiseStudy.mjs`, which the runner imports.
+- Gated (section 13 of the study's gate):
+  - every round's command runs that round;
+  - the study is handed every option the round names, and `runStudy` takes each by name;
+  - the harvest branch logs nothing of the verdict.
+- 5 sabotages, all red. One of them (R29) is the runner exactly as the harvest ran.
+
+**The secondary run:** `node tools/denoiseStudy.mjs --secondary-r11 --cache <dir> --workers 4` ->
+`render/denoise-results-r11-secondary.json`.
+- It is round 11 in every option, writing its own file. The harvest's results are never overwritten.
+- Its cache starts with every record the harvest made, hard-linked from the harvest's: the rendered scenes, the filter,
+  and the primary and shuffled-target networks.
+  - Those records were made at 88fa9228. Since then no code that makes them has changed. `render/`, `brain/` and
+    `physics/` differ only in the results file, a gate, and the runner's table and `studyOptions` added to
+    `render/denoiseStudy.mjs`, which no record reads.
+  - Each record is keyed by every input and option it depends on. A record the fixed runner asked for differently
+    would be missed and made again.
+- So it should make exactly 8 things: each family's filter and its three networks. Its file records how many it made
+  (cache misses).
+- Its primary analysis is read back from the harvest's records, so it must equal the committed file bit for bit. That
+  is checked and reported. It is not a second test.
+- The secondary is what section 32 fixed. Nothing in it is chosen now.
+
+**What follows.** Section 34 reports round 11 from both files: the hypotheses from the harvest's, the secondary from
+the second. It also says whether each family's networks came out bit for bit as round 10's, which section 32 promised
+for "section 33".
