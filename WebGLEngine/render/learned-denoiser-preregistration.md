@@ -1947,3 +1947,39 @@ network the harvest measured, image by image, and it puts the network on a page 
 - **D0 fails:** the shipped file is not the harvested network. Nothing else is read until it is.
 - **D1, D2 or D3 fails:** the device pass is wrong somewhere. It is found and fixed, and the measurement repeated
   under a new section, never silently.
+
+## 36. ROUND 12 -- REPORTED: THE NETWORK IS ON THE DEVICE
+
+`node tools/denoiseDevice.mjs --measure-r12 --cache <dir>` at 41ab583e, in one run (21:20:50Z to 21:27:21Z).
+- Its output, unedited, is `render/denoise-results-r12.json`, committed at ca25e327 before it was read.
+- The cache served all 24 test images (hits 24, misses 0).
+
+**Every criterion held.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the layers | 20,545,536 conv cells, every one the twin's: none fused, none unexplained |
+| D2, the kernel | worst 6.4e-7 relative to its twin (bound 1e-5) |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (median 6.8e-8; bound 1e-4); it beats the primary filter on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+Reported, not a criterion:
+- One 64 x 64 pass took 620-830 ms (median 702).
+- The device is SwiftShader 5.0.0, a CPU running a JIT, so this says nothing about a GPU's time.
+- The f64 network on the CPU, in node, takes about 0.4 s on the same image.
+
+**What this buys, per section 35: "D0-D3 hold".**
+- **The network is on the device.**
+  - On every one of round 11's test images, the device gives the harvested network's answer: bit for bit through
+    every conv layer, and within 6.4e-7 through the kernel.
+  - Round 11's verdict, re-read from the device's own images, is unchanged.
+- **The page, `denoise.html`, is the round's deliverable,** beside the Path Tracer, for scenes of R and C.
+- **Section 9's outcome for "H1 and H2 supported" is now carried out:** the network runs through
+  `brain/conv2d.mjs`'s kernels, on a page beside the path tracer's.
+
+**What it has not shown.**
+- **A GPU.** Every device in this container is SwiftShader. Speed on real hardware, and WebGPU on a real adapter, are
+  unmeasured. Keith's rig is where the page meets one.
+- **Any scene outside R and C.** In every round that tested a family the network was not trained on, it never beat
+  the filter there. The page says so, and renders nothing else.
+- **The path tracer's own scenes.** They are neither R nor C, so the page does not offer them.
