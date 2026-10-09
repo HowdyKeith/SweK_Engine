@@ -14,6 +14,9 @@
 //   N4  the large network with three 3 x 3 layers (a 7 x 7 field)                1 RED
 //   N5  a large residual network allowed                                          1 RED
 //   N6  the longer schedule with half the batch                                   1 RED
+//   CK1 a resumed training without Adam's moments                                1 RED
+//   CK2 a resumed training without the stream's position                         1 RED
+//   CK3 a resumed training that starts again from step 0                         1 RED
 //   L4  the default init back to "he"                                            3 RED
 //   L5  zero-last draws its weights from another stream than round 1's          2 RED
 //   K1  the softmax normalised over all 81 taps, outside the image included      3 RED
@@ -209,6 +212,35 @@ console.log("\n8. THE LARGER NETWORK, TRAINED LONGER (pre-registration section 2
     const long = trainDenoiser(imgs, { ...o, steps: 5, onStep: (step, loss, net) => { if (step === 2) at3 = cloneNet(net); } }), short = trainDenoiser(imgs, { ...o, steps: 3 });
     ok("!! a longer run's first steps ARE the shorter run, weight for weight -- and onStep hands over the network being trained",
         !!at3 && at3.layers.every((L, i) => same(L.W, short.net.layers[i].W) && same(L.b, short.net.layers[i].b)) && !long.net.layers.every((L, i) => same(L.W, short.net.layers[i].W)));
+}
+
+console.log("\n9. A TRAINING STOPPED AND RESUMED (pre-registration section 30)");
+{
+    // train 6 steps unbroken; then train again with a checkpoint every 2 steps, stopped right after the step-4 save, and
+    // resumed from it. The resumed network and its losses must be the unbroken run's, bit for bit.
+    // the small kernel network: resuming does not depend on the size, and the gate stays inside its sweep budget
+    const imgs = [synth(12, 12, 4), synth(12, 12, 5)], o = { seed: 9, init: INIT, head: "kernel", batch: 2, crop: 8, steps: 6 };
+    const unbroken = trainDenoiser(imgs, o);
+    let store = null, saves = 0;
+    const STOP = new Error("stopped");
+    const keep = (st) => { store = JSON.parse(JSON.stringify(st, (k, v) => (v instanceof Float64Array ? { f64: Array.from(v, (x) => (Object.is(x, -0) ? "-0" : x)) } : v)));
+                           saves++; if (st.step === 4) throw STOP; };
+    const revive = (v) => (v && typeof v === "object" ? (v.f64 ? Float64Array.from(v.f64, (x) => (x === "-0" ? -0 : x)) : Array.isArray(v) ? v.map(revive) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, revive(x)]))) : v);
+    let stopped = false;
+    try { trainDenoiser(imgs, { ...o, checkpoint: { every: 2, load: () => null, save: keep } }); } catch (e) { stopped = e === STOP; }
+    const resumed = trainDenoiser(imgs, { ...o, checkpoint: { every: 2, load: () => revive(store), save: () => {} } });
+    const sameNet = (x, y) => x.layers.every((L, i) => same(L.W, y.layers[i].W) && same(L.b, y.layers[i].b));
+    ok("!! *** stopped after step 4 and resumed from its checkpoint, a training IS the unbroken one: every weight and every loss, bit for bit ***",
+        stopped && saves === 2 && store.step === 4 && sameNet(resumed.net, unbroken.net) && same(resumed.losses, unbroken.losses), `${resumed.losses.length} losses`);
+    // and it is READ: one ulp in the checkpoint's first weight, and the resumed network is another
+    const off = revive(store); off.layers[0].W[0] += Math.abs(off.layers[0].W[0]) * Number.EPSILON || Number.MIN_VALUE;
+    const nudged = trainDenoiser(imgs, { ...o, checkpoint: { every: 2, load: () => off, save: () => {} } });
+    ok("  ...and the checkpoint is READ: one ulp in it, and the resumed network is another", !sameNet(nudged.net, unbroken.net));
+    let saved = []; trainDenoiser(imgs, { ...o, checkpoint: { every: 3, load: () => null, save: (st) => saved.push(st.step) } });
+    ok("  a checkpoint every n steps, never at the last (the finished network is kept as itself)", saved.join() === "3");
+    const small = { ...store, layers: store.layers.slice(1) };
+    ok("  a checkpoint for another training -- another shape, or a step past the end -- is refused, not half-read",
+        [revive(small), { ...revive(store), step: 6 }].every((ck) => { try { trainDenoiser(imgs, { ...o, checkpoint: { every: 2, load: () => ck, save: () => {} } }); return false; } catch { return true; } }));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

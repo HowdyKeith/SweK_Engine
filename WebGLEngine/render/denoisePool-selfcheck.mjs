@@ -7,7 +7,8 @@
 // networks come back BIT FOR BIT as training them one after another gives, in job order; a training that throws in a
 // worker throws here, not hangs; and a whole miniature study shaped like round 9 -- the large network, the sign-flip
 // test, the small-network comparison -- gives the same result with workers as without, and with workers training only
-// the networks a half-filled cache does not hold, as a resumed harvest does.
+// the networks a half-filled cache does not hold, three of them resumed from checkpoints part-way through, as a
+// resumed harvest does (section 30).
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** The images are synthetic, or scenes seeded from 975000 up.
 //
@@ -19,6 +20,10 @@
 //   P4  the study hands the pool every job, not the missing ones                 1 RED (0 until the cache held networks from the MIDDLE
 //       of a batch: with only the last one held, the first n jobs were the missing ones by luck)
 //   P5  a worker drops a job's size: the small network trained in its place      2 RED
+//   P6  the other training's statistics not reported under the sign-flip test    1 RED
+//   CK4 a checkpoint never loaded: every training starts from step 0             1 RED (the ulp-off one is the row that sees it)
+//   CK5 a worker drops its job's checkpoint                                      1 RED
+//   CK6 C4's second training given seed 1's checkpoint key                       1 RED
 
 "use strict";
 import fs from "node:fs";
@@ -29,10 +34,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const { trainParallel } = await imp("render/denoisePool.mjs");
-const { INIT, TRAIN } = await imp("render/denoiseNet.mjs");
+const { INIT, TRAIN, trainDenoiser } = await imp("render/denoiseNet.mjs");
 const { seededRandom } = await imp("brain/convNet.mjs");
 const { runStudy, renderSplit } = await imp("render/denoiseStudy.mjs");
-const { openCache, hashArrays } = await imp("render/denoiseCache.mjs");
+const { openCache, hashArrays, saveRecord } = await imp("render/denoiseCache.mjs");
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -63,8 +68,8 @@ console.log("1. THE SAME NETWORKS, IN THE SAME ORDER");
     };
     const set = [img(), img()], other = [img(), img()];
     // four jobs: three seeds and seed 1 again, the large network among them, and a job on another set
-    const jobs = [{ set, opts: { seed: 1, init: INIT, head: "kernel", steps: 3, batch: 2, crop: 8 } }, { set, opts: { seed: 2, init: INIT, head: "kernel", steps: 3, batch: 2, crop: 8, size: "large" } },
-                  { set: other, opts: { seed: 3, init: INIT, head: "kernel", steps: 3, batch: 2, crop: 8 } }, { set, opts: { seed: 1, init: INIT, head: "kernel", steps: 3, batch: 2, crop: 8 } }];
+    const jobs = [{ set, opts: { seed: 1, init: INIT, head: "kernel", steps: 2, batch: 2, crop: 8 } }, { set, opts: { seed: 2, init: INIT, head: "kernel", steps: 2, batch: 2, crop: 8, size: "large" } },
+                  { set: other, opts: { seed: 3, init: INIT, head: "kernel", steps: 2, batch: 2, crop: 8 } }, { set, opts: { seed: 1, init: INIT, head: "kernel", steps: 2, batch: 2, crop: 8 } }];
     const serial = trainParallel(jobs, 0);
     let two = [], many = [], err = null;
     try { two = trainParallel(jobs, 2); many = trainParallel(jobs, 9); } catch (e) { err = e.message; }
@@ -83,34 +88,52 @@ console.log("\n2. A WHOLE MINIATURE STUDY, SHAPED LIKE ROUND 9, WITH WORKERS AND
     // the large network trained longer than the small one, the sign-flip test, the small network as the comparison --
     // scenes seeded outside every split
     const MINI9 = {
-        splits: { train: { family: "R", seeds: [975000, 975001, 975002] }, val: { family: "R", seeds: [975100] },
+        splits: { train: { family: "R", seeds: [975000, 975001, 975002] },
                   T1: { family: "R", seeds: [975200, 975201] }, T2: { family: "C", seeds: [975300, 975301] } },
         image: 8, sppIn: 1, sppRef: 16, train: { steps: 4, batch: 1, crop: 8 }, secondarySpp: [], c0: false, head: "kernel", emitterMask: true,
         size: "large", test: "signflip", compareSize: { size: "small", train: { steps: 2, batch: 1, crop: 8 } },
+        compareTrainSplit: { family: "C", seeds: [975400] },   // round 10's other training, trained side by side too
     };
-    // the run without workers fills a cache. Then the primary networks of seeds 2 and 3 are taken out of it -- the MIDDLE
-    // of their batch, beside seed 1's and C4's second, which stay -- and every shuffled-target and small network; the run
-    // with three workers must train exactly those eight and give the same study. The keys are the study's own: a
-    // training set's every bit, then the options in the order the study writes them.
+    // the run without workers fills a cache. Then every network but seed 1's primary is taken out of it, and three of the
+    // trainings are left part-way, as a stopped harvest leaves them: checkpoints at step 2 of 4 for seeds 2 and 3 -- the
+    // MIDDLE of their batch -- and for C4's second training, that one ONE ULP OFF. The run with three workers must train
+    // exactly the twelve missing networks, resume those three in two workers, and give the same study -- except C4, which
+    // must now see the ulp. The keys are the study's own: a training set's every bit, then the options in its order.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "denoisePool-")), stamp = { round: "mini9" };
     try {
         const a = runStudy({ ...MINI9, cache: openCache(dir, stamp) });
         const train = renderSplit(MINI9.splits.train, { harvest: false, image: 8, sppIn: 1, sppRef: 16, ref2: false, emitterMask: true, cache: openCache(dir, stamp) });
-        const setKey = hashArrays(train.flatMap((im) => [im.x, im.ref, 8, 8]));
-        const primary = (s) => `net-${setKey}-${hashArrays([JSON.stringify({ seed: s, init: INIT, head: "kernel", ...MINI9.train, size: "large" })])}.json`;
-        const nets = fs.readdirSync(dir).filter((f) => f.startsWith("net-") && f.endsWith(".json")), keep = new Set([primary(1), primary(1).replace(/\.json$/, "-again.json")]);
-        const dropped = nets.filter((f) => !keep.has(f));
+        const set = train.map((im) => ({ x: im.x, ref: im.ref, w: 8, h: 8 })), setKey = hashArrays(set.flatMap((im) => [im.x, im.ref, 8, 8]));
+        const opts = (s) => ({ seed: s, init: INIT, head: "kernel", ...MINI9.train, size: "large" });
+        const key = (s, tag = "") => `net-${setKey}-${hashArrays([JSON.stringify(opts(s))])}${tag}`;
+        const nets = fs.readdirSync(dir).filter((f) => f.startsWith("net-") && f.endsWith(".json")), dropped = nets.filter((f) => f !== `${key(1)}.json`);
         for (const f of dropped) { fs.rmSync(path.join(dir, f)); fs.rmSync(path.join(dir, f.replace(/\.json$/, ".bin"))); }
-        const cb = openCache(dir, stamp), b = runStudy({ ...MINI9, cache: cb, workers: 3 });
-        ok("!! *** with three workers and a half-filled cache the study is the one without, bit for bit -- verdict, every table, every secondary, C4 ***",
-            a.tables !== null && same({ ...a, timings: null }, { ...b, timings: null }) && a.determinism === true && b.determinism === true, `run "${a.verdict.run}"`);
-        ok("  ...and the workers trained exactly what was missing: eight networks -- two from the middle of a batch -- beside the two they read back",
-            nets.length === 10 && nets.includes(primary(1)) && nets.includes(primary(2)) && dropped.length === 8 && cb.misses === 8,
-            `${nets.length} network records; ${cb.misses} trained again, ${cb.hits} read back`);
-        const H = a.verdict.hypotheses.H1, S = a.secondary["T1@small"];
-        ok("  round 9's plumbing is in it: the tested p is the sign-flip one with the sign test beside it, and the small network's statistics are reported",
+        const STOP = new Error("stopped at the checkpoint");
+        const leaveAt2 = (s, tag = "", ulp = false) => {
+            try {
+                trainDenoiser(set, { ...opts(s), checkpoint: { every: 2, load: () => null, save: (st) => {
+                    const W0 = Float64Array.from(st.layers[0].W);
+                    if (ulp) W0[0] += Math.abs(W0[0]) * Number.EPSILON || Number.MIN_VALUE;
+                    saveRecord(dir, `ckpt-${key(s, tag)}`, { ...st, layers: [{ W: W0, b: st.layers[0].b }, ...st.layers.slice(1)] });
+                    throw STOP;
+                } } });
+            } catch (e) { if (e !== STOP) throw e; }
+        };
+        leaveAt2(2); leaveAt2(3); leaveAt2(1, "-again", true);
+        const cb = openCache(dir, stamp), b = runStudy({ ...MINI9, cache: cb, workers: 2, checkpointEvery: 2 });
+        const strip = (o) => ({ ...o, timings: null, verdict: null, determinism: null });
+        ok("!! *** with two workers, a half-filled cache and three trainings resumed part-way from their checkpoints, every table and secondary is the uninterrupted run's, bit for bit ***",
+            a.tables !== null && same(strip(a), strip(b)), `run "${a.verdict.run}"`);
+        ok("!! ...and the checkpoints are READ, in the workers: C4's second training, resumed from one an ulp off, no longer matches seed 1 -- determinism off",
+            a.determinism === true && b.determinism === false && b.verdict.controls.C4 === false);
+        ok("  ...and the workers trained exactly what was missing: twelve networks -- two of them from the middle of a batch -- beside the one they read back",
+            nets.length === 13 && dropped.length === 12 && cb.misses === 12, `${nets.length} network records; ${cb.misses} trained again, ${cb.hits} read back`);
+        const H = a.verdict.hypotheses.H1, S = a.secondary["T1@small"], O = a.secondary["T2@otherTraining"];
+        ok("  rounds 9 and 10's plumbing is in it: the tested p is the sign-flip one with the sign test beside it; the small network's and the other training's statistics are reported",
             H.test === "signflip" && H.p === H.pSignFlip && typeof H.pSign === "number" && a.config.size === "large" && a.config.test === "signflip" &&
-            !!S && S.net.length === 3 && typeof S.p === "number" && typeof S.pSign === "number" && !!a.secondary["T2@small"], `H1 p ${H.p.toFixed(3)} (sign ${H.pSign.toFixed(3)}); small: k ${S.k}`);
+            !!S && S.net.length === 3 && typeof S.p === "number" && typeof S.pSign === "number" && !!a.secondary["T2@small"] &&
+            !!O && O.net.length === 3 && O.filter.length === 2 && typeof O.p === "number" && typeof O.pSign === "number" && !!a.secondary.filterOtherTraining,
+            `H1 p ${H.p.toFixed(3)} (sign ${H.pSign.toFixed(3)}); small: k ${S.k}; other training on T2: k ${O.k}`);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 

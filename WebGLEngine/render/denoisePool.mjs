@@ -12,14 +12,21 @@
 "use strict";
 import { Worker, MessageChannel, receiveMessageOnPort, isMainThread, workerData } from "node:worker_threads";
 import { trainDenoiser } from "./denoiseNet.mjs";
+import { loadRecord, saveRecord } from "./denoiseCache.mjs";
+
+// a job's training, with its checkpoint (section 30) when the job names one: { dir, key, every } -- plain data, so it
+// crosses into a worker, which then saves and resumes its own training's state in the cache directory
+const train = (j) => trainDenoiser(j.set, !j.checkpoint ? j.opts : { ...j.opts, checkpoint: { every: j.checkpoint.every,
+    load: () => loadRecord(j.checkpoint.dir, j.checkpoint.key), save: (st) => saveRecord(j.checkpoint.dir, j.checkpoint.key, st) } }).net;
 
 /**
- * Train every job -- { set, opts }, as trainDenoiser(set, opts) takes them -- and return the networks in job order.
+ * Train every job -- { set, opts }, as trainDenoiser(set, opts) takes them, and optionally `checkpoint` -- and return
+ * the networks in job order.
  * With `workers` 0 or 1 they are trained here, one after another; with more, job j goes to worker j % workers.
  */
 export function trainParallel(jobs, workers = 0) {
     const W = Math.min(Math.max(0, workers | 0), jobs.length);
-    if (W <= 1) return jobs.map((j) => trainDenoiser(j.set, j.opts).net);
+    if (W <= 1) return jobs.map(train);
     const flags = new Int32Array(new SharedArrayBuffer(4 * W)), out = new Array(jobs.length), ports = [], pool = [];
     for (let w = 0; w < W; w++) {
         const { port1, port2 } = new MessageChannel(), mine = jobs.map((j, i) => i).filter((i) => i % W === w);
@@ -46,7 +53,7 @@ export function trainParallel(jobs, workers = 0) {
 // the worker: train its jobs in order, post the networks, raise the flag
 if (!isMainThread && workerData && workerData.denoisePool) {
     const { slot, flags, port, jobs } = workerData;
-    try { port.postMessage({ nets: jobs.map((j) => trainDenoiser(j.set, j.opts).net) }); }
+    try { port.postMessage({ nets: jobs.map(train) }); }
     catch (e) { port.postMessage({ error: String(e && e.message || e) }); }
     Atomics.store(flags, slot, 1);
     Atomics.notify(flags, slot);

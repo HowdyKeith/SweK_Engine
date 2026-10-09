@@ -3,7 +3,7 @@
 // Run: node render/denoiseScenes-selfcheck.mjs
 //
 // GATES render/denoiseScenes.mjs, the pre-registration's section 3 and 4 as code. Its exports, each named here: IMAGE,
-// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, familyOf, isDatasetSeed, strideOf,
+// SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, familyOf, isDatasetSeed, strideOf,
 // renderSeeds, makeScene, guideBuffers,
 // renderImages, inputChannels, remodulate.
 //
@@ -34,6 +34,8 @@
 //   D23 SPLITS_R8's H1 set on round 7's range (22000)                            1 RED
 //   D24 SPLITS_R8 left out of the dataset refusal                                1 RED
 //   D25 SPLITS_R9's H1 set on round 8's range (24000)                            1 RED
+//   D26 SPLITS_R10 trained on family R                                           1 RED
+//   D27 SPLITS_R10's H1 set on round 9's range (27000)                           1 RED
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
@@ -43,7 +45,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const D = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
-const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, familyOf, isDatasetSeed, strideOf, renderSeeds,
+const { IMAGE, SPP_IN, SPP_REF, ALBEDO_FLOOR, CHANNELS, SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, familyOf, isDatasetSeed, strideOf, renderSeeds,
         makeScene, guideBuffers, renderImages, inputChannels, remodulate } = D;
 const { intersect, cameraBasis, pixelRay } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
 
@@ -308,6 +310,19 @@ console.log("\n8. ROUND 9'S SPLITS (pre-registration section 28)");
         Y.train === SPLITS_R7.train && Y.val === SPLITS_R7.val && Y.T1.family === "R" && Y.T1.seeds.length === 12 && Y.T2.family === "C" && Y.T2.seeds.length === 12 &&
         r9.every((s2) => !seen8.has(s2)) && new Set(r9).size === 24 && refused9 === 24 && new Set(nine).size === nine.length,
         `${refused9} of ${r9.length} refused; ${nine.length} render seeds`);
+}
+
+console.log("\n9. ROUND 10'S SPLITS -- TRAINED ON FAMILY C (pre-registration section 30)");
+{
+    const Z = SPLITS_R10, seen9 = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9].flatMap((S2) => Object.values(S2).flatMap((x) => x.seeds)));
+    const r10 = Object.values(Z).flatMap((x) => x.seeds);
+    let refused10 = 0;
+    for (const s2 of r10) { try { renderImages("C", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused10++; } }
+    const ten = [...new Set([...seen9, ...r10])].flatMap((s2) => { const r = renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_R10: 96 training scenes and 4 for val of FAMILY C, H1 on 12 new of C (32000), H2 on 12 new of R (33000) -- every seed new, refused without harvest; C5 over ten rounds",
+        Z.train.family === "C" && Z.train.seeds.length === 96 && Z.val.family === "C" && Z.val.seeds.length === 4 && Z.T1.family === "C" && Z.T1.seeds.length === 12 &&
+        Z.T2.family === "R" && Z.T2.seeds.length === 12 && r10.every((s2) => !seen9.has(s2)) && new Set(r10).size === r10.length && refused10 === r10.length &&
+        new Set(ten).size === ten.length, `${refused10} of ${r10.length} refused; ${ten.length} render seeds`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

@@ -8118,6 +8118,25 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 10 -- TRAINED ON FAMILY C, BEFORE ANY OF ITS TEST SCENES EXIST.
+    since492: Object.freeze({
+        // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened three.
+        at: "the denoiser arc, round 10 (unshipped)", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["render/denoiseScenes-selfcheck.mjs (SPLITS_R10: trained on C, H2 on R; C5 over ten rounds)",
+                                "render/denoiseStudy-selfcheck.mjs (ROUND10)",
+                                "render/denoisePool-selfcheck.mjs (the other training's networks side by side; three trainings resumed part-way in workers)",
+                                "render/denoiseNet-selfcheck.mjs (a training stopped and resumed IS the unbroken one)",
+                                "brain/convNet-selfcheck.mjs (the stream's position, restored)"]),
+        verdict: "*** TRAINED ON THE FAMILY IT NEVER BEAT THE FILTER ON. *** Nine rounds found the network winning where it " +
+                 "was trained and never on family C, which it was never trained on. Section 30 trains round 9's large " +
+                 "network, unchanged, on 96 scenes of C, tests on new scenes of C (H1) and of R (H2), and trains round 9's " +
+                 "R network beside it as the comparison on the same images -- C unseen, or C hard. This box trains at 1.4 s " +
+                 "a step, so a batch of four can outlast a background run: each training now keeps its whole state every " +
+                 "250 steps and resumes from it, bit for bit. 13 sabotages, all red; R10, written in round 5 for the serial " +
+                 "comparison, re-run against the parallel one and still red.",
+    }),
     // the denoiser arc, round 9 -- THE LARGER NETWORK, TRAINED LONGER, TESTED BY SIZE AS WELL AS COUNT.
     since491: Object.freeze({
         at: "the denoiser arc, round 9 (unshipped)", swept: 1, green: 1, red: 0,

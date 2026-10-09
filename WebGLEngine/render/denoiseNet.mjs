@@ -161,11 +161,27 @@ export function cropAt(x, ref, W, cx, cy, size) {
  * the image and the crop corner drawn from the seed's stream AFTER the initial weights. The batch's gradient is the
  * mean of its crops'. Returns { net, losses } with the batch loss of every step.
  */
-export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, init = INIT, head = "residual", size = "small", onStep = null } = {}) {
+export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN.batch, crop = TRAIN.crop, adam = ADAM, init = INIT, head = "residual", size = "small", onStep = null,
+                                         checkpoint = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("denoiseNet: training needs an integer seed -- it seeds the weights, the crops and the batch order");
     if (!images.length || images.some((im) => im.w < crop || im.h < crop)) throw new Error(`denoiseNet: every training image must be at least ${crop} x ${crop}`);
     const rand = seededRandom(seed), net = initDenoiser(rand, init, head, strideOf(images[0].x, images[0].w * images[0].h), size), state = adamState(net), losses = [];
-    for (let step = 0; step < steps; step++) {
+    // section 30: with `checkpoint` ({ every, load, save }), the training's whole state -- weights, Adam's moments and
+    // step, the stream's position, the losses so far -- is saved every `every` steps, and a saved one is picked up where
+    // it stopped. The state is restored AFTER the network is initialised, so the stream is where an unbroken run's is.
+    let start = 0;
+    const saved = checkpoint ? checkpoint.load() : null;
+    if (saved) {
+        if (!(saved.step > 0 && saved.step < steps) || saved.layers.length !== net.layers.length ||
+            saved.layers.some((L, i) => L.W.length !== net.layers[i].W.length || L.b.length !== net.layers[i].b.length)) throw new Error("denoiseNet: a checkpoint for another training");
+        net.layers.forEach((L, i) => { L.W.set(saved.layers[i].W); L.b.set(saved.layers[i].b); });
+        state.t = saved.adam.t;
+        for (const k of ["m", "v"]) state[k].forEach((q, i) => { q.W.set(saved.adam[k][i].W); q.b.set(saved.adam[k][i].b); });
+        rand.restore(saved.rng);
+        losses.push(...saved.losses);
+        start = saved.step;
+    }
+    for (let step = start; step < steps; step++) {
         let loss = 0, acc = null;
         for (let b = 0; b < batch; b++) {
             const im = images[Math.floor(rand.u() * images.length)];
@@ -177,6 +193,9 @@ export function trainDenoiser(images, { seed, steps = TRAIN.steps, batch = TRAIN
         }
         adamStep(net, acc, state, adam);
         losses.push(loss);
+        if (checkpoint && (step + 1) % checkpoint.every === 0 && step + 1 < steps)
+            checkpoint.save({ step: step + 1, layers: net.layers.map((L) => ({ W: L.W, b: L.b })), adam: { t: state.t, m: state.m, v: state.v }, rng: rand.state(),
+                              losses: Float64Array.from(losses) });
         if (onStep) onStep(step, loss, net);
     }
     return { net, losses };
