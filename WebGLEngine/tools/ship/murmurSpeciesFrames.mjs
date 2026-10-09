@@ -139,6 +139,9 @@ export const sp = (species, time, voice = VOICE, extra = {}) => {
                 // envelope's integral from 0 to t, which is what this quadrature computes.
                 paceDriveInt: lv.pace * st.drive * time,
                 voiceDriveInt: lv.voice * st.drive * time,
+                driveDriveInt: st.drive * st.drive * time,   // v4830: geode's and fathom's spins
+                // v4830: tempest's clamped energy at this frame's own operating point (think is THINKING, index 2)
+                tempestEnergyInt: Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * st.drive)) * time,
                 duetFlourishInt: flourishQuadrature(time),
                 colors: { ink: INK }, ...extra } };
 };

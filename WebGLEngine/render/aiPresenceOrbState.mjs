@@ -20,7 +20,7 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
-import { mhLive, mhState, mhFlourish, MH_DUET } from "./murmurKit.mjs";
+import { mhLive, mhState, mhFlourish, MH_DUET, MH_MIST_LIVE } from "./murmurKit.mjs";
 
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
@@ -246,7 +246,8 @@ export function createPresenceState(initial = "idle") {
     // exactly what that note said it would; what the note did not say is that it was worth it. MEASURED:
     // murmur's spelling advances limn's travel 68.3121 rad in ONE 1/60 s frame after half an hour of running
     // -- nearly eleven whole turns -- against a flat 0.056582.
-    let paceDriveInt = 0, voiceDriveInt = 0;
+    let paceDriveInt = 0, voiceDriveInt = 0, driveDriveInt = 0;   // v4830: drive squared, for geode and fathom
+    let tempestEnergyInt = 0;   // v4830: tempest.ts:54's clamped energy -- see MH_MIST_LIVE
 
     // *** THE GESTURE INTEGRAL, for duet -- AND THE RECORD THAT SAID IT COULD NOT EXIST WAS WRONG. ***
     // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x), where fl is
@@ -305,6 +306,14 @@ export function createPresenceState(initial = "idle") {
             // average of a product.
             paceDriveInt += lv.pace * stn.drive * dPhase;
             voiceDriveInt += lv.voice * stn.drive * dPhase;
+            // v4830 -- drive SQUARED: geode and fathom mix a drive-scaled rate by drive again, so their secular
+            // term carries d * d, whose integral is not driveInt squared for the same reason as the two above.
+            driveDriveInt += stn.drive * stn.drive * dPhase;
+            // v4830 -- tempest's ENERGY, clamped, so it is integrated here rather than assembled from the sums
+            // above: clamp(0.85 * pace + 0.65 * think + 0.55 * drive, 0, 1.6), think = THINKING, the storm's home state.
+            const ME = MH_MIST_LIVE.tempest;
+            tempestEnergyInt += Math.min(ME.eCap, Math.max(0, ME.ePace * lv.pace + ME.eThink * (cur === "thinking" ? 1 : 0)
+                + ME.eDrive * stn.drive)) * dPhase;
             // duet's gesture envelope, at the phase the shader will be handed this frame.
             duetFlourishInt += mhFlourish(phase, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * dPhase;
         },
@@ -324,7 +333,7 @@ export function createPresenceState(initial = "idle") {
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, duetFlourishInt };
+                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, driveDriveInt, tempestEnergyInt, duetFlourishInt };
         },
         get state() { return cur; },
     };

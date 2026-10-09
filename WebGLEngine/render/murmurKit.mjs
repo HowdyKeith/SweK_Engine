@@ -718,7 +718,8 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
 export const MH_SLOT_SIGNAL = Object.freeze({
     still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
     abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
-    tempest: Object.freeze({ pace: 0.00, voice: 1.30 * 0.85, drive: 0.00 }),
+    // v4830 -- tempest's entry is gone: it encoded energy as 0.85 * voice, which tempest.ts never wrote. Its slot
+    // count integrates the host's tempestEnergyInt now -- see MH_MIST_LIVE.
 });
 
 /**
@@ -973,6 +974,72 @@ export const MH_COMPLETE_INTERIOR = Object.freeze({
  * numbers below are the rim's; the interior's 0.90 is MH_COMPLETE_INTERIOR.limn.
  */
 export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClose: 1.20 });
+
+/**
+ * *** v4830 -- opal's LIVE TERMS, ALL THREE ABSENT UNTIL NOW. *** opal.ts at 1c23b99:
+ *
+ *     drift = (0.055 + 0.075 * driftK) * (1.0 + 0.75 * live.pace + 0.95 * st.drive);            line 67
+ *     life  = mix(life, 0.30 + 0.70 * max(sin(6.2831853 * t / 5.2 - fk * 1.4), 0.0), st.drive);  line 95
+ *     c     = mix(c, c * 0.55 + vec3(0.42, -0.10, 0.18) * sin(6.2831853 * t / 5.2 - fk * 1.4), st.drive);
+ *
+ * "Responding brightens them in sequence along the procession axis" and "under drive they all lean the same way:
+ * a procession, not a swarm." The drift is a RATE spent as drift * t, so it goes through mhRatePhase -- the
+ * integrated form, which is murmur's own expression at a held signal and no teleport while one moves. The
+ * procession pulse runs at a FIXED 5.2 s period, so it is not a rate and is transcribed as written.
+ */
+/**
+ * *** v4830 -- geode's AND fathom's SPINS: A RATE MIXED BY DRIVE INTO ANOTHER RATE. *** At 1c23b99:
+ *
+ *     geode.ts:62-64   sp = 1 + 0.80 * live.pace + 1.00 * st.drive
+ *                      ay = mix(mh_drift(t, 0.088 * sp, 0.48, 2.0), t * 0.30 * sp, st.drive * 0.7)
+ *                      ax = mix(0.34 + 0.22 * sin(t * 0.041), 0.30, st.drive * 0.7)
+ *     fathom.ts:81-84  sp = 1 + 0.85 * live.pace + 1.10 * st.drive
+ *                      a1 = mix(mh_drift(t, -0.062 * sp, 0.50, 2.0), a0, st.drive * 0.7)    (a2 likewise, 0.108)
+ *
+ * Both mix two GROWING phases by drive, so murmur's spelling teleports by t * (difference) on every change of
+ * drive, and this port carried neither. The secular part integrates exactly: with A = r1 and B = m * (r0 - r1),
+ *
+ *     integral of (A + B d)(1 + kp p + kd d) dt = A t + A kp P + (A kd + B) D + B kp PD + B kd DD
+ *
+ * which needs one integral the host did not keep -- DD, drive squared (render/aiPresenceOrbState.mjs). The
+ * wobbles keep murmur's instantaneous amplitudes, weighted by the same mix. At a held signal this is murmur's
+ * own expression to the last term; it differs only while drive or pace is moving, which is where murmur's is wrong.
+ */
+export const MH_SPIN_DRIVE = Object.freeze({
+    geode:  Object.freeze({ kp: 0.80, kd: 1.00, m: 0.7, target: 0.30, axTarget: 0.30 }),
+    fathom: Object.freeze({ kp: 0.85, kd: 1.10, m: 0.7 }),
+});
+
+/**
+ * *** v4830 -- THE MIST PAIR'S LIVE TERMS, AND tempest's ENERGY WAS THE WRONG SIGNAL ALTOGETHER. *** At 1c23b99:
+ *
+ *     tempest.ts:53-54  think = (stateIndex > 1.5 && stateIndex < 2.5) ? 1.0 : 0.0;
+ *                       energy = clamp(0.85 * live.pace + 0.65 * think + 0.55 * st.drive, 0.0, 1.6);
+ *     tempest.ts:65-67  fold * (1 + 0.85 * energy);  dr = mh_drift(...) * (1 + 0.95 * energy);  adv = V * (st.drive * 0.50 * t)
+ *     tempest.ts:73-75  rate = 1 / (1 + 1.30 * energy);  slots mix(2.9, 5.2, small) * rate and mix(4.3, 7.4, small) * rate
+ *     tempest.ts:91     warp offset vec3(0, dr * 0.65, dr)
+ *     nebula.ts:66-72   fold * (1 + 0.75 * live.pace);  dr = mh_drift(...) * (1 + 0.65 * pace + 0.35 * voice + 0.90 * drive);
+ *                       adv = V * (st.drive * 0.42 * t);  warp offset vec3(0, dr * 0.70, dr)
+ *
+ * This port had tempest's energy as clamp(0.85 * live.voice, 0, 1.6) -- tempest.ts line 101's (1 + 0.85 * live.voice)
+ * read as line 54, at a time when, its own comment said, voice was the only live input the port could honour.
+ * "THINKING IS THIS SPECIES' HOME STATE" and "a storm that rises while the assistant thinks is the whole concept":
+ * the storm did not rise at all. energy is CLAMPED, so its integral is not a sum of the shared ones; the host
+ * integrates it as tempestEnergyInt (render/aiPresenceOrbState.mjs), and every rate tempest spends it on reads that.
+ * The advections are integrated too -- V * k * D, the exact continuation of V * k * drive * t -- which is what
+ * MH_DRIVE_HEADING's `wired: false` was waiting for. And the warp's dr coefficient is 0.65 for tempest, not 0.70.
+ */
+export const MH_MIST_LIVE = Object.freeze({
+    nebula:  Object.freeze({ foldPace: 0.75, drPace: 0.65, drVoice: 0.35, drDrive: 0.90, warpDr: 0.70 }),
+    tempest: Object.freeze({ ePace: 0.85, eThink: 0.65, eDrive: 0.55, eCap: 1.6, foldE: 0.85, drE: 0.95,
+                             slotE: 1.30, warpDr: 0.65 }),
+});
+
+export const MH_OPAL_DRIVE = Object.freeze({
+    pace: 0.75, drive: 0.95,
+    procPeriod: 5.2, procLag: 1.4, procFloor: 0.30, procAmp: 0.70,
+    leanKeep: 0.55, lean: Object.freeze([0.42, -0.10, 0.18]),
+});
 
 /**
  * *** THE SATURATION: A FIGURE THAT IS PULLED TOWARD FULL RATHER THAN SCALED. ***
@@ -1245,8 +1312,9 @@ export const MH_DRIVE_HEADING = Object.freeze({
     abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
     sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
     droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
-    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: false }),
-    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: false }),
+    // v4830 -- wired, INTEGRATED: V * k * driveInt, the exact continuation of murmur's V * (drive * k * t)
+    nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: true }),
+    tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: true }),
 });
 
 /**
@@ -1870,7 +1938,8 @@ export const MH_HELIX = Object.freeze({
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
 export const MH_TEMPEST_BOLT = Object.freeze({
-    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9 }), Object.freeze({ seed: 27.0, slot: 4.3 })]),
+    // v4830 -- slotSmall: tempest.ts:74-75 spell each slot mix(slot, slotSmall, small); this table carried the first only
+    lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9, slotSmall: 5.2 }), Object.freeze({ seed: 27.0, slot: 4.3, slotSmall: 7.4 })]),
     maskIn: 0.35, maskOut: 0.62,
 });
 
