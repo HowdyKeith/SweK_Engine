@@ -2026,3 +2026,94 @@ hypothesis: no number is pre-registered to beat.
 
 **On this box,** for scale and nothing else: 64 x 64 took about 640 ms natively and 510 ms in the browser, and the
 three 32 -> 32 layers took most of it. That is SwiftShader, a CPU, and the report's first line says so.
+
+## 38. ROUND 12 -- REPORTED: THE FIRST GPU (AN INTEL GEN-9)
+
+Keith ran section 37's command, `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json`, at
+6bf17197.
+- **The machine.** Windows 11 (10.0.22631) with an Intel gen-9 integrated GPU, node v24.17.0. It is not the GTX 1080
+  box section 37 named; Keith says it is a different computer.
+- **The report.** It is `render/denoise-rig-r12-intel-gen9.json`, byte for byte as sent, committed at 193c8f86.
+- **Read before it was committed.** The report arrived as an upload and was read on arrival, before that commit. Section
+  37 pre-registered no number, so nothing in it can be steered by the order. The commit still keeps the file as sent.
+- **An earlier attempt ran nothing.** Keith's checkout was on `main`, which has neither gate. `--only denoise` matched
+  nothing, and the runner called that "NO ADAPTER WAS SEEN" and exited 0. It now says `NO GATE MATCHED`, names the
+  commit and exits 1 (6bf17197, gated, sabotages E1-E3).
+
+**Both gates held on a real GPU.**
+
+| Gate | Kind | Adapters | Result |
+|---|---|---|---|
+| `render/denoiseDevice-selfcheck.mjs` | exact | intel gen-9 (Chrome, `--use-angle=d3d11`) | PASS, 12.3 s |
+| `render/denoiseTiming-selfcheck.mjs` | timing | intel gen-9 through D3D12, driver 31.0.101.2137 (node-webgpu); intel gen-9 (Chrome) | PASS, 18.2 s |
+
+- **The exact gate has no hardware exemption.** No row in it is scoped to a software adapter. So on this GPU every conv
+  cell of every layer was the twin's or the fused mirror's, the kernel was within APPLY_TOL of its twin, and the page's
+  run in Chrome was the f64 network's within f32 rounding. The gate prints no measured lines, so how many cells were
+  fused is not in the report.
+- **The timing gate asserts the timer, not the time.** All its rows held on this GPU:
+  - the first size was measured, and every skip gave its reason;
+  - the device's span sat inside the wall clock, and the layers inside the span, on every pass;
+  - timestamp queries were asked for, and both the native device and the page offered them;
+  - a timed pass wrote an untimed pass's image, bit for bit.
+
+**The times.** These are medians on the device's clock, in ms a pass, with the wall clock in brackets.
+
+| Size | Native (D3D12) | Page (Chrome) | Mpx/s native |
+|---|---|---|---|
+| 64 x 64 | 34.7 (36.1) | 36.8 (39.1) | 0.114 |
+| 128 x 128 | 119.3 (120.6) | 134.6 (136.4) | 0.136 |
+| 256 x 256 | 522.1 (523.6) | 553.5 (559.2) | 0.125 |
+| 512 x 512 | skipped: predicted 2,095 ms | skipped: predicted 2,241 ms | -- |
+| 1024 x 1024 | skipped: predicted 8,379 ms | skipped: predicted 8,963 ms | -- |
+| 1920 x 1080 | skipped: predicted 16,570 ms | skipped: predicted 17,725 ms | -- |
+
+- **Against SwiftShader.** At 64 x 64, about 18 times faster natively (section 37: about 640 ms) and 13-14 times in
+  the browser (about 510 ms).
+- **The page costs 6-13% more than native at every size,** on both clocks.
+- **The cost is per pixel, not per pass.** Throughput is flat at 0.11-0.14 Mpx/s across a 16-fold range of sizes:
+  128 x 128 took 3.4 times 64 x 64, and 256 x 256 took 4.4 times 128 x 128. A fixed per-dispatch overhead would
+  have shown as rising throughput. That flatness is also why the ladder's linear predictions for the skipped sizes
+  are believable -- though they are predictions, not measurements.
+- **Where a pass goes.** The three 32 -> 32 layers take 73-79% of it, and the kernel 3.4-4.2%.
+- **A quirk of one size.** At 256 x 256 natively, the per-layer medians sum to 547.8 ms, more than the span's median
+  of 522.1. Those are medians of three passes, one of which ran to 649 ms. The gate holds the nesting per pass, where
+  it held.
+
+**What the arithmetic says.**
+- The network's conv layers cost 33,120 multiply-adds a pixel (66,240 flops):
+  - 10 -> 32, 3 x 3: 2,880;
+  - three 32 -> 32, 3 x 3: 9,216 each;
+  - 32 -> 81, 1 x 1: 2,592.
+- **Measured throughput is about 8-9 GFLOP/s.** The 3 x 3 layers run at 8-11 GFLOP/s through the tiled kernel. The
+  1 x 1 head runs at about 4.4 GFLOP/s through the direct one.
+- **The report does not name the part.** "Gen-9" covers several Intel GPUs. If this is the common 24-EU part (HD
+  520-630 class), its fp32 peak is roughly 0.4 TFLOP/s, and the kernels run at about 2% of it.
+- **A 1080p frame is 137 GFLOP for this network.**
+  - **On this GPU:** 30 frames a second needs 4.1 TFLOP/s, about ten times such a part's peak. No kernel, however
+    good, makes this network real time at 1080p on this class of GPU. At peak it could manage about 450 x 450 at 30
+    frames a second.
+  - **On a GTX 1080** (about 8.9 TFLOP/s peak), 1080p at 30 frames a second needs about 46% of peak. That is possible
+    in principle, and far from what these kernels achieve here.
+- **Two separate levers.**
+  - **The kernels' efficiency** is engineering, with up to about fifty times of headroom on paper. Candidate causes,
+    none measured:
+    - the tiled kernel's 32 accumulators are indexed by a loop variable, which usually puts them in memory rather
+      than registers;
+    - every multiply-add loads twice, once from the tile and once from the weights in storage;
+    - bounds tests sit inside the innermost loops.
+  - **The network's size** is modelling. A smaller network reopens the quality question, and would need its own
+    pre-registered round against the filter.
+- **The constraint a faster kernel works under.** D1 holds every device cell to the twin's sum, in the twin's order.
+  A faster kernel that keeps each cell's order keeps D1. That includes registers sized at compile time, weights staged
+  in workgroup memory, and several pixels a thread. One that reorders the sums -- vec4 dot products, split
+  reductions -- would need D1 restated as a bound, before it runs.
+
+**What this has not shown.**
+- **A discrete GPU.** Keith offers the GTX 1080 box, and it needs no code change: the same branch and the same command.
+  If its kernels run about as far from peak as these do, its ladder should reach the 1080p frame under the 1.5 s cap.
+  That is a guess, and the run is the measurement.
+- **Anything above 256 x 256 here.** Those rows are the ladder's predictions.
+- **Upload, read-back and pipeline creation.** They are excluded by design (section 37): the span is the network
+  alone.
+- **The part's name and clock.** WebGPU's adapter info gives "intel / gen-9" and the driver, nothing finer.

@@ -82,7 +82,9 @@ The run's second line, `on <commit> <date> <subject>`, should then show this bra
   where offered, and a timed pass writing the same image as an untimed one.
 
 On this box's SwiftShader, 64 x 64 takes about 640 ms natively and 510 ms in the browser. Those are a CPU's figures, and
-the report says so.
+the report says so. The first GPU run, on an Intel gen-9 integrated GPU, took 35 ms natively and 37 ms in the browser at
+64 x 64, and 0.52 s natively at 256 x 256, where the ladder stopped. Section 38 of the pre-registration reads it, and its report
+is `render/denoise-rig-r12-intel-gen9.json`.
 
 The page itself has the same button: open `denoise.html` in your browser and press **Time the network**. It shows the
 table for whatever adapter the browser hands it, and says so plainly when that adapter is software.
