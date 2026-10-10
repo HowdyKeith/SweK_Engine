@@ -168,15 +168,25 @@ export function idempotent(relPath, artefact, { timeoutMs = 120000 } = {}) {
     // two runs, two hashes, compared -- and the bytes that were there before are restored whatever happens.
     let before = null;
     try { before = fs.readFileSync(target); } catch { before = null; }
+    // v4828 -- A DAMAGED RECORD IS NOT PUT BACK. The rig's v4826 verify left page-index.json unparseable and this restore is the one line in the sweep that writes it whole from bytes it
+    // read earlier: had it read the file torn (another process rewriting it, a run cut at the cap), it would have written the tear back faithfully and called that "what it found".
+    // A .json target that does not parse when this starts is left as the regenerator wrote it, which is whole, and the result says `healed`.
+    const parses = (buf) => { try { JSON.parse(buf.toString("utf8")); return true; } catch { return false; } };
+    const damaged = before !== null && /\.json$/.test(target) && !parses(before);
     try {
         execFileSync(process.execPath, [path.join(ENGINE, relPath)], { cwd: ENGINE, timeout: timeoutMs, stdio: "ignore" });
         const a = hash();
         execFileSync(process.execPath, [path.join(ENGINE, relPath)], { cwd: ENGINE, timeout: timeoutMs, stdio: "ignore" });
         const b = hash();
-        return { ok: a !== null && a === b, first: a, second: b };
-    } catch (e) { return { ok: false, error: String(e && e.message).slice(0, 120) }; }
+        return { ok: a !== null && a === b, first: a, second: b, healed: damaged };
+    } catch (e) { return { ok: false, error: String(e && e.message).slice(0, 120), healed: false }; }
     finally {
-        try { if (before !== null) fs.writeFileSync(target, before); else fs.rmSync(target, { force: true }); } catch {}
+        // and only what DIFFERS is written back: a restore of identical bytes is the same open window a reader can fall into
+        try {
+            if (damaged) { /* whole already: the regenerator wrote it */ }
+            else if (before !== null) { let now = null; try { now = fs.readFileSync(target); } catch {} if (!now || !now.equals(before)) fs.writeFileSync(target, before); }
+            else fs.rmSync(target, { force: true });
+        } catch {}
     }
 }
 
