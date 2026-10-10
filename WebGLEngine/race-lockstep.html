@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Race lockstep (you drive, a fly-wired gunner shoots, and a second machine steps the same race bit for bit)">
+<meta name="demo:desc" content="Racing city 12: brain/raceLockstep.mjs steps the race with gunners from the commands two peers exchange over tools/ship/lockstepRelay.mjs, and brain/racePlay.mjs puts a keyboard on the wire where a policy was: W/A/S/D or the arrows drive your car, Z drops a slick, X lights it, and the turret on every car is still worked by its gunner brain (the Giant Fiber circuit). Two people each open the page with ?relay=ws://HOST:8799&amp;peer=A or peer=B and race the same cars on their own machines; with no relay it is a one-player race against a bot through the same code. Every tick each machine sends its race fingerprint and the page halts and says so on the first one that disagrees.">
+<meta name="demo:category" content="world">
+<title>Race lockstep</title>
+<style>
+  html,body { margin:0; background:#050805; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { padding:10px 14px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; line-height:1.7; max-width:960px; }
+  #wrap { display:flex; flex-wrap:wrap; gap:14px; padding:0 14px 14px; align-items:flex-start; }
+  #c { background:#0a120b; border:1px solid #2a3a30; max-width:100%; }
+  #side { min-width:300px; max-width:520px; line-height:1.6; }
+  #state { font-size:14px; } .ok { color:#7fb069; } .bad { color:#ff9a9a; } .warn { color:#f6a623; }
+  #cars div { margin:2px 0; } .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+  #result { margin-top:8px; white-space:pre-wrap; } a { color:#59d1ff; } code { color:#9fe6c0; }
+  kbd { border:1px solid #2a3a30; border-radius:3px; padding:0 4px; color:#b9d4ff; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">Race lockstep: you drive, a gunner brain shoots, and the other machine steps the same race</div>
+  <div id="be">loading box3d&hellip;</div>
+  <div id="sub">
+    Drive with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows, <kbd>Space</kbd> brakes, <kbd>Z</kbd> drops a slick, <kbd>X</kbd> lights it. The turret on your car is worked by its gunner brain.
+    <br><span id="how"></span>
+  </div>
+</div>
+<div id="wrap">
+  <canvas id="c" width="640" height="640" tabindex="0"></canvas>
+  <div id="side">
+    <div id="state">starting&hellip;</div>
+    <div id="line"></div>
+    <div id="cars"></div>
+    <div id="result"></div>
+  </div>
+</div>
+<script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { worldFromModule } from "./render/slugTicker.mjs";
+import * as D from "./brain/drivePolicy.mjs";
+import * as C from "./physics/raceCar.mjs";
+import * as U from "./physics/turret.mjs";
+import * as T from "./world/raceTrack.mjs";
+import { createRacePeer } from "./brain/raceLockstep.mjs";
+import * as P from "./brain/racePlay.mjs";
+
+const $ = (id) => document.getElementById(id), cvs = $("c"), ctx2 = cvs.getContext("2d");
+const fail = (m) => { $("be").innerHTML = '<span class="bad">' + m + "</span>"; $("state").innerHTML = '<span class="bad">not running</span>'; };
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const COLOURS = ["#e4572e", "#59b36a"], NAMES = ["red", "green"];
+
+// ---- what this page was opened with: the link IS the configuration, so two players who opened the same link are racing the same race ----------------------------------
+const q = new URLSearchParams(location.search);
+const relay = q.get("relay"), room = q.get("room") || "race", peerId = relay ? (q.get("peer") || "").toUpperCase() : "A";
+const num = (k, d, lo, hi) => { const v = +q.get(k); return Number.isFinite(v) && v >= lo && v <= hi && q.get(k) !== null && q.get(k) !== "" ? v : d; };
+const cfg = P.playableRace({ seconds: num("seconds", P.DEFAULT_SECONDS, 3, 600), seed: Math.floor(num("seed", 1, 1, 1e6)), gunners: q.get("gun") === "zero" ? "zero" : "hand", solo: !relay });
+const sig = P.configSignature(cfg), stopTick = Math.round(cfg.seconds / C.CAR.dt), inputDelay = relay ? Math.floor(num("delay", 4, 1, 30)) : 0, countdown = num("countdown", 3, 0, 30);
+
+const state = { phase: "loading", peer: null, loop: null, keys: P.createKeys(), fin: null, peerFin: null, summary: null, note: "", halt: null, snap: null, ws: null, goAt: 0 };
+const other = relay && peerId === "A" ? "B" : "A";
+function otherLink() { const u = new URL(location.href); u.searchParams.set("peer", other); return u.href; }
+$("how").innerHTML = relay
+    ? `Two players: relay <code>${esc(relay)}</code>, room <code>${esc(room)}</code>, you are peer <b>${esc(peerId)}</b> (${esc(NAMES[peerId === "A" ? 0 : 1])} car). The other player opens <code>${esc(otherLink())}</code>. The relay is <code>node tools/ship/lockstepRelay.mjs</code> on either machine. Same race on both: ${esc(sig)}.`
+    : `One player: you drive the red car, a bot drives the green one, through the same lockstep code with no one on the other end. For two players add <code>?relay=ws://HOST:8799&amp;peer=A</code> (and <code>peer=B</code> on the other machine).`;
+
+// ---- the wire: the page's WebSocket as the transport the lockstep takes -----------------------------------------------------------------------------------------------
+function send(m) { if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify(m)); }
+function onWire(m) {
+    if (m.t === "room") { if (m.error) { state.halt = "the relay refused: " + m.error; } else if (m.ready && state.phase === "waiting") startRace(); else if (m.left) { state.note = "the other player (" + m.left + ") left the room"; } return; }
+    if (m.t === "fin") { state.peerFin = m; return; }
+    if (m.t === "halt") { state.halt = "the other player stopped: " + (m.desync ? "it saw a desync at tick " + m.desync.tick : m.halted || "it halted"); return; }
+    if (state.peer) state.peer.receive(m);   // the peer is made SYNCHRONOUSLY in the handler of the relay's "ready", and the other player's messages are separate tasks behind it: none can beat it
+}
+
+let physMod = null, fleet = "";
+function startRace() {
+    state.phase = "running";
+    state.peer = createRacePeer({
+        selfId: peerId, peers: cfg.peers, owner: cfg.owner, worldFrom: () => worldFromModule(physMod, [0, -9.81, 0]), drivers: cfg.drivers, gunners: cfg.gunners, seed: cfg.seed, seconds: cfg.seconds, fleet, city: cfg.city,
+        send, backendId: fleet + "|" + sig, inputDelay, inputFn: P.humanInputFn(peerId, state.keys, { human: cfg.human[peerId] }),
+        onBackendMismatch: (h) => { const [ef, es] = String(h.ours).split("|"), [tf, ts] = String(h.theirs).split("|"); state.halt = ef !== tf ? "the other machine's physics engine differs from yours (" + h.theirs + " against " + h.ours + "): lockstep cannot work across two engines, so it stopped before the first step" : "the two of you opened different races (" + (ts || "?") + " against " + (es || "?") + "): open the same link, with only peer= different"; send({ t: "halt", peer: peerId, halted: state.halt }); },   // the peer that halts never announces its own identity (the net stops pumping), so the OTHER page is told here, or it would wait for commands that will never come
+    });
+    state.loop = P.createPlayLoop(state.peer, { stopTick });
+    state.snap = snapshot(state.peer.session.race);   // the grid, drawn while the countdown runs
+    state.goAt = performance.now() + countdown * 1000;   // nobody is thrown into a race the instant the second player joins; the lockstep waits for the slower page anyway
+}
+
+// ---- the picture: the whole track from above, north up -----------------------------------------------------------------------------------------------------------------
+const track = T.generateTrack({ seed: cfg.seed }), kerbs = T.kerbs(track), view = (() => {
+    const all = kerbs.left.concat(kerbs.right), xs = all.map((p) => p[0]), zs = all.map((p) => p[1]), m = 12;
+    const x0 = Math.min(...xs) - m, x1 = Math.max(...xs) + m, z0 = Math.min(...zs) - m, z1 = Math.max(...zs) + m;
+    return { x0, z0, s: Math.min(cvs.width / (x1 - x0), cvs.height / (z1 - z0)) };
+})();
+const sx = (x) => (x - view.x0) * view.s, sy = (z) => (z - view.z0) * view.s;
+function snapshot(race) {
+    const poses = race.poses(), c = race.cityCtx;
+    return {
+        tick: race.tick, poses: poses.map((p) => ({ pos: p.pos.slice(), yaw: p.yaw, vel: p.vel.slice(), quat: p.quat.slice() })),
+        aim: poses.map((p, i) => { const m = U.muzzle(p, race.turrets[i]); return [m.dir[0], m.dir[2]]; }),
+        shells: race.shells.map((s) => [s.x, s.z]), turrets: race.turrets.map((t) => ({ shots: t.shots, hits: t.hits })),
+        hp: c ? c.city.buildings.map((b) => b.hp) : [], topple: c ? { fallen: c.topple.fallen, shattered: c.topple.shattered } : null,
+    };
+}
+let hp0 = null;
+function draw(snap) {
+    const g = ctx2; g.fillStyle = "#0a120b"; g.fillRect(0, 0, cvs.width, cvs.height);
+    g.beginPath(); kerbs.left.forEach((p, i) => (i ? g.lineTo(sx(p[0]), sy(p[1])) : g.moveTo(sx(p[0]), sy(p[1])))); g.closePath(); g.fillStyle = "#2b2f2c"; g.fill();
+    g.beginPath(); kerbs.right.forEach((p, i) => (i ? g.lineTo(sx(p[0]), sy(p[1])) : g.moveTo(sx(p[0]), sy(p[1])))); g.closePath(); g.fillStyle = "#0a120b"; g.fill();
+    for (const k of [kerbs.left, kerbs.right]) { g.beginPath(); k.forEach((p, i) => (i ? g.lineTo(sx(p[0]), sy(p[1])) : g.moveTo(sx(p[0]), sy(p[1])))); g.closePath(); g.strokeStyle = "#8a8f87"; g.lineWidth = 1; g.stroke(); }
+    const fin = T.checkpoints(track)[0]; g.fillStyle = "#e8e8e8"; g.fillRect(sx(fin.x) - 12, sy(fin.z) - 2, 24, 4);
+    const rects = state.peer ? state.peer.session.race.cityCtx.rects : [];
+    if (snap && !hp0 && snap.hp.length) hp0 = snap.hp.slice();
+    rects.forEach((r, i) => {
+        const hp = snap && snap.hp[i] != null ? snap.hp[i] : 1, f = hp0 && hp0[i] ? Math.max(0, Math.min(1, hp / hp0[i])) : 1;
+        if (hp <= 0) { g.strokeStyle = "#4a4338"; g.lineWidth = 1; g.strokeRect(sx(r.x), sy(r.z), r.w * view.s, r.d * view.s); }
+        else { g.fillStyle = `rgb(${Math.round(70 + 90 * f)},${Math.round(80 + 70 * f)},${Math.round(90 + 60 * f)})`; g.fillRect(sx(r.x), sy(r.z), r.w * view.s, r.d * view.s); }
+    });
+    if (!snap) return;
+    g.fillStyle = "#ffd36b"; for (const s of snap.shells) { g.beginPath(); g.arc(sx(s[0]), sy(s[1]), 2, 0, 6.3); g.fill(); }
+    snap.poses.forEach((p, i) => {
+        const hx = Math.sin(p.yaw), hz = Math.cos(p.yaw), cx = sx(p.pos[0]), cy = sy(p.pos[2]);
+        g.save(); g.translate(cx, cy); g.rotate(Math.atan2(hz, hx));
+        g.fillStyle = COLOURS[i]; g.fillRect(-1.4 * view.s, -0.75 * view.s, 2.8 * view.s, 1.5 * view.s); g.fillStyle = "#050805"; g.fillRect(0.5 * view.s, -0.5 * view.s, 0.8 * view.s, 1 * view.s);
+        g.restore();
+        g.strokeStyle = COLOURS[i]; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + snap.aim[i][0] * 7 * view.s, cy + snap.aim[i][1] * 7 * view.s); g.stroke();
+        if (i === (cfg.human[peerId] || [0])[0]) { g.strokeStyle = "#ffffff"; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, 11, 0, 6.3); g.stroke(); }
+    });
+}
+
+// ---- the page's own loop ------------------------------------------------------------------------------------------------------------------------------------------------
+function hud() {
+    const L = state.loop, st = L ? L.status() : { state: state.phase, tick: 0, of: stopTick, lead: 0 };
+    const peer = state.peer, d = peer ? peer.session.desync() : null;
+    let word = st.state, cls = "ok";
+    if (state.halt) { word = "stopped: " + state.halt; cls = "bad"; }
+    else if (d) { word = "DESYNC at tick " + d.tick + " against peer " + d.peer + " (ours " + (d.local >>> 0).toString(16) + ", theirs " + (d.remote >>> 0).toString(16) + ")"; cls = "bad"; }
+    else if (state.phase === "waiting") { word = "waiting for the other player in room " + room; cls = "warn"; }
+    else if (L && performance.now() < state.goAt) { word = "starting in " + Math.ceil((state.goAt - performance.now()) / 1000) + "..."; cls = "warn"; }
+    else if (st.state === "waiting") { word = "waiting for the other player's commands (tick " + st.tick + ")"; cls = "warn"; }
+    else if (st.state === "finished") word = "finished";
+    $("state").innerHTML = `<span class="${cls}">${esc(word)}</span>` + (state.note ? ` <span class="warn">${esc(state.note)}</span>` : "");
+    $("line").textContent = peer ? `tick ${st.tick} of ${st.of} (${(st.tick * C.CAR.dt).toFixed(1)} s), input lead ${st.lead}, fingerprint ${peer.session.fingerprint()}` : "";
+    if (state.snap) $("cars").innerHTML = state.snap.poses.map((p, i) => `<div><span class="chip" style="background:${COLOURS[i]}"></span>${NAMES[i]}${cfg.human[peerId] && cfg.human[peerId].includes(i) ? " (you)" : cfg.owner[i] !== peerId && cfg.peers.length > 1 ? " (the other player)" : " (bot)"}: ${(Math.hypot(p.vel[0], p.vel[2]) * 3.6).toFixed(0)} km/h, shots ${state.snap.turrets[i].shots}, hits ${state.snap.turrets[i].hits}</div>`).join("") + (state.snap.topple ? `<div>buildings down ${state.snap.topple.fallen}, rubble ${state.snap.topple.shattered}</div>` : "");
+}
+function conclude() {
+    if (state.summary || !state.peer) return;
+    const s = state.peer.session, race = s.race, last = stopTick - 1, h = s.localHash(last) >>> 0;
+    state.snap = snapshot(race);   // the last picture, before finish() takes the world down
+    state.summary = P.summarise(race.finish(), NAMES);
+    state.fin = { t: "fin", peer: peerId, tick: last, hash: h };
+    send(state.fin);
+}
+function result() {
+    const S = state.summary; if (!S) return;
+    const lines = S.rows.map((r, i) => `${S.order.indexOf(r.car) + 1}. ${r.name}: ${r.laps} laps, ${r.metres} m, ${r.shots} shots, ${r.hits} hits, ${r.damageTaken} damage taken`);
+    lines.push(`buildings down ${S.fallen}, rubble ${S.shattered}`, `final fingerprint ${S.fingerprint}`);
+    const mine = state.fin && state.fin.hash >>> 0, pf = state.peerFin;
+    if (cfg.peers.length > 1) lines.push(pf ? ((pf.hash >>> 0) === mine ? "AGREED: both machines finished on the same fingerprint, tick for tick" : "DID NOT AGREE: the other machine finished on " + (pf.hash >>> 0).toString(16)) : "waiting for the other machine's final word...");
+    $("result").innerHTML = lines.map(esc).join("\n");
+}
+let last = performance.now();
+function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = (now - last) / 1000; last = now;
+    if (state.loop && !state.halt && now < state.goAt) { /* counting down: nothing pumps, nothing is sent */ }
+    else if (state.loop && !state.halt) {
+        const st = state.loop.frame(dt);
+        if (st === "running" || st === "waiting") state.snap = snapshot(state.peer.session.race);
+        if (st === "finished" && !state.summary) conclude();
+        if (st === "desync" && !state.sentHalt) { state.sentHalt = true; send({ t: "halt", peer: peerId, desync: state.peer.session.desync() }); }
+    }
+    if (state.summary) result();
+    draw(state.snap); hud();
+}
+
+async function main() {
+    if (relay && !cfg.peers.includes(peerId)) return fail("peer must be A or B (got '" + esc(q.get("peer") || "") + "'): " + esc(location.pathname) + "?relay=" + esc(relay) + "&peer=A");
+    try { const ps = await box3d.init(); if (!ps.ready) return fail("box3d: " + ps.reason); physMod = box3d._mod; fleet = D.machineFingerprint(physMod); }
+    catch (e) { return fail("loading box3d threw: " + e.message); }
+    $("be").textContent = `box3d's wasm loaded; engine ${fleet}; ${relay ? "two players via the relay" : "one player against a bot"}`;
+    addEventListener("keydown", (e) => { if (state.keys.press(e.code)) e.preventDefault(); });
+    addEventListener("keyup", (e) => { if (state.keys.release(e.code)) e.preventDefault(); });
+    addEventListener("blur", () => state.keys.clear());
+    cvs.focus();
+    if (relay) {
+        state.phase = "waiting";
+        try {
+            const ws = new WebSocket(relay.replace(/\/$/, "") + "/room/" + encodeURIComponent(room) + "?peer=" + encodeURIComponent(peerId) + "&n=2"); state.ws = ws;
+            ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } onWire(m); };
+            ws.onclose = () => { if (state.phase === "waiting") state.halt = "the relay closed the connection before the other player joined"; else if (!state.summary) state.note = "the connection to the relay closed"; };
+            ws.onerror = () => { if (state.phase === "waiting") state.halt = "could not reach the relay at " + relay + " (is node tools/ship/lockstepRelay.mjs running, and is this page http, not https?)"; };
+        } catch (e) { return fail("opening the relay threw: " + e.message); }
+    } else startRace();
+    requestAnimationFrame(frame);
+}
+window.__raceLockstep = { get countdown() { return countdown; }, get state() { return state; }, get config() { return cfg; }, get peerId() { return peerId; }, get stopTick() { return stopTick; }, keys: state.keys, get peer() { return state.peer; }, get loop() { return state.loop; }, get summary() { return state.summary; }, get snap() { return state.snap; }, get sig() { return sig; } };
+main();
+</script>
+</body>
+</html>

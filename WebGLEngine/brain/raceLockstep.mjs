@@ -81,9 +81,11 @@ export function createRaceSession(opts) {
  * One peer's session AND its transport. `send(msg)` puts a message on the wire to the other peers; the caller hands every message that arrives to
  * receive(msg) and calls pump() as often as it likes (a timer, an animation frame, a test's round). backendId is the engine's identity
  * (drivePolicy.machineFingerprint): peers whose engines differ halt before stepping rather than produce a desync that looks like a bug.
+ * `inputFn(session)` (v4827) replaces what this peer's cars would command -- (tick) => the commands for the cars it owns -- with something else, which is how a human
+ * takes the wheel (brain/racePlay.mjs): the wire is the same, only the author of the commands differs. Without it, session.inputFn(selfId): the policies.
  */
 export function createRacePeer(opts) {
     const session = createRaceSession(opts);
-    const net = createLockstepNet({ session, selfId: opts.selfId, inputFn: session.inputFn(opts.selfId), send: opts.send, inputDelay: opts.inputDelay != null ? opts.inputDelay : 4, dt: C.CAR.dt, backendId: opts.backendId || null, onBackendMismatch: opts.onBackendMismatch || null, redundancy: opts.redundancy });
+    const net = createLockstepNet({ session, selfId: opts.selfId, inputFn: opts.inputFn ? opts.inputFn(session) : session.inputFn(opts.selfId), send: opts.send, inputDelay: opts.inputDelay != null ? opts.inputDelay : 4, dt: C.CAR.dt, backendId: opts.backendId || null, onBackendMismatch: opts.onBackendMismatch || null, redundancy: opts.redundancy });
     return { session, net, receive: net.receive, pump: net.pump };
 }

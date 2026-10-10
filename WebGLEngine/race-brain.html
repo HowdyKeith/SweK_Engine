@@ -23,6 +23,10 @@
   .carWin { display:flex; flex-direction:column; gap:2px; }
   .carView { background:#000; border:1px solid #2a3a30; cursor:pointer; display:block; max-width:100%; }
   .viewLabel { color:#5f7aa0; font-size:10px; max-width:240px; line-height:1.3; }
+  #roster { padding:2px 14px 6px; } #roster summary { cursor:pointer; color:#f6a623; letter-spacing:.08em; }
+  #rosterTable { border-collapse:collapse; margin:4px 0; } #rosterTable th { text-align:left; color:#5f7aa0; font-weight:normal; padding:0 10px 2px 0; } #rosterTable td { padding:1px 10px 1px 0; }
+  #rosterTable select { background:#0c140f; color:#9fb2d4; border:1px solid #2a3a30; font:inherit; max-width:290px; }
+  .chip { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; } #rosterHelp { color:#5f7aa0; font-size:10px; max-width:900px; margin-top:3px; line-height:1.4; } #rosterNote { color:#7fb069; }
   #fleetList { display:flex; flex-direction:column; gap:2px; margin:2px 0; }
   .fleetRow { display:flex; align-items:center; gap:6px; }
   .fleetRow button { font-size:11px; }
@@ -32,10 +36,16 @@
 <div id="hud">
   <div id="cap">Race brain on the GPU: the driving policy trained in idle time, brains racing brains on box3d</div>
   <div id="be">requesting a device&hellip;</div>
-  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="race">Race</button> &middot; <button id="forget">Forget the stored brain</button>
+  <div id="sub">seed <input id="seed" type="number" value="1" min="1"> &middot; <button id="train">Train in idle time</button> <button id="stopTrain" disabled>Stop</button> &middot; <button id="forget">Forget the stored brain</button>
     &middot; <a href="?webgl=1">force WebGL2</a><br>
     <span id="tick">loading the racing kit and box3d&hellip;</span><br><span id="brain">no stored brain: the hand policy drives</span> <button id="exportBrain">Export brain</button> <button id="publishBrain">Publish to the fleet</button><br><span id="gun">turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)</span> <button id="trainGun">Train the gunner in idle time</button> <button id="stopGun" disabled>Stop</button> <button id="forgetGun">Forget the stored gunner</button> <button id="exportGun">Export gunner</button> <button id="publishGun">Publish to the fleet</button><br><span id="peer">no peer brain loaded -- the fourth car (purple) drives the zero policy</span> <button id="importBrainBtn">Import a peer's brain</button> <button id="clearPeer" disabled>Clear peer brain</button> <input id="importBrainFile" type="file" accept="application/json" style="display:none"><br><span id="peerGun">no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)</span> <button id="importGunBtn">Import a peer's gunner</button> <button id="clearPeerGun" disabled>Clear peer gunner</button> <input id="importGunFile" type="file" accept="application/json" style="display:none"><br><button id="findPeers">Find peer brains on the fleet</button> <span id="fleetStatus"></span><div id="fleetList"></div><br><span id="racing"></span><br><button id="labReplay">Replay the lab's accepted driver</button> <span id="lab">the Physics Lab's race scene stores the driver its adjudicator accepted; this plays that log back, not real time</span> &middot; drag to orbit, wheel to dolly</div>
 </div>
+<details id="roster" open>
+  <summary>Load Racers &mdash; who drives each car, who works each turret</summary>
+  <table id="rosterTable"><thead><tr><th>car</th><th>driver</th><th>turret gunner</th></tr></thead><tbody id="rosterRows"></tbody></table>
+  <button id="race">Start Race</button> <button id="rosterReset">Default lineup</button> <span id="rosterNote"></span>
+  <div id="rosterHelp">Every driver is the same network, wired like a fly's compass circuit, and every gunner the same network over its Giant Fiber circuit; a choice here picks which WEIGHTS run it: hand-set, zero (does nothing), noise on either, the one trained in idle time, or one imported from a peer. A choice that needs something not loaded yet is not offered. Choices stay in this browser; Start Race builds the lineup.</div>
+</details>
 <div id="raceRow">
   <canvas id="c"></canvas>
   <div id="viewsCol">
@@ -54,6 +64,7 @@ import { trackSurface, createCar, stepCars, carPose, lapTracker, truckPlacement,
 import * as D from "./brain/drivePolicy.mjs";
 import * as GP from "./brain/gunnerPolicy.mjs";
 import * as PB from "./brain/peerBrain.mjs";
+import * as R from "./brain/roster.mjs";
 import * as U from "./physics/turret.mjs";
 import { turretFleets, placeTurrets, slickFleets, placeSlicks, pickupFleets, placePickups, TURRET_DRAW, SLICK_DRAW } from "./render/raceTurret.mjs";
 import * as S from "./physics/slick.mjs";
@@ -82,6 +93,15 @@ let turrets = [], gunners = [], shells = [], turretBase = 0, gunStore = null, gu
 // of the hand gunner) when loaded, independently of each other; car 0's own gunner is unaffected (stored or hand).
 const DRIVE_DESC = PB.describePolicy("drivePolicy", D), GUNNER_DESC = PB.describePolicy("gunnerPolicy", GP);
 let peerBrain = null, peerBrainMeta = null, peerGunnerBrain = null, peerGunnerMeta = null;
+// v4827 -- the "Load Racers" panel (brain/roster.mjs): which brain DRIVES each car and which works each TURRET, chosen per car, then Start Race. `specs` is the choice
+// (ids, kept in this browser), `library` the brains imported this session (any of them can be given to any car), `roster` what the last race was built from.
+// Every choice is a set of WEIGHTS for the same fly-wired driver or gunner network -- see brain/roster.mjs's header for what that does and does not cover.
+const ROSTER_KEY = "swek.raceRoster.v1";
+let library = { drive: [], gun: [] }, specs = loadSpecs(), roster = null, slotOf = [], rosterSig = "";
+function loadSpecs() {
+  try { return R.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")).map((s) => ({ driver: /^lib:/.test(s.driver) ? R.AUTO : s.driver, gunner: /^lib:/.test(s.gunner) ? R.AUTO : s.gunner })); }
+  catch { return R.defaultSpecs(); }
+}
 // v4680 -- buildings as a third thing a shell can hit, not only the ground and other cars: `buildings` is each rect's box
 // (physics/raceCar.mjs's buildingBox(), the same one CD.buildingColliders() gave box3d). v4822 -- `cityCtx` (world/
 // crashDamage.mjs's crashWorld(), the same context race-crash.html's car crashes damage) replaces the flat damage tally
@@ -102,6 +122,7 @@ const readBytes = async (p) => { const r = await fetch("/" + p); if (!r.ok) thro
 const readImage = async (p) => { const r = await fetch("/" + p); if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" }); const oc = new OffscreenCanvas(bmp.width, bmp.height), ctx = oc.getContext("2d"); ctx.drawImage(bmp, 0, 0); return imageToColormap(ctx.getImageData(0, 0, bmp.width, bmp.height)); };
 
 function brainLine() {
+  renderRoster();   // a stored brain that has just been accepted becomes a choice
   const cur = store.current(), rep = trainer ? trainer.report() : null;
   $("brain").textContent = (cur ? `stored brain ${cur.hash}: held-out score ${cur.score.toFixed(1)}` : "no stored brain: the hand policy drives") +
     (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best audit ${rep.bestAuditEver.toFixed(1)} at attempt ${rep.bestAuditAt}, held audit ${rep.heldAudit == null ? "-" : rep.heldAudit.toFixed(1)}, regret ${rep.regret == null ? "-" : rep.regret.toFixed(2)}` : "") + ` -- fleet ${fleet}`;
@@ -117,6 +138,28 @@ function peerGunLine() {
   $("peerGun").textContent = peerGunnerBrain ? `peer gunner ${D.weightsHash(peerGunnerBrain)}` + (peerGunnerMeta && peerGunnerMeta.score != null ? `: their held-out score ${peerGunnerMeta.score}` : "") + (peerGunnerMeta && peerGunnerMeta.by ? ` (from ${peerGunnerMeta.by})` : "") + " -- manning the fourth car's turret" : "no peer gunner loaded -- car 0's turret uses the hand gunner (or the stored one)";
   $("clearPeerGun").disabled = !peerGunnerBrain;
 }
+
+// ---- v4827 the Load Racers panel --------------------------------------------------------------------------------------------
+const CHIP = ["#e0524d", "#5fbf6a", "#e6c84a", "#9a6fd6"];
+function rosterCtx() { const cur = store && store.current(), gcur = gunStore && gunStore.current(); return { stored: cur ? cur.weights : null, storedGun: gcur ? gcur.weights : null, library }; }
+function rosterNote(lines, problems) { const el = $("rosterNote"); if (el) el.innerHTML = lines.map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join(" &middot; ") + (problems && problems.length ? ' <span class="bad">' + problems.map((x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("; ") + "</span>" : ""); }
+/** Rebuild the selects when what can be chosen has changed (a brain trained or imported); leave them alone otherwise, so an open dropdown is not pulled away during training. */
+function renderRoster(force = false) {
+  if (!store || !gunStore) return;
+  const ctx = rosterCtx(), ch = R.choices(ctx), sig = JSON.stringify([!!ctx.stored, !!ctx.storedGun, library.drive.map((e) => e.id), library.gun.map((e) => e.id)]);
+  if (!force && sig === rosterSig && $("rosterRows").children.length) return;
+  rosterSig = sig;
+  const rows = $("rosterRows"); rows.textContent = "";
+  const sel = (id, opts, value, onChange) => { const s = document.createElement("select"); s.id = id; for (const o of opts) { const e = document.createElement("option"); e.value = o.id; e.textContent = o.label; s.appendChild(e); } s.value = opts.some((o) => o.id === value) ? value : R.AUTO; s.addEventListener("change", () => onChange(s.value)); return s; };
+  for (let i = 0; i < R.SLOTS; i++) {
+    const tr = document.createElement("tr"), name = document.createElement("td"), d = document.createElement("td"), g = document.createElement("td");
+    name.innerHTML = `<span class="chip" style="background:${CHIP[i]}"></span>${i + 1}. ${R.SLOT_COLOURS[i]}`;
+    d.appendChild(sel("drv" + i, ch.driver, specs[i].driver, (v) => { specs[i].driver = v; saveSpecs(); }));
+    g.appendChild(sel("gun" + i, ch.gunner, specs[i].gunner, (v) => { specs[i].gunner = v; saveSpecs(); }));
+    tr.append(name, d, g); rows.appendChild(tr);
+  }
+}
+function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 
 /** Trigger a browser download of a JSON blob under `name`. */
 function downloadJSON(name, obj) {
@@ -138,9 +181,11 @@ function readJSONFile(file) {
 function importBlobInto(policyKind, blob) {
   const r = PB.importBrain(policyKind === "drivePolicy" ? DRIVE_DESC : GUNNER_DESC, blob);
   if (r.ok) {
+    const kind = policyKind === "drivePolicy" ? "drive" : "gun", hash = D.weightsHash(r.weights), id = "lib:" + kind + "-" + hash;
+    if (!library[kind].some((e) => e.id === id)) library[kind].push({ id, label: hash + (r.meta && r.meta.score != null ? ` (score ${r.meta.score})` : "") + (r.meta && r.meta.by ? ` from ${r.meta.by}` : ""), weights: r.weights });
     if (policyKind === "drivePolicy") { peerBrain = r.weights; peerBrainMeta = r.meta; peerLine(); }
     else { peerGunnerBrain = r.weights; peerGunnerMeta = r.meta; peerGunLine(); }
-    setupRace();
+    renderRoster(); setupRace();
   }
   return r;
 }
@@ -174,22 +219,27 @@ function setupRace() {
   phys = worldFrom(); CD.buildingColliders(cityCtx, phys);
   BT.toppleWorld(cityCtx, { debris });   // a building at zero hit points falls over as a box3d body on what is left of its ground floor, then shatters (race-crash.html's, v4591)
   buildings = cityCtx.rects.map((r) => buildingBox(r));
-  const cur = store.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
-  let brains = cur ? [cur.weights, D.handWeights(), D.perturb(cur.weights, 0.05, rng), peerBrain || D.zeroWeights()] : [D.handWeights(), D.perturb(D.handWeights(), 0.05, rng), D.perturb(D.handWeights(), 0.1, rng), peerBrain || D.zeroWeights()];
-  names = cur ? ["stored brain", "hand", "stored + noise", peerBrain ? "peer brain" : "zero"] : ["hand", "hand + noise 0.05", "hand + noise 0.1", peerBrain ? "peer brain" : "zero"];
-  if (replayRec) { brains = [Float32Array.from(replayRec.weights)]; names = [`the lab's accepted driver (speedGain ${replayRec.knob.speedGain}, replayed from its log)`]; }
+  const cur = store.current(), gcur = gunStore.current(), rng = (() => { let a = 99; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; })();
+  // v4827 -- the lineup is the panel's (brain/roster.mjs); every slot on "default for this car" is exactly the lineup this page raced before the panel
+  const rctx = () => ({ D, GP, stored: cur ? cur.weights : null, storedGun: gcur ? gcur.weights : null, library, rng });
+  roster = R.resolveRoster(specs, rctx());
+  const rosterProblems = roster.problems.slice();
+  if (!roster.cars.length) roster = R.resolveRoster(R.defaultSpecs(), rctx());   // a race needs a car: the default lineup, and the note says why
+  let brains = roster.cars.map((c) => c.driver.weights);
+  names = roster.cars.map((c) => c.driver.label); slotOf = roster.cars.map((c) => c.slot);
+  if (replayRec) { brains = [Float32Array.from(replayRec.weights)]; names = [`the lab's accepted driver (speedGain ${replayRec.knob.speedGain}, replayed from its log)`]; slotOf = [0]; }
   const cp = checkpoints(track)[0];
   cars = brains.map((w, i) => createCar(phys, { x: cp.x + 5 - 4 * i, z: cp.z, yaw: Math.PI / 2 }));
   drivers = brains.map((w, i) => D.policyDriver(w, surface, cars[i])); trackers = cars.map(() => lapTracker(surface));
-  const gcur = gunStore.current(), peerSlot = brains.length - 1;
   turrets = cars.map(() => U.createTurret()); shells = [];
-  gunnerWeights = cars.map((c, i) => (gcur && i === 0 ? gcur.weights : (i === peerSlot && peerGunnerBrain) ? peerGunnerBrain : GP.handWeights())); driverWeights = brains;
+  gunnerWeights = replayRec ? [gcur ? gcur.weights : peerGunnerBrain || GP.handWeights()] : roster.cars.map((c) => c.gunner.weights); driverWeights = brains;
+  rosterNote(replayRec ? ["the lab's replay: one car, no turret policy"] : R.describe(roster), rosterProblems);
   gunners = gunnerWeights.map((w) => GP.gunnerFor(w));
   slicks = S.createSlicks(); slickSurf = S.slickSurface(surface, slicks);
   pickups = A.pickupField(surface, { seed: Math.max(1, +$("seed").value | 0) }); turrets.forEach((tr) => { tr.ammo = A.createAmmo(); });
   setupViews(cars.length);
   hash = 0x811c9dc5; ticks = 0; acc = 0;
-  trucks = cars.map((c, i) => ({ file: FILES[i], ...truckPlacement(carPose(phys, c)) }));
+  trucks = cars.map((c, i) => ({ file: FILES[slotOf[i]], ...truckPlacement(carPose(phys, c)) }));
   buildScene();
   gunLine();
   $("tick").textContent = `${describeTrack(track)}; ${cityCtx.rects.length} buildings; ${cars.length} cars: ${names.join(", ")} (red, green, yellow, purple), a turret on each; built in ${(performance.now() - t0).toFixed(0)} ms on ${scene.path}`;
@@ -275,6 +325,7 @@ async function refreshViews(poses) {
 }
 
 function gunLine() {
+  renderRoster();
   const cur = gunStore.current(), rep = gunTrainer ? gunTrainer.report() : null;
   $("gun").textContent = (cur ? `stored gunner ${cur.hash}: held-out duel score ${cur.score.toFixed(2)} (on car 0; the hand gunner on the rest)` : "turrets: the hand gunner on every car (v4588, task 77); it drops oil on a pursuer and lights it under them (v4590, task 79)") +
     (rep ? ` -- ${rep.attempts} attempts, ${rep.accepted} accepted, best held-out ${rep.best.toFixed(2)}` : "") + (shells.length ? ` -- ${shells.length} shell${shells.length === 1 ? "" : "s"} in the air` : "") +
@@ -329,6 +380,8 @@ async function main() {
   gunStore = GP.gunnerStore({ persist: (o) => { try { localStorage.setItem(GUN_KEY, JSON.stringify(o)); } catch {} }, restore: () => { try { const j = JSON.parse(localStorage.getItem(GUN_KEY) || "null"); return j && j.weights ? { ...j, weights: Float32Array.from(j.weights) } : null; } catch { return null; } } });
   GP.setModule(physMod);   // the shell-speed knob's adjudicator can run in this page
   store = D.driveStore({ persist: (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} }, restore: () => { try { const j = JSON.parse(localStorage.getItem(KEY) || "null"); return j && j.weights ? { ...j, weights: Float32Array.from(j.weights) } : null; } catch { return null; } } });
+  renderRoster(true);
+  $("rosterReset").addEventListener("click", () => { specs = R.defaultSpecs(); saveSpecs(); renderRoster(true); });
   brainLine(); peerLine(); peerGunLine(); setupRace(); probeShells(+new URLSearchParams(location.search).get("shell") || 0);
   $("seed").addEventListener("change", () => { replayRec = null; setupRace(); }); $("race").addEventListener("click", () => { replayRec = null; setupRace(); });
   $("labReplay").addEventListener("click", async () => {
@@ -358,7 +411,7 @@ async function main() {
     const r = importBlobInto("drivePolicy", blob);
     if (!r.ok) $("peer").textContent = "import refused: " + r.reason;
   });
-  $("clearPeer").addEventListener("click", () => { peerBrain = null; peerBrainMeta = null; peerLine(); setupRace(); });
+  $("clearPeer").addEventListener("click", () => { peerBrain = null; peerBrainMeta = null; library.drive = []; peerLine(); renderRoster(); setupRace(); });
   $("publishBrain").addEventListener("click", async () => {
     const cur = store.current(), w = cur ? cur.weights : D.handWeights();
     const blob = PB.exportBrain(DRIVE_DESC, w, { score: cur ? cur.score : null, citation: "male-cns E-PG compass circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
@@ -394,7 +447,7 @@ async function main() {
     const r = importBlobInto("gunnerPolicy", blob);
     if (!r.ok) $("peerGun").textContent = "import refused: " + r.reason;
   });
-  $("clearPeerGun").addEventListener("click", () => { peerGunnerBrain = null; peerGunnerMeta = null; peerGunLine(); setupRace(); });
+  $("clearPeerGun").addEventListener("click", () => { peerGunnerBrain = null; peerGunnerMeta = null; library.gun = []; peerGunLine(); renderRoster(); setupRace(); });
   $("publishGun").addEventListener("click", async () => {
     const cur = gunStore.current(), w = cur ? cur.weights : GP.handWeights();
     const blob = PB.exportBrain(GUNNER_DESC, w, { score: cur ? cur.score : null, citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
@@ -462,7 +515,7 @@ function frame(t) {
 // read-only handles for the gates, the way brain-maze.html keeps window.__maze: tools/ship/raceTurret-selfcheck.mjs reads the live
 // scene and the city's state off the page to hold that a repack rebuilt the scene and left the world fleet installed, and reads it back
 // through a render target of its own (the page's presented canvas is redrawn by its own frame loop between a gate's frame and its readback)
-window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; }, get shells() { return shells; } };
+window.__raceBrain = { get device() { return device; }, get scene() { return scene; }, get cityCtx() { return cityCtx; }, get sceneBuilds() { return sceneBuilds; }, get views() { return views; }, get debris() { return debris; }, get debrisBase() { return debrisBase; }, get blockBase() { return blockBase; }, get phys() { return phys; }, get viewBusy() { return viewBusy; }, get viewFrame() { return viewFrame; }, get shells() { return shells; }, get roster() { return roster; }, get trucks() { return trucks; }, get specs() { return specs; }, get library() { return library; }, get names() { return names; }, setSpecs(s) { specs = R.sanitizeSpecs(s); saveSpecs(); renderRoster(true); }, startRace() { replayRec = null; setupRace(); } };
 
 main();
 </script>
