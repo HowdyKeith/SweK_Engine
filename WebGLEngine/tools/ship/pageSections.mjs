@@ -693,6 +693,21 @@ export const SECTIONS = [
     // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
     { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
       pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html"] },
+    // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
+    // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
+    // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,
+    // not a merge's". Filed by the arc that made them, as RTX was. install-fsr-caches.html is FSR's own data (the
+    // frame-generation harvests off fsr.html) and keeps its home on the opt-in shelf: it is claimed there first, so
+    // this bucket gets a clone of its anchor (Keith's "duplicate links in folder buckets", v4778).
+    { id: "fsr", tab: "fsr", label: "FSR", note: "AMD FidelityFX Super Resolution, reimplemented: the upscaler, on a three.js scene, and the frame-generation caches it harvested",
+      pages: ["fsr.html", "fsr-three.html", "install-fsr-caches.html"] },
+    // DENOISER, KEITH'S CALL: "Give the denoiser its own link bucket." denoise.html -- the learned path-tracer denoiser,
+    // render/learned-denoiser-preregistration.md -- waited in UNPLACED from round 12: its drawer by subject was Renders,
+    // beside path-tracer.html, and Renders is at MAX_PER_PANEL. It is the one page that runs the denoiser (found by
+    // what imports render/denoiseDevice.mjs; fsr-three.html's "denoise" is RCAS's own switch, not this), so the drawer
+    // founds at one page and grows as the arc does.
+    { id: "denoiser", tab: "denoiser", label: "Denoiser", note: "the learned path-tracer denoiser, on the device, beside the filter it was tested against",
+      pages: ["denoise.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -710,6 +725,8 @@ export const MAX_PER_PANEL = 15;
 export const UNPLACED = new Map([
     // v4778-merge -- the four rtx-line pages that waited here (rtx-viewer, es-box3d-6dof, es-aircraft,
     // fly-connectome) were filed by Keith into their own RTX drawer above -- see that section's note.
+    // fsr.html and fsr-three.html, which waited here from v4623 and v4776 for a drawer decision (the note below), were
+    // given their own FSR drawer by Keith -- see that section's note. The note is kept for its history.
     // *** v4623-merge -- fsr.html, AND THE SENTENCE THIS FILE USED TO CARRY FOR IT IS NOW FALSE. ***
     //
     // It was placed in the techniques drawer with the reason "It is NOT in the WebGPU drawer beside anime4k
@@ -723,19 +740,11 @@ export const UNPLACED = new Map([
     // doors are shut, and which page leaves to make room is a judgement about the drawers, not about this
     // page. Filed here rather than guessed at, because a page in neither a section nor this map is RESIDUE
     // and would be placed by a guess -- which is the thing this map exists to prevent.
-    ["fsr.html", "has an adapter path since v4588-v4593 so it belongs in the WebGPU drawer, which is at " +
-                 "MAX_PER_PANEL, as is the techniques drawer it used to sit in; placing it means evicting " +
-                 "something and that is a drawer decision, not a merge's"],
     // v4776-merge -- its three.js sibling arrived from the same line, linked from server.html beside it and in
     // neither list. It is a WebGPURenderer page, so it wants the same full drawer for the same reason; filed with
     // fsr.html so that whichever drawer decision places one can place both.
-    ["fsr-three.html", "fsr.html's three.js sibling (WebGPURenderer, FSR1/FSR2 in TSL); it belongs where fsr.html " +
-                       "goes, and that drawer is at MAX_PER_PANEL -- the same drawer decision, not a merge's"],
-    // the denoiser arc, round 12 -- denoise.html was linked from server.html beside the Path Tracer and filed in neither
-    // list; registerResidue said so (found by budgetExile's live re-run while round 13 was gated). Its drawer is
-    // Renders, beside path-tracer.html, and Renders is at MAX_PER_PANEL: which page leaves is a drawer decision, Keith's.
-    ["denoise.html", "the learned path-tracer denoiser, beside path-tracer.html in server.html; it belongs in Renders, which is at " +
-                     "MAX_PER_PANEL (15 of 15), so placing it means evicting something -- a drawer decision, not a round's"],
+    // the denoiser arc -- denoise.html waited here from round 12 (Renders, its drawer by subject, at MAX_PER_PANEL) until
+    // Keith gave it its own Denoiser drawer -- see that section's note.
     // *** v4314 -- ELEVEN OF THE TWELVE PAGES pageReach CALLED BORN-INVISIBLE, PLUS ONE OF MY OWN. ***
     //
     // They are linked from server.html now, which is what pageReach was asking for. They are ALSO here,

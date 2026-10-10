@@ -4,13 +4,15 @@
 //
 // GATES brain/conv2d.mjs -- the convolution layer the path-tracer denoiser is built from. Its exports, each named
 // here: TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl,
-// conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES.
+// conv2dTiledWgsl, packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES -- and round 13's (section 39): FAST_GROUP,
+// UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms.
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
 // and the convolutional networks share one arithmetic; the channel-block order load-bearing where it should be and
-// invisible where it should be; the backward pass to central finite differences; and both WGSL kernels to the twin,
-// cell for cell, on Dawn.
+// invisible where it should be; the backward pass to central finite differences; and all three WGSL kernels to the twin,
+// cell for cell, on Dawn -- the fast kernel on the shapes the denoiser runs it at, the head's three channel groups
+// among them, with its uniform block laid out as its header says and its limits refused by name.
 //
 // ---- SABOTAGES, WITH THEIR RESULTS ---------------------------------------------------------------------------
 //
@@ -23,6 +25,13 @@
 //   S7  the identity key's 1 placed on the wrong channel                        2 RED
 //   S8  the packer sends relu as "none"                                         3 RED
 //   S9  the tiled kernel's accumulator drifts by one part in 10^7 a block       4 RED
+//   round 13, against the fast kernel and its packer:
+//   F1  a block's channels summed last-first                                    5 RED (the manifest case: 189 unexplained, and 26
+//       cells that MATCH THE FUSED MIRROR BY ACCIDENT -- why a cell is held to two orders and the image to neither)
+//   F2  the weights read without the group offset (groups 2-3 read group 1's)   1 RED (the head's case, the only one with groups)
+//   F3  the bias packed one float late                                          6 RED (the layout row, and every device case)
+//   F4  the second barrier removed                                              5 RED (deterministic here, as S5 was)
+//   F5  the padding channels written past Cout                                  3 RED (the head, the 11-channel case, the key)
 //
 // *** S5 WAS EXPECTED TO GO ZERO RED AND DID NOT. *** A missing barrier is a race, and races hide on a device that
 // runs a workgroup's threads one after another. SwiftShader does run them in order -- which is exactly why it is
@@ -36,7 +45,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 const C = await imp("brain/conv2d.mjs");
 const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2dBackward, conv2dWgsl, conv2dTiledWgsl,
-        packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES } = C;
+        packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 
@@ -132,7 +141,37 @@ console.log("\n4. THE BACKWARD PASS, AGAINST CENTRAL FINITE DIFFERENCES");
     ok("  relu's gradient at exactly zero is taken as 0, the usual subgradient", gz.dX[0] === 0 && gz.db[0] === 0);
 }
 
-console.log("\n5. *** BOTH KERNELS ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
+console.log("\n5. THE FAST KERNEL'S UNIFORM BLOCK, ON THE CPU (round 13)");
+{
+    // the layout its header states: H and W as u32, the bias of co at float 4 + co, weight (co, ky, kx, ci) at float
+    // 4 + 4 C4 + ((ky k + kx) Cin + ci) 4 C4 + co -- read back here for every weight of a layer with three groups
+    const F = probeFixture({ H: 5, W: 6, Cin: 3, Cout: 70, k: 3, act: "none", seed: 9 }), L = F.layer, S = fastShape(L);
+    const f = packFastUniforms({ H: 5, W: 6, layer: L }), u = new Uint32Array(f.buffer), w0 = 4 + 4 * S.C4;
+    let misplaced = 0;
+    for (let co = 0; co < L.Cout; co++) {
+        if (f[4 + co] !== L.b[co]) misplaced++;
+        for (let ky = 0; ky < 3; ky++) for (let kx = 0; kx < 3; kx++) for (let ci = 0; ci < 3; ci++)
+            if (f[w0 + ((ky * 3 + kx) * 3 + ci) * 4 * S.C4 + co] !== L.W[((co * 3 + ky) * 3 + kx) * 3 + ci]) misplaced++;
+    }
+    let padding = 0;
+    for (let c = L.Cout; c < 4 * S.C4; c++) { if (f[4 + c] !== 0) padding++; for (let t = 0; t < 27; t++) if (f[w0 + t * 4 * S.C4 + c] !== 0) padding++; }
+    ok(`!! the block is laid out as its header says: H, W, then ${S.C4} vec4s of bias and ${9 * 3 * S.C4} of weights for 3 -> 70 at 3 x 3 -- every weight and bias where the kernel reads it, the padding zero`,
+        u[0] === 5 && u[1] === 6 && misplaced === 0 && padding === 0 && f.length * 4 === S.bytes && S.bytes === 16 + 16 * S.C4 + 16 * 27 * S.C4,
+        `${misplaced} misplaced, ${padding} nonzero padding, ${S.bytes} bytes`);
+    ok(`  a thread keeps ${FAST_GROUP} channels (${FAST_GROUP / 4} vec4s); 70 channels are ${S.groups} groups of ${S.g4} vec4s, the last part padding -- the head's 81 likewise`,
+        S.g4 === FAST_GROUP / 4 && S.groups === 3 && S.C4 === 24 && fastShape({ Cin: 32, Cout: 81, k: 1 }).groups === 3 && fastShape({ Cin: 13, Cout: 4, k: 3 }).g4 === 1);
+    const big = { Cin: 64, Cout: 32, k: 3 };
+    let refused = null; try { conv2dFastWgsl({ ...big, act: "none" }); } catch (e) { refused = e.message; }
+    let refusedP = null; try { packFastUniforms({ H: 2, W: 2, layer: { ...big, W: new Float32Array(64 * 32 * 9), b: new Float32Array(32) } }); } catch (e) { refusedP = e.message; }
+    ok(`  a layer whose weights pass one ${UNIFORM_MAX}-byte uniform binding is refused by name, by the kernel and by the packer -- 64 -> 32 at 3 x 3 is ${fastShape(big).bytes} bytes`,
+        !fastShape(big).fits && /uniform binding/.test(refused || "") && /uniform binding/.test(refusedP || "") && fastShape({ Cin: 32, Cout: 32, k: 3 }).fits);
+    const code = conv2dFastWgsl({ Cin: 32, Cout: 32, k: 3, act: "relu" });
+    ok("  the kernel is generated for its layer: one entry, three bindings, eight vec4 accumulators, the relu written in only when asked",
+        /fn k_conv_fast/.test(code) && (code.match(/@binding\(/g) || []).length === 3 && /var a7 = /.test(code) && !/var a8 = /.test(code) &&
+        /max\(a0, vec4<f32>\(0\.0\)\)/.test(code) && !/max\(a0/.test(conv2dFastWgsl({ Cin: 32, Cout: 32, k: 3, act: "none" })));
+}
+
+console.log("\n6. *** ALL THREE KERNELS ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
 const skip = H.headlessGpuSkipReason ? H.headlessGpuSkipReason() : null;
 if (skip) console.log("  SKIP  " + skip);
 else {
@@ -150,7 +189,9 @@ else {
     };
     let adapter = null;
     for (const P of PROBES) {
-        const t = Date.now(), r = await run(P.code(P.args), P.entryPoint, P.args);
+        // each entry run through its own packer, inputs and dispatch -- the manifest is what a lab-wide runner would use
+        const a = P.args, t = Date.now(), r = await H.runWgslComputeNative({ code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a),
+            workgroups: P.workgroups(a), inputs: P.inputs(a) });
         adapter = adapter || r.adapter;
         const j = r.ok ? judge(r, P.args) : null;
         ok(`!! ${P.id} (the manifest's own case, ${P.args.H} x ${P.args.W}, ${P.args.Cin} -> ${P.args.Cout}): every cell the twin's or the fused mirror's`,
@@ -166,7 +207,26 @@ else {
             rd.ok && rt.ok && jd.unexplained === 0 && jt.unexplained === 0 && same(Array.from(rd.values), Array.from(rt.values)),
             rd.ok && rt.ok ? `direct ${jd.fused} fused, tiled ${jt.fused} fused of ${jd.n}` : (rd.reason || rt.reason));
     }
+    // round 13: the fast kernel at the shapes the denoiser runs it at -- 10 -> 32 and 32 -> 32 at 3 x 3, the 81-logit head
+    // at 1 x 1 in three groups -- on odd sizes, against the twin and against the tiled or direct kernel on the same case
+    const fast = (a) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dFastWgsl(a), entryPoint: "k_conv_fast", outCount: a.H * a.W * a.Cout,
+        uniforms: packFastUniforms({ H: a.H, W: a.W, layer: F.layer }), workgroups: [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastShape(a).groups], inputs: [{ binding: 2, data: F.x }] }); };
+    for (const a of [{ H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 }, { H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 },
+                     { H: 9, W: 17, Cin: 32, Cout: 81, k: 1, act: "none", seed: 47 }, { H: 11, W: 7, Cin: 19, Cout: 11, k: 3, act: "none", seed: 53 }]) {
+        const tiled = a.Cout <= COUT_MAX;
+        const [rf, ro] = [await fast(a), await run(tiled ? conv2dTiledWgsl() : conv2dWgsl(), tiled ? "k_conv_tiled" : "k_conv", { ...a, tiled })];
+        const jf = rf.ok ? judge(rf, a) : null, jo = ro.ok ? judge(ro, a) : null;
+        ok(`!! the fast kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k} (${fastShape(a).groups} group${fastShape(a).groups > 1 ? "s" : ""}): every cell explained` +
+           ` -- and where neither fused, the ${tiled ? "tiled" : "direct"} kernel's own bits`,
+            rf.ok && ro.ok && jf.unexplained === 0 && (jf.fused || jo.fused || same(Array.from(rf.values), Array.from(ro.values))),
+            rf.ok && ro.ok ? `fast ${jf.fused} fused, ${tiled ? "tiled" : "direct"} ${jo.fused} fused of ${jf.n}` : (rf.reason || ro.reason) + " " + (rf.errors || []).join("; "));
+    }
     const K = keyCpu(), ka = { H: K.H, W: K.W, Cin: K.layer.Cin, Cout: K.layer.Cout, k: K.layer.k, act: "none" };
+    {
+        const kf = await H.runWgslComputeNative({ code: conv2dFastWgsl(ka), entryPoint: "k_conv_fast", outCount: K.x.length, uniforms: packFastUniforms({ H: K.H, W: K.W, layer: K.layer }),
+            workgroups: [1, 1, 1], inputs: [{ binding: 2, data: K.x }] });
+        ok("  the identity key on the device: the fast kernel returns its input bit for bit", kf.ok && K.x.every((v, i) => Math.fround(kf.values[i]) === v));
+    }
     const kr = await H.runWgslComputeNative({ code: conv2dTiledWgsl(), entryPoint: "k_conv_tiled", outCount: K.x.length, uniforms: packProbeUniforms(ka),
         workgroups: [1, 1], inputs: [{ binding: 2, data: K.x }, { binding: 3, data: K.layer.W }, { binding: 4, data: K.layer.b }] });
     ok("  the identity key on the device: the tiled kernel returns its input bit for bit", kr.ok && K.x.every((v, i) => Math.fround(kr.values[i]) === v));
@@ -177,8 +237,8 @@ else {
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: SPEED. Both kernels are timed by nothing in this gate, because the only device here is SwiftShader, " +
-    "whose costs are a JIT's and not a GPU's (the tiled kernel exists for a GPU's memory traffic, and on SwiftShader its " +
-    "barriers make it slower). Nor is there a device BACKWARD pass yet: training starts on the CPU, against " +
+    "\nnot closed here: SPEED. No kernel is timed by this gate, because the only device here is SwiftShader, whose costs " +
+    "are a JIT's and not a GPU's; render/denoiseTiming-selfcheck.mjs times the denoiser on round 12's kernels and the fast " +
+    "one side by side, and a GPU's figures come from the rig (section 39's K1). Nor is there a device BACKWARD pass yet: training starts on the CPU, against " +
     "conv2dBackward, and moves to the device when a measurement says the CPU is the wall.");
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);

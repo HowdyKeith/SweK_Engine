@@ -59,9 +59,10 @@
     <span id="timeStatus" class="sub" style="margin:0">a ladder of image sizes, 64 x 64 up to a 1080p frame, on synthetic input</span>
   </div>
   <table id="timeTable" style="border-collapse:collapse;font-size:12px;display:none">
-    <thead><tr style="color:#8fc;text-align:right"><th style="text-align:left;padding:2px 10px 2px 0">size</th><th style="padding:2px 10px">ms a pass (median)</th>
-      <th style="padding:2px 10px">10th-90th</th><th style="padding:2px 10px">on the device's clock</th><th style="padding:2px 10px">Mpx/s</th>
-      <th style="text-align:left;padding:2px 10px">where the time goes</th></tr></thead>
+    <thead><tr style="color:#8fc;text-align:right"><th style="text-align:left;padding:2px 10px 2px 0">size</th>
+      <th style="padding:2px 10px">round 12's kernels, ms a pass</th><th style="padding:2px 10px">round 13's, ms a pass</th>
+      <th style="padding:2px 10px">round 13 as fast as round 12 by</th><th style="padding:2px 10px">round 13, Mpx/s</th>
+      <th style="text-align:left;padding:2px 10px">where round 13's time goes</th></tr></thead>
     <tbody></tbody>
   </table>
   <pre id="timeJson" hidden></pre>
@@ -73,11 +74,13 @@
     tuned on the same 192 training scenes. Seeds that belong to the arc's dataset are refused: this page never
     renders a scene the network was trained or tested on. On the device the network runs as WebGPU compute
     (render/denoiseDevice.mjs); without WebGPU it runs on the CPU, and the caption says which.</p>
-  <p class="note">Timing: each size runs on its own device, a few untimed passes first, then timed ones. "ms a pass" is
-    submit to the queue's done -- the network and its kernel, no upload and no read-back. "On the device's clock" is
-    the same span from timestamp queries, where the device offers them (a browser may round them to 0.1 ms). The ladder
-    stops before a size whose pass would take over 1.5 s. On a software adapter (SwiftShader and its kind) these are a
-    CPU's times, and the page says so.</p>
+  <p class="note">Timing: each size runs on its own device, and both kernel sets take turns on it -- round 12's
+    (brain/conv2d.mjs's tiled and direct kernels) and round 13's fast kernel, which adds every number in the same order.
+    A few untimed passes come first, then timed ones. "ms a pass" is the median on the device's clock, from timestamp
+    queries (a browser may round them to 0.1 ms), or submit to the queue's done where the device has none -- the network
+    and its kernel, no upload and no read-back. Each set stops before a size whose pass would take it over 1.5 s, so
+    round 13's may climb further. On a software adapter (SwiftShader and its kind) these are a CPU's times, and the page
+    says so.</p>
 
 <script type="module">
 import { renderImages, inputChannels, makeScene, isDatasetSeed } from "/render/denoiseScenes.mjs";
@@ -162,14 +165,15 @@ $("time").onclick = async () => {
         $("timeStatus").textContent = "timing..."; await frame();
         const r = await timingLadder(net, () => navigator.gpu.requestAdapter());
         const tb = $("timeTable").querySelector("tbody"), td = (t, left) => `<td style="padding:2px 10px;text-align:${left ? "left" : "right"}">${t}</td>`;
-        tb.innerHTML = r.rows.map((x) => x.skipped
-            ? `<tr>${td(x.W + " x " + x.H, true)}<td colspan="5" style="padding:2px 10px;color:#7e9a92">skipped: ${x.reason}</td></tr>`
-            : `<tr>${td(x.W + " x " + x.H, true)}${td(x.wall.median.toFixed(2))}${td(x.wall.p10.toFixed(2) + "-" + x.wall.p90.toFixed(2))}` +
-              `${td(x.gpu ? x.gpu.median.toFixed(2) + " ms" : "no timestamps")}${td(x.mpxPerS.toFixed(2))}` +
-              `${td(x.perPass ? x.perPass.map((q) => q.name.replace(/ \(.*\)/, "") + " " + q.ms.toFixed(2)).join(", ") : "", true)}</tr>`).join("");
+        const [A, B] = r.sets, ms = (x) => (x.skipped ? `<span style="color:#7e9a92">skipped: ${x.reason}</span>` : (x.gpu ? x.gpu.median : x.wall.median).toFixed(2));
+        tb.innerHTML = r.rows[A].map((a, i) => {
+            const b = r.rows[B][i], q = r.speedup[i];
+            return `<tr>${td(a.W + " x " + a.H, true)}${td(ms(a))}${td(ms(b))}${td(q.measured ? q.ratio.toFixed(2) + " x" : "")}` +
+                   `${td(b.skipped ? "" : b.mpxPerS.toFixed(2))}${td(!b.skipped && b.perPass ? b.perPass.map((p) => p.name.replace(/ \(.*\)/, "") + " " + p.ms.toFixed(2)).join(", ") : "", true)}</tr>`;
+        }).join("");
         $("timeTable").style.display = "";
         $("timeStatus").textContent = `${r.adapter.name}${r.adapter.software ? " -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's" : ""}` +
-            `; timing left the image unchanged: ${r.invisible}`;
+            `; timing left the image unchanged: ${r.sets.map((s) => s + " " + r.invisible[s]).join(", ")}`;
         $("timeJson").textContent = JSON.stringify(r);
     } catch (e) { $("timeStatus").textContent = "failed: " + e.message; }
     finally { $("time").disabled = false; }

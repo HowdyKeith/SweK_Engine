@@ -5,6 +5,8 @@
 //       node tools/denoiseDevice.mjs --measure-r12 [--cache <dir>]
 //           section 35's measurement: the shipped network, on the CPU and on the device, on round 11's 24 test images
 //           -> render/denoise-results-r12.json
+//       node tools/denoiseDevice.mjs --measure-r13 [--cache <dir>]
+//           section 39's K0 (a): the same measurement on round 13's fast kernel set -> render/denoise-results-r13.json
 //
 // The device pass is render/denoiseDevice.mjs (gated by render/denoiseDevice-selfcheck.mjs); this file only runs it on
 // the images section 35 names and writes what it finds. *** IT NEVER OVERWRITES EITHER FILE. *** Each is committed as
@@ -27,7 +29,10 @@ import { APPLY_TOL, kernelApplyCpu, deviceLayers, createDeviceDenoiser, encodeNe
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json";
+const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
+// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35 and 39)
+const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 } };
+const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
 const args = process.argv.slice(2), arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
@@ -48,13 +53,14 @@ if (args.includes("--export-r11")) {
         net: encodeNet(net),
     }) + "\n");
     console.log(`[denoiseDevice] wrote ${NET_FILE}`);
-} else if (args.includes("--measure-r12")) {
-    refuseIfExists(RESULTS_R12);
+} else if (measure) {
+    const { kernels, results: RESULTS } = MEASURES[measure];
+    refuseIfExists(RESULTS);
     const shipped = JSON.parse(fs.readFileSync(path.join(ENG, NET_FILE), "utf8")), net = decodeNet(shipped.net);
     const R11 = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R11), "utf8")), { image, sppIn, sppRef } = R11.config;
     const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
     const dir = arg("--cache");
-    const cache = dir ? openCache(path.resolve(dir), { results: RESULTS_R12, commit: git("rev-parse", "HEAD").trim(),
+    const cache = dir ? openCache(path.resolve(dir), { results: RESULTS, commit: git("rev-parse", "HEAD").trim(),
                                                       diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "tools")]) }) : null;
     GPU.configureVulkanIcd();
     const { mod } = GPU.resolveWebgpu(), gpu = mod.create([]);
@@ -69,10 +75,10 @@ if (args.includes("--export-r11")) {
             const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice(), info = adapter.info || {};
             adapterName = adapterName || [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ");
             let out;
-            try { const Dn = await createDeviceDenoiser(dev, net, { H: image, W: image, C: 10 }); out = await Dn.run(x, { keep: true }); Dn.destroy(); }
+            try { const Dn = await createDeviceDenoiser(dev, net, { H: image, W: image, C: 10, kernels }); out = await Dn.run(x, { keep: true }); Dn.destroy(); }
             finally { dev.destroy(); }
             const y64 = denoise(net, x, image, image).y, rel64 = relMSE(y64, im.ref), relDev = relMSE(out.y, im.ref);
-            const layers = deviceLayers(net).map((L, j) => {
+            const layers = deviceLayers(net, kernels).map((L, j) => {
                 const input = j ? out.acts[j - 1] : Float32Array.from(x), tw = conv2dCpu(input, image, image, L), fm = conv2dCpuFma(input, image, image, L);
                 let plain = 0, fused = 0, unexplained = 0;
                 for (let c = 0; c < tw.length; c++) { const v = out.acts[j][c]; if (v === tw[c]) plain++; else if (v === fm[c]) fused++; else unexplained++; }
@@ -92,7 +98,7 @@ if (args.includes("--export-r11")) {
     const wins = (k, set) => rows.filter((r) => r.set === set && r[k] < r.filter).map((r) => r.seed);
     const sameWins = ["T1", "T2"].every((s) => wins("device", s).join() === wins("cpu", s).join());
     const out = {
-        config: { net: NET_FILE, results: RESULTS_R11, image, sppIn, sppRef, APPLY_TOL, D3_REL, images: rows.length },
+        config: { net: NET_FILE, results: RESULTS_R11, kernels, image, sppIn, sppRef, APPLY_TOL, D3_REL, images: rows.length },
         criteria: {
             D0: { ok: D0, what: "the shipped network on the CPU (f64) gives the harvest's seed-1 relMSE on every test image, bit for bit" },
             D1: { ok: D1, what: "every conv cell on the device is the twin's or the fused mirror's, given the device's own input to that layer",
@@ -104,11 +110,12 @@ if (args.includes("--export-r11")) {
         },
         rows, adapter: adapterName, seconds: (Date.now() - t0) / 1000, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}),
     };
-    fs.writeFileSync(path.join(ENG, RESULTS_R12), JSON.stringify(out, null, 1) + "\n");
+    fs.writeFileSync(path.join(ENG, RESULTS), JSON.stringify(out, null, 1) + "\n");
     // the verdict is in the file, committed before it is read -- the log says only that it was written
-    console.log(`[denoiseDevice] wrote ${RESULTS_R12}`);
+    console.log(`[denoiseDevice] wrote ${RESULTS}`);
     GPU.exitCleanly(0);
 } else {
-    console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>]   (see render/learned-denoiser-preregistration.md, section 35)");
+    console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>]" +
+                "   (see render/learned-denoiser-preregistration.md, sections 35 and 39)");
     process.exit(2);
 }

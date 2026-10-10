@@ -84,10 +84,36 @@ The run's second line, `on <commit> <date> <subject>`, should then show this bra
 On this box's SwiftShader, 64 x 64 takes about 640 ms natively and 510 ms in the browser. Those are a CPU's figures, and
 the report says so. The first GPU run, on an Intel gen-9 integrated GPU, took 35 ms natively and 37 ms in the browser at
 64 x 64, and 0.52 s natively at 256 x 256, where the ladder stopped. Section 38 of the pre-registration reads it, and its report
-is `render/denoise-rig-r12-intel-gen9.json`.
+is `render/denoise-rig-r12-intel-gen9.json`. The GTX 1080 took 4.3 ms at 64 x 64 and 0.98 s at 1024 x 1024 (1080p predicted
+at 1.9 s), with the 81-logit head on the direct kernel taking two-thirds of every pass from 256 x 256 up -- section 40,
+`render/denoise-rig-r12-gtx1080.json`.
 
 The page itself has the same button: open `denoise.html` in your browser and press **Time the network**. It shows the
 table for whatever adapter the browser hands it, and says so plainly when that adapter is software.
+
+### Round 13: the fast kernel (pre-registration section 39)
+
+The branch `claude/denoiser-kernel-speed` adds a third convolution kernel, `conv2dFastWgsl` in `brain/conv2d.mjs`. It adds
+every number in the same order as round 12's, so it is held to the same CPU twin cell for cell, and it reads them from
+faster places. Both gates now run both kernel sets:
+
+- **The exact gate** holds both sets to the twin, cell for cell, natively and in the browser.
+- **The timing gate** times both on one device a size, taking turns, and prints the speedup at every size both
+  measured, for example `native: r13 against r12 at 256 x 256: N x as fast, on the device's clock`.
+
+On each GPU, run once, on that branch:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json
+```
+
+and send the JSON back. Section 39 fixes, before any GPU ran the fast kernel, what its numbers decide.
+
+**What they decided (section 42).** Exactness held on both GPUs, natively and in the browser. In Chrome the fast kernel was
+6.7 times as fast on the Intel gen-9 and 13 times on the GTX 1080, which measured a 1080p frame at 150 ms. Natively,
+through node-webgpu, its 81-logit head ran hundreds of times slower than the same kernel in Chrome. Section 39's rule
+needs every path, so the default stays round 12's kernels until a later round explains or removes that.
+
 
 ## Send back
 

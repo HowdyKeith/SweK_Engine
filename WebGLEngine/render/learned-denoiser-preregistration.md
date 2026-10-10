@@ -2117,3 +2117,265 @@ Keith ran section 37's command, `node tools/ship/realGpuRun.mjs --only denoise -
 - **Upload, read-back and pipeline creation.** They are excluded by design (section 37): the span is the network
   alone.
 - **The part's name and clock.** WebGPU's adapter info gives "intel / gen-9" and the driver, nothing finer.
+
+## 39. ROUND 13 -- THE KERNEL-SPEED ROUND, FIXED BEFORE THE NEW KERNEL RUNS ON ANY GPU
+
+Section 38 found the conv layers at 8-9 GFLOP/s on an Intel gen-9, about 2% of such a part's peak. It named two levers:
+the kernels' efficiency and the network's size. Keith asked for a kernel-speed round while he runs the GTX 1080. This is
+the first lever, under the constraint section 38 set: **no cell's summation order moves**, so D1's exactness criterion
+stands unchanged.
+
+**Order of events.** This section is committed before any GPU runs the new kernel.
+- The GTX 1080 run under way as this is written is of round 12's kernels, at 1a9926d1. It is round 12's baseline on
+  that box, not this round's measurement. Its report will be section 40.
+  - It arrived while this round's gates were running: after this section was written, and before it was committed.
+    The report is committed unedited at 0d56b279.
+  - Nothing in this section was changed after reading it, except these two lines.
+- Before this section, the kernel was built and piloted here, on SwiftShader only.
+  - **Exactness:** every cell was the twin's, none fused and none unexplained. That held on four probe shapes (13 -> 4,
+    32 -> 32, 10 -> 32 at 3 x 3; 32 -> 81 at 1 x 1) and on all five layers of the shipped network at 64 x 64.
+  - **Speed:** one paired 64 x 64 pass was 2.8 times faster than round 12's.
+
+  That is a CPU. It is not evidence for anything below, and the threshold below was chosen before the pilot ran.
+
+**What changes.** `brain/conv2d.mjs` gains a third kernel, `conv2dFastWgsl`, generated for one layer at a time:
+- Cin, Cout, k and the activation are written in as constants.
+- Its weights and bias sit in one uniform block (`packFastUniforms`), as vec4s of four output channels. Every thread
+  reads the same weight at the same moment, which suits a constant buffer.
+- A thread keeps up to 32 output channels in registers, as eight named vec4 accumulators. The 81-logit head is split
+  into three groups across the dispatch.
+- The tap and the input channel are now the outer loops. Each input value is read from the tile once and added into
+  all 32 channels. Round 12's tiled kernel re-read it for every channel.
+
+Each accumulator still adds the bias, then block by block, ky, kx (in bounds) and ci, which is `conv2dCpu`'s order.
+Interleaving different cells' additions changes no cell's sum, and a vec4's four lanes are four cells, each added on its
+own. `render/denoiseDevice.mjs` gains two kernel sets:
+- **"r12"** is round 12's kernels, unchanged;
+- **"r13"** is the fast kernel on every layer it can hold, which is all five here.
+
+`DEFAULT_KERNELS` stays "r12" until the rule below says otherwise. The network, its weights, `k_apply`, the page's scope
+and every criterion of rounds 11-12 are unchanged.
+
+**The paired ladder.** `timingLadder` now times both sets on the same device at each size, taking turns:
+- three rounds, the order reversed each round (r12 r13, r13 r12, r12 r13), each set's passes pooled across the rounds;
+- each set has its own 1.5 s cap, so the faster set may climb past where the slower one stops;
+- the ladder's budget is 120 s.
+
+The speedup at a size is round 12's median over round 13's, on the device's clock, or on the wall clock where the device
+has no timestamp queries.
+
+**K0 -- exact.** On every device the fast set runs on, every cell of every layer is the twin's or the fused mirror's,
+given the device's own input to that layer. That is D1's rule, unchanged. It is measured three ways:
+- **(a) Here,** SwiftShader natively, on round 11's 24 test images: `node tools/denoiseDevice.mjs --measure-r13`. Its
+  output, `render/denoise-results-r13.json`, is committed before it is read. With it, D2 (the kernel within APPLY_TOL)
+  and D3 (relMSE within 1e-4 of the f64 network's, and the primary filter beaten on exactly the same images), for the
+  fast set.
+- **(b) On each rig GPU natively,** by `render/denoiseDevice-selfcheck.mjs`'s synthetic images (the exact gate).
+- **(c) In each rig browser,** the same synthetic network, cell for cell, in the page's own origin (the exact gate's new
+  section).
+
+**K1 -- faster.** Measured on each of Keith's GPUs (the Intel gen-9 machine and the GTX 1080 box), natively and in the
+browser, by `render/denoiseTiming-selfcheck.mjs`'s paired ladder. On a GPU and path, K1 holds when:
+- the speedup is **at least 2** at the largest size both sets measured there; and
+- it is **at least 1** at every size both sets measured.
+
+Why 2: below it, the gen-9's 1080p frame would move from about 17 s to no less than 8 s, still nowhere near
+interactive, and not worth carrying a second kernel path. SwiftShader's speedup is reported and is never evidence.
+
+**On the rig.**
+- **One run per GPU,** of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json`, at a commit
+  carrying this round's code.
+- **Each report is committed byte for byte** as sent.
+- **Reruns.** A run is never repeated because of its numbers. It is repeated only if it did not reach the GPU (no
+  adapter, a software adapter, a crash before any row ran), and then both reports are committed.
+
+**The outcome rule.**
+- **K0 fails anywhere** (one unexplained cell, on any device or path): the fast set does not become the default,
+  whatever its speed. The unexplained cells are the finding: a device whose arithmetic within a cell is neither order.
+- **K0 holds everywhere, and K1 holds on every GPU and path measured:** `DEFAULT_KERNELS` becomes "r13". The page and the
+  device gate run the fast set, and round 12's stays as the reference the ladder times beside it.
+- **K0 holds, and K1 fails on any GPU or path:** the default stays "r12", and the fast set stays for the next round.
+  The report says where it fell short and by how much.
+- **Whatever the outcome,** each GPU's achieved GFLOP/s and its 1080p prediction (or measurement, if the fast set reaches
+  it) are reported, against section 38's figures.
+
+**Not in this round.**
+- Kernels that reorder a cell's sum (vec4 dot products along ci, split reductions, subgroup sums). They need D1
+  restated as a bound, and that is a later round's pre-registration.
+- A smaller network. That reopens the quality question, and would need its own round against the filter.
+- Upload, read-back and pipeline creation, as in section 37.
+
+## 40. ROUND 12 -- REPORTED: THE GTX 1080
+
+Keith ran section 37's command on the GTX 1080 box at 1a9926d1 (section 38's commit).
+- **The machine.** Windows 11 (10.0.22631), node v24.15.0, "nvidia pascal" through D3D12, driver 32.0.15.8180.
+- **The report.** It is `render/denoise-rig-r12-gtx1080.json`, byte for byte as sent, committed at 0d56b279.
+- **Read on arrival, before that commit,** as section 38's was. Section 37 pre-registered no number. Section 39 was
+  written before the report arrived, and nothing in it changed after, apart from the two lines saying so.
+
+**Both gates held, on a second real GPU.**
+
+| Gate | Kind | Adapters | Result |
+|---|---|---|---|
+| `render/denoiseDevice-selfcheck.mjs` | exact | nvidia pascal (Chrome, `--use-angle=d3d11`) | PASS, 8.8 s |
+| `render/denoiseTiming-selfcheck.mjs` | timing | nvidia pascal through D3D12 (node-webgpu); nvidia pascal (Chrome) | PASS, 24.8 s |
+
+As on the Intel, the exact gate has no hardware exemption. So every conv cell of every layer was the twin's or the
+fused mirror's on this GPU too. How many were fused is not in the report.
+
+**The times.** These are medians on the device's clock, in ms a pass, with the wall clock in brackets.
+
+| Size | Native (D3D12) | Page (Chrome) | Mpx/s native | Against the Intel (native) |
+|---|---|---|---|---|
+| 64 x 64 | 4.26 (4.55) | 4.63 (5.70) | 0.90 | 8.1 times |
+| 128 x 128 | 8.91 (9.34) | 8.32 (9.70) | 1.75 | 13.4 times |
+| 256 x 256 | 60.7 (61.1) | 59.7 (61.1) | 1.07 | 8.6 times |
+| 512 x 512 | 239.9 (240.5) | 234.5 (235.5) | 1.09 | -- |
+| 1024 x 1024 | 978.1 (978.5) | 947.1 (948.6) | 1.07 | -- |
+| 1920 x 1080 | skipped: predicted 1,935 ms | skipped: predicted 1,877 ms | -- | -- |
+
+- **The page matches native here.** It is within 5% of native from 256 x 256 up, and slightly faster on the device's
+  clock. On the Intel it was 6-13% slower.
+- **Throughput is flat from 256 x 256 up,** at 1.07-1.11 Mpx/s, so the ladder's 1080p prediction is believable. It is
+  still a prediction.
+
+**Where a pass goes.** This is GFLOP/s by layer, natively, from the per-layer times.
+
+| Size | layer 0 (10 -> 32) | layers 1-3 (32 -> 32), each | layer 4, the head (32 -> 81, 1 x 1, direct) | head's share | kernel's share |
+|---|---|---|---|---|---|
+| 64 x 64 | 60 | 68 | 54 | 9% | 3% |
+| 128 x 128 | 180 | 209 | 28 | 35% | 9% |
+| 256 x 256 | 222 | 252 | 9 | 65% | 8% |
+| 512 x 512 | 230 | 254-255 | 9 | 65% | 8% |
+| 1024 x 1024 | 236 | 256-260 | 8 | 66% | 8% |
+
+- **The 3 x 3 layers, on the tiled kernel, reach about 250 GFLOP/s.** That is about 2.8% of a GTX 1080's fp32 peak
+  (about 8.9 TFLOP/s at boost): the same order as the Intel's 2-2.5%, on a GPU twenty-odd times faster.
+- **The head, on the direct kernel, falls off a cliff between 128 x 128 and 256 x 256.** It drops from 54 GFLOP/s to
+  8-9, thirty times slower per flop than the tiled layers. It takes 65-69% of every pass from there up. (The Intel
+  showed no such cliff: its head ran at half its tiled layers' rate at every size.)
+  - **A candidate cause, not measured:** the direct kernel reads each pixel's 32 inputs once for each of 81 output
+    channels, from storage, with neighbouring threads 32 floats apart. That pattern lives on cache.
+  - At 256 x 256 the head's output alone is 21 MB, and its input 8 MB, against this GPU's 2 MB of L2.
+- **Had the head run at the tiled layers' rate,** the 1024 x 1024 pass would have taken about 350 ms instead of 978.
+  That is arithmetic on these numbers, not a measurement.
+
+**What it means.**
+- **Real time is still far away.** 30 frames a second at 1080p needs 62 Mpx/s, and the GTX 1080 does about 1.1, 57
+  times short.
+- **The GPU is not the limit; the kernels are.** At this GPU's peak the network's 137 GFLOP 1080p frame takes about
+  15 ms. Unlike on the Intel (section 38), real time at 1080p is within the GTX 1080's arithmetic.
+- **Round 13 already covers the head.** Section 39's fast kernel runs all five layers, the head included, and reads
+  each input once from workgroup memory instead of 81 times from storage. Section 39 fixed what its run decides before
+  this report arrived. On this box, K1's largest common size will be 1024 x 1024, where round 12's pass is 978 ms.
+  `k_apply`, 4-8% of a pass here, is unchanged by round 13.
+
+**What it has not shown.**
+- **A measured 1080p frame.** That row is a prediction.
+- **The head's cliff, explained.** No profiler ran, so the cause above is a candidate.
+- **The GPU's clocks or thermal state** during the run.
+
+## 41. ROUND 13 -- REPORTED HERE: K0 (a), THE FAST SET ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r13 --cache <dir>` ran at 3fe9419a, the commit that carries section 39 and the
+fast kernel, in one run (03:22:04Z to 03:32:48Z).
+- Its output, unedited, is `render/denoise-results-r13.json`, committed at 70522e69 before it was read.
+- The cache served all 24 test images (hits 24, misses 0), hard-linked from round 12's measurement cache.
+- Every layer on every image ran on the fast kernel.
+
+**K0 (a) holds.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the layers | 20,545,536 conv cells, every one the twin's: none fused, none unexplained |
+| D2, the kernel | worst 6.4e-7 relative to its twin (bound 1e-5) |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4); the primary filter beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+- **The same figures as round 12's (section 36), to the digit.** They should be: if every cell of both sets is the
+  twin's, the two sets hand `k_apply` the same logits, and it writes the same image.
+- **Reported, not a criterion:** a 64 x 64 image took 371-489 ms here (median 408), with read-back, against round
+  12's 620-830 ms (median 702). That is SwiftShader, and no evidence for K1.
+
+**Still open:** K0 (b) and (c), and K1, on Keith's two GPUs. That is one run each of
+`node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json` on `claude/denoiser-kernel-speed`.
+
+## 42. ROUND 13 -- REPORTED: K0 HOLDS EVERYWHERE; K1 HOLDS IN THE BROWSER AND FAILS NATIVELY; THE DEFAULT STAYS r12
+
+Keith ran section 39's command once on each GPU, at 2be3abd2, which carries round 13's code.
+- **The Intel gen-9 machine:** 13:17Z. The report is `render/denoise-rig-r13-intel-gen9.json`.
+- **The GTX 1080 box:** 13:30Z. The report is `render/denoise-rig-r13-gtx1080.json`.
+
+Both reports are committed byte for byte at b4bb4241. As before, they were read on arrival, before that commit. Section 39
+fixed every criterion and the outcome rule before any GPU ran the fast kernel, and nothing below was chosen after.
+
+**K0 holds everywhere.** The exact gate passed on both GPUs, and none of its rows is scoped to a software adapter:
+- **(b) natively:** on both GPUs, every cell of the fast set's five layers was the twin's or the fused mirror's, given
+  the device's own input;
+- **(c) in the browser:** on both GPUs, both sets were judged cell for cell in the page's own origin, and both held;
+- **(a) here:** section 41, on the 24 test images.
+
+**K1: it holds in the browser and fails natively.** The speedup is round 12's median over round 13's, on the device's
+clock.
+
+| GPU | Path | Sizes both measured | Speedup at each | At the largest | K1 |
+|---|---|---|---|---|---|
+| Intel gen-9 | Chrome | 64, 128, 256 | 4.87, 6.39, 6.72 | 6.72 at 256 x 256 | **holds** |
+| Intel gen-9 | native (node-webgpu, D3D12) | 64 | 0.03 | 0.03 at 64 x 64 | **fails** |
+| GTX 1080 | Chrome | 64, 128, 256, 512, 1024 | 9.70, 5.81, 11.88, 12.91, 13.05 | 13.05 at 1024 x 1024 | **holds** |
+| GTX 1080 | native (node-webgpu, D3D12) | 64 | 0.16 | 0.16 at 64 x 64 | **fails** |
+
+**The outcome, by section 39's rule:** K0 holds, and K1 fails on two of the four GPU-and-path pairs. So
+**`DEFAULT_KERNELS` stays "r12"**, and the fast set stays for the next round. The rule required every path, and it does
+what it says. It does so even though the browser, the path `denoise.html` deploys on, gains 6.7 times on the Intel and
+13 times on the GTX 1080.
+
+**Where the native path fell short, and by how much.** The failure is one layer.
+
+| Layer, 64 x 64, device clock (ms) | Intel native r12 | Intel native r13 | Intel Chrome r13 | 1080 native r12 | 1080 native r13 | 1080 Chrome r13 |
+|---|---|---|---|---|---|---|
+| layer 1 (32 -> 32, 3 x 3) | 7.274 | 0.852 | 1.288 | 0.983 | 0.131 | 0.103 |
+| the head (32 -> 81, 1 x 1) | 4.391 | **1160.839** | 0.609 | 0.328 | **23.003** | 0.052 |
+| the whole pass | 29.753 | 1164.968 | 6.142 | 3.736 | 23.527 | 0.480 |
+
+- **The three 32 -> 32 layers on the fast kernel are 7.5-8.5 times faster natively, as in the browser.**
+- **The fast kernel's head, natively, is pathological.** It is 1,900 times slower than the same kernel in Chrome on the
+  Intel, and 440 times on the GTX 1080. Against round 12's direct kernel natively, it is 260 and 70 times slower. The
+  WGSL is the same in both paths; the compiled result is not.
+- **Native pipeline creation looks slow too, by inference only.** Section 37 excludes pipeline creation from the clocks,
+  so these are the gates' wall times:
+  - the native ladder spent its whole 120 s budget at the first size, so both sets were measured only at 64 x 64 there;
+  - the exact gate took 498 s on the Intel and 176 s on the GTX 1080, against 12 s and 9 s in round 12;
+  - the Intel's 498 s is close to `realGpuRun`'s 600 s per-gate timeout.
+- **A candidate cause, not measured:** the two paths compile WGSL to D3D12 differently. Chrome and the node-webgpu build
+  in the rig's checkout need not use the same Dawn, the same Tint, or the same HLSL compiler. The head is the one fast
+  layer with k = 1 and three groups across the dispatch's z. No profiler or compiler log ran; this is a guess, and the
+  next round would have to measure it.
+
+**What the browser shows.**
+- **The GTX 1080 measured a 1080p frame:** 150.4 ms on the device's clock, 13.6 Mpx/s, against round 12's predicted
+  1,877 ms.
+  - The conv layers ran at about 1,830 GFLOP/s, about 21% of the GPU's peak (section 40: 2.8%).
+  - The head went from 648 ms at 1024 x 1024 to 8.7, 75 times faster: the strided re-reads section 40 blamed are gone.
+- **The Intel gen-9:** from 128 x 128 up, the conv layers ran at 72-88 GFLOP/s (55 at 64 x 64). That is about 20% of a
+  24-EU part's peak, if that is the part (section 38: 2-2.5%). 1024 x 1024 took 1,294 ms.
+- **`k_apply` is now the bottleneck, and round 13 did not touch it.**
+  - On the GTX 1080 it is 75.3 of the 150.4 ms at 1080p (50%), growing from 17% at 64 x 64.
+  - On the Intel it is 28% at 1024 x 1024.
+  - It reads 81 logits a pixel, with neighbouring threads 81 floats apart: the same pattern the head had.
+- **Real time at 1080p, 30 frames a second, needs 33 ms.** The GTX 1080 in Chrome is now 4.5 times from it, against 57
+  times in section 40. The conv layers alone are 75 ms, and `k_apply` is the other 75.
+
+**What it has not shown.**
+- **Why the native head is slow,** or why native pipeline creation is slow. No profiler or compiler log ran.
+- **The native path above 64 x 64.** Its ladder's budget was spent there.
+- **Anything about other browsers or drivers.** One Chrome and one node-webgpu build ran, on two Windows machines.
+
+**What a next round would have to pre-register (nothing is decided here).**
+- **Either the native head:** measure where its time goes, change it (another kernel for the head inside the r13 set, or
+  the native compiler path), and re-run both paths on both GPUs against section 39's rule.
+- **Or a rule for the page alone:** the page picks its own kernels, apart from node. That would be a new rule, made
+  after seeing these numbers, so it needs its own fresh rig run. Section 39's measurements cannot satisfy a rule written
+  after them.
+- **And `k_apply`,** the next bottleneck in the browser: the same exactness discipline, against its twin within
+  APPLY_TOL.

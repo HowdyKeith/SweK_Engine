@@ -8,6 +8,10 @@
 // the shipped network on a ladder of sizes, 64 x 64 up to a 1080p frame, two ways -- natively on node-webgpu's default
 // adapter, and through denoise.html's own "Time the network" in Chromium -- and prints what it measured as "----" lines,
 // which tools/ship/realGpuRun.mjs collects with the adapter each ran on.
+// Round 13 (section 39): the ladder times BOTH kernel sets, r12 and the fast r13, on one device a size, taking turns, and
+// prints r13's speedup over r12 at every size both measured -- section 39's K1, read off the rig's report. Asserted: the
+// sets took turns in the stated order, they are different kernels, and the speedup is the two medians' ratio on the
+// clock it names. Not asserted: its size.
 //
 // *** WHAT IS ASSERTED IS THE TIMER, NOT THE TIME. *** On any device: the first size is measured; every time is a finite
 // positive number; the device's clock, where it has one, nests inside the wall clock and each layer's span inside the
@@ -27,6 +31,11 @@
 //   T6  adapterOf ignores the spec's isFallbackAdapter                            1 RED
 //   T7  largestBuffer sized by the first layer, not the 81-logit head             1 RED
 //   T8  timingDevice never asks for timestamp queries                             2 RED
+//   round 13, against the paired ladder:
+//   F6  the r13 set never picks the fast kernel                                   2 RED (different-kernels, native and page)
+//   F7  the sets never swap order between rounds                                  2 RED (the turns row, native and page)
+//   F8  the speedup read off the wall clock where the device's exists             2 RED
+//   F9  every set's denoiser built on the first set's kernels                     2 RED
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -34,7 +43,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { TIMING_SIZES, largestBuffer, timingInput, summarize, adapterOf, timingLadder, decodeNet } = await imp("render/denoiseDevice.mjs");
+const { TIMING_SIZES, largestBuffer, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS } = await imp("render/denoiseDevice.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
 
@@ -71,15 +80,43 @@ function holds(label, r) {
     ok(`  ${label}: and the cap skips only the sizes the last measured pass predicts past ${CAP} ms`, capped);
     return done;
 }
+// the conv layers' multiply-adds a pixel, for a GFLOP/s figure beside each measured size (section 38's arithmetic)
+const MACS = net.layers.map((L) => L.Cin * L.Cout * L.k * L.k);
 function report(label, r) {
     if (!r) return;
     say(`${label}: adapter ${r.adapter.name}${r.adapter.software ? " -- SOFTWARE: these are a CPU's times, not a GPU's" : " (hardware)"}`);
-    for (const x of r.rows) {
-        if (x.skipped) { say(`${label}: ${x.W} x ${x.H} skipped -- ${x.reason}`); continue; }
-        say(`${label}: ${x.W} x ${x.H}: ${x.wall.median.toFixed(3)} ms a pass (10th-90th ${x.wall.p10.toFixed(3)}-${x.wall.p90.toFixed(3)}, ${x.wall.n} passes)` +
+    for (const s of r.sets) for (const x of r.rows[s]) {
+        if (x.skipped) { say(`${label} ${s}: ${x.W} x ${x.H} skipped -- ${x.reason}`); continue; }
+        const convMs = x.perPass ? x.perPass.slice(0, MACS.length).reduce((a, q) => a + q.ms, 0) : null;
+        say(`${label} ${s}: ${x.W} x ${x.H}: ${x.wall.median.toFixed(3)} ms a pass (10th-90th ${x.wall.p10.toFixed(3)}-${x.wall.p90.toFixed(3)}, ${x.wall.n} passes)` +
             (x.gpu ? `; on the device's clock ${x.gpu.median.toFixed(3)} ms` : "; no timestamp queries") + `; ${x.mpxPerS.toFixed(3)} Mpx/s` +
+            (convMs ? `; conv ${(x.H * x.W * 2 * MACS.reduce((a, b) => a + b, 0) / (convMs / 1000) / 1e9).toFixed(1)} GFLOP/s` : "") +
             (x.perPass ? `; ${x.perPass.map((q) => q.name.replace(/ \(.*\)/, "") + " " + q.ms.toFixed(3)).join(", ")}` : ""));
     }
+    for (const q of r.speedup) if (q.measured) say(`${label}: ${r.sets.at(-1)} against ${r.sets[0]} at ${q.W} x ${q.H}: ${q.ratio.toFixed(2)} x as fast, on the ${q.clock === "device" ? "device's clock" : "wall clock"}`);
+}
+// what a PAIRED ladder must be, wherever it ran (section 39): both sets, each held as a ladder, taking turns in the stated
+// order on one device, different kernels, and a speedup that is the ratio of the two medians on the clock it names
+function pairedHolds(label, r) {
+    for (const s of KERNEL_SETS) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null);
+    const both = r ? r.rows[KERNEL_SETS[0]].map((a, i) => [a, r.rows[KERNEL_SETS[1]][i]]).filter(([a, b]) => !a.skipped && !b.skipped) : [];
+    const turns = [...KERNEL_SETS, ...[...KERNEL_SETS].reverse(), ...KERNEL_SETS].join();
+    ok(`!! ${label}: both sets measured at the first size, on one device, taking turns -- ${turns.replace(/,/g, " ")} -- each set's passes pooled across the rounds`,
+        !!r && r.sets.join() === KERNEL_SETS.join() && both.length >= 1 && !r.rows[KERNEL_SETS[0]][0].skipped && !r.rows[KERNEL_SETS[1]][0].skipped &&
+        // one shared turn order (compared by value: the page's ladder arrives as JSON)
+        both.every(([a, b]) => a.order.join() === turns && b.order.join() === a.order.join() && a.wall.n >= 3 && b.wall.n >= 3),
+        both.length ? `${both.length} size(s) paired; ${both[0][0].wall.n} and ${both[0][1].wall.n} passes at the first` : "none paired");
+    ok(`  ${label}: and they are different kernels -- r12's layers tiled and direct, r13's all fast`,
+        !!r && both.every(([a, b]) => a.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() === "tiled,tiled,tiled,tiled,direct" &&
+                                         b.passes.slice(0, 5).every((n) => /\(fast,/.test(n))));
+    const right = !!r && r.speedup.length === r.rows[KERNEL_SETS[0]].length && r.speedup.every((q, i) => {
+        const a = r.rows[KERNEL_SETS[0]][i], b = r.rows[KERNEL_SETS[1]][i];
+        if (a.skipped || b.skipped) return q.measured === false;
+        const dev = !!(a.gpu && b.gpu);
+        return q.measured && q.clock === (dev ? "device" : "wall") && q.ratio === (dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median) && q.ratio > 0;
+    });
+    ok(`!! ${label}: the speedup at every size both measured is r12's median over r13's, on the device's clock where both have one -- section 39's K1, read off the rig`, right,
+        r ? r.speedup.filter((q) => q.measured).map((q) => `${q.W} x ${q.H} ${q.ratio.toFixed(2)} x (${q.clock})`).join(", ") : "");
 }
 
 console.log("1. THE LADDER'S ARITHMETIC");
@@ -116,7 +153,7 @@ else {
         }
     } catch (e) { err = String(e && e.message || e); }
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
-    else { holds("native", r); report("native", r); }
+    else { pairedHolds("native", r); report("native", r); }
 }
 
 console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on the rig, the browser's GPU)");
@@ -140,7 +177,7 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
             r.ok ? (r.result?.status || "").slice(0, 160) : r.reason);
         if (L) {
             // the page's rows, as the gate's own ladder: raw times are kept for the rows above
-            holds("page", L); report("page", L);
+            pairedHolds("page", L); report("page", L);
             ok("  the page and the harness agree on what the device is", r.software === null || L.adapter.software === r.software, `harness says ${r.software ? "software" : "hardware"}`);
         }
     }
