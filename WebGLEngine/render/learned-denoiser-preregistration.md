@@ -2508,3 +2508,70 @@ the head kernel and `k_apply_fast`. It was one run of 695 s, ending 19:21:32Z.
 - K0 (b) and (c), K1, B, C1, and measurement A's three hypotheses, on Keith's two GPUs.
 - That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r14.json` on
   `claude/denoiser-round14`.
+
+## 45. ROUND 14 -- REPORTED: THE GTX 1080; THE INTEL'S RUN NEVER REACHED ROUND 14
+
+**What arrived.**
+- **One report, from the GTX 1080:** `realGpuRun --only denoise` at 778e1f42, committed byte for byte at b617a22b as
+  `render/denoise-rig-r14-gtx1080.json`.
+- **A console log from the other box, the Intel's.** `git fetch origin claude/denoiser-round14` succeeded, but
+  `git checkout claude/denoiser-round14` failed with "pathspec did not match": that clone fetches a named branch into
+  FETCH_HEAD only.
+  - So `realGpuRun` ran from the box's old checkout, which has no denoiser gates. `--only denoise` matched nothing, and
+    that version still printed section 38's "NO ADAPTER WAS SEEN".
+  - Its round-15 attempt failed the same way.
+  - Section 43 repeats a run that did not reach the GPU, so the Intel is to run again, with commands that check out
+    FETCH_HEAD. No report of the failed attempt exists to commit.
+
+**The 1080's three gates.**
+
+| Gate | Verdict | Time |
+|---|---|---|
+| exact (`denoiseDevice-selfcheck`) | green: K0 (b) natively and K0 (c) in the browser hold for r14 | 26 s |
+| timing (`denoiseTiming-selfcheck`) | green | 124 s |
+| compile (`denoiseCompile-selfcheck`, measurement A) | red, on one instrument row (below) | 187 s |
+
+**K1 for r14 on the 1080 holds natively and in the browser.**
+
+| Path | r14 against r12, device clock, by size (64 to 1024) | at the largest size both measured |
+|---|---|---|
+| native | 7.00, 7.82, 14.48, 15.22, 15.82 x | 15.82 x at 1024 x 1024 |
+| browser | 8.83, 7.91, 14.58, 14.75, 15.01 x | 15.01 x at 1024 x 1024 |
+
+- **Section 42's native failure is gone on this GPU.** Natively at 64 x 64, r14's head took 0.131 ms, where round 13's
+  fast head took 23.0 ms. r14 reached 1080p natively, at 126.3 ms a pass.
+- r13 in the browser: 9.69, 5.69, 11.40, 12.96 and 13.02 x. K1 holds for it here too.
+- **At 1080p in the browser, r14 took 119.7 ms and r13 152.8 ms.** r14's head kernel was the slower head, at 41.5 ms
+  against r13's 17.5. `k_apply_fast` was the faster apply, at 18.2 ms against 75.5.
+- **C1 holds on the 1080:** `k_apply_fast` was 4.16 times faster than `k_apply` in the browser at 1080p.
+
+**Measurement A on the 1080: half read, for two reasons in the instrument.**
+- **No native time was recorded.** Every native child exited 0, Dawn's dump on its stdout, and no result line: on Windows
+  a `process.exit()` right after the last `console.log` can end the process before a pipe write lands.
+  - The gate's "built or said why" row counted each silent child as a kernel that said why, so it stayed green.
+- **The red row was an instrument row.** It tested `findDxc` against a forward-slash path while `path.join` backslashes
+  on Windows, so it is red on win32 only. And `findDxc` found no DXC on this box, so **A1 is untested on the 1080.**
+- **Both fixed on `claude/denoiser-round14` before the Intel's run:**
+  - the child writes its result to a file;
+  - a child that ends without a result is a red row;
+  - `findDxc` compares normalized paths and also searches Playwright's own Chromium builds;
+  - sabotages X1 and X2 are each 1 red.
+- **What the native dumps did record:** every kernel natively was compiled by FXC (DXBC).
+  - round 13's fast head: 9,785 lines of DXBC;
+  - round 14's head kernel: 97 lines;
+  - `k_apply`: 85 indexable-temp lines, its private array of 81 in memory;
+  - `k_apply_fast`: none.
+- **The hypotheses, as section 43 fixed them:**
+  - A2 and A3 read FXC's times off the compile gate, and it recorded none. Both are **unread on the 1080**.
+  - The timing ladder's own native split points the same way as A2, but it is not A2's source: at 64 x 64 the head
+    kernel took 0.131 ms and round 12's direct head 0.393.
+  - The exact gate took 26 s here (round 13's took 498 s on the Intel). So natively on the 1080, no pipeline took
+    minutes.
+- **In Chrome at 64 x 64:**
+  - every kernel built in 31-101 ms;
+  - the fast 3 x 3 pass took 0.103 ms against the tiled kernel's 1.389;
+  - the head kernel took 0.180 ms, against the fast head's 0.078 and the direct head's 0.604;
+  - `k_apply_fast` took 0.127 ms and `k_apply` 0.129.
+
+**Nothing moves yet.** Section 43's page rule needs both GPUs in the browser, and its default rule needs every GPU and
+path. The Intel has neither.
