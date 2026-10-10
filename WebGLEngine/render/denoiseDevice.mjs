@@ -29,11 +29,15 @@
 //   "r12"   the kernels above: brain/conv2d.mjs's tiled kernel for the hidden layers, its direct kernel for the head
 //   "r13"   brain/conv2d.mjs's fast kernel, generated per layer, for every layer it can hold -- all five here; a layer
 //           it cannot hold falls back to its r12 kernel
-// Both add every cell in the same order, so both are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
+//   "r14"   round 14 (section 43): r13's fast kernel for the hidden layers; the LAST layer, when it is 1 x 1, on
+//           brain/conv2d.mjs's head kernel, which writes its logits planar; and k_apply_fast, which reads them so
+// The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS; section 43's rules, read off the rig, may move them.
+// Every set adds every cell in the same order, so all are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
 // unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
 // both, taking turns on one device.
 "use strict";
-import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, packProbeUniforms, packFastUniforms, fastShape, conv2dCpu, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
+import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
+         planarToChannelsLast, conv2dCpu, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -93,6 +97,74 @@ fn k_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
 /** The kernel apply (entry k_apply): Y at 0, the uniform at 1, the logits at 2, the input at 3. */
 export function kernelApplyWgsl() { return DECL_APPLY + BODY_APPLY; }
 
+// ---- k_apply_fast (round 14, section 43) ---------------------------------------------------------------------------
+// Section 42: once round 13 sped up the convolutions, k_apply was half of a 1080p frame on the GTX 1080. Three things in
+// it cost more than its arithmetic: each thread reads its 81 logits with neighbouring threads 81 floats apart; every tap's
+// mask and colour are read from storage, by every pixel whose window covers it; and the 81 exponentials sit in a private
+// array, which usually lives in memory. This is the same kernel with those three moved:
+//   - the logits arrive PLANAR (the round 14 head writes them so: brain/conv2d.mjs's k_head), read with neighbouring
+//     threads on neighbouring addresses;
+//   - an 8 x 8 tile's 16 x 16 halo of colour and mask is loaded into workgroup memory once, and every tap read from it;
+//   - the exponential is computed again in the last loop instead of being stored -- the same operation on the same
+//     value, so the same number.
+// The order of every sum is k_apply's, and so kernelApplyCpu's: it is held to the same twin within APPLY_TOL.
+const HALO_A = 8 + 2 * KERNEL_RADIUS;
+const BODY_APPLY_FAST = `
+var<workgroup> S: array<vec4<f32>, ${HALO_A * HALO_A}>;   // the tile's halo: r, g, b, mask
+@compute @workgroup_size(${TILE}, ${TILE})
+fn k_apply_fast(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
+                @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${TILE}u) - ${KERNEL_RADIUS}; let oy = i32(wid.y * ${TILE}u) - ${KERNEL_RADIUS};
+    for (var i = lid.y * ${TILE}u + lid.x; i < ${HALO_A * HALO_A}u; i = i + ${TILE * TILE}u) {
+        let sx = ox + i32(i % ${HALO_A}u); let sy = oy + i32(i / ${HALO_A}u);
+        var v = vec4<f32>(0.0);
+        if (sx >= 0 && sx < i32(P.W) && sy >= 0 && sy < i32(P.H)) {
+            let q = (u32(sy) * P.W + u32(sx)) * P.C;
+            v = vec4<f32>(X[q], X[q + 1u], X[q + 2u], select(0.0, X[q + P.mc], P.mc != ${NO_MASK}u));
+        }
+        S[i] = v;
+    }
+    workgroupBarrier();
+    let px = i32(gid.x); let py = i32(gid.y);
+    if (gid.x >= P.W || gid.y >= P.H) { return; }
+    let n = P.H * P.W; let p = gid.y * P.W + gid.x;
+    let own = S[(lid.y + ${KERNEL_RADIUS}u) * ${HALO_A}u + lid.x + ${KERNEL_RADIUS}u].w;
+    // a tap is weighed when it is inside the image and, with a mask, on the pixel's own side of it -- k_apply's tapOk,
+    // its bounds on global coordinates and its mask read from the halo
+    var m = 0.0; var have = false;
+    for (var t = 0u; t < ${KERNEL_TAPS}u; t = t + 1u) {
+        let dy = t / ${D}u; let dx = t % ${D}u;
+        let qy = py + i32(dy) - ${KERNEL_RADIUS}; let qx = px + i32(dx) - ${KERNEL_RADIUS};
+        if (qy < 0 || qy >= i32(P.H) || qx < 0 || qx >= i32(P.W)) { continue; }
+        if (P.mc != ${NO_MASK}u && S[(lid.y + dy) * ${HALO_A}u + lid.x + dx].w != own) { continue; }
+        let l = L[t * n + p]; if (!have || l > m) { m = l; have = true; }
+    }
+    var sum = 0.0;
+    for (var t = 0u; t < ${KERNEL_TAPS}u; t = t + 1u) {
+        let dy = t / ${D}u; let dx = t % ${D}u;
+        let qy = py + i32(dy) - ${KERNEL_RADIUS}; let qx = px + i32(dx) - ${KERNEL_RADIUS};
+        if (qy < 0 || qy >= i32(P.H) || qx < 0 || qx >= i32(P.W)) { continue; }
+        if (P.mc != ${NO_MASK}u && S[(lid.y + dy) * ${HALO_A}u + lid.x + dx].w != own) { continue; }
+        sum = sum + exp(L[t * n + p] - m);
+    }
+    var r = 0.0; var g = 0.0; var b = 0.0;
+    for (var t = 0u; t < ${KERNEL_TAPS}u; t = t + 1u) {
+        let dy = t / ${D}u; let dx = t % ${D}u;
+        let qy = py + i32(dy) - ${KERNEL_RADIUS}; let qx = px + i32(dx) - ${KERNEL_RADIUS};
+        if (qy < 0 || qy >= i32(P.H) || qx < 0 || qx >= i32(P.W)) { continue; }
+        let s = S[(lid.y + dy) * ${HALO_A}u + lid.x + dx];
+        if (P.mc != ${NO_MASK}u && s.w != own) { continue; }
+        let wt = exp(L[t * n + p] - m) / sum;
+        if (wt == 0.0) { continue; }
+        r = r + wt * s.x; g = g + wt * s.y; b = b + wt * s.z;
+    }
+    let o = p * P.C;
+    Y[p * 3u] = r * max(X[o + 3u], P.floor); Y[p * 3u + 1u] = g * max(X[o + 4u], P.floor); Y[p * 3u + 2u] = b * max(X[o + 5u], P.floor);
+}
+`;
+/** The fast kernel apply (entry k_apply_fast): k_apply's bindings, the logits at 2 PLANAR (81 planes of H x W). */
+export function kernelApplyFastWgsl() { return DECL_APPLY.replace(`H x W x ${KERNEL_TAPS}, the head's logits`, `PLANAR: ${KERNEL_TAPS} planes of H x W, the head's logits`) + BODY_APPLY_FAST; }
+
 /** The apply uniform block: H, W, C, the mask channel (none: 0xffffffff) as u32 bits, the albedo floor as an f32. */
 export function packApplyUniforms({ H, W, C }) {
     const b = new ArrayBuffer(32), u = new Uint32Array(b), f = new Float32Array(b), mc = maskChannelOf(C);
@@ -128,24 +200,32 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel sets a pass can run on: round 12's, and round 13's fast kernel (section 39). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13"]);
-/** The set a pass runs unless told otherwise: round 12's, until section 39's outcome rule says otherwise. */
+/** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), and round 14's (section 43). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14"]);
+/** The set a pass runs unless told otherwise: round 12's, until section 43's outcome rule says otherwise. */
 export const DEFAULT_KERNELS = "r12";
+/** The set denoise.html runs: round 12's, until section 43's page rule says otherwise. */
+export const PAGE_KERNELS = "r12";
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit
  * head). r13: the fast kernel when its uniform block and tile fit the device's default limits, else the layer's r12 kernel.
+ * r14: r13's, except that the LAST layer (`last`), when it is 1 x 1 and fits, runs the head kernel and writes planar --
+ * only the last, because only k_apply_fast reads a planar layer.
  */
-export const kernelFor = (L, set = DEFAULT_KERNELS) => {
+export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
-    return set === "r13" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
+    if (set === "r14" && last && headShape(L).fits) return "head";
+    return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
 };
+/** The kernel apply a set runs: k_apply_fast when the set's last layer is planar (the head kernel), k_apply otherwise. */
+export const applyFor = (layers) => (layers[layers.length - 1].kernel === "head" ? "apply_fast" : "apply");
 
 /** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named. */
 export function deviceLayers(net, set = DEFAULT_KERNELS) {
     if (headOf(net) !== "kernel") throw new Error("denoiseDevice: only the kernel-predicting network runs on the device");
-    return net.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b), kernel: kernelFor(L, set) }));
+    return net.layers.map((L, i) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b),
+                                       kernel: kernelFor(L, set, i === net.layers.length - 1) }));
 }
 
 /** The whole pass's twin, layer by layer through conv2dCpu, then kernelApplyCpu: { y, acts } -- the device's order exactly. */
@@ -176,7 +256,9 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("direct")) await build("direct", conv2dWgsl(), "k_conv");
     if (used.has("tiled")) await build("tiled", conv2dTiledWgsl(), "k_conv_tiled");
     for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
-    await build("apply", kernelApplyWgsl(), "k_apply");
+    for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
+    const apply = applyFor(layers);
+    await build("apply", apply === "apply_fast" ? kernelApplyFastWgsl() : kernelApplyWgsl(), apply === "apply_fast" ? "k_apply_fast" : "k_apply");
     if (errors.length) throw new Error("denoiseDevice: WGSL did not compile: " + errors.join("; "));
     const owned = [];
     const buffer = (bytes, usage, data = null) => {
@@ -191,6 +273,13 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     const yBuf = buffer(H * W * 3 * 4, S);
     const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)];
     const steps = layers.map((L, i) => {
+        if (L.kernel === "head") {
+            // the head kernel: a thread per pixel and vec4 of outputs, written planar for k_apply_fast
+            const p = pipe["head" + i], uni = packHeadUniforms({ H, W, layer: L });
+            return { p, wg: [Math.ceil(H * W / 64), headShape(L).C4, 1], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
         if (L.kernel === "fast") {
             // the fast kernel: its weights and bias in the uniform block, the image alone at binding 2, a z group per FAST_GROUP channels
             const p = pipe["fast" + i], uni = packFastUniforms({ H, W, layer: L });
@@ -227,7 +316,9 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             dev.queue.submit([enc.finish()]);
             const y = await readBack(yBuf, H * W * 3);
             const ms = (globalThis.performance ?? Date).now() - t0;
-            const acts = keep ? await Promise.all(layers.map((L, i) => readBack(outs[i], H * W * L.Cout))) : null;
+            // every layer read back channels last, as the twin computes it: a planar layer (the head kernel's) is transposed
+            const acts = keep ? await Promise.all(layers.map(async (L, i) => { const v = await readBack(outs[i], H * W * L.Cout);
+                return L.kernel === "head" ? planarToChannelsLast(v, H * W, L.Cout) : v; })) : null;
             return { y, acts, ms };
         },
         /** The output buffer as it stands -- what the last run or timed pass wrote. */
@@ -275,7 +366,7 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
                 }
             } finally { qs?.destroy(); resolved?.destroy(); read?.destroy(); probe.destroy(); }
             return { wall, elapsed, gpu: ts ? gpu : null, perPass: ts ? perPass : null, timestamps: ts,
-                     passes: [...layers.map((L, i) => `layer ${i} (${L.kernel}, ${L.Cin} -> ${L.Cout})`), "kernel"] };
+                     passes: [...layers.map((L, i) => `layer ${i} (${L.kernel}, ${L.Cin} -> ${L.Cout})`), `kernel (${apply})`] };
         },
         destroy() { for (const b of owned) b.destroy(); owned.length = 0; },
     };
@@ -355,8 +446,8 @@ export async function timingDevice(adapter, bytes) {
  * `totalMs` is spent. On the first size each set measures, it also checks that timing changes nothing: the image a timed
  * pass wrote is an untimed run's, bit for bit.
  * Returns { adapter, sets, rows: { [set]: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS, order }] },
- * speedup: [{ H, W, measured, clock, ratio }] -- the first set's median over the last's, on the device's clock where both
- * have one -- and invisible: { [set]: bool } }.
+ * speedup: { [set]: [{ H, W, measured, clock, ratio }] } -- for each set after the first, the first set's median over its
+ * own, on the device's clock where both have one (round 14: three sets, r12 the reference) -- and invisible: { [set]: bool } }.
  */
 export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets = KERNEL_SETS, rounds = 3, capMs = 1500, totalMs = 120000, C = net.layers[0].Cin,
                                                       warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000 } = {}) {
@@ -400,10 +491,10 @@ export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets
             }
         } finally { dev.destroy(); }
     }
-    const [A, B] = [sets[0], sets[sets.length - 1]];
-    const speedup = rows[A].map((a, i) => {
+    const A = sets[0], speedup = {};
+    for (const B of sets.slice(1)) speedup[B] = rows[A].map((a, i) => {
         const b = rows[B][i];
-        if (a.skipped || b.skipped || A === B) return { H: a.H, W: a.W, measured: false };
+        if (a.skipped || b.skipped) return { H: a.H, W: a.W, measured: false };
         const clock = a.gpu && b.gpu ? "device" : "wall";
         return { H: a.H, W: a.W, measured: true, clock, ratio: clock === "device" ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median };
     });

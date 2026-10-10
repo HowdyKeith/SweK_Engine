@@ -13,7 +13,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
-         probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
+         probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS } from "./realGpuRun.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
 import { gateReport } from "./gateReport.mjs";
 const GR = gateReport("tools/ship/realGpuRun-selfcheck.mjs");
@@ -26,15 +26,17 @@ console.log("\n1. WHAT THE RUN COVERS, AND HOW IT SORTS IT");
 const gates = gateList(ENG);
 const fsr = fs.readdirSync(path.join(ENG, "fx/fsr")).filter((f) => f.endsWith("-selfcheck.mjs")).length;
 const tsl = fs.readdirSync(path.join(ENG, "render")).filter((f) => /Tsl.*-selfcheck\.mjs$/.test(f)).length;
-ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's and the denoiser's two: ${gates.length} gates`,
-   gates.length === fsr + tsl + 3 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
-   gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs"));
+ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's and the denoiser's three: ${gates.length} gates`,
+   gates.length === fsr + tsl + 4 && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
+   gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs"));
+ok(`  ...and each may run ${GATE_TIMEOUT_MS / 60000} minutes -- the rig's Intel took 498 s over one denoiser gate when the cap was 600 s (section 42)`,
+   GATE_TIMEOUT_MS >= 3 * 498000);
 const kinds = Object.fromEntries(gates.map((g) => [g, categorize(fs.readFileSync(path.join(ENG, g), "utf8"))]));
 const of = (k) => gates.filter((g) => kinds[g] === k);
 ok(`sorted by the doc's rule -- a clock read is timing, a dB grade quality, the rest exact: timing ${of("timing").length} (${of("timing").map((g) => path.basename(g, "-selfcheck.mjs")).join(", ")}), quality ${of("quality").length}, exact ${of("exact").length}`,
    kinds["fx/fsr/fsr3LiveClock-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFlowCost-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFrameGen-selfcheck.mjs"] === "quality" &&
    kinds["render/opticalFlowTsl-selfcheck.mjs"] === "exact" && kinds["render/temporalTslZoo-selfcheck.mjs"] === "exact" &&
-   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "exact");
+   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "exact" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
 ok("  ...and the rule on text: a clock is timing even beside dB, dB is quality, neither is exact",
    categorize("const t = performance.now(); // 3 dB") === "timing" && categorize("Math.log10(1 / mse)") === "quality" && categorize("same vector at every block") === "exact");
 const rows = parseRows("\n1. X\n  PASS  a\n  FAIL  *** b wrong ***   detail\n  ----  belt8: 12.3 dB\n\nFAIL -- 1 check(s)\n");
@@ -257,6 +259,8 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // tools/ship/realGpuRun.mjs: E1 the CLI's exit code back to every-gate-ok, which an empty list satisfies -> 1 red, the
 // empty-selection row ("exit 0"); E2 the empty-selection verdict removed -> 2 red, both rows ("NO ADAPTER WAS SEEN"); E3 the
 // commit not recorded -> 1 red, the commit row ("null"). All three restored, md5 verified.
+// DENOISER ROUND 14 (section 42: the Intel took 498 s over one gate against a 600 s cap). Against tools/ship/realGpuRun.mjs: T1
+// GATE_TIMEOUT_MS back to 600000 -> 1 red, the cap row. Restored, md5 verified.
 {
     const w = GR.write();
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +

@@ -8118,6 +8118,26 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 14 -- WHERE THE NATIVE TIME GOES, A RULE FOR THE PAGE, AND k_apply.
+    since496: Object.freeze({
+        at: "the denoiser arc, round 14 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseCompile-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["brain/conv2d-selfcheck.mjs (the head kernel: its uniform block, planar output, three device cases and a 1 x 1 key)",
+                                "render/denoiseDevice-selfcheck.mjs (the r14 set natively, all three sets in the browser, k_apply_fast handed logits plus 100)",
+                                "render/denoiseTiming-selfcheck.mjs (three sets in turns in the page, r12 and r14 natively)",
+                                "tools/ship/realGpuRun-selfcheck.mjs (the compile gate in the run, timing; a 30-minute cap a gate)",
+                                "tools/ship/crossBackend-selfcheck.mjs (the head kernel and k_apply_fast, the same bytes on both backends)"]),
+        verdict: "*** NODE-WEBGPU SHIPS FXC AND NOT DXC. *** Round 13's fast head ran 1,900 times slower natively than in " +
+                 "Chrome on the same WGSL, and its pipelines took minutes to build; the Windows package carries d3dcompiler_47.dll " +
+                 "and neither of DXC's two DLLs, without which Dawn's use_dxc does nothing, and Chrome ships DXC. " +
+                 "render/denoiseCompile-selfcheck.mjs times seven kernels' builds and passes natively, a process apiece, as " +
+                 "shipped and under use_dxc with DXC's DLLs copied beside dawn.node where the box has them, and in Chrome through " +
+                 "denoise.html's new \"Time each kernel\"; Dawn's own shader dump names the compiler each run really used and " +
+                 "what it made. The r14 set: the fast kernel, a head kernel with no tile and no barrier writing its logits planar, " +
+                 "and k_apply_fast reading them coalesced from a halo in workgroup memory -- all exact here. PAGE_KERNELS gets " +
+                 "its own pre-registered rule (section 43).",
+    }),
     // the denoiser arc, round 12 -- A GPU'S TIME, FOR THE RIG.
     since495: Object.freeze({
         at: "the denoiser arc, round 12, the rig's timing (unshipped)", swept: 1, green: 1, red: 0,

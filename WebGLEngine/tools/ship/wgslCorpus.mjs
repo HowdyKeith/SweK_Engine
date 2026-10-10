@@ -97,7 +97,7 @@ import * as LG from "../../physics/chaos/logisticWgsl.mjs";
 import * as MLP from "../../brain/mlp.js";
 // the denoiser arc, round 1 -- the convolution layer the path-tracer denoiser is built from
 import * as CONV from "../../brain/conv2d.mjs";
-import { kernelApplyWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
+import { kernelApplyWgsl, kernelApplyFastWgsl, packApplyUniforms } from "../../render/denoiseDevice.mjs";
 import { FLOWFIELD_WGSL } from "../../brain/flowfield.js";
 import { buildClothConstraints } from "../../physics/xpbd/clothMesh.js";
 import { colorConstraints as xpbdColors } from "../../physics/xpbd/xpbd.js";
@@ -809,6 +809,24 @@ export function corpus() {
               return { code: kernelApplyWgsl(), entryPoint: "k_apply", outCount: H * W * 3, uniforms: packApplyUniforms({ H, W, C }), workgroups: [1, 1],
                        inputs: [{ binding: 2, data: L }, { binding: 3, data: x }] };
           })() },
+        // the denoiser arc, round 14 -- the same kernel apply with its logits planar and its window from workgroup memory,
+        // and the head kernel that writes those logits; each held to its twin by render/denoiseDevice-selfcheck.mjs and
+        // brain/conv2d-selfcheck.mjs, and here to both backends' bytes
+        { id: "denoiseDevice.kernelApplyFastWgsl", from: "render/denoiseDevice.mjs",
+          why: "k_apply with its 81 logits read planar and a 16 x 16 halo of colour and mask loaded into workgroup memory behind a barrier, the exponential computed twice rather than stored: the same sums as k_apply, from different places",
+          opts: (() => {
+              const H = 7, W = 6, C = 10, T = 81, n = H * W;
+              let s = 12345; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+              const x = new Float32Array(n * C), L = new Float32Array(n * T), P = new Float32Array(n * T);
+              for (let p = 0; p < n; p++) { for (let c = 0; c < 9; c++) x[p * C + c] = Math.fround(c < 6 ? u() * 2 : u() * 2 - 1); x[p * C + 9] = p % W < 2 ? 1 : 0; }
+              for (let i = 0; i < L.length; i++) L[i] = Math.fround(u() * 16 - 8);
+              for (let p = 0; p < n; p++) for (let t = 0; t < T; t++) P[t * n + p] = L[p * T + t];
+              return { code: kernelApplyFastWgsl(), entryPoint: "k_apply_fast", outCount: n * 3, uniforms: packApplyUniforms({ H, W, C }), workgroups: [1, 1],
+                       inputs: [{ binding: 2, data: P }, { binding: 3, data: x }] };
+          })() },
+        { id: "conv2d.conv2dHeadWgsl", from: "brain/conv2d.mjs",
+          why: "a 1 x 1 convolution with no tile and no barrier, a thread per pixel and vec4 of outputs, weights in a uniform block, written planar: the head that round 13's fast kernel ran 1,900 times slower natively than in Chrome",
+          opts: (() => { const P = CONV.PROBES[3], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
         { id: "flowfield.FLOWFIELD_WGSL", from: "brain/flowfield.js", compileOnly: true,
           why: "the flow-field solver: cost, relax (ping-pong), tally (atomics) and flow in one module with an explicit seven-binding layout -- outside the one-buffer signature; brain/tools/flowfield-selfcheck.mjs holds the solver to its CPU twin",
           opts: { code: FLOWFIELD_WGSL, entryPoint: "k_relax", compileOnly: true, outCount: 0 } },

@@ -323,6 +323,70 @@ export function packFastUniforms({ H, W, layer }) {
     return f;
 }
 
+// ---- THE HEAD KERNEL (the denoiser arc, round 14: pre-registration section 43) ------------------------------------
+//
+// Section 42: the fast kernel's 81-logit head ran 1,900 times slower natively (node-webgpu, D3D12) than in Chrome, on the
+// same WGSL, while the fast kernel's 3 x 3 layers were fine on both. The head is the one layer with k = 1 and groups
+// across z. This is a 1 x 1 convolution with none of the fast kernel's machinery -- no tile, no barrier, no z groups:
+//   - one thread per (pixel, vec4 of four output channels): a 64-wide workgroup along the pixels, the vec4 along y;
+//   - the pixel's Cin inputs read straight from storage, the weights and bias from one uniform block (packHeadUniforms);
+//   - the output written PLANAR, channel-major (Y[c * H*W + p]), so the next pass reads it with neighbouring threads on
+//     neighbouring addresses -- render/denoiseDevice.mjs's k_apply_fast is built for that layout.
+// *** THE ORDER IS THE TWIN'S. *** At k = 1 the block-outer order is the plain one: b, then ci in order. Each lane of the
+// accumulator is one cell, added on its own. So it is held to conv2dCpu, or the fused mirror, cell for cell, at zero --
+// the planar layout moves where a cell is written, never what it is.
+
+/** The head kernel's shape for a 1 x 1 layer: C4 vec4s of output channels, the uniform block's bytes, whether it fits. */
+export function headShape({ Cin, Cout, k }) {
+    const C4 = Math.ceil(Cout / 4), bytes = 16 + 16 * C4 + 16 * Cin * C4;
+    return { C4, bytes, fits: k === 1 && bytes <= UNIFORM_MAX };
+}
+
+/** The head kernel (entry k_head), generated for one 1 x 1 layer: X channels-last in, Y planar out. */
+export function conv2dHeadWgsl({ Cin, Cout, k, act = "none" }) {
+    const S = headShape({ Cin, Cout, k });
+    if (!S.fits) throw new Error(`conv2d: the head kernel holds a 1 x 1 layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding, got k ${k}, ${S.bytes} bytes for ${Cin} -> ${Cout}`);
+    const lanes = ["x", "y", "z", "w"];
+    return `
+struct HP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: array<vec4<f32>, ${Cin * S.C4}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // PLANAR: ${Cout} planes of H x W
+@group(0) @binding(1) var<uniform> F: HP;                        // packHeadUniforms
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}, channels last
+@compute @workgroup_size(64, 1, 1)
+fn k_head(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let n = F.H * F.W; let p = gid.x; let j = gid.y;
+    if (p >= n) { return; }
+    var a = F.b[j];
+    let xo = p * ${Cin}u;
+    for (var ci = 0u; ci < ${Cin}u; ci = ci + 1u) { a = a + X[xo + ci] * F.w[ci * ${S.C4}u + j]; }
+    ${act === "relu" ? "a = max(a, vec4<f32>(0.0));" : ""}
+    let c = j * 4u;
+    ${lanes.map((l, i) => `if (c + ${i}u < ${Cout}u) { Y[(c + ${i}u) * n + p] = a.${l}; }`).join("\n    ")}
+}
+`;
+}
+
+/**
+ * The head kernel's uniform block for a 1 x 1 layer at H x W: H and W as u32 bits, then the bias, then the weights as
+ * vec4s of four output channels -- weight (co, ci) at float 4 + 4 C4 + ci 4 C4 + co, the bias of co at float 4 + co; the
+ * padding past Cout is zero. Refuses a layer the kernel cannot hold, by name.
+ */
+export function packHeadUniforms({ H, W, layer }) {
+    const { Cin, Cout, k } = layer, S = headShape(layer);
+    if (!S.fits) throw new Error(`conv2d: the head kernel holds a 1 x 1 layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding, got k ${k}, ${S.bytes} bytes for ${Cin} -> ${Cout}`);
+    const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf), w0 = 4 + 4 * S.C4;
+    u[0] = H; u[1] = W;
+    for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    for (let co = 0; co < Cout; co++) for (let ci = 0; ci < Cin; ci++) f[w0 + ci * 4 * S.C4 + co] = layer.W[co * Cin + ci];
+    return f;
+}
+/** Planar (Cout planes of n) to channels last (n x Cout): how a planar layer's output is judged against the twin. */
+export function planarToChannelsLast(y, n, Cout) {
+    const out = new Float32Array(n * Cout);
+    for (let c = 0; c < Cout; c++) for (let p = 0; p < n; p++) out[p * Cout + c] = y[c * n + p];
+    return out;
+}
+
 /** The direct kernel (entry k_conv), in the harness layout: Y at 0, the uniform at 1, X W B at 2 3 4. */
 export function conv2dWgsl() { return DECL_PROBE + BODY_DIRECT; }
 /** The tiled kernel (entry k_conv_tiled): same layout, same order, the window read from workgroup memory. */
@@ -379,4 +443,11 @@ export const PROBES = Object.freeze([
         pack: (a) => packFastUniforms({ H: a.H, W: a.W, layer: probeFixture(a).layer }),
         inputs: (a) => [{ binding: 2, data: probeFixture(a).x }],
         workgroups: (a) => [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastShape(a).groups] }),
+    // round 14: a 1 x 1 case through the head kernel -- planar out, so its twin is the channels-last one transposed
+    Object.freeze({ ...probe("conv2d.conv2dHeadWgsl", (a) => conv2dHeadWgsl(a), "k_head", { H: 12, W: 10, Cin: 13, Cout: 7, k: 1, act: "relu", seed: 7 }),
+        pack: (a) => packHeadUniforms({ H: a.H, W: a.W, layer: probeFixture(a).layer }),
+        inputs: (a) => [{ binding: 2, data: probeFixture(a).x }],
+        workgroups: (a) => [Math.ceil(a.H * a.W / 64), headShape(a).C4, 1],
+        cpu: (a) => { const y = probeCpu(a), n = a.H * a.W, out = new Float32Array(y.length);
+                      for (let p = 0; p < n; p++) for (let c = 0; c < a.Cout; c++) out[c * n + p] = y[p * a.Cout + c]; return out; } }),
 ]);

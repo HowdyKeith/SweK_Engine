@@ -2379,3 +2379,100 @@ what it says. It does so even though the browser, the path `denoise.html` deploy
   after them.
 - **And `k_apply`,** the next bottleneck in the browser: the same exactness discipline, against its twin within
   APPLY_TOL.
+
+## 43. ROUND 14 -- THE NATIVE HEAD, A RULE FOR THE PAGE, AND k_apply: FIXED BEFORE ANY GPU RUNS THE NEW KERNELS
+
+Keith asked for all three items section 42 named. This section is committed before any GPU runs the head kernel or
+`k_apply_fast`.
+
+**Built and piloted here first, on SwiftShader only:**
+- The r14 set was exact: every conv cell the twin's, none fused, on the shipped network at 64 x 64, on a synthetic large
+  network at 21 x 19 with the emitter mask, and on a small one at 13 x 11 without.
+- `k_apply_fast` matched `k_apply`'s worst error to the digit on all three.
+- SwiftShader's times are a CPU's, and no threshold below was chosen from them.
+
+**One fact found before building.** node-webgpu 0.6.0's Windows package ships `d3dcompiler_47.dll`, which is FXC, and
+not `dxcompiler.dll` or `dxil.dll`. Dawn's `use_dxc` switch only works when both of those are present. Chrome ships DXC.
+So the leading candidate for section 42's native failure is the compiler. It is a candidate, and measurement A tests it.
+
+**What changes.**
+- **`brain/conv2d.mjs`: `conv2dHeadWgsl`,** a 1 x 1 kernel with no tile, no barrier and no groups across z:
+  - a thread per pixel and vec4 of four output channels;
+  - weights from a uniform block;
+  - output written planar.
+
+  At k = 1 its order is the twin's (b, then ci in order), so it is held to `conv2dCpu` cell for cell. A planar layer is
+  read back channels last before it is judged.
+- **`render/denoiseDevice.mjs`:**
+  - **`k_apply_fast`** reads the logits planar, takes the 9 x 9 window from a 16 x 16 halo in workgroup memory, and
+    recomputes the exponential instead of storing 81 of them. Its sums are `k_apply`'s, in `k_apply`'s order.
+  - **The r14 set:** r13's fast kernel for the hidden layers; the head kernel for the last layer, when it is 1 x 1;
+    then `k_apply_fast`.
+  - **`PAGE_KERNELS`,** read by `denoise.html` alone, starts at "r12".
+- **The paired ladder:** the page times r12, r13 and r14 in turns. Natively it times r12 and r14 only, with a 600 s
+  budget, because each native fast pipeline took minutes to build.
+- **`render/denoiseCompile-selfcheck.mjs`** (a timing gate) is measurement A.
+- **`tools/ship/realGpuRun.mjs`** runs all three denoiser gates and allows each 30 minutes (section 42's 498 s against 600).
+
+**A. The native head: where its time goes, and a change.**
+- **The measurement, with no threshold.** The compile gate takes seven kernels:
+  - round 12's tiled and direct kernels;
+  - the fast kernel at 3 x 3 and as the head;
+  - the head kernel;
+  - `k_apply` and `k_apply_fast`.
+
+  For each, on a synthetic layer at 64 x 64, it records the pipeline's build time (wall clock), the pass time (the
+  device's clock), whether the output is exact, and what the compiler made of it, from Dawn's own dump: compiler, lines,
+  loops, indexable temps and barriers. It measures three ways:
+  - natively, as shipped (FXC on Windows);
+  - natively under `use_dxc`, with DXC's two DLLs copied beside `dawn.node` for that run and removed after, where the box
+    has them (a Chrome or the Playwright headless shell);
+  - in Chrome.
+
+  Each native kernel runs in its own process.
+- **Three hypotheses, read off that gate's lines.** Each is reported as supported, not supported, or untested, and
+  **none decides anything:**
+  - **A1, the compiler.** On a GPU where the `use_dxc` run's dump says DXIL, the fast head runs natively at least 10
+    times faster under DXC than under FXC. If that run's dump says DXBC, or the box has no DXC, A1 is untested there.
+  - **A2, the change.** Natively under FXC, the head kernel is no slower than round 12's direct head at 64 x 64.
+  - **A3, the build.** Natively under FXC, building the fast 3 x 3 pipeline takes at least 10 times longer than
+    building round 12's tiled one.
+- **The change, fixed now whatever A finds:** r14's head is the head kernel.
+
+**B. A rule for the page alone.** `PAGE_KERNELS` is read only by `denoise.html`. It is decided from this round's run,
+not round 13's.
+- **A set qualifies** when, on both GPUs, in the browser:
+  - K0 holds for it, cell for cell in the page's own origin (the exact gate's browser section); and
+  - K1 holds for it against r12 in the page ladder: at least 2 times at the largest size it and r12 both measured, and
+    at least 1 time at every size both measured.
+- **`PAGE_KERNELS` becomes** the qualifying set, of r13 and r14, with the larger of the two GPUs' smaller speedups at
+  those largest sizes. A tie goes to r14. If neither qualifies, it stays "r12".
+
+**C. `k_apply`.** r14 runs `k_apply_fast`. It is held to `kernelApplyCpu` within APPLY_TOL, inside K0.
+- **C1, reported and not deciding:** in the browser on each GPU, `k_apply_fast` is at least 2 times faster than
+  `k_apply`. It is read from the ladder's split by pass, r14's against r13's, at the largest size both measured.
+- **The whole pass decides,** through K1 and B.
+
+**K0 for r14 holds** when every conv cell is the twin's or the fused mirror's, and the kernel apply is within APPLY_TOL,
+in each of:
+- (a) here: `node tools/denoiseDevice.mjs --measure-r14` on round 11's 24 test images, with D0-D3, its output committed
+  before it is read;
+- (b) natively on both GPUs (the exact gate);
+- (c) in the browser on both GPUs (the exact gate's browser section).
+
+The compile gate's exactness rows are further evidence: an r14 kernel that is not exact anywhere it ran fails K0.
+
+**`DEFAULT_KERNELS`,** the rule section 39 used for r13: it becomes "r14" if K0 holds for r14 everywhere, and K1 holds
+for r14 against r12 on every GPU and path, native and browser. Otherwise it stays "r12".
+
+**On the rig.**
+- **One run per GPU** of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r14.json`, on
+  `claude/denoiser-round14`, at a commit carrying this round's code.
+- **It may take half an hour or more on the Intel,** because native FXC builds took minutes each in round 13.
+- **Each report is committed byte for byte.** A run is repeated only if it did not reach the GPU, and then both reports
+  are committed.
+
+**Not in this round.**
+- Making node use DXC by default. If A1 is supported, that is the next round's decision.
+- Kernels that reorder a cell's sum.
+- A smaller network.

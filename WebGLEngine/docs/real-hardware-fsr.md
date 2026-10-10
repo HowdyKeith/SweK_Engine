@@ -114,6 +114,26 @@ and send the JSON back. Section 39 fixes, before any GPU ran the fast kernel, wh
 through node-webgpu, its 81-logit head ran hundreds of times slower than the same kernel in Chrome. Section 39's rule
 needs every path, so the default stays round 12's kernels until a later round explains or removes that.
 
+### Round 14: the native head, a rule for the page, and `k_apply` (pre-registration section 43)
+
+The branch `claude/denoiser-round14` adds:
+- **a head kernel** for the network's 81-logit last layer, with no tile and no barrier, writing its logits planar;
+- **`k_apply_fast`**, which reads those logits coalesced and its 9 x 9 window from workgroup memory;
+- **a third denoiser gate, `render/denoiseCompile-selfcheck.mjs`.** It times each kernel's pipeline build and pass
+  natively, under the FXC compiler node-webgpu ships and under DXC where the machine has DXC's DLLs (it copies them
+  beside `dawn.node` for that run only), and in Chrome. It reads Dawn's shader dump to say which compiler each run
+  really used.
+
+On each GPU, run once, on that branch:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r14.json
+```
+
+Expect it to take a while on the Intel: native FXC builds took minutes each in round 13, and each gate may now run 30
+minutes. Send the JSON back. If the compile gate names dump files under your temp folder, they show what each compiler
+made of each kernel, and are worth sending too.
+
 
 ## Send back
 
