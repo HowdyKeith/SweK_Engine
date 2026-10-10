@@ -33,7 +33,18 @@
   <b style="color:#2fd6b0">&#9889; 6DOF space combat</b>
   <span id="stat"></span>
   <button id="resetBtn" title="restart the fight now">&#8635; Reset battle</button>
+  <button id="rosterBtn" title="Load Pilots (v4829): choose who flies EACH side -- the PD autopilot this page has always flown, or a brain (hand weights, zero, noise) -- then Start Fight. The brain is the same fly-wired network for every choice; a choice is a choice of weights. The hand brain IS the PD autopilot written through the network">&#127899; Load Pilots</button>
   <span id="tick" style="display:none"></span>
+</div>
+<div id="rosterPanel" style="position:fixed;top:40px;left:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:430px;box-shadow:0 8px 30px #000a;color:#b9d4ff;">
+  <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
+  <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
+    <tr><td style="padding:2px 10px 2px 0;color:#8fb6d0;">team A</td><td><select id="pilotA" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:260px;"></select></td></tr>
+    <tr><td style="padding:2px 10px 2px 0;color:#d0b08f;">team B</td><td><select id="pilotB" style="background:#0c1424;color:#b9d4ff;border:1px solid #2f486c;font:inherit;max-width:260px;"></select></td></tr>
+  </tbody></table>
+  <div style="display:flex;gap:6px;margin-bottom:6px;"><button id="startFight">Start Fight</button><button id="rosterReset">Default pilots</button></div>
+  <div id="rosterNote" style="color:#7fb069;margin-bottom:4px;"></div>
+  <div style="color:#5f7590;line-height:1.4;">Every brain pilot is the same network, wired like a fly's Giant Fiber circuit, with the PD autopilot's own contract (a torque about each axis, thrust, fire); a choice picks which WEIGHTS fly it. The PD autopilot is not a brain. No 6DOF brain has been trained or shipped yet, so there is nothing to import. Start Fight resets the battle and the tally.</div>
 </div>
 <div id="hint">real force + torque, not a kinematic flight model &mdash; drag to orbit, scroll to zoom</div>
 
@@ -49,6 +60,8 @@ import * as OM from "/physics/obbManifold.js";
 import * as RBW from "/physics/mechanics/rigidBody6dofWeapon.mjs";
 import * as AP from "/brain/autopilot6dof.mjs";
 import * as FA from "/brain/fleetAssign.mjs";
+import * as P6 from "/brain/pilot6dofPolicy.mjs";   // v4829 -- a learned pilot with the autopilot's own contract
+import * as PR from "/brain/pilotRoster.mjs";          // v4829 -- who flies each side: the PD autopilot, or a brain on one of several weight sets
 
 // ---- combat constants (game balance, not gated -- matching es-box3d-fly3d.html's own SHOT constants) ----
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
@@ -162,12 +175,12 @@ newBattle();
 // the measured gap this closes (two allied ships converging on the same nearest enemy and colliding with EACH
 // OTHER, not the enemy). stepFleet() itself stays a thin per-ship loop; the coordination lives entirely in the
 // assignment map it's handed, computed once per team in frame() below, not per-ship here.
-function stepFleet(mine, foes, assignment, dt, nowMs) {
+function stepFleet(mine, foes, assignment, dt, nowMs, pilot) {   // v4829 -- `pilot`: a team's brain (brain/pilot6dofPolicy.mjs's pilotFor), or null for the PD autopilot
   for (const ship of mine) {
     if (ship.dead) continue;
     const target = assignment.get(ship);
     if (!target) continue;
-    const d = AP.decide(ship.body, { pos: target.body.pos, vel: target.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
+    const d = (pilot || AP.decide)(ship.body, { pos: target.body.pos, vel: target.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
     const acc = RB.createAccumulator();
     RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT);
     acc.torque = d.torqueBody;
@@ -261,8 +274,8 @@ function frame() {
   const liveA = A.some((s) => !s.dead), liveB = B.some((s) => !s.dead);
   if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
   else {
-    stepFleet(A, B, FA.assignTargets(A, B), dt, nowMs);
-    stepFleet(B, A, FA.assignTargets(B, A), dt, nowMs);
+    stepFleet(A, B, FA.assignTargets(A, B), dt, nowMs, pilotAi("A"));
+    stepFleet(B, A, FA.assignTargets(B, A), dt, nowMs, pilotAi("B"));
     resolveCollisions(A.concat(B));
     stepWeapons(A.concat(B), dt);
     tick++;
@@ -273,6 +286,45 @@ function frame() {
     `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B}  ·  shots ${shots.length}  ·  tick ${tick}`;
   requestAnimationFrame(frame);
 }
+// ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects ------------------------------------------------------------------------------------------------------------
+// `specs` is the choice per team (ids, kept in this browser); a team's pilot function is rebuilt when its choice or the fleet changes. "default for this team" is the PD autopilot for both: this page has
+// no Brain pilot toggle and no shipped brain, so the roster's context holds neither.
+const ROSTER_KEY = "swek.sixdofRoster.v1", ROSTER_NAMES = { scriptedLabel: "PD autopilot (autopilot6dof.mjs)", scriptedName: "PD autopilot" };
+let specs = (() => { try { return PR.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")); } catch { return PR.defaultSpecs(); } })();
+let lineup = {}; const pilotCache = {};
+const rosterCtx = () => ({ PP: P6, shipped: null, imported: null, brainPilotOn: false, ...ROSTER_NAMES });
+function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
+function pilotAi(team) {
+  const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length;
+  let c = pilotCache[team];
+  if (!c || c.key !== key) {
+    const r = PR.resolveTeam(team, specs[team], rosterCtx(), fleet.length);
+    c = pilotCache[team] = { key, resolved: r, fn: PR.teamPilot(r, P6) };
+    lineup[team] = r; rosterNote();
+  }
+  return c.fn;
+}
+function rosterNote() {
+  const el = document.getElementById("rosterNote"); if (!el || !lineup.A || !lineup.B) return;
+  const probs = [...lineup.A.problems, ...lineup.B.problems];
+  el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
+}
+function renderRoster() {
+  const ch = PR.choices({ shipped: false, imported: false, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  for (const t of PR.TEAMS) {
+    const sel = document.getElementById("pilot" + t), keep = specs[t];
+    sel.textContent = "";
+    for (const c of ch) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+    if (!ch.some((c) => c.id === keep)) { const o = document.createElement("option"); o.value = keep; o.textContent = keep + " (not available here)"; sel.appendChild(o); }
+    sel.value = keep;
+    sel.onchange = () => { specs = { ...specs, [t]: sel.value }; saveSpecs(); };
+  }
+}
+function startFight() { wins.A = 0; wins.B = 0; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
+document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; renderRoster(); };
+document.getElementById("startFight").onclick = () => { startFight(); };
+document.getElementById("rosterReset").onclick = () => { specs = PR.defaultSpecs(); saveSpecs(); renderRoster(); };
+renderRoster();
 document.getElementById("resetBtn").onclick = () => newBattle();
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
@@ -288,6 +340,9 @@ window.__sixdof = {
     };
   },
   newBattle,
+  // v4829 -- the roster, for brain/pilot6dofPolicy-selfcheck.mjs's page rows
+  roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi },
+  get fleets() { return { A, B }; },
 };
 
 requestAnimationFrame(frame);

@@ -34,7 +34,9 @@ export function sanitizeSpecs(raw) {
  * does not hold is not offered. "brain" is the Brain panel's own pilot: the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown).
  */
 export function choices(ctx) {
-    const out = [{ id: AUTO, label: "default for this team" }, { id: SCRIPTED, label: "scripted AI (stepAI3d)" }, { id: "brain", label: "the Brain panel's pilot" }];
+    // v4829 -- a page with its own scripted pilot and no Brain panel (es-box3d-6dof.html: the PD autopilot) says so: ctx.scriptedLabel names the scripted choice and ctx.brainPanel === false leaves "brain" out
+    const out = [{ id: AUTO, label: "default for this team" }, { id: SCRIPTED, label: ctx.scriptedLabel || "scripted AI (stepAI3d)" }];
+    if (ctx.brainPanel !== false) out.push({ id: "brain", label: "the Brain panel's pilot" });
     if (ctx.shipped) out.push({ id: "shipped", label: "shipped pilot brain" });
     if (ctx.imported) out.push({ id: "imported", label: "imported pilot brain" });
     out.push({ id: "hand", label: "hand weights" }, { id: "noise05", label: "hand + noise 0.05 (each ship its own)" }, { id: "noise10", label: "hand + noise 0.1 (each ship its own)" }, { id: "zero", label: "zero (never turns, thrusts or fires)" });
@@ -56,7 +58,7 @@ export function resolveTeam(team, spec, ctx, n) {
     let id = spec == null || spec === AUTO ? autoChoice(team, ctx) : spec;
     const same = (w, label) => ({ id, label, scripted: false, weights: Array.from({ length: ships }, () => w) });
     let r;
-    if (id === SCRIPTED) r = { id, label: "scripted AI", scripted: true, weights: null };
+    if (id === SCRIPTED) r = { id, label: ctx.scriptedName || "scripted AI", scripted: true, weights: null };
     else if (id === "brain") r = same(brainWeights(ctx), ctx.imported ? "imported pilot brain" : ctx.shipped ? "shipped pilot brain" : "hand weights");
     else if (id === "shipped" && ctx.shipped) r = same(ctx.shipped, "shipped pilot brain");
     else if (id === "imported" && ctx.imported) r = same(ctx.imported, "imported pilot brain");

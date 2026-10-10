@@ -14,7 +14,7 @@
 // selects, the default lineup is scripted against scripted (brain on: the Brain panel's pilot against scripted), a choice made in a select is the pilot that flies after Start Fight (a zero team turns
 // nothing and takes the damage, a hand team turns and deals it), Start Fight rebuilds the battle and clears the tally, an imported pilot is offered and flies, and the choices survive a reload.
 //
-// SABOTAGE LOG -- v4829, eighteen, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
+// SABOTAGE LOG -- v4829, twenty-one, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
 //   A  pilotRoster.mjs: team A stays scripted with Brain pilot on                                 3 red (the default-is-the-old-demo rows, in node and in the page)
 //   B  pilotRoster.mjs: an unavailable choice is substituted in silence                           1 red (the by-name fallback row)
 //   C  pilotRoster.mjs: the zero pilot resolves to the hand weights                               5 red (the every-choice row, the hand-against-zero and zero-against-hand duels, both page fights)
@@ -34,6 +34,9 @@
 //      shipped file had been fetched, so the shipped pilot was never offered; pilotLine() now rebuilds them whenever availability changes ***
 //   R  es-box3d-fly3d.html: the pilot cache ignores the Brain pilot toggle                        1 red (Brain on never makes team A the Brain panel's pilot)
 //   S  es-box3d-fly3d.html: Start Fight does not rebuild the battle                               1 red (the swapped fight starts with team B already hurt from the last one)
+//   T  pilotRoster.mjs: choices() ignores ctx.brainPanel === false (the 6DOF page has no Brain panel)   1 red (the no-Brain-panel row)
+//   U  pilotRoster.mjs: choices() ignores ctx.scriptedLabel                                       1 red (same row)
+//   V  pilotRoster.mjs: resolveTeam() ignores ctx.scriptedName                                    1 red (same row). T-V were added for brain/pilot6dofPolicy-selfcheck.mjs's page and are graded here.
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,6 +100,8 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
     ok("!! noise is PER SHIP: six ships on 'hand + noise 0.1' fly six different pilots, none of them the hand weights", new Set(n6.weights.map((w) => Array.from(w.slice(0, 40)).join(","))).size === 6 && n6.weights.every((w) => !same(w, PP.handWeights())));
     ok("...drawn in SHIP order from a seeded stream: ship 3 is the same pilot in a fleet of four as in a fleet of six, and the two teams do not share a stream", same(n4.weights[3], n6.weights[3]) && !same(n6.weights[0], nB.weights[0]));
     ok("...and 0.05 differs from 0.1 by a smaller step: the 0.05 pilot sits nearer the hand weights", (() => { const d = (w) => w.reduce((a, v, i) => a + Math.abs(v - PP.handWeights()[i]), 0); return d(R.resolveTeam("A", "noise05", ctxOf(), 1).weights[0]) < d(R.resolveTeam("A", "noise10", ctxOf(), 1).weights[0]); })());
+    const six = R.choices({ shipped: false, imported: false, brainPanel: false, scriptedLabel: "PD autopilot" }), sx = R.resolveTeam("B", "scripted", ctxOf({ scriptedName: "PD autopilot" }), N);
+    ok("a page with its own scripted pilot and no Brain panel (the 6DOF battle) names it and leaves 'the Brain panel's pilot' out: six choices, the scripted one labelled 'PD autopilot', and the resolved team says so", six.length === 6 && !six.some((c) => c.id === "brain") && six.find((c) => c.id === R.SCRIPTED).label === "PD autopilot" && sx.label === "PD autopilot" && sx.scripted && R.choices({ shipped: false, imported: false }).some((c) => c.id === "brain"), six.map((c) => c.id).join(","));
     const s = R.sanitizeSpecs({ A: "hand", B: 7, extra: "x" });
     ok("saved choices from storage are sanitised: a non-string, an extra key, a 200-character id, a non-object and null all become 'default for this team' or are ignored, two teams always", s.A === "hand" && s.B === R.AUTO && Object.keys(s).length === 2 && R.sanitizeSpecs({ A: "z".repeat(200) }).A === R.AUTO && R.sanitizeSpecs("junk").A === R.AUTO && R.sanitizeSpecs(null).B === R.AUTO && R.sanitizeSpecs([1, 2]).A === R.AUTO);
     const fn = R.teamPilot(R.resolveTeam("A", "noise10", ctxOf(), 6), PP), hand = R.teamPilot(R.resolveTeam("A", "hand", ctxOf(), 6), PP);
