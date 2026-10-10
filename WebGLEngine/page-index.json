@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 478,
+ "count": 479,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -844,6 +844,13 @@
    "p": 0
   },
   {
+   "f": "denoise.html",
+   "t": "Denoiser",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "destructible.html",
    "t": "Destructible — an exact hole in a wall",
    "d": "",
@@ -1309,14 +1316,14 @@
    "f": "fsr-three.html",
    "t": "FSR on a three.js scene",
    "d": "A three.js WebGPURenderer scene rendered at reduced resolution and brought back up two ways, both written as TSL and graded against this tree's CPU references on both of three's backends: FSR1 (EASU then RCAS, one frame) and FSR2 (fsr.html's temporal chain -- jitter, motion, dilation, depth clip, reactive and lock masks, accumulation, RCAS). On this scene FSR2 is 2.4 dB closer to a supersampled render than FSR1. Compare against a bilinear stretch and the native render; debug views show the motion field and the masks.",
-   "g": "",
+   "g": "fsr",
    "p": 0
   },
   {
    "f": "fsr.html",
    "t": "FSR Upscaler",
    "d": "AMD FidelityFX Super Resolution, reimplemented natively in SweK. EASU+RCAS is the spatial half (one frame in, one out). The temporal half -- jitter, jitter-aware resolve, reprojected accumulation -- is what recovers detail the render resolution cannot carry. The spatial half runs on the adapter when there is one -- EASU and RCAS chained on one WebGPU encoder -- and on the CPU reference when there is not; the temporal half is CPU either way. Watch it converge frame by frame against a supersampled ground truth, with live PSNR: on a zone plate it beats bilinear by ~6.4 dB static and ~2.1 dB panning, and on smooth content it cannot beat bilinear at all, because there is nothing past Nyquist to recover.",
-   "g": "",
+   "g": "fsr",
    "p": 0
   },
   {
