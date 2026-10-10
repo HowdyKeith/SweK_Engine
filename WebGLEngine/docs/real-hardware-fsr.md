@@ -134,6 +134,23 @@ Expect it to take a while on the Intel: native FXC builds took minutes each in r
 minutes. Send the JSON back. If the compile gate names dump files under your temp folder, they show what each compiler
 made of each kernel, and are worth sending too.
 
+### Round 15: the head and the kernel apply in one pass (pre-registration section 46)
+
+The branch `claude/denoiser-round15` adds:
+- **`k_head_apply`**, which computes each pixel's 81 logits and applies them in the same pass, so the logits are never
+  stored -- at 1080p the pass allocates 1,115 MiB instead of 1,756;
+- **a fourth kernel set, r15**, timed against the other three on the page and against r12 and r14 natively;
+- **an order probe**: a head built so that only the order of its adds can change the image, run natively and in Chrome.
+
+On each GPU, run once, on that branch:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r15.json
+```
+
+As in round 14 it may take half an hour or more on the Intel. Send the JSON back, and any dump files the compile gate
+names.
+
 
 ## Send back
 

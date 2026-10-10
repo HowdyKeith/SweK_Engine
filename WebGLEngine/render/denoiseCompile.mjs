@@ -21,7 +21,26 @@ export const VARIANTS = Object.freeze([
     { id: "r14-head", what: "the head kernel, the 32 -> 81 head, planar out", kind: "head", L: () => conv(32, 81, 1, "none", 13) },
     { id: "r12-apply", what: "k_apply, the 81-tap kernel", kind: "apply" },
     { id: "r14-apply-fast", what: "k_apply_fast, planar logits and a halo in workgroup memory", kind: "apply_fast" },
+    { id: "r15-head-apply", what: "k_head_apply, the head and the kernel apply in one pass -- on the order probe", kind: "head_apply" },
 ].map((v) => Object.freeze(v)));
+
+// ---- THE ORDER PROBE (round 15, section 46) -------------------------------------------------------------------------
+// k_head_apply stores no logit, so its head's cells cannot be judged one by one -- only the image can. This head makes
+// the ORDER of its adds visible in the image, and nothing else: every input is 1 + i/64 (7 significant bits) and every
+// weight 8192 + j/8, j in -4..4 (17 bits), so every product is exact in f32 and a fused multiply-add rounds exactly as a
+// multiply then an add -- the twin's logits and the fused mirror's are the same bits. The sums are not exact: a logit
+// near 3.8e5 keeps 2^-5, and adding in another order moves a logit by up to 0.19 -- measured here on the CPU, the image
+// by 0.5% at the median, 99.9% of its values past APPLY_TOL. So an image within APPLY_TOL of the twin's says the head
+// added in the twin's order. The common 8192 is the same for every tap, so the softmax sees only the j/8 part: a spread
+// of about 16 between a pixel's logits, a kernel neither flat nor one tap.
+export function headApplyProbe() {
+    const n = N * N, Cin = 32, T = 81;
+    let s = 9; const u = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const A = new Float32Array(n * Cin); for (let i = 0; i < A.length; i++) A[i] = 1 + Math.floor(u() * 64) / 64;
+    const L = { Cin, Cout: T, k: 1, act: "none", W: new Float32Array(T * Cin), b: new Float32Array(T) };
+    for (let i = 0; i < L.W.length; i++) L.W[i] = 8192 + (Math.floor(u() * 9) - 4) / 8;
+    return { A, L, x: D.timingInput(N, N, 10, 5) };
+}
 
 // the kernel apply's inputs: a masked image and logits in the head's range, seeded
 function applyInputs() {
@@ -33,9 +52,20 @@ function applyInputs() {
     return { x, logits, planar };
 }
 
-/** One kernel's job description: its WGSL, entry, uniforms, inputs, dispatch, output count, and how to judge the output. */
+/**
+ * One kernel's job description: its WGSL, entry, uniforms, inputs (a second uniform block marked `uniform`), dispatch,
+ * output count, and how to judge the output.
+ */
 export function jobFor(v) {
     const n = N * N;
+    if (v.kind === "head_apply") {
+        const P = headApplyProbe();
+        return { code: D.kernelHeadApplyWgsl(P.L), entry: "k_head_apply", uniforms: D.packApplyUniforms({ H: N, W: N, C: 10 }),
+                 inputs: [{ binding: 2, data: Cv.packHeadUniforms({ H: N, W: N, layer: P.L }), uniform: true }, { binding: 3, data: P.A }, { binding: 4, data: P.x }],
+                 wg: [N / 8, N / 8, 1], out: n * 3,
+                 judge: (y) => { const j = D.judgeHeadApply(P.x, P.A, P.L, y, N, N);
+                                 return { ok: j.worst <= D.APPLY_TOL, detail: `worst ${j.worst.toExponential(2)} against the twin's logits, which are the fused mirror's here (APPLY_TOL ${D.APPLY_TOL})` }; } };
+    }
     if (v.kind === "apply" || v.kind === "apply_fast") {
         const A = applyInputs(), fast = v.kind === "apply_fast";
         return { code: fast ? D.kernelApplyFastWgsl() : D.kernelApplyWgsl(), entry: fast ? "k_apply_fast" : "k_apply",
@@ -78,7 +108,7 @@ export async function measure(dev, job, { now = () => performance.now(), budgetM
     try {
         const out = buf(job.out * 4, BU.STORAGE | BU.COPY_SRC | BU.COPY_DST);
         const entries = [{ binding: 0, resource: { buffer: out } }, { binding: 1, resource: { buffer: buf(job.uniforms.byteLength, BU.UNIFORM | BU.COPY_DST, job.uniforms) } },
-                         ...job.inputs.map((i) => ({ binding: i.binding, resource: { buffer: buf(i.data.byteLength, BU.STORAGE | BU.COPY_DST, i.data) } }))];
+                         ...job.inputs.map((i) => ({ binding: i.binding, resource: { buffer: buf(i.data.byteLength, (i.uniform ? BU.UNIFORM : BU.STORAGE) | BU.COPY_DST, i.data) } }))];
         const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries });
         const ts = !!(dev.features && dev.features.has("timestamp-query"));
         const qs = ts ? dev.createQuerySet({ type: "timestamp", count: 2 }) : null;

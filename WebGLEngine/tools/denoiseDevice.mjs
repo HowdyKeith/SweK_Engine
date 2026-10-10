@@ -9,6 +9,9 @@
 //           section 39's K0 (a): the same measurement on round 13's fast kernel set -> render/denoise-results-r13.json
 //       node tools/denoiseDevice.mjs --measure-r14 [--cache <dir>]
 //           section 43's K0 (a): the same on round 14's set (fast kernel, head kernel, k_apply_fast) -> render/denoise-results-r14.json
+//       node tools/denoiseDevice.mjs --measure-r15 [--cache <dir>]
+//           section 46's K0 (a): the same on round 15's set (fast kernel, then k_head_apply) -> render/denoise-results-r15.json;
+//           its last pass stores no logit, so it is judged through the image (judgeHeadApply), its hidden layers cell for cell
 //
 // The device pass is render/denoiseDevice.mjs (gated by render/denoiseDevice-selfcheck.mjs); this file only runs it on
 // the images section 35 names and writes what it finds. *** IT NEVER OVERWRITES EITHER FILE. *** Each is committed as
@@ -27,15 +30,15 @@ import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
 import { conv2dCpu, conv2dCpuFma } from "../brain/conv2d.mjs";
-import { APPLY_TOL, kernelApplyCpu, deviceLayers, createDeviceDenoiser, encodeNet, decodeNet } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, encodeNet, decodeNet } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
-const RESULTS_R14 = "render/denoise-results-r14.json";
-// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39 and 43)
+const RESULTS_R14 = "render/denoise-results-r14.json", RESULTS_R15 = "render/denoise-results-r15.json";
+// each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39, 43 and 46)
 const MEASURES = { "--measure-r12": { kernels: "r12", results: RESULTS_R12 }, "--measure-r13": { kernels: "r13", results: RESULTS_R13 },
-                   "--measure-r14": { kernels: "r14", results: RESULTS_R14 } };
+                   "--measure-r14": { kernels: "r14", results: RESULTS_R14 }, "--measure-r15": { kernels: "r15", results: RESULTS_R15 } };
 const measure = Object.keys(MEASURES).find((k) => process.argv.includes(k));
 // section 35's bound for D3: the device's relMSE on an image within this relative distance of the f64 network's
 const D3_REL = 1e-4;
@@ -82,17 +85,22 @@ if (args.includes("--export-r11")) {
             try { const Dn = await createDeviceDenoiser(dev, net, { H: image, W: image, C: 10, kernels }); out = await Dn.run(x, { keep: true }); Dn.destroy(); }
             finally { dev.destroy(); }
             const y64 = denoise(net, x, image, image).y, rel64 = relMSE(y64, im.ref), relDev = relMSE(out.y, im.ref);
-            const layers = deviceLayers(net, kernels).map((L, j) => {
+            const DL = deviceLayers(net, kernels), fusedLast = DL[DL.length - 1].kernel === "head_apply";
+            const layers = DL.map((L, j) => {
+                // a fused last pass (r15's k_head_apply) stores no cell: it is judged through the image, below
+                if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0, image: true };
                 const input = j ? out.acts[j - 1] : Float32Array.from(x), tw = conv2dCpu(input, image, image, L), fm = conv2dCpuFma(input, image, image, L);
                 let plain = 0, fused = 0, unexplained = 0;
                 for (let c = 0; c < tw.length; c++) { const v = out.acts[j][c]; if (v === tw[c]) plain++; else if (v === fm[c]) fused++; else unexplained++; }
                 return { kernel: L.kernel, plain, fused, unexplained };
             });
-            const tw = kernelApplyCpu(x, out.acts[out.acts.length - 1], image, image);
-            let applyWorst = 0; for (let c = 0; c < tw.length; c++) applyWorst = Math.max(applyWorst, Math.abs(out.y[c] - tw[c]) / (Math.abs(tw[c]) + 1e-30));
+            let applyWorst = 0, applyTwin, applyMirror;
+            if (fusedLast) ({ worst: applyWorst, twin: applyTwin, mirror: applyMirror } = judgeHeadApply(x, out.acts[DL.length - 2], DL[DL.length - 1], out.y, image, image));
+            else { const tw = kernelApplyCpu(x, out.acts[out.acts.length - 1], image, image);
+                   for (let c = 0; c < tw.length; c++) applyWorst = Math.max(applyWorst, Math.abs(out.y[c] - tw[c]) / (Math.abs(tw[c]) + 1e-30)); }
             const filter = R11.tables[name].filter[i];
             rows.push({ set: name, family: SPLITS_R11[name].family, seed: SPLITS_R11[name].seeds[i], harvestSeed1: R11.tables[name].net[0][i], cpu: rel64, device: relDev, filter,
-                        layers, applyWorst, ms: out.ms });
+                        layers, applyWorst, ...(fusedLast ? { applyTwin, applyMirror } : {}), ms: out.ms });
         }
     }
     const D0 = rows.every((r) => Object.is(r.cpu, r.harvestSeed1));
@@ -105,9 +113,12 @@ if (args.includes("--export-r11")) {
         config: { net: NET_FILE, results: RESULTS_R11, kernels, image, sppIn, sppRef, APPLY_TOL, D3_REL, images: rows.length },
         criteria: {
             D0: { ok: D0, what: "the shipped network on the CPU (f64) gives the harvest's seed-1 relMSE on every test image, bit for bit" },
-            D1: { ok: D1, what: "every conv cell on the device is the twin's or the fused mirror's, given the device's own input to that layer",
+            D1: { ok: D1, what: "every conv cell on the device is the twin's or the fused mirror's, given the device's own input to that layer" +
+                      (kernels === "r15" ? " -- the hidden layers' cells: the head's are never stored, and are judged through the image (D2)" : ""),
                   fused: rows.reduce((a, r) => a + r.layers.reduce((b, l) => b + l.fused, 0), 0), cells: rows.reduce((a, r) => a + r.layers.reduce((b, l) => b + l.plain + l.fused + l.unexplained, 0), 0) },
-            D2: { ok: D2 <= APPLY_TOL, worst: D2, what: "the kernel on the device within APPLY_TOL of its twin" },
+            D2: { ok: D2 <= APPLY_TOL, worst: D2, what: kernels === "r15"
+                      ? "the head and kernel pass on the device within APPLY_TOL of kernelApplyCpu on the twin's logits or the fused mirror's, from the device's own input to the head"
+                      : "the kernel on the device within APPLY_TOL of its twin" },
             D3: { ok: D3 <= D3_REL && sameWins, worst: D3, sameWins, winsDevice: { T1: wins("device", "T1").length, T2: wins("device", "T2").length },
                   winsCpu: { T1: wins("cpu", "T1").length, T2: wins("cpu", "T2").length },
                   what: "the device's relMSE within D3_REL of the f64 network's on every image, and it beats the primary filter on exactly the same images" },
@@ -120,6 +131,6 @@ if (args.includes("--export-r11")) {
     GPU.exitCleanly(0);
 } else {
     console.log("usage: node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record> | --measure-r12 [--cache <dir>] | --measure-r13 [--cache <dir>] | --measure-r14 [--cache <dir>]" +
-                "   (see render/learned-denoiser-preregistration.md, sections 35, 39 and 43)");
+                " | --measure-r15 [--cache <dir>]   (see render/learned-denoiser-preregistration.md, sections 35, 39, 43 and 46)");
     process.exit(2);
 }

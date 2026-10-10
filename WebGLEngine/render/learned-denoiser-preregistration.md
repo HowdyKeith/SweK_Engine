@@ -2508,3 +2508,105 @@ the head kernel and `k_apply_fast`. It was one run of 695 s, ending 19:21:32Z.
 - K0 (b) and (c), K1, B, C1, and measurement A's three hypotheses, on Keith's two GPUs.
 - That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r14.json` on
   `claude/denoiser-round14`.
+
+## 46. ROUND 15 -- THE HEAD AND THE KERNEL APPLY IN ONE PASS: FIXED BEFORE ANY GPU RUNS IT
+
+**Section 45 is held for round 14's verdict.** Keith's two round-14 rig runs were in progress while this section was
+written, and neither report had been read. Nothing below was chosen from them. Round 14's reports and section 45 go on
+`claude/denoiser-round14`, and that branch is merged here.
+
+**Why this round.** In round 13's 1080p frame in Chrome on the 1080, the head took 17.4 ms and `k_apply` took 75.3 ms,
+out of 150.4. On the Intel at 1024 x 1024 they took 140.7 ms and 368.3 ms, out of 1,294.5.
+- Round 14 writes the head's 81 logits to storage, planar, and `k_apply_fast` reads them back in each of its three
+  loops.
+- At 1080p that buffer is 672 MB, the largest the pass allocates. It is written once and read three times a frame.
+- This round keeps the logits in the thread that computes them.
+
+**Built and piloted here first, on SwiftShader only:**
+- r15's image was r14's, bit for bit, on the shipped network at 64 x 64 and 21 x 19, and on the exact gate's synthetic
+  networks.
+- The fused pass was within 5e-7 of its twin.
+- The order probe (below) passed as built, at 5.0e-7. With the head's sum reversed it read 1.28e-1.
+- SwiftShader's times are a CPU's, and no threshold below was chosen from them.
+
+**What changes.**
+- **`render/denoiseDevice.mjs`: `kernelHeadApplyWgsl`,** entry `k_head_apply`. It is the head and the kernel apply in one
+  pass:
+  - Each pixel's 81 logits are 21 named vec4 accumulators. Each lane is one cell, added b then ci in order: `k_head`'s
+    sum, so the twin's.
+  - The 81 taps are unrolled, so a tap's logit is a named lane, never an index into a private array.
+  - Which taps are weighed is decided once, as `k_apply_fast` decides it.
+  - Then `k_apply_fast`'s three sums run in its order, over the same 16 x 16 halo in workgroup memory.
+- **The r15 set:** r13's fast kernel for the hidden layers, then `k_head_apply` for the last layer when it is the 1 x 1
+  head of 81 logits. There is no separate apply pass and no logit buffer.
+- **`judgeHeadApply`:** the fused pass's image against `kernelApplyCpu` on the head's twin logits and on its fused
+  mirror's, both from the device's own input to the head. A value passes within `APPLY_TOL` of either.
+- **`passBytes`:** the storage a pass allocates per set. At 1080p that is 1,756 MiB for r14 and 1,115 MiB for r15.
+- **`render/denoiseCompile.mjs`: the order probe, and an eighth kernel for measurement A.** The probe is a head whose
+  products are exact in f32 and whose sums are not:
+  - every input is 1 + i/64, and every weight is 8192 + j/8, with j from -4 to 4;
+  - so the twin's logits and the fused mirror's are the same bits;
+  - adding in another order moves a logit by up to 0.19, which on the CPU pushes 99.9% of the image's values past
+    `APPLY_TOL`.
+
+  So **an image within `APPLY_TOL` on the probe says the head added in the twin's order**, whatever the compiler does
+  with multiply-adds.
+- **The ladders:**
+  - the page times r12, r13, r14 and r15, with a 300 s budget (four sets take turns);
+  - natively it times r12, r14 and r15, with 600 s;
+  - each size's line gives each set's buffers, and r15's merged pass against r14's head plus `k_apply_fast`.
+- **`tools/denoiseDevice.mjs --measure-r15`:** K0 (a) on round 11's 24 test images.
+
+**What exactness means for r15, said before it is measured.** The head's cells are never stored, so they cannot be
+judged one by one; on the 24 images that is 7,962,624 of section 44's 20,545,536 cells. What holds them instead:
+- the image (D2 below);
+- the order probe;
+- the exact gate's row that, where no cell of r14 or r15 fused, r15's image is r14's bit for bit.
+
+**K0 for r15 holds** when every one of these holds:
+- the hidden layers: every cell the twin's or the fused mirror's, given the device's own input (D1);
+- the fused pass: its image within `APPLY_TOL` of `kernelApplyCpu` on the twin's logits or the fused mirror's, from the
+  device's own input to the head (D2);
+- the order probe: within `APPLY_TOL` wherever it runs.
+
+It must hold in each of:
+- **(a) here:** `node tools/denoiseDevice.mjs --measure-r15` on round 11's 24 test images, with D0-D3, its output
+  committed before it is read;
+- **(b) natively on both GPUs:** the exact gate's r15 rows and its order probe, and the compile gate's native rows;
+- **(c) in the browser on both GPUs:** the exact gate's browser section, and the compile gate's browser rows.
+
+**Reported, deciding nothing:**
+- **E, the same image.** Where no cell of either set fused, r15's image is r14's bit for bit (the exact gate). Here,
+  the device's relMSE on each of the 24 images equals section 44's.
+- **F1, the merged pass.** In the browser on each GPU, r15's head-and-kernel pass is at least 1.25 times faster than r14's
+  head plus `k_apply_fast`, at the largest size both measured.
+- **F2, the whole pass.** r15 against r14, on each GPU and path, at the largest size both measured.
+- **F3, the memory.** `passBytes` at each size. It is arithmetic, not a measurement.
+
+**The rules, each applied to round 15's run alone.** Round 15's run times every set the rules can choose, so section
+43's rules decide from round 14's run (section 45) and these from round 15's; the later run's decision stands.
+- **K1 for a set:** section 39's rule against r12, on the device's clock: at least 2 times at the largest size both
+  measured, and at least 1 time at every size both measured.
+- **`PAGE_KERNELS`** (section 43's rule B, with r15 added):
+  - A set of r13, r14 and r15 qualifies when K0 and K1 hold for it on both GPUs in the browser.
+  - Of the qualifying sets, the page takes the one whose smaller speedup across the two GPUs is largest.
+  - A tie goes to the later round's set. If none qualifies, it is "r12".
+- **`DEFAULT_KERNELS`** (section 39's rule, with r15 added):
+  - A set of r14 and r15 qualifies when K0 holds for it everywhere, and K1 on every GPU and path, native and browser.
+  - Of the qualifying sets, the default takes the one whose smallest speedup across every GPU and path is largest.
+  - A tie goes to r15. If none qualifies, it is "r12".
+
+**On the rig.**
+- **One run per GPU** of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r15.json`, on
+  `claude/denoiser-round15`, at a commit carrying this round's code.
+- **A gate stopped by `realGpuRun`'s 30-minute cap reaches no verdict on its path.** K0 or K1 is then untested there,
+  and no rule that needs it can move.
+- **Each report is committed byte for byte.** A run is repeated only if it did not reach the GPU, and then both reports
+  are committed.
+
+**Not in this round.**
+- Kernels that reorder a cell's sum.
+- Lower precision.
+- A smaller network.
+- Reusing the hidden layers' buffers (ping-pong), which would change what the exact gate can read back.
+- Node on DXC by default: section 43's A1 decides whether that is a round.
