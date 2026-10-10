@@ -70,6 +70,33 @@ function externalAssetsDir() {  // mirror server.js resolution
     return "";
 }
 
+/**
+ * v4824 -- WHY A CHOSEN OUTPUT FOLDER WOULD NOT BE HONOURED, or null when it would. makeInstallable never zips into
+ * the tree it is zipping, so an outDir INSIDE the project is replaced -- silently -- by the project's parent; and
+ * for a project at the top of a drive (C:\\SweK_src) that parent IS the drive root, which Windows refuses with an
+ * EPERM thrown as an unhandled stream error. Measured on the rig at v4823: `--out ..\\release` from WebGLEngine
+ * resolved inside C:\\SweK_src and the packer tried C:\\SweK_Engine_v4823.zip. The panel's behaviour is unchanged;
+ * the CLI (tools/ship/packRelease.mjs) asks this first and refuses BEFORE building, naming a folder that works.
+ */
+function outDirRefusal(outDir, { projectRoot = PROJECT_ROOT, external = externalAssetsDir() } = {}) {
+    const root = path.resolve(projectRoot), parent = path.resolve(root, "..");
+    const isDriveRoot = (d) => path.parse(d).root === d;
+    const suggest = path.join(parent, path.basename(root) + "_release");
+    const chosen = String(outDir || "").trim();
+    if (chosen) {
+        const o = path.resolve(chosen);
+        if (o === root || o.startsWith(root + path.sep))
+            return "--out " + o + " is INSIDE the project (" + root + "), and the packer will not zip into the tree it is zipping -- " +
+                   "it would quietly write to " + parent + " instead. Choose a folder outside it, e.g. --out " + suggest;
+        return null;
+    }
+    const fallback = (external || "").trim() || parent;
+    if (isDriveRoot(path.resolve(fallback)))
+        return "no --out given and the default is " + fallback + ", the root of a drive, which Windows does not let a program write to. " +
+               "Pass --out with a folder outside the project, e.g. --out " + suggest;
+    return null;
+}
+
 function _copyTree(src, dest) {
     let copied = 0;
     const walk = (s, d) => {
@@ -556,4 +583,4 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
 // did: a gate that can only reach this file's behaviour through a full makeInstallable() run over the whole
 // real tree is a slow gate that also cannot target one edge case (an empty file, a non-ASCII name, a file
 // deflate doesn't shrink) without hoping the real tree happens to contain one today.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, FSR_CACHE_BLOBS, _skipFile, normalizeZipSeparators, _zip, _crc32 };
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, outDirRefusal, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, FSR_CACHE_BLOBS, _skipFile, normalizeZipSeparators, _zip, _crc32 };

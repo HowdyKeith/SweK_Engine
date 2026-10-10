@@ -14272,6 +14272,7 @@ export const TRANSIENT_DIRS = Object.freeze([
     ["tools/ship", ".sabotage-orbpresent-"],   // aiPresenceOrbPresent-selfcheck.mjs
     ["tools/ship", ".ffwasm-gate-"],           // ffmpegWasmBridge-selfcheck.mjs
     ["tools", ".ub-"],                         // unboundBuiltin-selfcheck.mjs
+    ["", ".fsrclocks-"],                       // fsrPageClocks-selfcheck.mjs (v4824: was .fsrclocks-pre.html in the root)
 ]);
 
 /** Remove stranded TRANSIENT_DIRS under `root`. Only safe while no gate is running -- callers are verify's
@@ -14283,7 +14284,7 @@ export function reclaimScratchDirs(root = ENG) {
         try { names = fs.readdirSync(path.join(root, dir), { withFileTypes: true }); } catch { continue; }
         for (const e of names) {
             if (!e.isDirectory() || !e.name.startsWith(prefix) || e.name.length !== prefix.length + 6) continue;
-            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir + "/" + e.name); } catch {}
+            try { fs.rmSync(path.join(root, dir, e.name), { recursive: true, force: true }); gone.push(dir ? dir + "/" + e.name : e.name); } catch {}
         }
     }
     return gone;

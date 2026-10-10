@@ -172,6 +172,12 @@ export function scan({ files = null, read = (f) => fs.readFileSync(f, "utf8"), s
  */
 export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
     at: "v4647", found: 10, correct: 8, defective: 2,
+    // v4824 -- sites ADDED since, each correct for the reason the header gives (both sides from the same native producer), named
+    // with that producer rather than folded into the v4647 figures, which stay what was found then.
+    addedCorrect: Object.freeze([
+        Object.freeze({ at: "v4824", gate: "tools/ship/releaseWorkflow-selfcheck.mjs",
+            why: "expects path.join(parent, name + \"_release\") inside outDirRefusal's message, which builds it with the same path.join" }),
+    ]),
     defects: Object.freeze([
         Object.freeze({ gate: "tools/ship/gateSweep-selfcheck.mjs", where: "cross-file",
             saw: 'produced "real/z-selfcheck.mjs", expected path.join -> "real\\z-selfcheck.mjs" on win32' }),
