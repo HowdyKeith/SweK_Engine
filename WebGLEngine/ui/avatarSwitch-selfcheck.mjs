@@ -61,7 +61,7 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // three 3D gauges, pet llama) and the WebGPU blob is now the final choice, at Keith's ask. The ORDER is
     // typed here exactly once because the order IS the request -- see the tail check further down for why it
     // is pinned as a sequence rather than as an endpoint.
-    // v4827 -- "orb" right after "blob", as asked: thirteen.
+    // v4825 -- "orb" right after "blob", as asked: thirteen.
     const ORDER = "svg,rigged,stickwoman,robotexpressive2,blob,orb,thead,krbn,ascii,heerich,stage3d,gauges3000,blobgpu";
     ok("!! thirteen surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, presence orb, talking head, Krbn pencil, ASCII, Heerich voxels, Full stage, Gauges 3000, WebGPU Blobulator",
        MODES.length === 13 && MODES.map((m) => m.id).join(",") === ORDER,

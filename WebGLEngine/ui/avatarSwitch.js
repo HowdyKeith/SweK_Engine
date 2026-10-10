@@ -50,7 +50,7 @@ export const MODES = [
       src: "/avatarstage.html?voice=M1&glb=RobotExpressive&camdock=1&embed=1&pet=0&saver=0", frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
     { id: "blob", label: "\ud83e\udee7", title: "Blobulator avatar — Avataro / Avatarina, the reactive metaball avatar", kind: "frame",
       src: "/blob-avatar.html?embed=1" },
-    // v4827 -- Keith: "Are we able to place murmur on server.html as the avatar choice after blob avatar?" ...
+    // v4825 -- Keith: "Are we able to place murmur on server.html as the avatar choice after blob avatar?" ...
     // "Add it with a species dropdown, default still". The orb page draws any of murmur's eighteen species and
     // carries its own picker in embed mode; the choice persists in this browser. It reacts to the same
     // engine:wakeState / voiceTranscript / voiceReply events the voice layer already fires. WebGPU with a

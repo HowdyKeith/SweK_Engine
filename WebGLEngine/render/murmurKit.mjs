@@ -718,7 +718,7 @@ export function abyssSlot(rarity, voice = 0, pace = 0, drive = 0, small = 0) {
 export const MH_SLOT_SIGNAL = Object.freeze({
     still:   Object.freeze({ pace: 0.30, voice: 0.00, drive: 1.70 }),
     abyss:   Object.freeze({ pace: 0.35, voice: 0.55, drive: 1.60 }),
-    // v4830 -- tempest's entry is gone: it encoded energy as 0.85 * voice, which tempest.ts never wrote. Its slot
+    // v4825 -- tempest's entry is gone: it encoded energy as 0.85 * voice, which tempest.ts never wrote. Its slot
     // count integrates the host's tempestEnergyInt now -- see MH_MIST_LIVE.
 });
 
@@ -928,9 +928,9 @@ export const MH_SETTLED_COMET_HEAD = 0.25;
  * droplet in SUCCESS. A missing key cannot be deleted by a tidying pass the way a ternary can, and a census
  * row can ask which key is missing and why, which is what tools/ship/murmurLive-selfcheck.mjs now does.
  */
-// v4828 -- AND limn IS THE SECOND MISSING KEY. limn.ts carries its settle on the RIM line, beside the rim's own
+// v4825 -- AND limn IS THE SECOND MISSING KEY. limn.ts carries its settle on the RIM line, beside the rim's own
 // (1 + 1.6 * complete) -- `rimE = ... * (1.0 + 1.6 * st.complete) * (1.0 + 0.30 * st.settled) + ringClose` -- and its
-// interior line has a complete factor (0.90) and NO settle at all. Until v4828 this port put both of the rim's
+// interior line has a complete factor (0.90) and NO settle at all. Until v4825 this port put both of the rim's
 // factors on the interior; buildLimn now spends them on its rim, and the interior line carries limn's own 0.90.
 export const MH_SETTLED_INTERIOR = Object.freeze(Object.fromEntries(
     Object.entries(MH_SETTLED).filter(([k]) => k !== "droplet" && k !== "limn")));
@@ -959,7 +959,7 @@ export const MH_COMPLETE_INTERIOR = Object.freeze({
     limn: 0.90, arc: 0.90, aura: 0.45, flux: 0.75,
 });
 /**
- * *** v4828 -- limn's ENTRY ABOVE WAS ITS RIM'S NUMBER, AND THE RIM'S NUMBERS ARE HERE NOW. *** limn.ts:
+ * *** v4825 -- limn's ENTRY ABOVE WAS ITS RIM'S NUMBER, AND THE RIM'S NUMBERS ARE HERE NOW. *** limn.ts:
  *
  *     interior = acc.x * 3.00 * b.m * mh_transmit(b.fres) * (1.0 + 0.9 * st.complete);              line 173
  *     ringClose = st.complete * band * 1.20;                                                       line 126
@@ -976,7 +976,7 @@ export const MH_COMPLETE_INTERIOR = Object.freeze({
 export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClose: 1.20 });
 
 /**
- * *** v4830 -- opal's LIVE TERMS, ALL THREE ABSENT UNTIL NOW. *** opal.ts at 1c23b99:
+ * *** v4825 -- opal's LIVE TERMS, ALL THREE ABSENT UNTIL NOW. *** opal.ts at 1c23b99:
  *
  *     drift = (0.055 + 0.075 * driftK) * (1.0 + 0.75 * live.pace + 0.95 * st.drive);            line 67
  *     life  = mix(life, 0.30 + 0.70 * max(sin(6.2831853 * t / 5.2 - fk * 1.4), 0.0), st.drive);  line 95
@@ -988,7 +988,7 @@ export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClo
  * procession pulse runs at a FIXED 5.2 s period, so it is not a rate and is transcribed as written.
  */
 /**
- * *** v4830 -- geode's AND fathom's SPINS: A RATE MIXED BY DRIVE INTO ANOTHER RATE. *** At 1c23b99:
+ * *** v4825 -- geode's AND fathom's SPINS: A RATE MIXED BY DRIVE INTO ANOTHER RATE. *** At 1c23b99:
  *
  *     geode.ts:62-64   sp = 1 + 0.80 * live.pace + 1.00 * st.drive
  *                      ay = mix(mh_drift(t, 0.088 * sp, 0.48, 2.0), t * 0.30 * sp, st.drive * 0.7)
@@ -1011,7 +1011,7 @@ export const MH_SPIN_DRIVE = Object.freeze({
 });
 
 /**
- * *** v4830 -- THE MIST PAIR'S LIVE TERMS, AND tempest's ENERGY WAS THE WRONG SIGNAL ALTOGETHER. *** At 1c23b99:
+ * *** v4825 -- THE MIST PAIR'S LIVE TERMS, AND tempest's ENERGY WAS THE WRONG SIGNAL ALTOGETHER. *** At 1c23b99:
  *
  *     tempest.ts:53-54  think = (stateIndex > 1.5 && stateIndex < 2.5) ? 1.0 : 0.0;
  *                       energy = clamp(0.85 * live.pace + 0.65 * think + 0.55 * st.drive, 0.0, 1.6);
@@ -1068,7 +1068,7 @@ export const MH_COMPLETE_LIFT = Object.freeze({
 export const MH_COMPLETE_SOL_CORE = 0.55;
 
 /**
- * *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH ONE LINE OF ITS OWN SPECIES' FILE, AND NONE SHARING A SHAPE. ***
+ * *** v4825 -- THE SINGLES: SEVEN FLASH FACTORS, EACH ONE LINE OF ITS OWN SPECIES' FILE, AND NONE SHARING A SHAPE. ***
  * Read off krispuckett/murmur-web's src/shaders/<species>.ts at 1c23b99, line by line:
  *
  *     still.ts:80     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)      the glint
@@ -1081,11 +1081,11 @@ export const MH_COMPLETE_SOL_CORE = 0.55;
  *
  * Each is EXACTLY a no-op at complete = 0 (a factor of 1, or an added 0), so no resting frame can move. A table
  * and not a formula, because the backlog note that named them was right: "none of them shares a shape with
- * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here: since v4828 the 0.90 is
+ * another". limn's two (its ring, 1.20, and its own interior, 0.90) are NOT here: since v4825 the 0.90 is
  * MH_COMPLETE_INTERIOR.limn and the ring is MH_LIMN_RIM.ringClose, after the rim was split from the interior.
  */
 /**
- * *** v4828 -- still's GLINT HAD NO VOICE, AND THE REPAIR MOVES ITS RESTING FRAME. *** still.ts:80:
+ * *** v4825 -- still's GLINT HAD NO VOICE, AND THE REPAIR MOVES ITS RESTING FRAME. *** still.ts:80:
  *     gBright = fl.x * (0.90 + 0.95 * live.voice) * (1.0 + 0.85 * st.complete)
  * This port multiplied the glint by fl.x alone, so at rest (voice 0) it was 1/0.90 of murmur's and speech never
  * brightened it -- the one hero whose whole brief is "one slow internal glint" did not answer the voice in it.
@@ -1312,7 +1312,7 @@ export const MH_DRIVE_HEADING = Object.freeze({
     abyss:   Object.freeze({ v: Object.freeze([0.90, -0.22, 0.37]), k: 0.80, pre: false, wired: true }),
     sol:     Object.freeze({ v: Object.freeze([0.86, -0.32, 0.39]), k: 0.70, pre: true,  wired: true }),
     droplet: Object.freeze({ v: Object.freeze([0.92,  0.20, 0.34]), k: 0.30, pre: true,  wired: true }),
-    // v4830 -- wired, INTEGRATED: V * k * driveInt, the exact continuation of murmur's V * (drive * k * t)
+    // v4825 -- wired, INTEGRATED: V * k * driveInt, the exact continuation of murmur's V * (drive * k * t)
     nebula:  Object.freeze({ v: Object.freeze([0.86,  0.24, -0.45]), k: 0.42, pre: false, wired: true }),
     tempest: Object.freeze({ v: Object.freeze([0.88,  0.20, -0.43]), k: 0.50, pre: false, wired: true }),
 });
@@ -1804,7 +1804,7 @@ export const MH_CHORUS = Object.freeze({
     radB: 0.082, radK: 0.038, radSmall: 1.75,
     brightB: 0.70, brightK: 0.55,
     syncK: 0.75, perB: 8.4, perPace: 2.2 * 0.6,
-    // v4828 -- chorus.ts:66: sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1). The drive
+    // v4825 -- chorus.ts:66: sync = clamp(syncK * 0.75 + 0.85 * st.drive + 0.55 * st.complete, 0, 1). The drive
     // term is the species' "whole gesture" -- responding pulls the seven voices most of the way into alignment --
     // and the v4653-v4657 drive rounds wired chorus's heading, narrowing and rates without reaching this line.
     syncDrive: 0.85,
@@ -1938,7 +1938,7 @@ export const MH_HELIX = Object.freeze({
 
 /** tempest's lightning: the two lane seeds, their slot lengths, and the radius its depth mask kills at. */
 export const MH_TEMPEST_BOLT = Object.freeze({
-    // v4830 -- slotSmall: tempest.ts:74-75 spell each slot mix(slot, slotSmall, small); this table carried the first only
+    // v4825 -- slotSmall: tempest.ts:74-75 spell each slot mix(slot, slotSmall, small); this table carried the first only
     lanes: Object.freeze([Object.freeze({ seed: 21.0, slot: 2.9, slotSmall: 5.2 }), Object.freeze({ seed: 27.0, slot: 4.3, slotSmall: 7.4 })]),
     maskIn: 0.35, maskOut: 0.62,
 });

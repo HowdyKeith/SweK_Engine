@@ -13,7 +13,7 @@
 //           The only figure keyed on WHICH PART of the species it is rather than on where the part is.
 //   geode   A FLAT LIFT with no sweep at all. geode's light is a facet term on a NORMAL; there is no path
 //           for a front to travel along, so the stone simply brightens.
-//   comet   THE ONLY ONE THAT ADDS NO LIGHT (this FIGURE -- since v4826 comet's head carries its own (1 + 2.2 *
+//   comet   THE ONLY ONE THAT ADDS NO LIGHT (this FIGURE -- since v4825 comet's head carries its own (1 + 2.2 *
 //           complete), a separate single, in MH_COMPLETE_SINGLES). It lengthens the trail -- decay = mix(decay, 9.0, sweep), and
 //           decay is in the DENOMINATOR of exp(-age/decay) -- so the orbit fills in behind the head out to
 //           wherever the sweep has reached. The flash is the path becoming visible.
@@ -204,7 +204,7 @@ sec("4. *** THE CENSUS: four sites, four shapes, and the two factors that have t
     const have = [["aura", /KIT\.mhIgniteLap\(angA, COMPLETE, SWEEP,/],
                   ["fathom", /KIT\.mhIgniteTurn\(float\(2 - k\), COMPLETE, SWEEP,/],
                   ["geode", /\.add\(COMPLETE\.mul\(MH_IGNITE_FLAT_GEODE\)\)/],
-                  ["comet", /mix\(float\(1\.30\)[\s\S]{0,220}float\(CT\.to\),\s*select\(COMPLETE\.greaterThan\(0\.001\), SWEEP, float\(0\.0\)\)\)/]];   // v4826: under comet.ts's own complete > 0.001 guard
+                  ["comet", /mix\(float\(1\.30\)[\s\S]{0,220}float\(CT\.to\),\s*select\(COMPLETE\.greaterThan\(0\.001\), SWEEP, float\(0\.0\)\)\)/]];   // v4825: under comet.ts's own complete > 0.001 guard
     const found = have.filter(([, re]) => re.test(raw)).map(([s]) => s);
     say(`the four sites present: ${found.join(", ")}`);
     ok("!! *** ALL FOUR ARE WIRED, EACH IN ITS OWN SHAPE, and fathom passes 2 - k rather than k ***",

@@ -29,7 +29,7 @@
 // three seconds. Two of murmur's numbers that were simply absent. Added in the integrated form, because
 // adding them as murmur spells them would have shipped a new teleport on the same afternoon as the repair.
 //
-// v4830 -- tempest's subject became tempest.ts's own energy (pace, thinking, drive; clamped) and the scaled-
+// v4825 -- tempest's subject became tempest.ts's own energy (pace, thinking, drive; clamped) and the scaled-
 // site census grew two honest shapes (per-species branches, spinPhase's split). SABOTAGES, each restored:
 // the host integrating 0.85*voice in place of pace (RED: section 2's mist bound, section 3's spelling row);
 // tempest's secular put back on a voice ratePhase (RED: section 3's drift row, section 5's deaf row);
@@ -60,7 +60,7 @@ const DT = 1 / 60;
 //   tempest.ts:              drift(t, drB + foldK*drK, 0.45, drLane) * (1 + 0.95*energy)
 //                            with energy = clamp(0.85*live.pace + 0.65*thinking + 0.55*st.drive, 0, 1.6)
 //   nebula.ts:               the same drift * (1 + 0.65*live.pace + 0.35*live.voice + 0.90*st.drive)
-//   (until v4830 this file wrote tempest's energy as clamp(0.85*live.voice) and gave tempest nebula's voice
+//   (until v4825 this file wrote tempest's energy as clamp(0.85*live.voice) and gave tempest nebula's voice
 //    term -- the port's reading, not murmur's; the subject below is now tempest.ts's own)
 //   helix.ts:                drift(t, climb, 0.44, 5.0) * (1 + 0.75*live.pace + 0.85*st.drive)
 const MIST_BASE = 0.070 + 0.5 * 0.075, MIST_KE = 0.95;      // tempest at foldK 0.5; its drift's energy coefficient
@@ -194,7 +194,7 @@ sec("2. *** WHAT THAT COSTS murmur ON THESE TWO: NINE AND THIRTY RADIANS IN A SI
 // =============================================================================================================
 sec("3. *** tempest's ENERGY IS INTEGRATED AS ONE CLAMPED SIGNAL, AND THE CLAMP'S NUMBERS ARE READ OUT OF BOTH HALVES ***");
 {
-    // v4830 REPLACED THIS SECTION'S SUBJECT. It used to prove that clamp(0.85 * VOICE) never bit, which is what
+    // v4825 REPLACED THIS SECTION'S SUBJECT. It used to prove that clamp(0.85 * VOICE) never bit, which is what
     // let the shader fold tempest's energy into a single voice coefficient. tempest.ts never read voice: its
     // energy is clamp(0.85*pace + 0.65*thinking + 0.55*drive, 0, 1.6). So the host now integrates THAT, clamp
     // and all (tempestEnergyInt), and the shader spends it as mistBase * (t + 0.95 * tempestEnergyInt). Folding
@@ -239,7 +239,7 @@ sec("3. *** tempest's ENERGY IS INTEGRATED AS ONE CLAMPED SIGNAL, AND THE CLAMP'
         drift && factor && MN.drPace === 0.65 && MN.drVoice === 0.35 && MN.drDrive === 0.90,
         `secular ${drift ? "found" : "NOT FOUND"}, wobble factor ${factor ? "found" : "NOT FOUND"}: nebula ` +
         `${MN.drPace}*pace + ${MN.drVoice}*voice + ${MN.drDrive}*drive on both, tempest ${ML.drE}*energy on both. ` +
-        `Until v4830 the shader gave BOTH species nebula's 0.35 voice term and tempest a voice-only energy, and ` +
+        `Until v4825 the shader gave BOTH species nebula's 0.35 voice term and tempest a voice-only energy, and ` +
         `nebula no pace or drive at all.`);
 }
 
@@ -287,7 +287,7 @@ sec("4. *** helix's CLIMB: TWO OF murmur's NUMBERS THAT WERE NOT ABSENT BY DESIG
         //                            the finished phase rather than living in a coefficient.
         // The first draft of this row knew only the first shape and went red on aura -- a correct subject,
         // which is the tell. Both spellings are here because both are in the file and both are right.
-        // v4830 adds two more shapes, both in the file and both right:
+        // v4825 adds two more shapes, both in the file and both right:
         //   PER-SPECIES BRANCHES -- a ternary whose two arms are each one of the honest forms: mist's, where
         //                           nebula takes ratePhase on its coefficients and tempest takes its base times
         //                           (t + drE * the integrated energy).
@@ -342,7 +342,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
     // those, so under murmur's spelling every one of these pairs would be byte-identical. What moves is the
     // accumulated history, which is the mechanism this round added and nothing else in the file can supply.
     const FR = [];
-    // v4830: tempest's cloud runs on tempestEnergyInt, the host's integral of its clamped energy -- see section 3
+    // v4825: tempest's cloud runs on tempestEnergyInt, the host's integral of its clamped energy -- see section 3
     const base = { stateIndex: 0, stateTau: 0, paceInt: 0, voiceInt: 0, driveInt: 0, tempestEnergyInt: 0 };
     FR.push(sp("tempest", 12.0, 0.6, { ...base }));
     FR.push(sp("tempest", 12.0, 0.6, { ...base, tempestEnergyInt: 14.0 }));
@@ -361,7 +361,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
     FR.push(sp("flux", 12.0, 0.6, { ...base, paceInt: 14.0 }));
     FR.push(sp("flux", 12.0, 0.6, { ...base, voiceInt: 14.0 }));
     FR.push(sp("flux", 12.0, 0.6, { ...base, driveInt: 14.0 }));
-    FR.push(sp("tempest", 12.0, 0.6, { ...base, voiceInt: 14.0 }));   // [12] v4830: the integral tempest LOST
+    FR.push(sp("tempest", 12.0, 0.6, { ...base, voiceInt: 14.0 }));   // [12] v4825: the integral tempest LOST
     const run = await renderSpecies(FR);
     if (!run.ok || !run.frames || run.frames.length !== FR.length) {
         ok("!! the output-multiplied clocks render at all", false,
@@ -402,7 +402,7 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         const fV = diff(run.frames[8], run.frames[10]), fD = diff(run.frames[8], run.frames[11]);
         say(`tempest paceInt 0 -> 14: ${tP.pct.toFixed(1)}%   tempest voiceInt 0 -> 14: ${tVo.pct.toFixed(1)}%   tempest driveInt (its ADVECTION) 0 -> 14: ${tD.pct.toFixed(1)}%   helix voiceInt 0 -> 14: ${hV.pct.toFixed(1)}%`);
         say(`flux    voiceInt 0 -> 14: ${fV.pct.toFixed(1)}%   flux driveInt 0 -> 14: ${fD.pct.toFixed(1)}%`);
-        // driveInt is NOT on the deaf list for tempest any more: v4830 wired murmur's RESPONDING advection,
+        // driveInt is NOT on the deaf list for tempest any more: v4825 wired murmur's RESPONDING advection,
         // V * k * driveInt, which streams the whole domain -- a different mechanism from the drift clock, and
         // it has to move SOMETHING or the wiring is dead. Its own rows are in murmurDrive-selfcheck.
         ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: five sweeps, zero bytes ***",
@@ -433,6 +433,6 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT IS NOT CLAIMED: nebula's drift in pixels -- its three coefficients are checked in the source " +
     "(section 3) but a fourth species compile would put this gate over its budget, so no frame here moves " +
     "nebula on paceInt or driveInt. opal's flash drift, geode's and fathom's spins and duet's rate are on " +
-    "the integrated clock as well since v4830 (and v4657 for duet); their rows live in murmurClock-selfcheck " +
+    "the integrated clock as well since v4825 (and v4657 for duet); their rows live in murmurClock-selfcheck " +
     "and murmurDrive-selfcheck, not here.");
 process.exit(fails ? 1 : 0);

@@ -20,7 +20,7 @@
 // and the shader needs the three running integrals, not the history. render/aiPresenceOrbState.mjs
 // accumulates them in SHADER time -- against the tempo integral, not wall seconds -- because a species' rate
 // is per second of the clock it is handed.
-// v4830 SABOTAGES, restored: geode's spin put back on a bare t * 0.30 (RED: the ten-clock census row);
+// v4825 SABOTAGES, restored: geode's spin put back on a bare t * 0.30 (RED: the ten-clock census row);
 // spinPhase's B sign flipped to m*(r1 - r0) (RED: section 3b); the host's driveDriveInt accumulating drive
 // rather than drive squared (RED: the eight-integrals row).
 "use strict";
@@ -264,7 +264,7 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     const repaired = [], plainDrift = [];
     for (let k = 0; k < marks.length - 1; k++) {
         const blk = lines.slice(marks[k][0], marks[k + 1][0]).join("\n");
-        // v4830: a builder is also repaired when it reaches the integrated clock through one of the two shared
+        // v4825: a builder is also repaired when it reaches the integrated clock through one of the two shared
         // helpers -- ratePhase (opal's flash drift, a bare rate * t with no wobble to hand mhDriftPhase) or
         // spinPhase (geode's and fathom's spins, whose drive MIX is integrated inside the helper).
         if (/KIT\.mhDriftPhase\(|\bratePhase\(|\bspinPhase\(/.test(blk)) repaired.push(marks[k][1]);
@@ -273,7 +273,7 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     say(`species whose clocks use the integrated phase: ${repaired.join(", ")}`);
     say(`modulated rates still on murmur's rate * t: ${plainDrift.length ? plainDrift.join(", ") : "(none)"}`);
 
-    // v4830: opal, fathom and geode join -- the three clocks that were recorded against the st.drive entry as
+    // v4825: opal, fathom and geode join -- the three clocks that were recorded against the st.drive entry as
     // "spells a bare rate * t" (opal's drift, geode's mix target) or carried no live term at all (fathom's spin).
     const WANT = ["aura", "comet", "limn", "flux", "helix", "mist", "duet", "opal", "fathom", "geode"].sort();
     ok("!! *** ALL TEN MODULATED CLOCKS IN THIS FILE ARE REPAIRED, AND THERE IS NOTHING LEFT TO NAME ***",
@@ -367,7 +367,7 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
     // The uniforms have to arrive, or the integrals are three numbers nobody sends.
     const W = codeOnly(fs.readFileSync(path.join(ENG, "ui", "aiPresenceOrbWidget.js"), "utf8"));
     const H = codeOnly(fs.readFileSync(path.join(ENG, "ai-presence-orb.html"), "utf8"));
-    // v4830: eight -- drive squared (the spin mix's B * kd term, geode and fathom) and tempest's clamped energy
+    // v4825: eight -- drive squared (the spin mix's B * kd term, geode and fathom) and tempest's clamped energy
     const feeds = (s) => ["paceInt", "voiceInt", "driveInt", "paceDriveInt", "voiceDriveInt", "driveDriveInt",
         "tempestEnergyInt", "duetFlourishInt"].every((n) => new RegExp(n + ":\\s*p\\." + n).test(s));
     const hostSrc = fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8");
@@ -377,7 +377,7 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
         /driveDriveInt: st\.drive \* st\.drive \* time/.test(FRsrc) &&
         /tempestEnergyInt: Math\.min\(1\.6, Math\.max\(0, 0\.85 \* lv\.pace \+ 0\.65 \* \(si === 2 \? 1 : 0\) \+ 0\.55 \* st\.drive\)\) \* time/.test(FRsrc),
         `ui/aiPresenceOrbWidget.js and ai-presence-orb.html both pass all eight -- the three conditioned signals ` +
-        `from v4654, limn's two cross products and duet's gesture from v4657, and v4830's drive squared and ` +
+        `from v4654, limn's two cross products and duet's gesture from v4657, and v4825's drive squared and ` +
         `tempest's clamped energy, which sp() derives as drive*drive*time and clamp(energy)*time -- and the ` +
         `state module accumulates them against dPhase rather than dt. THIS ROW IS THE LESSON OF v4650 APPLIED ` +
         `BEFORE THE FACT: there, a correct integrator was computed every tick for sixty-two rounds and thrown ` +
@@ -385,7 +385,7 @@ sec("3. *** WHICH CLOCKS ARE REPAIRED, AND THE TWO THAT ARE NOT -- each with the
 }
 
 // =============================================================================================================
-sec("3b. *** v4830: THE SPIN MIX -- murmur's mix(drift(t, r1*sp), target, m*drive), INTEGRATED, IS murmur's AT A HELD SIGNAL ***");
+sec("3b. *** v4825: THE SPIN MIX -- murmur's mix(drift(t, r1*sp), target, m*drive), INTEGRATED, IS murmur's AT A HELD SIGNAL ***");
 {
     // geode.ts:63 and fathom.ts:83-84 MIX two growing phases by drive: a drift at r1*sp pulled toward a target
     // at r0*sp (geode's straight t*0.30*sp, fathom's own outer shell a0). Mixing two growing phases by an

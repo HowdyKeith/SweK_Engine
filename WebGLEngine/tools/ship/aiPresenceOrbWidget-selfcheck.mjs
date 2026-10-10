@@ -175,7 +175,7 @@ async function main() {
         }
     }
 
-    sec("5b. *** v4829 -- THE SAME ORB AS THE AVATAR PANEL: the species the picker saved, refused if it is not one of eighteen ***");
+    sec("5b. *** v4825 -- THE SAME ORB AS THE AVATAR PANEL: the species the picker saved, refused if it is not one of eighteen ***");
     {
         // SABOTAGED, each restored: the widget's read of the saved species removed -> RED (comet mounts still);
         // the ORB_SPECIES check removed -> RED (a bogus name reaches the builder, which throws, and nothing mounts).

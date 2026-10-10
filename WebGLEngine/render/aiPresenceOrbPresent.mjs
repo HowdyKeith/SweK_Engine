@@ -194,7 +194,7 @@ export function makeAiPresenceOrbPresentTsl(THREE, TSL, sceneTexture, { knobs = 
  * direct renderer.render(fx.scene, fx.camera) call, which render(renderer) now does internally.
  * Returns { sceneFx, presentFx, target, setKnobs, setPresentKnobs, resize, render }.
  */
-// v4827 -- `species` is passed through: makeAiPresenceOrbTsl has built all eighteen since v4651, and this pipeline,
+// v4825 -- `species` is passed through: makeAiPresenceOrbTsl has built all eighteen since v4651, and this pipeline,
 // the only one with the HDR present pass, built "still" whatever its caller wanted.
 export function makeAiPresenceOrbHdrPipeline(THREE, TSL, { sceneKnobs = {}, presentKnobs = {}, species = "still" } = {}) {
     const sceneFx = makeAiPresenceOrbTsl(THREE, TSL, { knobs: sceneKnobs, linear: true, species });

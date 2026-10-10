@@ -15,7 +15,7 @@
   a { color: #9fe0b8; }
   code { color: #7fb0a0; }
   select { background: #10151a; color: #9fe0b8; border: 1px solid #2a3a30; border-radius: 3px; padding: 3px 6px; font: inherit; }
-  /* v4827 -- embed=1 is the avatar panel's frame: the orb and the species picker, nothing else */
+  /* v4825 -- embed=1 is the avatar panel's frame: the orb and the species picker, nothing else */
   body.embed #hud { display: none; }
   #speciesFloat { display: none; position: fixed; left: 6px; top: 6px; z-index: 2; opacity: 0.55; }
   body.embed #speciesFloat { display: block; }
@@ -32,7 +32,7 @@
   "port the design, hold the render/verification to this tree's own conventions" shape
   render/swiftShaderPass.js used for this SAME author's other repo. Scope, named plainly: murmur-web has
   18 material "species"; this page showed exactly one, "still" -- described in its own source as
-  "the minimal hero: a quiet glass sphere, one slow internal glint" -- until v4827, which gave it a species
+  "the minimal hero: a quiet glass sphere, one slow internal glint" -- until v4825, which gave it a species
   picker (default still) and an embed=1 mode for server.html's avatar panel. render/aiPresenceOrbPresent.mjs is
   the HDR present pass (exposure/bloom/the "house knee" tone curve/dither), a second pass sampling the
   scene's own linear HDR render target -- murmur-web's own present.wgsl, hand-ported the same way.
@@ -71,7 +71,7 @@ import { ORB_SPECIES } from "./render/aiPresenceOrbTsl.mjs";
 const say = (s, bad) => { const el = document.getElementById("route"); el.innerHTML = s; el.style.color = bad ? "#f08080" : ""; };
 const cv = document.getElementById("stage");
 const params = new URLSearchParams(location.search);
-// v4827 -- THE SPECIES: ?species= first, then this browser's last choice, then "still". A name that is not one
+// v4825 -- THE SPECIES: ?species= first, then this browser's last choice, then "still". A name that is not one
 // of the eighteen is refused here rather than handed to the builder, which throws on it. Changing it reloads,
 // because each species is its own compiled shader and a reload is the one teardown that cannot leak a pipeline.
 const SPECIES_KEY = "swek.orbSpecies";   // the same key ui/aiPresenceOrbWidget.js's ORB_SPECIES_KEY names

@@ -117,7 +117,7 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
         return null;
     }
 
-    // v4829 -- THE SAME ORB AS server.html's AVATAR PANEL. ai-presence-orb.html's species picker saves its choice in
+    // v4825 -- THE SAME ORB AS server.html's AVATAR PANEL. ai-presence-orb.html's species picker saves its choice in
     // this browser under swek.orbSpecies; the widget reads it at mount (an explicit opts.species wins), refuses any
     // name outside the eighteen, and draws still otherwise. Read once: a species is its own compiled shader, so a
     // change made elsewhere arrives with the next page load rather than by rebuilding a live pipeline.

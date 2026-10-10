@@ -27,7 +27,7 @@
 // so at the peak they arrive together and the differences between them close. A gain preserves every
 // difference and multiplies them; a saturation destroys them. Both are the flash, and a port that used one
 // spelling for all six would be wrong about six species in two different directions.
-// v4830 SABOTAGE, restored: opal's procession mix handed a zero weight in place of DRIVE (RED: the saturations row).
+// v4825 SABOTAGE, restored: opal's procession mix handed a zero weight in place of DRIVE (RED: the saturations row).
 "use strict";
 
 import fs from "node:fs";
@@ -134,7 +134,7 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
     // four species in the table. The two are applied at ONE site for all eighteen, so the check is that the
     // site carries both and that the complete table is a strict SUBSET of the settled one.
     const bothApplied = /\.mul\(compF\)\.mul\(settleF\)/.test(src);
-    // *** v4828 -- THE RULE WAS WRONG ABOUT ONE SPECIES, AND IT WAS THE ONE THE TABLE SAID 1.60 FOR. *** It read
+    // *** v4825 -- THE RULE WAS WRONG ABOUT ONE SPECIES, AND IT WAS THE ONE THE TABLE SAID 1.60 FOR. *** It read
     // "a species earns a complete factor here only because murmur writes it on the same line as the settled
     // factor". limn.ts's INTERIOR line (173) carries (1 + 0.9 * complete) and no settle; its settle is on the RIM
     // line (133) beside the rim's own (1 + 1.6 * complete). The rule picked the rim line, the port then folded the
@@ -160,7 +160,7 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
         `exploited when droplet's exclusion was a ternary.`);
 
     // The three saturation sites, named, because each is inside a different species' loop.
-    // v4830: opal's life is the RESPONDING mix murmur writes -- mix(life, procession, drive) -- and the lift
+    // v4825: opal's life is the RESPONDING mix murmur writes -- mix(life, procession, drive) -- and the lift
     // saturates THAT, so the site reads the lift around the mix and not around the bare mhOpalLife.
     const sites = [["opal", /KIT\.mhCompleteLift\(\s*mix\(KIT\.mhOpalLife\([^)]*\), uniforms\.time\), float\(OD\.procFloor\)\.add\(max\(proc, 0\.0\)\.mul\(OD\.procAmp\)\), DRIVE\)/],
                    ["sol", /KIT\.mhCompleteLift\(sn\.mul\(sn\), COMPLETE,/],
@@ -268,7 +268,7 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
 }
 
 // =============================================================================================================
-sec("5. *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OWN SPECIES, AT murmur's NUMBER ***");
+sec("5. *** v4825 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OWN SPECIES, AT murmur's NUMBER ***");
 {
     // The numbers are murmur's, read off krispuckett/murmur-web src/shaders/<species>.ts at 1c23b99 and written
     // here with the line each came from, so a change to the kit's table has to disagree with a quotation to pass.
@@ -299,7 +299,7 @@ sec("5. *** v4826 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OW
     ok("!! *** each of the seven is murmur's number, read exactly once, inside its own species' builder ***",
         bad.length === 0 && tableKeys.length === 7 && tableKeys.every((k) => k in MURMUR),
         bad.length ? bad.join("; ") : `${tableKeys.length} singles: ` + Object.entries(MURMUR).map(([k, [w]]) => `${k} (${w})`).join(", "));
-    // *** v4828 -- limn's TWO, AND THE TWO GAPS v4826 RECORDED BESIDE THEM, CLOSED. *** limn's are not singles:
+    // *** v4825 -- limn's TWO, AND THE TWO GAPS RECORDED BESIDE THEM, CLOSED. *** limn's are not singles:
     // its 0.90 is MH_COMPLETE_INTERIOR.limn on the shared interior line, and its rim's 1.6 / 0.30 / ringClose 1.20
     // are MH_LIMN_RIM, spent in buildLimn on a rim that joins the pixel BESIDE the interior (limn.ts: e = interior
     // + rimE + ...). still's glint takes still.ts:80's (0.90 + 0.95 * live.voice); chorus's sync takes chorus.ts:66's
@@ -354,7 +354,7 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "\nWHAT IS NOT CLAIMED: the eight per-species ignition FIGURES that are still missing -- comet, fathom, " +
     "geode, arc, aura, flux, prism and helix each spend complete on a gaussian of their own (arc on its " +
     "filament, aura on a von Mises that follows the sweep round its ribbons, geode on a flat lit += 0.70) " +
-    "and none is the one shape MH_IGNITE holds. The SINGLES are section 5 since v4826, all but limn's ring " +
+    "and none is the one shape MH_IGNITE holds. The SINGLES are section 5 since v4825, all but limn's ring " +
     "and second interior, which wait on limn's rim/interior split. Counted in murmur's own sources st.complete appears 47 times; " +
     "this round takes 8 of them and the census in tools/ship/murmurLive-selfcheck.mjs holds the total.");
 process.exit(fails ? 1 : 0);

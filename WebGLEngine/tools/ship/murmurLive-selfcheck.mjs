@@ -41,7 +41,7 @@
 // and that round took the two that are a DIRECTION or a SIZE and left the sixteen that multiply a local
 // clock. So the row inverts a second time and the deferral is checked next door rather than promised here.
 //
-// v4830 SABOTAGES, each RED on its own row and restored: geode's spinPhase handed kp 0 (the cadence census --
+// v4825 SABOTAGES, each RED on its own row and restored: geode's spinPhase handed kp 0 (the cadence census --
 // a route with no coefficient is no cadence); tempest's THINKING read inline off uniforms.stateIndex instead of
 // THINK (the raw-uniform row, stateIndex 5); tempest's energy put back on VOICE (the 42/21 code count).
 "use strict";
@@ -216,7 +216,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // murmur hands the same state to both conditioners: mh_live weights the microphone by it and mh_state
     // turns it plus the elapsed tau into four windows. The row names BOTH call sites in full rather than
     // loosening the count to "at most a few", which is how a census stops being one.
-    // v4830: a THIRD conditioning line, THINK -- tempest.ts:53 reads THINKING straight off the state index, so
+    // v4825: a THIRD conditioning line, THINK -- tempest.ts:53 reads THINKING straight off the state index, so
     // the port does too, ONCE, in the shared block beside the other two, and the row names all three in full.
     const thinkLine = (src.split("\n").find((l) => /const THINK = /.test(l)) || "").trim();
     const thinkRe = /const THINK = select\(uniforms\.stateIndex\.greaterThan\(1\.5\)\.and\(uniforms\.stateIndex\.lessThan\(2\.5\)\)/;
@@ -228,7 +228,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `${rawT}; the readers are ${callLine}, ${stLine} and ${thinkLine.slice(0, 60)}... (two reads, one window) ` +
         `-- so there is no second path by which a raw level could reach a species. Before v4641 the voice count ` +
         `was 44 and there was no activity knob at all; before v4644 there was no stateTau and stateIndex was ` +
-        `read once; before v4830 tempest had no THINKING and stateIndex was read twice.`);
+        `read once; before v4825 tempest had no THINKING and stateIndex was read twice.`);
 
     // *** THIS CENSUS COUNTED ITS OWN PROSE UNTIL v4644, AND ITS RECORDED NUMBER WAS ONE TOO HIGH BECAUSE OF
     // IT. *** The counts ran over the raw file, so a COMMENT naming VOICE scored as a reader -- and one did,
@@ -241,8 +241,8 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const cc = (re) => (code.match(re) || []).length;
     const decl = cc(/const VOICE = /g) + cc(/const PACE = /g);
     const readV = cc(/\bVOICE\b/g) - 1, readP = cc(/\bPACE\b/g) - 1;
-    // v4828: 43 -- still's glint took murmur's (0.90 + 0.95 * live.voice), which this port had never carried.
-    // v4830: 42 and 21 -- tempest's energy LOST its 0.85 * VOICE (tempest.ts reads pace, think and drive, not
+    // v4825: 43 -- still's glint took murmur's (0.90 + 0.95 * live.voice), which this port had never carried.
+    // v4825: 42 and 21 -- tempest's energy LOST its 0.85 * VOICE (tempest.ts reads pace, think and drive, not
     // voice), and the cadence gained six: tempest's energy, nebula's fold and its drift factor, droplet's
     // tremor, fathom's spin and the shared spinPhase helper's own rate.
     ok("!! the conditioned pair is declared once each and read 42 and 21 times, counting CODE and not comments",
@@ -263,7 +263,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     ok("!! *** mh_state's THREE WIRED OUTPUTS ARE DECLARED ONCE EACH AND LAND ON EXACTLY THE SITES murmur HAS ***",
         declS === 3 && readSe === 4 && readC === 24 && readSw === 8 && igAt === 6 && igMist === 2,
         `settled ${readSe} readers -- the shared interior factor, comet's headBright, droplet's coreBright and ` +
-        `(since v4828) limn's RIM, where limn.ts carries its settle -- ` +
+        `(since v4825) limn's RIM, where limn.ts carries its settle -- ` +
         `which is murmur's nineteen sites collapsed onto the three shapes they take; complete ${readC} at ` +
         `v4658 and 2 before it -- the shell, the mist pair's pre-multiply, and the five v4658 added: the ` +
         `shared interior BRIGHTENING beside the settle, opal's and sol's and chorus's saturations, and sol's ` +
@@ -271,7 +271,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `which is why sweep went from 1 reader to 5 in the same round -- AND THE THREE v4660 ADDED, which ` +
         `are the ignition figures that are NOT a gaussian on an axis: aura's von Mises going round its ` +
         `ribbons, fathom's triangular window on each shell's own turn, and geode's flat lift with no sweep ` +
-        `in it at all -- AND THE EIGHT v4826 ADDED: the seven SINGLES, each one line of its own species' file ` +
+        `in it at all -- AND THE EIGHT v4825 ADDED: the seven SINGLES, each one line of its own species' file ` +
         `(still's glint 0.85, comet's head 2.2, droplet's heart 0.26, duet's shrink 0.62 and flare 1.15, ` +
         `chorus's sync 0.55, prism's beams 1.10, in MH_COMPLETE_SINGLES), and comet's trail-fill GUARD, ` +
         `complete > 0.001, which murmur always had and this port did not. SIX SPECIES MOVED ZERO BYTES ` +
@@ -280,7 +280,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `nothing until v4659 gave them the figure that is their whole flash, and fathom and geode still ` +
         `moved nothing until v4660 gave them theirs. sweep ${readSw} -- the shell, the four axis fronts, and ` +
         `v4660's three: aura's angle, fathom's turn and comet's trail length, which is the one figure in the ` +
-        `roster that reads the sweep under its own guard rather than through a figure (since v4826, under ` +
+        `roster that reads the sweep under its own guard rather than through a figure (since v4825, under ` +
         `complete > 0.001, as comet.ts writes it -- before that it read the sweep unguarded). The ` +
         `shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
@@ -318,7 +318,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     const unpaced = ALL.filter((n) => !paced.includes(n));
     say(`builders reading the conditioned cadence: ${paced.join(", ")}; reading the conditioned voice: ${voiced.length} of ${marks.length - 1}`);
     say(`builders with NO cadence, which murmur gives one to: ${unpaced.join(", ")}`);
-    // v4830: THE LAST FIVE BUILDERS ARE REACHED, three of them without a PACE identifier inside the builder,
+    // v4825: THE LAST FIVE BUILDERS ARE REACHED, three of them without a PACE identifier inside the builder,
     // so the census names the route each takes rather than scoring an identifier. mist and fathom read PACE
     // in their own bodies. opal hands MH_OPAL_DRIVE.pace to ratePhase -- the cadence lives in the integrated
     // secular phase (paceInt) and its wobble amplitude. geode hands MH_SPIN_DRIVE.geode.kp to spinPhase, whose
@@ -339,7 +339,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `${cadenced.length} of ${ALL.length} builders (${MURMUR_PACED} species, since mist draws nebula and ` +
         `tempest). ${paced.length} read PACE in their own body; ${unpaced.join(", ")} reach it by route: ` +
         `opal through ratePhase's pace coefficient ${MH_OPAL_DRIVE.pace}, geode through spinPhase's kp ` +
-        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE. The v4830 five were the ` +
+        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE. The v4825 five were the ` +
         `last: mist (tempest's energy, nebula's fold and drift), fathom and geode (their spins, which murmur ` +
         `scales by 1 + kp*pace + kd*drive and MIXES toward a target by m*drive), opal (its flash drift) and ` +
         `droplet (its tremor). THE ROW USED TO SAY SIX WAS THE WHOLE DESIGN, then counted the port up to ` +
@@ -438,7 +438,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // names exist, so long as it says which question it is answering.
     const interiorKeys = Object.keys(MH_SETTLED_INTERIOR), settledKeys = Object.keys(MH_SETTLED);
     const missing = settledKeys.filter((k) => !interiorKeys.includes(k));
-    // v4828: TWO missing keys now -- droplet (settles on its coreBright) and limn (settles on its RIM, limn.ts:133)
+    // v4825: TWO missing keys now -- droplet (settles on its coreBright) and limn (settles on its RIM, limn.ts:133)
     ok("!! *** droplet's AND limn's EXCLUSIONS FROM THE SHARED INTERIOR SETTLE ARE MISSING KEYS, NOT CONDITIONALS ***",
         interiorKeys.length === 16 && missing.length === 2 && missing.includes("droplet") && missing.includes("limn") &&
         /MH_SETTLED_INTERIOR\[species\]/.test(code) && !/species === "droplet" \? 0\.0/.test(code),

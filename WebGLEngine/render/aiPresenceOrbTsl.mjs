@@ -62,10 +62,10 @@ export const ORB_KNOBS = Object.freeze([
     // this host already keeps. See render/aiPresenceOrbState.mjs, which explains why the record that called
     // that impossible was wrong.
     "paceDriveInt", "voiceDriveInt", "duetFlourishInt",
-    // v4830 -- the integral of drive SQUARED, for geode's and fathom's spins: each mixes a drive-scaled rate by
+    // v4825 -- the integral of drive SQUARED, for geode's and fathom's spins: each mixes a drive-scaled rate by
     // drive * 0.7 again, so the secular term carries d * d. See render/murmurKit.mjs's MH_SPIN_DRIVE.
     "driveDriveInt",
-    // v4830 -- tempest's ENERGY, integrated host-side because it is clamped: see MH_MIST_LIVE.
+    // v4825 -- tempest's ENERGY, integrated host-side because it is clamped: see MH_MIST_LIVE.
     "tempestEnergyInt",
     // limn's own four, from murmur's src/styles.ts roster. They sit in the same uniform block rather than a
     // second one because a species is a different BODY over one shared kit, which is exactly how murmur's own
@@ -268,7 +268,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const SETTLED = STATE.settled.toVar();
         const COMPLETE = STATE.complete.toVar();
         const SWEEP = STATE.sweep.toVar();
-        // v4830 -- the third and last raw reader: tempest.ts:53 reads THINKING straight off the state index,
+        // v4825 -- the third and last raw reader: tempest.ts:53 reads THINKING straight off the state index,
         // `(stateIndex > 1.5 && stateIndex < 2.5) ? 1 : 0`, and so does this, once, here beside the other two.
         const THINK = select(uniforms.stateIndex.greaterThan(1.5).and(uniforms.stateIndex.lessThan(2.5)), float(1.0), float(0.0)).toVar();
         // *** AND `drive` ARRIVES AT v4653, THE LAST OF mh_state's FOUR. *** It ramps in over half a second
@@ -291,7 +291,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const ratePhase = (base, kPace, kVoice, kDrive) => KIT.mhRatePhase(
             base, uniforms.time, float(kPace), uniforms.paceInt,
             float(kVoice), uniforms.voiceInt, float(kDrive), uniforms.driveInt);
-        // v4830 -- murmur's mix(mh_drift(t, r1 * sp), target, m * drive), integrated exactly: see MH_SPIN_DRIVE. `r0`
+        // v4825 -- murmur's mix(mh_drift(t, r1 * sp), target, m * drive), integrated exactly: see MH_SPIN_DRIVE. `r0`
         // is the target's rate (geode's t * 0.30 * sp, or fathom's a0); `w0`/`lane0` give the target its own
         // wobble when it has one (fathom's a0 does, geode's straight line does not).
         const spinPhase = ({ r1, wob1, lane1, r0, wob0 = null, lane0 = null, kp, kd, m }) => {
@@ -385,14 +385,14 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // The five non-droplet shapes come from the kit's own table, so the gate can assert them against
         // murmur's roster instead of against a copy of this file.
         const SH = MH_SHAPE[species] || MH_SHAPE.still;
-        // THE SIZE DIAL, once, for every species -- here rather than with the march step since v4830, because
+        // THE SIZE DIAL, once, for every species -- here rather than with the march step since v4825, because
         // droplet's shape (murmur's mix(1.0, 1.20, small) and its tremor gate) reads it before the body exists.
         const smallK = KIT.mhSmall(float(120.0), float(120.0)).toVar();
         const shapeAmp = species === "droplet"
             ? float(0.052).add(uniforms.wobble.mul(0.040))
                 .mul(float(1.0).sub(uniforms.tension.mul(0.22)))
                 .mul(float(1.0).add(swell.mul(0.30)))
-                .mul(mix(float(1.0), float(1.20), smallK)).toVar()   // v4830 -- droplet.ts:63's small-mount factor
+                .mul(mix(float(1.0), float(1.20), smallK)).toVar()   // v4825 -- droplet.ts:63's small-mount factor
             : (SH[1] === 0 ? float(SH[0]).toVar()
                            : float(SH[0]).add(KIT.mhBreath(uniforms.time, float(SH[2])).mul(SH[1])).toVar());
         const shapeGain = float(species === "droplet" ? MH_DROPLET_GAIN : SH[3]);
@@ -415,7 +415,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                      amp: DRIVE.mul(HEAD.k),
                      phase: KIT.mhDrift(uniforms.time, float(2.05), float(0.30), float(7.0)).negate() };
         })() : null;
-        // v4830 -- droplet.ts:66-67: the tremor, "texture rather than shape", whose amplitude is the CADENCE --
+        // v4825 -- droplet.ts:66-67: the tremor, "texture rather than shape", whose amplitude is the CADENCE --
         // 0.012 * live.pace, gated by the moire ease at its own wavenumber and off on the small mounts. It is an
         // AMPLITUDE, so it needs no integral. Every other species passes 0, as murmur's other seventeen do.
         const tremor = species === "droplet"
@@ -446,7 +446,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // turned into a ReferenceError the moment the wrapping landed. Their own comment already said so --
         // "THE SIZE DIAL, once, for every species" -- so this is the file catching up with what it knew.
         const ds = L.div(MH_TAPS).toVar();
-        // (smallK, the size dial, is defined above the body since v4830: droplet's shape reads it too)
+        // (smallK, the size dial, is defined above the body since v4825: droplet's shape reads it too)
 
         // *** EACH SPECIES' BLOCK IS A CLOSURE NOW, AND ONLY THE SELECTED ONE IS CALLED. ***
         // Until v4635 every block below ran for every species: still's compiled shader carried abyss's
@@ -511,8 +511,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const visG = KIT.mhInside(atG).mul(exp(sG.mul(-MH_EXT)));
         const glintLive = select(sG.greaterThan(0.0).and(sG.lessThan(L)),
             exp(negate(argG)).mul(1.05).add(KIT.mhScatter(argG, float(0.38))).mul(visG).mul(fl.x)
-                .mul(float(MH_STILL_GLINT.base).add(VOICE.mul(MH_STILL_GLINT.voice)))   // v4828 -- still.ts:80's voice term
-                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.still.glint))),   // v4826 -- still.ts:80
+                .mul(float(MH_STILL_GLINT.base).add(VOICE.mul(MH_STILL_GLINT.voice)))   // v4825 -- still.ts:80's voice term
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.still.glint))),   // v4825 -- still.ts:80
             float(0.0));
 
         // *** THE MARCH. *** still.ts's own loop, in its own order: the contribution is multiplied by the
@@ -651,7 +651,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             accL.addAssign(e2.mul(transL).mul(ds));
             transL.assign(transL.mul(exp(e2.mul(1.80).add(MH_EXT).mul(ds).negate())));
         });
-        // *** v4828 -- THE RIM AND THE INTERIOR ARE TWO LINES, AS limn.ts WRITES THEM. *** Until v4828 the rim was
+        // *** v4825 -- THE RIM AND THE INTERIOR ARE TWO LINES, AS limn.ts WRITES THEM. *** Until v4825 the rim was
         // added into `density`, so the shared interior line put b.m * mh_transmit and the RIM's flash and settle
         // factors on both, and the hue numerator below counted the rim twice. The interior is now accL alone (its
         // own 0.90 comes from MH_COMPLETE_INTERIOR on the shared line, and it has no settle); the rim carries its
@@ -717,7 +717,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // trail and the small mounts shorten it to two fifths -- "a full lap of smear on a 44 px badge".
         // Both are bounded multipliers on a decay rather than on a clock, so neither can teleport anything.
         const CT = MH_COMET_TRAIL;
-        // *** v4826 -- AND THE GUARD WAS NEEDED AFTER ALL. *** The note above reasoned from OUTSIDE SUCCESS, where
+        // *** v4825 -- AND THE GUARD WAS NEEDED AFTER ALL. *** The note above reasoned from OUTSIDE SUCCESS, where
         // sweep is 0. INSIDE it, sweep reaches 1 at 0.95 s and stays there while complete closes to 0 at 1.20 s,
         // and comet.ts applies the fill only `if (st.complete > 0.001)` -- so from the end of the breath until
         // the state changes, murmur's trail is back to its own length and this port's stayed filled at 9.0.
@@ -787,7 +787,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // factor its file also carries is comet's OWN ignition figure, not the shared shell, and belongs to
         // the per-species round that follows this one.
         const headBright = float(1.0).add(VOICE.mul(1.30))
-            .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.comet.head)))   // v4826 -- comet.ts:111, the head's own flash
+            .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.comet.head)))   // v4825 -- comet.ts:111, the head's own flash
             .mul(float(1.0).add(SETTLED.mul(MH_SETTLED_COMET_HEAD)));
         const headE = select(sH.greaterThan(0.0).and(sH.lessThan(L)),
             exp(negate(harg)).mul(0.92).add(KIT.mhScatter(harg, float(0.30))).mul(headBright).mul(visH),
@@ -855,7 +855,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // a lamp inside a lens instead of a disc pasted on ink."
         const heart = select(sC.greaterThan(0.0).and(sC.lessThan(L)),
             exp(negate(dC2)).mul(1.65).add(KIT.mhScatter(dC2, float(0.34))).mul(visC)
-                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.droplet.heart))),   // v4826 -- droplet.ts:156
+                .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.droplet.heart))),   // v4825 -- droplet.ts:156
             float(0.0)).toVar();
         const dropletDensity = accD.mul(4.20).add(heart).mul(uniforms.depth);
         return { density: dropletDensity, accD, accHD };
@@ -883,7 +883,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // the multiplier "takes the extremes to about thirty-seven degrees of OKLAB hue at spread 1: still
         // one hue family by the rail's own definition, and the widest this collection ever goes".
         const opalDrift = float(0.055).add(uniforms.drift.mul(0.075)).toVar();
-        // v4830 -- opal.ts:67's drift * t, with its live terms, on the integrated clock (MH_OPAL_DRIVE's note)
+        // v4825 -- opal.ts:67's drift * t, with its live terms, on the integrated clock (MH_OPAL_DRIVE's note)
         const OD = MH_OPAL_DRIVE;
         const driftT = ratePhase(opalDrift, OD.pace, 0.0, OD.drive).toVar();
         const opalRad = float(0.135).add(uniforms.softness.mul(0.095))
@@ -903,7 +903,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // floor of 0.16 so nothing ever switches on.
             // opal.ts pulls each flash toward FULL on the flash: life = mix(life, 1.0, st.complete * 0.85).
             // A saturation, not a gain -- at the peak the four lives arrive together whatever they were.
-            // v4830 -- opal.ts:95: responding brightens the four IN SEQUENCE along the procession axis, mixed in by
+            // v4825 -- opal.ts:95: responding brightens the four IN SEQUENCE along the procession axis, mixed in by
             // drive BEFORE the success lift, in that order, as the file writes them
             const proc = sin(uniforms.time.mul(6.2831853 / OD.procPeriod).sub(fk * OD.procLag)).toVar();
             const life = KIT.mhCompleteLift(
@@ -913,7 +913,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const c0 = vec3(sin(driftT.mul(0.83 + 0.11 * fk).add(fk * 2.1)).mul(0.44),
                             sin(driftT.mul(0.67 + 0.13 * fk).add(fk * 3.7 + 1.1)).mul(0.40),
                             sin(driftT.mul(0.95 + 0.09 * fk).add(fk * 1.3 + 2.6)).mul(0.42)).toVar();
-            // v4830 -- opal.ts:103: "under drive they all lean the same way: a procession, not a swarm"
+            // v4825 -- opal.ts:103: "under drive they all lean the same way: a procession, not a swarm"
             const c = mix(c0, c0.mul(OD.leanKeep).add(vec3(...OD.lean).mul(proc)), DRIVE).toVar();
             const rk = opalRad.mul(0.80 + 0.30 * ((fk * 0.37 + 0.21) % 1))
                 .mul(k === 0 ? float(1.0).add(flO.x.mul(0.35)) : float(1.0)).toVar();
@@ -1067,8 +1067,8 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const glintK = clamp(uniforms.glint, 0.0, 1.0).toVar();
         // `energy` is tempest's own term and tempest.ts calls it "the deepest reading of cadence in the
         // collection": it raises the churn, quickens the weather AND shortens both flicker slots at once.
-        // v4830 -- tempest.ts:53-54, the real one: cadence, THINKING (the species' home state, THINK above) and
-        // the responding lean. Until v4830 this was clamp(0.85 * VOICE), written when the port had no
+        // v4825 -- tempest.ts:53-54, the real one: cadence, THINKING (the species' home state, THINK above) and
+        // the responding lean. Until v4825 this was clamp(0.85 * VOICE), written when the port had no
         // mh_live or mh_state and voice was the only signal it could honour -- see MH_MIST_LIVE.
         const ML = MH_MIST_LIVE[species] || MH_MIST_LIVE.nebula, MT = MH_MIST_LIVE.tempest;
         const energy = species === "tempest"
@@ -1086,13 +1086,13 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // spellings identical: base*(t + k*s*t) + (k*base*(1+k*s)/w2)*sin IS (base*t + (k*base/w2)*sin) *
         // (1 + k*s), which is why this migration moves no recorded frame.
         //
-        // tempest's CLAMP CAN BITE NOW AND THE INTEGRAL CARRIES IT. Until v4830 energy was clamp(0.85 * VOICE)
+        // tempest's CLAMP CAN BITE NOW AND THE INTEGRAL CARRIES IT. Until v4825 energy was clamp(0.85 * VOICE)
         // and topped out at 0.849, so the clamp was inert and the integral could be 0.85 * voiceInt. Murmur's
         // real energy reaches 0.85 + 0.65 + 0.55 = 2.05 against the 1.6 cap, so the host integrates the
         // CLAMPED value itself (tempestEnergyInt in render/aiPresenceOrbState.mjs) rather than a sum of
         // signal integrals that would overshoot it.
         const mistBase = float(MIST.drB).add(foldK.mul(MIST.drK)).toVar();
-        // v4830 -- each species' own factor: nebula's three shared signals, tempest's integrated energy alone
+        // v4825 -- each species' own factor: nebula's three shared signals, tempest's integrated energy alone
         const MN = MH_MIST_LIVE.nebula;
         const mDrFactor = (species === "tempest"
             ? float(1.0).add(energy.mul(MT.drE))
@@ -1102,7 +1102,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 ? mistBase.mul(uniforms.time.add(uniforms.tempestEnergyInt.mul(MT.drE)))
                 : ratePhase(mistBase, MN.drPace, MN.drVoice, MN.drDrive),
             mistBase.mul(mDrFactor), float(0.45), float(MIST.drLane), uniforms.time).toVar();
-        // v4830 -- "RESPONDING: the whole domain streams one way": murmur's V * (drive * k * t), as V * k * driveInt
+        // v4825 -- "RESPONDING: the whole domain streams one way": murmur's V * (drive * k * t), as V * k * driveInt
         const AH = MH_DRIVE_HEADING[species];   // mist draws only nebula and tempest, both wired
         const mAdv = vec3(...AH.v).mul(uniforms.driveInt.mul(AH.k)).toVar();
         const mAbsorb = float(MIST.absorb).mul(float(0.55).add(densityK.mul(0.85))).toVar();
@@ -1121,7 +1121,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         // clamp(0.85*VOICE, 0, 1.6) and the clamp is inert by 1.88x, so 1.30 * 0.85 is a constant and the
         // slot count is an exact integral. nebula keeps its fixed 7.2 s slot and the PLAIN clock, because a
         // slot that does not move has no index to re-roll and migrating it would move a frame for nothing.
-        // v4830 -- the slot COUNT integrates (t + 1.30 E) / slot, E the host's integral of the clamped energy, and
+        // v4825 -- the slot COUNT integrates (t + 1.30 E) / slot, E the host's integral of the clamped energy, and
         // each slot is mix(slot, slotSmall, small) as tempest.ts:74-75 write it.
         const TB = MH_TEMPEST_BOLT.lanes.map((ln) => mix(float(ln.slot), float(ln.slotSmall), smallK).toVar());
         const mistRate = float(1.0).div(float(1.0).add(energy.mul(MT.slotE))).toVar();
@@ -1159,7 +1159,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const pM = P.add(rd.mul(float(i).add(0.5).mul(ds))).toVar();
             const fade = KIT.mhInside(pM).toVar();
             // THE FOLD: one noise displaces the coordinates the next is read at.
-            // v4830 -- the warp's own dr coefficient per species, and the advection, integrated
+            // v4825 -- the warp's own dr coefficient per species, and the advection, integrated
             const w = KIT.mhNoise3(pM.mul(mWarp).add(vec3(0.0, mDr.mul(ML.warpDr), mDr)).sub(mAdv.mul(0.5))).toVar();
             const q = pM.mul(mScale)
                 .add(w.mul(mFold).mul(species === "tempest" ? vec3(0.90, -0.62, 0.68) : vec3(0.92, -0.58, 0.71)))
@@ -1267,7 +1267,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             // IN-PLANE direction, which is exactly the direction of the shell's limb there: an approximation
             // away from the limb and exact AT it, which is the right place for the error to be.
             const limbDir = normalize(vec3(P.x, P.y, 0.02).add(1e-5)).toVar();
-            // v4830 -- fathom.ts:81-84: "independent rotations, aligned by drive". Every shell's rate takes the
+            // v4825 -- fathom.ts:81-84: "independent rotations, aligned by drive". Every shell's rate takes the
             // live terms, and the inner two are pulled toward the outer one's angle by drive * 0.7 -- integrated
             // (MH_SPIN_DRIVE), since both ends of that mix are growing phases.
             const SF = MH_SPIN_DRIVE.fathom, S0 = FA.shells[0];
@@ -1373,7 +1373,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const glimK = clamp(uniforms.glim, 0.0, 1.0).toVar();
             const stoneK = clamp(uniforms.stone, 0.0, 1.0).toVar();
             const flG = KIT.mhFlourish(uniforms.time, float(19.0), float(10.2)).toVar();
-            // v4830 -- geode.ts:62-64: the spin with its live terms and drive's pull toward a straight t * 0.30 * sp,
+            // v4825 -- geode.ts:62-64: the spin with its live terms and drive's pull toward a straight t * 0.30 * sp,
             // integrated (MH_SPIN_DRIVE); the tilt settles toward 0.30 under the same drive * 0.7.
             const SG = MH_SPIN_DRIVE.geode;
             const ayG = spinPhase({ r1: GE.spinRate, wob1: GE.spinWob, lane1: GE.spinLane, r0: SG.target,
@@ -2091,7 +2091,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                 .mul(mix(float(1.0), float(DU.rSmall), smallK))
                 .mul(float(1.0).sub(DRIVE.mul(FORM.sep)))
                 .mul(float(1.0).sub(flD.x.mul(0.30)))
-                // v4826 -- duet.ts:77's fourth term, "and success all the way in": the roster's one SHRINK
+                // v4825 -- duet.ts:77's fourth term, "and success all the way in": the roster's one SHRINK
                 .mul(float(1.0).sub(COMPLETE.mul(MH_COMPLETE_SINGLES.duet.shrink))).toVar();
             // *** duet's RATE WAS TELEPORTING ON ITS OWN GESTURE, AND v4654 RECORDED THAT AS UNREACHABLE. ***
             // duet.ts: rate = (0.40 + 0.55*orbitK) * (1 + 0.55*live.pace + 0.90*st.drive + 0.85*fl.x). This
@@ -2153,7 +2153,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const occA = select(aFirst, float(1.0), exp(coreB.mul(-DU.occlude))).toVar();
             const occB = select(aFirst, exp(coreA.mul(-DU.occlude)), float(1.0)).toVar();
 
-            // v4826 -- duet.ts:120: flare = 1 + 1.15 * complete, on both bodies
+            // v4825 -- duet.ts:120: flare = 1 + 1.15 * complete, on both bodies
             const flareD = float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.duet.flare)).toVar();
             const eA = coreA.mul(DU.coreGain).add(KIT.mhScatter(argA, float(DU.scatterAmp)).mul(visA))
                 .mul(brA).mul(occA).mul(flareD).toVar();
@@ -2196,9 +2196,9 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
             const depthKn = clamp(uniforms.breath, 0.0, 1.0).toVar();
             const flC = KIT.mhFlourish(uniforms.time, float(CH.flourishSlot), float(CH.flourishDur)).toVar();
 
-            // chorus.ts:66 whole: the knob, responding's lean (v4828) and success (v4826), inside one clamp.
+            // chorus.ts:66 whole: the knob, responding's lean (v4825) and success (v4825), inside one clamp.
             const sync = clamp(syncKn.mul(CH.syncK).add(DRIVE.mul(CH.syncDrive))
-                .add(COMPLETE.mul(MH_COMPLETE_SINGLES.chorus.sync)), 0.0, 1.0).toVar();   // v4828 -- and its drive term
+                .add(COMPLETE.mul(MH_COMPLETE_SINGLES.chorus.sync)), 0.0, 1.0).toVar();   // v4825 -- and its drive term
             const per = float(CH.perB).sub(PACE.mul(CH.perPace)).toVar();
             const breathe = float(CH.breatheB).add(depthKn.mul(CH.breatheK))
                 .mul(mix(float(1.0), float(CH.breatheSmall), smallK)).toVar();
@@ -2356,7 +2356,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
                     .add(KIT.mhIgniteAxis(S1[1], COMPLETE, SWEEP, float(IA_P.lo), float(IA_P.hi),
                         float(IA_P.width), float(IA_P.gain), float(IA_P.flat))).toVar();
                 const beams = E[0].add(E[1]).add(E[2]).mul(brightP).mul(run).mul(float(1.0).add(pulse))
-                    .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.prism.beams))).toVar();   // v4826 -- prism.ts:159
+                    .mul(float(1.0).add(COMPLETE.mul(MH_COMPLETE_SINGLES.prism.beams))).toVar();   // v4825 -- prism.ts:159
                 // THE SPLIT IS THE HUE: outer beams either side of the anchor, the middle one on it.
                 const hueWP = E[0].mul(PR.hueW[0]).add(E[2].mul(PR.hueW[2])).mul(brightP).mul(run).toVar();
                 const medP = KIT.mhMedium(pP, uniforms.time, float(PR.medLane)).mul(medAmtP).toVar();
@@ -2605,7 +2605,7 @@ export function makeAiPresenceOrbTsl(THREE, TSL, { knobs = {}, linear = false, s
         const compK = MH_COMPLETE_INTERIOR[species] ?? 0.0;
         const compF = compK === 0.0 ? float(1.0) : float(1.0).add(COMPLETE.mul(compK));
         const interior = density.mul(surfB.m).mul(KIT.mhTransmit(fres)).mul(compF).mul(settleF).toVar();
-        // v4828 -- limn's rim joins BESIDE the interior (limn.ts: e = interior + rimE + sf.rim + ...); every other
+        // v4825 -- limn's rim joins BESIDE the interior (limn.ts: e = interior + rimE + sf.rim + ...); every other
         // species carries its rim-like light inside its own density, so this is limn's alone.
         const limnRim = species === "limn" ? SP.rimE : float(0.0);
         const railE = interior.add(limnRim).add(sf.rim).add(sf.spec.add(sf.glow).mul(dark)).toVar();
