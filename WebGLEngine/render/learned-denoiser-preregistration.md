@@ -2476,3 +2476,35 @@ for r14 against r12 on every GPU and path, native and browser. Otherwise it stay
 - Making node use DXC by default. If A1 is supported, that is the next round's decision.
 - Kernels that reorder a cell's sum.
 - A smaller network.
+
+## 44. ROUND 14 -- REPORTED HERE: K0 (a), THE r14 SET ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r14 --cache <dir>` ran at 04023b33, the commit that carries section 43 and
+the head kernel and `k_apply_fast`. It was one run of 695 s, ending 19:21:32Z.
+- Its output, unedited, is `render/denoise-results-r14.json`, committed at a0cf964b before it was read.
+- The cache served all 24 test images (hits 24, misses 0). It was hard-linked from round 12's measurement cache.
+- On every image the four hidden layers ran on the fast kernel and the 81-logit head on the head kernel. The kernel
+  apply was `k_apply_fast`.
+
+**K0 (a) holds.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the layers | 20,545,536 conv cells, every one the twin's: none fused, none unexplained. 7,962,624 of them are the head kernel's, read back planar and judged channels last |
+| D2, the kernel | `k_apply_fast`'s worst is 6.4e-7 relative to its twin (bound 1e-5) |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4). The primary filter is beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+- **The device's relMSE is round 13's and round 12's, bit for bit, on all 24 images.** D2 and D3 match theirs to the
+  last digit too.
+  - That is what both new kernels predict. The head kernel's cells are the twin's, so the logits are the same bits.
+  - `k_apply_fast` sums in `k_apply`'s order, so it writes the same image from them.
+  - It is a stronger result than D2 asks for: on these 24 images the new apply is not merely within APPLY_TOL of
+    the old one; it is identical.
+- **Reported, not a criterion:** a 64 x 64 image took 363-476 ms here (median 427), with read-back. Round 13 took a
+  median of 408 ms and round 12 a median of 702. That is SwiftShader, a CPU, and no evidence for K1, B or C1.
+
+**Still open:**
+- K0 (b) and (c), K1, B, C1, and measurement A's three hypotheses, on Keith's two GPUs.
+- That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r14.json` on
+  `claude/denoiser-round14`.
