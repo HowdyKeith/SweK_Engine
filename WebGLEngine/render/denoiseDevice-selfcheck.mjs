@@ -4,7 +4,8 @@
 //
 // GATES render/denoiseDevice.mjs -- the kernel-predicting network's forward pass and its kernel on a GPUDevice
 // (pre-registration section 35). Its exports, each named here: APPLY_TOL, kernelApplyWgsl, packApplyUniforms,
-// kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet -- and, held by
+// kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet, KERNEL_SETS,
+// DEFAULT_KERNELS -- and, held by
 // render/denoiseTiming-selfcheck.mjs rather than here (section 37), TIMING_SIZES, largestBuffer, timingInput, summarize,
 // adapterOf, timingDevice and timingLadder. What it holds: the
 // apply twin is render/denoiseNet.mjs's f64 kernel within f32 rounding, mask and borders included; the head runs on the
@@ -12,6 +13,8 @@
 // the fused mirror's given the device's own input to that layer, the kernel is its twin within APPLY_TOL, and the whole
 // pass is the f64 network's within f32 rounding; the shipped network decodes to its shape bit for bit; and the page,
 // denoise.html, in Chromium, runs the network on ITS device and finds it the f64 network's, refusing a dataset seed.
+// Round 13 (section 39): both kernel sets, r12 and the fast r13, held to the same twin cell for cell -- natively on Dawn
+// (section 3), and in the browser's own origin (section 5) -- K0's (b) and (c) on the rig.
 //
 // *** NOTHING HERE RENDERS A DATASET SEED. *** The images are synthetic; the networks are drawn from seeds here.
 // *** ONE DEVICE PER JOB. *** Measured while building this: a Dawn device reused after the JS thread had been busy for
@@ -34,13 +37,22 @@
 //       holds the page's own refusal)
 //   V11 k_apply's softmax without the largest logit subtracted                   1 RED (0 until the shift-by-100 row: until a
 //       logit passes ~88 it changes nothing a finite image shows)
+//   round 13, against brain/conv2d.mjs's fast kernel and the r13 set (each also run against brain/conv2d-selfcheck.mjs):
+//   F1  the fast kernel sums a block's channels last-first                       2 RED (K0 natively and in the browser)
+//   F2  its weights read without the group offset                                3 RED (the head's groups 2-3)
+//   F3  its bias packed one float late                                           0 RED HERE -- V6's blind spot again: these
+//       networks' biases are zero; brain/conv2d-selfcheck.mjs's layout row and its six device cases catch it, 6 RED
+//   F4  its second barrier removed                                               3 RED
+//   F5  its padding channels written past Cout                                   3 RED
+//   F6  the r13 set never picks the fast kernel                                  3 RED
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet } = await imp("render/denoiseDevice.mjs");
+const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
+        KERNEL_SETS, DEFAULT_KERNELS } = await imp("render/denoiseDevice.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
 const { conv2dCpu, conv2dCpuFma, COUT_MAX } = await imp("brain/conv2d.mjs");
 const { seededRandom } = await imp("brain/convNet.mjs");
@@ -89,6 +101,12 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
     ok(`!! the large network's four hidden layers run TILED and its head of ${KERNEL_TAPS} logits DIRECT -- past the tiled kernel's COUT_MAX ${COUT_MAX}, on the kernel that never had one`,
         L.map((l) => l.kernel).join() === "tiled,tiled,tiled,tiled,direct" && L[4].Cout === KERNEL_TAPS && KERNEL_TAPS > COUT_MAX &&
         kernelFor({ k: 3, Cout: COUT_MAX }) === "tiled" && kernelFor({ k: 3, Cout: COUT_MAX + 1 }) === "direct" && kernelFor({ k: 5, Cout: 4 }) === "direct");
+    const L13 = deviceLayers(net, "r13");
+    let noSet = null; try { kernelFor({ k: 3, Cout: 4, Cin: 4 }, "r14"); } catch (e) { noSet = e.message; }
+    ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them -- the default stays ${DEFAULT_KERNELS} (section 39)`,
+        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13" && DEFAULT_KERNELS === "r12" &&
+        deviceLayers(net).map((l) => l.kernel).join() === L.map((l) => l.kernel).join() && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r14"/.test(noSet || ""),
+        "a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name");
     let refused = null; try { deviceLayers(makeDenoiser(1, "he", "residual")); } catch (e) { refused = e.message; }
     ok("  a residual network is refused by name: only the kernel-predicting network runs on the device", /only the kernel-predicting/.test(refused || ""));
     ok("  kernelApplyWgsl is one kernel, k_apply, with its four bindings", /fn k_apply/.test(kernelApplyWgsl()) && (kernelApplyWgsl().match(/@binding\(/g) || []).length === 4);
@@ -115,17 +133,17 @@ else try {
     const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
     // one job: a fresh adapter and device, the network built and run, everything read back, the device destroyed --
     // before any CPU work long enough to matter
-    const job = async (net, x, h, w, C) => {
+    const job = async (net, x, h, w, C, kernels = DEFAULT_KERNELS) => {
         const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice(), info = adapter.info || {};
         try {
-            const D = await createDeviceDenoiser(dev, net, { H: h, W: w, C });
+            const D = await createDeviceDenoiser(dev, net, { H: h, W: w, C, kernels });
             const out = await D.run(x, { keep: true });
             D.destroy();
             return { ...out, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
         } finally { dev.destroy(); }
     };
     // each layer judged on the device's OWN input to it: the twin's cell, or the fused mirror's, or unexplained
-    const judge = (net, x, h, w, acts) => deviceLayers(net).map((L, i) => {
+    const judge = (net, x, h, w, acts, set = DEFAULT_KERNELS) => deviceLayers(net, set).map((L, i) => {
         const input = i ? acts[i - 1] : Float32Array.from(x), tw = conv2dCpu(input, h, w, L), fm = conv2dCpuFma(input, h, w, L);
         let plain = 0, fused = 0, unexplained = 0;
         for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
@@ -141,6 +159,15 @@ else try {
         wa <= APPLY_TOL, `worst relative ${wa.toExponential(2)}, ${(APPLY_TOL / Math.max(wa, 1e-30)).toFixed(0)} x inside`);
     const ref = denoise(net, x, HH, WW).y, wf = worstRel(r.y, ref, 1e-12);
     ok("  the whole pass on the device is the f64 network's output within f32 rounding", wf < 1e-5, `worst relative ${wf.toExponential(2)}`);
+    // round 13: the fast set, the same network and image -- section 39's K0, natively
+    const r13 = await job(net, x, HH, WW, 10, "r13"), J13 = judge(net, x, HH, WW, r13.acts, "r13");
+    const w13 = worstRel(r13.y, kernelApplyCpu(x, r13.acts[4], HH, WW));
+    ok(`!! *** K0 natively: the r13 set -- the fast kernel on all five layers -- every cell the twin's or the fused mirror's, given the device's own input; the kernel within APPLY_TOL ***`,
+        J13.every((j) => j.unexplained === 0) && J13.every((j) => j.kernel === "fast") && w13 <= APPLY_TOL && worstRel(r13.y, ref, 1e-12) < 1e-5,
+        J13.map((j) => `${j.kernel} ${j.plain}+${j.fused}f`).join(", ") + `; kernel ${w13.toExponential(2)}`);
+    const noneFused = [...J, ...J13].every((j) => j.fused === 0);
+    ok("  ...and where no layer of either set fused a cell, the two sets' images are the same bits", !noneFused || r13.y.every((v, i) => Object.is(v, r.y[i])),
+        noneFused ? "no cell fused in either set on this device: the images must agree exactly" : "a set fused cells here, so the images may differ where it did");
     // the mask is read on the device too: the same image with the mask erased gives another output
     const x0 = Float64Array.from(x); for (let p = 0; p < HH * WW; p++) x0[p * 10 + 9] = 0;
     const r0 = await job(net, x0, HH, WW, 10);
@@ -194,7 +221,46 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
     }
 }
 
+console.log("\n5. BOTH KERNEL SETS IN THE BROWSER, CELL FOR CELL (round 13, section 39's K0 (c))");
+{
+    // in the engine's origin, on the browser's own adapter: the large network drawn from a seed, both sets run with every
+    // layer read back, and each cell judged against the twin and the fused mirror in the page itself -- an adapter per set,
+    // as a browser's adapter gives one device
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 180000, script: `async () => {
+        const D = await import("/render/denoiseDevice.mjs"), Cv = await import("/brain/conv2d.mjs"), N = await import("/render/denoiseNet.mjs");
+        const net = N.makeDenoiser(3, "he", "kernel", 10, "large"), h = 21, w = 19, x = D.timingInput(h, w, 10, 7), out = {};
+        if (!navigator.gpu) return { error: "no navigator.gpu" };
+        for (const set of D.KERNEL_SETS) {
+            const a = await navigator.gpu.requestAdapter(); if (!a) return { error: "no adapter" };
+            const dev = await a.requestDevice();
+            try {
+                const Dn = await D.createDeviceDenoiser(dev, net, { H: h, W: w, C: 10, kernels: set }), res = await Dn.run(x, { keep: true });
+                const layers = D.deviceLayers(net, set).map((L, i) => {
+                    const input = i ? res.acts[i - 1] : Float32Array.from(x), tw = Cv.conv2dCpu(input, h, w, L), fm = Cv.conv2dCpuFma(input, h, w, L);
+                    let plain = 0, fused = 0, unexplained = 0;
+                    for (let j = 0; j < tw.length; j++) { const v = res.acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
+                    return { kernel: L.kernel, plain, fused, unexplained };
+                });
+                const tw = D.kernelApplyCpu(x, res.acts[res.acts.length - 1], h, w);
+                let worst = 0; for (let j = 0; j < tw.length; j++) worst = Math.max(worst, Math.abs(res.y[j] - tw[j]) / (Math.abs(tw[j]) + 1e-30));
+                out[set] = { layers, worst, kernels: Dn.layers.map((L) => L.kernel) };
+                Dn.destroy();
+            } finally { dev.destroy(); }
+        }
+        return { out };
+    }` });
+    if (r.skipped) console.log("  SKIP  " + r.reason);
+    else {
+        const O = (r.result && r.result.out) || {}, line = (s) => O[s] ? O[s].layers.map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") : "not run";
+        for (const s of KERNEL_SETS)
+            ok(`!! ${s === "r13" ? "*** K0 in the browser: " : ""}the ${s} set in the browser's own device, every cell the twin's or the fused mirror's, the kernel within APPLY_TOL${s === "r13" ? " ***" : ""}`,
+                r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL &&
+                O[s].kernels.join() === (s === "r13" ? "fast,fast,fast,fast,fast" : "tiled,tiled,tiled,tiled,direct"),
+                r.ok ? `${line(s)}; kernel ${O[s] ? O[s].worst.toExponential(2) : "-"}` + (r.result && r.result.error ? "; " + r.result.error : "") : r.reason);
+    }
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: the shipped network itself, on the images it was measured on. `node tools/denoiseDevice.mjs --measure-r12` is " +
-    "section 35's one command, and no gate runs it.");
+    "section 35's one command, and no gate runs it; round 13's is `--measure-r13` (section 39's K0 (a)).");
 H.exitCleanly ? H.exitCleanly(fails ? 1 : 0) : process.exit(fails ? 1 : 0);

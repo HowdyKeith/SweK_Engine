@@ -89,6 +89,25 @@ is `render/denoise-rig-r12-intel-gen9.json`.
 The page itself has the same button: open `denoise.html` in your browser and press **Time the network**. It shows the
 table for whatever adapter the browser hands it, and says so plainly when that adapter is software.
 
+### Round 13: the fast kernel (pre-registration section 39)
+
+The branch `claude/denoiser-kernel-speed` adds a third convolution kernel, `conv2dFastWgsl` in `brain/conv2d.mjs`. It adds
+every number in the same order as round 12's, so it is held to the same CPU twin cell for cell, and it reads them from
+faster places. Both gates now run both kernel sets:
+
+- **The exact gate** holds both sets to the twin, cell for cell, natively and in the browser.
+- **The timing gate** times both on one device a size, taking turns, and prints the speedup at every size both
+  measured, for example `native: r13 against r12 at 256 x 256: N x as fast, on the device's clock`.
+
+On each GPU, run once, on that branch:
+
+```
+node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json
+```
+
+and send the JSON back. Section 39 fixes, before any GPU ran the fast kernel, what its numbers decide.
+
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

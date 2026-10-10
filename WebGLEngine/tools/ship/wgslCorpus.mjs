@@ -792,6 +792,10 @@ export function corpus() {
         { id: "conv2d.conv2dTiledWgsl", from: "brain/conv2d.mjs",
           why: "the same convolution out of workgroup memory -- a halo'd tile loaded per channel block between two barriers -- the first kernel in the corpus whose correctness depends on workgroupBarrier ordering",
           opts: (() => { const P = CONV.PROBES[1], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
+        // the denoiser arc, round 13 -- the fast kernel: generated per layer, its weights in the uniform block
+        { id: "conv2d.conv2dFastWgsl", from: "brain/conv2d.mjs",
+          why: "the same convolution generated for its layer -- weights and bias as vec4s in one uniform block, eight named vec4 accumulators, the tap and channel outer -- in the order every copy of the layer shares, so both backends must give the same bytes",
+          opts: (() => { const P = CONV.PROBES[2], a = P.args; return { code: P.code(a), entryPoint: P.entryPoint, outCount: P.outCount(a), uniforms: P.pack(a), workgroups: P.workgroups(a), inputs: P.inputs(a) }; })() },
         // the denoiser arc, round 12 -- the kernel-predicting network's kernel, held to its twin (kernelApplyCpu) within
         // APPLY_TOL by render/denoiseDevice-selfcheck.mjs; here, both backends must give the same bytes
         { id: "denoiseDevice.kernelApplyWgsl", from: "render/denoiseDevice.mjs",

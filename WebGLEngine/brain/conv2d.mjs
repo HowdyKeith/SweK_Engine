@@ -220,6 +220,109 @@ fn k_conv_tiled(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_in
 }
 `;
 
+// ---- THE FAST KERNEL (the denoiser arc, round 13: pre-registration section 39) ----------------------------------
+//
+// Round 12's rig run (section 38) found the tiled kernel at about 2% of an Intel gen-9's peak. Three things in it cost
+// more than the arithmetic: each multiply-add loads twice (the tile, and the weight from storage); the output channel is
+// the OUTER loop, so the same tile value is re-read for each of 32 channels; and 32 accumulators indexed by a loop
+// variable with a runtime bound usually live in memory, not registers. This kernel keeps every number the same and moves
+// where it is read from:
+//   - it is generated per layer, Cin, Cout, k and the activation written in as constants;
+//   - its weights and bias are in ONE uniform block (packFastUniforms), as vec4s of four output channels -- a constant
+//     buffer read the same by every thread, and the harness layout unchanged: Y at 0, the uniform at 1, X at 2;
+//   - a thread keeps up to FAST_GROUP output channels in registers, as named vec4 accumulators (a0..a7), and a wider
+//     layer is split into groups across the dispatch's z (the 81-logit head is three);
+//   - the tap and the input channel are the OUTER loops: each value is read from the tile once, and added into every
+//     channel's accumulator.
+// *** NOT ONE CELL'S ORDER MOVES. *** Each accumulator still adds b, then block by block, ky, kx (in bounds), ci -- the
+// order conv2dCpu adds in. Interleaving DIFFERENT cells' additions is free; a vec4's four lanes are four cells, each
+// added on its own. So the kernel is held to the same twin, or the fused mirror, cell for cell, at zero.
+export const FAST_GROUP = 32;           // output channels one thread keeps, as FAST_GROUP / 4 vec4s
+export const UNIFORM_MAX = 65536;       // WebGPU's default maxUniformBufferBindingSize: one layer's weights must fit it
+const WORKGROUP_MAX = 16384;            // WebGPU's default maxComputeWorkgroupStorageSize
+
+/**
+ * The fast kernel's shape for a layer: g4 vec4s a thread keeps, groups of them across z, C4 vec4s of padded output
+ * channels, the uniform block's bytes (16 of H and W, then the bias, then the weights), and whether the device's default
+ * limits hold it.
+ */
+export function fastShape({ Cin, Cout, k }) {
+    const c4 = Math.ceil(Cout / 4), g4 = Math.min(FAST_GROUP / 4, c4), groups = Math.ceil(c4 / g4), C4 = groups * g4;
+    const bytes = 16 + 16 * C4 + 16 * k * k * Cin * C4, halo = TILE + k - 1, wgBytes = halo * halo * CB * 4;
+    return { g4, groups, C4, bytes, wgBytes, fits: k % 2 === 1 && bytes <= UNIFORM_MAX && wgBytes <= WORKGROUP_MAX };
+}
+
+/** The fast kernel (entry k_conv_fast), generated for one layer's Cin, Cout, k and activation. */
+export function conv2dFastWgsl({ Cin, Cout, k, act = "none" }) {
+    const S = fastShape({ Cin, Cout, k });
+    if (!S.fits) throw new Error(`conv2d: the fast kernel holds a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding, got ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}`);
+    const R = (k - 1) / 2, HW = TILE + k - 1, G = S.g4, js = Array.from({ length: G }, (_, j) => j);
+    const lanes = ["x", "y", "z", "w"];
+    return `
+struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: array<vec4<f32>, ${k * k * Cin * S.C4}> };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
+@group(0) @binding(1) var<uniform> F: FP;                        // packFastUniforms
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
+var<workgroup> T: array<f32, ${HW * HW * CB}>;
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_conv_fast(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
+               @builtin(workgroup_id) wid: vec3<u32>) {
+    let ox = i32(wid.x * ${TILE}u) - ${R}; let oy = i32(wid.y * ${TILE}u) - ${R};
+    let px = gid.x; let py = gid.y; let g = wid.z;
+    let inside = px < F.W && py < F.H;
+    ${js.map((j) => `var a${j} = F.b[g * ${G}u + ${j}u];`).join("\n    ")}
+    for (var c0 = 0u; c0 < ${Cin}u; c0 = c0 + ${CB}u) {
+        let nb = min(${CB}u, ${Cin}u - c0);
+        for (var i = lid.y * ${TILE}u + lid.x; i < ${HW * HW}u * nb; i = i + ${TILE * TILE}u) {
+            let cj = i % nb; let t = i / nb; let sx = ox + i32(t % ${HW}u); let sy = oy + i32(t / ${HW}u);
+            var v = 0.0;
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + c0 + cj]; }
+            T[i] = v;
+        }
+        workgroupBarrier();
+        if (inside) {
+            for (var ky = 0u; ky < ${k}u; ky = ky + 1u) {
+                let sy = i32(py) + i32(ky) - ${R};
+                if (sy < 0 || sy >= i32(F.H)) { continue; }
+                for (var kx = 0u; kx < ${k}u; kx = kx + 1u) {
+                    let sx = i32(px) + i32(kx) - ${R};
+                    if (sx < 0 || sx >= i32(F.W)) { continue; }
+                    let to = ((lid.y + ky) * ${HW}u + lid.x + kx) * nb;
+                    let wb = ((ky * ${k}u + kx) * ${Cin}u + c0) * ${S.C4}u + g * ${G}u;
+                    for (var cj = 0u; cj < nb; cj = cj + 1u) {
+                        let x = T[to + cj];
+                        let w = wb + cj * ${S.C4}u;
+                        ${js.map((j) => `a${j} = a${j} + x * F.w[w + ${j}u];`).join("\n                        ")}
+                    }
+                }
+            }
+        }
+        workgroupBarrier();
+    }
+    if (!inside) { return; }
+    let o = (py * F.W + px) * ${Cout}u; let c = g * ${G * 4}u;
+    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, vec4<f32>(0.0));\n    ` : "") +
+        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = a${j}.${l}; }`).join(" ")).join("\n    ")}
+}
+`;
+}
+
+/**
+ * The fast kernel's uniform block for one layer at H x W: H and W as u32 bits, then the bias, then the weights, each as
+ * vec4s of four output channels -- weight (co, ky, kx, ci) at float ((ky k + kx) Cin + ci) 4 C4 + co after the bias,
+ * the bias of co at float co; the padding past Cout is zero. Refuses a layer the kernel cannot hold, by name.
+ */
+export function packFastUniforms({ H, W, layer }) {
+    const { Cin, Cout, k } = layer, S = fastShape(layer);
+    if (!S.fits) throw new Error(`conv2d: the fast kernel holds a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding, got ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}`);
+    const buf = new ArrayBuffer(S.bytes), u = new Uint32Array(buf), f = new Float32Array(buf), w0 = 4 + 4 * S.C4;
+    u[0] = H; u[1] = W;
+    for (let co = 0; co < Cout; co++) f[4 + co] = layer.b[co];
+    for (let co = 0; co < Cout; co++) for (let ky = 0; ky < k; ky++) for (let kx = 0; kx < k; kx++) for (let ci = 0; ci < Cin; ci++)
+        f[w0 + ((ky * k + kx) * Cin + ci) * 4 * S.C4 + co] = layer.W[((co * k + ky) * k + kx) * Cin + ci];
+    return f;
+}
+
 /** The direct kernel (entry k_conv), in the harness layout: Y at 0, the uniform at 1, X W B at 2 3 4. */
 export function conv2dWgsl() { return DECL_PROBE + BODY_DIRECT; }
 /** The tiled kernel (entry k_conv_tiled): same layout, same order, the window read from workgroup memory. */
@@ -271,4 +374,9 @@ const probe = (id, code, entryPoint, args) => Object.freeze({
 export const PROBES = Object.freeze([
     probe("conv2d.conv2dWgsl", () => conv2dWgsl(), "k_conv", { H: 12, W: 10, Cin: 13, Cout: 4, k: 3, act: "relu", seed: 7 }),
     probe("conv2d.conv2dTiledWgsl", () => conv2dTiledWgsl(), "k_conv_tiled", { H: 12, W: 10, Cin: 13, Cout: 4, k: 3, act: "relu", seed: 7, tiled: true }),
+    // round 13: the same case, generated for its shape, its weights in the uniform -- binding 2 the image alone
+    Object.freeze({ ...probe("conv2d.conv2dFastWgsl", (a) => conv2dFastWgsl(a), "k_conv_fast", { H: 12, W: 10, Cin: 13, Cout: 4, k: 3, act: "relu", seed: 7 }),
+        pack: (a) => packFastUniforms({ H: a.H, W: a.W, layer: probeFixture(a).layer }),
+        inputs: (a) => [{ binding: 2, data: probeFixture(a).x }],
+        workgroups: (a) => [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastShape(a).groups] }),
 ]);

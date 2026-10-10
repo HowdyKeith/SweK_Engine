@@ -23,8 +23,17 @@
 // exp 3 + 2|x| ulp, division 2.5 ulp), so k_apply is held to its twin (kernelApplyCpu) within APPLY_TOL, a bound fixed
 // in section 35 from synthetic images before any measured one. And the whole pass to the f64 network
 // (denoiseNet.mjs's denoise) is a measurement, not a key.
+//
+// ---- TWO KERNEL SETS (round 13, section 39) ------------------------------------------------------------------------
+//
+//   "r12"   the kernels above: brain/conv2d.mjs's tiled kernel for the hidden layers, its direct kernel for the head
+//   "r13"   brain/conv2d.mjs's fast kernel, generated per layer, for every layer it can hold -- all five here; a layer
+//           it cannot hold falls back to its r12 kernel
+// Both add every cell in the same order, so both are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
+// unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
+// both, taking turns on one device.
 "use strict";
-import { conv2dWgsl, conv2dTiledWgsl, packProbeUniforms, conv2dCpu, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
+import { conv2dWgsl, conv2dTiledWgsl, conv2dFastWgsl, packProbeUniforms, packFastUniforms, fastShape, conv2dCpu, TILE, K_MAX, COUT_MAX } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -119,13 +128,24 @@ export function kernelApplyCpu(x, logits, H, W) {
     return y;
 }
 
-/** The kernel each layer runs on: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit head). */
-export const kernelFor = (L) => (L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct");
+/** The kernel sets a pass can run on: round 12's, and round 13's fast kernel (section 39). */
+export const KERNEL_SETS = Object.freeze(["r12", "r13"]);
+/** The set a pass runs unless told otherwise: round 12's, until section 39's outcome rule says otherwise. */
+export const DEFAULT_KERNELS = "r12";
 
-/** A network's layers as the device takes them: f32 weights and biases, each layer's kernel named. */
-export function deviceLayers(net) {
+/**
+ * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit
+ * head). r13: the fast kernel when its uniform block and tile fit the device's default limits, else the layer's r12 kernel.
+ */
+export const kernelFor = (L, set = DEFAULT_KERNELS) => {
+    if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
+    return set === "r13" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
+};
+
+/** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named. */
+export function deviceLayers(net, set = DEFAULT_KERNELS) {
     if (headOf(net) !== "kernel") throw new Error("denoiseDevice: only the kernel-predicting network runs on the device");
-    return net.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b), kernel: kernelFor(L) }));
+    return net.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b), kernel: kernelFor(L, set) }));
 }
 
 /** The whole pass's twin, layer by layer through conv2dCpu, then kernelApplyCpu: { y, acts } -- the device's order exactly. */
@@ -137,26 +157,27 @@ export function denoiseTwin(net, x, H, W) {
 }
 
 /**
- * A denoiser on `dev` (a GPUDevice) for one network and one image size: run(x) -> { y, acts?, ms }. With `keep`, every
- * layer's output is read back too (the gate judges each layer on its own device input). Buffers and pipelines are built
- * once; destroy() frees the buffers.
+ * A denoiser on `dev` (a GPUDevice) for one network, one image size and one kernel set: run(x) -> { y, acts?, ms }. With
+ * `keep`, every layer's output is read back too (the gate judges each layer on its own device input). Buffers and
+ * pipelines are built once -- only the kernels the set uses, the fast kernel once per layer, as it is generated for one;
+ * destroy() frees the buffers.
  */
-export async function createDeviceDenoiser(dev, net, { H, W, C }) {
-    const layers = deviceLayers(net);
+export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAULT_KERNELS }) {
+    const layers = deviceLayers(net, kernels);
     if (layers[0].Cin !== C) throw new Error(`denoiseDevice: a network of ${layers[0].Cin} input channels was handed an input of ${C}`);
-    const mods = {}, errors = [];
-    for (const [key, code] of [["direct", conv2dWgsl()], ["tiled", conv2dTiledWgsl()], ["apply", kernelApplyWgsl()]]) {
+    const used = new Set(layers.map((L) => L.kernel)), errors = [], pipe = {};
+    const build = async (key, code, entryPoint) => {
         const m = dev.createShaderModule({ code });
         const info = m.getCompilationInfo ? await m.getCompilationInfo() : { messages: [] };
-        for (const g of info.messages) if (g.type === "error") errors.push(`${key} ${g.lineNum}:${g.linePos} ${g.message}`);
-        mods[key] = m;
-    }
-    if (errors.length) throw new Error("denoiseDevice: WGSL did not compile: " + errors.join("; "));
-    const pipe = {
-        direct: dev.createComputePipeline({ layout: "auto", compute: { module: mods.direct, entryPoint: "k_conv" } }),
-        tiled: dev.createComputePipeline({ layout: "auto", compute: { module: mods.tiled, entryPoint: "k_conv_tiled" } }),
-        apply: dev.createComputePipeline({ layout: "auto", compute: { module: mods.apply, entryPoint: "k_apply" } }),
+        const bad = info.messages.filter((g) => g.type === "error");
+        for (const g of bad) errors.push(`${key} ${g.lineNum}:${g.linePos} ${g.message}`);
+        if (!bad.length) pipe[key] = dev.createComputePipeline({ layout: "auto", compute: { module: m, entryPoint } });
     };
+    if (used.has("direct")) await build("direct", conv2dWgsl(), "k_conv");
+    if (used.has("tiled")) await build("tiled", conv2dTiledWgsl(), "k_conv_tiled");
+    for (const [i, L] of layers.entries()) if (L.kernel === "fast") await build("fast" + i, conv2dFastWgsl(L), "k_conv_fast");
+    await build("apply", kernelApplyWgsl(), "k_apply");
+    if (errors.length) throw new Error("denoiseDevice: WGSL did not compile: " + errors.join("; "));
     const owned = [];
     const buffer = (bytes, usage, data = null) => {
         const b = dev.createBuffer({ size: Math.max(16, bytes), usage });
@@ -170,14 +191,21 @@ export async function createDeviceDenoiser(dev, net, { H, W, C }) {
     const yBuf = buffer(H * W * 3 * 4, S);
     const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)];
     const steps = layers.map((L, i) => {
+        if (L.kernel === "fast") {
+            // the fast kernel: its weights and bias in the uniform block, the image alone at binding 2, a z group per FAST_GROUP channels
+            const p = pipe["fast" + i], uni = packFastUniforms({ H, W, layer: L });
+            return { p, wg: [...groups, fastShape(L).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
         const p = pipe[L.kernel];
         const uni = buffer(32, BU.UNIFORM | BU.COPY_DST, packProbeUniforms({ H, W, Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, tiled: L.kernel === "tiled" }));
-        return { p, bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+        return { p, wg: [...groups, 1], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
             { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: uni } }, { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } },
             { binding: 3, resource: { buffer: buffer(L.W.length * 4, BU.STORAGE | BU.COPY_DST, L.W) } }, { binding: 4, resource: { buffer: buffer(L.b.length * 4, BU.STORAGE | BU.COPY_DST, L.b) } }] }) };
     });
     const applyUni = buffer(32, BU.UNIFORM | BU.COPY_DST, packApplyUniforms({ H, W, C }));
-    steps.push({ p: pipe.apply, bind: dev.createBindGroup({ layout: pipe.apply.getBindGroupLayout(0), entries: [
+    steps.push({ p: pipe.apply, wg: [...groups, 1], bind: dev.createBindGroup({ layout: pipe.apply.getBindGroupLayout(0), entries: [
         { binding: 0, resource: { buffer: yBuf } }, { binding: 1, resource: { buffer: applyUni } }, { binding: 2, resource: { buffer: outs[outs.length - 1] } },
         { binding: 3, resource: { buffer: xBuf } }] }) });
     const readBack = async (src, n) => {
@@ -189,13 +217,13 @@ export async function createDeviceDenoiser(dev, net, { H, W, C }) {
         return v;
     };
     return {
-        layers,
+        layers, kernels,
         async run(x, { keep = false } = {}) {
             if (x.length !== H * W * C) throw new Error(`denoiseDevice: an input of ${x.length} values for ${H} x ${W} x ${C}`);
             const t0 = (globalThis.performance ?? Date).now();
             dev.queue.writeBuffer(xBuf, 0, Float32Array.from(x));
             const enc = dev.createCommandEncoder();
-            for (const s of steps) { const pass = enc.beginComputePass(); pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(groups[0], groups[1]); pass.end(); }
+            for (const s of steps) { const pass = enc.beginComputePass(); pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(...s.wg); pass.end(); }
             dev.queue.submit([enc.finish()]);
             const y = await readBack(yBuf, H * W * 3);
             const ms = (globalThis.performance ?? Date).now() - t0;
@@ -228,7 +256,7 @@ export async function createDeviceDenoiser(dev, net, { H, W, C }) {
                     const enc = dev.createCommandEncoder();
                     steps.forEach((s, i) => {
                         const pass = enc.beginComputePass(ts ? { timestampWrites: { querySet: qs, beginningOfPassWriteIndex: 2 * i, endOfPassWriteIndex: 2 * i + 1 } } : {});
-                        pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(groups[0], groups[1]); pass.end();
+                        pass.setPipeline(s.p); pass.setBindGroup(0, s.bind); pass.dispatchWorkgroups(...s.wg); pass.end();
                     });
                     if (ts) { enc.resolveQuerySet(qs, 0, 2 * n, resolved, 0); enc.copyBufferToBuffer(resolved, 0, read, 0, 16 * n); }
                     enc.copyBufferToBuffer(yBuf, 0, probe, 0, 4);
@@ -319,34 +347,65 @@ export async function timingDevice(adapter, bytes) {
 }
 /**
  * The ladder: each size in `sizes`, on a fresh device from `newAdapter()` (one per size -- a reused Dawn device was found to
- * crash, section 35), timed by time() and released; a size is skipped when the adapter's buffers cannot hold it, and the
- * ladder stops before a size whose pass, predicted from the last GUARD median (time()'s `elapsed`) scaled by pixels, would
- * pass `capMs`, or once `totalMs` is spent. On the first size it also checks that timing changes nothing: the image a timed
+ * crash, section 35), released after. On that one device every kernel set in `sets` is timed by time(), TAKING TURNS
+ * (round 13, section 39): `rounds` rounds, the sets' order reversed each round, so a device that warms up or throttles
+ * during a size shares it between them -- each set's passes are pooled across the rounds. A size is skipped when the
+ * adapter's buffers cannot hold it; a set is left out at a size its own last GUARD median (time()'s `elapsed`), scaled by
+ * pixels, predicts past `capMs`, so the faster set can climb past where the slower one stops; and nothing runs once
+ * `totalMs` is spent. On the first size each set measures, it also checks that timing changes nothing: the image a timed
  * pass wrote is an untimed run's, bit for bit.
- * Returns { adapter, rows: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS }], invisible }.
+ * Returns { adapter, sets, rows: { [set]: [{ H, W, skipped, reason, wall, gpu, perPass, timestamps, mpxPerS, order }] },
+ * speedup: [{ H, W, measured, clock, ratio }] -- the first set's median over the last's, on the device's clock where both
+ * have one -- and invisible: { [set]: bool } }.
  */
-export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, capMs = 1500, totalMs = 60000, C = net.layers[0].Cin, ...opts } = {}) {
-    const rows = [], start = (globalThis.performance ?? Date).now();
-    let adapter = null, last = null, invisible = null;
+export async function timingLadder(net, newAdapter, { sizes = TIMING_SIZES, sets = KERNEL_SETS, rounds = 3, capMs = 1500, totalMs = 120000, C = net.layers[0].Cin,
+                                                      warmup = 2, minReps = 3, maxReps = 30, budgetMs = 2000 } = {}) {
+    const now = () => (globalThis.performance ?? Date).now(), start = now();
+    const rows = Object.fromEntries(sets.map((s) => [s, []])), last = {}, invisible = {};
+    let adapter = null;
     for (const [W, H] of sizes) {
-        const bytes = largestBuffer(net, H, W);
-        if ((globalThis.performance ?? Date).now() - start > totalMs) { rows.push({ H, W, skipped: true, reason: `the ladder's ${totalMs / 1000} s budget is spent` }); continue; }
-        if (last && last.ms * (H * W) / last.px > capMs) { rows.push({ H, W, skipped: true, reason: `predicted ${(last.ms * (H * W) / last.px).toFixed(0)} ms a pass, over the ${capMs} ms cap` }); continue; }
+        const bytes = largestBuffer(net, H, W), skip = {};
+        for (const s of sets) {
+            if (now() - start > totalMs) skip[s] = `the ladder's ${totalMs / 1000} s budget is spent`;
+            else if (last[s] && last[s].ms * (H * W) / last[s].px > capMs) skip[s] = `predicted ${(last[s].ms * (H * W) / last[s].px).toFixed(0)} ms a pass, over the ${capMs} ms cap`;
+        }
+        const live = sets.filter((s) => !skip[s]);
+        if (!live.length) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
         const a = await newAdapter();
         adapter = adapter || adapterOf(a);
         const dev = await timingDevice(a, bytes);
-        if (!dev) { rows.push({ H, W, skipped: true, reason: `a ${(bytes / 2 ** 20).toFixed(0)} MiB buffer is over the adapter's limit` }); continue; }
+        if (!dev) { for (const s of sets) rows[s].push({ H, W, skipped: true, reason: skip[s] || `a ${(bytes / 2 ** 20).toFixed(0)} MiB buffer is over the adapter's limit` }); continue; }
         try {
-            const D = await createDeviceDenoiser(dev, net, { H, W, C }), x = timingInput(H, W, C);
-            const t = await D.time(x, opts);
-            if (invisible === null) { const timed = await D.output(), plain = (await D.run(x)).y; invisible = timed.length === plain.length && timed.every((v, i) => Object.is(v, plain[i])); }
-            D.destroy();
-            const wall = summarize(t.wall), gpu = summarize(t.gpu), elapsed = summarize(t.elapsed);
-            const perPass = t.perPass ? t.passes.map((name, i) => ({ name, ms: summarize(t.perPass.map((r) => r[i])).median })) : null;
-            rows.push({ H, W, skipped: false, wall, gpu, elapsed, perPass, timestamps: t.timestamps, raw: { wall: t.wall, gpu: t.gpu, perPass: t.perPass, elapsed: t.elapsed },
-                        mpxPerS: (H * W / 1e6) / (wall.median / 1000) });
-            last = { ms: elapsed.median, px: H * W };
+            const x = timingInput(H, W, C), Ds = {}, got = {}, order = [];
+            for (const s of live) { Ds[s] = await createDeviceDenoiser(dev, net, { H, W, C, kernels: s }); got[s] = { wall: [], gpu: [], perPass: [], elapsed: [], timestamps: false, passes: null }; }
+            for (let r = 0; r < rounds; r++) for (const s of (r % 2 ? [...live].reverse() : live)) {
+                const t = await Ds[s].time(x, { warmup: r ? 1 : warmup, minReps: Math.ceil(minReps / rounds), maxReps: Math.ceil(maxReps / rounds), budgetMs: budgetMs / rounds });
+                const g = got[s]; order.push(s);
+                g.wall.push(...t.wall); g.elapsed.push(...t.elapsed); g.timestamps = t.timestamps; g.passes = t.passes;
+                if (t.gpu) { g.gpu.push(...t.gpu); g.perPass.push(...t.perPass); }
+            }
+            for (const s of live) if (invisible[s] === undefined) {
+                const timed = await Ds[s].output(), plain = (await Ds[s].run(x)).y;
+                invisible[s] = timed.length === plain.length && timed.every((v, i) => Object.is(v, plain[i]));
+            }
+            for (const s of live) Ds[s].destroy();
+            for (const s of sets) {
+                if (skip[s]) { rows[s].push({ H, W, skipped: true, reason: skip[s] }); continue; }
+                const t = got[s], wall = summarize(t.wall), gpu = t.timestamps ? summarize(t.gpu) : null, elapsed = summarize(t.elapsed);
+                const perPass = t.timestamps ? t.passes.map((name, i) => ({ name, ms: summarize(t.perPass.map((q) => q[i])).median })) : null;
+                rows[s].push({ H, W, skipped: false, wall, gpu, elapsed, perPass, timestamps: t.timestamps, order, passes: t.passes,
+                               raw: { wall: t.wall, gpu: t.timestamps ? t.gpu : null, perPass: t.timestamps ? t.perPass : null, elapsed: t.elapsed },
+                               mpxPerS: (H * W / 1e6) / (wall.median / 1000) });
+                last[s] = { ms: elapsed.median, px: H * W };
+            }
         } finally { dev.destroy(); }
     }
-    return { adapter, rows, invisible };
+    const [A, B] = [sets[0], sets[sets.length - 1]];
+    const speedup = rows[A].map((a, i) => {
+        const b = rows[B][i];
+        if (a.skipped || b.skipped || A === B) return { H: a.H, W: a.W, measured: false };
+        const clock = a.gpu && b.gpu ? "device" : "wall";
+        return { H: a.H, W: a.W, measured: true, clock, ratio: clock === "device" ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median };
+    });
+    return { adapter, sets: [...sets], rows, speedup, invisible };
 }

@@ -2117,3 +2117,90 @@ Keith ran section 37's command, `node tools/ship/realGpuRun.mjs --only denoise -
 - **Upload, read-back and pipeline creation.** They are excluded by design (section 37): the span is the network
   alone.
 - **The part's name and clock.** WebGPU's adapter info gives "intel / gen-9" and the driver, nothing finer.
+
+## 39. ROUND 13 -- THE KERNEL-SPEED ROUND, FIXED BEFORE THE NEW KERNEL RUNS ON ANY GPU
+
+Section 38 found the conv layers at 8-9 GFLOP/s on an Intel gen-9, about 2% of such a part's peak. It named two levers:
+the kernels' efficiency and the network's size. Keith asked for a kernel-speed round while he runs the GTX 1080. This is
+the first lever, under the constraint section 38 set: **no cell's summation order moves**, so D1's exactness criterion
+stands unchanged.
+
+**Order of events.** This section is committed before any GPU runs the new kernel.
+- The GTX 1080 run under way as this is written is of round 12's kernels, at 1a9926d1. It is round 12's baseline on
+  that box, not this round's measurement. Its report will be section 40.
+  - It arrived while this round's gates were running: after this section was written, and before it was committed.
+    The report is committed unedited at 0d56b279.
+  - Nothing in this section was changed after reading it, except these two lines.
+- Before this section, the kernel was built and piloted here, on SwiftShader only.
+  - **Exactness:** every cell was the twin's, none fused and none unexplained. That held on four probe shapes (13 -> 4,
+    32 -> 32, 10 -> 32 at 3 x 3; 32 -> 81 at 1 x 1) and on all five layers of the shipped network at 64 x 64.
+  - **Speed:** one paired 64 x 64 pass was 2.8 times faster than round 12's.
+
+  That is a CPU. It is not evidence for anything below, and the threshold below was chosen before the pilot ran.
+
+**What changes.** `brain/conv2d.mjs` gains a third kernel, `conv2dFastWgsl`, generated for one layer at a time:
+- Cin, Cout, k and the activation are written in as constants.
+- Its weights and bias sit in one uniform block (`packFastUniforms`), as vec4s of four output channels. Every thread
+  reads the same weight at the same moment, which suits a constant buffer.
+- A thread keeps up to 32 output channels in registers, as eight named vec4 accumulators. The 81-logit head is split
+  into three groups across the dispatch.
+- The tap and the input channel are now the outer loops. Each input value is read from the tile once and added into
+  all 32 channels. Round 12's tiled kernel re-read it for every channel.
+
+Each accumulator still adds the bias, then block by block, ky, kx (in bounds) and ci, which is `conv2dCpu`'s order.
+Interleaving different cells' additions changes no cell's sum, and a vec4's four lanes are four cells, each added on its
+own. `render/denoiseDevice.mjs` gains two kernel sets:
+- **"r12"** is round 12's kernels, unchanged;
+- **"r13"** is the fast kernel on every layer it can hold, which is all five here.
+
+`DEFAULT_KERNELS` stays "r12" until the rule below says otherwise. The network, its weights, `k_apply`, the page's scope
+and every criterion of rounds 11-12 are unchanged.
+
+**The paired ladder.** `timingLadder` now times both sets on the same device at each size, taking turns:
+- three rounds, the order reversed each round (r12 r13, r13 r12, r12 r13), each set's passes pooled across the rounds;
+- each set has its own 1.5 s cap, so the faster set may climb past where the slower one stops;
+- the ladder's budget is 120 s.
+
+The speedup at a size is round 12's median over round 13's, on the device's clock, or on the wall clock where the device
+has no timestamp queries.
+
+**K0 -- exact.** On every device the fast set runs on, every cell of every layer is the twin's or the fused mirror's,
+given the device's own input to that layer. That is D1's rule, unchanged. It is measured three ways:
+- **(a) Here,** SwiftShader natively, on round 11's 24 test images: `node tools/denoiseDevice.mjs --measure-r13`. Its
+  output, `render/denoise-results-r13.json`, is committed before it is read. With it, D2 (the kernel within APPLY_TOL)
+  and D3 (relMSE within 1e-4 of the f64 network's, and the primary filter beaten on exactly the same images), for the
+  fast set.
+- **(b) On each rig GPU natively,** by `render/denoiseDevice-selfcheck.mjs`'s synthetic images (the exact gate).
+- **(c) In each rig browser,** the same synthetic network, cell for cell, in the page's own origin (the exact gate's new
+  section).
+
+**K1 -- faster.** Measured on each of Keith's GPUs (the Intel gen-9 machine and the GTX 1080 box), natively and in the
+browser, by `render/denoiseTiming-selfcheck.mjs`'s paired ladder. On a GPU and path, K1 holds when:
+- the speedup is **at least 2** at the largest size both sets measured there; and
+- it is **at least 1** at every size both sets measured.
+
+Why 2: below it, the gen-9's 1080p frame would move from about 17 s to no less than 8 s, still nowhere near
+interactive, and not worth carrying a second kernel path. SwiftShader's speedup is reported and is never evidence.
+
+**On the rig.**
+- **One run per GPU,** of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json`, at a commit
+  carrying this round's code.
+- **Each report is committed byte for byte** as sent.
+- **Reruns.** A run is never repeated because of its numbers. It is repeated only if it did not reach the GPU (no
+  adapter, a software adapter, a crash before any row ran), and then both reports are committed.
+
+**The outcome rule.**
+- **K0 fails anywhere** (one unexplained cell, on any device or path): the fast set does not become the default,
+  whatever its speed. The unexplained cells are the finding: a device whose arithmetic within a cell is neither order.
+- **K0 holds everywhere, and K1 holds on every GPU and path measured:** `DEFAULT_KERNELS` becomes "r13". The page and the
+  device gate run the fast set, and round 12's stays as the reference the ladder times beside it.
+- **K0 holds, and K1 fails on any GPU or path:** the default stays "r12", and the fast set stays for the next round.
+  The report says where it fell short and by how much.
+- **Whatever the outcome,** each GPU's achieved GFLOP/s and its 1080p prediction (or measurement, if the fast set reaches
+  it) are reported, against section 38's figures.
+
+**Not in this round.**
+- Kernels that reorder a cell's sum (vec4 dot products along ci, split reductions, subgroup sums). They need D1
+  restated as a bound, and that is a later round's pre-registration.
+- A smaller network. That reopens the quality question, and would need its own round against the filter.
+- Upload, read-back and pipeline creation, as in section 37.
