@@ -245,6 +245,7 @@ function startGeom(seed, gap) {
  * ONE-ON-ONE: the candidate pilot (team A, weights `w`) against `opponent`'s pilot (team B), `seconds` in physics/esBox3d.js's
  * fly3d mode on the headless planar-fallback substrate. `opponent` is "scripted" (ev/flightModel3d.js's own stepAI3d, the
  * default -- the AI already flying this demo), "hand" (this module's own handWeights()), or "zero" (never turns or fires).
+ * v4829: `opponent` may also be a weight vector (a Float32Array of pilotFor's length), flown as team B's pilot; the result then reports opponent "weights".
  * `altOffset` (default 0) shifts BOTH ships' starting altitude by the same amount -- their altitude DIFFERENCE, and so every
  * yaw/pitch/thrust/fire decision either pilot makes, is unchanged, but the two runs occupy different absolute altitude. A
  * gate uses this to isolate whether the fingerprint actually sees altitude, independent of any behavior difference.
@@ -256,7 +257,7 @@ export function duel(worldFrom, w, { seed = 1, seconds = 30, standoff = 140, ran
     const a = makeDuelShip("A", "A", g.ax, 0, g.aAlt + altOffset, g.aHead), b = makeDuelShip("B", "B", g.bx, 0, g.bAlt + altOffset, g.bHead);
     const ra = esbx.add(a, STATS), rb = esbx.add(b, STATS);
     const pilotA = pilotFor(w);
-    const pilotB = opponent === "hand" ? pilotFor(handWeights()) : opponent === "zero" ? pilotFor(zeroWeights()) : null;   // null -> the original scripted AI
+    const pilotB = opponent === "hand" ? pilotFor(handWeights()) : opponent === "zero" ? pilotFor(zeroWeights()) : (opponent && typeof opponent === "object") ? pilotFor(opponent) : null;   // v4829: a weight VECTOR is a pilot too (brain/pilotRoster.mjs flies any weights against any); null -> the original scripted AI
     const dt = 1 / 30, steps = Math.round(seconds / dt);
     let shots = [], nowMs = 0, h = 0x811c9dc5, t = 0;
     const tally = { hits: 0, shotsFired: 0, damageDealt: 0, damageTaken: 0 };
@@ -293,7 +294,7 @@ export function duel(worldFrom, w, { seed = 1, seconds = 30, standoff = 140, ran
     }
     esbx.destroy();   // esBox3d.js's own destroy() already guards world.destroy not existing (planarFallbackWorld.js has none)
     const score = tally.hits * REWARD.hit - tally.shotsFired * REWARD.waste - tally.damageTaken * REWARD.damageTaken + (b.dead ? REWARD.kill : 0);
-    return { ...tally, aDead: a.dead, bDead: b.dead, score, ticks: t, seed, opponent, fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
+    return { ...tally, aDead: a.dead, bDead: b.dead, score, ticks: t, seed, opponent: typeof opponent === "string" ? opponent : "weights", fingerprint: (h >>> 0).toString(16).padStart(8, "0") };
 }
 
 /** The mean duel score of a pilot over track seeds, against `opts.opponent` (default: the scripted AI it replaces). */
