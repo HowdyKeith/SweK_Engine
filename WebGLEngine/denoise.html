@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK — Denoiser</title>
+<!-- the denoiser arc, round 12 (render/learned-denoiser-preregistration.md, sections 32-36): the network round 11
+     trained on scene families R and C, on the device, beside the path tracer's page. It renders only R and C,
+     because that is all the arc's evidence covers -- and it says so above everything else on the page. -->
+<style>
+  body { background:#0b0f13; color:#cfe6dd; font:13px/1.6 ui-monospace,Menlo,Consolas,monospace; margin:0; padding:16px; }
+  h1 { font-size:16px; color:#9fe6c0; margin:0 0 2px; }
+  .sub { color:#7e9a92; margin:0 0 14px; }
+  .scope { max-width:860px; margin:0 0 14px; padding:7px 9px; border-radius:5px; border:1px solid #a07a40; color:#f2dcb8; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; margin:10px 0; }
+  figure { margin:0; flex:1 1 180px; max-width:360px; }
+  figcaption { color:#8fc; margin-top:4px; font-size:12px; }
+  figcaption .n { color:#cfe6dd; }
+  /* the drawing buffer is the network's 64 x 64 and stays so; the element grows with its column */
+  canvas { image-rendering:pixelated; border:1px solid #24405a; background:#000; width:100%; height:auto; aspect-ratio:1; display:block; }
+  label { margin-right:6px; color:#8fc; }
+  select, input { background:#111a22; color:#cfe6dd; border:1px solid #24405a; border-radius:4px; padding:3px 6px; font:inherit; }
+  button { background:#12303f; color:#9fe6c0; border:1px solid #2a5a72; border-radius:5px; padding:4px 12px; font:inherit; cursor:pointer; }
+  .note { color:#7e9a92; font-size:11px; margin-top:10px; border-left:3px solid #24405a; padding-left:9px; max-width:860px; }
+  a { color:#9fe6c0; }
+</style>
+</head>
+<body>
+  <h1>Denoiser</h1>
+  <p class="sub">A learned denoiser for the path tracer, on the device &mdash; <a href="/server.html">&larr; back</a> &middot; <a href="/path-tracer.html">Path Tracer</a></p>
+
+  <p class="scope" id="scope"><b>Trained on two families of scenes, R and C, and this page renders only those.</b>
+    Round 11 found it beats the hand-written filter on new scenes of both. Across eleven pre-registered rounds, no
+    network in the arc ever beat the filter on a family it was <b>not</b> trained on, in either direction. Nothing here
+    says it works on any other scene &mdash; the path tracer's own scenes included.</p>
+
+  <div class="row">
+    <label>Family <select id="family">
+      <option value="R">R &mdash; randomized: spheres, materials, lights and skies drawn at random</option>
+      <option value="C">C &mdash; night interiors: rough and glossy spheres, two small coloured lights</option>
+    </select></label>
+    <label>Seed <input id="seed" type="number" min="0" step="1" style="width:110px" /></label>
+    <button id="reseed">New seed</button>
+    <label>Reference <select id="refspp"><option value="64">64 spp</option><option value="256" selected>256 spp</option><option value="1024">1024 spp (slow)</option></select></label>
+    <button id="go">Render and denoise</button>
+  </div>
+  <div id="status" class="sub">idle</div>
+
+  <div class="row">
+    <figure><canvas id="cNoisy" width="64" height="64"></canvas><figcaption>noisy, 4 spp <span class="n" id="eNoisy"></span></figcaption></figure>
+    <figure><canvas id="cFilter" width="64" height="64"></canvas><figcaption>hand-written filter <span class="n" id="eFilter"></span></figcaption></figure>
+    <figure><canvas id="cNet" width="64" height="64"></canvas><figcaption id="netCap">network <span class="n" id="eNet"></span></figcaption></figure>
+    <figure><canvas id="cRef" width="64" height="64"></canvas><figcaption>reference <span class="n" id="eRef"></span></figcaption></figure>
+  </div>
+
+  <h2 style="font-size:14px;color:#9fe6c0;margin:18px 0 4px">Time on this device</h2>
+  <div class="row" style="margin-top:0">
+    <button id="time">Time the network</button>
+    <span id="timeStatus" class="sub" style="margin:0">a ladder of image sizes, 64 x 64 up to a 1080p frame, on synthetic input</span>
+  </div>
+  <table id="timeTable" style="border-collapse:collapse;font-size:12px;display:none">
+    <thead><tr style="color:#8fc;text-align:right"><th style="text-align:left;padding:2px 10px 2px 0">size</th><th style="padding:2px 10px">ms a pass (median)</th>
+      <th style="padding:2px 10px">10th-90th</th><th style="padding:2px 10px">on the device's clock</th><th style="padding:2px 10px">Mpx/s</th>
+      <th style="text-align:left;padding:2px 10px">where the time goes</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <pre id="timeJson" hidden></pre>
+
+  <p class="note">The numbers are relMSE against the reference (lower is better): the arc's own metric, mean of
+    (y - r)<sup>2</sup> / (r<sup>2</sup> + 0.01). The reference here is a display, rendered at the samples chosen above;
+    the arc's references were 1024 samples a pixel. The network is round 11's seed 1, loaded from
+    <a href="/render/denoise-net-r11.json">render/denoise-net-r11.json</a>; the filter is the joint bilateral filter
+    tuned on the same 192 training scenes. Seeds that belong to the arc's dataset are refused: this page never
+    renders a scene the network was trained or tested on. On the device the network runs as WebGPU compute
+    (render/denoiseDevice.mjs); without WebGPU it runs on the CPU, and the caption says which.</p>
+  <p class="note">Timing: each size runs on its own device, a few untimed passes first, then timed ones. "ms a pass" is
+    submit to the queue's done -- the network and its kernel, no upload and no read-back. "On the device's clock" is
+    the same span from timestamp queries, where the device offers them (a browser may round them to 0.1 ms). The ladder
+    stops before a size whose pass would take over 1.5 s. On a software adapter (SwiftShader and its kind) these are a
+    CPU's times, and the page says so.</p>
+
+<script type="module">
+import { renderImages, inputChannels, makeScene, isDatasetSeed } from "/render/denoiseScenes.mjs";
+import { emitterCoverage, withMask } from "/render/denoiseMask.mjs";
+import { jointBilateral } from "/render/denoiseFilter.mjs";
+import { relMSE } from "/render/denoiseStats.mjs";
+import { denoise } from "/render/denoiseNet.mjs";
+import { decodeNet, createDeviceDenoiser, timingLadder } from "/render/denoiseDevice.mjs";
+
+const $ = (id) => document.getElementById(id);
+const status = (s) => { $("status").textContent = s; };
+const frame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+const N = 64;
+
+// display only: Reinhard, then the sRGB curve
+function show(id, rgb) {
+    const ctx = $(id).getContext("2d"), img = ctx.createImageData(N, N);
+    for (let p = 0; p < N * N; p++) for (let c = 0; c < 3; c++) {
+        const v = Math.max(0, rgb[p * 3 + c]), t = v / (1 + v);
+        img.data[p * 4 + c] = Math.round(255 * (t <= 0.0031308 ? 12.92 * t : 1.055 * Math.pow(t, 1 / 2.4) - 0.055));
+    }
+    for (let p = 0; p < N * N; p++) img.data[p * 4 + 3] = 255;
+    ctx.putImageData(img, 0, 0);
+}
+const randomSeed = () => { let s; do { s = 990000 + Math.floor(Math.random() * 9999); } while (isDatasetSeed(s)); return s; };
+$("seed").value = randomSeed();
+$("reseed").onclick = () => { $("seed").value = randomSeed(); };
+
+let shipped = null, net = null, device = null, denoiser = null, deviceNote = "";
+async function setup() {
+    if (!shipped) { status("loading the network..."); shipped = await (await fetch("/render/denoise-net-r11.json")).json(); net = decodeNet(shipped.net); }
+    if (denoiser || deviceNote) return;
+    try {
+        if (!navigator.gpu) throw new Error("no WebGPU in this browser");
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) throw new Error("no WebGPU adapter");
+        device = await adapter.requestDevice();
+        denoiser = await createDeviceDenoiser(device, net, { H: N, W: N, C: 10 });
+        const info = adapter.info || {};
+        deviceNote = "on the device" + ([info.vendor, info.architecture].filter(Boolean).length ? " (" + [info.vendor, info.architecture].filter(Boolean).join(" / ") + ")" : "");
+    } catch (e) { denoiser = null; deviceNote = "on the CPU -- " + e.message; }
+}
+
+$("go").onclick = async () => {
+    const family = $("family").value, seed = Number($("seed").value), sppRef = Number($("refspp").value);
+    if (!Number.isInteger(seed) || seed < 0) { status("a seed is a whole number"); return; }
+    if (isDatasetSeed(seed)) { status(`seed ${seed} belongs to the arc's dataset and is refused -- choose another`); return; }
+    $("go").disabled = true;
+    try {
+        await setup();
+        status(`rendering ${family} ${seed}: 4 spp, and the reference at ${sppRef}...`); await frame();
+        const t0 = performance.now();
+        const I = renderImages(family, seed, { harvest: false, w: N, h: N, sppIn: 4, sppRef });
+        const x = withMask(inputChannels(I.input, I.albedo, I.normal, N, N), emitterCoverage(makeScene(family, seed), N, N));
+        const tRender = performance.now() - t0;
+        status("denoising..."); await frame();
+        const yf = jointBilateral(x, N, N, shipped.filter);
+        let yn, tNet, agree = "";
+        if (denoiser) {
+            const out = await denoiser.run(x);
+            yn = out.y; tNet = out.ms;
+            // the page checks itself: the device's image against the f64 network on the CPU, every value
+            const y64 = denoise(net, x, N, N).y;
+            let w = 0; for (let i = 0; i < y64.length; i++) w = Math.max(w, Math.abs(yn[i] - y64[i]) / (Math.abs(y64[i]) + 1e-12));
+            agree = `; against the f64 network on the CPU, worst relative difference ${w.toExponential(1)}`;
+        } else { const t1 = performance.now(); yn = denoise(net, x, N, N).y; tNet = performance.now() - t1; }
+        show("cNoisy", I.input); show("cFilter", yf); show("cNet", yn); show("cRef", I.ref);
+        const e = (y) => relMSE(y, I.ref).toFixed(4);
+        $("eNoisy").textContent = e(I.input); $("eFilter").textContent = e(yf); $("eNet").textContent = e(yn); $("eRef").textContent = `(${sppRef} spp)`;
+        $("netCap").firstChild.textContent = `network, ${deviceNote} `;
+        status(`${family} ${seed}: rendered in ${(tRender / 1000).toFixed(1)} s; the network ran ${deviceNote} in ${tNet.toFixed(0)} ms${agree}`);
+    } catch (e) { status("failed: " + e.message); }
+    finally { $("go").disabled = false; }
+};
+
+// the timing ladder (section 37): the same timingLadder the gate runs, on this browser's device
+$("time").onclick = async () => {
+    $("time").disabled = true;
+    try {
+        if (!navigator.gpu) { $("timeStatus").textContent = "no WebGPU in this browser: nothing to time"; return; }
+        if (!shipped) { shipped = await (await fetch("/render/denoise-net-r11.json")).json(); net = decodeNet(shipped.net); }
+        $("timeStatus").textContent = "timing..."; await frame();
+        const r = await timingLadder(net, () => navigator.gpu.requestAdapter());
+        const tb = $("timeTable").querySelector("tbody"), td = (t, left) => `<td style="padding:2px 10px;text-align:${left ? "left" : "right"}">${t}</td>`;
+        tb.innerHTML = r.rows.map((x) => x.skipped
+            ? `<tr>${td(x.W + " x " + x.H, true)}<td colspan="5" style="padding:2px 10px;color:#7e9a92">skipped: ${x.reason}</td></tr>`
+            : `<tr>${td(x.W + " x " + x.H, true)}${td(x.wall.median.toFixed(2))}${td(x.wall.p10.toFixed(2) + "-" + x.wall.p90.toFixed(2))}` +
+              `${td(x.gpu ? x.gpu.median.toFixed(2) + " ms" : "no timestamps")}${td(x.mpxPerS.toFixed(2))}` +
+              `${td(x.perPass ? x.perPass.map((q) => q.name.replace(/ \(.*\)/, "") + " " + q.ms.toFixed(2)).join(", ") : "", true)}</tr>`).join("");
+        $("timeTable").style.display = "";
+        $("timeStatus").textContent = `${r.adapter.name}${r.adapter.software ? " -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's" : ""}` +
+            `; timing left the image unchanged: ${r.invisible}`;
+        $("timeJson").textContent = JSON.stringify(r);
+    } catch (e) { $("timeStatus").textContent = "failed: " + e.message; }
+    finally { $("time").disabled = false; }
+};
+</script>
+</body>
+</html>

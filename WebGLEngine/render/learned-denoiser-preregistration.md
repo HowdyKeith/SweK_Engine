@@ -1868,3 +1868,252 @@ Reported, never tested: on the test sets, both methods beat the noisy input on 1
   (round 8, 7 of 12 on R) was one draw of scenes (section 29).
 - **It has never beaten the filter on a family it was not trained on,** in any round that tested one.
 - **Trained on everything it is used on, it wins there**, at little cost against each family's own network.
+
+## 35. ROUND 12 -- THE DEVICE ROUND, FIXED BEFORE THE SHIPPED NETWORK RUNS ON ANY TEST IMAGE
+
+Committed with the code that implements it. The shipped network has not been run on the device on any test image.
+
+**What this round is.** Section 34 sent round 11's network to the device, for scenes of R and C, as Keith asked. This
+round tests no new hypothesis: nothing about the network changes. It asks whether the network on the device IS the
+network the harvest measured, image by image, and it puts the network on a page beside the path tracer's.
+
+**What ships.**
+- **The network:** round 11's seed 1, the seed C4 trained twice. It is exported from the harvest's cache to
+  `render/denoise-net-r11.json`:
+  - every weight, as base64 float64;
+  - the harvest's filter setting (sS 1, sN 1, sA 0.2, sI 4);
+  - where it came from.
+- **The device pass:** `render/denoiseDevice.mjs`, on any GPUDevice.
+  - The four hidden layers run on `brain/conv2d.mjs`'s tiled kernel.
+  - The 81-logit head runs on its direct kernel. `COUT_MAX` 32 limits only the tiled kernel's private accumulators;
+    the direct kernel keeps one accumulator at a time and never had the limit. So the head needed neither widening
+    nor splitting, which section 15 expected it would.
+  - A new kernel, `k_apply`, does what `render/denoiseNet.mjs`'s kernelApply does, in f32:
+    - a softmax over the 9 x 9 taps that are inside the image and on the pixel's side of the emitter mask;
+    - the weighted noisy irradiance;
+    - re-modulation by the albedo.
+- **The page:** `denoise.html`, linked beside the Path Tracer on the front door.
+  - It renders scenes of R and C only, with seeds outside every split; a dataset seed is refused.
+  - It shows the noisy input, the filter, the network and a reference.
+  - It runs the network on the viewer's device, or on the CPU without WebGPU, and says which.
+  - It checks its own device output against the f64 network.
+  - Above everything, it says the network was trained on R and C, and that no round found a network beating the
+    filter on a family it was not trained on.
+
+**Gated** (`render/denoiseDevice-selfcheck.mjs`, synthetic images and seeds outside every split):
+- **On Dawn:**
+  - every conv cell is the twin's or the fused mirror's, given the device's own input to that layer;
+  - `k_apply` is within `APPLY_TOL` of its twin. That bound is 1e-5 relative, because WGSL's `exp` and division are
+    not correctly rounded;
+  - handed every logit plus 100, `k_apply` gives the same image;
+  - the whole pass is the f64 network's within f32 rounding.
+- **In Chromium:** the page runs the network on its own device, finds it the f64 network's within f32 rounding, and
+  refuses a round 11 test seed.
+- **11 sabotages, all red.** One of them (V11: the largest logit not subtracted before `exp`) went red only after a
+  row was written for it. Until a logit passes about 88 it changes nothing measurable.
+- **One device per job.** While this was built, a Dawn device reused after the JS thread had been busy for about a
+  second crashed the process or hung. A fresh adapter and device per job, destroyed after, ran clean every time.
+
+**What was seen first.**
+- Everything in sections 1-34.
+- The device pass on synthetic images, and the shipped network on two scenes outside every split (R 975600 and
+  C 975700, 64 x 64, a 64-sample reference). None of these is a test image.
+  - Logits ran from -56 to 12.
+  - `k_apply` was 4.8e-7 and 5.5e-7 from its twin.
+  - The device's image was 8.9e-7 and 9.5e-7 from the f64 network's.
+  - The relMSE was the same to six digits.
+
+**The criteria,** on round 11's 24 test images (12 of R, 12 of C), with the shipped network:
+- **D0, the shipped file is the harvest's network:** on the CPU, in f64, its relMSE on every test image equals round
+  11's seed-1 relMSE, bit for bit.
+- **D1, the layers:** every conv cell on the device is the twin's or the fused mirror's, given the device's own input
+  to that layer. None is unexplained.
+- **D2, the kernel:** `k_apply` is within `APPLY_TOL` of its twin on every value.
+- **D3, the verdict on the device:**
+  - on every image, the device's relMSE is within 1e-4 relative of the f64 network's;
+  - the device network beats the primary filter on exactly the images the f64 network does.
+- **Reported, not criteria:** the time per 64 x 64 frame, and the adapter. This box's device is SwiftShader, a
+  software device, so its times are a JIT's cost and not a GPU's.
+
+**The command:** `node tools/denoiseDevice.mjs --measure-r12 --cache <dir>` -> `render/denoise-results-r12.json`.
+- It refuses if the file exists.
+- Its log says only that the file was written, and the file is committed before it is read.
+- Its cache starts with the harvest's test renders, hard-linked (section 33's way), so the images are the harvest's.
+  D0 would catch any that were not.
+- Each image gets its own fresh device.
+
+**The outcomes:**
+- **D0-D3 hold:** the network is on the device, and the page is the round's deliverable.
+- **D0 fails:** the shipped file is not the harvested network. Nothing else is read until it is.
+- **D1, D2 or D3 fails:** the device pass is wrong somewhere. It is found and fixed, and the measurement repeated
+  under a new section, never silently.
+
+## 36. ROUND 12 -- REPORTED: THE NETWORK IS ON THE DEVICE
+
+`node tools/denoiseDevice.mjs --measure-r12 --cache <dir>` at 41ab583e, in one run (21:20:50Z to 21:27:21Z).
+- Its output, unedited, is `render/denoise-results-r12.json`, committed at ca25e327 before it was read.
+- The cache served all 24 test images (hits 24, misses 0).
+
+**Every criterion held.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the layers | 20,545,536 conv cells, every one the twin's: none fused, none unexplained |
+| D2, the kernel | worst 6.4e-7 relative to its twin (bound 1e-5) |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (median 6.8e-8; bound 1e-4); it beats the primary filter on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+Reported, not a criterion:
+- One 64 x 64 pass took 620-830 ms (median 702).
+- The device is SwiftShader 5.0.0, a CPU running a JIT, so this says nothing about a GPU's time.
+- The f64 network on the CPU, in node, takes about 0.4 s on the same image.
+
+**What this buys, per section 35: "D0-D3 hold".**
+- **The network is on the device.**
+  - On every one of round 11's test images, the device gives the harvested network's answer: bit for bit through
+    every conv layer, and within 6.4e-7 through the kernel.
+  - Round 11's verdict, re-read from the device's own images, is unchanged.
+- **The page, `denoise.html`, is the round's deliverable,** beside the Path Tracer, for scenes of R and C.
+- **Section 9's outcome for "H1 and H2 supported" is now carried out:** the network runs through
+  `brain/conv2d.mjs`'s kernels, on a page beside the path tracer's.
+
+**What it has not shown.**
+- **A GPU.** Every device in this container is SwiftShader. Speed on real hardware, and WebGPU on a real adapter, are
+  unmeasured. Keith's rig is where the page meets one.
+- **Any scene outside R and C.** In every round that tested a family the network was not trained on, it never beat
+  the filter there. The page says so, and renders nothing else.
+- **The path tracer's own scenes.** They are neither R nor C, so the page does not offer them.
+
+## 37. ROUND 12 -- A GPU'S TIME, FOR THE RIG
+
+Section 36 left one thing unshown: a GPU. Every device in this container is SwiftShader, so every time sections 35-36
+printed was a CPU's. Keith asked for a timing measurement the rig can run. This is it. It is a measurement, not a
+hypothesis: no number is pre-registered to beat.
+
+**What is timed.**
+- One pass of round 11's network (`render/denoise-net-r11.json`): the five conv layers and the kernel.
+- A ladder of sizes, from the trained 64 x 64 through 128, 256, 512 and 1024 squares to a 1920 x 1080 frame. The
+  network is fully convolutional and the kernel is per pixel, so any size runs. What a pass costs does not depend on
+  what the image shows, so the input is synthetic (`timingInput`).
+- **Two ways:**
+  - natively, on node-webgpu's default adapter (on the rig, the GTX 1080 through D3D12);
+  - through `denoise.html`'s own "Time the network", in the browser.
+
+**How.** `render/denoiseDevice.mjs`'s `time()` and `timingLadder`.
+- Each size gets a fresh device (section 35's hazard), with the storage limits raised to fit its largest buffer. A
+  size whose buffer is over the adapter's limit is skipped, and says so.
+- Two untimed passes come first (one natively), then timed ones until 30, or until 2 s of them once there are 3.
+- Per size:
+  - **wall clock:** submit to `queue.onSubmittedWorkDone()`, with no upload and no read-back;
+  - **the device's clock:** the same span, and each pass's, from timestamp queries where the adapter offers them;
+  - the median and the 10th-90th percentiles, and megapixels a second.
+- The ladder stops before a size whose pass, predicted from the last median scaled by pixels, would take over 1.5 s.
+  On SwiftShader that leaves 64 x 64 alone; on a GPU it should reach the 1080p frame.
+
+**Gated** (`render/denoiseTiming-selfcheck.mjs`, a timing gate). The timer is asserted, never the time:
+- the first size is measured, and every time is finite and positive;
+- every skip says why, and the cap skips only what the last pass predicts past it;
+- per timed pass, the device's span sits inside the wall clock and the layers inside the span (two 0.1 ms quanta
+  allowed, since a browser rounds timestamps);
+- timestamp queries are asked for wherever the adapter offers them;
+- timing changes nothing: the image a timed pass wrote is an untimed run's, bit for bit.
+
+**On the rig.** `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json` runs both denoiser gates.
+- The runner now covers them, with the device gate as exact and the timing gate as timing.
+- The report names every adapter they ran on. The native adapter is logged by the gate itself, since it does not go
+  through the browser harness.
+- `docs/real-hardware-fsr.md` says what to send back.
+
+**On this box,** for scale and nothing else: 64 x 64 took about 640 ms natively and 510 ms in the browser, and the
+three 32 -> 32 layers took most of it. That is SwiftShader, a CPU, and the report's first line says so.
+
+## 38. ROUND 12 -- REPORTED: THE FIRST GPU (AN INTEL GEN-9)
+
+Keith ran section 37's command, `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json`, at
+6bf17197.
+- **The machine.** Windows 11 (10.0.22631) with an Intel gen-9 integrated GPU, node v24.17.0. It is not the GTX 1080
+  box section 37 named; Keith says it is a different computer.
+- **The report.** It is `render/denoise-rig-r12-intel-gen9.json`, byte for byte as sent, committed at 193c8f86.
+- **Read before it was committed.** The report arrived as an upload and was read on arrival, before that commit. Section
+  37 pre-registered no number, so nothing in it can be steered by the order. The commit still keeps the file as sent.
+- **An earlier attempt ran nothing.** Keith's checkout was on `main`, which has neither gate. `--only denoise` matched
+  nothing, and the runner called that "NO ADAPTER WAS SEEN" and exited 0. It now says `NO GATE MATCHED`, names the
+  commit and exits 1 (6bf17197, gated, sabotages E1-E3).
+
+**Both gates held on a real GPU.**
+
+| Gate | Kind | Adapters | Result |
+|---|---|---|---|
+| `render/denoiseDevice-selfcheck.mjs` | exact | intel gen-9 (Chrome, `--use-angle=d3d11`) | PASS, 12.3 s |
+| `render/denoiseTiming-selfcheck.mjs` | timing | intel gen-9 through D3D12, driver 31.0.101.2137 (node-webgpu); intel gen-9 (Chrome) | PASS, 18.2 s |
+
+- **The exact gate has no hardware exemption.** No row in it is scoped to a software adapter. So on this GPU every conv
+  cell of every layer was the twin's or the fused mirror's, the kernel was within APPLY_TOL of its twin, and the page's
+  run in Chrome was the f64 network's within f32 rounding. The gate prints no measured lines, so how many cells were
+  fused is not in the report.
+- **The timing gate asserts the timer, not the time.** All its rows held on this GPU:
+  - the first size was measured, and every skip gave its reason;
+  - the device's span sat inside the wall clock, and the layers inside the span, on every pass;
+  - timestamp queries were asked for, and both the native device and the page offered them;
+  - a timed pass wrote an untimed pass's image, bit for bit.
+
+**The times.** These are medians on the device's clock, in ms a pass, with the wall clock in brackets.
+
+| Size | Native (D3D12) | Page (Chrome) | Mpx/s native |
+|---|---|---|---|
+| 64 x 64 | 34.7 (36.1) | 36.8 (39.1) | 0.114 |
+| 128 x 128 | 119.3 (120.6) | 134.6 (136.4) | 0.136 |
+| 256 x 256 | 522.1 (523.6) | 553.5 (559.2) | 0.125 |
+| 512 x 512 | skipped: predicted 2,095 ms | skipped: predicted 2,241 ms | -- |
+| 1024 x 1024 | skipped: predicted 8,379 ms | skipped: predicted 8,963 ms | -- |
+| 1920 x 1080 | skipped: predicted 16,570 ms | skipped: predicted 17,725 ms | -- |
+
+- **Against SwiftShader.** At 64 x 64, about 18 times faster natively (section 37: about 640 ms) and 13-14 times in
+  the browser (about 510 ms).
+- **The page costs 6-13% more than native at every size,** on both clocks.
+- **The cost is per pixel, not per pass.** Throughput is flat at 0.11-0.14 Mpx/s across a 16-fold range of sizes:
+  128 x 128 took 3.4 times 64 x 64, and 256 x 256 took 4.4 times 128 x 128. A fixed per-dispatch overhead would
+  have shown as rising throughput. That flatness is also why the ladder's linear predictions for the skipped sizes
+  are believable -- though they are predictions, not measurements.
+- **Where a pass goes.** The three 32 -> 32 layers take 73-79% of it, and the kernel 3.4-4.2%.
+- **A quirk of one size.** At 256 x 256 natively, the per-layer medians sum to 547.8 ms, more than the span's median
+  of 522.1. Those are medians of three passes, one of which ran to 649 ms. The gate holds the nesting per pass, where
+  it held.
+
+**What the arithmetic says.**
+- The network's conv layers cost 33,120 multiply-adds a pixel (66,240 flops):
+  - 10 -> 32, 3 x 3: 2,880;
+  - three 32 -> 32, 3 x 3: 9,216 each;
+  - 32 -> 81, 1 x 1: 2,592.
+- **Measured throughput is about 8-9 GFLOP/s.** The 3 x 3 layers run at 8-11 GFLOP/s through the tiled kernel. The
+  1 x 1 head runs at about 4.4 GFLOP/s through the direct one.
+- **The report does not name the part.** "Gen-9" covers several Intel GPUs. If this is the common 24-EU part (HD
+  520-630 class), its fp32 peak is roughly 0.4 TFLOP/s, and the kernels run at about 2% of it.
+- **A 1080p frame is 137 GFLOP for this network.**
+  - **On this GPU:** 30 frames a second needs 4.1 TFLOP/s, about ten times such a part's peak. No kernel, however
+    good, makes this network real time at 1080p on this class of GPU. At peak it could manage about 450 x 450 at 30
+    frames a second.
+  - **On a GTX 1080** (about 8.9 TFLOP/s peak), 1080p at 30 frames a second needs about 46% of peak. That is possible
+    in principle, and far from what these kernels achieve here.
+- **Two separate levers.**
+  - **The kernels' efficiency** is engineering, with up to about fifty times of headroom on paper. Candidate causes,
+    none measured:
+    - the tiled kernel's 32 accumulators are indexed by a loop variable, which usually puts them in memory rather
+      than registers;
+    - every multiply-add loads twice, once from the tile and once from the weights in storage;
+    - bounds tests sit inside the innermost loops.
+  - **The network's size** is modelling. A smaller network reopens the quality question, and would need its own
+    pre-registered round against the filter.
+- **The constraint a faster kernel works under.** D1 holds every device cell to the twin's sum, in the twin's order.
+  A faster kernel that keeps each cell's order keeps D1. That includes registers sized at compile time, weights staged
+  in workgroup memory, and several pixels a thread. One that reorders the sums -- vec4 dot products, split
+  reductions -- would need D1 restated as a bound, before it runs.
+
+**What this has not shown.**
+- **A discrete GPU.** Keith offers the GTX 1080 box, and it needs no code change: the same branch and the same command.
+  If its kernels run about as far from peak as these do, its ladder should reach the 1080p frame under the 1.5 s cap.
+  That is a guess, and the run is the measurement.
+- **Anything above 256 x 256 here.** Those rows are the ladder's predictions.
+- **Upload, read-back and pipeline creation.** They are excluded by design (section 37): the span is the network
+  alone.
+- **The part's name and clock.** WebGPU's adapter info gives "intel / gen-9" and the driver, nothing finer.

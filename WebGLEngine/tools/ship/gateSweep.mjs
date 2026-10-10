@@ -8118,6 +8118,39 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "inside, on fsr-three.html's scene, neutral (-0.010 to +0.014 dB over six cases), the still picture " +
                  "within 2e-5 and its mask never firing -- section 4 of the device gate holds that.",
     }),
+    // the denoiser arc, round 12 -- A GPU'S TIME, FOR THE RIG.
+    since495: Object.freeze({
+        at: "the denoiser arc, round 12, the rig's timing (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseTiming-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze(["tools/ship/realGpuRun-selfcheck.mjs (the run covers the denoiser's two gates; the timing gate is timing, the device gate exact)"]),
+        verdict: "*** EVERY TIME THE DENOISER HAD PRINTED WAS SWIFTSHADER'S. *** Section 37: render/denoiseDevice.mjs times one " +
+                 "pass of round 11's network on a ladder of sizes, 64 x 64 up to a 1080p frame -- wall clock, and the device's own " +
+                 "clock pass by pass from timestamp queries where offered -- natively and through denoise.html's new \"Time the " +
+                 "network\", and tools/ship/realGpuRun.mjs now runs both denoiser gates, so `--only denoise` on the rig carries a " +
+                 "GPU's numbers back. The timer is asserted, never the time. The first sabotage, a wall clock read without " +
+                 "awaiting the queue, ran the gate 900 s: the ladder trusted the clock it measured and climbed into minutes. It " +
+                 "now spends its budget in a guard read-back that cannot land early, under a 60 s ladder budget, and the " +
+                 "sabotage goes red in seconds. 8 sabotages, all red.",
+    }),
+    // the denoiser arc, round 12 -- THE NETWORK ON THE DEVICE, BEFORE IT RUNS ON ANY TEST IMAGE.
+    since494: Object.freeze({
+        at: "the denoiser arc, round 12 (unshipped)", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["render/denoiseDevice-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "*** ROUND 11'S NETWORK, ON THE DEVICE, BESIDE THE PATH TRACER. *** render/denoiseDevice.mjs runs the large " +
+                 "kernel network on any GPUDevice: the four hidden layers on brain/conv2d.mjs's tiled kernel, the 81-logit " +
+                 "head on its DIRECT kernel -- COUT_MAX was only ever the tiled kernel's limit, so the head needed neither " +
+                 "the widening nor the split section 15 expected -- and a new k_apply for the masked softmax and the weighted " +
+                 "irradiance. On Dawn every conv cell is the twin's given the device's own input to that layer, and k_apply " +
+                 "is its twin within 1e-5 (WGSL's exp and division are not correctly rounded). denoise.html, beside the Path " +
+                 "Tracer on the front door, renders only families R and C, says so above everything, refuses a dataset " +
+                 "seed, and checks its own device output against the f64 network; the gate drives it in Chromium. 11 " +
+                 "sabotages, all red; the softmax's missing max only after a row handed it logits plus 100. A Dawn device " +
+                 "reused after a busy second crashed or hung, so every job takes its own. Section 35 fixes D0-D3 before " +
+                 "the shipped network runs on any of round 11's test images.",
+    }),
     // the denoiser arc, round 11 -- THE DEPLOYMENT ROUND, BEFORE ANY OF ITS TEST SCENES EXIST.
     since493: Object.freeze({
         // swept 0: the ledger's invariant is added.length === swept, and this round added no gate -- it widened two.
