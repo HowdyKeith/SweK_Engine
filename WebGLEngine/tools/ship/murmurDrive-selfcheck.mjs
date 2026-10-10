@@ -22,6 +22,8 @@
 // collapsing around the heading -- on the five species that narrow. The split is the usual budget one.
 // v4825 SABOTAGES, restored: the clouds' advection spelled as murmur's DRIVE * k * t (RED: the z-split row and the
 // growing-phase row); mist's heading read with a fallback to a named entry (RED: the wired-set row).
+// v4826 -- flux's stream takes flux.ts:78's 0.95 * st.drive, so the amplitude count is four. SABOTAGE, restored:
+// flux's DRIVE term deleted from its mhDriftPhase rate -> RED.
 "use strict";
 
 import fs from "node:fs";
@@ -394,13 +396,14 @@ sec("4. *** THE CENSUS: what the shader reads, and the rule this round set itsel
     const driveIntSpin = (src.match(/\.add\(uniforms\.driveInt\.mul\(A \* kd \+ B\)\)/g) || []).length;
     const driveIntAdv = (src.match(/vec3\(\.\.\.AH\.v\)\.mul\(uniforms\.driveInt\.mul\(AH\.k\)\)/g) || []).length;
     ok("!! *** INSTANTANEOUS DRIVE NEVER MULTIPLIES A GROWING PHASE -- it reaches a clock only as a bounded amplitude ***",
-        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 3 && driveIntSpin === 1 && driveIntAdv === 1 &&
+        bad.length === 0 && secularDrive === 0 && amplitudeDrive === 4 && driveIntSpin === 1 && driveIntAdv === 1 &&
         driveIntReads === driveIntInRate + driveIntSpin + driveIntAdv,
         `no line reads both DRIVE and uniforms.time (${bad.length}); of the mhDriftPhase sites, ` +
         `${secularDrive} pass DRIVE as the SECULAR phase and ${amplitudeDrive} as the wobble AMPLITUDE -- ` +
         `helix's climb, whose whole rate murmur scales by st.drive, and limn's flattening ease, ` +
         `mix(0.62, 0.14, st.drive), which arrived at v4657, and (v4825) fathom's innermost shell, whose ` +
-        `rate fathom.ts scales by 1 + kp*pace + kd*drive. All three are amplitudes. The ` +
+        `rate fathom.ts scales by 1 + kp*pace + kd*drive, and (v4826) flux's stream, whose output flux.ts:78 ` +
+        `scales by 1 + 0.70*pace + 0.95*drive. All four are amplitudes. The ` +
         `amplitude is bounded by k*rate/w2 whatever drive does; the secular half is where the teleport lives ` +
         `and it reads uniforms.driveInt, which appears ${driveIntReads} times: ${driveIntInRate} as the last ` +
         `argument of a mhRatePhase call, ${driveIntSpin} in spinPhase's secular sum and ${driveIntAdv} as the ` +

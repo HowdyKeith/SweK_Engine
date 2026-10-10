@@ -10,6 +10,10 @@
 //
 // BOTH BODIES ARE SOLVED AT THE RAY'S CLOSEST APPROACH -- two dot products each, no march -- which is what
 // chorus does with its seven, and why the two ship together (…murmurSpecies13-selfcheck.mjs).
+// v4826 -- the sep row grades the LOUDER body's distance from the centre. The pair distance hung on the quieter
+// body, a ~25-of-255 patch whose tied top flipped 6 px with the last bit of the medium when the edge taps took
+// murmur's `continue`, and read 9.1 px where 11.2 had been. The louder body reads x1.69 against rFar / rNear's
+// 1.67. SABOTAGE, restored: mix(rNear, rFar, sepK) typed float(rNear) -> RED.
 "use strict";
 import * as K from "../../render/murmurKit.mjs";
 import { N3, VOICE, ACTIVITY, flourishQuadrature, sp, renderSpecies, light, interiorPeak } from "./murmurSpeciesFrames.mjs";
@@ -85,8 +89,22 @@ const twoPeaks = (px) => {
     P.sort((a, b) => b[2] - a[2]);
     const a = P[0]; let b = null;
     for (const p of P) if (Math.hypot(p[0] - a[0], p[1] - a[1]) > 6) { b = p; break; }
+    // *** v4826 -- A BODY'S POSITION IS THE CENTRE OF ITS NEAR-TIED TOP, NOT ITS FIRST BRIGHTEST PIXEL. *** At
+    // sep 1 and voice 0 the quieter body is a dim, broad patch about 25 of 255 high, and 8-bit output gives
+    // it SEVERAL pixels tied for its top, 6 px apart. The sort handed back whichever came first, and the
+    // v4826 edge-tap change (murmur's `if (fade <= 0.001) continue;` instead of a soft mask -- a change in the
+    // last bit of the medium) flipped that tie from (26,29) to (20,28) and read 9.1 px where 11.2 had been.
+    // The light-weighted centre of every pixel within 4 px of a peak and within 8% of its light does not
+    // depend on which tied pixel sorts first.
+    const centre = (q) => { let sx = 0, sy = 0, sw = 0;
+        for (const p of P) if (Math.hypot(p[0] - q[0], p[1] - q[1]) <= 4 && p[2] >= q[2] * 0.92) { sx += p[0] * p[2]; sy += p[1] * p[2]; sw += p[2]; }
+        return [sx / sw, sy / sw]; };
+    const ca = centre(a), cb = b ? centre(b) : null;
     return { hi: a[2], lo: b ? b[2] : 0, ratio: b ? a[2] / Math.max(b[2], 1e-9) : null,
-             dist: b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : null };
+             dist: b ? Math.hypot(ca[0] - cb[0], ca[1] - cb[1]) : null,
+             // the LOUDER body's distance from the orb's centre: it orbits at a radius that rSep scales, and it
+             // is the bright one, so it does not hang on the quieter body's 8-bit top
+             rA: Math.hypot(ca[0] - (N3 / 2 - 0.5), ca[1] - (N3 / 2 - 0.5)) };
 };
 
 // =============================================================================================================
@@ -115,11 +133,17 @@ sec("1. *** SOMEBODY HAS THE FLOOR: level is a SPLIT, not a gain ***");
 
         // AND THE SEPARATION IS ITS OWN KNOB, which keeps the row above from being a claim about geometry.
         const s0 = twoPeaks(fr(F.sLo)), s1 = twoPeaks(fr(F.sHi));
-        say(`sep 0: apart ${s0.dist.toFixed(1)} px; sep 1: apart ${s1.dist.toFixed(1)} px`);
+        say(`sep 0: apart ${s0.dist.toFixed(1)} px, louder body ${s0.rA.toFixed(2)} px from centre; ` +
+            `sep 1: apart ${s1.dist.toFixed(1)} px, louder body ${s1.rA.toFixed(2)} px from centre`);
+        // *** v4826 -- GRADED ON THE LOUDER BODY'S RADIUS. *** The pair's distance hangs on the quieter body,
+        // which at voice 0 is a ~25-of-255 patch whose position moved 1.6 px with the last bit of the medium
+        // (v4826's edge-tap change); the louder body's distance from the centre is what rSep scales and is read
+        // off a body six times brighter. The pair distance is still printed and still the voice half's reading.
         ok("!! ...and `sep` moves them apart, which `voice` did not",
-            s1.dist > s0.dist * 1.4 && Math.abs(b.dist - a.dist) < 2,
-            `sep 0 -> 1 takes the two bodies from ${s0.dist.toFixed(1)} px apart to ${s1.dist.toFixed(1)} ` +
-            `(x${(s1.dist / s0.dist).toFixed(2)}), driving r from ${K.MH_DUET.rNear} to ${K.MH_DUET.rFar} of ` +
+            s1.rA > s0.rA * 1.4 && s1.dist > s0.dist && Math.abs(b.dist - a.dist) < 2,
+            `sep 0 -> 1 takes the louder body from ${s0.rA.toFixed(2)} px off centre to ${s1.rA.toFixed(2)} ` +
+            `(x${(s1.rA / s0.rA).toFixed(2)}) and the pair from ${s0.dist.toFixed(1)} to ${s1.dist.toFixed(1)} px apart, ` +
+            `driving r from ${K.MH_DUET.rNear} to ${K.MH_DUET.rFar} of ` +
             `the body. Over the same range VOICE moved them ${Math.abs(b.dist - a.dist).toFixed(1)} px, i.e. ` +
             `not at all -- two knobs, two quantities, neither doing the other's job.`);
     }

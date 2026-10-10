@@ -1005,6 +1005,37 @@ export const MH_LIMN_RIM = Object.freeze({ complete: 1.6, settled: 0.30, ringClo
  * wobbles keep murmur's instantaneous amplitudes, weighted by the same mix. At a held signal this is murmur's
  * own expression to the last term; it differs only while drive or pace is moving, which is where murmur's is wrong.
  */
+/**
+ * *** v4826 -- EACH SPECIES' OWN KNOB DEFAULTS, AS murmur's styles.ts:35-52 WRITES THEM. *** The port kept ONE default per
+ * knob NAME, so every species shared spread 0.4 -- murmur gives still 0.2, droplet, comet and arc 0.3, opal 0.7, and
+ * flux, duet, prism and helix 0.6 -- and the two species that share a name (opal's and abyss's `drift`) shared a value
+ * murmur gives them separately (0.4 and 0.5). murmur's four knobs are positional (c0..c3); the keys below are the
+ * PORT's names for them in each builder (tempest's storm/churn/flicker are mist's density/fold/glint, prism's drift is
+ * swing, arc's arcLength/corePin are bow/pin, sol's coronaSize/prominence are corona/prom, aura's ribbons is ribbon,
+ * duet's separation/sizeRatio are sep/ratio, chorus's breatheDepth is breath, helix's strandGlow is strand, geode's
+ * facets/glimmer/depthCrystal are facet/glim/stone). A caller's own knobs still win -- these are defaults only.
+ */
+export const MH_STYLE_DEFAULTS = Object.freeze({
+    still:   Object.freeze({ glintRate: 0.3, clarity: 0.6, presence: 0.5, spread: 0.2 }),
+    droplet: Object.freeze({ wobble: 0.5, tension: 0.5, sheen: 0.5, spread: 0.3 }),
+    nebula:  Object.freeze({ density: 0.5, fold: 0.5, glint: 0.4, spread: 0.4 }),
+    prism:   Object.freeze({ beams: 0.4, split: 0.5, swing: 0.5, spread: 0.6 }),
+    limn:    Object.freeze({ rimWidth: 0.4, travel: 0.5, innerHint: 0.3, spread: 0.4 }),
+    duet:    Object.freeze({ sep: 0.5, orbit: 0.5, ratio: 0.5, spread: 0.6 }),
+    fathom:  Object.freeze({ layers: 0.5, parallax: 0.5, murk: 0.4, spread: 0.4 }),
+    arc:     Object.freeze({ bow: 0.5, sway: 0.5, pin: 0.5, spread: 0.3 }),
+    opal:    Object.freeze({ flashes: 0.5, drift: 0.4, softness: 0.6, spread: 0.7 }),
+    comet:   Object.freeze({ orbitTilt: 0.5, trail: 0.5, pointSize: 0.4, spread: 0.3 }),
+    flux:    Object.freeze({ stream: 0.5, bend: 0.5, height: 0.5, spread: 0.6 }),
+    tempest: Object.freeze({ density: 0.5, fold: 0.5, glint: 0.3, spread: 0.5 }),
+    helix:   Object.freeze({ turns: 0.5, rise: 0.4, strand: 0.5, spread: 0.6 }),
+    geode:   Object.freeze({ facet: 0.5, glim: 0.4, stone: 0.5, spread: 0.5 }),
+    sol:     Object.freeze({ corona: 0.5, prom: 0.5, simmer: 0.4, spread: 0.4 }),
+    abyss:   Object.freeze({ creatures: 0.4, rarity: 0.6, drift: 0.5, spread: 0.4 }),
+    chorus:  Object.freeze({ voices: 0.5, sync: 0.5, breath: 0.4, spread: 0.5 }),
+    aura:    Object.freeze({ ribbon: 0.5, swirl: 0.5, depth3d: 0.5, spread: 0.5 }),
+});
+
 export const MH_SPIN_DRIVE = Object.freeze({
     geode:  Object.freeze({ kp: 0.80, kd: 1.00, m: 0.7, target: 0.30, axTarget: 0.30 }),
     fathom: Object.freeze({ kp: 0.85, kd: 1.10, m: 0.7 }),
@@ -1441,11 +1472,11 @@ export const MH_SHAPE = Object.freeze({
  */
 export const MH_MIST = Object.freeze({
     nebula: Object.freeze({ scale: 2.20, warp: 1.30, small: 0.58, foldB: 0.30, foldK: 0.70,
-                            drB: 0.052, drK: 0.055, drLane: 2.0, dLo: -0.20, dHi: 0.30,
+                            drB: 0.052, drK: 0.055, drLane: 2.0, drWob: 0.45, dLo: -0.20, dHi: 0.30,
                             gLo: 0.30, gK: 0.95, gFar: 0.88, absorb: 3.10, emitB: 0.62, emitK: 0.85,
                             gain: 3.30, voiceE: 0.75 }),
     tempest: Object.freeze({ scale: 2.55, warp: 1.45, small: 0.55, foldB: 0.42, foldK: 0.80,
-                             drB: 0.070, drK: 0.075, drLane: 3.0, dLo: -0.12, dHi: 0.46,
+                             drB: 0.070, drK: 0.075, drLane: 3.0, drWob: 0.42, dLo: -0.12, dHi: 0.46,
                              gLo: 0.26, gK: 0.72, gFar: 0.90, absorb: 3.60, emitB: 0.58, emitK: 0.72,
                              gain: 6.20, voiceE: 0.85 }),
 });
@@ -1549,7 +1580,7 @@ export const MH_ARC = Object.freeze({
     // times the light at the same coefficient -- it stopped being a glow around a thread and became a wide
     // band with a thread inside it."
     haloK: 0.09,
-    shimCycles: 4.2, shimPace: 0.55, runFreq: 4.2, runRate: 2.4,
+    shimCycles: 4.2, shimPace: 0.55, shimDrive: 0.75, runFreq: 4.2, runRate: 2.4,   // v4826: shimDrive -- arc.ts:104
     sepIn: 0.16, sepOut: 0.44,
     medB: 0.055, medS: 0.030, medAbsorb: 2.00, medGain: 3.40,
     // THE GAIN, AND IT IS 35.0 BECAUSE A CLOSED FORM RETURNS A LENGTH. See mhTube's note: a march returns a
@@ -1643,6 +1674,8 @@ export const MH_AURA = Object.freeze({
     // raised voice and were deaf to how busy the exchange was -- on the one species whose brief is depth
     // through motion.
     rateB: 0.17, rateK: 0.24, rateVoice: 0.85, ratePace: 0.45, rateDrive: 1.05,
+    // v4826 -- aura.ts:116-126: responding pulls the tilts halfway toward a common one; the rolls do not align
+    alignK: 0.5, alignYaw: 0.30, alignTilt: 0.34,
     rateLane: Object.freeze([1.00, 0.83, 1.17]),
     driftWob: Object.freeze([0.40, 0.52, 0.34]), driftPhase: Object.freeze([0.0, 2.1, 4.3]),
     ampB: 0.098, ampK: 0.130, ampVoice: 0.55, ampSmall: 0.78,
@@ -1703,7 +1736,8 @@ export const MH_AURA = Object.freeze({
 export const MH_FLUX = Object.freeze({
     yawRate: 0.047, yawWob: 0.50, yawLane: 2.0,
     tiltB: 0.16, tiltAmp: 0.10, tiltRate: 0.033,
-    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70,
+    flowB: 0.26, flowK: 0.34, flowWob: 0.45, flowLane: 4.0, flowPace: 0.70, flowDrive: 0.95,   // v4826 -- flux.ts:78
+    aySteer: 0.42, ayDrive: 0.6, brightDrive: 0.35,   // v4826 -- flux.ts:74 (mix(drift, 0.42, drive * 0.6)) and :87
     bendB: 0.30, bendK: 0.42, bendPace: 0.45, bendSmall: 0.50,
     wB: 0.105, wK: 0.030, wSmall: 2.00,
     // THE REACH ABOVE THE FOOT. hi runs 0.42 -> 0.88 of the body, which is what `height` buys.
@@ -1747,7 +1781,7 @@ export const MH_FLUX = Object.freeze({
 export const MH_DUET = Object.freeze({
     leanB: 0.62, leanAmp: 0.20, leanRate: 0.037,
     precRate: 0.064, precWob: 0.45, precLane: 2.0,
-    rNear: 0.30, rFar: 0.50, rSmall: 1.36,
+    rNear: 0.30, rFar: 0.50, rSmall: 1.36, sepPace: 0.14,   // v4826 -- duet.ts:76's (1 - 0.14 * live.pace)
     rateB: 0.40, rateK: 0.55, orbitWob: 0.40, orbitLane: 3.0,
     braidDrive: 0.16, braidFlourish: 0.06, braidRate: 3.0,
     wAB: 0.145, wAK: 0.030, wASmall: 1.50, ratioLo: 0.52, ratioHi: 1.0, ratioSmall: 0.65,
@@ -1875,7 +1909,7 @@ export const MH_PRISM = Object.freeze({
     wGrowB: 0.040, wGrowK: 0.035,
     alphaIn: Object.freeze([0.12, 0.46]), alphaOut: Object.freeze([1.60, 2.35]),
     thirdIn: 0.30, thirdOut: 0.72,
-    brightB: 0.76, brightVoice: 0.65,
+    brightB: 0.76, brightVoice: 0.65, brightDrive: 0.55,   // v4826 -- prism.ts:96
     shimCycles: 5.4, shimK: 0.55, runFreq: 5.4, runRate: 2.6,
     pulseFrom: 2.0, pulseW: 0.28, pulseAmp: 1.05,
     scatterAmp: 0.16, beamGain: 0.95,

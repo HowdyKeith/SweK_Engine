@@ -20,7 +20,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderThreeTslToPixels } from "./webgpuHarness.mjs";
-import { srgbToLinear, linearToOklab, mhLive, mhState, mhFlourish, MH_DUET } from "../../render/murmurKit.mjs";
+import { srgbToLinear, linearToOklab, mhLive, mhState, mhFlourish, MH_DUET, MH_CHORUS, MH_TEMPEST_BOLT } from "../../render/murmurKit.mjs";
 
 export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -143,6 +143,11 @@ export const sp = (species, time, voice = VOICE, extra = {}) => {
                 // v4825: tempest's clamped energy at this frame's own operating point (think is THINKING, index 2)
                 tempestEnergyInt: Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * st.drive)) * time,
                 duetFlourishInt: flourishQuadrature(time),
+                // v4826: chorus's breath (the integral of 1 / per) and tempest's floored lane-0 slot, at this frame's
+                // steady operating point -- see render/aiPresenceOrbState.mjs
+                chorusBreathInt: time / (MH_CHORUS.perB - MH_CHORUS.perPace * lv.pace),
+                tempestSlot0Int: Math.min(1 + 1.30 * Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * st.drive)),
+                                          MH_TEMPEST_BOLT.lanes[0].slot) * time,
                 colors: { ink: INK }, ...extra } };
 };
 

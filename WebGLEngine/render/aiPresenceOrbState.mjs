@@ -20,7 +20,7 @@
 // and the clearest to verify. The other 17 are not attempted; see tools/ship/nextRounds.mjs's closing note.
 "use strict";
 
-import { mhLive, mhState, mhFlourish, MH_DUET, MH_MIST_LIVE } from "./murmurKit.mjs";
+import { mhLive, mhState, mhFlourish, MH_DUET, MH_MIST_LIVE, MH_CHORUS, MH_TEMPEST_BOLT } from "./murmurKit.mjs";
 
 // ---------------------------------------------------------------------------------------------------------
 // OKLAB. Bjoern Ottosson's perceptual colour space (public domain description; used here for its published
@@ -267,6 +267,18 @@ export function createPresenceState(initial = "idle") {
     // integral" and calling it one would invite exactly that mistake.
     let duetFlourishInt = 0;
 
+    // *** v4826 -- TWO CLOCKS WHOSE RATE IS NOT A SUM, SO NEITHER IS ASSEMBLED FROM THE INTEGRALS ABOVE. ***
+    // chorus.ts:67/104: the breath is sin(2 pi t / per) with per = 8.4 - 2.2 * (pace * 0.6) -- a RECIPROCAL of a
+    // signal, so its phase is the integral of 1 / per and not anything linear in paceInt. Spelled raw, a busier
+    // exchange moved all seven breaths by t * d(1/per) at once.
+    // tempest.ts:74 with kit.ts's mh_flourish: lane 0's slot is 2.9 / (1 + 1.30 E), FLOORED at 1 s by mh_flourish's
+    // max(slotLen, 1.0) -- and at full energy 2.9 / 3.08 = 0.94 s, so the floor bites. Its slot COUNT is therefore
+    // the integral of min(1 + 1.30 E, 2.9) / 2.9, which tempestEnergyInt (the integral of E alone) cannot give;
+    // lane 1's 4.3 s never reaches the floor and keeps reading tempestEnergyInt. 2.9 is the 120 pt slot -- the
+    // shader's small mix is 0 at this port's one mount, which is the same reason MH_TEMPEST_BOLT's slotSmall is
+    // inert here.
+    let chorusBreathInt = 0, tempestSlot0Int = 0;
+
     function paramsAt(name) { return STATES[name]; }
     function blendedParams() {
         if (transitionT >= TRANSITION_DURATION || !prev) return paramsAt(cur);
@@ -316,6 +328,11 @@ export function createPresenceState(initial = "idle") {
                 + ME.eDrive * stn.drive)) * dPhase;
             // duet's gesture envelope, at the phase the shader will be handed this frame.
             duetFlourishInt += mhFlourish(phase, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * dPhase;
+            // v4826 -- chorus's breath and tempest's floored lane 0; see their note above
+            chorusBreathInt += dPhase / (MH_CHORUS.perB - MH_CHORUS.perPace * lv.pace);
+            const E0 = Math.min(ME.eCap, Math.max(0, ME.ePace * lv.pace + ME.eThink * (cur === "thinking" ? 1 : 0)
+                + ME.eDrive * stn.drive));
+            tempestSlot0Int += Math.min(1 + ME.slotE * E0, MH_TEMPEST_BOLT.lanes[0].slot) * dPhase;
         },
         getParams() {
             const p = blendedParams();
@@ -333,7 +350,8 @@ export function createPresenceState(initial = "idle") {
                      phase, voice: voice.value, activity: activity.value, state: cur, stateTau: entryT,
                      // The three signal integrals, in shader time. A species that modulates a clock reads
                      // these instead of multiplying the clock by the instantaneous signal.
-                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, driveDriveInt, tempestEnergyInt, duetFlourishInt };
+                     paceInt, voiceInt, driveInt, paceDriveInt, voiceDriveInt, driveDriveInt, tempestEnergyInt, duetFlourishInt,
+                     chorusBreathInt, tempestSlot0Int };
         },
         get state() { return cur; },
     };

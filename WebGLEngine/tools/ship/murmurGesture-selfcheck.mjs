@@ -27,6 +27,11 @@
 // murmur's small mix. SABOTAGES, each restored: lane 1's count on foldE in place of slotE (RED: section 4's
 // slot row and the base/length row); the small mix dropped (RED: the slot row); lane 0's count on voiceInt
 // (RED: the slot row and the base/length row). The 1.0 s floor row now RECORDS that it bites on lane 0.
+// v4826 -- LANE 0's FLOOR IS CLOSED. Its count integrates its FLOORED rate, min(1 + 1.30 E, 2.9) / 2.9, as the host's
+// tempestSlot0Int; lane 1 (4.3 s) never reaches mh_flourish's 1 s floor and keeps (t + 1.30 tempestEnergyInt) / 4.3.
+// The walk reads tempestSlot0Int, the floor row now asserts the count's rate EQUALS murmur's clamped one, and the
+// pixel frames carry tempestSlot0Int at the same slot counts they had. SABOTAGES, each restored: the host's
+// min(..., 2.9) deleted (RED: the floor row); lane 0 put back on tempestEnergyInt (RED: the slot row).
 "use strict";
 
 import fs from "node:fs";
@@ -84,7 +89,8 @@ function walkOnce(settle, C) {
         const E = Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * stn.drive));
         const F = C.energy ? 1 + C.energy * E : 1 + C.a * lv.pace + C.b * lv.voice + C.c * stn.drive;
         const SLOT = C.B / F, t = p.phase;
-        const S = C.energy ? (t + C.energy * p.tempestEnergyInt) / C.B
+        // v4826: lane 0 counts on the host's integral of its FLOORED rate -- see the floor row
+        const S = C.energy ? p.tempestSlot0Int / C.B
                            : K.mhRatePhase(1 / C.B, t, C.a, p.paceInt, C.b, p.voiceInt, C.c, p.driveInt);
         out.push({ t, SLOT, S,
                    murmur: K.mhFlourish(t, C.lane, SLOT), murmurSlot: Math.floor(t / Math.max(SLOT, 1)),
@@ -255,16 +261,42 @@ sec("3. *** AND IT IS murmur's OWN FUNCTION WHEREVER THE SIGNAL IS HELD, across 
     const margins = LANES.map(([n2, B, F]) => [n2, B / F]);
     say(`shortest slot each wired lane can reach: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}`);
     const bites = margins.filter(([, m]) => m < 1.0);
-    ok("!! *** THE 1.0 s FLOOR BITES ON ONE LANE ONLY -- tempest's first, by 1.7%, in THINKING at full cadence ***",
+    // *** v4826 -- AND THAT LANE NOW INTEGRATES ITS FLOORED RATE, SO THE COUNT IS murmur's. *** The host
+    // accumulates min(1 + 1.30 E, 2.9) per second of shader time (tempestSlot0Int), which is 2.9 / max(SLOT, 1):
+    // murmur's clamped slot rate, times the base. Checked on the real state module across the THINKING walk at
+    // full cadence, CUMULATIVELY: the count's advance against the sum of dt / max(SLOT, 1), and against the old
+    // spelling (t + 1.30 * tempestEnergyInt) / 2.9 on the same frames. NOT PER FRAME: the host samples the
+    // signals at one end of a tick and the walk at the other, so a frame where energy STEPS (the THINKING entry)
+    // reads ~10% either way -- a sampling offset of one frame, not a rate error, and it washes out of the sum.
+    // MEASURED: 1.2e-13 against the old spelling's 1.70e-2 -- the recorded 1.7%, closed.
+    let worstRate = 0, worstOld = 0, bitFrames = 0;
+    for (const s2 of [5, 60, 300]) {
+        const w = walk(s2, SUBJ.tempest);
+        let want = 0, oldS = 0;
+        for (let i = 1; i < w.length; i++) {
+            const dt = w[i].t - w[i - 1].t; if (dt <= 0) continue;
+            want += dt / Math.max(w[i].SLOT, 1);
+            oldS += dt / w[i].SLOT;   // the energy integral's rate, F / B, with no floor
+            if (w[i].SLOT < 1) bitFrames++;
+        }
+        const got = w[w.length - 1].S - w[0].S;
+        worstRate = Math.max(worstRate, Math.abs(got - want) / want);
+        worstOld = Math.max(worstOld, Math.abs(oldS - want) / want);
+    }
+    say(`lane 0 against murmur's clamped slot rate, cumulative over the walk: ${worstRate.toExponential(2)} (the unfloored energy integral: ${worstOld.toExponential(2)}), ${bitFrames} frames where the floor bites`);
+    ok("!! *** THE 1.0 s FLOOR BITES ON ONE LANE ONLY -- tempest's first, by 1.7%, in THINKING at full cadence -- AND THAT LANE'S COUNT HONOURS IT ***",
         bites.length === 1 && bites[0][0] === "tempest L0" && bites[0][1] > 0.98 &&
-        margins.filter(([n2]) => n2 !== "tempest L0").every(([, m]) => m > 1.4),
+        margins.filter(([n2]) => n2 !== "tempest L0").every(([, m]) => m > 1.4) &&
+        bitFrames > 0 && worstRate < 1e-9 && worstOld > 0.01,
         `each lane's shortest possible slot is its STYLE MINIMUM over its LARGEST signal sum, so these are ` +
         `the worst cases and not samples: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}. ` +
         `Only tempest's first lane on the large mount crosses the floor, to ${bites.length ? bites[0][1].toFixed(3) : "?"} ` +
         `s, which needs energy above ${((2.9 - 1) / 1.30).toFixed(4)} -- THINKING with cadence above ` +
-        `${(((2.9 - 1) / 1.30 - 0.65) / 0.85).toFixed(3)}. There the integrated count runs up to 1.7% fast ` +
-        `against murmur's clamped slot; the index still steps by one (section 2), so it is a drift in WHICH ` +
-        `gesture plays, not a re-roll. Every other lane clears the floor by at least 1.4x.`);
+        `${(((2.9 - 1) / 1.30 - 0.65) / 0.85).toFixed(3)}. Until v4826 the integrated count ran up to 1.7% fast ` +
+        `there, because an integral of E cannot clamp; the host now integrates the floored rate itself ` +
+        `(tempestSlot0Int), and across the walk -- ${bitFrames} frames of it under the floor -- the count's advance ` +
+        `matches the sum of dt / max(SLOT, 1) to ${worstRate.toExponential(1)} where the unfloored integral misses ` +
+        `by ${worstOld.toExponential(1)}. Every other lane clears the floor by at least 1.4x.`);
 }
 
 // =============================================================================================================
@@ -302,14 +334,19 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
     // The slot itself is mix(slot, slotSmall, small) per tempest.ts:74-75: a MOUNT constant, not a signal.
     {
         const rateOk = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(MT\.slotE\)\)\)/.test(raw);
-        const counts = (raw.match(/uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\(TB\[[01]\]\)/g) || []).length;
+        // v4826: lane 1 alone counts on the energy integral; lane 0 counts on its floored-rate integral
+        const counts = (raw.match(/uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\(TB\[1\]\)/g) || []).length;
+        const lane0 = /uniforms\.tempestSlot0Int\.div\(TB\[0\]\)/.test(raw) &&
+            /tempestSlot0Int \+= Math\.min\(1 \+ ME\.slotE \* E0, MH_TEMPEST_BOLT\.lanes\[0\]\.slot\) \* dPhase/.test(
+                fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbState.mjs"), "utf8"));
         const slots = /const TB = MH_TEMPEST_BOLT\.lanes\.map\(\(ln\) => mix\(float\(ln\.slot\), float\(ln\.slotSmall\), smallK\)/.test(raw);
         const L = K.MH_TEMPEST_BOLT.lanes, ME = K.MH_MIST_LIVE.tempest;
         ok("!! *** tempest's SLOT COUNT AND SLOT LENGTH SPEND THE SAME 1.30 ON THE SAME CLAMPED ENERGY, on murmur's small-mixed slots ***",
-            rateOk && counts === 2 && slots && ME.slotE === 1.30 && !("tempest" in K.MH_SLOT_SIGNAL) &&
+            rateOk && counts === 1 && lane0 && slots && ME.slotE === 1.30 && !("tempest" in K.MH_SLOT_SIGNAL) &&
             L[0].slot === 2.9 && L[0].slotSmall === 5.2 && L[1].slot === 4.3 && L[1].slotSmall === 7.4,
             `length slot / (1 + slotE * energy) ${rateOk ? "found" : "NOT FOUND"}; count (t + slotE * ` +
-            `tempestEnergyInt) / slot on ${counts} of 2 lanes; slots mix(${L[0].slot}, ${L[0].slotSmall}) and ` +
+            `tempestEnergyInt) / slot on lane 1 (${counts}), lane 0 on the host's min(1 + slotE * E, slot) integral ` +
+            `${lane0 ? "found" : "NOT FOUND"}; slots mix(${L[0].slot}, ${L[0].slotSmall}) and ` +
             `mix(${L[1].slot}, ${L[1].slotSmall}) on small ${slots ? "found" : "NOT FOUND"}; slotE ${ME.slotE}. ` +
             `MH_SLOT_SIGNAL carries no tempest entry any more -- its folded 1.105 voice coefficient was the ` +
             `port's energy, not murmur's.`);
@@ -347,7 +384,8 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
         // energy integral in place of mhRatePhase's three, so its base is the slot it divides by
         const bm = /^KIT\.mhRatePhase\(\s*float\(1\.0\)\.div\(([\s\S]*?)\),/.exec(args[0] || "") ||
                    /^KIT\.mhRatePhase\(\s*float\(([\s\S]*?)\),/.exec(args[0] || "") ||
-                   /^uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\((TB\[\d\])\)$/.exec(args[0] || "");
+                   /^uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\((TB\[\d\])\)$/.exec(args[0] || "") ||
+                   /^uniforms\.tempestSlot0Int\.div\((TB\[\d\])\)$/.exec(args[0] || "");   // v4826: lane 0's floored integral
         pairs.push({ base: bm ? bm[1].trim() : "(none)", len: (args[1] || "").trim(),
                      ok: !!bm && !live(bm[1]) && live(args[1] || "") });
     }
@@ -397,10 +435,12 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7 }),                    // 4  third lane passing
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, voiceInt: 9.0 }),     // 5
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, driveInt: 6.0 }),     // 6
-        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55 }),                // 7  first bolt up
-        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 6.8 }),                 // 8
-        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, voiceInt: 9.0 }), // 9  DEAF, with the bolt ON
-        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, paceInt: 9.0 }),  // 10 DEAF, with the bolt ON
+        // v4826: lane 0 counts on tempestSlot0Int, set to t + 1.30 * energyInt -- the same counts (the floor never
+        // bit on this history, so the two integrals agree), and lane 1 keeps reading tempestEnergyInt
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, tempestSlot0Int: 10 + 1.30 * 2.55 }),                // 7  first bolt up
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 6.8, tempestSlot0Int: 10 + 1.30 * 6.8 }),                  // 8
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, tempestSlot0Int: 10 + 1.30 * 2.55, voiceInt: 9.0 }), // 9  DEAF, with the bolt ON
+        sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, tempestSlot0Int: 10 + 1.30 * 2.55, paceInt: 9.0 }),  // 10 DEAF, with the bolt ON
     ];
     const run = await renderSpecies(FR);
     if (!run.ok || !run.frames || run.frames.length !== FR.length) {

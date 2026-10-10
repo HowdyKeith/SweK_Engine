@@ -28,6 +28,13 @@
 // difference and multiplies them; a saturation destroys them. Both are the flash, and a port that used one
 // spelling for all six would be wrong about six species in two different directions.
 // v4825 SABOTAGE, restored: opal's procession mix handed a zero weight in place of DRIVE (RED: the saturations row).
+// v4826 -- sol's core row reads the LIMB (0.22 to 0.30 of the frame): with u_depth no longer multiplying every
+// interior, the disc sits at the rail's top in murmur and here alike, and read x1.01 with its gain and x1.002
+// without. The limb reads x1.211 with it and x1.039 without. The saturation census reads sol's gesture-lifted
+// liftG, and the beside-the-interior row reads besideE, which carries comet's head as well as limn's rim now.
+// SABOTAGE, restored: COMPLETE.mul(MH_COMPLETE_SOL_CORE) typed COMPLETE.mul(0.0) -> RED (the core row and the
+// saturations census). comet's head put back into its density stays GREEN here -- this gate's row is limn's --
+// and goes RED in murmurParity-selfcheck, which holds comet's.
 "use strict";
 
 import fs from "node:fs";
@@ -163,7 +170,7 @@ sec("3. *** THE CENSUS: WHO SPENDS complete, AND THE RULE THAT DECIDES WHICH TAB
     // v4825: opal's life is the RESPONDING mix murmur writes -- mix(life, procession, drive) -- and the lift
     // saturates THAT, so the site reads the lift around the mix and not around the bare mhOpalLife.
     const sites = [["opal", /KIT\.mhCompleteLift\(\s*mix\(KIT\.mhOpalLife\([^)]*\), uniforms\.time\), float\(OD\.procFloor\)\.add\(max\(proc, 0\.0\)\.mul\(OD\.procAmp\)\), DRIVE\)/],
-                   ["sol", /KIT\.mhCompleteLift\(sn\.mul\(sn\), COMPLETE,/],
+                   ["sol", /KIT\.mhCompleteLift\(liftG, COMPLETE,/],   // v4826: the gesture-lifted sn^2, sol.ts:112
                    ["chorus", /KIT\.mhCompleteLift\(\s*life\.add\(select\(/]];
     const found = sites.filter(([, re]) => re.test(raw)).map(([s]) => s);
     ok("!! *** ALL THREE SATURATIONS ARE WIRED, EACH ON THE FIGURE ITS OWN FILE NAMES ***",
@@ -187,7 +194,8 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
     // SATURATED -- measured at 2.0937 against 2.0916 across the flash, a ratio of 0.999 -- so its 0.55 core
     // gain cannot show: the pixels are already at the top of the range. A sabotage that deleted that gain
     // walked through this section reading x1.05, because the lift on the prominences carried the row on its
-    // own. At glow 0.25 the same core reads x2.56. A frame where the subject is clipped is not a measurement
+    // own. At glow 0.25 the core read x2.56 until v4826 (a depth double count kept it dim; the row below
+    // now reads the limb, and says why). A frame where the subject is clipped is not a measurement
     // of the subject, and "it still moved" is not evidence about which term moved it.
     const KN = (s) => (s === "sol" ? { glow: 0.25, depth: 0.5 } : {});
     const FR = [];
@@ -221,24 +229,32 @@ sec("4. *** AND IT REACHES PIXELS: four species that did not move a byte at the 
 
         // *** sol's CORE, ON ITS OWN, because sol carries BOTH shapes and the interior row cannot separate
         // them. *** Its prominences saturate and its core takes a 0.55 gain; a reading of the whole interior
-        // is their sum, and deleting the gain left that sum moving. The core is the inner 0.16 of the frame.
+        // is their sum, and deleting the gain left that sum moving.
+        // *** v4826 -- READ ON THE LIMB, NOT THE DISC. *** Until v4825 the core was the inner 0.16 of the frame
+        // and read x2.56 -- but only because the port multiplied every interior by u_depth AS WELL AS spending
+        // it in mh_palette, so this frame's depth 0.5 halved the core and kept it off the top of the rail.
+        // murmur spends depth only in the palette. With that double count gone the disc's coreBright (1.20 and
+        // up, sol.ts:90) sits at the rail's top in murmur and in the port alike, and the inner disc reads x1.01
+        // with the gain and x1.002 without it -- a clipped subject, which is no measurement. The gain is still
+        // VISIBLE where disc's own smoothstep takes the core below the top: the limb, 0.22 to 0.30 of the frame.
+        // MEASURED: x1.211 there with the gain, x1.039 with COMPLETE.mul(MH_COMPLETE_SOL_CORE) typed
+        // COMPLETE.mul(0.0) -- the floor sits between them.
         const solOff = run.frames[SPEC.indexOf("sol") * 2], solOn = run.frames[SPEC.indexOf("sol") * 2 + 1];
-        const coreMean = (px) => { let a = 0, n = 0;
+        const limbMean = (px) => { let a = 0, n = 0;
             for (let y = 0; y < N3; y++) for (let x = 0; x < N3; x++) {
-                const dx = (x + 0.5) / N3 * 2 - 1, dy = (y + 0.5) / N3 * 2 - 1;
-                if (Math.hypot(dx, dy) > 0.16) continue;
+                const r = Math.hypot((x + 0.5) / N3 * 2 - 1, (y + 0.5) / N3 * 2 - 1);
+                if (r < 0.22 || r >= 0.30) continue;
                 a += light(px, x, y); n++;
             }
             return a / n; };
-        const cLo = coreMean(solOff), cHi = coreMean(solOn);
-        say(`sol's core alone (inner 0.16 of the frame, glow 0.25): ${cLo.toFixed(4)} -> ${cHi.toFixed(4)}  (x${(cHi / cLo).toFixed(3)})`);
-        ok("!! *** sol's CORE TAKES ITS OWN 0.55 GAIN, measured apart from the prominences that saturate ***",
-            cHi / cLo > 2.0,
-            `the inner disc goes x${(cHi / cLo).toFixed(3)} across the flash where the whole interior goes ` +
-            `x${(R.find((r) => r.s === "sol").hi / R.find((r) => r.s === "sol").lo).toFixed(3)}. TWO SHAPES ` +
-            `IN ONE SPECIES AND THE ROW HAS TO SEPARATE THEM: sol.ts gives the core a GAIN on its brightness ` +
-            `and the prominences a SATURATION on their lives, and a reading of the interior is their sum. ` +
-            `Deleting the gain left that sum moving and this gate green, which is why the core has a row.`);
+        const cLo = limbMean(solOff), cHi = limbMean(solOn);
+        say(`sol's limb alone (0.22 to 0.30 of the frame, glow 0.25): ${cLo.toFixed(4)} -> ${cHi.toFixed(4)}  (x${(cHi / cLo).toFixed(3)})`);
+        ok("!! *** sol's CORE TAKES ITS OWN 0.55 GAIN, read on the limb where the disc is below the rail's top ***",
+            cHi / cLo > 1.12,
+            `the limb goes x${(cHi / cLo).toFixed(3)} across the flash (x1.039 measured with the gain deleted). ` +
+            `TWO SHAPES IN ONE SPECIES AND THE ROW HAS TO SEPARATE THEM: sol.ts gives the core a GAIN on its ` +
+            `brightness and the prominences a SATURATION on their lives, and a reading of the interior is their ` +
+            `sum. The inner disc is at the top of the rail in murmur too, so the gain is read where disc falls off.`);
 
         // *** A ROW ABOUT THE DARK STAYING DARK WAS WRITTEN HERE AND DELETED, AND THE MEASUREMENT IS WHY. ***
         // kit.ts's own reason for a multiply rather than an overlay is that it "brightens exactly what is
@@ -308,10 +324,10 @@ sec("5. *** v4825 -- THE SINGLES: SEVEN FLASH FACTORS, EACH READ ONCE, IN ITS OW
     const limnBody = bodyOf("Limn"), stillBody = bodyOf("Still"), chorusBody = bodyOf("Chorus");
     const R = K.MH_LIMN_RIM || {};
     const limnOk = R.complete === 1.6 && R.settled === 0.30 && R.ringClose === 1.20 && K.MH_COMPLETE_INTERIOR.limn === 0.90 &&
-        /const limnDensity = accL\.mul\(3\.0\)\.mul\(uniforms\.depth\);/.test(limnBody) &&
+        /const limnDensity = accL\.mul\(3\.0\);/.test(limnBody) &&
         // the species name is a STRING, which codeOnly blanks -- so this one line is read from the raw source
-        /species === "limn" \? SP\.rimE : float\(0\.0\)/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")) &&
-        /interior\.add\(limnRim\)\.add\(sf\.rim\)/.test(orb);
+        /species === "limn" \? SP\.rimE : species === "comet" \? SP\.headE\.mul\(surfB\.m\) : float\(0\.0\)/.test(fs.readFileSync(path.join(ENG, "render", "aiPresenceOrbTsl.mjs"), "utf8")) &&
+        /interior\.add\(besideE\)\.add\(sf\.rim\)/.test(orb);
     ok("!! *** limn: the rim carries 1.6, 0.30 and ringClose 1.20 and joins BESIDE an interior carrying 0.90 -- limn.ts:126-173 ***",
         limnOk, `MH_LIMN_RIM ${JSON.stringify(R)}, interior ${K.MH_COMPLETE_INTERIOR.limn}; density is accL alone and the rim is added at railE and eTotal`);
     const G = K.MH_STILL_GLINT || {};

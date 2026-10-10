@@ -29,6 +29,8 @@
 // three seconds. Two of murmur's numbers that were simply absent. Added in the integrated form, because
 // adding them as murmur spells them would have shipped a new teleport on the same afternoon as the repair.
 //
+// v4826 -- flux's stream takes flux.ts:78's 0.95 * st.drive, so the deaf row moves flux's driveInt sweep from the
+// deaf half to the hearing half. SABOTAGE, restored: MH_FLUX.flowDrive typed 0 in the mhRatePhase call -> RED.
 // v4825 -- tempest's subject became tempest.ts's own energy (pace, thinking, drive; clamped) and the scaled-
 // site census grew two honest shapes (per-species branches, spinPhase's split). SABOTAGES, each restored:
 // the host integrating 0.85*voice in place of pace (RED: section 2's mist bound, section 3's spelling row);
@@ -405,16 +407,19 @@ sec("5. *** AND ALL THREE REACH PIXELS -- with the instantaneous signal held at 
         // driveInt is NOT on the deaf list for tempest any more: v4825 wired murmur's RESPONDING advection,
         // V * k * driveInt, which streams the whole domain -- a different mechanism from the drift clock, and
         // it has to move SOMETHING or the wiring is dead. Its own rows are in murmurDrive-selfcheck.
+        // v4826 -- NOR FOR flux: flux.ts:78 is mh_drift(...) * (1 + 0.70 * live.pace + 0.95 * st.drive), and this
+        // port carried the pace term alone, so the row below held flux deaf to an integral murmur DOES give it.
+        // MH_FLUX.flowDrive is spent through driveInt now; flux is deaf to voiceInt only.
         ok("!! *** ...AND EACH SPECIES IS DEAF TO THE INTEGRALS murmur DOES NOT GIVE IT: five sweeps, zero bytes ***",
-            tP.pct === 0 && tVo.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct === 0 && tD.pct > 0,
+            tP.pct === 0 && tVo.pct === 0 && hV.pct === 0 && fV.pct === 0 && fD.pct > 5 && tD.pct > 0,
             `the SAME fourteen radian-seconds that move ${tV.pct.toFixed(1)}% of tempest on its energy move ` +
             `${tP.pct.toFixed(0)} bytes on paceInt and ${tVo.pct.toFixed(0)} on voiceInt (tempest.ts's energy ` +
             `reads cadence, thinking and drive through the ONE clamped integral, never the separate ones), ` +
             `while driveInt moves ${tD.pct.toFixed(1)}% through the advection alone, and the same sweep ` +
             `that moves ${hD.pct.toFixed(1)}% of helix on driveInt moves ${hV.pct.toFixed(0)} bytes on ` +
-            `voiceInt, and flux moves ${fV.pct.toFixed(0)} and ${fD.pct.toFixed(0)} bytes on the two it does ` +
-            `not read. tempest.ts scales its drift by its clamped energy alone; flux.ts scales its stream ` +
-            `by pace alone; helix.ts scales its climb by pace and drive alone. THE POSITIVE ROWS ABOVE ` +
+            `voiceInt, and flux moves ${fV.pct.toFixed(0)} bytes on voiceInt, which it does not read, and ` +
+            `${fD.pct.toFixed(1)}% on driveInt, which it does (v4826). tempest.ts scales its drift by its clamped ` +
+            `energy alone; flux.ts scales its stream by pace and drive; helix.ts scales its climb by pace and drive alone. THE POSITIVE ROWS ABOVE ` +
             `CANNOT TELL THE DIFFERENCE between three wires ` +
             `and one bus -- this one can, and it is the reason the three integrals were kept as three ` +
             `uniforms instead of being summed into the single "how busy has it been" number that would have ` +

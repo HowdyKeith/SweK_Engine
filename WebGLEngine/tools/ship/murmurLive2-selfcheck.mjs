@@ -11,12 +11,21 @@
 //
 // WHY THESE TWO AND NOT ANY OTHER TWO:
 //
-//   chorus -- its cadence site is a PERIOD (CH.perB minus pace times CH.perPace), where arc's is a shimmer
-//             amplitude. A wiring error that happened to be harmless on a brightness is not harmless on a
-//             clock, and the two are not the same test even though they read the same signal.
+//   comet -- its cadence site is the ORBIT'S RADIUS (comet.ts:73, r0 * (1 - 0.24 * live.pace)), where arc's is
+//             a shimmer amplitude. A wiring error that happened to be harmless on a brightness is not harmless
+//             on a geometry, and the two are not the same test even though they read the same signal.
+//             *** v4826 -- THIS WAS chorus UNTIL THE PORT INTEGRATED chorus's BREATH. *** chorus spent its pace on
+//             one site, its breath PERIOD, and that phase is now the host's integral of 1 / per (chorus.ts:104
+//             spells 2 pi t / per, which jumps every voice when pace moves). With the integral held, as this
+//             gate holds every integral, chorus reads no instantaneous cadence at all and its span moved 0
+//             bytes. comet's r0 read VOICE until v4826 and reads murmur's live.pace now, so it took the row.
 //   droplet -- its VOICE drives mh_shape's swell, which scales the whole body. On this one species of the
 //             eighteen the 20%-hot error this round fixes was a 20%-hot SILHOUETTE rather than an exposure,
 //             which is the one form of it no tone-curve headroom could have absorbed.
+// v4826 -- section 1's species is comet, whose orbit radius reads the conditioned cadence; chorus's breath is
+// integrated now and reads none. SABOTAGES, restored: comet's r0 on the RAW activity -> RED (513 bytes between
+// the conditioned pair). comet's r0 on VOICE stays GREEN, and should: voice is held equal across these frames,
+// and murmurParity-selfcheck is the gate that holds which signal r0 reads.
 "use strict";
 
 import { renderSpecies } from "./murmurSpeciesFrames.mjs";
@@ -44,11 +53,11 @@ const A_SQRT = A_WORK * Math.pow(P_REST, -1 / 0.5);          // the near-miss a 
 const f = (species, extra) => ({ factoryArgs: { species }, knobs: { ...BASE, ...extra } });
 // STATES: 0 idle, 1 listening, 2 thinking, 3 responding, 4 success.
 const FRAMES = [
-    /* 0 */ f("chorus", { stateIndex: 3, activity: A_WORK }),
-    /* 1 */ f("chorus", { stateIndex: 0, activity: A_PARTNER }),
-    /* 2 */ f("chorus", { stateIndex: 0, activity: A_SQRT }),
-    /* 3 */ f("chorus", { stateIndex: 0, activity: 0.0 }),
-    /* 4 */ f("chorus", { stateIndex: 0, activity: 1.0 }),
+    /* 0 */ f("comet", { stateIndex: 3, activity: A_WORK }),
+    /* 1 */ f("comet", { stateIndex: 0, activity: A_PARTNER }),
+    /* 2 */ f("comet", { stateIndex: 0, activity: A_SQRT }),
+    /* 3 */ f("comet", { stateIndex: 0, activity: 0.0 }),
+    /* 4 */ f("comet", { stateIndex: 0, activity: 1.0 }),
     /* 5 */ f("droplet", { stateIndex: 1, voice: L_LISTEN }),
     /* 6 */ f("droplet", { stateIndex: 0, voice: L_PARTNER }),
     /* 7 */ f("droplet", { stateIndex: 0, voice: L_LISTEN }),
@@ -74,20 +83,20 @@ if (!run.ok) {
 } else {
     const F = run.frames;
 
-    sec("1. *** chorus: THE CADENCE DRIVES A CLOCK HERE, NOT A BRIGHTNESS, AND IT IS THE SAME CURVE ***");
+    sec("1. *** comet: THE CADENCE DRIVES A GEOMETRY HERE, NOT A BRIGHTNESS, AND IT IS THE SAME CURVE ***");
     {
         const eq = cmp(F[0], F[1]), near = cmp(F[0], F[2]), span = cmp(F[3], F[4]);
-        say(`chorus: responding at ${A_WORK} vs idle at ${A_PARTNER.toFixed(6)} -- ${eq.n} of ${F[0].length} bytes ` +
+        say(`comet: responding at ${A_WORK} vs idle at ${A_PARTNER.toFixed(6)} -- ${eq.n} of ${F[0].length} bytes ` +
             `differ; against the 0.5-exponent partner ${A_SQRT.toFixed(6)}, ${near.n} bytes, total ${near.sum}; ` +
             `across activity 0 to 1, ${span.n} bytes, total ${span.sum}, worst ${span.mx}`);
-        ok("!! *** chorus: THE CADENCE EXPONENT IS 0.85 AND THE RESTING WEIGHT IS 0.60, TO THE BYTE ***",
+        ok("!! *** comet: THE CADENCE EXPONENT IS 0.85 AND THE RESTING WEIGHT IS 0.60, TO THE BYTE ***",
             eq.n === 0 && near.sum > 300 && span.sum > 500,
             `${eq.n} differing bytes between a cadence of ${A_WORK} in RESPONDING and ${A_PARTNER.toFixed(6)} in ` +
             `IDLE -- the same conditioned number, so the same picture. RESPONDING and IDLE weight the VOICE ` +
             `identically (only LISTENING lifts it), so this pair isolates the cadence and nothing else. The ` +
             `square-root near-miss disagrees by ${near.sum} and the full cadence span moves ${span.sum}, so the ` +
-            `row is not passing because chorus is insensitive or dark. chorus spends its pace on the ensemble's ` +
-            `PERIOD rather than on a brightness: a wiring error harmless to an exposure is not harmless to a clock.`);
+            `row is not passing because comet is insensitive or dark. comet spends its pace on the orbit's ` +
+            `RADIUS rather than on a brightness: a wiring error harmless to an exposure is not harmless to a geometry.`);
     }
 
     sec("2. *** droplet: CONDITIONING THE VOICE MOVES THE SILHOUETTE AND NOT ONLY THE EXPOSURE ***");
