@@ -1283,6 +1283,7 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="rtx"><span class="gtabTog">&#9656;</span><span>&#128294; RTX</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="fsr"><span class="gtabTog">&#9656;</span><span>&#128269; FSR</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="denoiser"><span class="gtabTog">&#9656;</span><span>&#10024; Denoiser</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1897,6 +1898,14 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#128269; FSR</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">AMD FidelityFX Super Resolution, reimplemented natively: the spatial upscaler (EASU and RCAS) and the temporal chain -- jitter, motion vectors, reprojected accumulation, frame generation -- on its own test scenes (fsr.html) and on a three.js WebGPURenderer scene (fsr-three.html), and the frame-generation caches it harvested, installed on request (install-fsr-caches.html).</div>
           <div data-panel-pages="fsr" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- Keith: "Give the denoiser its own link bucket." The learned denoiser's page, which had waited in UNPLACED since
+             round 12 because Renders was full; the anchor stays beside the Path Tracer in Arriving and pageSections.mjs
+             moves it here. -->
+        <div class="gpanel" data-panel="denoiser" hidden>
+          <div class="gpanelHdr">&#10024; Denoiser</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The learned path-tracer denoiser (denoise.html): a small kernel-predicting network trained on two scene families, run as WebGPU compute beside the joint bilateral filter it was tested against, with a self-check against the network on the CPU and a timing table for whatever GPU the browser hands it. It renders the two families it was trained on and nothing else -- render/learned-denoiser-preregistration.md says why.</div>
+          <div data-panel-pages="denoiser" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
