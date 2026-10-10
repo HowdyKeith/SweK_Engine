@@ -2610,3 +2610,34 @@ It must hold in each of:
 - A smaller network.
 - Reusing the hidden layers' buffers (ping-pong), which would change what the exact gate can read back.
 - Node on DXC by default: section 43's A1 decides whether that is a round.
+
+## 47. ROUND 15 -- REPORTED HERE: K0 (a), THE r15 SET ON THE 24 TEST IMAGES
+
+`node tools/denoiseDevice.mjs --measure-r15 --cache <dir>` ran at 8e2d749e, the commit that carries section 46 and
+`k_head_apply`. It was one run of 764 s, ending 21:09:29Z.
+- Its output, unedited, is `render/denoise-results-r15.json`, committed at 6c2691d9 before it was read.
+- The cache served all 24 test images (hits 24, misses 0). It was hard-linked from round 12's measurement cache.
+- On every image the four hidden layers ran on the fast kernel, and the head and the kernel apply ran as one pass,
+  `k_head_apply`.
+
+**K0 (a) holds.**
+
+| Criterion | Result |
+|---|---|
+| D0, the shipped file is the harvest's network | its f64 relMSE equals round 11's seed 1 on all 24 images, bit for bit |
+| D1, the hidden layers | 12,582,912 conv cells, every one the twin's: none fused, none unexplained. The head's 7,962,624 are never stored (section 46) |
+| D2, the head and kernel pass | worst 4.9e-7 relative to `kernelApplyCpu` on the twin's logits or the fused mirror's (bound 1e-5); against the twin's alone 6.4e-7, against the mirror's alone 7.6e-7 |
+| D3, the verdict on the device | relMSE within 3.8e-7 of the f64 network's on every image (bound 1e-4). The primary filter is beaten on 12 of 12 images of R and 12 of 12 of C, the same images as on the CPU |
+
+- **E: the device's relMSE equals section 44's, bit for bit, on all 24 images,** and so rounds 12's and 13's.
+  - Against the twin's logits alone, the worst value is round 14's D2 to the digit, 6.4e-7.
+  - That is what an identical image predicts: on SwiftShader nothing fuses, so `k_head_apply`'s logits are `k_head`'s
+    bits, and it sums them in `k_apply_fast`'s order.
+- **Reported, not a criterion:** a 64 x 64 image took 365-515 ms here (median 399), with read-back, against round 14's
+  median of 427. That is SwiftShader, a CPU, and no evidence for K1, F1 or F2.
+
+**Still open:**
+- K0 (b) and (c) for r15, K1, F1-F2 and the two rules, on Keith's two GPUs.
+- That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r15.json` on
+  `claude/denoiser-round15`.
+- Section 45, round 14's verdict, is still held for its two reports.
