@@ -166,10 +166,12 @@ sec("3. THE RULE, AND WHERE IT ENDS");
        "v4571 spent half a round on rows that forbade the repair they existed to prompt. A deliberate " +
        "removal is a TERM -- redCensus.mjs's own v4313 rule -- and the door is shown opening rather than " +
        "described");
-    ok("  the door is EMPTY today, so nothing is being waved through",
-       DROPPED_ON_PURPOSE.length === 0,
-       "an exemption list that fills up quietly is how a ratchet stops holding anything; it is empty, and " +
-       "each future entry needs a round name and a reason");
+    ok("  the door holds ONLY the removals it names -- two, both v4826, each with a record, a field, a round and a reason of substance -- so nothing is being waved through",
+       DROPPED_ON_PURPOSE.length === 2 && DROPPED_ON_PURPOSE.every((d) => d.record && d.field && /^v\d+$/.test(d.round) && String(d.why).length >= 80) &&
+       DROPPED_ON_PURPOSE.every((d) => d.round === "v4826" && /trader-policy(-spread)?\.json$/.test(d.record) && d.field === "top:measuredAt"),
+       "an exemption list that fills up quietly is how a ratchet stops holding anything. It was EMPTY until v4826, when tools/ship/stableWrite.mjs renamed the trader " +
+       "artifacts' `measuredAt` (stamped with the running version on every run, so it dirtied the tree in each new one) to `changedAt` (moves only with the numbers). " +
+       "The count is pinned: a third entry is a red here until this row says why");
     // *** THE LIMIT, STATED IN THE NUMBER IT WAS MEASURED BY. ***
     ok("  and what this does NOT check is stated rather than implied",
        /584 writeFileSync call sites/.test(fs.readFileSync(path.join(ENG, "tools/ship/recordShape.mjs"), "utf8")),

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "3f7934247f393d14f9e4978d946eff7a10af0c60",
+ "head": "9f0d40de518644761ccc1725e6c82d5c05083229",
  "bodies": {
   "box3d": [
    {
@@ -121,8 +121,8 @@
    },
    {
     "path": "tools/ship/copiedOutsideVendor-selfcheck.mjs",
-    "bytes": 23201,
-    "sha": "5d3d8d83a3e03fe43ca343af0b34483783a2b4e8"
+    "bytes": 23745,
+    "sha": "653e470323f8b29c839ef5e5d7971a21dc4b4e06"
    },
    {
     "path": "tools/ship/jointDrive-selfcheck.mjs",
@@ -340,8 +340,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 881792,
-    "sha": "6682fad31dbbe429b1ee5c47bb0088c3f2831a9b"
+    "bytes": 882516,
+    "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -721,8 +721,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3495718,
-    "sha": "4f306f5111cf03c30136ac854ad21b2d5e8bd0af"
+    "bytes": 3509734,
+    "sha": "9f0d40de518644761ccc1725e6c82d5c05083229"
    },
    {
     "path": "mpm3d.html",
@@ -766,8 +766,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 881792,
-    "sha": "6682fad31dbbe429b1ee5c47bb0088c3f2831a9b"
+    "bytes": 882516,
+    "sha": "76256d926c6ad9f7e790b879fb94bd256dc1c108"
    },
    {
     "path": "shipavatar.html",
@@ -924,7 +924,7 @@
    {
     "path": "ai-presence-orb.html",
     "bytes": 11946,
-    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
+    "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    },
    {
     "path": "fsr-three.html",
@@ -1274,7 +1274,7 @@
    {
     "path": "ui/aiPresenceOrbWidget.js",
     "bytes": 18817,
-    "sha": "d68f2a290afb2f5a9332ffa479024ee77e38df05"
+    "sha": "89b9999f0689caa4ea19a97fdd7d1d3c923d950d"
    }
   ],
   "three-webgpu-r185": [

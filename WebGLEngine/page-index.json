@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 478,
+ "count": 479,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2338,6 +2338,13 @@
    "f": "race-crash.html",
    "t": "Race crash on the GPU",
    "d": "Racing city 7: world/crashDamage.mjs lets the car of race-car.html damage the city of race-track.html. A car that loses more than 3 m/s of speed in one step against a building's static box is an impact: the sandbox's own blast (render/voxelDamage.mjs) carves a sphere centred on the first solid voxel along the car's heading, the debris system bursts six cubes per voxel, CityGen charges the building the voxels its footprint lost (its hit points are its standing voxels, v4510), the crater's faces show render/rebar.mjs's cage as steel where the rods were cut -- and a building whose ground floor falls under 30% support is charged the rest: CityGen topples it, its box is parked and the car drives the rubble. Lap with the pursuit driver, or Ram the nearest standing building at full throttle. On WebGPU or WebGL2. Drag to orbit, wheel to dolly.",
+   "g": "racing",
+   "p": 0
+  },
+  {
+   "f": "race-lockstep.html",
+   "t": "Race lockstep",
+   "d": "Racing city 12: brain/raceLockstep.mjs steps the race with gunners from the commands two peers exchange over tools/ship/lockstepRelay.mjs, and brain/racePlay.mjs puts a keyboard on the wire where a policy was: W/A/S/D or the arrows drive your car, Z drops a slick, X lights it, and the turret on every car is still worked by its gunner brain (the Giant Fiber circuit). Two people each open the page with ?relay=ws://HOST:8799&peer=A or peer=B and race the same cars on their own machines; with no relay it is a one-player race against a bot through the same code. Every tick each machine sends its race fingerprint and the page halts and says so on the first one that disagrees.",
    "g": "racing",
    "p": 0
   },

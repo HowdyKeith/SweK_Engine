@@ -27,7 +27,7 @@ import * as C from "../physics/raceCar.mjs";
 export const NEUTRAL = Object.freeze({ throttle: 0, steer: 0, brake: 0, yaw: 0, pitch: 0, fire: 0, drop: 0, ignite: 0 });
 
 /**
- * One peer's session. opts: { worldFrom, drivers, gunners, peers, owner (carIndex -> peerId), seed, seconds, fleet, gap, shellSpeed, pickups, city, tamper }.
+ * One peer's session. opts: { worldFrom, drivers, gunners, peers, owner (carIndex -> peerId), seed, seconds, fleet, gap, shellSpeed, pickups, city, tamper, stopTick }.
  * `tamper(tick, rec)` is a gate's hook: it may change the commands THIS peer steps (not what it sent) to stand in for a real divergence.
  */
 export function createRaceSession(opts) {
@@ -42,7 +42,10 @@ export function createRaceSession(opts) {
         inbuf.get(t).set(peerId, inputs || []);
         return true;
     }
-    const ready = (t = tick) => { const m = inbuf.get(t); return !!m && peers.every((p) => m.has(p)); };
+    // v4827 -- `stopTick`: the session never steps tick `stopTick` or later. One pump can step a dozen ticks it already holds the commands for, and a page that paces the race on a clock
+    // would otherwise run past the end by a different number on each machine: the running fingerprint, the log and the results it prints at the finish are all of the tick it stopped on.
+    const stopAt = opts.stopTick != null ? opts.stopTick : Infinity;
+    const ready = (t = tick) => { if (t >= stopAt) return false; const m = inbuf.get(t); return !!m && peers.every((p) => m.has(p)); };
     function note(peerId, t, hash) {
         const local = localHashes.get(t);
         if (local == null) { pendingPeer.set(t + "/" + peerId, hash >>> 0); return true; }   // not stepped here yet: keep it, compare when we do
@@ -66,7 +69,7 @@ export function createRaceSession(opts) {
     }
     return {
         submitInputs, ready, tryStep, checkPeerHash: note,
-        stepDt: () => lockedDt, staleDropped: () => staleDropped, pendingTicks: () => inbuf.size,
+        stepDt: () => lockedDt, stopTick: () => stopAt, staleDropped: () => staleDropped, pendingTicks: () => inbuf.size,
         get tick() { return tick; },
         localHash(t) { return localHashes.get(t == null ? tick - 1 : t); },
         desync() { return desync; },
@@ -81,9 +84,11 @@ export function createRaceSession(opts) {
  * One peer's session AND its transport. `send(msg)` puts a message on the wire to the other peers; the caller hands every message that arrives to
  * receive(msg) and calls pump() as often as it likes (a timer, an animation frame, a test's round). backendId is the engine's identity
  * (drivePolicy.machineFingerprint): peers whose engines differ halt before stepping rather than produce a desync that looks like a bug.
+ * `inputFn(session)` (v4827) replaces what this peer's cars would command -- (tick) => the commands for the cars it owns -- with something else, which is how a human
+ * takes the wheel (brain/racePlay.mjs): the wire is the same, only the author of the commands differs. Without it, session.inputFn(selfId): the policies.
  */
 export function createRacePeer(opts) {
     const session = createRaceSession(opts);
-    const net = createLockstepNet({ session, selfId: opts.selfId, inputFn: session.inputFn(opts.selfId), send: opts.send, inputDelay: opts.inputDelay != null ? opts.inputDelay : 4, dt: C.CAR.dt, backendId: opts.backendId || null, onBackendMismatch: opts.onBackendMismatch || null, redundancy: opts.redundancy });
+    const net = createLockstepNet({ session, selfId: opts.selfId, inputFn: opts.inputFn ? opts.inputFn(session) : session.inputFn(opts.selfId), send: opts.send, inputDelay: opts.inputDelay != null ? opts.inputDelay : 4, dt: C.CAR.dt, backendId: opts.backendId || null, onBackendMismatch: opts.onBackendMismatch || null, redundancy: opts.redundancy });
     return { session, net, receive: net.receive, pump: net.pump };
 }

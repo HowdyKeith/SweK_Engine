@@ -1,0 +1,445 @@
+{
+ "generatedFrom": "tools/ship/flakeProbe.mjs",
+ "at": "2026-10-10",
+ "thinMax": 3,
+ "gates": {
+  "ev/esFleetSize-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "gfx/frontDoor-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "physics/blobarium-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "render/cloudField-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "render/holoAgree-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "render/mossField-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "rig/cinematicShot-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "simulation/carrySpawn-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/krbn/krbnCompareLive-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/androidTvNav-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/asciify-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/avatarFraming-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/avatarServerViews-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/avatarZWander-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/bellPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/blobulatorSkins-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/brainTrail-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/browserSafety-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/canvasFill-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/cartPolePage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/chipOrder-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/crtToggle-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/demoChrome-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/dockRows-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/domToTexture-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/ecologyPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/economyLockstep-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/engineSceneBot-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/firewallBanner-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/flyConnectomePage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/frameDirtyProbes-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/galaxyProfile-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/gitEconomy-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/githubPanelLive-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/goLinkStyle-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/gpuOrbits-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/gpuUniverse-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/hostingControls-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/keplerPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/lensingPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/localModelProbe-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/mpmGpuPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/orreryAuthor-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/orreryFleet-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/orreryPost-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/orreryReached-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/pageGround-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/pageSectionsReport-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/phoneQR-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/reactorPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/realTerrainFlyIn-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/recordFloat-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/releasePanelRoute-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/rigCanvas-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/rigJobs-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/rigLabGeminiKey-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/rigProgress-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/rigTiming-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/sharpPanel-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/shippedLadder-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/slugRig-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/stellarPage-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/tslRace-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [
+    {
+     "name": "and the identity picture still names Chaos ships (the pick pipeline is the fleet's own; the generated one only paints)",
+     "min": 1,
+     "max": 2
+    }
+   ],
+   "crashed": 0
+  },
+  "tools/ship/tslRig-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/universeJournal-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/universeWire-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/verifiedPolygonIntersection-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/voxtralBrowser-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "tools/ship/webrtxBrowser-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "ui/pageGauges-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "ui/stageInfo-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  },
+  "world/rootArch-selfcheck.mjs": {
+   "times": 5,
+   "flipped": [],
+   "thin": [],
+   "crashed": 0
+  }
+ }
+}

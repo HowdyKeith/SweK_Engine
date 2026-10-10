@@ -262,7 +262,11 @@ export const POSIX_AT_V4485 = Object.freeze({
     // tools/bakeConnectomeTopology.mjs (normalises), tools/bakeGfcTopology.mjs, tools/bakeGunnerTrace.mjs,
     // tools/maleCnsBake.mjs and tools/mesh/mikktRef.mjs (do not). NOTHING WAS UN-NORMALISED; the five are one
     // past the band's +/- 4, which is why this is a re-take and not a tolerance.
-    separator: Object.freeze({ callers: 171, calls: 236, normalised: 115, never: 56 }),
+    // v4826 -- 171/236/115/56 -> 176/245/120/56, under the same rule and skip list, taken with the gate's own scan. Measured on the committed tree just before this round's
+    // files (a worktree of HEAD): 175/244/120/55 -- the lockstep round and main's v4823-v4825 had already moved it +4/+8/+5/-1, inside the band's +/- 4. THIS round's
+    // part is one caller, one call and one `never`: tools/ship/flakeProbe.mjs builds the engine's own paths with path.join and never compares or records one with a
+    // separator in it. NOTHING WAS UN-NORMALISED. 176 is one past the band, which is why this is a re-take and not a tolerance.
+    separator: Object.freeze({ callers: 176, calls: 245, normalised: 120, never: 56 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

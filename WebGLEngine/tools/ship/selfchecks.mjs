@@ -21,9 +21,14 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseOrExit, refusalLines } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const VERBOSE = process.argv.includes("--verbose");
+// v4826 -- the options, parsed once and strictly. `--affected` takes the changed files as bare words after it; bare words anywhere else are refused.
+const SPEC = { values: { "--timeout": "number", "--budget": "number" }, flags: ["--verbose", "--affected", "--select-only", "--count-only"], positional: true };
+const CLI = parseOrExit("selfchecks", SPEC);
+if (CLI.rest.length && !CLI.flags.has("--affected")) { for (const l of refusalLines("selfchecks", [`unexpected argument "${CLI.rest[0]}" -- bare words are changed files, and only --affected takes them`], SPEC)) console.error(l); process.exit(2); }
+const VERBOSE = CLI.flags.has("--verbose");
 // 60s, from measurement, not taste. The slowest real check is brain/rl/dock-hazard-selfcheck.mjs at ~19.4s
 // standalone, with occlusion-bptt at ~18.2s and bz-pilot at ~17.7s behind it. A 30s budget looked generous and
 // was not: all four of the slow ones passed standalone and TIMED OUT inside verify.mjs, where the machine is
@@ -34,7 +39,7 @@ const VERBOSE = process.argv.includes("--verbose");
 // for needing 63s to 280s. windTunnel missed by THREE SECONDS. The rule did not change -- nobody re-applied it.
 // tools/ship/gateBudget.mjs holds the measurement each number comes from, so this can be contradicted rather
 // than trusted. --timeout still overrides everything, for a caller who knows better than the table.
-const OVERRIDE = process.argv.includes("--timeout") ? parseInt(process.argv[process.argv.indexOf("--timeout") + 1], 10) : 0;
+const OVERRIDE = CLI.values["--timeout"] ? Math.trunc(CLI.values["--timeout"]) : 0;
 
 // v3584 -- DECLARED HERE, NOT BESIDE writeTimings. The flush call sits inside the run loop, ABOVE the
 // function's own definition, and a `const` in a temporal dead zone throws ReferenceError on first use --
@@ -126,9 +131,8 @@ let all = walk(ROOT).sort();
 // HONEST LIMIT, PRINTED EVERY TIME: this selects among the SELFCHECKS ONLY. verify.mjs -- physicsSuite, the
 // claims gate, the page parse -- is not decomposable this way and is what catches every mutation in tools/mutate.
 // So --affected is a FAST PRE-FILTER, never a replacement for a ship.
-if (process.argv.includes("--affected")) {
-    const i = process.argv.indexOf("--affected");
-    const changed = process.argv.slice(i + 1).filter((a) => !a.startsWith("--"));
+if (CLI.flags.has("--affected")) {
+    const changed = CLI.rest;
     if (!changed.length) {
         console.log("[selfchecks] --affected needs at least one changed file. Refusing to run a filtered set on an empty filter -- 0 of 0 passing is a pass that means nothing.");
         process.exit(2);
@@ -187,7 +191,7 @@ if (process.argv.includes("--affected")) {
     // IT EXITS 3, NOT 0. A flag that runs no checks and returns success is the identical shape to the two
     // silent green lights this round exists to close, and it would be a worse one for being deliberate.
     // Three means "a selection, not a verdict", and nothing can mistake it for a ship.
-    if (process.argv.includes("--select-only")) {
+    if (CLI.flags.has("--select-only")) {
         console.log("[selfchecks] --select-only: NOTHING WAS RUN. The list above is a plan, not a result.");
         process.exit(3);
     }
@@ -212,7 +216,7 @@ const UNFILTERED_COUNT = toRun.length;
 // refuses for --affected, so a gate reporting on the timing record was REWRITING IT on every invocation, which is
 // exactly the unprotected-filter finding v4580 recorded one file over, committed by the round that cited it.
 // --count-only prints the walk's population and exits before anything is spawned or written.
-if (process.argv.includes("--count-only")) {
+if (CLI.flags.has("--count-only")) {
     console.log("[selfchecks] population " + UNFILTERED_COUNT + " runnable of " + all.length + " discovered");
     process.exit(0);
 }
@@ -226,9 +230,8 @@ if (process.argv.includes("--count-only")) {
 // drops gates the change CAN REACH prints a warning naming them. A fast green run that skipped the gate for the
 // thing you edited is the failure this flag could otherwise manufacture, and it is the reason missedReachable
 // is printed rather than merely computed.
-if (process.argv.includes("--budget")) {
-    const bi = process.argv.indexOf("--budget");
-    const secs = parseFloat(process.argv[bi + 1]);
+if ("--budget" in CLI.values) {
+    const secs = CLI.values["--budget"];
     if (!Number.isFinite(secs) || secs <= 0) {
         console.log("[selfchecks] --budget needs a positive number of seconds.");
         process.exit(2);
@@ -238,9 +241,7 @@ if (process.argv.includes("--budget")) {
     // that match nothing orders every gate as unreachable, so the "gates the change can reach were dropped
     // for time" warning -- the one thing keeping --budget honest -- could never fire.
     const { normaliseChanged: normPlan } = await import("./changedPaths.mjs");
-    const changedForPlan = process.argv.includes("--affected")
-        ? normPlan(process.argv.slice(process.argv.indexOf("--affected") + 1).filter((a) => !a.startsWith("--"))).resolved
-        : [];
+    const changedForPlan = CLI.flags.has("--affected") ? normPlan(CLI.rest).resolved : [];
     let ledger = null;
     try { ledger = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "roundhouse", "perf-ledger.json"), "utf8")); } catch {}
     const relOf = (f) => path.relative(ROOT, f).replace(/\\/g, "/");
@@ -392,7 +393,7 @@ for (const f of toRun) {
 // DIFFERENT POPULATION, and merging it would silently overwrite a slow gate's real number with whatever a
 // filtered pass happened to see.
 function writeTimings(complete) {
-    if (process.argv.includes("--affected")) return;
+    if (CLI.flags.has("--affected")) return;
     const n = Object.keys(observedMs).length;
     if (!n) return;
     try {

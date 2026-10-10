@@ -96,7 +96,12 @@ export function buildPageIndex(root = ROOT) {
 if (import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1] || "").href) {
     const out = buildPageIndex();
     const dest = path.join(ROOT, "page-index.json");
-    fs.writeFileSync(dest, JSON.stringify(out, null, 1) + "\n");
+    // v4828 -- WRITTEN ONLY WHEN IT CHANGED. artefactWriters-selfcheck runs this tool in place, twice, in the sweep's parallel phase, and the rig's v4826 verify (2,260 s, 66 gates cut at
+    // the cap) ended with page-index.json unparseable for the three gates that read it. Nothing in the log says how; what it does say is that the file was whole at the start and torn
+    // by the time they ran. A rewrite of identical bytes is a window in which a reader can see half a file, and a tool that is run to MEASURE whether it is idempotent should not open it.
+    const text = JSON.stringify(out, null, 1) + "\n";
+    let onDisk = null; try { onDisk = fs.readFileSync(dest, "utf8"); } catch (e) { /* none yet */ }
+    if (onDisk !== text) fs.writeFileSync(dest, text);
     const grouped = out.pages.filter((p) => p.g).length;
     const described = out.pages.filter((p) => p.d).length;
     console.log("[buildPageIndex] " + out.count + " pages -> page-index.json (" + grouped + " in a drawer, " +

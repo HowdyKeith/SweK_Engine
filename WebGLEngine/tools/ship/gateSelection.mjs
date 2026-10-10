@@ -39,6 +39,7 @@ import { gateFiles } from "./staleness.mjs";
 import { MEASURED } from "./gateBudget.mjs";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import fs from "node:fs";
+import { parseOrExit } from "./cliArgs.mjs";   // v4826 -- an option this tool does not know is refused, not read past
 
 // The general population is overwhelmingly sub-second: 473 of 556 timed gates in the v3211 run came in under 1s,
 // with a tail of about twenty. So an untimed gate is ASSUMED CHEAP, which is true for ~85% of them, and the
@@ -213,10 +214,9 @@ export function selectionLines(s) {
 // Dry by design: seeing the plan is a separate act from executing it, and a planner that ran things would be two
 // tools in one file. Execution lives in selfchecks.mjs behind --budget.
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const argv = process.argv.slice(2);
-    const bi = argv.indexOf("--budget");
-    const secs = bi >= 0 ? parseFloat(argv[bi + 1]) : 180;
-    const changed = argv.filter((a, i) => !a.startsWith("--") && i !== bi + 1);
+    const cli = parseOrExit("gateSelection", { values: { "--budget": "number" }, positional: true });   // the bare words are the changed files
+    const secs = cli.values["--budget"] || 180;
+    const changed = cli.rest;
     let ledger = null;
     try { ledger = JSON.parse(fs.readFileSync(new URL("../roundhouse/perf-ledger.json", import.meta.url), "utf8")); } catch {}
     const plan = selectGates({ changed, budgetMs: secs * 1000, ledger });

@@ -78,9 +78,19 @@ export function tokens(file, title = "") {
     return new Set(raw.filter((w) => w && w.length > 1 && !STOP.has(w)));
 }
 
+/**
+ * v4828 -- A GENERATED INDEX THAT DOES NOT PARSE SAYS SO, with its size, its last bytes and the command that regenerates it. The rig's v4826 verify reported three gates "NO FAILING
+ * ROW: it died" on a bare `at JSON.parse` -- the verdict's tail shows the last three lines of a stack, and the line that said what was wrong was above them.
+ */
+export function readJsonOrSay(file, regenerate) {
+    const text = fs.readFileSync(file, "utf8");
+    try { return JSON.parse(text); }
+    catch (e) { throw new Error(path.basename(file) + " is not valid JSON (" + text.length + " characters, ends " + JSON.stringify(text.slice(-30)) + "): " + e.message + " -- regenerate it with `" + regenerate + "`"); }
+}
+
 /** Read the page list the rest of the ship tooling already derives. No second walker. */
 export function readPages() {
-    const j = JSON.parse(fs.readFileSync(path.join(ENG, "page-index.json"), "utf8"));
+    const j = readJsonOrSay(path.join(ENG, "page-index.json"), "node tools/ship/buildPageIndex.mjs");
     const byFile = new Map(j.pages.map((p) => [p.f, p.t || p.f]));
     // launch-index carries eight pages the page walker misses; fold them in so the inventory is of the TREE
     try {
