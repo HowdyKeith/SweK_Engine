@@ -128,6 +128,20 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
     const isVendored = (rel) => /^vendor[\\/]/.test(rel);
     let requestDevice = 0, requiredLimits = 0, scanned = 0;
     let vendorRequiredLimits = 0, vendorFiles = 0;
+    // *** THE DENOISER ARC, ROUND 12 -- THE FIRST requiredLimits IN THIS TREE'S OWN CODE, AND IT RAISES NO WORKGROUP
+    // LIMIT. *** render/denoiseDevice.mjs's timingDevice asks for the storage-buffer limits a 1080p frame's 81-logit
+    // head needs (672 MB, past the 128 MiB default binding) -- the rig's GTX 1080 measured 1024 x 1024 through it. This
+    // row counted every requiredLimits as the claim's breach and went red on it (found by budgetExile's live re-run in
+    // round 13). The CLAIM is about workgroups: no device here raises a compute-workgroup limit, so a 1024-wide
+    // workgroup cannot be created. So each site's limits object is read: one naming a compute-workgroup limit, or not
+    // spelled out as an object, breaches it; one raising storage limits only is counted apart and must be NAMED below,
+    // so a new site is a decision someone wrote down and not a drift.
+    // SABOTAGES: W1 the timing device also asking maxComputeInvocationsPerWorkgroup -> 1 red, this row ("1 site(s) that do
+    // or may"); W2 the denoiser left out of STORAGE_LIMIT_SITES -> 1 red, this row ("UNNAMED: render/denoiseDevice.mjs").
+    // Both restored, md5 verified.
+    const STORAGE_LIMIT_SITES = ["render/denoiseDevice.mjs"];
+    const WORKGROUP_LIMIT = /maxComputeInvocationsPerWorkgroup|maxComputeWorkgroupSize[XYZ]|maxComputeWorkgroupStorageSize|maxComputeWorkgroupsPerDimension/;
+    let workgroupRaises = 0; const storageSites = [];
     for (const f of walk(ENG)) {
         if (!/\.(js|mjs|html)$/.test(f)) continue;
         // v4681: posix, or SELF never matches on Windows and the gate counts its own three files -- exactly the 3
@@ -143,12 +157,19 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl")).sort();
         scanned++;
         requestDevice += (src.match(/requestDevice\s*\(/g) || []).length;
         requiredLimits += hits;
+        if (hits) {
+            const objects = [...src.matchAll(/requiredLimits\s*:\s*\{([^}]*)\}/g)].map((m) => m[1]);
+            if (objects.length < hits || objects.some((o) => WORKGROUP_LIMIT.test(o))) workgroupRaises += hits;
+            else storageSites.push(rel);
+        }
     }
     ok(requestDevice >= 8, `${requestDevice} requestDevice() call sites in the tree`);
-    ok(requiredLimits === 0,
-        `and across ${scanned} of THIS TREE'S files requiredLimits appears ${requiredLimits} times -- every ` +
-        `device in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it ` +
-        `cannot be created here`);
+    ok(workgroupRaises === 0 && storageSites.every((f) => STORAGE_LIMIT_SITES.includes(f)),
+        `and across ${scanned} of THIS TREE'S files no device raises a compute-workgroup limit (${workgroupRaises} site(s) that do or ` +
+        `may) -- every workgroup in this tree runs at the defaults, so a 1024-wide workgroup is not merely unportable, it ` +
+        `cannot be created here. requiredLimits appears ${requiredLimits} time(s), raising storage-buffer limits only, at ` +
+        `${storageSites.join(", ") || "no site"}` + (storageSites.every((f) => STORAGE_LIMIT_SITES.includes(f)) ? "" :
+        ` -- UNNAMED: ${storageSites.filter((f) => !STORAGE_LIMIT_SITES.includes(f)).join(", ")}`));
     // *** THE EXCLUSION IS ONLY MEANINGFUL IF IT EXCLUDES SOMETHING, so the vendored count is asserted
     // NON-ZERO. *** An exclusion that removes nothing is indistinguishable from no exclusion at all, and this
     // one would then be a line nobody could tell had stopped working -- which is how the count reached 5
