@@ -31,7 +31,8 @@
 //           it cannot hold falls back to its r12 kernel
 //   "r14"   round 14 (section 43): r13's fast kernel for the hidden layers; the LAST layer, when it is 1 x 1, on
 //           brain/conv2d.mjs's head kernel, which writes its logits planar; and k_apply_fast, which reads them so
-// The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS; section 43's rules, read off the rig, may move them.
+// The page runs PAGE_KERNELS and every other caller DEFAULT_KERNELS. Section 43's rules, read off both GPUs (section 49),
+// put the page on r13 and the default on r14.
 // Every set adds every cell in the same order, so all are held to the same twin, cell for cell. The pass runs DEFAULT_KERNELS
 // unless told otherwise; section 39's outcome rule, read off the rig, is what may change it. The timing ladder times
 // both, taking turns on one device.
@@ -202,10 +203,10 @@ export function kernelApplyCpu(x, logits, H, W) {
 
 /** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), and round 14's (section 43). */
 export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14"]);
-/** The set a pass runs unless told otherwise: round 12's, until section 43's outcome rule says otherwise. */
-export const DEFAULT_KERNELS = "r12";
-/** The set denoise.html runs: round 12's, until section 43's page rule says otherwise. */
-export const PAGE_KERNELS = "r12";
+/** The set a pass runs unless told otherwise: r14, by section 43's outcome rule on both GPUs (section 49). */
+export const DEFAULT_KERNELS = "r14";
+/** The set denoise.html runs: r13, by section 43's page rule on both GPUs (section 49) -- 6.45 x against r14's 6.33. */
+export const PAGE_KERNELS = "r13";
 
 /**
  * The kernel a layer runs on in a set. r12: tiled when the tiled kernel can hold it, direct otherwise (the 81-logit

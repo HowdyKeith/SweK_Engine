@@ -60,6 +60,9 @@
 //       tiled kernel's S5 was: it runs a workgroup's threads in order, so the tile is read before it is written)
 //   S1  the r14 set never runs the head kernel                                  3 RED (the r14 row, K0 natively and in the browser)
 //   S2  the r14 set reads its planar logits with k_apply                        4 RED
+//   round 14's verdict (section 49: the default r14, the page r13):
+//   V1  the default left at r12                                                 1 RED (the r14 row)
+//   V2  the page given rule B's runner-up, r14                                  1 RED (the same row)
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -112,21 +115,22 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
     const u9 = new Uint32Array(packApplyUniforms({ H: 2, W: 3, C: 9 }).buffer), u10 = new Uint32Array(packApplyUniforms({ H: 2, W: 3, C: 10 }).buffer);
     ok("  the uniform block: H, W, C, the mask channel -- 9 with the mask, none (0xffffffff) without -- and the floor as an f32",
         u10[0] === 2 && u10[1] === 3 && u10[2] === 10 && u10[3] === 9 && u9[3] === 0xffffffff && new Float32Array(u10.buffer)[4] === Math.fround(ALBEDO_FLOOR));
-    const L = deviceLayers(net);
+    const L = deviceLayers(net, "r12");
     ok(`!! the large network's four hidden layers run TILED and its head of ${KERNEL_TAPS} logits DIRECT -- past the tiled kernel's COUT_MAX ${COUT_MAX}, on the kernel that never had one`,
         L.map((l) => l.kernel).join() === "tiled,tiled,tiled,tiled,direct" && L[4].Cout === KERNEL_TAPS && KERNEL_TAPS > COUT_MAX &&
-        kernelFor({ k: 3, Cout: COUT_MAX }) === "tiled" && kernelFor({ k: 3, Cout: COUT_MAX + 1 }) === "direct" && kernelFor({ k: 5, Cout: 4 }) === "direct");
+        kernelFor({ k: 3, Cout: COUT_MAX }, "r12") === "tiled" && kernelFor({ k: 3, Cout: COUT_MAX + 1 }, "r12") === "direct" && kernelFor({ k: 5, Cout: 4 }, "r12") === "direct");
     const L13 = deviceLayers(net, "r13");
     let noSet = null; try { kernelFor({ k: 3, Cout: 4, Cin: 4 }, "r15"); } catch (e) { noSet = e.message; }
     const L14 = deviceLayers(net, "r14"), L14s = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r14");
     ok(`!! round 14: the r14 set runs the hidden layers on the fast kernel and the ${KERNEL_TAPS}-logit head -- the last layer only -- on the head kernel, then k_apply_fast; ` +
-       `r12 and r13 keep k_apply; the default and the page both stay ${DEFAULT_KERNELS} (section 43)`,
+       `r12 and r13 keep k_apply; by section 43's rules on both GPUs the default is r14 and the page r13 (section 49)`,
         L14.map((l) => l.kernel).join() === "fast,fast,fast,fast,head" && applyFor(L14) === "apply_fast" && applyFor(L13) === "apply" && applyFor(L) === "apply" &&
         L14s.map((l) => l.kernel).join() === "fast,fast,fast,head" && kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r14", false) === "fast" &&
-        DEFAULT_KERNELS === "r12" && PAGE_KERNELS === "r12", `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel`);
-    ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them -- the default stays ${DEFAULT_KERNELS} (section 39)`,
-        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14" && DEFAULT_KERNELS === "r12" &&
-        deviceLayers(net).map((l) => l.kernel).join() === L.map((l) => l.kernel).join() && kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r15"/.test(noSet || ""),
+        DEFAULT_KERNELS === "r14" && PAGE_KERNELS === "r13" && deviceLayers(net).map((l) => l.kernel).join() === L14.map((l) => l.kernel).join(),
+        `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel; default ${DEFAULT_KERNELS}, page ${PAGE_KERNELS}`);
+    ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them (section 39)`,
+        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14" &&
+        kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r15"/.test(noSet || ""),
         "a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name");
     let refused = null; try { deviceLayers(makeDenoiser(1, "he", "residual")); } catch (e) { refused = e.message; }
     ok("  a residual network is refused by name: only the kernel-predicting network runs on the device", /only the kernel-predicting/.test(refused || ""));
@@ -154,7 +158,8 @@ else try {
     const { mod } = H.resolveWebgpu(), gpu = mod.create([]);
     // one job: a fresh adapter and device, the network built and run, everything read back, the device destroyed --
     // before any CPU work long enough to matter
-    const job = async (net, x, h, w, C, kernels = DEFAULT_KERNELS) => {
+    // round 12's kernels unless told otherwise -- the rows below that name no set are about them, whatever the default is
+    const job = async (net, x, h, w, C, kernels = "r12") => {
         const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice(), info = adapter.info || {};
         try {
             const D = await createDeviceDenoiser(dev, net, { H: h, W: w, C, kernels });
@@ -164,7 +169,7 @@ else try {
         } finally { dev.destroy(); }
     };
     // each layer judged on the device's OWN input to it: the twin's cell, or the fused mirror's, or unexplained
-    const judge = (net, x, h, w, acts, set = DEFAULT_KERNELS) => deviceLayers(net, set).map((L, i) => {
+    const judge = (net, x, h, w, acts, set = "r12") => deviceLayers(net, set).map((L, i) => {
         const input = i ? acts[i - 1] : Float32Array.from(x), tw = conv2dCpu(input, h, w, L), fm = conv2dCpuFma(input, h, w, L);
         let plain = 0, fused = 0, unexplained = 0;
         for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }

@@ -2575,3 +2575,93 @@ the head kernel and `k_apply_fast`. It was one run of 695 s, ending 19:21:32Z.
 
 **Nothing moves yet.** Section 43's page rule needs both GPUs in the browser, and its default rule needs every GPU and
 path. The Intel has neither.
+
+## 49. ROUND 14 -- THE VERDICT: K0 AND K1 HOLD ON BOTH GPUS; BY SECTION 43 THE PAGE GOES TO r13 AND THE DEFAULT TO r14
+
+Sections 46-48 are round 15's, on `claude/denoiser-round15`. This is round 14's verdict, numbered after them because it
+was written after them.
+
+**What arrived.**
+- **The Intel's report:** `realGpuRun --only denoise` at b617a22b, committed byte for byte at 7846e7e2 as
+  `render/denoise-rig-r14-intel-gen9.json`.
+  - That commit carries round 14's kernels and gates as the 1080 ran them.
+  - It does not carry section 45's compile-gate fixes.
+- **Measurement A's native half, from the fixed compile gate at 3c881f35.** That is round 15's commit, which carries
+  round 14's seven kernels unchanged.
+  - On the 1080: `--only denoiseCompile`, committed at 1c6f8cf2.
+  - On the Intel: its round-15 run, committed at 1c6f8cf2.
+
+**The Intel's three gates at b617a22b.**
+
+| Gate | Verdict | Time |
+|---|---|---|
+| exact | green: K0 (b) natively and K0 (c) in the browser hold for r14 | 46 s |
+| timing | green | 191 s |
+| compile | red: section 45's `findDxc` row (not yet fixed at that commit), and the dump row under `use_dxc` (below) | 821 s |
+
+**K0 for r14 holds:** (a) section 44, (b) and (c) the exact gates on both GPUs.
+- Every r14 kernel the compile gate built was exact wherever it ran.
+- **In Chrome on the Intel the head kernel fused 221,346 of its 331,776 cells, with none unexplained.** This is the
+  first path in the arc where the fused mirror was the answer rather than a possibility.
+
+**K1 for r14 holds on every GPU and path.**
+
+| GPU | Path | r14 against r12, device clock, by size | at the largest size both measured |
+|---|---|---|---|
+| GTX 1080 | native | 7.00, 7.82, 14.48, 15.22, 15.82 x | 15.82 x at 1024 x 1024 |
+| GTX 1080 | browser | 8.83, 7.91, 14.58, 14.75, 15.01 x | 15.01 x at 1024 x 1024 |
+| Intel gen-9 | native | 6.50, 7.00, 6.86 x | 6.86 x at 256 x 256 |
+| Intel gen-9 | browser | 5.68, 6.31, 6.33 x | 6.33 x at 256 x 256 |
+
+On the Intel, r12 stops at 256 x 256 (the 1.5 s cap). r14 reached 1024 x 1024: 1,089.9 ms natively and 1,376.5 ms in
+the browser.
+
+**C1 holds on both GPUs.** `k_apply_fast` was 4.16 times faster than `k_apply` in the browser on the 1080 at 1080p, and
+3.03 times on the Intel at 1024 x 1024 (127.6 ms against 386.9).
+
+**Measurement A,** at 64 x 64, each kernel's build (wall clock) and pass (device clock). Native is as shipped, under FXC.
+
+| Kernel | 1080 native | Intel native | Chrome pass, 1080 / Intel |
+|---|---|---|---|
+| round 12's tiled 3 x 3 | 393 ms / 1.114 ms | 410 ms / 7.406 ms | 1.389 / 7.434 ms |
+| the fast 3 x 3 | 3,869 ms / 0.131 ms | 7,104 ms / 0.786 ms | 0.103 / 1.078 ms |
+| round 12's direct head | 266 ms / 0.393 ms | 220 ms / 4.456 ms | 0.420 / 4.378 ms |
+| the fast head | **152,398 ms / 22.610 ms** | **431,073 ms / 1,428.095 ms** | 0.078 / 0.450 ms |
+| the head kernel | 121 ms / 0.131 ms | 115 ms / 1.376 ms | 0.175 / 1.349 ms |
+| `k_apply` | 84 ms / 0.131 ms | 115 ms / 1.114 ms | 0.127 / 1.172 ms |
+| `k_apply_fast` | 215 ms / 0.066 ms | 178 ms / 0.393 ms | 0.125 / 0.416 ms |
+
+- **Section 42's failure, measured kernel by kernel.** Natively the fast head took 2.5 and 7.2 minutes to build. Its
+  passes ran 290 and 3,170 times slower than in Chrome, in 9,785 lines of DXBC. The head kernel, 97 lines, removes it.
+- **A1 is untested on both GPUs.**
+  - DXC's two DLLs were found: on the 1080 in Playwright's chromium-1243, and on the Intel in Chrome 154. The
+    `use_dxc` runs built and ran.
+  - But every one of their dumps was empty. The child handed Dawn two `enable-dawn-features` entries, and dawn.node
+    keeps the last, so `use_dxc` replaced `dump_shaders`. This was reproduced here with `allow_unsafe_apis`.
+  - With no dump, no run says DXIL, and section 43 makes that untested. The gate's own dump row went red on both
+    GPUs, as it is there to.
+  - The `use_dxc` times match FXC's: the fast head took 146 s and 22.6 ms on the 1080, and 357 s and 1,420 ms on the
+    Intel. That suggests DXC compiled none of them, but it is a suggestion, not A1.
+  - **Fixed:** one entry (`dawnFlags`), its own row, and sabotage D1, 1 red.
+- **A2 is supported on both GPUs.** Natively under FXC, the head kernel took 0.131 ms against the direct head's 0.393 on
+  the 1080, and 1.376 against 4.456 on the Intel.
+- **A3 is supported on the Intel and not on the 1080.** Building the fast 3 x 3 took 17.3 times longer than the tiled
+  kernel on the Intel, and 9.84 times on the 1080, under the bound of 10.
+
+**The rules (section 43, applied to round 14's runs).**
+- **B, the page.** Both candidate sets qualify, with K0 and K1 in the browser on both GPUs. The smaller of each set's
+  two speedups, at the largest size it and r12 both measured:
+
+  | Set | GTX 1080 | Intel gen-9 | Smaller |
+  |---|---|---|---|
+  | r13 | 13.02 x | 6.45 x | 6.45 x |
+  | r14 | 15.01 x | 6.33 x | 6.33 x |
+
+  **`PAGE_KERNELS` becomes "r13".** On the Intel's browser at 256 x 256, r13 ran 82.4 ms against r14's 84.0. r14's
+  head kernel was the slower head there, at 26.6 ms against 8.8.
+- **The default:** K0 holds for r14 everywhere, and K1 on every GPU and path. **`DEFAULT_KERNELS` becomes "r14".**
+- **Both are set in `render/denoiseDevice.mjs` at this commit.** The exact gate's rows that meant round 12's kernels now
+  name them, instead of reading the default. Sabotages V1 (the default left at r12) and V2 (the page given r14) are
+  each 1 red.
+- **Round 15's run times every set again, and section 46's rules read it.** The later run's decision stands (section
+  50).

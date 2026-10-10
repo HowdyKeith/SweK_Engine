@@ -36,6 +36,8 @@
 //       read green, each silent child counted as a kernel that "said why" -- exactly the 1080's report)
 //   X2  findDxc never looks in Playwright's browser folders                      1 RED
 //   Both restored, md5 verified.
+//   after both GPUs' use_dxc runs came back with empty dumps (section 49):
+//   D1  the child's Dawn features in two entries again                          1 RED (the one-entry row). Restored, md5 verified.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -59,7 +61,7 @@ if (process.argv.includes("--child")) {
     let result;
     try {
         H.configureVulkanIcd();
-        const { mod } = H.resolveWebgpu(), gpu = mod.create(["enable-dawn-features=dump_shaders", ...flags]);
+        const { mod } = H.resolveWebgpu(), gpu = mod.create(dawnFlags(flags));
         const v = VARIANTS.find((x) => x.id === vid), a = await gpu.requestAdapter();
         const dev = await a.requestDevice({ requiredFeatures: a.features.has("timestamp-query") ? ["timestamp-query"] : [] });
         try { result = await measure(dev, jobFor(v)); } finally { dev.destroy(); }
@@ -76,6 +78,16 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
 const now = () => performance.now(), t0 = now(), BUDGET_MS = 1500000, CHILD_MS = 900000;
+
+/**
+ * The child's Dawn flags: ONE enable-dawn-features entry, dump_shaders first, every other feature asked for joined to it.
+ * Section 49: dawn.node keeps the LAST of two such entries, so the use_dxc run's second entry dropped dump_shaders and
+ * every use_dxc dump came back empty, on both GPUs -- reproduced here with allow_unsafe_apis.
+ */
+export function dawnFlags(flags = []) {
+    const key = "enable-dawn-features=", asked = flags.filter((f) => f.startsWith(key)).flatMap((f) => f.slice(key.length).split(",")).filter(Boolean);
+    return [key + ["dump_shaders", ...asked.filter((f) => f !== "dump_shaders")].join(","), ...flags.filter((f) => !f.startsWith(key))];
+}
 
 /**
  * Where this box keeps DXC's two DLLs, if anywhere: a directory holding both dxcompiler.dll and dxil.dll -- the headless
@@ -112,6 +124,10 @@ console.log("1. THE INSTRUMENT, ON THE CPU");
         same(findDxc({ env: { ProgramFiles: "C:/pf" }, exists: ex, readdir: rd, shell: "C:/s/headless_shell.exe" }), "C:/s") &&
         findDxc({ env: { ProgramFiles: "C:/pf" }, exists: ex, readdir: rd }) === null &&
         same(findDxc({ env: { ProgramFiles: "C:/pf" }, exists: ex, readdir: rd, roots: ["C:/pw"] }), "C:/pw/chromium-1140/chrome-win"));
+    const df = dawnFlags(["enable-dawn-features=use_dxc"]);
+    ok("  the child asks Dawn for its features in ONE entry -- dump_shaders with use_dxc, not two entries of which Dawn keeps the last",
+        df.length === 1 && df[0] === "enable-dawn-features=dump_shaders,use_dxc" && dawnFlags([]).join() === "enable-dawn-features=dump_shaders",
+        `section 49: two entries left every use_dxc dump empty, on both GPUs -- got ${JSON.stringify(df)}`);
     let jobsOk = true; for (const v of VARIANTS) { const j = jobFor(v); jobsOk &&= typeof j.code === "string" && j.out > 0 && j.wg.length === 3; }
     ok(`  every kernel has a job: ${VARIANTS.map((v) => v.id).join(", ")}`, jobsOk);
 }
