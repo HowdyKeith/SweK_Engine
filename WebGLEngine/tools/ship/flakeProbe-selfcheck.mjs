@@ -19,7 +19,7 @@
 //   I  `--times` read as a string (0 accepted)                               -> 3 red: the refusal row, the --write row and the --merge row: `--times 0` printed `stable` for zero runs, NaN ms each.
 //   J  thin fires on fractions too (the whole-number test removed)           -> 1 red: the measured-fraction row.
 //   FINDING (J): the first draft had no whole-number test and the first full probe (72 live-page gates) flagged every gate that reports a coverage fraction,
-//   0.2197 against 0.2193 -- four dozen rows of noise around the one species that matters. A thin number is a COUNT.
+//   0.2197 against 0.2193 -- eleven rows of noise around the one species that matters. A thin number is a COUNT.
 //   FINDING (I): an empty probe that says `stable` is exactly the output cliArgs refuses numbers <= 0 to prevent, and this tool was the first draft to meet it.
 "use strict";
 import fs from "node:fs";
@@ -59,7 +59,7 @@ sec("2. THE COMPARISON, ON FIXTURES");
     const big = compareRuns([mk(0, [row("time", true, "took 1204 ms, 36173 bytes")]), mk(0, [row("time", true, "took 998 ms, 36170 bytes")])]);
     ok("a number that varies and is LARGE (milliseconds, bytes) is not thin: only counts that have room to be zero are the species", big.thin.length === 0 && big.stable);
     const frac = compareRuns([mk(0, [row("cover", true, "coverage 0.2197 of the frame")]), mk(0, [row("cover", true, "coverage 0.2193 of the frame")]), mk(0, [row("cover", true, "coverage 0.2194 of the frame")])]);
-    ok("a small number that varies and is NOT a whole number (a measured fraction, 0.2197 / 0.2193 / 0.2194) is not thin: it has no zero to fall to, and the first full probe reported four dozen of these", frac.thin.length === 0 && frac.stable, JSON.stringify(frac.thin));
+    ok("a small number that varies and is NOT a whole number (a measured fraction, 0.2197 / 0.2193 / 0.2194) is not thin: it has no zero to fall to, and the first full probe reported eleven of these", frac.thin.length === 0 && frac.stable, JSON.stringify(frac.thin));
     const steadySmall = compareRuns([mk(0, [row("n", true, "2 of 9")]), mk(0, [row("n", true, "2 of 9")])]);
     ok("a small number that does NOT vary is not thin (a count that is always 2 is a count)", steadySmall.stable);
     const hexOnly = compareRuns([mk(0, [row("fp", true, "fingerprint 8e62060a")]), mk(0, [row("fp", true, "fingerprint 060d9731")])]);

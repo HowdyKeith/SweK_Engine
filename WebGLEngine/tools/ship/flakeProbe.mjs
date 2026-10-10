@@ -15,7 +15,7 @@
 //   THIN     a row that PASSED every run but whose detail carries a number that VARIED between runs with a small value among them (3 or under): the species
 //            that was the tslRace row before it failed -- a COUNT read from a moving scene that has room to be zero. It has not failed yet; it is one run
 //            away. (A number that varies and is large is a timing in milliseconds or a hash fragment; one that varies and is not a whole number is a measured
-//            fraction -- 0.2197, 0.2193 -- with no zero to fall to; neither is reported. The first full probe, over the live-page gates, reported four dozen of those.)
+//            fraction -- 0.2197, 0.2193 -- with no zero to fall to; neither is reported. The first full probe, over the live-page gates, reported eleven of those.)
 // A gate that exits non-zero with no FAIL row (a crash, a timeout) is reported as CRASHED with its last line.
 //
 // WHAT IT DOES NOT DO: prove a gate stable. K clean runs bound the flake rate (5 clean runs: under 37% at 95% confidence, "rule of three" 3/K = 60% for 5)
