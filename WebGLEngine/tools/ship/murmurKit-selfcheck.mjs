@@ -12,7 +12,7 @@
 // never read the shader, letting three sabotages through. Here the two implementations are genuinely
 // independent -- f64 scalar JS against an f32 node graph compiled to WGSL and executed on a GPU -- and for an
 // INTEGER hash there is no tolerance to hide behind: 256 of 256 uint32s match or they do not.
-// v4827 -- section 18 and a probe mode (`dither`) for mh_out, the kit's 41st function: grey 128 at the fragment's own
+// v4829 -- section 18 and a probe mode (`dither`) for mh_out, the kit's 41st function: grey 128 at the fragment's own
 // pixel (256/256 bytes equal to the CPU twin at murmur's y-down convention, 156 at y up), the noise alone at the
 // lattice's centres, and black's clamp. SABOTAGES, restored: the pixel's y flipped in the probe -> RED; 52.9829189
 // typed 52.98 in the TSL twin -> RED.
@@ -2021,9 +2021,9 @@ sec("17. *** THE TWO IGNITION FIGURES THAT ARE NOT AN AXIS: aura's CIRCLE AND fa
 }
 
 // =============================================================================================================
-sec("18. *** mh_out: THE TRIANGULAR DITHER, THE KIT'S 41st AND LAST FUNCTION, ON A REAL GPU -- v4827 ***");
+sec("18. *** mh_out: THE TRIANGULAR DITHER, THE KIT'S 41st AND LAST FUNCTION, ON A REAL GPU -- v4829 ***");
 {
-    // kit.ts:311-321. Until v4827 the port carried 40 of the kit's 41 functions and this one was the gap; the
+    // kit.ts:311-321. Until v4829 the port carried 40 of the kit's 41 functions and this one was the gap; the
     // HDR path has always dithered (render/aiPresenceOrbPresent.mjs, present.wgsl's port), the DIRECT path had
     // nothing between linearToSrgb and the byte.
     const r = probeRun;
@@ -2061,7 +2061,7 @@ console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN") +
     "would each otherwise have re-approximated the march, the medium, the gesture clock and the hash " +
     "separately. The SPECIES themselves are gated next door in tools/ship/murmurSpecies-selfcheck.mjs -- they " +
     "need real renders and this gate does not, which is a budget fact before it is a tidiness one. " +
-    "\nmh_out IS CLAIMED SINCE v4827, at section 18 -- the kit's 41st function and the last one; section 12 still " +
+    "\nmh_out IS CLAIMED SINCE v4829, at section 18 -- the kit's 41st function and the last one; section 12 still " +
     "grades mhPresentFinish rather than mhPresent because the dither is spent after the encode, on the direct path." +
     " mh_present's own TONE CURVE and its two ground-dependent terms " +
     "ARE claimed now, at section 12, bit-exactly on three grounds: the catchlight, the contact shadow and the " +

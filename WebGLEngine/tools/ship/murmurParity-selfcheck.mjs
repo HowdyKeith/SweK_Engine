@@ -1,8 +1,8 @@
-// WebGLEngine/tools/ship/murmurParity-selfcheck.mjs -- v4827
+// WebGLEngine/tools/ship/murmurParity-selfcheck.mjs -- v4829
 //
 // *** THE PARITY ROUND: EVERY GAP A FULL READ OF murmur-web AT 1c23b99 FOUND, HELD AGAINST ITS OWN LINE. ***
 //
-// The rounds before this one took murmur a site at a time, each from a note the previous round left. v4827 read
+// The rounds before this one took murmur a site at a time, each from a note the previous round left. v4829 read
 // all eighteen shaders and kit.ts against the port side by side and found twenty-two differences the notes had
 // never named. Three were port-wide, and the first of them touched every pixel the orb draws:
 //
@@ -67,7 +67,7 @@ sec("1. *** THE PORT-WIDE GAPS: depth once, each species' own defaults, the skip
     ok("!! *** u_depth IS READ ONCE, BY THE PALETTE, AS murmur READS IT -- no interior multiplies it as well ***",
         depthReads === 1 && inPalette,
         `uniforms.depth read ${depthReads} time(s) in code, ${inPalette ? "as" : "NOT as"} mhPalette's depth. Until ` +
-        `v4827 every builder's density carried .mul(uniforms.depth) as well -- eighteen sites -- so the ` +
+        `v4829 every builder's density carried .mul(uniforms.depth) as well -- eighteen sites -- so the ` +
         `states' depth (0.75 idle, 1.25 thinking and responding) scaled every interior on top of the rail it ` +
         `already bends. sol's core sits at the rail's top once the double count is gone, and murmurComplete's ` +
         `core row reads its gain on the limb for that reason.`);
@@ -119,10 +119,10 @@ sec("1. *** THE PORT-WIDE GAPS: depth once, each species' own defaults, the skip
         `also skips helix.ts's prof <= 0.002 taps). EMISSION keeps the soft mask exactly where murmur's own file ` +
         `multiplies by fade (fathom's and limn's media, and comet, ` +
         `droplet, nebula, tempest, aura, flux, prism and helix's strands, which scale the whole emission). ` +
-        `Until v4827 every one of the eighteen absorbed on taps murmur never takes, and the edge of each body ` +
+        `Until v4829 every one of the eighteen absorbed on taps murmur never takes, and the edge of each body ` +
         `lost light to them.`);
 
-    // (4) v4827 -- mh_out, kit.ts:311-321: the last thing every field does, after the encode. The DIRECT path takes it;
+    // (4) v4829 -- mh_out, kit.ts:311-321: the last thing every field does, after the encode. The DIRECT path takes it;
     // the linear path must NOT, because render/aiPresenceOrbPresent.mjs (present.wgsl's port) dithers the encoded
     // byte itself and a second dither there is v4643's second knee in a new place.
     const outLine = /const outColor = linear \? colorLinear : KIT\.mhOutEncoded\(linearToSrgb\(colorLinear\), TSL\.screenCoordinate\);/.test(raw);

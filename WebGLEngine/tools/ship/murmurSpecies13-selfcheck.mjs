@@ -76,10 +76,10 @@ const voiceLight = (px, q = 0.80) => {
 // (b + g*v1 - b) / (b + g*v5 - b) = v1/v5 for any g. Measured, the uniform lift now reads x0.858 against the
 // front-weighted x3.828.
 //
-// *** v4827 -- ONE PEAK PER VOICE: A 5x5 WINDOW, AND PEAKS WITHIN 4 px MERGED TO THE BRIGHTER. *** The 4-neighbour
+// *** v4829 -- ONE PEAK PER VOICE: A 5x5 WINDOW, AND PEAKS WITHIN 4 px MERGED TO THE BRIGHTER. *** The 4-neighbour
 // `>=` test counted every TIED pixel of a flat top as its own maximum, so a bright voice whose top was a plateau
 // supplied several of the five "peaks" and the fifth was a duplicate of a bright voice rather than the fifth
-// voice. murmur's mh_out dither (v4827) breaks those ties by one code value, the duplicates vanished, and voice 0
+// voice. murmur's mh_out dither (v4829) breaks those ties by one code value, the duplicates vanished, and voice 0
 // read 7.938 where it had read 3.663 -- the instrument had been measuring plateau widths. A window wider than a
 // dither speckle and a merge radius narrower than the voices' spacing (about 0.35 of the body) count voices.
 // RE-MEASURED on it: the front-weighted lift reads x1.71, the equal-average UNIFORM lift (liftFront spent at
@@ -150,7 +150,7 @@ sec("2. *** LEVEL PICKS OUT THE NEAREST, rather than turning everybody up ***");
             b > a * 1.5 && a > 1.5,
             `voice 0 -> 1 takes the brightest peak over the fifth-brightest from ${a.toFixed(3)} to ` +
             `${b.toFixed(3)}, x${(b / a).toFixed(2)} -- against x1.31 for a uniform lift of the same average on this ` +
-            `instrument (v4827; x0.858 on the old one, whose fifth peak was a plateau duplicate), ` +
+            `instrument (v4829; x0.858 on the old one, whose fifth peak was a plateau duplicate), ` +
             `which is the sabotage that forced this instrument. The lift is 1 + voice * (${K.MH_CHORUS.liftB} + ` +
             `${K.MH_CHORUS.liftFront} * front), so the back of the shell gains ` +
             `${(1 + K.MH_CHORUS.liftB).toFixed(2)}x and the front ` +

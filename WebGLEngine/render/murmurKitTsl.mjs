@@ -402,7 +402,7 @@ export function makeMurmurKitTsl(TSL) {
     };
 
     /** Identity below the knee, an asymptotic compression above -- so a specular keeps its SHAPE, not a plateau. */
-    // v4827 -- mh_out's noise, kit.ts:316-317, in code values; see the CPU twin mhOutTri. fract(x) is x - floor(x),
+    // v4829 -- mh_out's noise, kit.ts:316-317, in code values; see the CPU twin mhOutTri. fract(x) is x - floor(x),
     // which is GLSL's own definition of it.
     const mhOutTri = Fn(([pixel]) => {
         const a = dot(pixel, vec2(0.06711056, 0.00583715)).toVar();
@@ -1003,7 +1003,7 @@ export function makeMurmurKitProbeTsl(THREE, TSL, { mode = "hash", n = 16 } = {}
                         clamp(b, 0.0, 1.0), clamp(a.div(3.0), 0.0, 1.0));
         }
         if (mode === "dither") {
-            // *** mh_out, THE KIT'S 41st FUNCTION -- v4827. ***
+            // *** mh_out, THE KIT'S 41st FUNCTION -- v4829. ***
             // R  mh_out on a flat grey of 128 code values, at the FRAGMENT'S OWN screen position -- the argument
             //    the species shader hands it -- so this channel grades the pixel convention as well as the noise.
             // G  the noise ALONE, (tri + 1) / 2, at the LATTICE's pixel centres -- the function apart from where
