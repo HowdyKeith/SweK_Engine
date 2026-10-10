@@ -58,9 +58,17 @@ export function parseRows(stdout) {
              green: lines.some((l) => /^ALL GREEN|all (checks )?pass/.test(l.trim())) };
 }
 
-/** The report's first line: whether this was a real-hardware run at all. */
+/**
+ * The report's first line: whether this was a real-hardware run at all. *** DENOISER ROUND 12, ON THE RIG -- A RUN OF NO
+ * GATES READ "NO ADAPTER WAS SEEN" AND EXITED 0. *** Keith's `--only denoise` ran on a checkout without the denoiser's gates,
+ * matched nothing, and said only that no device was reached. An empty selection says so first, with what was asked for and
+ * the commit it was asked of, and the CLI exits 1 on it.
+ */
 export function verdict(report) {
     const ads = report.adapters;
+    if (report.gates && !report.gates.length)
+        return `*** NO GATE MATCHED${report.only ? ` --only "${report.only}"` : ""}: NOTHING RAN -- this checkout (${report.commit ? report.commit.split(" ").slice(0, 2).join(" ") : "commit unknown"}) has no such gate; ` +
+               "is it on the branch that added it? ***";
     if (!ads.length) return "*** NO ADAPTER WAS SEEN: no gate reached a device -- this is not a hardware run ***";
     if (ads.some((a) => a.software !== false)) return `*** SOFTWARE ADAPTER (${ads.filter((a) => a.software !== false).map((a) => a.name).join("; ")}): THIS IS NOT A REAL-HARDWARE RUN -- its times are a CPU's ***`;
     return `a real-hardware run on ${ads.map((a) => a.name).join("; ")}`;
@@ -78,8 +86,10 @@ export function runLaunchArgs(env = process.env, platform = process.platform) {
 export function runGates({ root = ENG, only = null, log = console.log, launchArgs = runLaunchArgs() } = {}) {
     const gates = gateList(root).filter((g) => !only || g.includes(only));
     const logFile = path.join(os.tmpdir(), `swek-adapters-${process.pid}-${Date.now()}.jsonl`);
+    // the checkout's commit, so a report says which tree it ran -- the rig's empty run came from a checkout behind the branch
+    const git = spawnSync("git", ["log", "-1", "--format=%h %cs %s"], { cwd: root, encoding: "utf8" });
     const report = { at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
-                     launchArgs, gates: [], adapters: [] };
+                     commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, launchArgs, gates: [], adapters: [] };
     for (const g of gates) {
         const t0 = Date.now();
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: 600000,
@@ -280,9 +290,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     }
     const arg = (k) => cli.values[k] ?? null;
     const out = path.resolve(arg("--out") || path.join(process.cwd(), "real-gpu-run.json"));
-    console.log(`\nthe FSR and frame-generation gates, with the harness logging each call's adapter (${process.platform})`);
+    console.log(`\nthe FSR, frame-generation and denoiser gates, with the harness logging each call's adapter (${process.platform})`);
     const report = runGates({ only: arg("--only") });
+    console.log(`  on ${report.commit || "a checkout git could not name"}`);
     fs.writeFileSync(out, JSON.stringify(report, null, 1));
     console.log(`\n${report.verdict}\n${report.summary}  --  the report: ${out}`);
-    process.exitCode = report.gates.every((g) => g.ok) ? 0 : 1;
+    // a run of no gates is not a green one
+    process.exitCode = report.gates.length && report.gates.every((g) => g.ok) ? 0 : 1;
 }

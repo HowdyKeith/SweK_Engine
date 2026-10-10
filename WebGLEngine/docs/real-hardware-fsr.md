@@ -49,6 +49,18 @@ sections 35-37). To run just those:
 node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise.json
 ```
 
+The two gates are on the branch `claude/denoiser-device` (PR #23) until it merges. A checkout without them runs nothing:
+the first rig run of this command printed `exact 0/0, quality 0/0, timing 0/0` and called it "NO ADAPTER WAS SEEN". The run
+now says `*** NO GATE MATCHED --only "denoise": NOTHING RAN ***`, names the commit it ran on, and exits 1. If you see that,
+check out the branch first:
+
+```
+git fetch origin claude/denoiser-device
+git checkout claude/denoiser-device
+```
+
+The run's second line, `on <commit> <date> <subject>`, should then show this branch's latest commit.
+
 - **`render/denoiseDevice-selfcheck.mjs`** (exact) holds round 11's network on the device to its CPU twin, cell for
   cell, and drives `denoise.html` in the browser. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
   twin's fused mirror); an unexplained one is a finding.

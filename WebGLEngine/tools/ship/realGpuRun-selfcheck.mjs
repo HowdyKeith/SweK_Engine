@@ -8,7 +8,9 @@
 // the one a real-hardware run turns around. SWEK_LAUNCH_ARGS reaches the browser, as the doc tells a Linux GPU owner to use it.
 "use strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines } from "./realGpuRun.mjs";
@@ -41,6 +43,20 @@ ok(`the tree's row format read: a failing row and not the summary, a measured li
 ok("the verdict leads with a software adapter, and names a hardware one",
    /NOT A REAL-HARDWARE RUN/.test(verdict({ adapters: [{ name: "google swiftshader", software: true }] })) && /NO ADAPTER/.test(verdict({ adapters: [] })) &&
    verdict({ adapters: [{ name: "nvidia ampere", software: false }] }) === "a real-hardware run on nvidia ampere");
+{   // *** denoiser round 12, on the rig: `--only denoise` on a checkout without those gates ran none, read "NO ADAPTER WAS
+    // SEEN" and exited 0. *** The CLI itself, asked for a gate no checkout has: it must say so, name the commit, and exit 1.
+    const tmp = path.join(os.tmpdir(), `swek-realgpu-empty-${process.pid}.json`);
+    const r = spawnSync(process.execPath, ["tools/ship/realGpuRun.mjs", "--only", "no-such-gate-anywhere", "--out", tmp], { cwd: ENG, encoding: "utf8", timeout: 60000 });
+    const rep = fs.existsSync(tmp) ? JSON.parse(fs.readFileSync(tmp, "utf8")) : null;
+    try { fs.unlinkSync(tmp); } catch {}
+    const head = spawnSync("git", ["log", "-1", "--format=%h"], { cwd: ENG, encoding: "utf8" }).stdout.trim();
+    ok(`!! *** an --only that matches no gate is said first and exits non-zero: exit ${r.status}, "${(rep && rep.verdict || "").slice(0, 90)}..." ***`,
+       r.status === 1 && !!rep && rep.gates.length === 0 && rep.only === "no-such-gate-anywhere" &&
+       /^\*\*\* NO GATE MATCHED --only "no-such-gate-anywhere": NOTHING RAN/.test(rep.verdict) && /NO GATE MATCHED/.test(r.stdout || "") && !/NO ADAPTER/.test(r.stdout || ""),
+       (r.stderr || "").split("\n")[0].slice(0, 120));
+    ok(`  ...and the report and the log name the checkout's commit: "${rep && rep.commit}"`,
+       !!rep && !!head && String(rep.commit).startsWith(head + " ") && rep.verdict.includes(`(${head} `) && (r.stdout || "").includes("on " + rep.commit));
+}
 
 console.log("\n2. ON THIS BOX: a run of two gates, and what it says it ran on");
 const skip = webgpuSkipReason();
@@ -237,6 +253,10 @@ console.log("\n5. RIG RUN 9: WHICH ADAPTER node-webgpu HANDS OUT, PER WAY OF ASK
 // runGates not handing SWEK_LAUNCH_ARGS to the child -> 1 red, the plumbing row ("launched with --enable-unsafe-webgpu").
 // That row's first draft passed under R8: on Linux HARDWARE_ARGS is LAUNCH_ARGS, so it now hands the run a third set. All
 // four restored, md5 verified.
+// DENOISER ROUND 12, ON THE RIG (an --only that matched nothing read "NO ADAPTER WAS SEEN" and exited 0). Against
+// tools/ship/realGpuRun.mjs: E1 the CLI's exit code back to every-gate-ok, which an empty list satisfies -> 1 red, the
+// empty-selection row ("exit 0"); E2 the empty-selection verdict removed -> 2 red, both rows ("NO ADAPTER WAS SEEN"); E3 the
+// commit not recorded -> 1 red, the commit row ("null"). All three restored, md5 verified.
 {
     const w = GR.write();
     console.log("\n  ----  gate report: " + (w.written ? "written to " + w.file : w.why) +
