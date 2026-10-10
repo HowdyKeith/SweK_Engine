@@ -731,6 +731,11 @@ export const UNPLACED = new Map([
     // fsr.html so that whichever drawer decision places one can place both.
     ["fsr-three.html", "fsr.html's three.js sibling (WebGPURenderer, FSR1/FSR2 in TSL); it belongs where fsr.html " +
                        "goes, and that drawer is at MAX_PER_PANEL -- the same drawer decision, not a merge's"],
+    // the denoiser arc, round 12 -- denoise.html was linked from server.html beside the Path Tracer and filed in neither
+    // list; registerResidue said so (found by budgetExile's live re-run while round 13 was gated). Its drawer is
+    // Renders, beside path-tracer.html, and Renders is at MAX_PER_PANEL: which page leaves is a drawer decision, Keith's.
+    ["denoise.html", "the learned path-tracer denoiser, beside path-tracer.html in server.html; it belongs in Renders, which is at " +
+                     "MAX_PER_PANEL (15 of 15), so placing it means evicting something -- a drawer decision, not a round's"],
     // *** v4314 -- ELEVEN OF THE TWELVE PAGES pageReach CALLED BORN-INVISIBLE, PLUS ONE OF MY OWN. ***
     //
     // They are linked from server.html now, which is what pageReach was asking for. They are ALSO here,
