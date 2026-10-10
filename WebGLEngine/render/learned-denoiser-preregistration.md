@@ -2708,3 +2708,59 @@ It must hold in each of:
 - That is one run each of `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r15.json` on
   `claude/denoiser-round15`.
 - Section 45, round 14's verdict, is still held for its two reports.
+
+## 48. ROUND 15 -- REPORTED: THE GTX 1080
+
+**What arrived.** One report, from the GTX 1080: `realGpuRun --only denoise` at 4da876c3, committed byte for byte at
+e1230aec as `render/denoise-rig-r15-gtx1080.json`. The Intel's attempt never checked round 15 out (section 45), and
+it is to run again.
+
+**The 1080's three gates.**
+
+| Gate | Verdict | Time |
+|---|---|---|
+| exact | green: K0 (b) natively and K0 (c) in the browser hold for r15 and for r14 | 91 s |
+| timing | green | 249 s |
+| compile (measurement A) | red, on section 45's instrument row; its native half recorded no result, the same Windows fault | 197 s |
+
+- Every r15 row of the exact gate passed natively and in the browser: the hidden layers cell for cell; the fused pass
+  through its image; the order probe; the bias-plus-100 row; the no-mask row.
+- **The order probe also passed in Chrome,** in the compile gate's browser half: 6.26e-7 against the twin's logits.
+  - So on this GPU, natively and in the browser, the head inside `k_head_apply` added in the twin's order.
+  - The same-bits row passed natively too. The report does not say whether any cell fused there, and so whether the
+    row was binding.
+
+**K1 for r15 on the 1080 holds natively and in the browser.**
+
+| Path | r15 against r12, device clock, by size (64 to 1024) | at the largest size both measured |
+|---|---|---|
+| native | 4.31, 10.46, 23.51, 18.24, 26.16 x | 26.16 x at 1024 x 1024 |
+| browser | 11.45, 11.34, 23.65, 24.27, 24.50 x | 24.50 x at 1024 x 1024 |
+
+In the same run, r14 against r12 was 15.80 x natively and 15.11 x in the browser at 1024 x 1024, and r13 13.07 x in the
+browser. So K1 holds for every set on this GPU.
+
+**The reported measures.**
+- **F1 holds on the 1080.** In the browser at 1080p, r15's head-and-kernel pass took 19.8 ms. r14's head and
+  `k_apply_fast` took 50.2 + 18.2 = 68.4 ms. That is **3.46 times** faster, against a bound of 1.25.
+  - By size it was 2.27, 2.60, 3.96, 4.11, 3.76 and 3.46 times.
+  - Natively it was 0.60, 3.00, 4.57, 4.69, 4.44 and 4.26 times. The one ratio under 1, at 64 x 64, is two coarse
+    readings: 0.328 ms against 0.197, on a native clock that steps in 0.066 ms.
+- **F2, the whole pass at 1080p:**
+
+  | Path | r14 | r15 | r15 faster by |
+  |---|---|---|---|
+  | browser | 128.4 ms | 80.3 ms | 1.60 x |
+  | native | 127.1 ms | 76.2 ms | 1.67 x |
+
+  Round 13's 1080p frame in Chrome was 150.4 ms.
+- **F3:** at 1080p r14 allocates 1,756 MiB and r15 1,115 MiB.
+- **Where r15's 1080p frame goes in the browser:** the four hidden layers 60.4 ms (6.0 + 18.2 + 18.2 + 18.0), and the
+  head and kernel 19.8. The hidden layers are now three quarters of the frame.
+- **In Chrome at 64 x 64 on the probe:** `k_head_apply` built in 2,012 ms, where the other kernels built in 16-117 ms.
+  Its pass took 0.072 ms. The unrolled taps cost compile time once per pipeline.
+- **Natively, FXC compiled `k_head_apply`** to 4,954 lines of DXBC with no indexable temp. That is the unrolled logits
+  staying in registers, as built.
+
+**Nothing moves yet.** Section 46's rules need both GPUs, so they wait for the Intel's runs of rounds 14 and 15. On the
+1080 alone, every candidate set qualifies, and r15 has the largest speedup on every path.
