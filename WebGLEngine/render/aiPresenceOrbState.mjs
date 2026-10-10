@@ -267,7 +267,7 @@ export function createPresenceState(initial = "idle") {
     // integral" and calling it one would invite exactly that mistake.
     let duetFlourishInt = 0;
 
-    // *** v4826 -- TWO CLOCKS WHOSE RATE IS NOT A SUM, SO NEITHER IS ASSEMBLED FROM THE INTEGRALS ABOVE. ***
+    // *** v4827 -- TWO CLOCKS WHOSE RATE IS NOT A SUM, SO NEITHER IS ASSEMBLED FROM THE INTEGRALS ABOVE. ***
     // chorus.ts:67/104: the breath is sin(2 pi t / per) with per = 8.4 - 2.2 * (pace * 0.6) -- a RECIPROCAL of a
     // signal, so its phase is the integral of 1 / per and not anything linear in paceInt. Spelled raw, a busier
     // exchange moved all seven breaths by t * d(1/per) at once.
@@ -328,7 +328,7 @@ export function createPresenceState(initial = "idle") {
                 + ME.eDrive * stn.drive)) * dPhase;
             // duet's gesture envelope, at the phase the shader will be handed this frame.
             duetFlourishInt += mhFlourish(phase, MH_DUET.flourishSlot, MH_DUET.flourishDur).env * dPhase;
-            // v4826 -- chorus's breath and tempest's floored lane 0; see their note above
+            // v4827 -- chorus's breath and tempest's floored lane 0; see their note above
             chorusBreathInt += dPhase / (MH_CHORUS.perB - MH_CHORUS.perPace * lv.pace);
             const E0 = Math.min(ME.eCap, Math.max(0, ME.ePace * lv.pace + ME.eThink * (cur === "thinking" ? 1 : 0)
                 + ME.eDrive * stn.drive));

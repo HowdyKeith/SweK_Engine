@@ -14,15 +14,15 @@
 //   comet -- its cadence site is the ORBIT'S RADIUS (comet.ts:73, r0 * (1 - 0.24 * live.pace)), where arc's is
 //             a shimmer amplitude. A wiring error that happened to be harmless on a brightness is not harmless
 //             on a geometry, and the two are not the same test even though they read the same signal.
-//             *** v4826 -- THIS WAS chorus UNTIL THE PORT INTEGRATED chorus's BREATH. *** chorus spent its pace on
+//             *** v4827 -- THIS WAS chorus UNTIL THE PORT INTEGRATED chorus's BREATH. *** chorus spent its pace on
 //             one site, its breath PERIOD, and that phase is now the host's integral of 1 / per (chorus.ts:104
 //             spells 2 pi t / per, which jumps every voice when pace moves). With the integral held, as this
 //             gate holds every integral, chorus reads no instantaneous cadence at all and its span moved 0
-//             bytes. comet's r0 read VOICE until v4826 and reads murmur's live.pace now, so it took the row.
+//             bytes. comet's r0 read VOICE until v4827 and reads murmur's live.pace now, so it took the row.
 //   droplet -- its VOICE drives mh_shape's swell, which scales the whole body. On this one species of the
 //             eighteen the 20%-hot error this round fixes was a 20%-hot SILHOUETTE rather than an exposure,
 //             which is the one form of it no tone-curve headroom could have absorbed.
-// v4826 -- section 1's species is comet, whose orbit radius reads the conditioned cadence; chorus's breath is
+// v4827 -- section 1's species is comet, whose orbit radius reads the conditioned cadence; chorus's breath is
 // integrated now and reads none. SABOTAGES, restored: comet's r0 on the RAW activity -> RED (513 bytes between
 // the conditioned pair). comet's r0 on VOICE stays GREEN, and should: voice is held equal across these frames,
 // and murmurParity-selfcheck is the gate that holds which signal r0 reads.

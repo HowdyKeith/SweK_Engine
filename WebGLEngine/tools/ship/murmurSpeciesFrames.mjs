@@ -143,7 +143,7 @@ export const sp = (species, time, voice = VOICE, extra = {}) => {
                 // v4825: tempest's clamped energy at this frame's own operating point (think is THINKING, index 2)
                 tempestEnergyInt: Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * st.drive)) * time,
                 duetFlourishInt: flourishQuadrature(time),
-                // v4826: chorus's breath (the integral of 1 / per) and tempest's floored lane-0 slot, at this frame's
+                // v4827: chorus's breath (the integral of 1 / per) and tempest's floored lane-0 slot, at this frame's
                 // steady operating point -- see render/aiPresenceOrbState.mjs
                 chorusBreathInt: time / (MH_CHORUS.perB - MH_CHORUS.perPace * lv.pace),
                 tempestSlot0Int: Math.min(1 + 1.30 * Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * st.drive)),

@@ -44,7 +44,7 @@
 // v4825 SABOTAGES, each RED on its own row and restored: geode's spinPhase handed kp 0 (the cadence census --
 // a route with no coefficient is no cadence); tempest's THINKING read inline off uniforms.stateIndex instead of
 // THINK (the raw-uniform row, stateIndex 5); tempest's energy put back on VOICE (the 42/21 code count).
-// v4826 -- comet's r0 moved from VOICE to PACE, duet's separation took pace, and chorus's period and sol's
+// v4827 -- comet's r0 moved from VOICE to PACE, duet's separation took pace, and chorus's period and sol's
 // granulation left for integrals: 41 voice readers, 21 cadence. sweep has a ninth reader (limn's lap). chorus
 // is the fourth builder to reach its cadence by a named route, the host's breath integral. SABOTAGE, restored:
 // chorus's breath back on uniforms.time / 8.4 -> RED (the route row).
@@ -249,7 +249,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
     // v4825: 42 and 21 -- tempest's energy LOST its 0.85 * VOICE (tempest.ts reads pace, think and drive, not
     // voice), and the cadence gained six: tempest's energy, nebula's fold and its drift factor, droplet's
     // tremor, fathom's spin and the shared spinPhase helper's own rate.
-    // v4826: 41 and 21 -- comet's orbit radius took comet.ts:73's live.pace where the port read VOICE (one voice
+    // v4827: 41 and 21 -- comet's orbit radius took comet.ts:73's live.pace where the port read VOICE (one voice
     // reader becomes a cadence one), duet's separation took duet.ts:76's (1 - 0.14 * live.pace), and two cadence
     // readers LEFT the shader for integrals: chorus's breath period (the host's chorusBreathInt) and sol's
     // granulation clock (paceInt). +2 -2: the cadence count holds at 21 with four of its sites changed.
@@ -290,7 +290,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `v4660's three: aura's angle, fathom's turn and comet's trail length, which is the one figure in the ` +
         `roster that reads the sweep under its own guard rather than through a figure (since v4825, under ` +
         `complete > 0.001, as comet.ts writes it -- before that it read the sweep unguarded) -- and since ` +
-        `v4826 limn's extra LAP, limn.ts:73's phi0 += st.sweep * 2 pi, "so the ignition travels". The ` +
+        `v4827 limn's extra LAP, limn.ts:73's phi0 += st.sweep * 2 pi, "so the ignition travels". The ` +
         `shell itself is ` +
         `spelled ONCE, as igniteAt, called from ${igAt} sites covering seven species because nebula and ` +
         `tempest share igniteMist, which is called ${igMist} times. murmur writes those four lines out seven ` +
@@ -340,7 +340,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         geode: /spinPhase\(\{[^}]*kp:\s*SG\.kp/.test(blkOf("geode")) && MH_SPIN_DRIVE.geode.kp > 0 &&
             /const sp = float\(1\.0\)\.add\(PACE\.mul\(kp\)\)/.test(code),
         droplet: /species === "droplet"\s*\?\s*PACE\.mul\(0\.012/.test(src),   // src, not code: codeOnly blanks the string
-        // v4826 -- chorus's one cadence site is its breath PERIOD, and its phase is the host's integral of 1 / per
+        // v4827 -- chorus's one cadence site is its breath PERIOD, and its phase is the host's integral of 1 / per
         // now (chorus.ts:104 spells 2 pi t / per, which jumps all seven voices when pace moves)
         chorus: /uniforms\.chorusBreathInt\.mul\(2 \* Math\.PI\)/.test(blkOf("chorus")) && MH_CHORUS.perPace > 0 &&
             /chorusBreathInt \+= dPhase \/ \(MH_CHORUS\.perB - MH_CHORUS\.perPace \* lv\.pace\)/.test(
@@ -353,7 +353,7 @@ sec("4. *** THE SOURCE CENSUS: WHICH SPECIES READ WHICH SIGNAL. NOT A RENDER, AN
         `${cadenced.length} of ${ALL.length} builders (${MURMUR_PACED} species, since mist draws nebula and ` +
         `tempest). ${paced.length} read PACE in their own body; ${unpaced.join(", ")} reach it by route: ` +
         `opal through ratePhase's pace coefficient ${MH_OPAL_DRIVE.pace}, geode through spinPhase's kp ` +
-        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE, and (v4826) chorus through the ` +
+        `${MH_SPIN_DRIVE.geode.kp}, droplet through the shared tremor 0.012 * PACE, and (v4827) chorus through the ` +
         `host's breath integral, the integral of 1 / (${MH_CHORUS.perB} - ${MH_CHORUS.perPace.toFixed(2)} * pace). The v4825 five were the ` +
         `last: mist (tempest's energy, nebula's fold and drift), fathom and geode (their spins, which murmur ` +
         `scales by 1 + kp*pace + kd*drive and MIXES toward a target by m*drive), opal (its flash drift) and ` +

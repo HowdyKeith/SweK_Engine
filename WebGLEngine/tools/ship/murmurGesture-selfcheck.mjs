@@ -27,7 +27,7 @@
 // murmur's small mix. SABOTAGES, each restored: lane 1's count on foldE in place of slotE (RED: section 4's
 // slot row and the base/length row); the small mix dropped (RED: the slot row); lane 0's count on voiceInt
 // (RED: the slot row and the base/length row). The 1.0 s floor row now RECORDS that it bites on lane 0.
-// v4826 -- LANE 0's FLOOR IS CLOSED. Its count integrates its FLOORED rate, min(1 + 1.30 E, 2.9) / 2.9, as the host's
+// v4827 -- LANE 0's FLOOR IS CLOSED. Its count integrates its FLOORED rate, min(1 + 1.30 E, 2.9) / 2.9, as the host's
 // tempestSlot0Int; lane 1 (4.3 s) never reaches mh_flourish's 1 s floor and keeps (t + 1.30 tempestEnergyInt) / 4.3.
 // The walk reads tempestSlot0Int, the floor row now asserts the count's rate EQUALS murmur's clamped one, and the
 // pixel frames carry tempestSlot0Int at the same slot counts they had. SABOTAGES, each restored: the host's
@@ -89,7 +89,7 @@ function walkOnce(settle, C) {
         const E = Math.min(1.6, Math.max(0, 0.85 * lv.pace + 0.65 * (si === 2 ? 1 : 0) + 0.55 * stn.drive));
         const F = C.energy ? 1 + C.energy * E : 1 + C.a * lv.pace + C.b * lv.voice + C.c * stn.drive;
         const SLOT = C.B / F, t = p.phase;
-        // v4826: lane 0 counts on the host's integral of its FLOORED rate -- see the floor row
+        // v4827: lane 0 counts on the host's integral of its FLOORED rate -- see the floor row
         const S = C.energy ? p.tempestSlot0Int / C.B
                            : K.mhRatePhase(1 / C.B, t, C.a, p.paceInt, C.b, p.voiceInt, C.c, p.driveInt);
         out.push({ t, SLOT, S,
@@ -261,7 +261,7 @@ sec("3. *** AND IT IS murmur's OWN FUNCTION WHEREVER THE SIGNAL IS HELD, across 
     const margins = LANES.map(([n2, B, F]) => [n2, B / F]);
     say(`shortest slot each wired lane can reach: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}`);
     const bites = margins.filter(([, m]) => m < 1.0);
-    // *** v4826 -- AND THAT LANE NOW INTEGRATES ITS FLOORED RATE, SO THE COUNT IS murmur's. *** The host
+    // *** v4827 -- AND THAT LANE NOW INTEGRATES ITS FLOORED RATE, SO THE COUNT IS murmur's. *** The host
     // accumulates min(1 + 1.30 E, 2.9) per second of shader time (tempestSlot0Int), which is 2.9 / max(SLOT, 1):
     // murmur's clamped slot rate, times the base. Checked on the real state module across the THINKING walk at
     // full cadence, CUMULATIVELY: the count's advance against the sum of dt / max(SLOT, 1), and against the old
@@ -292,7 +292,7 @@ sec("3. *** AND IT IS murmur's OWN FUNCTION WHEREVER THE SIGNAL IS HELD, across 
         `the worst cases and not samples: ${margins.map(([n2, m]) => `${n2} ${m.toFixed(3)} s`).join(", ")}. ` +
         `Only tempest's first lane on the large mount crosses the floor, to ${bites.length ? bites[0][1].toFixed(3) : "?"} ` +
         `s, which needs energy above ${((2.9 - 1) / 1.30).toFixed(4)} -- THINKING with cadence above ` +
-        `${(((2.9 - 1) / 1.30 - 0.65) / 0.85).toFixed(3)}. Until v4826 the integrated count ran up to 1.7% fast ` +
+        `${(((2.9 - 1) / 1.30 - 0.65) / 0.85).toFixed(3)}. Until v4827 the integrated count ran up to 1.7% fast ` +
         `there, because an integral of E cannot clamp; the host now integrates the floored rate itself ` +
         `(tempestSlot0Int), and across the walk -- ${bitFrames} frames of it under the floor -- the count's advance ` +
         `matches the sum of dt / max(SLOT, 1) to ${worstRate.toExponential(1)} where the unfloored integral misses ` +
@@ -334,7 +334,7 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
     // The slot itself is mix(slot, slotSmall, small) per tempest.ts:74-75: a MOUNT constant, not a signal.
     {
         const rateOk = /const mistRate = float\(1\.0\)\.div\(float\(1\.0\)\.add\(energy\.mul\(MT\.slotE\)\)\)/.test(raw);
-        // v4826: lane 1 alone counts on the energy integral; lane 0 counts on its floored-rate integral
+        // v4827: lane 1 alone counts on the energy integral; lane 0 counts on its floored-rate integral
         const counts = (raw.match(/uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\(TB\[1\]\)/g) || []).length;
         const lane0 = /uniforms\.tempestSlot0Int\.div\(TB\[0\]\)/.test(raw) &&
             /tempestSlot0Int \+= Math\.min\(1 \+ ME\.slotE \* E0, MH_TEMPEST_BOLT\.lanes\[0\]\.slot\) \* dPhase/.test(
@@ -385,7 +385,7 @@ sec("4. *** THE COEFFICIENTS ARE RECOVERED FROM abyss's OWN FUNCTION, NOT COMPAR
         const bm = /^KIT\.mhRatePhase\(\s*float\(1\.0\)\.div\(([\s\S]*?)\),/.exec(args[0] || "") ||
                    /^KIT\.mhRatePhase\(\s*float\(([\s\S]*?)\),/.exec(args[0] || "") ||
                    /^uniforms\.time\.add\(uniforms\.tempestEnergyInt\.mul\(MT\.slotE\)\)\.div\((TB\[\d\])\)$/.exec(args[0] || "") ||
-                   /^uniforms\.tempestSlot0Int\.div\((TB\[\d\])\)$/.exec(args[0] || "");   // v4826: lane 0's floored integral
+                   /^uniforms\.tempestSlot0Int\.div\((TB\[\d\])\)$/.exec(args[0] || "");   // v4827: lane 0's floored integral
         pairs.push({ base: bm ? bm[1].trim() : "(none)", len: (args[1] || "").trim(),
                      ok: !!bm && !live(bm[1]) && live(args[1] || "") });
     }
@@ -435,7 +435,7 @@ sec("5. *** AND IT REACHES PIXELS: the same instant, the same live signals, and 
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7 }),                    // 4  third lane passing
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, voiceInt: 9.0 }),     // 5
         sp("abyss", 9.0, 0.6, { ...z, paceInt: 2.7, driveInt: 6.0 }),     // 6
-        // v4826: lane 0 counts on tempestSlot0Int, set to t + 1.30 * energyInt -- the same counts (the floor never
+        // v4827: lane 0 counts on tempestSlot0Int, set to t + 1.30 * energyInt -- the same counts (the floor never
         // bit on this history, so the two integrals agree), and lane 1 keeps reading tempestEnergyInt
         sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 2.55, tempestSlot0Int: 10 + 1.30 * 2.55 }),                // 7  first bolt up
         sp("tempest", 10.0, 0.6, { ...z, tempestEnergyInt: 6.8, tempestSlot0Int: 10 + 1.30 * 6.8 }),                  // 8
