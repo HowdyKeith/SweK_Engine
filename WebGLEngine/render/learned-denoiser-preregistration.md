@@ -2299,3 +2299,83 @@ fast kernel, in one run (03:22:04Z to 03:32:48Z).
 
 **Still open:** K0 (b) and (c), and K1, on Keith's two GPUs. That is one run each of
 `node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json` on `claude/denoiser-kernel-speed`.
+
+## 42. ROUND 13 -- REPORTED: K0 HOLDS EVERYWHERE; K1 HOLDS IN THE BROWSER AND FAILS NATIVELY; THE DEFAULT STAYS r12
+
+Keith ran section 39's command once on each GPU, at 2be3abd2, which carries round 13's code.
+- **The Intel gen-9 machine:** 13:17Z. The report is `render/denoise-rig-r13-intel-gen9.json`.
+- **The GTX 1080 box:** 13:30Z. The report is `render/denoise-rig-r13-gtx1080.json`.
+
+Both reports are committed byte for byte at b4bb4241. As before, they were read on arrival, before that commit. Section 39
+fixed every criterion and the outcome rule before any GPU ran the fast kernel, and nothing below was chosen after.
+
+**K0 holds everywhere.** The exact gate passed on both GPUs, and none of its rows is scoped to a software adapter:
+- **(b) natively:** on both GPUs, every cell of the fast set's five layers was the twin's or the fused mirror's, given
+  the device's own input;
+- **(c) in the browser:** on both GPUs, both sets were judged cell for cell in the page's own origin, and both held;
+- **(a) here:** section 41, on the 24 test images.
+
+**K1: it holds in the browser and fails natively.** The speedup is round 12's median over round 13's, on the device's
+clock.
+
+| GPU | Path | Sizes both measured | Speedup at each | At the largest | K1 |
+|---|---|---|---|---|---|
+| Intel gen-9 | Chrome | 64, 128, 256 | 4.87, 6.39, 6.72 | 6.72 at 256 x 256 | **holds** |
+| Intel gen-9 | native (node-webgpu, D3D12) | 64 | 0.03 | 0.03 at 64 x 64 | **fails** |
+| GTX 1080 | Chrome | 64, 128, 256, 512, 1024 | 9.70, 5.81, 11.88, 12.91, 13.05 | 13.05 at 1024 x 1024 | **holds** |
+| GTX 1080 | native (node-webgpu, D3D12) | 64 | 0.16 | 0.16 at 64 x 64 | **fails** |
+
+**The outcome, by section 39's rule:** K0 holds, and K1 fails on two of the four GPU-and-path pairs. So
+**`DEFAULT_KERNELS` stays "r12"**, and the fast set stays for the next round. The rule required every path, and it does
+what it says. It does so even though the browser, the path `denoise.html` deploys on, gains 6.7 times on the Intel and
+13 times on the GTX 1080.
+
+**Where the native path fell short, and by how much.** The failure is one layer.
+
+| Layer, 64 x 64, device clock (ms) | Intel native r12 | Intel native r13 | Intel Chrome r13 | 1080 native r12 | 1080 native r13 | 1080 Chrome r13 |
+|---|---|---|---|---|---|---|
+| layer 1 (32 -> 32, 3 x 3) | 7.274 | 0.852 | 1.288 | 0.983 | 0.131 | 0.103 |
+| the head (32 -> 81, 1 x 1) | 4.391 | **1160.839** | 0.609 | 0.328 | **23.003** | 0.052 |
+| the whole pass | 29.753 | 1164.968 | 6.142 | 3.736 | 23.527 | 0.480 |
+
+- **The three 32 -> 32 layers on the fast kernel are 7.5-8.5 times faster natively, as in the browser.**
+- **The fast kernel's head, natively, is pathological.** It is 1,900 times slower than the same kernel in Chrome on the
+  Intel, and 440 times on the GTX 1080. Against round 12's direct kernel natively, it is 260 and 70 times slower. The
+  WGSL is the same in both paths; the compiled result is not.
+- **Native pipeline creation looks slow too, by inference only.** Section 37 excludes pipeline creation from the clocks,
+  so these are the gates' wall times:
+  - the native ladder spent its whole 120 s budget at the first size, so both sets were measured only at 64 x 64 there;
+  - the exact gate took 498 s on the Intel and 176 s on the GTX 1080, against 12 s and 9 s in round 12;
+  - the Intel's 498 s is close to `realGpuRun`'s 600 s per-gate timeout.
+- **A candidate cause, not measured:** the two paths compile WGSL to D3D12 differently. Chrome and the node-webgpu build
+  in the rig's checkout need not use the same Dawn, the same Tint, or the same HLSL compiler. The head is the one fast
+  layer with k = 1 and three groups across the dispatch's z. No profiler or compiler log ran; this is a guess, and the
+  next round would have to measure it.
+
+**What the browser shows.**
+- **The GTX 1080 measured a 1080p frame:** 150.4 ms on the device's clock, 13.6 Mpx/s, against round 12's predicted
+  1,877 ms.
+  - The conv layers ran at about 1,830 GFLOP/s, about 21% of the GPU's peak (section 40: 2.8%).
+  - The head went from 648 ms at 1024 x 1024 to 8.7, 75 times faster: the strided re-reads section 40 blamed are gone.
+- **The Intel gen-9:** from 128 x 128 up, the conv layers ran at 72-88 GFLOP/s (55 at 64 x 64). That is about 20% of a
+  24-EU part's peak, if that is the part (section 38: 2-2.5%). 1024 x 1024 took 1,294 ms.
+- **`k_apply` is now the bottleneck, and round 13 did not touch it.**
+  - On the GTX 1080 it is 75.3 of the 150.4 ms at 1080p (50%), growing from 17% at 64 x 64.
+  - On the Intel it is 28% at 1024 x 1024.
+  - It reads 81 logits a pixel, with neighbouring threads 81 floats apart: the same pattern the head had.
+- **Real time at 1080p, 30 frames a second, needs 33 ms.** The GTX 1080 in Chrome is now 4.5 times from it, against 57
+  times in section 40. The conv layers alone are 75 ms, and `k_apply` is the other 75.
+
+**What it has not shown.**
+- **Why the native head is slow,** or why native pipeline creation is slow. No profiler or compiler log ran.
+- **The native path above 64 x 64.** Its ladder's budget was spent there.
+- **Anything about other browsers or drivers.** One Chrome and one node-webgpu build ran, on two Windows machines.
+
+**What a next round would have to pre-register (nothing is decided here).**
+- **Either the native head:** measure where its time goes, change it (another kernel for the head inside the r13 set, or
+  the native compiler path), and re-run both paths on both GPUs against section 39's rule.
+- **Or a rule for the page alone:** the page picks its own kernels, apart from node. That would be a new rule, made
+  after seeing these numbers, so it needs its own fresh rig run. Section 39's measurements cannot satisfy a rule written
+  after them.
+- **And `k_apply`,** the next bottleneck in the browser: the same exactness discipline, against its twin within
+  APPLY_TOL.

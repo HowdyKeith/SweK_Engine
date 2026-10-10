@@ -109,6 +109,11 @@ node tools/ship/realGpuRun.mjs --only denoise --out real-gpu-denoise-r13.json
 
 and send the JSON back. Section 39 fixes, before any GPU ran the fast kernel, what its numbers decide.
 
+**What they decided (section 42).** Exactness held on both GPUs, natively and in the browser. In Chrome the fast kernel was
+6.7 times as fast on the Intel gen-9 and 13 times on the GTX 1080, which measured a 1080p frame at 150 ms. Natively,
+through node-webgpu, its 81-logit head ran hundreds of times slower than the same kernel in Chrome. Section 39's rule
+needs every path, so the default stays round 12's kernels until a later round explains or removes that.
+
 
 ## Send back
 
