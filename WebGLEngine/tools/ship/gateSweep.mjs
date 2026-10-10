@@ -8892,6 +8892,23 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4827 -- TWO new gate files: brain/roster-selfcheck.mjs (the Load Racers panel on race-brain.html and the lineup resolver behind it) and brain/racePlay-selfcheck.mjs
+    // (a keyboard on the lockstep wire, and race-lockstep.html in two browsers through a real relay).
+    since519: Object.freeze({
+        at: "v4827", swept: 2, green: 2, red: 0,
+        added: Object.freeze([
+            "brain/roster-selfcheck.mjs",
+            "brain/racePlay-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** A GATE I TRUSTED FAILED THREE RUNS IN TEN FOR A REASON THAT WAS MINE. *** The pair row of the new lockstep gate (two pages, a real relay, both print AGREED on one " +
+                 "fingerprint) went red under sabotages that could not touch it, so the unsabotaged gate was looped ten times: twice the harness read the result block one frame " +
+                 "before the page redrew it, and once, with both pages printing AGREED, the printed fingerprints differed -- a real bug (a pump can step a dozen ticks it holds commands " +
+                 "for, so a clock-paced page ran past the end of the race by a different number on each machine). The session takes a stopTick now. The roster gate's page row " +
+                 "removed the LAST car, where a slot and a position are the same number, so the sabotage that numbered trucks by position went 0 red until a row removed a middle car. " +
+                 "Fifteen sabotages for the roster gate, twenty-two for the lockstep gate, logged in the two headers. NOT CLOSED: nobody has played the page; every key is synthetic.",
+    }),
     // v4826 -- TWO new gate files: tools/ship/flakeProbe-selfcheck.mjs (the tool that runs a gate K times and reports the rows that flip or read a thin number) and
     // tools/ship/stableWrite-selfcheck.mjs (the one definition of writing a stamped record without dirtying the tree).
     since518: Object.freeze({

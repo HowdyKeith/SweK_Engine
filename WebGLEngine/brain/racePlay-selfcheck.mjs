@@ -17,7 +17,7 @@
 // the browser stepped reproduce IN NODE), two players through a real relay on two iframes (both end AGREED on one fingerprint, each car followed its own player), two
 // players who opened different races (both stop, naming it), and a relay that is not there (said, not hung).
 //
-// SABOTAGE LOG -- v4827, twenty-three, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
+// SABOTAGE LOG -- v4827, twenty-two, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
 //   A  racePlay.mjs: LEFT_STEER back to -1, the first draft             2 red: the turn-on-the-road row (A went to +z, D to -z: a RIGHT turn on a north-up map) and the row that reads A's steer off the other machine's log
 //   B  racePlay.mjs: down while rolling reverses instead of braking     1 red (the key table)
 //   C  racePlay.mjs: the steer not scaled by speed                      1 red (the shrink row: 1.000 at 20 m/s)

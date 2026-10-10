@@ -601,7 +601,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // tools/ship/lockstepRelay.mjs, tools/ship/lockstepPeer.mjs and tools/ship/lockstepRelay-selfcheck.mjs.
     // v4824 -- 4605 -> 4607 for ui/pick.mjs and ui/pick-selfcheck.mjs.
     // v4826 -- 4607 -> 4612 for tools/ship/flakeProbe.mjs, flakeCompare.mjs, stableWrite.mjs and the two gates beside them (flakeProbe-selfcheck, stableWrite-selfcheck).
-    files: 4612,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    // v4827 -- 4612 -> 4616 for brain/roster.mjs, brain/racePlay.mjs, race-lockstep.html and the two gates beside the modules (roster-selfcheck, racePlay-selfcheck); race-brain.html grew a panel.
+    files: 4616,                              // v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1154,8 +1155,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // row reported for those two files; the other rows hold.
     // v4826 -- the probe round's five files: ES modules +5, closures as values +4, async/await +1 (the two gates' spawn wrappers; the probe's own runGate is spawnSync, so it
     // adds none), Promises +2 (the same two wrappers); the other rows hold.
-    esModules: 4307, closures: 4154, asyncAwait: 1729, typedArrays: 1271, promises: 412,
-    fetchXhr: 251, performanceNow: 241, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
+    // v4827 -- ES modules 4307 -> 4311, closures 4154 -> 4158, async/await 1729 -> 1731, Promises 412 -> 414, performance.now 241 -> 243: the five new files and the panel's page code.
+    esModules: 4311, closures: 4158, asyncAwait: 1731, typedArrays: 1271, promises: 414,
+    fetchXhr: 251, performanceNow: 243, raf: 127, webgl: 200, webgpu: 57, threads: 25, wasm: 24,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.
