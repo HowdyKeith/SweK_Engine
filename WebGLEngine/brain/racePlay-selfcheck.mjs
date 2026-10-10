@@ -50,6 +50,7 @@
 //   over two different printed fingerprints). createRaceSession takes a stopTick now and never steps it; the pair row reads the tick, the log length and the stop each page holds. Ten
 //   unsabotaged runs after: ten clean.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { initNode, mod, VENDOR_DIR } from "../physics/box3d/box3dNode.mjs";
@@ -105,6 +106,14 @@ function playSolo(script, seconds, { gun = "hand", seed = 1 } = {}) {
     return { cfg, trail, shots, log, fingerprint: fin.fingerprint, results: fin.results };
 }
 const dist = (a, b) => Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]);
+
+{
+    const cfgD = P.playableRace(), html = fs.readFileSync(path.join(ENG, "race-lockstep.html"), "utf8");
+    ok("!! the two peers are A and B, in that order, frozen; the default race is DEFAULT_SECONDS (90) long and the PAGE takes its default from the same constant (so a link with no seconds= is the race this gate graded)", P.PEERS.join() === "A,B" && Object.isFrozen(P.PEERS) && P.DEFAULT_SECONDS === 90 && cfgD.seconds === P.DEFAULT_SECONDS && cfgD.peers.join() === P.PEERS.join() && /num\("seconds", P\.DEFAULT_SECONDS/.test(html));
+    const fin = { order: [1, 0], fingerprint: "deadbeef", city: { topple: { fallen: 3, shattered: 1 } }, results: [{ car: 0, laps: 0, metres: 50.4, shots: 5, hits: 2, damageTaken: 14.6 }, { car: 1, laps: 1, metres: 99.6, shots: 7, hits: 4, damageTaken: 3.2 }] };
+    const sm = P.summarise(fin, ["red", "green"]);
+    ok("summarise() turns a finished race into what the page prints: the order as given, each car's name, laps, metres and damage rounded, the buildings down and in rubble, and the fingerprint both machines should show", sm.order.join() === "1,0" && sm.rows[0].name === "red" && sm.rows[1].metres === 100 && sm.rows[0].metres === 50 && sm.rows[0].damageTaken === 15 && sm.fallen === 3 && sm.shattered === 1 && sm.fingerprint === "deadbeef" && P.summarise({ ...fin, city: null }, []).fallen === 0 && P.summarise({ ...fin, city: null }, []).rows[0].name === "car 1");
+}
 
 sec("2. THE KEYS REACH THE CAR: a solo race through the real lockstep session");
 {

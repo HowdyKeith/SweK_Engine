@@ -1570,9 +1570,12 @@ console.log("\n*** v4647m -- THE VERDICT MUST NOT DEPEND ON WHICH RUN HAPPENED L
     // v4815: the same roll for the host change. SABOTAGE: headlessGpu's entry given readings none of which is over
     // (serialMs [2400, 2500, 2600], hereMs 2500, recordedWas 2900) -> 2 red by name, this row and the 12-of-22 row,
     // which consults the roll; restored md5-identical.
-    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live ***",
-       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => justifiedOver(x)),
-       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} alone ${aloneMs(x.gate)} ms, ` +
+    // v4829: the v4813 row's rule, for this roll too -- an entry is justified over live, OR carries `returned` and is cheap alone, in the sweep, and retired on readings under the bar.
+    // sweepBudget retired at v4829 (2,328 / 2,503 / 2,462 alone) and this row went red at step 4b because it still demanded justifiedOver of every entry.
+    // SABOTAGE v4829: sweepBudget's returned.aloneMs set to 3,500 -> this row red by name; headlessGpu's entry given readings none of which is over -> this row red; both restored.
+    ok("!! *** the v4815 still-over roll names only returnees genuinely over on the new host, each justified live -- or returned, live ***",
+       SC.STILL_OVER_AT_V4815.stillOver.length > 0 && SC.STILL_OVER_AT_V4815.stillOver.every((x) => rollEntryHolds(x)) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => x.returned) && SC.STILL_OVER_AT_V4815.stillOver.some((x) => !x.returned),
+       SC.STILL_OVER_AT_V4815.stillOver.map((x) => `${x.gate.split("/").pop()} ${x.returned ? "RETURNED " + x.returned.at + ", " : ""}alone ${aloneMs(x.gate)} ms, ` +
            `${inSweep(x.gate) ? "in" : "out of"} the sweep`).join("; "));
 
     // v4818: and back. SABOTAGE: orreryEjecta's entry given readings none of which is over (serialMs [2700, 2800,

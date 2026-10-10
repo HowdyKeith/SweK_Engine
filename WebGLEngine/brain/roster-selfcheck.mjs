@@ -31,6 +31,7 @@
 //                                                                            number. Row added that removes a MIDDLE slot and reads which truck is on the road (rb.trucks); then 1 red.
 //   O  the Default lineup button does nothing                                1 red (the reset row)
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
@@ -98,6 +99,13 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
     const peerD2 = D.perturb(D.handWeights(), 0.4, mkRng()), two = { D, GP, stored: null, storedGun: null, rng: mkRng(), library: { drive: [{ id: "lib:drive-first", label: "first", weights: peerD }, { id: "lib:drive-second", label: "second", weights: peerD2 }], gun: [] } };
     const lat = R.resolveRoster([{ driver: "peer", gunner: R.AUTO }, { driver: "lib:drive-first", gunner: R.AUTO }, { driver: "lib:drive-second", gunner: R.AUTO }, { driver: R.NONE, gunner: R.AUTO }], two);
     ok("with two imports held, 'peer' is the LATEST one and each id is its own entry: car 1 'peer' = the second, car 2 = the first, car 3 = the second by id", lat.cars[0].driver.weights === peerD2 && lat.cars[1].driver.weights === peerD && lat.cars[2].driver.weights === peerD2 && lat.problems.length === 0);
+    {
+        const html = fs.readFileSync(path.join(ENG, "race-brain.html"), "utf8"), files = [...html.matchAll(/vehicle-truck-(\w+)\.glb/g)].map((m) => m[1]).slice(0, 4);
+        const sdev = (w, h) => { const d = Array.from(w, (v, i) => v - h[i]), m = d.reduce((a, v) => a + v, 0) / d.length; return Math.sqrt(d.reduce((a, v) => a + (v - m) * (v - m), 0) / d.length); };
+        const n05 = R.resolveRoster([{ driver: "noise05", gunner: R.AUTO }, { driver: R.NONE }, { driver: R.NONE }, { driver: R.NONE }], ctxOf(false, false)).cars[0].driver, n10 = R.resolveRoster([{ driver: "noise10", gunner: R.AUTO }, { driver: R.NONE }, { driver: R.NONE }, { driver: R.NONE }], ctxOf(false, false)).cars[0].driver;
+        ok("!! the lineup has SLOTS cars and they wear the PAGE's trucks: four slots, and SLOT_COLOURS is the order of vehicle-truck-<colour>.glb in race-brain.html's FILES (so 'car 3 is yellow' in the panel and on the road are one fact)", R.SLOTS === 4 && R.SLOT_COLOURS.length === R.SLOTS && files.join() === R.SLOT_COLOURS.join(), `${R.SLOT_COLOURS.join(",")} / page ${files.join(",")}`);
+        ok("the two noise levels are what they say: NOISE_05 is 0.05 and NOISE_10 is 0.1, the label carries the number, and the standard deviation of (noise driver - hand driver) over its weights is within 15% of it", R.NOISE_05 === 0.05 && R.NOISE_10 === 0.1 && n05.label === `hand + noise ${R.NOISE_05}` && n10.label === `hand + noise ${R.NOISE_10}` && Math.abs(sdev(n05.weights, D.handWeights()) / R.NOISE_05 - 1) < 0.15 && Math.abs(sdev(n10.weights, D.handWeights()) / R.NOISE_10 - 1) < 0.15, `measured ${sdev(n05.weights, D.handWeights()).toFixed(4)} and ${sdev(n10.weights, D.handWeights()).toFixed(4)}`);
+    }
     const s = R.sanitizeSpecs([{ driver: "hand", gunner: 7 }, null, "x", { driver: "z".repeat(200), gunner: "zero" }, { driver: "zero", gunner: "zero" }, { driver: "extra", gunner: "extra" }]);
     ok("saved choices from storage are sanitised: a non-object, a number, a 200-character id and a fifth entry are dropped to 'default for this car' or ignored, four slots always", s.length === 4 && s[0].driver === "hand" && s[0].gunner === R.AUTO && s[1].driver === R.AUTO && s[3].driver === R.AUTO && s[3].gunner === "zero" && R.sanitizeSpecs("junk").every((x) => x.driver === R.AUTO) && R.sanitizeSpecs(null).length === 4, JSON.stringify(s[3]));
     const n1 = R.resolveRoster([{ driver: "noise05", gunner: R.AUTO }, { driver: "noise10", gunner: R.AUTO }, { driver: R.NONE, gunner: R.AUTO }, { driver: R.NONE, gunner: R.AUTO }], ctxOf(false, false)), n2 = R.resolveRoster([{ driver: "noise10", gunner: R.AUTO }, { driver: "noise05", gunner: R.AUTO }, { driver: R.NONE, gunner: R.AUTO }, { driver: R.NONE, gunner: R.AUTO }], ctxOf(false, false));

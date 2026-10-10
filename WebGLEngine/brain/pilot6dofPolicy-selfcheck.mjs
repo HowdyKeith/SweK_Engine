@@ -36,6 +36,7 @@
 //   FIRST RUN OF THE GATE: one red, and it was my claim and not the code: the hand brain tracks the PD autopilot to 1.13% at small errors, not the 1% the header said -- the tanh's first-order
 //   saturation (tanh(0.15) is 0.9926 of 0.15, at one radian of error; the angular-velocity term adds the rest). The bound is 2% now and says why.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as P6 from "./pilot6dofPolicy.mjs";
@@ -84,6 +85,14 @@ sec("1. THE NETWORK");
     const z = P6.pilotFor(P6.zeroWeights()), outs = STATES.map((s) => z(s.body, s.target, OPTS));
     ok("!! the zero pilot never turns, thrusts or fires: zero torque, zero thrust, no fire on all " + STATES.length + " states", outs.every((o) => o.torqueBody.every((t) => t === 0) && o.thrust === 0 && o.firing === false));
     ok("the hand and zero vectors are the right length, finite, and a perturbed vector keeps its length and differs", P6.handWeights().length === 930 && P6.handWeights().every(Number.isFinite) && (() => { const n = P6.perturb(P6.handWeights(), 0.05, mkRng(1)); return n.length === 930 && !same(n, P6.handWeights()); })());
+}
+
+{
+    // forward(), REC_STEPS and REC_EDGES are the network's own shape, graded here and not merely exported
+    const w = P6.handWeights(), x = P6.features(STATES[0].body, STATES[0].target, OPTS), y = P6.forward(w, x), yz = P6.forward(P6.zeroWeights(), x);
+    const pf = P6.pilotFor(w)(STATES[0].body, STATES[0].target, OPTS), L = P6.layersOf(w);
+    ok("!! forward() is the output layer: five numbers inside [-1, 1], exactly zero for the zero weights, and pilotFor() is those numbers times the torque gain times each axis' moment of inertia -- not a second computation", y.length === 5 && y.every((v) => Math.abs(v) <= 1) && yz.every((v) => v === 0) && [0, 1, 2].every((i) => pf.torqueBody[i] === STATES[0].body.I[i] * P6.TORQUE_GAIN * y[i]), y.map((v) => v.toFixed(3)).join(","));
+    ok("!! the core is " + P6.REC_STEPS + " weight-tied recurrent steps over " + P6.REC_EDGES + " real synapses: the layer list is an encoder, REC_STEPS copies of ONE recurrent layer (the same object, so the weights are tied), and a decoder; the synapse count is the circuit's own", P6.REC_STEPS === 3 && P6.REC_EDGES === Topo.EDGES.length && P6.REC_EDGES === 313 && L.length === P6.REC_STEPS + 2 && L.slice(1, 1 + P6.REC_STEPS).every((l) => l === L[1]) && L[0].nIn === P6.FEATURES && L[L.length - 1].nOut === P6.OUTPUTS);
 }
 
 sec("2. THE GEOMETRY IS decide()'s, state for state");
@@ -141,6 +150,15 @@ sec("4. THE DUELS: the choice reaches the fight");
     ok("a noisy brain is another fight from the hand brain it is made from (the weights reach the ship)", hn.fingerprint !== ha.fingerprint, `${hn.fingerprint} against ${ha.fingerprint}`);
     const r = R.resolveRoster({ A: "hand", B: "zero" }, { PP: P6, shipped: null, imported: null, brainPilotOn: false }, 1), viaRoster = P6.duel(r.A.weights[0], r.B.weights[0], { seed: 1, seconds: 40 });
     ok("brain/pilotRoster.mjs, handed this module as its policy, resolves hand-against-zero to the same fight: the plane page's resolver flies this page's ships", viaRoster.fingerprint === hz.fingerprint && r.A.weights[0].length === 930, viaRoster.fingerprint);
+}
+
+{
+    // the duel's ship and weapon are the PAGE's, and a copy that drifts from the page is a duel of some other game: each constant is read out of the page's own source
+    const html = fs.readFileSync(path.join(ENG, "es-box3d-6dof.html"), "utf8"), num = (re) => { const m = re.exec(html); return m ? m[1].split(",").map((v) => +v.trim()) : null; };
+    const pa = /const PAGE_AUTOPILOT = \{ thrustForce: (\d+), standoff: (\d+) \}/.exec(html);
+    ok("!! the duel's ship, engine mount, mass, damage, spawn and thrust settings are the PAGE's own, read from es-box3d-6dof.html's source: HALF, ENGINE_MOUNT, SHIP_MASS, SHOT_DAMAGE, SPAWN_X and PAGE_AUTOPILOT (and the hit points, which the duel's ships start with)",
+       same(num(/const HALF = \[([^\]]+)\]/), P6.HALF) && same(num(/const ENGINE_MOUNT = \[([^\]]+)\]/), P6.ENGINE_MOUNT) && num(/const SHIP_MASS = (\d+)/)[0] === P6.SHIP_MASS && num(/SHOT_DAMAGE = (\d+)/)[0] === P6.SHOT_DAMAGE && num(/SPAWN_X = (\d+)/)[0] === P6.SPAWN_X && num(/HP_MAX = (\d+)/)[0] === P6.HP_MAX && !!pa && +pa[1] === P6.PAGE_AUTOPILOT.thrustForce && +pa[2] === P6.PAGE_AUTOPILOT.standoff,
+       `${P6.HALF.join("x")}, mount ${P6.ENGINE_MOUNT[0]}, mass ${P6.SHIP_MASS}, damage ${P6.SHOT_DAMAGE}, spawn +-${P6.SPAWN_X}, thrust ${P6.PAGE_AUTOPILOT.thrustForce}, standoff ${P6.PAGE_AUTOPILOT.standoff}`);
 }
 
 sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
