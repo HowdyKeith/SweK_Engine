@@ -1,0 +1,72 @@
+{
+ "at": "2026-10-10T02:12:29.957Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "6bf17197 2026-10-10 realGpuRun: a run of no gates says so, names its commit, and exits 1",
+ "only": "denoise",
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 12291,
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": []
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 18248,
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137",
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "native: adapter intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware)",
+    "native: 64 x 64: 36.055 ms a pass (10th-90th 33.443-40.236, 30 passes); on the device's clock 34.669 ms; 0.114 Mpx/s; layer 0 2.753, layer 1 8.389, layer 2 8.716, layer 3 8.192, layer 4 4.981, kernel 1.180",
+    "native: 128 x 128: 120.582 ms a pass (10th-90th 119.463-123.762, 13 passes); on the device's clock 119.341 ms; 0.136 Mpx/s; layer 0 8.847, layer 1 29.491, layer 2 29.491, layer 3 29.426, layer 4 17.498, kernel 4.129",
+    "native: 256 x 256: 523.638 ms a pass (10th-90th 518.316-649.340, 3 passes); on the device's clock 522.125 ms; 0.125 Mpx/s; layer 0 37.552, layer 1 123.470, layer 2 145.949, layer 3 144.769, layer 4 77.988, kernel 18.088",
+    "native: 512 x 512 skipped -- predicted 2095 ms a pass, over the 1500 ms cap",
+    "native: 1024 x 1024 skipped -- predicted 8379 ms a pass, over the 1500 ms cap",
+    "native: 1920 x 1080 skipped -- predicted 16570 ms a pass, over the 1500 ms cap",
+    "page: adapter intel / gen-9 (hardware)",
+    "page: 64 x 64: 39.100 ms a pass (10th-90th 34.400-42.400, 30 passes); on the device's clock 36.762 ms; 0.105 Mpx/s; layer 0 2.866, layer 1 9.087, layer 2 9.029, layer 3 8.673, layer 4 5.258, kernel 1.357",
+    "page: 128 x 128: 136.400 ms a pass (10th-90th 126.200-159.100, 15 passes); on the device's clock 134.576 ms; 0.120 Mpx/s; layer 0 9.940, layer 1 33.214, layer 2 34.738, layer 3 32.920, layer 4 20.921, kernel 5.637",
+    "page: 256 x 256: 559.200 ms a pass (10th-90th 556.000-584.000, 4 passes); on the device's clock 553.519 ms; 0.117 Mpx/s; layer 0 40.270, layer 1 137.338, layer 2 137.354, layer 3 137.201, layer 4 83.319, kernel 22.584",
+    "page: 512 x 512 skipped -- predicted 2241 ms a pass, over the 1500 ms cap",
+    "page: 1024 x 1024 skipped -- predicted 8963 ms a pass, over the 1500 ms cap",
+    "page: 1920 x 1080 skipped -- predicted 17725 ms a pass, over the 1500 ms cap"
+   ]
+  }
+ ],
+ "adapters": [
+  {
+   "name": "intel gen-9",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ]
+  },
+  {
+   "name": "intel gen-9 D3D12 driver version 31.0.101.2137",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ]
+  }
+ ],
+ "verdict": "a real-hardware run on intel gen-9; intel gen-9 D3D12 driver version 31.0.101.2137",
+ "summary": "exact 1/1, quality 0/0, timing 1/1"
+}
