@@ -8892,6 +8892,24 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                  "The CLIs refuse an unknown option (cliArgs) and the peer's transport is a row of its own. Thirteen sabotages red by name, " +
                  "logged in the two headers. NOT CLOSED: the pair has run over loopback and in one browser, not between two machines.",
     }),
+    // v4829 -- ONE new gate file: tools/ship/murmurParity-selfcheck.mjs (the full read of murmur-web at 1c23b99, every difference it found held
+    // against the murmur line it transcribes).
+    since520: Object.freeze({
+        at: "v4829", swept: 1, green: 1, red: 0,
+        added: Object.freeze([
+            "tools/ship/murmurParity-selfcheck.mjs",
+        ]),
+        widened: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        verdict: "*** u_depth WAS COUNTED TWICE, AND IT TOUCHED EVERY PIXEL THE ORB DRAWS. *** murmur spends it in mh_palette alone; the port also multiplied " +
+                 "every species' interior by it, so thinking and responding drew 25% hot and idle 25% cold. Read all eighteen shaders and kit.ts against the " +
+                 "port and closed what the earlier notes never named: each species' own knob defaults (styles.ts), murmur's skipped edge taps, nine drive and " +
+                 "cadence terms, eight shapes (sol's halo was 3.19x too wide), two clocks integrated host-side (chorus's breath jumped 2.15 turns in a frame " +
+                 "after half an hour; tempest's lane 0 now honours mh_flourish's floor, closing v4825's 1.7%), and mh_out's dither, the kit's 41st and last " +
+                 "function, graded byte for byte on a GPU. Green in about 0.2 s: source and CPU rows against QUOTED lines, because murmur is not on the rig. " +
+                 "Eleven sabotages red by name, logged in its header; seven existing gates restated with their own. NOT CLOSED: formScale and the small-mount " +
+                 "mixes, inert at the one form and mount this port draws.",
+    }),
     // v4827 -- TWO new gate files: brain/roster-selfcheck.mjs (the Load Racers panel on race-brain.html and the lineup resolver behind it) and brain/racePlay-selfcheck.mjs
     // (a keyboard on the lockstep wire, and race-lockstep.html in two browsers through a real relay).
     since519: Object.freeze({
